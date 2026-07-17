@@ -6,10 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Nuvora ist die Basis, Module sind Gäste.** Der Kern besitzt Konten, Klassen und Schüler. Module (CardVote, Lernpfad) arbeiten auf diesen Daten, besitzen sie aber nicht, und werden pro Lehrkraft zugeschaltet.
 
-Daraus folgen zwei Regeln, die jede Änderung einhalten muss:
+Daraus folgen drei Regeln, die jede Änderung einhalten muss:
 
 - **Kein Modul besitzt Klassen oder Schüler.** Die liegen im Kern. Ein Modul, das eigene anlegt, hat den Sinn der Plattform gebrochen.
 - **Kein Modul hat eigene Konten.** Der Kern authentifiziert, Module erben.
+- **Module hängen nicht voneinander ab.** CardVote muss ohne Lernpfad vollständig funktionieren und umgekehrt. Verbindendes (Themen, später die Wochenplanung) ist **Zusatz, nie Voraussetzung**: `questions.topic_id` ist deshalb optional und `ON DELETE SET NULL`. Ein Feature, das CardVote ohne Lernpfad kaputt macht, ist falsch gebaut — auch wenn es fachlich reizvoll klingt.
 
 Verzeichnisse folgen der Architektur, nicht der Herkunft: `apps/api` (Kern + Modul-Router), `apps/web` (Shell + Modul-Seiten), `apps/lernpfad` (noch eigenständig). Es gibt kein `apps/cardvote` — der Kern kann nicht in einem seiner Module liegen.
 
@@ -53,10 +54,30 @@ Pflicht-Env: `POSTGRES_PASSWORD`, `TOKEN_SECRET` — Compose bricht ohne sie bew
 
 ### Als Nächstes
 
-1. **Themen-Taxonomie im Kern** — CardVote-Fragen und Lernpfad-Aufgaben brauchen dieselben Themen, sonst ist Ziel 2 unmöglich.
+1. **Themenauswahl im CardVote-Fragen-Editor** — ohne sie bleibt die Taxonomie leer. Optional bleiben (siehe Regel 3).
 2. **Lernpfad auf den Kern** — localStorage raus, Daten pro Lehrkraft, eigene Konten/Klassen entfallen (siehe Migrationshürde).
+3. **Wochenplanung** (Entwurf, siehe unten) — Zusatz, kein Fundament.
 
-Erledigt: Rahmen mit Modulregister; Klassen und Schüler liegen im Kern (`/classes`), nicht mehr im Modul.
+Erledigt: Rahmen mit Modulregister; Klassen, Schüler und Themen liegen im Kern (`/classes`, `/topics`).
+
+### Wochenplanung (geplant, noch nicht gebaut)
+
+Der Unterricht des Nutzers läuft in Wochen: 1–3 **Themenblöcke** pro Woche, jeder Block zeigt auf ein Thema aus der Taxonomie; am Ende ein kleiner Test **im Unterricht** über die Themen der Woche.
+
+```
+Woche 12 · Klasse 7.5
+├── Block 1   Bruchrechnung / Vervielfachen
+├── Block 2   Bruchrechnung / Kürzen
+└── Test      CardVote, über beide Themen
+```
+
+Damit wird Ziel 2 konkret: das Testergebnis zeigt pro Thema, wo es klemmt; die Folgewoche zieht daraus Wiederholung.
+
+Randbedingungen aus dem Gespräch mit dem Nutzer:
+
+- **Zusatzfunktion, kein Fundament.** CardVote bleibt ohne Planung und ohne Lernpfad voll nutzbar (Regel 3).
+- **Blöcke pro Woche ist eine Einstellung**, kein fester Wert: bei ihm 2, andere Lehrkräfte haben andere Stundenzahlen.
+- Konkret für **eine Klasse (7.5)** gedacht. Wiederverwendung über Jahre/Klassen ist erwünscht, aber ausdrücklich **später** — jetzt nicht auf Vorrat bauen.
 
 ## Was ist Nuvora
 

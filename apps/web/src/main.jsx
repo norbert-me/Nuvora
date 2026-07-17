@@ -74,8 +74,8 @@ const getModuleNavItems = (t, pathname) => {
       { to: `${CV}/marketplace`, label: t("nav.marketplace") },
     ];
   }
+  // Kein "Start": der Nuvora-Schriftzug links fuehrt bereits dorthin.
   return [
-    { to: "/", label: "Start" },
     { to: "/classes", label: t("nav.classes") },
     { to: "/topics", label: "Themen" },
     { to: "/modules", label: "Module" },
