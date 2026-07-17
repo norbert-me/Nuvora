@@ -94,6 +94,40 @@ else
   echo "  ✓ .env vollständig, unverändert."
 fi
 
+# Der Port-Konflikt zeigt sich sonst erst, wenn alle Images gebaut sind und
+# der Proxy als letzter Container startet — also nach mehreren Minuten.
+echo "→ Port prüfen..."
+WANT_PORT=$(ssh "$SERVER" "cd '$REMOTE_DIR' && sed -n 's|^PORT=\([0-9]*\).*|\1|p' .env | head -1")
+WANT_PORT="${WANT_PORT:-8080}"
+PORT_USER=$(ssh "$SERVER" "
+  # Belegt der Port schon jemand ANDERES als Nuvoras eigener Proxy?
+  # Nuvoras Proxy darf ihn halten — der wird beim Deploy ohnehin ersetzt.
+  own=\$(cd '$REMOTE_DIR' && docker compose ps -q proxy 2>/dev/null | head -1)
+  other=\$(docker ps --format '{{.ID}} {{.Names}} {{.Ports}}' 2>/dev/null | grep ':$WANT_PORT->' | grep -v \"^\$(echo \$own | cut -c1-12)\" | head -1)
+  if [ -n \"\$other\" ]; then echo \"docker: \$other\"; exit 0; fi
+  # Nicht-Docker-Prozess auf dem Port?
+  if command -v ss >/dev/null 2>&1; then
+    ss -tlnp 2>/dev/null | grep -E \"[:.]$WANT_PORT \" | head -1
+  fi
+")
+
+if [ -n "$PORT_USER" ]; then
+  echo ""
+  echo "  ⚠ Port $WANT_PORT ist auf dem Server schon belegt:"
+  echo "      $PORT_USER"
+  echo ""
+  echo "    Nuvora würde erst nach dem Build daran scheitern. Anderen Port setzen:"
+  echo ""
+  echo "      ssh $SERVER"
+  echo "      cd $REMOTE_DIR && nano .env     # PORT= und SITE_URL= anpassen"
+  echo ""
+  echo "    Freien Port suchen:"
+  echo "      ssh $SERVER \"ss -tln | awk 'NR>1{print \\\$4}' | sed 's/.*://' | sort -n | uniq\""
+  echo ""
+  exit 1
+fi
+echo "  ✓ Port $WANT_PORT frei."
+
 echo "→ Container bauen (${BUILD_SERVICES:-alle})..."
 # shellcheck disable=SC2029
 ssh "$SERVER" "cd '$REMOTE_DIR' && docker compose build $BUILD_SERVICES && docker compose up -d"
