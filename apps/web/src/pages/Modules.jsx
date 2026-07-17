@@ -2,6 +2,7 @@
 // des Moduls bleiben im Kern liegen und sind nach dem Wiedereinschalten da.
 import { useState } from "react";
 import { useModules } from "../core/modules.js";
+import { pageTitle } from "../components/Icons.jsx";
 
 export default function Modules() {
   const { modules, loading, toggle } = useModules();
@@ -24,7 +25,7 @@ export default function Modules() {
 
   return (
     <div style={{ maxWidth: 720 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 6 }}>Module</h1>
+      <h1 style={pageTitle}>Module</h1>
       <p style={{ color: "var(--text2)", marginBottom: 24, fontSize: 14 }}>
         Aktiviere, was du brauchst. Abschalten entfernt keine Daten — sie sind
         nach dem Wiedereinschalten wieder da.

@@ -12,7 +12,7 @@
 // "Anstrengungsbereitschaft" ist kein Messwert.
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle } from "../components/Icons.jsx";
 
 const API = "/api/noten";
 
@@ -85,7 +85,7 @@ export default function Noten() {
   if (classes.length === 0) {
     return (
       <div style={{ maxWidth: 700 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Noten</h1>
+        <h1 style={pageTitle}>Noten</h1>
         <p style={{ color: "var(--text2)", fontSize: 14 }}>
           Noch keine Klasse. Lege sie unter <Link to="/classes" style={{ color: "var(--accent)" }}>Klassen</Link> an —
           Klassen und Schüler gehören Nuvora, alle Module nutzen dieselben.
@@ -97,7 +97,7 @@ export default function Noten() {
   return (
     <div style={{ maxWidth: 1100 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700 }}>Noten</h1>
+        <h1 style={pageTitle}>Noten</h1>
         <select
           value={classId ?? ""} onChange={(e) => setClassId(Number(e.target.value))}
           style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)" }}
@@ -391,5 +391,3 @@ const inp = { width: "100%", padding: 8, border: "1px solid var(--border2)", bor
 const kopfInp = { width: "100%", padding: 4, border: "1px solid var(--border2)", borderRadius: 6, fontSize: 12, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box", fontWeight: 400 };
 const th = { padding: "8px 6px", borderBottom: "2px solid var(--border)", fontWeight: 600, fontSize: 12, color: "var(--text2)", textAlign: "center", whiteSpace: "nowrap" };
 const td = { padding: "4px 6px", borderBottom: "1px solid var(--border)", textAlign: "center", color: "var(--text)" };
-const btnSecondary = { padding: "7px 14px", cursor: "pointer", fontSize: 13.5, border: "1px solid var(--border2)", borderRadius: 980, background: "var(--card)", color: "var(--text)", fontWeight: 500 };
-const btnPrimary = { padding: "7px 14px", cursor: "pointer", fontSize: 13.5, border: "none", borderRadius: 980, background: "var(--text)", color: "var(--bg)", fontWeight: 600 };

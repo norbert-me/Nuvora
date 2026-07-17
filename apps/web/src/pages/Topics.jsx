@@ -3,7 +3,7 @@
 // erst dadurch laesst sich ein schwach ausgefallenes Thema auf passende
 // Aufgaben abbilden.
 import { useState, useEffect } from "react";
-import { Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle } from "../components/Icons.jsx";
 
 const API = "/api";
 
@@ -133,7 +133,7 @@ export default function Topics() {
 
   return (
     <div style={{ maxWidth: 760 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 6 }}>Themen</h1>
+      <h1 style={pageTitle}>Themen</h1>
       <p style={{ color: "var(--text2)", marginBottom: 22, fontSize: 14 }}>
         Der gemeinsame Wortschatz deiner Module. Fragen und Aufgaben zeigen auf
         dieselben Themen — so lässt sich später erkennen, wo eine Klasse Übung
@@ -180,5 +180,3 @@ export default function Topics() {
   );
 }
 
-const btnSecondary = { padding: "7px 14px", cursor: "pointer", fontSize: 13.5, border: "1px solid var(--border2)", borderRadius: 980, background: "var(--card)", color: "var(--text)", fontWeight: 500 };
-const btnPrimary = { padding: "7px 14px", cursor: "pointer", fontSize: 13.5, border: "none", borderRadius: 980, background: "var(--text)", color: "var(--bg)", fontWeight: 600 };

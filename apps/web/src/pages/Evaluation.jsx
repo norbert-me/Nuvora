@@ -919,7 +919,6 @@ const gradeDistribution = (() => {
 
 const th = { padding: "8px 10px", borderBottom: "2px solid var(--border3)", textAlign: "left", fontSize: 13, color: "var(--text)" };
 const td = { padding: "8px 10px", borderBottom: "1px solid var(--border)" };
-const btnSecondary = { padding: "9px 18px", cursor: "pointer", border: "1px solid var(--border2)", borderRadius: 980, background: "var(--card)", color: "var(--text)", fontSize: 14, fontWeight: 500 };
 
 function Stat({ label, value, onClick, clickable, info }) {
   return (

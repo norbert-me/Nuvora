@@ -10,7 +10,7 @@
 // /cardvote/cards: der Kern kennt Klassen, nicht was ein Modul damit tut.
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
@@ -231,11 +231,28 @@ export default function Classes() {
             {detailsFor === idx && (
               <div style={{ margin: "0 0 12px 52px", padding: 16, border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)" }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>Klassenleitung</div>
-                <input
-                  value={s.klassenlehrer || ""} onChange={(e) => setStudentField(idx, "klassenlehrer", e.target.value)}
-                  placeholder="z. B. Frau Meyer (7a)" maxLength={120}
-                  style={{ width: "100%", padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 13, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box", marginBottom: 16 }}
-                />
+                <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+                  <input
+                    value={s.klassenlehrer || ""} onChange={(e) => setStudentField(idx, "klassenlehrer", e.target.value)}
+                    placeholder="z. B. Frau Meyer (7a)" maxLength={120}
+                    style={{ flex: 1, minWidth: 180, padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 13, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }}
+                  />
+                  {/* Bei einer echten Klasse ist die Leitung fuer alle gleich —
+                      dann waere 30x tippen unsinnig. Bei einem Kurs, der Kinder
+                      aus mehreren Klassen mischt, bleibt jedes Feld einzeln. */}
+                  {(s.klassenlehrer || "").trim() && students.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!confirm(`„${s.klassenlehrer}" für alle ${students.length} Personen dieser Klasse übernehmen?`)) return;
+                        setStudents(students.map((st) => ({ ...st, klassenlehrer: s.klassenlehrer })));
+                      }}
+                      style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12.5 }}
+                    >
+                      Für alle übernehmen
+                    </button>
+                  )}
+                </div>
 
                 <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>
                   Förderschwerpunkte
@@ -333,5 +350,3 @@ export default function Classes() {
   );
 }
 
-const btnSecondary = { padding: "9px 18px", cursor: "pointer", fontSize: 14, border: "1px solid var(--border2)", borderRadius: 980, background: "var(--card)", color: "var(--text)", fontWeight: 500, letterSpacing: "-0.1px" };
-const btnPrimary = { padding: "9px 18px", cursor: "pointer", fontSize: 14, border: "none", borderRadius: 980, background: "var(--text)", color: "var(--bg)", fontWeight: 600, letterSpacing: "-0.1px" };

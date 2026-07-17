@@ -3,6 +3,7 @@
 // Modulauswahl statt eine leere Seite zu zeigen.
 import { Link } from "react-router-dom";
 import { useModules } from "../core/modules.js";
+import { pageTitle } from "../components/Icons.jsx";
 
 const card = {
   display: "block",
@@ -23,7 +24,7 @@ export default function NuvoraHome({ user }) {
 
   return (
     <div style={{ maxWidth: 820 }}>
-      <h1 style={{ fontSize: 26, fontWeight: 700, marginBottom: 6 }}>
+      <h1 style={pageTitle}>
         {firstName ? `Willkommen, ${firstName}` : "Willkommen"}
       </h1>
       <p style={{ color: "var(--text2)", marginBottom: 28 }}>

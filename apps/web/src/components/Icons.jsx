@@ -45,6 +45,37 @@ export function DownloadLink({ children, style, ...props }) {
   );
 }
 
+// ─── Buttons ───
+// Lagen frueher in jeder Seite einzeln und sind auseinandergelaufen: vier
+// Varianten von btnPrimary, fuenf von btnSecondary — mal 14px, mal 13.5px,
+// mal mit, mal ohne letterSpacing. Verbindlich ist ab hier diese eine Quelle.
+export const btnPrimary = {
+  padding: "9px 18px", cursor: "pointer", fontSize: 14, border: "none",
+  borderRadius: 980, background: "var(--text)", color: "var(--bg)",
+  fontWeight: 600, letterSpacing: "-0.1px",
+};
+
+export const btnSecondary = {
+  padding: "9px 18px", cursor: "pointer", fontSize: 14,
+  border: "1px solid var(--border2)", borderRadius: 980,
+  background: "var(--card)", color: "var(--text)",
+  fontWeight: 500, letterSpacing: "-0.1px",
+};
+
+// Kleinere Variante fuer Knoepfe in Zeilen und Tabellen.
+export const btnSmall = { padding: "5px 12px", fontSize: 13 };
+
+// Bewusst NICHT vereinheitlicht, weil kontextgebunden und je Gruppe stimmig:
+//   Formularseiten (Login, Contact, ResetPassword) — volle Breite, 15px
+//   Bestaetigungsseiten (VerifyEmail, ConfirmEmailChange) — inline, 12px 24px
+//   Session — 15px in Akzentfarbe, weil vom Beamer aus lesbar
+// Wer eine dieser Seiten anfasst, bleibt bei der Gruppe statt hierher zu greifen.
+
+// ─── Seitenkopf ───
+// 22px, wie in CardVote seit jeher. Neuere Seiten hatten 24 und 26.
+export const pageTitle = { fontSize: 22, fontWeight: 700, color: "var(--text)", marginBottom: 8 };
+export const pageIntro = { color: "var(--text2)", fontSize: 14, marginBottom: 22, lineHeight: 1.6 };
+
 export const COLORS = {
   danger: "#d1350f",
   success: "#0a7d3e",

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Latex from "../components/Latex.jsx";
-import { Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import TopicPicker from "../components/TopicPicker.jsx";
@@ -473,9 +473,7 @@ function ImportProgress({ status }) {
 }
 
 const inputStyle = { padding: "10px 14px", border: "1px solid var(--border2)", borderRadius: 10, fontSize: 14, background: "var(--card)" };
-const btnSecondary = { padding: "9px 18px", cursor: "pointer", fontSize: 14, border: "1px solid var(--border2)", borderRadius: 980, background: "var(--card)", color: "var(--text)", fontWeight: 500, letterSpacing: "-0.1px" };
 const arrowBtn = { border: "none", background: "none", padding: "1px 2px", color: "var(--text3)", display: "flex", lineHeight: 1 };
-const btnPrimary = { padding: "9px 18px", cursor: "pointer", fontSize: 14, border: "none", borderRadius: 980, background: "var(--text)", color: "var(--bg)", fontWeight: 600, letterSpacing: "-0.1px" };
 const btnSmall = { background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: "4px 10px", fontWeight: 500, color: "var(--text3)" };
 
 function NewSetButton({ onCreate }) {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLanguage } from "../i18n/index.jsx";
+import { btnPrimary, btnSecondary } from "../components/Icons.jsx";
 
 const API = "/api";
 
@@ -305,17 +306,7 @@ const inputStyle = {
   maxWidth: 340,
 };
 
-const btnPrimary = {
-  padding: "10px 22px", fontSize: 14, fontWeight: 600,
-  background: "var(--accent)", color: "#fff", border: "none", borderRadius: 980,
-  cursor: "pointer",
-};
 
-const btnSecondary = {
-  padding: "10px 22px", fontSize: 14, fontWeight: 500,
-  background: "var(--card)", color: "var(--text)", border: "1px solid var(--border2)",
-  borderRadius: 980, cursor: "pointer",
-};
 
 const linkBtn = {
   background: "none", border: "none", color: "var(--accent)", fontSize: 13, fontWeight: 500, cursor: "pointer", padding: 0,

@@ -6,6 +6,7 @@
 // wieder, weil der Fortschritt im Konto-Browser gemerkt wird.
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { btnPrimary, btnSecondary, pageTitle } from "../components/Icons.jsx";
 
 const STORAGE_KEY = "cv_tutorial_done";
 
@@ -87,7 +88,7 @@ export default function Tutorial() {
   return (
     <div style={{ maxWidth: 760 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700 }}>Tutorial</h1>
+        <h1 style={pageTitle}>Tutorial</h1>
         <span style={{ fontSize: 13, color: "var(--text3)" }}>{fertig} von {BEREICHE.length} erledigt</span>
         {fertig > 0 && (
           <button onClick={neu} style={{ marginLeft: "auto", ...btnSecondary }}>Von vorn beginnen</button>
@@ -142,5 +143,3 @@ export default function Tutorial() {
   );
 }
 
-const btnSecondary = { padding: "7px 14px", cursor: "pointer", fontSize: 13.5, border: "1px solid var(--border2)", borderRadius: 980, background: "var(--card)", color: "var(--text)", fontWeight: 500 };
-const btnPrimary = { padding: "7px 14px", cursor: "pointer", fontSize: 13.5, border: "none", borderRadius: 980, background: "var(--text)", color: "var(--bg)", fontWeight: 600 };

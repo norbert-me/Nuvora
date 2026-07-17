@@ -6,7 +6,7 @@
 // Kern-Klassenseite; damit trug der Kern Modulwissen (Regel 3 in CLAUDE.md).
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Icon, ICONS, iconBtn } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, pageTitle } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api";
@@ -37,7 +37,7 @@ export default function Cards() {
 
   return (
     <div style={{ maxWidth: 760 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 6 }}>Karten & Auswertung</h1>
+      <h1 style={pageTitle}>Karten & Auswertung</h1>
       <p style={{ color: "var(--text2)", marginBottom: 20, fontSize: 14 }}>
         Jede Person bekommt eine Karte mit eindeutigem Marker. Klassen und Namen
         pflegst du unter <Link to="/classes" style={{ color: "var(--accent)" }}>Klassen</Link>.
