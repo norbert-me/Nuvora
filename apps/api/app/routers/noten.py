@@ -17,7 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import GradeCategory, GradeEntry, SchoolClass, Student, User
+from ..models import GradeCategory, GradeEntry, SchoolClass, Session as TestSession, Student, User
 from .auth import get_current_user, rate_limit
 from .modules import is_active
 
@@ -330,3 +330,65 @@ async def summary(
             observations=len([e for e in eigene if e.kind == "observation"]),
         ))
     return out
+
+
+# ─── CardVote-Testergebnis als Noten uebernehmen ───
+# Kopplung, aber optional und nur auf Knopfdruck: das Notenmodul funktioniert
+# ohne CardVote (Regel 3), und CardVote weiss nichts davon. Die Note wird im
+# Frontend aus dem Notenschluessel berechnet — hier kommt sie fertig an, wir
+# ordnen sie nur der richtigen Person und Kategorie zu.
+
+class ImportGrade(BaseModel):
+    card_id: int
+    value: float
+
+    @field_validator("value")
+    @classmethod
+    def v_ok(cls, v):
+        if v < 1.0 or v > 6.0:
+            raise ValueError("Note muss zwischen 1,0 und 6,0 liegen")
+        return round(v, 1)
+
+
+class ImportBody(BaseModel):
+    session_id: int
+    category_id: int
+    grades: List[ImportGrade]
+
+
+@router.post("/import-session", status_code=201)
+async def import_session(
+    body: ImportBody,
+    user: User = Depends(require_module),
+    db: AsyncSession = Depends(get_db),
+):
+    rate_limit("noten_import", f"u{user.id}", 30, 60, "Zu viele Übernahmen in kurzer Zeit. Bitte kurz warten.")
+
+    sess = await db.get(TestSession, body.session_id)
+    if not sess or sess.owner_id != user.id:
+        raise HTTPException(404, "Session nicht gefunden")
+    if not sess.class_id:
+        raise HTTPException(400, "Diese Session hat keine Klasse — keine Zuordnung möglich")
+
+    cat = await _owned_category(db, user, body.category_id)
+    if cat.class_id != sess.class_id:
+        raise HTTPException(400, "Kategorie und Session gehören zu verschiedenen Klassen")
+
+    # card_id -> Student.id innerhalb der Klasse der Session.
+    students = (await db.execute(
+        select(Student).where(Student.class_id == sess.class_id)
+    )).scalars().all()
+    by_card = {st.card_id: st.id for st in students}
+
+    angelegt = 0
+    for g in body.grades:
+        sid = by_card.get(g.card_id)
+        if not sid:
+            continue  # Karte ohne Person (z.B. leerer Platz) — ueberspringen
+        db.add(GradeEntry(
+            category_id=cat.id, student_id=sid, kind="grade", value=g.value,
+            note=f"Aus Test: {sess.name}" if sess.name else "Aus CardVote-Test",
+        ))
+        angelegt += 1
+    await db.commit()
+    return {"imported": angelegt}

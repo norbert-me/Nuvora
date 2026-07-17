@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useModules } from "../core/modules.js";
 import Latex from "../components/Latex.jsx";
-import { DownloadLink } from "../components/Icons.jsx";
+import { DownloadLink, btnPrimary, btnSecondary } from "../components/Icons.jsx";
 
 const API = "/api";
 const COLORS = { A: "#0066cc", B: "#5856d6", C: "#b8860b", D: "#d1350f" };
@@ -135,6 +136,9 @@ export default function Evaluation() {
   const [showCiInfo, setShowCiInfo] = useState(false);
   const [gradeView, setGradeView] = useState("bar");
   const [gradeMode, setGradeMode] = useState("whole"); // "whole" | "tendency"
+  const { modules } = useModules();
+  const notenAktiv = modules.find((m) => m.key === "noten")?.active ?? false;
+  const [notenDialog, setNotenDialog] = useState(false);
   const [avgMode, setAvgMode] = useState("pts");
   const [medMode, setMedMode] = useState("pts");
   const [sdMode, setSdMode] = useState("pts");
@@ -472,8 +476,27 @@ const gradeDistribution = (() => {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <Link to="/cardvote/tests" style={{ color: "var(--text3)", textDecoration: "none", fontSize: 13, fontWeight: 500 }}>← Alle Tests</Link>
+        {notenDialog && (
+          <NotenImport
+            sessionId={Number(id)} classId={data.class_id} sessionName={data.session_name}
+            grades={presentStudents.map((st) => ({
+              card_id: st.card_id, name: st.name,
+              value: gradeMode === "tendency"
+                ? tendencyGrade(maxScore > 0 ? (st.weightedScore / maxScore) * 100 : 0, gradeScale)
+                : Math.round(gradeFromPct(maxScore > 0 ? (st.weightedScore / maxScore) * 100 : 0, gradeScale) * 10) / 10,
+            }))}
+            onClose={() => setNotenDialog(false)}
+          />
+        )}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {configDirty && <span style={{ fontSize: 11, color: saving ? "#b8860b" : "#0a7d3e" }}>{saving ? "Speichern…" : "Gespeichert"}</span>}
+          {/* Nur sichtbar, wenn das Notenmodul aktiv ist — sonst fuehrt der
+              Knopf ins Leere (Regel 3: CardVote haengt nicht von Noten ab). */}
+          {notenAktiv && data.class_id && (
+            <button onClick={() => setNotenDialog(true)} style={{ ...btnSecondary, padding: "6px 14px", fontSize: 13 }}>
+              Ins Notenmodul
+            </button>
+          )}
           <DownloadLink onClick={async () => { const r = await fetch(`${API}/sessions/${id}/all-students-pdf`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `Auswertungen_${id}.pdf`; a.click(); URL.revokeObjectURL(a.href); }}>
             PDF
           </DownloadLink>
@@ -956,6 +979,77 @@ function StatBox({ label, value, color }) {
     <div style={{ padding: "10px 16px", background: "var(--bg2)", borderRadius: 10, textAlign: "center", minWidth: 100 }}>
       <div style={{ fontSize: 24, fontWeight: 800, color: color || "#1d1d1f" }}>{value}</div>
       <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>{label}</div>
+    </div>
+  );
+}
+
+
+// Dialog: CardVote-Testnoten in eine Kategorie des Notenmoduls uebernehmen.
+function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
+  const [cats, setCats] = useState([]);
+  const [catId, setCatId] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch(`/api/noten/classes/${classId}/categories`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => { setCats(d); if (d.length) setCatId(d[0].id); })
+      .catch(() => {});
+  }, [classId]);
+
+  const uebernehmen = async () => {
+    setBusy(true); setError("");
+    const res = await fetch("/api/noten/import-session", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId, category_id: catId, grades: grades.map((g) => ({ card_id: g.card_id, value: g.value })) }),
+    });
+    setBusy(false);
+    if (!res.ok) { const b = await res.json().catch(() => ({})); setError(b.detail || "Übernahme fehlgeschlagen"); return; }
+    const b = await res.json();
+    setDone(b.imported);
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 200 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--card)", borderRadius: 18, maxWidth: 460, width: "100%", maxHeight: "85vh", overflow: "auto", padding: 22, border: "1px solid var(--border)" }}>
+        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>Ins Notenmodul übernehmen</h3>
+        <p style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 16 }}>
+          {sessionName ? `Test „${sessionName}"` : "Dieser Test"} — {grades.length} Note{grades.length === 1 ? "" : "n"} nach dem eingestellten Notenschlüssel.
+        </p>
+
+        {done !== null ? (
+          <>
+            <p style={{ fontSize: 14, color: "#0a7d3e", marginBottom: 16 }}>
+              {done} Note{done === 1 ? "" : "n"} übernommen.
+            </p>
+            <button onClick={onClose} style={btnPrimary}>Schließen</button>
+          </>
+        ) : cats.length === 0 ? (
+          <>
+            <p style={{ fontSize: 13.5, color: "var(--text3)", marginBottom: 16 }}>
+              Diese Klasse hat im Notenmodul noch keine Kategorie. Lege dort zuerst eine Spalte an.
+            </p>
+            <button onClick={onClose} style={btnSecondary}>Schließen</button>
+          </>
+        ) : (
+          <>
+            {error && <p style={{ color: "var(--danger, #dc2626)", fontSize: 13, marginBottom: 10 }}>{error}</p>}
+            <div style={{ fontSize: 12.5, color: "var(--text2)", marginBottom: 6 }}>In welche Kategorie?</div>
+            <select value={catId ?? ""} onChange={(e) => setCatId(Number(e.target.value))}
+              style={{ width: "100%", padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)", marginBottom: 16, boxSizing: "border-box" }}>
+              {cats.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.weight} %)</option>)}
+            </select>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={uebernehmen} disabled={busy || !catId} style={{ ...btnPrimary, opacity: busy || !catId ? 0.5 : 1 }}>
+                {busy ? "Übernehme…" : "Übernehmen"}
+              </button>
+              <button onClick={onClose} style={btnSecondary}>Abbrechen</button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -233,6 +233,7 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
     return {
         "session_id": session_id,
         "session_name": session.name,
+        "class_id": session.class_id,
         "questions": questions,
         "students": rows,
     }
