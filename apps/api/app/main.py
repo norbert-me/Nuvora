@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .database import engine
 from .models import Base
-from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace
+from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules
 from . import websocket as ws
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -68,7 +68,7 @@ class AbuseGuardMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-app = FastAPI(title="CardVote API")
+app = FastAPI(title="Nuvora API")
 
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(AbuseGuardMiddleware)
@@ -88,6 +88,7 @@ app.include_router(folders.router)
 app.include_router(cards.router)
 app.include_router(export_import.router)
 app.include_router(auth.router)
+app.include_router(modules.router)
 app.include_router(marketplace.router)
 
 UPLOAD_DIR = "/app/uploads"
@@ -106,6 +107,7 @@ def _ensure_columns(sync_conn):
         ("users", "email_verified", "BOOLEAN DEFAULT false NOT NULL"),
         ("users", "pending_email", "VARCHAR(255)"),
         ("questions", "owner_id", "INTEGER"),
+        ("users", "modules_initialized", "BOOLEAN DEFAULT false NOT NULL"),
     ]
     for table, column, ddl in wanted:
         if table not in existing_tables:
@@ -155,6 +157,25 @@ async def startup():
             "UPDATE users SET email_verified = true "
             f"WHERE email_verified = false AND created_at < TIMESTAMPTZ '{VERIFY_CUTOFF}'"
         ))
+        await db.commit()
+
+    # Bestandskonten an das Modulregister anschliessen: wer schon CardVote-Daten
+    # hat, bekommt CardVote aktiviert — sonst staende er nach dem Umbau vor einer
+    # leeren Shell, obwohl seine Daten da sind. Laeuft einmal pro Konto
+    # (modules_initialized), damit spaeteres Abschalten nicht rueckgaengig wird.
+    async with async_session() as db:
+        await db.execute(text("""
+            INSERT INTO user_modules (user_id, module_key)
+            SELECT u.id, 'cardvote' FROM users u
+            WHERE u.modules_initialized = false
+              AND EXISTS (
+                    SELECT 1 FROM questions q WHERE q.owner_id = u.id
+                    UNION ALL SELECT 1 FROM school_classes c WHERE c.owner_id = u.id
+                    UNION ALL SELECT 1 FROM sessions s WHERE s.owner_id = u.id
+              )
+            ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
+        """))
+        await db.execute(text("UPDATE users SET modules_initialized = true WHERE modules_initialized = false"))
         await db.commit()
 
     admin_email = os.environ.get("ADMIN_EMAIL", "")

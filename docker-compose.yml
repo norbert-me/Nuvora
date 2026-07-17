@@ -7,17 +7,17 @@ services:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-cardvote}
+      POSTGRES_USER: ${POSTGRES_USER:-nuvora}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD nicht gesetzt — .env aus .env.example anlegen}
-      POSTGRES_DB: ${POSTGRES_DB:-cardvote}
+      POSTGRES_DB: ${POSTGRES_DB:-nuvora}
     volumes:
       - pgdata:/var/lib/postgresql/data
 
-  cardvote-backend:
-    build: ./apps/cardvote/backend
+  api:
+    build: ./apps/api
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-cardvote}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-cardvote}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-nuvora}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-nuvora}
       TOKEN_SECRET: ${TOKEN_SECRET:?TOKEN_SECRET nicht gesetzt — .env aus .env.example anlegen}
       CORS_ORIGINS: ${SITE_URL:-http://localhost:8080}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
@@ -36,15 +36,15 @@ services:
     networks:
       default:
         aliases:
-          # apps/cardvote/frontend/nginx.conf proxyt intern auf Host "backend".
+          # apps/web/nginx.conf proxyt intern auf Host "backend".
           # Alias, damit die App-eigene Config unveraendert weiterlaeuft.
           - backend
 
-  cardvote-frontend:
-    build: ./apps/cardvote/frontend
+  web:
+    build: ./apps/web
     restart: unless-stopped
     depends_on:
-      - cardvote-backend
+      - api
 
   lernpfad:
     build: ./apps/lernpfad
@@ -70,7 +70,7 @@ services:
       # die Lernpfad serverseitig einliest.
       - ./config:/srv/config:ro
     depends_on:
-      - cardvote-frontend
+      - web
       - lernpfad
 
 volumes:

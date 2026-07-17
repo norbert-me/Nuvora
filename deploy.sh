@@ -3,7 +3,7 @@
 # Konfiguration in .deploy.env (siehe .deploy.env.example)
 #
 # Nutzung: ./deploy.sh                          -> baut alle Services
-#          ./deploy.sh cardvote-backend         -> baut nur diesen Service
+#          ./deploy.sh api                      -> baut nur diesen Service
 #          ./deploy.sh lernpfad proxy           -> baut mehrere
 #          ./deploy.sh --port 8090              -> anderer Port, wird in .deploy.env gemerkt
 #          ./deploy.sh --port 8090 lernpfad     -> beides kombinierbar
@@ -193,7 +193,7 @@ ssh "$SERVER" "cd '$REMOTE_DIR' && docker compose build $BUILD_SERVICES && docke
 echo "→ Status & Logs..."
 sleep 6
 # shellcheck disable=SC2029
-ssh "$SERVER" "cd '$REMOTE_DIR' && docker compose ps; echo '--- cardvote-backend log (letzte 30) ---'; docker compose logs --tail=30 cardvote-backend; echo '--- lernpfad log (letzte 15) ---'; docker compose logs --tail=15 lernpfad"
+ssh "$SERVER" "cd '$REMOTE_DIR' && docker compose ps; echo '--- api log (letzte 30) ---'; docker compose logs --tail=30 api; echo '--- lernpfad log (letzte 15) ---'; docker compose logs --tail=15 lernpfad"
 
 PORT="${PORT:-8080}"
 echo "→ Health-Checks (auf dem Server, Port $PORT)..."

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import ForeignKey, String, Text, DateTime, Integer, JSON, Boolean, func
+from sqlalchemy import ForeignKey, String, Text, DateTime, Integer, JSON, Boolean, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -22,6 +22,9 @@ class User(Base):
     token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     pending_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    # Wurde das Konto schon einmal ans Modulregister angeschlossen? Verhindert,
+    # dass der Backfill beim Start ein abgeschaltetes Modul wieder aktiviert.
+    modules_initialized: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     folders: Mapped[list["Folder"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
@@ -159,3 +162,17 @@ class MarketplaceRating(Base):
     stars: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     quiz: Mapped[MarketplaceQuiz] = relationship(back_populates="ratings")
+
+
+# ─── Nuvora-Kern: Modulregister ───
+# Module sind zuschaltbar. Der Kern besitzt Konten, Klassen und Schueler;
+# Module arbeiten darauf, besitzen sie aber nicht. Welche Module eine Lehrkraft
+# aktiviert hat, steht hier — eine Zeile pro aktiviertem Modul.
+class UserModule(Base):
+    __tablename__ = "user_modules"
+    __table_args__ = (UniqueConstraint("user_id", "module_key", name="uq_user_module"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    module_key: Mapped[str] = mapped_column(String(50))
+    activated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
