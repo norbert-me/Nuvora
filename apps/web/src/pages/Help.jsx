@@ -19,6 +19,13 @@ export default function Help() {
     <div style={{ maxWidth: 700 }}>
       <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", marginBottom: 20 }}>Hilfe</h2>
 
+      {/* Wer Hilfe sucht, sucht meist den Einstieg — das Tutorial fuehrt durch
+          die vier Bereiche in der Reihenfolge einer echten Stunde. */}
+      <p style={{ marginBottom: 24, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", fontSize: 14 }}>
+        Zum ersten Mal hier? Das <Link to="/cardvote/tutorial" style={{ color: "var(--accent)", fontWeight: 600 }}>Tutorial</Link> führt
+        dich durch Fragen, Klasse, Live-Session und Auswertung — jederzeit neu startbar.
+      </p>
+
       <Section title="Was ist CardVote?">
         CardVote ist ein Abstimmungstool für den Unterricht — ganz ohne Geräte für die Lernenden.
         Jede Person bekommt eine gedruckte Karte mit einem Muster (Marker). Je nachdem, welche Seite

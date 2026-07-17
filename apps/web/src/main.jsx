@@ -62,6 +62,7 @@ import Modules from "./pages/Modules.jsx";
 import Topics from "./pages/Topics.jsx";
 import LernpfadModule from "./pages/LernpfadModule.jsx";
 import Cards from "./pages/Cards.jsx";
+import Tutorial from "./pages/Tutorial.jsx";
 import { useModules } from "./core/modules.js";
 // Navigation ist modulbezogen: die Shell zeigt die Punkte des Moduls, in dem
 // man gerade ist. Ausserhalb eines Moduls navigiert Nuvora selbst.
@@ -280,7 +281,7 @@ function Nav({ user, onLogout }) {
   const { t } = useLanguage();
 
   const navItems = getModuleNavItems(t, location.pathname);
-  const allPages = [...navItems, { to: `${CV}/scan`, label: t("nav.scanner") }, { to: "/profile", label: t("nav.profile") }, { to: `${CV}/evaluation`, label: t("nav.evaluation") }, { to: "/changelog", label: t("nav.changelog") }, { to: "/login", label: t("nav.login") }];
+  const allPages = [...navItems, { to: `${CV}/tutorial`, label: "Tutorial" }, { to: `${CV}/scan`, label: t("nav.scanner") }, { to: "/profile", label: t("nav.profile") }, { to: `${CV}/evaluation`, label: t("nav.evaluation") }, { to: "/changelog", label: t("nav.changelog") }, { to: "/login", label: t("nav.login") }];
   const pageTitle = allPages.find((item) => location.pathname.startsWith(item.to))?.label || "";
 
   const showNav = !!user;
@@ -557,6 +558,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={`${CV}/class-evaluation/:id`} element={user ? <ModuleGate moduleKey="cardvote"><ClassEvaluation /></ModuleGate> : <Landing />} />
           <Route path={`${CV}/student-evaluation/:classId/:cardId`} element={user ? <ModuleGate moduleKey="cardvote"><StudentEvaluation /></ModuleGate> : <Landing />} />
           <Route path={`${CV}/scan`} element={user ? <ModuleGate moduleKey="cardvote"><Scanner /></ModuleGate> : <Landing />} />
+          <Route path={`${CV}/tutorial`} element={user ? <ModuleGate moduleKey="cardvote"><Tutorial /></ModuleGate> : <Landing />} />
           <Route path={`${CV}/cards`} element={user ? <ModuleGate moduleKey="cardvote"><Cards /></ModuleGate> : <Landing />} />
           <Route path={`${CV}/marketplace`} element={user ? <ModuleGate moduleKey="cardvote"><Marketplace /></ModuleGate> : <Landing />} />
 
@@ -582,6 +584,8 @@ function AppRoutes({ user, setUser, logout }) {
             haeufiger gebraucht. */}
         <span style={{ display: "inline-flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: "0 8px", padding: "0 16px" }}>
           <Link to="/help" style={footerLink}>{t("footer.help")}</Link>
+          <span style={footerSep}>·</span>
+          <Link to={`${CV}/tutorial`} style={footerLink}>Tutorial</Link>
           <span style={footerSep}>·</span>
           <Link to="/changelog" style={footerLink}>{t("footer.changelog")}</Link>
           <span style={footerSep}>·</span>
