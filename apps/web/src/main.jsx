@@ -497,6 +497,9 @@ function Home() {
   );
 }
 
+const footerLink = { color: "var(--text3)", textDecoration: "none", whiteSpace: "nowrap" };
+const footerSep = { color: "var(--text3)" };
+
 function ContentWrapper({ children }) {
   const location = useLocation();
   const isSession = location.pathname.startsWith("/session");
@@ -572,15 +575,22 @@ function AppRoutes({ user, setUser, logout }) {
           <Link to="/contact" style={{ color: "var(--accent)", textDecoration: "none" }}>{t("footer.contact")}</Link>
           {t("home.contribute").split("{{link}}")[1]}
         </p>
-        <Link to="/help" style={{ color: "var(--text3)", textDecoration: "none" }}>{t("footer.help")}</Link>
-        <span style={{ margin: "0 8px", color: "var(--text3)" }}>·</span>
-        <Link to="/changelog" style={{ color: "var(--text3)", textDecoration: "none" }}>{t("footer.changelog")}</Link>
-        <span style={{ margin: "0 8px", color: "var(--text3)" }}>·</span>
-        <Link to="/legal" style={{ color: "var(--text3)", textDecoration: "none" }}>{t("footer.legal")}</Link>
-        <span style={{ margin: "0 8px", color: "var(--text3)" }}>·</span>
-        <Link to="/contact" style={{ color: "var(--text3)", textDecoration: "none" }}>{t("footer.contact")}</Link>
-        <span style={{ margin: "0 8px", color: "var(--text3)" }}>·</span>
-        <a href="https://github.com/norbert-me/CardVote" target="_blank" rel="noopener noreferrer" style={{ color: "var(--text3)", textDecoration: "none" }}>GitHub</a>
+        {/* Auf schmalen Bildschirmen brach "Impressum & Datenschutz" mitten im
+            Link um und las sich wie zwei Eintraege — es ist aber eine Seite.
+            Deshalb umbruchfest, und die Trenner duerfen umbrechen statt der
+            Beschriftungen. Kontakt steht vor den Rechtsseiten: er wird
+            haeufiger gebraucht. */}
+        <span style={{ display: "inline-flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: "0 8px", padding: "0 16px" }}>
+          <Link to="/help" style={footerLink}>{t("footer.help")}</Link>
+          <span style={footerSep}>·</span>
+          <Link to="/changelog" style={footerLink}>{t("footer.changelog")}</Link>
+          <span style={footerSep}>·</span>
+          <Link to="/contact" style={footerLink}>{t("footer.contact")}</Link>
+          <span style={footerSep}>·</span>
+          <Link to="/legal" style={footerLink}>{t("footer.legal")}</Link>
+          <span style={footerSep}>·</span>
+          <a href="https://github.com/norbert-me/CardVote" target="_blank" rel="noopener noreferrer" style={footerLink}>GitHub</a>
+        </span>
       </footer>
     </>
   );

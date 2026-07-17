@@ -191,15 +191,19 @@ export default function Marketplace() {
                 </div>
                 {(preview.questions || []).map((q, i) => (
                   <div key={i} style={{ padding: "12px 0", borderTop: "1px solid var(--border)" }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>{i + 1}. {q.text}</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {/* overflowWrap + minWidth:0: Flex-Kinder haben eine
+                        Mindestbreite von "min-content", darum sprengte ein
+                        langer oder umbruchloser Antworttext die Zeile und lief
+                        auf schmalen Bildschirmen aus dem Kasten. */}
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 6, overflowWrap: "anywhere" }}>{i + 1}. {q.text}</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
                       {["A", "B", "C", "D"].slice(0, q.num_choices || 4).map((k) => {
                         const isCorrect = q.correct_answer && q.correct_answer.includes(k);
                         return (
-                          <div key={k} style={{ fontSize: 13, color: isCorrect ? "#0a7d3e" : "var(--text2)", fontWeight: isCorrect ? 600 : 400, display: "flex", gap: 6 }}>
-                            <span style={{ fontWeight: 700 }}>{k}</span>
-                            <span>{(q.choices && q.choices[k]) || "–"}</span>
-                            {isCorrect && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a7d3e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 1 }}><path d="M20 6L9 17l-5-5"/></svg>}
+                          <div key={k} style={{ fontSize: 13, color: isCorrect ? "#0a7d3e" : "var(--text2)", fontWeight: isCorrect ? 600 : 400, display: "flex", gap: 6, minWidth: 0, alignItems: "flex-start" }}>
+                            <span style={{ fontWeight: 700, flexShrink: 0 }}>{k}</span>
+                            <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{(q.choices && q.choices[k]) || "–"}</span>
+                            {isCorrect && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a7d3e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 1, flexShrink: 0 }}><path d="M20 6L9 17l-5-5"/></svg>}
                           </div>
                         );
                       })}

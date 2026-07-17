@@ -474,6 +474,7 @@ function ImportProgress({ status }) {
 
 const inputStyle = { padding: "10px 14px", border: "1px solid var(--border2)", borderRadius: 10, fontSize: 14, background: "var(--card)" };
 const btnSecondary = { padding: "9px 18px", cursor: "pointer", fontSize: 14, border: "1px solid var(--border2)", borderRadius: 980, background: "var(--card)", color: "var(--text)", fontWeight: 500, letterSpacing: "-0.1px" };
+const arrowBtn = { border: "none", background: "none", padding: "1px 2px", color: "var(--text3)", display: "flex", lineHeight: 1 };
 const btnPrimary = { padding: "9px 18px", cursor: "pointer", fontSize: 14, border: "none", borderRadius: 980, background: "var(--text)", color: "var(--bg)", fontWeight: 600, letterSpacing: "-0.1px" };
 const btnSmall = { background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: "4px 10px", fontWeight: 500, color: "var(--text3)" };
 
@@ -523,6 +524,17 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onQuestionsChang
   };
 
   const saveName = () => saveSet(name, questions);
+
+  // Reihenfolge per Pfeil — gleiche Wirkung wie Ziehen, nur ohne Maus.
+  const moveQuestion = (idx, delta) => {
+    const arr = [...(previewQuestions || questions)];
+    const ziel = idx + delta;
+    if (ziel < 0 || ziel >= arr.length) return;
+    [arr[idx], arr[ziel]] = [arr[ziel], arr[idx]];
+    setQuestions(arr);
+    setPreviewQuestions(null);
+    saveSet(name, arr);
+  };
 
   const toggleShuffleQ = () => { const v = !shuffleQ; setShuffleQ(v); saveSet(name, questions, v, shuffleA); };
   const toggleShuffleA = () => { const v = !shuffleA; setShuffleA(v); saveSet(name, questions, shuffleQ, v); };
@@ -635,7 +647,27 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onQuestionsChang
             cursor: "grab", transition: "transform 0.15s ease",
           }}
         >
-          <span style={{ color: "var(--text3)", width: 28, textAlign: "center", fontSize: 20, cursor: "grab", lineHeight: 1 }}>⠿</span>
+          {/* Ziehen funktioniert nur mit Maus: iOS Safari kennt kein HTML5-
+              Drag&Drop, dort liess sich die Reihenfolge gar nicht aendern.
+              Die Pfeile funktionieren auf jedem Geraet und sind zugleich per
+              Tastatur bedienbar. */}
+          <span style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
+            <button
+              onClick={() => moveQuestion(idx, -1)} disabled={idx === 0}
+              title="Nach oben" aria-label="Frage nach oben"
+              style={{ ...arrowBtn, opacity: idx === 0 ? 0.25 : 1, cursor: idx === 0 ? "default" : "pointer" }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
+            </button>
+            <button
+              onClick={() => moveQuestion(idx, 1)} disabled={idx === (previewQuestions || questions).length - 1}
+              title="Nach unten" aria-label="Frage nach unten"
+              style={{ ...arrowBtn, opacity: idx === (previewQuestions || questions).length - 1 ? 0.25 : 1, cursor: idx === (previewQuestions || questions).length - 1 ? "default" : "pointer" }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+          </span>
+          <span className="drag-handle" style={{ color: "var(--text3)", width: 20, textAlign: "center", fontSize: 18, cursor: "grab", lineHeight: 1, flexShrink: 0 }}>⠿</span>
           <span onClick={() => setEditingQ({ ...q })} style={{ flex: 1, color: "var(--text)", cursor: "pointer" }} title={t("dash.clickEdit")}>
             <Latex>{q.text}</Latex>
             {q.image_url && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 6, verticalAlign: "middle" }}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>}
