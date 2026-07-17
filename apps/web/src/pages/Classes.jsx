@@ -205,22 +205,22 @@ export default function Classes() {
                 style={{ flex: 1, padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)" }} />
               <select
                 value={s.niveau || ""} onChange={(e) => setStudentField(idx, "niveau", e.target.value)}
-                title="E-/G-Kurs"
+                title={t("classes.courseTitle")}
                 style={{ padding: 7, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 13, background: "var(--bg)", color: "var(--text)", flexShrink: 0 }}
               >
                 <option value="">E/G</option>
-                <option value="E">E-Kurs</option>
-                <option value="G">G-Kurs</option>
+                <option value="E">{t("classes.eCourse")}</option>
+                <option value="G">{t("classes.gCourse")}</option>
               </select>
               <button
                 type="button" onClick={() => setDetailsFor(detailsFor === idx ? null : idx)}
-                title="Förderschwerpunkte, Klassenleitung und Notizen"
+                title={t("classes.detailsTitle")}
                 style={{
                   border: "1px solid var(--border2)", background: (s.foerder?.length || s.notizen || s.klassenlehrer) ? "var(--accent-bg)" : "var(--card)",
                   color: "var(--text2)", cursor: "pointer", borderRadius: 8, padding: "6px 10px", fontSize: 12.5, flexShrink: 0,
                 }}
               >
-                {s.foerder?.length ? `Details (${s.foerder.length})` : "Details"}
+                {s.foerder?.length ? t("classes.detailsN", { n: s.foerder.length }) : t("classes.details")}
               </button>
               <button onClick={() => removeStudent(idx)} style={{ border: "none", background: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", flexShrink: 0 }} title={t("classes.removeCard")}>
                 <Icon d={ICONS.trash} color={C.danger} />
@@ -229,11 +229,11 @@ export default function Classes() {
 
             {detailsFor === idx && (
               <div style={{ margin: "0 0 12px 52px", padding: 16, border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)" }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>Klassenleitung</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>{t("classes.classTeacher")}</div>
                 <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
                   <input
                     value={s.klassenlehrer || ""} onChange={(e) => setStudentField(idx, "klassenlehrer", e.target.value)}
-                    placeholder="z. B. Frau Meyer (7a)" maxLength={120}
+                    placeholder={t("classes.classTeacherPlaceholder")} maxLength={120}
                     style={{ flex: 1, minWidth: 180, padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 13, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }}
                   />
                   {/* Bei einer echten Klasse ist die Leitung fuer alle gleich —
@@ -243,19 +243,17 @@ export default function Classes() {
                     <button
                       type="button"
                       onClick={() => {
-                        if (!confirm(`„${s.klassenlehrer}" für alle ${students.length} Personen dieser Klasse übernehmen?`)) return;
+                        if (!confirm(t("classes.applyAllConfirm", { name: s.klassenlehrer, n: students.length }))) return;
                         setStudents(students.map((st) => ({ ...st, klassenlehrer: s.klassenlehrer })));
                       }}
                       style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12.5 }}
                     >
-                      Für alle übernehmen
+                      {t("classes.applyAll")}
                     </button>
                   )}
                 </div>
 
-                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>
-                  Förderschwerpunkte
-                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>{t("classes.supportNeeds")}</div>
                 <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 9 }}>
                   Schwierigkeiten — steuern später die Differenzierung in Lernpfad.
                 </div>
@@ -284,14 +282,14 @@ export default function Classes() {
                   })}
                 </div>
 
-                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>Notizen</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>{t("classes.notes")}</div>
                 <textarea
                   value={s.notizen || ""} onChange={(e) => setStudentField(idx, "notizen", e.target.value)}
-                  rows={2} placeholder="z.B. Nachteilsausgleich, Besonderheiten…" maxLength={2000}
+                  rows={2} placeholder={t("classes.notesPlaceholder")} maxLength={2000}
                   style={{ width: "100%", padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 13, background: "var(--bg)", color: "var(--text)", resize: "vertical", boxSizing: "border-box" }}
                 />
                 <p style={{ fontSize: 11.5, color: "var(--text3)", margin: "9px 0 0" }}>
-                  Bleibt bei dir: diese Angaben stehen in keinem Export und in keiner Veröffentlichung.
+                  {t("classes.staysPrivate")}
                 </p>
               </div>
             )}

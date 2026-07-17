@@ -3,6 +3,7 @@
 // Modulauswahl statt eine leere Seite zu zeigen.
 import { Link } from "react-router-dom";
 import { useModules } from "../core/modules.js";
+import { useLanguage } from "../i18n/index.jsx";
 import { pageTitle } from "../components/Icons.jsx";
 
 const card = {
@@ -16,6 +17,7 @@ const card = {
 };
 
 export default function NuvoraHome({ user }) {
+  const { t } = useLanguage();
   const { active, loading } = useModules();
 
   if (loading) return null;
@@ -25,21 +27,19 @@ export default function NuvoraHome({ user }) {
   return (
     <div style={{ maxWidth: 820 }}>
       <h1 style={pageTitle}>
-        {firstName ? `Willkommen, ${firstName}` : "Willkommen"}
+        {firstName ? t("home.welcome", { name: firstName }) : t("home.welcomePlain")}
       </h1>
       <p style={{ color: "var(--text2)", marginBottom: 28 }}>
-        Nuvora ist deine Basis: Konto, Klassen und Schüler liegen hier. Module
-        arbeiten darauf.
+        {t("home.intro")}
       </p>
 
       {active.length === 0 ? (
         <div style={{ ...card, textAlign: "center", padding: 36 }}>
           <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
-            Noch kein Modul aktiv
+            {t("home.noModuleTitle")}
           </p>
           <p style={{ color: "var(--text2)", marginBottom: 20 }}>
-            Schalte ein Modul frei, um loszulegen. Du kannst es jederzeit wieder
-            abschalten — deine Daten bleiben erhalten.
+            {t("home.noModuleText")}
           </p>
           <Link
             to="/modules"
@@ -49,7 +49,7 @@ export default function NuvoraHome({ user }) {
               fontWeight: 600, fontSize: 14,
             }}
           >
-            Module auswählen
+            {t("home.chooseModules")}
           </Link>
         </div>
       ) : (
@@ -77,7 +77,7 @@ export default function NuvoraHome({ user }) {
             )}
           </div>
           <p style={{ marginTop: 22, fontSize: 13, color: "var(--text3)" }}>
-            <Link to="/modules" style={{ color: "var(--accent)" }}>Module verwalten</Link>
+            <Link to="/modules" style={{ color: "var(--accent)" }}>{t("home.manageModules")}</Link>
           </p>
         </>
       )}

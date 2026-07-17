@@ -37,16 +37,15 @@ export default function Cards() {
 
   return (
     <div style={{ maxWidth: 760 }}>
-      <h1 style={pageTitle}>Karten & Auswertung</h1>
+      <h1 style={pageTitle}>{t("cards.title")}</h1>
       <p style={{ color: "var(--text2)", marginBottom: 20, fontSize: 14 }}>
-        Jede Person bekommt eine Karte mit eindeutigem Marker. Klassen und Namen
-        pflegst du unter <Link to="/classes" style={{ color: "var(--accent)" }}>Klassen</Link>.
+        {t("cards.intro").split("{{link}}")[0]}<Link to="/classes" style={{ color: "var(--accent)" }}>{t("nav.classes")}</Link>{t("cards.intro").split("{{link}}")[1]}
       </p>
 
-      {!loaded && <p style={{ color: "var(--text3)", fontSize: 14 }}>Lädt…</p>}
+      {!loaded && <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("common.loading2")}</p>}
       {loaded && classes.length === 0 && (
         <p style={{ color: "var(--text3)", fontSize: 14 }}>
-          Noch keine Klasse. Lege sie unter <Link to="/classes" style={{ color: "var(--accent)" }}>Klassen</Link> an.
+          {t("cards.empty").split("{{link}}")[0]}<Link to="/classes" style={{ color: "var(--accent)" }}>{t("nav.classes")}</Link>{t("cards.empty").split("{{link}}")[1]}
         </p>
       )}
 

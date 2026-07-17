@@ -3,11 +3,13 @@
 // erst dadurch laesst sich ein schwach ausgefallenes Thema auf passende
 // Aufgaben abbilden.
 import { useState, useEffect } from "react";
+import { useLanguage } from "../i18n/index.jsx";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle } from "../components/Icons.jsx";
 
 const API = "/api";
 
 export default function Topics() {
+  const { t } = useLanguage();
   const [topics, setTopics] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
@@ -21,7 +23,7 @@ export default function Topics() {
     fetch(`${API}/topics`)
       .then((r) => (r.ok ? r.json() : []))
       .then((d) => setTopics(Array.isArray(d) ? d : []))
-      .catch(() => setError("Themen konnten nicht geladen werden"))
+      .catch(() => setError(t("topics.loadError")))
       .finally(() => setLoaded(true));
 
   useEffect(() => { load(); }, []);
@@ -32,13 +34,13 @@ export default function Topics() {
       const res = await fn();
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setError(body.detail || "Das hat nicht geklappt");
+        setError(body.detail || t("common.notWork"));
         return false;
       }
       await load();
       return true;
     } catch {
-      setError("Das hat nicht geklappt");
+      setError(t("common.notWork"));
       return false;
     }
   };
@@ -57,14 +59,14 @@ export default function Topics() {
       body: JSON.stringify({ name, parent_id: t.parent_id }),
     }));
 
-  const remove = async (t) => {
-    const kids = topics.filter((x) => x.parent_id === t.id);
-    const parts = [`„${t.name}“ löschen?`];
-    if (kids.length) parts.push(`${kids.length} Unterthema${kids.length > 1 ? "s" : ""} verschwindet mit.`);
-    const affected = t.question_count + kids.reduce((n, k) => n + k.question_count, 0);
-    if (affected) parts.push(`${affected} Frage${affected > 1 ? "n" : ""} verliert das Thema — die Fragen selbst bleiben.`);
+  const remove = async (tp) => {
+    const kids = topics.filter((x) => x.parent_id === tp.id);
+    const parts = [t("topics.delConfirm", { name: tp.name })];
+    if (kids.length) parts.push(t("topics.delSubs", { n: kids.length }));
+    const affected = tp.question_count + kids.reduce((n, k) => n + k.question_count, 0);
+    if (affected) parts.push(t("topics.delQuestions", { n: affected }));
     if (!confirm(parts.join("\n"))) return;
-    await call(() => fetch(`${API}/topics/${t.id}`, { method: "DELETE" }));
+    await call(() => fetch(`${API}/topics/${tp.id}`, { method: "DELETE" }));
   };
 
   const roots = topics.filter((t) => t.parent_id === null);
@@ -82,9 +84,9 @@ export default function Topics() {
     if (await add(childName.trim(), parentId)) { setChildName(""); setAddingUnder(null); }
   };
 
-  const row = (t, isChild) => (
+  const row = (tp, isChild) => (
     <div
-      key={t.id}
+      key={tp.id}
       style={{
         display: "flex", alignItems: "center", gap: 10,
         padding: isChild ? "8px 12px" : "12px 14px",
@@ -93,37 +95,37 @@ export default function Topics() {
         background: isChild ? "var(--bg)" : "var(--card)",
       }}
     >
-      {editing === t.id ? (
+      {editing === tp.id ? (
         <form
-          onSubmit={async (e) => { e.preventDefault(); if (await rename(t, editName.trim())) setEditing(null); }}
+          onSubmit={async (e) => { e.preventDefault(); if (await rename(tp, editName.trim())) setEditing(null); }}
           style={{ display: "flex", gap: 8, flex: 1 }}
         >
           <input
             value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus
             style={{ flex: 1, padding: 7, border: "1px solid var(--border2)", borderRadius: 8, background: "var(--bg)", color: "var(--text)" }}
           />
-          <button type="submit" style={btnPrimary}>Speichern</button>
-          <button type="button" onClick={() => setEditing(null)} style={btnSecondary}>Abbrechen</button>
+          <button type="submit" style={btnPrimary}>{t("common.save")}</button>
+          <button type="button" onClick={() => setEditing(null)} style={btnSecondary}>{t("common.abort")}</button>
         </form>
       ) : (
         <>
           <span style={{ flex: 1, fontWeight: isChild ? 400 : 600, fontSize: isChild ? 14 : 15.5, color: "var(--text)" }}>
-            {t.name}
+            {tp.name}
           </span>
-          {t.question_count > 0 && (
+          {tp.question_count > 0 && (
             <span style={{ fontSize: 12, color: "var(--text3)" }}>
-              {t.question_count} Frage{t.question_count > 1 ? "n" : ""}
+              {t("topics.questionCount", { n: tp.question_count })}
             </span>
           )}
           {!isChild && (
-            <button onClick={() => { setAddingUnder(t.id); setChildName(""); }} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>
-              + Unterthema
+            <button onClick={() => { setAddingUnder(tp.id); setChildName(""); }} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>
+              {t("topics.addSub")}
             </button>
           )}
-          <button onClick={() => { setEditing(t.id); setEditName(t.name); }} className="icon-btn" style={iconBtn} title="Umbenennen">
+          <button onClick={() => { setEditing(tp.id); setEditName(tp.name); }} className="icon-btn" style={iconBtn} title={t("common.rename")}>
             <Icon d={ICONS.edit} />
           </button>
-          <button onClick={() => remove(t)} className="icon-btn" style={iconBtn} title="Löschen">
+          <button onClick={() => remove(tp)} className="icon-btn" style={iconBtn} title={t("common.delete")}>
             <Icon d={ICONS.trash} color={C.danger} />
           </button>
         </>
@@ -133,45 +135,43 @@ export default function Topics() {
 
   return (
     <div style={{ maxWidth: 760 }}>
-      <h1 style={pageTitle}>Themen</h1>
+      <h1 style={pageTitle}>{t("topics.title")}</h1>
       <p style={{ color: "var(--text2)", marginBottom: 22, fontSize: 14 }}>
-        Der gemeinsame Wortschatz deiner Module. Fragen und Aufgaben zeigen auf
-        dieselben Themen — so lässt sich später erkennen, wo eine Klasse Übung
-        braucht.
+        {t("topics.intro")}
       </p>
 
       {error && <p style={{ color: "var(--danger, #dc2626)", fontSize: 13, marginBottom: 12 }}>{error}</p>}
 
       <form onSubmit={submitRoot} style={{ display: "flex", gap: 8, marginBottom: 22 }}>
         <input
-          value={newRoot} onChange={(e) => setNewRoot(e.target.value)} placeholder="Neues Thema, z. B. Bruchrechnung"
+          value={newRoot} onChange={(e) => setNewRoot(e.target.value)} placeholder={t("topics.newPlaceholder")}
           style={{ flex: 1, maxWidth: 340, padding: "9px 12px", border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)" }}
         />
         <button type="submit" disabled={!newRoot.trim()} style={{ ...btnPrimary, opacity: newRoot.trim() ? 1 : 0.4 }}>
-          Hinzufügen
+          {t("common.add")}
         </button>
       </form>
 
-      {!loaded && <p style={{ color: "var(--text3)", fontSize: 14 }}>Lädt…</p>}
+      {!loaded && <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("common.loading2")}</p>}
       {loaded && roots.length === 0 && (
         <p style={{ color: "var(--text3)", fontSize: 14 }}>
-          Noch keine Themen. Lege eins an — Unterthemen kommen darunter.
+          {t("topics.empty")}
         </p>
       )}
 
-      {roots.map((t) => (
-        <div key={t.id} style={{ marginBottom: 10 }}>
-          {row(t, false)}
-          {childrenOf(t.id).map((c) => row(c, true))}
-          {addingUnder === t.id && (
-            <form onSubmit={(e) => submitChild(e, t.id)} style={{ display: "flex", gap: 8, marginLeft: 28, marginBottom: 6 }}>
+      {roots.map((tp) => (
+        <div key={tp.id} style={{ marginBottom: 10 }}>
+          {row(tp, false)}
+          {childrenOf(tp.id).map((c) => row(c, true))}
+          {addingUnder === tp.id && (
+            <form onSubmit={(e) => submitChild(e, tp.id)} style={{ display: "flex", gap: 8, marginLeft: 28, marginBottom: 6 }}>
               <input
                 value={childName} onChange={(e) => setChildName(e.target.value)} autoFocus
-                placeholder="Unterthema, z. B. Vervielfachen und Teilen"
+                placeholder={t("topics.subPlaceholder")}
                 style={{ flex: 1, padding: 7, border: "1px solid var(--border2)", borderRadius: 8, background: "var(--bg)", color: "var(--text)" }}
               />
-              <button type="submit" style={btnPrimary}>Hinzufügen</button>
-              <button type="button" onClick={() => setAddingUnder(null)} style={btnSecondary}>Abbrechen</button>
+              <button type="submit" style={btnPrimary}>{t("common.add")}</button>
+              <button type="button" onClick={() => setAddingUnder(null)} style={btnSecondary}>{t("common.abort")}</button>
             </form>
           )}
         </div>

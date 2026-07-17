@@ -2,9 +2,11 @@
 // des Moduls bleiben im Kern liegen und sind nach dem Wiedereinschalten da.
 import { useState } from "react";
 import { useModules } from "../core/modules.js";
+import { useLanguage } from "../i18n/index.jsx";
 import { pageTitle } from "../components/Icons.jsx";
 
 export default function Modules() {
+  const { t } = useLanguage();
   const { modules, loading, toggle } = useModules();
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState("");
@@ -17,7 +19,7 @@ export default function Modules() {
     try {
       await toggle(m.key, !m.active);
     } catch (e) {
-      setError(e.message || "Fehler");
+      setError(e.message || t("modules.error"));
     } finally {
       setBusy(null);
     }
@@ -25,7 +27,7 @@ export default function Modules() {
 
   return (
     <div style={{ maxWidth: 720 }}>
-      <h1 style={pageTitle}>Module</h1>
+      <h1 style={pageTitle}>{t("modules.title")}</h1>
       <p style={{ color: "var(--text2)", marginBottom: 24, fontSize: 14 }}>
         Aktiviere, was du brauchst. Abschalten entfernt keine Daten — sie sind
         nach dem Wiedereinschalten wieder da.
@@ -50,7 +52,7 @@ export default function Modules() {
                 {m.name}
                 {!m.available && (
                   <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text3)", marginLeft: 8 }}>
-                    noch nicht verfügbar
+                    {t("modules.notAvailable")}
                   </span>
                 )}
               </div>
@@ -70,7 +72,7 @@ export default function Modules() {
                 opacity: busy === m.key || !m.available ? 0.5 : 1,
               }}
             >
-              {m.active ? "Abschalten" : "Aktivieren"}
+              {m.active ? t("modules.deactivate") : t("modules.activate")}
             </button>
           </div>
         ))}
