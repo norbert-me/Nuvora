@@ -53,67 +53,61 @@ Pflicht-Env: `POSTGRES_PASSWORD`, `TOKEN_SECRET` — Compose bricht ohne sie bew
 
 ### Als Nächstes
 
-1. Konten zusammenführen — CardVote gewinnt, Lernpfad-Auth entfällt.
-2. Themen-Taxonomie: CardVote-Fragen und Lernpfad-Aufgaben brauchen dieselben Themen, sonst ist Ziel 2 unmöglich.
-3. Lernpfad von localStorage auf Postgres, Daten pro Lehrkraft (siehe unten).
+1. **Themen-Taxonomie im Kern** — CardVote-Fragen und Lernpfad-Aufgaben brauchen dieselben Themen, sonst ist Ziel 2 unmöglich.
+2. **Lernpfad auf den Kern** — localStorage raus, Daten pro Lehrkraft, eigene Konten/Klassen entfallen (siehe Migrationshürde).
+
+Erledigt: Rahmen mit Modulregister; Klassen und Schüler liegen im Kern (`/classes`), nicht mehr im Modul.
 
 ## Was ist Nuvora
 
 Werkzeug **für Lehrkräfte** — keine Lernplattform. Lernende haben keine Konten und loggen sich nie ein; sie tauchen nur als Datensätze auf, die die Lehrkraft verwaltet. Deutschsprachig (UI, Kommentare, Daten).
 
-Nuvora bündelt zwei bestehende Apps als Module:
-
-- **CardVote** — Abstimmung im Unterricht per bedruckter ArUco-Karten, die die Lehrkraft mit dem Handy scannt.
-- **Lernpfad** (bisher „Lernleiter") — Verwaltung von Mathe-Aufgaben, Klassen und Lernpfaden.
-
-### Ziele der Bündelung
+### Ziele
 
 1. **Geteilte Klassen/Schüler** — einmal anlegen, in beiden Modulen nutzen.
 2. **Ergebnisse steuern Lernpfad** — schwache Themen aus CardVote-Tests erzeugen passende Aufgaben im Lernpfad.
 3. **Ein Login, eine Domain.**
 4. **Öffentlich anbieten** — Registrierung, Datenschutz, Mandantentrennung **pro Lehrkraft**.
 
-## Quellprojekte
+## Die Module
 
-Beide liegen außerhalb dieses Repos unter `/Users/schule/Dwarves/`.
+### CardVote — `apps/api` + `apps/web`
 
-### CardVote — `/Users/schule/Dwarves/plickers-clone` (v1.4.4)
+Im Rahmen, unter `/cardvote/*`. Herkunft: eigenständiges Projekt bis v1.4.4 ([Archiv](https://github.com/norbert-me/CardVote)), Weiterentwicklung nur noch hier.
 
-Wird der **Kern von Nuvora**. Sein Auth-, Konto- und Mandantenmodell gewinnt.
-
-- **Backend** `backend/app` — FastAPI + SQLAlchemy 2 (async, asyncpg) + Postgres 16, Alembic-Migrationen. Router bereits fachlich getrennt: `auth`, `classes`, `cards`, `questions`, `folders`, `sessions`, `results`, `marketplace`, `export_import`, `scan_image`. Live-Ergebnisse via `websocket.py`.
-- **Frontend** `frontend/` — React 18 + Vite + react-router, KaTeX für Formeln, i18n vorhanden.
+- **Backend** `apps/api/app` — FastAPI + SQLAlchemy 2 (async, asyncpg) + Postgres 16. Router: `auth`, `classes`, `modules` (Kern) sowie `questions`, `folders`, `sessions`, `results`, `scan_image`, `cards`, `marketplace`, `export_import` (Modul). Live-Ergebnisse via `websocket.py`.
+- **Frontend** `apps/web/src` — React 18 + Vite + react-router, KaTeX, i18n (de/en/es).
 - **Scan** — OpenCV (`opencv-contrib-python-headless`), ArUco `DICT_6X6_50`.
-- **Export** — reportlab (PDF), openpyxl (Excel), iDoceo-CSV.
-- **Auth** — PBKDF2 (SHA-256, 100k Iterationen), E-Mail-Bestätigungspflicht, Passwort-Reset per Einmal-Link (1h), Rate-Limits.
-- **Deploy** — `docker-compose.yml`: `db` / `backend` / `frontend`, Frontend auf `:3001`.
+- **Auth** — PBKDF2 (SHA-256, 100k Iterationen), E-Mail-Bestätigungspflicht, Reset per Einmal-Link (1h), Rate-Limits. Token im `localStorage`, globaler `fetch`-Interceptor in `main.jsx`.
 
-### Lernleiter — `/Users/schule/Dwarves/lernleiter`
+### Lernpfad — `apps/lernpfad`
 
-Wird **portiert**, nicht übernommen. Eigenes `CLAUDE.md` dort lesen, bevor daran gearbeitet wird.
+**Noch nicht im Rahmen.** Läuft als eigene App unter `/lernpfad/`, im Register `available=False`.
 
-- Express + `sql.js` (SQLite in-memory, als Datei-Buffer persistiert), `lernleiter.db`.
-- Frontend `js/app.js` — ~2000 Zeilen, ein IIFE, kein Framework, kein Build.
+- Express + `sql.js` (SQLite in-memory, als Datei-Buffer persistiert).
+- Frontend `js/app.js` — ~2000 Zeilen, ein IIFE, kein Framework, kein Build. KaTeX liegt gebündelt in `vendor/` (kein Dependency-Ordner — nicht löschen, der Docker-Build braucht ihn).
 - Tabellen: `aufgaben`, `schueler`, `klassen`, `lernpfade`, `kontakt`, `users`, `sessions`.
-- Auth: eigene Konten — scrypt-Hashing (`crypto.scryptSync`), `sessions`-Tabelle, HttpOnly-Cookie, Admin über `ADMIN_EMAIL`-Env.
+- Auth: eigene Konten — scrypt (`crypto.scryptSync`), `sessions`-Tabelle, HttpOnly-Cookie, Admin über `ADMIN_EMAIL`.
 
-> Achtung: Lernleiters eigenes `CLAUDE.md` ist an dieser Stelle **veraltet** — es beschreibt hardcodiertes Basic Auth (`admin`) und `LERNLEITER_NO_AUTH`. Beides ist aus `server.js` verschwunden. Dort dokumentierte Aussagen vor Verwendung gegen den Code prüfen.
+> **Fachbegriff:** Ein **Lernpfad** besteht aus mehreren **Lernleitern**. Das sind zwei Dinge, nicht alter und neuer Name — nicht zusammenführen. Nur die Produktmarke hieß früher „Lernleiter".
 
 ## Die zentrale Migrationshürde
 
-**Lernleiters Source of Truth ist `localStorage`, nicht die DB.** `js/app.js` hält State unter `ll_aufgaben`, `ll_schueler`, `ll_klassen`, `ll_id_counter`; jedes `save()` schreibt localStorage und spiegelt per `syncToAPI()` ans Backend. Die App läuft komplett ohne Backend.
+**Lernpfads Source of Truth ist `localStorage`, nicht die DB.** `js/app.js` hält State unter `ll_aufgaben`, `ll_schueler`, `ll_klassen`, `ll_id_counter`; jedes `save()` schreibt localStorage und spiegelt per `syncToAPI()` ans Backend. Die App läuft komplett ohne Backend.
 
-Lernleiter *hat* inzwischen Konten (scrypt, Sessions), aber die fachlichen Daten hängen trotzdem am Browser statt an der Person — die Konten schützen den Zugang, trennen aber keine Mandanten. Beide Konto-Systeme müssen zu einem werden; CardVots gewinnt (E-Mail-Bestätigung, Reset, Rate-Limits).
+Lernpfad *hat* Konten (scrypt, Sessions), aber die fachlichen Daten hängen am Browser statt an der Person — die Konten schützen den Zugang, trennen aber keine Mandanten.
 
-Für Nuvora heißt das — ohne diesen Umbau gibt es kein Produkt, nur zwei Apps unter einer Domain:
+Was zu tun ist:
 
 1. localStorage als Source of Truth entfernen; Server wird autoritativ.
-2. Jede Lernpfad-Entität bekommt einen Besitzer (Lehrkraft-FK), Postgres statt sql.js.
-3. `schueler`/`klassen` aus Lernleiter **entfallen** — CardVotes Klassen-/Schülermodell ist das gemeinsame. Nur `aufgaben` und `lernpfade` wandern rüber.
-4. Frontend-IIFE wird React-Modul im bestehenden Vite-Frontend.
+2. `aufgaben` und `lernpfade` nach Postgres, mit `owner_id`.
+3. `schueler`/`klassen`/`users` aus Lernpfad **entfallen** — der Kern hat sie bereits.
+4. Frontend-IIFE wird React-Modul in `apps/web`, dann `available=True`.
+
+Davor braucht es die **Themen-Taxonomie**: CardVote-Fragen und Lernpfad-Aufgaben müssen auf dieselben Themen zeigen, sonst lässt sich „schwaches Thema" nicht auf Aufgaben abbilden (Ziel 2).
 
 ## Konventionen
 
-- Deutsch für UI, Daten und Kommentare; Code-Bezeichner Englisch, wie in CardVote üblich.
-- Migrationen ausschließlich über Alembic — kein manuelles Schema-Gefummel.
+- Deutsch für UI, Daten und Kommentare; Code-Bezeichner Englisch.
+- **Kein Alembic im Betrieb**, obwohl es in `requirements.txt` steht: das Schema entsteht beim Start aus `Base.metadata.create_all` plus `_ensure_columns` in `main.py` (additive Spalten und Indizes, idempotent). Neue Tabellen kommen von selbst; neue Spalten auf bestehenden Tabellen gehören in die `wanted`-Liste in `_ensure_columns`.
 - Schüler sind Daten, keine Nutzer. Jeder Vorschlag, Lernenden ein Konto zu geben, widerspricht dem Produktzweck.

@@ -6,11 +6,13 @@ Quelloffen und nicht kommerziell nutzbar ([CC BY-NC 4.0](LICENSE)) — der Quell
 
 Lernende brauchen keine Geräte und keine Konten — sie tauchen nur als Datensätze auf, die die Lehrkraft verwaltet.
 
-> **Status: früh.** Nuvora bündelt gerade zwei bisher eigenständige Werkzeuge zu einem Produkt. Aktuell sind es zwei getrennt lauffähige Apps in einem Repo; gemeinsame Konten und geteilte Klassen kommen noch. Siehe [CLAUDE.md](CLAUDE.md) für den Zielaufbau.
+Nuvora ist die Basis: Konto, Klassen und Schüler liegen hier. Module werden dazugeschaltet und arbeiten auf diesen Daten — sie besitzen sie nicht.
+
+> **Status: im Aufbau.** Der Rahmen steht: Anmeldung, Startseite, Modulverwaltung und Klassen sind Nuvora. CardVote läuft als Modul darin. Lernpfad hängt noch als eigene App mit eigener Anmeldung daneben und ist deshalb noch nicht aktivierbar.
 
 ## Module
 
-### CardVote — `apps/cardvote`
+### CardVote — `apps/web` + `apps/api`
 
 Abstimmung im Unterricht ganz ohne digitale Endgeräte. Lernende halten bedruckte Karten hoch, die Lehrkraft scannt sie mit der Handykamera, Ergebnisse erscheinen live.
 
@@ -27,7 +29,9 @@ FastAPI · Postgres · React · OpenCV (ArUco)
 
 ### Lernpfad — `apps/lernpfad`
 
-Verwaltung von Mathe-Aufgaben, Klassen und Lernpfaden.
+Verwaltung von Mathe-Aufgaben und Lernpfaden. Ein Lernpfad besteht aus mehreren Lernleitern.
+
+> Noch nicht im Rahmen: eigene Konten, eigene Klassen. Wird als Nächstes auf den Kern gezogen.
 
 Express · sql.js · Vanilla JS
 
@@ -50,10 +54,11 @@ docker compose up -d --build
 
 Dann auf <http://localhost:8080>:
 
-| Pfad         | Modul    |
-| ------------ | -------- |
-| `/`          | CardVote |
-| `/lernpfad/` | Lernpfad |
+| Pfad         | Was                                   |
+| ------------ | ------------------------------------- |
+| `/`          | Nuvora — Startseite, Module, Klassen  |
+| `/cardvote/` | Modul CardVote                        |
+| `/lernpfad/` | Lernpfad (noch eigenständig)          |
 
 Ohne `POSTGRES_PASSWORD` und `TOKEN_SECRET` startet der Stack absichtlich nicht — Standardpasswörter sollen nicht versehentlich in Produktion landen. Zufallswert erzeugen mit `openssl rand -hex 32`.
 
@@ -62,10 +67,13 @@ Ohne `POSTGRES_PASSWORD` und `TOKEN_SECRET` startet der Stack absichtlich nicht 
 ```bash
 cp .deploy.env.example .deploy.env   # Server und Zielpfad eintragen
 ./deploy.sh                          # alles
-./deploy.sh lernpfad                 # nur einen Service neu bauen
+./deploy.sh api                      # nur einen Service neu bauen
+./deploy.sh --port 8090              # anderer Port, wird in .deploy.env gemerkt
 ```
 
-Lädt hoch, baut auf dem Server, prüft beide Module und bricht ab, wenn eins nicht antwortet.
+Lädt hoch, baut auf dem Server, prüft Kern und Module und bricht ab, wenn etwas nicht antwortet.
+
+Services: `api` (Kern), `web` (Shell + Modul-Seiten), `lernpfad`, `db`, `proxy`.
 
 Beim ersten Lauf legt das Skript die `.env` auf dem Server an und erzeugt `TOKEN_SECRET` und `POSTGRES_PASSWORD` als Zufallswerte (`chmod 600`) — niemand muss sie lesen oder eintippen. Danach wird die `.env` des Servers **nie** überschrieben; Secrets bleiben dort.
 
@@ -92,7 +100,9 @@ cp config/site.example.json config/site.json  # Impressum/Betreiberdaten
 | `.deploy.env`      | Serveradresse, Zielpfad                       | nein     |
 | `config/site.json` | Betreiber, Anschrift, Kontakt (Impressum)     | nein     |
 
-`config/site.json` ist die einzige Quelle der Betreiberdaten: Lernpfad liest sie serverseitig, CardVotes Impressum holt sie über `/site.json` vom Proxy.
+`config/site.json` ist die einzige Quelle der Betreiberdaten: Lernpfad liest sie serverseitig, das Impressum im Rahmen holt sie über `/site.json` vom Proxy.
+
+**Postgres legt Rolle und Datenbank nur beim ersten Start an.** Ein später geändertes `POSTGRES_PASSWORD` erreicht eine bestehende Datenbank nicht — dann ist es ein `ALTER ROLE`, kein `.env`-Edit. `deploy.sh` prüft das vorab und sagt, was zu tun ist.
 
 Datenbanken, Backups und Uploads enthalten personenbezogene Daten und sind grundsätzlich von Git ausgeschlossen.
 

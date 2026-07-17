@@ -608,7 +608,7 @@ app.get('/api/kontakt', (req, res) => {
 
 initDB().then(() => {
   app.listen(PORT, () => {
-    console.log(`Lernleiter Backend läuft auf Port ${PORT} (DB: ${dbPath})`);
+    console.log(`Lernpfad Backend läuft auf Port ${PORT} (DB: ${dbPath})`);
   });
 }).catch(err => {
   // Ohne dieses catch stirbt der Prozess wortlos und nginx liefert nur 502
