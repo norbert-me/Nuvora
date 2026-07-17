@@ -16,7 +16,7 @@ Verzeichnisse folgen der Architektur, nicht der Herkunft: `apps/api` (Kern + Mod
 
 ## Status
 
-Der Rahmen steht: Nuvora hat eigene Startseite, Modulregister und Navigation. CardVote ist ein Modul unter `/cardvote/*`. **Lernpfad noch nicht** — es hängt unter `/lernpfad/` als eigene App mit eigenen Konten und ist im Register bewusst `available=False`.
+Der Rahmen steht: Nuvora hat eigene Startseite, Modulregister und Navigation. CardVote ist ein Modul unter `/cardvote/*`. **Lernpfad ist zuschaltbar, sitzt aber noch nicht auf dem Kern** — es läuft unter `/lernpfad/` als eigene App mit eigenen Konten und Klassen (`external=True` im Register, echter Seitenwechsel statt React-Route). Dass dort eine zweite Anmeldung wartet, steht in seiner Modulbeschreibung.
 
 ### Aufbau heute
 
@@ -103,7 +103,7 @@ Im Rahmen, unter `/cardvote/*`. Herkunft: eigenständiges Projekt bis v1.4.4 ([A
 
 ### Lernpfad — `apps/lernpfad`
 
-**Noch nicht im Rahmen.** Läuft als eigene App unter `/lernpfad/`, im Register `available=False`.
+**Zuschaltbar, aber noch nicht auf dem Kern.** Läuft als eigene App unter `/lernpfad/` (`external=True`): eigene Konten, eigene Klassen, eigene SQLite-Datei.
 
 - Express + `sql.js` (SQLite in-memory, als Datei-Buffer persistiert).
 - Frontend `js/app.js` — ~2000 Zeilen, ein IIFE, kein Framework, kein Build. KaTeX liegt gebündelt in `vendor/` (kein Dependency-Ordner — nicht löschen, der Docker-Build braucht ihn).
