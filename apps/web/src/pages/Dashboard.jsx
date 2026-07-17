@@ -3,6 +3,8 @@ import Latex from "../components/Latex.jsx";
 import { Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import TopicPicker from "../components/TopicPicker.jsx";
+import { useModules } from "../core/modules.js";
 
 const API = "/api";
 
@@ -502,7 +504,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onQuestionsChang
   const [showAdd, setShowAdd] = useState(false);
   const [editingQ, setEditingQ] = useState(null);
   const [saving, setSaving] = useState(false);
-  const EMPTY_Q = { text: "", choices: { A: "", B: "", C: "", D: "" }, correct_answer: "", num_choices: 4, image_url: null, image_layout: "above", choice_images: null };
+  const EMPTY_Q = { text: "", choices: { A: "", B: "", C: "", D: "" }, correct_answer: "", num_choices: 4, image_url: null, image_layout: "above", choice_images: null, topic_id: null };
   const [newQ, setNewQ] = useState({ ...EMPTY_Q });
 
   const saveSet = async (updatedName, updatedQuestions, sQ, sA) => {
@@ -710,6 +712,8 @@ const LATEX_BUTTONS = [
 
 function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
   const { t } = useLanguage();
+  const { modules } = useModules();
+  const lernpfad = modules.find((m) => m.key === "lernpfad")?.active ?? false;
   const activeKeys = choiceKeys.slice(0, q.num_choices || 4);
   const inputRefs = useRef({});        // { text: el, A: el, B: el, ... }
   const activeField = useRef("text");  // das zuletzt fokussierte Feld
@@ -790,6 +794,17 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
           </button>
         ))}
       </div>
+
+      {/* Thema — nur sichtbar, wenn Lernpfad aktiv ist: allein fuer CardVote
+          hat ein Thema keinen Nutzen, und der Rahmen soll keine Felder zeigen,
+          die ins Leere laufen. Ohne Thema bleibt die Frage voll nutzbar. */}
+      {lernpfad && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 14, color: "var(--text2)" }}>Thema</span>
+          <TopicPicker value={q.topic_id ?? null} onChange={(id) => setQ({ ...q, topic_id: id })} />
+          <span style={{ fontSize: 12, color: "var(--text3)" }}>optional — verbindet die Frage mit Lernpfad-Aufgaben</span>
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: activeKeys.length <= 2 ? "1fr 1fr" : "1fr 1fr", gap: 8, marginBottom: 14 }}>
         {activeKeys.map((k) => {

@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Question, User
+from ..models import Question, Topic, User
 from .auth import get_current_user, rate_limit
 
 router = APIRouter(prefix="/api/questions", tags=["questions"])
@@ -26,6 +26,9 @@ class QuestionCreate(BaseModel):
     image_layout: str = "above"
     num_choices: int = 4
     choice_images: Optional[dict] = None
+    # Thema aus dem Kern. Optional und ohne Wirkung auf CardVote selbst —
+    # es verbindet die Frage nur mit Aufgaben desselben Themas.
+    topic_id: Optional[int] = None
 
     @model_validator(mode="after")
     def validate_fields(self):
@@ -57,13 +60,26 @@ class QuestionOut(BaseModel):
     image_layout: str
     num_choices: int
     choice_images: Optional[dict] = None
+    topic_id: Optional[int] = None
 
     model_config = {"from_attributes": True}
+
+
+async def _check_topic(db: AsyncSession, user: User, topic_id):
+    """Themen gehoeren dem Kern und der Lehrkraft — kein Fremdthema anhaengen."""
+    if topic_id is None:
+        return
+    result = await db.execute(
+        select(Topic.id).where(Topic.id == topic_id, Topic.owner_id == user.id)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(400, "Thema nicht gefunden")
 
 
 @router.post("", response_model=QuestionOut, status_code=201)
 async def create_question(body: QuestionCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("q_create", f"u{user.id}", 200, 60, "Zu viele Fragen in kurzer Zeit. Bitte kurz warten.")
+    await _check_topic(db, user, body.topic_id)
     q = Question(**body.model_dump())
     q.owner_id = user.id
     db.add(q)
@@ -79,6 +95,7 @@ async def update_question(question_id: int, body: QuestionCreate, user: User = D
         raise HTTPException(404)
     if q.owner_id and q.owner_id != user.id:
         raise HTTPException(403, "Kein Zugriff auf diese Frage")
+    await _check_topic(db, user, body.topic_id)
     for k, v in body.model_dump().items():
         setattr(q, k, v)
     await db.commit()
