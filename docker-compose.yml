@@ -33,6 +33,12 @@ services:
       - uploads:/app/uploads
     depends_on:
       - db
+    networks:
+      default:
+        aliases:
+          # apps/cardvote/frontend/nginx.conf proxyt intern auf Host "backend".
+          # Alias, damit die App-eigene Config unveraendert weiterlaeuft.
+          - backend
 
   cardvote-frontend:
     build: ./apps/cardvote/frontend
