@@ -8,7 +8,7 @@ Lernende brauchen keine Geräte und keine Konten — sie tauchen nur als Datens�
 
 Nuvora ist die Basis: Konto, Klassen und Schüler liegen hier. Module werden dazugeschaltet und arbeiten auf diesen Daten — sie besitzen sie nicht.
 
-> **Status: im Aufbau.** Der Rahmen steht: Anmeldung, Startseite, Modulverwaltung und Klassen sind Nuvora. CardVote läuft als Modul darin. Lernpfad hängt noch als eigene App mit eigener Anmeldung daneben und ist deshalb noch nicht aktivierbar.
+> **Status: im Aufbau.** Der Rahmen steht: Anmeldung, Startseite, Modulverwaltung, Klassen und Themen sind Nuvora. Alle drei Module sitzen auf dem Kern — keins hat noch eigene Konten oder eine eigene Datenbank.
 
 ## Module
 
@@ -29,11 +29,19 @@ FastAPI · Postgres · React · OpenCV (ArUco)
 
 ### Lernpfad — `apps/lernpfad`
 
-Verwaltung von Mathe-Aufgaben und Lernpfaden. Ein Lernpfad besteht aus mehreren Lernleitern.
+Verwaltung von Mathe-Aufgaben und Lernpfaden. Ein Lernpfad besteht aus mehreren Lernleitern; der Generator verteilt Aufgaben differenziert auf die Lernenden.
 
-> Noch nicht im Rahmen: eigene Konten, eigene Klassen. Wird als Nächstes auf den Kern gezogen.
+Läuft eingebettet unter Nuvoras Navbar — die bewährte Oberfläche blieb, nur der Unterbau wurde ausgetauscht.
 
-Express · sql.js · Vanilla JS
+Express (nur Statik) · Vanilla JS
+
+### Noten
+
+Notenbuch: Spalten aus deinem Leistungskonzept mit Gewichten, Noten und Beobachtungen je Person. Bedient sich wie eine leere Tabelle.
+
+Rechnet den gewichteten Schnitt deiner Noten und zeigt, wie viel des Konzepts belegt ist — die Zeugnisnote bleibt deine Entscheidung. Beobachtungen zählen nie mit.
+
+React · Postgres
 
 > CardVote wurde bis v1.4.4 eigenständig entwickelt ([Archiv](https://github.com/norbert-me/CardVote)). Weiterentwicklung findet nur noch hier statt.
 
@@ -58,7 +66,8 @@ Dann auf <http://localhost:8080>:
 | ------------ | ------------------------------------- |
 | `/`          | Nuvora — Startseite, Module, Klassen  |
 | `/cardvote/` | Modul CardVote                        |
-| `/lernpfad/` | Lernpfad (noch eigenständig)          |
+| `/lernpfad/` | Modul Lernpfad                        |
+| `/noten`     | Modul Noten                           |
 
 Ohne `POSTGRES_PASSWORD` und `TOKEN_SECRET` startet der Stack absichtlich nicht — Standardpasswörter sollen nicht versehentlich in Produktion landen. Zufallswert erzeugen mit `openssl rand -hex 32`.
 
