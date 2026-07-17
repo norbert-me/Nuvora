@@ -131,6 +131,9 @@ class SchoolClass(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
     owner_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    # Standard-Anzahl Themenbloecke je Woche (Wochenplanung). Nur ein Vorschlag
+    # beim Anlegen — die einzelne Woche darf abweichen.
+    plan_blocks: Mapped[int] = mapped_column(Integer, default=2, server_default="2")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     students: Mapped[list["Student"]] = relationship(back_populates="school_class", order_by="Student.card_id", cascade="all, delete-orphan")
     owner: Mapped[Optional["User"]] = relationship(back_populates="classes")
@@ -404,3 +407,43 @@ class GradeEntry(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     category: Mapped[GradeCategory] = relationship(back_populates="entries")
+
+
+# ─── Nuvora-Kern: Wochenplanung ───
+# Verbindet, was die Module tun: eine Woche hat 1–3 Themenbloecke (aus der
+# Taxonomie) und am Ende einen Test ueber diese Themen. Kern, kein Modul —
+# sie setzt keins voraus (Regel 3): Themen liegen im Kern, der Test ist ein
+# Marker, den CardVote spaeter fuellen kann.
+class PlanWeek(Base):
+    __tablename__ = "plan_weeks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    # Freie Beschriftung, z.B. "Woche 12" oder "17.–21. März".
+    label: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    notiz: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # Test am Ende der Woche geschrieben? Spaeter kann CardVote das fuellen.
+    test_done: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    blocks: Mapped[list["PlanBlock"]] = relationship(
+        back_populates="week", cascade="all, delete-orphan", order_by="PlanBlock.position"
+    )
+
+
+class PlanBlock(Base):
+    """Ein Themenblock einer Woche — Verweis auf ein Kern-Thema."""
+    __tablename__ = "plan_blocks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    week_id: Mapped[int] = mapped_column(ForeignKey("plan_weeks.id", ondelete="CASCADE"), index=True)
+    topic_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+    week: Mapped[PlanWeek] = relationship(back_populates="blocks")
