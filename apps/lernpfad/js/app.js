@@ -26,14 +26,112 @@
     // Uebergangs-App: haengt in Nuvora unter /lernpfad-alt/ (das echte Modul
     // liegt auf dem Kern unter /lernpfad/). Basis aus dem Pfad ableiten, damit
     // die App auch standalone unter / laeuft (`npm start`, ohne Proxy davor).
-    const API = (location.pathname.startsWith('/lernpfad-alt') ? '/lernpfad-alt' : '') + '/api';
+    // ─── Nuvora-Kern statt eigenem Backend ───
+    // Die App laeuft auf Nuvoras API. Ihre Oberflaeche bleibt unveraendert;
+    // uebersetzt wird nur an der Datengrenze (siehe zuKern/vonKern):
+    //   thema/unterthema (Text)  <->  topic_id  (Kern-Taxonomie)
+    //   klasse (Name)            <->  class_id  (Kern-Klassen)
+    // Eigene Konten, eigene Schueler und eigene Klassen gibt es nicht mehr.
+    const API = '/api';
+    const LP = '/api/lernpfad';
 
+    function authHeaders() {
+        const token = localStorage.getItem('token');
+        return token ? { 'Authorization': 'Bearer ' + token } : {};
+    }
+    function jsonHeaders() {
+        return Object.assign({ 'Content-Type': 'application/json' }, authHeaders());
+    }
+    async function api(url, opts) {
+        const o = Object.assign({}, opts || {});
+        o.headers = Object.assign(o.body ? jsonHeaders() : authHeaders(), o.headers || {});
+        return fetch(url, o);
+    }
+
+    // localStorage ist nur noch Anzeige-Cache, nicht mehr Wahrheit: der Server
+    // ist autoritativ. Frueher schrieb save() hierhin und spiegelte danach ans
+    // Backend — deshalb hingen Daten am Browser statt an der Person.
     const STORAGE_KEYS = {
         aufgaben: 'll_aufgaben',
         schueler: 'll_schueler',
         klassen: 'll_klassen',
         idCounter: 'll_id_counter'
     };
+
+    // Themen des Kerns, fuer die Uebersetzung Text <-> id.
+    let topics = [];
+    function topicPfad(id) {
+        const t = topics.find(x => x.id === id);
+        if (!t) return { thema: '', unterthema: '' };
+        const p = t.parent_id ? topics.find(x => x.id === t.parent_id) : null;
+        return p ? { thema: p.name, unterthema: t.name } : { thema: t.name, unterthema: '' };
+    }
+    async function topicId(thema, unterthema) {
+        thema = (thema || '').trim();
+        unterthema = (unterthema || '').trim();
+        if (!thema) return null;
+        let ober = topics.find(t => !t.parent_id && t.name === thema);
+        if (!ober) {
+            const r = await api(`${API}/topics`, { method: 'POST', body: JSON.stringify({ name: thema, parent_id: null }) });
+            if (!r.ok) return null;
+            ober = await r.json();
+            topics.push(ober);
+        }
+        if (!unterthema) return ober.id;
+        let unter = topics.find(t => t.parent_id === ober.id && t.name === unterthema);
+        if (!unter) {
+            const r = await api(`${API}/topics`, { method: 'POST', body: JSON.stringify({ name: unterthema, parent_id: ober.id }) });
+            if (!r.ok) return ober.id;
+            unter = await r.json();
+            topics.push(unter);
+        }
+        return unter.id;
+    }
+
+    // Kern-Aufgabe -> Form, die die Oberflaeche kennt.
+    function vonKern(ex) {
+        const tp = topicPfad(ex.topic_id);
+        return {
+            _id: String(ex.id),
+            id: ex.id,
+            thema: tp.thema,
+            unterthema: tp.unterthema,
+            kategorie: ex.kategorie || '',
+            quelleTyp: ex.quelle_typ || '',
+            quelleDetail: ex.quelle_detail || '',
+            quelle: ex.quelle_detail ? `${ex.quelle_typ === 'schulbuch' ? 'Schulbuch' : (ex.quelle_typ || '')} [${ex.quelle_detail}]`.trim() : '',
+            operator: ex.operator || '',
+            unteraufgaben: ex.unteraufgaben || 1,
+            kompetenz: ex.kompetenz || '',
+            methode: ex.methode || '',
+            lrs: ex.lrs ? 1 : 0,
+            lrsText: ex.lrs_text || '',
+            loesung: ex.loesung || '',
+            aufgabentext: ex.aufgabentext || '',
+            foerderschwerpunkte: ex.foerderschwerpunkte || [],
+            latex: ex.latex || ''
+        };
+    }
+
+    // Oberflaechen-Form -> Kern-Aufgabe.
+    async function zuKern(a) {
+        return {
+            topic_id: await topicId(a.thema, a.unterthema),
+            kategorie: a.kategorie || '',
+            aufgabentext: a.aufgabentext || '',
+            loesung: a.loesung || '',
+            operator: a.operator || '',
+            kompetenz: a.kompetenz || '',
+            methode: a.methode || '',
+            unteraufgaben: parseInt(a.unteraufgaben) || 1,
+            quelle_typ: a.quelleTyp || '',
+            quelle_detail: a.quelleDetail || '',
+            lrs: !!(a.lrs && a.lrs !== '0'),
+            lrs_text: a.lrsText || '',
+            foerderschwerpunkte: (a.foerderschwerpunkte && a.foerderschwerpunkte.length) ? a.foerderschwerpunkte : null,
+            latex: a.latex || ''
+        };
+    }
 
     function load(key) {
         try { return JSON.parse(localStorage.getItem(key)) || []; }
@@ -44,28 +142,32 @@
     }
     function save(key, data) {
         localStorage.setItem(key, JSON.stringify(data));
-        if (key === STORAGE_KEYS.aufgaben) syncToAPI('aufgaben', data);
-        if (key === STORAGE_KEYS.schueler) syncToAPI('schueler', data);
-        if (key === STORAGE_KEYS.klassen) syncToAPI('klassen', data);
+        if (key === STORAGE_KEYS.aufgaben) syncAufgaben(data);
+        // schueler/klassen gehoeren dem Kern und werden unter /classes gepflegt —
+        // von hier aus wird nichts zurueckgeschrieben.
     }
 
-    async function syncToAPI(type, data) {
+    // Aufgaben zum Kern spiegeln: anlegen, aendern, geloeschte entfernen.
+    async function syncAufgaben(data) {
         try {
-            const endpoint = `${API}/${type}`;
-            if (type === 'klassen') {
-                await Promise.all(data.map(name => fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name })
-                })));
-            } else {
-                await Promise.all(data.map(item => fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(item)
-                })));
+            const serverIds = new Set((await api(`${LP}/exercises`).then(r => r.ok ? r.json() : [])).map(e => e.id));
+            for (const a of data) {
+                const body = JSON.stringify(await zuKern(a));
+                const vorhanden = a.id && serverIds.has(a.id);
+                const r = await api(vorhanden ? `${LP}/exercises/${a.id}` : `${LP}/exercises`,
+                                    { method: vorhanden ? 'PUT' : 'POST', body });
+                if (r.ok && !vorhanden) {
+                    const neu = await r.json();
+                    a.id = neu.id; a._id = String(neu.id);
+                }
+                serverIds.delete(a.id);
             }
-        } catch(e) { console.error('API sync error:', e); }
+            // Was der Server noch hat, die Oberflaeche aber nicht mehr: loeschen.
+            for (const weg of serverIds) {
+                await api(`${LP}/exercises/${weg}`, { method: 'DELETE' });
+            }
+            localStorage.setItem(STORAGE_KEYS.aufgaben, JSON.stringify(data));
+        } catch(e) { console.error('Sync-Fehler:', e); }
     }
     function toast(msg) {
         const el = document.createElement('div');
@@ -178,105 +280,9 @@
     // Bei Login/Erststart werden die Daten des Kontos geladen und der lokale
     // Cache damit ersetzt (verschiedene Konten am selben Browser dürfen sich
     // nicht vermischen). Während der Sitzung cached localStorage und synct hoch.
-    let authMode = 'login'; // oder 'register'
-
-    function showAuth() {
-        document.getElementById('auth-overlay').style.display = 'flex';
-        document.body.classList.remove('authed');
-    }
-    function hideAuth() {
-        document.getElementById('auth-overlay').style.display = 'none';
-        document.body.classList.add('authed');
-    }
-
-    // Daten des angemeldeten Kontos laden und lokalen Cache ersetzen.
-    async function loadUserData() {
-        const [aRes, sRes, kRes] = await Promise.all([
-            fetch(`${API}/aufgaben`), fetch(`${API}/schueler`), fetch(`${API}/klassen`)
-        ]);
-        if (!aRes.ok || !sRes.ok || !kRes.ok) { showAuth(); return false; }
-        aufgaben = await aRes.json();
-        schueler = await sRes.json();
-        klassen = await kRes.json();
-        lernpfade = [];
-        // Direkt in den Cache schreiben, NICHT über save() - sonst würde alles
-        // sofort wieder ans Backend zurückgepostet.
-        localStorage.setItem(STORAGE_KEYS.aufgaben, JSON.stringify(aufgaben));
-        localStorage.setItem(STORAGE_KEYS.schueler, JSON.stringify(schueler));
-        localStorage.setItem(STORAGE_KEYS.klassen, JSON.stringify(klassen));
-        overviewKlasse = '';
-        renderAufgaben();
-        renderKlassen();
-        renderSchueler();
-        updateFilters();
-        return true;
-    }
-
-    async function checkAuth() {
-        try {
-            const me = await fetch(`${API}/me`).then(r => r.json());
-            if (me && me.user) {
-                document.getElementById('nav-user').textContent = me.user.email;
-                hideAuth();
-                await loadUserData();
-            } else {
-                showAuth();
-            }
-        } catch (e) {
-            showAuth();
-        }
-    }
-
-    function setAuthMode(mode) {
-        authMode = mode;
-        const reg = mode === 'register';
-        document.getElementById('auth-title').textContent = reg ? 'Registrieren' : 'Anmelden';
-        document.getElementById('auth-sub').textContent = reg
-            ? 'Lege ein Konto an – deine Daten bleiben privat für dich.'
-            : 'Melde dich an, um deine Aufgaben und Klassen zu verwalten.';
-        document.getElementById('auth-submit').textContent = reg ? 'Konto anlegen' : 'Anmelden';
-        document.getElementById('auth-switch-text').textContent = reg ? 'Schon ein Konto?' : 'Noch kein Konto?';
-        document.getElementById('auth-switch-link').textContent = reg ? 'Anmelden' : 'Registrieren';
-        document.getElementById('auth-password').setAttribute('autocomplete', reg ? 'new-password' : 'current-password');
-        document.getElementById('auth-error').style.display = 'none';
-    }
-
-    document.getElementById('auth-switch-link').addEventListener('click', (e) => {
-        e.preventDefault();
-        setAuthMode(authMode === 'login' ? 'register' : 'login');
-    });
-
-    document.getElementById('auth-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const email = document.getElementById('auth-email').value.trim();
-        const password = document.getElementById('auth-password').value;
-        const errEl = document.getElementById('auth-error');
-        errEl.style.display = 'none';
-        const btn = document.getElementById('auth-submit');
-        btn.disabled = true;
-        try {
-            const res = await fetch(`${API}/` + (authMode === 'register' ? 'register' : 'login'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                errEl.textContent = data.error || 'Fehlgeschlagen';
-                errEl.style.display = '';
-                return;
-            }
-            document.getElementById('nav-user').textContent = data.email || email;
-            document.getElementById('auth-password').value = '';
-            hideAuth();
-            await loadUserData();
-        } catch (err) {
-            errEl.textContent = 'Serverfehler';
-            errEl.style.display = '';
-        } finally {
-            btn.disabled = false;
-        }
-    });
+    // Login-Code entfernt: Nuvora meldet an, dieses Modul erbt den Token.
+    // Was hier stand (authMode, setAuthMode, Login-/Registrier-Formular), hatte
+    // kein Backend mehr — siehe showAuth(), das zur Anmeldung des Rahmens fuehrt.
 
     // Konto-Dropdown auf/zu
     const accountMenu = document.getElementById('account-menu');
@@ -288,15 +294,16 @@
         if (!document.getElementById('nav-account').contains(e.target)) accountMenu.style.display = 'none';
     });
 
-    document.getElementById('btn-logout').addEventListener('click', async () => {
-        await fetch(`${API}/logout`, { method: 'POST' }).catch(() => {});
-        // Lokalen Cache leeren, damit das nächste Konto nichts erbt.
+    // Abmelden gehoert Nuvora: das Modul hat kein eigenes Konto mehr. Im Rahmen
+    // meldet man sich oben rechts ab; der Knopf hier fuehrt nur dorthin.
+    document.getElementById('btn-logout').addEventListener('click', () => {
+        // Anzeige-Cache leeren, damit das naechste Konto nichts erbt.
         [STORAGE_KEYS.aufgaben, STORAGE_KEYS.schueler, STORAGE_KEYS.klassen, STORAGE_KEYS.idCounter]
             .forEach(k => localStorage.removeItem(k));
         aufgaben = []; schueler = []; klassen = []; lernpfade = [];
-        document.getElementById('auth-password').value = '';
-        setAuthMode('login');
-        showAuth();
+        const ziel = '/profile';
+        if (window.parent !== window) window.parent.location.href = ziel;
+        else window.location.href = ziel;
     });
 
     document.addEventListener('DOMContentLoaded', checkAuth);
@@ -1037,7 +1044,8 @@
         if (!confirm(msg)) return;
 
         // Schüler entfernen (Backend + lokal)
-        kSchueler.forEach(s => fetch(`${API}/schueler/` + s._id, { method: 'DELETE' }).catch(() => {}));
+        // Schueler gehoeren dem Kern und werden unter /classes gepflegt —
+        // dieses Modul loescht sie nicht.
         schueler = schueler.filter(s => s.klasse !== name);
         save(STORAGE_KEYS.schueler, schueler);
 
@@ -1048,7 +1056,7 @@
             if (kept.length === p.lernleitern.length) continue;
             p.lernleitern = kept;
             if (kept.length === 0) {
-                fetch(`${API}/lernpfade/` + p._id, { method: 'DELETE' }).catch(() => {});
+                api(`${LP}/paths/` + p.id, { method: 'DELETE' }).catch(() => {});
             } else {
                 await savePfad(p);
             }
@@ -1641,12 +1649,50 @@
     // verschluckt wird - sonst sieht der Nutzer Daten, die es nicht mehr gibt.
     async function savePfad(pfad) {
         try {
-            const res = await fetch(`${API}/lernpfade`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(pfad)
-            });
-            if (!res.ok) throw new Error('HTTP ' + res.status);
+            // Pfad anlegen, falls neu. Der Kern kennt Namen als eindeutig je Konto.
+            if (!pfad.id) {
+                const r = await api(`${LP}/paths`, { method: 'POST', body: JSON.stringify({ name: pfad.name }) });
+                if (r.status === 409) {
+                    // Existiert schon: seine id holen statt zu scheitern.
+                    const alle = await api(`${LP}/paths`).then(x => x.ok ? x.json() : []);
+                    const da = alle.find(x => x.name === pfad.name);
+                    if (!da) throw new Error('HTTP 409');
+                    pfad.id = da.id;
+                    for (const ll of (da.ladders || [])) await api(`${LP}/ladders/${ll.id}`, { method: 'DELETE' });
+                } else if (!r.ok) {
+                    throw new Error('HTTP ' + r.status);
+                } else {
+                    pfad.id = (await r.json()).id;
+                }
+            } else {
+                // Bestehender Pfad: Lernleitern ersetzen, statt zu duplizieren.
+                const alle = await api(`${LP}/paths`).then(x => x.ok ? x.json() : []);
+                const da = alle.find(x => x.id === pfad.id);
+                for (const ll of ((da && da.ladders) || [])) await api(`${LP}/ladders/${ll.id}`, { method: 'DELETE' });
+            }
+
+            const klassenRaw = await api(`${API}/classes`).then(x => x.ok ? x.json() : []);
+            const classIdVon = name => (klassenRaw.find(c => c.name === name) || {}).id || null;
+
+            let pos = 0;
+            for (const ll of (pfad.lernleitern || [])) {
+                const assignments = (ll.schueler || []).map(sch => ({
+                    student_id: parseInt(sch.id || sch._id) || null,
+                    exercise_ids: (sch.aufgabenIds || []).map(x => parseInt(x)).filter(Boolean)
+                })).filter(a => a.student_id);
+                const r = await api(`${LP}/paths/${pfad.id}/ladders`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        class_id: classIdVon(ll.klasse),
+                        topic_id: await topicId(ll.thema, ll.unterthema),
+                        position: pos++,
+                        notizen: ll.notizen || '',
+                        assignments: assignments.length ? assignments : null,
+                        config: ll.config || null
+                    })
+                });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+            }
             return true;
         } catch (e) {
             toast('Speichern fehlgeschlagen: ' + e.message);
@@ -2141,7 +2187,7 @@
         if (!confirm(ids.length + ' ausgewählte Aufgabe(n) wirklich löschen?')) return;
         const idSet = new Set(ids);
         // Backend + lokal löschen
-        ids.forEach(id => fetch(`${API}/aufgaben/` + id, { method: 'DELETE' }).catch(() => {}));
+        ids.forEach(id => api(`${LP}/exercises/` + id, { method: 'DELETE' }).catch(() => {}));
         aufgaben = aufgaben.filter(a => !idSet.has(a._id));
         save(STORAGE_KEYS.aufgaben, aufgaben);
         bulkSelectAll.checked = false;
@@ -2453,7 +2499,34 @@
 
     async function loadLernpfade() {
         try {
-            lernpfade = await fetch(`${API}/lernpfade`).then(r => r.json()).catch(() => []);
+            const paths = await api(`${LP}/paths`).then(r => r.ok ? r.json() : []);
+            const byId = new Map(schueler.map(s => [s.id, s]));
+            lernpfade = paths.map(p => ({
+                _id: String(p.id),
+                id: p.id,
+                name: p.name,
+                aufgaben_order: [],
+                lernleitern: (p.ladders || []).map(l => {
+                    const tp = topicPfad(l.topic_id);
+                    return {
+                        _id: String(l.id),
+                        thema: tp.thema,
+                        unterthema: tp.unterthema,
+                        klasse: (schueler.find(s => s.id === ((l.assignments || [])[0] || {}).student_id) || {}).klasse || '',
+                        notizen: l.notizen || '',
+                        config: l.config || null,
+                        schueler: (l.assignments || []).map(a => {
+                            const st = byId.get(a.student_id);
+                            return {
+                                _id: String(a.student_id),
+                                id: a.student_id,
+                                name: st ? st.name : '?',
+                                aufgabenIds: a.exercise_ids || []
+                            };
+                        })
+                    };
+                })
+            }));
         } catch(e) { lernpfade = []; }
         renderLernpfade();
         renderGenPfade();
@@ -2478,7 +2551,7 @@
         const deletePfad = id => {
             if (!confirm('Pfad wirklich löschen?')) return;
             lernpfade = lernpfade.filter(p => p._id !== id);
-            fetch(`${API}/lernpfade/` + id, { method: 'DELETE' }).catch(() => {});
+            api(`${LP}/paths/` + id, { method: 'DELETE' }).catch(() => {});
             loadLernpfade();
         };
         // Klick auf Balken öffnet; Icon-Buttons haben Vorrang via stopPropagation

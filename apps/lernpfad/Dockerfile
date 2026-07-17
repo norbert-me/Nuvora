@@ -12,7 +12,8 @@ RUN npm install --omit=dev
 
 # Backend
 COPY server.js ./
-COPY daten/ ./daten/
+# daten/ entfaellt: es war Seed fuer die eigene SQLite-Datei, die es nicht
+# mehr gibt. Die Beispielaufgaben liegen jetzt unter examples/.
 # config/ wird NICHT ins Image kopiert: die Betreiberdaten liegen zentral in
 # Nuvoras config/ und werden zur Laufzeit gemountet (siehe docker-compose.yml).
 

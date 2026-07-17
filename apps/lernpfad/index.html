@@ -10,30 +10,7 @@
 </head>
 <body>
     <!-- Login / Registrierung: liegt über allem, bis eine Session besteht -->
-    <div id="auth-overlay" class="auth-overlay">
-        <div class="auth-card">
-            <div class="auth-brand">Lernpfad</div>
-            <h1 class="auth-title" id="auth-title">Anmelden</h1>
-            <p class="auth-sub" id="auth-sub">Melde dich an, um deine Aufgaben und Klassen zu verwalten.</p>
-            <form id="auth-form" class="auth-form">
-                <label for="auth-email">E-Mail</label>
-                <input type="email" id="auth-email" autocomplete="email" required placeholder="name@schule.de">
-                <label for="auth-password">Passwort</label>
-                <input type="password" id="auth-password" autocomplete="current-password" required placeholder="mind. 8 Zeichen">
-                <div id="auth-error" class="auth-error" style="display:none"></div>
-                <button type="submit" class="btn primary auth-submit" id="auth-submit">Anmelden</button>
-            </form>
-            <p class="auth-switch">
-                <span id="auth-switch-text">Noch kein Konto?</span>
-                <a href="#" id="auth-switch-link">Registrieren</a>
-            </p>
-            <p class="auth-legal">
-                <a href="impressum.html">Impressum</a>
-                <a href="datenschutz.html">Datenschutz</a>
-                <a href="kontakt.html">Kontakt</a>
-            </p>
-        </div>
-    </div>
+    <!-- Login-Overlay entfernt: Nuvora meldet an, dieses Modul erbt den Token. -->
 
     <nav class="navbar">
         <div class="nav-inner">

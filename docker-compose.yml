@@ -56,16 +56,13 @@ services:
       - api
 
   lernpfad:
+    # Nur noch Statik: Konten, Klassen, Schueler und Themen liegen im Kern,
+    # die Fachdaten unter /api/lernpfad. Deshalb kein DB-Volume und kein
+    # ADMIN_EMAIL mehr — das Modul haelt keine Daten.
     build: ./apps/lernpfad
     restart: unless-stopped
-    environment:
-      DB_PATH: /app/data/lernpfad.db
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
     volumes:
-      # Verzeichnis mounten, nie die DB-Datei selbst: eine nicht existierende
-      # gemountete Datei legt Docker als Verzeichnis an -> EISDIR.
-      - lernpfad-data:/app/data
-      # Betreiberdaten: eine Quelle fuer beide Module (siehe config/).
+      # Betreiberdaten fuer Impressum/Datenschutz der ausgelieferten Seiten.
       - ./config:/app/config:ro
 
   proxy:
@@ -85,4 +82,3 @@ services:
 volumes:
   pgdata:
   uploads:
-  lernpfad-data:
