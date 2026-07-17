@@ -68,6 +68,14 @@ import { useModules } from "./core/modules.js";
 // Navigation ist modulbezogen: die Shell zeigt die Punkte des Moduls, in dem
 // man gerade ist. Ausserhalb eines Moduls navigiert Nuvora selbst.
 const CV = "/cardvote";
+
+// Bereich fuer die kontextsensitive Hilfe aus dem aktuellen Pfad.
+function helpArea(pathname) {
+  if (pathname.startsWith("/cardvote")) return "cardvote";
+  if (pathname.startsWith("/lernpfad")) return "lernpfad";
+  if (pathname.startsWith("/noten")) return "noten";
+  return "core";
+}
 const LP = "/lernpfad";
 const NO = "/noten";
 
@@ -588,7 +596,7 @@ function AppRoutes({ user, setUser, logout }) {
             Beschriftungen. Kontakt steht vor den Rechtsseiten: er wird
             haeufiger gebraucht. */}
         <span style={{ display: "inline-flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: "0 8px", padding: "0 16px" }}>
-          <Link to="/help" style={footerLink}>{t("footer.help")}</Link>
+          <Link to={`/help?area=${helpArea(location.pathname)}`} style={footerLink}>{t("footer.help")}</Link>
           <span style={footerSep}>·</span>
           <Link to={`${CV}/tutorial`} style={footerLink}>Tutorial</Link>
           <span style={footerSep}>·</span>

@@ -1,8 +1,15 @@
-import { Link } from "react-router-dom";
+// Hilfe, passend zum Bereich, aus dem man kommt.
+//
+// Nuvora hat mehrere Bereiche (Kern, CardVote, Lernpfad, Noten). Eine einzige
+// CardVote-Hilfe passte nicht mehr. Der Bereich kommt aus ?area= (die Navbar
+// haengt ihn beim Klick auf Hilfe an, abgeleitet aus der aktuellen Seite);
+// oben stehen die anderen Bereiche zum Wechseln.
+import { Link, useSearchParams } from "react-router-dom";
+import { useModules } from "../core/modules.js";
 
 const Section = ({ title, children }) => (
-  <section style={{ marginBottom: 28 }}>
-    <h3 style={{ fontSize: 17, fontWeight: 700, color: "var(--text)", marginBottom: 8 }}>{title}</h3>
+  <section style={{ marginBottom: 26 }}>
+    <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", marginBottom: 8 }}>{title}</h3>
     <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.7 }}>{children}</div>
   </section>
 );
@@ -14,91 +21,177 @@ const Faq = ({ q, children }) => (
   </details>
 );
 
-export default function Help() {
+const A = ({ to, children }) => <Link to={to} style={{ color: "var(--accent)" }}>{children}</Link>;
+
+// ─── Inhalte je Bereich ───
+
+function KernHilfe() {
   return (
-    <div style={{ maxWidth: 700 }}>
-      <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", marginBottom: 20 }}>Hilfe</h2>
+    <>
+      <Section title="Klassen und Schüler">
+        Klassen und Schüler gehören Nuvora, nicht einem einzelnen Modul — einmal unter <A to="/classes">Klassen</A> angelegt,
+        nutzen alle Module dieselben. Jede Person hat eine Kartennummer (für CardVote), dazu optional E-/G-Kurs,
+        Förderschwerpunkte, Notizen und die Klassenleitung.
+      </Section>
+      <Section title="Themen">
+        <A to="/topics">Themen</A> sind der gemeinsame Wortschatz: CardVote-Fragen und Lernpfad-Aufgaben zeigen auf
+        dieselben Themen. Nur so lässt sich später erkennen, wo eine Klasse Übung braucht. Themen sind zweistufig
+        (Thema → Unterthema) und entstehen auch nebenbei beim Anlegen einer Aufgabe.
+      </Section>
+      <Section title="Module">
+        Unter <A to="/modules">Module</A> schaltest du zu, was du brauchst. Abschalten entfernt keine Daten — sie
+        sind nach dem Wiedereinschalten wieder da.
+      </Section>
+      <Faq q="Was passiert mit den Daten meiner Schüler?">
+        Alles liegt auf dem eigenen Server — keine Cloud, kein Tracking. Förderschwerpunkte und Notizen sind
+        besonders geschützt: sie stehen in keinem Export und in keiner Veröffentlichung. Details in der{" "}
+        <A to="/legal">Datenschutzerklärung</A>.
+      </Faq>
+    </>
+  );
+}
 
-      {/* Wer Hilfe sucht, sucht meist den Einstieg — das Tutorial fuehrt durch
-          die vier Bereiche in der Reihenfolge einer echten Stunde. */}
-      <p style={{ marginBottom: 24, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", fontSize: 14 }}>
-        Zum ersten Mal hier? Das <Link to="/cardvote/tutorial" style={{ color: "var(--accent)", fontWeight: 600 }}>Tutorial</Link> führt
-        dich durch Fragen, Klasse, Live-Session und Auswertung — jederzeit neu startbar.
-      </p>
-
+function CardVoteHilfe() {
+  return (
+    <>
       <Section title="Was ist CardVote?">
-        CardVote ist ein Abstimmungstool für den Unterricht — ganz ohne Geräte für die Lernenden.
-        Jede Person bekommt eine gedruckte Karte mit einem Muster (Marker). Je nachdem, welche Seite
-        der Karte nach oben zeigt, bedeutet das Antwort A, B, C oder D. Die Lehrkraft scannt die
-        hochgehaltenen Karten mit der Handykamera, die Ergebnisse erscheinen live auf dem Beamer.
+        Abstimmung im Unterricht — ganz ohne Geräte für die Lernenden. Jede Person bekommt eine gedruckte Karte
+        mit einem Muster. Je nachdem, welche Seite nach oben zeigt, bedeutet das Antwort A, B, C oder D. Die
+        Lehrkraft scannt die hochgehaltenen Karten mit der Handykamera, Ergebnisse erscheinen live auf dem Beamer.
       </Section>
-
-      <Section title="Karten drucken und falten">
-        Unter <Link to="/cardvote/classes" style={{ color: "var(--accent)" }}>Klassen</Link> eine Klasse anlegen
-        und über das Drucker-Symbol die Karten als PDF herunterladen. Pro Blatt liegen zwei Karten:
-        vorne der Marker mit den Buchstaben A, B, C, D an den vier Rändern, auf der Folgeseite die
-        zugehörigen Namen (beidseitig drucken). An der gestrichelten Linie auseinanderschneiden — fertig.
-        <br /><br />
-        <strong>Wichtig:</strong> Die Karte gehört fest zu einer Person (Kartennummer). Zum Antworten
-        wird die Karte so gedreht, dass der gewählte Buchstabe oben ist, und hochgehalten.
+      <Section title="Karten drucken">
+        Unter <A to="/cardvote/cards">Karten</A> die Karten-PDF einer Klasse herunterladen. Pro Blatt zwei Karten:
+        vorne der Marker mit A, B, C, D an den Rändern, auf der Folgeseite die Namen (beidseitig drucken). An der
+        gestrichelten Linie schneiden. Zum Antworten wird die Karte so gedreht, dass der Buchstabe oben ist.
       </Section>
-
       <Section title="Ablauf einer Session">
         <ol style={{ paddingLeft: 20, margin: 0 }}>
-          <li>Unter <Link to="/cardvote/questions" style={{ color: "var(--accent)" }}>Fragen</Link> ein Frageset erstellen (oder aus dem Marktplatz übernehmen).</li>
-          <li>Unter <Link to="/cardvote/session" style={{ color: "var(--accent)" }}>Live-Session</Link> Klasse und Frageset wählen und starten.</li>
-          <li>Den angezeigten <strong>Session-Code</strong> im Scanner auf dem Handy eingeben (oder QR-Code scannen).</li>
-          <li>Frage auf dem Beamer zeigen, Lernende halten Karten hoch, mit dem Handy über die Klasse schwenken.</li>
-          <li><strong>Aufdecken</strong> zeigt die Antwortverteilung — auch direkt vom Handy aus steuerbar.</li>
-          <li>Nach der letzten Frage <strong>Test beenden</strong> — die Auswertung liegt danach unter <Link to="/cardvote/tests" style={{ color: "var(--accent)" }}>Auswertung</Link>.</li>
+          <li>Unter <A to="/cardvote/questions">Fragen</A> ein Frageset erstellen (oder aus dem Marktplatz übernehmen).</li>
+          <li>Unter <A to="/cardvote/session">Live-Session</A> Klasse und Frageset wählen und starten.</li>
+          <li>Den <strong>Session-Code</strong> im Scanner auf dem Handy eingeben.</li>
+          <li>Frage auf dem Beamer zeigen, Karten hochhalten, mit dem Handy über die Klasse schwenken.</li>
+          <li><strong>Aufdecken</strong> zeigt die Verteilung — auch vom Handy aus steuerbar.</li>
+          <li>Nach der letzten Frage <strong>Test beenden</strong> — Auswertung unter <A to="/cardvote/tests">Auswertung</A>.</li>
         </ol>
       </Section>
-
-      <Section title="Test oder Spiel-Modus?">
-        <strong>Test</strong> speichert Ergebnisse für die Auswertung (Noten, Statistiken, Export).
-        <strong> Spiel-Modus</strong> ist für spielerisches Wiederholen: Punkte, Streaks und eine
-        Bestenliste mit Podium am Ende — ohne Benotung. Im Spiel-Modus gibt es einen Geschwindigkeitsbonus,
-        wenn ein Timer gesetzt ist.
-      </Section>
-
       <Section title="Tipps zum Scannen">
         <ul style={{ paddingLeft: 20, margin: 0 }}>
-          <li>Gutes Licht hilft — Gegenlicht und starke Schatten vermeiden.</li>
-          <li>Karten ruhig und möglichst flach zur Kamera halten, nicht knicken.</li>
-          <li>Langsam über die Klasse schwenken; erfasste Personen erscheinen sofort in der Liste.</li>
-          <li>„Erkennung anzeigen" blendet Rahmen um erkannte Karten samt Antwort ein — nützlich zum Prüfen.</li>
+          <li>Gutes Licht, Gegenlicht und starke Schatten vermeiden.</li>
+          <li>Karten flach zur Kamera halten, nicht knicken.</li>
+          <li>Langsam schwenken; erfasste Personen erscheinen sofort.</li>
+          <li>„Erkennung anzeigen" blendet Rahmen samt Antwort ein.</li>
         </ul>
       </Section>
-
-      <h3 style={{ fontSize: 17, fontWeight: 700, color: "var(--text)", margin: "32px 0 12px" }}>Häufige Fragen</h3>
-
-      <Faq q="Der Session-Code funktioniert nicht.">
-        Der Code gilt nur für die eigene, gerade laufende Session. Prüfe, ob die Session auf dem
-        Hauptgerät gestartet ist und du im Scanner mit demselben Konto angemeldet bist.
-      </Faq>
       <Faq q="Eine Karte wird nicht erkannt.">
-        Meist Licht oder Winkel: Karte flacher halten, näher herangehen, Reflexionen vermeiden.
-        Zerknickte oder stark verblasste Karten neu drucken.
-      </Faq>
-      <Faq q="Eine Person hat ihre Karte verloren.">
-        Unter Klassen die Karten-PDF erneut herunterladen und nur die betroffene Seite drucken —
-        die Kartennummer bleibt dieselbe.
-      </Faq>
-      <Faq q="Ich habe keine Bestätigungs-E-Mail bekommen.">
-        Spam-Ordner prüfen. Auf der Anmeldeseite kann die Bestätigungs-E-Mail erneut gesendet
-        werden (Hinweis erscheint beim Anmeldeversuch).
+        Meist Licht oder Winkel: flacher halten, näher heran, Reflexionen vermeiden. Zerknickte oder verblasste
+        Karten neu drucken.
       </Faq>
       <Faq q="Kann ich Fragen mit Formeln oder Bildern erstellen?">
-        Ja. Mathematische Formeln über die Formel-Leiste im Frage-Editor (LaTeX, z.&nbsp;B. Brüche
-        und Wurzeln), Bilder per Upload — beides auch in den Antwortmöglichkeiten.
+        Ja. Formeln über die Formel-Leiste im Editor (LaTeX), Bilder per Upload — beides auch in den Antworten.
       </Faq>
-      <Faq q="Was passiert mit meinen Daten?">
-        Alles liegt auf dem eigenen Server der Schule bzw. des Betreibers — keine Cloud, kein Tracking.
-        Details in der <Link to="/legal" style={{ color: "var(--accent)" }}>Datenschutzerklärung</Link>.
+    </>
+  );
+}
+
+function LernpfadHilfe() {
+  return (
+    <>
+      <Section title="Was ist Lernpfad?">
+        Verwaltung von Aufgaben und Lernpfaden. Ein <strong>Lernpfad</strong> besteht aus mehreren
+        <strong> Lernleitern</strong> — jede Lernleiter deckt ein Thema für eine Klasse ab, mit einer eigenen
+        Aufgabenauswahl pro Person. Genau diese Auswahl ist die Differenzierung.
+      </Section>
+      <Section title="Aufgaben und Themen">
+        Jede Aufgabe hängt an einem <A to="/topics">Thema</A> aus dem Kern — demselben, das auch CardVote-Fragen
+        nutzen. Kategorie (Basis, E-/G-Niveau), Quelle, LRS-Variante und Förderschwerpunkte lassen sich hinterlegen.
+      </Section>
+      <Section title="Klassen">
+        Der Tab „Klasse" zeigt die Schüler nur an — angelegt und bearbeitet werden sie im Rahmen unter{" "}
+        <A to="/classes">Klassen</A>, damit alle Module dieselben Daten nutzen.
+      </Section>
+      <Faq q="Warum sehe ich meine alten Aufgaben nicht?">
+        Bestandsdaten aus der früheren Lernleiter-App werden einmalig übernommen. Ist das noch nicht geschehen,
+        ist das Modul leer. Frag den Betreiber nach der Datenübernahme.
       </Faq>
+    </>
+  );
+}
+
+function NotenHilfe() {
+  return (
+    <>
+      <Section title="Wie das Notenbuch funktioniert">
+        Wie eine leere Tabelle: Zeilen sind die Schüler, Spalten legst du selbst an (Name + Gewicht in Prozent aus
+        deinem Leistungskonzept). In eine Zelle tippen: <code>2</code> oder <code>2,3</code>. Mehrere Noten pro Feld
+        sind erlaubt — gezeigt wird ihr Schnitt.
+      </Section>
+      <Section title="Schnitt und Zeugnisnote">
+        Der Schnitt ist eine <strong>Rechenhilfe</strong> aus deinen Noten, keine Zeugnisnote. „40 % belegt" heißt,
+        dass erst dieser Anteil deines Konzepts mit Noten hinterlegt ist. Die Note bleibt deine Entscheidung.
+      </Section>
+      <Section title="Beobachtungen">
+        Über die Beob.-Spalte hältst du Beobachtungen fest (Anstrengungsbereitschaft, Hilfe angeboten …). Sie
+        zählen <strong>nie</strong> in den Schnitt — sie sind dein Gedächtnis fürs Quartalsende.
+      </Section>
+      <Section title="Test aus CardVote übernehmen">
+        In der CardVote-Auswertung gibt es „Ins Notenmodul": die Testnoten wandern nach dem eingestellten
+        Notenschlüssel in eine Kategorie dieser Klasse. Voraussetzung: die Klasse hat dort schon eine Spalte.
+      </Section>
+    </>
+  );
+}
+
+const BEREICHE = {
+  core: { label: "Kern", el: <KernHilfe /> },
+  cardvote: { label: "CardVote", el: <CardVoteHilfe /> },
+  lernpfad: { label: "Lernpfad", el: <LernpfadHilfe /> },
+  noten: { label: "Noten", el: <NotenHilfe /> },
+};
+
+export default function Help() {
+  const [params, setParams] = useSearchParams();
+  const { modules } = useModules();
+  const aktiv = new Set(modules.filter((m) => m.active).map((m) => m.key));
+
+  // Sichtbar: Kern immer, Module nur wenn aktiv.
+  const sichtbar = ["core", ...["cardvote", "lernpfad", "noten"].filter((k) => aktiv.has(k))];
+  const gewuenscht = params.get("area");
+  const area = sichtbar.includes(gewuenscht) ? gewuenscht : sichtbar[0];
+
+  return (
+    <div style={{ maxWidth: 700 }}>
+      <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", marginBottom: 16 }}>Hilfe</h2>
+
+      {aktiv.has("cardvote") && (
+        <p style={{ marginBottom: 20, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", fontSize: 14 }}>
+          Zum ersten Mal hier? Das <A to="/cardvote/tutorial">Tutorial</A> führt dich durch CardVote — jederzeit neu startbar.
+        </p>
+      )}
+
+      {/* Bereichs-Umschalter: nur zeigen, wenn es mehr als den Kern gibt. */}
+      {sichtbar.length > 1 && (
+        <div style={{ display: "flex", gap: 6, marginBottom: 22, flexWrap: "wrap" }}>
+          {sichtbar.map((k) => (
+            <button
+              key={k}
+              onClick={() => setParams({ area: k })}
+              style={{
+                padding: "6px 14px", borderRadius: 980, fontSize: 13.5, cursor: "pointer", fontWeight: 500,
+                border: area === k ? "1px solid var(--accent)" : "1px solid var(--border2)",
+                background: area === k ? "var(--accent-bg)" : "var(--card)",
+                color: area === k ? "var(--accent)" : "var(--text2)",
+              }}
+            >
+              {BEREICHE[k].label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {BEREICHE[area].el}
 
       <p style={{ fontSize: 13, color: "var(--text3)", marginTop: 24 }}>
-        Frage nicht dabei? Über <Link to="/contact" style={{ color: "var(--accent)" }}>Kontakt</Link> melden.
+        Frage nicht dabei? Über <A to="/contact">Kontakt</A> melden.
       </p>
     </div>
   );
