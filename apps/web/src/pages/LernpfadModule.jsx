@@ -17,15 +17,34 @@ export default function LernpfadModule() {
 
   // Die eingebettete App bringt ihre eigene Hoehe mit; ohne das entstuende
   // entweder ein zweiter Scrollbalken oder abgeschnittener Inhalt.
+  // Thema an die App melden: sie hat keinen eigenen Umschalter und soll dem
+  // Rahmen folgen — sonst leuchtet sie im dunklen Design weiss.
+  const sendeTheme = () => {
+    const dark = document.documentElement.classList.contains("dark");
+    ref.current?.contentWindow?.postMessage(
+      { type: "nuvora:theme", dark }, window.location.origin
+    );
+  };
+
   useEffect(() => {
     const onMessage = (e) => {
       if (e.origin !== window.location.origin) return;
       if (e.data?.type === "lernpfad:height" && typeof e.data.height === "number") {
         setHeight(Math.max(400, Math.min(e.data.height, 20000)));
       }
+      if (e.data?.type === "lernpfad:ready") sendeTheme();
     };
     window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
+
+    // Nuvoras Umschalter aendert die Klasse auf <html> — darauf lauschen,
+    // damit die App live mitzieht statt erst beim naechsten Laden.
+    const obs = new MutationObserver(sendeTheme);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+
+    return () => {
+      window.removeEventListener("message", onMessage);
+      obs.disconnect();
+    };
   }, []);
 
   return (

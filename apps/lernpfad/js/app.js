@@ -7,6 +7,21 @@
     // zweiter Scrollbalken oder der Inhalt waere abgeschnitten.
     const embedded = window.parent !== window;
     if (embedded) {
+        // Nuvoras Navbar steht schon darueber: eigene Marke und eigenes
+        // Konto-Menue wuerden doppelt erscheinen. Die Tabs bleiben — sie sind
+        // die Struktur dieses Moduls.
+        document.documentElement.classList.add('embedded');
+
+        // Thema folgt dem Rahmen: Nuvora setzt .dark auf <html> und meldet
+        // Wechsel. Ohne das leuchtet das iframe im dunklen Design weiss.
+        window.addEventListener('message', (e) => {
+            if (e.origin !== window.location.origin) return;
+            if (e.data && e.data.type === 'nuvora:theme') {
+                document.documentElement.classList.toggle('dark', !!e.data.dark);
+            }
+        });
+        window.parent.postMessage({ type: 'lernpfad:ready' }, window.location.origin);
+
         const melde = () => {
             const h = Math.max(
                 document.body.scrollHeight, document.documentElement.scrollHeight,
@@ -23,9 +38,6 @@
         setInterval(melde, 1000);
     }
 
-    // Uebergangs-App: haengt in Nuvora unter /lernpfad-alt/ (das echte Modul
-    // liegt auf dem Kern unter /lernpfad/). Basis aus dem Pfad ableiten, damit
-    // die App auch standalone unter / laeuft (`npm start`, ohne Proxy davor).
     // ─── Nuvora-Kern statt eigenem Backend ───
     // Die App laeuft auf Nuvoras API. Ihre Oberflaeche bleibt unveraendert;
     // uebersetzt wird nur an der Datengrenze (siehe zuKern/vonKern):
