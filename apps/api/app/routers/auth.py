@@ -1,12 +1,15 @@
 """Authentication: register, login, profile, admin user management, password reset."""
 import base64
 import hashlib
+import logging
 import hmac
 import os
 import secrets
 import time
 from collections import defaultdict
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
@@ -305,6 +308,17 @@ async def register(body: RegisterBody, request: Request, db: AsyncSession = Depe
     db.add(user)
     await db.commit()
     await db.refresh(user)
+
+    # Beispielinhalt anlegen: ein leeres Konto zeigt nicht, was das Werkzeug
+    # kann. Best-effort — scheitert das, ist das Konto trotzdem gueltig; eine
+    # Registrierung darf nicht an einer Demo haengen.
+    try:
+        from ..seed import seed_new_account
+        await seed_new_account(db, user.id)
+    except Exception as e:
+        logger.warning("Beispielinhalt für %s konnte nicht angelegt werden: %s", user.id, e)
+        await db.rollback()
+
     # Bestätigungs-Mail (best-effort). Login erst nach Bestätigung möglich.
     await _send_verify_mail(user)
     return {"ok": True}
