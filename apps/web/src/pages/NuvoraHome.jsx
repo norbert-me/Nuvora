@@ -54,14 +54,26 @@ export default function NuvoraHome({ user }) {
       ) : (
         <>
           <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
-            {active.map((m) => (
-              <Link key={m.key} to={m.path} style={card}>
-                <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{m.name}</div>
-                <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.6 }}>
-                  {m.description}
-                </div>
-              </Link>
-            ))}
+            {active.map((m) =>
+              // Externe Module leben ausserhalb der React-App (eigene Seite
+              // hinter dem Proxy) — die brauchen einen echten Seitenwechsel,
+              // ein <Link> wuerde ins Leere routen.
+              m.external ? (
+                <a key={m.key} href={m.path} style={card}>
+                  <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{m.name}</div>
+                  <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.6 }}>
+                    {m.description}
+                  </div>
+                </a>
+              ) : (
+                <Link key={m.key} to={m.path} style={card}>
+                  <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{m.name}</div>
+                  <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.6 }}>
+                    {m.description}
+                  </div>
+                </Link>
+              )
+            )}
           </div>
           <p style={{ marginTop: 22, fontSize: 13, color: "var(--text3)" }}>
             <Link to="/modules" style={{ color: "var(--accent)" }}>Module verwalten</Link>
