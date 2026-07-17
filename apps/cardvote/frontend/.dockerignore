@@ -1,0 +1,9 @@
+# Das Dockerfile nutzt COPY . . — hier steht, was NICHT ins Image darf.
+.dockerignore
+Dockerfile
+node_modules
+dist
+.git
+.DS_Store
+*.env
+.env*

@@ -1,0 +1,13 @@
+# Das Dockerfile nutzt COPY . . — hier steht, was NICHT ins Image darf.
+.dockerignore
+Dockerfile
+__pycache__
+*.pyc
+venv
+.venv
+.git
+.DS_Store
+*.env
+.env*
+*.db
+uploads

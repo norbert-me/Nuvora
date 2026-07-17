@@ -1,9 +1,15 @@
-deploy.sh
-Dockerfile
-docker-compose.yml
+# Nuvora konfiguriert und deployt aus dem Wurzelverzeichnis — hier liegt
+# nur Quellcode. Was trotzdem im Ordner landet, gehoert nicht ins Image.
 .dockerignore
-.DS_Store
+Dockerfile
 node_modules
 .git
-.gitignore
-README.md
+.DS_Store
+*.env
+.env*
+*.db
+*.db-shm
+*.db-wal
+data
+backups
+config
