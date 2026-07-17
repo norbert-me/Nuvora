@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lernleiter – Differenzierte Aufgabenplanung</title>
+    <link rel="stylesheet" href="css/style.css?v=17">
+    <link rel="stylesheet" href="vendor/katex/katex.min.css">
+    <script defer src="vendor/katex/katex.min.js"></script>
+</head>
+<body>
+    <!-- Login / Registrierung: liegt über allem, bis eine Session besteht -->
+    <div id="auth-overlay" class="auth-overlay">
+        <div class="auth-card">
+            <div class="auth-brand">Lernleiter</div>
+            <h1 class="auth-title" id="auth-title">Anmelden</h1>
+            <p class="auth-sub" id="auth-sub">Melde dich an, um deine Aufgaben und Klassen zu verwalten.</p>
+            <form id="auth-form" class="auth-form">
+                <label for="auth-email">E-Mail</label>
+                <input type="email" id="auth-email" autocomplete="email" required placeholder="name@schule.de">
+                <label for="auth-password">Passwort</label>
+                <input type="password" id="auth-password" autocomplete="current-password" required placeholder="mind. 8 Zeichen">
+                <div id="auth-error" class="auth-error" style="display:none"></div>
+                <button type="submit" class="btn primary auth-submit" id="auth-submit">Anmelden</button>
+            </form>
+            <p class="auth-switch">
+                <span id="auth-switch-text">Noch kein Konto?</span>
+                <a href="#" id="auth-switch-link">Registrieren</a>
+            </p>
+            <p class="auth-legal">
+                <a href="impressum.html">Impressum</a>
+                <a href="datenschutz.html">Datenschutz</a>
+                <a href="kontakt.html">Kontakt</a>
+            </p>
+        </div>
+    </div>
+
+    <nav class="navbar">
+        <div class="nav-inner">
+            <div class="nav-brand">
+                <span class="nav-title">Lernleiter</span>
+            </div>
+            <button class="nav-toggle" id="nav-toggle" aria-label="Menü" aria-expanded="false"></button>
+            <div class="nav-links" id="nav-links">
+                <button class="nav-link tab active" data-tab="aufgaben">Aufgaben</button>
+                <button class="nav-link tab" data-tab="klasse">Klasse</button>
+                <button class="nav-link tab" data-tab="generator">Lernleiter generieren</button>
+                <button class="nav-link tab" data-tab="lernpfade">Lernpfade</button>
+                <div class="nav-account" id="nav-account">
+                    <button class="nav-link" id="btn-account" type="button">Konto ▾</button>
+                    <div class="account-menu" id="account-menu" style="display:none">
+                        <div class="account-email" id="nav-user"></div>
+                        <button type="button" class="btn small" id="btn-export-all">Alle Daten exportieren</button>
+                        <button type="button" class="btn small" id="btn-import-all">Alle Daten importieren</button>
+                        <input type="file" id="all-data-file-input" accept=".json" style="display:none">
+                        <button type="button" class="btn small danger nav-logout" id="btn-logout">Abmelden</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <!-- ============ TAB: AUFGABEN ============ -->
+    <section id="tab-aufgaben" class="tab-content active">
+        <div class="panel">
+            <h2 id="aufgaben-form-title">Neue Aufgabe</h2>
+            <form id="aufgabe-form">
+                <input type="hidden" id="aufgabe-edit-id">
+                <input type="hidden" id="aufgabe-id">
+                <div id="edit-id-display" style="display:none;margin-bottom:0.5rem">
+                    <span style="font-size:0.8rem;color:var(--text-muted)">ID:</span> <strong id="edit-id-label"></strong>
+                </div>
+
+                <!-- Schritt 1: Was wird geübt -->
+                <section class="form-step">
+                    <h3 class="form-step-title"><span class="form-step-num">1</span> Thema &amp; Unterthema</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="aufgabe-thema">Thema</label>
+                            <input type="text" id="aufgabe-thema" required placeholder="z.B. Bruchrechnung" list="themen-list">
+                            <datalist id="themen-list"></datalist>
+                        </div>
+                        <div class="form-group" style="flex:0 0 160px">
+                            <label for="aufgabe-kategorie">Kategorie</label>
+                            <select id="aufgabe-kategorie" required>
+                                <option value="">– wählen –</option>
+                                <option value="Basis">Basis</option>
+                                <option value="G-Niveau">G-Niveau</option>
+                                <option value="E-Niveau">E-Niveau</option>
+                                <option value="Erklärung">Erklärung</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row" id="unterthema-row" style="display:none">
+                        <div class="form-group">
+                            <label for="aufgabe-unterthema">Unterthema</label>
+                            <input type="text" id="aufgabe-unterthema" placeholder="Auswählen oder neu eingeben" list="unterthemen-list">
+                            <datalist id="unterthemen-list"></datalist>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Schritt 2: Bilder -->
+                <section class="form-step" id="bilder-step" style="display:none">
+                    <h3 class="form-step-title"><span class="form-step-num">2</span> Bilder <span class="hint">(optional)</span></h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Aufgabenbild</label>
+                            <input type="file" id="aufgabe-bild" accept="image/*" style="font-size:0.85rem">
+                            <div id="aufgabe-bild-preview" class="bild-preview"></div>
+                        </div>
+                        <div class="form-group" id="loesungbild-group">
+                            <label>Lösungsbild</label>
+                            <input type="file" id="aufgabe-loesungbild" accept="image/*" style="font-size:0.85rem">
+                            <div id="aufgabe-loesungbild-preview" class="bild-preview"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Schritt 3: Aufgabentyp -->
+                <section class="form-step" id="aufgabentyp-row" style="display:none">
+                    <h3 class="form-step-title"><span class="form-step-num">3</span> Aufgabentyp</h3>
+                    <div class="form-row">
+                    <div class="form-group">
+                        <label for="aufgabe-operator">Aufgabentyp</label>
+                        <input type="text" id="aufgabe-operator" placeholder="z.B. Berechne, Erkläre" list="aufgabentyp-list">
+                        <datalist id="aufgabentyp-list">
+                            <option value="Berechne">
+                            <option value="Bestimme">
+                            <option value="Ordne/Sortiere">
+                            <option value="Erkläre/Begründe">
+                            <option value="Bewerte/Überprüfe">
+                            <option value="Finde/Erfinde">
+                            <option value="Umkehraufgabe">
+                            <option value="Stelle dar">
+                            <option value="Zeichne">
+                            <option value="Beschreibe">
+                            <option value="Vergleiche">
+                            <option value="Vereinfache">
+                            <option value="Ergänze">
+                        </datalist>
+                        <div class="bruder-hint">
+                            <details>
+                                <summary>Aufgabentypen nach Bruder</summary>
+                                <ul class="bruder-list">
+                                    <li><strong>Berechne</strong> – Kalkül ausführen, direktes Rechnen</li>
+                                    <li><strong>Bestimme</strong> – Größe oder Wert ermitteln, auch durch Ablesen</li>
+                                    <li><strong>Ordne/Sortiere</strong> – Objekte nach Kriterium anordnen</li>
+                                    <li><strong>Erkläre/Begründe</strong> – Sachverhalt mit eigenen Worten erläutern</li>
+                                    <li><strong>Bewerte/Überprüfe</strong> – Aussage auf Richtigkeit prüfen</li>
+                                    <li><strong>Finde/Erfinde</strong> – Eigenes Beispiel oder Aufgabe erstellen</li>
+                                    <li><strong>Umkehraufgabe</strong> – Aufgabe rückwärts denken</li>
+                                </ul>
+                            </details>
+                        </div>
+                    </div>
+                    <div class="form-group" style="flex:0 0 130px">
+                        <label for="aufgabe-unteraufgaben">Unteraufgaben</label>
+                        <input type="number" id="aufgabe-unteraufgaben" min="1" value="1" placeholder="1">
+                    </div>
+                    </div>
+                </section>
+
+                <!-- Schritte 4-6: erst sichtbar sobald Aufgabentyp/Erklärung gesetzt -->
+                <div id="aufgabe-details" style="display:none">
+
+                <!-- Schritt 4: Einordnung -->
+                <section class="form-step">
+                    <h3 class="form-step-title"><span class="form-step-num">4</span> Einordnung</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Quelle</label>
+                            <select id="aufgabe-quelle-typ">
+                                <option value="schulbuch">Schulbuch</option>
+                                <option value="aufgabenblaetter">Aufgabenblätter</option>
+                                <option value="latex">LaTeX (Formel)</option>
+                            </select>
+                            <input type="text" id="aufgabe-quelle-detail" placeholder="Seite/Nummer">
+                        </div>
+                    </div>
+
+                    <!-- LaTeX-Quelle: Code wird aufs Arbeitsblatt gerendert -->
+                    <div class="form-group" id="latex-group" style="display:none">
+                        <label for="aufgabe-latex">LaTeX-Code (Mathe)</label>
+                        <div class="latex-toolbar" id="latex-toolbar"></div>
+                        <textarea id="aufgabe-latex" rows="3" placeholder="z.B. \frac{3}{4} \cdot \frac{2}{5} = \square"></textarea>
+                        <div class="latex-preview-wrap">
+                            <span class="hint">Vorschau:</span>
+                            <div id="aufgabe-latex-preview" class="latex-preview"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-row" id="kompetenz-row">
+                        <div class="form-group">
+                            <label>Methode</label>
+                            <input type="text" id="aufgabe-methode" placeholder="z.B. Einzelarbeit" list="methode-list">
+                            <datalist id="methode-list">
+                                <option value="Einzelarbeit">
+                                <option value="Partnerarbeit">
+                                <option value="Gruppenarbeit">
+                                <option value="Kopfrechnen">
+                                <option value="Zeichnen">
+                                <option value="Handlungsorientiert">
+                            </datalist>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Schritt 5: Differenzierung -->
+                <section class="form-step">
+                    <h3 class="form-step-title"><span class="form-step-num">5</span> Differenzierung <span class="hint">(optional)</span></h3>
+                    <div class="form-group">
+                        <label>Förderschwerpunkte (Aufgabe angepasst für)</label>
+                        <div class="checkbox-group" id="aufgabe-foerder-group">
+                            <label class="chip" title="Aufgabe mit weniger Text, größerer Schrift oder Markierungen"><input type="checkbox" class="aufgabe-foerder" value="LRS" id="aufgabe-lrs"> LRS</label>
+                            <label class="chip" title="Aufgabe mit Visualisierungen, Zahlenstrahl oder vereinfachten Zahlen"><input type="checkbox" class="aufgabe-foerder" value="Dyskalkulie"> Dyskalkulie</label>
+                            <label class="chip" title="Aufgabe mit einfacherem Text oder Bildern statt Text"><input type="checkbox" class="aufgabe-foerder" value="Lesen"> Lesen</label>
+                            <label class="chip" title="Aufgabe mit einfacher Sprache oder Worterklärungen"><input type="checkbox" class="aufgabe-foerder" value="DaZ"> DaZ</label>
+                            <label class="chip" title="Aufgabe mit kleineren Schritten oder Hilfestellungen"><input type="checkbox" class="aufgabe-foerder" value="Lernen"> Lernen</label>
+                            <label class="chip" title="Aufgabe für Einzel- oder Partnerarbeit angepasst"><input type="checkbox" class="aufgabe-foerder" value="Sozial-Emotional"> Sozial-Emotional</label>
+                            <label class="chip" title="Aufgabe mit visuellen statt auditiven Anweisungen"><input type="checkbox" class="aufgabe-foerder" value="Auditive Wahrnehmung"> Auditive Wahrnehmung</label>
+                            <label class="chip" title="Aufgabe ohne Feinmotorik-Anforderungen"><input type="checkbox" class="aufgabe-foerder" value="Motorik"> Motorik</label>
+                            <label class="chip" title="Aufgabe in kurzen Einheiten oder mit klarer Struktur"><input type="checkbox" class="aufgabe-foerder" value="Konzentration"> Konzentration</label>
+                            <label class="chip" title="Aufgabe mit großer Schrift oder kontrastreicher Darstellung"><input type="checkbox" class="aufgabe-foerder" value="Sehen"> Sehen</label>
+                            <label class="chip" title="Aufgabe mit visuellen Anweisungen statt Hörverstehen"><input type="checkbox" class="aufgabe-foerder" value="Hören"> Hören</label>
+                            <label class="chip" title="Aufgabe mit weniger mündlichen Anforderungen"><input type="checkbox" class="aufgabe-foerder" value="Sprache"> Sprache</label>
+                        </div>
+                    </div>
+                    <div class="form-group lrs-alt-group" style="display:none">
+                        <label for="aufgabe-lrs-text">LRS: Alternative Formulierung</label>
+                        <textarea id="aufgabe-lrs-text" rows="2" placeholder="Vereinfachte Formulierung…"></textarea>
+                    </div>
+                </section>
+
+                <!-- Schritt 6: Inhalt -->
+                <section class="form-step">
+                    <h3 class="form-step-title"><span class="form-step-num">6</span> Inhalt <span class="hint">(optional)</span></h3>
+                    <div class="form-row">
+                        <div class="form-group" id="loesung-group">
+                            <label for="aufgabe-loesung">Lösung</label>
+                            <textarea id="aufgabe-loesung" rows="2" placeholder="Lösung für Lösungsschlüssel…"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="aufgabe-aufgabentext">Aufgabentext</label>
+                            <textarea id="aufgabe-aufgabentext" rows="2" placeholder="Vollständiger Aufgabentext…"></textarea>
+                        </div>
+                    </div>
+                </section>
+
+                </div><!-- /aufgabe-details -->
+
+                <div class="form-actions">
+                    <button type="submit" class="btn primary" id="aufgabe-submit-btn">Aufgabe speichern</button>
+                    <button type="button" class="btn" id="aufgabe-cancel-btn" style="display:none">Abbrechen</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="panel">
+            <div class="table-header">
+                <h2>Aufgabenübersicht</h2>
+                <div class="btn-group">
+                    <button type="button" class="btn" id="btn-json-import">Aufgaben importieren</button>
+                    <input type="file" id="json-file-input" accept=".json" style="display:none">
+                    <input type="file" id="klasse-file-input" accept=".json" style="display:none">
+                </div>
+            </div>
+            <div class="filter-bar">
+                <input type="text" id="aufgaben-suche" placeholder="Suche (ID, Thema, Quelle, Tags…)" class="search-input">
+                <select id="filter-thema">
+                    <option value="">Alle Themen</option>
+                </select>
+                <select id="filter-unterthema">
+                    <option value="">Alle Unterthemen</option>
+                </select>
+                <select id="filter-kategorie">
+                    <option value="">Alle Kategorien</option>
+                    <option value="Basis">Basis</option>
+                    <option value="G-Niveau">G-Niveau</option>
+                    <option value="E-Niveau">E-Niveau</option>
+                    <option value="Erklärung">Erklärung</option>
+                </select>
+            </div>
+            <div id="bulk-bar" class="bulk-bar" style="display:none">
+                <span id="bulk-count">0 ausgewählt</span>
+                <div class="form-row" style="gap:0.5rem;flex-wrap:nowrap;align-items:center;margin:0">
+                    <input type="text" id="bulk-thema" placeholder="Thema zuweisen" list="themen-list" style="min-width:140px;margin:0">
+                    <input type="text" id="bulk-unterthema" placeholder="Unterthema zuweisen" list="unterthemen-list" style="min-width:160px;margin:0">
+                    <button type="button" class="btn primary small" id="btn-bulk-assign">Zuweisen</button>
+                    <button type="button" class="btn danger small" id="btn-bulk-delete">Auswahl löschen</button>
+                    <button type="button" class="btn small" id="btn-bulk-cancel">Abbrechen</button>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table id="aufgaben-tabelle">
+                    <thead>
+                        <tr>
+                            <th style="width:30px"><input type="checkbox" id="bulk-select-all"></th>
+                            <th data-sort="id">ID</th>
+                            <th data-sort="thema">Thema</th>
+                            <th>Kategorie</th>
+                            <th>Quelle</th>
+                            <th>Tags</th>
+                            <th>LRS</th>
+                            <th>Lösung</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ TAB: KLASSE ============ -->
+    <section id="tab-klasse" class="tab-content">
+        <div class="panel">
+            <h2>Klassen verwalten</h2>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="klasse-name">Neue Klasse</label>
+                    <input type="text" id="klasse-name" placeholder="z.B. 7a">
+                </div>
+                <div class="form-group btn-group-vertical">
+                    <button type="button" class="btn primary" id="btn-klasse-add">Klasse anlegen</button>
+                </div>
+            </div>
+            <div id="klassen-chips" class="checkbox-group" style="margin-top:0.5rem"></div>
+        </div>
+
+        <div class="panel" id="schueler-panel" style="display:none">
+            <h2 id="schueler-form-title">Schüler hinzufügen</h2>
+            <form id="schueler-form">
+                <input type="hidden" id="schueler-edit-idx">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="schueler-name">Name</label>
+                        <input type="text" id="schueler-name" required placeholder="Vorname Nachname">
+                    </div>
+                    <div class="form-group">
+                        <label for="schueler-niveau">E/G-Zuordnung</label>
+                        <select id="schueler-niveau" required>
+                            <option value="">– wählen –</option>
+                            <option value="E">E-Kurs</option>
+                            <option value="G">G-Kurs</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="schueler-klasse">Klasse</label>
+                        <select id="schueler-klasse" required>
+                            <option value="">– wählen –</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Förderschwerpunkte (Schwierigkeiten)</label>
+                    <div class="checkbox-group">
+                        <label class="chip" title="Schwierigkeiten beim Lesen und Schreiben"><input type="checkbox" value="LRS"> LRS</label>
+                        <label class="chip" title="Schwierigkeiten mit Zahlen, Mengen und Rechenoperationen"><input type="checkbox" value="Dyskalkulie"> Dyskalkulie</label>
+                        <label class="chip" title="Schwierigkeiten beim Textverständnis"><input type="checkbox" value="Lesen"> Lesen</label>
+                        <label class="chip" title="Deutsch als Zweitsprache – Fachsprache fällt schwer"><input type="checkbox" value="DaZ"> DaZ</label>
+                        <label class="chip" title="Allgemeine Lernschwierigkeiten, braucht mehr Zeit und Struktur"><input type="checkbox" value="Lernen"> Lernen</label>
+                        <label class="chip" title="Schwierigkeiten in Gruppenarbeit oder bei Frustration"><input type="checkbox" value="Sozial-Emotional"> Sozial-Emotional</label>
+                        <label class="chip" title="Schwierigkeiten bei der Verarbeitung gehörter Informationen"><input type="checkbox" value="Auditive Wahrnehmung"> Auditive Wahrnehmung</label>
+                        <label class="chip" title="Schwierigkeiten bei feinmotorischen Aufgaben (Schreiben, Zeichnen)"><input type="checkbox" value="Motorik"> Motorik</label>
+                        <label class="chip" title="Kann sich nur kurz konzentrieren, leicht ablenkbar"><input type="checkbox" value="Konzentration"> Konzentration</label>
+                        <label class="chip" title="Eingeschränktes Sehvermögen, braucht große Schrift/Kontrast"><input type="checkbox" value="Sehen"> Sehen</label>
+                        <label class="chip" title="Eingeschränktes Hörvermögen, braucht visuelle Anweisungen"><input type="checkbox" value="Hören"> Hören</label>
+                        <label class="chip" title="Schwierigkeiten beim mündlichen Ausdruck"><input type="checkbox" value="Sprache"> Sprache</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="schueler-notizen">Notizen</label>
+                    <textarea id="schueler-notizen" rows="2" placeholder="z.B. Nachteilsausgleich, Besonderheiten…"></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn primary" id="schueler-submit-btn">Schüler speichern</button>
+                    <button type="button" class="btn" id="schueler-cancel-btn" style="display:none">Abbrechen</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="panel" id="schueler-overview-panel" style="display:none">
+            <div class="table-header">
+                <h2>Klassenübersicht</h2>
+                <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+                    <span id="overview-klasse-label" style="display:none;font-size:0.9rem;color:var(--text-muted)"></span>
+                    <button class="btn small" id="btn-overview-alle" style="display:none">Alle anzeigen</button>
+                    <button class="btn small" id="btn-export-klasse">Klasse exportieren</button>
+                    <button class="btn small" id="btn-import-klasse">Klasse importieren</button>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table id="schueler-tabelle">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Klasse</th>
+                            <th>Niveau</th>
+                            <th>Förderschwerpunkte</th>
+                            <th>Notizen</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ TAB: GENERATOR ============ -->
+    <section id="tab-generator" class="tab-content">
+        <div class="panel">
+            <h2>Lernleiter generieren</h2>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="gen-pfad">Lernpfad (optional)</label>
+                    <select id="gen-pfad">
+                        <option value="">– Einzeln –</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="gen-thema">Thema</label>
+                    <select id="gen-thema" required>
+                        <option value="">– Thema wählen –</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Unterthema</label>
+                    <div id="gen-unterthema-container" class="checkbox-group" style="min-height:1.5rem"></div>
+                </div>
+                <div class="form-group">
+                    <label for="gen-klasse">Klasse</label>
+                    <select id="gen-klasse" required>
+                        <option value="">– Klasse wählen –</option>
+                    </select>
+                </div>
+                <div class="form-group btn-group-vertical">
+                    <button type="button" class="btn primary" id="btn-generate">Vorschau generieren</button>
+                </div>
+            </div>
+            <div id="gen-stats" class="gen-stats" style="display:none"></div>
+        </div>
+
+        <div id="gen-config" class="panel" style="display:none">
+            <h2>Aufgabenauswahl konfigurieren</h2>
+            <p class="hint">Lege fest, wie viele Aufgaben pro Kategorie in die Lernleiter aufgenommen werden. Aufgabentypen werden automatisch möglichst vielfältig verteilt.</p>
+            <div id="gen-config-body"></div>
+        </div>
+
+        <div id="preview-area" style="display:none">
+            <div class="panel">
+                <div class="table-header">
+                    <h2>Vorschau & Anpassung</h2>
+                    <div class="btn-group">
+                        <button type="button" class="btn primary" id="btn-pdf-all">PDF alle Schüler</button>
+                        <button type="button" class="btn" id="btn-pdf-loesung">PDF Lösungsblatt</button>
+                        <button type="button" class="btn" id="btn-pdf-lrs">PDF Sonderaufgaben (LRS)</button>
+                        <button type="button" class="btn" id="btn-save-to-pfad" style="margin-left: 1rem;">In Lernpfad speichern</button>
+                    </div>
+                </div>
+                <p class="hint">Aufgaben per Klick ab-/anwählen. Änderungen gelten nur für diesen Export.</p>
+                <label class="chip" style="margin-bottom:0.75rem;display:inline-flex">
+                    <input type="checkbox" id="gen-group-edit" checked>
+                    Änderungen auf ganze Gruppe anwenden (gleiches Niveau + gleiche Tags)
+                </label>
+                <div id="preview-students"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- TAB: LERNPFADE -->
+    <section id="tab-lernpfade" class="tab-content">
+        <div class="panel">
+            <h2>Lernpfade</h2>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="pfad-name">Neuer Lernpfad</label>
+                    <input type="text" id="pfad-name" placeholder="z.B. Bruchrechnung Kurs 7a">
+                </div>
+                <button type="button" class="btn primary" id="pfad-create-btn">Pfad anlegen</button>
+            </div>
+            <div id="pfade-list"></div>
+        </div>
+
+        <div class="panel" id="pfad-edit-panel" style="display:none">
+            <h2 id="pfad-edit-title">Lernpfad bearbeiten</h2>
+
+            <div id="pfad-lernleitern-section">
+                <h3>Lernleitern in diesem Pfad</h3>
+                <div id="pfad-lernleitern-list"></div>
+            </div>
+
+            <div style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap">
+                <button type="button" class="btn primary" id="pfad-add-ll-btn">+ Lernleiter hinzufügen</button>
+                <button type="button" class="btn" id="pfad-cancel-btn">Schließen</button>
+            </div>
+        </div>
+    </section>
+
+    <div id="task-detail-modal" class="modal-overlay" style="display:none">
+        <div class="modal-content">
+            <button class="modal-close" id="modal-close-btn">&times;</button>
+            <div id="task-detail-body"></div>
+        </div>
+    </div>
+
+    <footer class="site-footer">
+        <a class="link-btn" href="impressum.html">Impressum</a>
+        <span class="foot-sep">·</span>
+        <a class="link-btn" href="datenschutz.html">Datenschutz</a>
+        <span class="foot-sep">·</span>
+        <a class="link-btn" href="kontakt.html">Kontakt</a>
+    </footer>
+
+    <script src="js/jspdf.umd.min.js"></script>
+    <script src="js/app.js?v=32"></script>
+</body>
+</html>

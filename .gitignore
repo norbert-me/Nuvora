@@ -1,0 +1,62 @@
+# ─── Secrets: niemals committen ───
+.env
+.env.*
+!.env.example
+*.env.local
+*.env.production
+.deploy.env
+!.deploy.env.example
+*.pem
+*.key
+*.p12
+.htpasswd
+secrets/
+
+# ─── Personenbezogene Daten (DSGVO) ───
+# Datenbanken enthalten Schülerdaten und Passwort-Hashes.
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+backups/
+uploads/
+daten/
+
+# ─── Betreiber-/Rechtskonfiguration ───
+config/site.json
+!config/site.example.json
+**/public/legal-config.json
+!**/public/legal-config.example.json
+
+# ─── Dependencies ───
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ─── Build-Output ───
+dist/
+build/
+
+# ─── IDE & Tools ───
+.vscode/
+.idea/
+.claude/
+*.swp
+*~
+
+# ─── OS ───
+.DS_Store
+Thumbs.db
+@eaDir/
+
+# ─── Sonstiges ───
+*.log
+*.bak
+*.doc
+*.docx
+*.xlsx
+*.bundle
+~$*

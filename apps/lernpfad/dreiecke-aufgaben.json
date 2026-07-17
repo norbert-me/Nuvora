@@ -1,0 +1,1442 @@
+[
+  {
+    "thema": "Dreiecke",
+    "unterthema": "1 Winkel im Schnittpunkt von Geraden",
+    "kategorie": "Erklärung",
+    "operator": "",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.70 Merke",
+    "quelle": "Schulbuch [S.70 Merke]",
+    "aufgabentext": "Im Schnittpunkt von Geraden entstehen mehrere gleich große Winkel. Scheitelwinkel (gegenüberliegend) sind gleich groß; Nebenwinkel ergänzen sich zu 180°. An parallelen Geraden gilt: Stufenwinkel gleich groß, Wechselwinkel gleich groß."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "2 Winkelsumme im Dreieck",
+    "kategorie": "Erklärung",
+    "operator": "",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.72 Merke",
+    "quelle": "Schulbuch [S.72 Merke]",
+    "aufgabentext": "Winkelsummensatz (Innenwinkelsatz): Die Winkelsumme im Dreieck beträgt 180°. Es gilt α + β + γ = 180°."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "3 Dreiecksformen",
+    "kategorie": "Erklärung",
+    "operator": "",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.74 Merke",
+    "quelle": "Schulbuch [S.74 Merke]",
+    "aufgabentext": "Einteilung nach Seiten: gleichseitig (a=b=c), gleichschenklig (a=b), allgemein (drei verschiedene Seiten). Nach Winkeln: spitzwinklig (alle <90°), rechtwinklig (ein Winkel =90°), stumpfwinklig (ein Winkel >90°)."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "Erklärung",
+    "operator": "",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.76 Merke",
+    "quelle": "Schulbuch [S.76 Merke]",
+    "aufgabentext": "Vier Kongruenzsätze zur eindeutigen Konstruktion mit drei Stücken: SSS, SWS (eingeschlossener Winkel), WSW (anliegende Winkel), SsW (Gegenwinkel der längeren Seite). Vorher Planfigur skizzieren. Übereinstimmung in einem Kongruenzsatz = deckungsgleich (kongruent)."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "5 Satz des Thales",
+    "kategorie": "Erklärung",
+    "operator": "",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.79 Merke",
+    "quelle": "Schulbuch [S.79 Merke]",
+    "aufgabentext": "Satz des Thales: Liegt der Eckpunkt C des Dreiecks ABC auf dem Halbkreisbogen über AB, hat das Dreieck bei C einen rechten Winkel. Der Halbkreis heißt Thaleskreis."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "6 Höhen",
+    "kategorie": "Erklärung",
+    "operator": "",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.80 Merke",
+    "quelle": "Schulbuch [S.80 Merke]",
+    "aufgabentext": "Jede Höhe verbindet einen Eckpunkt mit der gegenüberliegenden Seite und steht senkrecht auf ihr. Drei Höhen (h_a, h_b, h_c) schneiden sich in einem Punkt; bei stumpfwinkligen Dreiecken können Höhen außerhalb liegen."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "7 Mittelsenkrechte, Umkreis",
+    "kategorie": "Erklärung",
+    "operator": "",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.83 Merke",
+    "quelle": "Schulbuch [S.83 Merke]",
+    "aufgabentext": "Die Mittelsenkrechte m_AB geht durch den Mittelpunkt von AB und steht senkrecht auf ihr; jeder Punkt darauf ist von A und B gleich weit entfernt. Die drei Mittelsenkrechten schneiden sich im Umkreismittelpunkt U; die Eckpunkte liegen auf dem Umkreis."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "1 Winkel im Schnittpunkt von Geraden",
+    "kategorie": "Basis",
+    "operator": "Bestimme",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.70 Nr.1",
+    "quelle": "Schulbuch [S.70 Nr.1]",
+    "aufgabentext": "a) Finde Scheitelwinkel. b) Finde Nebenwinkel."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "1 Winkel im Schnittpunkt von Geraden",
+    "kategorie": "Basis",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.70 Nr.2",
+    "quelle": "Schulbuch [S.70 Nr.2]",
+    "aufgabentext": "Wie groß sind die Winkel?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "1 Winkel im Schnittpunkt von Geraden",
+    "kategorie": "Basis",
+    "operator": "Bestimme",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.70 A",
+    "quelle": "Schulbuch [S.70 A]",
+    "aufgabentext": "Gib den richtigen Winkel an (Scheitel-, Neben-, Stufen-, Wechselwinkel)."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "1 Winkel im Schnittpunkt von Geraden",
+    "kategorie": "Basis",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.70 B",
+    "quelle": "Schulbuch [S.70 B]",
+    "aufgabentext": "Gib die Winkel γ, δ, α′, β′, δ′ an; nenne zwei Wege, δ′ zu berechnen."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "1 Winkel im Schnittpunkt von Geraden",
+    "kategorie": "G-Niveau",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.71 Nr.3 links",
+    "quelle": "Schulbuch [S.71 Nr.3 links]",
+    "aufgabentext": "Wie groß sind α und β an den parallelen Geraden g und h?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "1 Winkel im Schnittpunkt von Geraden",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.71 Nr.3 rechts",
+    "quelle": "Schulbuch [S.71 Nr.3 rechts]",
+    "aufgabentext": "Zeichne die Figur. Markiere gleich große Winkel mit gleicher Farbe."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "1 Winkel im Schnittpunkt von Geraden",
+    "kategorie": "G-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.71 Nr.4 links",
+    "quelle": "Schulbuch [S.71 Nr.4 links]",
+    "aufgabentext": "Zeichne die Figur ab. Färbe gleich große Winkel mit der gleichen Farbe."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "1 Winkel im Schnittpunkt von Geraden",
+    "kategorie": "E-Niveau",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.71 Nr.4 rechts",
+    "quelle": "Schulbuch [S.71 Nr.4 rechts]",
+    "aufgabentext": "Die vier Geraden schließen ein Viereck ein. Wie groß sind β, γ und δ? Begründe."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "1 Winkel im Schnittpunkt von Geraden",
+    "kategorie": "G-Niveau",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.71 Nr.5 links",
+    "quelle": "Schulbuch [S.71 Nr.5 links]",
+    "aufgabentext": "Wie groß sind die Winkel α, β, γ, δ und ε?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "1 Winkel im Schnittpunkt von Geraden",
+    "kategorie": "E-Niveau",
+    "operator": "Bewerte/Überprüfe",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.71 Nr.5 rechts",
+    "quelle": "Schulbuch [S.71 Nr.5 rechts]",
+    "aufgabentext": "Wera und Khaled beschreiben je einen Winkel. Welche Winkel meinen sie? Begründe."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "2 Winkelsumme im Dreieck",
+    "kategorie": "Basis",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.72 Nr.1",
+    "quelle": "Schulbuch [S.72 Nr.1]",
+    "aufgabentext": "Berechne den fehlenden Winkel."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "2 Winkelsumme im Dreieck",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.72 Nr.2",
+    "quelle": "Schulbuch [S.72 Nr.2]",
+    "aufgabentext": "Zeichne ab und miss die Winkel. Überprüfe mithilfe der Winkelsumme."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "2 Winkelsumme im Dreieck",
+    "kategorie": "Basis",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.72 A",
+    "quelle": "Schulbuch [S.72 A]",
+    "aufgabentext": "Berechne den fehlenden Winkel."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "2 Winkelsumme im Dreieck",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.72 B",
+    "quelle": "Schulbuch [S.72 B]",
+    "aufgabentext": "Zeichne das Dreieck und miss die Winkel. Überprüfe mit der Winkelsumme."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "2 Winkelsumme im Dreieck",
+    "kategorie": "G-Niveau",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.72 Nr.3 links",
+    "quelle": "Schulbuch [S.72 Nr.3 links]",
+    "aufgabentext": "Berechne den fehlenden Winkel."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "2 Winkelsumme im Dreieck",
+    "kategorie": "E-Niveau",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.72 Nr.3 rechts",
+    "quelle": "Schulbuch [S.72 Nr.3 rechts]",
+    "aufgabentext": "Berechne die rot markierten Winkel."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "2 Winkelsumme im Dreieck",
+    "kategorie": "G-Niveau",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.72 Nr.4 links",
+    "quelle": "Schulbuch [S.72 Nr.4 links]",
+    "aufgabentext": "Ein Winkel fehlt. Berechne (Tabelle a–e)."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "2 Winkelsumme im Dreieck",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.72 Nr.4 rechts",
+    "quelle": "Schulbuch [S.72 Nr.4 rechts]",
+    "aufgabentext": "Zeichne das Dreieck A(0|0), B(7|0), C(3,5|6). Miss die Winkel, prüfe mit der Winkelsumme. Beschreibe."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "2 Winkelsumme im Dreieck",
+    "kategorie": "G-Niveau",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.72 Nr.5 links",
+    "quelle": "Schulbuch [S.72 Nr.5 links]",
+    "aufgabentext": "Berechne die fehlenden Winkel. Beschreibe, mit welcher Art von Winkeln du die Lösung gefunden hast."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "2 Winkelsumme im Dreieck",
+    "kategorie": "E-Niveau",
+    "operator": "Finde/Erfinde",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.72 Nr.5 rechts",
+    "quelle": "Schulbuch [S.72 Nr.5 rechts]",
+    "aufgabentext": "Von drei Dreiecken wurden die Ecken abgerissen. Finde zusammenpassende Ecken. Beschreibt euren Lösungsweg."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "2 Winkelsumme im Dreieck",
+    "kategorie": "G-Niveau",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.72 Nr.6 links",
+    "quelle": "Schulbuch [S.72 Nr.6 links]",
+    "aufgabentext": "Zwei Ecken des Dreiecks wurden abgeschnitten. Wie groß waren die Winkel des Dreiecks?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "2 Winkelsumme im Dreieck",
+    "kategorie": "E-Niveau",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.72 Nr.6 rechts",
+    "quelle": "Schulbuch [S.72 Nr.6 rechts]",
+    "aufgabentext": "Berechne β, γ und δ (g ∥ h)."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "3 Dreiecksformen",
+    "kategorie": "Basis",
+    "operator": "Bestimme",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.74 Nr.1",
+    "quelle": "Schulbuch [S.74 Nr.1]",
+    "aufgabentext": "Welche Dreiecksformen findest du in den Verkehrszeichen?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "3 Dreiecksformen",
+    "kategorie": "Basis",
+    "operator": "Bewerte/Überprüfe",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.74 Nr.2",
+    "quelle": "Schulbuch [S.74 Nr.2]",
+    "aufgabentext": "Entscheide nach Augenmaß: gleichseitig, gleichschenklig oder allgemein? spitz-, recht- oder stumpfwinklig? Prüfe mit dem Geodreieck."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "3 Dreiecksformen",
+    "kategorie": "Basis",
+    "operator": "Ergänze",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.74 A",
+    "quelle": "Schulbuch [S.74 A]",
+    "aufgabentext": "Fülle die Tabelle im Heft aus (Einteilung nach Seiten und Winkeln)."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "3 Dreiecksformen",
+    "kategorie": "Basis",
+    "operator": "Ordne/Sortiere",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.74 B",
+    "quelle": "Schulbuch [S.74 B]",
+    "aufgabentext": "Ordne die Kärtchen den Dreiecken A bis G zu."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "3 Dreiecksformen",
+    "kategorie": "G-Niveau",
+    "operator": "Bestimme",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.74 Nr.3 links",
+    "quelle": "Schulbuch [S.74 Nr.3 links]",
+    "aufgabentext": "Nenne die Form des Dreiecks ABC und die Formen seiner Teildreiecke."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "3 Dreiecksformen",
+    "kategorie": "E-Niveau",
+    "operator": "Finde/Erfinde",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.74 Nr.3 rechts",
+    "quelle": "Schulbuch [S.74 Nr.3 rechts]",
+    "aufgabentext": "Wie viele Dreiecke findest du hier? Welche Form haben sie?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "3 Dreiecksformen",
+    "kategorie": "G-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.74 Nr.4 links",
+    "quelle": "Schulbuch [S.74 Nr.4 links]",
+    "aufgabentext": "Zeichne ein Dreieck: a) rechtwinklig und gleichschenklig b) stumpfwinklig und gleichschenklig."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "3 Dreiecksformen",
+    "kategorie": "E-Niveau",
+    "operator": "Bewerte/Überprüfe",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.74 Nr.4 rechts",
+    "quelle": "Schulbuch [S.74 Nr.4 rechts]",
+    "aufgabentext": "Gibt es dieses Dreieck? Begründe. a) gleichschenklig-stumpfwinklig b) gleichseitig-rechtwinklig."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "3 Dreiecksformen",
+    "kategorie": "G-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.74 Nr.5 links",
+    "quelle": "Schulbuch [S.74 Nr.5 links]",
+    "aufgabentext": "Zeichne das Dreieck in ein Koordinatensystem und bestimme die Dreiecksform."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "3 Dreiecksformen",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.74 Nr.5 rechts",
+    "quelle": "Schulbuch [S.74 Nr.5 rechts]",
+    "aufgabentext": "Zeichne A(4|3), B(8|3), C(4|6). a) Welche Form? b) Ergänze zu einem gleichschenkligen Dreieck (zwei Möglichkeiten)."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "3 Dreiecksformen",
+    "kategorie": "G-Niveau",
+    "operator": "Bewerte/Überprüfe",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.74 Nr.6 links",
+    "quelle": "Schulbuch [S.74 Nr.6 links]",
+    "aufgabentext": "Wahr oder falsch? Begründet. a) Ein gleichseitiges Dreieck hat einen rechten Winkel. b) Ein allgemeines Dreieck ist immer spitzwinklig."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "3 Dreiecksformen",
+    "kategorie": "E-Niveau",
+    "operator": "Bestimme",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.74 Nr.6 rechts",
+    "quelle": "Schulbuch [S.74 Nr.6 rechts]",
+    "aufgabentext": "Welche Form hat das Dreieck? (Tabelle a–f mit α, β, γ)."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.76 Nr.1",
+    "quelle": "Schulbuch [S.76 Nr.1]",
+    "aufgabentext": "Konstruiere das Dreieck nach SSS."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.76 Nr.2",
+    "quelle": "Schulbuch [S.76 Nr.2]",
+    "aufgabentext": "Konstruiere das Dreieck nach SWS."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.76 Nr.3",
+    "quelle": "Schulbuch [S.76 Nr.3]",
+    "aufgabentext": "Konstruiere das Dreieck nach WSW."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.76 Nr.4",
+    "quelle": "Schulbuch [S.76 Nr.4]",
+    "aufgabentext": "Konstruiere das Dreieck nach SsW."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.76 A",
+    "quelle": "Schulbuch [S.76 A]",
+    "aufgabentext": "Konstruiere das Dreieck."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.76 B",
+    "quelle": "Schulbuch [S.76 B]",
+    "aufgabentext": "Skizziere die Planfigur und konstruiere. a) SSS b) SWS c) WSW."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "G-Niveau",
+    "operator": "Bestimme",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.76 Nr.5 links",
+    "quelle": "Schulbuch [S.76 Nr.5 links]",
+    "aufgabentext": "Die Planfigur ist gegeben. Nach welchem Kongruenzsatz müsste man konstruieren: SSS, SWS, WSW oder SsW?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.76 Nr.5 rechts",
+    "quelle": "Schulbuch [S.76 Nr.5 rechts]",
+    "aufgabentext": "Konstruiere das Dreieck. Zeichne zuerst eine Planfigur, entscheide den Kongruenzsatz. Beschreibe deine Konstruktion."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.76 Nr.6 rechts",
+    "quelle": "Schulbuch [S.76 Nr.6 rechts]",
+    "aufgabentext": "Zeichne eine Planfigur und konstruiere das gleichschenklige Dreieck ABC mit Basis c und Schenkeln a und b."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "G-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.78 Nr.6 links",
+    "quelle": "Schulbuch [S.78 Nr.6 links]",
+    "aufgabentext": "Zeichne eine Planfigur und konstruiere das Dreieck. Beschreibe die Konstruktion."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "G-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.78 Nr.7 links",
+    "quelle": "Schulbuch [S.78 Nr.7 links]",
+    "aufgabentext": "Zeichne eine Planfigur und konstruiere. Welche Form hat das Dreieck?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "E-Niveau",
+    "operator": "Beschreibe",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.78 Nr.7 rechts",
+    "quelle": "Schulbuch [S.78 Nr.7 rechts]",
+    "aufgabentext": "Konstruiere das Dreieck ABC. Beschreibe, was du beobachtest."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "G-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.78 Nr.8 links",
+    "quelle": "Schulbuch [S.78 Nr.8 links]",
+    "aufgabentext": "Konstruiere das gleichseitige Dreieck ABC. a) c=6 cm nach SSS b) a=8 cm nach WSW."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.78 Nr.8 rechts",
+    "quelle": "Schulbuch [S.78 Nr.8 rechts]",
+    "aufgabentext": "Konstruiere das gleichschenklig-rechtwinklige Dreieck RST. a) r=6, s=6, τ=90° b) t=6, τ=90° c) t=7, τ=90°."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "G-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.78 Nr.9 links",
+    "quelle": "Schulbuch [S.78 Nr.9 links]",
+    "aufgabentext": "Konstruiere das gleichschenklige Dreieck mit Basis c. Beschreibe mit Fachbegriffen."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "E-Niveau",
+    "operator": "Erkläre/Begründe",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.78 Nr.9 rechts",
+    "quelle": "Schulbuch [S.78 Nr.9 rechts]",
+    "aufgabentext": "Alina meint, die zwei Dreiecke seien kongruent. Noah widerlegt es. Begründet gemeinsam."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "G-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.78 Nr.10 links",
+    "quelle": "Schulbuch [S.78 Nr.10 links]",
+    "aufgabentext": "Konstruiert auf einem Blatt drei Dreiecke und untersucht, ob sie deckungsgleich sind."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "E-Niveau",
+    "operator": "Finde/Erfinde",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.78 Nr.10 rechts",
+    "quelle": "Schulbuch [S.78 Nr.10 rechts]",
+    "aufgabentext": "Wählt aus 3, 4, 5, 6, 8 cm je drei Längen. Lässt sich immer ein Dreieck konstruieren? Notiert eine Regel und begründet sie."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "G-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.78 Nr.11 links",
+    "quelle": "Schulbuch [S.78 Nr.11 links]",
+    "aufgabentext": "Aus 90 m Entfernung sieht man die Turmspitze des Ulmer Münsters unter 61°. Wie hoch ist der Turm? Maßstab 1:1000."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "4 Dreiecke konstruieren",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.78 Nr.11 rechts",
+    "quelle": "Schulbuch [S.78 Nr.11 rechts]",
+    "aufgabentext": "Leitern unter Anstellwinkel 65°–75°. a) Wie hoch reicht eine 6-m-Leiter? b) Wie lang für 7 m Höhe? c) Warum ist 80° oder 40° gefährlich?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "5 Satz des Thales",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.80 Nr.1",
+    "quelle": "Schulbuch [S.80 Nr.1]",
+    "aufgabentext": "Zeichne die abgebildete Figur ins Heft. Miss die Winkel in C, D, E, F, G. Was stellst du fest?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "5 Satz des Thales",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.80 Nr.2",
+    "quelle": "Schulbuch [S.80 Nr.2]",
+    "aufgabentext": "Konstruiere das Dreieck ABC mithilfe des Thaleskreises. a) c=8, a=4, γ=90° b) c=6, b=5, γ=90°."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "5 Satz des Thales",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.80 A",
+    "quelle": "Schulbuch [S.80 A]",
+    "aufgabentext": "Konstruiere das Dreieck ABC mit c=10 cm, a=5 cm und γ=90°."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "5 Satz des Thales",
+    "kategorie": "G-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.80 Nr.3 links",
+    "quelle": "Schulbuch [S.80 Nr.3 links]",
+    "aufgabentext": "Konstruiere das Dreieck ABC mit γ=90°. a) c=8, a=3 b) c=10, b=6."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "5 Satz des Thales",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.80 Nr.3 rechts",
+    "quelle": "Schulbuch [S.80 Nr.3 rechts]",
+    "aufgabentext": "Konstruiere die zwei Dreiecke mit c=10, γ=90° und a=8 bzw. a=6. Was vermutest du? Prüfe nach."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "5 Satz des Thales",
+    "kategorie": "G-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.80 Nr.4 links",
+    "quelle": "Schulbuch [S.80 Nr.4 links]",
+    "aufgabentext": "Konstruiere das gleichschenklig-rechtwinklige Dreieck ABC mit c=8 cm und γ=90°."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "5 Satz des Thales",
+    "kategorie": "E-Niveau",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.80 Nr.4 rechts",
+    "quelle": "Schulbuch [S.80 Nr.4 rechts]",
+    "aufgabentext": "Berechne die rot markierten Winkel."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "5 Satz des Thales",
+    "kategorie": "G-Niveau",
+    "operator": "Bewerte/Überprüfe",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.80 Nr.5 links",
+    "quelle": "Schulbuch [S.80 Nr.5 links]",
+    "aufgabentext": "Ben behauptet, fünf rechtwinklige Dreiecke gezeichnet zu haben. Überprüft ohne Messen, ob er recht hat."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "5 Satz des Thales",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.80 Nr.5 rechts",
+    "quelle": "Schulbuch [S.80 Nr.5 rechts]",
+    "aufgabentext": "Zeichne die Figur und trage nach unten den Thaleskreis mit dem Durchmesser BC ein. Was fällt dir auf? Begründe."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "5 Satz des Thales",
+    "kategorie": "G-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.80 Nr.6 links",
+    "quelle": "Schulbuch [S.80 Nr.6 links]",
+    "aufgabentext": "Lina stürmt auf das Tor zu und sieht die Torlinie unter einem rechten Winkel, 3 m vom linken Pfosten. Zeichne im Maßstab 1:100 die Stelle des Torschusses."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "6 Höhen",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.82 Nr.1",
+    "quelle": "Schulbuch [S.82 Nr.1]",
+    "aufgabentext": "Übertrage und zeichne alle Höhen ein."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "6 Höhen",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.82 Nr.2",
+    "quelle": "Schulbuch [S.82 Nr.2]",
+    "aufgabentext": "Zeichne das stumpfwinklige Dreieck A(1|2), B(11|2), C(8|5). Zeichne die drei Höhen ein und beschrifte sie."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "6 Höhen",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.82 Nr.3",
+    "quelle": "Schulbuch [S.82 Nr.3]",
+    "aufgabentext": "Zeichne das gleichseitige Dreieck ABC mit c=6 cm. Zeichne die Höhen ein und miss ihre Länge."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "6 Höhen",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.82 A",
+    "quelle": "Schulbuch [S.82 A]",
+    "aufgabentext": "Zeichne das Dreieck A(1|1), B(9|1), C(6|6). Zeichne die drei Höhen ein und benenne sie."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "6 Höhen",
+    "kategorie": "G-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.82 Nr.4 links",
+    "quelle": "Schulbuch [S.82 Nr.4 links]",
+    "aufgabentext": "Zeichne das Dreieck ins Heft und trage die Höhen ein."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "6 Höhen",
+    "kategorie": "E-Niveau",
+    "operator": "Erkläre/Begründe",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.82 Nr.4 rechts",
+    "quelle": "Schulbuch [S.82 Nr.4 rechts]",
+    "aufgabentext": "Zeichne das Dreieck A(0|0), B(6,5|0), C(4|6). Trage die Höhen ein, miss ihre Länge. Was fällt dir auf? Begründe."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "6 Höhen",
+    "kategorie": "G-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.82 Nr.5 links",
+    "quelle": "Schulbuch [S.82 Nr.5 links]",
+    "aufgabentext": "Konstruiere das Dreieck ABC mit a=7, b=7, c=5. Zeichne die Höhen ein und miss ihre Länge. Was beobachtest du?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "6 Höhen",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.82 Nr.5 rechts",
+    "quelle": "Schulbuch [S.82 Nr.5 rechts]",
+    "aufgabentext": "Zeichne das Dreieck A(5|5), B(13|5), C(3|11). Verlängere die Höhen bis zum Schnittpunkt H. b) Beschreibe die Höhen des Dreiecks HBC."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "6 Höhen",
+    "kategorie": "G-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.82 Nr.6 links",
+    "quelle": "Schulbuch [S.82 Nr.6 links]",
+    "aufgabentext": "Konstruiere das Dreieck ABC mit a=5, b=5, c=8. Zeichne die Höhen ein und überprüfe, ob sie sich in einem Punkt schneiden."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "6 Höhen",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.82 Nr.6 rechts",
+    "quelle": "Schulbuch [S.82 Nr.6 rechts]",
+    "aufgabentext": "Konstruiere ein Dreieck mit c=9, b=6, h_c=5. C muss auf einer Parallelen zu AB liegen. Gibt es nur ein solches Dreieck?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "6 Höhen",
+    "kategorie": "G-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.82 Nr.7 links",
+    "quelle": "Schulbuch [S.82 Nr.7 links]",
+    "aufgabentext": "Zeichne das Dreieck im Maßstab 1:1000. Bestimme die Höhe des Sendemasts."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "6 Höhen",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.82 Nr.7 rechts",
+    "quelle": "Schulbuch [S.82 Nr.7 rechts]",
+    "aufgabentext": "Zeichne maßstäblich und miss die Höhe der Felsnase über dem Ufer."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "7 Mittelsenkrechte, Umkreis",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.84 Nr.1",
+    "quelle": "Schulbuch [S.84 Nr.1]",
+    "aufgabentext": "Übertrage die Strecke AB. Zeichne die Mittelsenkrechte m_AB ein."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "7 Mittelsenkrechte, Umkreis",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.84 Nr.2",
+    "quelle": "Schulbuch [S.84 Nr.2]",
+    "aufgabentext": "Dreieck A(1|1), B(9|1), C(7|7). Zeichne das Dreieck, alle Mittelsenkrechten und den Umkreis. Gib die Koordinaten von U an."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "7 Mittelsenkrechte, Umkreis",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.84 A",
+    "quelle": "Schulbuch [S.84 A]",
+    "aufgabentext": "Übertrage die Strecke. Zeichne die Mittelsenkrechte und beschrifte sie."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "7 Mittelsenkrechte, Umkreis",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.84 B",
+    "quelle": "Schulbuch [S.84 B]",
+    "aufgabentext": "Dreieck A(3|3), B(12|3), C(5|10). Zeichne das Dreieck, alle Mittelsenkrechten und den Umkreis."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "7 Mittelsenkrechte, Umkreis",
+    "kategorie": "G-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.84 Nr.3 links",
+    "quelle": "Schulbuch [S.84 Nr.3 links]",
+    "aufgabentext": "Übertrage die Strecken AB und CD. Zeichne ihre Mittelsenkrechten ein. Was beobachtest du?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "7 Mittelsenkrechte, Umkreis",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.84 Nr.3 rechts",
+    "quelle": "Schulbuch [S.84 Nr.3 rechts]",
+    "aufgabentext": "Übertrage in getrennte Figuren die Dreiecke ABC, ABD und ABE. Konstruiere je die Mittelsenkrechten mit Zirkel und Lineal und den Umkreis. Was beobachtest du?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "7 Mittelsenkrechte, Umkreis",
+    "kategorie": "G-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.84 Nr.4 links",
+    "quelle": "Schulbuch [S.84 Nr.4 links]",
+    "aufgabentext": "Zeichne das Dreieck ABC mit a=6, b=5, c=7. Konstruiere die Mittelsenkrechten mit Zirkel und Lineal und den Umkreis."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "7 Mittelsenkrechte, Umkreis",
+    "kategorie": "E-Niveau",
+    "operator": "Beschreibe",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.84 Nr.4 rechts",
+    "quelle": "Schulbuch [S.84 Nr.4 rechts]",
+    "aufgabentext": "Mona baut aus Tellern eine Etagere und bestimmt den Mittelpunkt jedes Tellers. a) Zeichne mithilfe eines Tellers einen Kreis und konstruiere den Mittelpunkt. b) Beschreibe dein Vorgehen."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "7 Mittelsenkrechte, Umkreis",
+    "kategorie": "G-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.84 Nr.5 links",
+    "quelle": "Schulbuch [S.84 Nr.5 links]",
+    "aufgabentext": "Drei Freunde wollen sich treffen, gleich weit von jedem entfernt. Übertrage die Zeichnung und bestimme den Treffpunkt. Wie weit muss jeder gehen?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "7 Mittelsenkrechte, Umkreis",
+    "kategorie": "E-Niveau",
+    "operator": "Erkläre/Begründe",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.84 Nr.5 rechts",
+    "quelle": "Schulbuch [S.84 Nr.5 rechts]",
+    "aufgabentext": "a) Konstruiere mit Zirkel und Lineal die Mittelsenkrechte der Strecke AB mit A(2|2) und B(8|4). b) Begründe mithilfe kongruenter Dreiecke, dass jeder Punkt auf der Mittelsenkrechten von A und B gleich weit entfernt ist."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Basistraining",
+    "kategorie": "Basis",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.88 Nr.1",
+    "quelle": "Schulbuch [S.88 Nr.1]",
+    "aufgabentext": "Wie groß sind die Winkel α, β, γ, δ?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Basistraining",
+    "kategorie": "Basis",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.88 Nr.2",
+    "quelle": "Schulbuch [S.88 Nr.2]",
+    "aufgabentext": "Berechne die Winkel α und β."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Basistraining",
+    "kategorie": "Basis",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.88 Nr.3",
+    "quelle": "Schulbuch [S.88 Nr.3]",
+    "aufgabentext": "a) Berechne den fehlenden Winkel. b) Ordne jedem Dreieck das richtige Kärtchen zu. Ein Kärtchen bleibt übrig."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Basistraining",
+    "kategorie": "Basis",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.88 Nr.4",
+    "quelle": "Schulbuch [S.88 Nr.4]",
+    "aufgabentext": "Berechne den fehlenden Winkel im Dreieck ABC (Tabelle). Welches Dreieck ist gleichschenklig?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Basistraining",
+    "kategorie": "Basis",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.88 Nr.5",
+    "quelle": "Schulbuch [S.88 Nr.5]",
+    "aufgabentext": "Berechne die markierten Winkel."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Basistraining",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.88 Nr.6",
+    "quelle": "Schulbuch [S.88 Nr.6]",
+    "aufgabentext": "Zeichne das Dreieck ABC. Miss die Winkel und prüfe mit dem Winkelsummensatz."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Basistraining",
+    "kategorie": "Basis",
+    "operator": "Finde/Erfinde",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.88 Nr.7",
+    "quelle": "Schulbuch [S.88 Nr.7]",
+    "aufgabentext": "Im rechtwinkligen Dreieck ABC verstecken sich viele rechtwinklige Teildreiecke. Finde möglichst viele (mehr als fünf)."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Basistraining",
+    "kategorie": "Basis",
+    "operator": "Finde/Erfinde",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.88 Nr.8",
+    "quelle": "Schulbuch [S.88 Nr.8]",
+    "aufgabentext": "Das gleichschenklige Dreieck ABC enthält viele gleichschenklige Teildreiecke. Suche möglichst viele."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Basistraining",
+    "kategorie": "Basis",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.88 Nr.9",
+    "quelle": "Schulbuch [S.88 Nr.9]",
+    "aufgabentext": "Ein gleichschenkliges Dreieck hat den Basiswinkel a) α=50° b) α=60° c) β=70°. Berechne den Winkel an der Spitze. Ist es gleichseitig?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Basistraining",
+    "kategorie": "Basis",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.88 Nr.10",
+    "quelle": "Schulbuch [S.88 Nr.10]",
+    "aufgabentext": "Ein gleichschenkliges Dreieck hat an der Spitze a) γ=40° b) γ=130° c) γ=90°. Wie groß sind die Basiswinkel?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Basistraining",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.88 Nr.11",
+    "quelle": "Schulbuch [S.88 Nr.11]",
+    "aufgabentext": "Konstruiere das Dreieck (a–f)."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Basistraining",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.88 Nr.12",
+    "quelle": "Schulbuch [S.88 Nr.12]",
+    "aufgabentext": "Konstruiere das Dreieck. Gib an, welchen Kongruenzsatz du verwendest."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Basistraining",
+    "kategorie": "Basis",
+    "operator": "Bewerte/Überprüfe",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.88 Nr.13",
+    "quelle": "Schulbuch [S.88 Nr.13]",
+    "aufgabentext": "Welche der fünf Dreiecke ABC, ABD, ABE, ABF und ABG sind rechtwinklig? Begründe."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Basistraining",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.88 Nr.14",
+    "quelle": "Schulbuch [S.88 Nr.14]",
+    "aufgabentext": "Zeichne das rechtwinklige Dreieck mit c=8, a=6, γ=90°."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Basistraining",
+    "kategorie": "Basis",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.88 Nr.15",
+    "quelle": "Schulbuch [S.88 Nr.15]",
+    "aufgabentext": "Berechne die rot markierten Winkel."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Basistraining",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.88 Nr.16",
+    "quelle": "Schulbuch [S.88 Nr.16]",
+    "aufgabentext": "Zeichne das Dreieck zweimal ab. a) Zeichne die Höhen ein. b) Zeichne die Mittelsenkrechten ein."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.90 Nr.17",
+    "quelle": "Schulbuch [S.90 Nr.17]",
+    "aufgabentext": "Berechne die rot markierten Winkel (g ∥ h)."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Bewerte/Überprüfe",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.90 Nr.18",
+    "quelle": "Schulbuch [S.90 Nr.18]",
+    "aufgabentext": "Yannik meint, Wechselwinkel müsse er sich nicht merken. Beurteile seine Aussage."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.90 Nr.19",
+    "quelle": "Schulbuch [S.90 Nr.19]",
+    "aufgabentext": "Die Dreiecke ABC und BDC sind gleichschenklig. Wie groß ist β?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Beschreibe",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.90 Nr.20",
+    "quelle": "Schulbuch [S.90 Nr.20]",
+    "aufgabentext": "Tino und Lea betrachten ein Dreieck. a) Welche Form? b) Finde eine weitere eindeutige Beschreibung."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Finde/Erfinde",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.90 Nr.21",
+    "quelle": "Schulbuch [S.90 Nr.21]",
+    "aufgabentext": "Trennt aus einem DIN-A4-Blatt (21 cm × 12 cm) durch Falten ein gleichseitiges Dreieck. a) Schichten? b) Anteil? c) Flächeninhalt?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Erkläre/Begründe",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.90 Nr.22",
+    "quelle": "Schulbuch [S.90 Nr.22]",
+    "aufgabentext": "Es gilt AB ∥ g. a) Welche Winkel sind gleich groß? Begründe. b) Erkläre, warum die Winkelsumme im Dreieck 180° ist."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Bestimme",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.90 Nr.23",
+    "quelle": "Schulbuch [S.90 Nr.23]",
+    "aufgabentext": "Vom Dreieck ABC sind zwei Winkel bekannt (Tabelle). a) Vervollständige. b) Welche Form? c) Längste/kürzeste Seite?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Erkläre/Begründe",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.90 Nr.24",
+    "quelle": "Schulbuch [S.90 Nr.24]",
+    "aufgabentext": "Lara will ein gleichseitiges Dreieck (c=6) konstruieren, ihr Zirkel bricht ab. Wie geht es dennoch? Begründe."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.90 Nr.25",
+    "quelle": "Schulbuch [S.90 Nr.25]",
+    "aufgabentext": "Konstruiere den Dreiecks-Fünfling. Überlegt, mit welchem Dreieck man anfangen kann."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.90 Nr.26",
+    "quelle": "Schulbuch [S.90 Nr.26]",
+    "aufgabentext": "Konstruiere das Dreieck und zerlege es durch zwei Teilungslinien in ein gleichseitiges und zwei gleichschenklige Dreiecke (zwei Möglichkeiten)."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Bewerte/Überprüfe",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.90 Nr.27",
+    "quelle": "Schulbuch [S.90 Nr.27]",
+    "aufgabentext": "Tom behauptet: Zwei in den Winkeln übereinstimmende Dreiecke stimmen auch in den übrigen Stücken überein. Beurteile."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.90 Nr.28",
+    "quelle": "Schulbuch [S.90 Nr.28]",
+    "aufgabentext": "Konstruiere das Dreieck (Planfigur skizzieren). Gib die Form an."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.90 Nr.29",
+    "quelle": "Schulbuch [S.90 Nr.29]",
+    "aufgabentext": "a) Konstruiere ABC mit c=8, α=40°, β=60°. Beschreibe. b) mit c=8, α=20°, β=60°. c) Welche Form, wie groß γ? d) Weitere Dreiecke mit Winkeln als Vielfache von 20°."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.90 Nr.30",
+    "quelle": "Schulbuch [S.90 Nr.30]",
+    "aufgabentext": "Konstruiere ABC mit c=9, b=1,5, γ=90° nach SsW und beschreibe mit Fachbegriffen."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Erkläre/Begründe",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.90 Nr.31",
+    "quelle": "Schulbuch [S.90 Nr.31]",
+    "aufgabentext": "Versucht das Dreieck zu konstruieren; erklärt, warum keins entsteht. a) a=5, b=4, c=10 b) a=6,5, b=2,5, c=9 c) c=9, α=110°, β=80°."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.90 Nr.32",
+    "quelle": "Schulbuch [S.90 Nr.32]",
+    "aufgabentext": "Übertragt die Tabelle, konstruiert vier Dreiecke, zeichnet die Höhen ein und messt sie. Vergleicht Seiten und Höhen und stellt eine Vermutung auf."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.92 Nr.33",
+    "quelle": "Schulbuch [S.92 Nr.33]",
+    "aufgabentext": "Ein schiefes Regal wird mit zwei Leisten (je 10 cm Überstand) repariert. Bestimme die Leistenlänge durch eine maßstäbliche Zeichnung."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.92 Nr.34",
+    "quelle": "Schulbuch [S.92 Nr.34]",
+    "aufgabentext": "Ein Baum wirft am 21.06. 18 m, am 23.12. 108 m Schatten. Unter welchen Winkeln treffen die Sonnenstrahlen auf?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.92 Nr.35",
+    "quelle": "Schulbuch [S.92 Nr.35]",
+    "aufgabentext": "Bestimme die Höhe des Eiffelturms durch eine maßstäbliche Zeichnung. Vergleiche mit dem Internetwert."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.92 Nr.36",
+    "quelle": "Schulbuch [S.92 Nr.36]",
+    "aufgabentext": "Hannah und Leonie bestimmen mit einem Messstab die Schulhöhe. a) Maßstäbliche Zeichnung der Höhe. b) Wie hoch ist eure Schule?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.92 Nr.37",
+    "quelle": "Schulbuch [S.92 Nr.37]",
+    "aufgabentext": "Die steilste Straße hat 25,3 % Steigung. Zeichne das Steigungsdreieck im Maßstab 1:1000 und miss den Steigungswinkel."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Erkläre/Begründe",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.92 Nr.38",
+    "quelle": "Schulbuch [S.92 Nr.38]",
+    "aufgabentext": "So steckt ihr ein Rechteck ab (zwei gleich lange Seile). Begründet, dass die Pflöcke ein Rechteck bilden."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.92 Nr.39",
+    "quelle": "Schulbuch [S.92 Nr.39]",
+    "aufgabentext": "a) Konstruiere das Viereck ABCD. b) Begründe, dass es ein Rechteck ist."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.92 Nr.40",
+    "quelle": "Schulbuch [S.92 Nr.40]",
+    "aufgabentext": "Berechne δ, ε, γ1, γ2. c) Begründe, dass die Summe von γ1 und γ2 immer 90° beträgt."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.92 Nr.41",
+    "quelle": "Schulbuch [S.92 Nr.41]",
+    "aufgabentext": "Übertrage die Raute. Zeichne die Mittelsenkrechten der vier Seiten. Welches Viereck schließen sie ein?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.92 Nr.42",
+    "quelle": "Schulbuch [S.92 Nr.42]",
+    "aufgabentext": "Kirchbach, Grünwald und Niederkirchen wollen eine Schutzhütte gleich weit von allen Orten. a) Maßstab 1:100000, bestimme den Standort. b) Entfernung zu jedem Ort?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Anwenden. Nachdenken",
+    "kategorie": "E-Niveau",
+    "operator": "Bewerte/Überprüfe",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.92 Nr.43",
+    "quelle": "Schulbuch [S.92 Nr.43]",
+    "aufgabentext": "Der Umkreismittelpunkt kann innerhalb, außerhalb oder auf einer Seite liegen. Untersucht an verschiedenen Dreiecken und schreibt eine Vermutung."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Rückspiegel",
+    "kategorie": "Basis",
+    "operator": "Bestimme",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.94 Nr.1",
+    "quelle": "Schulbuch [S.94 Nr.1]",
+    "aufgabentext": "Gib den rot markierten Winkel an. Scheitel-, Neben-, Stufen- oder Wechselwinkel?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Rückspiegel",
+    "kategorie": "Basis",
+    "operator": "Berechne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.94 Nr.2",
+    "quelle": "Schulbuch [S.94 Nr.2]",
+    "aufgabentext": "Gib den dritten Winkel im Dreieck ABC an."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Rückspiegel",
+    "kategorie": "Basis",
+    "operator": "Bestimme",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.94 Nr.3",
+    "quelle": "Schulbuch [S.94 Nr.3]",
+    "aufgabentext": "Ist das Dreieck allgemein, gleichschenklig oder gleichseitig? spitz-, recht- oder stumpfwinklig?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Rückspiegel",
+    "kategorie": "Basis",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.94 Nr.4",
+    "quelle": "Schulbuch [S.94 Nr.4]",
+    "aufgabentext": "Konstruiere das Dreieck ABC. a) a=7, b=5, c=8 b) c=7, α=40°, β=60° c) a=5, c=8, β=40°."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Rückspiegel",
+    "kategorie": "G-Niveau",
+    "operator": "Bestimme",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.94 Nr.5 links",
+    "quelle": "Schulbuch [S.94 Nr.5 links]",
+    "aufgabentext": "Welches der Dreiecke ABC, ABD, ABE und ABF ist rechtwinklig?"
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Rückspiegel",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.94 Nr.5 rechts",
+    "quelle": "Schulbuch [S.94 Nr.5 rechts]",
+    "aufgabentext": "Konstruiere das Dreieck ABC. a) a=6,5, c=6, α=50° b) c=6, γ=90°, α=70°. Hier hilft der Satz des Thales."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Rückspiegel",
+    "kategorie": "G-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.94 Nr.6 links",
+    "quelle": "Schulbuch [S.94 Nr.6 links]",
+    "aufgabentext": "Zeichne zweimal A(1|1), B(8|1), C(6|7). a) Zeichne die Höhen. b) Zeichne die Mittelsenkrechten."
+  },
+  {
+    "thema": "Dreiecke",
+    "unterthema": "Rückspiegel",
+    "kategorie": "E-Niveau",
+    "operator": "Zeichne",
+    "quelleTyp": "schulbuch",
+    "quelleDetail": "S.94 Nr.7 rechts",
+    "quelle": "Schulbuch [S.94 Nr.7 rechts]",
+    "aufgabentext": "Wie hoch über seiner Absprungstelle kreist der Gleitschirmflieger? Zeichne maßstäblich."
+  }
+]

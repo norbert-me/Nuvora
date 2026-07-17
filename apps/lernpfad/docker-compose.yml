@@ -1,0 +1,25 @@
+services:
+  lernleiter:
+    build: .
+    ports:
+      - "8082:3000"
+    environment:
+      - DB_PATH=/app/data/lernleiter.db
+    volumes:
+      # Quellcode live ins Image mounten: Frontend (index.html, css/, js/,
+      # vendor/) wird von express.static direkt von der Platte ausgeliefert –
+      # geaenderte Dateien wirken ohne Rebuild sofort (nur Reload noetig).
+      # server.js aendern -> `docker compose restart` reicht (kein Build).
+      - ./index.html:/app/index.html
+      - ./impressum.html:/app/impressum.html
+      - ./datenschutz.html:/app/datenschutz.html
+      - ./kontakt.html:/app/kontakt.html
+      - ./css:/app/css
+      - ./js:/app/js
+      - ./vendor:/app/vendor
+      - ./daten:/app/daten
+      - ./config:/app/config
+      - ./server.js:/app/server.js
+      # DB-Verzeichnis (nicht die Datei, sonst EISDIR).
+      - ./data:/app/data
+    restart: unless-stopped

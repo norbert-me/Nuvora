@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kontakt – Lernleiter</title>
+    <link rel="stylesheet" href="css/style.css?v=11">
+</head>
+<body class="authed">
+    <nav class="navbar">
+        <div class="nav-inner">
+            <a class="nav-brand" href="index.html" style="text-decoration:none">
+                <span class="nav-title">Lernleiter</span>
+            </a>
+            <div class="nav-links">
+                <a class="nav-link" href="index.html">&larr; Zurück</a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="tab-content active">
+        <div class="panel legal-page">
+            <h2>Kontakt</h2>
+            <p>Fragen oder Rückmeldungen? Schreib eine kurze Nachricht.</p>
+            <form id="kontakt-form">
+                <div class="form-group">
+                    <label for="k-name">Name (optional)</label>
+                    <input type="text" id="k-name" placeholder="Dein Name">
+                </div>
+                <div class="form-group">
+                    <label for="k-email">E-Mail (optional, für Antwort)</label>
+                    <input type="text" id="k-email" placeholder="dein@mail.de">
+                </div>
+                <div class="form-group">
+                    <label for="k-nachricht">Nachricht</label>
+                    <textarea id="k-nachricht" rows="6" placeholder="Deine Nachricht…" required></textarea>
+                </div>
+                <button type="submit" class="btn primary">Absenden</button>
+                <span id="k-status" style="margin-left:0.75rem"></span>
+            </form>
+        </div>
+    </section>
+
+    <footer class="site-footer">
+        <a class="link-btn" href="impressum.html">Impressum</a>
+        <span class="foot-sep">·</span>
+        <a class="link-btn" href="datenschutz.html">Datenschutz</a>
+        <span class="foot-sep">·</span>
+        <a class="link-btn" href="kontakt.html">Kontakt</a>
+    </footer>
+
+    <script>
+        document.getElementById('kontakt-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            const status = document.getElementById('k-status');
+            const nachricht = document.getElementById('k-nachricht').value.trim();
+            if (!nachricht) { status.textContent = 'Bitte Nachricht eingeben.'; status.style.color='#dc2626'; return; }
+            const payload = {
+                name: document.getElementById('k-name').value.trim(),
+                email: document.getElementById('k-email').value.trim(),
+                nachricht
+            };
+            try {
+                const res = await fetch('/api/kontakt', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                e.target.reset();
+                status.textContent = 'Nachricht gesendet – danke!'; status.style.color='#16a34a';
+            } catch (err) {
+                status.textContent = 'Senden fehlgeschlagen: ' + err.message; status.style.color='#dc2626';
+            }
+        });
+    </script>
+</body>
+</html>

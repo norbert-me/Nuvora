@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Impressum – Lernleiter</title>
+    <link rel="stylesheet" href="css/style.css?v=11">
+</head>
+<body class="authed">
+    <nav class="navbar">
+        <div class="nav-inner">
+            <a class="nav-brand" href="index.html" style="text-decoration:none">
+                <span class="nav-title">Lernleiter</span>
+            </a>
+            <div class="nav-links">
+                <a class="nav-link" href="index.html">&larr; Zurück</a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="tab-content active">
+        <div class="panel legal-page" id="content">
+            <h2>Impressum</h2>
+            <p>Wird geladen…</p>
+        </div>
+    </section>
+
+    <footer class="site-footer">
+        <a class="link-btn" href="impressum.html">Impressum</a>
+        <span class="foot-sep">·</span>
+        <a class="link-btn" href="datenschutz.html">Datenschutz</a>
+        <span class="foot-sep">·</span>
+        <a class="link-btn" href="kontakt.html">Kontakt</a>
+    </footer>
+
+    <script>
+        function esc(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
+        fetch('/api/site').then(r=>r.json()).then(s=>{
+            const adr=[s.betreiber,s.strasse,s.plz_ort,s.land].filter(Boolean).map(esc).join('<br>');
+            document.getElementById('content').innerHTML = `
+                <h2>Impressum</h2>
+                <p><strong>Angaben gemäß § 5 TMG</strong></p>
+                <p>${adr || '<em>Noch nicht hinterlegt.</em>'}</p>
+                ${s.email ? `<p><strong>E-Mail:</strong> ${esc(s.email)}</p>` : ''}
+                ${s.telefon ? `<p><strong>Telefon:</strong> ${esc(s.telefon)}</p>` : ''}
+                <p><strong>Verantwortlich i.S.d. § 55 Abs. 2 RStV:</strong><br>${esc(s.verantwortlich || s.betreiber || '')}</p>
+                ${s.hinweis ? `<p class="hint">${esc(s.hinweis)}</p>` : ''}`;
+        }).catch(()=>{ document.getElementById('content').innerHTML='<h2>Impressum</h2><p>Daten konnten nicht geladen werden.</p>'; });
+    </script>
+</body>
+</html>

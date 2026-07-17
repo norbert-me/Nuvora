@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Datenschutz – Lernleiter</title>
+    <link rel="stylesheet" href="css/style.css?v=11">
+</head>
+<body class="authed">
+    <nav class="navbar">
+        <div class="nav-inner">
+            <a class="nav-brand" href="index.html" style="text-decoration:none">
+                <span class="nav-title">Lernleiter</span>
+            </a>
+            <div class="nav-links">
+                <a class="nav-link" href="index.html">&larr; Zurück</a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="tab-content active">
+        <div class="panel legal-page" id="content">
+            <h2>Datenschutzerklärung</h2>
+            <p>Wird geladen…</p>
+        </div>
+    </section>
+
+    <footer class="site-footer">
+        <a class="link-btn" href="impressum.html">Impressum</a>
+        <span class="foot-sep">·</span>
+        <a class="link-btn" href="datenschutz.html">Datenschutz</a>
+        <span class="foot-sep">·</span>
+        <a class="link-btn" href="kontakt.html">Kontakt</a>
+    </footer>
+
+    <script>
+        function esc(s){const d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
+        fetch('/api/site').then(r=>r.json()).then(s=>{
+            const adr=[s.betreiber,s.strasse,s.plz_ort,s.land].filter(Boolean).map(esc).join('<br>');
+            document.getElementById('content').innerHTML = `
+                <h2>Datenschutzerklärung</h2>
+                <p>Diese Anwendung ist ein privates Werkzeug zur Unterrichtsplanung. Es findet kein Tracking, keine Werbung und keine Weitergabe von Daten an Dritte statt.</p>
+                <h3>Verantwortlicher</h3>
+                <p>${adr || '<em>siehe Impressum</em>'}${s.email ? '<br>' + esc(s.email) : ''}</p>
+                <h3>Welche Daten werden verarbeitet?</h3>
+                <p>Selbst eingegebene Inhalte (Aufgaben, Klassen, Schülernamen, Förderschwerpunkte, Lernpfade) werden ausschließlich auf dem Server des Betreibers gespeichert, um die Funktion bereitzustellen. Schülerdaten sollten nur pseudonymisiert (z.B. Initialen) eingegeben werden.</p>
+                <h3>Kontaktnachrichten</h3>
+                <p>Über das Kontaktformular übermittelte Angaben (Name, E-Mail, Nachricht) werden zur Bearbeitung der Anfrage gespeichert.</p>
+                <h3>Auskunft &amp; Löschung</h3>
+                <p>Für Auskunft oder Löschung genügt eine formlose Nachricht an ${s.email ? esc(s.email) : 'den Betreiber'}.</p>`;
+        }).catch(()=>{ document.getElementById('content').innerHTML='<h2>Datenschutzerklärung</h2><p>Daten konnten nicht geladen werden.</p>'; });
+    </script>
+</body>
+</html>
