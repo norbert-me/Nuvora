@@ -82,3 +82,17 @@ export const COLORS = {
   correctBg: "#d4edda",
   incorrectBg: "#fde2d9",
 };
+
+// Reifegrad-Badge (alpha/beta) fuer Module. beta = blau, alpha = orange-Warnung.
+export function StageBadge({ stage, title }) {
+  if (!stage) return null;
+  const beta = stage === "beta";
+  return (
+    <span title={title} style={{
+      display: "inline-block", fontSize: 10, fontWeight: 700, letterSpacing: "0.5px",
+      textTransform: "uppercase", padding: "2px 6px", borderRadius: 6, verticalAlign: "middle",
+      background: beta ? "rgba(10,132,255,0.15)" : "rgba(184,134,11,0.18)",
+      color: beta ? "var(--accent)" : "#b8860b",
+    }}>{stage}</span>
+  );
+}

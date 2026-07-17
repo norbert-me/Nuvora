@@ -16,6 +16,17 @@ export default function Legal() {
 
   return (
     <div style={{ maxWidth: 700, lineHeight: 1.7, color: "var(--text)" }}>
+      {/* Entwicklungsstatus: die Anwendung ist im Aufbau (Alpha/Beta). Realer
+          Hinweis, weil echte Daten betroffen sind. */}
+      <div style={{ marginBottom: 28, padding: "14px 16px", border: "1px solid #b8860b", borderRadius: 12, background: "rgba(184,134,11,0.10)", fontSize: 13.5 }}>
+        <strong>Hinweis zum Entwicklungsstand.</strong> Nuvora befindet sich in
+        aktiver Entwicklung (Alpha/Beta). Es besteht <strong>kein Anspruch auf
+        die erstellten Daten</strong>: im Zuge der Weiterentwicklung können Daten
+        verändert werden oder verloren gehen. Verlasse dich nicht als einzige
+        Quelle darauf — bewahre Noten und wichtige Unterlagen zusätzlich außerhalb
+        des Systems auf.
+      </div>
+
       <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 24 }}>Impressum</h2>
 
       <section style={{ marginBottom: 32 }}>
@@ -75,8 +86,9 @@ export default function Legal() {
         <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>4. Art der verarbeiteten Daten</h3>
         <ul style={{ paddingLeft: 20 }}>
           <li><strong>Nutzungsdaten der Lehrkraft:</strong> E-Mail-Adresse, Name, Passwort (als gesalzener Hash gespeichert, nicht im Klartext).</li>
-          <li><strong>Daten der Lernenden:</strong> Name und zugewiesene Kartennummer, eingegeben durch die Lehrkraft.</li>
-          <li><strong>Abstimmungsergebnisse:</strong> Antworten der Lernenden pro Frage und Session (zugeordnet über Kartennummern).</li>
+          <li><strong>Daten der Lernenden:</strong> Name und zugewiesene Kartennummer, eingegeben durch die Lehrkraft. Optional E-/G-Kurs, Klassenleitung sowie – soweit von der Lehrkraft erfasst – Förderschwerpunkte und Notizen.</li>
+          <li><strong>Besondere Kategorien (Art. 9 DSGVO):</strong> Angaben zu Förderschwerpunkten (z.&nbsp;B. LRS, Dyskalkulie) und Notizen zu Nachteilsausgleichen können besondere Kategorien personenbezogener Daten darstellen. Diese Angaben werden ausschließlich auf dem Server des Verantwortlichen verarbeitet, erscheinen in <strong>keinem Export</strong> und in keiner Veröffentlichung. Rechtsgrundlage und Erforderlichkeit ihrer Erhebung liegen in der Verantwortung der erhebenden Lehrkraft bzw. Schule (in der Regel Schulgesetz/-verordnung des jeweiligen Landes).</li>
+          <li><strong>Abstimmungsergebnisse und Noten:</strong> Antworten der Lernenden pro Frage und Session, sowie im Modul Noten erfasste Bewertungen und Beobachtungen.</li>
           <li><strong>Kamerabilder:</strong> Werden beim Scannen kurzfristig im Arbeitsspeicher verarbeitet, um ArUco-Marker zu erkennen. Es erfolgt keine dauerhafte Speicherung der Bilder.</li>
           <li><strong>Technische Zugriffsdaten:</strong> IP-Adresse (kurzfristig im Arbeitsspeicher für Brute-Force-Schutz, nicht dauerhaft gespeichert).</li>
         </ul>

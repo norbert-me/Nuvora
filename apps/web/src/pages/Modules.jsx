@@ -2,6 +2,7 @@
 // des Moduls bleiben im Kern liegen und sind nach dem Wiedereinschalten da.
 import { useState } from "react";
 import { useModules } from "../core/modules.js";
+import { StageBadge } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { pageTitle } from "../components/Icons.jsx";
 
@@ -50,6 +51,7 @@ export default function Modules() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
                 {t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name}
+                {" "}<StageBadge stage={m.stage} title={m.stage === "beta" ? t("stage.betaHint") : t("stage.alphaHint")} />
                 {!m.available && (
                   <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text3)", marginLeft: 8 }}>
                     {t("modules.notAvailable")}

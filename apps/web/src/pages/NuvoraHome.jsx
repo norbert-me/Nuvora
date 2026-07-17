@@ -4,6 +4,7 @@
 import { Link } from "react-router-dom";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
+import { StageBadge } from "../components/Icons.jsx";
 import { pageTitle } from "../components/Icons.jsx";
 
 const card = {
@@ -61,14 +62,14 @@ export default function NuvoraHome({ user }) {
               // ein <Link> wuerde ins Leere routen.
               m.external ? (
                 <a key={m.key} href={m.path} style={card}>
-                  <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name}</div>
+                  <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name} <StageBadge stage={m.stage} /></div>
                   <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.6 }}>
                     {t(`mod.${m.key}.desc`) !== `mod.${m.key}.desc` ? t(`mod.${m.key}.desc`) : m.description}
                   </div>
                 </a>
               ) : (
                 <Link key={m.key} to={m.path} style={card}>
-                  <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name}</div>
+                  <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name} <StageBadge stage={m.stage} /></div>
                   <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.6 }}>
                     {t(`mod.${m.key}.desc`) !== `mod.${m.key}.desc` ? t(`mod.${m.key}.desc`) : m.description}
                   </div>

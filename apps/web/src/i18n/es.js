@@ -539,4 +539,8 @@ export default {
   "noten.gradesBySection": "Notas por sección",
   "noten.noGrades": "Aún no hay notas.",
   "noten.clickStudent": "Clic en un nombre para ver toda la información.",
+  "stage.beta": "Beta",
+  "stage.alpha": "Alpha",
+  "stage.alphaHint": "Desarrollo temprano: los datos pueden perderse.",
+  "stage.betaHint": "En desarrollo pero utilizable.",
 };

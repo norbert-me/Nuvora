@@ -33,6 +33,9 @@ class ModuleDef(BaseModel):
     # Laeuft das Modul ausserhalb der React-App (eigene Seite hinter dem Proxy)?
     # Dann muss die Shell es per echtem Seitenwechsel oeffnen, nicht per Route.
     external: bool = False
+    # Reifegrad: "beta" = laeuft, aber in Entwicklung; "alpha" = frueh, Daten
+    # koennen verloren gehen. Die Shell zeigt das als Badge.
+    stage: str = "alpha"
 
 
 REGISTRY: List[ModuleDef] = [
@@ -45,6 +48,7 @@ REGISTRY: List[ModuleDef] = [
             "und Export."
         ),
         path="/cardvote",
+        stage="beta",
     ),
     ModuleDef(
         key="lernpfad",
