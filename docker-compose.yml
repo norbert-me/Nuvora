@@ -12,6 +12,14 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-nuvora}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    # Ohne diesen Check startet api los, bevor Postgres Verbindungen annimmt,
+    # stirbt an "Connection refused" und wird nur vom restart wieder eingefangen.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nuvora} -d ${POSTGRES_DB:-nuvora}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
 
   api:
     build: ./apps/api
@@ -32,7 +40,8 @@ services:
     volumes:
       - uploads:/app/uploads
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       default:
         aliases:

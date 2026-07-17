@@ -195,9 +195,47 @@ if [ -n "$PORT_USER" ]; then
 fi
 echo "  ✓ Port $WANT_PORT frei."
 
+# Postgres initialisiert sein Volume nur EINMAL. Wer POSTGRES_PASSWORD spaeter
+# aendert, aendert damit nicht die Rolle in der bestehenden DB — die api
+# scheitert dann an "password authentication failed", was wie ein Codefehler
+# aussieht, aber Datenstand ist. Hier frueh und eindeutig melden.
+echo "→ Datenbank-Zugang prüfen..."
+DB_CHECK=$(ssh "$SERVER" "
+  cd '$REMOTE_DIR' || exit 0
+  # Laeuft die DB ueberhaupt schon? Beim allerersten Deploy gibt es nichts zu pruefen.
+  docker compose ps -q db 2>/dev/null | grep -q . || exit 0
+  user=\$(grep '^POSTGRES_USER=' .env | cut -d= -f2- | tr -d '\"' | tr -d ' ')
+  pass=\$(grep '^POSTGRES_PASSWORD=' .env | cut -d= -f2- | tr -d '\"' | tr -d ' ')
+  db=\$(grep '^POSTGRES_DB=' .env | cut -d= -f2- | tr -d '\"' | tr -d ' ')
+  [ -z \"\$user\" ] && user=nuvora
+  [ -z \"\$db\" ] && db=nuvora
+  out=\$(docker compose exec -T -e PGPASSWORD=\"\$pass\" db psql -U \"\$user\" -d \"\$db\" -c 'SELECT 1' 2>&1) || echo \"\$out\"
+")
+
+if printf '%s' "$DB_CHECK" | grep -qi 'password authentication failed\|role .* does not exist\|database .* does not exist'; then
+  echo ""
+  echo "  ⚠ Die Datenbank akzeptiert die Zugangsdaten aus der .env nicht:"
+  echo "      $(printf '%s' "$DB_CHECK" | head -1)"
+  echo ""
+  echo "    Postgres legt Rolle und Datenbank nur beim ERSTEN Start an. Ein"
+  echo "    spaeter geaendertes POSTGRES_PASSWORD erreicht die bestehende DB nicht."
+  echo ""
+  echo "    Passwort der Rolle nachziehen (Daten bleiben erhalten):"
+  echo "      ssh $SERVER"
+  echo "      cd $REMOTE_DIR"
+  echo "      PW=\$(grep '^POSTGRES_PASSWORD=' .env | cut -d= -f2-)"
+  echo "      docker compose exec -T db psql -U postgres -c \"ALTER ROLE <user> WITH PASSWORD '\$PW';\""
+  echo ""
+  echo "    Oder — LOESCHT ALLE DATEN — das Volume neu aufsetzen:"
+  echo "      docker compose down --remove-orphans && docker volume rm nuvora_pgdata"
+  echo ""
+  exit 1
+fi
+echo "  ✓ Datenbank-Zugang in Ordnung."
+
 echo "→ Container bauen (${BUILD_SERVICES:-alle})..."
 # shellcheck disable=SC2029
-ssh "$SERVER" "cd '$REMOTE_DIR' && docker compose build $BUILD_SERVICES && docker compose up -d"
+ssh "$SERVER" "cd '$REMOTE_DIR' && docker compose build $BUILD_SERVICES && docker compose up -d --remove-orphans"
 
 echo "→ Status & Logs..."
 sleep 6
@@ -208,7 +246,7 @@ PORT="${PORT:-8080}"
 echo "→ Health-Checks (auf dem Server, Port $PORT)..."
 CV=$(ssh "$SERVER" "curl -s -o /dev/null -w '%{http_code}' http://localhost:$PORT/api/health" || echo "000")
 LP=$(ssh "$SERVER" "curl -s -o /dev/null -w '%{http_code}' http://localhost:$PORT/lernpfad/" || echo "000")
-echo "  /api/health  -> $CV   (CardVote)"
+echo "  /api/health  -> $CV   (Nuvora-Kern)"
 echo "  /lernpfad/   -> $LP   (Lernpfad)"
 
 echo ""
@@ -218,7 +256,7 @@ if [ "$CV" = "200" ] && [ "$LP" = "200" ]; then
   echo "  ${SITE_URL:-http://localhost:$PORT}"
   echo "========================================"
 else
-  [ "$CV" != "200" ] && echo "  ⚠ CardVote nicht gesund (health=$CV)"
+  [ "$CV" != "200" ] && echo "  ⚠ Nuvora-Kern nicht gesund (health=$CV)"
   [ "$LP" != "200" ] && echo "  ⚠ Lernpfad nicht gesund (status=$LP)"
   echo "  Logs oben prüfen."
   echo "========================================"
