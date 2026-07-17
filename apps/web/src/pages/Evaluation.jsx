@@ -20,7 +20,6 @@ function stddev(arr) {
 }
 
 const DEFAULT_SCALE = { 1: 87, 2: 73, 3: 59, 4: 45, 5: 20, 6: 0 };
-const GRADE_LABELS = { 1: "sehr gut", 2: "gut", 3: "befriedigend", 4: "ausreichend", 5: "mangelhaft", 6: "ungenügend" };
 const GRADE_COLORS = { 1: "#0a7d3e", 2: "#0a7d3e", 3: "#b8860b", 4: "#b8860b", 5: "#d1350f", 6: "#d1350f" };
 
 function gradeFromPct(pct, scale) {

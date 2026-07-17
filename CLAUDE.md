@@ -156,7 +156,7 @@ docker compose exec api python /tmp/m.py --sqlite /tmp/alt.db --email DEINE@MAIL
 ## Konventionen
 
 - Deutsch für UI, Daten und Kommentare; Code-Bezeichner Englisch.
-- **Kein Alembic im Betrieb**, obwohl es in `requirements.txt` steht: das Schema entsteht beim Start aus `Base.metadata.create_all` plus `_ensure_columns` in `main.py` (additive Spalten und Indizes, idempotent). Neue Tabellen kommen von selbst; neue Spalten auf bestehenden Tabellen gehören in die `wanted`-Liste in `_ensure_columns`.
+- **Kein Alembic.** Es stand als ungenutzte Abhängigkeit in `requirements.txt` und hat genau das suggeriert — inzwischen entfernt. Das Schema entsteht beim Start aus `Base.metadata.create_all` plus `_ensure_columns` in `main.py` (additive Spalten und Indizes, idempotent). Neue Tabellen kommen von selbst; neue Spalten auf bestehenden Tabellen gehören in die `wanted`-Liste in `_ensure_columns`.
 - Schüler sind Daten, keine Nutzer. Jeder Vorschlag, Lernenden ein Konto zu geben, widerspricht dem Produktzweck.
 - **Stile kommen aus `apps/web/src/components/Icons.jsx`** — `btnPrimary`, `btnSecondary`, `btnSmall`, `pageTitle`, `iconBtn`, `COLORS`. Nicht je Seite neu definieren: genau so sind vier Varianten von `btnPrimary` entstanden. Drei Gruppen weichen bewusst ab (Formularseiten, Bestätigungsseiten, Session/Beamer) — das steht an der Definition.
 - **Besonders schützenswerte Daten:** `students.foerder` und `students.notizen` sind DSGVO Art. 9 (Dyskalkulie, LRS, Nachteilsausgleiche). Sie stehen in keinem Export und in keiner Veröffentlichung. Wer ein Feld ergänzt, prüft zuerst jeden Export- und Marktplatzpfad.

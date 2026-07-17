@@ -23,7 +23,6 @@ function parseNote(text) {
   if (Number.isNaN(n) || n < 1 || n > 6) return null;
   return Math.round(n * 10) / 10;
 }
-const fmt = (n) => (n === null || n === undefined ? "" : n.toFixed(1).replace(".", ","));
 
 export default function Noten() {
   const [classes, setClasses] = useState([]);

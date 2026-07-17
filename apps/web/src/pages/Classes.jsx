@@ -9,7 +9,6 @@
 // Kartendruck und Auswertung liegen NICHT hier, sondern im Modul unter
 // /cardvote/cards: der Kern kennt Klassen, nicht was ein Modul damit tut.
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";

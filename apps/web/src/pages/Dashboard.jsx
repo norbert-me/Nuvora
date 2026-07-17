@@ -723,7 +723,6 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onQuestionsChang
 const modalOverlay = { position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "5vh 16px", overflowY: "auto" };
 const modalCard = { background: "var(--card)", border: "1px solid var(--border)", borderRadius: 18, padding: 24, width: "100%", maxWidth: 620, boxShadow: "0 12px 40px rgba(0,0,0,0.3)" };
 
-const formBox = { marginTop: 20, padding: 24, border: "1px solid var(--border)", borderRadius: 16, background: "var(--bg3)" };
 
 const LATEX_BUTTONS = [
   { label: "a/b", tex: "\\frac{}{}", cursor: -3 },
