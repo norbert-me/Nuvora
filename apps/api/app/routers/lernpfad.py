@@ -150,9 +150,11 @@ async def delete_exercise(
 
 class LadderIn(BaseModel):
     class_id: Optional[int] = None
+    topic_id: Optional[int] = None
     position: int = 0
     notizen: str = ""
-    exercise_order: Optional[list] = None
+    # [{"student_id": 12, "exercise_ids": [3, 7]}, ...]
+    assignments: Optional[list] = None
     config: Optional[dict] = None
 
 
@@ -243,6 +245,7 @@ async def add_ladder(
 ):
     await _owned_path(db, user, path_id)
     await _check_class(db, user, body.class_id)
+    await _check_topic(db, user, body.topic_id)
     ladder = LearningLadder(**body.model_dump(), path_id=path_id)
     db.add(ladder)
     await db.commit()
@@ -262,6 +265,7 @@ async def update_ladder(
         raise HTTPException(404, "Lernleiter nicht gefunden")
     await _owned_path(db, user, ladder.path_id)
     await _check_class(db, user, body.class_id)
+    await _check_topic(db, user, body.topic_id)
     for k, v in body.model_dump().items():
         setattr(ladder, k, v)
     await db.commit()

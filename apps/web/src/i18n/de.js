@@ -26,7 +26,7 @@ export default {
   "landing.feature4.desc": "Eigener Server, keine Cloud, kein Tracking, keine Schülerdaten bei Dritten. Lernende brauchen weder Konto noch Gerät.",
   "landing.cta": "Jetzt starten",
   "landing.ctaHint": "Kostenlos registrieren — kein Abo, keine versteckten Kosten.",
-  "landing.contribute": "Idee, Verbesserungsvorschlag oder Fehler gefunden? Über {{link}} gerne melden — CardVote lebt von Rückmeldungen.",
+  "landing.contribute": "Idee, Verbesserungsvorschlag oder Fehler gefunden? Über {{link}} gerne melden — Nuvora lebt von Rückmeldungen.",
   "landing.contactLink": "Kontakt",
 
   // Login
@@ -78,8 +78,7 @@ export default {
   "home.step4.desc": "Scanner am Handy öffnen, Session-Code eingeben, Karten erfassen.",
   "home.step5.title": "Auswerten",
   "home.step5.desc": "Ergebnisse pro Klasse oder Person, Noten, Boxplots, Auffälligkeiten. Export als PDF, Excel, iDoceo.",
-  "home.contribute": "Idee, Verbesserungsvorschlag oder Fehler gefunden? Über {{link}} gerne melden — CardVote lebt von Rückmeldungen.",
-
+  "home.contribute": "Idee, Verbesserungsvorschlag oder Fehler gefunden? Über {{link}} gerne melden — Nuvora lebt von Rückmeldungen.",
   // Auswertung (Liste)
   "tests.showActive": "Aktive anzeigen",
   "tests.archive": "Archiv",

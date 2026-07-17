@@ -26,7 +26,7 @@ export default {
   "landing.feature4.desc": "Your own server, no cloud, no tracking, no student data with third parties. Learners need neither an account nor a device.",
   "landing.cta": "Get started",
   "landing.ctaHint": "Free to register — no subscription, no hidden costs.",
-  "landing.contribute": "Found an idea, suggestion, or bug? Let us know via {{link}} — CardVote lives from feedback.",
+  "landing.contribute": "Got an idea, a suggestion or found a bug? Get in touch via {{link}} — Nuvora lives on feedback.",
   "landing.contactLink": "Contact",
 
   // Login
@@ -78,8 +78,7 @@ export default {
   "home.step4.desc": "Open the scanner on your phone, enter the session code, capture cards.",
   "home.step5.title": "Evaluate",
   "home.step5.desc": "Results per class or student, grades, box plots, flagged issues. Export as PDF, Excel, iDoceo.",
-  "home.contribute": "Found an idea, suggestion, or bug? Let us know via {{link}} — CardVote lives from feedback.",
-
+  "home.contribute": "Got an idea, a suggestion or found a bug? Get in touch via {{link}} — Nuvora lives on feedback.",
   // Results (list)
   "tests.showActive": "Show active",
   "tests.archive": "Archive",

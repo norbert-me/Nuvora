@@ -26,7 +26,7 @@ export default {
   "landing.feature4.desc": "Servidor propio, sin nube, sin rastreo, sin datos del alumnado en terceros. El alumnado no necesita ni cuenta ni dispositivo.",
   "landing.cta": "Empezar ahora",
   "landing.ctaHint": "Registro gratuito — sin suscripción, sin costes ocultos.",
-  "landing.contribute": "¿Tienes una idea, sugerencia o encontraste un error? Escríbenos por {{link}} — CardVote vive de los comentarios.",
+  "landing.contribute": "¿Tienes una idea, una sugerencia o has encontrado un fallo? Escríbenos por {{link}} — Nuvora vive de los comentarios.",
   "landing.contactLink": "Contacto",
 
   // Login
@@ -78,8 +78,7 @@ export default {
   "home.step4.desc": "Abrir el escáner en el móvil, introducir el código de sesión, capturar tarjetas.",
   "home.step5.title": "Evaluar",
   "home.step5.desc": "Resultados por clase o persona, notas, diagramas de caja, avisos. Exportar como PDF, Excel, iDoceo.",
-  "home.contribute": "¿Tienes una idea, sugerencia o encontraste un error? Escríbenos por {{link}} — CardVote vive de los comentarios.",
-
+  "home.contribute": "¿Tienes una idea, una sugerencia o has encontrado un fallo? Escríbenos por {{link}} — Nuvora vive de los comentarios.",
   // Resultados (lista)
   "tests.showActive": "Mostrar activos",
   "tests.archive": "Archivo",

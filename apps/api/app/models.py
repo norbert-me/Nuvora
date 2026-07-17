@@ -294,7 +294,9 @@ class LearningPath(Base):
 
 
 class LearningLadder(Base):
-    """Eine Lernleiter: eine Stufe innerhalb eines Lernpfads, fuer eine Klasse."""
+    """Eine Lernleiter: eine Stufe eines Lernpfads — ein Thema, eine Klasse,
+    und je Schueler eine eigene Aufgabenauswahl. Genau diese Auswahl ist die
+    Differenzierung, um die es in dem Modul geht."""
     __tablename__ = "learning_ladders"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -304,10 +306,16 @@ class LearningLadder(Base):
     class_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("school_classes.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    # Das Thema der Stufe. Frueher thema/unterthema als Freitext.
+    topic_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     notizen: Mapped[str] = mapped_column(Text, default="", server_default="")
-    # Reihenfolge/Auswahl der Aufgaben dieser Stufe (Liste von exercise-IDs).
-    exercise_order: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # Aufgaben je Schueler: [{"student_id": 12, "exercise_ids": [3, 7, 9]}, ...]
+    # Bewusst JSON statt eigener Tabelle: die Liste wird immer als Ganzes
+    # gelesen und geschrieben, nie einzeln abgefragt.
+    assignments: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
