@@ -545,4 +545,6 @@ export default {
   "stage.betaHint": "In development but usable.",
   "dash.searchQ": "Search questions…",
   "dash.noSearchHit": "No question matches.",
+  "mod.code-detektiv.name": "Code Detective",
+  "mod.code-detektiv.desc": "Coding puzzles for computer science lessons: put code blocks in the right order, alone or as a class.",
 };

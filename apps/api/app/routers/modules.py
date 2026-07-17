@@ -71,6 +71,15 @@ REGISTRY: List[ModuleDef] = [
         ),
         path="/noten",
     ),
+    ModuleDef(
+        key="code-detektiv",
+        name="Code-Detektiv",
+        description=(
+            "Programmier-Rätsel für den Informatikunterricht: Code-Bausteine "
+            "in die richtige Reihenfolge bringen, allein oder in der Klasse."
+        ),
+        path="/code-detektiv",
+    ),
 ]
 
 _BY_KEY = {m.key: m for m in REGISTRY}

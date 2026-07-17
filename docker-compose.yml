@@ -64,6 +64,12 @@ services:
     build: ./apps/lernpfad
     restart: unless-stopped
 
+  code-detektiv:
+    # Reine Client-App (React 19 + Vite), eigener Container. Kein Backend,
+    # kein Login — im Rahmen ueber ModuleGate geschuetzt, eingebettet per iframe.
+    build: ./apps/code-detektiv
+    restart: unless-stopped
+
   proxy:
     image: nginx:alpine
     restart: unless-stopped
@@ -77,6 +83,7 @@ services:
     depends_on:
       - web
       - lernpfad
+      - code-detektiv
 
 volumes:
   pgdata:

@@ -545,4 +545,6 @@ export default {
   "stage.betaHint": "En desarrollo pero utilizable.",
   "dash.searchQ": "Buscar preguntas…",
   "dash.noSearchHit": "Ninguna pregunta coincide.",
+  "mod.code-detektiv.name": "Detective de Código",
+  "mod.code-detektiv.desc": "Retos de programación para clase de informática: ordena los bloques de código, solo o en grupo.",
 };

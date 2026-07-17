@@ -61,6 +61,7 @@ import NuvoraHome from "./pages/NuvoraHome.jsx";
 import Modules from "./pages/Modules.jsx";
 import Topics from "./pages/Topics.jsx";
 import LernpfadModule from "./pages/LernpfadModule.jsx";
+import CodeDetektivModule from "./pages/CodeDetektivModule.jsx";
 import Cards from "./pages/Cards.jsx";
 import Tutorial from "./pages/Tutorial.jsx";
 import NotenModul from "./pages/Noten.jsx";
@@ -78,6 +79,7 @@ function helpArea(pathname) {
 }
 const LP = "/lernpfad";
 const NO = "/noten";
+const CD = "/code-detektiv";
 
 // Menue passend zum Bereich. Man soll im Modul-Menue bleiben, auch auf
 // modulneutralen Seiten (Hilfe, Impressum), solange man aus einem Modul kam —
@@ -88,6 +90,7 @@ const getModuleNavItems = (t, location) => {
   const area = pathname.startsWith(CV) ? "cardvote"
     : pathname.startsWith(LP) ? "lernpfad"
     : pathname.startsWith(NO) ? "noten"
+    : pathname.startsWith(CD) ? "code-detektiv"
     : params.get("area"); // Hilfe u.ae.: Bereich aus der Query
 
   if (area === "cardvote") {
@@ -579,6 +582,9 @@ function AppRoutes({ user, setUser, logout }) {
 
           {/* ─── Modul Noten ─── */}
           <Route path={NO} element={user ? <ModuleGate moduleKey="noten"><NotenModul /></ModuleGate> : <Landing />} />
+
+          {/* ─── Modul Code-Detektiv ─── */}
+          <Route path={CD} element={user ? <ModuleGate moduleKey="code-detektiv"><CodeDetektivModule /></ModuleGate> : <Landing />} />
 
           {/* ─── Modul Lernpfad ─── */}
           {/* Die App laeuft eingebettet (siehe LernpfadModule) — nicht in React

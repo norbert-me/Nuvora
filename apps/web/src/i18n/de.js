@@ -545,4 +545,6 @@ export default {
   "stage.betaHint": "In Entwicklung, aber nutzbar.",
   "dash.searchQ": "Fragen durchsuchen…",
   "dash.noSearchHit": "Keine Frage passt zur Suche.",
+  "mod.code-detektiv.name": "Code-Detektiv",
+  "mod.code-detektiv.desc": "Programmier-Rätsel für den Informatikunterricht: Code-Bausteine in die richtige Reihenfolge bringen, allein oder in der Klasse.",
 };
