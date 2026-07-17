@@ -516,4 +516,10 @@ export default {
   "help.nt.impT": "Test aus CardVote übernehmen",
   "help.nt.imp": "In der CardVote-Auswertung gibt es „Ins Notenmodul“: die Testnoten wandern nach dem eingestellten Notenschlüssel in eine Kategorie dieser Klasse. Voraussetzung: die Klasse hat dort schon eine Spalte.",
   "help.coreLabel": "Kern",
+  "mod.cardvote.name": "CardVote",
+  "mod.cardvote.desc": "Abstimmen im Unterricht ohne Geräte: Lernende halten bedruckte Karten hoch, du scannst sie mit dem Handy. Mit Auswertung, Noten und Export.",
+  "mod.lernpfad.name": "Lernpfad",
+  "mod.lernpfad.desc": "Aufgaben und Lernpfade verwalten — mit denselben Themen und Klassen wie der Rest von Nuvora.",
+  "mod.noten.name": "Noten",
+  "mod.noten.desc": "Leistungsbewertung: eigene Kategorien mit Gewichten, Noten und Beobachtungen je Person. Rechnet den gewichteten Schnitt der Noten — die Zeugnisnote bleibt deine Entscheidung.",
 };

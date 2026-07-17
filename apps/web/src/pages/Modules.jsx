@@ -49,7 +49,7 @@ export default function Modules() {
           >
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
-                {m.name}
+                {t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name}
                 {!m.available && (
                   <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text3)", marginLeft: 8 }}>
                     {t("modules.notAvailable")}
@@ -57,7 +57,7 @@ export default function Modules() {
                 )}
               </div>
               <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.6 }}>
-                {m.description}
+                {t(`mod.${m.key}.desc`) !== `mod.${m.key}.desc` ? t(`mod.${m.key}.desc`) : m.description}
               </div>
             </div>
             <button

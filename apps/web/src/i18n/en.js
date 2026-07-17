@@ -516,4 +516,10 @@ export default {
   "help.nt.impT": "Import a test from CardVote",
   "help.nt.imp": "In the CardVote evaluation there is “To gradebook”: the test grades move by the current grading scale into a category of this class. Prerequisite: the class already has a column there.",
   "help.coreLabel": "Core",
+  "mod.cardvote.name": "CardVote",
+  "mod.cardvote.desc": "Voting in class without devices: learners hold up printed cards, you scan them with your phone. With evaluation, grades and export.",
+  "mod.lernpfad.name": "Lernpfad",
+  "mod.lernpfad.desc": "Manage exercises and learning paths — with the same topics and classes as the rest of Nuvora.",
+  "mod.noten.name": "Grades",
+  "mod.noten.desc": "Assessment: your own weighted categories, grades and observations per person. Computes the weighted average of grades — the report-card grade stays your decision.",
 };

@@ -516,4 +516,10 @@ export default {
   "help.nt.impT": "Importar una prueba de CardVote",
   "help.nt.imp": "En la evaluación de CardVote está «Al cuaderno»: las notas pasan según la escala actual a una categoría de esta clase. Requisito: la clase ya tiene una columna allí.",
   "help.coreLabel": "Núcleo",
+  "mod.cardvote.name": "CardVote",
+  "mod.cardvote.desc": "Votar en clase sin dispositivos: el alumnado levanta tarjetas impresas y tú las escaneas con el móvil. Con evaluación, notas y exportación.",
+  "mod.lernpfad.name": "Lernpfad",
+  "mod.lernpfad.desc": "Gestiona ejercicios y rutas de aprendizaje, con los mismos temas y clases que el resto de Nuvora.",
+  "mod.noten.name": "Notas",
+  "mod.noten.desc": "Evaluación: tus categorías con pesos, notas y observaciones por persona. Calcula la media ponderada; la nota final sigue siendo tu decisión.",
 };
