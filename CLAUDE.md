@@ -2,19 +2,38 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Das Prinzip
+
+**Nuvora ist die Basis, Module sind Gäste.** Der Kern besitzt Konten, Klassen und Schüler. Module (CardVote, Lernpfad) arbeiten auf diesen Daten, besitzen sie aber nicht, und werden pro Lehrkraft zugeschaltet.
+
+Daraus folgen zwei Regeln, die jede Änderung einhalten muss:
+
+- **Kein Modul besitzt Klassen oder Schüler.** Die liegen im Kern. Ein Modul, das eigene anlegt, hat den Sinn der Plattform gebrochen.
+- **Kein Modul hat eigene Konten.** Der Kern authentifiziert, Module erben.
+
+Verzeichnisse folgen der Architektur, nicht der Herkunft: `apps/api` (Kern + Modul-Router), `apps/web` (Shell + Modul-Seiten), `apps/lernpfad` (noch eigenständig). Es gibt kein `apps/cardvote` — der Kern kann nicht in einem seiner Module liegen.
+
 ## Status
 
-Beide Module sind importiert (`apps/cardvote`, `apps/lernpfad`) und laufen hinter einem gemeinsamen Proxy auf einer Domain. **Fachlich sind sie noch getrennt**: eigene Konten, eigene Klassen, eigene DBs. Die Bündelung ist bisher Deployment-Ebene, nicht Datenebene.
+Der Rahmen steht: Nuvora hat eigene Startseite, Modulregister und Navigation. CardVote ist ein Modul unter `/cardvote/*`. **Lernpfad noch nicht** — es hängt unter `/lernpfad/` als eigene App mit eigenen Konten und ist im Register bewusst `available=False`.
 
 ### Aufbau heute
 
 `docker-compose.yml` (Root) + `nginx.conf` (Root) fahren alles zusammen:
 
-| Pfad         | Ziel                      |
-| ------------ | ------------------------- |
-| `/`          | `cardvote-frontend:3000`  |
-| `/api/`, `/ws/` | `cardvote-backend:8000` |
-| `/lernpfad/` | `lernpfad:3000`           |
+| Pfad         | Ziel                 |
+| ------------ | -------------------- |
+| `/`          | `web:3000` (Shell)   |
+| `/api/`, `/ws/` | `api:8000`        |
+| `/lernpfad/` | `lernpfad:3000`      |
+
+### Modulregister
+
+`apps/api/app/routers/modules.py` — `REGISTRY` listet die Module **im Code**: ein Modul existiert nur, wenn es Code dazu gibt. Die DB (`user_modules`) merkt sich nur, wer was aktiviert hat.
+
+Im Frontend liest `src/core/modules.js` das aus; `ModuleGate` in `main.jsx` schützt die Modul-Routen — ohne Aktivierung landet man bei `/modules`. Neue Module: Eintrag in `REGISTRY`, Routen in `main.jsx` hinter `ModuleGate`.
+
+Bestandskonten werden beim Start einmalig angeschlossen (`users.modules_initialized`), damit niemand nach dem Umbau vor einer leeren Shell steht.
 
 Der Slash am Ende von `proxy_pass http://lernpfad:3000/` schneidet das Prefix ab — Lernpfad sieht `/` und weiss von Nuvora nichts. Passend dazu leitet `apps/lernpfad/js/app.js` seine `API`-Konstante aus `location.pathname` ab, damit das Modul auch standalone (`npm start`) läuft. Beim Ändern eines der beiden Punkte den anderen mitziehen.
 

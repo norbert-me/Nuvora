@@ -336,7 +336,7 @@ export default function Session() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20, gap: 12, flexWrap: "wrap" }}>
           <button onClick={() => {
             const code = prompt(t("session.codePrompt"));
-            if (code && code.trim()) navigate(`/scan?session=${code.trim().replace(/\D/g, "").slice(0, 4)}`);
+            if (code && code.trim()) navigate(`/cardvote/scan?session=${code.trim().replace(/\D/g, "").slice(0, 4)}`);
           }} style={{
             display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", fontSize: 14, fontWeight: 600, cursor: "pointer",
             background: "var(--card)", color: "var(--text)", border: "1px solid var(--border2)", borderRadius: 980,
@@ -559,8 +559,8 @@ export default function Session() {
             </div>
           )}
           <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 32 }}>
-            <button onClick={() => navigate(`/evaluation/${sessionId}`)} style={{ ...btnPrimary, padding: "10px 20px" }}>{t("session.detailEval")}</button>
-            <button onClick={() => navigate("/tests")} style={{ ...btnSecondary, padding: "10px 20px" }}>{t("session.allTests")}</button>
+            <button onClick={() => navigate(`/cardvote/evaluation/${sessionId}`)} style={{ ...btnPrimary, padding: "10px 20px" }}>{t("session.detailEval")}</button>
+            <button onClick={() => navigate("/cardvote/tests")} style={{ ...btnSecondary, padding: "10px 20px" }}>{t("session.allTests")}</button>
           </div>
         </div>
       );
@@ -629,8 +629,8 @@ export default function Session() {
           </tbody>
         </table>
         <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-          <button onClick={() => navigate(`/evaluation/${sessionId}`)} style={{ ...btnPrimary, padding: "10px 20px" }}>{t("session.detailEval")}</button>
-          <button onClick={() => navigate("/tests")} style={{ ...btnSecondary, padding: "10px 20px" }}>{t("session.allTests")}</button>
+          <button onClick={() => navigate(`/cardvote/evaluation/${sessionId}`)} style={{ ...btnPrimary, padding: "10px 20px" }}>{t("session.detailEval")}</button>
+          <button onClick={() => navigate("/cardvote/tests")} style={{ ...btnSecondary, padding: "10px 20px" }}>{t("session.allTests")}</button>
         </div>
       </div>
     );

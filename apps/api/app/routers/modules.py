@@ -47,9 +47,17 @@ REGISTRY: List[ModuleDef] = [
         key="lernpfad",
         name="Lernpfad",
         description=(
-            "Aufgaben, Themen und Lernpfade verwalten und Klassen zuweisen."
+            "Aufgaben, Themen und Lernpfade verwalten und Klassen zuweisen. "
+            "Läuft noch als eigene App mit eigener Anmeldung — wird als "
+            "Nächstes in den Rahmen geholt."
         ),
         path="/lernpfad",
+        # Bewusst nicht aktivierbar: Lernpfad haengt zwar schon unter
+        # /lernpfad/, hat aber noch eigene Konten und eigene Klassen. Wer es
+        # heute zuschaltet, landet in einer zweiten Anmeldung — genau die
+        # Naht, die Nuvora beseitigen soll. Auf true stellen, sobald das Modul
+        # auf dem Kern sitzt.
+        available=False,
     ),
 ]
 

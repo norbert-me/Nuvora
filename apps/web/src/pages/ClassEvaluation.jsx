@@ -59,7 +59,7 @@ export default function ClassEvaluation() {
   if (tests.length === 0) {
     return (
       <div>
-        <Link to="/tests" style={backLink}>← Alle Tests</Link>
+        <Link to="/cardvote/tests" style={backLink}>← Alle Tests</Link>
         <h2 style={{ marginTop: 12, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>Klasse {class_name}</h2>
         <p style={{ color: "var(--text3)" }}>Noch keine Tests für diese Klasse.</p>
       </div>
@@ -120,7 +120,7 @@ export default function ClassEvaluation() {
 
   return (
     <div>
-      <Link to="/tests" style={backLink}>← Alle Tests</Link>
+      <Link to="/cardvote/tests" style={backLink}>← Alle Tests</Link>
       <h2 style={{ marginTop: 12, marginBottom: 20, fontSize: 24, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.3px" }}>
         {class_name} <span style={{ fontWeight: 400, color: "var(--text3)", fontSize: 18 }}>— Gesamtauswertung</span>
       </h2>

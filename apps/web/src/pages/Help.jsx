@@ -27,7 +27,7 @@ export default function Help() {
       </Section>
 
       <Section title="Karten drucken und falten">
-        Unter <Link to="/classes" style={{ color: "var(--accent)" }}>Klassen</Link> eine Klasse anlegen
+        Unter <Link to="/cardvote/classes" style={{ color: "var(--accent)" }}>Klassen</Link> eine Klasse anlegen
         und über das Drucker-Symbol die Karten als PDF herunterladen. Pro Blatt liegen zwei Karten:
         vorne der Marker mit den Buchstaben A, B, C, D an den vier Rändern, auf der Folgeseite die
         zugehörigen Namen (beidseitig drucken). An der gestrichelten Linie auseinanderschneiden — fertig.
@@ -38,12 +38,12 @@ export default function Help() {
 
       <Section title="Ablauf einer Session">
         <ol style={{ paddingLeft: 20, margin: 0 }}>
-          <li>Unter <Link to="/questions" style={{ color: "var(--accent)" }}>Fragen</Link> ein Frageset erstellen (oder aus dem Marktplatz übernehmen).</li>
-          <li>Unter <Link to="/session" style={{ color: "var(--accent)" }}>Live-Session</Link> Klasse und Frageset wählen und starten.</li>
+          <li>Unter <Link to="/cardvote/questions" style={{ color: "var(--accent)" }}>Fragen</Link> ein Frageset erstellen (oder aus dem Marktplatz übernehmen).</li>
+          <li>Unter <Link to="/cardvote/session" style={{ color: "var(--accent)" }}>Live-Session</Link> Klasse und Frageset wählen und starten.</li>
           <li>Den angezeigten <strong>Session-Code</strong> im Scanner auf dem Handy eingeben (oder QR-Code scannen).</li>
           <li>Frage auf dem Beamer zeigen, Lernende halten Karten hoch, mit dem Handy über die Klasse schwenken.</li>
           <li><strong>Aufdecken</strong> zeigt die Antwortverteilung — auch direkt vom Handy aus steuerbar.</li>
-          <li>Nach der letzten Frage <strong>Test beenden</strong> — die Auswertung liegt danach unter <Link to="/tests" style={{ color: "var(--accent)" }}>Auswertung</Link>.</li>
+          <li>Nach der letzten Frage <strong>Test beenden</strong> — die Auswertung liegt danach unter <Link to="/cardvote/tests" style={{ color: "var(--accent)" }}>Auswertung</Link>.</li>
         </ol>
       </Section>
 

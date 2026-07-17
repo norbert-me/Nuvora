@@ -37,7 +37,7 @@ window.fetch = function(input, init) {
     throw err;
   });
 };
-import { BrowserRouter, Routes, Route, NavLink, Link, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, NavLink, Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import Dashboard from "./pages/Dashboard.jsx";
 import Session from "./pages/Session.jsx";
 import Scanner from "./pages/Scanner.jsx";
@@ -57,13 +57,36 @@ import VerifyEmail from "./pages/VerifyEmail.jsx";
 import ConfirmEmailChange from "./pages/ConfirmEmailChange.jsx";
 import Contact from "./pages/Contact.jsx";
 import Help from "./pages/Help.jsx";
-const getNavItems = (t) => [
-  { to: "/questions", label: t("nav.questions") },
-  { to: "/classes", label: t("nav.classes") },
-  { to: "/session", label: t("nav.session") },
-  { to: "/tests", label: t("nav.tests") },
-  { to: "/marketplace", label: t("nav.marketplace") },
-];
+import NuvoraHome from "./pages/NuvoraHome.jsx";
+import Modules from "./pages/Modules.jsx";
+import { useModules } from "./core/modules.js";
+// Navigation ist modulbezogen: die Shell zeigt die Punkte des Moduls, in dem
+// man gerade ist. Ausserhalb eines Moduls navigiert Nuvora selbst.
+const CV = "/cardvote";
+
+const getModuleNavItems = (t, pathname) => {
+  if (pathname.startsWith(CV)) {
+    return [
+      { to: `${CV}/questions`, label: t("nav.questions") },
+      { to: `${CV}/classes`, label: t("nav.classes") },
+      { to: `${CV}/session`, label: t("nav.session") },
+      { to: `${CV}/tests`, label: t("nav.tests") },
+      { to: `${CV}/marketplace`, label: t("nav.marketplace") },
+    ];
+  }
+  return [{ to: "/", label: "Start" }, { to: "/modules", label: "Module" }];
+};
+
+// Ein Modul ist nur erreichbar, wenn es aktiviert ist — sonst waere das
+// Register reine Anzeige. Wer eine Modul-Adresse aufruft ohne es aktiviert zu
+// haben, landet bei der Modulauswahl statt auf einer kaputten Seite.
+function ModuleGate({ moduleKey, children }) {
+  const { modules, loading } = useModules();
+  if (loading) return null;
+  const mod = modules.find((m) => m.key === moduleKey);
+  if (!mod?.active) return <Navigate to="/modules" replace />;
+  return children;
+}
 
 function ConnectionMonitor() {
   const [online, setOnline] = useState(true);
@@ -247,8 +270,8 @@ function Nav({ user, onLogout }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { t } = useLanguage();
 
-  const navItems = getNavItems(t);
-  const allPages = [...navItems, { to: "/scan", label: t("nav.scanner") }, { to: "/profile", label: t("nav.profile") }, { to: "/evaluation", label: t("nav.evaluation") }, { to: "/changelog", label: t("nav.changelog") }, { to: "/login", label: t("nav.login") }];
+  const navItems = getModuleNavItems(t, location.pathname);
+  const allPages = [...navItems, { to: `${CV}/scan`, label: t("nav.scanner") }, { to: "/profile", label: t("nav.profile") }, { to: `${CV}/evaluation`, label: t("nav.evaluation") }, { to: "/changelog", label: t("nav.changelog") }, { to: "/login", label: t("nav.login") }];
   const pageTitle = allPages.find((item) => location.pathname.startsWith(item.to))?.label || "";
 
   const showNav = !!user;
@@ -293,7 +316,7 @@ function Nav({ user, onLogout }) {
             color: "var(--text)",
             letterSpacing: "-0.5px",
           }}>
-            CardVote
+            Nuvora
           </div>
         </NavLink>
 
@@ -403,7 +426,7 @@ function Nav({ user, onLogout }) {
   );
 }
 
-const HOME_STEP_LINKS = ["/classes", "/questions", "/session", "/scan", "/tests"];
+const HOME_STEP_LINKS = [`${CV}/classes`, `${CV}/questions`, `${CV}/session`, `${CV}/scan`, `${CV}/tests`];
 
 function Home() {
   const { t } = useLanguage();
@@ -492,26 +515,36 @@ function AppRoutes({ user, setUser, logout }) {
       <Nav user={user} onLogout={logout} />
       <ContentWrapper>
         <Routes>
-          <Route path="/" element={user ? <Home /> : <Landing />} />
-          <Route path="/login" element={user ? <Home /> : <Login onLogin={handleLogin} />} />
+          {/* ─── Nuvora-Rahmen ─── */}
+          <Route path="/" element={user ? <NuvoraHome user={user} /> : <Landing />} />
+          <Route path="/modules" element={user ? <Modules /> : <Landing />} />
+          <Route path="/login" element={user ? <NuvoraHome user={user} /> : <Login onLogin={handleLogin} />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/confirm-email-change" element={<ConfirmEmailChange />} />
-          <Route path="/questions" element={user ? <Dashboard /> : <Landing />} />
-          <Route path="/session" element={user ? <Session /> : <Landing />} />
-          <Route path="/session/:id" element={user ? <Session /> : <Landing />} />
-          <Route path="/classes" element={user ? <Classes /> : <Landing />} />
-          <Route path="/tests" element={user ? <Tests /> : <Landing />} />
-          <Route path="/evaluation/:id" element={user ? <Evaluation /> : <Landing />} />
-          <Route path="/class-evaluation/:id" element={user ? <ClassEvaluation /> : <Landing />} />
-          <Route path="/student-evaluation/:classId/:cardId" element={user ? <StudentEvaluation /> : <Landing />} />
-          <Route path="/scan" element={user ? <Scanner /> : <Landing />} />
-          <Route path="/marketplace" element={user ? <Marketplace /> : <Landing />} />
           <Route path="/profile" element={user ? <Profile user={user} onLogout={logout} onUserUpdate={setUser} /> : <Landing />} />
           <Route path="/legal" element={<Legal />} />
           <Route path="/changelog" element={<Changelog />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/help" element={<Help />} />
+
+          {/* ─── Modul CardVote ─── */}
+          <Route path={CV} element={user ? <ModuleGate moduleKey="cardvote"><Home /></ModuleGate> : <Landing />} />
+          <Route path={`${CV}/questions`} element={user ? <ModuleGate moduleKey="cardvote"><Dashboard /></ModuleGate> : <Landing />} />
+          <Route path={`${CV}/session`} element={user ? <ModuleGate moduleKey="cardvote"><Session /></ModuleGate> : <Landing />} />
+          <Route path={`${CV}/session/:id`} element={user ? <ModuleGate moduleKey="cardvote"><Session /></ModuleGate> : <Landing />} />
+          <Route path={`${CV}/classes`} element={user ? <ModuleGate moduleKey="cardvote"><Classes /></ModuleGate> : <Landing />} />
+          <Route path={`${CV}/tests`} element={user ? <ModuleGate moduleKey="cardvote"><Tests /></ModuleGate> : <Landing />} />
+          <Route path={`${CV}/evaluation/:id`} element={user ? <ModuleGate moduleKey="cardvote"><Evaluation /></ModuleGate> : <Landing />} />
+          <Route path={`${CV}/class-evaluation/:id`} element={user ? <ModuleGate moduleKey="cardvote"><ClassEvaluation /></ModuleGate> : <Landing />} />
+          <Route path={`${CV}/student-evaluation/:classId/:cardId`} element={user ? <ModuleGate moduleKey="cardvote"><StudentEvaluation /></ModuleGate> : <Landing />} />
+          <Route path={`${CV}/scan`} element={user ? <ModuleGate moduleKey="cardvote"><Scanner /></ModuleGate> : <Landing />} />
+          <Route path={`${CV}/marketplace`} element={user ? <ModuleGate moduleKey="cardvote"><Marketplace /></ModuleGate> : <Landing />} />
+
+          {/* Alte CardVote-Adressen (Lesezeichen, Links in Mails) umleiten. */}
+          {["questions", "session", "classes", "tests", "scan", "marketplace"].map((p) => (
+            <Route key={p} path={`/${p}/*`} element={<Navigate to={`${CV}/${p}`} replace />} />
+          ))}
         </Routes>
       </ContentWrapper>
       <footer style={{ textAlign: "center", padding: "16px 0 24px", fontSize: 12, color: "var(--text3)" }}>
