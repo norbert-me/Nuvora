@@ -116,6 +116,11 @@ def _ensure_columns(sync_conn):
         ("students", "foerder", "JSON"),
         ("students", "notizen", "TEXT DEFAULT '' NOT NULL"),
         ("students", "klassenlehrer", "VARCHAR(120) DEFAULT '' NOT NULL"),
+        # learning_ladders wurde in einem frueheren Deploy ohne diese Spalten
+        # angelegt; sie kamen erst spaeter ins Modell. create_all aendert
+        # bestehende Tabellen nicht — deshalb hier nachziehen.
+        ("learning_ladders", "topic_id", "INTEGER"),
+        ("learning_ladders", "assignments", "JSON"),
     ]
     for table, column, ddl in wanted:
         if table not in existing_tables:

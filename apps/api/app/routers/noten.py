@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from ..models import GradeCategory, GradeEntry, SchoolClass, Student, User
-from .auth import get_current_user
+from .auth import get_current_user, rate_limit
 from .modules import is_active
 
 router = APIRouter(prefix="/api/noten", tags=["noten"])
@@ -106,6 +106,7 @@ async def create_category(
     user: User = Depends(require_module),
     db: AsyncSession = Depends(get_db),
 ):
+    rate_limit("noten_cat", f"u{user.id}", 100, 60, "Zu viele Kategorien in kurzer Zeit. Bitte kurz warten.")
     await _owned_class(db, user, class_id)
     cat = GradeCategory(**body.model_dump(), class_id=class_id, owner_id=user.id)
     db.add(cat)
@@ -237,6 +238,7 @@ async def create_entry(
     user: User = Depends(require_module),
     db: AsyncSession = Depends(get_db),
 ):
+    rate_limit("noten_entry", f"u{user.id}", 600, 60, "Zu viele Einträge in kurzer Zeit. Bitte kurz warten.")
     await _check_entry(db, user, body)
     data = body.model_dump()
     if data.get("date") is None:

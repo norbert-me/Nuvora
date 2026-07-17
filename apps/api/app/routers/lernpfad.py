@@ -20,7 +20,7 @@ from sqlalchemy.orm import selectinload
 
 from ..database import get_db
 from ..models import Exercise, LearningLadder, LearningPath, SchoolClass, Topic, User
-from .auth import get_current_user
+from .auth import get_current_user, rate_limit
 from .modules import is_active
 
 router = APIRouter(prefix="/api/lernpfad", tags=["lernpfad"])
@@ -107,6 +107,7 @@ async def create_exercise(
     user: User = Depends(require_module),
     db: AsyncSession = Depends(get_db),
 ):
+    rate_limit("ex_create", f"u{user.id}", 400, 60, "Zu viele Aufgaben in kurzer Zeit. Bitte kurz warten.")
     await _check_topic(db, user, body.topic_id)
     ex = Exercise(**body.model_dump(), owner_id=user.id)
     db.add(ex)
@@ -205,6 +206,7 @@ async def create_path(
     dup = await db.execute(
         select(LearningPath.id).where(LearningPath.owner_id == user.id, LearningPath.name == body.name)
     )
+    rate_limit("path_create", f"u{user.id}", 100, 60, "Zu viele Lernpfade in kurzer Zeit. Bitte kurz warten.")
     if dup.scalar_one_or_none():
         raise HTTPException(409, "Ein Lernpfad mit diesem Namen existiert schon")
     path = LearningPath(name=body.name, owner_id=user.id)

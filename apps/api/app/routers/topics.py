@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from ..models import Question, Topic, User
-from .auth import get_current_user
+from .auth import get_current_user, rate_limit
 
 router = APIRouter(prefix="/api/topics", tags=["topics"])
 
@@ -107,6 +107,7 @@ async def create_topic(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    rate_limit("topic_create", f"u{user.id}", 200, 60, "Zu viele Themen in kurzer Zeit. Bitte kurz warten.")
     if data.parent_id is not None:
         await _owned(db, user, data.parent_id)
 
