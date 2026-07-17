@@ -60,12 +60,17 @@ import Help from "./pages/Help.jsx";
 import NuvoraHome from "./pages/NuvoraHome.jsx";
 import Modules from "./pages/Modules.jsx";
 import Topics from "./pages/Topics.jsx";
+import LpExercises from "./pages/lernpfad/Exercises.jsx";
 import { useModules } from "./core/modules.js";
 // Navigation ist modulbezogen: die Shell zeigt die Punkte des Moduls, in dem
 // man gerade ist. Ausserhalb eines Moduls navigiert Nuvora selbst.
 const CV = "/cardvote";
+const LP = "/lernpfad";
 
 const getModuleNavItems = (t, pathname) => {
+  if (pathname.startsWith(LP)) {
+    return [{ to: `${LP}/exercises`, label: "Aufgaben" }];
+  }
   if (pathname.startsWith(CV)) {
     return [
       { to: `${CV}/questions`, label: t("nav.questions") },
@@ -534,6 +539,10 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path="/changelog" element={<Changelog />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/help" element={<Help />} />
+
+          {/* ─── Modul Lernpfad ─── */}
+          <Route path={LP} element={user ? <Navigate to={`${LP}/exercises`} replace /> : <Landing />} />
+          <Route path={`${LP}/exercises`} element={user ? <ModuleGate moduleKey="lernpfad"><LpExercises /></ModuleGate> : <Landing />} />
 
           {/* ─── Modul CardVote ─── */}
           <Route path={CV} element={user ? <ModuleGate moduleKey="cardvote"><Home /></ModuleGate> : <Landing />} />

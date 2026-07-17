@@ -1,10 +1,10 @@
 (function () {
     'use strict';
 
-    // Nuvora haengt Lernpfad unter /lernpfad/ ein, CardVote liegt auf /.
-    // Basis aus dem Pfad ableiten, damit die App auch unter / laeuft
-    // (Standalone via `npm start`, ohne den Nuvora-Proxy davor).
-    const API = (location.pathname.startsWith('/lernpfad') ? '/lernpfad' : '') + '/api';
+    // Uebergangs-App: haengt in Nuvora unter /lernpfad-alt/ (das echte Modul
+    // liegt auf dem Kern unter /lernpfad/). Basis aus dem Pfad ableiten, damit
+    // die App auch standalone unter / laeuft (`npm start`, ohne Proxy davor).
+    const API = (location.pathname.startsWith('/lernpfad-alt') ? '/lernpfad-alt' : '') + '/api';
 
     const STORAGE_KEYS = {
         aufgaben: 'll_aufgaben',

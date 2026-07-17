@@ -50,15 +50,12 @@ REGISTRY: List[ModuleDef] = [
         key="lernpfad",
         name="Lernpfad",
         description=(
-            "Aufgaben und Lernpfade verwalten. Achtung: läuft noch als eigene "
-            "App mit eigener Anmeldung und eigenen Klassen — bis es auf dem "
-            "Kern sitzt, meldest du dich dort getrennt an."
+            "Aufgaben und Lernpfade verwalten — mit denselben Themen und "
+            "Klassen wie der Rest von Nuvora. Die alte, eigenständige App "
+            "bleibt vorerst unter /lernpfad-alt/ erreichbar, bis die Daten "
+            "übernommen sind."
         ),
-        path="/lernpfad/",
-        # Noch nicht auf dem Kern (eigene Konten, eigene Klassen), aber
-        # zuschaltbar: ohne das Modul laesst sich der Unterricht nicht planen.
-        # Die zweite Anmeldung steht bewusst in der Beschreibung.
-        external=True,
+        path="/lernpfad",
     ),
 ]
 

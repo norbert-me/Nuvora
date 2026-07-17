@@ -250,9 +250,9 @@ ssh "$SERVER" "cd '$REMOTE_DIR' && docker compose ps; echo '--- api log (letzte 
 PORT="${PORT:-8080}"
 echo "→ Health-Checks (auf dem Server, Port $PORT)..."
 CV=$(ssh "$SERVER" "curl -s -o /dev/null -w '%{http_code}' http://localhost:$PORT/api/health" || echo "000")
-LP=$(ssh "$SERVER" "curl -s -o /dev/null -w '%{http_code}' http://localhost:$PORT/lernpfad/" || echo "000")
+LP=$(ssh "$SERVER" "curl -s -o /dev/null -w '%{http_code}' http://localhost:$PORT/lernpfad-alt/" || echo "000")
 echo "  /api/health  -> $CV   (Nuvora-Kern)"
-echo "  /lernpfad/   -> $LP   (Lernpfad)"
+echo "  /lernpfad-alt/ -> $LP  (alte Lernpfad-App, Übergang)"
 
 echo ""
 echo "========================================"
@@ -262,7 +262,7 @@ if [ "$CV" = "200" ] && [ "$LP" = "200" ]; then
   echo "========================================"
 else
   [ "$CV" != "200" ] && echo "  ⚠ Nuvora-Kern nicht gesund (health=$CV)"
-  [ "$LP" != "200" ] && echo "  ⚠ Lernpfad nicht gesund (status=$LP)"
+  [ "$LP" != "200" ] && echo "  ⚠ Alte Lernpfad-App nicht gesund (status=$LP)"
   echo "  Logs oben prüfen."
   echo "========================================"
   exit 1

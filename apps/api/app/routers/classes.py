@@ -13,12 +13,16 @@ from .auth import get_current_user, rate_limit
 router = APIRouter(prefix="/api/classes", tags=["classes"])
 
 
-# Feste Auswahl statt Freitext: die Werte steuern spaeter die Differenzierung
-# in Lernpfad — Tippfehler wuerden dort still zu einer eigenen Kategorie.
+# Feste Auswahl statt Freitext: die Werte steuern die Differenzierung in
+# Lernpfad — Tippfehler wuerden dort still zu einer eigenen Kategorie.
+#
+# Wortlaut exakt wie in der bisherigen Lernleiter-App (inkl. Umlaut in
+# "Hoeren" -> "Hören"): die Bestandsdaten benutzen genau diese Zeichenketten,
+# jede Abweichung macht sie beim Uebernehmen unbrauchbar.
 FOERDER_VALUES = {
-    "LRS", "Dyskalkulie", "DaZ", "Lernen", "Sprache", "Hoeren", "Sehen",
-    "Motorik", "Sozial-Emotional", "Konzentration", "Lesen",
-    "Auditive Wahrnehmung",
+    "LRS", "Dyskalkulie", "Lesen", "DaZ", "Lernen", "Sozial-Emotional",
+    "Auditive Wahrnehmung", "Motorik", "Konzentration", "Sehen", "Hören",
+    "Sprache",
 }
 
 

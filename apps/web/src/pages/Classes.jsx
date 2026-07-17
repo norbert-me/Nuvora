@@ -14,11 +14,26 @@ import { useModules } from "../core/modules.js";
 
 const API = "/api";
 
-// Feste Auswahl, identisch zum Backend (FOERDER_VALUES in classes.py):
-// Freitext wuerde in Lernpfads Differenzierung still zu Extrakategorien fuehren.
+// Feste Auswahl, identisch zum Backend (FOERDER_VALUES in classes.py) und
+// wortgleich zur bisherigen Lernleiter-App — die Bestandsdaten benutzen genau
+// diese Zeichenketten. Freitext wuerde in Lernpfads Differenzierung still zu
+// Extrakategorien fuehren.
+//
+// Die Erklaerungen stammen ebenfalls von dort: sie sagen, was der Schwerpunkt
+// im Unterricht bedeutet, statt nur ein Etikett zu vergeben.
 const FOERDER = [
-  "LRS", "Dyskalkulie", "DaZ", "Lernen", "Sprache", "Hoeren", "Sehen",
-  "Motorik", "Sozial-Emotional", "Konzentration", "Lesen", "Auditive Wahrnehmung",
+  ["LRS", "Schwierigkeiten beim Lesen und Schreiben"],
+  ["Dyskalkulie", "Schwierigkeiten mit Zahlen, Mengen und Rechenoperationen"],
+  ["Lesen", "Schwierigkeiten beim Textverständnis"],
+  ["DaZ", "Deutsch als Zweitsprache – Fachsprache fällt schwer"],
+  ["Lernen", "Allgemeine Lernschwierigkeiten, braucht mehr Zeit und Struktur"],
+  ["Sozial-Emotional", "Schwierigkeiten in Gruppenarbeit oder bei Frustration"],
+  ["Auditive Wahrnehmung", "Schwierigkeiten bei der Verarbeitung gehörter Informationen"],
+  ["Motorik", "Schwierigkeiten bei feinmotorischen Aufgaben (Schreiben, Zeichnen)"],
+  ["Konzentration", "Kann sich nur kurz konzentrieren, leicht ablenkbar"],
+  ["Sehen", "Eingeschränktes Sehvermögen, braucht große Schrift/Kontrast"],
+  ["Hören", "Eingeschränktes Hörvermögen, braucht visuelle Anweisungen"],
+  ["Sprache", "Schwierigkeiten beim mündlichen Ausdruck"],
 ];
 
 const EMPTY_STUDENT = { card_id: 1, name: "", niveau: "", foerder: null, notizen: "" };
@@ -210,33 +225,45 @@ export default function Classes() {
             </div>
 
             {detailsFor === idx && (
-              <div style={{ margin: "0 0 10px 52px", padding: 12, border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)" }}>
-                <div style={{ fontSize: 12.5, color: "var(--text2)", marginBottom: 8 }}>Förderschwerpunkte</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-                  {FOERDER.map((f) => {
-                    const on = (s.foerder || []).includes(f);
+              <div style={{ margin: "0 0 12px 52px", padding: 16, border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>
+                  Förderschwerpunkte
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 9 }}>
+                  Schwierigkeiten — steuern später die Differenzierung in Lernpfad.
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 16 }}>
+                  {FOERDER.map(([wert, erklaerung]) => {
+                    const on = (s.foerder || []).includes(wert);
                     return (
-                      <button
-                        key={f} type="button" onClick={() => toggleFoerder(idx, f)}
+                      <label
+                        key={wert} title={erklaerung}
                         style={{
-                          padding: "4px 10px", borderRadius: 980, fontSize: 12.5, cursor: "pointer",
+                          display: "inline-flex", alignItems: "center", gap: 6,
+                          padding: "5px 11px", borderRadius: 20, fontSize: 13, cursor: "pointer",
+                          userSelect: "none",
                           border: on ? "1px solid var(--accent)" : "1px solid var(--border2)",
                           background: on ? "var(--accent-bg)" : "var(--bg)",
-                          color: on ? "var(--accent)" : "var(--text2)", fontWeight: on ? 600 : 400,
+                          color: on ? "var(--accent)" : "var(--text2)",
                         }}
                       >
-                        {f}
-                      </button>
+                        <input
+                          type="checkbox" checked={on} onChange={() => toggleFoerder(idx, wert)}
+                          style={{ margin: 0, cursor: "pointer" }}
+                        />
+                        {wert}
+                      </label>
                     );
                   })}
                 </div>
-                <div style={{ fontSize: 12.5, color: "var(--text2)", marginBottom: 6 }}>Notizen</div>
+
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>Notizen</div>
                 <textarea
                   value={s.notizen || ""} onChange={(e) => setStudentField(idx, "notizen", e.target.value)}
-                  rows={2} placeholder="z. B. Nachteilsausgleich, Besonderheiten…" maxLength={2000}
+                  rows={2} placeholder="z.B. Nachteilsausgleich, Besonderheiten…" maxLength={2000}
                   style={{ width: "100%", padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 13, background: "var(--bg)", color: "var(--text)", resize: "vertical", boxSizing: "border-box" }}
                 />
-                <p style={{ fontSize: 11.5, color: "var(--text3)", margin: "8px 0 0" }}>
+                <p style={{ fontSize: 11.5, color: "var(--text3)", margin: "9px 0 0" }}>
                   Bleibt bei dir: diese Angaben stehen in keinem Export und in keiner Veröffentlichung.
                 </p>
               </div>
