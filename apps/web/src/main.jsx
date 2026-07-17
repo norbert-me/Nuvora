@@ -79,8 +79,18 @@ function helpArea(pathname) {
 const LP = "/lernpfad";
 const NO = "/noten";
 
-const getModuleNavItems = (t, pathname) => {
-  if (pathname.startsWith(CV)) {
+// Menue passend zum Bereich. Man soll im Modul-Menue bleiben, auch auf
+// modulneutralen Seiten (Hilfe, Impressum), solange man aus einem Modul kam —
+// dafuer traegt der Hilfe-Link ?area, sonst greift der Pfad.
+const getModuleNavItems = (t, location) => {
+  const { pathname, search } = location;
+  const params = new URLSearchParams(search);
+  const area = pathname.startsWith(CV) ? "cardvote"
+    : pathname.startsWith(LP) ? "lernpfad"
+    : pathname.startsWith(NO) ? "noten"
+    : params.get("area"); // Hilfe u.ae.: Bereich aus der Query
+
+  if (area === "cardvote") {
     return [
       { to: `${CV}/questions`, label: t("nav.questions") },
       { to: `${CV}/session`, label: t("nav.session") },
@@ -89,7 +99,20 @@ const getModuleNavItems = (t, pathname) => {
       { to: `${CV}/marketplace`, label: t("nav.marketplace") },
     ];
   }
-  // Kein "Start": der Nuvora-Schriftzug links fuehrt bereits dorthin.
+  if (area === "lernpfad") {
+    // Tabs der eingebetteten App: steuern das iframe per ?tab. Aktiv = tab-Query.
+    const cur = params.get("tab") || "aufgaben";
+    return [
+      { to: `${LP}?tab=aufgaben`, label: t("nav.exercises"), active: cur === "aufgaben" },
+      { to: `${LP}?tab=klasse`, label: t("nav.classes"), active: cur === "klasse" },
+      { to: `${LP}?tab=generator`, label: "Lernleiter", active: cur === "generator" },
+      { to: `${LP}?tab=lernpfade`, label: t("nav.topics") === "Themen" ? "Lernpfade" : "Lernpfade", active: cur === "lernpfade" },
+    ];
+  }
+  if (area === "noten") {
+    return [{ to: NO, label: t("nav.grades") }];
+  }
+  // Kern: der Nuvora-Schriftzug links fuehrt zur Startseite.
   return [
     { to: "/classes", label: t("nav.classes") },
     { to: "/topics", label: t("nav.topics") },
@@ -290,7 +313,7 @@ function Nav({ user, onLogout }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { t } = useLanguage();
 
-  const navItems = getModuleNavItems(t, location.pathname);
+  const navItems = getModuleNavItems(t, location);
   const allPages = [...navItems, { to: `${CV}/tutorial`, label: t("nav.tutorial") }, { to: `${CV}/scan`, label: t("nav.scanner") }, { to: "/profile", label: t("nav.profile") }, { to: `${CV}/evaluation`, label: t("nav.evaluation") }, { to: "/changelog", label: t("nav.changelog") }, { to: "/login", label: t("nav.login") }];
   const pageTitle = allPages.find((item) => location.pathname.startsWith(item.to))?.label || "";
 
@@ -368,7 +391,7 @@ function Nav({ user, onLogout }) {
 
         <div className={showNav ? "nav-links-desktop" : ""} style={{ display: showNav ? "flex" : "block", gap: 2, overflow: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none", flex: 1, minWidth: 0, marginLeft: 8 }}>
           {showNav && navItems.map((item) => {
-            const isActive = location.pathname.startsWith(item.to);
+            const isActive = item.active !== undefined ? item.active : location.pathname.startsWith(item.to.split("?")[0]) && !item.to.includes("?");
             return (
               <NavLink
                 key={item.to}
@@ -422,7 +445,7 @@ function Nav({ user, onLogout }) {
           padding: "8px 16px",
         }}>
           {navItems.map((item) => {
-            const isActive = location.pathname.startsWith(item.to);
+            const isActive = item.active !== undefined ? item.active : location.pathname.startsWith(item.to.split("?")[0]) && !item.to.includes("?");
             return (
               <NavLink
                 key={item.to}

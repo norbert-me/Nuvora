@@ -339,17 +339,29 @@
     }
 
     // ─── Tabs ───
+    function switchTab(tab) {
+        const btn = document.querySelector('.tab[data-tab="' + tab + '"]');
+        if (!btn) return;
+        document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(s => s.classList.remove('active'));
+        btn.classList.add('active');
+        const content = document.getElementById('tab-' + tab);
+        if (content) content.classList.add('active');
+        if (tab === 'generator') refreshGeneratorDropdowns();
+        if (tab === 'aufgaben') setNextId();
+        if (tab === 'lernpfade') loadLernpfade();
+        const nav = document.getElementById('nav-links');
+        if (nav) nav.classList.remove('open');
+        // Eingebettet: Nuvora ueber den aktiven Tab informieren (Menue-Markierung).
+        if (window.parent !== window) window.parent.postMessage({ type: 'lernpfad:tab', tab }, window.location.origin);
+    }
     document.querySelectorAll('.tab').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(s => s.classList.remove('active'));
-            btn.classList.add('active');
-            document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-            if (btn.dataset.tab === 'generator') refreshGeneratorDropdowns();
-            if (btn.dataset.tab === 'aufgaben') setNextId();
-            if (btn.dataset.tab === 'lernpfade') loadLernpfade();
-            document.getElementById('nav-links').classList.remove('open'); // Mobile-Menü schließen
-        });
+        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    });
+    // Eingebettet: Nuvoras Navbar steuert die Tabs.
+    window.addEventListener('message', (e) => {
+        if (e.origin !== window.location.origin) return;
+        if (e.data && e.data.type === 'nuvora:lernpfad-tab' && e.data.tab) switchTab(e.data.tab);
     });
 
     // Mobiles Navigations-Menü aufklappen

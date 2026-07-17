@@ -1089,10 +1089,10 @@ body:not(.authed) #auth-overlay ~ .tab-content { display: none !important; }
    (Marke, Konto), darf hier nicht doppelt erscheinen; die Tabs bleiben, sie
    sind die Struktur des Moduls. Ohne Einbettung (Direktaufruf) greift nichts
    davon. */
-.embedded .navbar { position: static; border-top: none; }
-.embedded .nav-title,
-.embedded .nav-brand,
-.embedded .nav-account { display: none !important; }
+/* Eingebettet: die eigene Navbar (Marke, Tabs, Konto) ganz aus — Nuvoras
+   Rahmen liefert die Navigation. Die Tabs steuert Nuvora per Nachricht. */
+.embedded .navbar { display: none !important; }
+.embedded .site-footer { display: none !important; }
 .embedded body { background: transparent; }
 /* Der Rahmen scrollt, nicht das iframe: sonst zwei Scrollbalken. */
 .embedded, .embedded body { overflow: visible; height: auto; }
