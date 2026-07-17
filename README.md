@@ -45,6 +45,43 @@ React · Postgres
 
 > CardVote wurde bis v1.4.4 eigenständig entwickelt ([Archiv](https://github.com/norbert-me/CardVote)). Weiterentwicklung findet nur noch hier statt.
 
+## Architektur
+
+Nuvora ist die Basis, Module sind Gäste. Drei Regeln, die jede Änderung einhält:
+
+1. **Kein Modul besitzt Klassen oder Schüler** — die liegen im Kern, alle Module teilen sie.
+2. **Kein Modul hat eigene Konten** — der Kern authentifiziert, Module erben.
+3. **Module hängen nicht voneinander ab** — CardVote läuft ohne Lernpfad und ohne Noten. Verbindendes (gemeinsame Themen, Ergebnis-Übernahme) ist Zusatz, nie Voraussetzung.
+
+```
+Nuvora-Kern (apps/api, apps/web)
+├── Konten · Klassen · Schüler · Themen        gehören dem Kern
+├── Modulregister                              wer hat was aktiviert
+└── Module
+    ├── CardVote   /cardvote/*   Abstimmung, Auswertung, Marktplatz
+    ├── Lernpfad   /lernpfad     Aufgaben & Lernpfade (eingebettet)
+    └── Noten      /noten        Notenbuch
+```
+
+| Teil       | Stack                                        |
+| ---------- | -------------------------------------------- |
+| Kern-API   | FastAPI · SQLAlchemy 2 (async) · Postgres 16 |
+| Frontend   | React 18 · Vite · react-router               |
+| Lernpfad   | Express (nur Statik) · Vanilla JS            |
+| Proxy      | nginx — eine Domain, alle Teile              |
+
+Ein Konto sieht nur eigene Daten (`owner_id` überall); Module werden pro Lehrkraft zugeschaltet.
+
+## Sicherheit & Datenschutz
+
+- **Selbst gehostet, keine Cloud.** Schülerdaten verlassen den eigenen Server nicht.
+- **Lernende haben keine Konten** und loggen sich nie ein — sie sind Datensätze, die die Lehrkraft verwaltet.
+- **Besonders schützenswerte Daten** (Förderschwerpunkte, Notizen — DSGVO Art. 9) stehen in **keinem Export** und in keiner Marktplatz-Veröffentlichung.
+- **Passwörter** mit PBKDF2 (SHA-256, 100 000 Iterationen) gehasht und gesalzen; Pflicht zur E-Mail-Bestätigung, Reset per Einmal-Link.
+- **Sicherheits-Header** zentral am Proxy (CSP, `X-Frame-Options: SAMEORIGIN`, `nosniff`, Referrer-Policy); `server_tokens off`.
+- **Rate-Limits** gegen Brute-Force und Massenanlage auf allen schreibenden Endpunkten.
+- **Secrets** liegen nur auf dem Server (`.env`, `chmod 600`) und werden nie ins Repo committet; `POSTGRES_PASSWORD` und `TOKEN_SECRET` sind Pflicht, sonst startet der Stack nicht.
+
 ## Ziel der Bündelung
 
 1. Klassen und Schüler einmal anlegen, in beiden Modulen nutzen.
