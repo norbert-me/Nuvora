@@ -674,24 +674,6 @@ tr:hover td { background: #f9fafb; }
     font-weight: 700;
 }
 
-.step-rating {
-    display: flex;
-    gap: 0.15rem;
-    flex-shrink: 0;
-    margin-left: auto;
-}
-.step-rating-smiley {
-    width: 22px;
-    height: 22px;
-    border: 1.5px solid var(--border);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.75rem;
-    cursor: default;
-    background: var(--surface);
-}
 .step-info-btn {
     flex-shrink: 0;
     width: 22px;

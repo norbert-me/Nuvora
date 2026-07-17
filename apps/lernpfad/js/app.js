@@ -1798,61 +1798,6 @@
         toast('PDF heruntergeladen');
     }
 
-    function drawSmileyHappy(doc, x, y, r) {
-        doc.setDrawColor(80, 80, 80);
-        doc.setLineWidth(0.3);
-        doc.circle(x, y, r);
-        const er = r * 0.12;
-        doc.setFillColor(80, 80, 80);
-        doc.circle(x - r * 0.3, y - r * 0.2, er, 'F');
-        doc.circle(x + r * 0.3, y - r * 0.2, er, 'F');
-        const smileW = r * 0.5;
-        doc.setLineWidth(0.25);
-        const steps = 8;
-        for (let i = 0; i < steps; i++) {
-            const t1 = (i / steps) * Math.PI;
-            const t2 = ((i + 1) / steps) * Math.PI;
-            const x1 = x - smileW + (2 * smileW * i / steps);
-            const x2 = x - smileW + (2 * smileW * (i + 1) / steps);
-            const y1 = y + r * 0.2 + Math.sin(t1) * r * 0.25;
-            const y2 = y + r * 0.2 + Math.sin(t2) * r * 0.25;
-            doc.line(x1, y1, x2, y2);
-        }
-    }
-
-    function drawSmileyNeutral(doc, x, y, r) {
-        doc.setDrawColor(80, 80, 80);
-        doc.setLineWidth(0.3);
-        doc.circle(x, y, r);
-        const er = r * 0.12;
-        doc.setFillColor(80, 80, 80);
-        doc.circle(x - r * 0.3, y - r * 0.2, er, 'F');
-        doc.circle(x + r * 0.3, y - r * 0.2, er, 'F');
-        doc.setLineWidth(0.3);
-        doc.line(x - r * 0.35, y + r * 0.3, x + r * 0.35, y + r * 0.3);
-    }
-
-    function drawSmileySad(doc, x, y, r) {
-        doc.setDrawColor(80, 80, 80);
-        doc.setLineWidth(0.3);
-        doc.circle(x, y, r);
-        const er = r * 0.12;
-        doc.setFillColor(80, 80, 80);
-        doc.circle(x - r * 0.3, y - r * 0.2, er, 'F');
-        doc.circle(x + r * 0.3, y - r * 0.2, er, 'F');
-        const smileW = r * 0.5;
-        doc.setLineWidth(0.25);
-        const steps = 8;
-        for (let i = 0; i < steps; i++) {
-            const t1 = (i / steps) * Math.PI;
-            const t2 = ((i + 1) / steps) * Math.PI;
-            const x1 = x - smileW + (2 * smileW * i / steps);
-            const x2 = x - smileW + (2 * smileW * (i + 1) / steps);
-            const y1 = y + r * 0.5 - Math.sin(t1) * r * 0.25;
-            const y2 = y + r * 0.5 - Math.sin(t2) * r * 0.25;
-            doc.line(x1, y1, x2, y2);
-        }
-    }
 
     function renderStudentPage(doc, entry, marginL, contentW, lineH, checkboxSize) {
         const s = entry.student;
@@ -1862,11 +1807,10 @@
         const cbX = marginL;
         const numX = marginL + cbSize + 3;
         const textX = numX + 10;
-        const smileyR = 3;
-        const smileyGap = 9;
-        const smileyStartX = marginL + contentW - smileyGap * 2 - smileyR;
-        // Zwei zusätzliche Ankreuzspalten links der Smileys.
-        const korrX = smileyStartX - smileyR - 22;
+        // Die Selbsteinschätzung per Smiley ist entfallen: sie wurde nie
+        // ausgewertet (Papier), und was die Lernenden können, zeigt der Test.
+        // Die beiden Ankreuzspalten ruecken dafuer an den rechten Rand.
+        const korrX = marginL + contentW - 24;
         const pruefX = korrX - 32;
         const rowH = 12;
 
@@ -1895,7 +1839,6 @@
         doc.text('erledigt', cbX, y);
         doc.text('Lösung geprüft', pruefX, y);
         doc.text('korrigiert', korrX, y);
-        doc.text('Einschätzung', smileyStartX - 2, y);
         doc.setTextColor(0);
         y += 2;
         doc.setLineWidth(0.2);
@@ -1944,7 +1887,7 @@
                 doc.text(task.quelle, textX, y + 1.5);
             }
 
-            // Ankreuzfelder: Lösung geprüft + korrigiert (vor den Smileys)
+            // Ankreuzfelder: Lösung geprüft + korrigiert
             // Bei Erklärungen weglassen (nichts zu prüfen/korrigieren)
             const istErkl = task.section === 'Erklärung' || getKategorie(task) === 'Erklärung';
             if (!istErkl) {
@@ -1953,10 +1896,6 @@
                 doc.rect(pruefX + 4, y - cbSize / 2, cbSize, cbSize);
                 doc.rect(korrX + 2, y - cbSize / 2, cbSize, cbSize);
             }
-
-            drawSmileyHappy(doc, smileyStartX, y, smileyR);
-            drawSmileyNeutral(doc, smileyStartX + smileyGap, y, smileyR);
-            drawSmileySad(doc, smileyStartX + smileyGap * 2, y, smileyR);
 
             y += rowH;
 
