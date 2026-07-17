@@ -23,8 +23,11 @@ backups/
 uploads/
 # Achtung: apps/lernpfad/daten/ ist KEIN Nutzerdatenverzeichnis, sondern
 # Seed-Aufgaben, die der Docker-Build braucht (loadInitialData in server.js).
-# Laufzeitdaten liegen in data/ (Bind-Mount) und sind ueber *.db erfasst.
-data/
+# Laufzeit-Datenverzeichnisse (Bind-Mounts). Bewusst NICHT das breite "data/",
+# das auch Quellordner wie apps/code-detektiv/src/data trifft — DB-Dateien sind
+# ohnehin ueber *.db erfasst.
+/data/
+apps/*/data/
 
 # ─── Betreiber-/Rechtskonfiguration ───
 # Eine Quelle fuer beide Module: enthaelt die private Anschrift des Betreibers.

@@ -113,7 +113,8 @@ rsync -rlz -c --inplace --delete \
   --exclude='__pycache__/' \
   --exclude='*.pyc' \
   --exclude='dist/' \
-  --exclude='data/' \
+  --exclude='/data/' \
+  --exclude='apps/*/data/' \
   --exclude='backups/' \
   --exclude='uploads/' \
   --exclude='*.db' \
