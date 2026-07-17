@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .database import engine
 from .models import Base
-from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad
+from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten
 from . import websocket as ws
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -91,6 +91,7 @@ app.include_router(auth.router)
 app.include_router(modules.router)
 app.include_router(topics.router)
 app.include_router(lernpfad.router)
+app.include_router(noten.router)
 app.include_router(marketplace.router)
 
 UPLOAD_DIR = "/app/uploads"

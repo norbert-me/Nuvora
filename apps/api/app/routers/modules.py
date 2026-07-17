@@ -57,6 +57,16 @@ REGISTRY: List[ModuleDef] = [
         ),
         path="/lernpfad",
     ),
+    ModuleDef(
+        key="noten",
+        name="Noten",
+        description=(
+            "Leistungsbewertung: eigene Kategorien mit Gewichten, Noten und "
+            "Beobachtungen je Person. Rechnet den gewichteten Schnitt der "
+            "Noten — die Zeugnisnote bleibt deine Entscheidung."
+        ),
+        path="/noten",
+    ),
 ]
 
 _BY_KEY = {m.key: m for m in REGISTRY}

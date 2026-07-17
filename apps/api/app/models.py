@@ -320,3 +320,53 @@ class LearningLadder(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     path: Mapped[LearningPath] = relationship(back_populates="ladders")
+
+
+# ─── Modul Noten ───
+# Eigenstaendig: es kommt ohne CardVote und ohne Lernpfad aus (Regel 3).
+# Ergebnisse aus Modulen koennen spaeter als Eintrag einflieszen, sind aber
+# nie Voraussetzung. Der Kern liefert Klassen und Schueler.
+class GradeCategory(Base):
+    """Eine Spalte des Leistungskonzepts, z.B. 'Selbstständiges und
+    kooperatives Arbeiten' mit 15 %. Gewichte sind Fachkonferenz-Recht und
+    deshalb frei einstellbar — das Werkzeug gibt keine vor."""
+    __tablename__ = "grade_categories"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    # Kategorien gelten pro Klasse: verschiedene Faecher/Stufen wiegen anders.
+    class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    weight: Mapped[int] = mapped_column(Integer, default=0, server_default="0")  # Prozent
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    entries: Mapped[list["GradeEntry"]] = relationship(back_populates="category", cascade="all, delete-orphan")
+
+
+class GradeEntry(Base):
+    """Ein Eintrag zu einer Person: entweder eine Note oder eine Beobachtung.
+
+    Beides bewusst in einer Tabelle, aber mit `kind` getrennt: eine Beobachtung
+    ("hat geholfen") ist keine Note und darf nie in einen Schnitt gerechnet
+    werden. Wer das vermischt, erzeugt Scheinobjektivitaet.
+    """
+    __tablename__ = "grade_entries"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    category_id: Mapped[int] = mapped_column(ForeignKey("grade_categories.id", ondelete="CASCADE"), index=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), index=True)
+    # "grade" = zaehlt in den Schnitt, "observation" = zaehlt nie.
+    kind: Mapped[str] = mapped_column(String(20), default="grade", server_default="grade")
+    # Note als Zahl (1.0–6.0, Tendenzen als .3/.7). Bei Beobachtungen leer.
+    value: Mapped[Optional[float]] = mapped_column(nullable=True)
+    # Beobachtung: +1 positiv, -1 negativ, 0 neutral. Bei Noten leer.
+    tendency: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    note: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # Datum der Stunde, nicht der Eingabe: nachtragen muss moeglich sein.
+    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    category: Mapped[GradeCategory] = relationship(back_populates="entries")

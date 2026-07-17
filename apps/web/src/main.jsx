@@ -63,11 +63,13 @@ import Topics from "./pages/Topics.jsx";
 import LernpfadModule from "./pages/LernpfadModule.jsx";
 import Cards from "./pages/Cards.jsx";
 import Tutorial from "./pages/Tutorial.jsx";
+import NotenModul from "./pages/Noten.jsx";
 import { useModules } from "./core/modules.js";
 // Navigation ist modulbezogen: die Shell zeigt die Punkte des Moduls, in dem
 // man gerade ist. Ausserhalb eines Moduls navigiert Nuvora selbst.
 const CV = "/cardvote";
 const LP = "/lernpfad";
+const NO = "/noten";
 
 const getModuleNavItems = (t, pathname) => {
   if (pathname.startsWith(CV)) {
@@ -542,6 +544,9 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path="/changelog" element={<Changelog />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/help" element={<Help />} />
+
+          {/* ─── Modul Noten ─── */}
+          <Route path={NO} element={user ? <ModuleGate moduleKey="noten"><NotenModul /></ModuleGate> : <Landing />} />
 
           {/* ─── Modul Lernpfad ─── */}
           {/* Die App laeuft eingebettet (siehe LernpfadModule) — nicht in React
