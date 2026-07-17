@@ -65,7 +65,16 @@ cp .deploy.env.example .deploy.env   # Server und Zielpfad eintragen
 ./deploy.sh lernpfad                 # nur einen Service neu bauen
 ```
 
-Lädt hoch, baut auf dem Server, prüft beide Module und bricht ab, wenn eins nicht antwortet. Die `.env` des Servers wird nie überschrieben — Secrets liegen nur dort.
+Lädt hoch, baut auf dem Server, prüft beide Module und bricht ab, wenn eins nicht antwortet.
+
+Beim ersten Lauf legt das Skript die `.env` auf dem Server an und erzeugt `TOKEN_SECRET` und `POSTGRES_PASSWORD` als Zufallswerte (`chmod 600`) — niemand muss sie lesen oder eintippen. Danach wird die `.env` des Servers **nie** überschrieben; Secrets bleiben dort.
+
+Optional nachtragen für Mailversand und Admin-Konto (`SMTP_*`, `ADMIN_EMAIL`):
+
+```bash
+ssh <server>
+cd <pfad> && nano .env
+```
 
 ## Konfiguration
 
