@@ -293,8 +293,56 @@
     // Cache damit ersetzt (verschiedene Konten am selben Browser dürfen sich
     // nicht vermischen). Während der Sitzung cached localStorage und synct hoch.
     // Login-Code entfernt: Nuvora meldet an, dieses Modul erbt den Token.
-    // Was hier stand (authMode, setAuthMode, Login-/Registrier-Formular), hatte
-    // kein Backend mehr — siehe showAuth(), das zur Anmeldung des Rahmens fuehrt.
+    // Was hier stand (authMode/setAuthMode/Formular), hatte kein Backend mehr.
+
+    // Kein eigenes Login: fehlt der Token, zur Anmeldung des Rahmens (bricht
+    // aus dem iframe aus, damit Nuvoras Seite im ganzen Fenster laedt).
+    function showAuth() {
+        document.body.classList.remove('authed');
+        const ziel = '/login';
+        if (window.parent !== window) window.parent.location.href = ziel;
+        else window.location.href = ziel;
+    }
+    function hideAuth() {
+        document.body.classList.add('authed');
+    }
+
+    // Daten aus dem Nuvora-Kern laden und lokalen Anzeige-Cache ersetzen.
+    async function loadUserData() {
+        const [tRes, exRes, clRes] = await Promise.all([
+            api(`${API}/topics`), api(`${LP}/exercises`), api(`${API}/classes`)
+        ]);
+        if (!tRes.ok || !exRes.ok || !clRes.ok) { showAuth(); return false; }
+        topics = await tRes.json();
+        aufgaben = (await exRes.json()).map(vonKern);
+        const klassenRaw = await clRes.json();
+        klassen = klassenRaw.map(c => c.name);
+        schueler = [];
+        klassenRaw.forEach(c => (c.students || []).forEach(st => schueler.push({
+            _id: String(st.id), id: st.id, name: st.name, klasse: c.name,
+            niveau: st.niveau || '', foerder: st.foerder || [], notizen: st.notizen || ''
+        })));
+        lernpfade = [];
+        localStorage.setItem(STORAGE_KEYS.aufgaben, JSON.stringify(aufgaben));
+        localStorage.setItem(STORAGE_KEYS.schueler, JSON.stringify(schueler));
+        localStorage.setItem(STORAGE_KEYS.klassen, JSON.stringify(klassen));
+        overviewKlasse = '';
+        renderAufgaben(); renderKlassen(); renderSchueler(); updateFilters();
+        return true;
+    }
+
+    // Kein eigener Login: Nuvora authentifiziert, die App erbt den Token
+    // (gleiche Origin, gleicher localStorage).
+    async function checkAuth() {
+        if (!localStorage.getItem('token')) { showAuth(); return; }
+        try {
+            const u = JSON.parse(localStorage.getItem('user') || 'null');
+            const el = document.getElementById('nav-user');
+            if (el) el.textContent = (u && u.email) || '';
+        } catch (e) { /* Anzeige ist nebensaechlich */ }
+        hideAuth();
+        await loadUserData();
+    }
 
     // Konto-Dropdown auf/zu
     const accountMenu = document.getElementById('account-menu');
