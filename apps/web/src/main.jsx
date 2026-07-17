@@ -92,6 +92,7 @@ const getModuleNavItems = (t, location) => {
 
   if (area === "cardvote") {
     return [
+      { to: "/classes", label: t("nav.classes") },
       { to: `${CV}/questions`, label: t("nav.questions") },
       { to: `${CV}/session`, label: t("nav.session") },
       { to: `${CV}/tests`, label: t("nav.tests") },
@@ -585,7 +586,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={LP} element={user ? <ModuleGate moduleKey="lernpfad"><LernpfadModule /></ModuleGate> : <Landing />} />
 
           {/* ─── Modul CardVote ─── */}
-          <Route path={CV} element={user ? <ModuleGate moduleKey="cardvote"><Home /></ModuleGate> : <Landing />} />
+          <Route path={CV} element={user ? <Navigate to={`${CV}/questions`} replace /> : <Landing />} />
           <Route path={`${CV}/questions`} element={user ? <ModuleGate moduleKey="cardvote"><Dashboard /></ModuleGate> : <Landing />} />
           <Route path={`${CV}/session`} element={user ? <ModuleGate moduleKey="cardvote"><Session /></ModuleGate> : <Landing />} />
           <Route path={`${CV}/session/:id`} element={user ? <ModuleGate moduleKey="cardvote"><Session /></ModuleGate> : <Landing />} />

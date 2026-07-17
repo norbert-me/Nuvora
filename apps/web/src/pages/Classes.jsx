@@ -206,7 +206,7 @@ export default function Classes() {
               <select
                 value={s.niveau || ""} onChange={(e) => setStudentField(idx, "niveau", e.target.value)}
                 title={t("classes.courseTitle")}
-                style={{ padding: 7, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 13, background: "var(--bg)", color: "var(--text)", flexShrink: 0 }}
+                style={{ width: 88, flexShrink: 0, padding: 7, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 13, background: "var(--bg)", color: "var(--text)" }}
               >
                 <option value="">E/G</option>
                 <option value="E">{t("classes.eCourse")}</option>
@@ -216,8 +216,9 @@ export default function Classes() {
                 type="button" onClick={() => setDetailsFor(detailsFor === idx ? null : idx)}
                 title={t("classes.detailsTitle")}
                 style={{
+                  width: 92, flexShrink: 0, textAlign: "center",
                   border: "1px solid var(--border2)", background: (s.foerder?.length || s.notizen || s.klassenlehrer) ? "var(--accent-bg)" : "var(--card)",
-                  color: "var(--text2)", cursor: "pointer", borderRadius: 8, padding: "6px 10px", fontSize: 12.5, flexShrink: 0,
+                  color: "var(--text2)", cursor: "pointer", borderRadius: 8, padding: "6px 10px", fontSize: 12.5,
                 }}
               >
                 {s.foerder?.length ? t("classes.detailsN", { n: s.foerder.length }) : t("classes.details")}
