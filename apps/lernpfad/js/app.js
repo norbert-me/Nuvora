@@ -1,6 +1,28 @@
 (function () {
     'use strict';
 
+    // ─── Einbettung in Nuvora ───
+    // Die App laeuft im iframe unter Nuvoras Navbar. Der Rahmen kann die Hoehe
+    // des Inhalts nicht kennen, also meldet sie die App — sonst entstuende ein
+    // zweiter Scrollbalken oder der Inhalt waere abgeschnitten.
+    const embedded = window.parent !== window;
+    if (embedded) {
+        const melde = () => {
+            const h = Math.max(
+                document.body.scrollHeight, document.documentElement.scrollHeight,
+                document.body.offsetHeight, document.documentElement.offsetHeight
+            );
+            window.parent.postMessage({ type: 'lernpfad:height', height: h }, window.location.origin);
+        };
+        window.addEventListener('load', melde);
+        window.addEventListener('resize', melde);
+        // Die App rendert clientseitig nach: auf jede DOM-Aenderung reagieren.
+        new MutationObserver(melde).observe(document.documentElement, {
+            childList: true, subtree: true, attributes: true,
+        });
+        setInterval(melde, 1000);
+    }
+
     // Uebergangs-App: haengt in Nuvora unter /lernpfad-alt/ (das echte Modul
     // liegt auf dem Kern unter /lernpfad/). Basis aus dem Pfad ableiten, damit
     // die App auch standalone unter / laeuft (`npm start`, ohne Proxy davor).
