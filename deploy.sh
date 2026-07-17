@@ -162,12 +162,21 @@ fi
 echo "→ Port prüfen..."
 WANT_PORT="$PORT"
 PORT_USER=$(ssh "$SERVER" "
-  # Belegt der Port schon jemand ANDERES als Nuvoras eigener Proxy?
-  # Nuvoras Proxy darf ihn halten — der wird beim Deploy ohnehin ersetzt.
-  own=\$(cd '$REMOTE_DIR' && docker compose ps -q proxy 2>/dev/null | head -1)
-  other=\$(docker ps --format '{{.ID}} {{.Names}} {{.Ports}}' 2>/dev/null | grep ':$WANT_PORT->' | grep -v \"^\$(echo \$own | cut -c1-12)\" | head -1)
-  if [ -n \"\$other\" ]; then echo \"docker: \$other\"; exit 0; fi
-  # Nicht-Docker-Prozess auf dem Port?
+  # Nuvoras eigener Proxy darf den Port halten — der wird beim Deploy ersetzt.
+  own=\$(cd '$REMOTE_DIR' && docker compose ps -q proxy 2>/dev/null | head -1 | cut -c1-12)
+  holder=\$(docker ps --format '{{.ID}} {{.Names}} {{.Ports}}' 2>/dev/null | grep ':$WANT_PORT->' | head -1)
+
+  if [ -n \"\$holder\" ]; then
+    # Haelt ein Container den Port: nur melden, wenn es NICHT unser Proxy ist.
+    id=\$(echo \"\$holder\" | cut -d' ' -f1)
+    if [ -n \"\$own\" ] && [ \"\$id\" = \"\$own\" ]; then exit 0; fi
+    echo \"docker: \$holder\"
+    exit 0
+  fi
+
+  # Kein Container: dann kann nur noch ein Nicht-Docker-Prozess drauf sitzen.
+  # (Sitzt ein Container drauf, taucht dessen docker-proxy hier ebenfalls auf —
+  # deshalb wird ss nur geprueft, wenn oben nichts gefunden wurde.)
   if command -v ss >/dev/null 2>&1; then
     ss -tlnp 2>/dev/null | grep -E \"[:.]$WANT_PORT \" | head -1
   fi
