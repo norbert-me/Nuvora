@@ -108,9 +108,8 @@ const getModuleNavItems = (t, location) => {
     const cur = params.get("tab") || "aufgaben";
     return [
       { to: `${LP}?tab=aufgaben`, label: t("nav.exercises"), active: cur === "aufgaben" },
-      { to: `${LP}?tab=klasse`, label: t("nav.classes"), active: cur === "klasse" },
       { to: `${LP}?tab=generator`, label: "Lernleiter", active: cur === "generator" },
-      { to: `${LP}?tab=lernpfade`, label: t("nav.topics") === "Themen" ? "Lernpfade" : "Lernpfade", active: cur === "lernpfade" },
+      { to: `${LP}?tab=lernpfade`, label: "Lernpfade", active: cur === "lernpfade" },
     ];
   }
   if (area === "noten") {

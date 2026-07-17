@@ -1,12 +1,10 @@
 // Modul Lernpfad im Rahmen.
 //
-// Die App wird bewusst NICHT in React nachgebaut — ihre Oberflaeche ist
-// erprobt (Aufgaben, Klasse, Generator, Lernpfade). Sie laeuft eingebettet
-// unter Nuvoras Navbar; ihre eigene Navbar ist ausgeblendet, die Tabs steuert
-// Nuvora ueber ?tab= und postMessage.
+// Die erprobte App laeuft eingebettet unter Nuvoras Navbar; ihre eigene Navbar
+// ist ausgeblendet, die Tabs steuert Nuvora ueber ?tab= und postMessage.
 //
 // Gleiche Origin: die App liest Nuvoras Token aus demselben localStorage und
-// spricht dieselbe API. Es gibt keinen zweiten Login.
+// spricht dieselbe API. Kein zweiter Login.
 import { useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -16,19 +14,24 @@ export default function LernpfadModule() {
   const ref = useRef(null);
   const [params] = useSearchParams();
   const tab = params.get("tab") || "aufgaben";
+  // Aktuellen Tab in einem Ref halten, damit onLoad/onMessage-Handler nicht
+  // eine veraltete Kopie senden (Stale-Closure).
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
 
   const post = (msg) => ref.current?.contentWindow?.postMessage(msg, window.location.origin);
   const sendeTheme = () => post({ type: "nuvora:theme", dark: document.documentElement.classList.contains("dark") });
-  const sendeTab = () => post({ type: "nuvora:lernpfad-tab", tab });
+  const sendeTab = () => post({ type: "nuvora:lernpfad-tab", tab: tabRef.current });
+  const sendeAlles = () => { sendeTheme(); sendeTab(); };
 
   useEffect(() => {
     const onMessage = (e) => {
       if (e.origin !== window.location.origin) return;
       if (e.data?.type === "lernpfad:height" && typeof e.data.height === "number") {
-        // Die App meldet ihre Hoehe; der Rahmen scrollt, nicht das iframe.
         ref.current.style.height = Math.max(400, Math.min(e.data.height, 20000)) + "px";
       }
-      if (e.data?.type === "lernpfad:ready") { sendeTheme(); sendeTab(); }
+      // Die App meldet, dass sie bereit ist — dann Thema und Tab (erneut) setzen.
+      if (e.data?.type === "lernpfad:ready") sendeAlles();
     };
     window.addEventListener("message", onMessage);
     const obs = new MutationObserver(sendeTheme);
@@ -36,7 +39,7 @@ export default function LernpfadModule() {
     return () => { window.removeEventListener("message", onMessage); obs.disconnect(); };
   }, []);
 
-  // Tab-Wechsel aus Nuvoras Navbar an die App weitergeben.
+  // Tab-Wechsel aus Nuvoras Navbar an die App geben.
   useEffect(() => { sendeTab(); }, [tab]);
 
   return (
@@ -44,6 +47,7 @@ export default function LernpfadModule() {
       ref={ref}
       src={APP_URL}
       title="Lernpfad"
+      onLoad={sendeAlles}  // sicher senden, sobald die App geladen ist
       style={{ width: "100%", height: 800, border: "none", display: "block" }}
     />
   );
