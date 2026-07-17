@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Latex from "../components/Latex.jsx";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Toggle } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import TopicPicker from "../components/TopicPicker.jsx";
@@ -473,7 +473,6 @@ function ImportProgress({ status }) {
 }
 
 const inputStyle = { padding: "10px 14px", border: "1px solid var(--border2)", borderRadius: 10, fontSize: 14, background: "var(--card)" };
-const arrowBtn = { border: "none", background: "none", padding: "1px 2px", color: "var(--text3)", display: "flex", lineHeight: 1 };
 const btnSmall = { background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: "4px 10px", fontWeight: 500, color: "var(--text3)" };
 
 function NewSetButton({ onCreate }) {
@@ -495,6 +494,7 @@ function NewSetButton({ onCreate }) {
 
 
 function QuestionSetEditor({ questionSet, allQuestions, onBack, onQuestionsChange }) {
+  const [qSearch, setQSearch] = useState("");
   const { t } = useLanguage();
   const [name, setName] = useState(questionSet.name);
   const [questions, setQuestions] = useState(questionSet.questions || []);
@@ -523,16 +523,6 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onQuestionsChang
 
   const saveName = () => saveSet(name, questions);
 
-  // Reihenfolge per Pfeil — gleiche Wirkung wie Ziehen, nur ohne Maus.
-  const moveQuestion = (idx, delta) => {
-    const arr = [...(previewQuestions || questions)];
-    const ziel = idx + delta;
-    if (ziel < 0 || ziel >= arr.length) return;
-    [arr[idx], arr[ziel]] = [arr[ziel], arr[idx]];
-    setQuestions(arr);
-    setPreviewQuestions(null);
-    saveSet(name, arr);
-  };
 
   const toggleShuffleQ = () => { const v = !shuffleQ; setShuffleQ(v); saveSet(name, questions, v, shuffleA); };
   const toggleShuffleA = () => { const v = !shuffleA; setShuffleA(v); saveSet(name, questions, shuffleQ, v); };
@@ -618,61 +608,59 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onQuestionsChang
         {saving && <span style={{ color: "var(--text3)", fontSize: 13 }}>{t("dash.saving")}</span>}
       </div>
 
-      <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 14 }}>
-          <input type="checkbox" checked={shuffleQ} onChange={toggleShuffleQ} style={{ accentColor: "#0066cc" }} />
-          {t("dash.shuffleQ")}
-        </label>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 14 }}>
-          <input type="checkbox" checked={shuffleA} onChange={toggleShuffleA} style={{ accentColor: "#0066cc" }} />
-          {t("dash.shuffleA")}
-        </label>
+      <div style={{ display: "flex", gap: 24, marginBottom: 20, flexWrap: "wrap" }}>
+        <Toggle checked={shuffleQ} onChange={toggleShuffleQ} label={t("dash.shuffleQ")} />
+        <Toggle checked={shuffleA} onChange={toggleShuffleA} label={t("dash.shuffleA")} />
       </div>
 
-      <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("dash.questionsCount", { count: questions.length })}</h3>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+        <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", margin: 0 }}>{t("dash.questionsCount", { count: questions.length })}</h3>
+        {questions.length > 3 && (
+          <input
+            value={qSearch} onChange={(e) => setQSearch(e.target.value)} placeholder={t("dash.searchQ")}
+            style={{ flex: 1, minWidth: 160, maxWidth: 320, padding: "7px 12px", border: "1px solid var(--border2)", borderRadius: 980, fontSize: 13.5, background: "var(--bg)", color: "var(--text)" }}
+          />
+        )}
+      </div>
 
-      {(previewQuestions || questions).map((q, idx) => (
+      {(() => {
+        const base = previewQuestions || questions;
+        const term = qSearch.trim().toLowerCase();
+        const searching = term.length > 0;
+        const inText = (q) => (q.text || "").toLowerCase().includes(term)
+          || Object.values(q.choices || {}).some((v) => typeof v === "string" && v.toLowerCase().includes(term));
+        const shown = searching ? base.filter(inText) : base;
+        if (searching && shown.length === 0) {
+          return <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("dash.noSearchHit")}</p>;
+        }
+        // Beim Suchen kein Ziehen: der gefilterte Index passt nicht zur echten
+        // Reihenfolge, ein Drop wuerde die falsche Frage verschieben.
+        return shown.map((q) => {
+          const idx = base.indexOf(q);
+          return (
         <div
           key={q.id}
-          draggable
-          onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; dragIdx.current = idx; }}
-          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; reorderPreview(dragIdx.current, idx); dragIdx.current = idx; }}
-          onDrop={(e) => { e.preventDefault(); const arr = previewQuestions || questions; setQuestions(arr); setPreviewQuestions(null); saveSet(name, arr); dragIdx.current = null; }}
+          draggable={!searching}
+          onDragStart={(e) => { if (searching) return; e.dataTransfer.effectAllowed = "move"; dragIdx.current = idx; }}
+          onDragOver={(e) => { if (searching) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; reorderPreview(dragIdx.current, idx); dragIdx.current = idx; }}
+          onDrop={(e) => { if (searching) return; e.preventDefault(); const arr = previewQuestions || questions; setQuestions(arr); setPreviewQuestions(null); saveSet(name, arr); dragIdx.current = null; }}
           onDragEnd={() => { setPreviewQuestions(null); dragIdx.current = null; }}
           style={{
             display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", marginBottom: 6,
             border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)",
-            cursor: "grab", transition: "transform 0.15s ease",
+            cursor: searching ? "default" : "grab", transition: "transform 0.15s ease",
           }}
         >
-          {/* Ziehen funktioniert nur mit Maus: iOS Safari kennt kein HTML5-
-              Drag&Drop, dort liess sich die Reihenfolge gar nicht aendern.
-              Die Pfeile funktionieren auf jedem Geraet und sind zugleich per
-              Tastatur bedienbar. */}
-          <span style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
-            <button
-              onClick={() => moveQuestion(idx, -1)} disabled={idx === 0}
-              title="Nach oben" aria-label="Frage nach oben"
-              style={{ ...arrowBtn, opacity: idx === 0 ? 0.25 : 1, cursor: idx === 0 ? "default" : "pointer" }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
-            </button>
-            <button
-              onClick={() => moveQuestion(idx, 1)} disabled={idx === (previewQuestions || questions).length - 1}
-              title="Nach unten" aria-label="Frage nach unten"
-              style={{ ...arrowBtn, opacity: idx === (previewQuestions || questions).length - 1 ? 0.25 : 1, cursor: idx === (previewQuestions || questions).length - 1 ? "default" : "pointer" }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-            </button>
-          </span>
-          <span className="drag-handle" style={{ color: "var(--text3)", width: 20, textAlign: "center", fontSize: 18, cursor: "grab", lineHeight: 1, flexShrink: 0 }}>⠿</span>
+          {!searching && <span className="drag-handle" style={{ color: "var(--text3)", width: 20, textAlign: "center", fontSize: 18, cursor: "grab", lineHeight: 1, flexShrink: 0 }}>⠿</span>}
           <span onClick={() => setEditingQ({ ...q })} style={{ flex: 1, color: "var(--text)", cursor: "pointer" }} title={t("dash.clickEdit")}>
             <Latex>{q.text}</Latex>
             {q.image_url && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 6, verticalAlign: "middle" }}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>}
           </span>
           <button onClick={() => removeQuestion(idx)} style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
         </div>
-      ))}
+          );
+        });
+      })()}
 
       <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
         <button onClick={() => setShowAdd(true)} style={btnPrimary}>{t("dash.newQ")}</button>

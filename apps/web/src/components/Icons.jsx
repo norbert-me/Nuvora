@@ -96,3 +96,26 @@ export function StageBadge({ stage, title }) {
     }}>{stage}</span>
   );
 }
+
+// Ein-/Aus-Schalter statt Checkbox. Fuer Optionen, die sichtbar an/aus sein
+// sollen (z.B. Mischen).
+export function Toggle({ checked, onChange, label }) {
+  return (
+    <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 14, color: "var(--text)" }}>
+      <span
+        onClick={() => onChange(!checked)}
+        role="switch" aria-checked={checked}
+        style={{
+          width: 38, height: 22, borderRadius: 11, flexShrink: 0, position: "relative",
+          background: checked ? "var(--accent)" : "var(--border2)", transition: "background 0.15s",
+        }}
+      >
+        <span style={{
+          position: "absolute", top: 2, left: checked ? 18 : 2, width: 18, height: 18, borderRadius: 9,
+          background: "#fff", transition: "left 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.3)",
+        }} />
+      </span>
+      {label}
+    </label>
+  );
+}

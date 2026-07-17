@@ -543,4 +543,6 @@ export default {
   "stage.alpha": "Alpha",
   "stage.alphaHint": "Early development — data may be lost.",
   "stage.betaHint": "In development but usable.",
+  "dash.searchQ": "Search questions…",
+  "dash.noSearchHit": "No question matches.",
 };
