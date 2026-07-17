@@ -60,35 +60,38 @@ rsync -rlz -c --inplace --delete \
   --exclude='.claude/' \
   "$DIR/" "$SERVER:$REMOTE_DIR/"
 
-echo "→ .env auf dem Server vorhanden?"
-if ! ssh "$SERVER" "test -f '$REMOTE_DIR/.env'"; then
-  echo "  Keine .env auf dem Server — lege eine an."
-  echo "  Die beiden Pflicht-Secrets werden dabei zufällig erzeugt; sie müssen"
-  echo "  nie jemand lesen oder eintippen."
+echo "→ Pflicht-Secrets auf dem Server prüfen..."
+# Nicht nur "gibt es eine .env?", sondern "stehen Werte drin?": eine .env mit
+# leerem TOKEN_SECRET laesst compose genauso scheitern wie gar keine (${VAR:?}
+# greift auch bei leer). Jeder fehlende Pflichtwert wird hier nachgezogen,
+# vorhandene Werte bleiben unangetastet.
+#
+# Die Werte entstehen lokal und gehen per stdin rueber, nicht als Argument:
+# so tauchen sie weder in der Prozessliste des Servers noch in einer History auf.
+GEN_TOKEN=$(openssl rand -hex 32)
+GEN_PGPW=$(openssl rand -hex 24)
 
-  # Lokal erzeugen und per stdin uebertragen: die Werte tauchen so weder in
-  # der Prozessliste des Servers noch in einer Shell-History auf.
-  GEN_TOKEN=$(openssl rand -hex 32)
-  GEN_PGPW=$(openssl rand -hex 24)
+BOOTSTRAP=$(ssh "$SERVER" sh -s <<REMOTE
+cd '$REMOTE_DIR' || exit 1
+t='$GEN_TOKEN'
+p='$GEN_PGPW'
+$(cat "$DIR/scripts/ensure-env.sh")
+REMOTE
+)
 
-  ssh "$SERVER" "cd '$REMOTE_DIR' && cp .env.example .env && chmod 600 .env"
-  printf '%s\n%s\n' "$GEN_TOKEN" "$GEN_PGPW" | ssh "$SERVER" "cd '$REMOTE_DIR' && \
-    read -r t && read -r p && \
-    sed -i \"s|^TOKEN_SECRET=.*|TOKEN_SECRET=\$t|; s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=\$p|\" .env"
+unset GEN_TOKEN GEN_PGPW
 
-  unset GEN_TOKEN GEN_PGPW
-
+if [ -n "$BOOTSTRAP" ]; then
+  echo "  ✓ .env ergänzt (chmod 600):$BOOTSTRAP"
+  echo "    Zufallswerte erzeugt — niemand muss sie lesen oder eintippen."
   echo ""
-  echo "  ✓ .env angelegt, TOKEN_SECRET und POSTGRES_PASSWORD gesetzt (chmod 600)."
-  echo ""
-  echo "  Optional — E-Mail-Versand und Admin-Konto. Ohne diese Angaben läuft"
-  echo "  alles, nur ohne Mailversand (Registrierung, Passwort-Reset):"
-  echo ""
+  echo "    Optional für Mailversand und Admin-Konto (ohne läuft alles,"
+  echo "    nur ohne Registrierungs- und Reset-Mails):"
   echo "      ssh $SERVER"
-  echo "      cd $REMOTE_DIR && nano .env      # oder: micro .env"
+  echo "      cd $REMOTE_DIR && nano .env"
   echo ""
-  echo "  Deploy läuft jetzt weiter."
-  echo ""
+else
+  echo "  ✓ .env vollständig, unverändert."
 fi
 
 echo "→ Container bauen (${BUILD_SERVICES:-alle})..."
