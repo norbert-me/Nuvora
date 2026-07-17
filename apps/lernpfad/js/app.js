@@ -1,6 +1,11 @@
 (function () {
     'use strict';
 
+    // Nuvora haengt Lernpfad unter /lernpfad/ ein, CardVote liegt auf /.
+    // Basis aus dem Pfad ableiten, damit die App auch unter / laeuft
+    // (Standalone via `npm start`, ohne den Nuvora-Proxy davor).
+    const API = (location.pathname.startsWith('/lernpfad') ? '/lernpfad' : '') + '/api';
+
     const STORAGE_KEYS = {
         aufgaben: 'll_aufgaben',
         schueler: 'll_schueler',
@@ -24,7 +29,7 @@
 
     async function syncToAPI(type, data) {
         try {
-            const endpoint = `/api/${type}`;
+            const endpoint = `${API}/${type}`;
             if (type === 'klassen') {
                 await Promise.all(data.map(name => fetch(endpoint, {
                     method: 'POST',
@@ -165,7 +170,7 @@
     // Daten des angemeldeten Kontos laden und lokalen Cache ersetzen.
     async function loadUserData() {
         const [aRes, sRes, kRes] = await Promise.all([
-            fetch('/api/aufgaben'), fetch('/api/schueler'), fetch('/api/klassen')
+            fetch(`${API}/aufgaben`), fetch(`${API}/schueler`), fetch(`${API}/klassen`)
         ]);
         if (!aRes.ok || !sRes.ok || !kRes.ok) { showAuth(); return false; }
         aufgaben = await aRes.json();
@@ -187,7 +192,7 @@
 
     async function checkAuth() {
         try {
-            const me = await fetch('/api/me').then(r => r.json());
+            const me = await fetch(`${API}/me`).then(r => r.json());
             if (me && me.user) {
                 document.getElementById('nav-user').textContent = me.user.email;
                 hideAuth();
@@ -228,7 +233,7 @@
         const btn = document.getElementById('auth-submit');
         btn.disabled = true;
         try {
-            const res = await fetch('/api/' + (authMode === 'register' ? 'register' : 'login'), {
+            const res = await fetch(`${API}/` + (authMode === 'register' ? 'register' : 'login'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
@@ -262,7 +267,7 @@
     });
 
     document.getElementById('btn-logout').addEventListener('click', async () => {
-        await fetch('/api/logout', { method: 'POST' }).catch(() => {});
+        await fetch(`${API}/logout`, { method: 'POST' }).catch(() => {});
         // Lokalen Cache leeren, damit das nächste Konto nichts erbt.
         [STORAGE_KEYS.aufgaben, STORAGE_KEYS.schueler, STORAGE_KEYS.klassen, STORAGE_KEYS.idCounter]
             .forEach(k => localStorage.removeItem(k));
@@ -1010,7 +1015,7 @@
         if (!confirm(msg)) return;
 
         // Schüler entfernen (Backend + lokal)
-        kSchueler.forEach(s => fetch('/api/schueler/' + s._id, { method: 'DELETE' }).catch(() => {}));
+        kSchueler.forEach(s => fetch(`${API}/schueler/` + s._id, { method: 'DELETE' }).catch(() => {}));
         schueler = schueler.filter(s => s.klasse !== name);
         save(STORAGE_KEYS.schueler, schueler);
 
@@ -1021,7 +1026,7 @@
             if (kept.length === p.lernleitern.length) continue;
             p.lernleitern = kept;
             if (kept.length === 0) {
-                fetch('/api/lernpfade/' + p._id, { method: 'DELETE' }).catch(() => {});
+                fetch(`${API}/lernpfade/` + p._id, { method: 'DELETE' }).catch(() => {});
             } else {
                 await savePfad(p);
             }
@@ -1614,7 +1619,7 @@
     // verschluckt wird - sonst sieht der Nutzer Daten, die es nicht mehr gibt.
     async function savePfad(pfad) {
         try {
-            const res = await fetch('/api/lernpfade', {
+            const res = await fetch(`${API}/lernpfade`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(pfad)
@@ -2114,7 +2119,7 @@
         if (!confirm(ids.length + ' ausgewählte Aufgabe(n) wirklich löschen?')) return;
         const idSet = new Set(ids);
         // Backend + lokal löschen
-        ids.forEach(id => fetch('/api/aufgaben/' + id, { method: 'DELETE' }).catch(() => {}));
+        ids.forEach(id => fetch(`${API}/aufgaben/` + id, { method: 'DELETE' }).catch(() => {}));
         aufgaben = aufgaben.filter(a => !idSet.has(a._id));
         save(STORAGE_KEYS.aufgaben, aufgaben);
         bulkSelectAll.checked = false;
@@ -2426,7 +2431,7 @@
 
     async function loadLernpfade() {
         try {
-            lernpfade = await fetch('/api/lernpfade').then(r => r.json()).catch(() => []);
+            lernpfade = await fetch(`${API}/lernpfade`).then(r => r.json()).catch(() => []);
         } catch(e) { lernpfade = []; }
         renderLernpfade();
         renderGenPfade();
@@ -2451,7 +2456,7 @@
         const deletePfad = id => {
             if (!confirm('Pfad wirklich löschen?')) return;
             lernpfade = lernpfade.filter(p => p._id !== id);
-            fetch('/api/lernpfade/' + id, { method: 'DELETE' }).catch(() => {});
+            fetch(`${API}/lernpfade/` + id, { method: 'DELETE' }).catch(() => {});
             loadLernpfade();
         };
         // Klick auf Balken öffnet; Icon-Buttons haben Vorrang via stopPropagation

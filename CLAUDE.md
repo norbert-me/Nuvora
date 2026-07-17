@@ -2,9 +2,29 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Status: greenfield
+## Status
 
-Dieses Verzeichnis ist **leer**. Es gibt noch keinen Nuvora-Code. Dieses Dokument beschreibt das *Ziel* und die beiden bestehenden Apps, aus denen Nuvora entsteht — nicht den Ist-Zustand dieses Repos. Beim Anlegen von Code diese Datei mitpflegen und den Status-Abschnitt ersetzen.
+Beide Module sind importiert (`apps/cardvote`, `apps/lernpfad`) und laufen hinter einem gemeinsamen Proxy auf einer Domain. **Fachlich sind sie noch getrennt**: eigene Konten, eigene Klassen, eigene DBs. Die Bündelung ist bisher Deployment-Ebene, nicht Datenebene.
+
+### Aufbau heute
+
+`docker-compose.yml` (Root) + `nginx.conf` (Root) fahren alles zusammen:
+
+| Pfad         | Ziel                      |
+| ------------ | ------------------------- |
+| `/`          | `cardvote-frontend:3000`  |
+| `/api/`, `/ws/` | `cardvote-backend:8000` |
+| `/lernpfad/` | `lernpfad:3000`           |
+
+Der Slash am Ende von `proxy_pass http://lernpfad:3000/` schneidet das Prefix ab — Lernpfad sieht `/` und weiss von Nuvora nichts. Passend dazu leitet `apps/lernpfad/js/app.js` seine `API`-Konstante aus `location.pathname` ab, damit das Modul auch standalone (`npm start`) läuft. Beim Ändern eines der beiden Punkte den anderen mitziehen.
+
+Pflicht-Env: `POSTGRES_PASSWORD`, `TOKEN_SECRET` (Compose bricht ohne sie bewusst ab). Vorlage `.env.example`.
+
+### Als Nächstes
+
+1. Konten zusammenführen — CardVote gewinnt, Lernpfad-Auth entfällt.
+2. Themen-Taxonomie: CardVote-Fragen und Lernpfad-Aufgaben brauchen dieselben Themen, sonst ist Ziel 2 unmöglich.
+3. Lernpfad von localStorage auf Postgres, Daten pro Lehrkraft (siehe unten).
 
 ## Was ist Nuvora
 

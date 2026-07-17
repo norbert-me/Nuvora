@@ -21,7 +21,10 @@ secrets/
 *.sqlite3
 backups/
 uploads/
-daten/
+# Achtung: apps/lernpfad/daten/ ist KEIN Nutzerdatenverzeichnis, sondern
+# Seed-Aufgaben, die der Docker-Build braucht (loadInitialData in server.js).
+# Laufzeitdaten liegen in data/ (Bind-Mount) und sind ueber *.db erfasst.
+data/
 
 # ─── Betreiber-/Rechtskonfiguration ───
 config/site.json

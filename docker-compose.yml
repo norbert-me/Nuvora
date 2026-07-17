@@ -1,0 +1,68 @@
+# Nuvora — beide Module hinter EINEM Proxy auf EINER Domain.
+#   /          -> CardVote (Kern)
+#   /lernpfad/ -> Lernpfad
+# Die Einzel-Composes in apps/*/ bleiben fuer isoliertes Arbeiten bestehen.
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cardvote}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD nicht gesetzt — .env aus .env.example anlegen}
+      POSTGRES_DB: ${POSTGRES_DB:-cardvote}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  cardvote-backend:
+    build: ./apps/cardvote/backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-cardvote}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-cardvote}
+      TOKEN_SECRET: ${TOKEN_SECRET:?TOKEN_SECRET nicht gesetzt — .env aus .env.example anlegen}
+      CORS_ORIGINS: ${SITE_URL:-http://localhost:8080}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      SITE_URL: ${SITE_URL:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Nuvora}
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      - db
+
+  cardvote-frontend:
+    build: ./apps/cardvote/frontend
+    restart: unless-stopped
+    depends_on:
+      - cardvote-backend
+
+  lernpfad:
+    build: ./apps/lernpfad
+    restart: unless-stopped
+    environment:
+      DB_PATH: /app/data/lernpfad.db
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+    volumes:
+      # Verzeichnis mounten, nie die DB-Datei selbst: eine nicht existierende
+      # gemountete Datei legt Docker als Verzeichnis an -> EISDIR.
+      - lernpfad-data:/app/data
+
+  proxy:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - cardvote-frontend
+      - lernpfad
+
+volumes:
+  pgdata:
+  uploads:
+  lernpfad-data:
