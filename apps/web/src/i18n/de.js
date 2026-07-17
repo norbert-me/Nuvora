@@ -431,4 +431,10 @@ export default {
   "classes.eCourse": "E-Kurs",
   "classes.gCourse": "G-Kurs",
   "classes.courseTitle": "E-/G-Kurs",
+  "noten.enterGrade": "Note eintragen",
+  "noten.delColTitle": "Spalte löschen",
+  "noten.colNamePlaceholder": "Spaltenname",
+  "noten.newColTitle": "Spalte hinzufügen",
+  "noten.category": "Kategorie",
+  "noten.ok": "OK",
 };

@@ -13,6 +13,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle } from "../components/Icons.jsx";
+import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api/noten";
 
@@ -25,6 +26,7 @@ function parseNote(text) {
 }
 
 export default function Noten() {
+  const { t } = useLanguage();
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
   const [cats, setCats] = useState([]);
@@ -59,7 +61,7 @@ export default function Noten() {
     const res = await fn();
     if (!res.ok) {
       const b = await res.json().catch(() => ({}));
-      setError(typeof b.detail === "string" ? b.detail : "Das hat nicht geklappt");
+      setError(typeof b.detail === "string" ? b.detail : t("common.notWork"));
       return false;
     }
     await load(classId);
@@ -84,10 +86,9 @@ export default function Noten() {
   if (classes.length === 0) {
     return (
       <div style={{ maxWidth: 700 }}>
-        <h1 style={pageTitle}>Noten</h1>
+        <h1 style={pageTitle}>{t("noten.title")}</h1>
         <p style={{ color: "var(--text2)", fontSize: 14 }}>
-          Noch keine Klasse. Lege sie unter <Link to="/classes" style={{ color: "var(--accent)" }}>Klassen</Link> an —
-          Klassen und Schüler gehören Nuvora, alle Module nutzen dieselben.
+          {t("noten.needClass").split("{{link}}")[0]}<Link to="/classes" style={{ color: "var(--accent)" }}>{t("nav.classes")}</Link>{t("noten.needClass").split("{{link}}")[1]}
         </p>
       </div>
     );
@@ -96,7 +97,7 @@ export default function Noten() {
   return (
     <div style={{ maxWidth: 1100 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
-        <h1 style={pageTitle}>Noten</h1>
+        <h1 style={pageTitle}>{t("noten.title")}</h1>
         <select
           value={classId ?? ""} onChange={(e) => setClassId(Number(e.target.value))}
           style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)" }}
@@ -105,7 +106,7 @@ export default function Noten() {
         </select>
         {cats.length > 0 && (
           <span style={{ fontSize: 12.5, color: gewichtSumme === 100 ? "var(--text3)" : "#b8860b" }}>
-            {gewichtSumme} %{gewichtSumme !== 100 && " — nicht 100 %"}
+            {gewichtSumme !== 100 ? t("noten.weightNot100", { n: gewichtSumme }) : t("noten.weightSum", { n: gewichtSumme })}
           </span>
         )}
       </div>
@@ -124,7 +125,7 @@ export default function Noten() {
                   method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b),
                 }))} onDelete={() => {
                   const n = entries.filter((e) => e.category_id === k.id).length;
-                  if (!confirm(`Spalte „${k.name}" löschen?${n ? `\n${n} Eintrag/Einträge verschwinden mit.` : ""}`)) return;
+                  if (!confirm(t("noten.delColumn", { name: k.name }) + (n ? "\n" + t("noten.delEntries", { n }) : ""))) return;
                   call(() => fetch(`${API}/categories/${k.id}`, { method: "DELETE" }));
                 }} />
               ))}
@@ -141,14 +142,14 @@ export default function Noten() {
                     }}
                   />
                 ) : (
-                  <button onClick={() => setNeueSpalte(true)} title="Spalte hinzufügen"
+                  <button onClick={() => setNeueSpalte(true)} title={t("noten.newColTitle")}
                     style={{ border: "none", background: "none", cursor: "pointer", color: "var(--accent)", fontSize: 18, lineHeight: 1, padding: 4 }}>
                     +
                   </button>
                 )}
               </th>
-              {cats.length > 0 && <th style={th}>Schnitt</th>}
-              <th style={{ ...th, minWidth: 40 }} title="Beobachtungen — zählen nie in den Schnitt">Beob.</th>
+              {cats.length > 0 && <th style={th}>{t("noten.avg")}</th>}
+              <th style={{ ...th, minWidth: 40 }} title={t("noten.obsTitle")}>{t("noten.obs")}</th>
             </tr>
           </thead>
           <tbody>
@@ -170,7 +171,7 @@ export default function Noten() {
                       ) : (
                         <button
                           onClick={() => setZelle(id)}
-                          title={noten.length > 1 ? noten.map((e) => fmt(e.value)).join(" · ") : "Note eintragen"}
+                          title={noten.length > 1 ? noten.map((e) => fmt(e.value)).join(" · ") : t("noten.enterGrade")}
                           style={{
                             width: "100%", minHeight: 34, border: "none", background: "none", cursor: "text",
                             color: "var(--text)", fontSize: 13.5, fontWeight: noten.length ? 600 : 400,
@@ -193,14 +194,14 @@ export default function Noten() {
                     {s.weighted !== null ? String(s.weighted).replace(".", ",") : <span style={{ color: "var(--border2)" }}>·</span>}
                     {s.weighted !== null && s.weight_covered < 100 && (
                       <div style={{ fontWeight: 400, fontSize: 10, color: "#b8860b" }}
-                        title="So viel Prozent deines Konzepts sind bisher mit Noten belegt">
+                        title={t("noten.covered")}>
                         {s.weight_covered} %
                       </div>
                     )}
                   </td>
                 )}
                 <td style={td}>
-                  <button onClick={() => setBeobFuer(s)} title="Beobachtungen"
+                  <button onClick={() => setBeobFuer(s)} title={t("noten.obsHeading")}
                     style={{ border: "none", background: "none", cursor: "pointer", color: s.observations ? "var(--accent)" : "var(--text3)", fontSize: 12.5, padding: 4 }}>
                     {s.observations || "+"}
                   </button>
@@ -212,8 +213,7 @@ export default function Noten() {
       </div>
 
       <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 10, lineHeight: 1.6 }}>
-        In eine Zelle tippen: <code>2</code> oder <code>2,3</code>. Mehrere Noten pro Feld sind erlaubt — gezeigt wird ihr Schnitt.
-        Der Gesamtschnitt ist eine Rechenhilfe, keine Zeugnisnote.
+        {t("noten.cellHint", { a: "2", b: "2,3" })}
       </p>
 
       {beobFuer && (
@@ -233,6 +233,7 @@ export default function Noten() {
 
 // Zelle: Eingabe direkt im Feld, Enter speichert, Escape bricht ab.
 function Zelle({ onSave, onCancel }) {
+  const { t } = useLanguage();
   const ref = useRef(null);
   useEffect(() => { ref.current?.focus(); }, []);
   return (
@@ -254,6 +255,7 @@ function Zelle({ onSave, onCancel }) {
 }
 
 function Spalte({ kat, onSave, onDelete }) {
+  const { t } = useLanguage();
   const [edit, setEdit] = useState(false);
   const [name, setName] = useState(kat.name);
   const [weight, setWeight] = useState(kat.weight);
@@ -281,7 +283,7 @@ function Spalte({ kat, onSave, onDelete }) {
           style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text2)", fontSize: 12, fontWeight: 600, padding: 0, maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {kat.name}
         </button>
-        <button onClick={onDelete} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title="Spalte löschen">
+        <button onClick={onDelete} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title={t("noten.delColTitle")}>
           <Icon d={ICONS.trash} color={C.danger} />
         </button>
       </div>
@@ -291,11 +293,12 @@ function Spalte({ kat, onSave, onDelete }) {
 }
 
 function NeueSpalte({ onSave, onCancel }) {
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const [weight, setWeight] = useState("");
   return (
     <div style={{ minWidth: 130 }}>
-      <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="Spaltenname"
+      <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder={t("noten.colNamePlaceholder")}
         onKeyDown={(e) => { if (e.key === "Escape") onCancel(); }}
         style={{ ...kopfInp, marginBottom: 4 }} />
       <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
@@ -311,6 +314,7 @@ function NeueSpalte({ onSave, onCancel }) {
 }
 
 function Beobachtungen({ student, cats, entries, onClose, onSave, onDelete }) {
+  const { t } = useLanguage();
   const [catId, setCatId] = useState(cats[0]?.id ?? null);
   const [tendency, setTendency] = useState(1);
   const [note, setNote] = useState("");
@@ -320,11 +324,11 @@ function Beobachtungen({ student, cats, entries, onClose, onSave, onDelete }) {
       <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--card)", borderRadius: 18, maxWidth: 460, width: "100%", maxHeight: "85vh", overflow: "auto", padding: 22, border: "1px solid var(--border)" }}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>{student.name}</h3>
         <p style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 16 }}>
-          Beobachtungen zählen nie in den Schnitt. Sie sind dein Gedächtnis fürs Quartalsende.
+          {t("noten.obsSub")}
         </p>
 
         {cats.length === 0 ? (
-          <p style={{ fontSize: 13.5, color: "var(--text3)" }}>Lege zuerst eine Spalte an.</p>
+          <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("noten.needColumnFirst")}</p>
         ) : (
           <>
             <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
@@ -342,7 +346,7 @@ function Beobachtungen({ student, cats, entries, onClose, onSave, onDelete }) {
             </div>
             <input
               value={note} onChange={(e) => setNote(e.target.value)} maxLength={2000}
-              placeholder="z. B. hat unaufgefordert geholfen"
+              placeholder={t("noten.obsPlaceholder")}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && catId) {
                   onSave({ category_id: catId, student_id: student.student_id, kind: "observation", tendency, note });
@@ -355,7 +359,7 @@ function Beobachtungen({ student, cats, entries, onClose, onSave, onDelete }) {
               onClick={() => { onSave({ category_id: catId, student_id: student.student_id, kind: "observation", tendency, note }); setNote(""); }}
               disabled={!catId} style={{ ...btnPrimary, opacity: catId ? 1 : 0.4, marginBottom: 18 }}
             >
-              Notieren
+              {t("noten.note")}
             </button>
           </>
         )}
@@ -373,14 +377,14 @@ function Beobachtungen({ student, cats, entries, onClose, onSave, onDelete }) {
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ color: "var(--text3)" }}>{k?.name}: </span>{e.note}
               </span>
-              <button onClick={() => onDelete(e.id)} className="icon-btn" style={iconBtn} title="Löschen">
+              <button onClick={() => onDelete(e.id)} className="icon-btn" style={iconBtn} title={t("common.delete")}>
                 <Icon d={ICONS.trash} color={C.danger} />
               </button>
             </div>
           );
         })}
 
-        <button onClick={onClose} style={{ ...btnSecondary, marginTop: 14 }}>Schließen</button>
+        <button onClick={onClose} style={{ ...btnSecondary, marginTop: 14 }}>{t("noten.close")}</button>
       </div>
     </div>
   );

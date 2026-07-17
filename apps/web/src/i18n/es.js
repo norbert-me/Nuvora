@@ -431,4 +431,10 @@ export default {
   "classes.eCourse": "Curso E",
   "classes.gCourse": "Curso G",
   "classes.courseTitle": "Curso E/G",
+  "noten.enterGrade": "Introducir nota",
+  "noten.delColTitle": "Eliminar columna",
+  "noten.colNamePlaceholder": "Nombre de columna",
+  "noten.newColTitle": "Añadir columna",
+  "noten.category": "Categoría",
+  "noten.ok": "OK",
 };

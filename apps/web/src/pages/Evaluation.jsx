@@ -494,7 +494,7 @@ const gradeDistribution = (() => {
               Knopf ins Leere (Regel 3: CardVote haengt nicht von Noten ab). */}
           {notenAktiv && data.class_id && (
             <button onClick={() => setNotenDialog(true)} style={{ ...btnSecondary, padding: "6px 14px", fontSize: 13 }}>
-              Ins Notenmodul
+              {t("notenimp.button")}
             </button>
           )}
           <DownloadLink onClick={async () => { const r = await fetch(`${API}/sessions/${id}/all-students-pdf`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `Auswertungen_${id}.pdf`; a.click(); URL.revokeObjectURL(a.href); }}>
@@ -986,6 +986,7 @@ function StatBox({ label, value, color }) {
 
 // Dialog: CardVote-Testnoten in eine Kategorie des Notenmoduls uebernehmen.
 function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
+  const { t } = useLanguage();
   const [cats, setCats] = useState([]);
   const [catId, setCatId] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -1006,7 +1007,7 @@ function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
       body: JSON.stringify({ session_id: sessionId, category_id: catId, grades: grades.map((g) => ({ card_id: g.card_id, value: g.value })) }),
     });
     setBusy(false);
-    if (!res.ok) { const b = await res.json().catch(() => ({})); setError(b.detail || "Übernahme fehlgeschlagen"); return; }
+    if (!res.ok) { const b = await res.json().catch(() => ({})); setError(b.detail || t("notenimp.failed")); return; }
     const b = await res.json();
     setDone(b.imported);
   };
@@ -1014,38 +1015,38 @@ function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 200 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--card)", borderRadius: 18, maxWidth: 460, width: "100%", maxHeight: "85vh", overflow: "auto", padding: 22, border: "1px solid var(--border)" }}>
-        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>Ins Notenmodul übernehmen</h3>
+        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t("notenimp.title")}</h3>
         <p style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 16 }}>
-          {sessionName ? `Test „${sessionName}"` : "Dieser Test"} — {grades.length} Note{grades.length === 1 ? "" : "n"} nach dem eingestellten Notenschlüssel.
+          {t("notenimp.intro", { test: sessionName ? t("notenimp.testNamed", { name: sessionName }) : t("notenimp.testThis"), n: grades.length })}
         </p>
 
         {done !== null ? (
           <>
             <p style={{ fontSize: 14, color: "#0a7d3e", marginBottom: 16 }}>
-              {done} Note{done === 1 ? "" : "n"} übernommen.
+{t("notenimp.done", { n: done })}
             </p>
-            <button onClick={onClose} style={btnPrimary}>Schließen</button>
+            <button onClick={onClose} style={btnPrimary}>{t("noten.close")}</button>
           </>
         ) : cats.length === 0 ? (
           <>
             <p style={{ fontSize: 13.5, color: "var(--text3)", marginBottom: 16 }}>
-              Diese Klasse hat im Notenmodul noch keine Kategorie. Lege dort zuerst eine Spalte an.
+              {t("notenimp.noCat")}
             </p>
-            <button onClick={onClose} style={btnSecondary}>Schließen</button>
+            <button onClick={onClose} style={btnSecondary}>{t("noten.close")}</button>
           </>
         ) : (
           <>
             {error && <p style={{ color: "var(--danger, #dc2626)", fontSize: 13, marginBottom: 10 }}>{error}</p>}
-            <div style={{ fontSize: 12.5, color: "var(--text2)", marginBottom: 6 }}>In welche Kategorie?</div>
+            <div style={{ fontSize: 12.5, color: "var(--text2)", marginBottom: 6 }}>{t("notenimp.whichCat")}</div>
             <select value={catId ?? ""} onChange={(e) => setCatId(Number(e.target.value))}
               style={{ width: "100%", padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)", marginBottom: 16, boxSizing: "border-box" }}>
               {cats.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.weight} %)</option>)}
             </select>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={uebernehmen} disabled={busy || !catId} style={{ ...btnPrimary, opacity: busy || !catId ? 0.5 : 1 }}>
-                {busy ? "Übernehme…" : "Übernehmen"}
+                {busy ? t("notenimp.importing") : t("notenimp.import")}
               </button>
-              <button onClick={onClose} style={btnSecondary}>Abbrechen</button>
+              <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
             </div>
           </>
         )}

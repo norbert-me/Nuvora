@@ -431,4 +431,10 @@ export default {
   "classes.eCourse": "E course",
   "classes.gCourse": "G course",
   "classes.courseTitle": "E/G course",
+  "noten.enterGrade": "Enter grade",
+  "noten.delColTitle": "Delete column",
+  "noten.colNamePlaceholder": "Column name",
+  "noten.newColTitle": "Add column",
+  "noten.category": "Category",
+  "noten.ok": "OK",
 };
