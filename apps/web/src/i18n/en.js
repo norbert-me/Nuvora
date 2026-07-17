@@ -547,4 +547,10 @@ export default {
   "dash.noSearchHit": "No question matches.",
   "mod.code-detektiv.name": "Code Detective",
   "mod.code-detektiv.desc": "Coding puzzles for computer science lessons: put code blocks in the right order, alone or as a class.",
+  "onboard.title": "Welcome to Nuvora",
+  "onboard.text": "Nuvora is your base: classes, students and topics live here, modules switch on. A quick tour, or straight to the help?",
+  "onboard.tour": "Start the tour",
+  "onboard.help": "Go to help",
+  "onboard.later": "Later",
+  "onboard.note": "You can reach both any time via the footer.",
 };

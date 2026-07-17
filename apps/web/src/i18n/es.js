@@ -547,4 +547,10 @@ export default {
   "dash.noSearchHit": "Ninguna pregunta coincide.",
   "mod.code-detektiv.name": "Detective de Código",
   "mod.code-detektiv.desc": "Retos de programación para clase de informática: ordena los bloques de código, solo o en grupo.",
+  "onboard.title": "Bienvenido/a a Nuvora",
+  "onboard.text": "Nuvora es tu base: clases, alumnado y temas están aquí, los módulos se activan. ¿Un recorrido rápido o directo a la ayuda?",
+  "onboard.tour": "Empezar el recorrido",
+  "onboard.help": "Ir a la ayuda",
+  "onboard.later": "Más tarde",
+  "onboard.note": "Puedes volver a ambos desde el pie de página.",
 };

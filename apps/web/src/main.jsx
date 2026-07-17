@@ -66,6 +66,7 @@ import Cards from "./pages/Cards.jsx";
 import Tutorial from "./pages/Tutorial.jsx";
 import NotenModul from "./pages/Noten.jsx";
 import { useModules } from "./core/modules.js";
+import { btnPrimary, btnSecondary } from "./components/Icons.jsx";
 // Navigation ist modulbezogen: die Shell zeigt die Punkte des Moduls, in dem
 // man gerade ist. Ausserhalb eines Moduls navigiert Nuvora selbst.
 const CV = "/cardvote";
@@ -549,6 +550,46 @@ function ContentWrapper({ children }) {
   );
 }
 
+// Einmaliges Willkommen nach dem allerersten Login. Merkt sich pro Konto im
+// Browser, dass es gezeigt wurde — danach nie wieder.
+function FirstRun({ user }) {
+  const { t } = useLanguage();
+  const navigate = useNavigate();
+  const { active } = useModules();
+  const key = `nuvora_onboarded_${user?.id ?? "x"}`;
+  const [show, setShow] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!user) return;
+    try { if (!localStorage.getItem(key)) setShow(true); } catch { /* egal */ }
+  }, [user, key]);
+
+  const done = (go) => {
+    try { localStorage.setItem(key, "1"); } catch { /* egal */ }
+    setShow(false);
+    if (go) navigate(go);
+  };
+  if (!show) return null;
+
+  const hasCardvote = active.some((m) => m.key === "cardvote");
+  const tourZiel = hasCardvote ? "/cardvote/tutorial" : "/help";
+
+  return (
+    <div onClick={() => done()} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 300 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--card)", borderRadius: 20, maxWidth: 440, width: "100%", padding: 28, border: "1px solid var(--border)" }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>{t("onboard.title")}</h2>
+        <p style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.6, marginBottom: 20 }}>{t("onboard.text")}</p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button onClick={() => done(tourZiel)} style={btnPrimary}>{t("onboard.tour")}</button>
+          <button onClick={() => done("/help")} style={btnSecondary}>{t("onboard.help")}</button>
+          <button onClick={() => done()} style={{ ...btnSecondary, marginLeft: "auto" }}>{t("onboard.later")}</button>
+        </div>
+        <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 14 }}>{t("onboard.note")}</p>
+      </div>
+    </div>
+  );
+}
+
 function AppRoutes({ user, setUser, logout }) {
   const location = useLocation();
   const { t } = useLanguage();
@@ -562,6 +603,7 @@ function AppRoutes({ user, setUser, logout }) {
   return (
     <>
       <Nav user={user} onLogout={logout} />
+      {user && <FirstRun user={user} />}
       <ContentWrapper>
         <Routes>
           {/* ─── Nuvora-Rahmen ─── */}

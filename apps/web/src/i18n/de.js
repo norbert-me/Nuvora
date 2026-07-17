@@ -547,4 +547,10 @@ export default {
   "dash.noSearchHit": "Keine Frage passt zur Suche.",
   "mod.code-detektiv.name": "Code-Detektiv",
   "mod.code-detektiv.desc": "Programmier-Rätsel für den Informatikunterricht: Code-Bausteine in die richtige Reihenfolge bringen, allein oder in der Klasse.",
+  "onboard.title": "Willkommen bei Nuvora",
+  "onboard.text": "Nuvora ist deine Basis: Klassen, Schüler und Themen liegen hier, Module schaltest du dazu. Ein kurzer Rundgang oder direkt die Hilfe?",
+  "onboard.tour": "Rundgang starten",
+  "onboard.help": "Zur Hilfe",
+  "onboard.later": "Später",
+  "onboard.note": "Du findest beides jederzeit über die Fußzeile wieder.",
 };
