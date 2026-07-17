@@ -706,6 +706,8 @@ const gradeDistribution = (() => {
         </div>
       )}
 
+      <TopicAnalysis questions={questions} presentStudents={presentStudents} />
+
       <div style={{ overflowX: "auto" }}>
         <table style={{ borderCollapse: "collapse", fontSize: 14, whiteSpace: "nowrap" }}>
           <thead>
@@ -1056,6 +1058,84 @@ function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+
+// Ziel 2: Loesungsquote je Thema. Schwache Themen zeigen, wo Uebung fehlt, und
+// verlinken die passenden Aufgaben im Lernpfad — nur wenn Fragen ein Thema
+// haben und das Modul aktiv ist. Reine Anzeige, kein Automatismus: die
+// Lehrkraft entscheidet.
+function TopicAnalysis({ questions, presentStudents }) {
+  const { t } = useLanguage();
+  const { modules } = useModules();
+  const lernpfad = modules.find((m) => m.key === "lernpfad")?.active ?? false;
+  const [topics, setTopics] = useState([]);
+  const [exCount, setExCount] = useState({}); // topic_id -> Anzahl Aufgaben
+
+  useEffect(() => {
+    fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {});
+    if (lernpfad) {
+      fetch("/api/lernpfad/exercises").then((r) => (r.ok ? r.json() : [])).then((exs) => {
+        const c = {};
+        (exs || []).forEach((e) => { if (e.topic_id) c[e.topic_id] = (c[e.topic_id] || 0) + 1; });
+        setExCount(c);
+      }).catch(() => {});
+    }
+  }, [lernpfad]);
+
+  const withTopic = questions.filter((q) => q.topic_id);
+  if (withTopic.length === 0) return null;
+
+  const label = (id) => {
+    const tp = topics.find((x) => x.id === id);
+    if (!tp) return "?";
+    const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null;
+    return p ? `${p.name} / ${tp.name}` : tp.name;
+  };
+
+  // Loesungsquote je Thema ueber alle anwesenden Personen.
+  const byTopic = {};
+  for (const q of withTopic) {
+    byTopic[q.topic_id] ||= { correct: 0, total: 0 };
+  }
+  for (const st of presentStudents) {
+    // st.answers ist wie questions nach answeredIndices gefiltert — Index passt.
+    st.answers.forEach((a, i) => {
+      const q = questions[i];
+      if (!q || !q.topic_id || !a || !a.answer) return;
+      byTopic[q.topic_id].total += 1;
+      if (a.is_correct) byTopic[q.topic_id].correct += 1;
+    });
+  }
+  const rows = Object.entries(byTopic).map(([tid, v]) => ({
+    tid: Number(tid), pct: v.total ? Math.round((v.correct / v.total) * 100) : 0, total: v.total,
+  })).filter((r) => r.total > 0).sort((a, b) => a.pct - b.pct);
+  if (rows.length === 0) return null;
+
+  return (
+    <div style={{ padding: 16, background: "var(--card)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 16 }}>
+      <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{t("analyse.title")}</h3>
+      <p style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 12 }}>{t("analyse.intro")}</p>
+      {rows.map((r) => {
+        const weak = r.pct < 60;
+        const n = exCount[r.tid] || 0;
+        return (
+          <div key={r.tid} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: "1px solid var(--border)", flexWrap: "wrap" }}>
+            <span style={{ flex: 1, minWidth: 140, fontSize: 13.5, fontWeight: weak ? 600 : 400 }}>{label(r.tid)}</span>
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: weak ? "var(--danger, #dc2626)" : "#0a7d3e", width: 48, textAlign: "right" }}>{r.pct}%</span>
+            {weak && (
+              <span style={{ fontSize: 12, color: "#b8860b", display: "flex", alignItems: "center", gap: 8 }}>
+                {t("analyse.weak")}
+                {lernpfad && (n > 0
+                  ? <Link to="/lernpfad?tab=aufgaben" style={{ color: "var(--accent)", textDecoration: "none" }}>{t("analyse.exercisesN", { n })} →</Link>
+                  : <span style={{ color: "var(--text3)" }}>{t("analyse.noExercises")}</span>)}
+              </span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

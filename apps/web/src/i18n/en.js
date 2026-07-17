@@ -570,4 +570,12 @@ export default {
   "plan.notePlaceholder": "Note for the week (optional)",
   "plan.delWeek": "Delete week “{{name}}”?",
   "nav.plan": "Plan",
+  "analyse.title": "Topic analysis",
+  "analyse.intro": "Solve rate per topic. Weak topics show where practice is missing.",
+  "analyse.noTopics": "None of the questions has a topic. Link questions to topics in the editor, then per-topic analysis appears here.",
+  "analyse.solveRate": "Solve rate",
+  "analyse.weak": "Practice recommended",
+  "analyse.exercisesN": "{{n}} exercise(s) in Lernpfad",
+  "analyse.noExercises": "no exercises in Lernpfad",
+  "analyse.toLernpfad": "Go to exercises",
 };

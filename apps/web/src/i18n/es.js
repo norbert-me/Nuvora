@@ -570,4 +570,12 @@ export default {
   "plan.notePlaceholder": "Nota de la semana (opcional)",
   "plan.delWeek": "¿Eliminar la semana «{{name}}»?",
   "nav.plan": "Plan",
+  "analyse.title": "Análisis por tema",
+  "analyse.intro": "Tasa de acierto por tema. Los temas débiles muestran dónde falta práctica.",
+  "analyse.noTopics": "Ninguna pregunta tiene tema. Vincula las preguntas a temas en el editor y aquí aparecerá el análisis.",
+  "analyse.solveRate": "Tasa de acierto",
+  "analyse.weak": "Se recomienda practicar",
+  "analyse.exercisesN": "{{n}} ejercicio(s) en Lernpfad",
+  "analyse.noExercises": "sin ejercicios en Lernpfad",
+  "analyse.toLernpfad": "Ir a ejercicios",
 };

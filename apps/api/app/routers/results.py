@@ -193,6 +193,7 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
                 "correct_answer": correct,
                 "choices": q.choices,
                 "num_choices": q.num_choices or 4,
+                "topic_id": q.topic_id,  # fuer die Themen-Analyse (Ziel 2)
             })
 
     result = await db.execute(select(Scan).where(Scan.session_id == session_id))

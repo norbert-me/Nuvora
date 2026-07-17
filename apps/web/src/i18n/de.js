@@ -570,4 +570,12 @@ export default {
   "plan.notePlaceholder": "Notiz zur Woche (optional)",
   "plan.delWeek": "Woche „{{name}}“ löschen?",
   "nav.plan": "Planung",
+  "analyse.title": "Themen-Analyse",
+  "analyse.intro": "Lösungsquote je Thema. Schwache Themen zeigen, wo Übung fehlt.",
+  "analyse.noTopics": "Keine der Fragen hat ein Thema. Verknüpfe Fragen im Editor mit Themen, dann erscheint hier die Auswertung pro Thema.",
+  "analyse.solveRate": "Lösungsquote",
+  "analyse.weak": "Übung empfohlen",
+  "analyse.exercisesN": "{{n}} Aufgabe(n) im Lernpfad",
+  "analyse.noExercises": "keine Aufgaben im Lernpfad",
+  "analyse.toLernpfad": "Zu den Aufgaben",
 };
