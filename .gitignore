@@ -27,10 +27,9 @@ uploads/
 data/
 
 # ─── Betreiber-/Rechtskonfiguration ───
+# Eine Quelle fuer beide Module: enthaelt die private Anschrift des Betreibers.
 config/site.json
 !config/site.example.json
-**/public/legal-config.json
-!**/public/legal-config.example.json
 
 # ─── Dependencies ───
 node_modules/

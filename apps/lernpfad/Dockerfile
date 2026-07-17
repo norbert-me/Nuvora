@@ -13,7 +13,8 @@ RUN npm install --omit=dev
 # Backend
 COPY server.js ./
 COPY daten/ ./daten/
-COPY config/ ./config/
+# config/ wird NICHT ins Image kopiert: die Betreiberdaten liegen zentral in
+# Nuvoras config/ und werden zur Laufzeit gemountet (siehe docker-compose.yml).
 
 # Frontend (von express.static aus /app ausgeliefert)
 COPY index.html impressum.html datenschutz.html kontakt.html ./

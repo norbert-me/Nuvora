@@ -18,7 +18,19 @@ Beide Module sind importiert (`apps/cardvote`, `apps/lernpfad`) und laufen hinte
 
 Der Slash am Ende von `proxy_pass http://lernpfad:3000/` schneidet das Prefix ab — Lernpfad sieht `/` und weiss von Nuvora nichts. Passend dazu leitet `apps/lernpfad/js/app.js` seine `API`-Konstante aus `location.pathname` ab, damit das Modul auch standalone (`npm start`) läuft. Beim Ändern eines der beiden Punkte den anderen mitziehen.
 
-Pflicht-Env: `POSTGRES_PASSWORD`, `TOKEN_SECRET` (Compose bricht ohne sie bewusst ab). Vorlage `.env.example`.
+### Alles wird im Wurzelverzeichnis konfiguriert
+
+`apps/*` enthält **nur noch Quellcode und Dockerfile**. Kein eigenes Compose, kein eigenes `.env`, kein eigenes `deploy.sh` — das ist bewusst so und soll nicht zurückwandern.
+
+| Ort                | Zweck                                       |
+| ------------------ | ------------------------------------------- |
+| `.env`             | Secrets, Ports, SMTP (gitignored)           |
+| `.deploy.env`      | Zielserver für `deploy.sh` (gitignored)     |
+| `config/site.json` | Betreiberdaten (gitignored)                 |
+
+Pflicht-Env: `POSTGRES_PASSWORD`, `TOKEN_SECRET` — Compose bricht ohne sie bewusst ab, damit keine Default-Credentials in Produktion landen.
+
+`config/site.json` ist die **einzige** Quelle der Betreiberdaten. Lernpfad bekommt `./config` nach `/app/config` gemountet und liest sie über `server.js`; CardVotes `Legal.jsx` fetcht `/site.json`, das der Proxy aus demselben Mount ausliefert. Früher hatte jedes Modul seine eigene Datei (`config/site.json` vs. `frontend/public/legal-config.json`) mit eigenem Schema — die waren bereits inhaltlich auseinandergelaufen. Schema ist jetzt das deutsche (`betreiber`, `strasse`, `plz_ort`, …).
 
 ### Als Nächstes
 

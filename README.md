@@ -14,7 +14,14 @@ Lernende brauchen keine Geräte und keine Konten — sie tauchen nur als Datens�
 
 Abstimmung im Unterricht ganz ohne digitale Endgeräte. Lernende halten bedruckte Karten hoch, die Lehrkraft scannt sie mit der Handykamera, Ergebnisse erscheinen live.
 
-Auswertung als Noten, Boxplots und Konfidenzintervalle; Export als PDF, Excel und iDoceo-CSV. Fragen mit LaTeX und Bildern, Marktplatz zum Teilen von Fragesets.
+- **Live-Abstimmung** — Fragen auf dem Beamer, Ergebnisse in Echtzeit per WebSocket, Timer pro Frage
+- **Spiel-Modus** — Punkte, Streaks, Bestenliste, Podium
+- **Auswertung** — Notenverteilung mit anpassbarem Schlüssel, Boxplots, 95%-Konfidenzintervalle, didaktische Hinweise (Decken-/Bodeneffekt, Streuung, Ratewahrscheinlichkeit)
+- **Export** — PDF, Excel, iDoceo-CSV
+- **Fragen** — Ordner und Fragesets, LaTeX-Formeln, Bilder, Import/Export als JSON oder Excel
+- **Scanner** — ArUco-Erkennung (OpenCV, `DICT_6X6_50`) über die Handykamera, Fernsteuerung der Session
+- **Marktplatz** — eigene Fragesets veröffentlichen, fremde bewerten und übernehmen
+- **Sonst** — Vollbild für die Projektion, Dark Mode, PWA, kein Tracking
 
 FastAPI · Postgres · React · OpenCV (ArUco)
 
@@ -23,6 +30,8 @@ FastAPI · Postgres · React · OpenCV (ArUco)
 Verwaltung von Mathe-Aufgaben, Klassen und Lernpfaden.
 
 Express · sql.js · Vanilla JS
+
+> CardVote wurde bis v1.4.4 eigenständig entwickelt ([Archiv](https://github.com/norbert-me/CardVote)). Weiterentwicklung findet nur noch hier statt.
 
 ## Ziel der Bündelung
 
@@ -48,27 +57,33 @@ Dann auf <http://localhost:8080>:
 
 Ohne `POSTGRES_PASSWORD` und `TOKEN_SECRET` startet der Stack absichtlich nicht — Standardpasswörter sollen nicht versehentlich in Produktion landen. Zufallswert erzeugen mit `openssl rand -hex 32`.
 
-### Einzeln arbeiten
-
-Die Composes in `apps/*/` laufen weiter für sich, wenn nur ein Modul gebraucht wird:
+## Deploy
 
 ```bash
-cd apps/cardvote && docker compose up -d --build   # Frontend auf :3001
-cd apps/lernpfad && npm start                      # :3000
+cp .deploy.env.example .deploy.env   # Server und Zielpfad eintragen
+./deploy.sh                          # alles
+./deploy.sh lernpfad                 # nur einen Service neu bauen
 ```
 
-Lernpfad merkt an `location.pathname`, ob es unter `/lernpfad/` oder auf `/` liegt, und wählt seine API-Basis entsprechend — beide Betriebsarten funktionieren ohne Umbau.
+Lädt hoch, baut auf dem Server, prüft beide Module und bricht ab, wenn eins nicht antwortet. Die `.env` des Servers wird nie überschrieben — Secrets liegen nur dort.
 
 ## Konfiguration
 
-Alle Zugangsdaten kommen aus Env-Dateien, die **nicht** im Repo liegen. Vorlagen kopieren und ausfüllen:
+Alles wird an **einer** Stelle konfiguriert, im Wurzelverzeichnis. Die Module haben keine eigenen `.env`-Dateien, kein eigenes Compose und kein eigenes Deploy mehr.
 
 ```bash
-cp .env.example                           .env
-cp apps/cardvote/.deploy.env.example      apps/cardvote/.deploy.env
-cp apps/lernpfad/.deploy.env.example      apps/lernpfad/.deploy.env
-cp apps/lernpfad/config/site.example.json apps/lernpfad/config/site.json
+cp .env.example             .env          # Secrets, Ports, SMTP
+cp .deploy.env.example      .deploy.env   # Zielserver
+cp config/site.example.json config/site.json  # Impressum/Betreiberdaten
 ```
+
+| Datei              | Inhalt                                        | Im Repo? |
+| ------------------ | --------------------------------------------- | -------- |
+| `.env`             | Passwörter, `TOKEN_SECRET`, SMTP              | nein     |
+| `.deploy.env`      | Serveradresse, Zielpfad                       | nein     |
+| `config/site.json` | Betreiber, Anschrift, Kontakt (Impressum)     | nein     |
+
+`config/site.json` ist die einzige Quelle der Betreiberdaten: Lernpfad liest sie serverseitig, CardVotes Impressum holt sie über `/site.json` vom Proxy.
 
 Datenbanken, Backups und Uploads enthalten personenbezogene Daten und sind grundsätzlich von Git ausgeschlossen.
 

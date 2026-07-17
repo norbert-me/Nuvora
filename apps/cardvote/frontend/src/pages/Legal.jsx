@@ -1,14 +1,17 @@
 import { useState, useEffect } from "react";
 
-const FALLBACK = { name: "[Name eintragen]", street: "[Straße]", city: "[PLZ Ort]", email: "kontakt@example.com" };
+const FALLBACK = { betreiber: "[Name eintragen]", strasse: "[Straße]", plz_ort: "[PLZ Ort]", email: "kontakt@example.com" };
 
 export default function Legal() {
   const [cfg, setCfg] = useState(FALLBACK);
   useEffect(() => {
-    fetch("/legal-config.json").then((r) => r.ok ? r.json() : FALLBACK).then(setCfg).catch(() => {});
+    // Betreiberdaten kommen zentral aus Nuvoras config/site.json — dieselbe
+    // Quelle, die auch Lernpfad liest. Der Proxy liefert sie unter /site.json
+    // aus (siehe nginx.conf).
+    fetch("/site.json").then((r) => r.ok ? r.json() : FALLBACK).then(setCfg).catch(() => {});
   }, []);
 
-  const { name, street, city, email } = cfg;
+  const { betreiber: name, strasse: street, plz_ort: city, email } = cfg;
   const mailto = `mailto:${email}`;
 
   return (
