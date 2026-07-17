@@ -38,4 +38,27 @@ set_if_empty() {
 set_if_empty TOKEN_SECRET "$t"
 set_if_empty POSTGRES_PASSWORD "$p"
 
+# PORT und SITE_URL sind keine Secrets, sondern Deployment-Konfiguration:
+# .deploy.env auf dem Entwicklungsrechner gibt sie vor und ueberschreibt hier
+# immer. Wer den Port aendern will, aendert ihn dort — nicht auf dem Server.
+set_always() {
+  key="$1"
+  val="$2"
+  cur=$(sed -n "s|^${key}=\(.*\)|\1|p" .env | head -1)
+  [ "$cur" = "$val" ] && return 0
+
+  if grep -q "^${key}=" .env; then
+    awk -v k="$key" -v v="$val" \
+      'index($0, k "=") == 1 { print k "=" v; next } { print }' \
+      .env > .env.tmp && mv .env.tmp .env
+  else
+    printf '%s=%s\n' "$key" "$val" >> .env
+  fi
+  chmod 600 .env
+  changed="$changed $key"
+}
+
+set_always PORT "$port"
+set_always SITE_URL "$site"
+
 printf '%s' "$changed"

@@ -2,11 +2,16 @@
 # Nuvora — Deploy des Gesamt-Stacks auf den Server (rsync: nur geänderte Dateien)
 # Konfiguration in .deploy.env (siehe .deploy.env.example)
 #
-# Nutzung: ./deploy.sh                     -> baut alle Services
-#          ./deploy.sh cardvote-backend    -> baut nur diesen Service
-#          ./deploy.sh lernpfad proxy      -> baut mehrere
+# Nutzung: ./deploy.sh                          -> baut alle Services
+#          ./deploy.sh cardvote-backend         -> baut nur diesen Service
+#          ./deploy.sh lernpfad proxy           -> baut mehrere
+#          ./deploy.sh --port 8090              -> anderer Port, wird in .deploy.env gemerkt
+#          ./deploy.sh --port 8090 lernpfad     -> beides kombinierbar
 #
-# Die .env des Servers wird NIE überschrieben: Secrets leben nur dort.
+# Secrets (TOKEN_SECRET, POSTGRES_PASSWORD, SMTP_*) leben nur auf dem Server
+# und werden hier nie angefasst. PORT und SITE_URL dagegen gehoeren zum
+# Deployment, stehen in .deploy.env und werden bei jedem Lauf auf den Server
+# geschrieben — .deploy.env ist dafuer die Wahrheit, nicht der Serverzustand.
 
 set -euo pipefail
 
@@ -22,11 +27,67 @@ fi
 : "${SERVER:?SERVER nicht gesetzt (.deploy.env)}"
 : "${REMOTE_DIR:?REMOTE_DIR nicht gesetzt (.deploy.env)}"
 
-BUILD_SERVICES="${*:-}"
+# ─── Argumente: --port N, Rest sind zu bauende Services ───
+CLI_PORT=""
+ARGS=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --port|-p)
+      CLI_PORT="${2:-}"
+      [ -z "$CLI_PORT" ] && { echo "Fehler: --port braucht eine Nummer, z.B. --port 8090"; exit 1; }
+      shift 2
+      ;;
+    --port=*)
+      CLI_PORT="${1#*=}"; shift
+      ;;
+    -h|--help)
+      sed -n '2,15p' "$0" | sed 's|^# \{0,1\}||'
+      exit 0
+      ;;
+    *)
+      ARGS+=("$1"); shift
+      ;;
+  esac
+done
+
+if [ -n "$CLI_PORT" ]; then
+  case "$CLI_PORT" in
+    ''|*[!0-9]*) echo "Fehler: --port '$CLI_PORT' ist keine Zahl."; exit 1 ;;
+  esac
+  PORT="$CLI_PORT"
+  # In .deploy.env merken, damit der naechste Lauf ohne Flag denselben Port nimmt.
+  if grep -q '^PORT=' "$DIR/.deploy.env"; then
+    awk -v v="$PORT" 'index($0,"PORT=")==1 { print "PORT=" v; next } { print }' \
+      "$DIR/.deploy.env" > "$DIR/.deploy.env.tmp" && mv "$DIR/.deploy.env.tmp" "$DIR/.deploy.env"
+  else
+    printf 'PORT=%s\n' "$PORT" >> "$DIR/.deploy.env"
+  fi
+
+  # SITE_URL muss mitziehen, sonst zeigen Mail-Links und CORS auf den alten
+  # Port. Nur anfassen, wenn dort ueberhaupt ein Port steht: hinter einem
+  # Reverse Proxy ist SITE_URL eine Domain ohne Port und bleibt korrekt.
+  if [ -n "${SITE_URL:-}" ] && printf '%s' "$SITE_URL" | grep -qE ':[0-9]+/?$'; then
+    NEW_SITE_URL=$(printf '%s' "$SITE_URL" | sed -E "s|:[0-9]+(/?)$|:$PORT\1|")
+    if [ "$NEW_SITE_URL" != "$SITE_URL" ]; then
+      SITE_URL="$NEW_SITE_URL"
+      awk -v v="$SITE_URL" 'index($0,"SITE_URL=")==1 { print "SITE_URL=\"" v "\""; next } { print }' \
+        "$DIR/.deploy.env" > "$DIR/.deploy.env.tmp" && mv "$DIR/.deploy.env.tmp" "$DIR/.deploy.env"
+      echo "  SITE_URL mitgezogen: $SITE_URL"
+    fi
+  fi
+  echo "  Port $PORT in .deploy.env gemerkt."
+fi
+
+PORT="${PORT:-8080}"
+# SITE_URL leer -> aus Serveradresse und Port ableiten (Host hinter dem @).
+SITE_URL="${SITE_URL:-http://${SERVER#*@}:$PORT}"
+
+BUILD_SERVICES="${ARGS[*]:-}"
 
 echo "=== Nuvora Deploy ==="
 echo "Server: $SERVER"
 echo "Pfad:   $REMOTE_DIR"
+echo "Port:   $PORT"
 echo "Build:  ${BUILD_SERVICES:-alle Services}"
 echo ""
 
@@ -75,6 +136,8 @@ BOOTSTRAP=$(ssh "$SERVER" sh -s <<REMOTE
 cd '$REMOTE_DIR' || exit 1
 t='$GEN_TOKEN'
 p='$GEN_PGPW'
+port='$PORT'
+site='$SITE_URL'
 $(cat "$DIR/scripts/ensure-env.sh")
 REMOTE
 )
@@ -97,8 +160,7 @@ fi
 # Der Port-Konflikt zeigt sich sonst erst, wenn alle Images gebaut sind und
 # der Proxy als letzter Container startet — also nach mehreren Minuten.
 echo "→ Port prüfen..."
-WANT_PORT=$(ssh "$SERVER" "cd '$REMOTE_DIR' && sed -n 's|^PORT=\([0-9]*\).*|\1|p' .env | head -1")
-WANT_PORT="${WANT_PORT:-8080}"
+WANT_PORT="$PORT"
 PORT_USER=$(ssh "$SERVER" "
   # Belegt der Port schon jemand ANDERES als Nuvoras eigener Proxy?
   # Nuvoras Proxy darf ihn halten — der wird beim Deploy ohnehin ersetzt.
@@ -116,13 +178,9 @@ if [ -n "$PORT_USER" ]; then
   echo "  ⚠ Port $WANT_PORT ist auf dem Server schon belegt:"
   echo "      $PORT_USER"
   echo ""
-  echo "    Nuvora würde erst nach dem Build daran scheitern. Anderen Port setzen:"
+  echo "    Anderen Port nehmen — wird in .deploy.env gemerkt:"
   echo ""
-  echo "      ssh $SERVER"
-  echo "      cd $REMOTE_DIR && nano .env     # PORT= und SITE_URL= anpassen"
-  echo ""
-  echo "    Freien Port suchen:"
-  echo "      ssh $SERVER \"ss -tln | awk 'NR>1{print \\\$4}' | sed 's/.*://' | sort -n | uniq\""
+  echo "      ./deploy.sh --port 8090"
   echo ""
   exit 1
 fi
