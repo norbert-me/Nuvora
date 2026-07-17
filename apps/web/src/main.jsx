@@ -59,6 +59,7 @@ import Contact from "./pages/Contact.jsx";
 import Help from "./pages/Help.jsx";
 import NuvoraHome from "./pages/NuvoraHome.jsx";
 import Modules from "./pages/Modules.jsx";
+import Topics from "./pages/Topics.jsx";
 import { useModules } from "./core/modules.js";
 // Navigation ist modulbezogen: die Shell zeigt die Punkte des Moduls, in dem
 // man gerade ist. Ausserhalb eines Moduls navigiert Nuvora selbst.
@@ -76,6 +77,7 @@ const getModuleNavItems = (t, pathname) => {
   return [
     { to: "/", label: "Start" },
     { to: "/classes", label: t("nav.classes") },
+    { to: "/topics", label: "Themen" },
     { to: "/modules", label: "Module" },
   ];
 };
@@ -522,6 +524,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path="/" element={user ? <NuvoraHome user={user} /> : <Landing />} />
           <Route path="/modules" element={user ? <Modules /> : <Landing />} />
           <Route path="/classes" element={user ? <Classes /> : <Landing />} />
+          <Route path="/topics" element={user ? <Topics /> : <Landing />} />
           <Route path="/login" element={user ? <NuvoraHome user={user} /> : <Login onLogin={handleLogin} />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />

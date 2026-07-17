@@ -59,6 +59,10 @@ class Question(Base):
     num_choices: Mapped[int] = mapped_column(Integer, default=4)
     choice_images: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     owner_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    # Thema aus dem Kern (nicht CardVotes eigenes): verbindet die Frage mit
+    # Lernpfad-Aufgaben desselben Themas. Optional — Bestandsfragen haben keins,
+    # und ohne Thema bleibt die Frage voll nutzbar.
+    topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -185,3 +189,34 @@ class UserModule(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     module_key: Mapped[str] = mapped_column(String(50))
     activated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ─── Nuvora-Kern: Themen ───
+# Der gemeinsame Wortschatz beider Module. CardVote-Fragen und Lernpfad-Aufgaben
+# zeigen auf dieselben Themen — nur dadurch laesst sich ein in CardVote schwach
+# ausgefallenes Thema spaeter auf passende Lernpfad-Aufgaben abbilden.
+#
+# Hierarchie ueber parent_id (Lernpfad nutzt heute genau zwei Ebenen:
+# Thema > Unterthema). Die Tiefe ist bewusst nicht erzwungen — der Kern gibt
+# den Wortschatz vor, nicht die Fachdidaktik eines Moduls.
+class Topic(Base):
+    __tablename__ = "topics"
+    __table_args__ = (
+        UniqueConstraint("owner_id", "parent_id", "name", name="uq_topic_name_per_parent"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    parent_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("topics.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    owner_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    children: Mapped[list["Topic"]] = relationship(
+        back_populates="parent", cascade="all, delete-orphan"
+    )
+    parent: Mapped[Optional["Topic"]] = relationship(back_populates="children", remote_side="Topic.id")

@@ -1,0 +1,173 @@
+"""Nuvora-Kern: Themen.
+
+Der gemeinsame Wortschatz beider Module. Themen gehoeren dem Kern, nicht
+CardVote und nicht Lernpfad — nur deshalb kann ein in CardVote schwach
+ausgefallenes Thema spaeter passende Lernpfad-Aufgaben nach sich ziehen.
+
+Hierarchie ueber parent_id. Lernpfad nutzt heute zwei Ebenen (Thema >
+Unterthema); erzwungen wird das nicht.
+"""
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, field_validator
+from sqlalchemy import select, func as sa_func
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..database import get_db
+from ..models import Question, Topic, User
+from .auth import get_current_user
+
+router = APIRouter(prefix="/api/topics", tags=["topics"])
+
+
+class TopicIn(BaseModel):
+    name: str
+    parent_id: Optional[int] = None
+
+    @field_validator("name")
+    @classmethod
+    def name_not_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Name darf nicht leer sein")
+        if len(v) > 120:
+            raise ValueError("Name ist zu lang (max. 120 Zeichen)")
+        return v
+
+
+class TopicOut(BaseModel):
+    id: int
+    name: str
+    parent_id: Optional[int]
+    position: int
+    # Wie viele CardVote-Fragen haengen an diesem Thema? Macht sichtbar, was
+    # ein Loeschen kostet.
+    question_count: int = 0
+    model_config = {"from_attributes": True}
+
+
+async def _owned(db: AsyncSession, user: User, topic_id: int) -> Topic:
+    result = await db.execute(
+        select(Topic).where(Topic.id == topic_id, Topic.owner_id == user.id)
+    )
+    topic = result.scalar_one_or_none()
+    if not topic:
+        raise HTTPException(404, "Thema nicht gefunden")
+    return topic
+
+
+async def _would_cycle(db: AsyncSession, topic_id: int, new_parent_id: int) -> bool:
+    """Haengt new_parent unter topic? Dann wuerde der Zug einen Kreis bauen."""
+    current: Optional[int] = new_parent_id
+    seen = set()
+    while current is not None:
+        if current == topic_id:
+            return True
+        if current in seen:  # kaputte Daten: nicht endlos laufen
+            return True
+        seen.add(current)
+        result = await db.execute(select(Topic.parent_id).where(Topic.id == current))
+        current = result.scalar_one_or_none()
+    return False
+
+
+@router.get("", response_model=List[TopicOut])
+async def list_topics(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Flache Liste — der Baum wird im Frontend aus parent_id gebaut."""
+    counts = dict(
+        (
+            await db.execute(
+                select(Question.topic_id, sa_func.count(Question.id))
+                .where(Question.owner_id == user.id, Question.topic_id.isnot(None))
+                .group_by(Question.topic_id)
+            )
+        ).all()
+    )
+    result = await db.execute(
+        select(Topic)
+        .where(Topic.owner_id == user.id)
+        .order_by(Topic.position, Topic.name)
+    )
+    return [
+        TopicOut(
+            id=t.id, name=t.name, parent_id=t.parent_id, position=t.position,
+            question_count=counts.get(t.id, 0),
+        )
+        for t in result.scalars().all()
+    ]
+
+
+@router.post("", response_model=TopicOut, status_code=201)
+async def create_topic(
+    data: TopicIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if data.parent_id is not None:
+        await _owned(db, user, data.parent_id)
+
+    dup = await db.execute(
+        select(Topic.id).where(
+            Topic.owner_id == user.id,
+            Topic.parent_id.is_(data.parent_id) if data.parent_id is None else Topic.parent_id == data.parent_id,
+            sa_func.lower(Topic.name) == data.name.lower(),
+        )
+    )
+    if dup.scalar_one_or_none():
+        raise HTTPException(409, "Dieses Thema gibt es an dieser Stelle schon")
+
+    last = await db.execute(
+        select(sa_func.max(Topic.position)).where(
+            Topic.owner_id == user.id,
+            Topic.parent_id.is_(None) if data.parent_id is None else Topic.parent_id == data.parent_id,
+        )
+    )
+    topic = Topic(
+        name=data.name, parent_id=data.parent_id, owner_id=user.id,
+        position=(last.scalar_one_or_none() or 0) + 1,
+    )
+    db.add(topic)
+    await db.commit()
+    await db.refresh(topic)
+    return TopicOut(id=topic.id, name=topic.name, parent_id=topic.parent_id, position=topic.position)
+
+
+@router.put("/{topic_id}", response_model=TopicOut)
+async def update_topic(
+    topic_id: int,
+    data: TopicIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    topic = await _owned(db, user, topic_id)
+
+    if data.parent_id is not None:
+        if data.parent_id == topic_id:
+            raise HTTPException(400, "Ein Thema kann nicht sein eigenes Oberthema sein")
+        await _owned(db, user, data.parent_id)
+        if await _would_cycle(db, topic_id, data.parent_id):
+            raise HTTPException(400, "Ein Thema kann nicht unter eines seiner Unterthemen ziehen")
+
+    topic.name = data.name
+    topic.parent_id = data.parent_id
+    await db.commit()
+    await db.refresh(topic)
+    return TopicOut(id=topic.id, name=topic.name, parent_id=topic.parent_id, position=topic.position)
+
+
+@router.delete("/{topic_id}", status_code=204)
+async def delete_topic(
+    topic_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Loescht das Thema samt Unterthemen. Fragen bleiben, verlieren nur ihr
+    Thema (FK ist ON DELETE SET NULL) — Modulinhalte gehen nie verloren, weil
+    im Kern aufgeraeumt wird."""
+    topic = await _owned(db, user, topic_id)
+    await db.delete(topic)
+    await db.commit()
