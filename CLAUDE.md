@@ -132,6 +132,10 @@ Wer an den Datenformen etwas ändert, ändert den Adapter — nicht die Oberflä
 
 > **Fachbegriff:** Ein **Lernpfad** besteht aus mehreren **Lernleitern**. Das sind zwei Dinge, nicht alter und neuer Name — nicht zusammenführen. Nur die Produktmarke hieß früher „Lernleiter".
 
+### Code-Detektiv — `apps/code-detektiv`
+
+**Eigenständige Client-App (React 19 + Vite), eingebettet** unter `/code-detektiv` (iframe auf `/code-detektiv-app/`, eigener Container). Kein Backend, kein Login — reines Werkzeug, im Rahmen über `ModuleGate` geschützt. Nicht in `apps/web` gemergt wegen React-19-vs-18-Konflikt. `base` und `BrowserRouter basename` stehen auf `/code-detektiv-app/`.
+
 ### Noten — `apps/api/app/routers/noten.py` + `apps/web/src/pages/Noten.jsx`
 
 Notenbuch, eigenständig wie die anderen. Bedient sich wie eine leere Tabellenkalkulation: Zeilen sind die Schüler aus dem Kern, Spalten legt die Lehrkraft an (Name + Gewicht in Prozent), in die Zelle wird `2` oder `2,3` getippt.
