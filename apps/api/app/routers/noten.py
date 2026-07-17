@@ -5,7 +5,7 @@ Eigenstaendig (Regel 3). Der Kern liefert Klassen und Schueler.
 Zwei Ebenen:
 - ABSCHNITT (GradeSection): traegt das Gewicht, z.B. 'Klassenarbeiten' 50 %.
 - SPALTE (GradeCategory): eine einzelne Arbeit/Test im Abschnitt, ohne eigenes
-  Gewicht. Mehrere Noten je Feld erlaubt.
+  Gewicht. Genau eine Note je Zelle.
 
 Der Schnitt wird ueber die Abschnitte gewichtet; innerhalb eines Abschnitts
 zaehlen die Spalten gleich. Beobachtungen zaehlen NIE — 'Anstrengungsbereitschaft'
@@ -282,6 +282,25 @@ async def create_entry(body: EntryIn, user: User = Depends(require_module), db: 
     data = body.model_dump()
     if data.get("date") is None:
         data.pop("date")
+
+    # Genau EINE Note pro Zelle: existiert schon eine Note fuer diese Spalte und
+    # Person, wird sie ersetzt statt eine zweite anzulegen. Beobachtungen
+    # (kind="observation") duerfen dagegen mehrere sein.
+    if body.kind == "grade":
+        vorhanden = (await db.execute(
+            select(GradeEntry).where(
+                GradeEntry.category_id == body.category_id,
+                GradeEntry.student_id == body.student_id,
+                GradeEntry.kind == "grade",
+            )
+        )).scalar_one_or_none()
+        if vorhanden:
+            vorhanden.value = body.value
+            vorhanden.note = body.note
+            await db.commit()
+            await db.refresh(vorhanden)
+            return vorhanden
+
     entry = GradeEntry(**data)
     db.add(entry)
     await db.commit()

@@ -198,11 +198,10 @@ export default function Noten() {
                       return (
                         <td key={c.id} style={{ ...td, padding: 0, borderLeft: i === 0 ? "2px solid var(--border)" : "1px solid var(--border)" }}>
                           {zelle === id
-                            ? <Zelle onSave={(txt) => noteSetzen(s.student_id, c.id, txt)} onCancel={() => setZelle(null)} />
-                            : <button onClick={() => setZelle(id)} title={noten.length > 1 ? noten.map((e) => de(e.value)).join(" · ") : ""}
+                            ? <Zelle initial={noten[0] ? de(noten[0].value) : ""} onSave={(txt) => noteSetzen(s.student_id, c.id, txt)} onCancel={() => setZelle(null)} />
+                            : <button onClick={() => setZelle(id)}
                                 style={{ width: "100%", minHeight: 32, border: "none", background: "none", cursor: "text", color: "var(--text)", fontSize: 13.5, fontWeight: noten.length ? 600 : 400 }}>
                                 {s.per_category[String(c.id)] !== undefined ? de(s.per_category[String(c.id)]) : <span style={{ color: "var(--border2)" }}>·</span>}
-                                {noten.length > 1 && <span style={{ fontSize: 10, color: "var(--text3)", fontWeight: 400 }}> ({noten.length})</span>}
                               </button>}
                         </td>
                       );
@@ -246,11 +245,11 @@ export default function Noten() {
   );
 }
 
-function Zelle({ onSave, onCancel }) {
+function Zelle({ onSave, onCancel, initial = "" }) {
   const ref = useRef(null);
-  useEffect(() => { ref.current?.focus(); }, []);
+  useEffect(() => { ref.current?.focus(); ref.current?.select(); }, []);
   return (
-    <input ref={ref} defaultValue=""
+    <input ref={ref} defaultValue={initial}
       onBlur={(e) => (e.target.value.trim() ? onSave(e.target.value) : onCancel())}
       onKeyDown={(e) => { if (e.key === "Enter") onSave(e.target.value); if (e.key === "Escape") onCancel(); }}
       placeholder="2,3"
@@ -312,9 +311,11 @@ function StudentInfo({ t, student, summary, sections, className, onClose }) {
         <p style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 16 }}>{className}</p>
 
         <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "6px 14px", fontSize: 13.5, marginBottom: 18 }}>
-          {student.niveau && (<><dt style={dtS}>{t("noten.course")}</dt><dd style={ddS}>{student.niveau}</dd></>)}
+          <dt style={dtS}>{t("noten.course")}</dt>
+          <dd style={ddS}>{student.niveau ? (student.niveau === "E" ? "E-Kurs" : "G-Kurs") : "—"}</dd>
+          <dt style={dtS}>{t("noten.supportNeeds")}</dt>
+          <dd style={ddS}>{student.foerder?.length ? student.foerder.join(", ") : "—"}</dd>
           {student.klassenlehrer && (<><dt style={dtS}>{t("noten.classTeacher")}</dt><dd style={ddS}>{student.klassenlehrer}</dd></>)}
-          {student.foerder?.length > 0 && (<><dt style={dtS}>{t("noten.supportNeeds")}</dt><dd style={ddS}>{student.foerder.join(", ")}</dd></>)}
           {student.notizen && (<><dt style={dtS}>{t("noten.notes")}</dt><dd style={ddS}>{student.notizen}</dd></>)}
         </dl>
 
