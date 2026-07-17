@@ -111,6 +111,9 @@ def _ensure_columns(sync_conn):
         ("questions", "owner_id", "INTEGER"),
         ("users", "modules_initialized", "BOOLEAN DEFAULT false NOT NULL"),
         ("questions", "topic_id", "INTEGER"),
+        ("students", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
+        ("students", "foerder", "JSON"),
+        ("students", "notizen", "TEXT DEFAULT '' NOT NULL"),
     ]
     for table, column, ddl in wanted:
         if table not in existing_tables:

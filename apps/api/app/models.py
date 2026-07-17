@@ -149,6 +149,21 @@ class Student(Base):
     card_id: Mapped[int] = mapped_column(Integer)
     name: Mapped[str] = mapped_column(String(200))
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"))
+
+    # ─── Angaben zur Person, nicht zu einem Modul ───
+    # Der Kern haelt, was ueber die Lernenden bekannt ist; jedes Modul
+    # entscheidet selbst, was es davon nutzt. Lernpfad differenziert damit
+    # seine Lernleitern, CardVote ignoriert es heute — beides ist in Ordnung.
+    #
+    # ACHTUNG, besonders schuetzenswert: foerder und notizen sind Daten nach
+    # DSGVO Art. 9 (Dyskalkulie, LRS, Sozial-Emotional, Nachteilsausgleiche).
+    # Sie duerfen NIE in Marktplatz-Veroeffentlichungen oder in Exporte
+    # gelangen, die zum Teilen gedacht sind. Wer hier ein Feld ergaenzt,
+    # prueft zuerst jeden Export- und Veroeffentlichungspfad.
+    niveau: Mapped[str] = mapped_column(String(1), default="", server_default="")  # "E" | "G" | ""
+    foerder: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    notizen: Mapped[str] = mapped_column(Text, default="", server_default="")
+
     school_class: Mapped[SchoolClass] = relationship(back_populates="students")
 
 

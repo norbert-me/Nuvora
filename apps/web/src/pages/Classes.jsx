@@ -14,6 +14,15 @@ import { useModules } from "../core/modules.js";
 
 const API = "/api";
 
+// Feste Auswahl, identisch zum Backend (FOERDER_VALUES in classes.py):
+// Freitext wuerde in Lernpfads Differenzierung still zu Extrakategorien fuehren.
+const FOERDER = [
+  "LRS", "Dyskalkulie", "DaZ", "Lernen", "Sprache", "Hoeren", "Sehen",
+  "Motorik", "Sozial-Emotional", "Konzentration", "Lesen", "Auditive Wahrnehmung",
+];
+
+const EMPTY_STUDENT = { card_id: 1, name: "", niveau: "", foerder: null, notizen: "" };
+
 export default function Classes() {
   const { t } = useLanguage();
   const { modules } = useModules();
@@ -22,6 +31,7 @@ export default function Classes() {
   const [editing, setEditing] = useState(null);
   const [name, setName] = useState("");
   const [students, setStudents] = useState([]);
+  const [detailsFor, setDetailsFor] = useState(null);
 
   const [loadError, setLoadError] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -41,21 +51,32 @@ export default function Classes() {
   const startNew = () => {
     setEditing({ id: null });
     setName("");
-    setStudents([{ card_id: 1, name: "" }]);
+    setStudents([{ ...EMPTY_STUDENT, card_id: 1 }]);
   };
 
   const startEdit = (cls) => {
     setEditing(cls);
     setName(cls.name);
     const sorted = [...cls.students].sort((a, b) => a.card_id - b.card_id);
-    const rows = sorted.map((s, i) => ({ card_id: i + 1, name: s.name }));
-    if (rows.length === 0) rows.push({ card_id: 1, name: "" });
+    // Ganzen Datensatz uebernehmen, nicht nur Nummer und Name: niveau, foerder
+    // und notizen wuerden sonst bei jedem Speichern still verschwinden.
+    const rows = sorted.map((s, i) => ({ ...s, card_id: i + 1 }));
+    if (rows.length === 0) rows.push({ ...EMPTY_STUDENT, card_id: 1 });
     setStudents(rows);
   };
 
   const save = async () => {
     const filled = students.filter((s) => s.name.trim() !== "");
-    const body = { name, students: filled.map((s) => ({ card_id: s.card_id, name: s.name.trim() })) };
+    const body = {
+      name,
+      students: filled.map((s) => ({
+        card_id: s.card_id,
+        name: s.name.trim(),
+        niveau: s.niveau || "",
+        foerder: s.foerder || null,
+        notizen: s.notizen || "",
+      })),
+    };
     if (editing.id) {
       await fetch(`${API}/classes/${editing.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     } else {
@@ -105,10 +126,17 @@ export default function Classes() {
     input.click();
   };
 
-  const updateStudent = (idx, value) => {
+  const updateStudent = (idx, value) => setStudentField(idx, "name", value);
+
+  const setStudentField = (idx, field, value) => {
     const updated = [...students];
-    updated[idx] = { ...updated[idx], name: value };
+    updated[idx] = { ...updated[idx], [field]: value };
     setStudents(updated);
+  };
+
+  const toggleFoerder = (idx, wert) => {
+    const cur = students[idx].foerder || [];
+    setStudentField(idx, "foerder", cur.includes(wert) ? cur.filter((f) => f !== wert) : [...cur, wert]);
   };
 
   const removeStudent = (idx) => {
@@ -119,7 +147,7 @@ export default function Classes() {
 
   const addRow = () => {
     if (students.length >= MAX_CARDS) return;
-    setStudents([...students, { card_id: students.length + 1, name: "" }]);
+    setStudents([...students, { ...EMPTY_STUDENT, card_id: students.length + 1 }]);
   };
 
   const downloadFile = async (url, filename) => {
@@ -145,9 +173,10 @@ export default function Classes() {
         <p style={{ color: "var(--text3)", marginBottom: 8, fontSize: 14 }}>
           {t("classes.fillHint", { filled, total: students.length })}
         </p>
-        <div style={{ maxWidth: 500, marginBottom: 12 }}>
+        <div style={{ maxWidth: 620, marginBottom: 12 }}>
           {students.map((s, idx) => (
-            <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <div key={idx}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
               <span
                 style={{ width: 44, textAlign: "right", fontWeight: 700, color: s.name.trim() ? "var(--text)" : "var(--border2)", fontSize: 14, flexShrink: 0 }}
                 title={cardvote ? t("classes.cardNumberHint") : undefined}
@@ -156,9 +185,62 @@ export default function Classes() {
               </span>
               <input value={s.name} onChange={(e) => updateStudent(idx, e.target.value)} placeholder={t("common.name")}
                 style={{ flex: 1, padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)" }} />
+              <select
+                value={s.niveau || ""} onChange={(e) => setStudentField(idx, "niveau", e.target.value)}
+                title="E-/G-Kurs"
+                style={{ padding: 7, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 13, background: "var(--bg)", color: "var(--text)", flexShrink: 0 }}
+              >
+                <option value="">E/G</option>
+                <option value="E">E-Kurs</option>
+                <option value="G">G-Kurs</option>
+              </select>
+              <button
+                type="button" onClick={() => setDetailsFor(detailsFor === idx ? null : idx)}
+                title="Förderschwerpunkte und Notizen"
+                style={{
+                  border: "1px solid var(--border2)", background: (s.foerder?.length || s.notizen) ? "var(--accent-bg)" : "var(--card)",
+                  color: "var(--text2)", cursor: "pointer", borderRadius: 8, padding: "6px 10px", fontSize: 12.5, flexShrink: 0,
+                }}
+              >
+                {s.foerder?.length ? `Förder (${s.foerder.length})` : "Förder"}
+              </button>
               <button onClick={() => removeStudent(idx)} style={{ border: "none", background: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", flexShrink: 0 }} title={t("classes.removeCard")}>
                 <Icon d={ICONS.trash} color={C.danger} />
               </button>
+            </div>
+
+            {detailsFor === idx && (
+              <div style={{ margin: "0 0 10px 52px", padding: 12, border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)" }}>
+                <div style={{ fontSize: 12.5, color: "var(--text2)", marginBottom: 8 }}>Förderschwerpunkte</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+                  {FOERDER.map((f) => {
+                    const on = (s.foerder || []).includes(f);
+                    return (
+                      <button
+                        key={f} type="button" onClick={() => toggleFoerder(idx, f)}
+                        style={{
+                          padding: "4px 10px", borderRadius: 980, fontSize: 12.5, cursor: "pointer",
+                          border: on ? "1px solid var(--accent)" : "1px solid var(--border2)",
+                          background: on ? "var(--accent-bg)" : "var(--bg)",
+                          color: on ? "var(--accent)" : "var(--text2)", fontWeight: on ? 600 : 400,
+                        }}
+                      >
+                        {f}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize: 12.5, color: "var(--text2)", marginBottom: 6 }}>Notizen</div>
+                <textarea
+                  value={s.notizen || ""} onChange={(e) => setStudentField(idx, "notizen", e.target.value)}
+                  rows={2} placeholder="z. B. Nachteilsausgleich, Besonderheiten…" maxLength={2000}
+                  style={{ width: "100%", padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 13, background: "var(--bg)", color: "var(--text)", resize: "vertical", boxSizing: "border-box" }}
+                />
+                <p style={{ fontSize: 11.5, color: "var(--text3)", margin: "8px 0 0" }}>
+                  Bleibt bei dir: diese Angaben stehen in keinem Export und in keiner Veröffentlichung.
+                </p>
+              </div>
+            )}
             </div>
           ))}
         </div>

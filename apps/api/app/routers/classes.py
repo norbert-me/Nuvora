@@ -13,15 +13,56 @@ from .auth import get_current_user, rate_limit
 router = APIRouter(prefix="/api/classes", tags=["classes"])
 
 
+# Feste Auswahl statt Freitext: die Werte steuern spaeter die Differenzierung
+# in Lernpfad — Tippfehler wuerden dort still zu einer eigenen Kategorie.
+FOERDER_VALUES = {
+    "LRS", "Dyskalkulie", "DaZ", "Lernen", "Sprache", "Hoeren", "Sehen",
+    "Motorik", "Sozial-Emotional", "Konzentration", "Lesen",
+    "Auditive Wahrnehmung",
+}
+
+
 class StudentIn(BaseModel):
     card_id: int
     name: str
+    # Angaben zur Person (siehe Student in models.py). foerder und notizen sind
+    # besonders schuetzenswert (DSGVO Art. 9) — nie veroeffentlichen.
+    niveau: str = ""
+    foerder: Optional[List[str]] = None
+    notizen: str = ""
+
+    @field_validator("niveau")
+    @classmethod
+    def valid_niveau(cls, v: str) -> str:
+        if v not in ("", "E", "G"):
+            raise ValueError("Niveau muss E, G oder leer sein")
+        return v
+
+    @field_validator("foerder")
+    @classmethod
+    def valid_foerder(cls, v):
+        if v is None:
+            return v
+        unknown = set(v) - FOERDER_VALUES
+        if unknown:
+            raise ValueError(f"Unbekannter Foerderschwerpunkt: {', '.join(sorted(unknown))}")
+        return v
+
+    @field_validator("notizen")
+    @classmethod
+    def notizen_len(cls, v: str) -> str:
+        if len(v) > 2000:
+            raise ValueError("Notiz zu lang (max. 2000 Zeichen)")
+        return v
 
 
 class StudentOut(BaseModel):
     id: int
     card_id: int
     name: str
+    niveau: str = ""
+    foerder: Optional[List[str]] = None
+    notizen: str = ""
     model_config = {"from_attributes": True}
 
 
@@ -58,7 +99,8 @@ async def create_class(body: ClassCreate, user: User = Depends(get_current_user)
     db.add(sc)
     await db.flush()
     for s in body.students:
-        db.add(Student(card_id=s.card_id, name=s.name, class_id=sc.id))
+        db.add(Student(card_id=s.card_id, name=s.name, class_id=sc.id,
+                       niveau=s.niveau, foerder=s.foerder, notizen=s.notizen))
     await db.commit()
     return await _load_class(db, sc.id)
 
@@ -100,7 +142,8 @@ async def update_class(class_id: int, body: ClassCreate, user: User = Depends(ge
         await db.delete(s)
 
     for s in body.students:
-        db.add(Student(card_id=s.card_id, name=s.name, class_id=class_id))
+        db.add(Student(card_id=s.card_id, name=s.name, class_id=class_id,
+                       niveau=s.niveau, foerder=s.foerder, notizen=s.notizen))
 
     await db.commit()
     return await _load_class(db, class_id)

@@ -47,6 +47,10 @@ async def export_class(class_id: int, user: User = Depends(get_current_user), db
         "type": "cardvote_class",
         "version": 1,
         "name": cls.name,
+        # Bewusst nur card_id und name: niveau, foerder und notizen sind
+        # besonders schuetzenswert (DSGVO Art. 9) und gehoeren in keine Datei,
+        # die weitergegeben wird. Wer sie hier ergaenzt, macht aus einem
+        # Klassenexport eine Foerderakte.
         "students": [{"card_id": s.card_id, "name": s.name} for s in sorted(cls.students, key=lambda s: s.card_id)],
     }
 
