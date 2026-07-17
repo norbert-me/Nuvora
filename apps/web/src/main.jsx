@@ -61,6 +61,7 @@ import NuvoraHome from "./pages/NuvoraHome.jsx";
 import Modules from "./pages/Modules.jsx";
 import Topics from "./pages/Topics.jsx";
 import LernpfadModule from "./pages/LernpfadModule.jsx";
+import Cards from "./pages/Cards.jsx";
 import { useModules } from "./core/modules.js";
 // Navigation ist modulbezogen: die Shell zeigt die Punkte des Moduls, in dem
 // man gerade ist. Ausserhalb eines Moduls navigiert Nuvora selbst.
@@ -73,6 +74,7 @@ const getModuleNavItems = (t, pathname) => {
       { to: `${CV}/questions`, label: t("nav.questions") },
       { to: `${CV}/session`, label: t("nav.session") },
       { to: `${CV}/tests`, label: t("nav.tests") },
+      { to: `${CV}/cards`, label: "Karten" },
       { to: `${CV}/marketplace`, label: t("nav.marketplace") },
     ];
   }
@@ -552,6 +554,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={`${CV}/class-evaluation/:id`} element={user ? <ModuleGate moduleKey="cardvote"><ClassEvaluation /></ModuleGate> : <Landing />} />
           <Route path={`${CV}/student-evaluation/:classId/:cardId`} element={user ? <ModuleGate moduleKey="cardvote"><StudentEvaluation /></ModuleGate> : <Landing />} />
           <Route path={`${CV}/scan`} element={user ? <ModuleGate moduleKey="cardvote"><Scanner /></ModuleGate> : <Landing />} />
+          <Route path={`${CV}/cards`} element={user ? <ModuleGate moduleKey="cardvote"><Cards /></ModuleGate> : <Landing />} />
           <Route path={`${CV}/marketplace`} element={user ? <ModuleGate moduleKey="cardvote"><Marketplace /></ModuleGate> : <Landing />} />
 
           {/* Alte CardVote-Adressen (Lesezeichen, Links in Mails) umleiten. */}
