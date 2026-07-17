@@ -220,3 +220,80 @@ class Topic(Base):
         back_populates="parent", cascade="all, delete-orphan"
     )
     parent: Mapped[Optional["Topic"]] = relationship(back_populates="children", remote_side="Topic.id")
+
+
+# ─── Modul Lernpfad ───
+# Fachdaten des Moduls. Sie zeigen auf den Kern (owner_id, topic_id, class_id),
+# besitzen aber nichts davon. Was hier NICHT steht, ist Absicht: Klassen,
+# Schueler und Themen gehoeren dem Kern — Lernpfad brachte frueher eigene mit.
+class Exercise(Base):
+    """Eine Aufgabe. Frueher `aufgaben` in Lernpfads eigener SQLite-Datei."""
+    __tablename__ = "exercises"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    # Ersetzt Lernpfads freie Textfelder `thema`/`unterthema`: dieselbe
+    # Taxonomie, auf die auch CardVote-Fragen zeigen. Erst dadurch findet ein
+    # schwaches Testthema seine Uebungsaufgaben.
+    topic_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
+    kategorie: Mapped[str] = mapped_column(String(50), default="", server_default="")
+    aufgabentext: Mapped[str] = mapped_column(Text, default="", server_default="")
+    loesung: Mapped[str] = mapped_column(Text, default="", server_default="")
+    operator: Mapped[str] = mapped_column(String(100), default="", server_default="")
+    kompetenz: Mapped[str] = mapped_column(String(100), default="", server_default="")
+    methode: Mapped[str] = mapped_column(String(100), default="", server_default="")
+    unteraufgaben: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+
+    quelle_typ: Mapped[str] = mapped_column(String(50), default="", server_default="")
+    quelle_detail: Mapped[str] = mapped_column(String(255), default="", server_default="")
+
+    lrs: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    lrs_text: Mapped[str] = mapped_column(Text, default="", server_default="")
+    foerderschwerpunkte: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    latex: Mapped[str] = mapped_column(Text, default="", server_default="")
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class LearningPath(Base):
+    """Ein Lernpfad. Besteht aus mehreren Lernleitern (siehe LearningLadder) —
+    das sind zwei Begriffe, nicht einer."""
+    __tablename__ = "learning_paths"
+    __table_args__ = (UniqueConstraint("owner_id", "name", name="uq_path_name_per_owner"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    name: Mapped[str] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    ladders: Mapped[list["LearningLadder"]] = relationship(
+        back_populates="path", cascade="all, delete-orphan", order_by="LearningLadder.position"
+    )
+
+
+class LearningLadder(Base):
+    """Eine Lernleiter: eine Stufe innerhalb eines Lernpfads, fuer eine Klasse."""
+    __tablename__ = "learning_ladders"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    path_id: Mapped[int] = mapped_column(ForeignKey("learning_paths.id", ondelete="CASCADE"), index=True)
+    # Zeigt auf die Klasse des Kerns. Frueher stand hier der Klassenname als
+    # freier Text — ein Umbenennen der Klasse zerriss die Zuordnung.
+    class_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("school_classes.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    notizen: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # Reihenfolge/Auswahl der Aufgaben dieser Stufe (Liste von exercise-IDs).
+    exercise_order: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    path: Mapped[LearningPath] = relationship(back_populates="ladders")
