@@ -42,7 +42,7 @@ export default function StudentEvaluation() {
 
   return (
     <div style={{ maxWidth: 700 }}>
-      <Link to={`/class-evaluation/${classId}`} style={{ color: "var(--text3)", textDecoration: "none", fontSize: 13, fontWeight: 500 }}>
+      <Link to={`/cardvote/class-evaluation/${classId}`} style={{ color: "var(--text3)", textDecoration: "none", fontSize: 13, fontWeight: 500 }}>
         ← {class_name}
       </Link>
       <h2 style={{ marginTop: 12, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{student.name}</h2>
@@ -89,7 +89,7 @@ export default function StudentEvaluation() {
           {results.map((r) => (
             <tr key={r.session_id} style={{ borderBottom: "1px solid var(--border)", opacity: r.present ? 1 : 0.4 }}>
               <td style={tdStyle}>
-                <Link to={`/evaluation/${r.session_id}`} style={{ color: "var(--accent)", textDecoration: "none" }}>
+                <Link to={`/cardvote/evaluation/${r.session_id}`} style={{ color: "var(--accent)", textDecoration: "none" }}>
                   {r.name}
                 </Link>
               </td>

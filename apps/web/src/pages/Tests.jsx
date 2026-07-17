@@ -75,7 +75,7 @@ export default function Tests() {
             padding: "14px 18px", background: "var(--card)", border: "1px solid var(--border)",
             borderRadius: 14, transition: "background 0.15s",
           }}>
-            <Link to={`/evaluation/${s.id}`} style={{ flex: 1, textDecoration: "none", minWidth: 0 }}>
+            <Link to={`/cardvote/evaluation/${s.id}`} style={{ flex: 1, textDecoration: "none", minWidth: 0 }}>
               <div style={{ fontWeight: 600, color: "var(--text)", fontSize: 15, marginBottom: 2 }}>
                 {s.class_name || "–"}
                 {s.set_name && <span style={{ fontWeight: 400, color: "var(--text2)", marginLeft: 8 }}>{s.set_name}</span>}

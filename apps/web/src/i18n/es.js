@@ -105,6 +105,7 @@ export default {
   "classes.empty": "Aún no hay clases.",
   "classes.evalTitle": "Resultados de la clase",
   "classes.printCards": "Imprimir tarjetas",
+  "classes.cardNumberHint": "Número de la tarjeta impresa (CardVote)",
   "classes.export": "Exportar",
   "classes.importExcel": "Importar Excel",
   "classes.importJson": "Importar JSON",

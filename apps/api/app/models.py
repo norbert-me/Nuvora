@@ -118,6 +118,9 @@ class Scan(Base):
     session: Mapped[Session] = relationship(back_populates="scans")
 
 
+# ─── Nuvora-Kern: Klassen und Schueler ───
+# Kerndaten, kein Modulbesitz: beide Module arbeiten darauf. Ein Modul, das
+# eigene Klassen oder Schueler anlegt, hat den Sinn der Plattform gebrochen.
 class SchoolClass(Base):
     __tablename__ = "school_classes"
 
@@ -133,6 +136,12 @@ class Student(Base):
     __tablename__ = "students"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Nummer der bedruckten ArUco-Karte — CardVote-Zubehoer in einer
+    # Kerntabelle. Sie bleibt hier, weil sie die Person innerhalb der Klasse
+    # identifiziert (Scans referenzieren sie), aber der Kern darf sie nicht als
+    # eigenes Konzept behandeln: die Oberflaeche zeigt sie nur, wenn CardVote
+    # aktiviert ist. Weitere Modulbegriffe gehoeren NICHT hierher, sondern in
+    # eine Tabelle des jeweiligen Moduls.
     card_id: Mapped[int] = mapped_column(Integer)
     name: Mapped[str] = mapped_column(String(200))
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"))

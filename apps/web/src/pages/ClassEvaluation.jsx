@@ -167,7 +167,7 @@ export default function ClassEvaluation() {
                     style={{ ...th, textAlign: "center", fontSize: 12, padding: "8px 6px", maxWidth: 80 }}
                   >
                     <Link
-                      to={`/evaluation/${t.session_id}`}
+                      to={`/cardvote/evaluation/${t.session_id}`}
                       style={{ color: "var(--accent)", textDecoration: "none", whiteSpace: "normal", wordBreak: "break-word", display: "block", lineHeight: 1.3 }}
                       title={`${t.name} (${label})`}
                     >
@@ -196,7 +196,7 @@ export default function ClassEvaluation() {
                 <td style={{ ...td, fontWeight: 600, position: "sticky", left: 0, background: "var(--card)", zIndex: 1 }}>
                   {student.testsPresent > 0 ? (
                     <Link
-                      to={`/student-evaluation/${id}/${student.card_id}`}
+                      to={`/cardvote/student-evaluation/${id}/${student.card_id}`}
                       style={{ color: "var(--accent)", textDecoration: "none" }}
                     >
                       {student.name}

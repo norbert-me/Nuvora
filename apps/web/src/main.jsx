@@ -68,13 +68,16 @@ const getModuleNavItems = (t, pathname) => {
   if (pathname.startsWith(CV)) {
     return [
       { to: `${CV}/questions`, label: t("nav.questions") },
-      { to: `${CV}/classes`, label: t("nav.classes") },
       { to: `${CV}/session`, label: t("nav.session") },
       { to: `${CV}/tests`, label: t("nav.tests") },
       { to: `${CV}/marketplace`, label: t("nav.marketplace") },
     ];
   }
-  return [{ to: "/", label: "Start" }, { to: "/modules", label: "Module" }];
+  return [
+    { to: "/", label: "Start" },
+    { to: "/classes", label: t("nav.classes") },
+    { to: "/modules", label: "Module" },
+  ];
 };
 
 // Ein Modul ist nur erreichbar, wenn es aktiviert ist — sonst waere das
@@ -426,7 +429,7 @@ function Nav({ user, onLogout }) {
   );
 }
 
-const HOME_STEP_LINKS = [`${CV}/classes`, `${CV}/questions`, `${CV}/session`, `${CV}/scan`, `${CV}/tests`];
+const HOME_STEP_LINKS = ["/classes", `${CV}/questions`, `${CV}/session`, `${CV}/scan`, `${CV}/tests`];
 
 function Home() {
   const { t } = useLanguage();
@@ -518,6 +521,7 @@ function AppRoutes({ user, setUser, logout }) {
           {/* ─── Nuvora-Rahmen ─── */}
           <Route path="/" element={user ? <NuvoraHome user={user} /> : <Landing />} />
           <Route path="/modules" element={user ? <Modules /> : <Landing />} />
+          <Route path="/classes" element={user ? <Classes /> : <Landing />} />
           <Route path="/login" element={user ? <NuvoraHome user={user} /> : <Login onLogin={handleLogin} />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
@@ -533,7 +537,6 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={`${CV}/questions`} element={user ? <ModuleGate moduleKey="cardvote"><Dashboard /></ModuleGate> : <Landing />} />
           <Route path={`${CV}/session`} element={user ? <ModuleGate moduleKey="cardvote"><Session /></ModuleGate> : <Landing />} />
           <Route path={`${CV}/session/:id`} element={user ? <ModuleGate moduleKey="cardvote"><Session /></ModuleGate> : <Landing />} />
-          <Route path={`${CV}/classes`} element={user ? <ModuleGate moduleKey="cardvote"><Classes /></ModuleGate> : <Landing />} />
           <Route path={`${CV}/tests`} element={user ? <ModuleGate moduleKey="cardvote"><Tests /></ModuleGate> : <Landing />} />
           <Route path={`${CV}/evaluation/:id`} element={user ? <ModuleGate moduleKey="cardvote"><Evaluation /></ModuleGate> : <Landing />} />
           <Route path={`${CV}/class-evaluation/:id`} element={user ? <ModuleGate moduleKey="cardvote"><ClassEvaluation /></ModuleGate> : <Landing />} />
@@ -542,7 +545,8 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={`${CV}/marketplace`} element={user ? <ModuleGate moduleKey="cardvote"><Marketplace /></ModuleGate> : <Landing />} />
 
           {/* Alte CardVote-Adressen (Lesezeichen, Links in Mails) umleiten. */}
-          {["questions", "session", "classes", "tests", "scan", "marketplace"].map((p) => (
+          <Route path={`${CV}/classes`} element={<Navigate to="/classes" replace />} />
+          {["questions", "session", "tests", "scan", "marketplace"].map((p) => (
             <Route key={p} path={`/${p}/*`} element={<Navigate to={`${CV}/${p}`} replace />} />
           ))}
         </Routes>
