@@ -39,7 +39,7 @@ const FOERDER = [
   ["Sprache", "Schwierigkeiten beim mündlichen Ausdruck"],
 ];
 
-const EMPTY_STUDENT = { card_id: 1, name: "", niveau: "", foerder: null, notizen: "" };
+const EMPTY_STUDENT = { card_id: 1, name: "", niveau: "", foerder: null, notizen: "", klassenlehrer: "" };
 
 export default function Classes() {
   const { t } = useLanguage();
@@ -93,6 +93,7 @@ export default function Classes() {
         niveau: s.niveau || "",
         foerder: s.foerder || null,
         notizen: s.notizen || "",
+        klassenlehrer: s.klassenlehrer || "",
       })),
     };
     if (editing.id) {
@@ -214,13 +215,13 @@ export default function Classes() {
               </select>
               <button
                 type="button" onClick={() => setDetailsFor(detailsFor === idx ? null : idx)}
-                title="Förderschwerpunkte und Notizen"
+                title="Förderschwerpunkte, Klassenleitung und Notizen"
                 style={{
-                  border: "1px solid var(--border2)", background: (s.foerder?.length || s.notizen) ? "var(--accent-bg)" : "var(--card)",
+                  border: "1px solid var(--border2)", background: (s.foerder?.length || s.notizen || s.klassenlehrer) ? "var(--accent-bg)" : "var(--card)",
                   color: "var(--text2)", cursor: "pointer", borderRadius: 8, padding: "6px 10px", fontSize: 12.5, flexShrink: 0,
                 }}
               >
-                {s.foerder?.length ? `Förder (${s.foerder.length})` : "Förder"}
+                {s.foerder?.length ? `Details (${s.foerder.length})` : "Details"}
               </button>
               <button onClick={() => removeStudent(idx)} style={{ border: "none", background: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", flexShrink: 0 }} title={t("classes.removeCard")}>
                 <Icon d={ICONS.trash} color={C.danger} />
@@ -229,6 +230,13 @@ export default function Classes() {
 
             {detailsFor === idx && (
               <div style={{ margin: "0 0 12px 52px", padding: 16, border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>Klassenleitung</div>
+                <input
+                  value={s.klassenlehrer || ""} onChange={(e) => setStudentField(idx, "klassenlehrer", e.target.value)}
+                  placeholder="z. B. Frau Meyer (7a)" maxLength={120}
+                  style={{ width: "100%", padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 13, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box", marginBottom: 16 }}
+                />
+
                 <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>
                   Förderschwerpunkte
                 </div>

@@ -34,6 +34,15 @@ class StudentIn(BaseModel):
     niveau: str = ""
     foerder: Optional[List[str]] = None
     notizen: str = ""
+    klassenlehrer: str = ""
+
+    @field_validator("klassenlehrer")
+    @classmethod
+    def kl_len(cls, v: str) -> str:
+        v = v.strip()
+        if len(v) > 120:
+            raise ValueError("Name der Klassenleitung zu lang (max. 120 Zeichen)")
+        return v
 
     @field_validator("niveau")
     @classmethod
@@ -67,6 +76,7 @@ class StudentOut(BaseModel):
     niveau: str = ""
     foerder: Optional[List[str]] = None
     notizen: str = ""
+    klassenlehrer: str = ""
     model_config = {"from_attributes": True}
 
 
@@ -104,7 +114,8 @@ async def create_class(body: ClassCreate, user: User = Depends(get_current_user)
     await db.flush()
     for s in body.students:
         db.add(Student(card_id=s.card_id, name=s.name, class_id=sc.id,
-                       niveau=s.niveau, foerder=s.foerder, notizen=s.notizen))
+                       niveau=s.niveau, foerder=s.foerder, notizen=s.notizen,
+                       klassenlehrer=s.klassenlehrer))
     await db.commit()
     return await _load_class(db, sc.id)
 
@@ -147,7 +158,8 @@ async def update_class(class_id: int, body: ClassCreate, user: User = Depends(ge
 
     for s in body.students:
         db.add(Student(card_id=s.card_id, name=s.name, class_id=class_id,
-                       niveau=s.niveau, foerder=s.foerder, notizen=s.notizen))
+                       niveau=s.niveau, foerder=s.foerder, notizen=s.notizen,
+                       klassenlehrer=s.klassenlehrer))
 
     await db.commit()
     return await _load_class(db, class_id)

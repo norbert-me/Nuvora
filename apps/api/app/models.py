@@ -163,6 +163,10 @@ class Student(Base):
     niveau: Mapped[str] = mapped_column(String(1), default="", server_default="")  # "E" | "G" | ""
     foerder: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     notizen: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # Klassenleitung des Kindes — am Schueler, nicht an der Klasse: ein Kurs
+    # wie "Mathe 7.5" mischt Kinder aus mehreren Klassen mit je eigener
+    # Klassenleitung. Freitext, weil Lehrkraefte keine Nuvora-Konten sind.
+    klassenlehrer: Mapped[str] = mapped_column(String(120), default="", server_default="")
 
     school_class: Mapped[SchoolClass] = relationship(back_populates="students")
 

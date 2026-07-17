@@ -115,6 +115,7 @@ def _ensure_columns(sync_conn):
         ("students", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
         ("students", "foerder", "JSON"),
         ("students", "notizen", "TEXT DEFAULT '' NOT NULL"),
+        ("students", "klassenlehrer", "VARCHAR(120) DEFAULT '' NOT NULL"),
     ]
     for table, column, ddl in wanted:
         if table not in existing_tables:
