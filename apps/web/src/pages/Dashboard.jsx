@@ -495,6 +495,17 @@ function NewSetButton({ onCreate }) {
 
 function QuestionSetEditor({ questionSet, allQuestions, onBack, onQuestionsChange }) {
   const [qSearch, setQSearch] = useState("");
+  // Touch-Geraet? Dort funktioniert HTML5-Drag nicht (iOS Safari) — deshalb
+  // dort Pfeile statt Ziehen. Desktop behaelt das Ziehen.
+  const isTouch = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+
+  const moveQuestion = (from, delta) => {
+    const arr = [...(previewQuestions || questions)];
+    const to = from + delta;
+    if (to < 0 || to >= arr.length) return;
+    [arr[from], arr[to]] = [arr[to], arr[from]];
+    setQuestions(arr); setPreviewQuestions(null); saveSet(name, arr);
+  };
   const { t } = useLanguage();
   const [name, setName] = useState(questionSet.name);
   const [questions, setQuestions] = useState(questionSet.questions || []);
@@ -640,7 +651,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onQuestionsChang
           return (
         <div
           key={q.id}
-          draggable={!searching}
+          draggable={!searching && !isTouch}
           onDragStart={(e) => { if (searching) return; e.dataTransfer.effectAllowed = "move"; dragIdx.current = idx; }}
           onDragOver={(e) => { if (searching) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; reorderPreview(dragIdx.current, idx); dragIdx.current = idx; }}
           onDrop={(e) => { if (searching) return; e.preventDefault(); const arr = previewQuestions || questions; setQuestions(arr); setPreviewQuestions(null); saveSet(name, arr); dragIdx.current = null; }}
@@ -651,7 +662,20 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onQuestionsChang
             cursor: searching ? "default" : "grab", transition: "transform 0.15s ease",
           }}
         >
-          {!searching && <span className="drag-handle" style={{ color: "var(--text3)", width: 20, textAlign: "center", fontSize: 18, cursor: "grab", lineHeight: 1, flexShrink: 0 }}>⠿</span>}
+          {!searching && (isTouch ? (
+            <span style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
+              <button onClick={() => moveQuestion(idx, -1)} disabled={idx === 0} title="Nach oben" aria-label="Frage nach oben"
+                style={{ border: "none", background: "none", padding: "1px 2px", color: "var(--text3)", display: "flex", lineHeight: 1, opacity: idx === 0 ? 0.25 : 1, cursor: idx === 0 ? "default" : "pointer" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
+              </button>
+              <button onClick={() => moveQuestion(idx, 1)} disabled={idx === base.length - 1} title="Nach unten" aria-label="Frage nach unten"
+                style={{ border: "none", background: "none", padding: "1px 2px", color: "var(--text3)", display: "flex", lineHeight: 1, opacity: idx === base.length - 1 ? 0.25 : 1, cursor: idx === base.length - 1 ? "default" : "pointer" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </button>
+            </span>
+          ) : (
+            <span className="drag-handle" style={{ color: "var(--text3)", width: 20, textAlign: "center", fontSize: 18, cursor: "grab", lineHeight: 1, flexShrink: 0 }}>⠿</span>
+          ))}
           <span onClick={() => setEditingQ({ ...q })} style={{ flex: 1, color: "var(--text)", cursor: "pointer" }} title={t("dash.clickEdit")}>
             <Latex>{q.text}</Latex>
             {q.image_url && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 6, verticalAlign: "middle" }}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>}
