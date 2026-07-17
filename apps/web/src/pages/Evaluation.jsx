@@ -994,9 +994,14 @@ function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch(`/api/noten/classes/${classId}/categories`)
+    fetch(`/api/noten/classes/${classId}/sections`)
       .then((r) => (r.ok ? r.json() : []))
-      .then((d) => { setCats(d); if (d.length) setCatId(d[0].id); })
+      .then((secs) => {
+        // Spalten aller Abschnitte flach, mit Abschnittsname als Prefix.
+        const flat = (secs || []).flatMap((sec) => (sec.categories || []).map((c) => ({ id: c.id, name: `${sec.name}: ${c.name}` })));
+        setCats(flat);
+        if (flat.length) setCatId(flat[0].id);
+      })
       .catch(() => {});
   }, [classId]);
 
@@ -1040,7 +1045,7 @@ function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
             <div style={{ fontSize: 12.5, color: "var(--text2)", marginBottom: 6 }}>{t("notenimp.whichCat")}</div>
             <select value={catId ?? ""} onChange={(e) => setCatId(Number(e.target.value))}
               style={{ width: "100%", padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)", marginBottom: 16, boxSizing: "border-box" }}>
-              {cats.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.weight} %)</option>)}
+              {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={uebernehmen} disabled={busy || !catId} style={{ ...btnPrimary, opacity: busy || !catId ? 0.5 : 1 }}>

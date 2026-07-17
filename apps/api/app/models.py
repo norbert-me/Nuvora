@@ -328,25 +328,55 @@ class LearningLadder(Base):
 
 # ─── Modul Noten ───
 # Eigenstaendig: es kommt ohne CardVote und ohne Lernpfad aus (Regel 3).
-# Ergebnisse aus Modulen koennen spaeter als Eintrag einflieszen, sind aber
-# nie Voraussetzung. Der Kern liefert Klassen und Schueler.
-class GradeCategory(Base):
-    """Eine Spalte des Leistungskonzepts, z.B. 'Selbstständiges und
-    kooperatives Arbeiten' mit 15 %. Gewichte sind Fachkonferenz-Recht und
-    deshalb frei einstellbar — das Werkzeug gibt keine vor."""
-    __tablename__ = "grade_categories"
+# Der Kern liefert Klassen und Schueler.
+#
+# Zwei Ebenen, wie ein Leistungskonzept: ABSCHNITTE (Klassenarbeit, Sonstige
+# Mitarbeit) tragen die Gewichtung; darunter liegen SPALTEN (einzelne Arbeiten,
+# Tests). Der Schnitt wird ueber die Abschnitte gewichtet; innerhalb eines
+# Abschnitts zaehlen die Spalten gleich.
+class GradeSection(Base):
+    """Ein gewichteter Abschnitt, z.B. 'Klassenarbeiten' mit 50 %.
+    Gewichte sind Fachkonferenz-Recht — das Werkzeug gibt keine vor."""
+    __tablename__ = "grade_sections"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )
-    # Kategorien gelten pro Klasse: verschiedene Faecher/Stufen wiegen anders.
+    # Abschnitte gelten pro Kurs/Klasse: verschiedene Faecher wiegen anders.
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(120))
     weight: Mapped[int] = mapped_column(Integer, default=0, server_default="0")  # Prozent
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    categories: Mapped[list["GradeCategory"]] = relationship(
+        back_populates="section", cascade="all, delete-orphan", order_by="GradeCategory.position"
+    )
+
+
+class GradeCategory(Base):
+    """Eine Spalte innerhalb eines Abschnitts, z.B. eine einzelne
+    Klassenarbeit. Traegt selbst KEIN Gewicht — das liegt am Abschnitt."""
+    __tablename__ = "grade_categories"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    # Zu welchem Abschnitt gehoert die Spalte? Nullable nur fuer Altdaten —
+    # der Backfill beim Start haengt sie an einen Standard-Abschnitt.
+    section_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("grade_sections.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    name: Mapped[str] = mapped_column(String(120))
+    # Bleibt fuer Altdaten, wird aber nicht mehr zur Gewichtung genutzt.
+    weight: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    section: Mapped[Optional["GradeSection"]] = relationship(back_populates="categories")
     entries: Mapped[list["GradeEntry"]] = relationship(back_populates="category", cascade="all, delete-orphan")
 
 

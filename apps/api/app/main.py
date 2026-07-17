@@ -121,6 +121,7 @@ def _ensure_columns(sync_conn):
         # bestehende Tabellen nicht — deshalb hier nachziehen.
         ("learning_ladders", "topic_id", "INTEGER"),
         ("learning_ladders", "assignments", "JSON"),
+        ("grade_categories", "section_id", "INTEGER"),
     ]
     for table, column, ddl in wanted:
         if table not in existing_tables:
@@ -189,6 +190,23 @@ async def startup():
             ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
         """))
         await db.execute(text("UPDATE users SET modules_initialized = true WHERE modules_initialized = false"))
+        await db.commit()
+
+    # Noten: Kategorien ohne Abschnitt an einen Standard-Abschnitt haengen
+    # (zweistufiges Modell kam spaeter). Pro Klasse ein "Sonstige Mitarbeit"
+    # mit 100 %, damit der gewichtete Schnitt sofort rechnet.
+    async with async_session() as db:
+        rows = (await db.execute(text(
+            "SELECT DISTINCT class_id, owner_id FROM grade_categories WHERE section_id IS NULL"
+        ))).all()
+        for class_id, owner_id in rows:
+            sec = (await db.execute(text(
+                "INSERT INTO grade_sections (owner_id, class_id, name, weight, position) "
+                "VALUES (:o, :c, 'Sonstige Mitarbeit', 100, 0) RETURNING id"
+            ), {"o": owner_id, "c": class_id})).scalar()
+            await db.execute(text(
+                "UPDATE grade_categories SET section_id = :s WHERE class_id = :c AND section_id IS NULL"
+            ), {"s": sec, "c": class_id})
         await db.commit()
 
     admin_email = os.environ.get("ADMIN_EMAIL", "")
