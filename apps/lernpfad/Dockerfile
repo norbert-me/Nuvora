@@ -14,11 +14,11 @@ RUN npm install --omit=dev
 COPY server.js ./
 # daten/ entfaellt: es war Seed fuer die eigene SQLite-Datei, die es nicht
 # mehr gibt. Die Beispielaufgaben liegen jetzt unter examples/.
-# config/ wird NICHT ins Image kopiert: die Betreiberdaten liegen zentral in
-# Nuvoras config/ und werden zur Laufzeit gemountet (siehe docker-compose.yml).
+# Kein config/ mehr: Impressum/Datenschutz/Kontakt kommen aus Nuvora, die App
+# verlinkt nur noch dorthin (Footer, target=_top).
 
 # Frontend (von express.static aus /app ausgeliefert)
-COPY index.html impressum.html datenschutz.html kontakt.html ./
+COPY index.html ./
 COPY css/ ./css/
 COPY js/ ./js/
 COPY vendor/ ./vendor/

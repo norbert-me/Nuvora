@@ -2628,8 +2628,8 @@
         currentPfad = null;
     });
 
-    // Impressum/Datenschutz/Kontakt sind eigene Seiten (impressum.html etc.),
-    // verlinkt im Footer - kein Modal mehr nötig.
+    // Impressum/Datenschutz/Kontakt kommen aus Nuvora (Footer-Links mit
+    // target=_top) — damit sie ueberall gleich sind. Keine eigenen Seiten mehr.
 
     // ─── Init ───
     setNextId();

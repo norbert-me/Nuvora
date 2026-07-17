@@ -497,11 +497,14 @@
     </div>
 
     <footer class="site-footer">
-        <a class="link-btn" href="impressum.html">Impressum</a>
+        <!-- Rechtsseiten kommen aus Nuvora, damit sie ueberall gleich sind.
+             target="_top" bricht aus dem iframe aus, sodass Nuvoras Seite im
+             ganzen Fenster laedt (nicht in der eingebetteten App). -->
+        <a class="link-btn" href="/changelog" target="_top">Changelog</a>
         <span class="foot-sep">·</span>
-        <a class="link-btn" href="datenschutz.html">Datenschutz</a>
+        <a class="link-btn" href="/legal" target="_top">Impressum &amp; Datenschutz</a>
         <span class="foot-sep">·</span>
-        <a class="link-btn" href="kontakt.html">Kontakt</a>
+        <a class="link-btn" href="/contact" target="_top">Kontakt</a>
     </footer>
 
     <script src="js/jspdf.umd.min.js"></script>
