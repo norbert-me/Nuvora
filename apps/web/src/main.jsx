@@ -77,15 +77,15 @@ const getModuleNavItems = (t, pathname) => {
       { to: `${CV}/questions`, label: t("nav.questions") },
       { to: `${CV}/session`, label: t("nav.session") },
       { to: `${CV}/tests`, label: t("nav.tests") },
-      { to: `${CV}/cards`, label: "Karten" },
+      { to: `${CV}/cards`, label: t("nav.cards") },
       { to: `${CV}/marketplace`, label: t("nav.marketplace") },
     ];
   }
   // Kein "Start": der Nuvora-Schriftzug links fuehrt bereits dorthin.
   return [
     { to: "/classes", label: t("nav.classes") },
-    { to: "/topics", label: "Themen" },
-    { to: "/modules", label: "Module" },
+    { to: "/topics", label: t("nav.topics") },
+    { to: "/modules", label: t("nav.modules") },
   ];
 };
 
@@ -283,7 +283,7 @@ function Nav({ user, onLogout }) {
   const { t } = useLanguage();
 
   const navItems = getModuleNavItems(t, location.pathname);
-  const allPages = [...navItems, { to: `${CV}/tutorial`, label: "Tutorial" }, { to: `${CV}/scan`, label: t("nav.scanner") }, { to: "/profile", label: t("nav.profile") }, { to: `${CV}/evaluation`, label: t("nav.evaluation") }, { to: "/changelog", label: t("nav.changelog") }, { to: "/login", label: t("nav.login") }];
+  const allPages = [...navItems, { to: `${CV}/tutorial`, label: t("nav.tutorial") }, { to: `${CV}/scan`, label: t("nav.scanner") }, { to: "/profile", label: t("nav.profile") }, { to: `${CV}/evaluation`, label: t("nav.evaluation") }, { to: "/changelog", label: t("nav.changelog") }, { to: "/login", label: t("nav.login") }];
   const pageTitle = allPages.find((item) => location.pathname.startsWith(item.to))?.label || "";
 
   const showNav = !!user;
