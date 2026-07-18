@@ -277,6 +277,10 @@ class Exercise(Base):
         ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
+    # Anzeige-Code (#000001), lueckenfuellend je Lehrkraft vergeben — getrennt
+    # von der DB-id, damit die Nummerierung bei 1 beginnt statt bei der
+    # fortlaufenden Datenbank-id.
+    code: Mapped[str] = mapped_column(String(20), default="", server_default="")
     kategorie: Mapped[str] = mapped_column(String(50), default="", server_default="")
     aufgabentext: Mapped[str] = mapped_column(Text, default="", server_default="")
     loesung: Mapped[str] = mapped_column(Text, default="", server_default="")

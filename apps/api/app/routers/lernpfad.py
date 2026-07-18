@@ -61,6 +61,7 @@ async def _check_class(db: AsyncSession, user: User, class_id: Optional[int]) ->
 
 class ExerciseIn(BaseModel):
     topic_id: Optional[int] = None
+    code: str = ""
     kategorie: str = ""
     aufgabentext: str = ""
     loesung: str = ""

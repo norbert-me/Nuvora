@@ -135,6 +135,7 @@ def _ensure_columns(sync_conn):
         ("school_classes", "karten_token", "VARCHAR(64)"),
         ("students", "karten_token", "VARCHAR(64)"),
         ("card_decks", "released_at", "TIMESTAMPTZ"),
+        ("exercises", "code", "VARCHAR(20) DEFAULT '' NOT NULL"),
         ("users", "timetable_periods", "INTEGER DEFAULT 6 NOT NULL"),
     ]
     for table, column, ddl in wanted:

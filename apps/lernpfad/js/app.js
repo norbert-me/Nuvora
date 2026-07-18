@@ -106,6 +106,7 @@
         return {
             _id: String(ex.id),
             id: ex.id,
+            code: ex.code || '',
             thema: tp.thema,
             unterthema: tp.unterthema,
             kategorie: ex.kategorie || '',
@@ -129,6 +130,7 @@
     async function zuKern(a) {
         return {
             topic_id: await topicId(a.thema, a.unterthema),
+            code: a.code || '',
             kategorie: a.kategorie || '',
             aufgabentext: a.aufgabentext || '',
             loesung: a.loesung || '',
@@ -270,9 +272,11 @@
     // Nächste ID = kleinste freie Nummer. So rutschen neue Aufgaben in Lücken,
     // die durch Löschen entstehen, statt dass der Zähler endlos hochläuft.
     function nextAufgabeId() {
+        // Kleinste freie #-Nummer ueber die vergebenen Codes — beginnt bei 1 und
+        // fuellt Luecken, unabhaengig von der fortlaufenden Server-DB-id.
         const used = new Set();
         aufgaben.forEach(a => {
-            const m = String(a.id || '').match(/^#(\d+)$/);
+            const m = String(a.code || '').match(/^#(\d+)$/);
             if (m) used.add(parseInt(m[1], 10));
         });
         let n = 1;
@@ -685,7 +689,10 @@
 
         const obj = {
             _id: editId || uid(),
-            id: editId ? document.getElementById('aufgabe-id').value.trim() : nextAufgabeId(),
+            // Neu: keine id (der Server vergibt die DB-id beim Sync); der
+            // Anzeige-Code wird lueckenfuellend ab 1 gesetzt.
+            id: editId ? document.getElementById('aufgabe-id').value.trim() : undefined,
+            code: editId ? (aufgaben.find(x => x._id === editId)?.code || '') : nextAufgabeId(),
             thema: document.getElementById('aufgabe-thema').value.trim(),
             unterthema: document.getElementById('aufgabe-unterthema').value.trim(),
             kategorie,
@@ -778,7 +785,7 @@
             loesungBildPreview.innerHTML = '';
         }
         document.getElementById('edit-id-display').style.display = '';
-        document.getElementById('edit-id-label').textContent = fmtId(a.id);
+        document.getElementById('edit-id-label').textContent = fmtId(a.code || a.id);
         document.getElementById('aufgaben-form-title').textContent = 'Aufgabe bearbeiten';
         document.getElementById('aufgabe-cancel-btn').style.display = '';
         document.getElementById('aufgabe-submit-btn').textContent = 'Änderung speichern';
@@ -927,7 +934,7 @@
             return `
             <tr class="${hasDetail ? 'task-row-clickable' : ''}" data-detail-id="${a._id}">
                 <td><input type="checkbox" class="bulk-cb" data-id="${a._id}"></td>
-                <td><strong>${esc(fmtId(a.id))}</strong>${hasDetail ? ' <span class="detail-hint" title="Details">' + ICON.chevron + '</span>' : ''}</td>
+                <td><strong>${esc(fmtId(a.code || a.id))}</strong>${hasDetail ? ' <span class="detail-hint" title="Details">' + ICON.chevron + '</span>' : ''}</td>
                 <td>${esc(a.thema)}${a.unterthema ? '<br><small style="color:var(--text-muted)">' + esc(a.unterthema) + '</small>' : ''}</td>
                 <td><span class="badge badge-${katBadgeClass(kat)}">${esc(kat)}</span></td>
                 <td>${esc(a.quelle)}</td>
@@ -1027,7 +1034,8 @@
                     const kat = item.kategorie || (item.kategorien && item.kategorien[0]) || '';
                     const obj = {
                         _id: uid(),
-                        id: item.id || nextAufgabeId(),
+                        // Server vergibt die DB-id; Anzeige-Code lueckenfuellend.
+                        code: item.code || nextAufgabeId(),
                         thema: item.thema || '',
                         unterthema: item.unterthema || '',
                         kategorie: kat,
@@ -1657,7 +1665,7 @@
                 step.innerHTML = `
                     <span class="step-number">${stepNum}</span>
                     <div class="step-content">
-                        <span class="step-id step-id-link" title="Details anzeigen">${esc(fmtId(task.id))}</span>
+                        <span class="step-id step-id-link" title="Details anzeigen">${esc(fmtId(task.code || task.id))}</span>
                         <span class="step-source">${task.quelleTyp === 'latex' && task.latex ? '' : esc(task.quelle)}</span>
                         ${tags.length ? '<div class="step-tags">' + tags.join('') + '</div>' : ''}
                         ${hasLRS && task.lrs ? '<div class="lrs-hint">Sonderaufgabe – siehe separates Blatt</div>' : ''}
@@ -1725,7 +1733,7 @@
                 const kat = getKategorie(a);
                 return `<div class="add-task-item" data-id="${a._id}">
                     <span class="badge badge-${katBadgeClass(kat)}">${esc(kat)}</span>
-                    <strong>${esc(fmtId(a.id))}</strong> ${esc(a.quelle)}
+                    <strong>${esc(fmtId(a.code || a.id))}</strong> ${esc(a.quelle)}
                     ${a.operator ? ' <span class="badge badge-operator">' + esc(a.operator) + '</span>' : ''}
                 </div>`;
             }).join('') : '<p style="color:var(--text-muted)">Keine Treffer</p>';
@@ -2222,7 +2230,7 @@
         const chip = (txt, bg) => `<span style="font-size:12px;font-weight:600;padding:2px 9px;border-radius:980px;background:${bg};color:#fff">${esc(txt)}</span>`;
         const html = `
             <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
-                <strong style="font-size:18px">${esc(fmtId(a.id))}</strong>
+                <strong style="font-size:18px">${esc(fmtId(a.code || a.id))}</strong>
                 ${chip(kat, '#2563eb')}
                 ${a.lrs ? chip('LRS', '#b8860b') : ''}
             </div>
@@ -2237,7 +2245,7 @@
         // Eingebettet: Nuvora rendert das Overlay ueber der ganzen Seite —
         // zentriert und ohne sichtbare iframe-Grenze. Sonst lokales Modal.
         if (window.parent !== window) {
-            window.parent.postMessage({ type: 'lernpfad:modal', title: 'Aufgabe ' + fmtId(a.id), html }, window.location.origin);
+            window.parent.postMessage({ type: 'lernpfad:modal', title: 'Aufgabe ' + fmtId(a.code || a.id), html }, window.location.origin);
             return;
         }
         document.getElementById('task-detail-body').innerHTML = html;
