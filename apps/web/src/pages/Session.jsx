@@ -133,6 +133,7 @@ export default function Session() {
     setGameMode(s.mode === "game");
     const cls = classes.find((c) => c.id === s.class_id);
     if (cls) setSelectedClass(cls);
+    if (s.set_name) setSelectedSet({ name: s.set_name });
     if (s.question_set_id) {
       const res = await fetch(`${API}/question-sets/${s.question_set_id}`);
       if (res.ok) {
@@ -496,7 +497,7 @@ export default function Session() {
     return (
       <div style={{ textAlign: "center", paddingTop: 40 }}>
         {gameMode && <div style={{ marginBottom: 8 }}><SvgGamepad size={48} color="var(--text3)" /></div>}
-        <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{selectedClass?.name} — {selectedSet?.name}</h2>
+        <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{[selectedClass?.name, selectedSet?.name].filter(Boolean).join(" — ")}</h2>
         <div style={{
           display: "inline-block", padding: "12px 24px",
           background: "var(--text)", color: "var(--bg)", borderRadius: 12,

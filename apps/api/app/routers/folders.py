@@ -161,11 +161,13 @@ async def create_question_set(body: QuestionSetCreate, user: User = Depends(get_
 
 @router.get("/question-sets/{set_id}", response_model=QuestionSetOut)
 async def get_question_set(set_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    qs = await _load_set(db, set_id)
-    if not qs:
+    # Zugriff auf dem ORM-Objekt pruefen, dann als dict ausliefern — _load_set
+    # gibt bereits ein dict zurueck, das ensure_set_access nicht lesen kann.
+    orm = await db.get(QuestionSet, set_id)
+    if not orm:
         raise HTTPException(404)
-    await ensure_set_access(db, qs, user.id)
-    return qs
+    await ensure_set_access(db, orm, user.id)
+    return await _load_set(db, set_id)
 
 
 @router.put("/question-sets/{set_id}", response_model=QuestionSetOut)
