@@ -683,6 +683,8 @@ export default {
   "karten.newDeck": "New deck, e.g. Vocabulary",
   "karten.noDecks": "No deck yet. Create one and add cards.",
   "karten.deck": "Deck",
+  "karten.freeCards": "free cards",
+  "karten.topicHint": "Assign a topic — when planned in the calendar, the deck is released automatically",
   "karten.cards": "cards",
   "karten.front": "Front",
   "karten.back": "Back",

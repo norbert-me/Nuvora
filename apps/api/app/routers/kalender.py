@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import CalendarEntry, SchoolClass, TimetableSlot, Topic, User
+from ..models import CalendarEntry, CardDeck, SchoolClass, TimetableSlot, Topic, User
 from .auth import get_current_user, rate_limit
 from .modules import is_active
 
@@ -79,6 +79,7 @@ async def create_entry(body: EntryIn, user: User = Depends(require_module), db: 
     db.add(e)
     await db.commit()
     await db.refresh(e)
+    await _release_matching_decks(db, user, e)
     return e
 
 
@@ -93,7 +94,27 @@ async def update_entry(entry_id: int, body: EntryIn, user: User = Depends(requir
         setattr(e, k, v)
     await db.commit()
     await db.refresh(e)
+    await _release_matching_decks(db, user, e)
     return e
+
+
+async def _release_matching_decks(db: AsyncSession, user: User, e: CalendarEntry) -> None:
+    """Zusatz (Regel 3): plant der Kalender ein Thema, wird ein passender, noch
+    nicht ausgerollter Karten-Stapel automatisch zum Termin freigeschaltet.
+    Nur Entwuerfe (released_at NULL) — eine manuelle Freigabe bleibt unberuehrt.
+    """
+    if not e.topic_id:
+        return
+    q = select(CardDeck).where(
+        CardDeck.owner_id == user.id,
+        CardDeck.topic_id == e.topic_id,
+        CardDeck.released_at.is_(None),
+    )
+    if e.class_id:
+        q = q.where(CardDeck.class_id == e.class_id)
+    for deck in (await db.execute(q)).scalars().all():
+        deck.released_at = e.date
+    await db.commit()
 
 
 @router.delete("/entries/{entry_id}", status_code=204)

@@ -683,6 +683,8 @@ export default {
   "karten.newDeck": "Nuevo mazo, p. ej. Vocabulario",
   "karten.noDecks": "Aún no hay mazo. Crea uno y añade tarjetas.",
   "karten.deck": "Mazo",
+  "karten.freeCards": "tarjetas libres",
+  "karten.topicHint": "Asignar un tema — al planificarlo en el calendario, la baraja se distribuye automáticamente",
   "karten.cards": "tarjetas",
   "karten.front": "Anverso",
   "karten.back": "Reverso",

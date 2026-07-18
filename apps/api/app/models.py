@@ -552,6 +552,9 @@ class CardDeck(Base):
     owner_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    # Optionale Bindung an ein Kern-Thema (oder NULL = freie Karten). Kalender-
+    # Eintraege mit demselben Thema rollen den Stapel automatisch aus.
+    topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Ausrollen: NULL = Entwurf, fuer SuS unsichtbar. Gesetzt = ab diesem
     # Zeitpunkt faellig (jetzt = sofort, Zukunft = geplant).

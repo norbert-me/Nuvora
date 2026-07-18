@@ -20,6 +20,11 @@ export default function Karten() {
   const [newDeck, setNewDeck] = useState("");
   const [addingDeck, setAddingDeck] = useState(false);
   const [detail, setDetail] = useState(null); // { student, cards } — Einzelstatistik
+  const [topics, setTopics] = useState([]);
+
+  useEffect(() => {
+    fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).then((d) => {
@@ -88,7 +93,7 @@ export default function Karten() {
             <button type="submit" disabled={addingDeck || !newDeck.trim()} style={{ ...btnPrimary, opacity: (!addingDeck && newDeck.trim()) ? 1 : 0.4 }}>{t("common.add")}</button>
           </form>
           {decks.length === 0 && <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("karten.noDecks")}</p>}
-          {decks.map((d) => <Deck key={d.id} deck={d} t={t} call={call} />)}
+          {decks.map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} />)}
         </>
       )}
 
@@ -200,11 +205,13 @@ function StudentDetail({ detail, t, onClose }) {
   );
 }
 
-function Deck({ deck, t, call }) {
+function Deck({ deck, t, call, topics = [] }) {
   const [front, setFront] = useState("");
   const [back, setBack] = useState("");
   const [planDate, setPlanDate] = useState("");
   const [busy, setBusy] = useState(false);
+  const setTopic = (tid) => call(() => fetch(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: tid ? Number(tid) : null }) }));
+  const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
   const add = async (e) => {
     e.preventDefault();
     if (busy || !front.trim() || !back.trim()) return;
@@ -227,6 +234,11 @@ function Deck({ deck, t, call }) {
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
         <strong style={{ fontSize: 16 }}>{deck.name || t("karten.deck")}</strong>
         <span style={{ fontSize: 11.5, fontWeight: 600, padding: "2px 8px", borderRadius: 980, background: badge.bg, color: badge.col }}>{badge.text}</span>
+        <select value={deck.topic_id ?? ""} onChange={(e) => setTopic(e.target.value)} title={t("karten.topicHint")}
+          style={{ fontSize: 12, padding: "3px 8px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)", maxWidth: 180 }}>
+          <option value="">– {t("karten.freeCards")} –</option>
+          {topics.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
+        </select>
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{deck.cards.length} {t("karten.cards")}</span>
         <button onClick={() => { if (confirm(t("karten.delDeck", { name: deck.name }))) call(() => fetch(`${API}/decks/${deck.id}`, { method: "DELETE" })); }}

@@ -86,6 +86,7 @@ async def _owned_deck(db, user, deck_id) -> CardDeck:
 
 class DeckIn(BaseModel):
     name: str = ""
+    topic_id: Optional[int] = None
 
 
 class CardOut(BaseModel):
@@ -100,6 +101,7 @@ class DeckOut(BaseModel):
     id: int
     class_id: int
     name: str
+    topic_id: Optional[int] = None
     released_at: Optional[datetime] = None
     cards: List[CardOut] = []
     model_config = {"from_attributes": True}
@@ -120,8 +122,19 @@ async def list_decks(class_id: int, user: User = Depends(require_module), db: As
 async def create_deck(class_id: int, body: DeckIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("karten_deck", f"u{user.id}", 100, 60, "Zu viele Stapel. Bitte kurz warten.")
     await _owned_class(db, user, class_id)
-    deck = CardDeck(class_id=class_id, owner_id=user.id, name=body.name.strip())
+    deck = CardDeck(class_id=class_id, owner_id=user.id, name=body.name.strip(), topic_id=body.topic_id)
     db.add(deck)
+    await db.commit()
+    await db.refresh(deck, ["cards"])
+    return deck
+
+
+@router.put("/decks/{deck_id}", response_model=DeckOut)
+async def update_deck(deck_id: int, body: DeckIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Name und/oder Thema des Stapels aendern."""
+    deck = await _owned_deck(db, user, deck_id)
+    deck.name = body.name.strip()
+    deck.topic_id = body.topic_id
     await db.commit()
     await db.refresh(deck, ["cards"])
     return deck

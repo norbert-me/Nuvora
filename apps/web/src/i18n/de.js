@@ -683,6 +683,8 @@ export default {
   "karten.newDeck": "Neuer Stapel, z. B. Vokabeln",
   "karten.noDecks": "Noch kein Stapel. Lege einen an und füge Karten hinzu.",
   "karten.deck": "Stapel",
+  "karten.freeCards": "freie Karten",
+  "karten.topicHint": "Thema zuordnen — geplant im Kalender, wird der Stapel automatisch freigeschaltet",
   "karten.cards": "Karten",
   "karten.front": "Vorderseite",
   "karten.back": "Rückseite",
