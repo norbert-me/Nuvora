@@ -312,10 +312,16 @@
         const [tRes, exRes, clRes] = await Promise.all([
             api(`${API}/topics`), api(`${LP}/exercises`), api(`${API}/classes`)
         ]);
-        if (!tRes.ok || !exRes.ok || !clRes.ok) { showAuth(); return false; }
-        topics = await tRes.json();
-        aufgaben = (await exRes.json()).map(vonKern);
-        const klassenRaw = await clRes.json();
+        // Nur ein echtes Auth-Problem (401) fuehrt zum Login. Ist z. B. nur das
+        // Lernpfad-Modul nicht aktiv (403 auf /exercises), sollen Themen und
+        // Klassen trotzdem erscheinen — sonst wirkt die ganze App leer.
+        if (tRes.status === 401 || clRes.status === 401 || exRes.status === 401) { showAuth(); return false; }
+        if (!exRes.ok) {
+            alert('Aufgaben konnten nicht geladen werden — ist das Modul „Lernpfad" aktiviert? (Status ' + exRes.status + ')');
+        }
+        topics = tRes.ok ? await tRes.json() : [];
+        aufgaben = exRes.ok ? (await exRes.json()).map(vonKern) : [];
+        const klassenRaw = clRes.ok ? await clRes.json() : [];
         klassen = klassenRaw.map(c => c.name);
         schueler = [];
         klassenRaw.forEach(c => (c.students || []).forEach(st => schueler.push({
