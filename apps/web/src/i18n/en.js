@@ -562,6 +562,7 @@ export default {
   "noten.newSection": "New section, e.g. Class tests",
   "noten.sectionName": "Section",
   "noten.addColShort": "+ Column",
+  "noten.noColumns": "No column yet",
   "noten.colName": "Column name, e.g. Test 1",
   "noten.delSection": "Delete section “{{name}}”? All its columns and grades go with it.",
   "noten.total": "Total",

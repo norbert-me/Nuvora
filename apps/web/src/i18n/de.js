@@ -562,6 +562,7 @@ export default {
   "noten.newSection": "Neuer Abschnitt, z. B. Klassenarbeiten",
   "noten.sectionName": "Abschnitt",
   "noten.addColShort": "+ Spalte",
+  "noten.noColumns": "Noch keine Spalte",
   "noten.colName": "Spaltenname, z. B. 1. Klassenarbeit",
   "noten.delSection": "Abschnitt „{{name}}“ löschen? Alle Spalten und Noten darin verschwinden mit.",
   "noten.total": "Gesamt",

@@ -562,6 +562,7 @@ export default {
   "noten.newSection": "Nueva sección, p. ej. Exámenes",
   "noten.sectionName": "Sección",
   "noten.addColShort": "+ Columna",
+  "noten.noColumns": "Aún sin columna",
   "noten.colName": "Nombre, p. ej. Examen 1",
   "noten.delSection": "¿Eliminar la sección «{{name}}»? Sus columnas y notas se eliminan también.",
   "noten.total": "Total",

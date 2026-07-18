@@ -291,9 +291,11 @@ export default function Noten() {
                   if (cols.length === 0) {
                     return [
                       <th key={`empty-${sec.id}`} style={{ ...th, borderLeft: "2px solid var(--border)", fontWeight: 400 }}>
+                        {/* Spalte anlegen laeuft ueber das Kebab-Menue des
+                            Abschnitts; ein zweiter +Spalte-Knopf war doppelt. */}
                         {neuSpalteIn === sec.id
                           ? <ColForm t={t} onCancel={() => setNeuSpalteIn(null)} onSave={async (name) => { if (await call(() => fetch(`${API}/categories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: 0 }) }))) setNeuSpalteIn(null); }} />
-                          : <button onClick={() => setNeuSpalteIn(sec.id)} style={{ border: "none", background: "none", color: "var(--accent)", cursor: "pointer", fontSize: 12 }}>{t("noten.addColShort")}</button>}
+                          : <span style={{ color: "var(--text3)", fontSize: 12 }}>{t("noten.noColumns")}</span>}
                       </th>,
                       bereich,
                     ];
