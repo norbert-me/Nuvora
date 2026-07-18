@@ -22,6 +22,9 @@ export const ICONS = {
   chart: ["M3 17h14", "M5 13v4M9 9v8M13 11v6M17 7v10"],
   archive: ["M3 5a2 2 0 012-2h10a2 2 0 012 2v1H3V5z", "M4 6h12v11a2 2 0 01-2 2H6a2 2 0 01-2-2V6z", "M8 10h4"],
   restore: ["M10 3L3 10L10 17", "M3 10H17"],
+  grip: ["M7 5.5h.01M7 10h.01M7 14.5h.01M13 5.5h.01M13 10h.01M13 14.5h.01"],
+  close: ["M5 5l10 10M15 5L5 15"],
+  plus: ["M10 4v12M4 10h12"],
 };
 
 export const iconBtn = { cursor: "pointer", padding: "6px", border: "none", background: "transparent", borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s" };

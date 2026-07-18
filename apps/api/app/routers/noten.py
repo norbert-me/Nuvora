@@ -22,7 +22,7 @@ from sqlalchemy.orm import selectinload
 
 from ..database import get_db
 from ..models import (
-    GradeCategory, GradeEntry, GradeSection, SchoolClass,
+    GradeCategory, GradeEntry, GradeSection, GradeOverride, SchoolClass,
     Session as TestSession, Student, User,
 )
 from .auth import get_current_user, rate_limit
@@ -239,7 +239,7 @@ class EntryIn(BaseModel):
             return v
         if v < 1.0 or v > 6.0:
             raise ValueError("Note muss zwischen 1,0 und 6,0 liegen")
-        return round(v, 1)
+        return round(v, 2)
 
     @field_validator("tendency")
     @classmethod
@@ -337,6 +337,61 @@ async def delete_entry(entry_id: int, user: User = Depends(require_module), db: 
     await db.commit()
 
 
+# ─── Manuelle Noten (Bereichs- und Endnote ueberschreiben) ───
+
+class OverrideIn(BaseModel):
+    class_id: int
+    student_id: int
+    section_id: Optional[int] = None  # None = Endnote
+    value: float
+
+    @field_validator("value")
+    @classmethod
+    def value_ok(cls, v):
+        if v < 1.0 or v > 6.0:
+            raise ValueError("Note muss zwischen 1,0 und 6,0 liegen")
+        return round(v, 2)
+
+
+async def _find_override(db, user, class_id, student_id, section_id):
+    q = select(GradeOverride).where(
+        GradeOverride.owner_id == user.id,
+        GradeOverride.class_id == class_id,
+        GradeOverride.student_id == student_id,
+    )
+    q = q.where(GradeOverride.section_id.is_(None) if section_id is None
+                else GradeOverride.section_id == section_id)
+    return (await db.execute(q)).scalar_one_or_none()
+
+
+@router.put("/overrides", status_code=204)
+async def set_override(body: OverrideIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    rate_limit("noten_over", f"u{user.id}", 600, 60, "Zu viele Änderungen in kurzer Zeit. Bitte kurz warten.")
+    await _owned_class(db, user, body.class_id)
+    if body.section_id is not None:
+        await _owned_section(db, user, body.section_id)
+    r = await db.execute(select(Student.id).where(Student.id == body.student_id, Student.class_id == body.class_id))
+    if not r.scalar_one_or_none():
+        raise HTTPException(400, "Schüler gehört nicht zu dieser Klasse")
+    ex = await _find_override(db, user, body.class_id, body.student_id, body.section_id)
+    if ex:
+        ex.value = body.value
+    else:
+        db.add(GradeOverride(owner_id=user.id, class_id=body.class_id, student_id=body.student_id,
+                             section_id=body.section_id, value=body.value))
+    await db.commit()
+
+
+@router.delete("/overrides", status_code=204)
+async def clear_override(class_id: int, student_id: int, section_id: Optional[int] = None,
+                         user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    await _owned_class(db, user, class_id)
+    ex = await _find_override(db, user, class_id, student_id, section_id)
+    if ex:
+        await db.delete(ex)
+        await db.commit()
+
+
 # ─── Uebersicht ───
 
 class StudentSummary(BaseModel):
@@ -346,9 +401,15 @@ class StudentSummary(BaseModel):
     per_category: dict
     # Schnitt je Abschnitt, key = section_id als String.
     per_section: dict
-    # Gewichteter Gesamtschnitt. Ist kein Gewicht gesetzt, faellt es auf den
-    # ungewichteten Mittelwert aller Noten zurueck — so steht nie "kein Schnitt".
+    # Manuell gesetzte Bereichsnoten, key = section_id als String.
+    section_overrides: dict
+    # Effektive Bereichsnote (Override sonst Schnitt), key = section_id.
+    section_effective: dict
+    # Gewichteter Gesamtschnitt (rechnet mit den effektiven Bereichsnoten). Ist
+    # kein Gewicht gesetzt, faellt es auf den ungewichteten Mittelwert zurueck.
     weighted: Optional[float]
+    # Manuell gesetzte Endnote; ueberschreibt weighted in der Anzeige.
+    total_override: Optional[float]
     # true = ungewichteter Rueckfall (keine Gewichte gesetzt).
     unweighted_fallback: bool
     observations: int
@@ -378,6 +439,13 @@ async def summary(class_id: int, user: User = Depends(require_module), db: Async
         .where(GradeCategory.owner_id == user.id, GradeCategory.class_id == class_id)
     )).scalars().all()
 
+    overrides = (await db.execute(
+        select(GradeOverride).where(GradeOverride.owner_id == user.id, GradeOverride.class_id == class_id)
+    )).scalars().all()
+    # (student_id, section_id) -> value; section_id None = Endnote
+    sec_over = {(o.student_id, o.section_id): o.value for o in overrides if o.section_id is not None}
+    total_over = {o.student_id: o.value for o in overrides if o.section_id is None}
+
     out = []
     for st in students:
         eigene = [e for e in entries if e.student_id == st.id]
@@ -397,22 +465,31 @@ async def summary(class_id: int, user: User = Depends(require_module), db: Async
             if werte:
                 per_sec[str(s.id)] = round(sum(werte) / len(werte), 2)
 
-        # Gewichteter Gesamtschnitt ueber Abschnitte mit Gewicht und Noten
-        wsum = sum(sec_weight.get(int(sid), 0) for sid in per_sec)
+        # Effektive Bereichsnote: manuell gesetzte schlaegt den Schnitt.
+        sec_ovr = {str(s.id): sec_over[(st.id, s.id)] for s in sections if (st.id, s.id) in sec_over}
+        sec_eff = dict(per_sec)
+        sec_eff.update(sec_ovr)
+
+        # Gewichteter Gesamtschnitt ueber die effektiven Bereichsnoten
+        wsum = sum(sec_weight.get(int(sid), 0) for sid in sec_eff)
         weighted = None
         fallback = False
         if wsum > 0:
-            weighted = round(sum(per_sec[sid] * sec_weight.get(int(sid), 0) for sid in per_sec) / wsum, 2)
+            weighted = round(sum(sec_eff[sid] * sec_weight.get(int(sid), 0) for sid in sec_eff) / wsum, 2)
+        elif sec_eff:
+            # Kein Gewicht gesetzt: ungewichteter Mittelwert der Bereichsnoten.
+            weighted = round(sum(sec_eff.values()) / len(sec_eff), 2)
+            fallback = True
         elif grades:
-            # Kein Gewicht gesetzt: ungewichteter Mittelwert, damit ein Schnitt
-            # sichtbar ist statt "—".
             weighted = round(sum(e.value for e in grades) / len(grades), 2)
             fallback = True
 
         out.append(StudentSummary(
             student_id=st.id, name=st.name,
             per_category=per_cat, per_section=per_sec,
-            weighted=weighted, unweighted_fallback=fallback,
+            section_overrides=sec_ovr, section_effective=sec_eff,
+            weighted=weighted, total_override=total_over.get(st.id),
+            unweighted_fallback=fallback,
             observations=len([e for e in eigene if e.kind == "observation"]),
         ))
     return out

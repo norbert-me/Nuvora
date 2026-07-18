@@ -413,6 +413,29 @@ class GradeEntry(Base):
     category: Mapped[GradeCategory] = relationship(back_populates="entries")
 
 
+class GradeOverride(Base):
+    """Manuell gesetzte Note, die den errechneten Schnitt ersetzt.
+
+    section_id gesetzt = Bereichsnote dieses Abschnitts; section_id NULL =
+    Endnote. Die Note bleibt eine paedagogische Entscheidung — der Schnitt ist
+    nur ein Vorschlag, den die Lehrkraft ueberschreiben und wieder loeschen darf.
+    """
+    __tablename__ = "grade_overrides"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), index=True)
+    # NULL = Endnote, sonst die Bereichsnote dieses Abschnitts.
+    section_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("grade_sections.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    value: Mapped[float] = mapped_column(nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 # ─── Nuvora-Kern: Wochenplanung ───
 # Verbindet, was die Module tun: eine Woche hat 1–3 Themenbloecke (aus der
 # Taxonomie) und am Ende einen Test ueber diese Themen. Kern, kein Modul —

@@ -17,7 +17,7 @@ const API = "/api/noten";
 function parseNote(text) {
   const n = parseFloat(String(text).replace(",", "."));
   if (Number.isNaN(n) || n < 1 || n > 6) return null;
-  return Math.round(n * 10) / 10;
+  return Math.round(n * 100) / 100;
 }
 const de = (n) => (n === null || n === undefined ? "" : String(n).replace(".", ","));
 
@@ -36,16 +36,29 @@ export default function Noten() {
   const [beobFuer, setBeobFuer] = useState(null);
   const [infoFuer, setInfoFuer] = useState(null);
   const [dragId, setDragId] = useState(null);
+  // Vorschau beim Ziehen: auf welchem Abschnitt, und links oder rechts einfuegen.
+  const [dragOver, setDragOver] = useState(null); // { id, side: "left"|"right" }
+
+  const dragOverHeader = (e, secId) => {
+    e.preventDefault();
+    if (!dragId || secId === dragId) { setDragOver(null); return; }
+    const r = e.currentTarget.getBoundingClientRect();
+    const side = e.clientX < r.left + r.width / 2 ? "left" : "right";
+    setDragOver((p) => (p && p.id === secId && p.side === side ? p : { id: secId, side }));
+  };
 
   // Abschnitt per Drag & Drop verschieben: optimistisch umsortieren, dann speichern.
   const abschnittDrop = async (zielId) => {
-    const von = dragId;
-    setDragId(null);
+    const von = dragId, ov = dragOver;
+    setDragId(null); setDragOver(null);
     if (!von || von === zielId) return;
     const alt = sections;
     const ids = alt.map((s) => s.id);
-    const from = ids.indexOf(von), to = ids.indexOf(zielId);
+    const from = ids.indexOf(von);
+    let to = ids.indexOf(zielId);
     if (from < 0 || to < 0) return;
+    if (ov && ov.id === zielId && ov.side === "right") to += 1;
+    if (from < to) to -= 1;  // Entnahme verschiebt den Zielindex
     const neu = [...alt];
     neu.splice(to, 0, neu.splice(from, 1)[0]);
     setSections(neu);
@@ -54,6 +67,22 @@ export default function Noten() {
       body: JSON.stringify({ ids: neu.map((s) => s.id) }),
     }).catch(() => null);
     if (!res || !res.ok) { setSections(alt); setError(t("noten.reorderFail")); }
+  };
+
+  // Bereichs-/Endnote manuell setzen oder zuruecksetzen.
+  const overrideSetzen = async (studentId, sectionId, text) => {
+    const val = parseNote(text);
+    setZelle(null);
+    if (val === null) return;
+    await call(() => fetch(`${API}/overrides`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ class_id: classId, student_id: studentId, section_id: sectionId, value: val }),
+    }));
+  };
+  const overrideReset = async (studentId, sectionId) => {
+    const q = new URLSearchParams({ class_id: classId, student_id: studentId });
+    if (sectionId != null) q.set("section_id", sectionId);
+    await call(() => fetch(`${API}/overrides?${q}`, { method: "DELETE" }));
   };
 
   useEffect(() => {
@@ -178,15 +207,20 @@ export default function Noten() {
                 <th style={{ ...th, ...stickyL, minWidth: 150 }}></th>
                 {sections.map((sec) => {
                   const cols = (sec.categories || []).length || 1;
+                  const over = dragId && dragOver && dragOver.id === sec.id;
                   return (
-                    <th key={sec.id} colSpan={cols}
+                    <th key={sec.id} colSpan={cols + 1}
                       draggable
                       onDragStart={() => setDragId(sec.id)}
-                      onDragOver={(e) => e.preventDefault()}
+                      onDragOver={(e) => dragOverHeader(e, sec.id)}
+                      onDragEnd={() => { setDragId(null); setDragOver(null); }}
                       onDrop={() => abschnittDrop(sec.id)}
-                      style={{ ...th, borderLeft: "2px solid var(--border)", cursor: "grab", opacity: dragId === sec.id ? 0.4 : 1 }}>
+                      style={{ ...th, borderLeft: over && dragOver.side === "left" ? "3px solid var(--accent)" : "2px solid var(--border)",
+                        borderRight: over && dragOver.side === "right" ? "3px solid var(--accent)" : undefined,
+                        cursor: "grab", opacity: dragId === sec.id ? 0.4 : 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
-                        <span title={t("noten.dragHint")}>⋮⋮ {sec.name}</span>
+                        <span title={t("noten.dragHint")} style={{ display: "inline-flex", color: "var(--text3)" }}><Icon d={ICONS.grip} size={14} /></span>
+                        <span>{sec.name}</span>
                         <span style={{ color: "var(--text3)", fontWeight: 400 }}>{sec.weight} %</span>
                         <SectionMenu t={t} sec={sec}
                           onEdit={(b) => call(() => fetch(`${API}/sections/${sec.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }))}
@@ -203,16 +237,23 @@ export default function Noten() {
                 <th style={{ ...th, ...stickyL, textAlign: "left" }}>{cls?.name}</th>
                 {sections.map((sec) => {
                   const cols = sec.categories || [];
+                  const bereich = (
+                    <th key={`sn-${sec.id}`} style={{ ...th, borderRight: "2px solid var(--border)", fontWeight: 500, minWidth: 56 }} title={t("noten.sectionGradeHint")}>
+                      {t("noten.sectionGrade")}
+                    </th>
+                  );
                   if (cols.length === 0) {
-                    return (
+                    return [
                       <th key={`empty-${sec.id}`} style={{ ...th, borderLeft: "2px solid var(--border)", fontWeight: 400 }}>
                         {neuSpalteIn === sec.id
                           ? <ColForm t={t} onCancel={() => setNeuSpalteIn(null)} onSave={async (name) => { if (await call(() => fetch(`${API}/categories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: 0 }) }))) setNeuSpalteIn(null); }} />
                           : <button onClick={() => setNeuSpalteIn(sec.id)} style={{ border: "none", background: "none", color: "var(--accent)", cursor: "pointer", fontSize: 12 }}>{t("noten.addColShort")}</button>}
-                      </th>
-                    );
+                      </th>,
+                      bereich,
+                    ];
                   }
-                  return cols.map((c, i) => (
+                  return [
+                    ...cols.map((c, i) => (
                     <th key={c.id} style={{ ...th, borderLeft: i === 0 ? "2px solid var(--border)" : "1px solid var(--border)", minWidth: 70, fontWeight: 500 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 3, justifyContent: "center" }}>
                         <span style={{ maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
@@ -221,14 +262,16 @@ export default function Noten() {
                           <Icon d={ICONS.trash} color={C.danger} size={13} />
                         </button>
                         {i === cols.length - 1 && neuSpalteIn !== sec.id && (
-                          <button onClick={() => setNeuSpalteIn(sec.id)} title={t("noten.addColShort")} style={{ border: "none", background: "none", color: "var(--accent)", cursor: "pointer", fontSize: 14 }}>+</button>
+                          <button onClick={() => setNeuSpalteIn(sec.id)} title={t("noten.addColShort")} className="icon-btn" style={{ ...iconBtn, padding: 1, color: "var(--accent)" }}><Icon d={ICONS.plus} color="var(--accent)" size={14} /></button>
                         )}
                       </div>
                       {neuSpalteIn === sec.id && i === cols.length - 1 && (
                         <ColForm t={t} onCancel={() => setNeuSpalteIn(null)} onSave={async (name) => { if (await call(() => fetch(`${API}/categories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: cols.length }) }))) setNeuSpalteIn(null); }} />
                       )}
                     </th>
-                  ));
+                    )),
+                    bereich,
+                  ];
                 })}
               </tr>
             </thead>
@@ -243,32 +286,54 @@ export default function Noten() {
                   </td>
                   {sections.map((sec) => {
                     const cols = sec.categories || [];
-                    if (cols.length === 0) return <td key={`e-${sec.id}`} style={{ ...td, borderLeft: "2px solid var(--border)" }}></td>;
-                    return cols.map((c, i) => {
-                      const id = `${s.student_id}:${c.id}`;
-                      const noten = notenVon(s.student_id, c.id);
-                      return (
-                        <td key={c.id} style={{ ...td, padding: 0, borderLeft: i === 0 ? "2px solid var(--border)" : "1px solid var(--border)" }}>
-                          {zelle === id
-                            ? <Zelle initial={noten[0] ? de(noten[0].value) : ""} onSave={(txt) => noteSetzen(s.student_id, c.id, txt)} onCancel={() => setZelle(null)} />
-                            : <button onClick={() => setZelle(id)}
-                                style={{ width: "100%", minHeight: 32, border: "none", background: "none", cursor: "text", color: "var(--text)", fontSize: 13.5, fontWeight: noten.length ? 600 : 400 }}>
-                                {s.per_category[String(c.id)] !== undefined ? de(s.per_category[String(c.id)]) : <span style={{ color: "var(--border2)" }}>·</span>}
-                              </button>}
-                        </td>
-                      );
-                    });
+                    const bereichTd = (
+                      <td key={`sn-${sec.id}`} style={{ ...td, padding: 0, borderRight: "2px solid var(--border)", background: "var(--bg2, rgba(0,0,0,0.02))" }}>
+                        <NoteZelle t={t}
+                          editing={zelle === `sec:${s.student_id}:${sec.id}`}
+                          onEdit={() => setZelle(`sec:${s.student_id}:${sec.id}`)}
+                          value={s.section_effective[String(sec.id)] ?? null}
+                          isOverride={s.section_overrides[String(sec.id)] !== undefined}
+                          onSave={(txt) => overrideSetzen(s.student_id, sec.id, txt)}
+                          onCancel={() => setZelle(null)}
+                          onReset={() => overrideReset(s.student_id, sec.id)} />
+                      </td>
+                    );
+                    if (cols.length === 0) return [<td key={`e-${sec.id}`} style={{ ...td, borderLeft: "2px solid var(--border)" }}></td>, bereichTd];
+                    return [
+                      ...cols.map((c, i) => {
+                        const id = `${s.student_id}:${c.id}`;
+                        const noten = notenVon(s.student_id, c.id);
+                        return (
+                          <td key={c.id} style={{ ...td, padding: 0, borderLeft: i === 0 ? "2px solid var(--border)" : "1px solid var(--border)" }}>
+                            {zelle === id
+                              ? <Zelle initial={noten[0] ? de(noten[0].value) : ""} onSave={(txt) => noteSetzen(s.student_id, c.id, txt)} onCancel={() => setZelle(null)} />
+                              : <button onClick={() => setZelle(id)}
+                                  style={{ width: "100%", minHeight: 32, border: "none", background: "none", cursor: "text", color: "var(--text)", fontSize: 13.5, fontWeight: noten.length ? 600 : 400 }}>
+                                  {s.per_category[String(c.id)] !== undefined ? de(s.per_category[String(c.id)]) : <span style={{ color: "var(--border2)" }}>·</span>}
+                                </button>}
+                          </td>
+                        );
+                      }),
+                      bereichTd,
+                    ];
                   })}
-                  <td style={{ ...td, borderLeft: "2px solid var(--border)", fontWeight: 700 }}>
-                    {s.weighted !== null ? de(s.weighted) : <span style={{ color: "var(--border2)" }}>·</span>}
-                    {s.weighted !== null && s.unweighted_fallback && (
+                  <td style={{ ...td, padding: 0, borderLeft: "2px solid var(--border)" }}>
+                    <NoteZelle t={t} bold
+                      editing={zelle === `end:${s.student_id}`}
+                      onEdit={() => setZelle(`end:${s.student_id}`)}
+                      value={s.total_override ?? s.weighted}
+                      isOverride={s.total_override != null}
+                      onSave={(txt) => overrideSetzen(s.student_id, null, txt)}
+                      onCancel={() => setZelle(null)}
+                      onReset={() => overrideReset(s.student_id, null)} />
+                    {s.total_override == null && s.weighted !== null && s.unweighted_fallback && (
                       <div style={{ fontWeight: 400, fontSize: 10, color: "#b8860b" }}>{t("noten.unweighted")}</div>
                     )}
                   </td>
                   <td style={td}>
                     <button onClick={() => setBeobFuer(s.student_id)} title={t("noten.obsHeading")}
-                      style={{ border: "none", background: "none", cursor: "pointer", color: s.observations ? "var(--accent)" : "var(--text3)", fontSize: 12.5, padding: 4 }}>
-                      {s.observations || "+"}
+                      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", background: "none", cursor: "pointer", color: s.observations ? "var(--accent)" : "var(--text3)", fontSize: 12.5, padding: 4 }}>
+                      {s.observations || <Icon d={ICONS.plus} size={14} />}
                     </button>
                   </td>
                 </tr>
@@ -306,6 +371,26 @@ function Zelle({ onSave, onCancel, initial = "" }) {
       onKeyDown={(e) => { if (e.key === "Enter") onSave(e.target.value); if (e.key === "Escape") onCancel(); }}
       placeholder="2,3"
       style={{ width: "100%", minHeight: 32, border: "2px solid var(--accent)", borderRadius: 4, background: "var(--input-bg, var(--bg))", color: "var(--text)", textAlign: "center", fontSize: 13.5, padding: 0, boxSizing: "border-box" }} />
+  );
+}
+
+// Bereichs- oder Endnote: zeigt den Schnitt, per Klick ueberschreibbar, mit
+// Kreuz wieder auf den Schnitt zuruecksetzbar. Ueberschriebene Note steht in
+// Akzentfarbe, damit „gerechnet" und „gesetzt" unterscheidbar bleiben.
+function NoteZelle({ t, editing, onEdit, value, isOverride, onSave, onCancel, onReset, bold }) {
+  if (editing) return <Zelle initial={value != null ? de(value) : ""} onSave={onSave} onCancel={onCancel} />;
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2, minHeight: 32 }}>
+      <button onClick={onEdit} title={t("noten.overrideHint")}
+        style={{ border: "none", background: "none", cursor: "pointer", color: isOverride ? "var(--accent)" : "var(--text)", fontWeight: bold ? 700 : 600, fontSize: 13.5, padding: "0 2px" }}>
+        {value != null ? de(value) : <span style={{ color: "var(--border2)" }}>·</span>}
+      </button>
+      {isOverride && (
+        <button onClick={onReset} className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={t("noten.overrideReset")}>
+          <Icon d={ICONS.close} color={C.danger} size={12} />
+        </button>
+      )}
+    </div>
   );
 }
 
