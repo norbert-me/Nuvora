@@ -23,10 +23,10 @@
         window.parent.postMessage({ type: 'lernpfad:ready' }, window.location.origin);
 
         const melde = () => {
-            const h = Math.max(
-                document.body.scrollHeight, document.documentElement.scrollHeight,
-                document.body.offsetHeight, document.documentElement.offsetHeight
-            );
+            // Nur die body-Hoehe: documentElement fuellt die iframe-Hoehe und
+            // schrumpft nie zurueck, wodurch der Rahmen nach Tab-Wechseln viel
+            // zu hoch blieb. body hat height:auto -> echte Inhaltshoehe.
+            const h = Math.max(document.body.scrollHeight, document.body.offsetHeight);
             window.parent.postMessage({ type: 'lernpfad:height', height: h }, window.location.origin);
         };
         window.addEventListener('load', melde);
