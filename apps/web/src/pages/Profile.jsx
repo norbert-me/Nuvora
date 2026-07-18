@@ -182,7 +182,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12, padding: 12, background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 12 }}>
             {[1, 2, 3, 4, 5].map((g) => (
-              <div key={g} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 8px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8 }}>
+              <div key={g} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 8px", background: "var(--card)", borderRadius: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{g}</span>
                 <span style={{ fontSize: 11, color: "var(--text3)" }}>{t("profile.from")}</span>
                 <input
