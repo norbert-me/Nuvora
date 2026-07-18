@@ -52,6 +52,9 @@ class EntryIn(BaseModel):
     topic_id: Optional[int] = None
     method_id: Optional[int] = None
     period: Optional[int] = None
+    cardvote_set_id: Optional[int] = None
+    karten_deck_id: Optional[int] = None
+    lernpfad_ladder_id: Optional[int] = None
 
 
 class EntryOut(EntryIn):
@@ -105,6 +108,12 @@ async def _release_matching_decks(db: AsyncSession, user: User, e: CalendarEntry
     nicht ausgerollter Karten-Stapel automatisch zum Termin freigeschaltet.
     Nur Entwuerfe (released_at NULL) — eine manuelle Freigabe bleibt unberuehrt.
     """
+    # Explizit verknuepftes Deck: am Kalendertag freischalten, falls noch Entwurf.
+    if e.karten_deck_id:
+        deck = await db.get(CardDeck, e.karten_deck_id)
+        if deck and deck.owner_id == user.id and deck.released_at is None:
+            deck.released_at = e.date
+            await db.commit()
     if not e.topic_id:
         return
     q = select(CardDeck).where(

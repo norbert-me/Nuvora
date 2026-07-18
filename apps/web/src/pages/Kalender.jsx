@@ -19,6 +19,9 @@ export default function Kalender() {
   const [classes, setClasses] = useState([]);
   const [topics, setTopics] = useState([]);
   const [methods, setMethods] = useState([]); // aus Modul Methoden (falls aktiv)
+  const [quizze, setQuizze] = useState([]); // CardVote-Quizze (falls aktiv), flach
+  const [ladders, setLadders] = useState([]); // Lernpfad-Lernleitern (falls aktiv), flach
+  const [aktiv, setAktiv] = useState({}); // { cardvote, karten, lernpfad } aktiv?
   const [editing, setEditing] = useState(null); // { date, ...entry } oder null
   const [tt, setTt] = useState({ periods: 6, slots: [] }); // Stundenplan
   const [slotEdit, setSlotEdit] = useState(null); // { weekday, period, ...slot } oder null
@@ -28,6 +31,24 @@ export default function Kalender() {
     fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {});
     // Methoden nur, wenn das Modul aktiv ist (sonst 403 -> leer, kein Selektor).
     fetch("/api/methoden/list").then((r) => (r.ok ? r.json() : [])).then((d) => setMethods(Array.isArray(d) ? d : [])).catch(() => {});
+    // Regel 3: Modul-Objekte nur laden/anbieten, wenn das Modul aktiviert ist.
+    fetch("/api/modules").then((r) => (r.ok ? r.json() : [])).then((mods) => {
+      const on = {};
+      (Array.isArray(mods) ? mods : []).forEach((m) => { if (m.active) on[m.key] = true; });
+      setAktiv(on);
+      if (on.cardvote) fetch("/api/folders").then((r) => (r.ok ? r.json() : [])).then((tree) => {
+        // Quizze aus dem (rekursiven) Ordnerbaum flach ziehen, Ordnername als Kontext.
+        const flat = [];
+        const walk = (f) => { (f.question_sets || []).forEach((q) => flat.push({ id: q.id, name: q.name, folder: f.name })); (f.children || []).forEach(walk); };
+        (Array.isArray(tree) ? tree : []).forEach(walk);
+        setQuizze(flat);
+      }).catch(() => {});
+      if (on.lernpfad) fetch("/api/lernpfad/paths").then((r) => (r.ok ? r.json() : [])).then((paths) => {
+        const flat = [];
+        (Array.isArray(paths) ? paths : []).forEach((p) => (p.ladders || []).forEach((l) => flat.push({ id: l.id, name: l.name, path: p.name })));
+        setLadders(flat);
+      }).catch(() => {});
+    }).catch(() => {});
   }, []);
 
   const loadTt = useCallback(() => {
@@ -66,7 +87,7 @@ export default function Kalender() {
   };
 
   const save = async (e) => {
-    const body = { date: new Date(e.date).toISOString(), title: e.title || "", notes: e.notes || "", class_id: e.class_id || null, topic_id: e.topic_id || null, method_id: e.method_id || null, period: e.period ?? null };
+    const body = { date: new Date(e.date).toISOString(), title: e.title || "", notes: e.notes || "", class_id: e.class_id || null, topic_id: e.topic_id || null, method_id: e.method_id || null, period: e.period ?? null, cardvote_set_id: e.cardvote_set_id || null, karten_deck_id: e.karten_deck_id || null, lernpfad_ladder_id: e.lernpfad_ladder_id || null };
     const res = await fetch(e.id ? `${API}/entries/${e.id}` : `${API}/entries`, {
       method: e.id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     }).catch(() => null);
@@ -133,7 +154,7 @@ export default function Kalender() {
       {view === "day" && <DayView day={cursor} byDay={byDay} slotsFor={slotsFor} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
       {view === "timetable" && <TimetableView tt={tt} className={className} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
-      {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} topicName={topicName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
+      {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} aktiv={aktiv} topicName={topicName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
       {slotEdit && <SlotModal slot={slotEdit} classes={classes} topics={topics} onSave={saveSlot} onDelete={removeSlot} onClose={() => setSlotEdit(null)} t={t} />}
     </div>
   );
@@ -352,12 +373,21 @@ function SlotModal({ slot, classes, onSave, onDelete, onClose, t }) {
   );
 }
 
-function EntryModal({ entry, classes, topics, methods = [], onSave, onDelete, onClose, t }) {
+function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders = [], aktiv = {}, onSave, onDelete, onClose, t }) {
   const [title, setTitle] = useState(entry.title || "");
   const [notes, setNotes] = useState(entry.notes || "");
   const [classId, setClassId] = useState(entry.class_id || "");
   const [topicId, setTopicId] = useState(entry.topic_id || "");
   const [methodId, setMethodId] = useState(entry.method_id || "");
+  const [quizId, setQuizId] = useState(entry.cardvote_set_id || "");
+  const [ladderId, setLadderId] = useState(entry.lernpfad_ladder_id || "");
+  const [deckId, setDeckId] = useState(entry.karten_deck_id || "");
+  const [decks, setDecks] = useState([]); // Karten-Decks der gewaehlten Klasse
+  // Decks haengen an der Klasse: neu laden, wenn Klasse wechselt und Modul aktiv.
+  useEffect(() => {
+    if (!aktiv.karten || !classId) { setDecks([]); return; }
+    fetch(`/api/karten/classes/${classId}/decks`).then((r) => (r.ok ? r.json() : [])).then((d) => setDecks(Array.isArray(d) ? d : [])).catch(() => {});
+  }, [aktiv.karten, classId]);
   const fld = { width: "100%", padding: 9, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
   const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
@@ -390,10 +420,38 @@ function EntryModal({ entry, classes, topics, methods = [], onSave, onDelete, on
             </select>
           </>
         )}
+        {aktiv.cardvote && (
+          <>
+            <div style={lbl}>{t("kalender.planCardvote")}</div>
+            <select value={quizId} onChange={(e) => setQuizId(e.target.value)} style={fld}>
+              <option value="">– {t("kalender.none")} –</option>
+              {quizze.map((q) => <option key={q.id} value={q.id}>{q.folder ? `${q.folder} / ${q.name}` : q.name}</option>)}
+            </select>
+          </>
+        )}
+        {aktiv.karten && (
+          <>
+            <div style={lbl}>{t("kalender.planKarten")}</div>
+            <select value={deckId} onChange={(e) => setDeckId(e.target.value)} style={fld} disabled={!classId} title={!classId ? t("kalender.pickClassFirst") : undefined}>
+              <option value="">– {t("kalender.none")} –</option>
+              {decks.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+            {deckId && <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 4 }}>{t("kalender.deckReleaseHint")}</div>}
+          </>
+        )}
+        {aktiv.lernpfad && (
+          <>
+            <div style={lbl}>{t("kalender.planLernleiter")}</div>
+            <select value={ladderId} onChange={(e) => setLadderId(e.target.value)} style={fld}>
+              <option value="">– {t("kalender.none")} –</option>
+              {ladders.map((l) => <option key={l.id} value={l.id}>{l.path ? `${l.path} / ${l.name}` : l.name}</option>)}
+            </select>
+          </>
+        )}
         <div style={lbl}>{t("kalender.notes")}</div>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...fld, resize: "vertical" }} />
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
-          <button onClick={() => onSave({ ...entry, title, notes, class_id: classId ? Number(classId) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null })} style={btnPrimary}>{t("common.save")}</button>
+          <button onClick={() => onSave({ ...entry, title, notes, class_id: classId ? Number(classId) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null })} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
           {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
         </div>

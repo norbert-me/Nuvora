@@ -479,6 +479,12 @@ class CalendarEntry(Base):
     # Tag+Stunde eindeutig, damit ein erneuter Klick auf dieselbe Stunde den
     # vorhandenen Eintrag bearbeitet statt einen zweiten anzulegen.
     period: Mapped[Optional[int]] = mapped_column(nullable=True)
+    # Verknuepfte Modul-Objekte (Regel 3: alle optional, ON DELETE SET NULL —
+    # der Eintrag bleibt ohne das jeweilige Modul voll nutzbar). CardVote-Quiz,
+    # Karten-Deck (wird am Kalendertag freigeschaltet), Lernpfad-Lernleiter.
+    cardvote_set_id: Mapped[Optional[int]] = mapped_column(ForeignKey("question_sets.id", ondelete="SET NULL"), nullable=True, index=True)
+    karten_deck_id: Mapped[Optional[int]] = mapped_column(ForeignKey("card_decks.id", ondelete="SET NULL"), nullable=True, index=True)
+    lernpfad_ladder_id: Mapped[Optional[int]] = mapped_column(ForeignKey("learning_ladders.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
