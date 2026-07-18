@@ -426,7 +426,10 @@
                         <option value="">– Klasse wählen –</option>
                     </select>
                 </div>
-                <div class="form-group btn-group-vertical">
+                <!-- Oberer Generieren-Button ausgeblendet: das Konfig-Panel
+                     erscheint schon bei Themenwahl, dort steht der Button.
+                     Element bleibt (versteckt), weil JS darauf proxied. -->
+                <div class="form-group btn-group-vertical" style="display:none">
                     <button type="button" class="btn primary" id="btn-generate">Vorschau generieren</button>
                 </div>
             </div>
