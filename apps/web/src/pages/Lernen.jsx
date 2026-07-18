@@ -23,13 +23,19 @@ export default function Lernen() {
 
   const bewerten = async (grade) => {
     const card = data.cards[i];
-    await fetch(`${API}/lernen/${token}/review`, {
+    fetch(`${API}/lernen/${token}/review`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ card_id: card.card_id, grade }),
     }).catch(() => {});
     setFlipped(false);
-    if (i + 1 < data.cards.length) setI(i + 1);
-    else setDone(true);
+    // "Nochmal" (grade 0): Karte kommt in dieser Sitzung erneut dran — ans Ende
+    // der Warteschlange. Sonst ist sie fuer heute erledigt und faellt raus.
+    const rest = data.cards.filter((_, idx) => idx !== i);
+    const queue = grade === 0 ? [...rest, card] : rest;
+    if (queue.length === 0) { setDone(true); return; }
+    setData({ ...data, cards: queue });
+    // Nicht dieselbe Karte direkt noch einmal: war sie die letzte, vorne weiter.
+    setI(i >= queue.length || (grade === 0 && i >= queue.length - 1) ? 0 : i);
   };
 
   if (error) return <Center><p style={{ color: "#dc2626" }}>{error}</p></Center>;
