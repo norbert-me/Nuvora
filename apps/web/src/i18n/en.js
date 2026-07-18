@@ -218,6 +218,7 @@ export default {
   "profile.emailInfo": "We'll send a confirmation link to the new address. It only becomes active after confirmation.",
   "profile.sendLink": "Send confirmation link",
   "profile.linkSent": "Confirmation link sent to the new address.",
+  "profile.linkNotSent": "New address saved, but the confirmation email could not be sent — SMTP is not set up. Please contact the operator.",
   "profile.username": "Username",
   "profile.usernameHint": "Shown in the marketplace on your published question sets.",
   "profile.usernamePlaceholder": "e.g. Ms. Miller or a pseudonym",

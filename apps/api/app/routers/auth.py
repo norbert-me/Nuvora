@@ -457,7 +457,7 @@ async def change_email(body: ChangeEmailBody, request: Request, user: User = Dep
     await db.refresh(user)
     token = _make_email_change_token(user)
     link = f"{SITE_URL}/confirm-email-change?token={token}" if SITE_URL else f"/confirm-email-change?token={token}"
-    await mailer.send_email(
+    sent = await mailer.send_email(
         new_email,
         "CardVote — Neue E-Mail-Adresse bestätigen",
         "Hallo,\n\n"
@@ -466,7 +466,9 @@ async def change_email(body: ChangeEmailBody, request: Request, user: User = Dep
         "Wenn du das nicht warst, kannst du diese E-Mail ignorieren — deine bisherige Adresse bleibt gültig.\n\n"
         "Viele Grüße\nDein CardVote-Team",
     )
-    return {"ok": True, "pending_email": new_email}
+    # email_sent ehrlich zurueckgeben: ist SMTP nicht konfiguriert oder schlaegt
+    # der Versand fehl, darf die UI nicht "Mail verschickt" behaupten.
+    return {"ok": True, "pending_email": new_email, "email_sent": sent}
 
 
 class ConfirmEmailChangeBody(BaseModel):

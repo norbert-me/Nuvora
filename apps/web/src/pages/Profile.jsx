@@ -99,7 +99,8 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
       setPendingEmail(data.pending_email || newEmail);
-      setEmailMsg(t("profile.linkSent"));
+      // Nur "Link verschickt" melden, wenn wirklich versendet wurde.
+      setEmailMsg(data.email_sent === false ? t("profile.linkNotSent") : t("profile.linkSent"));
       setEmailPw("");
       setShowEmailForm(false);
     } else {
