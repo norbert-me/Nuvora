@@ -582,6 +582,8 @@ export default {
   "noten.yearGrade": "Nota anual",
   "noten.termGrade": "Nota sem.",
   "noten.term": "Semestre",
+  "noten.dividerOn": "Añadir línea de trimestre",
+  "noten.dividerOff": "Quitar línea de trimestre",
   "noten.statTitle": "Estadística (notas finales)",
   "noten.statAvg": "Media",
   "noten.statMedian": "Mediana",

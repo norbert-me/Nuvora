@@ -22,7 +22,7 @@ from sqlalchemy.orm import selectinload
 
 from ..database import get_db
 from ..models import (
-    GradeCategory, GradeEntry, GradeSection, GradeOverride, SchoolClass,
+    GradeCategory, GradeEntry, GradeSection, GradeOverride, QuartalDivider, SchoolClass,
     Session as TestSession, Student, User,
 )
 from .auth import get_current_user, rate_limit
@@ -149,6 +149,39 @@ async def reorder_sections(class_id: int, body: ReorderIn, user: User = Depends(
         if sec is not None:
             sec.position = pos
     await db.commit()
+
+
+@router.get("/classes/{class_id}/dividers")
+async def list_dividers(class_id: int, term: str = "1", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Quartalsstriche: nach welchen Spalten sie stehen (rein optisch)."""
+    await _owned_class(db, user, class_id)
+    rows = (await db.execute(select(QuartalDivider).where(
+        QuartalDivider.class_id == class_id, QuartalDivider.owner_id == user.id, QuartalDivider.term == term,
+    ))).scalars().all()
+    return [r.after_category_id for r in rows]
+
+
+class DividerIn(BaseModel):
+    after_category_id: int
+
+
+@router.post("/classes/{class_id}/dividers/toggle")
+async def toggle_divider(class_id: int, body: DividerIn, term: str = "1", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Strich nach einer Spalte an/aus. Gibt die neue Liste zurueck."""
+    await _owned_class(db, user, class_id)
+    existing = (await db.execute(select(QuartalDivider).where(
+        QuartalDivider.class_id == class_id, QuartalDivider.owner_id == user.id,
+        QuartalDivider.term == term, QuartalDivider.after_category_id == body.after_category_id,
+    ))).scalar_one_or_none()
+    if existing:
+        await db.delete(existing)
+    else:
+        db.add(QuartalDivider(class_id=class_id, owner_id=user.id, term=term, after_category_id=body.after_category_id))
+    await db.commit()
+    rows = (await db.execute(select(QuartalDivider).where(
+        QuartalDivider.class_id == class_id, QuartalDivider.owner_id == user.id, QuartalDivider.term == term,
+    ))).scalars().all()
+    return [r.after_category_id for r in rows]
 
 
 @router.put("/sections/{section_id}/categories/reorder", status_code=204)

@@ -41,6 +41,7 @@ export default function Noten() {
   // sich die Wahl pro Browser. Die Abschnitts-Gewichtung bleibt unberuehrt.
   const [agg, setAgg] = useState(() => { try { return localStorage.getItem("noten_agg") === "median" ? "median" : "mean"; } catch { return "mean"; } });
   const [yearData, setYearData] = useState({ sections: [], rows: [] });
+  const [dividers, setDividers] = useState([]); // Quartalsstriche: after_category_id[]
   const [collapsed, setCollapsed] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem("noten_collapsed") || "[]")); } catch { return new Set(); } });
   const toggleCollapse = (secId) => setCollapsed((prev) => {
     const n = new Set(prev);
@@ -154,6 +155,13 @@ export default function Noten() {
     ]);
     setSections(sec); setEntries(ent); setSummary(sum);
     setStudents(classes.find((c) => c.id === id)?.students || []);
+    fetch(`${API}/classes/${id}/dividers?term=${term}`).then((r) => (r.ok ? r.json() : [])).then((d) => setDividers(Array.isArray(d) ? d : [])).catch(() => {});
+  };
+  const toggleDivider = async (catId) => {
+    const r = await fetch(`${API}/classes/${classId}/dividers/toggle?term=${term}`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ after_category_id: catId }),
+    }).catch(() => null);
+    if (r && r.ok) setDividers(await r.json());
   };
   useEffect(() => { if (classId) load(classId); }, [classId, classes, term, agg]);
   const setAggPersist = (m) => { setAgg(m); try { localStorage.setItem("noten_agg", m); } catch { /* egal */ } };
@@ -364,12 +372,13 @@ export default function Noten() {
                       onDragEnd={() => { setDragCol(null); setDragColOver(null); }}
                       style={{ ...th, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", minWidth: 70, fontWeight: 500,
                         cursor: "grab", opacity: dragCol && dragCol.catId === c.id ? 0.4 : 1,
+                        borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined,
                         boxShadow: colOver === "left" ? "inset 3px 0 0 var(--accent)" : colOver === "right" ? "inset -3px 0 0 var(--accent)" : undefined }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 3, justifyContent: "center", position: "relative" }}>
                         <button onClick={() => setRenameCol(renameCol === c.id ? null : c.id)} title={t("noten.colOverview")}
                           style={{ maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", border: "none", background: "none", cursor: "pointer", color: "var(--text2)", fontWeight: 500, fontSize: 12, padding: 0 }}>{c.name}</button>
                         {renameCol === c.id && (
-                          <ColMenu t={t} cat={c}
+                          <ColMenu t={t} cat={c} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
                             onRename={async (name) => { if (await call(() => fetch(`${API}/categories/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: c.position ?? i }) }))) setRenameCol(null); }}
                             onDelete={() => { if (confirm(t("noten.delColumn", { name: c.name }))) { call(() => fetch(`${API}/categories/${c.id}`, { method: "DELETE" })); setRenameCol(null); } }}
                             onClose={() => setRenameCol(null)} />
@@ -412,7 +421,7 @@ export default function Noten() {
                         const id = `${s.student_id}:${c.id}`;
                         const noten = notenVon(s.student_id, c.id);
                         return (
-                          <td key={c.id} style={{ ...td, padding: 0, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)" }}>
+                          <td key={c.id} style={{ ...td, padding: 0, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined }}>
                             {zelle === id
                               ? <Zelle initial={noten[0] ? de(noten[0].value) : ""} onSave={(txt) => noteSetzen(s.student_id, c.id, txt)} onCancel={() => setZelle(null)} />
                               : <button onClick={() => setZelle(id)}
@@ -602,7 +611,7 @@ function SectionMenu({ t, sec, onEdit, onDelete, onAddCol }) {
 }
 
 // Kleine Uebersicht zur Spalte: Anlagedatum plus Umbenennen/Loeschen.
-function ColMenu({ t, cat, onRename, onDelete, onClose }) {
+function ColMenu({ t, cat, onRename, onDelete, onClose, dividerOn, onToggleDivider }) {
   const [name, setName] = useState(cat.name);
   const datum = cat.created_at ? new Date(cat.created_at).toLocaleDateString("de-DE") : "—";
   return (
@@ -616,6 +625,11 @@ function ColMenu({ t, cat, onRename, onDelete, onClose }) {
             style={{ ...inp, fontSize: 12, padding: 5 }} />
           <DatePick onPick={setName} title={t("noten.useDate")} />
         </div>
+        {onToggleDivider && (
+          <button onClick={onToggleDivider} style={{ width: "100%", marginBottom: 10, padding: "6px 8px", fontSize: 12, fontWeight: 600, borderRadius: 8, cursor: "pointer", border: `1px solid ${dividerOn ? "var(--accent)" : "var(--border2)"}`, background: dividerOn ? "var(--accent)" : "transparent", color: dividerOn ? "#fff" : "var(--text2)" }}>
+            {dividerOn ? t("noten.dividerOff") : t("noten.dividerOn")}
+          </button>
+        )}
         <div style={{ display: "flex", gap: 6, justifyContent: "space-between", alignItems: "center" }}>
           <button onClick={() => name.trim() && onRename(name.trim())} style={{ ...btnPrimary, padding: "5px 12px", fontSize: 12 }}>{t("common.save")}</button>
           <button onClick={onDelete} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>

@@ -449,6 +449,18 @@ class GradeOverride(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class QuartalDivider(Base):
+    """Optischer Quartalsstrich in der Notentabelle — nach welcher Spalte er
+    steht. Mehrere je Klasse+Halbjahr moeglich, rein visuell."""
+    __tablename__ = "quartal_dividers"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    term: Mapped[str] = mapped_column(String(8), default="1", server_default="1")
+    after_category_id: Mapped[int] = mapped_column(ForeignKey("grade_categories.id", ondelete="CASCADE"), index=True)
+
+
 # ─── Nuvora-Kern: Wochenplanung ───
 # Verbindet, was die Module tun: eine Woche hat 1–3 Themenbloecke (aus der
 # Taxonomie) und am Ende einen Test ueber diese Themen. Kern, kein Modul —

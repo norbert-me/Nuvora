@@ -582,6 +582,8 @@ export default {
   "noten.yearGrade": "Jahresnote",
   "noten.termGrade": "HJ-Note",
   "noten.term": "Halbjahr",
+  "noten.dividerOn": "Quartalsstrich setzen",
+  "noten.dividerOff": "Quartalsstrich entfernen",
   "noten.statTitle": "Statistik (Endnoten)",
   "noten.statAvg": "Schnitt",
   "noten.statMedian": "Median",

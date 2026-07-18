@@ -582,6 +582,8 @@ export default {
   "noten.yearGrade": "Year grade",
   "noten.termGrade": "Term grade",
   "noten.term": "Term",
+  "noten.dividerOn": "Add quarter divider",
+  "noten.dividerOff": "Remove quarter divider",
   "noten.statTitle": "Statistics (final grades)",
   "noten.statAvg": "Average",
   "noten.statMedian": "Median",
