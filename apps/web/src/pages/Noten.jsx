@@ -646,10 +646,10 @@ function ColMenu({ t, cat, onRename, onDelete, onClose, dividerOn, onToggleDivid
 // Datumswahl ueber ein natives <input type=date>, transparent ueber dem
 // Kalender-Icon: auf dem iPhone erscheinen so die Datumsraeder. Setzt den
 // Spaltennamen auf TT.MM.JJJJ, der Name bleibt aber frei editierbar.
-function DatePick({ onPick, title }) {
+function DatePick({ onPick, title, size = 14 }) {
   return (
-    <span className="icon-btn" style={{ ...iconBtn, padding: 3, position: "relative", overflow: "hidden" }} title={title}>
-      <Icon d={ICONS.calendar} size={14} />
+    <span className="icon-btn" style={{ ...iconBtn, padding: 6, position: "relative", overflow: "hidden" }} title={title}>
+      <Icon d={ICONS.calendar} size={size} />
       <input type="date" aria-label={title}
         onChange={(e) => { if (e.target.value) { const [y, m, d] = e.target.value.split("-"); onPick(`${d}.${m}.${y}`); } }}
         style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer", width: "100%", height: "100%" }} />
@@ -660,13 +660,13 @@ function DatePick({ onPick, title }) {
 function ColForm({ t, onSave, onCancel, initial = "" }) {
   const [name, setName] = useState(initial);
   return (
-    <div style={{ display: "flex", gap: 4, marginTop: 4, alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
+    <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
       <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder={t("noten.colName")}
         onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) onSave(name.trim()); if (e.key === "Escape") onCancel(); }}
-        style={{ ...inp, fontSize: 12, padding: 5, minWidth: 120 }} />
-      <DatePick onPick={setName} title={t("noten.useDate")} />
-      <button onClick={() => name.trim() && onSave(name.trim())} style={{ ...btnPrimary, padding: "4px 10px", fontSize: 12 }}>OK</button>
-      <button onClick={onCancel} className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={t("common.abort")}><Icon d={ICONS.close} size={13} /></button>
+        style={{ ...inp, fontSize: 14, padding: "9px 11px", flex: 1, minWidth: 120 }} />
+      <DatePick onPick={setName} title={t("noten.useDate")} size={20} />
+      <button onClick={() => name.trim() && onSave(name.trim())} style={{ ...btnPrimary }}>OK</button>
+      <button onClick={onCancel} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.abort")}><Icon d={ICONS.close} size={20} /></button>
     </div>
   );
 }
