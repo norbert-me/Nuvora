@@ -232,7 +232,13 @@ export default function Noten() {
             {gewichtSumme !== 100 ? t("noten.weightNot100", { n: gewichtSumme }) : t("noten.weightSum", { n: gewichtSumme })}
           </span>
         )}
-        {term !== "year" && <button onClick={() => setNeuAbschnitt(true)} style={{ ...btnSecondary, marginLeft: "auto" }}>{t("noten.addSection")}</button>}
+        {term !== "year" && (
+          <button onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}
+            className="icon-btn"
+            style={{ ...iconBtn, marginLeft: "auto", width: 36, height: 36, border: "1px solid var(--border2)", borderRadius: 10 }}>
+            <Icon d={ICONS.plus} size={20} color="var(--accent)" />
+          </button>
+        )}
       </div>
 
       {error && <p style={{ color: "var(--danger, #dc2626)", fontSize: 13, marginBottom: 10 }}>{error}</p>}
@@ -290,7 +296,7 @@ export default function Noten() {
                       onDragOver={(e) => dragOverHeader(e, sec.id)}
                       onDragEnd={() => { setDragId(null); setDragOver(null); }}
                       onDrop={() => abschnittDrop(sec.id)}
-                      style={{ ...th, borderLeft: over && dragOver.side === "left" ? "3px solid var(--accent)" : "2px solid var(--border2)",
+                      style={{ ...th, borderLeft: over && dragOver.side === "left" ? "3px solid var(--accent)" : "2px solid var(--border3)",
                         borderRight: over && dragOver.side === "right" ? "3px solid var(--accent)" : undefined,
                         cursor: "grab", opacity: dragId === sec.id ? 0.4 : 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
@@ -308,7 +314,7 @@ export default function Noten() {
                     </th>
                   );
                 })}
-                <th rowSpan={2} style={{ ...th, borderLeft: "2px solid var(--border2)" }}>{t("noten.total")}</th>
+                <th rowSpan={2} style={{ ...th, borderLeft: "2px solid var(--border3)" }}>{t("noten.total")}</th>
                 <th rowSpan={2} style={{ ...th, minWidth: 40 }} title={t("noten.obsTitle")}>{t("noten.obs")}</th>
               </tr>
               <tr>
@@ -316,14 +322,14 @@ export default function Noten() {
                 {sections.map((sec) => {
                   const cols = sec.categories || [];
                   const bereich = (
-                    <th key={`sn-${sec.id}`} style={{ ...th, borderLeft: collapsed.has(sec.id) ? "2px solid var(--border2)" : undefined, borderRight: "2px solid var(--border2)", fontWeight: 500, minWidth: 56 }} title={t("noten.sectionGradeHint")}>
+                    <th key={`sn-${sec.id}`} style={{ ...th, borderLeft: collapsed.has(sec.id) ? "2px solid var(--border3)" : undefined, borderRight: "2px solid var(--border3)", fontWeight: 500, minWidth: 56 }} title={t("noten.sectionGradeHint")}>
                       {t("noten.sectionGrade")}
                     </th>
                   );
                   if (collapsed.has(sec.id)) return [bereich];
                   if (cols.length === 0) {
                     return [
-                      <th key={`empty-${sec.id}`} style={{ ...th, borderLeft: "2px solid var(--border2)", fontWeight: 400 }}>
+                      <th key={`empty-${sec.id}`} style={{ ...th, borderLeft: "2px solid var(--border3)", fontWeight: 400 }}>
                         {/* Spalte anlegen laeuft ueber das Kebab-Menue des
                             Abschnitts; ein zweiter +Spalte-Knopf war doppelt. */}
                         {neuSpalteIn === sec.id
@@ -343,7 +349,7 @@ export default function Noten() {
                       onDragOver={(e) => dragOverCol(e, c.id, sec.id)}
                       onDrop={() => spalteDrop(c.id, sec)}
                       onDragEnd={() => { setDragCol(null); setDragColOver(null); }}
-                      style={{ ...th, borderLeft: i === 0 ? "2px solid var(--border2)" : "1px solid var(--border)", minWidth: 70, fontWeight: 500,
+                      style={{ ...th, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", minWidth: 70, fontWeight: 500,
                         cursor: "grab", opacity: dragCol && dragCol.catId === c.id ? 0.4 : 1,
                         boxShadow: colOver === "left" ? "inset 3px 0 0 var(--accent)" : colOver === "right" ? "inset -3px 0 0 var(--accent)" : undefined }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 3, justifyContent: "center", position: "relative" }}>
@@ -378,7 +384,7 @@ export default function Noten() {
                   {sections.map((sec) => {
                     const cols = sec.categories || [];
                     const bereichTd = (
-                      <td key={`sn-${sec.id}`} style={{ ...td, padding: 0, borderLeft: collapsed.has(sec.id) ? "2px solid var(--border2)" : undefined, borderRight: "2px solid var(--border2)", background: "var(--bg2, rgba(0,0,0,0.02))" }}>
+                      <td key={`sn-${sec.id}`} style={{ ...td, padding: 0, borderLeft: collapsed.has(sec.id) ? "2px solid var(--border3)" : undefined, borderRight: "2px solid var(--border3)", background: "var(--bg2, rgba(0,0,0,0.02))" }}>
                         <NoteZelle t={t}
                           editing={zelle === `sec:${s.student_id}:${sec.id}`}
                           onEdit={() => setZelle(`sec:${s.student_id}:${sec.id}`)}
@@ -390,13 +396,13 @@ export default function Noten() {
                       </td>
                     );
                     if (collapsed.has(sec.id)) return [bereichTd];
-                    if (cols.length === 0) return [<td key={`e-${sec.id}`} style={{ ...td, borderLeft: "2px solid var(--border2)" }}></td>, bereichTd];
+                    if (cols.length === 0) return [<td key={`e-${sec.id}`} style={{ ...td, borderLeft: "2px solid var(--border3)" }}></td>, bereichTd];
                     return [
                       ...cols.map((c, i) => {
                         const id = `${s.student_id}:${c.id}`;
                         const noten = notenVon(s.student_id, c.id);
                         return (
-                          <td key={c.id} style={{ ...td, padding: 0, borderLeft: i === 0 ? "2px solid var(--border2)" : "1px solid var(--border)" }}>
+                          <td key={c.id} style={{ ...td, padding: 0, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)" }}>
                             {zelle === id
                               ? <Zelle initial={noten[0] ? de(noten[0].value) : ""} onSave={(txt) => noteSetzen(s.student_id, c.id, txt)} onCancel={() => setZelle(null)} />
                               : <button onClick={() => setZelle(id)}
@@ -409,7 +415,7 @@ export default function Noten() {
                       bereichTd,
                     ];
                   })}
-                  <td style={{ ...td, padding: 0, borderLeft: "2px solid var(--border2)" }}>
+                  <td style={{ ...td, padding: 0, borderLeft: "2px solid var(--border3)" }}>
                     <NoteZelle t={t} bold
                       editing={zelle === `end:${s.student_id}`}
                       onEdit={() => setZelle(`end:${s.student_id}`)}
@@ -677,9 +683,9 @@ function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo }
   const sec1 = sections.filter((s) => s.term === "1");
   const sec2 = sections.filter((s) => s.term === "2");
   if (rows.length === 0) return <p style={{ fontSize: 13.5, color: "var(--text3)", marginTop: 8 }}>{t("noten.noStudents")}</p>;
-  const grp = { ...th, borderLeft: "2px solid var(--border2)", fontSize: 12.5 };
+  const grp = { ...th, borderLeft: "2px solid var(--border3)", fontSize: 12.5 };
   const secCols = (secs) => secs.map((s, i) => (
-    <th key={s.id} style={{ ...th, borderLeft: i === 0 ? "2px solid var(--border2)" : "1px solid var(--border)", minWidth: 56, fontWeight: 500 }}>{s.name}</th>
+    <th key={s.id} style={{ ...th, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", minWidth: 56, fontWeight: 500 }}>{s.name}</th>
   ));
   return (
     <div style={{ overflowX: "auto", overflowY: "visible", border: "1px solid var(--border)", borderRadius: 12, WebkitOverflowScrolling: "touch" }}>
@@ -709,7 +715,7 @@ function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo }
                 </button>
               </td>
               {sec1.map((s, i) => (
-                <td key={s.id} style={{ ...td, borderLeft: i === 0 ? "2px solid var(--border2)" : "1px solid var(--border)" }}>
+                <td key={s.id} style={{ ...td, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)" }}>
                   {r.section_grades[String(s.id)] != null ? de(r.section_grades[String(s.id)]) : <span style={{ color: "var(--border2)" }}>·</span>}
                 </td>
               ))}
@@ -717,14 +723,14 @@ function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo }
                 {r.term_ends["1"] != null ? de(r.term_ends["1"]) : <span style={{ color: "var(--border2)" }}>·</span>}
               </td>
               {sec2.map((s, i) => (
-                <td key={s.id} style={{ ...td, borderLeft: i === 0 ? "2px solid var(--border2)" : "1px solid var(--border)" }}>
+                <td key={s.id} style={{ ...td, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)" }}>
                   {r.section_grades[String(s.id)] != null ? de(r.section_grades[String(s.id)]) : <span style={{ color: "var(--border2)" }}>·</span>}
                 </td>
               ))}
               <td style={{ ...td, borderLeft: "1px solid var(--border)", fontWeight: 700 }}>
                 {r.term_ends["2"] != null ? de(r.term_ends["2"]) : <span style={{ color: "var(--border2)" }}>·</span>}
               </td>
-              <td style={{ ...td, padding: 0, borderLeft: "2px solid var(--border2)" }}>
+              <td style={{ ...td, padding: 0, borderLeft: "2px solid var(--border3)" }}>
                 <NoteZelle t={t} bold
                   editing={editing === `end:${r.student_id}`}
                   onEdit={() => setEditing(`end:${r.student_id}`)}
@@ -743,7 +749,7 @@ function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo }
 }
 
 const inp = { width: "100%", padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" };
-const th = { padding: "8px 6px", borderBottom: "2px solid var(--border2)", fontWeight: 600, fontSize: 12, color: "var(--text2)", textAlign: "center", whiteSpace: "nowrap", position: "relative" };
+const th = { padding: "8px 6px", borderBottom: "2px solid var(--border3)", fontWeight: 600, fontSize: 12, color: "var(--text2)", textAlign: "center", whiteSpace: "nowrap", position: "relative" };
 const td = { padding: "4px 6px", borderBottom: "1px solid var(--border)", textAlign: "center", color: "var(--text)" };
 const stickyL = { position: "sticky", left: 0, background: "var(--card)", zIndex: 1 };
 const overlay = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 200 };
