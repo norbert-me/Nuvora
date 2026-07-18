@@ -51,6 +51,18 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     fetch(`${API}/admin/setup`).then(r => r.ok ? r.json() : null).then(setSetup).catch(() => {});
   }, [isAdmin]);
 
+  const changeChannel = async (ch) => {
+    if (ch === versionInfo?.channel) return;
+    setVersionLoading(true);
+    await fetch(`${API}/version/channel`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel: ch }),
+    }).catch(() => {});
+    const d = await fetch(`${API}/version`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    setVersionInfo(d);
+    setVersionLoading(false);
+  };
+
   const saveProfile = async (e) => {
     e.preventDefault();
     setProfileMsg("");
@@ -245,6 +257,22 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                   </div>
                 ) : (
                   <div style={{ marginTop: 10, fontSize: 12, color: "var(--text3)" }}>{t("profile.githubFail")}</div>
+                )}
+                {versionInfo.channels && (
+                  <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
+                    <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 8 }}>{t("profile.channel")}</div>
+                    <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden" }}>
+                      {versionInfo.channels.map((ch) => (
+                        <button key={ch} onClick={() => changeChannel(ch)}
+                          style={{
+                            padding: "6px 16px", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
+                            background: versionInfo.channel === ch ? "var(--accent)" : "transparent",
+                            color: versionInfo.channel === ch ? "#fff" : "var(--text2)",
+                          }}>{t(`profile.channel.${ch}`)}</button>
+                      ))}
+                    </div>
+                    <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>{t(`profile.channelHint.${versionInfo.channel}`)}</p>
+                  </div>
                 )}
               </>
             ) : (

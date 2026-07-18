@@ -344,7 +344,17 @@ APP_VERSION = _read_version()
 GITHUB_VERSION_URL = os.environ.get(
     "GITHUB_VERSION_URL", "https://raw.githubusercontent.com/norbert-me/Nuvora/main/apps/api/VERSION"
 )
-_version_cache = {"ts": 0.0, "latest": None}
+# Stable = letztes veroeffentlichtes Nicht-Prerelease-Release. GitHubs
+# /releases/latest schliesst Prereleases (= Beta-Kanal) und Entwuerfe aus.
+GITHUB_RELEASE_URL = os.environ.get(
+    "GITHUB_RELEASE_URL", "https://api.github.com/repos/norbert-me/Nuvora/releases/latest"
+)
+# Kanal je Instanz. "stable" = nur bei Major-Releases; "beta" = jeder Commit
+# (rohe VERSION von main). Steht in app_settings, hier nur der Fallback.
+DEFAULT_CHANNEL = os.environ.get("UPDATE_CHANNEL", "stable")
+CHANNELS = ("stable", "beta")
+# Cache je Kanal, damit ein Umschalten nicht am alten Wert haengt.
+_version_cache = {"stable": {"ts": 0.0, "latest": None}, "beta": {"ts": 0.0, "latest": None}}
 
 
 def _parse_version(v: str):
@@ -356,30 +366,81 @@ def _parse_version(v: str):
     return tuple(out) or (0,)
 
 
-def _fetch_latest_version() -> str:
+from .database import get_db
+from pydantic import BaseModel as _BaseModel
+
+
+def _fetch_latest_beta() -> str:
     import urllib.request
     req = urllib.request.Request(GITHUB_VERSION_URL, headers={"User-Agent": "Nuvora"})
     with urllib.request.urlopen(req, timeout=5) as r:
         return r.read().decode("utf-8", "ignore").strip().split("\n")[0].strip()
 
 
-@app.get("/api/version")
-async def version(user=Depends(_require_admin)):
-    latest = _version_cache["latest"]
-    if latest is None or (_time.time() - _version_cache["ts"] > 3600):
+def _fetch_latest_stable() -> str:
+    """Tag des letzten Nicht-Prerelease-Releases. Leer, wenn es noch keins gibt."""
+    import urllib.request, urllib.error, json as _json
+    req = urllib.request.Request(GITHUB_RELEASE_URL, headers={"User-Agent": "Nuvora", "Accept": "application/vnd.github+json"})
+    try:
+        with urllib.request.urlopen(req, timeout=5) as r:
+            data = _json.loads(r.read().decode("utf-8", "ignore"))
+        return (data.get("tag_name") or "").strip()
+    except urllib.error.HTTPError as e:
+        if e.code == 404:  # noch kein Stable-Release veroeffentlicht
+            return ""
+        raise
+
+
+async def _get_channel(db) -> str:
+    from .models import AppSetting
+    row = await db.get(AppSetting, "update_channel")
+    ch = row.value if row else DEFAULT_CHANNEL
+    return ch if ch in CHANNELS else DEFAULT_CHANNEL
+
+
+async def _latest_for(channel: str) -> str:
+    cache = _version_cache[channel]
+    if cache["latest"] is None or (_time.time() - cache["ts"] > 3600):
         try:
-            latest = await asyncio.to_thread(_fetch_latest_version)
-            _version_cache["ts"] = _time.time()
-            _version_cache["latest"] = latest
+            fetch = _fetch_latest_stable if channel == "stable" else _fetch_latest_beta
+            cache["latest"] = await asyncio.to_thread(fetch)
+            cache["ts"] = _time.time()
         except Exception:
-            latest = _version_cache["latest"]
+            pass  # alten Cachewert behalten
+    return cache["latest"]
+
+
+@app.get("/api/version")
+async def version(user=Depends(_require_admin), db=Depends(get_db)):
+    channel = await _get_channel(db)
+    latest = await _latest_for(channel)
     update = bool(latest) and _parse_version(latest) > _parse_version(APP_VERSION)
     return {
         "current": APP_VERSION,
         "latest": latest,
         "update_available": update,
+        "channel": channel,
+        "channels": list(CHANNELS),
         "repo_url": "https://github.com/norbert-me/Nuvora",
     }
+
+
+class ChannelBody(_BaseModel):
+    channel: str
+
+
+@app.put("/api/version/channel")
+async def set_channel(body: ChannelBody, user=Depends(_require_admin), db=Depends(get_db)):
+    from .models import AppSetting
+    if body.channel not in CHANNELS:
+        raise HTTPException(400, "Unbekannter Kanal")
+    row = await db.get(AppSetting, "update_channel")
+    if row:
+        row.value = body.channel
+    else:
+        db.add(AppSetting(key="update_channel", value=body.channel))
+    await db.commit()
+    return {"channel": body.channel}
 
 
 @app.post("/api/mail-test")
