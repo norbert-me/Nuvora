@@ -58,9 +58,6 @@ export default function Cards() {
             </span>
           </div>
           <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-            <Link to={`/cardvote/class-evaluation/${cls.id}`} className="icon-btn" style={{ ...iconBtn, textDecoration: "none" }} title={t("classes.evalTitle")}>
-              <Icon d={ICONS.chart} color="#0066cc" />
-            </Link>
             <button
               onClick={() => download(`${API}/classes/${cls.id}/cards-pdf`, `CardVote_${cls.name}.pdf`)}
               className="icon-btn" style={iconBtn} title={t("classes.printCards")}

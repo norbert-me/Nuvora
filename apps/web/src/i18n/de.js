@@ -113,6 +113,7 @@ export default {
   "classes.printCards": "Karten drucken",
   "classes.cardNumberHint": "Nummer der bedruckten Karte (CardVote)",
   "classes.export": "Exportieren",
+  "classes.open": "Klasse öffnen",
   "classes.importExcel": "Excel importieren",
   "classes.importJson": "JSON importieren",
   "classes.templateExcel": "Excel-Vorlage",

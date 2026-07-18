@@ -333,13 +333,13 @@ export default function Classes() {
 
       {classes.map((cls) => (
         <div key={cls.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", marginBottom: 10, border: "1px solid var(--border)", borderRadius: 16, background: "var(--card)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button onClick={() => startEdit(cls)} title={t("classes.open")}
+            style={{ display: "flex", alignItems: "center", gap: 10, border: "none", background: "none", cursor: "pointer", padding: 0, textAlign: "left", flex: 1, minWidth: 0 }}>
             <strong style={{ fontSize: 16, color: "var(--text)" }}>{cls.name}</strong>
             <span style={{ color: "var(--text3)", fontSize: 13 }}>{cls.students.length} {t("classes.learners")}</span>
-          </div>
+          </button>
           <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
             <button onClick={() => downloadFile(`${API}/export/class/${cls.id}`, `${cls.name}.json`)} className="icon-btn" style={iconBtn} title={t("classes.export")}><Icon d={ICONS.download} /></button>
-            <button onClick={() => startEdit(cls)} className="icon-btn" style={iconBtn} title={t("common.edit")}><Icon d={ICONS.edit} /></button>
             <button onClick={() => remove(cls.id)} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
           </div>
         </div>
