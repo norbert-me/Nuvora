@@ -34,6 +34,9 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   const [profileMsg, setProfileMsg] = useState("");
   const DEFAULT_SCALE = { 1: 87, 2: 73, 3: 59, 4: 45, 5: 20, 6: 0 };
   const [gradeScale, setGradeScale] = useState(user.grade_scale || DEFAULT_SCALE);
+  const [showUsername, setShowUsername] = useState(false);
+  const [showScale, setShowScale] = useState(false);
+  const [showPw, setShowPw] = useState(false);
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminMsg, setAdminMsg] = useState("");
   const [setup, setSetup] = useState(null);
@@ -167,19 +170,24 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         {emailMsg && <div style={{ fontSize: 13, color: emailMsg === t("profile.linkSent") ? "#0a7d3e" : "#d1350f", marginBottom: 16 }}>{emailMsg}</div>}
 
         <form onSubmit={saveProfile}>
-          <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
+          <button type="button" onClick={() => setShowUsername((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: showUsername ? 10 : 0 }}>
+            <span style={{ fontSize: 20, color: "var(--text3)", lineHeight: 1 }}>{showUsername ? "−" : "+"}</span>
             <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{t("profile.username")}</span>
             <InfoDot text={t("profile.usernameHint")} />
-          </div>
-          <input placeholder={t("profile.usernamePlaceholder")} value={marketplaceName} onChange={(e) => setMarketplaceName(e.target.value)}
-            style={{ ...inputStyle, marginBottom: 10 }} />
+          </button>
+          {showUsername && (
+            <input placeholder={t("profile.usernamePlaceholder")} value={marketplaceName} onChange={(e) => setMarketplaceName(e.target.value)}
+              style={{ ...inputStyle, marginBottom: 10 }} />
+          )}
 
-          <div style={{ display: "flex", alignItems: "center", marginTop: 20, marginBottom: 10 }}>
+          <button type="button" onClick={() => setShowScale((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: 20, marginBottom: showScale ? 10 : 0 }}>
+            <span style={{ fontSize: 20, color: "var(--text3)", lineHeight: 1 }}>{showScale ? "−" : "+"}</span>
             <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{t("profile.gradeScale")}</span>
             <InfoDot text={t("profile.gradeScaleHint")} />
-          </div>
+          </button>
           <style>{".nice-num::-webkit-inner-spin-button,.nice-num::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.nice-num{-moz-appearance:textfield;appearance:textfield}"}</style>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+          {showScale && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12, marginTop: 4 }}>
             {[1, 2, 3, 4, 5].map((g) => (
               <div key={g} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 8px", background: "var(--card)", borderRadius: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{g}</span>
@@ -194,14 +202,19 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
               </div>
             ))}
           </div>
+          )}
 
-          {profileMsg && <div style={{ fontSize: 13, color: profileMsg === "Gespeichert" ? "#0a7d3e" : "#d1350f", marginBottom: 8 }}>{profileMsg}</div>}
-          <button type="submit" style={btnPrimary}>{t("common.save")}</button>
+          {profileMsg && <div style={{ fontSize: 13, color: profileMsg === "Gespeichert" ? "#0a7d3e" : "#d1350f", marginTop: 12, marginBottom: 8 }}>{profileMsg}</div>}
+          <button type="submit" style={{ ...btnPrimary, marginTop: 16 }}>{t("common.save")}</button>
         </form>
       </div>
 
       <div style={{ padding: 24, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 24 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("profile.changePw")}</div>
+        <button type="button" onClick={() => setShowPw((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: showPw ? 12 : 0 }}>
+          <span style={{ fontSize: 20, color: "var(--text3)", lineHeight: 1 }}>{showPw ? "−" : "+"}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{t("profile.changePw")}</span>
+        </button>
+        {showPw && (
         <form onSubmit={changePw} autoComplete="on">
           <input type="hidden" name="username" autoComplete="username" value={user?.email || ""} />
           <input type="password" name="current-password" autoComplete="current-password" placeholder={t("profile.oldPw")} value={oldPw} onChange={(e) => setOldPw(e.target.value)}
@@ -211,6 +224,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
           {msg && <div style={{ fontSize: 13, color: msg === t("profile.pwChanged") ? "#0a7d3e" : "#d1350f", marginBottom: 8 }}>{msg}</div>}
           <button type="submit" style={btnPrimary}>{t("profile.change")}</button>
         </form>
+        )}
       </div>
 
       {isAdmin && (
@@ -263,19 +277,19 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                   )}
                 </div>
                 {versionInfo.channels && (
-                  <div style={{ minWidth: 180 }}>
-                    <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 8 }}>{t("profile.channel")}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("profile.channel")}</span>
                     <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden" }}>
                       {versionInfo.channels.map((ch) => (
                         <button key={ch} onClick={() => changeChannel(ch)}
                           style={{
-                            padding: "6px 16px", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
+                            padding: "4px 12px", fontSize: 12.5, fontWeight: 600, border: "none", cursor: "pointer",
                             background: versionInfo.channel === ch ? "var(--accent)" : "transparent",
                             color: versionInfo.channel === ch ? "#fff" : "var(--text2)",
                           }}>{t(`profile.channel.${ch}`)}</button>
                       ))}
                     </div>
-                    <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>{t(`profile.channelHint.${versionInfo.channel}`)}</p>
+                    <InfoDot text={t(`profile.channelHint.${versionInfo.channel}`)} />
                   </div>
                 )}
               </div>
