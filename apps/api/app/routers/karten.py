@@ -38,6 +38,28 @@ def _token():
     return secrets.token_urlsafe(24)  # ~32 Zeichen, unratbar
 
 
+# Reifegrad einer Karte fuer das Histogramm. Ohne Review-Datensatz oder mit
+# reps==0 ist sie neu; sonst staffelt das Intervall (Tage) den Grad.
+BUCKETS = ("neu", "lernen", "kurz", "mittel", "lang")
+
+
+def _bucket(rev) -> str:
+    if rev is None or rev.reps == 0:
+        return "neu"
+    d = rev.interval_days
+    if d <= 6:
+        return "lernen"
+    if d <= 20:
+        return "kurz"
+    if d <= 59:
+        return "mittel"
+    return "lang"
+
+
+def _empty_hist() -> dict:
+    return {b: 0 for b in BUCKETS}
+
+
 async def require_module(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> User:
     if not await is_active(db, user.id, MODULE_KEY):
         raise HTTPException(403, "Modul Karten ist nicht aktiviert")
@@ -78,6 +100,7 @@ class DeckOut(BaseModel):
     id: int
     class_id: int
     name: str
+    released_at: Optional[datetime] = None
     cards: List[CardOut] = []
     model_config = {"from_attributes": True}
 
@@ -109,6 +132,30 @@ async def delete_deck(deck_id: int, user: User = Depends(require_module), db: As
     deck = await _owned_deck(db, user, deck_id)
     await db.delete(deck)
     await db.commit()
+
+
+class ReleaseIn(BaseModel):
+    # now=True: sofort ausrollen. released_at gesetzt: geplant. Beides leer:
+    # zurueckziehen (wieder Entwurf, fuer SuS unsichtbar).
+    now: bool = False
+    released_at: Optional[datetime] = None
+
+
+@router.post("/decks/{deck_id}/release", response_model=DeckOut)
+async def release_deck(deck_id: int, body: ReleaseIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    deck = await _owned_deck(db, user, deck_id)
+    if body.now:
+        deck.released_at = _now()
+    elif body.released_at is not None:
+        at = body.released_at
+        if at.tzinfo is None:
+            at = at.replace(tzinfo=timezone.utc)
+        deck.released_at = at
+    else:
+        deck.released_at = None  # zurueckziehen
+    await db.commit()
+    await db.refresh(deck, ["cards"])
+    return deck
 
 
 class CardIn(BaseModel):
@@ -191,6 +238,8 @@ class StudentProgress(BaseModel):
     name: str
     reviewed: int   # wie viele Karten schon einmal gelernt
     due: int        # wie viele heute faellig
+    total: int      # Karten in ausgerollten Stapeln
+    hist: dict      # Reifegrad-Verteilung (neu/lernen/kurz/mittel/lang)
 
 
 @router.get("/classes/{class_id}/progress", response_model=List[StudentProgress])
@@ -198,13 +247,32 @@ async def progress(class_id: int, user: User = Depends(require_module), db: Asyn
     await _owned_class(db, user, class_id)
     students = (await db.execute(select(Student).where(Student.class_id == class_id).order_by(Student.card_id))).scalars().all()
     now = _now()
+    # Nur ausgerollte Stapel zaehlen — Entwuerfe verzerren den Fortschritt nicht.
+    deck_ids = (await db.execute(select(CardDeck.id).where(
+        CardDeck.class_id == class_id,
+        CardDeck.released_at.is_not(None),
+        CardDeck.released_at <= now,
+    ))).scalars().all()
+    card_ids = []
+    if deck_ids:
+        card_ids = (await db.execute(select(Card.id).where(Card.deck_id.in_(deck_ids)))).scalars().all()
+    total = len(card_ids)
     out = []
     for st in students:
-        reviews = (await db.execute(select(CardReview).where(CardReview.student_id == st.id))).scalars().all()
+        reviews = {r.card_id: r for r in (await db.execute(select(CardReview).where(CardReview.student_id == st.id))).scalars().all()}
+        hist = _empty_hist()
+        due = 0
+        reviewed = 0
+        for cid in card_ids:
+            rev = reviews.get(cid)
+            hist[_bucket(rev)] += 1
+            if rev is not None and rev.reps > 0:
+                reviewed += 1
+            if rev is None or rev.due <= now:
+                due += 1
         out.append(StudentProgress(
             student_id=st.id, name=st.name,
-            reviewed=len(reviews),
-            due=len([r for r in reviews if r.due <= now]),
+            reviewed=reviewed, due=due, total=total, hist=hist,
         ))
     return out
 
@@ -247,19 +315,30 @@ async def qr_png(token: str, base: str = "", db: AsyncSession = Depends(get_db))
 async def student_session(token: str, db: AsyncSession = Depends(get_db)):
     """Faellige Karten fuer diesen Schueler. Token statt Login."""
     st = await _student_by_token(db, token)
-    # Alle Karten der Stapel dieser Klasse.
-    decks = (await db.execute(select(CardDeck.id).where(CardDeck.class_id == st.class_id))).scalars().all()
+    now = _now()
+    # Nur ausgerollte Stapel: Entwuerfe (released_at NULL) und geplante in der
+    # Zukunft bleiben fuer SuS unsichtbar.
+    decks = (await db.execute(select(CardDeck.id).where(
+        CardDeck.class_id == st.class_id,
+        CardDeck.released_at.is_not(None),
+        CardDeck.released_at <= now,
+    ))).scalars().all()
     if not decks:
-        return {"name": st.name, "cards": []}
+        return {"name": st.name, "cards": [], "total": 0, "due": 0, "learned": 0, "hist": _empty_hist()}
     cards = (await db.execute(select(Card).where(Card.deck_id.in_(decks)).order_by(Card.position))).scalars().all()
     reviews = {r.card_id: r for r in (await db.execute(select(CardReview).where(CardReview.student_id == st.id))).scalars().all()}
-    now = _now()
     faellig = []
+    hist = _empty_hist()
+    learned = 0
     for c in cards:
         rev = reviews.get(c.id)
+        hist[_bucket(rev)] += 1
+        if rev is not None and rev.reps > 0:
+            learned += 1
         if rev is None or rev.due <= now:
             faellig.append({"card_id": c.id, "front": c.front, "back": c.back})
-    return {"name": st.name, "cards": faellig, "total": len(cards)}
+    return {"name": st.name, "cards": faellig, "total": len(cards),
+            "due": len(faellig), "learned": learned, "hist": hist}
 
 
 class ReviewIn(BaseModel):

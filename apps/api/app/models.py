@@ -494,6 +494,9 @@ class CardDeck(Base):
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(120), default="", server_default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Ausrollen: NULL = Entwurf, fuer SuS unsichtbar. Gesetzt = ab diesem
+    # Zeitpunkt faellig (jetzt = sofort, Zukunft = geplant).
+    released_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     cards: Mapped[list["Card"]] = relationship(back_populates="deck", cascade="all, delete-orphan", order_by="Card.position")
 

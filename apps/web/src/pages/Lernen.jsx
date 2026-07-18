@@ -44,11 +44,12 @@ export default function Lernen() {
   if (done) {
     return (
       <Center>
-        <div style={{ textAlign: "center" }}>
+        <div style={{ textAlign: "center", width: "100%", maxWidth: 460 }}>
           <div style={{ fontSize: 48, marginBottom: 8 }}>✓</div>
           <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>Fertig für heute!</h2>
           <p style={{ color: "var(--text2)", marginBottom: 20 }}>Alle fälligen Karten gelernt. Komm später wieder.</p>
-          <button onClick={load} style={btn}>Nochmal prüfen</button>
+          <MeinFortschritt data={data} />
+          <button onClick={load} style={{ ...btn, marginTop: 20 }}>Nochmal prüfen</button>
         </div>
       </Center>
     );
@@ -85,6 +86,43 @@ export default function Lernen() {
         )}
       </div>
     </Center>
+  );
+}
+
+// Eigener Fortschritt fuer die lernende Person: gelernt-Anteil und die
+// Reifegrad-Verteilung als kleiner gestapelter Balken.
+const REIFE = [
+  ["neu", "Neu", "#cbd5e1"],
+  ["lernen", "Am Lernen", "#f59e0b"],
+  ["kurz", "Kurzfristig", "#eab308"],
+  ["mittel", "Mittelfristig", "#84cc16"],
+  ["lang", "Langfristig", "#0a7d3e"],
+];
+
+function MeinFortschritt({ data }) {
+  const hist = data?.hist || {};
+  const total = data?.total || 0;
+  if (!total) return null;
+  const learned = data?.learned || 0;
+  return (
+    <div style={{ padding: 16, border: "1px solid var(--border)", borderRadius: 16, background: "var(--card)", textAlign: "left" }}>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Dein Fortschritt</div>
+      <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 12 }}>{learned} von {total} Karten gelernt</div>
+      <div style={{ display: "flex", height: 12, borderRadius: 6, overflow: "hidden", marginBottom: 10 }}>
+        {REIFE.map(([k, , color]) => {
+          const n = hist[k] || 0;
+          return n > 0 ? <div key={k} style={{ width: `${(n / total) * 100}%`, background: color }} title={`${n}`} /> : null;
+        })}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 12px" }}>
+        {REIFE.map(([k, label, color]) => (
+          <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, color: "var(--text3)" }}>
+            <span style={{ width: 9, height: 9, borderRadius: 3, background: color }} />
+            {label} {hist[k] || 0}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 

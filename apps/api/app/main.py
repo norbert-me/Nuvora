@@ -129,6 +129,7 @@ def _ensure_columns(sync_conn):
         ("school_classes", "plan_blocks", "INTEGER DEFAULT 2 NOT NULL"),
         ("school_classes", "karten_token", "VARCHAR(64)"),
         ("students", "karten_token", "VARCHAR(64)"),
+        ("card_decks", "released_at", "TIMESTAMPTZ"),
     ]
     for table, column, ddl in wanted:
         if table not in existing_tables:
@@ -136,6 +137,11 @@ def _ensure_columns(sync_conn):
         cols = {c["name"] for c in inspector.get_columns(table)}
         if column not in cols:
             sync_conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
+            # Bestandsstapel bleiben sichtbar: einmalig als bereits ausgerollt
+            # markieren. Laeuft nur beim erstmaligen Anlegen der Spalte, also
+            # nicht wieder ueber spaeter angelegte Entwuerfe (released_at NULL).
+            if (table, column) == ("card_decks", "released_at"):
+                sync_conn.execute(text("UPDATE card_decks SET released_at = now() WHERE released_at IS NULL"))
 
     # Indizes auf haeufig gefilterte Fremdschluessel (idempotent, additiv).
     # Ohne sie laufen Auswertung/Live-Session als Full-Table-Scans ueber die scans-Tabelle.

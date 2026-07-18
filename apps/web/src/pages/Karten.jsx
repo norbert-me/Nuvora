@@ -83,26 +83,53 @@ export default function Karten() {
         </>
       )}
 
-      {view === "progress" && (
-        <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 12 }}>
-          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13.5 }}>
-            <thead><tr>
-              <th style={{ ...th, textAlign: "left" }}>{t("common.name")}</th>
-              <th style={th}>{t("karten.reviewed")}</th>
-              <th style={th}>{t("karten.due")}</th>
-            </tr></thead>
-            <tbody>
-              {progress.map((p) => (
-                <tr key={p.student_id}>
-                  <td style={{ ...td, textAlign: "left" }}>{p.name}</td>
-                  <td style={td}>{p.reviewed}</td>
-                  <td style={{ ...td, color: p.due ? "#b8860b" : "var(--text3)" }}>{p.due || "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {view === "progress" && (() => {
+        const total = progress[0]?.total || 0;
+        // Klassen-Verteilung: Reifegrade aller Schueler aufsummiert.
+        const classHist = progress.reduce((acc, p) => {
+          REIFE.forEach(([k]) => { acc[k] = (acc[k] || 0) + (p.hist?.[k] || 0); });
+          return acc;
+        }, {});
+        return (
+          <>
+            {total === 0 ? (
+              <p style={{ fontSize: 13.5, color: "var(--text3)", marginBottom: 16 }}>{t("karten.noRolledOut")}</p>
+            ) : (
+              <div style={{ padding: 16, border: "1px solid var(--border)", borderRadius: 12, marginBottom: 16, background: "var(--card)" }}>
+                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>{t("karten.classMaturity")}</div>
+                <ReifeBar hist={classHist} height={14} />
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", marginTop: 10 }}>
+                  {REIFE.map(([k, label, color]) => (
+                    <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--text3)" }}>
+                      <span style={{ width: 10, height: 10, borderRadius: 3, background: color }} />{label} {classHist[k] || 0}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 12 }}>
+              <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13.5 }}>
+                <thead><tr>
+                  <th style={{ ...th, textAlign: "left" }}>{t("common.name")}</th>
+                  <th style={{ ...th, textAlign: "left", minWidth: 120 }}>{t("karten.maturity")}</th>
+                  <th style={th}>{t("karten.reviewed")}</th>
+                  <th style={th}>{t("karten.due")}</th>
+                </tr></thead>
+                <tbody>
+                  {progress.map((p) => (
+                    <tr key={p.student_id}>
+                      <td style={{ ...td, textAlign: "left" }}>{p.name}</td>
+                      <td style={{ ...td, textAlign: "left" }}><ReifeBar hist={p.hist} /></td>
+                      <td style={td}>{p.reviewed}{total ? ` / ${total}` : ""}</td>
+                      <td style={{ ...td, color: p.due ? "#b8860b" : "var(--text3)" }}>{p.due || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        );
+      })()}
 
       {view === "qr" && (
         <div>
@@ -126,19 +153,47 @@ export default function Karten() {
 function Deck({ deck, t, call }) {
   const [front, setFront] = useState("");
   const [back, setBack] = useState("");
+  const [planDate, setPlanDate] = useState("");
   const add = async (e) => {
     e.preventDefault();
     if (!front.trim() || !back.trim()) return;
     if (await call(() => fetch(`${API}/decks/${deck.id}/cards`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ front: front.trim(), back: back.trim() }) }))) { setFront(""); setBack(""); }
   };
+  const release = (payload) => call(() => fetch(`${API}/decks/${deck.id}/release`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }));
+
+  const now = Date.now();
+  const rel = deck.released_at ? new Date(deck.released_at).getTime() : null;
+  const status = rel === null ? "entwurf" : rel > now ? "geplant" : "aus";
+  const badge = status === "aus" ? { text: t("karten.rolledOut"), bg: "rgba(10,125,62,0.12)", col: "#0a7d3e" }
+    : status === "geplant" ? { text: t("karten.plannedFor", { date: new Date(deck.released_at).toLocaleString() }), bg: "rgba(184,134,11,0.12)", col: "#b8860b" }
+    : { text: t("karten.draft"), bg: "var(--bg3)", col: "var(--text3)" };
+
   return (
     <div style={{ marginBottom: 14, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-        <strong style={{ flex: 1, fontSize: 16 }}>{deck.name || t("karten.deck")}</strong>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+        <strong style={{ fontSize: 16 }}>{deck.name || t("karten.deck")}</strong>
+        <span style={{ fontSize: 11.5, fontWeight: 600, padding: "2px 8px", borderRadius: 980, background: badge.bg, color: badge.col }}>{badge.text}</span>
+        <span style={{ flex: 1 }} />
         <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{deck.cards.length} {t("karten.cards")}</span>
         <button onClick={() => { if (confirm(t("karten.delDeck", { name: deck.name }))) call(() => fetch(`${API}/decks/${deck.id}`, { method: "DELETE" })); }}
           className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
       </div>
+
+      {/* Ausrollen: sofort, geplant oder zurueckziehen. Ohne Karten sinnlos. */}
+      {deck.cards.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap", fontSize: 13 }}>
+          {status !== "aus" && <button onClick={() => release({ now: true })} style={{ ...btnPrimary, padding: "5px 12px" }}>{t("karten.rollOutNow")}</button>}
+          {status !== "aus" && (
+            <>
+              <input type="datetime-local" value={planDate} onChange={(e) => setPlanDate(e.target.value)}
+                style={{ ...inp, padding: "5px 8px" }} />
+              <button disabled={!planDate} onClick={() => release({ released_at: new Date(planDate).toISOString() })}
+                style={{ ...btnSecondary, padding: "5px 12px", opacity: planDate ? 1 : 0.4 }}>{t("karten.plan")}</button>
+            </>
+          )}
+          {status !== "entwurf" && <button onClick={() => release({})} style={{ ...btnSecondary, padding: "5px 12px" }}>{t("karten.withdraw")}</button>}
+        </div>
+      )}
       {deck.cards.map((c) => (
         <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 13.5 }}>
           <span style={{ flex: 1, minWidth: 0 }}><strong>{c.front}</strong> <span style={{ color: "var(--text3)" }}>→ {c.back}</span></span>
@@ -150,6 +205,29 @@ function Deck({ deck, t, call }) {
         <input value={back} onChange={(e) => setBack(e.target.value)} placeholder={t("karten.back")} style={{ flex: 1, minWidth: 120, ...inp }} />
         <button type="submit" disabled={!front.trim() || !back.trim()} style={{ ...btnPrimary, padding: "6px 14px", opacity: (front.trim() && back.trim()) ? 1 : 0.4 }}>{t("common.add")}</button>
       </form>
+    </div>
+  );
+}
+
+// Reifegrade fuer das Histogramm — gleiche Staffelung wie in Lernen.jsx.
+const REIFE = [
+  ["neu", "Neu", "#cbd5e1"],
+  ["lernen", "Am Lernen", "#f59e0b"],
+  ["kurz", "Kurzfristig", "#eab308"],
+  ["mittel", "Mittelfristig", "#84cc16"],
+  ["lang", "Langfristig", "#0a7d3e"],
+];
+
+// Gestapelter Reifegrad-Balken aus einem hist-Objekt {neu,lernen,...}.
+function ReifeBar({ hist, height = 10 }) {
+  const total = REIFE.reduce((s, [k]) => s + (hist?.[k] || 0), 0);
+  if (!total) return <span style={{ fontSize: 12, color: "var(--text3)" }}>—</span>;
+  return (
+    <div style={{ display: "flex", height, borderRadius: height / 2, overflow: "hidden", minWidth: 80 }} title={REIFE.map(([k, l]) => `${l}: ${hist[k] || 0}`).join(" · ")}>
+      {REIFE.map(([k, , color]) => {
+        const n = hist?.[k] || 0;
+        return n > 0 ? <div key={k} style={{ width: `${(n / total) * 100}%`, background: color }} /> : null;
+      })}
     </div>
   );
 }
