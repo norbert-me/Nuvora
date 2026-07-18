@@ -50,6 +50,7 @@ class EntryIn(BaseModel):
     notes: str = ""
     class_id: Optional[int] = None
     topic_id: Optional[int] = None
+    method_id: Optional[int] = None
 
 
 class EntryOut(EntryIn):

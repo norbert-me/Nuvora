@@ -469,6 +469,23 @@ class CalendarEntry(Base):
     title: Mapped[str] = mapped_column(String(200), default="", server_default="")
     notes: Mapped[str] = mapped_column(Text, default="", server_default="")
     topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Optionaler Unterrichtseinstieg/Methode aus dem Modul Methoden (Regel 3:
+    # ON DELETE SET NULL, der Eintrag bleibt ohne die Methode nutzbar).
+    method_id: Mapped[Optional[int]] = mapped_column(ForeignKey("methods.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Method(Base):
+    """Modul Methoden: ein Unterrichtseinstieg oder eine Unterrichtsmethode als
+    wiederverwendbarer Sammlungseintrag."""
+    __tablename__ = "methods"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(20), default="einstieg", server_default="einstieg")  # einstieg | methode
+    title: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    description: Mapped[str] = mapped_column(Text, default="", server_default="")
+    phase: Mapped[str] = mapped_column(String(40), default="", server_default="")  # z. B. Einstieg/Erarbeitung/Sicherung
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

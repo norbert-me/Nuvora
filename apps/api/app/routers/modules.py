@@ -98,6 +98,15 @@ REGISTRY: List[ModuleDef] = [
         ),
         path="/kalender",
     ),
+    ModuleDef(
+        key="methoden",
+        name="Methoden",
+        description=(
+            "Sammlung von Unterrichtseinstiegen und -methoden. Wiederverwenden "
+            "und an Kalender-Stunden zuordnen."
+        ),
+        path="/methoden",
+    ),
 ]
 
 _BY_KEY = {m.key: m for m in REGISTRY}

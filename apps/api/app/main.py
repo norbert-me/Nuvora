@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .database import engine
 from .models import Base
-from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, planung, karten, kalender
+from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, planung, karten, kalender, methoden
 from . import websocket as ws
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -99,6 +99,7 @@ app.include_router(noten.router)
 app.include_router(planung.router)
 app.include_router(karten.router)
 app.include_router(kalender.router)
+app.include_router(methoden.router)
 app.include_router(marketplace.router)
 
 UPLOAD_DIR = "/app/uploads"
@@ -136,6 +137,7 @@ def _ensure_columns(sync_conn):
         ("students", "karten_token", "VARCHAR(64)"),
         ("card_decks", "released_at", "TIMESTAMPTZ"),
         ("card_decks", "topic_id", "INTEGER"),
+        ("calendar_entries", "method_id", "INTEGER"),
         ("exercises", "code", "VARCHAR(20) DEFAULT '' NOT NULL"),
         ("users", "timetable_periods", "INTEGER DEFAULT 6 NOT NULL"),
         ("users", "timetable_times", "JSON"),

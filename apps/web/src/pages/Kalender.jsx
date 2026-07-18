@@ -18,6 +18,7 @@ export default function Kalender() {
   const [entries, setEntries] = useState([]);
   const [classes, setClasses] = useState([]);
   const [topics, setTopics] = useState([]);
+  const [methods, setMethods] = useState([]); // aus Modul Methoden (falls aktiv)
   const [editing, setEditing] = useState(null); // { date, ...entry } oder null
   const [tt, setTt] = useState({ periods: 6, slots: [] }); // Stundenplan
   const [slotEdit, setSlotEdit] = useState(null); // { weekday, period, ...slot } oder null
@@ -25,6 +26,8 @@ export default function Kalender() {
   useEffect(() => {
     fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).then((d) => setClasses(Array.isArray(d) ? d : [])).catch(() => {});
     fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {});
+    // Methoden nur, wenn das Modul aktiv ist (sonst 403 -> leer, kein Selektor).
+    fetch("/api/methoden/list").then((r) => (r.ok ? r.json() : [])).then((d) => setMethods(Array.isArray(d) ? d : [])).catch(() => {});
   }, []);
 
   const loadTt = useCallback(() => {
@@ -63,7 +66,7 @@ export default function Kalender() {
   };
 
   const save = async (e) => {
-    const body = { date: new Date(e.date).toISOString(), title: e.title || "", notes: e.notes || "", class_id: e.class_id || null, topic_id: e.topic_id || null };
+    const body = { date: new Date(e.date).toISOString(), title: e.title || "", notes: e.notes || "", class_id: e.class_id || null, topic_id: e.topic_id || null, method_id: e.method_id || null };
     const res = await fetch(e.id ? `${API}/entries/${e.id}` : `${API}/entries`, {
       method: e.id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     }).catch(() => null);
@@ -122,7 +125,7 @@ export default function Kalender() {
       {view === "day" && <DayView day={cursor} byDay={byDay} slotsFor={slotsFor} className={className} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
       {view === "timetable" && <TimetableView tt={tt} className={className} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
-      {editing && <EntryModal entry={editing} classes={classes} topics={topics} topicName={topicName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
+      {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} topicName={topicName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
       {slotEdit && <SlotModal slot={slotEdit} classes={classes} topics={topics} onSave={saveSlot} onDelete={removeSlot} onClose={() => setSlotEdit(null)} t={t} />}
     </div>
   );
@@ -319,11 +322,12 @@ function SlotModal({ slot, classes, topics, onSave, onDelete, onClose, t }) {
   );
 }
 
-function EntryModal({ entry, classes, topics, onSave, onDelete, onClose, t }) {
+function EntryModal({ entry, classes, topics, methods = [], onSave, onDelete, onClose, t }) {
   const [title, setTitle] = useState(entry.title || "");
   const [notes, setNotes] = useState(entry.notes || "");
   const [classId, setClassId] = useState(entry.class_id || "");
   const [topicId, setTopicId] = useState(entry.topic_id || "");
+  const [methodId, setMethodId] = useState(entry.method_id || "");
   const fld = { width: "100%", padding: 9, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
   const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
@@ -344,10 +348,19 @@ function EntryModal({ entry, classes, topics, onSave, onDelete, onClose, t }) {
           <option value="">– {t("kalender.noTopic")} –</option>
           {topics.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
         </select>
+        {methods.length > 0 && (
+          <>
+            <div style={lbl}>{t("kalender.method")}</div>
+            <select value={methodId} onChange={(e) => setMethodId(e.target.value)} style={fld}>
+              <option value="">– {t("kalender.noMethod")} –</option>
+              {methods.map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
+            </select>
+          </>
+        )}
         <div style={lbl}>{t("kalender.notes")}</div>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...fld, resize: "vertical" }} />
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
-          <button onClick={() => onSave({ ...entry, title, notes, class_id: classId ? Number(classId) : null, topic_id: topicId ? Number(topicId) : null })} style={btnPrimary}>{t("common.save")}</button>
+          <button onClick={() => onSave({ ...entry, title, notes, class_id: classId ? Number(classId) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null })} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
           {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
         </div>
