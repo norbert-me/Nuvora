@@ -25,6 +25,7 @@ export default function Kalender() {
   const [aktiv, setAktiv] = useState({}); // { cardvote, karten, lernpfad } aktiv?
   const [editing, setEditing] = useState(null); // { date, ...entry } oder null
   const [tt, setTt] = useState({ periods: 6, slots: [] }); // Stundenplan
+  const [breaks, setBreaks] = useState([]); // unterrichtsfreie Zeitraeume (Ferien/Feiertage)
   const [slotEdit, setSlotEdit] = useState(null); // { weekday, period, ...slot } oder null
 
   useEffect(() => {
@@ -56,6 +57,18 @@ export default function Kalender() {
     fetch(`${API}/timetable`).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setTt(d); }).catch(() => {});
   }, []);
   useEffect(() => { loadTt(); }, [loadTt]);
+
+  const loadBreaks = useCallback(() => {
+    fetch(`${API}/breaks`).then((r) => (r.ok ? r.json() : [])).then((d) => setBreaks(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
+  useEffect(() => { loadBreaks(); }, [loadBreaks]);
+  // Ist der Tag unterrichtsfrei (in einem Ferien-/Feiertags-Zeitraum)?
+  const frei = (d) => breaks.find((b) => ymd(d) >= ymd(new Date(b.start_date)) && ymd(d) <= ymd(new Date(b.end_date)));
+  const addBreak = async (b) => {
+    const res = await fetch(`${API}/breaks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }).catch(() => null);
+    if (res && res.ok) loadBreaks();
+  };
+  const delBreak = async (id) => { await fetch(`${API}/breaks/${id}`, { method: "DELETE" }).catch(() => {}); loadBreaks(); };
 
   // Sichtbarer Zeitraum je Ansicht.
   const range = (() => {
@@ -150,10 +163,10 @@ export default function Kalender() {
       </div>
       {view !== "timetable" && <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: "var(--text)" }}>{title}</div>}
 
-      {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} slotsFor={slotsFor} onSlot={fromSlot} className={className} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} t={t} />}
-      {view === "week" && <WeekView range={range} byDay={byDay} slotsFor={slotsFor} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
-      {view === "day" && <DayView day={cursor} byDay={byDay} slotsFor={slotsFor} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
-      {view === "timetable" && <TimetableView tt={tt} className={className} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
+      {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} t={t} />}
+      {view === "week" && <WeekView range={range} byDay={byDay} slotsFor={slotsFor} frei={frei} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
+      {view === "day" && <DayView day={cursor} byDay={byDay} slotsFor={slotsFor} frei={frei} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
+      {view === "timetable" && <TimetableView tt={tt} className={className} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} breaks={breaks} onAddBreak={addBreak} onDelBreak={delBreak} t={t} />}
 
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} aktiv={aktiv} topicName={topicName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
       {slotEdit && <SlotModal slot={slotEdit} classes={classes} topics={topics} onSave={saveSlot} onDelete={removeSlot} onClose={() => setSlotEdit(null)} t={t} />}
@@ -193,7 +206,7 @@ function EntryChips({ list, className, topicName, onOpen, classColor }) {
   });
 }
 
-function MonthGrid({ range, cursor, byDay, slotsFor, onSlot, className, topicName, classColor, onAdd, onOpen, t }) {
+function MonthGrid({ range, cursor, byDay, slotsFor, onSlot, frei, className, topicName, classColor, onAdd, onOpen, t }) {
   const days = [];
   for (let d = new Date(range[0]); d <= range[1]; d = addDays(d, 1)) days.push(new Date(d));
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
@@ -207,14 +220,17 @@ function MonthGrid({ range, cursor, byDay, slotsFor, onSlot, className, topicNam
             <tr key={r}>
               {days.slice(r * 7, r * 7 + 7).map((d) => {
                 const other = d.getMonth() !== cursor.getMonth();
+                const f = frei && frei(d);
                 return (
-                  <td key={ymd(d)} style={{ ...cell, opacity: other ? 0.5 : 1, outline: ymd(d) === heute ? "2px solid var(--accent)" : "none", outlineOffset: -2 }}>
+                  <td key={ymd(d)} style={{ ...cell, opacity: other ? 0.5 : 1, background: f ? "var(--bg)" : undefined, outline: ymd(d) === heute ? "2px solid var(--accent)" : "none", outlineOffset: -2 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>{d.getDate()}</span>
-                      <button onClick={() => onAdd(d)} className="icon-btn" style={{ ...iconBtn, padding: 0 }} title={t("kalender.add")}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>
+                      {!f && <button onClick={() => onAdd(d)} className="icon-btn" style={{ ...iconBtn, padding: 0 }} title={t("kalender.add")}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>}
                     </div>
-                    <EntryChips list={byDay(d)} className={className} topicName={topicName} onOpen={onOpen} classColor={classColor} />
-                    {slotsFor && <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} topicName={topicName} onSlot={onSlot} day={d} t={t} />}
+                    {f ? <FreiMarker label={f.label} t={t} /> : (<>
+                      <EntryChips list={byDay(d)} className={className} topicName={topicName} onOpen={onOpen} classColor={classColor} />
+                      {slotsFor && <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} topicName={topicName} onSlot={onSlot} day={d} t={t} />}
+                    </>)}
                   </td>
                 );
               })}
@@ -226,28 +242,43 @@ function MonthGrid({ range, cursor, byDay, slotsFor, onSlot, className, topicNam
   );
 }
 
-function WeekView({ range, byDay, slotsFor, className, classColor, topicName, onAdd, onOpen, onSlot, t }) {
+function WeekView({ range, byDay, slotsFor, frei, className, classColor, topicName, onAdd, onOpen, onSlot, t }) {
   const days = [];
   for (let d = new Date(range[0]); d <= range[1]; d = addDays(d, 1)) days.push(new Date(d));
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 8, overflowX: "auto" }}>
-      {days.map((d) => (
-        <div key={ymd(d)} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 8, minHeight: 160, background: "var(--card)", minWidth: 90 }}>
+      {days.map((d) => {
+        const f = frei && frei(d);
+        return (
+        <div key={ymd(d)} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 8, minHeight: 160, background: f ? "var(--bg)" : "var(--card)", minWidth: 90 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
             <span style={{ fontSize: 12, fontWeight: 600 }}>{d.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}</span>
-            <button onClick={() => onAdd(d)} className="icon-btn" style={{ ...iconBtn, padding: 0 }}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>
+            {!f && <button onClick={() => onAdd(d)} className="icon-btn" style={{ ...iconBtn, padding: 0 }}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>}
           </div>
-          <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} topicName={topicName} onSlot={onSlot} day={d} t={t} />
-          <EntryChips list={byDay(d)} className={className} topicName={topicName} onOpen={onOpen} classColor={classColor} />
+          {f ? <FreiMarker label={f.label} t={t} /> : (<>
+            <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} topicName={topicName} onSlot={onSlot} day={d} t={t} />
+            <EntryChips list={byDay(d)} className={className} topicName={topicName} onOpen={onOpen} classColor={classColor} />
+          </>)}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
-function DayView({ day, byDay, slotsFor, className, classColor, topicName, onAdd, onOpen, onSlot, t }) {
+function FreiMarker({ label, t }) {
+  return (
+    <div style={{ fontSize: 11.5, color: "var(--text3)", fontStyle: "italic", padding: "4px 2px" }}>
+      {label || t("kalender.free")}
+    </div>
+  );
+}
+
+function DayView({ day, byDay, slotsFor, frei, className, classColor, topicName, onAdd, onOpen, onSlot, t }) {
   const list = byDay(day);
   const slots = slotsFor(day);
+  const f = frei && frei(day);
+  if (f) return <p style={{ fontSize: 14, color: "var(--text3)", fontStyle: "italic" }}>{f.label ? `${f.label} — ${t("kalender.free")}` : t("kalender.free")}</p>;
   return (
     <div>
       <button onClick={() => onAdd(day)} style={{ ...btnPrimary, marginBottom: 14 }}>{t("kalender.add")}</button>
@@ -267,7 +298,7 @@ function DayView({ day, byDay, slotsFor, className, classColor, topicName, onAdd
   );
 }
 
-function TimetableView({ tt, className, classColor, topicName, onEdit, onPeriods, onTimes, t }) {
+function TimetableView({ tt, className, classColor, topicName, onEdit, onPeriods, onTimes, breaks = [], onAddBreak, onDelBreak, t }) {
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri")];
   const periods = Array.from({ length: tt.periods }, (_, i) => i + 1);
   const slot = (wd, p) => tt.slots.find((s) => s.weekday === wd && s.period === p);
@@ -345,6 +376,51 @@ function TimetableView({ tt, className, classColor, topicName, onEdit, onPeriods
           </tbody>
         </table>
       </div>
+      <BreaksPanel breaks={breaks} onAdd={onAddBreak} onDel={onDelBreak} t={t} />
+    </div>
+  );
+}
+
+// Unterrichtsfreie Zeitraeume (Ferien, bewegliche Feiertage). An diesen Tagen
+// blendet der Kalender Vorlagen und Eintraege aus.
+function BreaksPanel({ breaks, onAdd, onDel, t }) {
+  const [von, setVon] = useState("");
+  const [bis, setBis] = useState("");
+  const [label, setLabel] = useState("");
+  const fld = { padding: "7px 9px", border: "1px solid var(--border2)", borderRadius: 8, fontSize: 13.5, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" };
+  const speichern = () => {
+    if (!von) return;
+    const ende = bis || von;
+    onAdd({ start_date: new Date(von + "T00:00:00").toISOString(), end_date: new Date(ende + "T00:00:00").toISOString(), label: label.trim() });
+    setVon(""); setBis(""); setLabel("");
+  };
+  const fmt = (s) => new Date(s).toLocaleDateString();
+  return (
+    <div style={{ marginTop: 26, borderTop: "1px solid var(--border)", paddingTop: 18 }}>
+      <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{t("kalender.breaksTitle")}</h3>
+      <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 12px", maxWidth: 620 }}>{t("kalender.breaksHint")}</p>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
+        <label style={{ fontSize: 12, color: "var(--text2)", display: "flex", flexDirection: "column", gap: 3 }}>{t("kalender.from")}
+          <input type="date" value={von} onChange={(e) => setVon(e.target.value)} style={fld} /></label>
+        <label style={{ fontSize: 12, color: "var(--text2)", display: "flex", flexDirection: "column", gap: 3 }}>{t("kalender.to")}
+          <input type="date" value={bis} onChange={(e) => setBis(e.target.value)} min={von} style={fld} /></label>
+        <label style={{ fontSize: 12, color: "var(--text2)", display: "flex", flexDirection: "column", gap: 3, flex: 1, minWidth: 160 }}>{t("kalender.breakLabel")}
+          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t("kalender.breakLabelPlaceholder")} style={fld} /></label>
+        <button onClick={speichern} disabled={!von} style={{ ...btnPrimary, opacity: von ? 1 : 0.5, alignSelf: "flex-end" }}>{t("kalender.addBreak")}</button>
+      </div>
+      {breaks.length === 0 ? (
+        <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("kalender.noBreaks")}</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {breaks.map((b) => (
+            <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--card)" }}>
+              <span style={{ fontSize: 13.5, fontWeight: 600 }}>{b.label || t("kalender.free")}</span>
+              <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{fmt(b.start_date)}{fmt(b.start_date) !== fmt(b.end_date) ? ` – ${fmt(b.end_date)}` : ""}</span>
+              <button onClick={() => onDel(b.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto", padding: 5 }} title={t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -488,6 +488,20 @@ class CalendarEntry(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class CalendarBreak(Base):
+    """Unterrichtsfreier Zeitraum (Ferien, beweglicher Feiertag). An Tagen
+    innerhalb des Zeitraums zeigt der Kalender weder Stundenplan-Vorlagen noch
+    Eintraege — sie bleiben in der DB, sind aber ausgeblendet."""
+    __tablename__ = "calendar_breaks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    start_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    end_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    label: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Method(Base):
     """Modul Methoden: ein Unterrichtseinstieg oder eine Unterrichtsmethode als
     wiederverwendbarer Sammlungseintrag."""

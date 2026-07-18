@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import CalendarEntry, CardDeck, SchoolClass, TimetableSlot, Topic, User
+from ..models import CalendarBreak, CalendarEntry, CardDeck, SchoolClass, TimetableSlot, Topic, User
 from .auth import get_current_user, rate_limit
 from .modules import is_active
 
@@ -125,6 +125,44 @@ async def _release_matching_decks(db: AsyncSession, user: User, e: CalendarEntry
         q = q.where(CardDeck.class_id == e.class_id)
     for deck in (await db.execute(q)).scalars().all():
         deck.released_at = e.date
+    await db.commit()
+
+
+class BreakIn(BaseModel):
+    start_date: datetime
+    end_date: datetime
+    label: str = ""
+
+
+class BreakOut(BreakIn):
+    id: int
+    model_config = {"from_attributes": True}
+
+
+@router.get("/breaks", response_model=List[BreakOut])
+async def list_breaks(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    q = select(CalendarBreak).where(CalendarBreak.owner_id == user.id).order_by(CalendarBreak.start_date)
+    return (await db.execute(q)).scalars().all()
+
+
+@router.post("/breaks", response_model=BreakOut, status_code=201)
+async def create_break(body: BreakIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    rate_limit("kalender_break", f"u{user.id}", 100, 60, "Zu viele Eintraege. Bitte kurz warten.")
+    if body.end_date < body.start_date:
+        raise HTTPException(400, "Ende liegt vor dem Anfang")
+    b = CalendarBreak(owner_id=user.id, start_date=body.start_date, end_date=body.end_date, label=body.label or "")
+    db.add(b)
+    await db.commit()
+    await db.refresh(b)
+    return b
+
+
+@router.delete("/breaks/{break_id}", status_code=204)
+async def delete_break(break_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    b = await db.get(CalendarBreak, break_id)
+    if not b or b.owner_id != user.id:
+        raise HTTPException(404, "Zeitraum nicht gefunden")
+    await db.delete(b)
     await db.commit()
 
 
