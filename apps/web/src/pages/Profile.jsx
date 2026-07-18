@@ -246,8 +246,8 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                 <Spinner /> {t("profile.checking")}
               </div>
             ) : versionInfo ? (
-              <div style={{ display: "flex", gap: 40, flexWrap: "wrap", alignItems: "flex-start" }}>
-                <div style={{ minWidth: 180 }}>
+              <div style={{ display: "flex", gap: 32, flexWrap: "wrap", alignItems: "flex-start" }}>
+                <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 14, color: "var(--text)" }}>{t("profile.installed")} <strong>v{versionInfo.current}</strong></span>
                     {!versionInfo.update_available && (
