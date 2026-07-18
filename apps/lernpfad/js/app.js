@@ -2222,9 +2222,12 @@
 
     function renderGenPfade() {
         const sel = document.getElementById('gen-pfad');
-        sel.innerHTML = '<option value="">– Einzeln –</option>' + lernpfade.map(p =>
-            `<option value="${p._id}">${esc(p.name)}</option>`
-        ).join('');
+        // Der Sammel-Pfad "Einzeln" ist bereits der leere Platzhalter oben —
+        // ihn zusaetzlich zu listen ergab denselben Namen doppelt.
+        sel.innerHTML = '<option value="">– Einzeln –</option>' + lernpfade
+            .filter(p => p.name !== 'Einzeln')
+            .map(p => `<option value="${p._id}">${esc(p.name)}</option>`)
+            .join('');
     }
 
     document.getElementById('gen-pfad').addEventListener('change', () => {
