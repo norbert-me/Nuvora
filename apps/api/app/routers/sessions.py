@@ -250,7 +250,7 @@ async def get_session_qr(session_id: int, request: Request, db: AsyncSession = D
     forwarded_host = request.headers.get("x-forwarded-host") or request.headers.get("host")
     scheme = request.headers.get("x-forwarded-proto", "https")
     base = f"{scheme}://{forwarded_host}" if forwarded_host else str(request.base_url).rstrip("/")
-    url = f"{base}/scan?session={s.code}"
+    url = f"{base}/cardvote/scan?session={s.code}"
     img = qrcode.make(url, box_size=6, border=2)
     buf = io.BytesIO()
     img.save(buf, format="PNG")

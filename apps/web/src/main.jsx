@@ -659,7 +659,7 @@ function AppRoutes({ user, setUser, logout }) {
           {/* Alte CardVote-Adressen (Lesezeichen, Links in Mails) umleiten. */}
           <Route path={`${CV}/classes`} element={<Navigate to="/classes" replace />} />
           {["questions", "session", "tests", "scan", "marketplace"].map((p) => (
-            <Route key={p} path={`/${p}/*`} element={<Navigate to={`${CV}/${p}`} replace />} />
+            <Route key={p} path={`/${p}/*`} element={<Navigate to={`${CV}/${p}${location.search}`} replace />} />
           ))}
         </Routes>
       </ContentWrapper>

@@ -659,7 +659,7 @@ export default function Session() {
           }}>
             {sessionCode}
           </span>
-          <button onClick={() => window.open(`/scan?session=${sessionCode}`, "_blank")} style={{
+          <button onClick={() => window.open(`/cardvote/scan?session=${sessionCode}`, "_blank")} style={{
             padding: "5px 10px", fontSize: 14, cursor: "pointer",
             background: "none", color: "var(--text3)", border: "1px solid var(--border2)", borderRadius: 980,
           }} title={t("session.openScanner")}>
