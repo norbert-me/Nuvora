@@ -1,0 +1,44 @@
+name: Release
+
+# Jeder Tag-Push v* erzeugt ein Release.
+# Regel: ändert sich die führende Zahl (Major) gegenüber dem letzten Tag,
+# geht es in den main/latest-Kanal. Sonst prerelease = beta-Kanal.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Kanal bestimmen (Major geändert?)
+        id: channel
+        run: |
+          TAG="${GITHUB_REF_NAME}"                 # z.B. v1.5.31
+          CUR_MAJOR="$(echo "${TAG#v}" | cut -d. -f1)"
+          # letztes Tag vor diesem (nach Version sortiert)
+          PREV="$(git tag --sort=-v:refname | grep -v "^${TAG}$" | head -1)"
+          PREV_MAJOR="$(echo "${PREV#v}" | cut -d. -f1)"
+          if [ -n "$PREV_MAJOR" ] && [ "$CUR_MAJOR" != "$PREV_MAJOR" ]; then
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "Major $PREV_MAJOR -> $CUR_MAJOR : main/latest"
+          else
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "Major unverändert ($CUR_MAJOR): beta (prerelease)"
+          fi
+
+      - name: Release anlegen
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          prerelease: ${{ steps.channel.outputs.prerelease }}
+          generate_release_notes: true
