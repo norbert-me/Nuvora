@@ -33,6 +33,7 @@ export default function Noten() {
   const [zelle, setZelle] = useState(null);
   const [neuAbschnitt, setNeuAbschnitt] = useState(false);
   const [neuSpalteIn, setNeuSpalteIn] = useState(null);
+  const [renameCol, setRenameCol] = useState(null);
   const [beobFuer, setBeobFuer] = useState(null);
   const [infoFuer, setInfoFuer] = useState(null);
   const [term, setTerm] = useState("1");
@@ -233,7 +234,7 @@ export default function Noten() {
           <table style={{ borderCollapse: "collapse", fontSize: 13.5, minWidth: "100%" }}>
             <thead>
               <tr>
-                <th style={{ ...th, ...stickyL, minWidth: 150 }}></th>
+                <th style={{ ...th, ...stickyL, whiteSpace: "nowrap" }}></th>
                 {sections.map((sec) => {
                   const isCol = collapsed.has(sec.id);
                   const cols = isCol ? 0 : (sec.categories || []).length || 1;
@@ -289,19 +290,22 @@ export default function Noten() {
                   return [
                     ...cols.map((c, i) => (
                     <th key={c.id} style={{ ...th, borderLeft: i === 0 ? "2px solid var(--border)" : "1px solid var(--border)", minWidth: 70, fontWeight: 500 }}>
+                      {renameCol === c.id ? (
+                        <ColForm t={t} initial={c.name} onCancel={() => setRenameCol(null)}
+                          onSave={async (name) => { if (await call(() => fetch(`${API}/categories/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: c.position ?? i }) }))) setRenameCol(null); }} />
+                      ) : (<>
                       <div style={{ display: "flex", alignItems: "center", gap: 3, justifyContent: "center" }}>
-                        <span style={{ maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
+                        <button onClick={() => setRenameCol(c.id)} title={t("common.rename")}
+                          style={{ maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", border: "none", background: "none", cursor: "pointer", color: "var(--text2)", fontWeight: 500, fontSize: 12, padding: 0 }}>{c.name}</button>
                         <button onClick={() => { if (confirm(t("noten.delColumn", { name: c.name }))) call(() => fetch(`${API}/categories/${c.id}`, { method: "DELETE" })); }}
                           className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={t("noten.delColTitle")}>
                           <Icon d={ICONS.trash} color={C.danger} size={13} />
                         </button>
-                        {i === cols.length - 1 && neuSpalteIn !== sec.id && (
-                          <button onClick={() => setNeuSpalteIn(sec.id)} title={t("noten.addColShort")} className="icon-btn" style={{ ...iconBtn, padding: 1, color: "var(--accent)" }}><Icon d={ICONS.plus} color="var(--accent)" size={14} /></button>
-                        )}
                       </div>
                       {neuSpalteIn === sec.id && i === cols.length - 1 && (
                         <ColForm t={t} onCancel={() => setNeuSpalteIn(null)} onSave={async (name) => { if (await call(() => fetch(`${API}/categories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: cols.length }) }))) setNeuSpalteIn(null); }} />
                       )}
+                      </>)}
                     </th>
                     )),
                     bereich,
@@ -443,7 +447,10 @@ function SectionForm({ t, onSave, onCancel, initial }) {
   );
 }
 
+// Kompaktes Kebab-Menue: haelt Spalte-hinzufuegen, Umbenennen und Loeschen,
+// damit der Abschnittskopf schmal bleibt.
 function SectionMenu({ t, sec, onEdit, onDelete, onAddCol }) {
+  const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState(false);
   if (edit) {
     return (
@@ -452,24 +459,38 @@ function SectionMenu({ t, sec, onEdit, onDelete, onAddCol }) {
       </span>
     );
   }
+  const item = { display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 10px", border: "none", background: "none", cursor: "pointer", color: "var(--text)", fontSize: 13, textAlign: "left", fontWeight: 400 };
   return (
-    <span style={{ display: "inline-flex", gap: 2 }}>
-      <button onClick={onAddCol} title={t("noten.addColShort")} style={{ border: "none", background: "none", color: "var(--accent)", cursor: "pointer", fontSize: 14, padding: 0 }}>+</button>
-      <button onClick={() => setEdit(true)} className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={t("common.rename")}><Icon d={ICONS.edit} size={13} /></button>
-      <button onClick={onDelete} className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={13} /></button>
+    <span style={{ position: "relative", display: "inline-flex" }} onClick={(e) => e.stopPropagation()}>
+      <button onClick={() => setOpen((o) => !o)} className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={t("common.options")}><Icon d={ICONS.more} size={15} /></button>
+      {open && (
+        <>
+          <span onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 9 }} />
+          <div style={{ position: "absolute", zIndex: 10, top: 24, right: 0, minWidth: 168, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: 4, boxShadow: "0 6px 20px rgba(0,0,0,0.2)" }}>
+            <button style={item} onClick={() => { setOpen(false); onAddCol(); }}><Icon d={ICONS.plus} size={14} color="var(--accent)" /> {t("noten.addColumn")}</button>
+            <button style={item} onClick={() => { setOpen(false); setEdit(true); }}><Icon d={ICONS.edit} size={14} /> {t("common.rename")}</button>
+            <button style={{ ...item, color: C.danger }} onClick={() => { setOpen(false); onDelete(); }}><Icon d={ICONS.trash} size={14} color={C.danger} /> {t("common.delete")}</button>
+          </div>
+        </>
+      )}
     </span>
   );
 }
 
-function ColForm({ t, onSave, onCancel }) {
-  const [name, setName] = useState("");
+function ColForm({ t, onSave, onCancel, initial = "" }) {
+  const [name, setName] = useState(initial);
+  const heute = () => {
+    const d = new Date();
+    setName(`${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`);
+  };
   return (
     <div style={{ display: "flex", gap: 4, marginTop: 4, alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
       <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder={t("noten.colName")}
         onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) onSave(name.trim()); if (e.key === "Escape") onCancel(); }}
         style={{ ...inp, fontSize: 12, padding: 5, minWidth: 120 }} />
+      <button onClick={heute} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("noten.useDate")}><Icon d={ICONS.calendar} size={14} /></button>
       <button onClick={() => name.trim() && onSave(name.trim())} style={{ ...btnPrimary, padding: "4px 10px", fontSize: 12 }}>OK</button>
-      <button onClick={onCancel} style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text3)" }}>×</button>
+      <button onClick={onCancel} className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={t("common.abort")}><Icon d={ICONS.close} size={13} /></button>
     </div>
   );
 }
@@ -578,7 +599,7 @@ function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo }
       <table style={{ borderCollapse: "collapse", fontSize: 13.5, minWidth: "100%" }}>
         <thead>
           <tr>
-            <th style={{ ...th, ...stickyL, minWidth: 150 }}></th>
+            <th style={{ ...th, ...stickyL, whiteSpace: "nowrap" }}></th>
             <th colSpan={sec1.length + 1} style={grp}>{t("noten.term1")}</th>
             <th colSpan={sec2.length + 1} style={grp}>{t("noten.term2")}</th>
             <th rowSpan={2} style={{ ...grp, fontWeight: 700 }}>{t("noten.yearGrade")}</th>

@@ -473,7 +473,7 @@ const gradeDistribution = (() => {
   const maxGrade = Math.max(...Object.values(gradeDistribution), 1);
 
   return (
-    <div>
+    <div style={{ maxWidth: 1000, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <Link to="/cardvote/tests" style={{ color: "var(--text3)", textDecoration: "none", fontSize: 13, fontWeight: 500 }}>← Alle Tests</Link>
         {notenDialog && (

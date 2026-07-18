@@ -26,6 +26,8 @@ export const ICONS = {
   close: ["M5 5l10 10M15 5L5 15"],
   plus: ["M10 4v12M4 10h12"],
   minus: ["M4 10h12"],
+  more: ["M5 10h.01M10 10h.01M15 10h.01"],
+  calendar: ["M4 5h12v11H4z", "M4 8h12M7 3v4M13 3v4"],
 };
 
 export const iconBtn = { cursor: "pointer", padding: "6px", border: "none", background: "transparent", borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s" };
