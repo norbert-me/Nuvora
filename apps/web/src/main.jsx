@@ -65,7 +65,6 @@ import CodeDetektivModule from "./pages/CodeDetektivModule.jsx";
 import Cards from "./pages/Cards.jsx";
 import Tutorial from "./pages/Tutorial.jsx";
 import NotenModul from "./pages/Noten.jsx";
-import Planung from "./pages/Planung.jsx";
 import Lernen from "./pages/Lernen.jsx";
 import Karten from "./pages/Karten.jsx";
 import Kalender from "./pages/Kalender.jsx";
@@ -154,7 +153,6 @@ const getModuleNavItems = (t, location) => {
   return [
     { to: "/classes", label: t("nav.classes") },
     { to: "/topics", label: t("nav.topics") },
-    { to: "/planung", label: t("nav.plan") },
     { to: "/modules", label: t("nav.modules") },
   ];
 };
@@ -653,7 +651,6 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path="/modules" element={user ? <Modules /> : <Landing />} />
           <Route path="/classes" element={user ? <Classes /> : <Landing />} />
           <Route path="/topics" element={user ? <Topics /> : <Landing />} />
-          <Route path="/planung" element={user ? <Planung /> : <Landing />} />
           <Route path="/login" element={user ? <NuvoraHome user={user} /> : <Login onLogin={handleLogin} />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />

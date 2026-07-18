@@ -99,7 +99,7 @@ export function StageBadge({ stage, title }) {
       textTransform: "uppercase", padding: "2px 6px", borderRadius: 6, verticalAlign: "middle",
       background: beta ? "rgba(10,132,255,0.15)" : "rgba(184,134,11,0.18)",
       color: beta ? "var(--accent)" : "#b8860b",
-    }}>{stage}</span>
+    }}>{beta ? "Beta" : "Frühphase"}</span>
   );
 }
 
