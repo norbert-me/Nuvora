@@ -150,6 +150,10 @@ export default function Evaluation() {
   const [showSdInfo, setShowSdInfo] = useState(false);
   const [showRateInfo, setShowRateInfo] = useState(false);
   const [showCiInfo, setShowCiInfo] = useState(false);
+  // Eigener Zustand fuer das "i" der oberen Kachel "95%-KI gesamt": seine
+  // Erklaerung erschien sonst ganz unten unter der Fragetabelle statt bei der
+  // Kachel.
+  const [showCiTop, setShowCiTop] = useState(false);
   const [gradeView, setGradeView] = useState("bar");
   const [gradeMode, setGradeMode] = useState("whole"); // "whole" | "tendency"
   const { modules } = useModules();
@@ -552,7 +556,7 @@ const gradeDistribution = (() => {
           <Stat
             label="95%-KI gesamt"
             value={`${quizCi.low}–${quizCi.high}%`}
-            info={() => setShowCiInfo(!showCiInfo)}
+            info={() => setShowCiTop(!showCiTop)}
           />
         )}
         {totalTime != null && (
@@ -578,6 +582,9 @@ const gradeDistribution = (() => {
           </div>
         </div>
       )}
+
+      {/* KI-Erklaerung der oberen Kachel — direkt hier, nicht am Seitenende. */}
+      {showCiTop && <CiInfoBox onClose={() => setShowCiTop(false)} />}
 
       {/* Notenverteilung / Boxplot toggle */}
       <div style={{ padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 12 }}>
@@ -891,29 +898,7 @@ const gradeDistribution = (() => {
         </table>
       </div>
 
-      {showCiInfo && (
-        <div style={{ marginTop: 12, padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <h4 style={{ fontSize: 15, fontWeight: 700 }}>Was ist das 95%-Konfidenzintervall (KI)?</h4>
-            <button onClick={() => setShowCiInfo(false)} style={{ width: 24, height: 24, borderRadius: 12, border: "none", background: "var(--bg2)", color: "var(--text3)", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
-          </div>
-          <p style={{ marginBottom: 10 }}>
-            Der Prozentwert „Richtig“ ist nur eine Stichprobe dieser einen Abfrage. Das Konfidenzintervall
-            zeigt, in welchem Bereich der <strong>wahre</strong> Anteil richtiger Antworten mit 95% Wahrscheinlichkeit
-            liegt, wenn man die Abfrage beliebig oft wiederholen könnte.
-          </p>
-          <p style={{ marginBottom: 0 }}>
-            Je <strong>weniger</strong> Antworten vorliegen, desto <strong>breiter</strong> das Intervall — bei kleinen
-            Klassen also Vorsicht bei der Interpretation einzelner Fragen. Ein enges Intervall bedeutet ein belastbares Ergebnis.
-          </p>
-          <p style={{ marginTop: 10, marginBottom: 0 }}>
-            <strong>„95%-KI gesamt“</strong> oben fasst alle Antworten dieses Tests zusammen (alle Fragen gepoolt)
-            und zeigt, wie belastbar das Gesamtergebnis des Quiz ist. Das KI <strong>pro Frage</strong> in der Tabelle
-            unten basiert nur auf den Antworten zu dieser einen Frage in diesem Test — die frageübergreifende
-            Statistik (alle jemals gegebenen Antworten) findest du beim Bearbeiten der Frage im Fragen-Bereich.
-          </p>
-        </div>
-      )}
+      {showCiInfo && <CiInfoBox onClose={() => setShowCiInfo(false)} />}
 
       {showRateInfo && (
         <div style={{ marginTop: 12, padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
@@ -953,6 +938,34 @@ const gradeDistribution = (() => {
           <p style={{ fontSize: 12, color: "var(--text3)", padding: "8px 12px", background: "var(--bg2)", borderRadius: 8 }}>Mindestens 3 beantwortete Bögen erforderlich.</p>
         </div>
       )}
+    </div>
+  );
+}
+
+// KI-Erklaerung — an zwei Stellen genutzt (obere Kachel und Fragetabelle),
+// deshalb als Komponente statt doppeltem Markup.
+function CiInfoBox({ onClose }) {
+  return (
+    <div style={{ marginTop: 12, padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <h4 style={{ fontSize: 15, fontWeight: 700 }}>Was ist das 95%-Konfidenzintervall (KI)?</h4>
+        <button onClick={onClose} style={{ width: 24, height: 24, borderRadius: 12, border: "none", background: "var(--bg2)", color: "var(--text3)", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </div>
+      <p style={{ marginBottom: 10 }}>
+        Der Prozentwert „Richtig“ ist nur eine Stichprobe dieser einen Abfrage. Das Konfidenzintervall
+        zeigt, in welchem Bereich der <strong>wahre</strong> Anteil richtiger Antworten mit 95% Wahrscheinlichkeit
+        liegt, wenn man die Abfrage beliebig oft wiederholen könnte.
+      </p>
+      <p style={{ marginBottom: 0 }}>
+        Je <strong>weniger</strong> Antworten vorliegen, desto <strong>breiter</strong> das Intervall — bei kleinen
+        Klassen also Vorsicht bei der Interpretation einzelner Fragen. Ein enges Intervall bedeutet ein belastbares Ergebnis.
+      </p>
+      <p style={{ marginTop: 10, marginBottom: 0 }}>
+        <strong>„95%-KI gesamt“</strong> oben fasst alle Antworten dieses Tests zusammen (alle Fragen gepoolt)
+        und zeigt, wie belastbar das Gesamtergebnis des Quiz ist. Das KI <strong>pro Frage</strong> in der Tabelle
+        unten basiert nur auf den Antworten zu dieser einen Frage in diesem Test — die frageübergreifende
+        Statistik (alle jemals gegebenen Antworten) findest du beim Bearbeiten der Frage im Fragen-Bereich.
+      </p>
     </div>
   );
 }
