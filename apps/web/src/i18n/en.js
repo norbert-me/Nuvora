@@ -107,6 +107,7 @@ export default {
   "classes.editTitle": "Edit class",
   "classes.newTitle": "New class",
   "classes.namePlaceholder": "Class name (e.g. 7a)",
+  "classes.subjectHint": "Tip: For modules like Grades or Cards it helps to create the class per subject (e.g. “7a Maths”) — keeping grades and cards separate per subject.",
   "classes.fillHint": "Enter names. Empty rows are ignored on save. ({{filled}} of {{total}} filled)",
   "classes.addRow": "+ Row",
   "classes.removeCard": "Remove card",

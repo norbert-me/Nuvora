@@ -184,10 +184,13 @@ export default function Classes() {
     return (
       <div>
         <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{editing.id ? t("classes.editTitle") : t("classes.newTitle")}</h2>
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 8 }}>
           <input placeholder={t("classes.namePlaceholder")} value={name} onChange={(e) => setName(e.target.value)}
             style={{ padding: "10px 14px", fontSize: 18, width: 300, border: "1px solid var(--border2)", borderRadius: 10 }} autoFocus />
         </div>
+        {!editing.id && (
+          <p style={{ color: "var(--text3)", fontSize: 12.5, marginBottom: 16, maxWidth: 460 }}>{t("classes.subjectHint")}</p>
+        )}
         <p style={{ color: "var(--text3)", marginBottom: 8, fontSize: 14 }}>
           {t("classes.fillHint", { filled, total: students.length })}
         </p>

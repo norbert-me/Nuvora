@@ -107,6 +107,7 @@ export default {
   "classes.editTitle": "Editar clase",
   "classes.newTitle": "Nueva clase",
   "classes.namePlaceholder": "Nombre de la clase (p. ej. 7a)",
+  "classes.subjectHint": "Consejo: para módulos como Notas o Tarjetas conviene crear la clase por asignatura (p. ej. «7a Mates») — así notas y tarjetas quedan separadas por asignatura.",
   "classes.fillHint": "Introduce los nombres. Las filas vacías se ignoran al guardar. ({{filled}} de {{total}} ocupadas)",
   "classes.addRow": "+ Fila",
   "classes.removeCard": "Quitar tarjeta",

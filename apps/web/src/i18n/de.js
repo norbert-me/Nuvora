@@ -107,6 +107,7 @@ export default {
   "classes.editTitle": "Klasse bearbeiten",
   "classes.newTitle": "Neue Klasse",
   "classes.namePlaceholder": "Klassenname (z.B. 7a)",
+  "classes.subjectHint": "Tipp: Für Module wie Noten oder Karten lohnt es sich, die Klasse pro Fach anzulegen (z. B. „7a Mathe“) — so bleiben Noten und Karten je Fach getrennt.",
   "classes.fillHint": "Name eintragen. Leere Zeilen werden beim Speichern ignoriert. ({{filled}} von {{total}} belegt)",
   "classes.addRow": "+ Zeile",
   "classes.removeCard": "Karte entfernen",
