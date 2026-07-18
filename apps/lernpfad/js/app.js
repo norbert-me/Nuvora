@@ -793,12 +793,24 @@
     }
 
     const katOrder = {'Erklärung': 0, 'Basis': 1, 'G-Niveau': 2, 'E-Niveau': 3};
+    // Natuerlicher Sortierschluessel aus der Quelle: erst Buchseite (S.70),
+    // dann Aufgabennummer (Nr.1), dann Resttext. So folgt die Lernleiter dem
+    // Buch (Nr.1, Nr.2, …) statt String-Reihenfolge (Nr.1, Nr.10, Nr.2).
+    function quelleKey(q) {
+        q = q || '';
+        const seite = (q.match(/S\.?\s*(\d+)/i) || [])[1];
+        const nr = (q.match(/Nr\.?\s*(\d+)/i) || [])[1];
+        return [seite ? +seite : 9999, nr ? +nr : 9999, q.toLowerCase()];
+    }
     function sortByKatThenQuelle(arr) {
         return arr.slice().sort((a, b) => {
             const ka = katOrder[getKategorie(a)] ?? 4;
             const kb = katOrder[getKategorie(b)] ?? 4;
             if (ka !== kb) return ka - kb;
-            return (a.quelle || '').localeCompare(b.quelle || '');
+            const [pa, na, ta] = quelleKey(a.quelle), [pb, nb, tb] = quelleKey(b.quelle);
+            if (pa !== pb) return pa - pb;
+            if (na !== nb) return na - nb;
+            return ta.localeCompare(tb);
         });
     }
 
