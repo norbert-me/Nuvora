@@ -134,6 +134,7 @@ def _ensure_columns(sync_conn):
         ("grade_overrides", "term", "VARCHAR(8) DEFAULT '1' NOT NULL"),
         ("school_classes", "plan_blocks", "INTEGER DEFAULT 2 NOT NULL"),
         ("school_classes", "karten_token", "VARCHAR(64)"),
+        ("school_classes", "color", "VARCHAR(9) DEFAULT '' NOT NULL"),
         ("students", "karten_token", "VARCHAR(64)"),
         ("card_decks", "released_at", "TIMESTAMPTZ"),
         ("card_decks", "topic_id", "INTEGER"),

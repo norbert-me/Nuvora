@@ -80,8 +80,18 @@ class StudentOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# Farbpalette fuer Klassen — gut unterscheidbar, in Hell/Dunkel lesbar.
+_CLASS_COLORS = ["#2563eb", "#0a7d3e", "#b8860b", "#7c3aed", "#d1350f", "#0891b2", "#db2777", "#65a30d", "#ea580c", "#4f46e5"]
+
+
+def _auto_color(name: str) -> str:
+    h = sum(ord(c) for c in (name or "")) if name else 0
+    return _CLASS_COLORS[h % len(_CLASS_COLORS)]
+
+
 class ClassCreate(BaseModel):
     name: str
+    color: str = ""
     students: List[StudentIn] = []
 
     @field_validator("students")
@@ -102,6 +112,7 @@ class ClassCreate(BaseModel):
 class ClassOut(BaseModel):
     id: int
     name: str
+    color: str = ""
     students: List[StudentOut] = []
     model_config = {"from_attributes": True}
 
@@ -109,7 +120,7 @@ class ClassOut(BaseModel):
 @router.post("", response_model=ClassOut, status_code=201)
 async def create_class(body: ClassCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("cls_create", f"u{user.id}", 30, 60, "Zu viele Klassen in kurzer Zeit. Bitte kurz warten.")
-    sc = SchoolClass(name=body.name, owner_id=user.id)
+    sc = SchoolClass(name=body.name, owner_id=user.id, color=body.color or _auto_color(body.name))
     db.add(sc)
     await db.flush()
     for s in body.students:
@@ -149,6 +160,7 @@ async def update_class(class_id: int, body: ClassCreate, user: User = Depends(ge
     if sc.owner_id and sc.owner_id != user.id:
         raise HTTPException(403, "Keine Berechtigung")
     sc.name = body.name
+    sc.color = body.color or sc.color or _auto_color(body.name)
     if not sc.owner_id:
         sc.owner_id = user.id
 

@@ -146,6 +146,9 @@ class SchoolClass(Base):
     # Standard-Anzahl Themenbloecke je Woche (Wochenplanung). Nur ein Vorschlag
     # beim Anlegen — die einzelne Woche darf abweichen.
     plan_blocks: Mapped[int] = mapped_column(Integer, default=2, server_default="2")
+    # Anzeigefarbe (Hex), z.B. im Kalender/Stundenplan. Wird beim Anlegen
+    # automatisch vergeben, ist aber aenderbar.
+    color: Mapped[str] = mapped_column(String(9), default="", server_default="")
     # Einzigartiger Token fuer den Karten-Zugang (unratbar). Wird bei Bedarf gesetzt.
     karten_token: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
