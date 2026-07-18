@@ -2697,6 +2697,7 @@
                     <span style="color:var(--text-muted)">– ${ll.schueler.length} Schüler</span>
                 </div>
                 <div class="btn-group">
+                    <button class="btn icon" data-ll-id="${ll._id}" data-action="rename" title="Umbenennen">${ICON.edit}</button>
                     ${i > 0 ? `<button class="btn icon" data-ll-id="${ll._id}" data-action="up" title="Nach oben">${ICON.up}</button>` : ''}
                     ${i < list.length - 1 ? `<button class="btn icon" data-ll-id="${ll._id}" data-action="down" title="Nach unten">${ICON.down}</button>` : ''}
                     <button class="btn icon danger" data-ll-id="${ll._id}" data-action="delete" title="Entfernen">${ICON.delete}</button>
@@ -2714,7 +2715,15 @@
                     openLernleiter(currentPfad, currentPfad.lernleitern[idx]);
                     return;
                 }
-                if (action === 'up' && idx > 0) {
+                if (action === 'rename') {
+                    const ll = currentPfad.lernleitern[idx];
+                    const neuThema = prompt('Thema der Lernleiter:', ll.thema || '');
+                    if (neuThema === null) return;  // abgebrochen
+                    const neuUnter = prompt('Unterthema (leer lassen für keins):', ll.unterthema || '');
+                    if (neuUnter === null) return;
+                    ll.thema = neuThema.trim();
+                    ll.unterthema = neuUnter.trim();
+                } else if (action === 'up' && idx > 0) {
                     [currentPfad.lernleitern[idx - 1], currentPfad.lernleitern[idx]] = [currentPfad.lernleitern[idx], currentPfad.lernleitern[idx - 1]];
                 } else if (action === 'down' && idx < currentPfad.lernleitern.length - 1) {
                     [currentPfad.lernleitern[idx + 1], currentPfad.lernleitern[idx]] = [currentPfad.lernleitern[idx], currentPfad.lernleitern[idx + 1]];
