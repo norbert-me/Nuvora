@@ -290,22 +290,19 @@ export default function Noten() {
                   return [
                     ...cols.map((c, i) => (
                     <th key={c.id} style={{ ...th, borderLeft: i === 0 ? "2px solid var(--border)" : "1px solid var(--border)", minWidth: 70, fontWeight: 500 }}>
-                      {renameCol === c.id ? (
-                        <ColForm t={t} initial={c.name} onCancel={() => setRenameCol(null)}
-                          onSave={async (name) => { if (await call(() => fetch(`${API}/categories/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: c.position ?? i }) }))) setRenameCol(null); }} />
-                      ) : (<>
-                      <div style={{ display: "flex", alignItems: "center", gap: 3, justifyContent: "center" }}>
-                        <button onClick={() => setRenameCol(c.id)} title={t("common.rename")}
+                      <div style={{ display: "flex", alignItems: "center", gap: 3, justifyContent: "center", position: "relative" }}>
+                        <button onClick={() => setRenameCol(renameCol === c.id ? null : c.id)} title={t("noten.colOverview")}
                           style={{ maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", border: "none", background: "none", cursor: "pointer", color: "var(--text2)", fontWeight: 500, fontSize: 12, padding: 0 }}>{c.name}</button>
-                        <button onClick={() => { if (confirm(t("noten.delColumn", { name: c.name }))) call(() => fetch(`${API}/categories/${c.id}`, { method: "DELETE" })); }}
-                          className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={t("noten.delColTitle")}>
-                          <Icon d={ICONS.trash} color={C.danger} size={13} />
-                        </button>
+                        {renameCol === c.id && (
+                          <ColMenu t={t} cat={c}
+                            onRename={async (name) => { if (await call(() => fetch(`${API}/categories/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: c.position ?? i }) }))) setRenameCol(null); }}
+                            onDelete={() => { if (confirm(t("noten.delColumn", { name: c.name }))) { call(() => fetch(`${API}/categories/${c.id}`, { method: "DELETE" })); setRenameCol(null); } }}
+                            onClose={() => setRenameCol(null)} />
+                        )}
                       </div>
                       {neuSpalteIn === sec.id && i === cols.length - 1 && (
                         <ColForm t={t} onCancel={() => setNeuSpalteIn(null)} onSave={async (name) => { if (await call(() => fetch(`${API}/categories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: cols.length }) }))) setNeuSpalteIn(null); }} />
                       )}
-                      </>)}
                     </th>
                     )),
                     bereich,
@@ -474,6 +471,34 @@ function SectionMenu({ t, sec, onEdit, onDelete, onAddCol }) {
         </>
       )}
     </span>
+  );
+}
+
+// Kleine Uebersicht zur Spalte: Anlagedatum plus Umbenennen/Loeschen.
+function ColMenu({ t, cat, onRename, onDelete, onClose }) {
+  const [name, setName] = useState(cat.name);
+  const datum = cat.created_at ? new Date(cat.created_at).toLocaleDateString("de-DE") : "—";
+  const heute = () => {
+    const d = new Date();
+    setName(`${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`);
+  };
+  return (
+    <>
+      <span onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 9 }} />
+      <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", zIndex: 10, top: 26, left: "50%", transform: "translateX(-50%)", minWidth: 210, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: 12, boxShadow: "0 6px 20px rgba(0,0,0,0.2)", textAlign: "left", fontWeight: 400 }}>
+        <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 8 }}>{t("noten.colCreated")}: {datum}</div>
+        <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 10 }}>
+          <input value={name} onChange={(e) => setName(e.target.value)} autoFocus
+            onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) onRename(name.trim()); if (e.key === "Escape") onClose(); }}
+            style={{ ...inp, fontSize: 12, padding: 5 }} />
+          <button onClick={heute} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("noten.useDate")}><Icon d={ICONS.calendar} size={14} /></button>
+        </div>
+        <div style={{ display: "flex", gap: 6, justifyContent: "space-between", alignItems: "center" }}>
+          <button onClick={() => name.trim() && onRename(name.trim())} style={{ ...btnPrimary, padding: "5px 12px", fontSize: 12 }}>{t("common.save")}</button>
+          <button onClick={onDelete} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
+        </div>
+      </div>
+    </>
   );
 }
 

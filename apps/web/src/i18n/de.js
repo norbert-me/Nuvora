@@ -538,6 +538,8 @@ export default {
   "noten.total": "Gesamt",
   "noten.unweighted": "ungewichtet",
   "noten.noSections": "Noch keine Abschnitte. Lege einen an (z. B. „Klassenarbeiten“, „Sonstige Mitarbeit“) und gib ihm ein Gewicht.",
+  "noten.colOverview": "Übersicht / umbenennen",
+  "noten.colCreated": "Angelegt",
   "noten.useDate": "Heutiges Datum verwenden",
   "noten.collapse": "Abschnitt einklappen",
   "noten.expand": "Abschnitt ausklappen",

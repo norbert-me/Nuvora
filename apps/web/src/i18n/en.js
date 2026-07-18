@@ -538,6 +538,8 @@ export default {
   "noten.total": "Total",
   "noten.unweighted": "unweighted",
   "noten.noSections": "No sections yet. Create one (e.g. “Class tests”, “Participation”) and give it a weight.",
+  "noten.colOverview": "Overview / rename",
+  "noten.colCreated": "Created",
   "noten.useDate": "Use today's date",
   "noten.collapse": "Collapse section",
   "noten.expand": "Expand section",

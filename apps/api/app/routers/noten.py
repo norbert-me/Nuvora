@@ -94,6 +94,7 @@ class CategoryOut(BaseModel):
     section_id: Optional[int]
     name: str
     position: int
+    created_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
 
 

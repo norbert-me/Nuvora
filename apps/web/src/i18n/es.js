@@ -538,6 +538,8 @@ export default {
   "noten.total": "Total",
   "noten.unweighted": "sin ponderar",
   "noten.noSections": "Aún no hay secciones. Crea una (p. ej. «Exámenes», «Participación») y dale un peso.",
+  "noten.colOverview": "Vista / renombrar",
+  "noten.colCreated": "Creado",
   "noten.useDate": "Usar la fecha de hoy",
   "noten.collapse": "Contraer área",
   "noten.expand": "Expandir área",
