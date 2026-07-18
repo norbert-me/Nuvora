@@ -240,6 +240,7 @@ class StudentProgress(BaseModel):
     due: int        # wie viele heute faellig
     total: int      # Karten in ausgerollten Stapeln
     hist: dict      # Reifegrad-Verteilung (neu/lernen/kurz/mittel/lang)
+    last_reviewed: Optional[datetime] = None  # wann zuletzt gelernt
 
 
 @router.get("/classes/{class_id}/progress", response_model=List[StudentProgress])
@@ -263,16 +264,19 @@ async def progress(class_id: int, user: User = Depends(require_module), db: Asyn
         hist = _empty_hist()
         due = 0
         reviewed = 0
+        last = None
         for cid in card_ids:
             rev = reviews.get(cid)
             hist[_bucket(rev)] += 1
-            if rev is not None and rev.reps > 0:
+            if rev is not None and (rev.reps or 0) > 0:
                 reviewed += 1
+            if rev is not None and rev.last_reviewed and (last is None or rev.last_reviewed > last):
+                last = rev.last_reviewed
             if rev is None or rev.due <= now:
                 due += 1
         out.append(StudentProgress(
             student_id=st.id, name=st.name,
-            reviewed=reviewed, due=due, total=total, hist=hist,
+            reviewed=reviewed, due=due, total=total, hist=hist, last_reviewed=last,
         ))
     return out
 
@@ -372,15 +376,19 @@ async def student_session(token: str, db: AsyncSession = Depends(get_db)):
     faellig = []
     hist = _empty_hist()
     learned = 0
+    next_due = None  # frueheste kuenftige Faelligkeit → wann wieder lernen
     for c in cards:
         rev = reviews.get(c.id)
         hist[_bucket(rev)] += 1
-        if rev is not None and rev.reps > 0:
+        if rev is not None and (rev.reps or 0) > 0:
             learned += 1
         if rev is None or rev.due <= now:
             faellig.append({"card_id": c.id, "front": c.front, "back": c.back})
+        elif rev.due > now and (next_due is None or rev.due < next_due):
+            next_due = rev.due
     return {"name": st.name, "cards": faellig, "total": len(cards),
-            "due": len(faellig), "learned": learned, "hist": hist}
+            "due": len(faellig), "learned": learned, "hist": hist,
+            "next_due": next_due.isoformat() if next_due else None}
 
 
 class ReviewIn(BaseModel):

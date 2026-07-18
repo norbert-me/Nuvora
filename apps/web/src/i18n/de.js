@@ -666,6 +666,7 @@ export default {
   "karten.noRolledOut": "Noch kein Stapel ausgerollt. Rolle einen Stapel aus, dann erscheint hier der Fortschritt.",
   "karten.classMaturity": "Reifegrad der Klasse",
   "karten.maturity": "Reifegrad",
+  "karten.lastLearned": "Zuletzt gelernt",
   "karten.dueNow": "fällig",
   "karten.lapsesHint": "Fehlversuche (Nochmal)",
   "karten.qrHint": "Jede Person bekommt einen QR-Code. Scannen öffnet die eigenen Karten — ohne Login. Drucken und austeilen.",

@@ -61,6 +61,11 @@ export default function Lernen() {
           <div style={{ fontSize: 48, marginBottom: 8 }}>✓</div>
           <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>Fertig für heute!</h2>
           <p style={{ color: "var(--text2)", marginBottom: 20 }}>Alle fälligen Karten gelernt. Komm später wieder.</p>
+          {data.next_due && (
+            <p style={{ fontSize: 14, color: "var(--text)", marginBottom: 20 }}>
+              Nächstes Lernen: <strong>{new Date(data.next_due).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}</strong>
+            </p>
+          )}
           <MeinFortschritt data={data} />
           <button onClick={load} style={{ ...btn, marginTop: 20 }}>Nochmal prüfen</button>
         </div>

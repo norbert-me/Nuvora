@@ -126,6 +126,7 @@ export default function Karten() {
                   <th style={{ ...th, textAlign: "left", minWidth: 120 }}>{t("karten.maturity")}</th>
                   <th style={th}>{t("karten.reviewed")}</th>
                   <th style={th}>{t("karten.due")}</th>
+                  <th style={th}>{t("karten.lastLearned")}</th>
                 </tr></thead>
                 <tbody>
                   {progress.map((p) => (
@@ -136,6 +137,7 @@ export default function Karten() {
                       <td style={{ ...td, textAlign: "left" }}><ReifeBar hist={p.hist} /></td>
                       <td style={td}>{p.reviewed}{total ? ` / ${total}` : ""}</td>
                       <td style={{ ...td, color: p.due ? "#b8860b" : "var(--text3)" }}>{p.due || "—"}</td>
+                      <td style={{ ...td, color: "var(--text3)", fontSize: 12.5 }}>{p.last_reviewed ? new Date(p.last_reviewed).toLocaleDateString() : "—"}</td>
                     </tr>
                   ))}
                 </tbody>

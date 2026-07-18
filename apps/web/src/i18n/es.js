@@ -666,6 +666,7 @@ export default {
   "karten.noRolledOut": "Aún no hay ninguna baraja distribuida. Distribuye una y el progreso aparecerá aquí.",
   "karten.classMaturity": "Madurez de la clase",
   "karten.maturity": "Madurez",
+  "karten.lastLearned": "Último repaso",
   "karten.dueNow": "pendiente",
   "karten.lapsesHint": "Fallos (Otra vez)",
   "karten.qrHint": "Cada persona recibe un código QR. Al escanearlo abre sus tarjetas, sin cuenta. Imprime y reparte.",
