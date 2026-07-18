@@ -661,6 +661,8 @@ export default {
   "karten.noRolledOut": "No deck rolled out yet. Roll out a deck and progress appears here.",
   "karten.classMaturity": "Class maturity",
   "karten.maturity": "Maturity",
+  "karten.dueNow": "due",
+  "karten.lapsesHint": "Lapses (Again)",
   "karten.qrHint": "Each person gets a QR code. Scanning opens their own cards — no login. Print and hand out.",
   "karten.print": "Print",
   "nav.cards2": "Cards",

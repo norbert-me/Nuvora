@@ -277,6 +277,48 @@ async def progress(class_id: int, user: User = Depends(require_module), db: Asyn
     return out
 
 
+class CardStat(BaseModel):
+    card_id: int
+    front: str
+    deck: str
+    bucket: str            # neu/lernen/kurz/mittel/lang
+    reps: int
+    lapses: int
+    interval_days: int
+    due: Optional[datetime]
+    last_reviewed: Optional[datetime]
+
+
+@router.get("/classes/{class_id}/students/{student_id}/cards", response_model=List[CardStat])
+async def student_cards(class_id: int, student_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Detailstatistik je Karte fuer einen Schueler — nur ausgerollte Stapel."""
+    await _owned_class(db, user, class_id)
+    st = await db.get(Student, student_id)
+    if not st or st.class_id != class_id:
+        raise HTTPException(404, "Schüler nicht in dieser Klasse")
+    now = _now()
+    decks = {d.id: d.name for d in (await db.execute(select(CardDeck).where(
+        CardDeck.class_id == class_id, CardDeck.released_at.is_not(None), CardDeck.released_at <= now,
+    ))).scalars().all()}
+    if not decks:
+        return []
+    cards = (await db.execute(select(Card).where(Card.deck_id.in_(decks.keys())).order_by(Card.deck_id, Card.position))).scalars().all()
+    reviews = {r.card_id: r for r in (await db.execute(select(CardReview).where(CardReview.student_id == student_id))).scalars().all()}
+    out = []
+    for c in cards:
+        rev = reviews.get(c.id)
+        out.append(CardStat(
+            card_id=c.id, front=c.front, deck=decks.get(c.deck_id, ""),
+            bucket=_bucket(rev),
+            reps=rev.reps if rev else 0,
+            lapses=rev.lapses if rev else 0,
+            interval_days=rev.interval_days if rev else 0,
+            due=rev.due if rev else None,
+            last_reviewed=rev.last_reviewed if rev else None,
+        ))
+    return out
+
+
 # ─── Schueler: Token-Zugang (KEIN Login) ───
 
 async def _student_by_token(db: AsyncSession, token: str) -> Student:

@@ -19,6 +19,7 @@ export default function Karten() {
   const [error, setError] = useState("");
   const [newDeck, setNewDeck] = useState("");
   const [addingDeck, setAddingDeck] = useState(false);
+  const [detail, setDetail] = useState(null); // { student, cards } — Einzelstatistik
 
   useEffect(() => {
     fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).then((d) => {
@@ -40,6 +41,10 @@ export default function Karten() {
   };
 
   const loadProgress = () => fetch(`${API}/classes/${classId}/progress`).then((r) => (r.ok ? r.json() : [])).then(setProgress).catch(() => {});
+  const openDetail = async (p) => {
+    const cards = await fetch(`${API}/classes/${classId}/students/${p.student_id}/cards`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+    setDetail({ student: p, cards });
+  };
   const loadTokens = () => fetch(`${API}/classes/${classId}/tokens`, { method: "POST" }).then((r) => (r.ok ? r.json() : [])).then(setTokens).catch(() => {});
   // Daten laden, wenn der Tab (aus der Navbar) oder die Klasse wechselt.
   useEffect(() => {
@@ -119,7 +124,9 @@ export default function Karten() {
                 <tbody>
                   {progress.map((p) => (
                     <tr key={p.student_id}>
-                      <td style={{ ...td, textAlign: "left" }}>{p.name}</td>
+                      <td style={{ ...td, textAlign: "left" }}>
+                        <button onClick={() => openDetail(p)} style={{ border: "none", background: "none", color: "var(--accent)", cursor: "pointer", fontWeight: 600, fontSize: 13.5, padding: 0, textAlign: "left" }}>{p.name}</button>
+                      </td>
                       <td style={{ ...td, textAlign: "left" }}><ReifeBar hist={p.hist} /></td>
                       <td style={td}>{p.reviewed}{total ? ` / ${total}` : ""}</td>
                       <td style={{ ...td, color: p.due ? "#b8860b" : "var(--text3)" }}>{p.due || "—"}</td>
@@ -147,6 +154,56 @@ export default function Karten() {
           </div>
         </div>
       )}
+
+      {detail && <StudentDetail detail={detail} t={t} onClose={() => setDetail(null)} />}
+    </div>
+  );
+}
+
+// Einzelstatistik je Schueler: alle Karten mit Reifegrad, Faelligkeit und
+// Fehlversuchen. Nur Anzeige.
+function StudentDetail({ detail, t, onClose }) {
+  const { student, cards } = detail;
+  const now = Date.now();
+  const label = (b) => (REIFE.find(([k]) => k === b) || [null, b])[1];
+  const color = (b) => (REIFE.find(([k]) => k === b) || [null, null, "var(--text3)"])[2];
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 200 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--card)", borderRadius: 18, maxWidth: 560, width: "100%", maxHeight: "85vh", overflow: "auto", padding: 22, border: "1px solid var(--border)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+          <h3 style={{ fontSize: 17, fontWeight: 700, flex: 1 }}>{student.name}</h3>
+          <button onClick={onClose} className="icon-btn" style={iconBtn} title={t("common.close")}><Icon d={ICONS.close} size={16} /></button>
+        </div>
+        <div style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 14 }}>{student.reviewed} / {student.total} {t("karten.reviewed").toLowerCase()} · {student.due || 0} {t("karten.due").toLowerCase()}</div>
+        {cards.length === 0 ? (
+          <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("karten.noRolledOut")}</p>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
+              <thead><tr>
+                <th style={{ ...th, textAlign: "left" }}>{t("karten.front")}</th>
+                <th style={{ ...th, textAlign: "left" }}>{t("karten.maturity")}</th>
+                <th style={th}>{t("karten.due")}</th>
+                <th style={th} title={t("karten.lapsesHint")}>↺</th>
+              </tr></thead>
+              <tbody>
+                {cards.map((c) => {
+                  const due = c.due ? new Date(c.due) : null;
+                  const dueTxt = !due ? "—" : due.getTime() <= now ? t("karten.dueNow") : due.toLocaleDateString();
+                  return (
+                    <tr key={c.card_id}>
+                      <td style={{ ...td, textAlign: "left", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={`${c.front} (${c.deck})`}>{c.front}</td>
+                      <td style={{ ...td, textAlign: "left" }}><span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 9, height: 9, borderRadius: 3, background: color(c.bucket) }} />{label(c.bucket)}</span></td>
+                      <td style={{ ...td, color: due && due.getTime() <= now ? "#b8860b" : "var(--text3)" }}>{dueTxt}</td>
+                      <td style={{ ...td, color: c.lapses ? "#d1350f" : "var(--text3)" }}>{c.lapses || "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
