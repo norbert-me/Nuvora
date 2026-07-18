@@ -592,7 +592,10 @@
     function updateFormUnterthemen() {
         const thema = document.getElementById('aufgabe-thema').value.trim();
         const dl = document.getElementById('unterthemen-list');
-        const matching = [...new Set(aufgaben.filter(a => a.thema === thema).map(a => a.unterthema).filter(Boolean))].sort();
+        // Unterthemen aus Aufgaben UND aus den Kind-Themen des Kern-Themas.
+        const ober = topics.find(t => !t.parent_id && t.name === thema);
+        const kernKinder = ober ? topics.filter(t => t.parent_id === ober.id).map(t => t.name) : [];
+        const matching = [...new Set([...aufgaben.filter(a => a.thema === thema).map(a => a.unterthema).filter(Boolean), ...kernKinder])].sort();
         dl.innerHTML = matching.map(t => `<option value="${esc(t)}">`).join('');
     }
 
@@ -936,7 +939,10 @@
     }
 
     function updateFilters() {
-        const themen = [...new Set(aufgaben.map(a => a.thema).filter(Boolean))].sort();
+        // Themen: aus vorhandenen Aufgaben UND aus der Kern-Taxonomie (topics),
+        // damit man Kern-Themen auch ohne bestehende Aufgabe auswaehlen kann.
+        const kernOber = topics.filter(t => !t.parent_id).map(t => t.name);
+        const themen = [...new Set([...aufgaben.map(a => a.thema).filter(Boolean), ...kernOber])].sort();
         const sel = document.getElementById('filter-thema');
         const cur = sel.value;
         sel.innerHTML = '<option value="">Alle Themen</option>' + themen.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
@@ -957,7 +963,8 @@
         const dl = document.getElementById('themen-list');
         dl.innerHTML = themen.map(t => `<option value="${esc(t)}">`).join('');
 
-        const allUnterthemen = [...new Set(aufgaben.map(a => a.unterthema).filter(Boolean))].sort();
+        const kernUnter = topics.filter(t => t.parent_id).map(t => t.name);
+        const allUnterthemen = [...new Set([...aufgaben.map(a => a.unterthema).filter(Boolean), ...kernUnter])].sort();
         const dlU = document.getElementById('unterthemen-list');
         dlU.innerHTML = allUnterthemen.map(t => `<option value="${esc(t)}">`).join('');
     }
