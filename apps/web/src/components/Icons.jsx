@@ -79,6 +79,17 @@ export const btnSmall = { padding: "5px 12px", fontSize: 13 };
 
 // ─── Seitenkopf ───
 // 22px, wie in CardVote seit jeher. Neuere Seiten hatten 24 und 26.
+// Einheitlicher Select-Look: eigener Chevron statt des eckigen OS-Selects.
+// caretSvg ist ein grauer Chevron als Hintergrundbild (currentColor geht in
+// background-image nicht, Grau liest sich in Hell wie Dunkel).
+const caretSvg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E";
+export const selectStyle = {
+  appearance: "none", WebkitAppearance: "none", MozAppearance: "none",
+  padding: "7px 30px 7px 11px", borderRadius: 10, border: "1px solid var(--border2)",
+  background: `var(--bg) url("${caretSvg}") no-repeat right 9px center`,
+  color: "var(--text)", fontSize: 13.5, cursor: "pointer", lineHeight: 1.3, boxSizing: "border-box",
+};
+
 export const pageTitle = { fontSize: 22, fontWeight: 700, color: "var(--text)", marginBottom: 8 };
 export const pageIntro = { color: "var(--text2)", fontSize: 14, marginBottom: 22, lineHeight: 1.6 };
 

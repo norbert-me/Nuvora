@@ -2,7 +2,7 @@
 // Fortschritt sehen. Schüler lernen kontenlos über den Token (siehe Lernen.jsx).
 import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, selectStyle } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
 
@@ -81,7 +81,7 @@ export default function Karten() {
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
           {t("nav.classes")}
           <select value={classId ?? ""} onChange={(e) => { setClassId(Number(e.target.value)); setTokens(null); }}
-            style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)" }}>
+            style={selectStyle}>
             {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </label>
@@ -241,7 +241,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false }) {
         <span style={{ fontSize: 11.5, fontWeight: 600, padding: "2px 8px", borderRadius: 980, background: badge.bg, color: badge.col }}>{badge.text}</span>
         {showTopic && (
           <select value={deck.topic_id ?? ""} onChange={(e) => setTopic(e.target.value)} title={t("karten.topicHint")}
-            style={{ fontSize: 12, padding: "3px 8px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)", maxWidth: 180 }}>
+            style={{ ...selectStyle, fontSize: 12, padding: "4px 28px 4px 9px", maxWidth: 180 }}>
             <option value="">– {t("karten.freeCards")} –</option>
             {topics.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
           </select>
