@@ -148,16 +148,16 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
           <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 10 }}>
             {t("profile.gradeScaleHint")}
           </p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12, padding: 12, background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 12 }}>
             {[1, 2, 3, 4, 5].map((g) => (
-              <div key={g} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, width: 16 }}>{g}</span>
+              <div key={g} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 8px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{g}</span>
                 <span style={{ fontSize: 11, color: "var(--text3)" }}>{t("profile.from")}</span>
                 <input
                   type="number" min="0" max="100" step="1"
                   value={gradeScale[g]}
                   onChange={(e) => setGradeScale({ ...gradeScale, [g]: Math.max(0, Math.min(100, Number(e.target.value))) })}
-                  style={{ width: 48, padding: "4px 4px", fontSize: 13, border: "1px solid var(--border2)", borderRadius: 6, textAlign: "center" }}
+                  style={{ width: 46, padding: "4px 4px", fontSize: 13, border: "1px solid var(--border2)", borderRadius: 6, textAlign: "center", background: "var(--bg)", color: "var(--text)" }}
                 />
                 <span style={{ fontSize: 11, color: "var(--text3)" }}>%</span>
               </div>
