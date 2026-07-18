@@ -674,39 +674,44 @@ const gradeDistribution = (() => {
       </div>
 
       {showScale && (
-        <div style={{ padding: 14, background: "var(--card)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 12 }}>
-          <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 10 }}>Mindestprozent für jede Note. Wird pro Test gespeichert.</p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+        <div style={{ padding: 16, background: "var(--card)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 12 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>Notenschlüssel</h3>
+          <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>Mindestprozent für jede Note. Wird pro Test gespeichert.</p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(112px, 1fr))", gap: 8 }}>
             {[1, 2, 3, 4, 5].map((g) => (
-              <div key={g} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", width: 16 }}>{g}</span>
+              <div key={g} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg3)" }}>
+                <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 11, background: GRADE_COLORS[g], color: "#fff", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{g}</span>
                 <span style={{ fontSize: 11, color: "var(--text3)" }}>ab</span>
                 <input
                   type="number" min="0" max="100" step="1"
                   value={gradeScale[g]}
                   onChange={(e) => updateScale(g, e.target.value)}
-                  style={{ width: 48, padding: "4px 4px", fontSize: 13, border: "1px solid var(--border2)", borderRadius: 6, textAlign: "center", background: "var(--bg)", color: "var(--text)" }}
+                  style={{ width: 44, padding: "5px 4px", fontSize: 13, border: "1px solid var(--border2)", borderRadius: 6, textAlign: "center", background: "var(--bg)", color: "var(--text)" }}
                 />
                 <span style={{ fontSize: 11, color: "var(--text3)" }}>%</span>
               </div>
             ))}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", border: "1px dashed var(--border2)", borderRadius: 10 }}>
+              <span style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 11, background: GRADE_COLORS[6], color: "#fff", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>6</span>
+              <span style={{ fontSize: 12, color: "var(--text3)" }}>unter {gradeScale[5]}%</span>
+            </div>
           </div>
-          <div style={{ marginTop: 8, fontSize: 12, color: "var(--text3)" }}>Note 6: unter {gradeScale[5]}%</div>
         </div>
       )}
 
       {showWeights && (
-        <div style={{ padding: 14, background: "var(--card)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 12 }}>
-          <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 10 }}>Punkte pro richtige Antwort. Standard = 1.</p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <div style={{ padding: 16, background: "var(--card)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 12 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>Gewichtung</h3>
+          <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>Punkte pro richtige Antwort. Standard = 1.</p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 8 }}>
             {questions.map((q, i) => (
-              <div key={q.id} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)", width: 24 }}>F{i + 1}</span>
+              <div key={q.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg3)" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)", flexShrink: 0 }}>F{i + 1}</span>
                 <input
                   type="number" min="0" max="10" step="0.5"
                   value={getWeight(q.id)}
                   onChange={(e) => updateWeight(q.id, e.target.value)}
-                  style={{ width: 52, padding: "4px 6px", fontSize: 13, border: "1px solid var(--border2)", borderRadius: 6, textAlign: "center", background: "var(--bg)", color: "var(--text)" }}
+                  style={{ width: 52, marginLeft: "auto", padding: "5px 6px", fontSize: 13, border: "1px solid var(--border2)", borderRadius: 6, textAlign: "center", background: "var(--bg)", color: "var(--text)" }}
                 />
               </div>
             ))}
