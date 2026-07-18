@@ -674,6 +674,8 @@ export default {
   "karten.classMaturity": "Madurez de la clase",
   "karten.maturity": "Madurez",
   "karten.lastLearned": "Último repaso",
+  "karten.thisWeek": "Aprendido esta semana",
+  "karten.neverLearned": "Nunca aprendido",
   "karten.dueNow": "pendiente",
   "karten.lapsesHint": "Fallos (Otra vez)",
   "karten.qrHint": "Cada persona recibe un código QR. Al escanearlo abre sus tarjetas, sin cuenta. Imprime y reparte.",

@@ -674,6 +674,8 @@ export default {
   "karten.classMaturity": "Class maturity",
   "karten.maturity": "Maturity",
   "karten.lastLearned": "Last learned",
+  "karten.thisWeek": "Learned this week",
+  "karten.neverLearned": "Never learned",
   "karten.dueNow": "due",
   "karten.lapsesHint": "Lapses (Again)",
   "karten.qrHint": "Each person gets a QR code. Scanning opens their own cards — no login. Print and hand out.",

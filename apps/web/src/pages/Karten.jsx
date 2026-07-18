@@ -102,6 +102,11 @@ export default function Karten() {
           REIFE_AKTIV.forEach(([k]) => { acc[k] = (acc[k] || 0) + (p.hist?.[k] || 0); });
           return acc;
         }, {});
+        // Wochenansicht: wer hat diese Woche (ab Montag) gelernt, wer noch nie.
+        const wochStart = (() => { const d = new Date(); const wd = (d.getDay() + 6) % 7; d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - wd); return d.getTime(); })();
+        const nStud = progress.length;
+        const dieseWoche = progress.filter((p) => p.last_reviewed && new Date(p.last_reviewed).getTime() >= wochStart).length;
+        const nieGelernt = progress.filter((p) => !p.last_reviewed).length;
         return (
           <>
             {total === 0 ? (
@@ -109,6 +114,10 @@ export default function Karten() {
             ) : (
               <div style={{ padding: 16, border: "1px solid var(--border)", borderRadius: 12, marginBottom: 16, background: "var(--card)" }}>
                 <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>{t("karten.classMaturity")}</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+                  <span style={{ fontSize: 12.5, padding: "4px 10px", borderRadius: 980, background: "rgba(10,125,62,0.12)", color: "#0a7d3e", fontWeight: 600 }}>{t("karten.thisWeek")}: {dieseWoche}/{nStud}</span>
+                  {nieGelernt > 0 && <span style={{ fontSize: 12.5, padding: "4px 10px", borderRadius: 980, background: "var(--bg2)", color: "var(--text3)", fontWeight: 600 }}>{t("karten.neverLearned")}: {nieGelernt}</span>}
+                </div>
                 <ReifeBar hist={classHist} height={14} />
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", marginTop: 10 }}>
                   {REIFE_AKTIV.map(([k, label, color]) => (
