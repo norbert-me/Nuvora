@@ -23,10 +23,21 @@ export default function Lernen() {
 
   const bewerten = async (grade) => {
     const card = data.cards[i];
-    await fetch(`${API}/lernen/${token}/review`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ card_id: card.card_id, grade }),
-    }).catch(() => {});
+    // Bewertung MUSS ankommen, sonst geht Fortschritt verloren und die Sitzung
+    // beginnt spaeter von vorn. Schlaegt der Aufruf fehl, hier stoppen und
+    // melden statt still weiterzublaettern.
+    try {
+      const r = await fetch(`${API}/lernen/${token}/review`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ card_id: card.card_id, grade }),
+      });
+      console.debug("[Karten] Review", card.card_id, "grade", grade, "→", r.status, r.ok);
+      if (!r.ok) { setError(`Speichern fehlgeschlagen (${r.status}). Bitte Seite neu laden.`); return; }
+    } catch (e) {
+      console.error("[Karten] Review-Aufruf fehlgeschlagen:", e);
+      setError("Keine Verbindung — Bewertung nicht gespeichert. Bitte erneut versuchen.");
+      return;
+    }
     setFlipped(false);
     // "Nochmal" (grade 0): Karte kommt in dieser Sitzung erneut dran — ans Ende
     // der Warteschlange. Sonst ist sie fuer heute erledigt und faellt raus.
