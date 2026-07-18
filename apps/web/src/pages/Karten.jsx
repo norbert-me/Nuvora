@@ -1,7 +1,7 @@
 // Modul Karten (Lehrer): Stapel & Karten verwalten, QR-Tokens drucken,
 // Fortschritt sehen. Schüler lernen kontenlos über den Token (siehe Lernen.jsx).
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -14,7 +14,8 @@ export default function Karten() {
   const [decks, setDecks] = useState([]);
   const [progress, setProgress] = useState([]);
   const [tokens, setTokens] = useState(null);
-  const [view, setView] = useState("cards"); // cards | progress | qr
+  const [params] = useSearchParams();
+  const view = params.get("tab") || "cards"; // cards | progress | qr — aus der Navbar
   const [error, setError] = useState("");
   const [newDeck, setNewDeck] = useState("");
 
@@ -39,6 +40,12 @@ export default function Karten() {
 
   const loadProgress = () => fetch(`${API}/classes/${classId}/progress`).then((r) => (r.ok ? r.json() : [])).then(setProgress).catch(() => {});
   const loadTokens = () => fetch(`${API}/classes/${classId}/tokens`, { method: "POST" }).then((r) => (r.ok ? r.json() : [])).then(setTokens).catch(() => {});
+  // Daten laden, wenn der Tab (aus der Navbar) oder die Klasse wechselt.
+  useEffect(() => {
+    if (!classId) return;
+    if (view === "progress") loadProgress();
+    if (view === "qr") loadTokens();
+  }, [view, classId]);
 
   if (classes.length === 0) {
     return (
@@ -55,21 +62,10 @@ export default function Karten() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
         <h1 style={pageTitle}>{t("karten.title")}</h1>
-        <select value={classId ?? ""} onChange={(e) => { setClassId(Number(e.target.value)); setView("cards"); setTokens(null); }}
+        <select value={classId ?? ""} onChange={(e) => { setClassId(Number(e.target.value)); setTokens(null); }}
           style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)" }}>
           {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-      </div>
-
-      <div style={{ display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" }}>
-        {[["cards", t("karten.tabCards")], ["progress", t("karten.tabProgress")], ["qr", t("karten.tabQr")]].map(([k, label]) => (
-          <button key={k} onClick={() => { setView(k); if (k === "progress") loadProgress(); if (k === "qr") loadTokens(); }}
-            style={{ padding: "6px 14px", borderRadius: 980, fontSize: 13.5, cursor: "pointer", fontWeight: 500,
-              border: view === k ? "1px solid var(--accent)" : "1px solid var(--border2)",
-              background: view === k ? "var(--accent-bg)" : "var(--card)", color: view === k ? "var(--accent)" : "var(--text2)" }}>
-            {label}
-          </button>
-        ))}
       </div>
 
       {error && <p style={{ color: "var(--danger, #dc2626)", fontSize: 13, marginBottom: 10 }}>{error}</p>}

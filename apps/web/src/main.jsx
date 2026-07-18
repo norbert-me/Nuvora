@@ -120,6 +120,15 @@ const getModuleNavItems = (t, location) => {
   if (area === "noten") {
     return [{ to: NO, label: t("nav.grades") }];
   }
+  if (area === "karten") {
+    // Tabs der Kartenseite laufen ueber die Nuvora-Navbar (?tab).
+    const cur = params.get("tab") || "cards";
+    return [
+      { to: `${KA}?tab=cards`, label: t("karten.tabCards"), active: cur === "cards" },
+      { to: `${KA}?tab=progress`, label: t("karten.tabProgress"), active: cur === "progress" },
+      { to: `${KA}?tab=qr`, label: t("karten.tabQr"), active: cur === "qr" },
+    ];
+  }
   // Kern: der Nuvora-Schriftzug links fuehrt zur Startseite.
   return [
     { to: "/classes", label: t("nav.classes") },
