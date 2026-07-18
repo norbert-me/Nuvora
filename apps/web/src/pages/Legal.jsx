@@ -15,7 +15,7 @@ export default function Legal() {
   const mailto = `mailto:${email}`;
 
   return (
-    <div style={{ maxWidth: 700, lineHeight: 1.7, color: "var(--text)" }}>
+    <div style={{ lineHeight: 1.7, color: "var(--text)" }}>
       {/* Entwicklungsstatus: die Anwendung ist im Aufbau (Alpha/Beta). Realer
           Hinweis, weil echte Daten betroffen sind. */}
       <div style={{ marginBottom: 28, padding: "14px 16px", border: "1px solid #b8860b", borderRadius: 12, background: "rgba(184,134,11,0.10)", fontSize: 13.5 }}>
