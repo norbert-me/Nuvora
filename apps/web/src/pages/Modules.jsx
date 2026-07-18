@@ -27,7 +27,7 @@ export default function Modules() {
   };
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: 720, margin: "0 auto" }}>
       <h1 style={pageTitle}>{t("modules.title")}</h1>
       <p style={{ color: "var(--text2)", marginBottom: 24, fontSize: 14 }}>
         Aktiviere, was du brauchst. Abschalten entfernt keine Daten — sie sind
