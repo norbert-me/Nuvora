@@ -59,6 +59,8 @@ export default function Session() {
   const [scannedStudents, setScannedStudents] = useState([]);
   const [revealed, setRevealed] = useState(false);
   const [started, setStarted] = useState(false);
+  const [resuming, setResuming] = useState(false);
+  const [resumeQid, setResumeQid] = useState(null);
   const [finished, setFinished] = useState(false);
   const [allScans, setAllScans] = useState({});
   const [questionTimes, setQuestionTimes] = useState({});
@@ -152,9 +154,21 @@ export default function Session() {
         }
       }
     }
-    setStarted(true);
+    // NICHT direkt in die Live-Ansicht springen: erst die Beitrittsseite mit QR
+    // zeigen, damit die Handys wieder scannen koennen. Von dort geht es weiter.
+    setResumeQid(s.current_question_id || null);
+    setResuming(true);
     sessionStartRef.current = Date.now();
     questionStartRef.current = Date.now();
+  };
+
+  // Fortsetzen aus der Beitrittsseite: an der zuletzt aktiven Frage weiter,
+  // und sie erneut an die Handys senden.
+  const continueResumed = () => {
+    setResuming(false);
+    setStarted(true);
+    const idx = resumeQid ? questions.findIndex((q) => q.id === resumeQid) : -1;
+    activateQuestion(idx >= 0 ? idx : 0);
   };
 
 
@@ -503,12 +517,26 @@ export default function Session() {
           {t("session.countsLine", { q: questions.length, s: studentList.length })}
           {gameMode && ` ${t("session.timerSuffix", { t: timerSeconds })}`}
         </p>
-        <button onClick={startFromBeginning} disabled={questions.length === 0} style={{
-          ...btnLarge,
-          background: "var(--text)", color: "var(--bg)",
-        }}>
-          {gameMode ? t("session.letsgo") : t("session.start")}
-        </button>
+        {questions.length === 0 && (
+          <p style={{ color: "var(--accent)", marginBottom: 16, fontSize: 14 }}>{t("session.noQuestions")}</p>
+        )}
+        {resuming ? (
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+            <button onClick={continueResumed} disabled={questions.length === 0} style={{ ...btnLarge, background: "var(--text)", color: "var(--bg)" }}>
+              {t("session.continue")}
+            </button>
+            <button onClick={startFromBeginning} disabled={questions.length === 0} style={{ ...btnLarge, background: "var(--card)", color: "var(--text)", border: "1px solid var(--border2)" }}>
+              {t("session.fromStart")}
+            </button>
+          </div>
+        ) : (
+          <button onClick={startFromBeginning} disabled={questions.length === 0} style={{
+            ...btnLarge,
+            background: "var(--text)", color: "var(--bg)",
+          }}>
+            {gameMode ? t("session.letsgo") : t("session.start")}
+          </button>
+        )}
       </div>
     );
   }
