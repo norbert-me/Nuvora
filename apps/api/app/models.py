@@ -475,6 +475,10 @@ class CalendarEntry(Base):
     # Optionaler Unterrichtseinstieg/Methode aus dem Modul Methoden (Regel 3:
     # ON DELETE SET NULL, der Eintrag bleibt ohne die Methode nutzbar).
     method_id: Mapped[Optional[int]] = mapped_column(ForeignKey("methods.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Aus welcher Stundenplan-Stunde der Eintrag stammt (1..n). Macht die Zuordnung
+    # Tag+Stunde eindeutig, damit ein erneuter Klick auf dieselbe Stunde den
+    # vorhandenen Eintrag bearbeitet statt einen zweiten anzulegen.
+    period: Mapped[Optional[int]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

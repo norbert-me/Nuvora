@@ -139,6 +139,7 @@ def _ensure_columns(sync_conn):
         ("card_decks", "released_at", "TIMESTAMPTZ"),
         ("card_decks", "topic_id", "INTEGER"),
         ("calendar_entries", "method_id", "INTEGER"),
+        ("calendar_entries", "period", "INTEGER"),
         ("exercises", "code", "VARCHAR(20) DEFAULT '' NOT NULL"),
         ("users", "timetable_periods", "INTEGER DEFAULT 6 NOT NULL"),
         ("users", "timetable_times", "JSON"),

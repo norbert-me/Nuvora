@@ -66,7 +66,7 @@ export default function Kalender() {
   };
 
   const save = async (e) => {
-    const body = { date: new Date(e.date).toISOString(), title: e.title || "", notes: e.notes || "", class_id: e.class_id || null, topic_id: e.topic_id || null, method_id: e.method_id || null };
+    const body = { date: new Date(e.date).toISOString(), title: e.title || "", notes: e.notes || "", class_id: e.class_id || null, topic_id: e.topic_id || null, method_id: e.method_id || null, period: e.period ?? null };
     const res = await fetch(e.id ? `${API}/entries/${e.id}` : `${API}/entries`, {
       method: e.id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     }).catch(() => null);
@@ -81,9 +81,11 @@ export default function Kalender() {
   // Klick auf eine Stundenplan-Vorlage: gibt es an dem Tag schon einen Eintrag
   // dieser Klasse, wird der bearbeitet; sonst ein neuer aus der Vorlage.
   const fromSlot = (day, s) => {
-    const vorhanden = entries.find((e) => ymd(new Date(e.date)) === ymd(day) && (e.class_id || null) === (s.class_id || null));
+    // Eindeutig ueber Tag + Stunde: ein zweiter Klick auf dieselbe Stunde
+    // bearbeitet den vorhandenen Eintrag statt einen neuen anzulegen.
+    const vorhanden = entries.find((e) => ymd(new Date(e.date)) === ymd(day) && e.period != null && e.period === s.period);
     if (vorhanden) setEditing({ ...vorhanden, date: new Date(vorhanden.date) });
-    else setEditing({ date: startOfDay(day), title: s.title || "", class_id: s.class_id || null, topic_id: s.topic_id || null });
+    else setEditing({ date: startOfDay(day), period: s.period, title: s.title || "", class_id: s.class_id || null, topic_id: s.topic_id || null });
   };
 
   const saveSlot = async (s) => {
@@ -146,8 +148,8 @@ function SlotGhosts({ list, entries, className, topicName, onSlot, day, t }) {
   // Vorlagen ausblenden, sobald an dem Tag schon ein Eintrag dieser Klasse
   // existiert — der wird dann als Chip gezeigt und dort bearbeitet, statt
   // dass ein Klick auf die Geister-Vorlage einen zweiten Eintrag anlegt.
-  const belegt = new Set((entries || []).map((e) => e.class_id || 0));
-  return list.filter((s) => !belegt.has(s.class_id || 0)).map((s) => {
+  const belegt = new Set((entries || []).filter((e) => e.period != null).map((e) => e.period));
+  return list.filter((s) => !belegt.has(s.period)).map((s) => {
     const label = [s.period + ". " + t("kalender.period"), className(s.class_id) || s.title || topicName(s.topic_id)].filter(Boolean).join(" · ");
     return (
       <button key={s.id} onClick={() => onSlot(day, s)} style={ghost} title={label + " — " + t("kalender.fromTimetable")}>{label}</button>

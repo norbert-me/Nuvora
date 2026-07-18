@@ -51,6 +51,7 @@ class EntryIn(BaseModel):
     class_id: Optional[int] = None
     topic_id: Optional[int] = None
     method_id: Optional[int] = None
+    period: Optional[int] = None
 
 
 class EntryOut(EntryIn):
