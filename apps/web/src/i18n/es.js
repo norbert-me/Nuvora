@@ -221,7 +221,6 @@ export default {
   "profile.emailInfo": "Enviaremos un enlace de confirmación a la nueva dirección. Solo se activará tras confirmarla.",
   "profile.sendLink": "Enviar enlace de confirmación",
   "profile.linkSent": "Enlace de confirmación enviado a la nueva dirección.",
-  "profile.linkNotSent": "Nueva dirección guardada, pero no se pudo enviar el correo de confirmación — SMTP no está configurado. Contacta con el operador.",
   "profile.username": "Nombre de usuario",
   "profile.usernameHint": "Se muestra en el mercado junto a tus bancos de preguntas publicados.",
   "profile.usernamePlaceholder": "p. ej. Sra. García o un seudónimo",

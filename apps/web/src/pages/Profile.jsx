@@ -100,9 +100,10 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
+      // Bei res.ok ist die Bestaetigungsmail garantiert verschickt — der Server
+      // aendert die Adresse sonst gar nicht erst (503 statt ok).
       setPendingEmail(data.pending_email || newEmail);
-      // Nur "Link verschickt" melden, wenn wirklich versendet wurde.
-      setEmailMsg(data.email_sent === false ? t("profile.linkNotSent") : t("profile.linkSent"));
+      setEmailMsg(t("profile.linkSent"));
       setEmailPw("");
       setShowEmailForm(false);
     } else {

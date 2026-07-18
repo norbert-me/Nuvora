@@ -221,7 +221,6 @@ export default {
   "profile.emailInfo": "Wir senden einen Bestätigungslink an die neue Adresse. Erst nach Bestätigung wird sie aktiv.",
   "profile.sendLink": "Bestätigungslink senden",
   "profile.linkSent": "Bestätigungslink an die neue Adresse gesendet.",
-  "profile.linkNotSent": "Neue Adresse gespeichert. Die Bestätigungs-Mail konnte aber nicht versendet werden — SMTP ist nicht eingerichtet. Bitte den Betreiber kontaktieren.",
   "profile.username": "Benutzername",
   "profile.usernameHint": "Wird im Marktplatz bei veröffentlichten Fragesets angezeigt.",
   "profile.usernamePlaceholder": "z.B. Frau Müller oder ein Pseudonym",

@@ -452,9 +452,10 @@ async def change_email(body: ChangeEmailBody, request: Request, user: User = Dep
     result = await db.execute(select(User).where(User.email == new_email))
     if result.scalar_one_or_none():
         raise HTTPException(400, "Diese E-Mail-Adresse wird bereits verwendet")
+    # Nur im Speicher setzen — der Token braucht kein Commit, er signiert
+    # user.id + pending_email. So koennen wir erst die Mail versenden und die
+    # Aenderung nur festschreiben, wenn sie zugestellt werden konnte.
     user.pending_email = new_email
-    await db.commit()
-    await db.refresh(user)
     token = _make_email_change_token(user)
     link = f"{SITE_URL}/confirm-email-change?token={token}" if SITE_URL else f"/confirm-email-change?token={token}"
     sent = await mailer.send_email(
@@ -466,9 +467,13 @@ async def change_email(body: ChangeEmailBody, request: Request, user: User = Dep
         "Wenn du das nicht warst, kannst du diese E-Mail ignorieren — deine bisherige Adresse bleibt gültig.\n\n"
         "Viele Grüße\nDein CardVote-Team",
     )
-    # email_sent ehrlich zurueckgeben: ist SMTP nicht konfiguriert oder schlaegt
-    # der Versand fehl, darf die UI nicht "Mail verschickt" behaupten.
-    return {"ok": True, "pending_email": new_email, "email_sent": sent}
+    # Ohne zustellbare Bestaetigungsmail darf die Adresse nicht wechseln:
+    # sonst haengt ein pending_email fest, das nie bestaetigt werden kann.
+    if not sent:
+        await db.rollback()
+        raise HTTPException(503, "Die Bestätigungs-Mail konnte nicht versendet werden. Bitte den Betreiber kontaktieren. Die E-Mail-Adresse wurde nicht geändert.")
+    await db.commit()
+    return {"ok": True, "pending_email": new_email, "email_sent": True}
 
 
 class ConfirmEmailChangeBody(BaseModel):
