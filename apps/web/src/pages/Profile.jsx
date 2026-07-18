@@ -11,6 +11,11 @@ const Spinner = ({ size = 14 }) => (
   </svg>
 );
 
+// Kleiner Info-Punkt: erklaerender Text als Tooltip statt als Fliesstext.
+const InfoDot = ({ text }) => (
+  <span title={text} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--border2)", color: "var(--text3)", fontSize: 10, fontWeight: 700, fontStyle: "normal", cursor: "help", marginLeft: 6, flexShrink: 0 }}>i</span>
+);
+
 const TrashIcon = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#d1350f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/>
@@ -162,17 +167,17 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         {emailMsg && <div style={{ fontSize: 13, color: emailMsg === t("profile.linkSent") ? "#0a7d3e" : "#d1350f", marginBottom: 16 }}>{emailMsg}</div>}
 
         <form onSubmit={saveProfile}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>{t("profile.username")}</div>
-          <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 10 }}>
-            {t("profile.usernameHint")}
-          </p>
+          <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
+            <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{t("profile.username")}</span>
+            <InfoDot text={t("profile.usernameHint")} />
+          </div>
           <input placeholder={t("profile.usernamePlaceholder")} value={marketplaceName} onChange={(e) => setMarketplaceName(e.target.value)}
             style={{ ...inputStyle, marginBottom: 10 }} />
 
-          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginTop: 20, marginBottom: 10 }}>{t("profile.gradeScale")}</div>
-          <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 10 }}>
-            {t("profile.gradeScaleHint")}
-          </p>
+          <div style={{ display: "flex", alignItems: "center", marginTop: 20, marginBottom: 10 }}>
+            <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{t("profile.gradeScale")}</span>
+            <InfoDot text={t("profile.gradeScaleHint")} />
+          </div>
           <style>{".nice-num::-webkit-inner-spin-button,.nice-num::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.nice-num{-moz-appearance:textfield;appearance:textfield}"}</style>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
             {[1, 2, 3, 4, 5].map((g) => (
