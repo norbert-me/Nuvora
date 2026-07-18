@@ -26,7 +26,7 @@ export default function NuvoraHome({ user }) {
   const firstName = (user?.name || "").split(" ")[0];
 
   return (
-    <div style={{ maxWidth: 820 }}>
+    <div style={{ maxWidth: 820, margin: "0 auto" }}>
       <h1 style={pageTitle}>
         {firstName ? t("home.welcome", { name: firstName }) : t("home.welcomePlain")}
       </h1>
