@@ -137,6 +137,21 @@ async def create_topic(
     return TopicOut(id=topic.id, name=topic.name, parent_id=topic.parent_id, position=topic.position)
 
 
+class ReorderIn(BaseModel):
+    ids: List[int]
+
+
+@router.put("/reorder", status_code=204)
+async def reorder_topics(body: ReorderIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Setzt die Reihenfolge anhand der ID-Liste (nur eigene Themen)."""
+    result = await db.execute(select(Topic).where(Topic.owner_id == user.id, Topic.id.in_(body.ids)))
+    by_id = {t.id: t for t in result.scalars().all()}
+    for pos, tid in enumerate(body.ids):
+        if tid in by_id:
+            by_id[tid].position = pos
+    await db.commit()
+
+
 @router.put("/{topic_id}", response_model=TopicOut)
 async def update_topic(
     topic_id: int,
