@@ -13,8 +13,9 @@ export default function Lernen() {
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
 
-  const load = useCallback(() => {
-    fetch(`${API}/lernen/${token}`)
+  // all=true: freiwilliges Weiteruben — alle Karten, auch nicht faellige.
+  const load = useCallback((all = false) => {
+    fetch(`${API}/lernen/${token}${all ? "?all=1" : ""}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then((d) => { setData(d); setI(0); setFlipped(false); setDone((d.cards || []).length === 0); })
       .catch(() => setError("Der Link ist ungültig oder abgelaufen."));
@@ -67,7 +68,11 @@ export default function Lernen() {
             </p>
           )}
           <MeinFortschritt data={data} />
-          <button onClick={load} style={{ ...btn, marginTop: 20 }}>Nochmal prüfen</button>
+          {data.total > 0 && (
+            <button onClick={() => load(true)} style={{ ...btn, marginTop: 20, background: "transparent", color: "var(--text)", border: "1px solid var(--border2)" }}>
+              Freiwillig weiterüben
+            </button>
+          )}
         </div>
       </Center>
     );

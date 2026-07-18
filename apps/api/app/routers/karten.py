@@ -358,8 +358,9 @@ async def qr_png(token: str, base: str = "", db: AsyncSession = Depends(get_db))
 
 
 @router.get("/lernen/{token}")
-async def student_session(token: str, db: AsyncSession = Depends(get_db)):
-    """Faellige Karten fuer diesen Schueler. Token statt Login."""
+async def student_session(token: str, all: bool = False, db: AsyncSession = Depends(get_db)):
+    """Faellige Karten fuer diesen Schueler. Token statt Login.
+    all=True: alle Karten (freiwilliges Weiteruben, auch nicht faellige)."""
     st = await _student_by_token(db, token)
     now = _now()
     # Nur ausgerollte Stapel: Entwuerfe (released_at NULL) und geplante in der
@@ -376,18 +377,22 @@ async def student_session(token: str, db: AsyncSession = Depends(get_db)):
     faellig = []
     hist = _empty_hist()
     learned = 0
+    due_count = 0
     next_due = None  # frueheste kuenftige Faelligkeit → wann wieder lernen
     for c in cards:
         rev = reviews.get(c.id)
         hist[_bucket(rev)] += 1
         if rev is not None and (rev.reps or 0) > 0:
             learned += 1
-        if rev is None or rev.due <= now:
+        is_due = rev is None or rev.due <= now
+        if is_due:
+            due_count += 1
+        if all or is_due:
             faellig.append({"card_id": c.id, "front": c.front, "back": c.back})
-        elif rev.due > now and (next_due is None or rev.due < next_due):
+        if rev is not None and rev.due > now and (next_due is None or rev.due < next_due):
             next_due = rev.due
     return {"name": st.name, "cards": faellig, "total": len(cards),
-            "due": len(faellig), "learned": learned, "hist": hist,
+            "due": due_count, "learned": learned, "hist": hist,
             "next_due": next_due.isoformat() if next_due else None}
 
 
