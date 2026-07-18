@@ -89,6 +89,8 @@ export default {
   // Results (list)
   "tests.showActive": "Show active",
   "tests.archive": "Archive",
+  "tests.byClass": "Evaluation by class",
+  "tests.quizzes": "Individual quizzes",
   "tests.emptyArchived": "No archived tests.",
   "tests.emptyActive": "No sessions run yet.",
   "tests.deleteConfirm": "Really delete this test?",

@@ -8,8 +8,13 @@ const API = "/api";
 export default function Tests() {
   const { t, lang } = useLanguage();
   const [sessions, setSessions] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [showArchived, setShowArchived] = useState(false);
   const [error, setError] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API}/classes`).then((r) => (r.ok ? r.json() : [])).then((d) => setClasses(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
 
   const load = () => {
     const timer = setTimeout(() => setError(true), 15000);
@@ -52,7 +57,25 @@ export default function Tests() {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 24 }}>
+      {/* Oben: je Klasse die Gesamtauswertung. Darunter die einzelnen Quiz. */}
+      {classes.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text3)", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>{t("tests.byClass")}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {classes.map((c) => (
+              <Link key={c.id} to={`/cardvote/class-evaluation/${c.id}`}
+                style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 14, textDecoration: "none", color: "var(--text)" }}>
+                <Icon d={ICONS.chart} color="#0066cc" />
+                <span style={{ fontWeight: 600, fontSize: 14 }}>{c.name}</span>
+                <span style={{ fontSize: 12, color: "var(--text3)" }}>{(c.students || []).length}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px" }}>{t("tests.quizzes")}</div>
         <button
           onClick={() => setShowArchived(!showArchived)}
           style={{
