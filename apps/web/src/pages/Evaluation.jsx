@@ -1022,7 +1022,9 @@ function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
   const [term, setTerm] = useState("1");
   const [sections, setSections] = useState([]);
   const [sectionId, setSectionId] = useState(null);
-  const [colName, setColName] = useState(heute());
+  // Standard-Spaltenname ist der Testname (nicht das Datum); ueber lang wird er
+  // in der Notentabelle ohnehin per Ellipse gekuerzt. Fallback: heutiges Datum.
+  const [colName, setColName] = useState((sessionName || "").trim() || heute());
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(null);
   const [error, setError] = useState("");
