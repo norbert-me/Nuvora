@@ -39,6 +39,10 @@ services:
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Nuvora}
     volumes:
       - uploads:/app/uploads
+      # Betreiberdaten: der Setup-Check im Admin-Profil prueft
+      # /app/config/site.json. Ohne diesen Mount galt das Impressum immer als
+      # fehlend, obwohl nginx dieselbe Datei unter /site.json ausliefert.
+      - ./config:/app/config:ro
     depends_on:
       db:
         condition: service_healthy
