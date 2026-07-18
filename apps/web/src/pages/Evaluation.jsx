@@ -678,13 +678,13 @@ const gradeDistribution = (() => {
           <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>Notenschlüssel</h3>
           <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>Mindestprozent für jede Note. Wird pro Test gespeichert.</p>
           <style>{NUM_CSS}</style>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(112px, 1fr))", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(136px, 1fr))", gap: 8 }}>
             {[1, 2, 3, 4, 5].map((g) => (
-              <div key={g} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 10, background: "var(--bg3)" }}>
+              <div key={g} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", borderRadius: 10, background: "var(--bg3)" }}>
                 <span style={gradeBadge}>{g}</span>
                 <span style={{ fontSize: 11, color: "var(--text3)" }}>ab</span>
                 <input className="nice-num" type="number" min="0" max="100" step="1"
-                  value={gradeScale[g]} onChange={(e) => updateScale(g, e.target.value)} style={numInput} />
+                  value={Number(gradeScale[g])} onChange={(e) => updateScale(g, e.target.value)} style={numInput} />
                 <span style={{ fontSize: 11, color: "var(--text3)" }}>%</span>
               </div>
             ))}
@@ -706,7 +706,7 @@ const gradeDistribution = (() => {
               <div key={q.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 10, background: "var(--bg3)" }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)", flexShrink: 0 }}>F{i + 1}</span>
                 <input className="nice-num" type="number" min="0" max="10" step="0.5"
-                  value={getWeight(q.id)} onChange={(e) => updateWeight(q.id, e.target.value)} style={{ ...numInput, marginLeft: "auto" }} />
+                  value={Number(getWeight(q.id))} onChange={(e) => updateWeight(q.id, e.target.value)} style={{ ...numInput, marginLeft: "auto" }} />
               </div>
             ))}
           </div>
@@ -971,9 +971,9 @@ function CiInfoBox({ onClose }) {
 
 // Zahlenfelder ohne die haesslichen nativen Spinner-Pfeile, sauber gerahmt.
 const NUM_CSS = ".nice-num::-webkit-inner-spin-button,.nice-num::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.nice-num{-moz-appearance:textfield;appearance:textfield}";
-const numInput = { width: 52, padding: "6px 8px", fontSize: 13, border: "1px solid var(--border2)", borderRadius: 8, textAlign: "center", background: "var(--bg)", color: "var(--text)" };
-// Noten-Badge ohne Farbe: neutraler Kreis mit Nummer.
-const gradeBadge = { flexShrink: 0, width: 22, height: 22, borderRadius: 11, background: "var(--bg2)", border: "1px solid var(--border2)", color: "var(--text)", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" };
+const numInput = { width: 48, padding: "6px 6px", fontSize: 13, border: "1px solid var(--border2)", borderRadius: 8, textAlign: "center", background: "var(--bg)", color: "var(--text)" };
+// Noten-Nummer schlicht, ohne Kreis/Umrandung.
+const gradeBadge = { flexShrink: 0, minWidth: 14, color: "var(--text)", fontSize: 14, fontWeight: 700, textAlign: "center" };
 
 const th = { padding: "8px 10px", borderBottom: "2px solid var(--border3)", textAlign: "left", fontSize: 13, color: "var(--text)" };
 const td = { padding: "8px 10px", borderBottom: "1px solid var(--border)" };
