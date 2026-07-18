@@ -391,6 +391,13 @@ async def student_session(token: str, all: bool = False, db: AsyncSession = Depe
             faellig.append({"card_id": c.id, "front": c.front, "back": c.back})
         if rev is not None and rev.due > now and (next_due is None or rev.due < next_due):
             next_due = rev.due
+    # Auch geplante Stapel zaehlen: rollt einer frueher aus als die naechste
+    # Karte faellig ist, zieht das "naechste Lernen" nach vorne.
+    future_release = (await db.execute(select(sa_func.min(CardDeck.released_at)).where(
+        CardDeck.class_id == st.class_id, CardDeck.released_at > now,
+    ))).scalar()
+    if future_release is not None and (next_due is None or future_release < next_due):
+        next_due = future_release
     return {"name": st.name, "cards": faellig, "total": len(cards),
             "due": due_count, "learned": learned, "hist": hist,
             "next_due": next_due.isoformat() if next_due else None}
