@@ -1377,6 +1377,8 @@
         });
     }
 
+    // Zweiter Ausloeser im Konfig-Panel — teilt sich die Logik mit btn-generate.
+    document.getElementById('btn-generate-config')?.addEventListener('click', () => document.getElementById('btn-generate').click());
     document.getElementById('btn-generate').addEventListener('click', () => {
         const thema = document.getElementById('gen-thema').value;
         const klasse = document.getElementById('gen-klasse').value;
