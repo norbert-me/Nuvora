@@ -790,9 +790,9 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
 
   return (
     <>
-      <input ref={(el) => (inputRefs.current.text = el)} onFocus={() => (activeField.current = "text")}
+      <textarea ref={(el) => (inputRefs.current.text = el)} onFocus={() => (activeField.current = "text")} rows={2}
         placeholder={t("dash.qTextPh")} value={q.text} onChange={(e) => setQ({ ...q, text: e.target.value })}
-        style={{ padding: "10px 12px", width: "100%", marginBottom: 4, fontSize: 16, border: "1px solid var(--border2)", borderRadius: 8, boxSizing: "border-box" }} autoFocus />
+        style={{ padding: "10px 12px", width: "100%", marginBottom: 4, fontSize: 16, border: "1px solid var(--border2)", borderRadius: 8, boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", lineHeight: 1.4, color: "var(--text)", background: "var(--bg)" }} autoFocus />
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
         {LATEX_BUTTONS.map((b) => (
           <button key={b.label} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insertLatex(b.tex, b.cursor)}
@@ -847,7 +847,7 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: activeKeys.length <= 2 ? "1fr 1fr" : "1fr 1fr", gap: 8, marginBottom: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 8, marginBottom: 14 }}>
         {activeKeys.map((k) => {
           const isCorrect = (q.correct_answer || "").includes(k);
           const choiceImg = q.choice_images?.[k];
@@ -874,9 +874,9 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
                   transition: "all 0.15s ease", userSelect: "none",
                 }}>{k}</div>
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", border: "1px solid var(--border2)", borderLeft: "none", borderRadius: "0 8px 8px 0", overflow: "hidden" }}>
-                  <input ref={(el) => (inputRefs.current[k] = el)} onFocus={() => (activeField.current = k)}
+                  <textarea ref={(el) => (inputRefs.current[k] = el)} onFocus={() => (activeField.current = k)} rows={2}
                     placeholder={t("dash.answerPh", { k })} value={q.choices[k] || ""} onChange={(e) => setQ({ ...q, choices: { ...q.choices, [k]: e.target.value } })}
-                    style={{ padding: "8px 12px", border: "none", fontSize: 14, outline: "none", background: "transparent", color: "var(--text)" }} />
+                    style={{ padding: "8px 12px", border: "none", fontSize: 14, outline: "none", background: "transparent", color: "var(--text)", resize: "vertical", fontFamily: "inherit", lineHeight: 1.4 }} />
                   {(q.choices[k] || "").includes("$") && (
                     <div style={{ padding: "6px 12px", background: "var(--bg2)", fontSize: 14, borderTop: "1px solid var(--border3)" }}>
                       <Latex>{q.choices[k]}</Latex>
@@ -963,7 +963,6 @@ function QuestionStats({ questionId }) {
         )}
         {["A", "B", "C", "D"].map((k) => {
           const count = stats.answer_counts[k] || 0;
-          if (count === 0 && !keys.includes(k)) return null;
           return (
             <div key={k} style={{ background: "var(--bg2)", borderRadius: 8, padding: "6px 12px", textAlign: "center" }}>
               <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text)" }}>{count}</div>
