@@ -26,7 +26,7 @@ export default function CodeDetektivModule() {
       ref={ref}
       src={APP_URL}
       title="Code-Detektiv"
-      style={{ width: "100%", height: "calc(100vh - 120px)", minHeight: 480, border: "none", display: "block" }}
+      style={{ width: "100%", height: "100vh", minHeight: 480, border: "none", display: "block" }}
     />
   );
 }

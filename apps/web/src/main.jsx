@@ -560,6 +560,9 @@ function ContentWrapper({ children }) {
   // Oberflaeche nicht je Modul anders links klebt.
   const isSession = p.startsWith("/session") || p.startsWith("/cardvote/session");
   if (isSession) return <div style={{ padding: "24px 16px 64px" }}>{children}</div>;
+  // Code-Detektiv laeuft ohne Nuvora-Navbar im Vollbild — kein Padding, keine
+  // Spaltenbreite, damit das Spiel den ganzen Platz nutzt.
+  if (p.startsWith(CD)) return children;
   return (
     <>
       <style>{`@media (max-width: 640px) { .content-wrap { padding: 16px 12px 64px !important; } }`}</style>
@@ -618,9 +621,12 @@ function AppRoutes({ user, setUser, logout }) {
     navigate("/");
   };
 
+  // Code-Detektiv laeuft im Vollbild ohne Nuvora-Rahmen (Navbar + Fussleiste).
+  const bare = location.pathname.startsWith(CD);
+
   return (
     <>
-      <Nav user={user} onLogout={logout} />
+      {!bare && <Nav user={user} onLogout={logout} />}
       {user && <FirstRun user={user} />}
       <ContentWrapper>
         <Routes>
@@ -675,7 +681,7 @@ function AppRoutes({ user, setUser, logout }) {
           ))}
         </Routes>
       </ContentWrapper>
-      <footer style={{ textAlign: "center", padding: "16px 0 24px", fontSize: 12, color: "var(--text3)" }}>
+      {!bare && <footer style={{ textAlign: "center", padding: "16px 0 24px", fontSize: 12, color: "var(--text3)" }}>
         {/* Rueckmeldungs-Hinweis: stand frueher nur auf der Landing- und der
             CardVote-Startseite. In der Fussleiste laeuft er auf jeder Seite mit. */}
         <p style={{ margin: "0 auto 12px", maxWidth: 520, lineHeight: 1.6, padding: "0 16px" }}>
@@ -701,7 +707,7 @@ function AppRoutes({ user, setUser, logout }) {
           <span style={footerSep}>·</span>
           <a href="https://github.com/norbert-me/Nuvora" target="_blank" rel="noopener noreferrer" style={footerLink}>GitHub</a>
         </span>
-      </footer>
+      </footer>}
     </>
   );
 }
