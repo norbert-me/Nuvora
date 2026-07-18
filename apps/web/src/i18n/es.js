@@ -681,6 +681,7 @@ export default {
   "kalender.planLernleiter": "Escalera de aprendizaje",
   "kalender.pickClassFirst": "Elige primero una clase",
   "kalender.deckReleaseHint": "Se publica automáticamente el día del calendario.",
+  "kalender.openLinked": "Abrir vinculado",
   "methoden.title": "Métodos",
   "methoden.all": "Todos",
   "methoden.einstiege": "Inicios",

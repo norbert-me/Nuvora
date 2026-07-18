@@ -1,6 +1,7 @@
 // Modul Kalender — Unterrichtsplanung. Tag-, Wochen- und Monatsansicht; je Tag
 // Stunden eintragen und optional Klasse + Thema (Kern-Taxonomie) zuordnen.
 import { useState, useEffect, useCallback, Fragment } from "react";
+import { Link } from "react-router-dom";
 import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -448,6 +449,32 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
             </select>
           </>
         )}
+        {(() => {
+          // Verknüpfte Objekte als klickbare Links (öffnet das Modul). Nur was
+          // gewählt und dessen Modul aktiv ist — Name aus den geladenen Listen.
+          const q = quizId && quizze.find((x) => x.id === Number(quizId));
+          const d = deckId && decks.find((x) => x.id === Number(deckId));
+          const l = ladderId && ladders.find((x) => x.id === Number(ladderId));
+          const links = [
+            q && { to: "/cardvote/questions", label: q.folder ? `${q.folder} / ${q.name}` : q.name, icon: t("kalender.planCardvote") },
+            d && { to: `/karten?class=${classId}`, label: d.name, icon: t("kalender.planKarten") },
+            l && { to: "/lernpfad", label: l.path ? `${l.path} / ${l.name}` : l.name, icon: t("kalender.planLernleiter") },
+          ].filter(Boolean);
+          if (!links.length) return null;
+          return (
+            <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={lbl}>{t("kalender.openLinked")}</div>
+              {links.map((lk) => (
+                <Link key={lk.to} to={lk.to} onClick={onClose}
+                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", textDecoration: "none", color: "var(--accent)", fontSize: 13.5 }}>
+                  <Icon d={ICONS.open} size={15} color="var(--accent)" />
+                  <span style={{ color: "var(--text3)", fontSize: 11.5 }}>{lk.icon}</span>
+                  <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lk.label}</span>
+                </Link>
+              ))}
+            </div>
+          );
+        })()}
         <div style={lbl}>{t("kalender.notes")}</div>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...fld, resize: "vertical" }} />
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>

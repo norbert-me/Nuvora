@@ -35,7 +35,9 @@ export default function Karten() {
     fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).then((d) => {
       const list = Array.isArray(d) ? d : [];
       setClasses(list);
-      if (list.length && classId === null) setClassId(list[0].id);
+      // Vorauswahl per ?class=<id> (z. B. Link aus dem Kalender), sonst erste Klasse.
+      const wanted = Number(params.get("class")) || null;
+      if (classId === null) setClassId((wanted && list.some((c) => c.id === wanted)) ? wanted : (list[0]?.id ?? null));
     }).catch(() => {});
   }, []);
 
