@@ -100,6 +100,7 @@ class CategoryOut(BaseModel):
 class SectionOut(BaseModel):
     id: int
     class_id: int
+    term: str
     name: str
     weight: int
     position: int
@@ -108,11 +109,11 @@ class SectionOut(BaseModel):
 
 
 @router.get("/classes/{class_id}/sections", response_model=List[SectionOut])
-async def list_sections(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def list_sections(class_id: int, term: str = "1", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
     r = await db.execute(
         select(GradeSection)
-        .where(GradeSection.owner_id == user.id, GradeSection.class_id == class_id)
+        .where(GradeSection.owner_id == user.id, GradeSection.class_id == class_id, GradeSection.term == term)
         .options(selectinload(GradeSection.categories))
         .order_by(GradeSection.position, GradeSection.id)
     )
@@ -120,10 +121,10 @@ async def list_sections(class_id: int, user: User = Depends(require_module), db:
 
 
 @router.post("/classes/{class_id}/sections", response_model=SectionOut, status_code=201)
-async def create_section(class_id: int, body: SectionIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def create_section(class_id: int, body: SectionIn, term: str = "1", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("noten_sec", f"u{user.id}", 100, 60, "Zu viele Abschnitte in kurzer Zeit. Bitte kurz warten.")
     await _owned_class(db, user, class_id)
-    sec = GradeSection(**body.model_dump(), class_id=class_id, owner_id=user.id)
+    sec = GradeSection(**body.model_dump(), term=term, class_id=class_id, owner_id=user.id)
     db.add(sec)
     await db.commit()
     await db.refresh(sec, ["categories"])
@@ -343,6 +344,7 @@ class OverrideIn(BaseModel):
     class_id: int
     student_id: int
     section_id: Optional[int] = None  # None = Endnote
+    term: str = "1"                   # nur fuer die Endnote (section_id None) relevant
     value: float
 
     @field_validator("value")
@@ -353,14 +355,16 @@ class OverrideIn(BaseModel):
         return round(v, 2)
 
 
-async def _find_override(db, user, class_id, student_id, section_id):
+async def _find_override(db, user, class_id, student_id, section_id, term):
     q = select(GradeOverride).where(
         GradeOverride.owner_id == user.id,
         GradeOverride.class_id == class_id,
         GradeOverride.student_id == student_id,
     )
-    q = q.where(GradeOverride.section_id.is_(None) if section_id is None
-                else GradeOverride.section_id == section_id)
+    if section_id is None:
+        q = q.where(GradeOverride.section_id.is_(None), GradeOverride.term == term)
+    else:
+        q = q.where(GradeOverride.section_id == section_id)
     return (await db.execute(q)).scalar_one_or_none()
 
 
@@ -373,20 +377,20 @@ async def set_override(body: OverrideIn, user: User = Depends(require_module), d
     r = await db.execute(select(Student.id).where(Student.id == body.student_id, Student.class_id == body.class_id))
     if not r.scalar_one_or_none():
         raise HTTPException(400, "Schüler gehört nicht zu dieser Klasse")
-    ex = await _find_override(db, user, body.class_id, body.student_id, body.section_id)
+    ex = await _find_override(db, user, body.class_id, body.student_id, body.section_id, body.term)
     if ex:
         ex.value = body.value
     else:
         db.add(GradeOverride(owner_id=user.id, class_id=body.class_id, student_id=body.student_id,
-                             section_id=body.section_id, value=body.value))
+                             section_id=body.section_id, term=body.term, value=body.value))
     await db.commit()
 
 
 @router.delete("/overrides", status_code=204)
-async def clear_override(class_id: int, student_id: int, section_id: Optional[int] = None,
+async def clear_override(class_id: int, student_id: int, section_id: Optional[int] = None, term: str = "1",
                          user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
-    ex = await _find_override(db, user, class_id, student_id, section_id)
+    ex = await _find_override(db, user, class_id, student_id, section_id, term)
     if ex:
         await db.delete(ex)
         await db.commit()
@@ -416,18 +420,21 @@ class StudentSummary(BaseModel):
 
 
 @router.get("/classes/{class_id}/summary", response_model=List[StudentSummary])
-async def summary(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def summary(class_id: int, term: str = "1", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
 
     sections = (await db.execute(
-        select(GradeSection).where(GradeSection.owner_id == user.id, GradeSection.class_id == class_id)
+        select(GradeSection).where(GradeSection.owner_id == user.id, GradeSection.class_id == class_id, GradeSection.term == term)
     )).scalars().all()
     sec_weight = {s.id: s.weight for s in sections}
+    sec_ids = {s.id for s in sections}
 
-    cats = (await db.execute(
+    # Nur Spalten der Abschnitte dieses Halbjahrs.
+    cats = [c for c in (await db.execute(
         select(GradeCategory).where(GradeCategory.owner_id == user.id, GradeCategory.class_id == class_id)
-    )).scalars().all()
+    )).scalars().all() if c.section_id in sec_ids]
     cat_section = {c.id: c.section_id for c in cats}
+    cat_ids = {c.id for c in cats}
 
     students = (await db.execute(
         select(Student).where(Student.class_id == class_id).order_by(Student.card_id)
@@ -443,13 +450,13 @@ async def summary(class_id: int, user: User = Depends(require_module), db: Async
         select(GradeOverride).where(GradeOverride.owner_id == user.id, GradeOverride.class_id == class_id)
     )).scalars().all()
     # (student_id, section_id) -> value; section_id None = Endnote
-    sec_over = {(o.student_id, o.section_id): o.value for o in overrides if o.section_id is not None}
-    total_over = {o.student_id: o.value for o in overrides if o.section_id is None}
+    sec_over = {(o.student_id, o.section_id): o.value for o in overrides if o.section_id in sec_ids}
+    total_over = {o.student_id: o.value for o in overrides if o.section_id is None and o.term == term}
 
     out = []
     for st in students:
         eigene = [e for e in entries if e.student_id == st.id]
-        grades = [e for e in eigene if e.kind == "grade" and e.value is not None]
+        grades = [e for e in eigene if e.kind == "grade" and e.value is not None and e.category_id in cat_ids]
 
         # Schnitt je Spalte
         per_cat = {}
@@ -490,7 +497,7 @@ async def summary(class_id: int, user: User = Depends(require_module), db: Async
             section_overrides=sec_ovr, section_effective=sec_eff,
             weighted=weighted, total_override=total_over.get(st.id),
             unweighted_fallback=fallback,
-            observations=len([e for e in eigene if e.kind == "observation"]),
+            observations=len([e for e in eigene if e.kind == "observation" and e.category_id in cat_ids]),
         ))
     return out
 

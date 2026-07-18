@@ -352,6 +352,9 @@ class GradeSection(Base):
     )
     # Abschnitte gelten pro Kurs/Klasse: verschiedene Faecher wiegen anders.
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    # Halbjahr: jedes Halbjahr ein eigenes Notenbuch (eigene Abschnitte, Gewichte,
+    # Endnote). "1"/"2" heute; String laesst spaeter "2024/1" zu.
+    term: Mapped[str] = mapped_column(String(8), default="1", server_default="1", index=True)
     name: Mapped[str] = mapped_column(String(120))
     weight: Mapped[int] = mapped_column(Integer, default=0, server_default="0")  # Prozent
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
@@ -432,6 +435,8 @@ class GradeOverride(Base):
     section_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("grade_sections.id", ondelete="CASCADE"), nullable=True, index=True
     )
+    # Halbjahr der Endnote (nur relevant, wenn section_id NULL ist).
+    term: Mapped[str] = mapped_column(String(8), default="1", server_default="1")
     value: Mapped[float] = mapped_column(nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

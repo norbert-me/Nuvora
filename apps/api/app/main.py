@@ -124,6 +124,8 @@ def _ensure_columns(sync_conn):
         ("learning_ladders", "topic_id", "INTEGER"),
         ("learning_ladders", "assignments", "JSON"),
         ("grade_categories", "section_id", "INTEGER"),
+        ("grade_sections", "term", "VARCHAR(8) DEFAULT '1' NOT NULL"),
+        ("grade_overrides", "term", "VARCHAR(8) DEFAULT '1' NOT NULL"),
         ("school_classes", "plan_blocks", "INTEGER DEFAULT 2 NOT NULL"),
         ("school_classes", "karten_token", "VARCHAR(64)"),
         ("students", "karten_token", "VARCHAR(64)"),

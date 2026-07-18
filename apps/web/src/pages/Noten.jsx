@@ -35,6 +35,7 @@ export default function Noten() {
   const [neuSpalteIn, setNeuSpalteIn] = useState(null);
   const [beobFuer, setBeobFuer] = useState(null);
   const [infoFuer, setInfoFuer] = useState(null);
+  const [term, setTerm] = useState("1");
   const [dragId, setDragId] = useState(null);
   // Vorschau beim Ziehen: auf welchem Abschnitt, und links oder rechts einfuegen.
   const [dragOver, setDragOver] = useState(null); // { id, side: "left"|"right" }
@@ -76,11 +77,11 @@ export default function Noten() {
     if (val === null) return;
     await call(() => fetch(`${API}/overrides`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ class_id: classId, student_id: studentId, section_id: sectionId, value: val }),
+      body: JSON.stringify({ class_id: classId, student_id: studentId, section_id: sectionId, term, value: val }),
     }));
   };
   const overrideReset = async (studentId, sectionId) => {
-    const q = new URLSearchParams({ class_id: classId, student_id: studentId });
+    const q = new URLSearchParams({ class_id: classId, student_id: studentId, term });
     if (sectionId != null) q.set("section_id", sectionId);
     await call(() => fetch(`${API}/overrides?${q}`, { method: "DELETE" }));
   };
@@ -96,14 +97,14 @@ export default function Noten() {
   const load = async (id) => {
     if (!id) return;
     const [sec, ent, sum] = await Promise.all([
-      fetch(`${API}/classes/${id}/sections`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`${API}/classes/${id}/sections?term=${term}`).then((r) => (r.ok ? r.json() : [])),
       fetch(`${API}/classes/${id}/entries`).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API}/classes/${id}/summary`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`${API}/classes/${id}/summary?term=${term}`).then((r) => (r.ok ? r.json() : [])),
     ]);
     setSections(sec); setEntries(ent); setSummary(sum);
     setStudents(classes.find((c) => c.id === id)?.students || []);
   };
-  useEffect(() => { if (classId) load(classId); }, [classId, classes]);
+  useEffect(() => { if (classId) load(classId); }, [classId, classes, term]);
 
   const call = async (fn) => {
     setError("");
@@ -158,6 +159,14 @@ export default function Noten() {
             {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
+          {t("noten.term")}
+          <select value={term} onChange={(e) => setTerm(e.target.value)}
+            style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)" }}>
+            <option value="1">{t("noten.term1")}</option>
+            <option value="2">{t("noten.term2")}</option>
+          </select>
+        </label>
         {sections.length > 0 && (
           <span style={{ fontSize: 12.5, color: gewichtSumme === 100 ? "var(--text3)" : "#b8860b" }}>
             {gewichtSumme !== 100 ? t("noten.weightNot100", { n: gewichtSumme }) : t("noten.weightSum", { n: gewichtSumme })}
@@ -170,7 +179,7 @@ export default function Noten() {
 
       {neuAbschnitt && (
         <SectionForm t={t} onCancel={() => setNeuAbschnitt(false)}
-          onSave={async (b) => { if (await call(() => fetch(`${API}/classes/${classId}/sections`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...b, position: sections.length }) }))) setNeuAbschnitt(false); }} />
+          onSave={async (b) => { if (await call(() => fetch(`${API}/classes/${classId}/sections?term=${term}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...b, position: sections.length }) }))) setNeuAbschnitt(false); }} />
       )}
 
       {sections.length === 0 ? (
