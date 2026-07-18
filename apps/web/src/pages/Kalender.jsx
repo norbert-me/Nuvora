@@ -394,12 +394,18 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 200 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--card)", borderRadius: 16, maxWidth: 440, width: "100%", padding: 22, border: "1px solid var(--border)", maxHeight: "85vh", overflow: "auto" }}>
-        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 2 }}>{(entry.id || entry.period != null) ? t("kalender.editEntry") : t("kalender.newEntry")}</h3>
-        <div style={{ fontSize: 12.5, color: "var(--text3)" }}>
-          {entry.period != null && <b style={{ color: "var(--text2)" }}>{entry.period}. {t("kalender.period")} · </b>}
-          {new Date(entry.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--card)", borderRadius: 18, maxWidth: 460, width: "100%", padding: 0, border: "1px solid var(--border)", maxHeight: "88vh", overflow: "auto", boxShadow: "0 20px 50px rgba(0,0,0,0.28)" }}>
+        <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "flex-start", gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 5 }}>{(entry.id || entry.period != null) ? t("kalender.editEntry") : t("kalender.newEntry")}</h3>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              {entry.period != null && <span style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 9px", borderRadius: 980, background: "var(--accent)", color: "#fff" }}>{entry.period}. {t("kalender.period")}</span>}
+              <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{new Date(entry.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>
+            </div>
+          </div>
+          <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
         </div>
+        <div style={{ padding: "6px 24px 22px" }}>
         <div style={lbl}>{t("kalender.entryTitle")}</div>
         <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus placeholder={t("kalender.entryTitlePlaceholder")} style={fld} />
         <div style={lbl}>{t("nav.classes")}</div>
@@ -420,6 +426,12 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
               {methods.map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
             </select>
           </>
+        )}
+        {(aktiv.cardvote || aktiv.karten || aktiv.lernpfad) && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "18px 0 2px" }}>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.6px", textTransform: "uppercase", color: "var(--text3)" }}>{t("kalender.planning")}</span>
+            <span style={{ flex: 1, height: 1, background: "var(--border)" }} />
+          </div>
         )}
         {aktiv.cardvote && (
           <>
@@ -481,6 +493,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
           <button onClick={() => onSave({ ...entry, title, notes, class_id: classId ? Number(classId) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null })} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
           {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
+        </div>
         </div>
       </div>
     </div>

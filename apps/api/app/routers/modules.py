@@ -70,6 +70,7 @@ REGISTRY: List[ModuleDef] = [
             "Noten — die Zeugnisnote bleibt deine Entscheidung."
         ),
         path="/noten",
+        stage="beta",
     ),
     ModuleDef(
         key="code-detektiv",
@@ -88,6 +89,7 @@ REGISTRY: List[ModuleDef] = [
             "per QR-Code; ihren Fortschritt siehst du im Modul."
         ),
         path="/karten",
+        stage="beta",
     ),
     ModuleDef(
         key="kalender",

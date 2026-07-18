@@ -682,6 +682,7 @@ export default {
   "kalender.pickClassFirst": "Erst eine Klasse wählen",
   "kalender.deckReleaseHint": "Wird am Kalendertag automatisch freigeschaltet.",
   "kalender.openLinked": "Verknüpftes öffnen",
+  "kalender.planning": "Planung",
   "methoden.title": "Methoden",
   "methoden.all": "Alle",
   "methoden.einstiege": "Einstiege",
