@@ -62,6 +62,8 @@ export default function Session() {
   const [resuming, setResuming] = useState(false);
   const [resumeQid, setResumeQid] = useState(null);
   const [finished, setFinished] = useState(false);
+  const [muted, setMuted] = useState(() => localStorage.getItem("nuvora_session_muted") === "1");
+  const audioCtxRef = useRef(null);
   const [allScans, setAllScans] = useState({});
   const [questionTimes, setQuestionTimes] = useState({});
   const [scores, setScores] = useState({});
@@ -207,10 +209,32 @@ export default function Session() {
     }
   };
 
+  // Kurzer Signalton per WebAudio (keine Assets). Stumm ueber den Mute-Knopf.
+  const beep = (freq, dur = 0.13) => {
+    if (muted) return;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!audioCtxRef.current) audioCtxRef.current = new AC();
+      const ctx = audioCtxRef.current;
+      if (ctx.state === "suspended") ctx.resume();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "sine";
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.22, ctx.currentTime + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime + dur);
+    } catch { /* Audio nicht verfuegbar */ }
+  };
+  const toggleMute = () => setMuted((m) => { const n = !m; localStorage.setItem("nuvora_session_muted", n ? "1" : "0"); return n; });
+
   const activateQuestion = async (idx) => {
     const q = questions[idx];
     if (!q || !sessionId) return;
     saveQuestionTime();
+    beep(523.25);
     await fetch(`${API}/sessions/${sessionId}/set-question?question_id=${q.id}`, { method: "POST" });
     setQuestion(q);
     setQuestionIndex(idx);
@@ -276,6 +300,7 @@ export default function Session() {
 
   const revealResults = () => {
     setRevealed(true);
+    beep(880);
     broadcastState(true);
     if (timerRef.current) clearInterval(timerRef.current);
     if (gameMode) {
@@ -672,6 +697,7 @@ export default function Session() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "calc(100vh - 120px)" }}>
+      <style>{`@keyframes nqIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}`}</style>
       {/* Top bar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1vh" }}>
         <h2 style={{ margin: 0, fontSize: "clamp(18px, 2.5vh, 26px)", fontWeight: 700, color: "var(--text)" }}>
@@ -693,6 +719,16 @@ export default function Session() {
             background: "none", color: "var(--text3)", border: "1px solid var(--border2)", borderRadius: 980,
           }} title={t("session.openScanner")}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          </button>
+          <button onClick={toggleMute} style={{
+            padding: "5px 10px", fontSize: 14, cursor: "pointer",
+            background: "none", color: muted ? "#d1350f" : "var(--text3)", border: "1px solid var(--border2)", borderRadius: 980,
+          }} title={muted ? t("session.unmute") : t("session.mute")}>
+            {muted ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M23 9l-6 6M17 9l6 6"/></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>
+            )}
           </button>
           <button onClick={() => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }} style={{
             padding: "5px 10px", fontSize: 14, cursor: "pointer",
@@ -738,9 +774,10 @@ export default function Session() {
       {question && (
         <>
           {/* Question text — large, full width */}
-          <div style={{
+          <div key={`q${question.id}`} style={{
             fontSize: "clamp(28px, 5.5vh, 64px)", fontWeight: 600, marginBottom: "2vh", padding: "clamp(20px, 3.5vh, 44px) clamp(24px, 3vw, 48px)",
             background: "var(--bg2)", borderRadius: 16, color: "var(--text)", lineHeight: 1.4,
+            animation: "nqIn 0.22s ease both",
           }}>
             <Latex>{question.text}</Latex>
           </div>
@@ -756,13 +793,13 @@ export default function Session() {
             {(() => {
               const validKeys = ["A", "B", "C", "D"].slice(0, question.num_choices || 4);
               const extraKeys = revealed ? ["A", "B", "C", "D"].filter((k) => !validKeys.includes(k) && (counts[k] || 0) > 0) : [];
-              return [...validKeys, ...extraKeys].map((key) => {
+              return [...validKeys, ...extraKeys].map((key, i) => {
                 const isExtra = !validKeys.includes(key);
                 const isCorrect = revealed && !isExtra && question.correct_answer && question.correct_answer.includes(key);
                 const isWrong = revealed && !isExtra && question.correct_answer && !question.correct_answer.includes(key);
                 const count = counts[key] || 0;
                 return (
-                  <div key={key} style={{
+                  <div key={`${question.id}-${key}`} style={{
                     padding: "clamp(12px, 2.5vh, 28px) clamp(16px, 2vw, 28px)",
                     background: isExtra ? "var(--bg2)" : isCorrect ? "#0a7d3e" : isWrong ? "var(--bg2)" : "var(--card)",
                     color: isCorrect ? "white" : "var(--text)",
@@ -773,6 +810,8 @@ export default function Session() {
                     transition: "all 0.3s",
                     position: "relative",
                     display: "flex", alignItems: "center",
+                    animation: "nqIn 0.22s ease both",
+                    animationDelay: `${140 * (i + 1)}ms`,
                   }}>
                     <strong style={{ fontSize: "clamp(24px, 4.5vh, 48px)", marginRight: 10 }}>{key}</strong>
                     {isExtra ? <span style={{ fontSize: "clamp(14px, 2.5vh, 22px)", color: "var(--text3)", fontStyle: "italic" }}>{t("session.noAnswerField")}</span> : <Latex>{question.choices[key] || "–"}</Latex>}

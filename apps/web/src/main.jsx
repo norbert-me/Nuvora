@@ -546,7 +546,7 @@ const footerSep = { color: "var(--text3)" };
 
 function ContentWrapper({ children }) {
   const location = useLocation();
-  const isSession = location.pathname.startsWith("/session");
+  const isSession = location.pathname.startsWith("/session") || location.pathname.startsWith("/cardvote/session");
   if (isSession) return <div style={{ padding: "24px 16px 64px" }}>{children}</div>;
   return (
     <>

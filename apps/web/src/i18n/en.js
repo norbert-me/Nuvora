@@ -342,6 +342,8 @@ export default {
   "session.countsLine": "{{q}} questions · {{s}} students",
   "session.timerSuffix": "· {{t}}s timer",
   "session.start": "Start",
+  "session.mute": "Mute",
+  "session.unmute": "Unmute",
   "session.continue": "Continue",
   "session.fromStart": "From the start",
   "session.noQuestions": "This question set has no questions — check the “Questions” tab.",

@@ -342,6 +342,8 @@ export default {
   "session.countsLine": "{{q}} Fragen · {{s}} Lernende",
   "session.timerSuffix": "· {{t}}s Timer",
   "session.start": "Starten",
+  "session.mute": "Ton aus",
+  "session.unmute": "Ton an",
   "session.continue": "Fortsetzen",
   "session.fromStart": "Von vorne",
   "session.noQuestions": "Dieses Frageset hat keine Fragen mehr — bitte im Tab „Fragen“ prüfen.",
