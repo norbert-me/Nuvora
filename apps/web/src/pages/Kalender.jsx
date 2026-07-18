@@ -78,8 +78,13 @@ export default function Kalender() {
   const classColor = (id) => (classes.find((c) => c.id === id) || {}).color || "#2563eb";
   const weekdayOf = (d) => (new Date(d).getDay() + 6) % 7; // 0 = Montag
   const slotsFor = (d) => tt.slots.filter((s) => s.weekday === weekdayOf(d)).sort((a, b) => a.period - b.period);
-  // Klick auf eine Stundenplan-Vorlage: daraus einen Termin an diesem Tag anlegen.
-  const fromSlot = (day, s) => setEditing({ date: startOfDay(day), title: s.title || "", class_id: s.class_id || null, topic_id: s.topic_id || null });
+  // Klick auf eine Stundenplan-Vorlage: gibt es an dem Tag schon einen Eintrag
+  // dieser Klasse, wird der bearbeitet; sonst ein neuer aus der Vorlage.
+  const fromSlot = (day, s) => {
+    const vorhanden = entries.find((e) => ymd(new Date(e.date)) === ymd(day) && (e.class_id || null) === (s.class_id || null));
+    if (vorhanden) setEditing({ ...vorhanden, date: new Date(vorhanden.date) });
+    else setEditing({ date: startOfDay(day), title: s.title || "", class_id: s.class_id || null, topic_id: s.topic_id || null });
+  };
 
   const saveSlot = async (s) => {
     const body = { weekday: s.weekday, period: s.period, title: s.title || "", class_id: s.class_id || null, topic_id: s.topic_id || null };
