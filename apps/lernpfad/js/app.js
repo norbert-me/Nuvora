@@ -1971,16 +1971,19 @@
         const s = entry.student;
         const selectedTasks = entry.tasks.filter(t => t.selected);
         let y = 15;
-        // QR oben rechts, falls vorhanden. Das Datum weicht dann nach links aus.
+        // QR unten rechts auf dem Blatt, falls vorhanden. Datum bleibt oben
+        // rechts (keine Kollision mehr).
         const qrImg = withQR ? qrCache[s.id] : null;
         const qrSize = 20;
-        const dateRight = qrImg ? marginL + contentW - qrSize - 4 : marginL + contentW;
+        const dateRight = marginL + contentW;
         if (qrImg) {
-            doc.addImage(qrImg, 'PNG', marginL + contentW - qrSize, 6, qrSize, qrSize);
+            const pageH = doc.internal.pageSize.getHeight();
+            const qrY = pageH - qrSize - 12;
+            doc.addImage(qrImg, 'PNG', marginL + contentW - qrSize, qrY, qrSize, qrSize);
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(6);
             doc.setTextColor(120);
-            doc.text('Karten-App', marginL + contentW - qrSize / 2, 6 + qrSize + 2.5, { align: 'center' });
+            doc.text('Karten-App', marginL + contentW - qrSize / 2, qrY + qrSize + 2.5, { align: 'center' });
             doc.setTextColor(0);
         }
         const cbSize = 5;
