@@ -2188,48 +2188,33 @@
     modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
 
     function showTaskDetail(a) {
+        // Inline-Styles, damit das Modal auch auf Nuvora-Ebene (ohne die
+        // lernpfad-CSS) korrekt aussieht.
         const kat = getKategorie(a);
-        const body = document.getElementById('task-detail-body');
-        body.innerHTML = `
-            <div style="display:flex;gap:1rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
-                <strong style="font-size:1.1rem;color:var(--primary)">${esc(a.id)}</strong>
-                <span class="badge badge-${katBadgeClass(kat)}">${esc(kat)}</span>
-                ${a.lrs ? '<span class="badge badge-lrs">LRS</span>' : ''}
+        const tags = [a.operator, a.kompetenz, a.methode].filter(Boolean).map(esc).join(' · ');
+        const sec = (h, inner) => `<div style="margin-bottom:16px"><div style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#8a8a8a;margin-bottom:4px">${h}</div>${inner}</div>`;
+        const chip = (txt, bg) => `<span style="font-size:12px;font-weight:600;padding:2px 9px;border-radius:980px;background:${bg};color:#fff">${esc(txt)}</span>`;
+        const html = `
+            <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+                <strong style="font-size:18px">${esc(a.id)}</strong>
+                ${chip(kat, '#2563eb')}
+                ${a.lrs ? chip('LRS', '#b8860b') : ''}
             </div>
-            <div class="task-detail-section">
-                <h3>Thema</h3>
-                <p>${esc(a.thema)}${a.unterthema ? ' – ' + esc(a.unterthema) : ''}</p>
-            </div>
-            <div class="task-detail-section">
-                <h3>Quelle</h3>
-                <p>${esc(a.quelle)}</p>
-            </div>
-            ${a.operator || a.kompetenz || a.methode ? `
-            <div class="task-detail-section">
-                <h3>Tags</h3>
-                <div>${renderTags(a)}</div>
-            </div>` : ''}
-            ${a.aufgabentext ? `
-            <div class="task-detail-section">
-                <h3>Aufgabentext</h3>
-                <div class="task-detail-text">${esc(a.aufgabentext)}</div>
-            </div>` : ''}
-            ${a.loesung ? `
-            <div class="task-detail-section">
-                <h3>Lösung</h3>
-                <div class="task-detail-text">${esc(a.loesung)}</div>
-            </div>` : ''}
-            ${a.bild ? `
-            <div class="task-detail-section">
-                <h3>Bild</h3>
-                <img src="${a.bild}" class="task-detail-img">
-            </div>` : ''}
-            ${a.loesungBild ? `
-            <div class="task-detail-section">
-                <h3>Lösungsbild</h3>
-                <img src="${a.loesungBild}" class="task-detail-img">
-            </div>` : ''}
+            ${sec('Thema', `<div>${esc(a.thema)}${a.unterthema ? ' – ' + esc(a.unterthema) : ''}</div>`)}
+            ${a.quelle ? sec('Quelle', `<div>${esc(a.quelle)}</div>`) : ''}
+            ${tags ? sec('Tags', `<div style="color:#555">${tags}</div>`) : ''}
+            ${a.aufgabentext ? sec('Aufgabentext', `<div style="white-space:pre-wrap;line-height:1.5">${esc(a.aufgabentext)}</div>`) : ''}
+            ${a.loesung ? sec('Lösung', `<div style="white-space:pre-wrap;line-height:1.5">${esc(a.loesung)}</div>`) : ''}
+            ${a.bild ? sec('Bild', `<img src="${a.bild}" style="max-width:100%;border-radius:8px;display:block">`) : ''}
+            ${a.loesungBild ? sec('Lösungsbild', `<img src="${a.loesungBild}" style="max-width:100%;border-radius:8px;display:block">`) : ''}
         `;
+        // Eingebettet: Nuvora rendert das Overlay ueber der ganzen Seite —
+        // zentriert und ohne sichtbare iframe-Grenze. Sonst lokales Modal.
+        if (window.parent !== window) {
+            window.parent.postMessage({ type: 'lernpfad:modal', title: 'Aufgabe ' + (a.id || ''), html }, window.location.origin);
+            return;
+        }
+        document.getElementById('task-detail-body').innerHTML = html;
         modal.style.display = '';
     }
 
