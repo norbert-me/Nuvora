@@ -128,7 +128,7 @@ export default function Kalender() {
       </div>
       {view !== "timetable" && <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: "var(--text)" }}>{title}</div>}
 
-      {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} className={className} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} t={t} />}
+      {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} slotsFor={slotsFor} onSlot={fromSlot} className={className} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} t={t} />}
       {view === "week" && <WeekView range={range} byDay={byDay} slotsFor={slotsFor} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
       {view === "day" && <DayView day={cursor} byDay={byDay} slotsFor={slotsFor} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
       {view === "timetable" && <TimetableView tt={tt} className={className} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
@@ -171,7 +171,7 @@ function EntryChips({ list, className, topicName, onOpen, classColor }) {
   });
 }
 
-function MonthGrid({ range, cursor, byDay, className, topicName, classColor, onAdd, onOpen, t }) {
+function MonthGrid({ range, cursor, byDay, slotsFor, onSlot, className, topicName, classColor, onAdd, onOpen, t }) {
   const days = [];
   for (let d = new Date(range[0]); d <= range[1]; d = addDays(d, 1)) days.push(new Date(d));
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
@@ -192,6 +192,7 @@ function MonthGrid({ range, cursor, byDay, className, topicName, classColor, onA
                       <button onClick={() => onAdd(d)} className="icon-btn" style={{ ...iconBtn, padding: 0 }} title={t("kalender.add")}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>
                     </div>
                     <EntryChips list={byDay(d)} className={className} topicName={topicName} onOpen={onOpen} classColor={classColor} />
+                    {slotsFor && <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} topicName={topicName} onSlot={onSlot} day={d} t={t} />}
                   </td>
                 );
               })}
@@ -363,8 +364,11 @@ function EntryModal({ entry, classes, topics, methods = [], onSave, onDelete, on
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 200 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--card)", borderRadius: 16, maxWidth: 440, width: "100%", padding: 22, border: "1px solid var(--border)", maxHeight: "85vh", overflow: "auto" }}>
-        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 2 }}>{entry.id ? t("kalender.editEntry") : t("kalender.newEntry")}</h3>
-        <div style={{ fontSize: 12.5, color: "var(--text3)" }}>{new Date(entry.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
+        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 2 }}>{(entry.id || entry.period != null) ? t("kalender.editEntry") : t("kalender.newEntry")}</h3>
+        <div style={{ fontSize: 12.5, color: "var(--text3)" }}>
+          {entry.period != null && <b style={{ color: "var(--text2)" }}>{entry.period}. {t("kalender.period")} · </b>}
+          {new Date(entry.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+        </div>
         <div style={lbl}>{t("kalender.entryTitle")}</div>
         <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus placeholder={t("kalender.entryTitlePlaceholder")} style={fld} />
         <div style={lbl}>{t("nav.classes")}</div>
