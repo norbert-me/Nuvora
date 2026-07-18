@@ -12,7 +12,7 @@ const APP_URL = "/lernpfad-app/";
 
 export default function LernpfadModule() {
   const ref = useRef(null);
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const tab = params.get("tab") || "aufgaben";
   // Aktuellen Tab in einem Ref halten, damit onLoad/onMessage-Handler nicht
   // eine veraltete Kopie senden (Stale-Closure).
@@ -32,6 +32,11 @@ export default function LernpfadModule() {
       }
       // Die App meldet, dass sie bereit ist — dann Thema und Tab (erneut) setzen.
       if (e.data?.type === "lernpfad:ready") sendeAlles();
+      // Interner Tab-Wechsel der App (z. B. nach "+ Lernleiter") → Nuvora-Menue
+      // mitziehen: ?tab aktualisieren, damit die Navbar-Markierung stimmt.
+      if (e.data?.type === "lernpfad:tab" && e.data.tab && e.data.tab !== tabRef.current) {
+        setParams({ tab: e.data.tab }, { replace: true });
+      }
     };
     window.addEventListener("message", onMessage);
     const obs = new MutationObserver(sendeTheme);
