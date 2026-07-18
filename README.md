@@ -1,5 +1,7 @@
 # Nuvora
 
+**Deutsch** · [English](README.en.md)
+
 Werkzeugkasten **für Lehrkräfte**. Selbst gehostet, keine Cloud, keine Schülerdaten bei Dritten.
 
 Quellcode: [github.com/norbert-me/Nuvora](https://github.com/norbert-me/Nuvora)
