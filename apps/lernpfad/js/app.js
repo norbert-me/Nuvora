@@ -285,6 +285,56 @@
     // gesetzt, wenn im Generator eine bestehende Lernleiter bearbeitet wird
     let editingLlId = null;
 
+    // Karten-Modul ist optionaler Gast: nur wenn aktiv, bietet der PDF-Export
+    // an, den QR-Zugang jedes Schuelers zum Karten-Ueben aufzudrucken. Der Cache
+    // haelt die vorgerenderten QR-Bilder je Schueler-ID fuer einen Export.
+    let kartenAktiv = false;
+    let qrCache = {};
+
+    async function checkKartenModul() {
+        try {
+            const r = await api(`${API}/modules`);
+            kartenAktiv = r.ok && (await r.json()).some(m => m.key === 'karten' && m.active);
+        } catch (e) { kartenAktiv = false; }
+        const wrap = document.getElementById('gen-qr-wrap');
+        if (wrap) wrap.style.display = kartenAktiv ? 'inline-flex' : 'none';
+    }
+
+    function blobToDataURL(blob) {
+        return new Promise((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload = () => resolve(fr.result);
+            fr.onerror = reject;
+            fr.readAsDataURL(blob);
+        });
+    }
+
+    // QR je Schueler vorab holen: erst Tokens pro Klasse (der Token ist der
+    // login-freie Zugang), dann das QR-PNG aus dem Karten-Modul.
+    async function prerenderQR(entries) {
+        qrCache = {};
+        const byClass = {};
+        entries.forEach(e => {
+            const c = e.student && e.student.class_id;
+            if (c) (byClass[c] = byClass[c] || []).push(e.student.id);
+        });
+        const tokenByStudent = {};
+        for (const cid of Object.keys(byClass)) {
+            const r = await api(`${API}/karten/classes/${cid}/tokens`, { method: 'POST' });
+            if (!r.ok) continue;
+            (await r.json()).forEach(t => { tokenByStudent[t.student_id] = t.token; });
+        }
+        for (const e of entries) {
+            const tok = tokenByStudent[e.student && e.student.id];
+            if (!tok) continue;
+            try {
+                const res = await api(`${API}/karten/qr/${tok}.png?base=${encodeURIComponent(location.origin)}`);
+                if (!res.ok) continue;
+                qrCache[e.student.id] = await blobToDataURL(await res.blob());
+            } catch (err) { /* ohne QR weiter */ }
+        }
+    }
+
     let sortState = { table: null, column: null, asc: true };
 
     // ─── Authentifizierung ───
@@ -325,9 +375,10 @@
         klassen = klassenRaw.map(c => c.name);
         schueler = [];
         klassenRaw.forEach(c => (c.students || []).forEach(st => schueler.push({
-            _id: String(st.id), id: st.id, name: st.name, klasse: c.name,
+            _id: String(st.id), id: st.id, name: st.name, klasse: c.name, class_id: c.id,
             niveau: st.niveau || '', foerder: st.foerder || [], notizen: st.notizen || ''
         })));
+        await checkKartenModul();
         lernpfade = [];
         localStorage.setItem(STORAGE_KEYS.aufgaben, JSON.stringify(aufgaben));
         localStorage.setItem(STORAGE_KEYS.schueler, JSON.stringify(schueler));
@@ -1841,6 +1892,11 @@
         const lineH = 6;
         const checkboxSize = 4;
 
+        // QR nur beim Schueler-PDF und nur, wenn das Karten-Modul aktiv und die
+        // Option angehakt ist.
+        const withQR = mode === 'all' && kartenAktiv && !!document.getElementById('gen-qr')?.checked;
+        if (withQR) await prerenderQR(previewData);
+
         if (mode === 'lrs') {
             generateLRSPdf(doc, marginL, contentW, lineH);
         } else if (mode === 'loesung') {
@@ -1848,7 +1904,7 @@
         } else {
             previewData.forEach((entry, idx) => {
                 if (idx > 0) doc.addPage();
-                renderStudentPage(doc, entry, marginL, contentW, lineH, checkboxSize);
+                renderStudentPage(doc, entry, marginL, contentW, lineH, checkboxSize, withQR);
             });
         }
 
@@ -1865,10 +1921,22 @@
     }
 
 
-    function renderStudentPage(doc, entry, marginL, contentW, lineH, checkboxSize) {
+    function renderStudentPage(doc, entry, marginL, contentW, lineH, checkboxSize, withQR) {
         const s = entry.student;
         const selectedTasks = entry.tasks.filter(t => t.selected);
         let y = 15;
+        // QR oben rechts, falls vorhanden. Das Datum weicht dann nach links aus.
+        const qrImg = withQR ? qrCache[s.id] : null;
+        const qrSize = 20;
+        const dateRight = qrImg ? marginL + contentW - qrSize - 4 : marginL + contentW;
+        if (qrImg) {
+            doc.addImage(qrImg, 'PNG', marginL + contentW - qrSize, 6, qrSize, qrSize);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(6);
+            doc.setTextColor(120);
+            doc.text('Karten-App', marginL + contentW - qrSize / 2, 6 + qrSize + 2.5, { align: 'center' });
+            doc.setTextColor(0);
+        }
         const cbSize = 5;
         const cbX = marginL;
         const numX = marginL + cbSize + 3;
@@ -1893,7 +1961,7 @@
         doc.text(s.name, marginL, y);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(10);
-        doc.text('Datum: _______________', marginL + contentW, y, { align: 'right' });
+        doc.text('Datum: _______________', dateRight, y, { align: 'right' });
         y += 3;
         doc.setLineWidth(0.6);
         doc.line(marginL, y, marginL + contentW, y);
