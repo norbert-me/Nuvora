@@ -47,6 +47,7 @@ export default function Classes() {
   const [classes, setClasses] = useState([]);
   const [editing, setEditing] = useState(null);
   const [name, setName] = useState("");
+  const [color, setColor] = useState("#2563eb");
   const [students, setStudents] = useState([]);
   const [detailsFor, setDetailsFor] = useState(null);
 
@@ -68,12 +69,14 @@ export default function Classes() {
   const startNew = () => {
     setEditing({ id: null });
     setName("");
+    setColor("#2563eb");
     setStudents([{ ...EMPTY_STUDENT, card_id: 1 }]);
   };
 
   const startEdit = (cls) => {
     setEditing(cls);
     setName(cls.name);
+    setColor(cls.color || "#2563eb");
     const sorted = [...cls.students].sort((a, b) => a.card_id - b.card_id);
     // Ganzen Datensatz uebernehmen, nicht nur Nummer und Name: niveau, foerder
     // und notizen wuerden sonst bei jedem Speichern still verschwinden.
@@ -86,6 +89,7 @@ export default function Classes() {
     const filled = students.filter((s) => s.name.trim() !== "");
     const body = {
       name,
+      color,
       students: filled.map((s) => ({
         card_id: s.card_id,
         name: s.name.trim(),
@@ -184,9 +188,11 @@ export default function Classes() {
     return (
       <div>
         <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{editing.id ? t("classes.editTitle") : t("classes.newTitle")}</h2>
-        <div style={{ marginBottom: 8 }}>
+        <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}>
           <input placeholder={t("classes.namePlaceholder")} value={name} onChange={(e) => setName(e.target.value)}
             style={{ padding: "10px 14px", fontSize: 18, width: 300, border: "1px solid var(--border2)", borderRadius: 10 }} autoFocus />
+          <input type="color" value={color} onChange={(e) => setColor(e.target.value)} title={t("classes.color")}
+            style={{ width: 40, height: 40, padding: 0, border: "1px solid var(--border2)", borderRadius: 8, background: "none", cursor: "pointer" }} />
         </div>
         {!editing.id && (
           <p style={{ color: "var(--text3)", fontSize: 12.5, marginBottom: 16, maxWidth: 460 }}>{t("classes.subjectHint")}</p>

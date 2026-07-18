@@ -75,6 +75,7 @@ export default function Kalender() {
   const remove = async (id) => { await fetch(`${API}/entries/${id}`, { method: "DELETE" }).catch(() => {}); setEditing(null); load(); };
 
   const className = (id) => (classes.find((c) => c.id === id) || {}).name || "";
+  const classColor = (id) => (classes.find((c) => c.id === id) || {}).color || "#2563eb";
   const weekdayOf = (d) => (new Date(d).getDay() + 6) % 7; // 0 = Montag
   const slotsFor = (d) => tt.slots.filter((s) => s.weekday === weekdayOf(d)).sort((a, b) => a.period - b.period);
   // Klick auf eine Stundenplan-Vorlage: daraus einen Termin an diesem Tag anlegen.
@@ -120,10 +121,10 @@ export default function Kalender() {
       </div>
       {view !== "timetable" && <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: "var(--text)" }}>{title}</div>}
 
-      {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} t={t} />}
-      {view === "week" && <WeekView range={range} byDay={byDay} slotsFor={slotsFor} className={className} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
-      {view === "day" && <DayView day={cursor} byDay={byDay} slotsFor={slotsFor} className={className} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
-      {view === "timetable" && <TimetableView tt={tt} className={className} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
+      {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} t={t} />}
+      {view === "week" && <WeekView range={range} byDay={byDay} slotsFor={slotsFor} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
+      {view === "day" && <DayView day={cursor} byDay={byDay} slotsFor={slotsFor} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
+      {view === "timetable" && <TimetableView tt={tt} className={className} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} topicName={topicName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
       {slotEdit && <SlotModal slot={slotEdit} classes={classes} topics={topics} onSave={saveSlot} onDelete={removeSlot} onClose={() => setSlotEdit(null)} t={t} />}
@@ -145,15 +146,20 @@ function SlotGhosts({ list, className, topicName, onSlot, day, t }) {
   });
 }
 
-function EntryChips({ list, topicName, onOpen }) {
-  return list.map((e) => (
-    <button key={e.id} onClick={() => onOpen({ ...e, date: new Date(e.date) })} style={chip} title={e.title || topicName(e.topic_id)}>
-      {e.title || topicName(e.topic_id) || "—"}
-    </button>
-  ));
+function EntryChips({ list, topicName, onOpen, classColor }) {
+  return list.map((e) => {
+    const col = e.class_id && classColor ? classColor(e.class_id) : null;
+    return (
+      <button key={e.id} onClick={() => onOpen({ ...e, date: new Date(e.date) })}
+        style={{ ...chip, ...(col ? { background: col + "22", color: col, borderLeft: `3px solid ${col}` } : {}) }}
+        title={e.title || topicName(e.topic_id)}>
+        {e.title || topicName(e.topic_id) || "—"}
+      </button>
+    );
+  });
 }
 
-function MonthGrid({ range, cursor, byDay, topicName, onAdd, onOpen, t }) {
+function MonthGrid({ range, cursor, byDay, topicName, classColor, onAdd, onOpen, t }) {
   const days = [];
   for (let d = new Date(range[0]); d <= range[1]; d = addDays(d, 1)) days.push(new Date(d));
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
@@ -173,7 +179,7 @@ function MonthGrid({ range, cursor, byDay, topicName, onAdd, onOpen, t }) {
                       <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>{d.getDate()}</span>
                       <button onClick={() => onAdd(d)} className="icon-btn" style={{ ...iconBtn, padding: 0 }} title={t("kalender.add")}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>
                     </div>
-                    <EntryChips list={byDay(d)} topicName={topicName} onOpen={onOpen} />
+                    <EntryChips list={byDay(d)} topicName={topicName} onOpen={onOpen} classColor={classColor} />
                   </td>
                 );
               })}
@@ -185,7 +191,7 @@ function MonthGrid({ range, cursor, byDay, topicName, onAdd, onOpen, t }) {
   );
 }
 
-function WeekView({ range, byDay, slotsFor, className, topicName, onAdd, onOpen, onSlot, t }) {
+function WeekView({ range, byDay, slotsFor, className, classColor, topicName, onAdd, onOpen, onSlot, t }) {
   const days = [];
   for (let d = new Date(range[0]); d <= range[1]; d = addDays(d, 1)) days.push(new Date(d));
   return (
@@ -197,14 +203,14 @@ function WeekView({ range, byDay, slotsFor, className, topicName, onAdd, onOpen,
             <button onClick={() => onAdd(d)} className="icon-btn" style={{ ...iconBtn, padding: 0 }}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>
           </div>
           <SlotGhosts list={slotsFor(d)} className={className} topicName={topicName} onSlot={onSlot} day={d} t={t} />
-          <EntryChips list={byDay(d)} topicName={topicName} onOpen={onOpen} />
+          <EntryChips list={byDay(d)} topicName={topicName} onOpen={onOpen} classColor={classColor} />
         </div>
       ))}
     </div>
   );
 }
 
-function DayView({ day, byDay, slotsFor, className, topicName, onAdd, onOpen, onSlot, t }) {
+function DayView({ day, byDay, slotsFor, className, classColor, topicName, onAdd, onOpen, onSlot, t }) {
   const list = byDay(day);
   const slots = slotsFor(day);
   return (
@@ -259,12 +265,14 @@ function TimetableView({ tt, className, topicName, onEdit, onPeriods, onTimes, t
                 {wdays.map((_, wd) => {
                   const s = slot(wd, p);
                   const label = s ? className(s.class_id) : "";
+                  const col = s ? classColor(s.class_id) : null;
                   return (
-                    <td key={wd} style={tdBase}>
+                    <td key={wd} style={{ ...tdBase, padding: 0, height: 72 }}>
                       <button onClick={() => onEdit(s ? { ...s } : { weekday: wd, period: p })}
-                        style={{ display: "block", width: "100%", minHeight: 44, textAlign: "left", padding: "6px 8px", border: "none", cursor: "pointer",
-                          background: s ? "var(--accent-bg, rgba(10,132,255,0.12))" : "transparent", color: s ? "var(--accent)" : "var(--text3)" }}>
-                        {s ? <div style={{ fontSize: 12.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label || "—"}</div>
+                        style={{ display: "flex", alignItems: "center", width: "100%", height: "100%", minHeight: 72, textAlign: "left", padding: "6px 10px", border: "none", cursor: "pointer", boxSizing: "border-box",
+                          borderLeft: col ? `4px solid ${col}` : "4px solid transparent",
+                          background: col ? col + "22" : "transparent", color: col ? col : "var(--text3)" }}>
+                        {s ? <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label || "—"}</div>
                           : <span style={{ fontSize: 12 }}>+</span>}
                       </button>
                     </td>

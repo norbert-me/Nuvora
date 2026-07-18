@@ -126,6 +126,7 @@ export default {
   "classes.invalidFormat": "Ungültiges Format",
   "classes.importError": "Fehler beim Import",
   "classes.classNamePrompt": "Klassenname:",
+  "classes.color": "Farbe der Klasse",
 
   // Import-Menü
   "importMenu.label": "Import & Vorlagen",
