@@ -81,9 +81,19 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     if (res.ok) {
       const data = await res.json();
       if (data.token) localStorage.setItem("token", data.token);
+      // Passwortmanager (Chrome/Edge) das neue Passwort anbieten. Safari kennt
+      // die API nicht — dort haengt das Speichern am echten Formular-Submit,
+      // deshalb die Felder nicht sofort leeren (das wuergt den Dialog ab),
+      // sondern erst nach kurzer Verzoegerung.
+      try {
+        if (window.PasswordCredential && user?.email) {
+          await navigator.credentials.store(
+            new window.PasswordCredential({ id: user.email, password: newPw })
+          );
+        }
+      } catch { /* egal, best effort */ }
       setMsg(t("profile.pwChanged"));
-      setOldPw("");
-      setNewPw("");
+      setTimeout(() => { setOldPw(""); setNewPw(""); }, 1500);
     } else {
       const data = await res.json();
       setMsg(data.detail || t("login.genericError"));
