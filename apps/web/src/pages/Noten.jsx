@@ -286,7 +286,7 @@ export default function Noten() {
                   <tr key={st.id}>
                     <td style={{ ...td, textAlign: "left", padding: 0 }}>
                       <button onClick={() => setInfoFuer(st.id)} title={t("noten.studentInfo")}
-                        style={{ width: "100%", textAlign: "left", padding: "6px 10px", border: "none", background: "none", color: "var(--text)", fontWeight: 500, cursor: "pointer" }}>
+                        style={{ width: "100%", textAlign: "left", padding: "6px 10px", border: "none", background: "none", color: "var(--text)", fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}>
                         <span style={{ color: "var(--text3)", fontWeight: 400, marginRight: 6 }}>{si + 1}.</span>{st.name}
                       </button>
                     </td>
@@ -369,13 +369,13 @@ export default function Noten() {
                       onDragOver={(e) => dragOverCol(e, c.id, sec.id)}
                       onDrop={() => spalteDrop(c.id, sec)}
                       onDragEnd={() => { setDragCol(null); setDragColOver(null); }}
-                      style={{ ...th, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", minWidth: 70, fontWeight: 500,
+                      style={{ ...th, padding: 0, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", minWidth: 70, fontWeight: 500,
                         cursor: "grab", opacity: dragCol && dragCol.catId === c.id ? 0.4 : 1,
                         borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined,
                         boxShadow: colOver === "left" ? "inset 3px 0 0 var(--accent)" : colOver === "right" ? "inset -3px 0 0 var(--accent)" : undefined }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 3, justifyContent: "center", position: "relative" }}>
                         <button onClick={() => setRenameCol(renameCol === c.id ? null : c.id)} title={t("noten.colOverview")}
-                          style={{ maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", border: "none", background: "none", cursor: "pointer", color: "var(--text2)", fontWeight: 500, fontSize: 12, padding: 0 }}>{c.name}</button>
+                          style={{ width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", border: "none", background: "none", cursor: "pointer", color: "var(--text2)", fontWeight: 500, fontSize: 12, padding: "8px 6px" }}>{c.name}</button>
                         {renameCol === c.id && (
                           <ColMenu t={t} cat={c} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
                             onRename={async (name) => { if (await call(() => fetch(`${API}/categories/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: c.position ?? i }) }))) setRenameCol(null); }}
@@ -395,7 +395,7 @@ export default function Noten() {
                 <tr key={s.student_id}>
                   <td style={{ ...td, ...stickyL, textAlign: "left", padding: 0 }}>
                     <button onClick={() => setInfoFuer(s.student_id)} title={t("noten.studentInfo")}
-                      style={{ width: "100%", textAlign: "left", padding: "6px 8px", border: "none", background: "none", color: "var(--text)", fontWeight: 500, cursor: "pointer" }}>
+                      style={{ width: "100%", textAlign: "left", padding: "6px 8px", border: "none", background: "none", color: "var(--text)", fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}>
                       <span style={{ color: "var(--text3)", fontWeight: 400, marginRight: 6 }}>{si + 1}.</span>{s.name}
                     </button>
                   </td>
