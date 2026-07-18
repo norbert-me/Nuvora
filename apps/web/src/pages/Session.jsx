@@ -733,9 +733,11 @@ export default function Session() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>
             )}
           </button>
-          <input type="range" min={0} max={1} step={0.05} value={muted ? 0 : volume}
-            onChange={(e) => changeVolume(parseFloat(e.target.value))}
-            title={t("session.volume")} style={{ width: 70, accentColor: "var(--accent)", cursor: "pointer" }} />
+          {!muted && (
+            <input type="range" min={0} max={1} step={0.05} value={volume}
+              onChange={(e) => changeVolume(parseFloat(e.target.value))}
+              title={t("session.volume")} style={{ width: 70, accentColor: "var(--accent)", cursor: "pointer" }} />
+          )}
           <button onClick={() => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }} style={{
             padding: "5px 10px", fontSize: 14, cursor: "pointer",
             background: "none", color: "var(--text3)", border: "1px solid var(--border2)", borderRadius: 980,
