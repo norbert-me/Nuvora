@@ -626,6 +626,8 @@ export default {
   "analyse.weak": "Übung empfohlen",
   "analyse.exercisesN": "{{n}} Aufgabe(n) im Lernpfad",
   "analyse.noExercises": "keine Aufgaben im Lernpfad",
+  "analyse.verdictWeak": "Unter 60 % liegen: {{list}}. Hier lohnt gezielte Wiederholung.",
+  "analyse.verdictOk": "Alle ausgewerteten Themen liegen bei mindestens 60 % — solide Basis.",
   "analyse.toLernpfad": "Zu den Aufgaben",
   "karten.title": "Karten",
   "karten.needClass": "Noch keine Klasse. Lege sie unter {{link}} an.",

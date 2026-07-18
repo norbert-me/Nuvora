@@ -1130,10 +1130,23 @@ function TopicAnalysis({ questions, presentStudents }) {
   })).filter((r) => r.total > 0).sort((a, b) => a.pct - b.pct);
   if (rows.length === 0) return null;
 
+  // Kernaussage regelbasiert: schwaechste Themen benennen und eine Empfehlung
+  // geben — die Zusammenfassung, die die Lehrkraft sonst selbst aus der Liste
+  // ziehen muesste. Kein Automatismus, nur ein Satz.
+  const weakRows = rows.filter((r) => r.pct < 60);
+  const verdict = weakRows.length > 0
+    ? t("analyse.verdictWeak", { list: weakRows.map((r) => `${label(r.tid)} (${r.pct}%)`).join(", ") })
+    : t("analyse.verdictOk");
+
   return (
     <div style={{ padding: 16, background: "var(--card)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 16 }}>
       <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{t("analyse.title")}</h3>
       <p style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 12 }}>{t("analyse.intro")}</p>
+      <p style={{
+        fontSize: 13, lineHeight: 1.6, marginBottom: 12, padding: "10px 12px", borderRadius: 10,
+        background: weakRows.length > 0 ? "rgba(184,134,11,0.10)" : "rgba(10,125,62,0.08)",
+        border: `1px solid ${weakRows.length > 0 ? "rgba(184,134,11,0.35)" : "rgba(10,125,62,0.25)"}`,
+      }}>{verdict}</p>
       {rows.map((r) => {
         const weak = r.pct < 60;
         const n = exCount[r.tid] || 0;

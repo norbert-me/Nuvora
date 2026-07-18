@@ -626,6 +626,8 @@ export default {
   "analyse.weak": "Se recomienda practicar",
   "analyse.exercisesN": "{{n}} ejercicio(s) en Lernpfad",
   "analyse.noExercises": "sin ejercicios en Lernpfad",
+  "analyse.verdictWeak": "Por debajo del 60 %: {{list}}. Aquí conviene un repaso específico.",
+  "analyse.verdictOk": "Todos los temas evaluados alcanzan al menos el 60 % — una base sólida.",
   "analyse.toLernpfad": "Ir a ejercicios",
   "karten.title": "Tarjetas",
   "karten.needClass": "Aún no hay clase. Créala en {{link}}.",
