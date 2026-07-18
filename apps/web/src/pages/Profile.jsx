@@ -240,26 +240,26 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                 <Spinner /> {t("profile.checking")}
               </div>
             ) : versionInfo ? (
-              <>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
+                <div style={{ flex: "1 1 220px", minWidth: 200 }}>
                   <span style={{ fontSize: 14, color: "var(--text)" }}>{t("profile.installed")} <strong>v{versionInfo.current}</strong></span>
+                  {versionInfo.update_available ? (
+                    <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--bg2)", border: "1px solid var(--border2)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v10M12 12l4-4M12 12l-4-4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{t("profile.updateAvailable")} v{versionInfo.latest}</span>
+                      <a href={versionInfo.repo_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 600, color: "var(--accent)" }}>{t("profile.toGithub")}</a>
+                    </div>
+                  ) : versionInfo.latest ? (
+                    <div style={{ marginTop: 10, fontSize: 13, color: "#0a7d3e", display: "flex", alignItems: "center", gap: 6 }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0a7d3e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                      {t("profile.upToDate")}
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 10, fontSize: 12, color: "var(--text3)" }}>{versionInfo.channel === "stable" ? t("profile.noStableRelease") : t("profile.githubFail")}</div>
+                  )}
                 </div>
-                {versionInfo.update_available ? (
-                  <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--bg2)", border: "1px solid var(--border2)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v10M12 12l4-4M12 12l-4-4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{t("profile.updateAvailable")} v{versionInfo.latest}</span>
-                    <a href={versionInfo.repo_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 600, color: "var(--accent)" }}>{t("profile.toGithub")}</a>
-                  </div>
-                ) : versionInfo.latest ? (
-                  <div style={{ marginTop: 10, fontSize: 13, color: "#0a7d3e", display: "flex", alignItems: "center", gap: 6 }}>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0a7d3e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-                    {t("profile.upToDate")}
-                  </div>
-                ) : (
-                  <div style={{ marginTop: 10, fontSize: 12, color: "var(--text3)" }}>{t("profile.githubFail")}</div>
-                )}
                 {versionInfo.channels && (
-                  <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
+                  <div style={{ flex: "1 1 220px", minWidth: 200 }}>
                     <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 8 }}>{t("profile.channel")}</div>
                     <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden" }}>
                       {versionInfo.channels.map((ch) => (
@@ -274,7 +274,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                     <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>{t(`profile.channelHint.${versionInfo.channel}`)}</p>
                   </div>
                 )}
-              </>
+              </div>
             ) : (
               <div style={{ fontSize: 12, color: "var(--text3)" }}>{t("profile.versionFail")}</div>
             )}

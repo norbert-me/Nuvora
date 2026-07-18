@@ -250,6 +250,7 @@ export default {
   "profile.toGithub": "Ir a GitHub →",
   "profile.upToDate": "Versión actual instalada",
   "profile.githubFail": "No se pudo comprobar la versión de GitHub.",
+  "profile.noStableRelease": "Al día — todavía no hay una versión estable más reciente.",
   "profile.channel": "Canal de actualización",
   "profile.channel.stable": "Estable",
   "profile.channel.beta": "Beta",
