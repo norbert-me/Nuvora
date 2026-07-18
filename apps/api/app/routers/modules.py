@@ -89,6 +89,15 @@ REGISTRY: List[ModuleDef] = [
         ),
         path="/karten",
     ),
+    ModuleDef(
+        key="kalender",
+        name="Kalender",
+        description=(
+            "Unterrichtsplanung im Kalender: Tag-, Wochen- und Monatsansicht. "
+            "Stunden eintragen und Themen aus der Taxonomie zuordnen."
+        ),
+        path="/kalender",
+    ),
 ]
 
 _BY_KEY = {m.key: m for m in REGISTRY}

@@ -449,6 +449,21 @@ class GradeOverride(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class CalendarEntry(Base):
+    """Unterrichtsplanung: ein Eintrag an einem Datum. Optional an eine Klasse
+    und ein Thema geknuepft (Thema ON DELETE SET NULL — Regel 3)."""
+    __tablename__ = "calendar_entries"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    class_id: Mapped[Optional[int]] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), nullable=True, index=True)
+    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    title: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    notes: Mapped[str] = mapped_column(Text, default="", server_default="")
+    topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class QuartalDivider(Base):
     """Optischer Quartalsstrich in der Notentabelle — nach welcher Spalte er
     steht. Mehrere je Klasse+Halbjahr moeglich, rein visuell."""
