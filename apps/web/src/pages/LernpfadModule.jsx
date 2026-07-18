@@ -15,6 +15,7 @@ export default function LernpfadModule() {
   // Modal auf Nuvora-Ebene: die eingebettete App schickt Detail-HTML, wir
   // rendern es zentriert ueber der ganzen Seite (nicht im hohen iframe).
   const [modal, setModal] = useState(null); // { title, html } | null
+  const [toast, setToast] = useState(""); // Toast-Meldung der App
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") || "aufgaben";
   // Aktuellen Tab in einem Ref halten, damit onLoad/onMessage-Handler nicht
@@ -44,6 +45,12 @@ export default function LernpfadModule() {
       if (e.data?.type === "lernpfad:modal" && typeof e.data.html === "string") {
         setModal({ title: e.data.title || "", html: e.data.html });
       }
+      // Toast der App im echten Sichtfenster zeigen (nicht am iframe-Rand).
+      if (e.data?.type === "lernpfad:toast" && e.data.msg) {
+        setToast(String(e.data.msg));
+        clearTimeout(window.__lpToast);
+        window.__lpToast = setTimeout(() => setToast(""), 2500);
+      }
     };
     window.addEventListener("message", onMessage);
     const obs = new MutationObserver(sendeTheme);
@@ -66,6 +73,9 @@ export default function LernpfadModule() {
             <div dangerouslySetInnerHTML={{ __html: modal.html }} />
           </div>
         </div>
+      )}
+      {toast && (
+        <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 400, background: "#1e293b", color: "#fff", padding: "10px 18px", borderRadius: 8, fontSize: 14, boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }}>{toast}</div>
       )}
       <iframe
       ref={ref}

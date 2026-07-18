@@ -182,6 +182,12 @@
         } catch(e) { console.error('Sync-Fehler:', e); }
     }
     function toast(msg) {
+        // Eingebettet: an Nuvora geben — position:fixed im hohen iframe landet
+        // sonst am unteren iframe-Rand, ausserhalb des Sichtfensters.
+        if (window.parent !== window) {
+            window.parent.postMessage({ type: 'lernpfad:toast', msg: String(msg) }, window.location.origin);
+            return;
+        }
         const el = document.createElement('div');
         el.className = 'toast';
         el.textContent = msg;
