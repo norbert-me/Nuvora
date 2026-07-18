@@ -113,12 +113,26 @@ function Boxplot({ values, max, label }) {
         ))}
       </div>
       {/* Beschriftungen an ihrer echten Position, nicht gleichmaessig verteilt —
-          sonst stehen sie nicht unter ihren Markierungen. */}
-      <div style={{ position: "relative", height: 15, margin: "4px 20px 0", fontSize: 11, color: "var(--text3)" }}>
-        {[["Min", sorted[0]], ["Q1", q1], ["Med", med], ["Q3", q3], ["Max", sorted[sorted.length - 1]]].map(([lbl, v], i) => (
-          <span key={i} style={{ position: "absolute", left: `${pct(v)}%`, transform: "translateX(-50%)", whiteSpace: "nowrap" }}>{lbl}: {fmt(v)}</span>
-        ))}
-      </div>
+          sonst stehen sie nicht unter ihren Markierungen. Liegen zwei Werte nah
+          beieinander (z. B. Q3 und Max), weicht das zweite in eine zweite Zeile
+          aus, damit sich die Texte nicht ueberschneiden. */}
+      {(() => {
+        const MINGAP = 14; // Prozent Mindestabstand, sonst zweite Zeile
+        const last = [-Infinity, -Infinity];
+        const items = [["Min", sorted[0]], ["Q1", q1], ["Med", med], ["Q3", q3], ["Max", sorted[sorted.length - 1]]].map(([lbl, v]) => {
+          const x = pct(v);
+          let row = x - last[0] >= MINGAP ? 0 : x - last[1] >= MINGAP ? 1 : (last[0] <= last[1] ? 0 : 1);
+          last[row] = x;
+          return { lbl, v, x, row };
+        });
+        return (
+          <div style={{ position: "relative", height: 28, margin: "4px 20px 0", fontSize: 11, color: "var(--text3)" }}>
+            {items.map((it, i) => (
+              <span key={i} style={{ position: "absolute", top: it.row * 13, left: `${it.x}%`, transform: "translateX(-50%)", whiteSpace: "nowrap" }}>{it.lbl}: {fmt(it.v)}</span>
+            ))}
+          </div>
+        );
+      })()}
     </div>
   );
 }
