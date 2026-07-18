@@ -269,7 +269,9 @@ export default function Noten() {
         );
       })()}
 
-      {term !== "year" && sections.length > 0 && <NotenStatistik summary={summary} t={t} />}
+      {term === "year"
+        ? (yearData.rows || []).length > 0 && <NotenStatistik noten={(yearData.rows || []).map((r) => (r.year_override != null ? r.year_override : r.year))} t={t} />
+        : sections.length > 0 && <NotenStatistik noten={(summary || []).map((s) => (s.total_override != null ? s.total_override : s.weighted))} t={t} />}
 
       {term === "year" ? (
         <YearTable t={t} data={yearData} cls={cls}
@@ -285,12 +287,12 @@ export default function Noten() {
                 <tr><th style={{ ...th, textAlign: "left" }}>{cls?.name}</th></tr>
               </thead>
               <tbody>
-                {students.map((st) => (
+                {students.map((st, si) => (
                   <tr key={st.id}>
                     <td style={{ ...td, textAlign: "left", padding: 0 }}>
                       <button onClick={() => setInfoFuer(st.id)} title={t("noten.studentInfo")}
                         style={{ width: "100%", textAlign: "left", padding: "6px 10px", border: "none", background: "none", color: "var(--text)", fontWeight: 500, cursor: "pointer" }}>
-                        {st.name}
+                        <span style={{ color: "var(--text3)", fontWeight: 400, marginRight: 6 }}>{si + 1}.</span>{st.name}
                       </button>
                     </td>
                   </tr>
@@ -392,12 +394,12 @@ export default function Noten() {
               </tr>
             </thead>
             <tbody>
-              {summary.map((s) => (
+              {summary.map((s, si) => (
                 <tr key={s.student_id}>
                   <td style={{ ...td, ...stickyL, textAlign: "left", padding: 0 }}>
                     <button onClick={() => setInfoFuer(s.student_id)} title={t("noten.studentInfo")}
                       style={{ width: "100%", textAlign: "left", padding: "6px 8px", border: "none", background: "none", color: "var(--text)", fontWeight: 500, cursor: "pointer" }}>
-                      {s.name}
+                      <span style={{ color: "var(--text3)", fontWeight: 400, marginRight: 6 }}>{si + 1}.</span>{s.name}
                     </button>
                   </td>
                   {sections.map((sec) => {
@@ -514,10 +516,9 @@ function NoteZelle({ t, editing, onEdit, value, isOverride, onSave, onCancel, on
 // Statistische Auswertung der Halbjahresnoten — analog CardVote: Kennzahlen und
 // Notenverteilung ueber die effektiven Endnoten (manuell gesetzt schlaegt
 // Schnitt). Rein deskriptiv, keine Zeugnisnote.
-function NotenStatistik({ summary, t }) {
-  const noten = (summary || [])
-    .map((s) => (s.total_override != null ? s.total_override : s.weighted))
-    .filter((v) => v != null);
+function NotenStatistik({ noten, t }) {
+  const [open, setOpen] = useState(false);
+  noten = (noten || []).filter((v) => v != null);
   if (noten.length < 2) return null;
   const n = noten.length;
   const avg = noten.reduce((a, b) => a + b, 0) / n;
@@ -534,22 +535,28 @@ function NotenStatistik({ summary, t }) {
   );
   return (
     <div style={{ padding: 16, background: "var(--card)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 14 }}>
-      <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{t("noten.statTitle")}</h3>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-        {tile(t("noten.statAvg"), de(Math.round(avg * 100) / 100))}
-        {tile(t("noten.statMedian"), de(Math.round(median * 100) / 100))}
-        {tile(t("noten.statSd"), `±${(Math.round(sd * 100) / 100).toString().replace(".", ",")}`)}
-        {tile(t("noten.statCount"), n)}
-      </div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 90 }}>
-        {dist.map((c, i) => (
-          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-            <div style={{ fontSize: 11, color: "var(--text3)" }}>{c || ""}</div>
-            <div style={{ width: "100%", maxWidth: 44, height: `${(c / maxD) * 60}px`, minHeight: c ? 3 : 0, background: "var(--accent)", borderRadius: "5px 5px 0 0", opacity: c ? 0.85 : 0.15 }} />
-            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)" }}>{i + 1}</div>
+      <button onClick={() => setOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
+        <Icon d={open ? ICONS.minus : ICONS.plus} size={14} />
+        <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{t("noten.statTitle")}</span>
+      </button>
+      {open && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+            {tile(t("noten.statAvg"), de(Math.round(avg * 100) / 100))}
+            {tile(t("noten.statMedian"), de(Math.round(median * 100) / 100))}
+            {tile(t("noten.statSd"), `±${(Math.round(sd * 100) / 100).toString().replace(".", ",")}`)}
           </div>
-        ))}
-      </div>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 90 }}>
+            {dist.map((c, i) => (
+              <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                <div style={{ fontSize: 11, color: "var(--text3)" }}>{c || ""}</div>
+                <div style={{ width: "100%", maxWidth: 44, height: `${(c / maxD) * 60}px`, minHeight: c ? 3 : 0, background: "var(--accent)", borderRadius: "5px 5px 0 0", opacity: c ? 0.85 : 0.15 }} />
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)" }}>{i + 1}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -785,12 +792,12 @@ function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo }
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {rows.map((r, ri) => (
             <tr key={r.student_id}>
               <td style={{ ...td, ...stickyL, textAlign: "left", padding: 0 }}>
                 <button onClick={() => onInfo(r.student_id)} title={t("noten.studentInfo")}
                   style={{ width: "100%", textAlign: "left", padding: "6px 8px", border: "none", background: "none", color: "var(--text)", fontWeight: 500, cursor: "pointer" }}>
-                  {r.name}
+                  <span style={{ color: "var(--text3)", fontWeight: 400, marginRight: 6 }}>{ri + 1}.</span>{r.name}
                 </button>
               </td>
               {sec1.map((s, i) => (
