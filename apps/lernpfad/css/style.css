@@ -1096,6 +1096,9 @@ body:not(.authed) #auth-overlay ~ .tab-content { display: none !important; }
 .embedded body { background: transparent; }
 /* Der Rahmen scrollt, nicht das iframe: sonst zwei Scrollbalken. */
 .embedded, .embedded body { overflow: visible; height: auto; }
+/* Eingebettet scrollt Nuvora selbst — kein zweiter (nested) Scrollbalken.
+   Die interne 60vh-Tabellenhoehe entfaellt, der Inhalt fliesst voll. */
+.embedded .table-wrap { max-height: none !important; overflow: visible !important; }
 
 /* ─── Dark Mode ───
    Die App hatte keinen: eingebettet in Nuvoras dunkles Design leuchtete das
