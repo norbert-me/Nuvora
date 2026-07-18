@@ -47,33 +47,9 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   useEffect(() => {
     if (!isAdmin) return;
     fetch(`${API}/auth/admin/users`).then(r => r.ok ? r.json() : []).then(setAdminUsers).finally(() => setAdminUsersLoading(false));
-    fetch(`${API}/version`)
-      .then(async (r) => {
-        console.debug("[Versionscheck] GET /api/version →", r.status, r.ok);
-        if (!r.ok) { console.warn("[Versionscheck] Antwort nicht ok:", r.status, await r.text().catch(() => "")); return null; }
-        return r.json();
-      })
-      .then((d) => { console.debug("[Versionscheck] Daten:", d); if (d) console.info(`[Versionscheck] installiert=${d.current} · neueste=${d.latest || "—"} · Kanal=${d.channel} · Update=${d.update_available}`); setVersionInfo(d); })
-      .catch((e) => console.error("[Versionscheck] Fehler beim Abruf:", e))
-      .finally(() => setVersionLoading(false));
+    fetch(`${API}/version`).then(r => r.ok ? r.json() : null).then(setVersionInfo).catch(() => {}).finally(() => setVersionLoading(false));
     fetch(`${API}/admin/setup`).then(r => r.ok ? r.json() : null).then(setSetup).catch(() => {});
   }, [isAdmin]);
-
-  const refreshVersion = async () => {
-    setVersionLoading(true);
-    console.debug("[Versionscheck] Erneut prüfen (refresh=1) …");
-    const d = await fetch(`${API}/version?refresh=1`)
-      .then(async (r) => {
-        console.debug("[Versionscheck] GET /api/version?refresh=1 →", r.status, r.ok);
-        if (!r.ok) { console.warn("[Versionscheck] Antwort nicht ok:", r.status, await r.text().catch(() => "")); return null; }
-        return r.json();
-      })
-      .catch((e) => { console.error("[Versionscheck] Fehler beim Abruf:", e); return null; });
-    console.debug("[Versionscheck] Daten (refresh):", d);
-    if (d) console.info(`[Versionscheck] installiert=${d.current} · neueste=${d.latest || "—"} · Kanal=${d.channel} · Update=${d.update_available}`);
-    setVersionInfo(d);
-    setVersionLoading(false);
-  };
 
   const changeChannel = async (ch) => {
     if (ch === versionInfo?.channel) return;
@@ -197,7 +173,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
           <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 10 }}>
             {t("profile.gradeScaleHint")}
           </p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12, padding: 12, background: "var(--bg2)", border: "1px solid var(--border)", borderRadius: 12 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
             {[1, 2, 3, 4, 5].map((g) => (
               <div key={g} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 8px", background: "var(--card)", borderRadius: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{g}</span>
@@ -258,10 +234,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
           )}
 
           <div style={{ padding: 24, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{t("profile.version")}</div>
-              <button onClick={refreshVersion} disabled={versionLoading} style={{ marginLeft: "auto", fontSize: 12.5, fontWeight: 600, color: "var(--accent)", background: "none", border: "none", cursor: versionLoading ? "default" : "pointer", opacity: versionLoading ? 0.5 : 1 }}>{t("profile.recheck")}</button>
-            </div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("profile.version")}</div>
             {versionLoading ? (
               <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text3)" }}>
                 <Spinner /> {t("profile.checking")}
