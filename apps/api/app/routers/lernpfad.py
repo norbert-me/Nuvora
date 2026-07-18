@@ -72,7 +72,10 @@ class ExerciseIn(BaseModel):
     quelle_detail: str = ""
     lrs: bool = False
     lrs_text: str = ""
-    foerderschwerpunkte: Optional[dict] = None
+    # Liste von Foerderschwerpunkt-Kuerzeln (Checkboxen im Frontend). War
+    # faelschlich als dict typisiert — dadurch schlug jeder Aufgaben-POST mit
+    # ausgewaehlten Schwerpunkten mit 422 fehl und nichts wurde gespeichert.
+    foerderschwerpunkte: Optional[list] = None
     latex: str = ""
 
     @field_validator("unteraufgaben")

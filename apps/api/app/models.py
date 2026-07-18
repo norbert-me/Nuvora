@@ -288,7 +288,7 @@ class Exercise(Base):
 
     lrs: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     lrs_text: Mapped[str] = mapped_column(Text, default="", server_default="")
-    foerderschwerpunkte: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    foerderschwerpunkte: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     latex: Mapped[str] = mapped_column(Text, default="", server_default="")
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
