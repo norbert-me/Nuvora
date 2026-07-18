@@ -688,6 +688,7 @@ export default {
   "karten.withdraw": "Withdraw",
   "karten.noRolledOut": "No deck rolled out yet. Roll out a deck and progress appears here.",
   "karten.classMaturity": "Class maturity",
+  "karten.progress": "Progress",
   "karten.maturity": "Maturity",
   "karten.lastLearned": "Last learned",
   "karten.thisWeek": "Learned this week",

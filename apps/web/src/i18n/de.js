@@ -688,6 +688,7 @@ export default {
   "karten.withdraw": "Zurückziehen",
   "karten.noRolledOut": "Noch kein Stapel ausgerollt. Rolle einen Stapel aus, dann erscheint hier der Fortschritt.",
   "karten.classMaturity": "Reifegrad der Klasse",
+  "karten.progress": "Fortschritt",
   "karten.maturity": "Reifegrad",
   "karten.lastLearned": "Zuletzt gelernt",
   "karten.thisWeek": "Diese Woche gelernt",

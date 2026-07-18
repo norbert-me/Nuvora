@@ -96,12 +96,6 @@ export default function Karten() {
         const total = progress[0]?.total || 0;
         // Klassen-Reifegrad zeigt nur aktiv gelernte Karten — "Neu" (noch nicht
         // angefasst) bleibt aussen vor, sonst spiegelt der Balken vor allem
-        // Unbearbeitetes.
-        const REIFE_AKTIV = REIFE.filter(([k]) => k !== "neu");
-        const classHist = progress.reduce((acc, p) => {
-          REIFE_AKTIV.forEach(([k]) => { acc[k] = (acc[k] || 0) + (p.hist?.[k] || 0); });
-          return acc;
-        }, {});
         // Wochenansicht: wer hat diese Woche (ab Montag) gelernt, wer noch nie.
         const wochStart = (() => { const d = new Date(); const wd = (d.getDay() + 6) % 7; d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - wd); return d.getTime(); })();
         const nStud = progress.length;
@@ -113,18 +107,10 @@ export default function Karten() {
               <p style={{ fontSize: 13.5, color: "var(--text3)", marginBottom: 16 }}>{t("karten.noRolledOut")}</p>
             ) : (
               <div style={{ padding: 16, border: "1px solid var(--border)", borderRadius: 12, marginBottom: 16, background: "var(--card)" }}>
-                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>{t("karten.classMaturity")}</div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>{t("karten.progress")}</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 12.5, padding: "4px 10px", borderRadius: 980, background: "rgba(10,125,62,0.12)", color: "#0a7d3e", fontWeight: 600 }}>{t("karten.thisWeek")}: {dieseWoche}/{nStud}</span>
                   {nieGelernt > 0 && <span style={{ fontSize: 12.5, padding: "4px 10px", borderRadius: 980, background: "var(--bg2)", color: "var(--text3)", fontWeight: 600 }}>{t("karten.neverLearned")}: {nieGelernt}</span>}
-                </div>
-                <ReifeBar hist={classHist} height={14} />
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", marginTop: 10 }}>
-                  {REIFE_AKTIV.map(([k, label, color]) => (
-                    <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--text3)" }}>
-                      <span style={{ width: 10, height: 10, borderRadius: 3, background: color }} />{label} {classHist[k] || 0}
-                    </span>
-                  ))}
                 </div>
               </div>
             )}

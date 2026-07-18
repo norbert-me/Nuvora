@@ -688,6 +688,7 @@ export default {
   "karten.withdraw": "Retirar",
   "karten.noRolledOut": "Aún no hay ninguna baraja distribuida. Distribuye una y el progreso aparecerá aquí.",
   "karten.classMaturity": "Madurez de la clase",
+  "karten.progress": "Progreso",
   "karten.maturity": "Madurez",
   "karten.lastLearned": "Último repaso",
   "karten.thisWeek": "Aprendido esta semana",
