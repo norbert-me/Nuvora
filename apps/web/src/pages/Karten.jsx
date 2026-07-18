@@ -52,7 +52,7 @@ export default function Karten() {
   }
 
   return (
-    <div style={{ maxWidth: 860 }}>
+    <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
         <h1 style={pageTitle}>{t("karten.title")}</h1>
         <select value={classId ?? ""} onChange={(e) => { setClassId(Number(e.target.value)); setView("cards"); setTokens(null); }}

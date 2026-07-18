@@ -163,7 +163,7 @@ export default function Noten() {
   const cls = classes.find((c) => c.id === classId);
 
   return (
-    <div style={{ maxWidth: 1200 }}>
+    <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
         <h1 style={pageTitle}>{t("noten.title")}</h1>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>

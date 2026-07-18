@@ -101,7 +101,6 @@ const getModuleNavItems = (t, location) => {
 
   if (area === "cardvote") {
     return [
-      { to: "/classes", label: t("nav.classes") },
       { to: `${CV}/questions`, label: t("nav.questions") },
       { to: `${CV}/session`, label: t("nav.session") },
       { to: `${CV}/tests`, label: t("nav.tests") },
@@ -546,8 +545,20 @@ const footerSep = { color: "var(--text3)" };
 
 function ContentWrapper({ children }) {
   const location = useLocation();
-  const isSession = location.pathname.startsWith("/session") || location.pathname.startsWith("/cardvote/session");
-  if (isSession) return <div style={{ padding: "24px 16px 64px" }}>{children}</div>;
+  const p = location.pathname;
+  const isSession = p.startsWith("/session") || p.startsWith("/cardvote/session");
+  // Werkzeugseiten (breite Tabellen, Auswertungen) nutzen die volle Breite.
+  // Nur Text-/Formularseiten bleiben lesefreundlich zentriert.
+  const toolFull = ["/cardvote", "/noten", "/karten", "/classes", "/topics", "/planung", "/lernpfad", "/code-detektiv", "/modules"]
+    .some((t) => p.startsWith(t));
+  if (isSession || toolFull) {
+    return (
+      <>
+        <style>{`@media (max-width: 640px) { .content-full { padding: 16px 12px 64px !important; } }`}</style>
+        <div className="content-full" style={{ padding: "24px 24px 64px" }}>{children}</div>
+      </>
+    );
+  }
   return (
     <>
       <style>{`@media (max-width: 640px) { .content-wrap { padding: 16px 12px 64px !important; } }`}</style>

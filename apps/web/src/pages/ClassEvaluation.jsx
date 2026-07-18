@@ -47,12 +47,18 @@ export default function ClassEvaluation() {
 
   useEffect(() => {
     const timer = setTimeout(() => { if (!data) setLoadError(true); }, 15000);
-    fetch(`${API}/classes/${id}/evaluation`).then((r) => r.json()).then((d) => { setData(d); clearTimeout(timer); }).catch(() => setLoadError(true));
+    fetch(`${API}/classes/${id}/evaluation`)
+      .then(async (r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+      .then((d) => { setData(d); clearTimeout(timer); })
+      .catch(() => setLoadError(true));
     return () => clearTimeout(timer);
   }, [id]);
 
-  if (loadError && !data) return <p style={{ color: "#d1350f" }}>Verbindungsfehler — Server nicht erreichbar.</p>;
+  if (loadError && !data) return <p style={{ color: "#d1350f", padding: 20 }}>Auswertung konnte nicht geladen werden.</p>;
   if (!data) return <p style={{ color: "var(--text3)", padding: 20 }}>Laden…</p>;
+  // Fehler-Payload (z. B. {detail: …}) statt Auswertung: nicht am fehlenden
+  // Feld abstürzen, sondern melden.
+  if (!Array.isArray(data.tests)) return <p style={{ color: "#d1350f", padding: 20 }}>Auswertung konnte nicht geladen werden.</p>;
 
   const { class_name, students, tests } = data;
 

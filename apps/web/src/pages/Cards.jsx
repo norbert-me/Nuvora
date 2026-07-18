@@ -36,7 +36,7 @@ export default function Cards() {
   };
 
   return (
-    <div style={{ maxWidth: 760 }}>
+    <div>
       <h1 style={pageTitle}>{t("cards.title")}</h1>
       <p style={{ color: "var(--text2)", marginBottom: 20, fontSize: 14 }}>
         {t("cards.intro").split("{{link}}")[0]}<Link to="/classes" style={{ color: "var(--accent)" }}>{t("nav.classes")}</Link>{t("cards.intro").split("{{link}}")[1]}
