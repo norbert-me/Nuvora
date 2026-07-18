@@ -33,6 +33,8 @@ class User(Base):
     # Wurde das Konto schon einmal ans Modulregister angeschlossen? Verhindert,
     # dass der Backfill beim Start ein abgeschaltetes Modul wieder aktiviert.
     modules_initialized: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Modul Kalender: Stunden pro Tag im hinterlegten Stundenplan (Einstellung).
+    timetable_periods: Mapped[int] = mapped_column(Integer, default=6, server_default="6")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     folders: Mapped[list["Folder"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
@@ -462,6 +464,22 @@ class CalendarEntry(Base):
     notes: Mapped[str] = mapped_column(Text, default="", server_default="")
     topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class TimetableSlot(Base):
+    """Modul Kalender: eine Stunde im wiederkehrenden Wochen-Stundenplan.
+    Keyed ueber Wochentag (0=Mo .. 6=So) + Stundennummer. Klasse und Thema
+    kommen aus dem Kern (Thema ON DELETE SET NULL — Regel 3); title ist freies
+    Eintragen, wenn keine Klasse/kein Thema passt."""
+    __tablename__ = "timetable_slots"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    weekday: Mapped[int] = mapped_column(Integer)  # 0 = Montag
+    period: Mapped[int] = mapped_column(Integer)    # 1-basiert
+    class_id: Mapped[Optional[int]] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), nullable=True, index=True)
+    title: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
 
 
 class QuartalDivider(Base):

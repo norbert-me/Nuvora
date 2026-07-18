@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import CalendarEntry, SchoolClass, Topic, User
+from ..models import CalendarEntry, SchoolClass, TimetableSlot, Topic, User
 from .auth import get_current_user, rate_limit
 from .modules import is_active
 
@@ -102,4 +102,78 @@ async def delete_entry(entry_id: int, user: User = Depends(require_module), db: 
     if not e or e.owner_id != user.id:
         raise HTTPException(404, "Eintrag nicht gefunden")
     await db.delete(e)
+    await db.commit()
+
+
+# ─── Stundenplan (wiederkehrendes Wochenraster, Vorlage fuer Termine) ───
+
+class SlotIn(BaseModel):
+    weekday: int
+    period: int
+    class_id: Optional[int] = None
+    title: str = ""
+    topic_id: Optional[int] = None
+
+
+class SlotOut(SlotIn):
+    id: int
+    model_config = {"from_attributes": True}
+
+
+class Timetable(BaseModel):
+    periods: int
+    slots: List[SlotOut]
+
+
+class PeriodsIn(BaseModel):
+    periods: int
+
+
+@router.get("/timetable", response_model=Timetable)
+async def get_timetable(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    rows = (await db.execute(
+        select(TimetableSlot).where(TimetableSlot.owner_id == user.id)
+        .order_by(TimetableSlot.weekday, TimetableSlot.period)
+    )).scalars().all()
+    return {"periods": user.timetable_periods or 6, "slots": rows}
+
+
+@router.put("/timetable/periods", response_model=Timetable)
+async def set_periods(body: PeriodsIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    if not 1 <= body.periods <= 16:
+        raise HTTPException(400, "Stundenzahl muss zwischen 1 und 16 liegen")
+    user.timetable_periods = body.periods
+    await db.commit()
+    return await get_timetable(user, db)
+
+
+@router.put("/timetable/slot", response_model=SlotOut)
+async def upsert_slot(body: SlotIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Setzt die Stunde an (weekday, period) — legt an oder aktualisiert."""
+    if not 0 <= body.weekday <= 6 or body.period < 1:
+        raise HTTPException(400, "Ungueltige Stunde")
+    await _check_class(db, user, body.class_id)
+    await _check_topic(db, user, body.topic_id)
+    s = (await db.execute(select(TimetableSlot).where(
+        TimetableSlot.owner_id == user.id,
+        TimetableSlot.weekday == body.weekday,
+        TimetableSlot.period == body.period,
+    ))).scalar_one_or_none()
+    if s is None:
+        s = TimetableSlot(owner_id=user.id, **body.model_dump())
+        db.add(s)
+    else:
+        for k, v in body.model_dump().items():
+            setattr(s, k, v)
+    await db.commit()
+    await db.refresh(s)
+    return s
+
+
+@router.delete("/timetable/slot/{slot_id}", status_code=204)
+async def delete_slot(slot_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    s = await db.get(TimetableSlot, slot_id)
+    if not s or s.owner_id != user.id:
+        raise HTTPException(404, "Stunde nicht gefunden")
+    await db.delete(s)
     await db.commit()
