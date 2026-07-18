@@ -2684,7 +2684,7 @@
             return;
         }
         container.innerHTML = list.map((ll, i) => `
-            <div class="list-row" data-ll-id="${ll._id}" data-action="open" title="Öffnen zum Bearbeiten">
+            <div class="list-row">
                 <div>
                     ${esc(ll.thema || '(ohne Thema)')}${ll.unterthema ? ' <span style="color:var(--text-muted)">&gt; ' + esc(ll.unterthema) + '</span>' : ''}
                     <span style="color:var(--text-muted)">– ${ll.schueler.length} Schüler</span>
