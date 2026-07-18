@@ -55,7 +55,7 @@ export default function ClassEvaluation() {
   }, [id]);
 
   if (loadError && !data) return <p style={{ color: "#d1350f", padding: 20 }}>Auswertung konnte nicht geladen werden.</p>;
-  if (!data) return <p style={{ color: "var(--text3)", padding: 20 }}>Laden…</p>;
+  if (!data) return <div style={{ minHeight: "70vh" }} />;
   // Fehler-Payload (z. B. {detail: …}) statt Auswertung: nicht am fehlenden
   // Feld abstürzen, sondern melden.
   if (!Array.isArray(data.tests)) return <p style={{ color: "#d1350f", padding: 20 }}>Auswertung konnte nicht geladen werden.</p>;

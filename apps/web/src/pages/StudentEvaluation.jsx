@@ -12,7 +12,7 @@ export default function StudentEvaluation() {
     fetch(`${API}/classes/${classId}/evaluation`).then((r) => r.json()).then(setData);
   }, [classId]);
 
-  if (!data) return <p>Laden...</p>;
+  if (!data) return <div style={{ minHeight: "70vh" }} />;
 
   const { class_name, students, tests } = data;
   const student = students.find((s) => String(s.card_id) === cardId);

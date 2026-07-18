@@ -103,7 +103,7 @@ function Boxplot({ values, max, label }) {
           background: "rgba(10,132,255,0.15)", border: "2px solid var(--accent)", borderRadius: 6,
         }} />
         {/* Median line */}
-        <div style={{ position: "absolute", top: 6, left: `${pct(med)}%`, width: 3, height: 36, background: "var(--accent)", borderRadius: 2 }} />
+        <div style={{ position: "absolute", top: 6, left: `${pct(med)}%`, width: 3, height: 36, background: "var(--accent)", borderRadius: 2, transform: "translateX(-1.5px)" }} />
         {/* Outliers */}
         {outliers.map((v, i) => (
           <div key={i} style={{
@@ -112,12 +112,12 @@ function Boxplot({ values, max, label }) {
           }} />
         ))}
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", margin: "4px 20px 0", fontSize: 11, color: "var(--text3)" }}>
-        <span>Min: {fmt(sorted[0])}</span>
-        <span>Q1: {fmt(q1)}</span>
-        <span>Med: {fmt(med)}</span>
-        <span>Q3: {fmt(q3)}</span>
-        <span>Max: {fmt(sorted[sorted.length - 1])}</span>
+      {/* Beschriftungen an ihrer echten Position, nicht gleichmaessig verteilt —
+          sonst stehen sie nicht unter ihren Markierungen. */}
+      <div style={{ position: "relative", height: 15, margin: "4px 20px 0", fontSize: 11, color: "var(--text3)" }}>
+        {[["Min", sorted[0]], ["Q1", q1], ["Med", med], ["Q3", q3], ["Max", sorted[sorted.length - 1]]].map(([lbl, v], i) => (
+          <span key={i} style={{ position: "absolute", left: `${pct(v)}%`, transform: "translateX(-50%)", whiteSpace: "nowrap" }}>{lbl}: {fmt(v)}</span>
+        ))}
       </div>
     </div>
   );
@@ -203,7 +203,7 @@ export default function Evaluation() {
   };
 
   if (loadError && !data) return <p style={{ color: "#d1350f" }}>Verbindungsfehler — Server nicht erreichbar.</p>;
-  if (!data) return <p>Laden…</p>;
+  if (!data) return <div style={{ maxWidth: 1000, margin: "0 auto", minHeight: "70vh" }} />;
 
   const { questions: rawQuestions = [], students: rawStudents = [], session_name } = data;
 
