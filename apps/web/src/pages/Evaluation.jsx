@@ -653,7 +653,7 @@ const gradeDistribution = (() => {
       </div>
 
       {showScale && (
-        <div style={{ padding: 14, background: "var(--bg3)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 12 }}>
+        <div style={{ padding: 14, background: "var(--card)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 12 }}>
           <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 10 }}>Mindestprozent für jede Note. Wird pro Test gespeichert.</p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             {[1, 2, 3, 4, 5].map((g) => (
@@ -664,7 +664,7 @@ const gradeDistribution = (() => {
                   type="number" min="0" max="100" step="1"
                   value={gradeScale[g]}
                   onChange={(e) => updateScale(g, e.target.value)}
-                  style={{ width: 48, padding: "4px 4px", fontSize: 13, border: "1px solid var(--border2)", borderRadius: 6, textAlign: "center" }}
+                  style={{ width: 48, padding: "4px 4px", fontSize: 13, border: "1px solid var(--border2)", borderRadius: 6, textAlign: "center", background: "var(--bg)", color: "var(--text)" }}
                 />
                 <span style={{ fontSize: 11, color: "var(--text3)" }}>%</span>
               </div>
@@ -675,7 +675,7 @@ const gradeDistribution = (() => {
       )}
 
       {showWeights && (
-        <div style={{ padding: 14, background: "var(--bg3)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 12 }}>
+        <div style={{ padding: 14, background: "var(--card)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 12 }}>
           <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 10 }}>Punkte pro richtige Antwort. Standard = 1.</p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {questions.map((q, i) => (
@@ -685,7 +685,7 @@ const gradeDistribution = (() => {
                   type="number" min="0" max="10" step="0.5"
                   value={getWeight(q.id)}
                   onChange={(e) => updateWeight(q.id, e.target.value)}
-                  style={{ width: 52, padding: "4px 6px", fontSize: 13, border: "1px solid var(--border2)", borderRadius: 6, textAlign: "center" }}
+                  style={{ width: 52, padding: "4px 6px", fontSize: 13, border: "1px solid var(--border2)", borderRadius: 6, textAlign: "center", background: "var(--bg)", color: "var(--text)" }}
                 />
               </div>
             ))}
