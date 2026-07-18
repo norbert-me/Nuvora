@@ -687,7 +687,7 @@ function AppRoutes({ user, setUser, logout }) {
           <span style={footerSep}>·</span>
           <Link to="/legal" style={footerLink}>{t("footer.legal")}</Link>
           <span style={footerSep}>·</span>
-          <a href="https://github.com/norbert-me/CardVote" target="_blank" rel="noopener noreferrer" style={footerLink}>GitHub</a>
+          <a href="https://github.com/norbert-me/Nuvora" target="_blank" rel="noopener noreferrer" style={footerLink}>GitHub</a>
         </span>
       </footer>
     </>
