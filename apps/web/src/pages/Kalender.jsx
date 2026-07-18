@@ -237,7 +237,7 @@ function DayView({ day, byDay, slotsFor, className, classColor, topicName, onAdd
   );
 }
 
-function TimetableView({ tt, className, topicName, onEdit, onPeriods, onTimes, t }) {
+function TimetableView({ tt, className, classColor, topicName, onEdit, onPeriods, onTimes, t }) {
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri")];
   const periods = Array.from({ length: tt.periods }, (_, i) => i + 1);
   const slot = (wd, p) => tt.slots.find((s) => s.weekday === wd && s.period === p);
