@@ -658,6 +658,8 @@ export default {
   "kalender.day": "Día",
   "kalender.start": "Inicio",
   "kalender.end": "Fin",
+  "kalender.addPeriod": "Añadir hora",
+  "kalender.removePeriod": "Quitar última hora",
   "kalender.today": "Hoy",
   "kalender.add": "Entrada",
   "kalender.empty": "Sin entrada este día.",

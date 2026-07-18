@@ -237,42 +237,34 @@ function TimetableView({ tt, className, topicName, onEdit, onPeriods, onTimes, t
     arr[i] = { ...arr[i], [f]: val };
     onTimes(arr);
   };
-  const timeInput = { width: "100%", border: "1px solid var(--border2)", borderRadius: 6, fontSize: 11, padding: "2px 3px", background: "var(--bg)", color: "var(--text)", marginTop: 2 };
+  const timeInput = { width: "100%", boxSizing: "border-box", border: "1px solid var(--border2)", borderRadius: 6, fontSize: 12, padding: "3px 4px", background: "var(--bg)", color: "var(--text)", marginTop: 2 };
   const tdBase = { border: "1px solid var(--border)", padding: 0, verticalAlign: "top", background: "var(--card)" };
   return (
     <div>
       <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 12px", maxWidth: 620 }}>{t("kalender.timetableHint")}</p>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-        <label style={{ fontSize: 13, color: "var(--text2)" }}>{t("kalender.periods")}</label>
-        <input type="number" min={1} max={16} value={tt.periods}
-          onChange={(e) => { const n = Number(e.target.value); if (n >= 1 && n <= 16) onPeriods(n); }}
-          style={{ width: 64, padding: 7, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)" }} />
-      </div>
       <div style={{ overflowX: "auto" }}>
-        <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed", minWidth: 600 }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed", minWidth: 640 }}>
           <thead><tr>
-            <th style={{ width: 44, padding: 6, fontSize: 12, color: "var(--text3)" }}></th>
+            <th style={{ width: 96, padding: 6, fontSize: 12, color: "var(--text3)" }}></th>
             {wdays.map((w) => <th key={w} style={{ padding: 6, fontSize: 12, color: "var(--text3)" }}>{w}</th>)}
           </tr></thead>
           <tbody>
             {periods.map((p) => (
               <tr key={p}>
-                <td style={{ ...tdBase, textAlign: "center", padding: 4, background: "transparent", border: "none", width: 70 }}>
+                <td style={{ ...tdBase, textAlign: "center", padding: 4, background: "transparent", border: "none", width: 96 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>{p}.</div>
                   <input type="time" defaultValue={timeVal(p - 1, "start")} onBlur={(e) => commitTime(p - 1, "start", e.target.value)} style={timeInput} title={t("kalender.start")} />
                   <input type="time" defaultValue={timeVal(p - 1, "end")} onBlur={(e) => commitTime(p - 1, "end", e.target.value)} style={timeInput} title={t("kalender.end")} />
                 </td>
                 {wdays.map((_, wd) => {
                   const s = slot(wd, p);
-                  const label = s ? (className(s.class_id) || s.title || topicName(s.topic_id)) : "";
-                  const sub = s && className(s.class_id) ? (s.title || topicName(s.topic_id)) : "";
+                  const label = s ? className(s.class_id) : "";
                   return (
                     <td key={wd} style={tdBase}>
                       <button onClick={() => onEdit(s ? { ...s } : { weekday: wd, period: p })}
-                        style={{ display: "block", width: "100%", minHeight: 48, textAlign: "left", padding: "6px 8px", border: "none", cursor: "pointer",
+                        style={{ display: "block", width: "100%", minHeight: 44, textAlign: "left", padding: "6px 8px", border: "none", cursor: "pointer",
                           background: s ? "var(--accent-bg, rgba(10,132,255,0.12))" : "transparent", color: s ? "var(--accent)" : "var(--text3)" }}>
-                        {s ? <><div style={{ fontSize: 12.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label || "—"}</div>
-                          {sub && <div style={{ fontSize: 11, color: "var(--text3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</div>}</>
+                        {s ? <div style={{ fontSize: 12.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label || "—"}</div>
                           : <span style={{ fontSize: 12 }}>+</span>}
                       </button>
                     </td>
@@ -280,6 +272,15 @@ function TimetableView({ tt, className, topicName, onEdit, onPeriods, onTimes, t
                 })}
               </tr>
             ))}
+            <tr>
+              <td style={{ padding: 6, border: "none", textAlign: "center" }}>
+                <div style={{ display: "inline-flex", gap: 4 }}>
+                  {tt.periods > 1 && <button onClick={() => onPeriods(tt.periods - 1)} title={t("kalender.removePeriod")} style={{ ...btnSecondary, padding: "3px 9px", fontSize: 14 }}>−</button>}
+                  <button onClick={() => onPeriods(tt.periods + 1)} title={t("kalender.addPeriod")} style={{ ...btnSecondary, padding: "3px 9px", fontSize: 14 }}>+</button>
+                </div>
+              </td>
+              {wdays.map((_, wd) => <td key={wd} style={{ border: "none" }} />)}
+            </tr>
           </tbody>
         </table>
       </div>
@@ -287,14 +288,11 @@ function TimetableView({ tt, className, topicName, onEdit, onPeriods, onTimes, t
   );
 }
 
-function SlotModal({ slot, classes, topics, onSave, onDelete, onClose, t }) {
-  const [title, setTitle] = useState(slot.title || "");
+function SlotModal({ slot, classes, onSave, onDelete, onClose, t }) {
   const [classId, setClassId] = useState(slot.class_id || "");
-  const [topicId, setTopicId] = useState(slot.topic_id || "");
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
   const fld = { width: "100%", padding: 9, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
-  const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 200 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--card)", borderRadius: 16, maxWidth: 440, width: "100%", padding: 22, border: "1px solid var(--border)", maxHeight: "85vh", overflow: "auto" }}>
@@ -305,15 +303,8 @@ function SlotModal({ slot, classes, topics, onSave, onDelete, onClose, t }) {
           <option value="">– {t("kalender.noClass")} –</option>
           {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <div style={lbl}>{t("kalender.topic")}</div>
-        <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={fld}>
-          <option value="">– {t("kalender.noTopic")} –</option>
-          {topics.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
-        </select>
-        <div style={lbl}>{t("kalender.entryTitle")}</div>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("kalender.entryTitlePlaceholder")} style={fld} />
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
-          <button onClick={() => onSave({ weekday: slot.weekday, period: slot.period, title, class_id: classId ? Number(classId) : null, topic_id: topicId ? Number(topicId) : null })} style={btnPrimary}>{t("common.save")}</button>
+          <button onClick={() => onSave({ weekday: slot.weekday, period: slot.period, title: "", class_id: classId ? Number(classId) : null, topic_id: null })} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
           {slot.id && <button onClick={() => onDelete(slot.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
         </div>
