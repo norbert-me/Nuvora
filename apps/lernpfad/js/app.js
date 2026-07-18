@@ -266,7 +266,7 @@
     function nextAufgabeId() {
         const used = new Set();
         aufgaben.forEach(a => {
-            const m = (a.id || '').match(/^#(\d+)$/);
+            const m = String(a.id || '').match(/^#(\d+)$/);
             if (m) used.add(parseInt(m[1], 10));
         });
         let n = 1;
@@ -436,7 +436,7 @@
 
     if (aufgaben.length) {
         const maxNum = aufgaben.reduce((max, a) => {
-            const m = a.id.match(/^#(\d+)$/);
+            const m = String(a.id || '').match(/^#(\d+)$/);
             return m ? Math.max(max, parseInt(m[1])) : max;
         }, 0);
         const stored = loadNum(STORAGE_KEYS.idCounter);
