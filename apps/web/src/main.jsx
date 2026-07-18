@@ -127,7 +127,6 @@ const getModuleNavItems = (t, location) => {
     return [
       { to: `${CD}?view=admin`, label: t("cd.create"), active: cur === "admin" },
       { to: `${CD}?view=join`, label: t("cd.join"), active: cur === "join" },
-      { to: `${CD}?view=solo`, label: t("cd.solo"), active: cur === "solo" },
     ];
   }
   if (area === "karten") {

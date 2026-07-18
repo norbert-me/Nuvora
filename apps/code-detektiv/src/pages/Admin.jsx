@@ -496,11 +496,7 @@ export default function Admin() {
 
   return (
     <div onPointerMove={e => { pointerRef.current = { x: e.clientX, y: e.clientY }; }}>
-      <div className="app-header">
-        <h1>Admin</h1>
-        <button className="btn btn-outline" onClick={() => navigate('/')}>Zurück</button>
-      </div>
-
+      {/* Kein eigener Header/Zurueck mehr: laeuft eingebettet in Nuvoras Navbar. */}
       <div className="page-container" style={{ maxWidth: '100%' }}>
         {activeSessions.length > 0 && (
           <div style={{ marginBottom: 32 }}>
@@ -560,7 +556,7 @@ export default function Admin() {
         {/* Puzzle Editor */}
         <div style={{ marginBottom: 32 }}>
           <h2 style={{ marginBottom: 16 }}>
-            {editingPuzzleId ? 'Rätsel bearbeiten' : 'Neues Rätsel erstellen'}
+            {editingPuzzleId && 'Rätsel bearbeiten'}
             {editingPuzzleId && (
               <button className="btn btn-outline" onClick={cancelEdit} style={{ marginLeft: 12, fontSize: 12 }}>Abbrechen</button>
             )}
