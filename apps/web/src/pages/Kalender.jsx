@@ -126,7 +126,7 @@ export default function Kalender() {
       </div>
       {view !== "timetable" && <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: "var(--text)" }}>{title}</div>}
 
-      {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} t={t} />}
+      {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} className={className} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} t={t} />}
       {view === "week" && <WeekView range={range} byDay={byDay} slotsFor={slotsFor} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
       {view === "day" && <DayView day={cursor} byDay={byDay} slotsFor={slotsFor} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
       {view === "timetable" && <TimetableView tt={tt} className={className} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
@@ -142,8 +142,12 @@ const chip = { display: "block", width: "100%", textAlign: "left", fontSize: 11.
 // Vorlage aus dem Stundenplan: gestrichelt, gedaempft — anklicken macht daraus einen Termin.
 const ghost = { ...chip, background: "transparent", color: "var(--text3)", border: "1px dashed var(--border2)" };
 
-function SlotGhosts({ list, className, topicName, onSlot, day, t }) {
-  return list.map((s) => {
+function SlotGhosts({ list, entries, className, topicName, onSlot, day, t }) {
+  // Vorlagen ausblenden, sobald an dem Tag schon ein Eintrag dieser Klasse
+  // existiert — der wird dann als Chip gezeigt und dort bearbeitet, statt
+  // dass ein Klick auf die Geister-Vorlage einen zweiten Eintrag anlegt.
+  const belegt = new Set((entries || []).map((e) => e.class_id || 0));
+  return list.filter((s) => !belegt.has(s.class_id || 0)).map((s) => {
     const label = [s.period + ". " + t("kalender.period"), className(s.class_id) || s.title || topicName(s.topic_id)].filter(Boolean).join(" · ");
     return (
       <button key={s.id} onClick={() => onSlot(day, s)} style={ghost} title={label + " — " + t("kalender.fromTimetable")}>{label}</button>
@@ -151,20 +155,21 @@ function SlotGhosts({ list, className, topicName, onSlot, day, t }) {
   });
 }
 
-function EntryChips({ list, topicName, onOpen, classColor }) {
+function EntryChips({ list, className, topicName, onOpen, classColor }) {
   return list.map((e) => {
     const col = e.class_id && classColor ? classColor(e.class_id) : null;
+    const label = e.title || topicName(e.topic_id) || (className && className(e.class_id)) || "—";
     return (
       <button key={e.id} onClick={() => onOpen({ ...e, date: new Date(e.date) })}
         style={{ ...chip, ...(col ? { background: col + "22", color: col, borderLeft: `3px solid ${col}` } : {}) }}
-        title={e.title || topicName(e.topic_id)}>
-        {e.title || topicName(e.topic_id) || "—"}
+        title={label}>
+        {label}
       </button>
     );
   });
 }
 
-function MonthGrid({ range, cursor, byDay, topicName, classColor, onAdd, onOpen, t }) {
+function MonthGrid({ range, cursor, byDay, className, topicName, classColor, onAdd, onOpen, t }) {
   const days = [];
   for (let d = new Date(range[0]); d <= range[1]; d = addDays(d, 1)) days.push(new Date(d));
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
@@ -184,7 +189,7 @@ function MonthGrid({ range, cursor, byDay, topicName, classColor, onAdd, onOpen,
                       <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>{d.getDate()}</span>
                       <button onClick={() => onAdd(d)} className="icon-btn" style={{ ...iconBtn, padding: 0 }} title={t("kalender.add")}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>
                     </div>
-                    <EntryChips list={byDay(d)} topicName={topicName} onOpen={onOpen} classColor={classColor} />
+                    <EntryChips list={byDay(d)} className={className} topicName={topicName} onOpen={onOpen} classColor={classColor} />
                   </td>
                 );
               })}
@@ -207,8 +212,8 @@ function WeekView({ range, byDay, slotsFor, className, classColor, topicName, on
             <span style={{ fontSize: 12, fontWeight: 600 }}>{d.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}</span>
             <button onClick={() => onAdd(d)} className="icon-btn" style={{ ...iconBtn, padding: 0 }}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>
           </div>
-          <SlotGhosts list={slotsFor(d)} className={className} topicName={topicName} onSlot={onSlot} day={d} t={t} />
-          <EntryChips list={byDay(d)} topicName={topicName} onOpen={onOpen} classColor={classColor} />
+          <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} topicName={topicName} onSlot={onSlot} day={d} t={t} />
+          <EntryChips list={byDay(d)} className={className} topicName={topicName} onOpen={onOpen} classColor={classColor} />
         </div>
       ))}
     </div>
@@ -223,7 +228,7 @@ function DayView({ day, byDay, slotsFor, className, classColor, topicName, onAdd
       <button onClick={() => onAdd(day)} style={{ ...btnPrimary, marginBottom: 14 }}>{t("kalender.add")}</button>
       {slots.length > 0 && (
         <div style={{ marginBottom: 14 }}>
-          <SlotGhosts list={slots} className={className} topicName={topicName} onSlot={onSlot} day={day} t={t} />
+          <SlotGhosts list={slots} entries={list} className={className} topicName={topicName} onSlot={onSlot} day={day} t={t} />
         </div>
       )}
       {list.length === 0 ? <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("kalender.empty")}</p> : list.map((e) => (
