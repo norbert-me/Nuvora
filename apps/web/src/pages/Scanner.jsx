@@ -460,7 +460,7 @@ export default function Scanner() {
 
       {/* Video — nur während des Scannens sichtbar */}
       <div style={{ position: "relative", marginBottom: 8, borderRadius: 12, overflow: "hidden", background: "#000", display: scanning ? "block" : "none" }}>
-        <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", maxHeight: "52vh", display: "block", objectFit: "contain" }} />
+        <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", maxHeight: "60vh", display: "block", objectFit: "contain" }} />
         <canvas ref={overlayRef} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none" }} />
       </div>
 

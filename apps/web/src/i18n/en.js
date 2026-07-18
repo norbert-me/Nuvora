@@ -537,6 +537,8 @@ export default {
   "noten.total": "Total",
   "noten.unweighted": "unweighted",
   "noten.noSections": "No sections yet. Create one (e.g. “Class tests”, “Participation”) and give it a weight.",
+  "noten.collapse": "Collapse section",
+  "noten.expand": "Expand section",
   "noten.year": "Year",
   "noten.yearGrade": "Year grade",
   "noten.termGrade": "Term grade",

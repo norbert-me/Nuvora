@@ -537,6 +537,8 @@ export default {
   "noten.total": "Total",
   "noten.unweighted": "sin ponderar",
   "noten.noSections": "Aún no hay secciones. Crea una (p. ej. «Exámenes», «Participación») y dale un peso.",
+  "noten.collapse": "Contraer área",
+  "noten.expand": "Expandir área",
   "noten.year": "Año",
   "noten.yearGrade": "Nota anual",
   "noten.termGrade": "Nota sem.",

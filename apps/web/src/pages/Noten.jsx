@@ -37,6 +37,13 @@ export default function Noten() {
   const [infoFuer, setInfoFuer] = useState(null);
   const [term, setTerm] = useState("1");
   const [yearData, setYearData] = useState({ sections: [], rows: [] });
+  const [collapsed, setCollapsed] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem("noten_collapsed") || "[]")); } catch { return new Set(); } });
+  const toggleCollapse = (secId) => setCollapsed((prev) => {
+    const n = new Set(prev);
+    n.has(secId) ? n.delete(secId) : n.add(secId);
+    localStorage.setItem("noten_collapsed", JSON.stringify([...n]));
+    return n;
+  });
   const [dragId, setDragId] = useState(null);
   // Vorschau beim Ziehen: auf welchem Abschnitt, und links oder rechts einfuegen.
   const [dragOver, setDragOver] = useState(null); // { id, side: "left"|"right" }
@@ -228,7 +235,8 @@ export default function Noten() {
               <tr>
                 <th style={{ ...th, ...stickyL, minWidth: 150 }}></th>
                 {sections.map((sec) => {
-                  const cols = (sec.categories || []).length || 1;
+                  const isCol = collapsed.has(sec.id);
+                  const cols = isCol ? 0 : (sec.categories || []).length || 1;
                   const over = dragId && dragOver && dragOver.id === sec.id;
                   return (
                     <th key={sec.id} colSpan={cols + 1}
@@ -242,6 +250,9 @@ export default function Noten() {
                         cursor: "grab", opacity: dragId === sec.id ? 0.4 : 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
                         <span title={t("noten.dragHint")} style={{ display: "inline-flex", color: "var(--text3)" }}><Icon d={ICONS.grip} size={14} /></span>
+                        <button onClick={() => toggleCollapse(sec.id)} className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={isCol ? t("noten.expand") : t("noten.collapse")}>
+                          <Icon d={isCol ? ICONS.plus : ICONS.minus} size={14} />
+                        </button>
                         <span>{sec.name}</span>
                         <span style={{ color: "var(--text3)", fontWeight: 400 }}>{sec.weight} %</span>
                         <SectionMenu t={t} sec={sec}
@@ -260,10 +271,11 @@ export default function Noten() {
                 {sections.map((sec) => {
                   const cols = sec.categories || [];
                   const bereich = (
-                    <th key={`sn-${sec.id}`} style={{ ...th, borderRight: "2px solid var(--border)", fontWeight: 500, minWidth: 56 }} title={t("noten.sectionGradeHint")}>
+                    <th key={`sn-${sec.id}`} style={{ ...th, borderLeft: collapsed.has(sec.id) ? "2px solid var(--border)" : undefined, borderRight: "2px solid var(--border)", fontWeight: 500, minWidth: 56 }} title={t("noten.sectionGradeHint")}>
                       {t("noten.sectionGrade")}
                     </th>
                   );
+                  if (collapsed.has(sec.id)) return [bereich];
                   if (cols.length === 0) {
                     return [
                       <th key={`empty-${sec.id}`} style={{ ...th, borderLeft: "2px solid var(--border)", fontWeight: 400 }}>
@@ -309,7 +321,7 @@ export default function Noten() {
                   {sections.map((sec) => {
                     const cols = sec.categories || [];
                     const bereichTd = (
-                      <td key={`sn-${sec.id}`} style={{ ...td, padding: 0, borderRight: "2px solid var(--border)", background: "var(--bg2, rgba(0,0,0,0.02))" }}>
+                      <td key={`sn-${sec.id}`} style={{ ...td, padding: 0, borderLeft: collapsed.has(sec.id) ? "2px solid var(--border)" : undefined, borderRight: "2px solid var(--border)", background: "var(--bg2, rgba(0,0,0,0.02))" }}>
                         <NoteZelle t={t}
                           editing={zelle === `sec:${s.student_id}:${sec.id}`}
                           onEdit={() => setZelle(`sec:${s.student_id}:${sec.id}`)}
@@ -320,6 +332,7 @@ export default function Noten() {
                           onReset={() => overrideReset(s.student_id, sec.id)} />
                       </td>
                     );
+                    if (collapsed.has(sec.id)) return [bereichTd];
                     if (cols.length === 0) return [<td key={`e-${sec.id}`} style={{ ...td, borderLeft: "2px solid var(--border)" }}></td>, bereichTd];
                     return [
                       ...cols.map((c, i) => {

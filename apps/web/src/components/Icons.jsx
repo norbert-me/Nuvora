@@ -25,6 +25,7 @@ export const ICONS = {
   grip: ["M7 5.5h.01M7 10h.01M7 14.5h.01M13 5.5h.01M13 10h.01M13 14.5h.01"],
   close: ["M5 5l10 10M15 5L5 15"],
   plus: ["M10 4v12M4 10h12"],
+  minus: ["M4 10h12"],
 };
 
 export const iconBtn = { cursor: "pointer", padding: "6px", border: "none", background: "transparent", borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s" };
