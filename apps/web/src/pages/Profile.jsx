@@ -216,7 +216,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             <div style={{ height: 1, flex: 1, background: "var(--border2)" }} />
           </div>
 
-          {setup && (
+          {setup && !(setup.smtp && setup.site_json && setup.admin_email) && (
             <div style={{ padding: 24, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 16 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("profile.setup")}</div>
               {[["smtp", t("profile.setupSmtp")], ["site_json", t("profile.setupSite")], ["admin_email", t("profile.setupAdminMail")]].map(([k, label]) => (
