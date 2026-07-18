@@ -280,6 +280,14 @@
         return '#' + String(n).padStart(6, '0');
     }
 
+    // Anzeige-ID immer als #xxxxxx: nach dem Sync ist a.id die numerische
+    // Server-ID; die Oberflaeche zeigt sie einheitlich im #-Format.
+    function fmtId(id) {
+        if (id === null || id === undefined || id === '') return '';
+        const s = String(id);
+        return s.startsWith('#') ? s : '#' + s.replace(/\D/g, '').padStart(6, '0');
+    }
+
     // ─── State ───
     let aufgaben = load(STORAGE_KEYS.aufgaben);
     let schueler = load(STORAGE_KEYS.schueler);
@@ -770,7 +778,7 @@
             loesungBildPreview.innerHTML = '';
         }
         document.getElementById('edit-id-display').style.display = '';
-        document.getElementById('edit-id-label').textContent = a.id;
+        document.getElementById('edit-id-label').textContent = fmtId(a.id);
         document.getElementById('aufgaben-form-title').textContent = 'Aufgabe bearbeiten';
         document.getElementById('aufgabe-cancel-btn').style.display = '';
         document.getElementById('aufgabe-submit-btn').textContent = 'Änderung speichern';
@@ -919,7 +927,7 @@
             return `
             <tr class="${hasDetail ? 'task-row-clickable' : ''}" data-detail-id="${a._id}">
                 <td><input type="checkbox" class="bulk-cb" data-id="${a._id}"></td>
-                <td><strong>${esc(a.id)}</strong>${hasDetail ? ' <span class="detail-hint" title="Details">' + ICON.chevron + '</span>' : ''}</td>
+                <td><strong>${esc(fmtId(a.id))}</strong>${hasDetail ? ' <span class="detail-hint" title="Details">' + ICON.chevron + '</span>' : ''}</td>
                 <td>${esc(a.thema)}${a.unterthema ? '<br><small style="color:var(--text-muted)">' + esc(a.unterthema) + '</small>' : ''}</td>
                 <td><span class="badge badge-${katBadgeClass(kat)}">${esc(kat)}</span></td>
                 <td>${esc(a.quelle)}</td>
@@ -1649,7 +1657,7 @@
                 step.innerHTML = `
                     <span class="step-number">${stepNum}</span>
                     <div class="step-content">
-                        <span class="step-id step-id-link" title="Details anzeigen">${esc(task.id)}</span>
+                        <span class="step-id step-id-link" title="Details anzeigen">${esc(fmtId(task.id))}</span>
                         <span class="step-source">${task.quelleTyp === 'latex' && task.latex ? '' : esc(task.quelle)}</span>
                         ${tags.length ? '<div class="step-tags">' + tags.join('') + '</div>' : ''}
                         ${hasLRS && task.lrs ? '<div class="lrs-hint">Sonderaufgabe – siehe separates Blatt</div>' : ''}
@@ -1717,7 +1725,7 @@
                 const kat = getKategorie(a);
                 return `<div class="add-task-item" data-id="${a._id}">
                     <span class="badge badge-${katBadgeClass(kat)}">${esc(kat)}</span>
-                    <strong>${esc(a.id)}</strong> ${esc(a.quelle)}
+                    <strong>${esc(fmtId(a.id))}</strong> ${esc(a.quelle)}
                     ${a.operator ? ' <span class="badge badge-operator">' + esc(a.operator) + '</span>' : ''}
                 </div>`;
             }).join('') : '<p style="color:var(--text-muted)">Keine Treffer</p>';
@@ -2214,7 +2222,7 @@
         const chip = (txt, bg) => `<span style="font-size:12px;font-weight:600;padding:2px 9px;border-radius:980px;background:${bg};color:#fff">${esc(txt)}</span>`;
         const html = `
             <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
-                <strong style="font-size:18px">${esc(a.id)}</strong>
+                <strong style="font-size:18px">${esc(fmtId(a.id))}</strong>
                 ${chip(kat, '#2563eb')}
                 ${a.lrs ? chip('LRS', '#b8860b') : ''}
             </div>
@@ -2229,7 +2237,7 @@
         // Eingebettet: Nuvora rendert das Overlay ueber der ganzen Seite —
         // zentriert und ohne sichtbare iframe-Grenze. Sonst lokales Modal.
         if (window.parent !== window) {
-            window.parent.postMessage({ type: 'lernpfad:modal', title: 'Aufgabe ' + (a.id || ''), html }, window.location.origin);
+            window.parent.postMessage({ type: 'lernpfad:modal', title: 'Aufgabe ' + fmtId(a.id), html }, window.location.origin);
             return;
         }
         document.getElementById('task-detail-body').innerHTML = html;
