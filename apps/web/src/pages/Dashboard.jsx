@@ -302,7 +302,7 @@ export default function Dashboard() {
   if (loadError && folders.length === 0) return <p style={{ color: "#d1350f" }}>{t("common.connectionError")}</p>;
 
   return (
-    <div>
+    <div style={{ maxWidth: 1000, margin: "0 auto" }}>
 
       <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 16, fontSize: 14 }}>
         <span onClick={() => goToPath(-1)} style={{ cursor: "pointer", color: path.length === 0 ? "var(--text)" : "var(--accent)", fontWeight: path.length === 0 ? 600 : 400 }}>

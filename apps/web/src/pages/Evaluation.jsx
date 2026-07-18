@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useModules } from "../core/modules.js";
+import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
 import { DownloadLink, btnPrimary, btnSecondary } from "../components/Icons.jsx";
 
@@ -123,6 +124,7 @@ function Boxplot({ values, max, label }) {
 }
 
 export default function Evaluation() {
+  const { t } = useLanguage();
   const { id } = useParams();
   const [data, setData] = useState(null);
   const [selectedQ, setSelectedQ] = useState(null);
