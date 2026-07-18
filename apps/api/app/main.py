@@ -363,6 +363,10 @@ GITHUB_VERSION_URL = os.environ.get(
 GITHUB_RELEASE_URL = os.environ.get(
     "GITHUB_RELEASE_URL", "https://api.github.com/repos/norbert-me/Nuvora/releases/latest"
 )
+# Beta liest die VERSION-Datei ueber die Contents-API (frischer als der Raw-CDN).
+GITHUB_CONTENTS_URL = os.environ.get(
+    "GITHUB_CONTENTS_URL", "https://api.github.com/repos/norbert-me/Nuvora/contents/apps/api/VERSION?ref=main"
+)
 # Kanal je Instanz. "stable" = nur bei Major-Releases; "beta" = jeder Commit
 # (rohe VERSION von main). Steht in app_settings, hier nur der Fallback.
 DEFAULT_CHANNEL = os.environ.get("UPDATE_CHANNEL", "stable")
@@ -385,10 +389,15 @@ from pydantic import BaseModel as _BaseModel
 
 
 def _fetch_latest_beta() -> str:
-    import urllib.request
-    req = urllib.request.Request(GITHUB_VERSION_URL, headers={"User-Agent": "Nuvora"})
+    # Ueber die GitHub-Contents-API statt raw.githubusercontent: der Raw-CDN
+    # cacht die Datei mehrere Minuten, sodass frische Commits verspaetet
+    # erschienen. Die API ist deutlich aktueller.
+    import urllib.request, json as _json, base64 as _b64
+    req = urllib.request.Request(GITHUB_CONTENTS_URL, headers={"User-Agent": "Nuvora", "Accept": "application/vnd.github+json"})
     with urllib.request.urlopen(req, timeout=5) as r:
-        return r.read().decode("utf-8", "ignore").strip().split("\n")[0].strip()
+        data = _json.loads(r.read().decode("utf-8", "ignore"))
+    raw = _b64.b64decode(data.get("content", "")).decode("utf-8", "ignore")
+    return raw.strip().split("\n")[0].strip()
 
 
 def _fetch_latest_stable() -> str:
