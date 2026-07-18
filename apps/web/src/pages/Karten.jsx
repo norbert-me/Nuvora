@@ -172,45 +172,36 @@ export default function Karten() {
 // Fehlversuchen. Nur Anzeige.
 function StudentDetail({ detail, t, onClose }) {
   const { student, cards } = detail;
-  const now = Date.now();
-  const label = (b) => (REIFE.find(([k]) => k === b) || [null, b])[1];
-  const color = (b) => (REIFE.find(([k]) => k === b) || [null, null, "var(--text3)"])[2];
+  // Nach Set/Stapel gruppieren: je Set ein Reifegrad-Balken mit der aktuellen
+  // Zuordnung, statt jede einzelne Karte aufzulisten.
+  const sets = {};
+  for (const c of cards) {
+    const key = c.deck || "—";
+    (sets[key] ||= { hist: {}, learned: 0, total: 0 });
+    sets[key].hist[c.bucket] = (sets[key].hist[c.bucket] || 0) + 1;
+    sets[key].total += 1;
+    if (c.bucket !== "neu") sets[key].learned += 1;
+  }
+  const rows = Object.entries(sets);
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 200 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--card)", borderRadius: 18, maxWidth: 560, width: "100%", maxHeight: "85vh", overflow: "auto", padding: 22, border: "1px solid var(--border)" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--card)", borderRadius: 18, maxWidth: 520, width: "100%", maxHeight: "85vh", overflow: "auto", padding: 22, border: "1px solid var(--border)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
           <h3 style={{ fontSize: 17, fontWeight: 700, flex: 1 }}>{student.name}</h3>
           <button onClick={onClose} className="icon-btn" style={iconBtn} title={t("common.close")}><Icon d={ICONS.close} size={16} /></button>
         </div>
-        <div style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 14 }}>{student.reviewed} / {student.total} {t("karten.reviewed").toLowerCase()} · {student.due || 0} {t("karten.due").toLowerCase()}</div>
-        {cards.length === 0 ? (
+        <div style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 16 }}>{student.reviewed} / {student.total} {t("karten.reviewed").toLowerCase()} · {student.due || 0} {t("karten.due").toLowerCase()}</div>
+        {rows.length === 0 ? (
           <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("karten.noRolledOut")}</p>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
-              <thead><tr>
-                <th style={{ ...th, textAlign: "left" }}>{t("karten.front")}</th>
-                <th style={{ ...th, textAlign: "left" }}>{t("karten.maturity")}</th>
-                <th style={th}>{t("karten.due")}</th>
-                <th style={th} title={t("karten.lapsesHint")}>↺</th>
-              </tr></thead>
-              <tbody>
-                {cards.map((c) => {
-                  const due = c.due ? new Date(c.due) : null;
-                  const dueTxt = !due ? "—" : due.getTime() <= now ? t("karten.dueNow") : due.toLocaleDateString();
-                  return (
-                    <tr key={c.card_id}>
-                      <td style={{ ...td, textAlign: "left", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={`${c.front} (${c.deck})`}>{c.front}</td>
-                      <td style={{ ...td, textAlign: "left" }}><span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 9, height: 9, borderRadius: 3, background: color(c.bucket) }} />{label(c.bucket)}</span></td>
-                      <td style={{ ...td, color: due && due.getTime() <= now ? "#b8860b" : "var(--text3)" }}>{dueTxt}</td>
-                      <td style={{ ...td, color: c.lapses ? "#d1350f" : "var(--text3)" }}>{c.lapses || "—"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        ) : rows.map(([name, s]) => (
+          <div key={name} style={{ marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>{name}</span>
+              <span style={{ fontSize: 12, color: "var(--text3)" }}>{s.learned} / {s.total} {t("karten.reviewed").toLowerCase()}</span>
+            </div>
+            <ReifeBar hist={s.hist} height={12} />
           </div>
-        )}
+        ))}
       </div>
     </div>
   );
