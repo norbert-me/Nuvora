@@ -163,7 +163,7 @@ function EntryChips({ list, className, topicName, onOpen, classColor }) {
     const label = e.title || topicName(e.topic_id) || (className && className(e.class_id)) || "—";
     return (
       <button key={e.id} onClick={() => onOpen({ ...e, date: new Date(e.date) })}
-        style={{ ...chip, ...(col ? { background: col + "22", color: col, borderLeft: `3px solid ${col}` } : {}) }}
+        style={{ ...chip, ...(col ? { background: col + "22", color: "var(--text)", borderLeft: `3px solid ${col}` } : {}) }}
         title={label}>
         {label}
       </button>
@@ -261,7 +261,7 @@ function TimetableView({ tt, className, classColor, topicName, onEdit, onPeriods
   // Vertikal konstant: Zeilenhoehe = Dauer * px/min. Pausen zwischen den Stunden
   // erscheinen als leere Zwischenzeile derselben Skalierung.
   const toMin = (s) => { const m = /^(\d{1,2}):(\d{2})$/.exec(s || ""); return m ? (+m[1]) * 60 + (+m[2]) : null; };
-  const PXMIN = 1.4;
+  const PXMIN = 1.3;
   const rowH = (p) => { const a = toMin(timeVal(p - 1, "start")), b = toMin(timeVal(p - 1, "end")); return a != null && b != null && b > a ? Math.max(52, (b - a) * PXMIN) : 72; };
   const gapH = (p) => { const a = toMin(timeVal(p - 1, "end")), b = toMin(timeVal(p, "start")); return a != null && b != null && b > a ? (b - a) * PXMIN : 0; };
   return (
@@ -294,7 +294,7 @@ function TimetableView({ tt, className, classColor, topicName, onEdit, onPeriods
                           <button onClick={() => onEdit(s ? { ...s } : { weekday: wd, period: p })}
                             style={{ display: "flex", alignItems: "center", width: "100%", height: "100%", minHeight: h, textAlign: "left", padding: "6px 10px", border: "none", cursor: "pointer", boxSizing: "border-box",
                               borderLeft: col ? `4px solid ${col}` : "4px solid transparent",
-                              background: col ? col + "22" : "transparent", color: col ? col : "var(--text3)" }}>
+                              background: col ? col + "22" : "transparent", color: col ? "var(--text)" : "var(--text3)" }}>
                             {s ? <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label || "—"}</div>
                               : <span style={{ fontSize: 12 }}>+</span>}
                           </button>
