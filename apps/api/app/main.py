@@ -72,9 +72,13 @@ app = FastAPI(title="Nuvora API")
 
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(AbuseGuardMiddleware)
+# Origins normalisieren: Leerzeichen und ein versehentlicher Trailing-Slash in
+# SITE_URL/CORS_ORIGINS sind der haeufigste Grund, warum der Browser-Origin
+# (nie mit Slash) nicht matcht und Aufrufe an /api "access control"-blockiert.
+_cors = [o.strip().rstrip("/") for o in os.environ.get("CORS_ORIGINS", "http://localhost:3001").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.environ.get("CORS_ORIGINS", "http://localhost:3001").split(","),
+    allow_origins=_cors,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Content-Type", "Authorization"],
 )
