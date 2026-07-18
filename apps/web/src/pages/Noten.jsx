@@ -244,9 +244,22 @@ export default function Noten() {
       {error && <p style={{ color: "var(--danger, #dc2626)", fontSize: 13, marginBottom: 10 }}>{error}</p>}
 
       {neuAbschnitt && (
-        <SectionForm t={t} onCancel={() => setNeuAbschnitt(false)}
-          onSave={async (b) => { if (await call(() => fetch(`${API}/classes/${classId}/sections?term=${term}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...b, position: sections.length }) }))) setNeuAbschnitt(false); }} />
+        <Modal title={t("noten.addSection")} onClose={() => setNeuAbschnitt(false)}>
+          <SectionForm t={t} onCancel={() => setNeuAbschnitt(false)}
+            onSave={async (b) => { if (await call(() => fetch(`${API}/classes/${classId}/sections?term=${term}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...b, position: sections.length }) }))) setNeuAbschnitt(false); }} />
+        </Modal>
       )}
+
+      {neuSpalteIn != null && (() => {
+        const sec = sections.find((s) => s.id === neuSpalteIn);
+        const pos = (sec?.categories || []).length;
+        return (
+          <Modal title={t("noten.addColumn")} onClose={() => setNeuSpalteIn(null)}>
+            <ColForm t={t} onCancel={() => setNeuSpalteIn(null)}
+              onSave={async (name) => { if (await call(() => fetch(`${API}/categories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: neuSpalteIn, position: pos }) }))) setNeuSpalteIn(null); }} />
+          </Modal>
+        );
+      })()}
 
       {term === "year" ? (
         <YearTable t={t} data={yearData} cls={cls}
@@ -332,9 +345,7 @@ export default function Noten() {
                       <th key={`empty-${sec.id}`} style={{ ...th, borderLeft: "2px solid var(--border3)", fontWeight: 400 }}>
                         {/* Spalte anlegen laeuft ueber das Kebab-Menue des
                             Abschnitts; ein zweiter +Spalte-Knopf war doppelt. */}
-                        {neuSpalteIn === sec.id
-                          ? <ColForm t={t} onCancel={() => setNeuSpalteIn(null)} onSave={async (name) => { if (await call(() => fetch(`${API}/categories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: 0 }) }))) setNeuSpalteIn(null); }} />
-                          : <span style={{ color: "var(--text3)", fontSize: 12 }}>{t("noten.noColumns")}</span>}
+                        <span style={{ color: "var(--text3)", fontSize: 12 }}>{t("noten.noColumns")}</span>
                       </th>,
                       bereich,
                     ];
@@ -362,9 +373,6 @@ export default function Noten() {
                             onClose={() => setRenameCol(null)} />
                         )}
                       </div>
-                      {neuSpalteIn === sec.id && i === cols.length - 1 && (
-                        <ColForm t={t} onCancel={() => setNeuSpalteIn(null)} onSave={async (name) => { if (await call(() => fetch(`${API}/categories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: cols.length }) }))) setNeuSpalteIn(null); }} />
-                      )}
                     </th>
                     ); }),
                     bereich,
@@ -488,6 +496,18 @@ function NoteZelle({ t, editing, onEdit, value, isOverride, onSave, onCancel, on
           <Icon d={ICONS.close} color={C.danger} size={12} />
         </button>
       )}
+    </div>
+  );
+}
+
+// Einfaches modales Popup fuer die Anlage-Formulare (Abschnitt/Spalte).
+function Modal({ title, onClose, children }) {
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 200 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--card)", borderRadius: 16, maxWidth: 400, width: "100%", padding: 20, border: "1px solid var(--border)" }}>
+        {title && <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>{title}</h3>}
+        {children}
+      </div>
     </div>
   );
 }
