@@ -235,11 +235,6 @@ export default function Noten() {
                 background: agg === m ? "var(--accent)" : "transparent", color: agg === m ? "#fff" : "var(--text2)" }}>{label}</button>
           ))}
         </div>
-        {term !== "year" && sections.length > 0 && (
-          <span style={{ fontSize: 12.5, color: gewichtSumme === 100 ? "var(--text3)" : "#b8860b" }}>
-            {gewichtSumme !== 100 ? t("noten.weightNot100", { n: gewichtSumme }) : t("noten.weightSum", { n: gewichtSumme })}
-          </span>
-        )}
         {term !== "year" && (
           <button onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}
             className="icon-btn"
@@ -309,7 +304,9 @@ export default function Noten() {
           <table style={{ borderCollapse: "collapse", fontSize: 13.5, minWidth: "100%" }}>
             <thead>
               <tr>
-                <th style={{ ...th, ...stickyL, whiteSpace: "nowrap" }}></th>
+                <th style={{ ...th, ...stickyL, whiteSpace: "nowrap", textAlign: "left", fontWeight: 400, fontSize: 12.5, color: gewichtSumme === 100 ? "var(--text3)" : "#b8860b" }}>
+                  {gewichtSumme !== 100 ? t("noten.weightNot100", { n: gewichtSumme }) : t("noten.weightSum", { n: gewichtSumme })}
+                </th>
                 {sections.map((sec) => {
                   const isCol = collapsed.has(sec.id);
                   const cols = isCol ? 0 : (sec.categories || []).length || 1;
