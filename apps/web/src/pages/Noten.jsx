@@ -261,6 +261,8 @@ export default function Noten() {
         );
       })()}
 
+      {term !== "year" && sections.length > 0 && <NotenStatistik summary={summary} t={t} />}
+
       {term === "year" ? (
         <YearTable t={t} data={yearData} cls={cls}
           onSet={(sid, txt) => overrideSetzen(sid, null, txt)}
@@ -496,6 +498,49 @@ function NoteZelle({ t, editing, onEdit, value, isOverride, onSave, onCancel, on
           <Icon d={ICONS.close} color={C.danger} size={12} />
         </button>
       )}
+    </div>
+  );
+}
+
+// Statistische Auswertung der Halbjahresnoten — analog CardVote: Kennzahlen und
+// Notenverteilung ueber die effektiven Endnoten (manuell gesetzt schlaegt
+// Schnitt). Rein deskriptiv, keine Zeugnisnote.
+function NotenStatistik({ summary, t }) {
+  const noten = (summary || [])
+    .map((s) => (s.total_override != null ? s.total_override : s.weighted))
+    .filter((v) => v != null);
+  if (noten.length < 2) return null;
+  const n = noten.length;
+  const avg = noten.reduce((a, b) => a + b, 0) / n;
+  const sorted = [...noten].sort((a, b) => a - b);
+  const median = n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+  const sd = Math.sqrt(noten.reduce((a, b) => a + (b - avg) ** 2, 0) / n);
+  const dist = [1, 2, 3, 4, 5, 6].map((g) => noten.filter((v) => Math.round(v) === g).length);
+  const maxD = Math.max(...dist, 1);
+  const tile = (label, value) => (
+    <div style={{ flex: "1 1 90px", minWidth: 80, padding: "10px 12px", background: "var(--bg2)", borderRadius: 10, textAlign: "center" }}>
+      <div style={{ fontSize: 20, fontWeight: 800, color: "var(--text)" }}>{value}</div>
+      <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 2 }}>{label}</div>
+    </div>
+  );
+  return (
+    <div style={{ padding: 16, background: "var(--card)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 14 }}>
+      <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{t("noten.statTitle")}</h3>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        {tile(t("noten.statAvg"), de(Math.round(avg * 100) / 100))}
+        {tile(t("noten.statMedian"), de(Math.round(median * 100) / 100))}
+        {tile(t("noten.statSd"), `±${(Math.round(sd * 100) / 100).toString().replace(".", ",")}`)}
+        {tile(t("noten.statCount"), n)}
+      </div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 90 }}>
+        {dist.map((c, i) => (
+          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+            <div style={{ fontSize: 11, color: "var(--text3)" }}>{c || ""}</div>
+            <div style={{ width: "100%", maxWidth: 44, height: `${(c / maxD) * 60}px`, minHeight: c ? 3 : 0, background: "var(--accent)", borderRadius: "5px 5px 0 0", opacity: c ? 0.85 : 0.15 }} />
+            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)" }}>{i + 1}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
