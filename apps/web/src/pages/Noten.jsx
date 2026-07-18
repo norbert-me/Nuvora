@@ -125,7 +125,31 @@ export default function Noten() {
       )}
 
       {sections.length === 0 ? (
-        <p style={{ fontSize: 13.5, color: "var(--text3)", marginTop: 8 }}>{t("noten.noSections")}</p>
+        <>
+          <p style={{ fontSize: 13.5, color: "var(--text3)", marginTop: 8, marginBottom: 12 }}>{t("noten.noSections")}</p>
+          <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 12, WebkitOverflowScrolling: "touch", maxWidth: 360 }}>
+            <table style={{ borderCollapse: "collapse", fontSize: 13.5, width: "100%" }}>
+              <thead>
+                <tr><th style={{ ...th, textAlign: "left" }}>{cls?.name}</th></tr>
+              </thead>
+              <tbody>
+                {students.map((st) => (
+                  <tr key={st.id}>
+                    <td style={{ ...td, textAlign: "left", padding: 0 }}>
+                      <button onClick={() => setInfoFuer(st.id)} title={t("noten.studentInfo")}
+                        style={{ width: "100%", textAlign: "left", padding: "6px 10px", border: "none", background: "none", color: "var(--text)", fontWeight: 500, cursor: "pointer" }}>
+                        {st.name}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {students.length === 0 && (
+                  <tr><td style={{ ...td, textAlign: "left", color: "var(--text3)" }}>{t("noten.noStudents")}</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
       ) : (
         <div style={{ overflowX: "auto", overflowY: "visible", border: "1px solid var(--border)", borderRadius: 12, WebkitOverflowScrolling: "touch" }}>
           <table style={{ borderCollapse: "collapse", fontSize: 13.5, minWidth: "100%" }}>

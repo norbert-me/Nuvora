@@ -531,6 +531,7 @@ export default {
   "noten.total": "Total",
   "noten.unweighted": "sin ponderar",
   "noten.noSections": "Aún no hay secciones. Crea una (p. ej. «Exámenes», «Participación») y dale un peso.",
+  "noten.noStudents": "Aún no hay alumnado en esta clase. Añádelo en Clases.",
   "noten.studentInfo": "Información",
   "noten.course": "Curso E/G",
   "noten.supportNeeds": "Necesidades",
