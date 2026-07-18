@@ -36,6 +36,7 @@ export default function Noten() {
   const [beobFuer, setBeobFuer] = useState(null);
   const [infoFuer, setInfoFuer] = useState(null);
   const [term, setTerm] = useState("1");
+  const [yearData, setYearData] = useState({ sections: [], rows: [] });
   const [dragId, setDragId] = useState(null);
   // Vorschau beim Ziehen: auf welchem Abschnitt, und links oder rechts einfuegen.
   const [dragOver, setDragOver] = useState(null); // { id, side: "left"|"right" }
@@ -96,6 +97,12 @@ export default function Noten() {
 
   const load = async (id) => {
     if (!id) return;
+    if (term === "year") {
+      const y = await fetch(`${API}/classes/${id}/year`).then((r) => (r.ok ? r.json() : { sections: [], rows: [] }));
+      setYearData(y);
+      setStudents(classes.find((c) => c.id === id)?.students || []);
+      return;
+    }
     const [sec, ent, sum] = await Promise.all([
       fetch(`${API}/classes/${id}/sections?term=${term}`).then((r) => (r.ok ? r.json() : [])),
       fetch(`${API}/classes/${id}/entries`).then((r) => (r.ok ? r.json() : [])),
@@ -165,14 +172,15 @@ export default function Noten() {
             style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)" }}>
             <option value="1">{t("noten.term1")}</option>
             <option value="2">{t("noten.term2")}</option>
+            <option value="year">{t("noten.year")}</option>
           </select>
         </label>
-        {sections.length > 0 && (
+        {term !== "year" && sections.length > 0 && (
           <span style={{ fontSize: 12.5, color: gewichtSumme === 100 ? "var(--text3)" : "#b8860b" }}>
             {gewichtSumme !== 100 ? t("noten.weightNot100", { n: gewichtSumme }) : t("noten.weightSum", { n: gewichtSumme })}
           </span>
         )}
-        <button onClick={() => setNeuAbschnitt(true)} style={{ ...btnSecondary, marginLeft: "auto" }}>{t("noten.addSection")}</button>
+        {term !== "year" && <button onClick={() => setNeuAbschnitt(true)} style={{ ...btnSecondary, marginLeft: "auto" }}>{t("noten.addSection")}</button>}
       </div>
 
       {error && <p style={{ color: "var(--danger, #dc2626)", fontSize: 13, marginBottom: 10 }}>{error}</p>}
@@ -182,7 +190,12 @@ export default function Noten() {
           onSave={async (b) => { if (await call(() => fetch(`${API}/classes/${classId}/sections?term=${term}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...b, position: sections.length }) }))) setNeuAbschnitt(false); }} />
       )}
 
-      {sections.length === 0 ? (
+      {term === "year" ? (
+        <YearTable t={t} data={yearData} cls={cls}
+          onSet={(sid, txt) => overrideSetzen(sid, null, txt)}
+          onReset={(sid) => overrideReset(sid, null)}
+          editing={zelle} setEditing={setZelle} onInfo={setInfoFuer} />
+      ) : sections.length === 0 ? (
         <>
           <p style={{ fontSize: 13.5, color: "var(--text3)", marginTop: 8, marginBottom: 12 }}>{t("noten.noSections")}</p>
           <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 12, WebkitOverflowScrolling: "touch", maxWidth: 360 }}>
@@ -532,6 +545,78 @@ function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete })
         })}
         <button onClick={onClose} style={{ ...btnSecondary, marginTop: 14 }}>{t("noten.close")}</button>
       </div>
+    </div>
+  );
+}
+
+// Jahresuebersicht: Bereichsnoten beider Halbjahre, die zwei Halbjahresnoten
+// und die Jahresnote (Mittel der beiden, per Klick ueberschreibbar).
+function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo }) {
+  const { sections = [], rows = [] } = data || {};
+  const sec1 = sections.filter((s) => s.term === "1");
+  const sec2 = sections.filter((s) => s.term === "2");
+  if (rows.length === 0) return <p style={{ fontSize: 13.5, color: "var(--text3)", marginTop: 8 }}>{t("noten.noStudents")}</p>;
+  const grp = { ...th, borderLeft: "2px solid var(--border)", fontSize: 12.5 };
+  const secCols = (secs) => secs.map((s, i) => (
+    <th key={s.id} style={{ ...th, borderLeft: i === 0 ? "2px solid var(--border)" : "1px solid var(--border)", minWidth: 56, fontWeight: 500 }}>{s.name}</th>
+  ));
+  return (
+    <div style={{ overflowX: "auto", overflowY: "visible", border: "1px solid var(--border)", borderRadius: 12, WebkitOverflowScrolling: "touch" }}>
+      <table style={{ borderCollapse: "collapse", fontSize: 13.5, minWidth: "100%" }}>
+        <thead>
+          <tr>
+            <th style={{ ...th, ...stickyL, minWidth: 150 }}></th>
+            <th colSpan={sec1.length + 1} style={grp}>{t("noten.term1")}</th>
+            <th colSpan={sec2.length + 1} style={grp}>{t("noten.term2")}</th>
+            <th rowSpan={2} style={{ ...grp, fontWeight: 700 }}>{t("noten.yearGrade")}</th>
+          </tr>
+          <tr>
+            <th style={{ ...th, ...stickyL, textAlign: "left" }}>{cls?.name}</th>
+            {secCols(sec1)}
+            <th style={{ ...th, borderLeft: "1px solid var(--border)", fontWeight: 700 }}>{t("noten.termGrade")}</th>
+            {secCols(sec2)}
+            <th style={{ ...th, borderLeft: "1px solid var(--border)", fontWeight: 700 }}>{t("noten.termGrade")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.student_id}>
+              <td style={{ ...td, ...stickyL, textAlign: "left", padding: 0 }}>
+                <button onClick={() => onInfo(r.student_id)} title={t("noten.studentInfo")}
+                  style={{ width: "100%", textAlign: "left", padding: "6px 8px", border: "none", background: "none", color: "var(--text)", fontWeight: 500, cursor: "pointer" }}>
+                  {r.name}
+                </button>
+              </td>
+              {sec1.map((s, i) => (
+                <td key={s.id} style={{ ...td, borderLeft: i === 0 ? "2px solid var(--border)" : "1px solid var(--border)" }}>
+                  {r.section_grades[String(s.id)] != null ? de(r.section_grades[String(s.id)]) : <span style={{ color: "var(--border2)" }}>·</span>}
+                </td>
+              ))}
+              <td style={{ ...td, borderLeft: "1px solid var(--border)", fontWeight: 700 }}>
+                {r.term_ends["1"] != null ? de(r.term_ends["1"]) : <span style={{ color: "var(--border2)" }}>·</span>}
+              </td>
+              {sec2.map((s, i) => (
+                <td key={s.id} style={{ ...td, borderLeft: i === 0 ? "2px solid var(--border)" : "1px solid var(--border)" }}>
+                  {r.section_grades[String(s.id)] != null ? de(r.section_grades[String(s.id)]) : <span style={{ color: "var(--border2)" }}>·</span>}
+                </td>
+              ))}
+              <td style={{ ...td, borderLeft: "1px solid var(--border)", fontWeight: 700 }}>
+                {r.term_ends["2"] != null ? de(r.term_ends["2"]) : <span style={{ color: "var(--border2)" }}>·</span>}
+              </td>
+              <td style={{ ...td, padding: 0, borderLeft: "2px solid var(--border)" }}>
+                <NoteZelle t={t} bold
+                  editing={editing === `end:${r.student_id}`}
+                  onEdit={() => setEditing(`end:${r.student_id}`)}
+                  value={r.year}
+                  isOverride={r.year_override != null}
+                  onSave={(txt) => onSet(r.student_id, txt)}
+                  onCancel={() => setEditing(null)}
+                  onReset={() => onReset(r.student_id)} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

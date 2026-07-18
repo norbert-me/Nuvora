@@ -419,12 +419,11 @@ class StudentSummary(BaseModel):
     observations: int
 
 
-@router.get("/classes/{class_id}/summary", response_model=List[StudentSummary])
-async def summary(class_id: int, term: str = "1", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    await _owned_class(db, user, class_id)
-
+async def _summarize(db, user, class_id, term):
+    """Berechnet die Uebersicht eines Halbjahrs. Gibt (sections, out) zurueck."""
     sections = (await db.execute(
         select(GradeSection).where(GradeSection.owner_id == user.id, GradeSection.class_id == class_id, GradeSection.term == term)
+        .order_by(GradeSection.position, GradeSection.id)
     )).scalars().all()
     sec_weight = {s.id: s.weight for s in sections}
     sec_ids = {s.id for s in sections}
@@ -499,7 +498,79 @@ async def summary(class_id: int, term: str = "1", user: User = Depends(require_m
             unweighted_fallback=fallback,
             observations=len([e for e in eigene if e.kind == "observation" and e.category_id in cat_ids]),
         ))
+    return sections, out
+
+
+@router.get("/classes/{class_id}/summary", response_model=List[StudentSummary])
+async def summary(class_id: int, term: str = "1", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    await _owned_class(db, user, class_id)
+    _, out = await _summarize(db, user, class_id, term)
     return out
+
+
+# ─── Jahresuebersicht: beide Halbjahre plus Jahresnote ───
+
+class YearSection(BaseModel):
+    term: str
+    id: int
+    name: str
+    weight: int
+
+
+class YearRow(BaseModel):
+    student_id: int
+    name: str
+    # Effektive Bereichsnote je Abschnitt (beide Halbjahre), key = section_id.
+    section_grades: dict
+    # Halbjahres-Endnote, key = "1"/"2".
+    term_ends: dict
+    # Jahresnote: manuell gesetzt sonst Mittel der beiden Halbjahresnoten.
+    year: Optional[float]
+    year_override: Optional[float]
+
+
+class YearOut(BaseModel):
+    sections: List[YearSection]
+    rows: List[YearRow]
+
+
+@router.get("/classes/{class_id}/year", response_model=YearOut)
+async def year_summary(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    await _owned_class(db, user, class_id)
+    sec1, sum1 = await _summarize(db, user, class_id, "1")
+    sec2, sum2 = await _summarize(db, user, class_id, "2")
+
+    year_over = {o.student_id: o.value for o in (await db.execute(
+        select(GradeOverride).where(
+            GradeOverride.owner_id == user.id, GradeOverride.class_id == class_id,
+            GradeOverride.section_id.is_(None), GradeOverride.term == "year",
+        )
+    )).scalars().all()}
+
+    sections = [YearSection(term="1", id=s.id, name=s.name, weight=s.weight) for s in sec1] \
+             + [YearSection(term="2", id=s.id, name=s.name, weight=s.weight) for s in sec2]
+
+    by_id1 = {r.student_id: r for r in sum1}
+    by_id2 = {r.student_id: r for r in sum2}
+    rows = []
+    for r in sum1:  # sum1/sum2 haben dieselben Schueler in gleicher Reihenfolge
+        sid = r.student_id
+        r2 = by_id2.get(sid)
+        end1 = r.total_override if r.total_override is not None else r.weighted
+        end2 = (r2.total_override if r2.total_override is not None else r2.weighted) if r2 else None
+        ends = [e for e in (end1, end2) if e is not None]
+        year = year_over.get(sid)
+        if year is None and ends:
+            year = round(sum(ends) / len(ends), 2)
+        sg = {}
+        sg.update(r.section_effective)
+        if r2:
+            sg.update(r2.section_effective)
+        rows.append(YearRow(
+            student_id=sid, name=r.name, section_grades=sg,
+            term_ends={"1": end1, "2": end2}, year=year, year_override=year_over.get(sid),
+        ))
+    return YearOut(sections=sections, rows=rows)
 
 
 # ─── CardVote-Testergebnis als Noten uebernehmen ───
