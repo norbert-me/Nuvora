@@ -222,13 +222,23 @@ async def startup():
             ), {"s": sec, "c": class_id})
         await db.commit()
 
+    # Admin-Konto genau EINMAL anlegen. Frueher lief das bei jedem Start anhand
+    # ADMIN_EMAIL — aendert der Admin danach seine Mail, wurde das Original neu
+    # erzeugt. Ein Marker in app_settings verhindert das dauerhaft.
     admin_email = os.environ.get("ADMIN_EMAIL", "")
     admin_pw = os.environ.get("ADMIN_PASSWORD", "")
     if admin_email and admin_pw:
+        from .models import AppSetting
         async with async_session() as db:
-            result = await db.execute(select(User).where(User.email == admin_email))
-            if not result.scalar_one_or_none():
-                db.add(User(email=admin_email, password_hash=_hash_pw(admin_pw), name="Admin", email_verified=True))
+            done = await db.get(AppSetting, "admin_bootstrapped")
+            if not done:
+                # Bestandsinstallationen haben schon Konten — dann nur markieren,
+                # nicht erneut anlegen (die Mail koennte laengst geaendert sein).
+                any_user = (await db.execute(select(User).limit(1))).scalar_one_or_none()
+                exists = (await db.execute(select(User).where(User.email == admin_email))).scalar_one_or_none()
+                if not any_user and not exists:
+                    db.add(User(email=admin_email, password_hash=_hash_pw(admin_pw), name="Admin", email_verified=True))
+                db.add(AppSetting(key="admin_bootstrapped", value="1"))
                 await db.commit()
 
     # Hintergrund-Task: unbestätigte Konten älter als 14 Tage löschen
