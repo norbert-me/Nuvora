@@ -334,7 +334,7 @@ def _read_version() -> str:
 
 APP_VERSION = _read_version()
 GITHUB_VERSION_URL = os.environ.get(
-    "GITHUB_VERSION_URL", "https://raw.githubusercontent.com/norbert-me/CardVote/main/backend/VERSION"
+    "GITHUB_VERSION_URL", "https://raw.githubusercontent.com/norbert-me/Nuvora/main/apps/api/VERSION"
 )
 _version_cache = {"ts": 0.0, "latest": None}
 
@@ -350,7 +350,7 @@ def _parse_version(v: str):
 
 def _fetch_latest_version() -> str:
     import urllib.request
-    req = urllib.request.Request(GITHUB_VERSION_URL, headers={"User-Agent": "CardVote"})
+    req = urllib.request.Request(GITHUB_VERSION_URL, headers={"User-Agent": "Nuvora"})
     with urllib.request.urlopen(req, timeout=5) as r:
         return r.read().decode("utf-8", "ignore").strip().split("\n")[0].strip()
 
@@ -370,7 +370,7 @@ async def version(user=Depends(_require_admin)):
         "current": APP_VERSION,
         "latest": latest,
         "update_available": update,
-        "repo_url": "https://github.com/norbert-me/CardVote",
+        "repo_url": "https://github.com/norbert-me/Nuvora",
     }
 
 
