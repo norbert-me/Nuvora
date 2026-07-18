@@ -121,6 +121,15 @@ const getModuleNavItems = (t, location) => {
   if (area === "noten") {
     return [{ to: NO, label: t("nav.grades") }];
   }
+  if (area === "code-detektiv") {
+    // Buttons der eingebetteten App steuern das iframe per ?view (wie Lernpfad).
+    const cur = params.get("view") || "admin";
+    return [
+      { to: `${CD}?view=admin`, label: t("cd.create"), active: cur === "admin" },
+      { to: `${CD}?view=join`, label: t("cd.join"), active: cur === "join" },
+      { to: `${CD}?view=solo`, label: t("cd.solo"), active: cur === "solo" },
+    ];
+  }
   if (area === "karten") {
     // Tabs der Kartenseite laufen ueber die Nuvora-Navbar (?tab).
     const cur = params.get("tab") || "cards";
@@ -622,12 +631,9 @@ function AppRoutes({ user, setUser, logout }) {
     navigate("/");
   };
 
-  // Code-Detektiv laeuft im Vollbild ohne Nuvora-Rahmen (Navbar + Fussleiste).
-  const bare = location.pathname.startsWith(CD);
-
   return (
     <>
-      {!bare && <Nav user={user} onLogout={logout} />}
+      <Nav user={user} onLogout={logout} />
       {user && <FirstRun user={user} />}
       <ContentWrapper>
         <Routes>
@@ -682,7 +688,7 @@ function AppRoutes({ user, setUser, logout }) {
           ))}
         </Routes>
       </ContentWrapper>
-      {!bare && <footer style={{ textAlign: "center", padding: "16px 0 24px", fontSize: 12, color: "var(--text3)" }}>
+      <footer style={{ textAlign: "center", padding: "16px 0 24px", fontSize: 12, color: "var(--text3)" }}>
         {/* Rueckmeldungs-Hinweis: stand frueher nur auf der Landing- und der
             CardVote-Startseite. In der Fussleiste laeuft er auf jeder Seite mit. */}
         <p style={{ margin: "0 auto 12px", maxWidth: 520, lineHeight: 1.6, padding: "0 16px" }}>
@@ -708,7 +714,7 @@ function AppRoutes({ user, setUser, logout }) {
           <span style={footerSep}>·</span>
           <a href="https://github.com/norbert-me/Nuvora" target="_blank" rel="noopener noreferrer" style={footerLink}>GitHub</a>
         </span>
-      </footer>}
+      </footer>
     </>
   );
 }
