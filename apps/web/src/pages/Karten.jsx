@@ -94,9 +94,12 @@ export default function Karten() {
 
       {view === "progress" && (() => {
         const total = progress[0]?.total || 0;
-        // Klassen-Verteilung: Reifegrade aller Schueler aufsummiert.
+        // Klassen-Reifegrad zeigt nur aktiv gelernte Karten — "Neu" (noch nicht
+        // angefasst) bleibt aussen vor, sonst spiegelt der Balken vor allem
+        // Unbearbeitetes.
+        const REIFE_AKTIV = REIFE.filter(([k]) => k !== "neu");
         const classHist = progress.reduce((acc, p) => {
-          REIFE.forEach(([k]) => { acc[k] = (acc[k] || 0) + (p.hist?.[k] || 0); });
+          REIFE_AKTIV.forEach(([k]) => { acc[k] = (acc[k] || 0) + (p.hist?.[k] || 0); });
           return acc;
         }, {});
         return (
@@ -108,7 +111,7 @@ export default function Karten() {
                 <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>{t("karten.classMaturity")}</div>
                 <ReifeBar hist={classHist} height={14} />
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", marginTop: 10 }}>
-                  {REIFE.map(([k, label, color]) => (
+                  {REIFE_AKTIV.map(([k, label, color]) => (
                     <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--text3)" }}>
                       <span style={{ width: 10, height: 10, borderRadius: 3, background: color }} />{label} {classHist[k] || 0}
                     </span>
