@@ -1,0 +1,99 @@
+// Kartenlernen für Schüler — KEIN Login, Zugriff über den Token in der URL.
+// Öffentliche Route: läuft ohne Nuvora-Konto. Der Token ist die Identität.
+import { useState, useEffect, useCallback } from "react";
+import { useParams } from "react-router-dom";
+
+const API = "/api/karten";
+
+export default function Lernen() {
+  const { token } = useParams();
+  const [data, setData] = useState(null);   // { name, cards, total }
+  const [i, setI] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+
+  const load = useCallback(() => {
+    fetch(`${API}/lernen/${token}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((d) => { setData(d); setI(0); setFlipped(false); setDone((d.cards || []).length === 0); })
+      .catch(() => setError("Der Link ist ungültig oder abgelaufen."));
+  }, [token]);
+  useEffect(() => { load(); }, [load]);
+
+  const bewerten = async (grade) => {
+    const card = data.cards[i];
+    await fetch(`${API}/lernen/${token}/review`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ card_id: card.card_id, grade }),
+    }).catch(() => {});
+    setFlipped(false);
+    if (i + 1 < data.cards.length) setI(i + 1);
+    else setDone(true);
+  };
+
+  if (error) return <Center><p style={{ color: "#dc2626" }}>{error}</p></Center>;
+  if (!data) return <Center><p style={{ color: "var(--text3)" }}>Lädt…</p></Center>;
+
+  if (done) {
+    return (
+      <Center>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 48, marginBottom: 8 }}>✓</div>
+          <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>Fertig für heute!</h2>
+          <p style={{ color: "var(--text2)", marginBottom: 20 }}>Alle fälligen Karten gelernt. Komm später wieder.</p>
+          <button onClick={load} style={btn}>Nochmal prüfen</button>
+        </div>
+      </Center>
+    );
+  }
+
+  const card = data.cards[i];
+  return (
+    <Center>
+      <div style={{ width: "100%", maxWidth: 460 }}>
+        <div style={{ fontSize: 13, color: "var(--text3)", textAlign: "center", marginBottom: 12 }}>
+          {data.name} · Karte {i + 1} von {data.cards.length}
+        </div>
+        <div
+          onClick={() => !flipped && setFlipped(true)}
+          style={{
+            minHeight: 200, display: "flex", alignItems: "center", justifyContent: "center",
+            textAlign: "center", padding: 28, fontSize: 20, lineHeight: 1.5,
+            border: "1px solid var(--border)", borderRadius: 18, background: "var(--card)",
+            cursor: flipped ? "default" : "pointer", whiteSpace: "pre-wrap",
+          }}
+        >
+          {flipped ? card.back : card.front}
+        </div>
+
+        {!flipped ? (
+          <button onClick={() => setFlipped(true)} style={{ ...btn, width: "100%", marginTop: 16 }}>Umdrehen</button>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginTop: 16 }}>
+            <Grade label="Nochmal" color="#dc2626" onClick={() => bewerten(0)} />
+            <Grade label="Schwer" color="#b8860b" onClick={() => bewerten(1)} />
+            <Grade label="Gut" color="#0a7d3e" onClick={() => bewerten(2)} />
+            <Grade label="Leicht" color="#0066cc" onClick={() => bewerten(3)} />
+          </div>
+        )}
+      </div>
+    </Center>
+  );
+}
+
+const Center = ({ children }) => (
+  <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: "var(--bg)" }}>
+    {children}
+  </div>
+);
+
+function Grade({ label, color, onClick }) {
+  return (
+    <button onClick={onClick} style={{ padding: "12px 4px", borderRadius: 12, border: "none", background: color, color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+      {label}
+    </button>
+  );
+}
+
+const btn = { padding: "10px 20px", borderRadius: 980, border: "none", background: "var(--text)", color: "var(--bg)", fontWeight: 600, fontSize: 14, cursor: "pointer" };

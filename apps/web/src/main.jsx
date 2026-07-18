@@ -66,6 +66,8 @@ import Cards from "./pages/Cards.jsx";
 import Tutorial from "./pages/Tutorial.jsx";
 import NotenModul from "./pages/Noten.jsx";
 import Planung from "./pages/Planung.jsx";
+import Lernen from "./pages/Lernen.jsx";
+import Karten from "./pages/Karten.jsx";
 import { useModules } from "./core/modules.js";
 import { btnPrimary, btnSecondary } from "./components/Icons.jsx";
 // Navigation ist modulbezogen: die Shell zeigt die Punkte des Moduls, in dem
@@ -82,6 +84,7 @@ function helpArea(pathname) {
 const LP = "/lernpfad";
 const NO = "/noten";
 const CD = "/code-detektiv";
+const KA = "/karten";
 
 // Menue passend zum Bereich. Man soll im Modul-Menue bleiben, auch auf
 // modulneutralen Seiten (Hilfe, Impressum), solange man aus einem Modul kam —
@@ -93,6 +96,7 @@ const getModuleNavItems = (t, location) => {
     : pathname.startsWith(LP) ? "lernpfad"
     : pathname.startsWith(NO) ? "noten"
     : pathname.startsWith(CD) ? "code-detektiv"
+    : pathname.startsWith(KA) ? "karten"
     : params.get("area"); // Hilfe u.ae.: Bereich aus der Query
 
   if (area === "cardvote") {
@@ -627,6 +631,9 @@ function AppRoutes({ user, setUser, logout }) {
           {/* ─── Modul Noten ─── */}
           <Route path={NO} element={user ? <ModuleGate moduleKey="noten"><NotenModul /></ModuleGate> : <Landing />} />
 
+          {/* ─── Modul Karten ─── */}
+          <Route path={KA} element={user ? <ModuleGate moduleKey="karten"><Karten /></ModuleGate> : <Landing />} />
+
           {/* ─── Modul Code-Detektiv ─── */}
           <Route path={CD} element={user ? <ModuleGate moduleKey="code-detektiv"><CodeDetektivModule /></ModuleGate> : <Landing />} />
 
@@ -702,7 +709,11 @@ function App() {
     <LanguageProvider>
       <BrowserRouter>
         <ConnectionMonitor />
-        <AppRoutes user={user} setUser={setUser} logout={logout} />
+        <Routes>
+          {/* Kartenlernen der Schueler: oeffentlich, ohne Login, ueber Token. */}
+          <Route path="/lernen/:token" element={<Lernen />} />
+          <Route path="/*" element={<AppRoutes user={user} setUser={setUser} logout={logout} />} />
+        </Routes>
       </BrowserRouter>
     </LanguageProvider>
   );

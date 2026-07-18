@@ -80,6 +80,15 @@ REGISTRY: List[ModuleDef] = [
         ),
         path="/code-detektiv",
     ),
+    ModuleDef(
+        key="karten",
+        name="Karten",
+        description=(
+            "Karteikarten mit Spaced Repetition. Die Lernenden üben ohne Konto "
+            "per QR-Code; ihren Fortschritt siehst du im Modul."
+        ),
+        path="/karten",
+    ),
 ]
 
 _BY_KEY = {m.key: m for m in REGISTRY}

@@ -134,6 +134,8 @@ class SchoolClass(Base):
     # Standard-Anzahl Themenbloecke je Woche (Wochenplanung). Nur ein Vorschlag
     # beim Anlegen — die einzelne Woche darf abweichen.
     plan_blocks: Mapped[int] = mapped_column(Integer, default=2, server_default="2")
+    # Einzigartiger Token fuer den Karten-Zugang (unratbar). Wird bei Bedarf gesetzt.
+    karten_token: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     students: Mapped[list["Student"]] = relationship(back_populates="school_class", order_by="Student.card_id", cascade="all, delete-orphan")
     owner: Mapped[Optional["User"]] = relationship(back_populates="classes")
@@ -166,6 +168,8 @@ class Student(Base):
     niveau: Mapped[str] = mapped_column(String(1), default="", server_default="")  # "E" | "G" | ""
     foerder: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     notizen: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # Einzigartiger Token fuer den kontenlosen Karten-Zugang (Bearer-Secret).
+    karten_token: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, unique=True, index=True)
     # Klassenleitung des Kindes — am Schueler, nicht an der Klasse: ein Kurs
     # wie "Mathe 7.5" mischt Kinder aus mehreren Klassen mit je eigener
     # Klassenleitung. Freitext, weil Lehrkraefte keine Nuvora-Konten sind.
@@ -447,3 +451,50 @@ class PlanBlock(Base):
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     week: Mapped[PlanWeek] = relationship(back_populates="blocks")
+
+
+# ─── Modul Karten (Karteikarten, Spaced Repetition) ───
+# Eigenstaendig (Regel 3). Kein Schueler-Login: Zugriff ueber einen
+# einzigartigen Token pro Schueler (wie die gedruckte CardVote-Karte). Der
+# Token IST die Identitaet — Bearer-Secret, muss unratbar sein.
+class CardDeck(Base):
+    """Ein Kartenstapel je Klasse."""
+    __tablename__ = "card_decks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    cards: Mapped[list["Card"]] = relationship(back_populates="deck", cascade="all, delete-orphan", order_by="Card.position")
+
+
+class Card(Base):
+    __tablename__ = "cards"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    deck_id: Mapped[int] = mapped_column(ForeignKey("card_decks.id", ondelete="CASCADE"), index=True)
+    front: Mapped[str] = mapped_column(Text, default="", server_default="")
+    back: Mapped[str] = mapped_column(Text, default="", server_default="")
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    deck: Mapped[CardDeck] = relationship(back_populates="cards")
+
+
+class CardReview(Base):
+    """SM-2-Zustand je (Schueler, Karte). Fortschritt liegt am Server, damit
+    die Lehrkraft ihn sieht — anders als bei Anki (Fortschritt am Geraet)."""
+    __tablename__ = "card_reviews"
+    __table_args__ = (UniqueConstraint("student_id", "card_id", name="uq_review_student_card"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), index=True)
+    card_id: Mapped[int] = mapped_column(ForeignKey("cards.id", ondelete="CASCADE"), index=True)
+    ease: Mapped[int] = mapped_column(Integer, default=250, server_default="250")   # SM-2 EF * 100
+    interval_days: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    reps: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    lapses: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    due: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_reviewed: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
