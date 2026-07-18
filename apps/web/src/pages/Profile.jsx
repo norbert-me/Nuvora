@@ -51,6 +51,13 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     fetch(`${API}/admin/setup`).then(r => r.ok ? r.json() : null).then(setSetup).catch(() => {});
   }, [isAdmin]);
 
+  const refreshVersion = async () => {
+    setVersionLoading(true);
+    const d = await fetch(`${API}/version?refresh=1`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    setVersionInfo(d);
+    setVersionLoading(false);
+  };
+
   const changeChannel = async (ch) => {
     if (ch === versionInfo?.channel) return;
     setVersionLoading(true);
@@ -234,7 +241,10 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
           )}
 
           <div style={{ padding: 24, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 16 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("profile.version")}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{t("profile.version")}</div>
+              <button onClick={refreshVersion} disabled={versionLoading} style={{ marginLeft: "auto", fontSize: 12.5, fontWeight: 600, color: "var(--accent)", background: "none", border: "none", cursor: versionLoading ? "default" : "pointer", opacity: versionLoading ? 0.5 : 1 }}>{t("profile.recheck")}</button>
+            </div>
             {versionLoading ? (
               <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text3)" }}>
                 <Spinner /> {t("profile.checking")}
@@ -252,7 +262,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                   ) : versionInfo.latest ? (
                     <div style={{ marginTop: 10, fontSize: 13, color: "#0a7d3e", display: "flex", alignItems: "center", gap: 6 }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0a7d3e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-                      {t("profile.upToDate")}
+                      {t("profile.upToDate")} (v{versionInfo.latest})
                     </div>
                   ) : (
                     <div style={{ marginTop: 10, fontSize: 12, color: "var(--text3)" }}>{versionInfo.channel === "stable" ? t("profile.noStableRelease") : t("profile.githubFail")}</div>

@@ -408,9 +408,9 @@ async def _get_channel(db) -> str:
     return ch if ch in CHANNELS else DEFAULT_CHANNEL
 
 
-async def _latest_for(channel: str) -> str:
+async def _latest_for(channel: str, force: bool = False) -> str:
     cache = _version_cache[channel]
-    if cache["latest"] is None or (_time.time() - cache["ts"] > 3600):
+    if force or cache["latest"] is None or (_time.time() - cache["ts"] > 3600):
         try:
             fetch = _fetch_latest_stable if channel == "stable" else _fetch_latest_beta
             cache["latest"] = await asyncio.to_thread(fetch)
@@ -421,9 +421,9 @@ async def _latest_for(channel: str) -> str:
 
 
 @app.get("/api/version")
-async def version(user=Depends(_require_admin), db=Depends(get_db)):
+async def version(refresh: bool = False, user=Depends(_require_admin), db=Depends(get_db)):
     channel = await _get_channel(db)
-    latest = await _latest_for(channel)
+    latest = await _latest_for(channel, force=refresh)
     update = bool(latest) and _parse_version(latest) > _parse_version(APP_VERSION)
     return {
         "current": APP_VERSION,
