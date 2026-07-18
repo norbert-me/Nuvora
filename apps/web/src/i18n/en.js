@@ -531,6 +531,8 @@ export default {
   "noten.total": "Total",
   "noten.unweighted": "unweighted",
   "noten.noSections": "No sections yet. Create one (e.g. “Class tests”, “Participation”) and give it a weight.",
+  "noten.reorderFail": "Could not save the new order.",
+  "noten.dragHint": "Drag to move the section",
   "noten.noStudents": "No students in this class yet. Add them under Classes.",
   "noten.studentInfo": "Student info",
   "noten.course": "E/G course",

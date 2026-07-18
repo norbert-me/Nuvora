@@ -35,6 +35,26 @@ export default function Noten() {
   const [neuSpalteIn, setNeuSpalteIn] = useState(null);
   const [beobFuer, setBeobFuer] = useState(null);
   const [infoFuer, setInfoFuer] = useState(null);
+  const [dragId, setDragId] = useState(null);
+
+  // Abschnitt per Drag & Drop verschieben: optimistisch umsortieren, dann speichern.
+  const abschnittDrop = async (zielId) => {
+    const von = dragId;
+    setDragId(null);
+    if (!von || von === zielId) return;
+    const alt = sections;
+    const ids = alt.map((s) => s.id);
+    const from = ids.indexOf(von), to = ids.indexOf(zielId);
+    if (from < 0 || to < 0) return;
+    const neu = [...alt];
+    neu.splice(to, 0, neu.splice(from, 1)[0]);
+    setSections(neu);
+    const res = await fetch(`${API}/classes/${classId}/sections/reorder`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: neu.map((s) => s.id) }),
+    }).catch(() => null);
+    if (!res || !res.ok) { setSections(alt); setError(t("noten.reorderFail")); }
+  };
 
   useEffect(() => {
     fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).then((d) => {
@@ -159,9 +179,14 @@ export default function Noten() {
                 {sections.map((sec) => {
                   const cols = (sec.categories || []).length || 1;
                   return (
-                    <th key={sec.id} colSpan={cols} style={{ ...th, borderLeft: "2px solid var(--border)" }}>
+                    <th key={sec.id} colSpan={cols}
+                      draggable
+                      onDragStart={() => setDragId(sec.id)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={() => abschnittDrop(sec.id)}
+                      style={{ ...th, borderLeft: "2px solid var(--border)", cursor: "grab", opacity: dragId === sec.id ? 0.4 : 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
-                        <span>{sec.name}</span>
+                        <span title={t("noten.dragHint")}>⋮⋮ {sec.name}</span>
                         <span style={{ color: "var(--text3)", fontWeight: 400 }}>{sec.weight} %</span>
                         <SectionMenu t={t} sec={sec}
                           onEdit={(b) => call(() => fetch(`${API}/sections/${sec.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }))}

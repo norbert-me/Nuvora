@@ -130,6 +130,25 @@ async def create_section(class_id: int, body: SectionIn, user: User = Depends(re
     return sec
 
 
+class ReorderIn(BaseModel):
+    ids: list[int]
+
+
+@router.put("/classes/{class_id}/sections/reorder", status_code=204)
+async def reorder_sections(class_id: int, body: ReorderIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Setzt die Reihenfolge der Abschnitte anhand der uebergebenen ID-Liste."""
+    await _owned_class(db, user, class_id)
+    result = await db.execute(
+        select(GradeSection).where(GradeSection.class_id == class_id, GradeSection.owner_id == user.id)
+    )
+    secs = {s.id: s for s in result.scalars().all()}
+    for pos, sid in enumerate(body.ids):
+        sec = secs.get(sid)
+        if sec is not None:
+            sec.position = pos
+    await db.commit()
+
+
 @router.put("/sections/{section_id}", response_model=SectionOut)
 async def update_section(section_id: int, body: SectionIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     sec = await _owned_section(db, user, section_id)

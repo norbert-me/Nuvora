@@ -531,6 +531,8 @@ export default {
   "noten.total": "Gesamt",
   "noten.unweighted": "ungewichtet",
   "noten.noSections": "Noch keine Abschnitte. Lege einen an (z. B. „Klassenarbeiten“, „Sonstige Mitarbeit“) und gib ihm ein Gewicht.",
+  "noten.reorderFail": "Reihenfolge konnte nicht gespeichert werden.",
+  "noten.dragHint": "Ziehen, um den Abschnitt zu verschieben",
   "noten.noStudents": "Noch keine Schüler in dieser Klasse. Lege sie unter Klassen an.",
   "noten.studentInfo": "Schülerinfo",
   "noten.course": "E-/G-Kurs",
