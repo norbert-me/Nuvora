@@ -991,29 +991,31 @@ function StatBox({ label, value, color }) {
 // Dialog: CardVote-Testnoten in eine Kategorie des Notenmoduls uebernehmen.
 function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
   const { t } = useLanguage();
-  const [cats, setCats] = useState([]);
-  const [catId, setCatId] = useState(null);
+  const heute = () => { const d = new Date(); return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`; };
+  const [term, setTerm] = useState("1");
+  const [sections, setSections] = useState([]);
+  const [sectionId, setSectionId] = useState(null);
+  const [colName, setColName] = useState(heute());
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch(`/api/noten/classes/${classId}/sections`)
+    fetch(`/api/noten/classes/${classId}/sections?term=${term}`)
       .then((r) => (r.ok ? r.json() : []))
       .then((secs) => {
-        // Spalten aller Abschnitte flach, mit Abschnittsname als Prefix.
-        const flat = (secs || []).flatMap((sec) => (sec.categories || []).map((c) => ({ id: c.id, name: `${sec.name}: ${c.name}` })));
-        setCats(flat);
-        if (flat.length) setCatId(flat[0].id);
+        const list = secs || [];
+        setSections(list);
+        setSectionId(list.length ? list[0].id : null);
       })
       .catch(() => {});
-  }, [classId]);
+  }, [classId, term]);
 
   const uebernehmen = async () => {
     setBusy(true); setError("");
     const res = await fetch("/api/noten/import-session", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id: sessionId, category_id: catId, grades: grades.map((g) => ({ card_id: g.card_id, value: g.value })) }),
+      body: JSON.stringify({ session_id: sessionId, section_id: sectionId, column_name: colName.trim() || heute(), grades: grades.map((g) => ({ card_id: g.card_id, value: g.value })) }),
     });
     setBusy(false);
     if (!res.ok) { const b = await res.json().catch(() => ({})); setError(b.detail || t("notenimp.failed")); return; }
@@ -1036,23 +1038,35 @@ function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
             </p>
             <button onClick={onClose} style={btnPrimary}>{t("noten.close")}</button>
           </>
-        ) : cats.length === 0 ? (
-          <>
-            <p style={{ fontSize: 13.5, color: "var(--text3)", marginBottom: 16 }}>
-              {t("notenimp.noCat")}
-            </p>
-            <button onClick={onClose} style={btnSecondary}>{t("noten.close")}</button>
-          </>
         ) : (
           <>
             {error && <p style={{ color: "var(--danger, #dc2626)", fontSize: 13, marginBottom: 10 }}>{error}</p>}
-            <div style={{ fontSize: 12.5, color: "var(--text2)", marginBottom: 6 }}>{t("notenimp.whichCat")}</div>
-            <select value={catId ?? ""} onChange={(e) => setCatId(Number(e.target.value))}
-              style={{ width: "100%", padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)", marginBottom: 16, boxSizing: "border-box" }}>
-              {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={uebernehmen} disabled={busy || !catId} style={{ ...btnPrimary, opacity: busy || !catId ? 0.5 : 1 }}>
+            {(() => { const fld = { width: "100%", padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }; const lbl = { fontSize: 12.5, color: "var(--text2)", marginBottom: 6, marginTop: 12 }; return (
+              <>
+                <div style={{ ...lbl, marginTop: 0 }}>{t("noten.term")}</div>
+                <select value={term} onChange={(e) => setTerm(e.target.value)} style={fld}>
+                  <option value="1">{t("noten.term1")}</option>
+                  <option value="2">{t("noten.term2")}</option>
+                </select>
+
+                <div style={lbl}>{t("notenimp.section")}</div>
+                {sections.length === 0 ? (
+                  <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("notenimp.noSection")}</p>
+                ) : (
+                  <select value={sectionId ?? ""} onChange={(e) => setSectionId(Number(e.target.value))} style={fld}>
+                    {sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                )}
+
+                <div style={lbl}>{t("notenimp.colName")}</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input value={colName} onChange={(e) => setColName(e.target.value)} style={fld} />
+                  <button onClick={() => setColName(heute())} style={{ ...btnSecondary, whiteSpace: "nowrap" }}>{t("noten.useDate")}</button>
+                </div>
+              </>
+            ); })()}
+            <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+              <button onClick={uebernehmen} disabled={busy || !sectionId} style={{ ...btnPrimary, opacity: busy || !sectionId ? 0.5 : 1 }}>
                 {busy ? t("notenimp.importing") : t("notenimp.import")}
               </button>
               <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>

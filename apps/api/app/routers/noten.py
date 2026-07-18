@@ -590,8 +590,18 @@ class ImportGrade(BaseModel):
 
 class ImportBody(BaseModel):
     session_id: int
-    category_id: int
+    # Uebernahme legt eine NEUE Spalte im gewaehlten Abschnitt an.
+    section_id: int
+    column_name: str
     grades: List[ImportGrade]
+
+    @field_validator("column_name")
+    @classmethod
+    def name_ok(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("Spaltenname darf nicht leer sein")
+        return v
 
 
 @router.post("/import-session", status_code=201)
@@ -603,9 +613,17 @@ async def import_session(body: ImportBody, user: User = Depends(require_module),
     if not sess.class_id:
         raise HTTPException(400, "Diese Session hat keine Klasse — keine Zuordnung möglich")
 
-    cat = await _owned_category(db, user, body.category_id)
-    if cat.class_id != sess.class_id:
-        raise HTTPException(400, "Spalte und Session gehören zu verschiedenen Klassen")
+    sec = await _owned_section(db, user, body.section_id)
+    if sec.class_id != sess.class_id:
+        raise HTTPException(400, "Abschnitt und Session gehören zu verschiedenen Klassen")
+
+    # Neue Spalte im Abschnitt anlegen (ans Ende).
+    pos = len((await db.execute(
+        select(GradeCategory).where(GradeCategory.section_id == sec.id)
+    )).scalars().all())
+    cat = GradeCategory(name=body.column_name, section_id=sec.id, class_id=sec.class_id, owner_id=user.id, position=pos)
+    db.add(cat)
+    await db.flush()
 
     students = (await db.execute(select(Student).where(Student.class_id == sess.class_id))).scalars().all()
     by_card = {st.card_id: st.id for st in students}
