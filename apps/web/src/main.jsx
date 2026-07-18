@@ -49,7 +49,6 @@ import StudentEvaluation from "./pages/StudentEvaluation.jsx";
 import Login from "./pages/Login.jsx";
 import Profile from "./pages/Profile.jsx";
 import Legal from "./pages/Legal.jsx";
-import Changelog from "./pages/Changelog.jsx";
 import Landing from "./pages/Landing.jsx";
 import Marketplace from "./pages/Marketplace.jsx";
 import ResetPassword from "./pages/ResetPassword.jsx";
@@ -351,7 +350,7 @@ function Nav({ user, onLogout }) {
   const { t } = useLanguage();
 
   const navItems = getModuleNavItems(t, location);
-  const allPages = [...navItems, { to: `${CV}/tutorial`, label: t("nav.tutorial") }, { to: `${CV}/scan`, label: t("nav.scanner") }, { to: "/profile", label: t("nav.profile") }, { to: `${CV}/evaluation`, label: t("nav.evaluation") }, { to: "/changelog", label: t("nav.changelog") }, { to: "/login", label: t("nav.login") }];
+  const allPages = [...navItems, { to: `${CV}/tutorial`, label: t("nav.tutorial") }, { to: `${CV}/scan`, label: t("nav.scanner") }, { to: "/profile", label: t("nav.profile") }, { to: `${CV}/evaluation`, label: t("nav.evaluation") }, { to: "/login", label: t("nav.login") }];
   const pageTitle = allPages.find((item) => location.pathname.startsWith(item.to))?.label || "";
 
   const showNav = !!user;
@@ -657,7 +656,6 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path="/confirm-email-change" element={<ConfirmEmailChange />} />
           <Route path="/profile" element={user ? <Profile user={user} onLogout={logout} onUserUpdate={setUser} /> : <Landing />} />
           <Route path="/legal" element={<Legal />} />
-          <Route path="/changelog" element={<Changelog />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/help" element={<Help />} />
 
@@ -715,8 +713,6 @@ function AppRoutes({ user, setUser, logout }) {
           <Link to={`/help?area=${helpArea(location.pathname)}`} style={footerLink}>{t("footer.help")}</Link>
           <span style={footerSep}>·</span>
           <Link to={`${CV}/tutorial`} style={footerLink}>Tutorial</Link>
-          <span style={footerSep}>·</span>
-          <Link to="/changelog" style={footerLink}>{t("footer.changelog")}</Link>
           <span style={footerSep}>·</span>
           <Link to="/contact" style={footerLink}>{t("footer.contact")}</Link>
           <span style={footerSep}>·</span>
