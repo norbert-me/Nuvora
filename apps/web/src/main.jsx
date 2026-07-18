@@ -690,7 +690,7 @@ function AppRoutes({ user, setUser, logout }) {
       <footer style={{ textAlign: "center", padding: "16px 0 24px", fontSize: 12, color: "var(--text3)" }}>
         {/* Rueckmeldungs-Hinweis: stand frueher nur auf der Landing- und der
             CardVote-Startseite. In der Fussleiste laeuft er auf jeder Seite mit. */}
-        <p style={{ margin: "0 auto 12px", maxWidth: 520, lineHeight: 1.6, padding: "0 16px" }}>
+        <p style={{ margin: "0 auto 12px", lineHeight: 1.6, padding: "0 16px" }}>
           {t("home.contribute").split("{{link}}")[0]}
           <Link to="/contact" style={{ color: "var(--accent)", textDecoration: "none" }}>{t("footer.contact")}</Link>
           {t("home.contribute").split("{{link}}")[1]}
