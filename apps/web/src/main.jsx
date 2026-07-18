@@ -79,6 +79,7 @@ function helpArea(pathname) {
   if (pathname.startsWith("/cardvote")) return "cardvote";
   if (pathname.startsWith("/lernpfad")) return "lernpfad";
   if (pathname.startsWith("/noten")) return "noten";
+  if (pathname.startsWith("/karten")) return "karten";
   return "core";
 }
 const LP = "/lernpfad";

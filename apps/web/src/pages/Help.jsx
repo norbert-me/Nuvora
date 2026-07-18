@@ -84,8 +84,20 @@ function NotenHilfe({ t }) {
   );
 }
 
-const AREA_COMP = { core: KernHilfe, cardvote: CardVoteHilfe, lernpfad: LernpfadHilfe, noten: NotenHilfe };
-const AREA_LABEL = { core: "help.core.modulesT", cardvote: "CardVote", lernpfad: "Lernpfad", noten: "noten.title" };
+function KartenHilfe({ t }) {
+  return (
+    <>
+      <Section title={t("help.ka.whatT")}>{t("help.ka.what")}</Section>
+      <Section title={t("help.ka.decksT")}>{t("help.ka.decks")}</Section>
+      <Section title={t("help.ka.qrT")}>{t("help.ka.qr")}</Section>
+      <Section title={t("help.ka.progressT")}>{t("help.ka.progress")}</Section>
+      <Faq q={t("help.ka.faqQ")}>{t("help.ka.faqA")}</Faq>
+    </>
+  );
+}
+
+const AREA_COMP = { core: KernHilfe, cardvote: CardVoteHilfe, lernpfad: LernpfadHilfe, karten: KartenHilfe, noten: NotenHilfe };
+const AREA_LABEL = { core: "help.core.modulesT", cardvote: "CardVote", lernpfad: "Lernpfad", karten: "karten.title", noten: "noten.title" };
 
 export default function Help() {
   const [params, setParams] = useSearchParams();
@@ -94,13 +106,13 @@ export default function Help() {
   const aktiv = new Set(modules.filter((m) => m.active).map((m) => m.key));
 
   // Kern immer, Module nur wenn aktiv.
-  const sichtbar = ["core", ...["cardvote", "lernpfad", "noten"].filter((k) => aktiv.has(k))];
+  const sichtbar = ["core", ...["cardvote", "lernpfad", "karten", "noten"].filter((k) => aktiv.has(k))];
   const gewuenscht = params.get("area");
   const area = sichtbar.includes(gewuenscht) ? gewuenscht : sichtbar[0];
   const Comp = AREA_COMP[area];
 
   // core-Reiter zeigt "Kern"; Modulnamen sind Eigennamen ausser Noten.
-  const label = (k) => (k === "core" ? t("help.coreLabel") : k === "noten" ? t("noten.title") : AREA_LABEL[k]);
+  const label = (k) => (k === "core" ? t("help.coreLabel") : k === "noten" ? t("noten.title") : k === "karten" ? t("karten.title") : AREA_LABEL[k]);
 
   return (
     <div style={{ maxWidth: 700 }}>
