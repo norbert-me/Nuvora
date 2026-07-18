@@ -151,6 +151,21 @@ async def reorder_sections(class_id: int, body: ReorderIn, user: User = Depends(
     await db.commit()
 
 
+@router.put("/sections/{section_id}/categories/reorder", status_code=204)
+async def reorder_categories(section_id: int, body: ReorderIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Setzt die Reihenfolge der Spalten eines Abschnitts anhand der ID-Liste."""
+    await _owned_section(db, user, section_id)
+    result = await db.execute(
+        select(GradeCategory).where(GradeCategory.section_id == section_id, GradeCategory.owner_id == user.id)
+    )
+    cats = {c.id: c for c in result.scalars().all()}
+    for pos, cid in enumerate(body.ids):
+        cat = cats.get(cid)
+        if cat is not None:
+            cat.position = pos
+    await db.commit()
+
+
 @router.put("/sections/{section_id}", response_model=SectionOut)
 async def update_section(section_id: int, body: SectionIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     sec = await _owned_section(db, user, section_id)

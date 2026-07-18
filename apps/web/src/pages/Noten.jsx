@@ -60,6 +60,39 @@ export default function Noten() {
     setDragOver((p) => (p && p.id === secId && p.side === side ? p : { id: secId, side }));
   };
 
+  // Spalten je Abschnitt: gleiche Mechanik wie Abschnitte, nur innerhalb eines
+  // Abschnitts. dragCol haelt {catId, secId}, dragColOver die Vorschau.
+  const [dragCol, setDragCol] = useState(null);
+  const [dragColOver, setDragColOver] = useState(null); // { id, side }
+  const dragOverCol = (e, catId, catSecId) => {
+    e.preventDefault();
+    if (!dragCol || dragCol.secId !== catSecId || catId === dragCol.catId) { setDragColOver(null); return; }
+    const r = e.currentTarget.getBoundingClientRect();
+    const side = e.clientX < r.left + r.width / 2 ? "left" : "right";
+    setDragColOver((p) => (p && p.id === catId && p.side === side ? p : { id: catId, side }));
+  };
+  const spalteDrop = async (zielId, sec) => {
+    const von = dragCol, ov = dragColOver;
+    setDragCol(null); setDragColOver(null);
+    if (!von || von.secId !== sec.id || von.catId === zielId) return;
+    const alt = sections;
+    const cols = (sec.categories || []).map((c) => c.id);
+    const from = cols.indexOf(von.catId);
+    let to = cols.indexOf(zielId);
+    if (from < 0 || to < 0) return;
+    if (ov && ov.id === zielId && ov.side === "right") to += 1;
+    if (from < to) to -= 1;
+    const neuCols = [...(sec.categories || [])];
+    neuCols.splice(to, 0, neuCols.splice(from, 1)[0]);
+    const neuSections = sections.map((s) => (s.id === sec.id ? { ...s, categories: neuCols } : s));
+    setSections(neuSections);
+    const res = await fetch(`${API}/sections/${sec.id}/categories/reorder`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: neuCols.map((c) => c.id) }),
+    }).catch(() => null);
+    if (!res || !res.ok) { setSections(alt); setError(t("noten.reorderFail")); }
+  };
+
   // Abschnitt per Drag & Drop verschieben: optimistisch umsortieren, dann speichern.
   const abschnittDrop = async (zielId) => {
     const von = dragId, ov = dragOver;
@@ -301,8 +334,18 @@ export default function Noten() {
                     ];
                   }
                   return [
-                    ...cols.map((c, i) => (
-                    <th key={c.id} style={{ ...th, borderLeft: i === 0 ? "2px solid var(--border)" : "1px solid var(--border)", minWidth: 70, fontWeight: 500 }}>
+                    ...cols.map((c, i) => {
+                    const colOver = dragCol && dragColOver && dragColOver.id === c.id ? dragColOver.side : null;
+                    return (
+                    <th key={c.id}
+                      draggable
+                      onDragStart={() => setDragCol({ catId: c.id, secId: sec.id })}
+                      onDragOver={(e) => dragOverCol(e, c.id, sec.id)}
+                      onDrop={() => spalteDrop(c.id, sec)}
+                      onDragEnd={() => { setDragCol(null); setDragColOver(null); }}
+                      style={{ ...th, borderLeft: i === 0 ? "2px solid var(--border)" : "1px solid var(--border)", minWidth: 70, fontWeight: 500,
+                        cursor: "grab", opacity: dragCol && dragCol.catId === c.id ? 0.4 : 1,
+                        boxShadow: colOver === "left" ? "inset 3px 0 0 var(--accent)" : colOver === "right" ? "inset -3px 0 0 var(--accent)" : undefined }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 3, justifyContent: "center", position: "relative" }}>
                         <button onClick={() => setRenameCol(renameCol === c.id ? null : c.id)} title={t("noten.colOverview")}
                           style={{ maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", border: "none", background: "none", cursor: "pointer", color: "var(--text2)", fontWeight: 500, fontSize: 12, padding: 0 }}>{c.name}</button>
@@ -317,7 +360,7 @@ export default function Noten() {
                         <ColForm t={t} onCancel={() => setNeuSpalteIn(null)} onSave={async (name) => { if (await call(() => fetch(`${API}/categories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: cols.length }) }))) setNeuSpalteIn(null); }} />
                       )}
                     </th>
-                    )),
+                    ); }),
                     bereich,
                   ];
                 })}
