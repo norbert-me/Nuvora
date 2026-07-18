@@ -102,10 +102,13 @@ export default function Noten() {
     <div style={{ maxWidth: 1200 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
         <h1 style={pageTitle}>{t("noten.title")}</h1>
-        <select value={classId ?? ""} onChange={(e) => setClassId(Number(e.target.value))}
-          style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)" }}>
-          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
+          {t("nav.classes")}
+          <select value={classId ?? ""} onChange={(e) => setClassId(Number(e.target.value))}
+            style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)" }}>
+            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </label>
         {sections.length > 0 && (
           <span style={{ fontSize: 12.5, color: gewichtSumme === 100 ? "var(--text3)" : "#b8860b" }}>
             {gewichtSumme !== 100 ? t("noten.weightNot100", { n: gewichtSumme }) : t("noten.weightSum", { n: gewichtSumme })}
