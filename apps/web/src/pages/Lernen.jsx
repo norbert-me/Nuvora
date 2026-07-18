@@ -23,7 +23,7 @@ export default function Lernen() {
 
   const bewerten = async (grade) => {
     const card = data.cards[i];
-    fetch(`${API}/lernen/${token}/review`, {
+    await fetch(`${API}/lernen/${token}/review`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ card_id: card.card_id, grade }),
     }).catch(() => {});
@@ -32,7 +32,9 @@ export default function Lernen() {
     // der Warteschlange. Sonst ist sie fuer heute erledigt und faellt raus.
     const rest = data.cards.filter((_, idx) => idx !== i);
     const queue = grade === 0 ? [...rest, card] : rest;
-    if (queue.length === 0) { setDone(true); return; }
+    // Fertig: frisch vom Server laden, damit "gelernt" und Reifegrad die eben
+    // gesendeten Bewertungen zeigen und nicht den Stand vom Seitenaufruf.
+    if (queue.length === 0) { load(); return; }
     setData({ ...data, cards: queue });
     // Nicht dieselbe Karte direkt noch einmal: war sie die letzte, vorne weiter.
     setI(i >= queue.length || (grade === 0 && i >= queue.length - 1) ? 0 : i);

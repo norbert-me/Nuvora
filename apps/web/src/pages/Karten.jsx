@@ -18,6 +18,7 @@ export default function Karten() {
   const view = params.get("tab") || "cards"; // cards | progress | qr — aus der Navbar
   const [error, setError] = useState("");
   const [newDeck, setNewDeck] = useState("");
+  const [addingDeck, setAddingDeck] = useState(false);
 
   useEffect(() => {
     fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).then((d) => {
@@ -72,11 +73,11 @@ export default function Karten() {
 
       {view === "cards" && (
         <>
-          <form onSubmit={async (e) => { e.preventDefault(); if (newDeck.trim() && await call(() => fetch(`${API}/classes/${classId}/decks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newDeck.trim() }) }))) setNewDeck(""); }}
+          <form onSubmit={async (e) => { e.preventDefault(); if (addingDeck || !newDeck.trim()) return; setAddingDeck(true); try { if (await call(() => fetch(`${API}/classes/${classId}/decks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newDeck.trim() }) }))) setNewDeck(""); } finally { setAddingDeck(false); } }}
             style={{ display: "flex", gap: 8, marginBottom: 18 }}>
             <input value={newDeck} onChange={(e) => setNewDeck(e.target.value)} placeholder={t("karten.newDeck")}
               style={{ flex: 1, maxWidth: 320, padding: "8px 12px", border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)" }} />
-            <button type="submit" disabled={!newDeck.trim()} style={{ ...btnPrimary, opacity: newDeck.trim() ? 1 : 0.4 }}>{t("common.add")}</button>
+            <button type="submit" disabled={addingDeck || !newDeck.trim()} style={{ ...btnPrimary, opacity: (!addingDeck && newDeck.trim()) ? 1 : 0.4 }}>{t("common.add")}</button>
           </form>
           {decks.length === 0 && <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("karten.noDecks")}</p>}
           {decks.map((d) => <Deck key={d.id} deck={d} t={t} call={call} />)}
@@ -154,10 +155,14 @@ function Deck({ deck, t, call }) {
   const [front, setFront] = useState("");
   const [back, setBack] = useState("");
   const [planDate, setPlanDate] = useState("");
+  const [busy, setBusy] = useState(false);
   const add = async (e) => {
     e.preventDefault();
-    if (!front.trim() || !back.trim()) return;
-    if (await call(() => fetch(`${API}/decks/${deck.id}/cards`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ front: front.trim(), back: back.trim() }) }))) { setFront(""); setBack(""); }
+    if (busy || !front.trim() || !back.trim()) return;
+    setBusy(true);
+    try {
+      if (await call(() => fetch(`${API}/decks/${deck.id}/cards`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ front: front.trim(), back: back.trim() }) }))) { setFront(""); setBack(""); }
+    } finally { setBusy(false); }
   };
   const release = (payload) => call(() => fetch(`${API}/decks/${deck.id}/release`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }));
 
@@ -203,7 +208,7 @@ function Deck({ deck, t, call }) {
       <form onSubmit={add} style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
         <input value={front} onChange={(e) => setFront(e.target.value)} placeholder={t("karten.front")} style={{ flex: 1, minWidth: 120, ...inp }} />
         <input value={back} onChange={(e) => setBack(e.target.value)} placeholder={t("karten.back")} style={{ flex: 1, minWidth: 120, ...inp }} />
-        <button type="submit" disabled={!front.trim() || !back.trim()} style={{ ...btnPrimary, padding: "6px 14px", opacity: (front.trim() && back.trim()) ? 1 : 0.4 }}>{t("common.add")}</button>
+        <button type="submit" disabled={busy || !front.trim() || !back.trim()} style={{ ...btnPrimary, padding: "6px 14px", opacity: (!busy && front.trim() && back.trim()) ? 1 : 0.4 }}>{t("common.add")}</button>
       </form>
     </div>
   );
