@@ -37,6 +37,9 @@ export default function Noten() {
   const [beobFuer, setBeobFuer] = useState(null);
   const [infoFuer, setInfoFuer] = useState(null);
   const [term, setTerm] = useState("1");
+  // Wie mehrere Einzelnoten zusammengefasst werden: Mittel oder Median. Merkt
+  // sich die Wahl pro Browser. Die Abschnitts-Gewichtung bleibt unberuehrt.
+  const [agg, setAgg] = useState(() => { try { return localStorage.getItem("noten_agg") === "median" ? "median" : "mean"; } catch { return "mean"; } });
   const [yearData, setYearData] = useState({ sections: [], rows: [] });
   const [collapsed, setCollapsed] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem("noten_collapsed") || "[]")); } catch { return new Set(); } });
   const toggleCollapse = (secId) => setCollapsed((prev) => {
@@ -106,7 +109,7 @@ export default function Noten() {
   const load = async (id) => {
     if (!id) return;
     if (term === "year") {
-      const y = await fetch(`${API}/classes/${id}/year`).then((r) => (r.ok ? r.json() : { sections: [], rows: [] }));
+      const y = await fetch(`${API}/classes/${id}/year?agg=${agg}`).then((r) => (r.ok ? r.json() : { sections: [], rows: [] }));
       setYearData(y);
       setStudents(classes.find((c) => c.id === id)?.students || []);
       return;
@@ -114,12 +117,13 @@ export default function Noten() {
     const [sec, ent, sum] = await Promise.all([
       fetch(`${API}/classes/${id}/sections?term=${term}`).then((r) => (r.ok ? r.json() : [])),
       fetch(`${API}/classes/${id}/entries`).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API}/classes/${id}/summary?term=${term}`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`${API}/classes/${id}/summary?term=${term}&agg=${agg}`).then((r) => (r.ok ? r.json() : [])),
     ]);
     setSections(sec); setEntries(ent); setSummary(sum);
     setStudents(classes.find((c) => c.id === id)?.students || []);
   };
-  useEffect(() => { if (classId) load(classId); }, [classId, classes, term]);
+  useEffect(() => { if (classId) load(classId); }, [classId, classes, term, agg]);
+  const setAggPersist = (m) => { setAgg(m); try { localStorage.setItem("noten_agg", m); } catch { /* egal */ } };
 
   const call = async (fn) => {
     setError("");
@@ -183,6 +187,13 @@ export default function Noten() {
             <option value="year">{t("noten.year")}</option>
           </select>
         </label>
+        <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden" }} title={t("noten.aggHint")}>
+          {[["mean", t("noten.aggMean")], ["median", t("noten.aggMedian")]].map(([m, label]) => (
+            <button key={m} onClick={() => setAggPersist(m)}
+              style={{ padding: "6px 14px", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
+                background: agg === m ? "var(--accent)" : "transparent", color: agg === m ? "#fff" : "var(--text2)" }}>{label}</button>
+          ))}
+        </div>
         {term !== "year" && sections.length > 0 && (
           <span style={{ fontSize: 12.5, color: gewichtSumme === 100 ? "var(--text3)" : "#b8860b" }}>
             {gewichtSumme !== 100 ? t("noten.weightNot100", { n: gewichtSumme }) : t("noten.weightSum", { n: gewichtSumme })}

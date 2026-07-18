@@ -420,8 +420,22 @@ class StudentSummary(BaseModel):
     observations: int
 
 
-async def _summarize(db, user, class_id, term):
-    """Berechnet die Uebersicht eines Halbjahrs. Gibt (sections, out) zurueck."""
+def _agg(werte, mode):
+    """Mehrere Noten zu einer zusammenfassen: Mittel oder Median. Die
+    Abschnitts-Gewichtung bleibt davon unberuehrt — sie ist Fachkonferenz-Recht."""
+    if not werte:
+        return None
+    if mode == "median":
+        s = sorted(werte)
+        n = len(s)
+        m = n // 2
+        return round(s[m] if n % 2 else (s[m - 1] + s[m]) / 2, 2)
+    return round(sum(werte) / len(werte), 2)
+
+
+async def _summarize(db, user, class_id, term, agg="mean"):
+    """Berechnet die Uebersicht eines Halbjahrs. Gibt (sections, out) zurueck.
+    agg steuert nur, wie mehrere Einzelnoten zusammengefasst werden."""
     sections = (await db.execute(
         select(GradeSection).where(GradeSection.owner_id == user.id, GradeSection.class_id == class_id, GradeSection.term == term)
         .order_by(GradeSection.position, GradeSection.id)
@@ -463,14 +477,14 @@ async def _summarize(db, user, class_id, term):
         for c in cats:
             werte = [e.value for e in grades if e.category_id == c.id]
             if werte:
-                per_cat[str(c.id)] = round(sum(werte) / len(werte), 2)
+                per_cat[str(c.id)] = _agg(werte, agg)
 
-        # Schnitt je Abschnitt: Mittel aller Noten seiner Spalten
+        # Schnitt je Abschnitt: Mittel/Median aller Noten seiner Spalten
         per_sec = {}
         for s in sections:
             werte = [e.value for e in grades if cat_section.get(e.category_id) == s.id]
             if werte:
-                per_sec[str(s.id)] = round(sum(werte) / len(werte), 2)
+                per_sec[str(s.id)] = _agg(werte, agg)
 
         # Effektive Bereichsnote: manuell gesetzte schlaegt den Schnitt.
         sec_ovr = {str(s.id): sec_over[(st.id, s.id)] for s in sections if (st.id, s.id) in sec_over}
@@ -484,11 +498,11 @@ async def _summarize(db, user, class_id, term):
         if wsum > 0:
             weighted = round(sum(sec_eff[sid] * sec_weight.get(int(sid), 0) for sid in sec_eff) / wsum, 2)
         elif sec_eff:
-            # Kein Gewicht gesetzt: ungewichteter Mittelwert der Bereichsnoten.
-            weighted = round(sum(sec_eff.values()) / len(sec_eff), 2)
+            # Kein Gewicht gesetzt: ungewichtete Zusammenfassung der Bereichsnoten.
+            weighted = _agg(list(sec_eff.values()), agg)
             fallback = True
         elif grades:
-            weighted = round(sum(e.value for e in grades) / len(grades), 2)
+            weighted = _agg([e.value for e in grades], agg)
             fallback = True
 
         out.append(StudentSummary(
@@ -503,9 +517,9 @@ async def _summarize(db, user, class_id, term):
 
 
 @router.get("/classes/{class_id}/summary", response_model=List[StudentSummary])
-async def summary(class_id: int, term: str = "1", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def summary(class_id: int, term: str = "1", agg: str = "mean", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
-    _, out = await _summarize(db, user, class_id, term)
+    _, out = await _summarize(db, user, class_id, term, agg="median" if agg == "median" else "mean")
     return out
 
 
@@ -536,10 +550,11 @@ class YearOut(BaseModel):
 
 
 @router.get("/classes/{class_id}/year", response_model=YearOut)
-async def year_summary(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def year_summary(class_id: int, agg: str = "mean", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
-    sec1, sum1 = await _summarize(db, user, class_id, "1")
-    sec2, sum2 = await _summarize(db, user, class_id, "2")
+    mode = "median" if agg == "median" else "mean"
+    sec1, sum1 = await _summarize(db, user, class_id, "1", agg=mode)
+    sec2, sum2 = await _summarize(db, user, class_id, "2", agg=mode)
 
     year_over = {o.student_id: o.value for o in (await db.execute(
         select(GradeOverride).where(
