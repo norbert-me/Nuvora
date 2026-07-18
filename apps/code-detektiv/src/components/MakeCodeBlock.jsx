@@ -318,6 +318,13 @@ export function DragOverlayBlock({ block }) {
         <div className="mc-block-header">
           <BlockContent block={block} />
         </div>
+        {/* Ganzen Block zeigen: die verschachtelten Kinder gehoeren mit ins
+            Drag-Bild, sonst schwebt nur der Kopf. */}
+        <div className="mc-block-body">
+          {block.children?.map(child => (
+            <StaticBlock key={child.id} block={child} />
+          ))}
+        </div>
         <div className="mc-block-footer" />
       </div>
     );
