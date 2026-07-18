@@ -203,7 +203,7 @@ export default function Evaluation() {
   };
 
   if (loadError && !data) return <p style={{ color: "#d1350f" }}>Verbindungsfehler — Server nicht erreichbar.</p>;
-  if (!data) return <div style={{ maxWidth: 1000, margin: "0 auto", minHeight: "70vh" }} />;
+  if (!data) return <div style={{ minHeight: "70vh" }} />;
 
   const { questions: rawQuestions = [], students: rawStudents = [], session_name } = data;
 
@@ -475,7 +475,7 @@ const gradeDistribution = (() => {
   const maxGrade = Math.max(...Object.values(gradeDistribution), 1);
 
   return (
-    <div style={{ maxWidth: 1000, margin: "0 auto" }}>
+    <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <Link to="/cardvote/tests" style={{ color: "var(--text3)", textDecoration: "none", fontSize: 13, fontWeight: 500 }}>← Alle Tests</Link>
         {notenDialog && (

@@ -546,23 +546,15 @@ const footerSep = { color: "var(--text3)" };
 function ContentWrapper({ children }) {
   const location = useLocation();
   const p = location.pathname;
+  // Die Live-Session laeuft voll ueber die Breite (Beamer). Alles andere ist
+  // einheitlich zentriert — dieselbe Spaltenbreite auf jeder Seite, damit die
+  // Oberflaeche nicht je Modul anders links klebt.
   const isSession = p.startsWith("/session") || p.startsWith("/cardvote/session");
-  // Werkzeugseiten (breite Tabellen, Auswertungen) nutzen die volle Breite.
-  // Nur Text-/Formularseiten bleiben lesefreundlich zentriert.
-  const toolFull = ["/cardvote", "/noten", "/karten", "/classes", "/topics", "/planung", "/lernpfad", "/code-detektiv", "/modules"]
-    .some((t) => p.startsWith(t));
-  if (isSession || toolFull) {
-    return (
-      <>
-        <style>{`@media (max-width: 640px) { .content-full { padding: 16px 12px 64px !important; } }`}</style>
-        <div className="content-full" style={{ padding: "24px 24px 64px" }}>{children}</div>
-      </>
-    );
-  }
+  if (isSession) return <div style={{ padding: "24px 16px 64px" }}>{children}</div>;
   return (
     <>
       <style>{`@media (max-width: 640px) { .content-wrap { padding: 16px 12px 64px !important; } }`}</style>
-      <div className="content-wrap" style={{ padding: "32px 32px 64px", maxWidth: 920, margin: "0 auto" }}>{children}</div>
+      <div className="content-wrap" style={{ padding: "32px 32px 64px", maxWidth: 1080, margin: "0 auto" }}>{children}</div>
     </>
   );
 }
