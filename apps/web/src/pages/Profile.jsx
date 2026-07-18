@@ -277,9 +277,8 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                       <a href={versionInfo.repo_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 600, color: "var(--accent)" }}>{t("profile.toGithub")}</a>
                     </div>
                   ) : versionInfo.latest ? (
-                    <div style={{ marginTop: 10, fontSize: 13, color: "#0a7d3e", display: "flex", alignItems: "center", gap: 6 }}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0a7d3e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-                      {t("profile.upToDate")} (v{versionInfo.latest})
+                    <div title={t("profile.upToDate")} style={{ marginTop: 10, fontSize: 13, color: "#0a7d3e", display: "flex", alignItems: "center", gap: 6 }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0a7d3e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
                     </div>
                   ) : (
                     <div style={{ marginTop: 10, fontSize: 12, color: "var(--text3)" }}>{versionInfo.channel === "stable" ? t("profile.noStableRelease") : t("profile.githubFail")}</div>
