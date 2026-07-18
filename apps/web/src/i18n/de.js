@@ -342,6 +342,7 @@ export default {
   "session.countsLine": "{{q}} Fragen · {{s}} Lernende",
   "session.timerSuffix": "· {{t}}s Timer",
   "session.start": "Starten",
+  "session.volume": "Lautstärke",
   "session.mute": "Ton aus",
   "session.unmute": "Ton an",
   "session.continue": "Fortsetzen",

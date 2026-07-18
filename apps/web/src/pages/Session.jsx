@@ -63,6 +63,7 @@ export default function Session() {
   const [resumeQid, setResumeQid] = useState(null);
   const [finished, setFinished] = useState(false);
   const [muted, setMuted] = useState(() => localStorage.getItem("nuvora_session_muted") === "1");
+  const [volume, setVolume] = useState(() => { const v = parseFloat(localStorage.getItem("nuvora_session_volume")); return Number.isFinite(v) ? v : 0.5; });
   const audioCtxRef = useRef(null);
   const [allScans, setAllScans] = useState({});
   const [questionTimes, setQuestionTimes] = useState({});
@@ -221,14 +222,16 @@ export default function Session() {
       const g = ctx.createGain();
       o.type = "sine";
       o.frequency.value = freq;
+      const peak = Math.max(0.0002, volume * 0.45);
       g.gain.setValueAtTime(0.0001, ctx.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.22, ctx.currentTime + 0.01);
+      g.gain.exponentialRampToValueAtTime(peak, ctx.currentTime + 0.01);
       g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
       o.connect(g); g.connect(ctx.destination);
       o.start(); o.stop(ctx.currentTime + dur);
     } catch { /* Audio nicht verfuegbar */ }
   };
   const toggleMute = () => setMuted((m) => { const n = !m; localStorage.setItem("nuvora_session_muted", n ? "1" : "0"); return n; });
+  const changeVolume = (v) => { setVolume(v); localStorage.setItem("nuvora_session_volume", String(v)); if (v > 0 && muted) toggleMute(); };
 
   const activateQuestion = async (idx) => {
     const q = questions[idx];
@@ -730,6 +733,9 @@ export default function Session() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>
             )}
           </button>
+          <input type="range" min={0} max={1} step={0.05} value={muted ? 0 : volume}
+            onChange={(e) => changeVolume(parseFloat(e.target.value))}
+            title={t("session.volume")} style={{ width: 70, accentColor: "var(--accent)", cursor: "pointer" }} />
           <button onClick={() => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }} style={{
             padding: "5px 10px", fontSize: 14, cursor: "pointer",
             background: "none", color: "var(--text3)", border: "1px solid var(--border2)", borderRadius: 980,

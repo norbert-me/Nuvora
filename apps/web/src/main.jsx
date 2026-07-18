@@ -253,15 +253,15 @@ function ConnectionMonitor() {
   if (online) return null;
 
   const text = reason === "db"
-    ? "Datenbank nicht erreichbar — Änderungen können gerade nicht gespeichert werden. Neuversuch läuft…"
-    : "Keine Verbindung zum Server — Änderungen können gerade nicht gespeichert werden. Neuversuch läuft…";
+    ? "Datenbank nicht erreichbar — Neuversuch läuft…"
+    : "Keine Verbindung — Neuversuch läuft…";
 
   return (
     <div style={{
-      position: "fixed", top: 0, left: 0, right: 0, zIndex: 200, height: 34,
+      position: "fixed", top: 0, left: 0, right: 0, zIndex: 200, minHeight: 34,
       background: "#d1350f", color: "#fff",
       display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-      padding: "0 16px", fontSize: 13, fontWeight: 600,
+      padding: "6px 14px", fontSize: 13, fontWeight: 600, textAlign: "center",
       boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
     }}>
       <style>{`@keyframes cmspin{to{transform:rotate(360deg)}}`}</style>

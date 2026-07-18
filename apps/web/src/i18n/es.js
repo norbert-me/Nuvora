@@ -342,6 +342,7 @@ export default {
   "session.countsLine": "{{q}} preguntas · {{s}} estudiantes",
   "session.timerSuffix": "· temporizador de {{t}}s",
   "session.start": "Empezar",
+  "session.volume": "Volumen",
   "session.mute": "Silenciar",
   "session.unmute": "Activar sonido",
   "session.continue": "Continuar",

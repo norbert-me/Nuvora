@@ -410,27 +410,29 @@ export default function Scanner() {
         <>
           {/* Fehlende Lernende kompakt über dem Video */}
           {classStudents.length > 0 && (unscanned.length > 0 || recentlyScanned.length > 0) && (
-            <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 6, padding: "0 4px", flexWrap: "wrap" }}>
-              {recentlyScanned.map((id) => {
-                const s = classStudents.find((st) => st.card_id === id);
-                if (!s) return null;
-                return (
-                  <span key={`recent-${id}`} style={{
-                    fontSize: 12, color: "#fff", background: "#0a7d3e", padding: "2px 8px",
-                    borderRadius: 980, fontWeight: 600, animation: "scanFlash 0.8s ease-out forwards",
-                  }}>
-                    {s.name} <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign: "-1px"}}><path d="M20 6L9 17l-5-5"/></svg>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, padding: "0 4px" }}>
+              {/* Einzeilig und seitlich scrollbar — spart vertikalen Platz fuers Video. */}
+              <div style={{ display: "flex", alignItems: "center", gap: 4, overflowX: "auto", whiteSpace: "nowrap", flex: 1, WebkitOverflowScrolling: "touch" }}>
+                {recentlyScanned.map((id) => {
+                  const s = classStudents.find((st) => st.card_id === id);
+                  if (!s) return null;
+                  return (
+                    <span key={`recent-${id}`} style={{
+                      flexShrink: 0, fontSize: 12, color: "#fff", background: "#0a7d3e", padding: "2px 8px",
+                      borderRadius: 980, fontWeight: 600, animation: "scanFlash 0.8s ease-out forwards",
+                    }}>
+                      {s.name} <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign: "-1px"}}><path d="M20 6L9 17l-5-5"/></svg>
+                    </span>
+                  );
+                })}
+                {unscanned.length > 0 && <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: "var(--text3)" }}>{t("scanner.missing")}</span>}
+                {unscanned.map((s) => (
+                  <span key={s.card_id} style={{ flexShrink: 0, fontSize: 12, color: "var(--text3)", background: "var(--bg2)", padding: "2px 8px", borderRadius: 980, border: "1px solid var(--border3)" }}>
+                    {s.name}
                   </span>
-                );
-              })}
-              {unscanned.length > 0 && <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)" }}>{t("scanner.missing")}</span>}
-              {unscanned.slice(0, 5).map((s) => (
-                <span key={s.card_id} style={{ fontSize: 12, color: "var(--text3)", background: "var(--bg2)", padding: "2px 8px", borderRadius: 980, border: "1px solid var(--border3)" }}>
-                  {s.name}
-                </span>
-              ))}
-              {unscanned.length > 5 && <span style={{ fontSize: 11, color: "var(--text3)" }}>+{unscanned.length - 5}</span>}
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#0a7d3e", marginLeft: "auto" }}>
+                ))}
+              </div>
+              <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: "#0a7d3e" }}>
                 {scannedStudents.length}/{classStudents.length}
               </span>
             </div>
@@ -458,7 +460,7 @@ export default function Scanner() {
 
       {/* Video — nur während des Scannens sichtbar */}
       <div style={{ position: "relative", marginBottom: 8, borderRadius: 12, overflow: "hidden", background: "#000", display: scanning ? "block" : "none" }}>
-        <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", display: "block", objectFit: "contain" }} />
+        <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", maxHeight: "52vh", display: "block", objectFit: "contain" }} />
         <canvas ref={overlayRef} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none" }} />
       </div>
 
