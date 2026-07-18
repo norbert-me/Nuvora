@@ -1,6 +1,6 @@
 // Modul Kalender — Unterrichtsplanung. Tag-, Wochen- und Monatsansicht; je Tag
 // Stunden eintragen und optional Klasse + Thema (Kern-Taxonomie) zuordnen.
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -250,41 +250,59 @@ function TimetableView({ tt, className, classColor, topicName, onEdit, onPeriods
   };
   const timeInput = { width: "100%", boxSizing: "border-box", border: "1px solid var(--border2)", borderRadius: 6, fontSize: 12, padding: "3px 4px", background: "var(--bg)", color: "var(--text)", marginTop: 2 };
   const tdBase = { border: "1px solid var(--border)", padding: 0, verticalAlign: "top", background: "var(--card)" };
+  // Vertikal konstant: Zeilenhoehe = Dauer * px/min. Pausen zwischen den Stunden
+  // erscheinen als leere Zwischenzeile derselben Skalierung.
+  const toMin = (s) => { const m = /^(\d{1,2}):(\d{2})$/.exec(s || ""); return m ? (+m[1]) * 60 + (+m[2]) : null; };
+  const PXMIN = 1.4;
+  const rowH = (p) => { const a = toMin(timeVal(p - 1, "start")), b = toMin(timeVal(p - 1, "end")); return a != null && b != null && b > a ? Math.max(52, (b - a) * PXMIN) : 72; };
+  const gapH = (p) => { const a = toMin(timeVal(p - 1, "end")), b = toMin(timeVal(p, "start")); return a != null && b != null && b > a ? (b - a) * PXMIN : 0; };
   return (
     <div>
       <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 12px", maxWidth: 620 }}>{t("kalender.timetableHint")}</p>
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed", minWidth: 640 }}>
+      <div>
+        <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
           <thead><tr>
             <th style={{ width: 96, padding: 6, fontSize: 12, color: "var(--text3)" }}></th>
             {wdays.map((w) => <th key={w} style={{ padding: 6, fontSize: 12, color: "var(--text3)" }}>{w}</th>)}
           </tr></thead>
           <tbody>
-            {periods.map((p) => (
-              <tr key={p}>
-                <td style={{ ...tdBase, textAlign: "center", padding: 4, background: "transparent", border: "none", width: 96 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>{p}.</div>
-                  <input type="time" defaultValue={timeVal(p - 1, "start")} onBlur={(e) => commitTime(p - 1, "start", e.target.value)} style={timeInput} title={t("kalender.start")} />
-                  <input type="time" defaultValue={timeVal(p - 1, "end")} onBlur={(e) => commitTime(p - 1, "end", e.target.value)} style={timeInput} title={t("kalender.end")} />
-                </td>
-                {wdays.map((_, wd) => {
-                  const s = slot(wd, p);
-                  const label = s ? className(s.class_id) : "";
-                  const col = s ? classColor(s.class_id) : null;
-                  return (
-                    <td key={wd} style={{ ...tdBase, padding: 0, height: 72 }}>
-                      <button onClick={() => onEdit(s ? { ...s } : { weekday: wd, period: p })}
-                        style={{ display: "flex", alignItems: "center", width: "100%", height: "100%", minHeight: 72, textAlign: "left", padding: "6px 10px", border: "none", cursor: "pointer", boxSizing: "border-box",
-                          borderLeft: col ? `4px solid ${col}` : "4px solid transparent",
-                          background: col ? col + "22" : "transparent", color: col ? col : "var(--text3)" }}>
-                        {s ? <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label || "—"}</div>
-                          : <span style={{ fontSize: 12 }}>+</span>}
-                      </button>
+            {periods.map((p) => {
+              const h = rowH(p);
+              const gap = gapH(p); // Pause nach dieser Stunde
+              return (
+                <Fragment key={p}>
+                  <tr>
+                    <td style={{ ...tdBase, textAlign: "center", padding: 4, background: "transparent", border: "none", width: 96 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>{p}.</div>
+                      <input type="time" defaultValue={timeVal(p - 1, "start")} onBlur={(e) => commitTime(p - 1, "start", e.target.value)} style={timeInput} title={t("kalender.start")} />
+                      <input type="time" defaultValue={timeVal(p - 1, "end")} onBlur={(e) => commitTime(p - 1, "end", e.target.value)} style={timeInput} title={t("kalender.end")} />
                     </td>
-                  );
-                })}
-              </tr>
-            ))}
+                    {wdays.map((_, wd) => {
+                      const s = slot(wd, p);
+                      const label = s ? className(s.class_id) : "";
+                      const col = s ? classColor(s.class_id) : null;
+                      return (
+                        <td key={wd} style={{ ...tdBase, padding: 0, height: h }}>
+                          <button onClick={() => onEdit(s ? { ...s } : { weekday: wd, period: p })}
+                            style={{ display: "flex", alignItems: "center", width: "100%", height: "100%", minHeight: h, textAlign: "left", padding: "6px 10px", border: "none", cursor: "pointer", boxSizing: "border-box",
+                              borderLeft: col ? `4px solid ${col}` : "4px solid transparent",
+                              background: col ? col + "22" : "transparent", color: col ? col : "var(--text3)" }}>
+                            {s ? <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label || "—"}</div>
+                              : <span style={{ fontSize: 12 }}>+</span>}
+                          </button>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                  {gap > 0 && (
+                    <tr aria-hidden style={{ height: gap }}>
+                      <td style={{ border: "none", background: "transparent" }} />
+                      {wdays.map((_, wd) => <td key={wd} style={{ border: "none", background: "repeating-linear-gradient(45deg, var(--bg), var(--bg) 6px, transparent 6px, transparent 12px)" }} />)}
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
             <tr>
               <td style={{ padding: 6, border: "none", textAlign: "center" }}>
                 <div style={{ display: "inline-flex", gap: 4 }}>
