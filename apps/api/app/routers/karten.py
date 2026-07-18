@@ -44,9 +44,9 @@ BUCKETS = ("neu", "lernen", "kurz", "mittel", "lang")
 
 
 def _bucket(rev) -> str:
-    if rev is None or rev.reps == 0:
+    if rev is None or (rev.reps or 0) == 0:
         return "neu"
-    d = rev.interval_days
+    d = rev.interval_days or 0
     if d <= 6:
         return "lernen"
     if d <= 20:
@@ -414,6 +414,13 @@ async def submit_review(token: str, body: ReviewIn, db: AsyncSession = Depends(g
     if rev is None:
         rev = CardReview(student_id=st.id, card_id=card.id)
         db.add(rev)
+
+    # Alt-Zeilen koennen NULL in den SM-2-Feldern haben (vor Default/Migration
+    # angelegt) — sonst kracht die Arithmetik mit 'NoneType + int'.
+    rev.ease = 250 if rev.ease is None else rev.ease
+    rev.interval_days = 0 if rev.interval_days is None else rev.interval_days
+    rev.reps = 0 if rev.reps is None else rev.reps
+    rev.lapses = 0 if rev.lapses is None else rev.lapses
 
     # SM-2 (vereinfacht): grade 0 zuruecksetzen, sonst Intervall/Ease anpassen.
     now = _now()

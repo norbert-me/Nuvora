@@ -165,6 +165,15 @@ def _ensure_columns(sync_conn):
         if table in existing_tables:
             sync_conn.execute(text(f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({column})"))
 
+    # Alt-Zeilen in card_reviews mit NULL-SM-2-Feldern auffuellen — sonst kracht
+    # die Bewertung ('NoneType + int') und der Reifegrad. Nur NULL-Zeilen.
+    if "card_reviews" in existing_tables:
+        sync_conn.execute(text(
+            "UPDATE card_reviews SET ease=COALESCE(ease,250), interval_days=COALESCE(interval_days,0), "
+            "reps=COALESCE(reps,0), lapses=COALESCE(lapses,0) "
+            "WHERE ease IS NULL OR interval_days IS NULL OR reps IS NULL OR lapses IS NULL"
+        ))
+
 
 # Konten, die vor diesem Zeitpunkt existierten, gelten als bestätigt (keine Verifizierung nötig).
 # Fester Zeitpunkt = idempotent, auch bei Neustart werden neue Konten NICHT auto-bestätigt.
