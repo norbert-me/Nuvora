@@ -31,6 +31,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   const [gradeScale, setGradeScale] = useState(user.grade_scale || DEFAULT_SCALE);
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminMsg, setAdminMsg] = useState("");
+  const [setup, setSetup] = useState(null);
   const [versionInfo, setVersionInfo] = useState(null);
   const [versionLoading, setVersionLoading] = useState(true);
   const [adminUsersLoading, setAdminUsersLoading] = useState(true);
@@ -47,6 +48,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     if (!isAdmin) return;
     fetch(`${API}/auth/admin/users`).then(r => r.ok ? r.json() : []).then(setAdminUsers).finally(() => setAdminUsersLoading(false));
     fetch(`${API}/version`).then(r => r.ok ? r.json() : null).then(setVersionInfo).catch(() => {}).finally(() => setVersionLoading(false));
+    fetch(`${API}/admin/setup`).then(r => r.ok ? r.json() : null).then(setSetup).catch(() => {});
   }, [isAdmin]);
 
   const saveProfile = async (e) => {
@@ -190,6 +192,23 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             </span>
             <div style={{ height: 1, flex: 1, background: "var(--border2)" }} />
           </div>
+
+          {setup && (
+            <div style={{ padding: 24, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 16 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("profile.setup")}</div>
+              {[["smtp", t("profile.setupSmtp")], ["site_json", t("profile.setupSite")], ["admin_email", t("profile.setupAdminMail")]].map(([k, label]) => (
+                <div key={k} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, padding: "5px 0", color: "var(--text)" }}>
+                  <span style={{ display: "inline-flex", width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center", background: setup[k] ? "#0a7d3e" : "var(--border3)", color: "#fff", flexShrink: 0 }}>
+                    {setup[k]
+                      ? <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                      : <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="3.5" strokeLinecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>}
+                  </span>
+                  <span style={{ color: setup[k] ? "var(--text)" : "#b8860b" }}>{label}</span>
+                </div>
+              ))}
+              {!setup.smtp && <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>{t("profile.setupSmtpHint")}</p>}
+            </div>
+          )}
 
           <div style={{ padding: 24, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 16 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("profile.version")}</div>

@@ -382,6 +382,18 @@ async def mail_test(to: str, user=Depends(_require_admin)):
     return await mailer.send_test(to)
 
 
+@app.get("/api/admin/setup")
+async def admin_setup(user=Depends(_require_admin)):
+    """Einrichtungsstatus fuer das Admin-Profil: was fehlt noch?"""
+    from . import mailer
+    site = _pathlib.Path("/app/config/site.json")
+    return {
+        "smtp": mailer.email_configured(),
+        "site_json": site.exists(),
+        "admin_email": bool(os.environ.get("ADMIN_EMAIL")),
+    }
+
+
 # --- Kontaktformular ---
 from pydantic import BaseModel as _BaseModel, field_validator as _field_validator
 
