@@ -47,13 +47,30 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   useEffect(() => {
     if (!isAdmin) return;
     fetch(`${API}/auth/admin/users`).then(r => r.ok ? r.json() : []).then(setAdminUsers).finally(() => setAdminUsersLoading(false));
-    fetch(`${API}/version`).then(r => r.ok ? r.json() : null).then(setVersionInfo).catch(() => {}).finally(() => setVersionLoading(false));
+    fetch(`${API}/version`)
+      .then(async (r) => {
+        console.debug("[Versionscheck] GET /api/version →", r.status, r.ok);
+        if (!r.ok) { console.warn("[Versionscheck] Antwort nicht ok:", r.status, await r.text().catch(() => "")); return null; }
+        return r.json();
+      })
+      .then((d) => { console.debug("[Versionscheck] Daten:", d); if (d) console.info(`[Versionscheck] installiert=${d.current} · neueste=${d.latest || "—"} · Kanal=${d.channel} · Update=${d.update_available}`); setVersionInfo(d); })
+      .catch((e) => console.error("[Versionscheck] Fehler beim Abruf:", e))
+      .finally(() => setVersionLoading(false));
     fetch(`${API}/admin/setup`).then(r => r.ok ? r.json() : null).then(setSetup).catch(() => {});
   }, [isAdmin]);
 
   const refreshVersion = async () => {
     setVersionLoading(true);
-    const d = await fetch(`${API}/version?refresh=1`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    console.debug("[Versionscheck] Erneut prüfen (refresh=1) …");
+    const d = await fetch(`${API}/version?refresh=1`)
+      .then(async (r) => {
+        console.debug("[Versionscheck] GET /api/version?refresh=1 →", r.status, r.ok);
+        if (!r.ok) { console.warn("[Versionscheck] Antwort nicht ok:", r.status, await r.text().catch(() => "")); return null; }
+        return r.json();
+      })
+      .catch((e) => { console.error("[Versionscheck] Fehler beim Abruf:", e); return null; });
+    console.debug("[Versionscheck] Daten (refresh):", d);
+    if (d) console.info(`[Versionscheck] installiert=${d.current} · neueste=${d.latest || "—"} · Kanal=${d.channel} · Update=${d.update_available}`);
     setVersionInfo(d);
     setVersionLoading(false);
   };
