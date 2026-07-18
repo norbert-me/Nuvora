@@ -702,6 +702,9 @@
         save(STORAGE_KEYS.aufgaben, aufgaben);
         resetAufgabeForm();
         renderAufgaben();
+        // Nach dem Speichern hoch scrollen: sonst bleibt man unten am Formular
+        // und sieht die neue Aufgabe in der Liste nicht.
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         toast(editId ? 'Aufgabe aktualisiert' : 'Aufgabe gespeichert');
     });
 
