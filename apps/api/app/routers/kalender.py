@@ -123,10 +123,15 @@ class SlotOut(SlotIn):
 class Timetable(BaseModel):
     periods: int
     slots: List[SlotOut]
+    times: list = []
 
 
 class PeriodsIn(BaseModel):
     periods: int
+
+
+class TimesIn(BaseModel):
+    times: list  # [{start, end}] je Stunde
 
 
 @router.get("/timetable", response_model=Timetable)
@@ -135,7 +140,15 @@ async def get_timetable(user: User = Depends(require_module), db: AsyncSession =
         select(TimetableSlot).where(TimetableSlot.owner_id == user.id)
         .order_by(TimetableSlot.weekday, TimetableSlot.period)
     )).scalars().all()
-    return {"periods": user.timetable_periods or 6, "slots": rows}
+    return {"periods": user.timetable_periods or 6, "slots": rows, "times": user.timetable_times or []}
+
+
+@router.put("/timetable/times", response_model=Timetable)
+async def set_times(body: TimesIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Uhrzeiten je Stunde setzen: Liste [{start,end}]."""
+    user.timetable_times = body.times
+    await db.commit()
+    return await get_timetable(user, db)
 
 
 @router.put("/timetable/periods", response_model=Timetable)

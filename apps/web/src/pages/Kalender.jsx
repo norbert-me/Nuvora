@@ -87,6 +87,10 @@ export default function Kalender() {
     const res = await fetch(`${API}/timetable/periods`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ periods: n }) }).catch(() => null);
     if (res && res.ok) setTt(await res.json());
   };
+  const setTimes = async (times) => {
+    const res = await fetch(`${API}/timetable/times`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ times }) }).catch(() => null);
+    if (res && res.ok) setTt(await res.json());
+  };
 
   const title = view === "month"
     ? cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" })
@@ -116,7 +120,7 @@ export default function Kalender() {
       {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} t={t} />}
       {view === "week" && <WeekView range={range} byDay={byDay} slotsFor={slotsFor} className={className} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
       {view === "day" && <DayView day={cursor} byDay={byDay} slotsFor={slotsFor} className={className} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
-      {view === "timetable" && <TimetableView tt={tt} className={className} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} t={t} />}
+      {view === "timetable" && <TimetableView tt={tt} className={className} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} topicName={topicName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
       {slotEdit && <SlotModal slot={slotEdit} classes={classes} topics={topics} onSave={saveSlot} onDelete={removeSlot} onClose={() => setSlotEdit(null)} t={t} />}
@@ -219,10 +223,18 @@ function DayView({ day, byDay, slotsFor, className, topicName, onAdd, onOpen, on
   );
 }
 
-function TimetableView({ tt, className, topicName, onEdit, onPeriods, t }) {
+function TimetableView({ tt, className, topicName, onEdit, onPeriods, onTimes, t }) {
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri")];
   const periods = Array.from({ length: tt.periods }, (_, i) => i + 1);
   const slot = (wd, p) => tt.slots.find((s) => s.weekday === wd && s.period === p);
+  // Uhrzeiten je Stunde: onBlur speichern (wenige Felder, kein Debounce noetig).
+  const timeVal = (i, f) => (tt.times && tt.times[i] && tt.times[i][f]) || "";
+  const commitTime = (i, f, val) => {
+    const arr = periods.map((_, idx) => ({ start: timeVal(idx, "start"), end: timeVal(idx, "end") }));
+    arr[i] = { ...arr[i], [f]: val };
+    onTimes(arr);
+  };
+  const timeInput = { width: "100%", border: "1px solid var(--border2)", borderRadius: 6, fontSize: 11, padding: "2px 3px", background: "var(--bg)", color: "var(--text)", marginTop: 2 };
   const tdBase = { border: "1px solid var(--border)", padding: 0, verticalAlign: "top", background: "var(--card)" };
   return (
     <div>
@@ -242,7 +254,11 @@ function TimetableView({ tt, className, topicName, onEdit, onPeriods, t }) {
           <tbody>
             {periods.map((p) => (
               <tr key={p}>
-                <td style={{ ...tdBase, textAlign: "center", padding: 6, fontSize: 12, fontWeight: 600, color: "var(--text2)", background: "transparent", border: "none" }}>{p}.</td>
+                <td style={{ ...tdBase, textAlign: "center", padding: 4, background: "transparent", border: "none", width: 70 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>{p}.</div>
+                  <input type="time" defaultValue={timeVal(p - 1, "start")} onBlur={(e) => commitTime(p - 1, "start", e.target.value)} style={timeInput} title={t("kalender.start")} />
+                  <input type="time" defaultValue={timeVal(p - 1, "end")} onBlur={(e) => commitTime(p - 1, "end", e.target.value)} style={timeInput} title={t("kalender.end")} />
+                </td>
                 {wdays.map((_, wd) => {
                   const s = slot(wd, p);
                   const label = s ? (className(s.class_id) || s.title || topicName(s.topic_id)) : "";

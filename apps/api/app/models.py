@@ -35,6 +35,8 @@ class User(Base):
     modules_initialized: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Modul Kalender: Stunden pro Tag im hinterlegten Stundenplan (Einstellung).
     timetable_periods: Mapped[int] = mapped_column(Integer, default=6, server_default="6")
+    # Uhrzeiten je Stunde: Liste [{start,end}] (Index = Stunde-1). Optional.
+    timetable_times: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     folders: Mapped[list["Folder"]] = relationship(back_populates="owner", cascade="all, delete-orphan")

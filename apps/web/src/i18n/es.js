@@ -656,6 +656,8 @@ export default {
   "kalender.month": "Mes",
   "kalender.week": "Semana",
   "kalender.day": "Día",
+  "kalender.start": "Inicio",
+  "kalender.end": "Fin",
   "kalender.today": "Hoy",
   "kalender.add": "Entrada",
   "kalender.empty": "Sin entrada este día.",

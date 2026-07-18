@@ -137,6 +137,7 @@ def _ensure_columns(sync_conn):
         ("card_decks", "released_at", "TIMESTAMPTZ"),
         ("exercises", "code", "VARCHAR(20) DEFAULT '' NOT NULL"),
         ("users", "timetable_periods", "INTEGER DEFAULT 6 NOT NULL"),
+        ("users", "timetable_times", "JSON"),
     ]
     for table, column, ddl in wanted:
         if table not in existing_tables:
