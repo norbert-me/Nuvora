@@ -17,7 +17,9 @@ from .auth import get_current_user, rate_limit
 from .modules import is_active
 
 router = APIRouter(prefix="/api/anwesenheit", tags=["anwesenheit"])
-MODULE_KEY = "anwesenheit"
+# Anwesenheit ist kein eigenes Modul mehr, sondern lebt im Modul „Orga &
+# Anwesenheit". Deshalb gategt der Router über orga.
+MODULE_KEY = "orga"
 _STATUS = {"da", "fehlt", "spaet", "entsch"}
 
 

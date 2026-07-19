@@ -306,6 +306,18 @@ async def startup():
         await db.execute(text("UPDATE users SET modules_initialized = true WHERE modules_initialized = false"))
         await db.commit()
 
+    # Anwesenheit ist ins Modul „Orga & Anwesenheit" aufgegangen. Wer Anwesenheit
+    # aktiv hatte, bekommt orga aktiv (sonst verschwindet der Zugang); die alten
+    # anwesenheit-Zeilen fallen weg. Idempotent.
+    async with async_session() as db:
+        await db.execute(text("""
+            INSERT INTO user_modules (user_id, module_key)
+            SELECT DISTINCT user_id, 'orga' FROM user_modules WHERE module_key = 'anwesenheit'
+            ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
+        """))
+        await db.execute(text("DELETE FROM user_modules WHERE module_key = 'anwesenheit'"))
+        await db.commit()
+
     # Noten: Kategorien ohne Abschnitt an einen Standard-Abschnitt haengen
     # (zweistufiges Modell kam spaeter). Pro Klasse ein "Sonstige Mitarbeit"
     # mit 100 %, damit der gewichtete Schnitt sofort rechnet.

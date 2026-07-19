@@ -72,7 +72,6 @@ import Kalender from "./pages/Kalender.jsx";
 import Methoden from "./pages/Methoden.jsx";
 import Zufall from "./pages/Zufall.jsx";
 import Sitzplan from "./pages/Sitzplan.jsx";
-import Anwesenheit from "./pages/Anwesenheit.jsx";
 import Orga from "./pages/Orga.jsx";
 import Ausleihe from "./pages/Ausleihe.jsx";
 import { useModules } from "./core/modules.js";
@@ -98,7 +97,6 @@ const KAL = "/kalender";
 const MET = "/methoden";
 const ZUF = "/zufall";
 const SIT = "/sitzplan";
-const ANW = "/anwesenheit";
 const ORG = "/orga";
 const AUS = "/ausleihe";
 
@@ -116,7 +114,6 @@ const getModuleNavItems = (t, location) => {
     : pathname.startsWith(MET) ? "methoden"
     : pathname.startsWith(ZUF) ? "zufall"
     : pathname.startsWith(SIT) ? "sitzplan"
-    : pathname.startsWith(ANW) ? "anwesenheit"
     : pathname.startsWith(ORG) ? "orga"
     : pathname.startsWith(AUS) ? "ausleihe"
     : pathname.startsWith(KA) ? "karten"
@@ -157,9 +154,6 @@ const getModuleNavItems = (t, location) => {
   }
   if (area === "sitzplan") {
     return [{ to: SIT, label: t("sitzplan.title") }];
-  }
-  if (area === "anwesenheit") {
-    return [{ to: ANW, label: t("anwesenheit.title") }];
   }
   if (area === "orga") {
     return [{ to: ORG, label: t("orga.title") }];
@@ -706,7 +700,6 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={MET} element={user ? <ModuleGate moduleKey="methoden"><Methoden /></ModuleGate> : <Landing />} />
           <Route path={ZUF} element={user ? <ModuleGate moduleKey="zufall"><Zufall /></ModuleGate> : <Landing />} />
           <Route path={SIT} element={user ? <ModuleGate moduleKey="sitzplan"><Sitzplan /></ModuleGate> : <Landing />} />
-          <Route path={ANW} element={user ? <ModuleGate moduleKey="anwesenheit"><Anwesenheit /></ModuleGate> : <Landing />} />
           <Route path={ORG} element={user ? <ModuleGate moduleKey="orga"><Orga /></ModuleGate> : <Landing />} />
           <Route path={AUS} element={user ? <ModuleGate moduleKey="ausleihe"><Ausleihe /></ModuleGate> : <Landing />} />
 

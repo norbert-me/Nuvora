@@ -111,21 +111,13 @@ REGISTRY: List[ModuleDef] = [
     ),
     ModuleDef(
         key="orga",
-        name="Orga",
+        name="Orga & Anwesenheit",
         description=(
-            "Sammel-Checklisten je Klasse: Orga-Punkte anlegen (z.B. „Unterschrift "
-            "der Klassenarbeit gesehen“) und pro Schueler abhaken."
+            "Zwei Werkzeuge je Klasse: Sammel-Checklisten (z.B. „Unterschrift der "
+            "Klassenarbeit gesehen“, pro Schueler abhaken) und Anwesenheit/Fehlzeiten "
+            "(fehlt, verspaetet, entschuldigt) mit Fehlzeiten-Report als PDF."
         ),
         path="/orga",
-    ),
-    ModuleDef(
-        key="anwesenheit",
-        name="Anwesenheit",
-        description=(
-            "Anwesenheit und Fehlzeiten je Klasse und Tag — fehlt, verspaetet "
-            "oder entschuldigt. Mit Fehlzeiten-Uebersicht je Person."
-        ),
-        path="/anwesenheit",
     ),
     ModuleDef(
         key="sitzplan",

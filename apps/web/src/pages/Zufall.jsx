@@ -12,7 +12,8 @@ const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0
 export default function Zufall() {
   const { t } = useLanguage();
   const { modules } = useModules();
-  const anwesenheitAktiv = modules.find((m) => m.key === "anwesenheit")?.active ?? false;
+  // Anwesenheit lebt jetzt im Modul „Orga & Anwesenheit" — daher orga prüfen.
+  const anwesenheitAktiv = modules.find((m) => m.key === "orga")?.active ?? false;
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
   const [ohneWdh, setOhneWdh] = useState(true);

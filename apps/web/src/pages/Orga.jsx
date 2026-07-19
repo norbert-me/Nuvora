@@ -2,10 +2,12 @@
 // als Spalten, Schüler als Zeilen, je Zelle ein Häkchen. Nur die Häkchen liegen
 // im Modul, die Schüler im Kern.
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { pageTitle, btnPrimary, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
+import Anwesenheit from "./Anwesenheit.jsx";
 
 const API = "/api/orga";
 
@@ -15,6 +17,10 @@ export default function Orga() {
   const [classId, setClassId] = useState(null);
   const [items, setItems] = useState([]);
   const [neu, setNeu] = useState("");
+  const [params] = useSearchParams();
+  // Zwei Werkzeuge unter einem Dach: Checklisten und Anwesenheit. Kalender kann
+  // per ?tab=anwesenheit direkt in die Anwesenheit springen.
+  const [tab, setTab] = useState(params.get("tab") === "anwesenheit" ? "anwesenheit" : "checklisten");
 
   useEffect(() => {
     return swr("classes", "/api/classes", (d) => {
@@ -58,8 +64,17 @@ export default function Orga() {
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+        <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("orga.moduleTitle")}</h1>
+        <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden" }}>
+          {[["checklisten", t("orga.tabChecklists")], ["anwesenheit", t("orga.tabAttendance")]].map(([k, label]) => (
+            <button key={k} onClick={() => setTab(k)} style={{ padding: "6px 16px", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", background: tab === k ? "var(--accent)" : "transparent", color: tab === k ? "#fff" : "var(--text2)" }}>{label}</button>
+          ))}
+        </div>
+      </div>
+
+      {tab === "anwesenheit" ? <Anwesenheit /> : (<>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
-        <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("orga.title")}</h1>
         <select value={classId ?? ""} onChange={(e) => setClassId(Number(e.target.value))} style={selectStyle}>
           {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
@@ -117,6 +132,7 @@ export default function Orga() {
           </table>
         </div>
       )}
+      </>)}
     </div>
   );
 }
