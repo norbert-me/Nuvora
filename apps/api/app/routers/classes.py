@@ -164,14 +164,31 @@ async def update_class(class_id: int, body: ClassCreate, user: User = Depends(ge
     if not sc.owner_id:
         sc.owner_id = user.id
 
-    existing = await db.execute(select(Student).where(Student.class_id == class_id))
-    for s in existing.scalars().all():
-        await db.delete(s)
-
+    # WICHTIG: Schueler NIE loeschen+neu anlegen. Das Loeschen kaskadiert
+    # (ON DELETE CASCADE) auf Noten (grade_entries), Karten-Fortschritt
+    # (card_reviews) und mehr — ein Klassen-Speichern (z.B. nur die Farbe)
+    # wuerde sonst live Daten vernichten. Stattdessen ueber die stabile card_id
+    # zusammenfuehren: vorhandene aktualisieren, neue anlegen, entfernte loeschen.
+    existing = (await db.execute(select(Student).where(Student.class_id == class_id))).scalars().all()
+    by_card = {s.card_id: s for s in existing}
+    seen = set()
     for s in body.students:
-        db.add(Student(card_id=s.card_id, name=s.name, class_id=class_id,
-                       niveau=s.niveau, foerder=s.foerder, notizen=s.notizen,
-                       klassenlehrer=s.klassenlehrer))
+        seen.add(s.card_id)
+        cur = by_card.get(s.card_id)
+        if cur:  # vorhandenen Schueler in-place aktualisieren, ID bleibt erhalten
+            cur.name = s.name
+            cur.niveau = s.niveau
+            cur.foerder = s.foerder
+            cur.notizen = s.notizen
+            cur.klassenlehrer = s.klassenlehrer
+        else:
+            db.add(Student(card_id=s.card_id, name=s.name, class_id=class_id,
+                           niveau=s.niveau, foerder=s.foerder, notizen=s.notizen,
+                           klassenlehrer=s.klassenlehrer))
+    # Nur wirklich entfernte Karten loeschen (deren Daten sollen dann auch weg).
+    for card_id, s in by_card.items():
+        if card_id not in seen:
+            await db.delete(s)
 
     await db.commit()
     return await _load_class(db, class_id)
