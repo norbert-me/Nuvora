@@ -194,6 +194,26 @@ async def update_class(class_id: int, body: ClassCreate, user: User = Depends(ge
     return await _load_class(db, class_id)
 
 
+class ColorIn(BaseModel):
+    color: str = ""
+
+
+@router.put("/{class_id}/color", response_model=ClassOut)
+async def set_class_color(class_id: int, body: ColorIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Nur die Klassenfarbe setzen — leichtgewichtig (z.B. aus dem Stundenplan),
+    ruehrt Schueler nicht an."""
+    sc = await db.get(SchoolClass, class_id)
+    if not sc:
+        raise HTTPException(404)
+    if sc.owner_id and sc.owner_id != user.id:
+        raise HTTPException(403, "Keine Berechtigung")
+    sc.color = body.color or _auto_color(sc.name)
+    if not sc.owner_id:
+        sc.owner_id = user.id
+    await db.commit()
+    return await _load_class(db, class_id)
+
+
 @router.delete("/{class_id}", status_code=204)
 async def delete_class(class_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     sc = await db.get(SchoolClass, class_id)

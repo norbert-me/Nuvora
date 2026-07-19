@@ -847,4 +847,6 @@ export default {
   "thema.openLernpfad": "Zum Lernpfad",
   "thema.draft": "Entwurf",
   "kalender.toAttendance": "Anwesenheit für diese Stunde",
+  "kalender.classColor": "Farbe",
+  "kalender.toClass": "Zur Klasse",
 };

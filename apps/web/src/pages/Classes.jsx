@@ -9,6 +9,7 @@
 // Kartendruck und Auswertung liegen NICHT hier, sondern im Modul unter
 // /cardvote/cards: der Kern kennt Klassen, nicht was ein Modul damit tut.
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -47,6 +48,7 @@ export default function Classes() {
   const cardvote = modules.find((m) => m.key === "cardvote")?.active ?? false;
   const [classes, setClasses] = useState([]);
   const [editing, setEditing] = useState(null);
+  const [params, setParams] = useSearchParams();
   const [name, setName] = useState("");
   const [color, setColor] = useState("#2563eb");
   const [students, setStudents] = useState([]);
@@ -87,6 +89,14 @@ export default function Classes() {
     if (rows.length === 0) rows.push({ ...EMPTY_STUDENT, card_id: 1 });
     setStudents(rows);
   };
+
+  // Direktlink ?open=<id> (z.B. aus dem Stundenplan): diese Klasse aufklappen.
+  useEffect(() => {
+    const oid = Number(params.get("open"));
+    if (!oid || editing) return;
+    const cls = classes.find((c) => c.id === oid);
+    if (cls) { startEdit(cls); setParams({}, { replace: true }); }
+  }, [classes, params]); // eslint-disable-line
 
   const save = async () => {
     const filled = students.filter((s) => s.name.trim() !== "");

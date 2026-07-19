@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, Fragment } from "react";
 import { Link } from "react-router-dom";
 import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { swr } from "../core/cache.js";
+import { swr, put } from "../core/cache.js";
 
 const API = "/api/kalender";
 
@@ -138,6 +138,12 @@ export default function Kalender() {
     else setEditing({ date: startOfDay(day), period: s.period, title: s.title || "", class_id: s.class_id || null, topic_id: s.topic_id || null });
   };
 
+  // Klassenfarbe aus dem Stundenplan setzen: sofort lokal, dann speichern.
+  const setClassColor = async (id, color) => {
+    setClasses((prev) => { const next = prev.map((c) => (c.id === id ? { ...c, color } : c)); put("classes", next); return next; });
+    await fetch(`/api/classes/${id}/color`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) }).catch(() => {});
+  };
+
   const saveSlot = async (s) => {
     const body = { weekday: s.weekday, period: s.period, title: s.title || "", class_id: s.class_id || null, topic_id: s.topic_id || null };
     const res = await fetch(`${API}/timetable/slot`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
@@ -192,7 +198,7 @@ export default function Kalender() {
       {view === "timetable" && <TimetableView tt={tt} className={className} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} breaks={breaks} onAddBreak={addBreak} onDelBreak={delBreak} t={t} />}
 
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} aktiv={aktiv} topicName={topicName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
-      {slotEdit && <SlotModal slot={slotEdit} classes={classes} topics={topics} onSave={saveSlot} onDelete={removeSlot} onClose={() => setSlotEdit(null)} t={t} />}
+      {slotEdit && <SlotModal slot={slotEdit} classes={classes} topics={topics} onSave={saveSlot} onDelete={removeSlot} onColor={setClassColor} onClose={() => setSlotEdit(null)} t={t} />}
     </div>
   );
 }
@@ -465,8 +471,11 @@ function BreaksPanel({ breaks, onAdd, onDel, t }) {
   );
 }
 
-function SlotModal({ slot, classes, onSave, onDelete, onClose, t }) {
+function SlotModal({ slot, classes, onSave, onDelete, onColor, onClose, t }) {
   const [classId, setClassId] = useState(slot.class_id || "");
+  const cls = classes.find((c) => c.id === Number(classId));
+  const [color, setColor] = useState(cls?.color || "#2563eb");
+  useEffect(() => { const c = classes.find((x) => x.id === Number(classId)); setColor(c?.color || "#2563eb"); }, [classId]); // eslint-disable-line
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
   const fld = { width: "100%", padding: 9, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
@@ -480,6 +489,16 @@ function SlotModal({ slot, classes, onSave, onDelete, onClose, t }) {
           <option value="">– {t("kalender.noClass")} –</option>
           {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
+        {classId && (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)" }}>
+              {t("kalender.classColor")}
+              <input type="color" value={color} onChange={(e) => { setColor(e.target.value); onColor && onColor(Number(classId), e.target.value); }}
+                style={{ width: 34, height: 28, border: "1px solid var(--border2)", borderRadius: 6, background: "none", cursor: "pointer", padding: 0 }} />
+            </label>
+            <Link to={`/classes?open=${classId}`} onClick={onClose} style={{ fontSize: 13, color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>{t("kalender.toClass")} ↗</Link>
+          </div>
+        )}
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
           <button onClick={() => onSave({ weekday: slot.weekday, period: slot.period, title: "", class_id: classId ? Number(classId) : null, topic_id: null })} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
