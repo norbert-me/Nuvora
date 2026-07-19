@@ -21,7 +21,7 @@ Der Rahmen steht, alle drei Module sitzen auf dem Kern:
 | Modul    | Pfad         | Form                                    |
 | -------- | ------------ | --------------------------------------- |
 | CardVote | `/cardvote/*` | React im Rahmen                        |
-| Lernpfad | `/lernpfad`  | bestehende App, eingebettet (iframe)     |
+| Lernpfad | `/lernpfad`  | bestehende Vanilla-JS-App, nativ in-page gemountet |
 | Noten    | `/noten`     | React im Rahmen                          |
 
 Keins hat noch eigene Konten, Klassen oder Datenbank. Die Datenübernahme der Bestandsdaten aus der alten Lernleiter-Installation ist erledigt; das Skript wurde entfernt.
@@ -36,7 +36,7 @@ Keins hat noch eigene Konten, Klassen oder Datenbank. Die Datenübernahme der Be
 | `/api/`, `/ws/`  | `api:8000`                              |
 | `/lernpfad-app/` | `lernpfad:3000` (nur Statik)            |
 
-`/lernpfad` ist eine React-Seite mit Nuvoras Navbar; sie bettet `/lernpfad-app/` als iframe ein. Gleiche Origin, daher liest die App Nuvoras Token aus `localStorage` und spricht dieselbe API.
+`/lernpfad` ist eine React-Seite mit Nuvoras Navbar. Sie mountet die bestehende App **nativ in-page** (kein iframe mehr): `LernpfadModule.jsx` injiziert das Markup von `/lernpfad-app/index.html` in einen Host `#lp-app`, lädt `style.scoped.css` (das komplette Lernpfad-CSS unter `#lp-app` gescopet, damit `:root`/`body`-Regeln nicht ins Shell-Theming lecken) und führt `js/app.js` im selben Fenster aus. `app.js` erkennt den In-page-Modus über `window.__nuvoraInPage` und hängt die Rahmen-Klassen (`embedded`/`authed`) an `#lp-app` statt an `html`/`body`. Kommunikation weiter per `window.postMessage` (Theme/Tab rein, Modal/Toast/Tab raus). Gleiche Origin, daher erbt die App Nuvoras Token aus `localStorage`. Der alte iframe-Weg (`/lernpfad-app/` als eigener Container) existiert noch, wird aber nicht mehr eingebunden.
 
 ### Modulregister
 
@@ -117,7 +117,7 @@ Wer an den Datenformen etwas ändert, ändert den Adapter — nicht die Oberflä
 
 ### Code-Detektiv — `apps/code-detektiv`
 
-**Eigenständige Client-App (React 19 + Vite), eingebettet** unter `/code-detektiv` (iframe auf `/code-detektiv-app/`, eigener Container). Kein Backend, kein Login — reines Werkzeug, im Rahmen über `ModuleGate` geschützt. Nicht in `apps/web` gemergt wegen React-19-vs-18-Konflikt. `base` und `BrowserRouter basename` stehen auf `/code-detektiv-app/`.
+Ursprünglich eigenständige Client-App (React 19 + Vite), **inzwischen nativ in die Shell portiert** nach `apps/web/src/codedetektiv/` (kein iframe mehr). Der Code läuft unverändert auf React 18 (keine React-19-only-APIs, reiner localStorage-Client). Sein CSS ist unter `.cd-scope` isoliert (`makecode.css` hatte globale `*`/`body`/`:root`), interne Navigation auf `/code-detektiv/*` umgeschrieben, als nested Route in `main.jsx` gemountet. `@dnd-kit` + `lzma` sind dafür web-Dependencies. Der alte `apps/code-detektiv`-Container (`/code-detektiv-app/`) ist ungenutzt. Kein Backend, kein Login — reines Werkzeug, im Rahmen über `ModuleGate`.
 
 ### Noten — `apps/api/app/routers/noten.py` + `apps/web/src/pages/Noten.jsx`
 
