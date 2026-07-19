@@ -50,6 +50,25 @@ async def _owned_class(db: AsyncSession, user: User, class_id: int) -> SchoolCla
     return cls
 
 
+async def _kurs_roster(db, user, class_id):
+    """Kanonische SuS des Kurses (gleichnamige Fach-Klassen-SuS dedupliziert).
+    Noten-Zeilen kommen aus dem Kurs; die Spalten bleiben pro Fach-Klasse."""
+    from .kurse import sibling_class_ids
+    sib = await sibling_class_ids(db, class_id)
+    studs = (await db.execute(select(Student).where(Student.class_id.in_(sib)).order_by(Student.id))).scalars().all()
+    canon = {}
+    for s in studs:
+        canon.setdefault(s.name.strip(), s)
+    return sorted(canon.values(), key=lambda s: (s.card_id, s.id))
+
+
+async def _student_in_kurs(db, class_id, student_id) -> bool:
+    from .kurse import sibling_class_ids
+    sib = await sibling_class_ids(db, class_id)
+    r = await db.execute(select(Student.id).where(Student.id == student_id, Student.class_id.in_(sib)))
+    return r.scalar_one_or_none() is not None
+
+
 async def _owned_section(db: AsyncSession, user: User, section_id: int) -> GradeSection:
     r = await db.execute(select(GradeSection).where(GradeSection.id == section_id, GradeSection.owner_id == user.id))
     sec = r.scalar_one_or_none()
@@ -109,6 +128,13 @@ class SectionOut(BaseModel):
     position: int
     categories: List[CategoryOut] = []
     model_config = {"from_attributes": True}
+
+
+@router.get("/classes/{class_id}/students")
+async def kurs_students(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Noten-Zeilen: die kanonischen SuS des Kurses (dedupliziert)."""
+    await _owned_class(db, user, class_id)
+    return [{"id": s.id, "card_id": s.card_id, "name": s.name} for s in await _kurs_roster(db, user, class_id)]
 
 
 @router.get("/classes/{class_id}/sections", response_model=List[SectionOut])
@@ -324,9 +350,8 @@ class EntryOut(BaseModel):
 
 async def _check_entry(db: AsyncSession, user: User, body: EntryIn) -> GradeCategory:
     cat = await _owned_category(db, user, body.category_id)
-    r = await db.execute(select(Student.id).where(Student.id == body.student_id, Student.class_id == cat.class_id))
-    if not r.scalar_one_or_none():
-        raise HTTPException(400, "Schüler gehört nicht zu dieser Klasse")
+    if not await _student_in_kurs(db, cat.class_id, body.student_id):
+        raise HTTPException(400, "Schüler gehört nicht zu diesem Kurs")
     if body.kind == "grade" and body.value is None:
         raise HTTPException(400, "Eine Note braucht einen Wert")
     if body.kind == "observation" and body.value is not None:
@@ -425,9 +450,8 @@ async def set_override(body: OverrideIn, user: User = Depends(require_module), d
     await _owned_class(db, user, body.class_id)
     if body.section_id is not None:
         await _owned_section(db, user, body.section_id)
-    r = await db.execute(select(Student.id).where(Student.id == body.student_id, Student.class_id == body.class_id))
-    if not r.scalar_one_or_none():
-        raise HTTPException(400, "Schüler gehört nicht zu dieser Klasse")
+    if not await _student_in_kurs(db, body.class_id, body.student_id):
+        raise HTTPException(400, "Schüler gehört nicht zu diesem Kurs")
     ex = await _find_override(db, user, body.class_id, body.student_id, body.section_id, body.term)
     if ex:
         ex.value = body.value
@@ -500,9 +524,7 @@ async def _summarize(db, user, class_id, term, agg="mean"):
     cat_section = {c.id: c.section_id for c in cats}
     cat_ids = {c.id for c in cats}
 
-    students = (await db.execute(
-        select(Student).where(Student.class_id == class_id).order_by(Student.card_id)
-    )).scalars().all()
+    students = await _kurs_roster(db, user, class_id)
 
     entries = (await db.execute(
         select(GradeEntry)
@@ -728,7 +750,7 @@ async def export_noten(class_id: int, term: str = "1", user: User = Depends(requ
             cat_index[c.id] = (si, ci)
         out_secs.append({"name": sec.name, "weight": sec.weight, "position": sec.position,
                          "categories": [{"name": c.name, "position": c.position} for c in cats]})
-    students = (await db.execute(select(Student).where(Student.class_id == class_id))).scalars().all()
+    students = await _kurs_roster(db, user, class_id)
     sid2card = {s.id: s.card_id for s in students}
     cat_ids = list(cat_index.keys())
     entries = []
@@ -767,7 +789,7 @@ async def import_noten(class_id: int, body: dict, term: str = "1", user: User = 
     if body.get("type") != "nuvora_noten":
         raise HTTPException(400, "Falsches Dateiformat")
     await _owned_class(db, user, class_id)
-    students = (await db.execute(select(Student).where(Student.class_id == class_id))).scalars().all()
+    students = await _kurs_roster(db, user, class_id)
     card2sid = {s.card_id: s.id for s in students}
     # Abschnitte + Spalten neu anlegen, Index -> neue ID merken.
     cat_map = {}  # (s_idx, c_idx) -> category_id

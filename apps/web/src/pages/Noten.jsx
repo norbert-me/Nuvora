@@ -145,12 +145,14 @@ export default function Noten() {
 
   useEffect(() => { if (classId) rememberClass(classId); }, [classId]);
 
+  // Noten-Zeilen kommen aus dem KURS (dedupliziert), nicht aus der Fach-Klasse.
+  const loadRoster = (id) => fetch(`${API}/classes/${id}/students`).then((r) => (r.ok ? r.json() : [])).then((d) => setStudents(Array.isArray(d) ? d : [])).catch(() => {});
   const load = async (id) => {
     if (!id) return;
+    loadRoster(id);
     if (term === "year") {
       const y = await fetch(`${API}/classes/${id}/year?agg=${agg}`).then((r) => (r.ok ? r.json() : { sections: [], rows: [] }));
       setYearData(y);
-      setStudents(classes.find((c) => c.id === id)?.students || []);
       return;
     }
     const [sec, ent, sum] = await Promise.all([
@@ -159,7 +161,6 @@ export default function Noten() {
       fetch(`${API}/classes/${id}/summary?term=${term}&agg=${agg}`).then((r) => (r.ok ? r.json() : [])),
     ]);
     setSections(sec); setEntries(ent); setSummary(sum);
-    setStudents(classes.find((c) => c.id === id)?.students || []);
     fetch(`${API}/classes/${id}/dividers?term=${term}`).then((r) => (r.ok ? r.json() : [])).then((d) => setDividers(Array.isArray(d) ? d : [])).catch(() => {});
   };
   const toggleDivider = async (catId) => {
