@@ -322,7 +322,7 @@ export default function Dashboard() {
         {currentChildren.map((f) => (
           <div key={f.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", marginBottom: 8, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 14, cursor: "pointer" }}>
             <span onClick={() => renamingFolder !== f.id && openFolder(f)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
               {renamingFolder === f.id ? (
                 <input
                   autoFocus
@@ -422,11 +422,11 @@ function ImportProgress({ status }) {
       <div style={{ width: "min(420px, 92vw)", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 14, boxShadow: "0 8px 30px rgba(0,0,0,0.18)", padding: "14px 16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
           {stage === "done" ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0a7d3e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="#0a7d3e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
           ) : stage === "error" ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d1350f" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="#d1350f" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
           ) : (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="2.5" strokeLinecap="round" style={{ animation: "spin 0.9s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.2-8.5"/><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></svg>
+            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="2.5" strokeLinecap="round" style={{ animation: "spin 0.9s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.2-8.5"/><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></svg>
           )}
           <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{s.title}</span>
         </div>
@@ -637,11 +637,11 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onQuestionsChang
             <span style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
               <button onClick={() => moveQuestion(idx, -1)} disabled={idx === 0} title="Nach oben" aria-label="Frage nach oben"
                 style={{ border: "none", background: "none", padding: "1px 2px", color: "var(--text3)", display: "flex", lineHeight: 1, opacity: idx === 0 ? 0.25 : 1, cursor: idx === 0 ? "default" : "pointer" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
+                <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
               </button>
               <button onClick={() => moveQuestion(idx, 1)} disabled={idx === base.length - 1} title="Nach unten" aria-label="Frage nach unten"
                 style={{ border: "none", background: "none", padding: "1px 2px", color: "var(--text3)", display: "flex", lineHeight: 1, opacity: idx === base.length - 1 ? 0.25 : 1, cursor: idx === base.length - 1 ? "default" : "pointer" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
               </button>
             </span>
           ) : (
@@ -649,7 +649,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onQuestionsChang
           ))}
           <span onClick={() => setEditingQ({ ...q })} style={{ flex: 1, color: "var(--text)", cursor: "pointer" }} title={t("dash.clickEdit")}>
             <Latex>{q.text}</Latex>
-            {q.image_url && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 6, verticalAlign: "middle" }}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>}
+            {q.image_url && <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 6, verticalAlign: "middle" }}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>}
           </span>
           <button onClick={() => removeQuestion(idx)} style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
         </div>
@@ -668,7 +668,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onQuestionsChang
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{t("dash.editQ")}</h4>
               <button onClick={() => setEditingQ(null)} title={t("common.close")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", padding: 4, display: "flex" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
               </button>
             </div>
             <QuestionForm q={editingQ} setQ={setEditingQ} onUpload={uploadImage} choiceKeys={CHOICE_KEYS} />
@@ -688,7 +688,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onQuestionsChang
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{t("dash.newQ")}</h4>
               <button onClick={() => setShowAdd(false)} title={t("common.close")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", padding: 4, display: "flex" }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
               </button>
             </div>
             <QuestionForm q={newQ} setQ={setNewQ} onUpload={uploadImage} choiceKeys={CHOICE_KEYS} />

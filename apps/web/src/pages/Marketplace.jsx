@@ -26,7 +26,7 @@ function Stars({ value, my, onRate, count, t }) {
               title={t("market.stars", { n })}
               style={{ background: "none", border: "none", padding: 0, cursor: "pointer", lineHeight: 0 }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24"
+              <svg width="1em" height="1em" viewBox="0 0 24 24"
                 fill={(hover ? n <= hover : filled) ? (my ? "#e5a000" : "var(--text2)") : "none"}
                 stroke={(my && !hover) ? "#e5a000" : "var(--text3)"} strokeWidth="1.5" strokeLinejoin="round">
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01L12 2z"/>
@@ -136,7 +136,7 @@ export default function Marketplace() {
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, padding: "8px 14px", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 980, fontSize: 13, color: "var(--text2)" }}>
           {t("market.filterBy")} <strong style={{ color: "var(--text)" }}>{authorFilter.name}</strong>
           <button onClick={() => setAuthorFilter(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "var(--text3)", display: "flex", alignItems: "center", padding: 2 }} title={t("market.clearFilter")}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
         </div>
       )}
@@ -214,7 +214,7 @@ export default function Marketplace() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 4 }}>
                   <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--text)" }}>{preview.title}</h3>
                   <button onClick={() => setPreview(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", padding: 4, display: "flex" }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
                   </button>
                 </div>
                 <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 16 }}>
@@ -261,7 +261,7 @@ export default function Marketplace() {
                           <div key={k} style={{ fontSize: 13, color: isCorrect ? "#0a7d3e" : "var(--text2)", fontWeight: isCorrect ? 600 : 400, display: "flex", gap: 6, minWidth: 0, alignItems: "flex-start" }}>
                             <span style={{ fontWeight: 700, flexShrink: 0 }}>{k}</span>
                             <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{(q.choices && q.choices[k]) || "–"}</span>
-                            {isCorrect && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a7d3e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 1, flexShrink: 0 }}><path d="M20 6L9 17l-5-5"/></svg>}
+                            {isCorrect && <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="#0a7d3e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 1, flexShrink: 0 }}><path d="M20 6L9 17l-5-5"/></svg>}
                           </div>
                         );
                       })}

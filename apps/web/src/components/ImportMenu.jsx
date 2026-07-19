@@ -70,7 +70,7 @@ export default function ImportMenu({ importItems = [], templateItems = [] }) {
       >
         <UploadIcon />
         {t("importMenu.label")}
-        <svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
+        <svg width="1em" height="1em" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
           <path d="M5 8l5 5 5-5" />
         </svg>
       </button>
