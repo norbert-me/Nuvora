@@ -68,9 +68,39 @@ class AbuseGuardMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+# Kern-GETs, die sich selten aendern: ETag + 304, damit der Hintergrund-Refresh
+# im Client (stale-while-revalidate) bei unveraenderten Daten fast keine Bytes
+# kostet. Bewusst nur diese Pfade — kein Caching fuer alles.
+import hashlib as _hashlib
+from starlette.responses import Response as _Response
+
+_ETAG_PREFIXES = ("/api/classes", "/api/topics", "/api/modules")
+
+
+class ETagMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        if request.method != "GET":
+            return response
+        path = request.url.path
+        if not any(path == p or path.startswith(p + "/") for p in _ETAG_PREFIXES):
+            return response
+        if response.status_code != 200:
+            return response
+        body = b"".join([chunk async for chunk in response.body_iterator])
+        etag = '"' + _hashlib.md5(body).hexdigest() + '"'
+        headers = dict(response.headers)
+        headers["etag"] = etag
+        headers.pop("content-length", None)
+        if request.headers.get("if-none-match") == etag:
+            return _Response(status_code=304, headers={"etag": etag})
+        return _Response(content=body, status_code=200, headers=headers, media_type=response.media_type)
+
+
 app = FastAPI(title="Nuvora API")
 
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(ETagMiddleware)
 app.add_middleware(AbuseGuardMiddleware)
 # Origins normalisieren: Leerzeichen und ein versehentlicher Trailing-Slash in
 # SITE_URL/CORS_ORIGINS sind der haeufigste Grund, warum der Browser-Origin
@@ -80,7 +110,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization", "If-None-Match"],
+    expose_headers=["ETag"],
 )
 
 app.include_router(questions.router)

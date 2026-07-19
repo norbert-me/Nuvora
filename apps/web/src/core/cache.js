@@ -4,16 +4,28 @@
 // Seitenaufruf SOFORT anzeigen — die Seite wirkt instant. Parallel wird im
 // Hintergrund neu geladen; nur wenn sich die Daten wirklich geaendert haben,
 // wird der Callback ein zweites Mal (mit den frischen Daten) aufgerufen und die
-// Ansicht aktualisiert. So faellt der wahrgenommene Ladebalken weg, ohne dass
-// veraltete Daten haengen bleiben.
+// Ansicht aktualisiert.
+//
+// Zusaetzlich wird pro Eintrag ein ETag gespeichert und beim Revalidieren als
+// If-None-Match mitgeschickt. Hat sich nichts geaendert, antwortet der Server
+// mit 304 (kein Body) — der Hintergrund-Refresh kostet dann praktisch keine
+// Bytes mehr.
 
 const PREFIX = "nuvora_cache_";
 
-function read(key) {
-  try { const raw = localStorage.getItem(PREFIX + key); return raw ? JSON.parse(raw) : null; } catch { return null; }
+// Gespeichert wird { d: <daten>, e: <etag|null> }. Alte reine Arrays werden noch
+// gelesen (als Daten ohne ETag), damit ein Update nichts wegwirft.
+function readEntry(key) {
+  try {
+    const raw = localStorage.getItem(PREFIX + key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && "d" in parsed) return parsed;
+    return { d: parsed, e: null };
+  } catch { return null; }
 }
-function write(key, value) {
-  try { localStorage.setItem(PREFIX + key, JSON.stringify(value)); } catch { /* Quota/Privatmodus: egal */ }
+function writeEntry(key, d, e) {
+  try { localStorage.setItem(PREFIX + key, JSON.stringify({ d, e: e || null })); } catch { /* Quota/Privatmodus: egal */ }
 }
 
 /**
@@ -24,20 +36,24 @@ function write(key, value) {
  */
 export function swr(key, url, onData) {
   let alive = true;
-  const cached = read(key);
-  if (cached != null) onData(cached, true);
+  const entry = readEntry(key);
+  if (entry && entry.d != null) onData(entry.d, true);
 
-  fetch(url)
-    .then((r) => (r.ok ? r.json() : null))
-    .then((data) => {
-      if (!alive || data == null) return;
-      const next = JSON.stringify(data);
-      const prev = JSON.stringify(cached);
-      // Nur re-rendern, wenn es beim ersten Mal keinen Cache gab ODER sich der
-      // Inhalt geaendert hat — sonst bleibt die instant gezeigte Ansicht stehen.
-      if (cached == null || next !== prev) {
-        write(key, data);
-        onData(data, false);
+  fetch(url, entry && entry.e ? { headers: { "If-None-Match": entry.e } } : undefined)
+    .then((r) => {
+      if (r.status === 304) return null;        // unveraendert: Cache bleibt stehen
+      if (!r.ok) return null;
+      const etag = r.headers.get("etag");
+      return r.json().then((data) => ({ data, etag }));
+    })
+    .then((res) => {
+      if (!alive || res == null || res.data == null) return;
+      const changed = entry == null || JSON.stringify(res.data) !== JSON.stringify(entry.d);
+      if (changed) {
+        writeEntry(key, res.data, res.etag);
+        onData(res.data, false);
+      } else if (res.etag && res.etag !== (entry && entry.e)) {
+        writeEntry(key, entry.d, res.etag); // gleiche Daten, nur ETag nachtragen
       }
     })
     .catch(() => { /* offline: der Cache-Stand bleibt stehen */ });
@@ -51,7 +67,7 @@ export function bust(key) {
 }
 
 /** Gecachten Stand lesen, ohne zu laden (fuer sofortiges Erst-Rendern). */
-export function peek(key) { return read(key); }
+export function peek(key) { const e = readEntry(key); return e ? e.d : null; }
 
 /** Frischen Stand in den Cache schreiben (z.B. nach einer eigenen Mutation). */
-export function put(key, data) { write(key, data); }
+export function put(key, data) { writeEntry(key, data, null); }
