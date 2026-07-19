@@ -209,8 +209,41 @@ async def update_class(class_id: int, body: ClassCreate, user: User = Depends(ge
         if card_id not in seen:
             await db.delete(s)
 
+    await db.flush()
+    await _sync_siblings(db, sc)
     await db.commit()
     return await _load_class(db, class_id)
+
+
+async def _sync_siblings(db: AsyncSession, sc: SchoolClass):
+    """Kurs-Konzept: SuS einmal pflegen. Anlegen und Bearbeiten von Schülern
+    einer Fach-Klasse werden auf die Geschwister-Klassen desselben Kurses
+    gespiegelt (Abgleich per Name). Bewusst KEIN automatisches Löschen in den
+    Geschwistern — Entfernen kaskadiert (Noten/Karten) und bleibt pro Klasse
+    eine bewusste Handlung. Attendance ist ohnehin schon kursweit geteilt."""
+    if not sc.kurs_id:
+        return
+    geschwister = (await db.execute(select(SchoolClass).where(
+        SchoolClass.kurs_id == sc.kurs_id, SchoolClass.id != sc.id, SchoolClass.deleted_at.is_(None)
+    ))).scalars().all()
+    if not geschwister:
+        return
+    meine = (await db.execute(select(Student).where(Student.class_id == sc.id))).scalars().all()
+    for g in geschwister:
+        vorhanden = (await db.execute(select(Student).where(Student.class_id == g.id))).scalars().all()
+        by_name = {s.name.strip(): s for s in vorhanden}
+        next_card = (max((s.card_id for s in vorhanden), default=0) + 1)
+        for m in meine:
+            twin = by_name.get(m.name.strip())
+            if twin:  # Felder angleichen (Name-Identität bleibt)
+                twin.niveau = m.niveau
+                twin.foerder = m.foerder
+                twin.notizen = m.notizen
+                twin.klassenlehrer = m.klassenlehrer
+            else:  # neuer Schüler -> in die Geschwister-Klasse übernehmen
+                db.add(Student(card_id=next_card, name=m.name, class_id=g.id, kurs_id=sc.kurs_id,
+                               niveau=m.niveau, foerder=m.foerder, notizen=m.notizen, klassenlehrer=m.klassenlehrer))
+                next_card += 1
 
 
 class ColorIn(BaseModel):
