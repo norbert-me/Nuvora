@@ -68,9 +68,10 @@ export default function Legal() {
 
         <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>2. Allgemeines zur Datenverarbeitung</h3>
         <p>
-          CardVote ist ein selbstgehostetes Werkzeug für Abstimmungen im Unterricht.
-          Die Verarbeitung personenbezogener Daten erfolgt ausschließlich zur Bereitstellung
-          und Nutzung der Anwendung. Es findet keine Weitergabe an Dritte statt.
+          Nuvora ist ein selbstgehosteter Werkzeugkasten für Lehrkräfte mit zuschaltbaren Modulen
+          (u.&nbsp;a. Abstimmungen, Karteikarten, Noten, Kalender). Die Verarbeitung personenbezogener
+          Daten erfolgt ausschließlich zur Bereitstellung und Nutzung der Anwendung. Es findet keine
+          Weitergabe an Dritte statt.
         </p>
 
         <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>3. Rechtsgrundlagen</h3>
@@ -88,8 +89,9 @@ export default function Legal() {
           <li><strong>Nutzungsdaten der Lehrkraft:</strong> E-Mail-Adresse, Name, Passwort (als gesalzener Hash gespeichert, nicht im Klartext).</li>
           <li><strong>Daten der Lernenden:</strong> Name und zugewiesene Kartennummer, eingegeben durch die Lehrkraft. Optional E-/G-Kurs, Klassenleitung sowie – soweit von der Lehrkraft erfasst – Förderschwerpunkte und Notizen.</li>
           <li><strong>Besondere Kategorien (Art. 9 DSGVO):</strong> Angaben zu Förderschwerpunkten (z.&nbsp;B. LRS, Dyskalkulie) und Notizen zu Nachteilsausgleichen können besondere Kategorien personenbezogener Daten darstellen. Diese Angaben werden ausschließlich auf dem Server des Verantwortlichen verarbeitet, erscheinen in <strong>keinem Export</strong> und in keiner Veröffentlichung. Rechtsgrundlage und Erforderlichkeit ihrer Erhebung liegen in der Verantwortung der erhebenden Lehrkraft bzw. Schule (in der Regel Schulgesetz/-verordnung des jeweiligen Landes).</li>
-          <li><strong>Abstimmungsergebnisse und Noten:</strong> Antworten der Lernenden pro Frage und Session, sowie im Modul Noten erfasste Bewertungen und Beobachtungen.</li>
-          <li><strong>Kamerabilder:</strong> Werden beim Scannen kurzfristig im Arbeitsspeicher verarbeitet, um ArUco-Marker zu erkennen. Es erfolgt keine dauerhafte Speicherung der Bilder.</li>
+          <li><strong>Modul-Daten der Lernenden:</strong> je nach genutztem Modul – Abstimmungsergebnisse (CardVote: Antworten pro Frage und Session), Bewertungen und Beobachtungen (Noten), Lernfortschritt beim Karteikarten-Üben (Karten), Anwesenheit und Fehlzeiten (Anwesenheit), Sitzpositionen (Sitzplan) sowie Unterrichtsplanung mit Klassen- und Themenbezug (Kalender). Alle diese Daten gibt die Lehrkraft ein bzw. erfasst sie im Unterricht.</li>
+          <li><strong>Pseudonymer Zugang der Lernenden (Modul Karten):</strong> Zum Üben ohne Konto erhält jede Person einen zufälligen, geheimen Token (in einem QR-Code/Link). Er dient allein dazu, den Übungsfortschritt der richtigen Person zuzuordnen; ein Login findet nicht statt. Wer den Link kennt, kann üben – die Lehrkraft gibt ihn gezielt aus.</li>
+          <li><strong>Kamerabilder:</strong> Werden beim Scannen (CardVote) kurzfristig im Arbeitsspeicher verarbeitet, um ArUco-Marker zu erkennen. Es erfolgt keine dauerhafte Speicherung der Bilder.</li>
           <li><strong>Technische Zugriffsdaten:</strong> IP-Adresse (kurzfristig im Arbeitsspeicher für Brute-Force-Schutz, nicht dauerhaft gespeichert).</li>
         </ul>
 
@@ -110,9 +112,15 @@ export default function Legal() {
 
         <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>7. Cookies und Tracking</h3>
         <p>
-          CardVote verwendet <strong>keine Cookies</strong> und <strong>keine Tracking-Dienste</strong>.
+          Nuvora verwendet <strong>keine Cookies</strong> und <strong>keine Tracking-Dienste</strong>.
           Die Authentifizierung erfolgt über ein Token, das ausschließlich im lokalen Speicher
           (localStorage) des Browsers abgelegt wird. Externe Analyse- oder Werbedienste werden nicht eingesetzt.
+        </p>
+        <p style={{ marginTop: 8 }}>
+          Zusätzlich legt die Anwendung im localStorage einen <strong>lokalen Zwischenspeicher</strong> selten
+          wechselnder eigener Daten der Lehrkraft ab (z.&nbsp;B. Klassen, Themen, aktive Module, die Reihenfolge
+          der Startseiten-Kacheln), damit Seiten schneller erscheinen. Diese Daten verbleiben im Browser der
+          Lehrkraft, werden nicht an Dritte übertragen und beim Abmelden wieder entfernt.
         </p>
         <p style={{ marginTop: 8 }}>
           Sämtliche Schriften und Bibliotheken (u.&nbsp;a. KaTeX zur Formeldarstellung) werden
@@ -148,8 +156,9 @@ export default function Legal() {
 
         <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>10. Wer ist für die Daten der Lernenden verantwortlich?</h3>
         <p>
-          Für die Daten der Schülerinnen und Schüler (Namen, Kartennummern, Abstimmungsergebnisse)
-          ist <strong>nicht der Betreiber dieser CardVote-Instanz</strong>, sondern die jeweils
+          Für die Daten der Schülerinnen und Schüler (Namen, Kartennummern, Modul-Daten wie
+          Abstimmungsergebnisse, Noten, Lernfortschritt, Anwesenheit)
+          ist <strong>nicht der Betreiber dieser Nuvora-Instanz</strong>, sondern die jeweils
           <strong> nutzende Lehrkraft bzw. Schule</strong> als eigenständig Verantwortliche/r im Sinne
           der DSGVO (Art. 4 Nr. 7 DSGVO) verantwortlich. Der Betreiber stellt lediglich die technische
           Infrastruktur bereit (vergleichbar einer Auftragsverarbeitung). Die Lehrkraft bzw. Schule ist
@@ -173,7 +182,7 @@ export default function Legal() {
 
         <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>12. Keine Gewährleistung der Bereitstellung</h3>
         <p>
-          CardVote wird unentgeltlich und ohne Anspruch auf ständige Verfügbarkeit, Fehlerfreiheit
+          Nuvora wird unentgeltlich und ohne Anspruch auf ständige Verfügbarkeit, Fehlerfreiheit
           oder Weiterführung bereitgestellt. Es besteht <strong>kein Rechtsanspruch auf die
           (dauerhafte) Bereitstellung des Dienstes</strong>. Der Betrieb kann jederzeit ohne
           Vorankündigung eingeschränkt, unterbrochen oder eingestellt werden. Nutzende sollten
