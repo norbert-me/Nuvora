@@ -5,11 +5,18 @@
 // Wahrheit benutzen und nicht jede Komponente einzeln nachfragt.
 import { useState, useEffect, useCallback } from "react";
 
-let _cache = null;
+// Erst-Stand aus localStorage: dann zeigt die Shell die Modul-Navigation sofort
+// beim Laden, ohne auf /api/modules zu warten. Wird bei jedem Fetch aktualisiert.
+const _LS = "nuvora_cache_modules";
+function _seed() {
+  try { const raw = localStorage.getItem(_LS); return raw ? JSON.parse(raw) : null; } catch { return null; }
+}
+let _cache = _seed();
 const _subscribers = new Set();
 
 function _publish(mods) {
   _cache = mods;
+  try { localStorage.setItem(_LS, JSON.stringify(mods)); } catch { /* egal */ }
   _subscribers.forEach((fn) => fn(mods));
 }
 

@@ -733,6 +733,9 @@ function App() {
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    // Zwischengespeicherte Kerndaten des Nutzers loeschen (kein Rest fuer den
+    // naechsten Login am selben Browser).
+    try { Object.keys(localStorage).filter((k) => k.startsWith("nuvora_cache_")).forEach((k) => localStorage.removeItem(k)); } catch { /* egal */ }
     setUser(null);
   };
 

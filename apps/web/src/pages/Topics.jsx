@@ -5,6 +5,7 @@
 import { useState, useEffect } from "react";
 import { useLanguage } from "../i18n/index.jsx";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle } from "../components/Icons.jsx";
+import { peek, put } from "../core/cache.js";
 
 const API = "/api";
 
@@ -48,11 +49,14 @@ export default function Topics() {
   const load = () =>
     fetch(`${API}/topics`)
       .then((r) => (r.ok ? r.json() : []))
-      .then((d) => setTopics(Array.isArray(d) ? d : []))
+      .then((d) => { const list = Array.isArray(d) ? d : []; setTopics(list); put("topics", list); })
       .catch(() => setError(t("topics.loadError")))
       .finally(() => setLoaded(true));
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const c = peek("topics"); if (Array.isArray(c)) { setTopics(c); setLoaded(true); }
+    load();
+  }, []);
 
   const call = async (fn) => {
     setError("");

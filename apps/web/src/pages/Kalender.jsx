@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, Fragment } from "react";
 import { Link } from "react-router-dom";
 import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import { swr } from "../core/cache.js";
 
 const API = "/api/kalender";
 
@@ -29,8 +30,8 @@ export default function Kalender() {
   const [slotEdit, setSlotEdit] = useState(null); // { weekday, period, ...slot } oder null
 
   useEffect(() => {
-    fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).then((d) => setClasses(Array.isArray(d) ? d : [])).catch(() => {});
-    fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {});
+    swr("classes", "/api/classes", (d) => setClasses(Array.isArray(d) ? d : []));
+    swr("topics", "/api/topics", (d) => setTopics(Array.isArray(d) ? d : []));
     // Methoden nur, wenn das Modul aktiv ist (sonst 403 -> leer, kein Selektor).
     fetch("/api/methoden/list").then((r) => (r.ok ? r.json() : [])).then((d) => setMethods(Array.isArray(d) ? d : [])).catch(() => {});
     // Regel 3: Modul-Objekte nur laden/anbieten, wenn das Modul aktiviert ist.

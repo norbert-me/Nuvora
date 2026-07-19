@@ -13,6 +13,7 @@ import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary } from "../
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
+import { peek, put } from "../core/cache.js";
 
 const API = "/api";
 
@@ -57,8 +58,10 @@ export default function Classes() {
   const load = () => fetch(`${API}/classes`).then((r) => {
     if (r.status === 401) { localStorage.removeItem("token"); localStorage.removeItem("user"); location.reload(); return []; }
     return r.json();
-  }).then((d) => { setClasses(Array.isArray(d) ? d : []); setLoadError(false); }).catch(() => setLoadError(true)).finally(() => setLoaded(true));
+  }).then((d) => { const list = Array.isArray(d) ? d : []; setClasses(list); put("classes", list); setLoadError(false); }).catch(() => setLoadError(true)).finally(() => setLoaded(true));
   useEffect(() => {
+    // Sofort den gecachten Stand zeigen (Seite wirkt instant), dann frisch laden.
+    const c = peek("classes"); if (Array.isArray(c)) { setClasses(c); setLoaded(true); }
     const timer = setTimeout(() => { if (classes.length === 0) setLoadError(true); }, 15000);
     load().then(() => clearTimeout(timer));
     return () => clearTimeout(timer);

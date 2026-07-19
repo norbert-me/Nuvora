@@ -5,6 +5,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, selectStyle } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
+import { swr } from "../core/cache.js";
 
 const API = "/api/karten";
 
@@ -28,17 +29,17 @@ export default function Karten() {
   const kalenderAktiv = modules.find((m) => m.key === "kalender")?.active ?? false;
 
   useEffect(() => {
-    if (kalenderAktiv) fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {});
+    if (kalenderAktiv) return swr("topics", "/api/topics", (d) => setTopics(Array.isArray(d) ? d : []));
   }, [kalenderAktiv]);
 
   useEffect(() => {
-    fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).then((d) => {
+    return swr("classes", "/api/classes", (d) => {
       const list = Array.isArray(d) ? d : [];
       setClasses(list);
       // Vorauswahl per ?class=<id> (z. B. Link aus dem Kalender), sonst erste Klasse.
       const wanted = Number(params.get("class")) || null;
       if (classId === null) setClassId((wanted && list.some((c) => c.id === wanted)) ? wanted : (list[0]?.id ?? null));
-    }).catch(() => {});
+    });
   }, []);
 
   const loadDecks = (id) => id && fetch(`${API}/classes/${id}/decks`).then((r) => (r.ok ? r.json() : [])).then(setDecks).catch(() => {});
