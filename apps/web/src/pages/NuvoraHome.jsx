@@ -77,9 +77,6 @@ export default function NuvoraHome({ user }) {
               )
             )}
           </div>
-          <p style={{ marginTop: 22, fontSize: 13, color: "var(--text3)" }}>
-            <Link to="/modules" style={{ color: "var(--accent)" }}>{t("home.manageModules")}</Link>
-          </p>
         </>
       )}
     </div>
