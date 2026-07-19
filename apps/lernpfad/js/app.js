@@ -2691,10 +2691,12 @@
         `).join('');
 
         const openPfad = id => editPfad(lernpfade.find(p => p._id === id));
-        const deletePfad = id => {
+        const deletePfad = async id => {
             if (!confirm('Pfad wirklich löschen?')) return;
             lernpfade = lernpfade.filter(p => p._id !== id);
-            api(`${LP}/paths/` + id, { method: 'DELETE' }).catch(() => {});
+            // Erst löschen, dann neu laden — sonst holt loadLernpfade den Pfad
+            // noch aus dem Backend zurück (Race), er erscheint wieder.
+            await api(`${LP}/paths/` + id, { method: 'DELETE' }).catch(() => {});
             loadLernpfade();
         };
         // Klick auf Balken öffnet; Icon-Buttons haben Vorrang via stopPropagation
