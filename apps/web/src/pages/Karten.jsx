@@ -259,7 +259,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false }) {
             const description = await askPrompt(t("karten.publishPrompt")); if (description === null) return;
             const r = await fetch(`/api/marketplace/publish/deck`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deck_id: deck.id, description }) }).catch(() => null);
             showAlert(r && r.ok ? t("karten.published") : t("karten.publishError"));
-          }} className="icon-btn" style={iconBtn} title={t("karten.publish")}><Icon d={ICONS.export} color="var(--accent)" /></button>
+          }} className="icon-btn" style={iconBtn} title={t("karten.publish")}><Icon d={ICONS.upload} color="var(--accent)" /></button>
         )}
         <button onClick={async () => { if (await askConfirm(t("karten.delDeck", { name: deck.name }))) call(() => fetch(`${API}/decks/${deck.id}`, { method: "DELETE" })); }}
           className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>

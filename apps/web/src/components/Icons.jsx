@@ -19,6 +19,9 @@ export const ICONS = {
   open: ["M10 3L17 10L10 17", "M17 10H3"],
   pdf: ["M5 2h7l4 4v11a2 2 0 01-2 2H5a2 2 0 01-2-2V4a2 2 0 012-2z", "M12 2v4h4"],
   export: ["M12 3h5v5", "M17 3L9 11", "M15 11v5a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h5"],
+  // Einheitliches "Veröffentlichen/Hochladen zum Marktplatz" — Pfeil nach oben
+  // auf eine Grundlinie. IMMER dieses Icon für Marktplatz-Upload verwenden.
+  upload: ["M12 16V4M12 4L7 9M12 4l5 5", "M4 20h16"],
   chart: ["M3 17h14", "M5 13v4M9 9v8M13 11v6M17 7v10"],
   archive: ["M3 5a2 2 0 012-2h10a2 2 0 012 2v1H3V5z", "M4 6h12v11a2 2 0 01-2 2H6a2 2 0 01-2-2V6z", "M8 10h4"],
   restore: ["M10 3L3 10L10 17", "M3 10H17"],

@@ -3,7 +3,7 @@ import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
-import { DownloadLink, btnPrimary, btnSecondary } from "../components/Icons.jsx";
+import { DownloadLink, Icon, ICONS, btnPrimary, btnSecondary } from "../components/Icons.jsx";
 
 const API = "/api";
 const COLORS = { A: "#0066cc", B: "#5856d6", C: "#b8860b", D: "#d1350f" };
@@ -783,9 +783,7 @@ const gradeDistribution = (() => {
                       title="PDF herunterladen"
                     >
                       {student.name}{" "}
-                      <svg width="10" height="10" viewBox="0 0 20 20" fill="none" stroke="var(--text3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: "inline", verticalAlign: "-1px" }}>
-                        <path d="M10 3v10M6 9l4 4 4-4" /><path d="M3 15v1a2 2 0 002 2h10a2 2 0 002-2v-1" />
-                      </svg>
+                      <Icon d={ICONS.download} size={12} color="var(--text3)" />
                     </a>
                   </td>
                   {student.answers.map((a, i) => (
