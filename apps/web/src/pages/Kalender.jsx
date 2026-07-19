@@ -235,8 +235,8 @@ function MonthGrid({ range, cursor, byDay, slotsFor, onSlot, frei, className, to
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
   const heute = ymd(new Date());
   return (
-    <div style={{ overflowX: "auto" }}>
-      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed", minWidth: 700 }}>
+    <div>
+      <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
         <thead><tr>{wdays.map((w) => <th key={w} style={{ padding: 6, fontSize: 12, color: "var(--text3)", textAlign: "left" }}>{w}</th>)}</tr></thead>
         <tbody>
           {Array.from({ length: days.length / 7 }).map((_, r) => (
