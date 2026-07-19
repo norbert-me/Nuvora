@@ -828,4 +828,7 @@ export default {
   "weak.hint": "Themen unter 60 % Trefferquote. Ein Klick legt ein themengebundenes Übungs-Deck (Entwurf) im Modul Karten an.",
   "weak.makeDeck": "Karten-Deck anlegen",
   "weak.created": "Deck angelegt ✓",
+  "anwesenheit.onlyToday": "Nur heutige Klassen",
+  "anwesenheit.overviewHint": "Auf einen Namen tippen, um Fehltage zu sehen und nachzutragen (z. B. Entschuldigung nachreichen).",
+  "anwesenheit.noEntries": "Keine Fehltage.",
 };

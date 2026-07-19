@@ -828,4 +828,7 @@ export default {
   "weak.hint": "Temas por debajo del 60% de aciertos. Un clic crea un mazo de práctica (borrador) vinculado al tema en el módulo Tarjetas.",
   "weak.makeDeck": "Crear mazo",
   "weak.created": "Mazo creado ✓",
+  "anwesenheit.onlyToday": "Solo clases de hoy",
+  "anwesenheit.overviewHint": "Toca un nombre para ver y corregir las ausencias (p. ej. justificar más tarde).",
+  "anwesenheit.noEntries": "Sin ausencias.",
 };

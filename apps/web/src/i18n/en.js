@@ -828,4 +828,7 @@ export default {
   "weak.hint": "Topics below 60% correct. One click creates a topic-bound practice deck (draft) in the Cards module.",
   "weak.makeDeck": "Create card deck",
   "weak.created": "Deck created ✓",
+  "anwesenheit.onlyToday": "Only today's classes",
+  "anwesenheit.overviewHint": "Tap a name to see and amend absences (e.g. add an excuse later).",
+  "anwesenheit.noEntries": "No absences.",
 };

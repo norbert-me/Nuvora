@@ -89,6 +89,17 @@ async def mark(class_id: int, body: MarkIn, user: User = Depends(require_module)
     return {"ok": True}
 
 
+@router.get("/{class_id}/student/{student_id}")
+async def student_history(class_id: int, student_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Alle nicht-'da'-Einträge eines Schülers, neueste zuerst — zum Nachtragen
+    (z.B. Entschuldigung nachreichen)."""
+    await _owned_class(db, user, class_id)
+    rows = (await db.execute(select(Attendance).where(
+        Attendance.class_id == class_id, Attendance.owner_id == user.id, Attendance.student_id == student_id,
+    ).order_by(Attendance.date.desc()))).scalars().all()
+    return [{"date": r.date.isoformat(), "status": r.status, "note": r.note} for r in rows]
+
+
 @router.get("/{class_id}/summary")
 async def summary(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Zusammenfassung je Schueler: Zaehler fehlt/spaet/entsch (ueber alles)."""
