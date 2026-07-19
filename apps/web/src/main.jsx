@@ -61,7 +61,7 @@ import Modules from "./pages/Modules.jsx";
 import Topics from "./pages/Topics.jsx";
 import ThemaAnsicht from "./pages/ThemaAnsicht.jsx";
 import LernpfadModule from "./pages/LernpfadModule.jsx";
-import CodeDetektivModule from "./pages/CodeDetektivModule.jsx";
+import CodeDetektiv from "./codedetektiv/CodeDetektiv.jsx";
 import Cards from "./pages/Cards.jsx";
 import Tutorial from "./pages/Tutorial.jsx";
 import NotenModul from "./pages/Noten.jsx";
@@ -151,11 +151,11 @@ const getModuleNavItems = (t, location) => {
     return [{ to: ANW, label: t("anwesenheit.title") }];
   }
   if (area === "code-detektiv") {
-    // Buttons der eingebetteten App steuern das iframe per ?view (wie Lernpfad).
-    const cur = params.get("view") || "admin";
+    // Nativ eingebunden: eigene Navigation in der App (Home). Shell zeigt nur
+    // den Rueckweg zur Startseite des Moduls.
     return [
-      { to: `${CD}?view=admin`, label: t("cd.create"), active: cur === "admin" },
-      { to: `${CD}?view=join`, label: t("cd.join"), active: cur === "join" },
+      { to: `${CD}`, label: t("cd.create") },
+      { to: `${CD}/solo`, label: t("cd.solo") },
     ];
   }
   if (area === "karten") {
@@ -691,7 +691,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={ANW} element={user ? <ModuleGate moduleKey="anwesenheit"><Anwesenheit /></ModuleGate> : <Landing />} />
 
           {/* ─── Modul Code-Detektiv ─── */}
-          <Route path={CD} element={user ? <ModuleGate moduleKey="code-detektiv"><CodeDetektivModule /></ModuleGate> : <Landing />} />
+          <Route path={`${CD}/*`} element={user ? <ModuleGate moduleKey="code-detektiv"><CodeDetektiv /></ModuleGate> : <Landing />} />
 
           {/* ─── Modul Lernpfad ─── */}
           {/* Die App laeuft eingebettet (siehe LernpfadModule) — nicht in React
