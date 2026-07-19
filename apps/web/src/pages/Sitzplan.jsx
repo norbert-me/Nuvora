@@ -4,9 +4,12 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { pageTitle, btnPrimary, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import { useModules } from "../core/modules.js";
 import { swr } from "../core/cache.js";
 
 const API = "/api/sitzplan";
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const ABS_COL = { fehlt: "#d1350f", spaet: "#b8860b", entsch: "#2563eb" };
 
 export default function Sitzplan() {
   const { t } = useLanguage();
@@ -17,6 +20,10 @@ export default function Sitzplan() {
   const [drag, setDrag] = useState(null); // { from: "pool"|index, id }
   const [over, setOver] = useState(null);  // Zielzelle-Index oder "pool" (Vorschau)
   const [msg, setMsg] = useState("");
+  const { modules } = useModules();
+  const anwesenheitAktiv = modules.find((m) => m.key === "anwesenheit")?.active ?? false;
+  const [abwesend, setAbwesend] = useState({}); // { student_id: status } heute
+  const [aufruf, setAufruf] = useState(false); // Aufruf-Ansicht: Abwesende ausgrauen
 
   useEffect(() => {
     return swr("classes", "/api/classes", (d) => {
@@ -25,6 +32,15 @@ export default function Sitzplan() {
       if (classId === null && list.length) setClassId(list[0].id);
     });
   }, []);
+
+  // Heutige Anwesenheit laden (nur wenn Modul aktiv und Aufruf-Ansicht an).
+  useEffect(() => {
+    if (!anwesenheitAktiv || !aufruf || !classId) { setAbwesend({}); return; }
+    fetch(`/api/anwesenheit/${classId}?date=${new Date(ymd(new Date()) + "T00:00:00").toISOString()}`)
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((d) => { const m = {}; Object.entries(d || {}).forEach(([sid, v]) => { if (v.status && v.status !== "da") m[sid] = v.status; }); setAbwesend(m); })
+      .catch(() => {});
+  }, [anwesenheitAktiv, aufruf, classId]);
 
   const cls = useMemo(() => classes.find((c) => c.id === classId), [classes, classId]);
   const students = useMemo(() => cls?.students || [], [cls]);
@@ -90,7 +106,10 @@ export default function Sitzplan() {
         <select value={classId ?? ""} onChange={(e) => setClassId(Number(e.target.value))} style={selectStyle}>
           {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+        {anwesenheitAktiv && (
+          <button onClick={() => setAufruf((a) => !a)} style={{ padding: "6px 13px", fontSize: 13, fontWeight: 600, borderRadius: 980, cursor: "pointer", border: aufruf ? "1px solid var(--accent)" : "1px solid var(--border2)", background: aufruf ? "var(--accent)" : "transparent", color: aufruf ? "#fff" : "var(--text2)" }}>{t("sitzplan.rollcall")}</button>
+        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: aufruf || !anwesenheitAktiv ? "auto" : 0 }}>
           <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("sitzplan.cols")}</span>
           <button onClick={() => setColsPersist(cols - 1)} style={{ ...btnSecondary, padding: "4px 10px" }}>−</button>
           <span style={{ minWidth: 20, textAlign: "center", fontWeight: 600 }}>{cols}</span>
@@ -111,6 +130,7 @@ export default function Sitzplan() {
           <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 8, marginBottom: 24 }}>
             {grid.map((sid, idx) => {
               const s = sid != null ? byId(sid) : null;
+              const abs = s && aufruf ? abwesend[String(sid)] : null;
               return (
                 <div key={idx}
                   draggable={!!s}
@@ -118,10 +138,12 @@ export default function Sitzplan() {
                   onDragOver={(e) => { e.preventDefault(); if (drag && over !== idx) setOver(idx); }}
                   onDrop={() => dropOnCell(idx)}
                   onDragEnd={() => { setDrag(null); setOver(null); }}
-                  style={{ ...seatStyle(!!s), opacity: drag && drag.from === idx ? 0.4 : 1,
+                  style={{ ...seatStyle(!!s), position: "relative", opacity: drag && drag.from === idx ? 0.4 : (abs ? 0.4 : 1),
+                    ...(abs ? { borderStyle: "dashed", textDecoration: "line-through" } : {}),
                     // Vorschau: wo die gezogene Person landen wuerde.
                     ...(drag && over === idx ? { outline: "2px solid var(--accent)", outlineOffset: -2, background: "var(--accent-bg, rgba(10,132,255,0.12))" } : {}) }}>
                   {drag && over === idx && drag.id !== sid ? (byId(drag.id)?.name || (s ? s.name : "")) : (s ? s.name : "")}
+                  {abs && <span style={{ position: "absolute", top: 4, right: 5, width: 8, height: 8, borderRadius: 4, background: ABS_COL[abs] || "#d1350f" }} title={t(`anwesenheit.${abs}`)} />}
                 </div>
               );
             })}
@@ -134,12 +156,17 @@ export default function Sitzplan() {
               {t("sitzplan.pool")} ({pool.length})
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {pool.map((s) => (
+              {pool.map((s) => {
+                const abs = aufruf ? abwesend[String(s.id)] : null;
+                return (
                 <div key={s.id} draggable onDragStart={() => setDrag({ from: "pool", id: s.id })}
-                  style={{ padding: "7px 12px", borderRadius: 980, border: "1px solid var(--border2)", background: "var(--card)", fontSize: 13, fontWeight: 600, cursor: "grab" }}>
+                  style={{ padding: "7px 12px", borderRadius: 980, border: "1px solid var(--border2)", background: "var(--card)", fontSize: 13, fontWeight: 600, cursor: "grab", display: "inline-flex", alignItems: "center", gap: 6,
+                    ...(abs ? { opacity: 0.45, textDecoration: "line-through" } : {}) }}>
+                  {abs && <span style={{ width: 8, height: 8, borderRadius: 4, background: ABS_COL[abs] || "#d1350f" }} title={t(`anwesenheit.${abs}`)} />}
                   {s.name}
                 </div>
-              ))}
+                );
+              })}
               {pool.length === 0 && <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("sitzplan.allSeated")}</span>}
             </div>
           </div>

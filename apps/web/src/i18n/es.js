@@ -892,4 +892,5 @@ export default {
   "tut.loslegen.1": "Listo — elige un módulo y empieza.",
   "tut.loslegen.2": "La ayuda es contextual desde el menú; el mercado comparte cuestionarios, tarjetas e inicios.",
   "tut.loslegen.3": "Puedes volver a este recorrido cuando quieras desde la Ayuda.",
+  "sitzplan.rollcall": "Pasar lista (ausentes en gris)",
 };

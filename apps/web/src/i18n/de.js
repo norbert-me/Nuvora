@@ -892,4 +892,5 @@ export default {
   "tut.loslegen.1": "Fertig — such dir ein Modul und leg los.",
   "tut.loslegen.2": "Hilfe gibt es kontextsensitiv über das Menü; der Marktplatz teilt Quizze, Karten und Einstiege.",
   "tut.loslegen.3": "Diese Tour findest du jederzeit über die Hilfe wieder.",
+  "sitzplan.rollcall": "Aufruf (Abwesende grau)",
 };

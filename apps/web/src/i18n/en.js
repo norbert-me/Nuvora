@@ -892,4 +892,5 @@ export default {
   "tut.loslegen.1": "Done — pick a module and get started.",
   "tut.loslegen.2": "Help is context-sensitive from the menu; the marketplace shares quizzes, cards and lesson starters.",
   "tut.loslegen.3": "You can find this tour again any time via Help.",
+  "sitzplan.rollcall": "Roll call (grey absent)",
 };
