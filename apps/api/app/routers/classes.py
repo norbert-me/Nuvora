@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
-from ..models import SchoolClass, Student, User, Kurs
+from ..models import SchoolClass, Student, User, Kurs, KursTag
 from .auth import get_current_user, rate_limit
 
 router = APIRouter(prefix="/api/classes", tags=["classes"])
@@ -128,6 +128,7 @@ async def create_class(body: ClassCreate, user: User = Depends(get_current_user)
     sc = SchoolClass(name=body.name, owner_id=user.id, color=body.color or _auto_color(body.name), kurs_id=kurs.id)
     db.add(sc)
     await db.flush()
+    db.add(KursTag(kurs_id=kurs.id, class_id=sc.id))  # Mitgliedschaft (many-to-many)
     for s in body.students:
         db.add(Student(card_id=s.card_id, name=s.name, class_id=sc.id, kurs_id=kurs.id,
                        niveau=s.niveau, foerder=s.foerder, notizen=s.notizen,
@@ -221,10 +222,13 @@ async def _sync_siblings(db: AsyncSession, sc: SchoolClass):
     gespiegelt (Abgleich per Name). Bewusst KEIN automatisches Löschen in den
     Geschwistern — Entfernen kaskadiert (Noten/Karten) und bleibt pro Klasse
     eine bewusste Handlung. Attendance ist ohnehin schon kursweit geteilt."""
-    if not sc.kurs_id:
+    from .kurse import sibling_class_ids
+    sib_ids = await sibling_class_ids(db, sc.id)
+    sib_ids.discard(sc.id)
+    if not sib_ids:
         return
     geschwister = (await db.execute(select(SchoolClass).where(
-        SchoolClass.kurs_id == sc.kurs_id, SchoolClass.id != sc.id, SchoolClass.deleted_at.is_(None)
+        SchoolClass.id.in_(sib_ids), SchoolClass.deleted_at.is_(None)
     ))).scalars().all()
     if not geschwister:
         return

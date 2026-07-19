@@ -127,7 +127,7 @@ export default {
   "classes.deleteConfirm": "Move class to trash? Restorable for 30 days.",
   "classes.trash": "Trash",
   "kurse.title": "Courses",
-  "kurse.intro": "Bundle subject-classes of the same group into one course (e.g. Math 7.5 and Study 7.5). Classes in the same course will share the student list and attendance; cards and grades stay per subject-class.",
+  "kurse.intro": "Bundle subject-classes of the same group into a course (e.g. Math 7.5 and Study 7.5). Classes in the same course share the student list and attendance; cards and grades stay per subject-class. A class may be in several courses.",
   "kurse.newPlaceholder": "New course, e.g. 7.5",
   "kurse.add": "Create course",
   "kurse.empty": "No class in this course yet.",

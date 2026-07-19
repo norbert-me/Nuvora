@@ -183,6 +183,7 @@ const getModuleNavItems = (t, location) => {
   // Kern: der Nuvora-Schriftzug links fuehrt zur Startseite.
   return [
     { to: "/classes", label: t("nav.classes") },
+    { to: "/kurse", label: t("kurse.title") },
     { to: "/topics", label: t("nav.topics") },
     { to: "/modules", label: t("nav.modules") },
   ];

@@ -10,23 +10,26 @@ export default function KursKlasseSelect({ value, onChange, style, allowNone = f
   const [groups, setGroups] = useState([]); // [{ id, name, classes:[{id,name}] }]
 
   useEffect(() => {
-    fetch("/api/kurse")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((d) => {
-        // Nur Sharing-Klassen je Kurs; Kurse ohne Klassen weglassen.
-        const g = (Array.isArray(d) ? d : [])
-          .map((k) => ({ id: k.id, name: k.name, classes: (k.classes || []).filter((c) => c.shared) }))
-          .filter((x) => x.classes.length);
-        setGroups(g);
-      })
-      .catch(() => {});
+    Promise.all([
+      fetch("/api/kurse").then((r) => (r.ok ? r.json() : [])).catch(() => []),
+      fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).catch(() => []),
+    ]).then(([kurse, classes]) => {
+      const g = (Array.isArray(kurse) ? kurse : [])
+        .map((k) => ({ id: k.id, name: k.name, classes: k.classes || [] }))
+        .filter((x) => x.classes.length);
+      // Klassen ohne Kurs unter „Ohne Kurs" ergänzen, damit jede wählbar bleibt.
+      const drin = new Set(g.flatMap((x) => x.classes.map((c) => c.id)));
+      const rest = (Array.isArray(classes) ? classes : []).filter((c) => !drin.has(c.id));
+      if (rest.length) g.push({ id: "none", name: null, classes: rest.map((c) => ({ id: c.id, name: c.name })) });
+      setGroups(g);
+    });
   }, []);
 
   const cur = groups.find((g) => g.classes.some((c) => c.id === value));
   const s = { ...selectStyle, ...style };
 
   const pickKurs = (kid) => {
-    const g = groups.find((x) => x.id === Number(kid));
+    const g = groups.find((x) => String(x.id) === String(kid));
     if (g && !g.classes.some((c) => c.id === value)) onChange(g.classes[0].id);
   };
 
@@ -36,7 +39,7 @@ export default function KursKlasseSelect({ value, onChange, style, allowNone = f
     <>
       <select value={cur?.id ?? ""} onChange={(e) => (e.target.value === "" ? onChange(allowNone ? "" : value) : pickKurs(e.target.value))} style={s}>
         {allowNone ? <option value="">{noneLabel}</option> : (!cur && <option value="">–</option>)}
-        {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+        {groups.map((g) => <option key={g.id} value={g.id}>{g.name || "—"}</option>)}
       </select>
       {cur && cur.classes.length > 1 && (
         <select value={value ?? ""} onChange={(e) => onChange(Number(e.target.value))} style={s}>

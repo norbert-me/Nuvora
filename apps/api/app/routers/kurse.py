@@ -1,20 +1,24 @@
-"""Kurse (Lerngruppen) — Phase 1: Fach-Klassen zu einem Kurs gruppieren.
+"""Kurse (Lerngruppen).
 
-Ein Kurs bündelt Fach-Klassen, die dieselbe Lerngruppe unterrichten (Mathe 7.5,
-Lernzeit 7.5). Phase 1 verwaltet nur die Zuordnung Klasse↔Kurs; das Teilen von
-Schülerliste und Anwesenheit über den Kurs kommt in Phase 2.
+Ein Kurs bündelt Fach-Klassen derselben Lerngruppe (Mathe 7.5, Lernzeit 7.5).
+Klassen im selben Kurs teilen sich Schülerliste + Anwesenheit (per Name);
+Karten/Noten bleiben pro Fach-Klasse.
+
+Mitgliedschaft ist many-to-many (Tabelle kurs_tags): eine Klasse kann in
+mehreren Kursen sein. Alle Mitglieder eines Kurses teilen — es gibt keinen
+Unterschied „Sharing vs. Tag" mehr.
 """
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select, update
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from datetime import datetime, timezone
 
 from ..database import get_db
-from ..models import Kurs, KursTag, SchoolClass, Student, User
+from ..models import Kurs, KursTag, SchoolClass, User
 from .auth import get_current_user
 
 router = APIRouter(prefix="/api/kurse", tags=["kurse"])
@@ -27,7 +31,6 @@ class KursIn(BaseModel):
 class ClassRef(BaseModel):
     id: int
     name: str
-    shared: bool = True   # True = Sharing-Klasse (SuS/Anwesenheit), False = loses Tag
 
 
 class KursOut(BaseModel):
@@ -43,19 +46,53 @@ async def _owned_kurs(db, user, kurs_id) -> Kurs:
     return k
 
 
-async def _kurs_classes(db, user, kurse):
-    """Je Kurs: Sharing-Klassen (kurs_id) shared=True + getaggte shared=False."""
-    classes = {c.id: c for c in (await db.execute(select(SchoolClass).where(
+async def _own_class(db, user, class_id) -> SchoolClass:
+    c = await db.get(SchoolClass, class_id)
+    if not c or (c.owner_id and c.owner_id != user.id):
+        raise HTTPException(404, "Klasse nicht gefunden")
+    return c
+
+
+# ─── Mitgliedschaft (wird auch von Anwesenheit/Klassen genutzt) ───
+
+async def member_class_ids(db, kurs_ids) -> set:
+    """Klassen-IDs, die Mitglied eines der Kurse sind (kurs_tags ∪ altes kurs_id)."""
+    if not kurs_ids:
+        return set()
+    kurs_ids = list(kurs_ids)
+    a = (await db.execute(select(KursTag.class_id).where(KursTag.kurs_id.in_(kurs_ids)))).scalars().all()
+    b = (await db.execute(select(SchoolClass.id).where(SchoolClass.kurs_id.in_(kurs_ids)))).scalars().all()
+    return set(a) | set(b)
+
+
+async def class_kurs_ids(db, class_id, only_active=True) -> set:
+    """Kurse (nicht gelöscht), in denen die Klasse Mitglied ist (kurs_tags ∪ kurs_id)."""
+    ids = set((await db.execute(select(KursTag.kurs_id).where(KursTag.class_id == class_id))).scalars().all())
+    sc = await db.get(SchoolClass, class_id)
+    if sc and sc.kurs_id:
+        ids.add(sc.kurs_id)
+    if only_active and ids:
+        alive = set((await db.execute(select(Kurs.id).where(Kurs.id.in_(list(ids)), Kurs.deleted_at.is_(None)))).scalars().all())
+        return ids & alive
+    return ids
+
+
+async def sibling_class_ids(db, class_id) -> set:
+    """Alle Klassen, die mit dieser einen Kurs teilen (inkl. sich selbst)."""
+    kurse = await class_kurs_ids(db, class_id)
+    ids = await member_class_ids(db, kurse)
+    ids.add(class_id)
+    return ids
+
+
+async def _classes_by_kurs(db, user, kurse):
+    names = {c.id: c.name for c in (await db.execute(select(SchoolClass).where(
         SchoolClass.owner_id == user.id, SchoolClass.deleted_at.is_(None)))).scalars().all()}
     tags = (await db.execute(select(KursTag).where(KursTag.kurs_id.in_([k.id for k in kurse] or [-1])))).scalars().all()
     out = {}
-    for c in classes.values():
-        if c.kurs_id:
-            out.setdefault(c.kurs_id, []).append(ClassRef(id=c.id, name=c.name, shared=True))
     for tg in tags:
-        c = classes.get(tg.class_id)
-        if c and c.kurs_id != tg.kurs_id:  # Sharing-Klasse nicht doppelt als Tag zeigen
-            out.setdefault(tg.kurs_id, []).append(ClassRef(id=c.id, name=c.name, shared=False))
+        if tg.class_id in names:
+            out.setdefault(tg.kurs_id, []).append(ClassRef(id=tg.class_id, name=names[tg.class_id]))
     return out
 
 
@@ -63,8 +100,8 @@ async def _kurs_classes(db, user, kurse):
 async def list_kurse(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     kurse = (await db.execute(select(Kurs).where(
         Kurs.owner_id == user.id, Kurs.deleted_at.is_(None)).order_by(Kurs.name))).scalars().all()
-    by_kurs = await _kurs_classes(db, user, kurse)
-    return [KursOut(id=k.id, name=k.name, classes=by_kurs.get(k.id, [])) for k in kurse]
+    by = await _classes_by_kurs(db, user, kurse)
+    return [KursOut(id=k.id, name=k.name, classes=by.get(k.id, [])) for k in kurse]
 
 
 @router.get("/trash", response_model=List[KursOut])
@@ -96,75 +133,37 @@ async def rename_kurs(kurs_id: int, body: KursIn, user: User = Depends(get_curre
     return KursOut(id=k.id, name=k.name, classes=[])
 
 
-async def _own_class(db, user, class_id) -> SchoolClass:
-    c = await db.get(SchoolClass, class_id)
-    if not c or (c.owner_id and c.owner_id != user.id):
-        raise HTTPException(404, "Klasse nicht gefunden")
-    return c
-
-
 @router.post("/{kurs_id}/classes/{class_id}", status_code=204)
-async def assign_class(kurs_id: int, class_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Klasse diesem Kurs zuordnen (in die Lerngruppe aufnehmen)."""
+async def add_member(kurs_id: int, class_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Klasse dem Kurs hinzufügen. Eine Klasse darf in mehreren Kursen sein."""
     await _owned_kurs(db, user, kurs_id)
-    c = await _own_class(db, user, class_id)
-    c.kurs_id = kurs_id
-    # Schüler der Klasse in den Kurs übernehmen (geteilte Anwesenheit).
-    await db.execute(update(Student).where(Student.class_id == class_id).values(kurs_id=kurs_id))
-    await db.commit()
-
-
-@router.delete("/classes/{class_id}", status_code=204)
-async def unlink_class(class_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Klasse aus ihrem Kurs lösen — sie bekommt wieder einen eigenen Kurs."""
-    c = await _own_class(db, user, class_id)
-    k = Kurs(owner_id=user.id, name=c.name)
-    db.add(k)
-    await db.flush()
-    c.kurs_id = k.id
-    await db.execute(update(Student).where(Student.class_id == class_id).values(kurs_id=k.id))
-    await db.commit()
-
-
-# ─── Lose Tags: Klasse in weitere Kurse (ohne Sharing) ───
-
-@router.post("/{kurs_id}/tag/{class_id}", status_code=204)
-async def add_tag(kurs_id: int, class_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    await _owned_kurs(db, user, kurs_id)
-    c = await _own_class(db, user, class_id)
-    if c.kurs_id == kurs_id:
-        return  # ist schon Sharing-Mitglied
+    await _own_class(db, user, class_id)
     exists = (await db.execute(select(KursTag).where(KursTag.kurs_id == kurs_id, KursTag.class_id == class_id))).scalar_one_or_none()
     if not exists:
         db.add(KursTag(kurs_id=kurs_id, class_id=class_id))
         await db.commit()
 
 
-@router.delete("/{kurs_id}/tag/{class_id}", status_code=204)
-async def remove_tag(kurs_id: int, class_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+@router.delete("/{kurs_id}/classes/{class_id}", status_code=204)
+async def remove_member(kurs_id: int, class_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Klasse aus diesem Kurs entfernen (bleibt in ihren anderen Kursen)."""
     await _owned_kurs(db, user, kurs_id)
-    row = (await db.execute(select(KursTag).where(KursTag.kurs_id == kurs_id, KursTag.class_id == class_id))).scalar_one_or_none()
-    if row:
-        await db.delete(row)
-        await db.commit()
+    await db.execute(delete(KursTag).where(KursTag.kurs_id == kurs_id, KursTag.class_id == class_id))
+    await db.commit()
 
 
 # ─── Kurs löschen / Papierkorb ───
 
 @router.delete("/{kurs_id}", status_code=204)
 async def delete_kurs(kurs_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """In den Papierkorb (30 Tage). Die Sharing-Klassen werden entgruppiert
-    (jede bekommt einen eigenen Kurs); beim Wiederherstellen kommen sie zurück."""
+    """In den Papierkorb (30 Tage). Die Mitgliedschaften werden entfernt (die
+    Klassen bleiben, ggf. in ihren anderen Kursen); Restore stellt sie wieder her."""
+    from sqlalchemy import update
     k = await _owned_kurs(db, user, kurs_id)
-    members = (await db.execute(select(SchoolClass).where(SchoolClass.kurs_id == kurs_id))).scalars().all()
-    k.deleted_members = [c.id for c in members]
-    for c in members:
-        solo = Kurs(owner_id=user.id, name=c.name)
-        db.add(solo)
-        await db.flush()
-        c.kurs_id = solo.id
-        await db.execute(update(Student).where(Student.class_id == c.id).values(kurs_id=solo.id))
-    # Tags bleiben an diesem Kurs hängen (CASCADE bei purge, greifen wieder bei restore).
+    members = list(await member_class_ids(db, [kurs_id]))
+    k.deleted_members = members
+    await db.execute(delete(KursTag).where(KursTag.kurs_id == kurs_id))
+    await db.execute(update(SchoolClass).where(SchoolClass.kurs_id == kurs_id).values(kurs_id=None))
     k.deleted_at = datetime.now(timezone.utc)
     await db.commit()
 
@@ -175,12 +174,13 @@ async def restore_kurs(kurs_id: int, user: User = Depends(get_current_user), db:
     for cid in (k.deleted_members or []):
         c = await db.get(SchoolClass, cid)
         if c and c.owner_id == user.id and c.deleted_at is None:
-            c.kurs_id = kurs_id
-            await db.execute(update(Student).where(Student.class_id == cid).values(kurs_id=kurs_id))
+            exists = (await db.execute(select(KursTag).where(KursTag.kurs_id == kurs_id, KursTag.class_id == cid))).scalar_one_or_none()
+            if not exists:
+                db.add(KursTag(kurs_id=kurs_id, class_id=cid))
     k.deleted_at = None
     k.deleted_members = None
     await db.commit()
-    by = await _kurs_classes(db, user, [k])
+    by = await _classes_by_kurs(db, user, [k])
     return KursOut(id=k.id, name=k.name, classes=by.get(k.id, []))
 
 

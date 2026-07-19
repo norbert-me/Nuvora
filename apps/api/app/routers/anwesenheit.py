@@ -53,12 +53,9 @@ async def _kurs_maps(db, user, class_id):
       to_canon   – student_id (dieser Klasse) -> kanonische id
       canon_back – kanonische id -> student_id dieser Klasse (Rückabbildung fürs UI)
     """
-    sc = await db.get(SchoolClass, class_id)
-    kurs_id = sc.kurs_id if sc else None
-    if kurs_id:
-        kurs_studs = (await db.execute(select(Student).where(Student.kurs_id == kurs_id))).scalars().all()
-    else:
-        kurs_studs = (await db.execute(select(Student).where(Student.class_id == class_id))).scalars().all()
+    from .kurse import sibling_class_ids
+    sib_ids = await sibling_class_ids(db, class_id)  # Klassen, die einen Kurs teilen (inkl. self)
+    kurs_studs = (await db.execute(select(Student).where(Student.class_id.in_(sib_ids)))).scalars().all()
     # Name -> kanonische (kleinste) id
     canon = {}
     for s in sorted(kurs_studs, key=lambda x: x.id):

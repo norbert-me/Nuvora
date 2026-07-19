@@ -360,6 +360,13 @@ async def startup():
                 "UPDATE students SET kurs_id = (SELECT kurs_id FROM school_classes WHERE id = students.class_id) "
                 "WHERE kurs_id IS NULL"
             ))
+            # Mitgliedschaft (kurs_tags) ist jetzt die Wahrheit (many-to-many):
+            # jede Klasse mit kurs_id wird Mitglied ihres Kurses.
+            await db.execute(text(
+                "INSERT INTO kurs_tags (kurs_id, class_id) "
+                "SELECT kurs_id, id FROM school_classes WHERE kurs_id IS NOT NULL "
+                "ON CONFLICT ON CONSTRAINT uq_kurs_tag DO NOTHING"
+            ))
             await db.commit()
         except Exception as e:
             print(f"[STARTUP-WARN] Kurs-Migration übersprungen: {e}", flush=True)

@@ -127,7 +127,7 @@ export default {
   "classes.deleteConfirm": "Klasse in den Papierkorb verschieben? 30 Tage wiederherstellbar.",
   "classes.trash": "Papierkorb",
   "kurse.title": "Kurse",
-  "kurse.intro": "Fach-Klassen derselben Lerngruppe zu einem Kurs bündeln (z.B. Mathe 7.5 und Lernzeit 7.5). Klassen im selben Kurs teilen sich später Schülerliste und Anwesenheit; Karten und Noten bleiben pro Fach-Klasse.",
+  "kurse.intro": "Fach-Klassen derselben Lerngruppe zu einem Kurs bündeln (z.B. Mathe 7.5 und Lernzeit 7.5). Klassen im selben Kurs teilen sich Schülerliste und Anwesenheit; Karten und Noten bleiben pro Fach-Klasse. Eine Klasse darf in mehreren Kursen sein.",
   "kurse.newPlaceholder": "Neuer Kurs, z.B. 7.5",
   "kurse.add": "Kurs anlegen",
   "kurse.empty": "Noch keine Klasse in diesem Kurs.",

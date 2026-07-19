@@ -1,15 +1,15 @@
-"""Kurse: löschen (Papierkorb, 30 Tage) + lose Mehrfach-Zuordnung (Tags).
+"""Kurse: Mehrfach-Mitgliedschaft (Klasse in mehreren Kursen) + Papierkorb.
 
-Löschen entgruppiert die Sharing-Klassen (jede bekommt einen eigenen Kurs) und
-legt den Kurs in den Papierkorb; Wiederherstellen gruppiert sie zurück. Tags =
-zusätzliche, nicht teilende Zugehörigkeit (kein SuS/Anwesenheit-Sharing).
+Mitgliedschaft ist many-to-many (kurs_tags): eine Klasse kann in mehreren Kursen
+sein. Kurs löschen entfernt nur die Mitgliedschaften dieses Kurses (Klassen
+bleiben, ggf. in anderen Kursen) und legt ihn 30 Tage in den Papierkorb.
 """
 import pytest
 import pytest_asyncio
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from app.models import Base, User, SchoolClass
+from app.models import Base, User
 from app.routers import kurse as K, classes as clsr
 
 
@@ -31,32 +31,43 @@ async def s():
 async def _setup(s):
     u = User(email="a@b.de", password_hash="x", name="L"); s.add(u); await s.flush()
     c1 = await clsr.create_class(clsr.ClassCreate(name="Mathe 7.5"), user=u, db=s)
-    c2 = await clsr.create_class(clsr.ClassCreate(name="Lernzeit 7.5"), user=u, db=s)
-    c3 = await clsr.create_class(clsr.ClassCreate(name="Förderband"), user=u, db=s)
-    return u, c1.id, c2.id, c3.id, c1.kurs_id
+    return u, c1.id
 
 
 @pytest.mark.asyncio
-async def test_tags_und_sharing_getrennt(s):
-    u, c1, c2, c3, kid = await _setup(s)
-    await K.assign_class(kid, c2, user=u, db=s)   # sharing
-    await K.add_tag(kid, c3, user=u, db=s)        # loses Tag
-    k = [x for x in await K.list_kurse(user=u, db=s) if x.id == kid][0]
-    assert {c.id for c in k.classes if c.shared} == {c1, c2}
-    assert {c.id for c in k.classes if not c.shared} == {c3}
+async def test_klasse_in_mehreren_kursen(s):
+    u, c1 = await _setup(s)
+    k1 = await K.create_kurs(K.KursIn(name="7.5"), user=u, db=s)
+    k2 = await K.create_kurs(K.KursIn(name="Abschlussjahrgang"), user=u, db=s)
+    await K.add_member(k1.id, c1, user=u, db=s)
+    await K.add_member(k2.id, c1, user=u, db=s)
+    lst = await K.list_kurse(user=u, db=s)
+    in_k1 = {c.id for c in next(x for x in lst if x.id == k1.id).classes}
+    in_k2 = {c.id for c in next(x for x in lst if x.id == k2.id).classes}
+    assert c1 in in_k1 and c1 in in_k2, "Klasse in beiden Kursen"
 
 
 @pytest.mark.asyncio
 async def test_loeschen_und_restore(s):
-    u, c1, c2, c3, kid = await _setup(s)
-    await K.assign_class(kid, c2, user=u, db=s)
-    await K.delete_kurs(kid, user=u, db=s)
-    assert not [x for x in await K.list_kurse(user=u, db=s) if x.id == kid]
-    assert [x for x in await K.list_kurs_trash(user=u, db=s) if x.id == kid]
-    # entgruppiert
-    assert (await s.get(SchoolClass, c1)).kurs_id != kid
-    assert (await s.get(SchoolClass, c2)).kurs_id != kid
-    # restore gruppiert zurück
-    await K.restore_kurs(kid, user=u, db=s)
-    assert (await s.get(SchoolClass, c1)).kurs_id == kid
-    assert (await s.get(SchoolClass, c2)).kurs_id == kid
+    u, c1 = await _setup(s)
+    k1 = await K.create_kurs(K.KursIn(name="7.5"), user=u, db=s)
+    await K.add_member(k1.id, c1, user=u, db=s)
+    await K.delete_kurs(k1.id, user=u, db=s)
+    assert not [x for x in await K.list_kurse(user=u, db=s) if x.id == k1.id], "aus Liste weg"
+    assert [x for x in await K.list_kurs_trash(user=u, db=s) if x.id == k1.id], "im Papierkorb"
+    await K.restore_kurs(k1.id, user=u, db=s)
+    back = next(x for x in await K.list_kurse(user=u, db=s) if x.id == k1.id)
+    assert c1 in {c.id for c in back.classes}, "Mitglied nach Restore zurück"
+
+
+@pytest.mark.asyncio
+async def test_entfernen_bleibt_in_anderem_kurs(s):
+    u, c1 = await _setup(s)
+    k1 = await K.create_kurs(K.KursIn(name="A"), user=u, db=s)
+    k2 = await K.create_kurs(K.KursIn(name="B"), user=u, db=s)
+    await K.add_member(k1.id, c1, user=u, db=s)
+    await K.add_member(k2.id, c1, user=u, db=s)
+    await K.remove_member(k1.id, c1, user=u, db=s)
+    lst = await K.list_kurse(user=u, db=s)
+    assert c1 not in {c.id for c in next(x for x in lst if x.id == k1.id).classes}
+    assert c1 in {c.id for c in next(x for x in lst if x.id == k2.id).classes}

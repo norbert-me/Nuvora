@@ -127,7 +127,7 @@ export default {
   "classes.deleteConfirm": "¿Mover la clase a la papelera? Recuperable durante 30 días.",
   "classes.trash": "Papelera",
   "kurse.title": "Cursos",
-  "kurse.intro": "Agrupa clases de la misma cohorte en un curso (p. ej. Mates 7.5 y Estudio 7.5). Las clases del mismo curso compartirán la lista de alumnos y la asistencia; las tarjetas y notas siguen por clase.",
+  "kurse.intro": "Agrupa clases de la misma cohorte en un curso (p. ej. Mates 7.5 y Estudio 7.5). Las clases del mismo curso comparten la lista de alumnos y la asistencia; las tarjetas y notas siguen por clase. Una clase puede estar en varios cursos.",
   "kurse.newPlaceholder": "Nuevo curso, p. ej. 7.5",
   "kurse.add": "Crear curso",
   "kurse.empty": "Aún no hay clases en este curso.",
