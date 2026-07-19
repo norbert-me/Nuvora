@@ -542,6 +542,13 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
                 {zeile(t("kalender.method"), methName)}
               </div>
             )}
+            {aktiv.anwesenheit && classId && (
+              <Link to={`/anwesenheit?class=${classId}&date=${ymd(new Date(entry.date))}`} onClick={onClose}
+                style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", textDecoration: "none", color: "var(--accent)", fontSize: 13.5, fontWeight: 600 }}>
+                <Icon d={ICONS.open} size={15} color="var(--accent)" />
+                {t("kalender.toAttendance")}
+              </Link>
+            )}
             {linkList.length > 0 && (
               <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
                 <div style={lbl}>{t("kalender.openLinked")}</div>

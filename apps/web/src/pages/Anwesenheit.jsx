@@ -2,6 +2,7 @@
 // Pro Schüler ein Status (da/fehlt/verspätet/entschuldigt). "da" ist Normalfall
 // und wird nicht gespeichert. Übersicht zeigt Fehlzeiten und lässt nachtragen.
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { pageTitle, btnSecondary, selectStyle, Toggle } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
@@ -17,14 +18,18 @@ export default function Anwesenheit() {
   const { t } = useLanguage();
   const { modules } = useModules();
   const kalenderAktiv = modules.find((m) => m.key === "kalender")?.active ?? false;
+  const [params] = useSearchParams();
   const [classes, setClasses] = useState([]);
-  const [classId, setClassId] = useState(null);
-  const [datum, setDatum] = useState(ymd(new Date()));
+  // Vorauswahl per ?class= / ?date= (z. B. aus dem Kalender).
+  const [classId, setClassId] = useState(() => Number(params.get("class")) || null);
+  const [datum, setDatum] = useState(params.get("date") || ymd(new Date()));
   const [tag, setTag] = useState({});      // { student_id: {status,note} }
   const [summe, setSumme] = useState({});   // { student_id: {fehlt,spaet,entsch} }
   const [view, setView] = useState("tag");  // tag | uebersicht
   const [slots, setSlots] = useState([]);   // Stundenplan-Slots (falls Kalender aktiv)
-  const [nurHeute, setNurHeute] = useState(true); // nur Klassen des gewählten Tages
+  // Kam eine Klasse per Link (Kalender), nicht auf heutige Klassen filtern —
+  // sonst könnte genau diese Klasse aus der Auswahl fallen.
+  const [nurHeute, setNurHeute] = useState(!params.get("class"));
   const [offen, setOffen] = useState(null); // aufgeklappter Schüler in der Übersicht
   const [verlauf, setVerlauf] = useState([]);
 

@@ -846,4 +846,5 @@ export default {
   "thema.openCardvote": "Go to questions",
   "thema.openLernpfad": "Go to Lernpfad",
   "thema.draft": "Draft",
+  "kalender.toAttendance": "Attendance for this lesson",
 };

@@ -846,4 +846,5 @@ export default {
   "thema.openCardvote": "Zu den Fragen",
   "thema.openLernpfad": "Zum Lernpfad",
   "thema.draft": "Entwurf",
+  "kalender.toAttendance": "Anwesenheit für diese Stunde",
 };

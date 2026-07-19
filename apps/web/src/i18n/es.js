@@ -846,4 +846,5 @@ export default {
   "thema.openCardvote": "Ir a las preguntas",
   "thema.openLernpfad": "Ir a Lernpfad",
   "thema.draft": "Borrador",
+  "kalender.toAttendance": "Asistencia de esta clase",
 };
