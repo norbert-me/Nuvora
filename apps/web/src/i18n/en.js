@@ -900,4 +900,6 @@ export default {
   "anwesenheit.periodHint": "Optionally attach the absence to a period",
   "kalender.resultAsGrade": "Import result as grade",
   "kalender.noSession": "No session has been run for this quiz and class yet.",
+  "kalender.wdhTitle": "Suggest revision (weak topics from last week)",
+  "kalender.wdhPrefix": "Revision",
 };

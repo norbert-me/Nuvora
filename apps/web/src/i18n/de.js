@@ -900,4 +900,6 @@ export default {
   "anwesenheit.periodHint": "Fehltag optional an eine Stunde hängen",
   "kalender.resultAsGrade": "Ergebnis als Note übernehmen",
   "kalender.noSession": "Zu diesem Quiz gibt es für die Klasse noch keine gelaufene Session.",
+  "kalender.wdhTitle": "Wiederholung vorschlagen (schwache Themen der Vorwoche)",
+  "kalender.wdhPrefix": "Wiederholung",
 };

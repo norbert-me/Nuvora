@@ -302,6 +302,49 @@ async def get_topic_stats(session_id: int, user: User = Depends(get_current_user
     return {"class_id": session.class_id, "topics": out}
 
 
+@router.get("/sessions/weak-topics")
+async def weak_topics_range(frm: datetime, to: datetime, class_id: Optional[int] = None,
+                            user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Schwache Themen (Trefferquote < 60 %) über alle Sessions in [frm, to] —
+    für den Wiederholungs-Vorschlag der Folgewoche."""
+    q = select(Session).where(Session.owner_id == user.id, Session.created_at >= frm, Session.created_at <= to)
+    if class_id is not None:
+        q = q.where(Session.class_id == class_id)
+    sessions = (await db.execute(q)).scalars().all()
+    agg = {}  # topic_id -> [correct, total]
+    for sess in sessions:
+        if not sess.question_set_id:
+            continue
+        items = (await db.execute(
+            select(QuestionSetItem).options(selectinload(QuestionSetItem.question))
+            .where(QuestionSetItem.question_set_id == sess.question_set_id)
+        )).scalars().all()
+        qmap = sess.question_map or {}
+        q_topic = {it.question.id: it.question.topic_id for it in items if it.question.topic_id}
+        q_correct = {it.question.id: qmap.get(str(it.question.id), it.question.correct_answer) for it in items}
+        scans = (await db.execute(select(Scan).where(Scan.session_id == sess.id))).scalars().all()
+        for s in scans:
+            tid = q_topic.get(s.question_id)
+            if not tid:
+                continue
+            a = agg.setdefault(tid, [0, 0]); a[1] += 1
+            if q_correct.get(s.question_id) and s.answer in q_correct[s.question_id]:
+                a[0] += 1
+    if not agg:
+        return {"topics": []}
+    topics = (await db.execute(select(Topic).where(Topic.id.in_(list(agg.keys()))))).scalars().all()
+    by_id = {t.id: t for t in topics}
+    for p in (await db.execute(select(Topic).where(Topic.id.in_([t.parent_id for t in topics if t.parent_id])))).scalars().all():
+        by_id[p.id] = p
+    def label(tid):
+        tp = by_id.get(tid);  par = by_id.get(tp.parent_id) if tp and tp.parent_id else None
+        return (f"{par.name} / {tp.name}" if par else tp.name) if tp else ""
+    out = [{"topic_id": tid, "name": label(tid), "pct": round(c / t * 100) if t else 0}
+           for tid, (c, t) in agg.items() if t and c / t < 0.6]
+    out.sort(key=lambda x: x["pct"])
+    return {"topics": out}
+
+
 @router.get("/questions/{question_id}/stats")
 async def get_question_stats(question_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     q = await db.get(Question, question_id)
