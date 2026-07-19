@@ -283,6 +283,14 @@ def _user_dict(user):
     }
 
 
+@router.get("/me")
+async def me(user: User = Depends(get_current_user)):
+    """Aktuellen Nutzer aus dem Token auflösen. Die Shell ruft das beim Laden
+    auf, um zu prüfen, dass das localStorage-Token noch gültig ist — sonst wird
+    einer Seite vertraut, deren Token längst abgelaufen/widerrufen ist."""
+    return _user_dict(user)
+
+
 @router.post("/login")
 async def login(body: LoginBody, request: Request, db: AsyncSession = Depends(get_db)):
     ip = request.headers.get("X-Real-IP", request.client.host if request.client else "unknown")

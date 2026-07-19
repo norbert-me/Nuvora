@@ -767,6 +767,26 @@ function App() {
   const [user, setUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem("user")); } catch { return null; }
   });
+  // Token beim Laden gegen den Server prüfen: localStorage allein beweist nichts
+  // (abgelaufen, widerrufen, manuell gesetzt). Erst wenn /auth/me den Token
+  // bestätigt, gilt der Nutzer als eingeloggt — bis dahin keine geschützte Seite.
+  const hasToken = (() => { try { return !!localStorage.getItem("token"); } catch { return false; } })();
+  const [checking, setChecking] = useState(hasToken);
+
+  useEffect(() => {
+    if (!hasToken) { setChecking(false); return; }
+    let alive = true;
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((u) => {
+        if (!alive) return;
+        if (u) { setUser(u); try { localStorage.setItem("user", JSON.stringify(u)); } catch { /* egal */ } }
+        else { try { localStorage.removeItem("token"); localStorage.removeItem("user"); } catch { /* egal */ } setUser(null); }
+      })
+      .catch(() => { /* offline: Interceptor kickt bei 401, sonst optimistisch */ })
+      .finally(() => { if (alive) setChecking(false); });
+    return () => { alive = false; };
+  }, []); // eslint-disable-line
 
   const logout = () => {
     localStorage.removeItem("token");
@@ -776,6 +796,10 @@ function App() {
     try { Object.keys(localStorage).filter((k) => k.startsWith("nuvora_cache_")).forEach((k) => localStorage.removeItem(k)); } catch { /* egal */ }
     setUser(null);
   };
+
+  // Solange der Token noch gegen /auth/me geprüft wird, keine geschützte Seite
+  // zeigen (checking ist nur bei vorhandenem Token true).
+  if (checking) return null;
 
   return (
     <LanguageProvider>
