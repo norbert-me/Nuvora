@@ -128,7 +128,7 @@ const getModuleNavItems = (t, location) => {
     const cur = params.get("tab") || "aufgaben";
     return [
       { to: `${LP}?tab=aufgaben`, label: t("nav.exercises"), active: cur === "aufgaben" },
-      { to: `${LP}?tab=generator`, label: "Lernleiter", active: cur === "generator" },
+      { to: `${LP}?tab=generator`, label: "Lernleiter generieren", active: cur === "generator" },
       { to: `${LP}?tab=lernpfade`, label: "Lernpfade", active: cur === "lernpfade" },
     ];
   }
