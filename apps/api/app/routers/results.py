@@ -16,6 +16,19 @@ from .. import websocket as ws
 router = APIRouter(prefix="/api", tags=["results"])
 
 
+async def _kurs_roster(db, class_id):
+    """Kanonische SuS des Kurses (gleichnamige Fach-Klassen-SuS dedupliziert).
+    CardVote-Auswertung/Roster laufen kursweit; card_id ist bei gleicher
+    Lerngruppe deckungsgleich."""
+    from .kurse import sibling_class_ids
+    sib = await sibling_class_ids(db, class_id)
+    studs = (await db.execute(select(Student).where(Student.class_id.in_(sib)).order_by(Student.id))).scalars().all()
+    canon = {}
+    for s in studs:
+        canon.setdefault(s.name.strip(), s)
+    return sorted(canon.values(), key=lambda s: (s.card_id, s.id))
+
+
 class ScanCreate(BaseModel):
     session_id: int
     student_id: int
@@ -171,10 +184,9 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
 
     students = []
     if session.class_id:
-        result = await db.execute(
-            select(Student).where(Student.class_id == session.class_id).order_by(Student.name)
-        )
-        students = [{"card_id": s.card_id, "name": s.name} for s in result.scalars().all()]
+        # Roster kursweit (gleichnamige Fach-Klassen-SuS = eine Person). Die
+        # Kartennummern (card_id) sind bei gleicher Lerngruppe deckungsgleich.
+        students = [{"card_id": s.card_id, "name": s.name} for s in await _kurs_roster(db, session.class_id)]
 
     questions = []
     if session.question_set_id:
@@ -400,7 +412,7 @@ async def get_class_evaluation(class_id: int, user: User = Depends(get_current_u
         raise HTTPException(403, "Kein Zugriff auf diese Klasse")
 
     result = await db.execute(
-        select(Student).where(Student.class_id == class_id).order_by(Student.name)
+        select(Student).where(Student.id.in_([s.id for s in await _kurs_roster(db, class_id)] or [-1])).order_by(Student.name)
     )
     students = [{"card_id": s.card_id, "name": s.name} for s in result.scalars().all()]
 

@@ -368,7 +368,17 @@ export default function Session() {
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const scannedIds = new Set(scannedStudents.map((s) => s.student_id));
   const scanMap = Object.fromEntries(scannedStudents.map((s) => [s.student_id, s.answer]));
-  const studentList = selectedClass ? selectedClass.students : [];
+  // Roster kursweit: gleichnamige SuS der Fach-Klassen eines Kurses = eine Person.
+  const kursRoster = (cls) => {
+    if (!cls) return [];
+    const kurs = kurse.find((k) => (k.classes || []).some((c) => c.id === cls.id));
+    const sib = kurs ? new Set(kurs.classes.map((c) => c.id)) : new Set([cls.id]);
+    const studs = classes.filter((c) => sib.has(c.id)).flatMap((c) => c.students || []);
+    const canon = {};
+    studs.forEach((s) => { const n = s.name.trim(); if (!(n in canon)) canon[n] = s; });
+    return Object.values(canon).sort((a, b) => a.card_id - b.card_id);
+  };
+  const studentList = kursRoster(selectedClass);
   const studentMap = Object.fromEntries(studentList.map((s) => [s.card_id, s.name]));
 
   const leaderboard = Object.entries(scores)

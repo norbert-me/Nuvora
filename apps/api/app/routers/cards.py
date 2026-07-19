@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy import select
 
 from ..database import get_db
-from ..models import SchoolClass, User
+from ..models import SchoolClass, Student, User
 from .auth import get_current_user
 
 router = APIRouter(prefix="/api", tags=["cards"])
@@ -61,7 +61,15 @@ async def class_cards_pdf(class_id: int, user: User = Depends(get_current_user),
     if cls.owner_id and cls.owner_id != user.id:
         raise HTTPException(403, "Kein Zugriff auf diese Klasse")
 
-    students = sorted(cls.students, key=lambda s: s.card_id)
+    # Karten kursweit: eine Karte je Person (gleichnamige Fach-Klassen-SuS
+    # dedupliziert). card_id ist bei gleicher Lerngruppe deckungsgleich.
+    from .kurse import sibling_class_ids
+    sib = await sibling_class_ids(db, class_id)
+    all_studs = (await db.execute(select(Student).where(Student.class_id.in_(sib)).order_by(Student.id))).scalars().all()
+    canon = {}
+    for s in all_studs:
+        canon.setdefault(s.name.strip(), s)
+    students = sorted(canon.values(), key=lambda s: s.card_id)
     if not students:
         raise HTTPException(400, "Keine Lernenden in der Klasse")
 
