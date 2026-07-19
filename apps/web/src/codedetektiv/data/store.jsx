@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, useEffect } from 'react';
+import { createContext, useContext, useReducer, useEffect, useRef } from 'react';
 import { samplePuzzles } from './samplePuzzles';
 
 function loadState() {
@@ -45,6 +45,17 @@ function reducer(state, action) {
       return { ...state, puzzles: action.puzzles };
     case 'SET_USER':
       return { ...state, currentUser: action.user };
+    case 'SET_CURRENT_SESSION':
+      return { ...state, currentSession: action.code };
+    // Server-Sync: eine Session upserten und ihre eingebetteten Rätsel ergänzen.
+    case 'SYNC_SESSION': {
+      const sessions = state.sessions.some(s => s.id === action.session.id)
+        ? state.sessions.map(s => (s.id === action.session.id ? action.session : s))
+        : [...state.sessions, action.session];
+      const have = new Set(state.puzzles.map(p => p.id));
+      const merged = [...state.puzzles, ...(action.puzzles || []).filter(p => !have.has(p.id))];
+      return { ...state, sessions, puzzles: merged };
+    }
     case 'CREATE_SESSION': {
       const session = {
         id: crypto.randomUUID().slice(0, 6).toUpperCase(),
@@ -127,21 +138,87 @@ const StoreContext = createContext();
 const CD_API = '/api/codedetektiv/puzzles';
 const jsonHeaders = { 'Content-Type': 'application/json' };
 
+const S_API = '/api/codedetektiv/sessions';
+// Server-Session in die vom UI erwartete Form bringen.
+function mapSession(srv) {
+  return {
+    id: srv.code,
+    puzzleIds: (srv.puzzles || []).map(p => p.id),
+    players: srv.players || [],
+    results: srv.results || [],
+    started: !!srv.started,
+    ended: !!srv.ended,
+    currentPuzzleIndex: srv.current_index || 0,
+    startedAt: srv.started_at ? Date.parse(srv.started_at) : null,
+    roundStartedAt: srv.round_started_at ? Date.parse(srv.round_started_at) : null,
+  };
+}
+
 export function StoreProvider({ children }) {
   const [state, rawDispatch] = useReducer(reducer, initialState);
+  const stateRef = useRef(state); stateRef.current = state;
 
-  // Rätsel liegen jetzt im Kern (themen-getaggt, im Kalender planbar). Der Store
-  // spiegelt sie lokal; Anlegen/Ändern/Löschen wird an den Server geschickt.
-  const dispatch = (action) => {
-    if (action.type === 'ADD_PUZZLE' || action.type === 'UPDATE_PUZZLE') {
-      const p = action.puzzle;
-      fetch(CD_API, { method: 'PUT', headers: jsonHeaders,
-        body: JSON.stringify({ client_id: p.id, title: p.title || '', topic_id: p.topic_id ?? null, payload: p }) }).catch(() => {});
-    } else if (action.type === 'DELETE_PUZZLE') {
-      fetch(`${CD_API}/${encodeURIComponent(action.puzzleId)}`, { method: 'DELETE' }).catch(() => {});
-    }
-    rawDispatch(action);
+  const applySession = (srv) => {
+    rawDispatch({ type: 'SYNC_SESSION', session: mapSession(srv), puzzles: srv.puzzles || [] });
+    rawDispatch({ type: 'SET_CURRENT_SESSION', code: srv.code });
   };
+
+  // Session-Aktionen laufen jetzt serverseitig (geräteübergreifendes Beitreten).
+  const dispatch = (action) => {
+    const cur = stateRef.current;
+    switch (action.type) {
+      case 'ADD_PUZZLE':
+      case 'UPDATE_PUZZLE': {
+        const p = action.puzzle;
+        fetch(CD_API, { method: 'PUT', headers: jsonHeaders,
+          body: JSON.stringify({ client_id: p.id, title: p.title || '', topic_id: p.topic_id ?? null, payload: p }) }).catch(() => {});
+        return rawDispatch(action);
+      }
+      case 'DELETE_PUZZLE':
+        fetch(`${CD_API}/${encodeURIComponent(action.puzzleId)}`, { method: 'DELETE' }).catch(() => {});
+        return rawDispatch(action);
+      case 'CREATE_SESSION': {
+        const puzzles = action.puzzleIds.map(id => cur.puzzles.find(p => p.id === id)).filter(Boolean);
+        fetch(S_API, { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ puzzles }) })
+          .then(r => (r.ok ? r.json() : null)).then(srv => srv && applySession(srv)).catch(() => {});
+        return;
+      }
+      case 'JOIN_SESSION':
+        rawDispatch({ type: 'SET_USER', user: { name: action.name, role: 'player' } });
+        fetch(`${S_API}/${action.sessionId}/join`, { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ name: action.name }) })
+          .then(r => (r.ok ? r.json() : null)).then(srv => srv && applySession(srv)).catch(() => {});
+        return;
+      case 'START_SESSION':
+        fetch(`${S_API}/${action.sessionId}/start`, { method: 'POST' }).then(r => (r.ok ? r.json() : null)).then(srv => srv && applySession(srv)).catch(() => {});
+        return;
+      case 'END_SESSION':
+        fetch(`${S_API}/${action.sessionId}/end`, { method: 'POST' }).then(r => (r.ok ? r.json() : null)).then(srv => srv && applySession(srv)).catch(() => {});
+        return;
+      case 'ADVANCE_PUZZLE':
+        fetch(`${S_API}/${action.sessionId}/advance`, { method: 'POST' }).then(r => (r.ok ? r.json() : null)).then(srv => srv && applySession(srv)).catch(() => {});
+        return;
+      case 'REMOVE_PLAYER':
+        fetch(`${S_API}/${action.sessionId}/remove`, { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ name: action.playerName }) })
+          .then(r => (r.ok ? r.json() : null)).then(srv => srv && applySession(srv)).catch(() => {});
+        return;
+      case 'SUBMIT_RESULT':
+        fetch(`${S_API}/${action.sessionId}/result`, { method: 'POST', headers: jsonHeaders, body: JSON.stringify(action.result) })
+          .then(r => (r.ok ? r.json() : null)).then(srv => srv && applySession(srv)).catch(() => {});
+        return;
+      default:
+        return rawDispatch(action);
+    }
+  };
+
+  // Laufende Session pollen, damit alle Geräte denselben Stand sehen.
+  useEffect(() => {
+    const code = state.currentSession;
+    if (!code) return;
+    let alive = true;
+    const tick = () => fetch(`${S_API}/${code}`).then(r => (r.ok ? r.json() : null)).then(srv => { if (alive && srv) rawDispatch({ type: 'SYNC_SESSION', session: mapSession(srv), puzzles: srv.puzzles || [] }); }).catch(() => {});
+    const iv = setInterval(tick, 1800); tick();
+    return () => { alive = false; clearInterval(iv); };
+  }, [state.currentSession]);
 
   // Beim Start: Rätsel vom Server laden. Lokale (noch nicht übertragene) Rätsel
   // einmalig hochladen — so gehen Bestände aus dem Browser nicht verloren.
@@ -171,20 +248,8 @@ export function StoreProvider({ children }) {
     localStorage.setItem('code-detektiv-state', JSON.stringify(toSave));
   }, [state]);
 
-  useEffect(() => {
-    function handleStorage(e) {
-      if (e.key === 'code-detektiv-state' && e.newValue) {
-        try {
-          const parsed = JSON.parse(e.newValue);
-          if (parsed.sessions) {
-            dispatch({ type: 'SYNC_STATE', sessions: parsed.sessions });
-          }
-        } catch {}
-      }
-    }
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
+  // Cross-Tab-Sync über localStorage entfällt: Sessions kommen jetzt vom Server
+  // (geräteübergreifend), das Polling hält alle Geräte aktuell.
 
   return (
     <StoreContext.Provider value={{ state, dispatch }}>

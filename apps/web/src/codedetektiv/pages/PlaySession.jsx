@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useCdBase } from '../base.jsx';
 import { useStore, calculateRoundScores, calculateTotalScores } from '../data/store';
 import {
   IconX, IconTrophy, IconHourglass, IconPuzzle, IconPlay,
@@ -9,6 +10,7 @@ import {
 export default function PlaySession() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
+  const base = useCdBase();
   const { state, dispatch } = useStore();
 
   const session = state.sessions.find(s => s.id === sessionId);
@@ -55,7 +57,7 @@ export default function PlaySession() {
           <p style={{ color: '#666', marginBottom: 24 }}>
             Der Code <strong>{sessionId}</strong> existiert nicht.
           </p>
-          <button className="btn btn-primary" onClick={() => navigate('/code-detektiv')}><IconBack size={14} /> Zurück zur Startseite</button>
+          <button className="btn btn-primary" onClick={() => navigate(base)}><IconBack size={14} /> Zurück zur Startseite</button>
         </div>
       </div>
     );
@@ -72,7 +74,7 @@ export default function PlaySession() {
           </div>
           <Scoreboard scores={totalScores} label="Gesamtpunkte" showTotal />
           <div style={{ textAlign: 'center', marginTop: 24 }}>
-            <button className="btn btn-primary" onClick={() => navigate('/code-detektiv')}><IconBack size={14} /> Zurück zur Startseite</button>
+            <button className="btn btn-primary" onClick={() => navigate(base)}><IconBack size={14} /> Zurück zur Startseite</button>
           </div>
         </div>
       </div>
@@ -115,7 +117,7 @@ export default function PlaySession() {
           <div style={{ marginBottom: 16 }}><IconX size={48} /></div>
           <h2 style={{ marginBottom: 8 }}>Session läuft bereits</h2>
           <p style={{ color: '#666', marginBottom: 24 }}>Du kannst dieser Session nicht mehr beitreten.</p>
-          <button className="btn btn-primary" onClick={() => navigate('/code-detektiv')}><IconBack size={14} /> Zurück zur Startseite</button>
+          <button className="btn btn-primary" onClick={() => navigate(base)}><IconBack size={14} /> Zurück zur Startseite</button>
         </div>
       </div>
     );
@@ -132,7 +134,7 @@ export default function PlaySession() {
           <button
             className="btn btn-success"
             style={{ fontSize: 18, padding: '14px 40px' }}
-            onClick={() => navigate(`/code-detektiv/puzzle/${currentPuzzleId}?session=${sessionId}`)}
+            onClick={() => navigate(`${base}/puzzle/${currentPuzzleId}?session=${sessionId}`)}
           >
             <IconPlay size={16} /> Rätsel starten
           </button>

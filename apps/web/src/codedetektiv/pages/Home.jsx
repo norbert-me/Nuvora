@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useCdBase } from '../base.jsx';
 import { useStore } from '../data/store';
 import { IconSearch, IconGamepad, IconPuzzle } from '../components/Icons';
 
 export default function Home() {
   const navigate = useNavigate();
+  const base = useCdBase();
   const [params] = useSearchParams();
   const { state, dispatch } = useStore();
   const [joinCode, setJoinCode] = useState('');
@@ -19,25 +21,20 @@ export default function Home() {
   const isInSession = activeSession && state.currentUser &&
     activeSession.players.some(p => p.name === state.currentUser.name);
 
-  function handleJoin(e) {
+  async function handleJoin(e) {
     e.preventDefault();
     setError('');
-    const code = joinCode.toUpperCase();
-    const session = state.sessions.find(s => s.id === code);
-    if (!session) {
-      setError('Session nicht gefunden!');
-      return;
-    }
-    if (session.ended) {
-      setError('Session ist bereits beendet.');
-      return;
-    }
-    if (session.started && !session.players.some(p => p.name === playerName)) {
-      setError('Session läuft bereits. Du kannst nicht mehr beitreten.');
-      return;
-    }
-    dispatch({ type: 'JOIN_SESSION', sessionId: session.id, name: playerName });
-    navigate(`/code-detektiv/play/${session.id}`);
+    const code = joinCode.toUpperCase().trim();
+    const name = playerName.trim();
+    if (!code || !name) return;
+    // Serverseitig beitreten (geräteübergreifend). Fehler direkt zurückmelden.
+    const r = await fetch(`/api/codedetektiv/sessions/${code}/join`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+    }).catch(() => null);
+    if (!r || !r.ok) { setError(r && r.status === 404 ? 'Session nicht gefunden!' : 'Beitreten nicht möglich.'); return; }
+    dispatch({ type: 'SET_USER', user: { name, role: 'player' } });
+    dispatch({ type: 'SET_CURRENT_SESSION', code });
+    navigate(`${base}/play/${code}`);
   }
 
   return (
@@ -53,7 +50,7 @@ export default function Home() {
           <div style={{ marginBottom: 20 }}>
             <button
               className="btn"
-              onClick={() => navigate(`/code-detektiv/play/${activeSession.id}`)}
+              onClick={() => navigate(`${base}/play/${activeSession.id}`)}
               style={{ background: '#4caf50', color: '#fff', fontSize: 16, padding: '14px 40px', borderRadius: 12, fontWeight: 700, width: 280 }}
             >
               Zurück zur Session {activeSession.id}
@@ -65,7 +62,7 @@ export default function Home() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
             <button
               className="btn"
-              onClick={() => navigate('/code-detektiv/admin')}
+              onClick={() => navigate(`${base}/admin`)}
               style={{ background: '#fff', color: '#764ba2', fontSize: 16, padding: '14px 40px', borderRadius: 12, fontWeight: 700, width: 280 }}
             >
               Admin / Rätsel erstellen
@@ -79,7 +76,7 @@ export default function Home() {
             </button>
             <button
               className="btn"
-              onClick={() => navigate('/code-detektiv/solo')}
+              onClick={() => navigate(`${base}/solo`)}
               style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 16, padding: '14px 40px', borderRadius: 12, fontWeight: 700, border: '2px solid rgba(255,255,255,0.2)', width: 280 }}
             >
               <IconPuzzle size={18} /> Solo üben
