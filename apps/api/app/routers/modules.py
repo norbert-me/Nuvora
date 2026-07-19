@@ -121,7 +121,7 @@ REGISTRY: List[ModuleDef] = [
     ModuleDef(
         key="orga",
         group="organisation",
-        name="Orga & Anwesenheit",
+        name="Orga",
         description=(
             "Zwei Werkzeuge je Klasse: Sammel-Checklisten (z.B. „Unterschrift der "
             "Klassenarbeit gesehen“, pro Schueler abhaken) und Anwesenheit/Fehlzeiten "
