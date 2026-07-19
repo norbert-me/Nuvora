@@ -227,6 +227,17 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         )}
       </div>
 
+      <div style={{ padding: 24, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 24, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{t("profile.tutorialTitle")}</div>
+          <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 2 }}>{t("profile.tutorialHint")}</div>
+        </div>
+        <button type="button" onClick={() => {
+          try { localStorage.removeItem(`nuvora_onboarded_${user?.id ?? "x"}`); } catch { /* egal */ }
+          window.location.href = "/";
+        }} style={btnSecondary}>{t("profile.tutorialRestart")}</button>
+      </div>
+
       {isAdmin && (
         <div style={{ marginTop: 40, marginBottom: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>

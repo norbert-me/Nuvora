@@ -769,4 +769,7 @@ export default {
   "methoden.publishPrompt": "Short description (optional):",
   "methoden.published": "Published to the marketplace.",
   "methoden.publishError": "Publishing failed.",
+  "profile.tutorialTitle": "Tutorial",
+  "profile.tutorialHint": "Show the intro again the next time you open the app.",
+  "profile.tutorialRestart": "Restart tutorial",
 };

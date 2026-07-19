@@ -769,4 +769,7 @@ export default {
   "methoden.publishPrompt": "Descripción breve (opcional):",
   "methoden.published": "Publicado en el mercado.",
   "methoden.publishError": "Error al publicar.",
+  "profile.tutorialTitle": "Tutorial",
+  "profile.tutorialHint": "Mostrar la introducción de nuevo la próxima vez.",
+  "profile.tutorialRestart": "Reiniciar tutorial",
 };
