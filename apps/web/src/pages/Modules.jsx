@@ -2,7 +2,7 @@
 // des Moduls bleiben im Kern liegen und sind nach dem Wiedereinschalten da.
 import { useState } from "react";
 import { useModules } from "../core/modules.js";
-import { StageBadge, Tabs } from "../components/Icons.jsx";
+import { StageBadge, Tabs, inputStyle, btnSecondary } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { pageTitle } from "../components/Icons.jsx";
 
@@ -13,6 +13,8 @@ export default function Modules() {
   const [error, setError] = useState("");
   const [sortKey, setSortKey] = useState("popular"); // popular | name | status
   const [dir, setDir] = useState("asc");           // asc | desc
+  const [search, setSearch] = useState("");
+  const [expanded, setExpanded] = useState({});    // je Kategorie ausgeklappt?
 
   if (loading) return null;
 
@@ -64,7 +66,9 @@ export default function Modules() {
         </p>
       )}
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+      <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("modules.searchPlaceholder")}
+        style={{ ...inputStyle, width: "100%", marginBottom: 12 }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("modules.sortBy")}</span>
         <Tabs value={effKey} onChange={setSortKey}
           options={[["name", t("modules.sortName")], ["status", t("modules.sortStatus")], ["popular", t("modules.sortPopular")]]} />
@@ -75,8 +79,13 @@ export default function Modules() {
       </div>
 
       {[["unterricht", t("modules.groupUnterricht")], ["organisation", t("modules.groupOrganisation")], ["werkzeug", t("modules.groupWerkzeug")]].map(([g, label]) => {
-        const mods = sorted.filter((m) => (m.group || "werkzeug") === g);
-        if (!mods.length) return null;
+        const q = search.trim().toLowerCase();
+        const desc = (m) => (t(`mod.${m.key}.desc`) !== `mod.${m.key}.desc` ? t(`mod.${m.key}.desc`) : m.description) || "";
+        const matches = (m) => !q || dispName(m).toLowerCase().includes(q) || desc(m).toLowerCase().includes(q);
+        const all = sorted.filter((m) => (m.group || "werkzeug") === g && matches(m));
+        if (!all.length) return null;
+        const open = !!q || expanded[g];
+        const mods = open ? all : all.slice(0, 2);
         return (
         <div key={g} style={{ marginBottom: 26 }}>
           <h2 style={{ fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", color: "var(--text3)", margin: "0 0 10px" }}>{label}</h2>
@@ -126,6 +135,12 @@ export default function Modules() {
           </div>
         ))}
           </div>
+          {all.length > 2 && !q && (
+            <button onClick={() => setExpanded((p) => ({ ...p, [g]: !p[g] }))}
+              style={{ ...btnSecondary, marginTop: 10, fontSize: 13 }}>
+              {expanded[g] ? t("modules.showLess") : t("modules.showMore", { n: all.length - 2 })}
+            </button>
+          )}
         </div>
         );
       })}
