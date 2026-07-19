@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { Icon, ICONS, modalOverlay, modalPanel } from "../components/Icons.jsx";
@@ -78,7 +78,11 @@ export default function Marketplace() {
 
   useEffect(() => { load(); }, [sort, authorFilter, kind]);
 
+  // Suche entkoppelt (Debounce). Beim Mount NICHT erneut laden — sonst feuert
+  // direkt nach dem ersten load ein zweiter, und die Liste flackert (kurz leer).
+  const firstSearch = useRef(true);
   useEffect(() => {
+    if (firstSearch.current) { firstSearch.current = false; return; }
     const t = setTimeout(load, 300);
     return () => clearTimeout(t);
   }, [search]);
@@ -161,7 +165,7 @@ export default function Marketplace() {
         </div>
       </div>
 
-      {loading ? (
+      {loading && quizzes.length === 0 ? (
         <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("common.loading")}</p>
       ) : quizzes.length === 0 ? (
         <p style={{ color: "var(--text3)", fontSize: 14 }}>{authorFilter ? t("market.emptyFiltered") : search ? t("market.emptySearch") : t("market.emptyNone")}</p>
