@@ -110,11 +110,22 @@ async def _student_deck_where(db, st):
     return CardDeck.class_id == st.class_id
 
 
+def _niveau_where(st):
+    """Niveau-Stapel automatisch verteilen: E-Schueler sehen E- und neutrale
+    Stapel, G-Schueler G- und neutrale, ohne Niveau nur neutrale."""
+    if st.niveau == "E":
+        return CardDeck.niveau.in_(["", "E"])
+    if st.niveau == "G":
+        return CardDeck.niveau.in_(["", "G"])
+    return CardDeck.niveau == ""
+
+
 # ─── Lehrkraft: Stapel & Karten ───
 
 class DeckIn(BaseModel):
     name: str = ""
     topic_id: Optional[int] = None
+    niveau: str = ""  # "" = alle, "E"/"G" = nur dieses Niveau
 
 
 class CardOut(BaseModel):
@@ -130,6 +141,7 @@ class DeckOut(BaseModel):
     class_id: int
     name: str
     topic_id: Optional[int] = None
+    niveau: str = ""
     released_at: Optional[datetime] = None
     cards: List[CardOut] = []
     model_config = {"from_attributes": True}
@@ -162,7 +174,8 @@ async def list_deck_trash(class_id: int, user: User = Depends(require_module), d
 async def create_deck(class_id: int, body: DeckIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("karten_deck", f"u{user.id}", 100, 60, "Zu viele Stapel. Bitte kurz warten.")
     cls = await _owned_class(db, user, class_id)
-    deck = CardDeck(class_id=class_id, kurs_id=cls.kurs_id, owner_id=user.id, name=body.name.strip(), topic_id=body.topic_id)
+    deck = CardDeck(class_id=class_id, kurs_id=cls.kurs_id, owner_id=user.id, name=body.name.strip(),
+                    topic_id=body.topic_id, niveau=body.niveau if body.niveau in ("E", "G") else "")
     db.add(deck)
     await db.commit()
     await db.refresh(deck, ["cards"])
@@ -175,6 +188,7 @@ async def update_deck(deck_id: int, body: DeckIn, user: User = Depends(require_m
     deck = await _owned_deck(db, user, deck_id)
     deck.name = body.name.strip()
     deck.topic_id = body.topic_id
+    deck.niveau = body.niveau if body.niveau in ("E", "G") else ""
     await db.commit()
     await db.refresh(deck, ["cards"])
     return deck
@@ -489,7 +503,7 @@ async def student_session(token: str, all: bool = False, db: AsyncSession = Depe
     # Nur ausgerollte Stapel: Entwuerfe (released_at NULL) und geplante in der
     # Zukunft bleiben fuer SuS unsichtbar.
     decks = (await db.execute(select(CardDeck.id).where(
-        dw,
+        dw, _niveau_where(st),
         CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None),
         CardDeck.released_at <= now,
     ))).scalars().all()
@@ -517,7 +531,7 @@ async def student_session(token: str, all: bool = False, db: AsyncSession = Depe
     # Auch geplante Stapel zaehlen: rollt einer frueher aus als die naechste
     # Karte faellig ist, zieht das "naechste Lernen" nach vorne.
     future_release = (await db.execute(select(sa_func.min(CardDeck.released_at)).where(
-        dw, CardDeck.deleted_at.is_(None), CardDeck.released_at > now,
+        dw, _niveau_where(st), CardDeck.deleted_at.is_(None), CardDeck.released_at > now,
     ))).scalar()
     if future_release is not None and (next_due is None or future_release < next_due):
         next_due = future_release

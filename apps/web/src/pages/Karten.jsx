@@ -249,7 +249,9 @@ function Deck({ deck, t, call, topics = [], showTopic = false }) {
   const [planDate, setPlanDate] = useState("");
   const [busy, setBusy] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const setTopic = (tid) => call(() => fetch(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: tid ? Number(tid) : null }) }));
+  const saveDeck = (patch) => call(() => fetch(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", ...patch }) }));
+  const setTopic = (tid) => saveDeck({ topic_id: tid ? Number(tid) : null });
+  const setNiveau = (n) => saveDeck({ niveau: n });
   const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
   const add = async (e) => {
     e.preventDefault();
@@ -280,6 +282,14 @@ function Deck({ deck, t, call, topics = [], showTopic = false }) {
             {topics.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
           </select>
         )}
+        {/* Niveau-Stapel: "E"/"G" wird automatisch nur an Schueler des jeweiligen
+            Niveaus verteilt, "" an alle. Kein manuelles Zuweisen noetig. */}
+        <select value={deck.niveau || ""} onChange={(e) => setNiveau(e.target.value)} title={t("karten.niveauHint")}
+          style={{ ...selectStyle, fontSize: 12, padding: "4px 28px 4px 9px", maxWidth: 150 }}>
+          <option value="">{t("karten.niveauAll")}</option>
+          <option value="E">{t("karten.niveauE")}</option>
+          <option value="G">{t("karten.niveauG")}</option>
+        </select>
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{deck.cards.length} {t("karten.cards")}</span>
         {deck.cards.length > 0 && (

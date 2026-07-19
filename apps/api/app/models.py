@@ -782,6 +782,9 @@ class CardDeck(Base):
     # einzelne Klasse. class_id bleibt als Herkunft/Fallback.
     kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    # Niveau-Stapel: "E"/"G" nur fuer Schueler des jeweiligen Niveaus, "" fuer
+    # alle. So teilt eine Stunde automatisch getrennte Kartensaetze aus.
+    niveau: Mapped[str] = mapped_column(String(1), default="", server_default="")
     # Optionale Bindung an ein Kern-Thema (oder NULL = freie Karten). Kalender-
     # Eintraege mit demselben Thema rollen den Stapel automatisch aus.
     topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
