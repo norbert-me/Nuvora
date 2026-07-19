@@ -82,15 +82,12 @@ export default function Karten() {
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
-        <h1 style={pageTitle}>{t("karten.title")}</h1>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
-          {t("nav.classes")}
-          <select value={classId ?? ""} onChange={(e) => { setClassId(Number(e.target.value)); setTokens(null); }}
-            style={selectStyle}>
-            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </label>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
+        <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("karten.title")}</h1>
+        <select value={classId ?? ""} onChange={(e) => { setClassId(Number(e.target.value)); setTokens(null); }}
+          style={selectStyle}>
+          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
       </div>
 
       {error && <p style={{ color: "var(--danger, #dc2626)", fontSize: 13, marginBottom: 10 }}>{error}</p>}
