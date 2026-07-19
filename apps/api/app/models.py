@@ -147,7 +147,23 @@ class Kurs(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(100), default="", server_default="")
+    # Papierkorb: gesetzt = gelöscht, 30 Tage wiederherstellbar. deleted_members
+    # merkt sich die (Sharing-)Klassen beim Löschen, damit Restore sie neu gruppiert.
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    deleted_members: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class KursTag(Base):
+    """Lose Mehrfach-Zugehörigkeit: eine Klasse kann zusätzlich zu ihrem einen
+    Sharing-Kurs (SchoolClass.kurs_id) in weiteren Kursen als Etikett stehen —
+    nur Gruppierung, KEIN Teilen von SuS/Anwesenheit."""
+    __tablename__ = "kurs_tags"
+    __table_args__ = (UniqueConstraint("kurs_id", "class_id", name="uq_kurs_tag"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kurs_id: Mapped[int] = mapped_column(ForeignKey("kurse.id", ondelete="CASCADE"), index=True)
+    class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
 
 
 class SchoolClass(Base):

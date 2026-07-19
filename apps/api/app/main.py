@@ -177,6 +177,8 @@ def _ensure_columns(sync_conn):
         ("school_classes", "deleted_at", "TIMESTAMPTZ"),
         ("school_classes", "kurs_id", "INTEGER"),
         ("students", "kurs_id", "INTEGER"),
+        ("kurse", "deleted_at", "TIMESTAMPTZ"),
+        ("kurse", "deleted_members", "JSON"),
         ("students", "karten_token", "VARCHAR(64)"),
         ("card_decks", "released_at", "TIMESTAMPTZ"),
         ("card_decks", "topic_id", "INTEGER"),
@@ -382,7 +384,7 @@ async def startup():
     # Papierkorb leeren: Klassen, die länger als 30 Tage gelöscht sind, endgültig
     # entfernen (jetzt greift die Kaskade auf Noten/Karten/…). Läuft bei jedem Start.
     async with async_session() as db:
-        for tbl, wort in (("school_classes", "Klasse(n)"), ("card_decks", "Deck(s)"), ("learning_paths", "Lernpfad(e)")):
+        for tbl, wort in (("school_classes", "Klasse(n)"), ("card_decks", "Deck(s)"), ("learning_paths", "Lernpfad(e)"), ("kurse", "Kurs(e)")):
             try:
                 res = await db.execute(text(
                     f"DELETE FROM {tbl} WHERE deleted_at IS NOT NULL AND deleted_at < now() - interval '30 days'"
