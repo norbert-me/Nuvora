@@ -898,4 +898,6 @@ export default {
   "zufall.absentSkipped": "{{n}} absent – skipped.",
   "anwesenheit.wholeDay": "Whole day",
   "anwesenheit.periodHint": "Optionally attach the absence to a period",
+  "kalender.resultAsGrade": "Import result as grade",
+  "kalender.noSession": "No session has been run for this quiz and class yet.",
 };

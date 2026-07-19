@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
@@ -161,6 +161,12 @@ export default function Evaluation() {
   const kartenAktiv = modules.find((m) => m.key === "karten")?.active ?? false;
   const lernpfadAktiv = modules.find((m) => m.key === "lernpfad")?.active ?? false;
   const [notenDialog, setNotenDialog] = useState(false);
+  const [sp] = useSearchParams();
+  // Aus dem Kalender ("Ergebnis als Note"): Import direkt öffnen, sobald Daten
+  // und Klasse da sind.
+  useEffect(() => {
+    if (sp.get("import") === "1" && notenAktiv && data?.class_id) setNotenDialog(true);
+  }, [sp, notenAktiv, data]);
   const [avgMode, setAvgMode] = useState("pts");
   const [medMode, setMedMode] = useState("pts");
   const [sdMode, setSdMode] = useState("pts");

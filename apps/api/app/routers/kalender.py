@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import CalendarBreak, CalendarEntry, CardDeck, SchoolClass, TimetableSlot, Topic, User
+from ..models import CalendarBreak, CalendarEntry, CardDeck, SchoolClass, TimetableSlot, Topic, User, Session as TestSession
 from .auth import get_current_user, rate_limit
 from .modules import is_active
 
@@ -203,6 +203,19 @@ async def import_kalender(body: dict, user: User = Depends(require_module), db: 
         n += 1
     await db.commit()
     return {"imported": n}
+
+
+@router.get("/quiz-session")
+async def quiz_session(set_id: int, class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Neueste CardVote-Session, die dieses Quiz für diese Klasse gelaufen ist —
+    für den Sprung „Ergebnis als Note" aus einem Kalender-Eintrag."""
+    q = select(TestSession).where(
+        TestSession.owner_id == user.id,
+        TestSession.question_set_id == set_id,
+        TestSession.class_id == class_id,
+    ).order_by(TestSession.created_at.desc())
+    s = (await db.execute(q)).scalars().first()
+    return {"session_id": s.id if s else None}
 
 
 class BreakIn(BaseModel):

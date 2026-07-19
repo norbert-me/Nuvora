@@ -898,4 +898,6 @@ export default {
   "zufall.absentSkipped": "{{n}} ausentes – se omiten.",
   "anwesenheit.wholeDay": "Todo el día",
   "anwesenheit.periodHint": "Vincular la ausencia opcionalmente a una hora",
+  "kalender.resultAsGrade": "Importar resultado como nota",
+  "kalender.noSession": "Aún no hay ninguna sesión de este cuestionario para la clase.",
 };

@@ -898,4 +898,6 @@ export default {
   "zufall.absentSkipped": "{{n}} abwesend – werden übersprungen.",
   "anwesenheit.wholeDay": "Ganzer Tag",
   "anwesenheit.periodHint": "Fehltag optional an eine Stunde hängen",
+  "kalender.resultAsGrade": "Ergebnis als Note übernehmen",
+  "kalender.noSession": "Zu diesem Quiz gibt es für die Klasse noch keine gelaufene Session.",
 };

@@ -1,7 +1,7 @@
 // Modul Kalender — Unterrichtsplanung. Tag-, Wochen- und Monatsansicht; je Tag
 // Stunden eintragen und optional Klasse + Thema (Kern-Taxonomie) zuordnen.
 import { useState, useEffect, useCallback, Fragment } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, selectStyle } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, put } from "../core/cache.js";
@@ -511,6 +511,14 @@ function SlotModal({ slot, classes, onSave, onDelete, onColor, onClose, t }) {
 }
 
 function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders = [], aktiv = {}, onSave, onDelete, onClose, t }) {
+  const navigate = useNavigate();
+  // "Ergebnis als Note": die gelaufene Session zum verknüpften Quiz suchen und
+  // deren Auswertung mit direkt geöffnetem Noten-Import ansteuern.
+  const alsNote = async () => {
+    const r = await fetch(`${API}/quiz-session?set_id=${entry.cardvote_set_id}&class_id=${entry.class_id}`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+    if (r && r.session_id) { onClose(); navigate(`/cardvote/evaluation/${r.session_id}?import=1`); }
+    else alert(t("kalender.noSession"));
+  };
   const [title, setTitle] = useState(entry.title || "");
   const [notes, setNotes] = useState(entry.notes || "");
   const [classId, setClassId] = useState(entry.class_id || "");
@@ -569,6 +577,13 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
                 <Icon d={ICONS.open} size={15} color="var(--accent)" />
                 {t("kalender.toAttendance")}
               </Link>
+            )}
+            {aktiv.cardvote && aktiv.noten && entry.cardvote_set_id && classId && (
+              <button onClick={alsNote}
+                style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", cursor: "pointer", color: "var(--accent)", fontSize: 13.5, fontWeight: 600, width: "100%" }}>
+                <Icon d={ICONS.chart} size={15} color="var(--accent)" />
+                {t("kalender.resultAsGrade")}
+              </button>
             )}
             {linkList.length > 0 && (
               <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
