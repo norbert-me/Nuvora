@@ -495,6 +495,20 @@ class CalendarEntry(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class SeatingPlan(Base):
+    """Modul Sitzplan: ein Rasterlayout je Klasse. `data` haelt Spaltenzahl und
+    die Zellenbelegung (Schueler-IDs) als JSON — Schueler bleiben im Kern, hier
+    liegen nur ihre Positionen (Regel 3)."""
+    __tablename__ = "seating_plans"
+    __table_args__ = (UniqueConstraint("owner_id", "class_id", name="uq_seating_owner_class"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    data: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class CalendarBreak(Base):
     """Unterrichtsfreier Zeitraum (Ferien, beweglicher Feiertag). An Tagen
     innerhalb des Zeitraums zeigt der Kalender weder Stundenplan-Vorlagen noch

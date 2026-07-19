@@ -101,6 +101,16 @@ REGISTRY: List[ModuleDef] = [
         path="/kalender",
     ),
     ModuleDef(
+        key="sitzplan",
+        name="Sitzplan",
+        description=(
+            "Sitzordnung je Klasse: Schueler per Drag & Drop auf ein Raster "
+            "setzen. Nur die Positionen werden gespeichert."
+        ),
+        path="/sitzplan",
+        stage="beta",
+    ),
+    ModuleDef(
         key="zufall",
         name="Zufallsschüler",
         description=(
