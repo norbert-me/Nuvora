@@ -83,6 +83,33 @@ async def _owned_deck(db, user, deck_id) -> CardDeck:
     return d
 
 
+async def _kurs_roster(db, user, class_id):
+    """Kanonische SuS des Kurses (gleichnamige der Fach-Klassen dedupliziert,
+    kleinste id). Karten-Fortschritt/QR gelten kursweit je Person."""
+    from .kurse import sibling_class_ids
+    sib = await sibling_class_ids(db, class_id)
+    studs = (await db.execute(select(Student).where(Student.class_id.in_(sib)).order_by(Student.id))).scalars().all()
+    canon = {}
+    for s in studs:
+        canon.setdefault(s.name.strip(), s)
+    return sorted(canon.values(), key=lambda s: (s.card_id, s.id))
+
+
+async def _kurs_decks_where(cls):
+    """Decks des Kurses einer Klasse (Fallback: nur diese Klasse)."""
+    if cls.kurs_id:
+        return CardDeck.kurs_id == cls.kurs_id
+    return CardDeck.class_id == cls.id
+
+
+async def _student_deck_where(db, st):
+    """Deck-Filter für einen Schüler (öffentliches Lernen) — kursweit."""
+    cls = await db.get(SchoolClass, st.class_id)
+    if cls and cls.kurs_id:
+        return CardDeck.kurs_id == cls.kurs_id
+    return CardDeck.class_id == st.class_id
+
+
 # ─── Lehrkraft: Stapel & Karten ───
 
 class DeckIn(BaseModel):
@@ -110,10 +137,10 @@ class DeckOut(BaseModel):
 
 @router.get("/classes/{class_id}/decks", response_model=List[DeckOut])
 async def list_decks(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    await _owned_class(db, user, class_id)
+    cls = await _owned_class(db, user, class_id)
     from sqlalchemy.orm import selectinload
     r = await db.execute(
-        select(CardDeck).where(CardDeck.owner_id == user.id, CardDeck.class_id == class_id, CardDeck.deleted_at.is_(None))
+        select(CardDeck).where(CardDeck.owner_id == user.id, await _kurs_decks_where(cls), CardDeck.deleted_at.is_(None))
         .options(selectinload(CardDeck.cards)).order_by(CardDeck.id)
     )
     return r.scalars().all()
@@ -121,11 +148,11 @@ async def list_decks(class_id: int, user: User = Depends(require_module), db: As
 
 @router.get("/classes/{class_id}/decks/trash", response_model=List[DeckOut])
 async def list_deck_trash(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    """Gelöschte Decks der Klasse (30 Tage wiederherstellbar)."""
-    await _owned_class(db, user, class_id)
+    """Gelöschte Decks des Kurses (30 Tage wiederherstellbar)."""
+    cls = await _owned_class(db, user, class_id)
     from sqlalchemy.orm import selectinload
     r = await db.execute(
-        select(CardDeck).where(CardDeck.owner_id == user.id, CardDeck.class_id == class_id, CardDeck.deleted_at.is_not(None))
+        select(CardDeck).where(CardDeck.owner_id == user.id, await _kurs_decks_where(cls), CardDeck.deleted_at.is_not(None))
         .options(selectinload(CardDeck.cards)).order_by(CardDeck.deleted_at.desc())
     )
     return r.scalars().all()
@@ -134,8 +161,8 @@ async def list_deck_trash(class_id: int, user: User = Depends(require_module), d
 @router.post("/classes/{class_id}/decks", response_model=DeckOut, status_code=201)
 async def create_deck(class_id: int, body: DeckIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("karten_deck", f"u{user.id}", 100, 60, "Zu viele Stapel. Bitte kurz warten.")
-    await _owned_class(db, user, class_id)
-    deck = CardDeck(class_id=class_id, owner_id=user.id, name=body.name.strip(), topic_id=body.topic_id)
+    cls = await _owned_class(db, user, class_id)
+    deck = CardDeck(class_id=class_id, kurs_id=cls.kurs_id, owner_id=user.id, name=body.name.strip(), topic_id=body.topic_id)
     db.add(deck)
     await db.commit()
     await db.refresh(deck, ["cards"])
@@ -262,9 +289,9 @@ class StudentTokenOut(BaseModel):
 
 @router.post("/classes/{class_id}/tokens", response_model=List[StudentTokenOut])
 async def ensure_tokens(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    """Erzeugt fehlende Schueler-Tokens fuer die Klasse (idempotent)."""
+    """Erzeugt fehlende Schueler-Tokens fuer den Kurs (idempotent, je Person einer)."""
     await _owned_class(db, user, class_id)
-    students = (await db.execute(select(Student).where(Student.class_id == class_id).order_by(Student.card_id))).scalars().all()
+    students = await _kurs_roster(db, user, class_id)
     out = []
     changed = False
     for st in students:
@@ -291,12 +318,12 @@ class StudentProgress(BaseModel):
 
 @router.get("/classes/{class_id}/progress", response_model=List[StudentProgress])
 async def progress(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    await _owned_class(db, user, class_id)
-    students = (await db.execute(select(Student).where(Student.class_id == class_id).order_by(Student.card_id))).scalars().all()
+    cls = await _owned_class(db, user, class_id)
+    students = await _kurs_roster(db, user, class_id)
     now = _now()
     # Nur ausgerollte Stapel zaehlen — Entwuerfe verzerren den Fortschritt nicht.
     deck_ids = (await db.execute(select(CardDeck.id).where(
-        CardDeck.class_id == class_id,
+        await _kurs_decks_where(cls),
         CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None),
         CardDeck.released_at <= now,
     ))).scalars().all()
@@ -342,13 +369,15 @@ class CardStat(BaseModel):
 @router.get("/classes/{class_id}/students/{student_id}/cards", response_model=List[CardStat])
 async def student_cards(class_id: int, student_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Detailstatistik je Karte fuer einen Schueler — nur ausgerollte Stapel."""
-    await _owned_class(db, user, class_id)
+    cls = await _owned_class(db, user, class_id)
+    from .kurse import sibling_class_ids
+    sib = await sibling_class_ids(db, class_id)
     st = await db.get(Student, student_id)
-    if not st or st.class_id != class_id:
-        raise HTTPException(404, "Schüler nicht in dieser Klasse")
+    if not st or st.class_id not in sib:
+        raise HTTPException(404, "Schüler nicht in diesem Kurs")
     now = _now()
     decks = {d.id: d.name for d in (await db.execute(select(CardDeck).where(
-        CardDeck.class_id == class_id, CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None), CardDeck.released_at <= now,
+        await _kurs_decks_where(cls), CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None), CardDeck.released_at <= now,
     ))).scalars().all()}
     if not decks:
         return []
@@ -456,10 +485,11 @@ async def student_session(token: str, all: bool = False, db: AsyncSession = Depe
     all=True: alle Karten (freiwilliges Weiteruben, auch nicht faellige)."""
     st = await _student_by_token(db, token)
     now = _now()
+    dw = await _student_deck_where(db, st)
     # Nur ausgerollte Stapel: Entwuerfe (released_at NULL) und geplante in der
     # Zukunft bleiben fuer SuS unsichtbar.
     decks = (await db.execute(select(CardDeck.id).where(
-        CardDeck.class_id == st.class_id,
+        dw,
         CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None),
         CardDeck.released_at <= now,
     ))).scalars().all()
@@ -487,7 +517,7 @@ async def student_session(token: str, all: bool = False, db: AsyncSession = Depe
     # Auch geplante Stapel zaehlen: rollt einer frueher aus als die naechste
     # Karte faellig ist, zieht das "naechste Lernen" nach vorne.
     future_release = (await db.execute(select(sa_func.min(CardDeck.released_at)).where(
-        CardDeck.class_id == st.class_id, CardDeck.deleted_at.is_(None), CardDeck.released_at > now,
+        dw, CardDeck.deleted_at.is_(None), CardDeck.released_at > now,
     ))).scalar()
     if future_release is not None and (next_due is None or future_release < next_due):
         next_due = future_release

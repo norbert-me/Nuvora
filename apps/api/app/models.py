@@ -778,6 +778,9 @@ class CardDeck(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    # Kartenstapel gelten für den ganzen KURS (alle Fach-Klassen), nicht die
+    # einzelne Klasse. class_id bleibt als Herkunft/Fallback.
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(120), default="", server_default="")
     # Optionale Bindung an ein Kern-Thema (oder NULL = freie Karten). Kalender-
     # Eintraege mit demselben Thema rollen den Stapel automatisch aus.

@@ -183,6 +183,7 @@ def _ensure_columns(sync_conn):
         ("card_decks", "released_at", "TIMESTAMPTZ"),
         ("card_decks", "topic_id", "INTEGER"),
         ("card_decks", "deleted_at", "TIMESTAMPTZ"),
+        ("card_decks", "kurs_id", "INTEGER"),
         ("learning_paths", "deleted_at", "TIMESTAMPTZ"),
         ("marketplace_quizzes", "kind", "VARCHAR(30) DEFAULT 'cardvote_questionset' NOT NULL"),
         ("methods", "ablauf", "TEXT DEFAULT '' NOT NULL"),
@@ -366,6 +367,11 @@ async def startup():
                 "INSERT INTO kurs_tags (kurs_id, class_id) "
                 "SELECT kurs_id, id FROM school_classes WHERE kurs_id IS NOT NULL "
                 "ON CONFLICT ON CONSTRAINT uq_kurs_tag DO NOTHING"
+            ))
+            # Karten-Decks an den Kurs ihrer Klasse hängen (Decks gelten kursweit).
+            await db.execute(text(
+                "UPDATE card_decks SET kurs_id = (SELECT kurs_id FROM school_classes WHERE id = card_decks.class_id) "
+                "WHERE kurs_id IS NULL"
             ))
             await db.commit()
         except Exception as e:
