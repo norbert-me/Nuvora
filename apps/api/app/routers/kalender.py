@@ -121,6 +121,7 @@ async def _release_matching_decks(db: AsyncSession, user: User, e: CalendarEntry
         CardDeck.owner_id == user.id,
         CardDeck.topic_id == e.topic_id,
         CardDeck.released_at.is_(None),
+        CardDeck.deleted_at.is_(None),
     )
     if e.class_id:
         q = q.where(CardDeck.class_id == e.class_id)

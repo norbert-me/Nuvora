@@ -113,8 +113,20 @@ async def list_decks(class_id: int, user: User = Depends(require_module), db: As
     await _owned_class(db, user, class_id)
     from sqlalchemy.orm import selectinload
     r = await db.execute(
-        select(CardDeck).where(CardDeck.owner_id == user.id, CardDeck.class_id == class_id)
+        select(CardDeck).where(CardDeck.owner_id == user.id, CardDeck.class_id == class_id, CardDeck.deleted_at.is_(None))
         .options(selectinload(CardDeck.cards)).order_by(CardDeck.id)
+    )
+    return r.scalars().all()
+
+
+@router.get("/classes/{class_id}/decks/trash", response_model=List[DeckOut])
+async def list_deck_trash(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Gelöschte Decks der Klasse (30 Tage wiederherstellbar)."""
+    await _owned_class(db, user, class_id)
+    from sqlalchemy.orm import selectinload
+    r = await db.execute(
+        select(CardDeck).where(CardDeck.owner_id == user.id, CardDeck.class_id == class_id, CardDeck.deleted_at.is_not(None))
+        .options(selectinload(CardDeck.cards)).order_by(CardDeck.deleted_at.desc())
     )
     return r.scalars().all()
 
@@ -143,7 +155,27 @@ async def update_deck(deck_id: int, body: DeckIn, user: User = Depends(require_m
 
 @router.delete("/decks/{deck_id}", status_code=204)
 async def delete_deck(deck_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Soft-Delete: in den Papierkorb (30 Tage). Karten-Fortschritt bleibt."""
     deck = await _owned_deck(db, user, deck_id)
+    deck.deleted_at = _now()
+    await db.commit()
+
+
+@router.post("/decks/{deck_id}/restore", response_model=DeckOut)
+async def restore_deck(deck_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    deck = await _owned_deck(db, user, deck_id)
+    deck.deleted_at = None
+    await db.commit()
+    await db.refresh(deck, ["cards"])
+    return deck
+
+
+@router.delete("/decks/{deck_id}/purge", status_code=204)
+async def purge_deck(deck_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Endgültig löschen (aus dem Papierkorb). Erst hier greift die Kaskade."""
+    deck = await _owned_deck(db, user, deck_id)
+    if deck.deleted_at is None:
+        raise HTTPException(400, "Deck ist nicht im Papierkorb")
     await db.delete(deck)
     await db.commit()
 
@@ -265,7 +297,7 @@ async def progress(class_id: int, user: User = Depends(require_module), db: Asyn
     # Nur ausgerollte Stapel zaehlen — Entwuerfe verzerren den Fortschritt nicht.
     deck_ids = (await db.execute(select(CardDeck.id).where(
         CardDeck.class_id == class_id,
-        CardDeck.released_at.is_not(None),
+        CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None),
         CardDeck.released_at <= now,
     ))).scalars().all()
     card_ids = []
@@ -316,7 +348,7 @@ async def student_cards(class_id: int, student_id: int, user: User = Depends(req
         raise HTTPException(404, "Schüler nicht in dieser Klasse")
     now = _now()
     decks = {d.id: d.name for d in (await db.execute(select(CardDeck).where(
-        CardDeck.class_id == class_id, CardDeck.released_at.is_not(None), CardDeck.released_at <= now,
+        CardDeck.class_id == class_id, CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None), CardDeck.released_at <= now,
     ))).scalars().all()}
     if not decks:
         return []
@@ -428,7 +460,7 @@ async def student_session(token: str, all: bool = False, db: AsyncSession = Depe
     # Zukunft bleiben fuer SuS unsichtbar.
     decks = (await db.execute(select(CardDeck.id).where(
         CardDeck.class_id == st.class_id,
-        CardDeck.released_at.is_not(None),
+        CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None),
         CardDeck.released_at <= now,
     ))).scalars().all()
     if not decks:
@@ -455,7 +487,7 @@ async def student_session(token: str, all: bool = False, db: AsyncSession = Depe
     # Auch geplante Stapel zaehlen: rollt einer frueher aus als die naechste
     # Karte faellig ist, zieht das "naechste Lernen" nach vorne.
     future_release = (await db.execute(select(sa_func.min(CardDeck.released_at)).where(
-        CardDeck.class_id == st.class_id, CardDeck.released_at > now,
+        CardDeck.class_id == st.class_id, CardDeck.deleted_at.is_(None), CardDeck.released_at > now,
     ))).scalar()
     if future_release is not None and (next_due is None or future_release < next_due):
         next_due = future_release

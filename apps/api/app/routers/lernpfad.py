@@ -194,9 +194,21 @@ async def list_paths(
 ):
     result = await db.execute(
         select(LearningPath)
-        .where(LearningPath.owner_id == user.id)
+        .where(LearningPath.owner_id == user.id, LearningPath.deleted_at.is_(None))
         .options(selectinload(LearningPath.ladders))
         .order_by(LearningPath.name)
+    )
+    return result.scalars().all()
+
+
+@router.get("/paths/trash", response_model=List[PathOut])
+async def list_path_trash(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Gelöschte Lernpfade (30 Tage wiederherstellbar). Vor /paths/{id}."""
+    result = await db.execute(
+        select(LearningPath)
+        .where(LearningPath.owner_id == user.id, LearningPath.deleted_at.is_not(None))
+        .options(selectinload(LearningPath.ladders))
+        .order_by(LearningPath.deleted_at.desc())
     )
     return result.scalars().all()
 
@@ -226,11 +238,36 @@ async def delete_path(
     user: User = Depends(require_module),
     db: AsyncSession = Depends(get_db),
 ):
-    """Loescht den Pfad samt seiner Lernleitern. Die Aufgaben bleiben — sie
-    gehoeren nicht dem Pfad, er verweist nur auf sie."""
+    """Soft-Delete: in den Papierkorb (30 Tage). Lernleitern bleiben so lange
+    erhalten. Aufgaben gehoeren ohnehin nicht dem Pfad."""
+    from datetime import datetime, timezone
     path = await db.get(LearningPath, path_id)
     if not path or path.owner_id != user.id:
         raise HTTPException(404, "Lernpfad nicht gefunden")
+    path.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
+
+
+@router.post("/paths/{path_id}/restore", response_model=PathOut)
+async def restore_path(path_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    path = await db.get(LearningPath, path_id)
+    if not path or path.owner_id != user.id:
+        raise HTTPException(404, "Lernpfad nicht gefunden")
+    path.deleted_at = None
+    await db.commit()
+    await db.refresh(path, ["ladders"])
+    return path
+
+
+@router.delete("/paths/{path_id}/purge", status_code=204)
+async def purge_path(path_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Endgültig löschen (aus dem Papierkorb). Erst hier greift die Kaskade auf
+    die Lernleitern."""
+    path = await db.get(LearningPath, path_id)
+    if not path or path.owner_id != user.id:
+        raise HTTPException(404, "Lernpfad nicht gefunden")
+    if path.deleted_at is None:
+        raise HTTPException(400, "Lernpfad ist nicht im Papierkorb")
     await db.delete(path)
     await db.commit()
 

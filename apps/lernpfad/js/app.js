@@ -2692,7 +2692,8 @@
 
         const openPfad = id => editPfad(lernpfade.find(p => p._id === id));
         const deletePfad = async id => {
-            if (!confirm('Pfad wirklich löschen?')) return;
+            // Soft-Delete: 30 Tage im Papierkorb wiederherstellbar.
+            if (!confirm('Pfad in den Papierkorb verschieben? 30 Tage wiederherstellbar.')) return;
             lernpfade = lernpfade.filter(p => p._id !== id);
             // Erst löschen, dann neu laden — sonst holt loadLernpfade den Pfad
             // noch aus dem Backend zurück (Race), er erscheint wieder.
@@ -2710,6 +2711,44 @@
                 else deletePfad(btn.dataset.id);
             });
         });
+        renderPfadTrash(list);
+    }
+
+    // Papierkorb der Lernpfade: gelöschte Pfade (30 Tage) mit Wiederherstellen /
+    // endgültig löschen. Wird unter die Liste gehängt.
+    async function renderPfadTrash(list) {
+        let trash = [];
+        try { trash = await api(`${LP}/paths/trash`).then(r => r.ok ? r.json() : []); } catch (e) { trash = []; }
+        const old = document.getElementById('pfade-trash');
+        if (old) old.remove();
+        if (!trash.length) return;
+        const box = document.createElement('div');
+        box.id = 'pfade-trash';
+        box.style.marginTop = '12px';
+        box.innerHTML = `
+            <details>
+                <summary style="cursor:pointer;color:var(--text-muted);font-size:13px">Papierkorb (${trash.length})</summary>
+                <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+                    ${trash.map(p => `
+                        <div class="list-row" style="opacity:.85">
+                            <div><strong>${esc(p.name)}</strong> <span style="color:var(--text-muted)">– ${(p.lernleitern || []).length} Lernleitern</span></div>
+                            <div class="btn-group">
+                                <button class="btn" data-restore="${p.id}">Wiederherstellen</button>
+                                <button class="btn icon danger" data-purge="${p.id}" title="Endgültig löschen">${ICON.delete}</button>
+                            </div>
+                        </div>`).join('')}
+                </div>
+            </details>`;
+        list.parentNode.insertBefore(box, list.nextSibling);
+        box.querySelectorAll('[data-restore]').forEach(b => b.addEventListener('click', async () => {
+            await api(`${LP}/paths/${b.dataset.restore}/restore`, { method: 'POST' }).catch(() => {});
+            loadLernpfade();
+        }));
+        box.querySelectorAll('[data-purge]').forEach(b => b.addEventListener('click', async () => {
+            if (!confirm('Lernpfad endgültig löschen? Die Lernleitern gehen verloren.')) return;
+            await api(`${LP}/paths/${b.dataset.purge}/purge`, { method: 'DELETE' }).catch(() => {});
+            renderPfadTrash(list);
+        }));
     }
 
     document.getElementById('pfad-create-btn').addEventListener('click', async () => {

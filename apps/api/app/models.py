@@ -322,6 +322,8 @@ class LearningPath(Base):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )
     name: Mapped[str] = mapped_column(String(200))
+    # Papierkorb: gesetzt = gelöscht, 30 Tage wiederherstellbar (Lernleitern bleiben).
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     ladders: Mapped[list["LearningLadder"]] = relationship(
@@ -745,6 +747,8 @@ class CardDeck(Base):
     # Eintraege mit demselben Thema rollen den Stapel automatisch aus.
     topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Papierkorb: gesetzt = gelöscht, 30 Tage wiederherstellbar (Karten-Fortschritt bleibt).
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     # Ausrollen: NULL = Entwurf, fuer SuS unsichtbar. Gesetzt = ab diesem
     # Zeitpunkt faellig (jetzt = sofort, Zukunft = geplant).
     released_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -166,7 +166,7 @@ async def topic_usage(topic_id: int, user: User = Depends(get_current_user), db:
         rows = (await db.execute(select(Question).where(Question.owner_id == user.id, Question.topic_id == topic_id).limit(50))).scalars().all()
         out["cardvote"] = [{"id": q.id, "text": (q.text or "")[:120]} for q in rows]
     if await on("karten"):
-        rows = (await db.execute(select(CardDeck).where(CardDeck.owner_id == user.id, CardDeck.topic_id == topic_id).limit(50))).scalars().all()
+        rows = (await db.execute(select(CardDeck).where(CardDeck.owner_id == user.id, CardDeck.topic_id == topic_id, CardDeck.deleted_at.is_(None)).limit(50))).scalars().all()
         out["karten"] = [{"id": d.id, "name": d.name, "class_id": d.class_id, "released": d.released_at is not None} for d in rows]
     if await on("lernpfad"):
         rows = (await db.execute(select(Exercise).where(Exercise.owner_id == user.id, Exercise.topic_id == topic_id).limit(50))).scalars().all()

@@ -45,14 +45,24 @@ export default function Karten() {
 
   useEffect(() => { if (classId) rememberClass(classId); }, [classId]);
 
+  const [deckTrash, setDeckTrash] = useState([]);
+  const [showTrash, setShowTrash] = useState(false);
   const loadDecks = (id) => id && fetch(`${API}/classes/${id}/decks`).then((r) => (r.ok ? r.json() : [])).then(setDecks).catch(() => {});
-  useEffect(() => { loadDecks(classId); }, [classId]);
+  const loadTrash = (id) => id && fetch(`${API}/classes/${id}/decks/trash`).then((r) => (r.ok ? r.json() : [])).then((d) => setDeckTrash(Array.isArray(d) ? d : [])).catch(() => {});
+  useEffect(() => { loadDecks(classId); loadTrash(classId); }, [classId]);
+  const restoreDeck = async (id) => { await fetch(`${API}/decks/${id}/restore`, { method: "POST" }).catch(() => {}); loadDecks(classId); loadTrash(classId); };
+  const purgeDeck = async (id) => {
+    if (!await askConfirm(t("karten.purgeConfirm"))) return;
+    await fetch(`${API}/decks/${id}/purge`, { method: "DELETE" }).catch(() => {});
+    loadTrash(classId);
+  };
 
   const call = async (fn) => {
     setError("");
     const res = await fn();
     if (!res.ok) { const b = await res.json().catch(() => ({})); setError(typeof b.detail === "string" ? b.detail : t("common.notWork")); return false; }
     await loadDecks(classId);
+    loadTrash(classId);
     return true;
   };
 
@@ -102,6 +112,23 @@ export default function Karten() {
           </form>
           {decks.length === 0 && <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("karten.noDecks")}</p>}
           {decks.map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} />)}
+          {deckTrash.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <button onClick={() => setShowTrash((v) => !v)} style={{ ...btnSecondary, fontSize: 13 }}>{t("karten.trash")} ({deckTrash.length})</button>
+              {showTrash && (
+                <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 12, marginTop: 8, background: "var(--bg3)" }}>
+                  <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 8px" }}>{t("karten.trashHint")}</p>
+                  {deckTrash.map((d) => (
+                    <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: "1px solid var(--border)" }}>
+                      <span style={{ flex: 1, fontWeight: 500 }}>{d.name} <span style={{ fontSize: 12, color: "var(--text3)" }}>· {t("karten.cardCount", { n: d.cards?.length || 0 })}</span></span>
+                      <button onClick={() => restoreDeck(d.id)} style={{ ...btnSecondary, padding: "4px 11px", fontSize: 12.5 }}>{t("classes.restore")}</button>
+                      <button onClick={() => purgeDeck(d.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("classes.purge")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
 

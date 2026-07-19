@@ -177,6 +177,8 @@ def _ensure_columns(sync_conn):
         ("students", "karten_token", "VARCHAR(64)"),
         ("card_decks", "released_at", "TIMESTAMPTZ"),
         ("card_decks", "topic_id", "INTEGER"),
+        ("card_decks", "deleted_at", "TIMESTAMPTZ"),
+        ("learning_paths", "deleted_at", "TIMESTAMPTZ"),
         ("marketplace_quizzes", "kind", "VARCHAR(30) DEFAULT 'cardvote_questionset' NOT NULL"),
         ("methods", "ablauf", "TEXT DEFAULT '' NOT NULL"),
         ("methods", "material", "TEXT DEFAULT '' NOT NULL"),
@@ -324,11 +326,15 @@ async def startup():
     # Papierkorb leeren: Klassen, die länger als 30 Tage gelöscht sind, endgültig
     # entfernen (jetzt greift die Kaskade auf Noten/Karten/…). Läuft bei jedem Start.
     async with async_session() as db:
-        res = await db.execute(text(
-            "DELETE FROM school_classes WHERE deleted_at IS NOT NULL AND deleted_at < now() - interval '30 days'"
-        ))
-        if res.rowcount:
-            print(f"[STARTUP] Papierkorb: {res.rowcount} Klasse(n) endgültig gelöscht (>30 Tage).", flush=True)
+        for tbl, wort in (("school_classes", "Klasse(n)"), ("card_decks", "Deck(s)"), ("learning_paths", "Lernpfad(e)")):
+            try:
+                res = await db.execute(text(
+                    f"DELETE FROM {tbl} WHERE deleted_at IS NOT NULL AND deleted_at < now() - interval '30 days'"
+                ))
+                if res.rowcount:
+                    print(f"[STARTUP] Papierkorb: {res.rowcount} {wort} endgültig gelöscht (>30 Tage).", flush=True)
+            except Exception:
+                pass
         await db.commit()
 
     # Mandantentrennung: owner_id IS NULL galt historisch als „für alle sichtbar"
