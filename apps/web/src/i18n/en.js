@@ -831,4 +831,7 @@ export default {
   "anwesenheit.onlyToday": "Only today's classes",
   "anwesenheit.overviewHint": "Tap a name to see and amend absences (e.g. add an excuse later).",
   "anwesenheit.noEntries": "No absences.",
+  "weak.hint2": "Topics below 60% correct. Create a topic-bound practice deck or a Lernpfad exercise (revision).",
+  "weak.makeExercise": "Lernpfad task",
+  "weak.repTitle": "Revision: {{thema}} (from CardVote test)",
 };

@@ -831,4 +831,7 @@ export default {
   "anwesenheit.onlyToday": "Nur heutige Klassen",
   "anwesenheit.overviewHint": "Auf einen Namen tippen, um Fehltage zu sehen und nachzutragen (z. B. Entschuldigung nachreichen).",
   "anwesenheit.noEntries": "Keine Fehltage.",
+  "weak.hint2": "Themen unter 60 % Trefferquote. Lege ein themengebundenes Übungs-Deck oder eine Lernpfad-Aufgabe (Wiederholung) an.",
+  "weak.makeExercise": "Lernpfad-Aufgabe",
+  "weak.repTitle": "Wiederholung: {{thema}} (aus CardVote-Test)",
 };

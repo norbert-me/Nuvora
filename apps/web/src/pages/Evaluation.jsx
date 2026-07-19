@@ -159,6 +159,7 @@ export default function Evaluation() {
   const { modules } = useModules();
   const notenAktiv = modules.find((m) => m.key === "noten")?.active ?? false;
   const kartenAktiv = modules.find((m) => m.key === "karten")?.active ?? false;
+  const lernpfadAktiv = modules.find((m) => m.key === "lernpfad")?.active ?? false;
   const [notenDialog, setNotenDialog] = useState(false);
   const [avgMode, setAvgMode] = useState("pts");
   const [medMode, setMedMode] = useState("pts");
@@ -531,7 +532,7 @@ const gradeDistribution = (() => {
       </div>
       <h2 style={{ marginTop: 8, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{session_name || `Session #${id}`}</h2>
 
-      {kartenAktiv && data.class_id && <WeakTopics sessionId={Number(id)} classId={data.class_id} t={t} />}
+      {(kartenAktiv || lernpfadAktiv) && data.class_id && <WeakTopics sessionId={Number(id)} classId={data.class_id} karten={kartenAktiv} lernpfad={lernpfadAktiv} t={t} />}
 
       {/* Statistik-Kacheln */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
@@ -1208,10 +1209,10 @@ function TopicAnalysis({ questions, presentStudents }) {
 
 // Ziel-2-Brücke: schwache Themen aus dem Test → ein Übungs-Deck im Modul Karten
 // anlegen (themengebunden, Entwurf). Nur wenn das Karten-Modul aktiv ist.
-function WeakTopics({ sessionId, classId, t }) {
+function WeakTopics({ sessionId, classId, karten, lernpfad, t }) {
   const [topics, setTopics] = useState([]);
-  const [busy, setBusy] = useState(null);
-  const [done, setDone] = useState({});
+  const [busy, setBusy] = useState(null);        // `${topic_id}:${art}`
+  const [done, setDone] = useState({});          // { `${topic_id}:${art}`: true }
 
   useEffect(() => {
     fetch(`/api/sessions/${sessionId}/topic-stats`).then((r) => (r.ok ? r.json() : null))
@@ -1222,33 +1223,39 @@ function WeakTopics({ sessionId, classId, t }) {
   const schwach = topics.filter((tp) => tp.topic_id && tp.pct < 60);
   if (!schwach.length) return null;
 
-  const deckAnlegen = async (tp) => {
-    setBusy(tp.topic_id);
-    const r = await fetch(`/api/karten/classes/${classId}/decks`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: tp.name, topic_id: tp.topic_id }),
-    }).catch(() => null);
+  const run = async (tp, art, req) => {
+    const key = `${tp.topic_id}:${art}`;
+    setBusy(key);
+    const r = await fetch(req.url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req.body) }).catch(() => null);
     setBusy(null);
-    if (r && r.ok) setDone((d) => ({ ...d, [tp.topic_id]: true }));
+    if (r && r.ok) setDone((d) => ({ ...d, [key]: true }));
+  };
+  const deckAnlegen = (tp) => run(tp, "karten", { url: `/api/karten/classes/${classId}/decks`, body: { name: tp.name, topic_id: tp.topic_id } });
+  const aufgabeAnlegen = (tp) => run(tp, "lernpfad", {
+    url: `/api/lernpfad/exercises`,
+    body: { topic_id: tp.topic_id, kategorie: "Basis", aufgabentext: t("weak.repTitle", { thema: tp.name }) },
+  });
+
+  const Btn = ({ tp, art, onClick, label }) => {
+    const key = `${tp.topic_id}:${art}`;
+    if (done[key]) return <span style={{ fontSize: 12.5, color: "#0a7d3e", fontWeight: 600 }}>✓</span>;
+    return (
+      <button onClick={() => onClick(tp)} disabled={busy === key}
+        style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12.5, opacity: busy === key ? 0.6 : 1 }}>{label}</button>
+    );
   };
 
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, marginBottom: 16 }}>
       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{t("weak.title")}</div>
-      <div style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 12 }}>{t("weak.hint")}</div>
+      <div style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 12 }}>{t("weak.hint2")}</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {schwach.map((tp) => (
-          <div key={tp.topic_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 10 }}>
-            <span style={{ flex: 1, fontWeight: 600, minWidth: 0 }}>{tp.name}</span>
+          <div key={tp.topic_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 10, flexWrap: "wrap" }}>
+            <span style={{ flex: 1, fontWeight: 600, minWidth: 120 }}>{tp.name}</span>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: tp.pct < 40 ? "#d1350f" : "#b8860b" }}>{tp.pct}%</span>
-            {done[tp.topic_id] ? (
-              <span style={{ fontSize: 12.5, color: "#0a7d3e", fontWeight: 600 }}>{t("weak.created")}</span>
-            ) : (
-              <button onClick={() => deckAnlegen(tp)} disabled={busy === tp.topic_id}
-                style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12.5, opacity: busy === tp.topic_id ? 0.6 : 1 }}>
-                {t("weak.makeDeck")}
-              </button>
-            )}
+            {karten && <Btn tp={tp} art="karten" onClick={deckAnlegen} label={t("weak.makeDeck")} />}
+            {lernpfad && <Btn tp={tp} art="lernpfad" onClick={aufgabeAnlegen} label={t("weak.makeExercise")} />}
           </div>
         ))}
       </div>
