@@ -11,7 +11,7 @@ import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, modalOverlay, modalPanel } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api/noten";
@@ -595,8 +595,8 @@ function NotenStatistik({ noten, t }) {
 // Einfaches modales Popup fuer die Anlage-Formulare (Abschnitt/Spalte).
 function Modal({ title, onClose, children }) {
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 200 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--card)", borderRadius: 16, maxWidth: 400, width: "100%", padding: 20, border: "1px solid var(--border)" }}>
+    <div onClick={onClose} style={modalOverlay}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 400 }}>
         {title && <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>{title}</h3>}
         {children}
       </div>
@@ -875,7 +875,7 @@ const inp = { width: "100%", padding: 8, border: "1px solid var(--border2)", bor
 const th = { padding: "8px 6px", borderBottom: "2px solid var(--border3)", fontWeight: 600, fontSize: 12, color: "var(--text2)", textAlign: "center", whiteSpace: "nowrap", position: "relative" };
 const td = { padding: "4px 6px", borderBottom: "1px solid var(--border)", textAlign: "center", color: "var(--text)" };
 const stickyL = { position: "sticky", left: 0, background: "var(--card)", zIndex: 1 };
-const overlay = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 200 };
-const modal = { background: "var(--card)", borderRadius: 18, maxWidth: 460, width: "100%", maxHeight: "85vh", overflow: "auto", padding: 22, border: "1px solid var(--border)" };
+const overlay = modalOverlay;
+const modal = { ...modalPanel, maxWidth: 460 };
 const dtS = { color: "var(--text3)", fontWeight: 500 };
 const ddS = { margin: 0, color: "var(--text)" };

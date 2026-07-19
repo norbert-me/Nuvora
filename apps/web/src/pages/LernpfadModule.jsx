@@ -1,3 +1,4 @@
+import { modalOverlay, modalPanel } from "../components/Icons.jsx";
 // Modul Lernpfad — nativ in die Shell gemountet (kein iframe mehr).
 //
 // Die erprobte Vanilla-JS-App (apps/lernpfad) wird unveraendert wiederverwendet:
@@ -90,8 +91,8 @@ export default function LernpfadModule() {
   return (
     <>
       {modal && (
-        <div onClick={() => setModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 400 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--card)", color: "var(--text)", borderRadius: 18, maxWidth: 560, width: "100%", maxHeight: "85vh", overflow: "auto", padding: 24, border: "1px solid var(--border)" }}>
+        <div onClick={() => setModal(null)} style={modalOverlay}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 560 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
               <h3 style={{ fontSize: 17, fontWeight: 700, flex: 1, margin: 0 }}>{modal.title}</h3>
               <button onClick={() => setModal(null)} style={{ width: 30, height: 30, borderRadius: 15, border: "none", background: "var(--bg2)", color: "var(--text3)", cursor: "pointer", fontSize: 16 }}>×</button>

@@ -140,6 +140,28 @@ export const badge = (color) => ({
   background: color + "22", color,
 });
 
+// Einheitliches Popup/Modal. EINE Quelle für alle Dialoge — vorher baute jede
+// Seite Overlay + Panel selbst (leicht andere z-index/Radius/Schatten).
+// Klick auf den Hintergrund schließt; Inhalt fängt den Klick ab.
+export const modalOverlay = {
+  position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex",
+  alignItems: "center", justifyContent: "center", padding: 16, zIndex: 1000, overflowY: "auto",
+};
+export const modalPanel = {
+  background: "var(--card)", color: "var(--text)", borderRadius: 16, width: "100%",
+  padding: 22, border: "1px solid var(--border)", boxShadow: "0 20px 50px rgba(0,0,0,0.3)",
+  maxHeight: "88vh", overflow: "auto", boxSizing: "border-box",
+};
+export function Modal({ children, onClose, width = 480, style }) {
+  return (
+    <div onClick={onClose} style={modalOverlay}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: width, ...style }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 // Pillen-Umschalter (Tabs/Ansichten). options: [[value, label], …].
 export function Tabs({ value, onChange, options, style }) {
   return (

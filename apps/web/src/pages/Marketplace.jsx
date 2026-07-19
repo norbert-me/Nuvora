@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { Icon, ICONS } from "../components/Icons.jsx";
+import { Icon, ICONS, modalOverlay, modalPanel } from "../components/Icons.jsx";
 
 const API = "/api";
 
@@ -201,8 +201,8 @@ export default function Marketplace() {
       )}
 
       {preview && (
-        <div onClick={() => setPreview(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 200 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--card)", borderRadius: 20, maxWidth: 560, width: "100%", maxHeight: "85vh", overflow: "auto", padding: 24, border: "1px solid var(--border)" }}>
+        <div onClick={() => setPreview(null)} style={modalOverlay}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 560 }}>
             {preview.loading ? (
               <p style={{ color: "var(--text3)", fontSize: 14, margin: 0 }}>{t("common.loading")}</p>
             ) : (
@@ -269,8 +269,8 @@ export default function Marketplace() {
       )}
 
       {copyDeckFor && (
-        <div onClick={() => setCopyDeckFor(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 210 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--card)", borderRadius: 18, maxWidth: 400, width: "100%", padding: 22, border: "1px solid var(--border)" }}>
+        <div onClick={() => setCopyDeckFor(null)} style={modalOverlay}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 400 }}>
             <h3 style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 700, color: "var(--text)" }}>{t("market.chooseClass")}</h3>
             <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 14px" }}>{t("market.chooseClassHint", { title: copyDeckFor.title })}</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflow: "auto" }}>

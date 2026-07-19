@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import Latex from "../components/Latex.jsx";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Toggle } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Toggle, modalOverlay as sOverlay, modalPanel as sPanel } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import TopicPicker from "../components/TopicPicker.jsx";
@@ -413,8 +413,8 @@ export default function Dashboard() {
       </div>
 
       {publishingSet && (
-        <div onClick={() => setPublishingSet(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 200 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--card)", borderRadius: 20, maxWidth: 460, width: "100%", padding: 24, border: "1px solid var(--border)" }}>
+        <div onClick={() => setPublishingSet(null)} style={sOverlay}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...sPanel, maxWidth: 460 }}>
             <h3 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "var(--text)" }}>{t("dash.publishTitle")}</h3>
             <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 16px" }}>{t("dash.publishText", { name: publishingSet.name })}</p>
             <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)", display: "block", marginBottom: 4 }}>{t("dash.description")}</label>
@@ -733,8 +733,8 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onQuestionsChang
   );
 }
 
-const modalOverlay = { position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "5vh 16px", overflowY: "auto" };
-const modalCard = { background: "var(--card)", border: "1px solid var(--border)", borderRadius: 18, padding: 24, width: "100%", maxWidth: 620, boxShadow: "0 12px 40px rgba(0,0,0,0.3)" };
+const modalOverlay = sOverlay;
+const modalCard = { ...sPanel, maxWidth: 620 };
 
 
 const LATEX_BUTTONS = [
