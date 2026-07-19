@@ -46,6 +46,7 @@ export default function Session() {
   const [sessionCode, setSessionCode] = useState("");
   const [classes, setClasses] = useState([]);
   const [selectedClass, setSelectedClass] = useState(null);
+  const [kurse, setKurse] = useState([]);
   const [folders, setFolders] = useState([]);
   const [selectedSet, setSelectedSet] = useState(null);
   const [showAnswers, setShowAnswers] = useState(false);
@@ -79,6 +80,7 @@ export default function Session() {
 
   useEffect(() => {
     fetch(`${API}/classes`).then((r) => r.ok ? r.json() : []).then((d) => setClasses(Array.isArray(d) ? d : []));
+    fetch(`${API}/kurse`).then((r) => r.ok ? r.json() : []).then((d) => setKurse(Array.isArray(d) ? d : []));
     fetch(`${API}/folders`).then((r) => r.ok ? r.json() : []).then((d) => setFolders(Array.isArray(d) ? d : []));
     fetch(`${API}/sessions/active`).then((r) => r.ok ? r.json() : []).then((d) => setActiveSessions(Array.isArray(d) ? d : []));
   }, []);
@@ -427,8 +429,9 @@ export default function Session() {
           {classes.length === 0 ? (
             <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("session.noClasses")} <a href="/classes" style={{ color: "var(--accent)" }}>{t("session.createClass")}</a></p>
           ) : (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {classes.map((cls) => {
+            (() => {
+              // Nach Kurs gruppieren; Kurs-Überschrift nur bei mehreren Fach-Klassen.
+              const btn = (cls) => {
                 const active = selectedClass?.id === cls.id;
                 return (
                   <button key={cls.id} onClick={() => setSelectedClass(cls)} style={{
@@ -441,8 +444,21 @@ export default function Session() {
                     <span style={{ color: "var(--text3)", marginLeft: 6, fontSize: 12, fontWeight: 400 }}>{cls.students.length} {t("classes.learners")}</span>
                   </button>
                 );
-              })}
-            </div>
+              };
+              const groups = kurse.map((k) => {
+                const ids = new Set((k.classes || []).filter((c) => c.shared).map((c) => c.id));
+                return { name: k.name, list: classes.filter((c) => ids.has(c.id)) };
+              }).filter((g) => g.list.length);
+              const grouped = new Set(groups.flatMap((g) => g.list.map((c) => c.id)));
+              const rest = classes.filter((c) => !grouped.has(c.id));
+              if (rest.length) groups.push({ name: null, list: rest });
+              return groups.map((g, gi) => (
+                <div key={gi} style={{ marginBottom: 6 }}>
+                  {g.name && g.list.length > 1 && <div style={{ fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text3)", margin: "2px 0 6px" }}>{g.name}</div>}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{g.list.map(btn)}</div>
+                </div>
+              ));
+            })()
           )}
         </div>
 
