@@ -135,7 +135,8 @@ export default function Classes() {
 
   const remove = async (id) => {
     if (!await askConfirm(t("classes.deleteConfirm"))) return;
-    await fetch(`${API}/classes/${id}`, { method: "DELETE" });
+    const r = await fetch(`${API}/classes/${id}`, { method: "DELETE" });
+    if (r.ok) { const next = classes.filter((c) => c.id !== id); setClasses(next); put("classes", next); } // sofort weg
     load();
     loadTrash();
   };

@@ -37,8 +37,9 @@ export default function Kurse() {
   const removeMember = async (kursId, classId) => { await fetch(`${API}/kurse/${kursId}/classes/${classId}`, { method: "DELETE" }).catch(() => {}); load(); };
   const delKurs = async (k) => {
     if (!await askConfirm(t("kurse.delConfirm", { name: k.name }))) return;
-    await fetch(`${API}/kurse/${k.id}`, { method: "DELETE" }).catch(() => {});
-    load(); loadTrash();
+    const r = await fetch(`${API}/kurse/${k.id}`, { method: "DELETE" }).catch(() => null);
+    if (r && r.ok) setKurse((prev) => prev.filter((x) => x.id !== k.id)); // sofort weg
+    loadTrash(); load();
   };
   const restore = async (id) => { await fetch(`${API}/kurse/${id}/restore`, { method: "POST" }).catch(() => {}); load(); loadTrash(); };
   const purge = async (id) => {

@@ -22,6 +22,8 @@ export default function Orga() {
   // Zwei Werkzeuge unter einem Dach: Checklisten und Anwesenheit. Kalender kann
   // per ?tab=anwesenheit direkt in die Anwesenheit springen.
   const [tab, setTab] = useState(params.get("tab") === "anwesenheit" ? "anwesenheit" : "checklisten");
+  // Auf ?tab-Wechsel aus der Navbar reagieren (nicht nur beim ersten Laden).
+  useEffect(() => { setTab(params.get("tab") === "anwesenheit" ? "anwesenheit" : "checklisten"); }, [params]);
 
   useEffect(() => {
     return swr("classes", "/api/classes", (d) => {

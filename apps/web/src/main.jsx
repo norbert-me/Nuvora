@@ -157,7 +157,11 @@ const getModuleNavItems = (t, location) => {
     return [{ to: SIT, label: t("sitzplan.title") }];
   }
   if (area === "orga") {
-    return [{ to: ORG, label: t("orga.title") }];
+    const tab = params.get("tab");
+    return [
+      { to: `${ORG}?tab=checklisten`, label: t("orga.tabChecklists"), active: tab !== "anwesenheit" },
+      { to: `${ORG}?tab=anwesenheit`, label: t("anwesenheit.title"), active: tab === "anwesenheit" },
+    ];
   }
   if (area === "ausleihe") {
     return [{ to: AUS, label: t("ausleihe.title") }];
