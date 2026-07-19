@@ -372,7 +372,17 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <button onClick={async () => {
+          const res = await fetch(`${API}/me/export`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
+          if (!res || !res.ok) { showAlert(t("profile.exportError")); return; }
+          const blob = await res.blob();
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = `nuvora-export-${new Date().toISOString().slice(0, 10)}.json`;
+          a.click();
+          URL.revokeObjectURL(a.href);
+        }} style={btnSecondary}>{t("profile.exportData")}</button>
         <button onClick={onLogout} style={{ ...btnPrimary, background: "#d1350f" }}>{t("profile.logout")}</button>
         <button onClick={async () => {
           const pw = await askPrompt(t("profile.deletePwPrompt"));

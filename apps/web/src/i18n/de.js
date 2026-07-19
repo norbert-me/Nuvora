@@ -227,6 +227,8 @@ export default {
   "emailchange.backToProfile": "Zurück zum Profil",
 
   // Profil
+  "profile.exportData": "Meine Daten exportieren",
+  "profile.exportError": "Export fehlgeschlagen. Bitte erneut versuchen.",
   "profile.email": "E-Mail",
   "profile.pending": "Bestätigung ausstehend für: {{email}} — bitte den Link in der E-Mail öffnen.",
   "profile.changeEmail": "E-Mail-Adresse ändern",
