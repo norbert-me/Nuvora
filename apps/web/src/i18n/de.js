@@ -781,4 +781,11 @@ export default {
   "noten.export": "Exportieren",
   "noten.import": "Importieren",
   "noten.importError": "Import fehlgeschlagen.",
+  "modules.sortBy": "Sortieren:",
+  "modules.sortName": "Name",
+  "modules.sortStatus": "Status",
+  "modules.sortDir": "Richtung wechseln",
+  "home.arrange": "Anordnen",
+  "home.arrangeHint": "Karten ziehen, um die Reihenfolge zu ändern.",
+  "common.done": "Fertig",
 };

@@ -1,10 +1,11 @@
 // Nuvoras Startseite: der Rahmen, nicht ein Modul.
 // Zeigt die aktivierten Module als Einstieg. Ohne Module fuehrt sie zur
 // Modulauswahl statt eine leere Seite zu zeigen.
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
-import { StageBadge } from "../components/Icons.jsx";
+import { StageBadge, Icon, ICONS, iconBtn } from "../components/Icons.jsx";
 import { pageTitle } from "../components/Icons.jsx";
 
 const card = {
@@ -20,18 +21,44 @@ const card = {
 export default function NuvoraHome({ user }) {
   const { t } = useLanguage();
   const { active, loading } = useModules();
+  const orderKey = `nuvora_modorder_${user?.id ?? "x"}`;
+  const [order, setOrder] = useState(() => { try { return JSON.parse(localStorage.getItem(orderKey)) || []; } catch { return []; } });
+  const [edit, setEdit] = useState(false);
+  const [dragKey, setDragKey] = useState(null);
 
   if (loading) return null;
 
   const firstName = (user?.name || "").split(" ")[0];
+  const name = (m) => (t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name);
+  const desc = (m) => (t(`mod.${m.key}.desc`) !== `mod.${m.key}.desc` ? t(`mod.${m.key}.desc`) : m.description);
+  // Nach gespeicherter Reihenfolge; unbekannte (neue) Module hinten anhaengen.
+  const rank = (k) => { const i = order.indexOf(k); return i < 0 ? 1000 + active.findIndex((m) => m.key === k) : i; };
+  const shown = [...active].sort((a, b) => rank(a.key) - rank(b.key));
+
+  const persist = (keys) => { setOrder(keys); try { localStorage.setItem(orderKey, JSON.stringify(keys)); } catch { /* egal */ } };
+  const drop = (targetKey) => {
+    if (!dragKey || dragKey === targetKey) return;
+    const keys = shown.map((m) => m.key);
+    const from = keys.indexOf(dragKey), to = keys.indexOf(targetKey);
+    keys.splice(to, 0, keys.splice(from, 1)[0]);
+    persist(keys);
+    setDragKey(null);
+  };
 
   return (
     <div style={{ maxWidth: 820, margin: "0 auto" }}>
-      <h1 style={pageTitle}>
-        {firstName ? t("home.welcome", { name: firstName }) : t("home.welcomePlain")}
-      </h1>
-      <p style={{ color: "var(--text2)", marginBottom: 28 }}>
-        {t("home.intro")}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <h1 style={{ ...pageTitle, marginBottom: 0, flex: 1 }}>
+          {firstName ? t("home.welcome", { name: firstName }) : t("home.welcomePlain")}
+        </h1>
+        {active.length > 1 && (
+          <button onClick={() => setEdit((e) => !e)} className="icon-btn" style={{ ...iconBtn, border: edit ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 10, padding: 8 }} title={t("home.arrange")}>
+            {edit ? <span style={{ fontSize: 13, fontWeight: 600, color: "var(--accent)", padding: "0 4px" }}>{t("common.done")}</span> : <Icon d={ICONS.edit} size={17} />}
+          </button>
+        )}
+      </div>
+      <p style={{ color: "var(--text2)", marginBottom: 28, marginTop: 8 }}>
+        {edit ? t("home.arrangeHint") : t("home.intro")}
       </p>
 
       {active.length === 0 ? (
@@ -56,26 +83,32 @@ export default function NuvoraHome({ user }) {
       ) : (
         <>
           <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
-            {active.map((m) =>
-              // Externe Module leben ausserhalb der React-App (eigene Seite
-              // hinter dem Proxy) — die brauchen einen echten Seitenwechsel,
-              // ein <Link> wuerde ins Leere routen.
-              m.external ? (
-                <a key={m.key} href={m.path} style={card}>
-                  <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name} <StageBadge stage={m.stage} /></div>
-                  <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.6 }}>
-                    {t(`mod.${m.key}.desc`) !== `mod.${m.key}.desc` ? t(`mod.${m.key}.desc`) : m.description}
+            {shown.map((m) => {
+              const inner = (<>
+                <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
+                  {edit && <span style={{ color: "var(--text3)", display: "inline-flex" }}><Icon d={ICONS.grip} size={16} /></span>}
+                  <span>{name(m)}</span> <StageBadge stage={m.stage} />
+                </div>
+                <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.6 }}>{desc(m)}</div>
+              </>);
+              if (edit) {
+                // Bearbeiten: Karten sind ziehbar, keine Navigation.
+                return (
+                  <div key={m.key} draggable
+                    onDragStart={() => setDragKey(m.key)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => drop(m.key)}
+                    onDragEnd={() => setDragKey(null)}
+                    style={{ ...card, cursor: "grab", opacity: dragKey === m.key ? 0.4 : 1, borderStyle: "dashed" }}>
+                    {inner}
                   </div>
-                </a>
-              ) : (
-                <Link key={m.key} to={m.path} style={card}>
-                  <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name} <StageBadge stage={m.stage} /></div>
-                  <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.6 }}>
-                    {t(`mod.${m.key}.desc`) !== `mod.${m.key}.desc` ? t(`mod.${m.key}.desc`) : m.description}
-                  </div>
-                </Link>
-              )
-            )}
+                );
+              }
+              // Externe Module leben ausserhalb der React-App — echter Seitenwechsel.
+              return m.external
+                ? <a key={m.key} href={m.path} style={card}>{inner}</a>
+                : <Link key={m.key} to={m.path} style={card}>{inner}</Link>;
+            })}
           </div>
         </>
       )}

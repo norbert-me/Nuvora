@@ -11,8 +11,19 @@ export default function Modules() {
   const { modules, loading, toggle } = useModules();
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState("");
+  const [sortKey, setSortKey] = useState("name"); // name | status
+  const [dir, setDir] = useState("asc");           // asc | desc
 
   if (loading) return null;
+
+  const dispName = (m) => (t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name);
+  const sorted = [...modules].sort((a, b) => {
+    // Status aufsteigend = aktive zuerst; bei Gleichstand alphabetisch.
+    const r = sortKey === "status"
+      ? (a.active === b.active ? dispName(a).localeCompare(dispName(b)) : (a.active ? -1 : 1))
+      : dispName(a).localeCompare(dispName(b));
+    return dir === "asc" ? r : -r;
+  });
 
   const handle = async (m) => {
     setBusy(m.key);
@@ -38,8 +49,21 @@ export default function Modules() {
         <p style={{ color: "var(--danger, #dc2626)", fontSize: 13, marginBottom: 12 }}>{error}</p>
       )}
 
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+        <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("modules.sortBy")}</span>
+        <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden" }}>
+          {[["name", t("modules.sortName")], ["status", t("modules.sortStatus")]].map(([k, label]) => (
+            <button key={k} onClick={() => setSortKey(k)} style={{ padding: "5px 13px", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", background: sortKey === k ? "var(--accent)" : "transparent", color: sortKey === k ? "#fff" : "var(--text2)" }}>{label}</button>
+          ))}
+        </div>
+        <button onClick={() => setDir((d) => (d === "asc" ? "desc" : "asc"))} title={t("modules.sortDir")}
+          style={{ padding: "5px 12px", fontSize: 14, fontWeight: 700, border: "1px solid var(--border2)", borderRadius: 980, cursor: "pointer", background: "transparent", color: "var(--text2)" }}>
+          {dir === "asc" ? "↑" : "↓"}
+        </button>
+      </div>
+
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {modules.map((m) => (
+        {sorted.map((m) => (
           <div
             key={m.key}
             style={{

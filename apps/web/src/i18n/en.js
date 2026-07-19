@@ -781,4 +781,11 @@ export default {
   "noten.export": "Export",
   "noten.import": "Import",
   "noten.importError": "Import failed.",
+  "modules.sortBy": "Sort:",
+  "modules.sortName": "Name",
+  "modules.sortStatus": "Status",
+  "modules.sortDir": "Toggle direction",
+  "home.arrange": "Arrange",
+  "home.arrangeHint": "Drag the cards to reorder them.",
+  "common.done": "Done",
 };
