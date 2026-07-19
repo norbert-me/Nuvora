@@ -7,6 +7,15 @@ import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C,
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, put } from "../core/cache.js";
+import ferienDE from "../data/ferien-de.json";
+
+// Bundeslaender fuer den Ferien-Import (Kuerzel muss zu ferien-de.json passen).
+const BUNDESLAENDER = [
+  ["BW", "Baden-Württemberg"], ["BY", "Bayern"], ["BE", "Berlin"], ["BB", "Brandenburg"],
+  ["HB", "Bremen"], ["HH", "Hamburg"], ["HE", "Hessen"], ["MV", "Mecklenburg-Vorpommern"],
+  ["NI", "Niedersachsen"], ["NW", "Nordrhein-Westfalen"], ["RP", "Rheinland-Pfalz"], ["SL", "Saarland"],
+  ["SN", "Sachsen"], ["ST", "Sachsen-Anhalt"], ["SH", "Schleswig-Holstein"], ["TH", "Thüringen"],
+];
 
 const API = "/api/kalender";
 
@@ -544,10 +553,33 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
     setVon(""); setBis(""); setLabel("");
   };
   const fmt = (s) => new Date(s).toLocaleDateString();
+  // Ferien-Import: statischer Datensatz (openHolidays), zwei Schuljahre. Fuegt
+  // nur fehlende Zeitraeume hinzu (gleiches Startdatum + Label = schon da).
+  const [land, setLand] = useState(() => localStorage.getItem("nuvora_bundesland") || "NW");
+  const [importing, setImporting] = useState(false);
+  const ferienImport = async () => {
+    const liste = ferienDE[land] || [];
+    const vorhanden = new Set(breaks.map((b) => `${ymd(new Date(b.start_date))}|${(b.label || "").trim()}`));
+    const neu = liste.filter((f) => !vorhanden.has(`${f.start}|${f.label.trim()}`));
+    if (neu.length === 0) { showAlert(t("kalender.ferienNothing")); return; }
+    setImporting(true);
+    for (const f of neu) {
+      await onAdd({ start_date: new Date(f.start + "T00:00:00").toISOString(), end_date: new Date(f.end + "T00:00:00").toISOString(), label: f.label });
+    }
+    setImporting(false);
+  };
   return (
     <div style={standalone ? {} : { marginTop: 26, borderTop: "1px solid var(--border)", paddingTop: 18 }}>
       <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{t("kalender.breaksTitle")}</h3>
       <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 12px", maxWidth: 620 }}>{t("kalender.breaksHint")}</p>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)" }}>
+        <label style={{ fontSize: 12, color: "var(--text2)", display: "flex", flexDirection: "column", gap: 3 }}>{t("kalender.bundesland")}
+          <select value={land} onChange={(e) => { setLand(e.target.value); localStorage.setItem("nuvora_bundesland", e.target.value); }} style={{ ...selectStyle, fontSize: 14, padding: "9px 30px 9px 12px" }}>
+            {BUNDESLAENDER.map(([k, n]) => <option key={k} value={k}>{n}</option>)}
+          </select></label>
+        <button onClick={ferienImport} disabled={importing} style={{ ...btnSecondary, opacity: importing ? 0.6 : 1 }}>{importing ? t("kalender.ferienImporting") : t("kalender.ferienImport")}</button>
+        <span style={{ fontSize: 11.5, color: "var(--text3)", flex: 1, minWidth: 160 }}>{t("kalender.ferienHint")}</span>
+      </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
         <label style={{ fontSize: 12, color: "var(--text2)", display: "flex", flexDirection: "column", gap: 3 }}>{t("kalender.from")}
           <input type="date" value={von} onChange={(e) => setVon(e.target.value)} style={fld} /></label>
