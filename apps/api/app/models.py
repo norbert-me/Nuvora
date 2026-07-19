@@ -514,6 +514,22 @@ class Attendance(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class CodePuzzle(Base):
+    """Modul Code-Detektiv: ein Rätsel serverseitig, damit es themen-getaggt und
+    im Kalender planbar ist. `client_id` ist die stabile ID der App; `payload`
+    hält das ganze Rätselobjekt. topic_id ON DELETE SET NULL (Regel 3)."""
+    __tablename__ = "code_puzzles"
+    __table_args__ = (UniqueConstraint("owner_id", "client_id", name="uq_codepuzzle_owner_client"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    client_id: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class SeatingPlan(Base):
     """Modul Sitzplan: ein Rasterlayout je Klasse. `data` haelt Spaltenzahl und
     die Zellenbelegung (Schueler-IDs) als JSON — Schueler bleiben im Kern, hier

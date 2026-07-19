@@ -41,6 +41,8 @@ function reducer(state, action) {
       return { ...state, puzzles: state.puzzles.map(p => p.id === action.puzzle.id ? action.puzzle : p) };
     case 'DELETE_PUZZLE':
       return { ...state, puzzles: state.puzzles.filter(p => p.id !== action.puzzleId) };
+    case 'SET_PUZZLES':
+      return { ...state, puzzles: action.puzzles };
     case 'SET_USER':
       return { ...state, currentUser: action.user };
     case 'CREATE_SESSION': {
@@ -122,12 +124,46 @@ function reducer(state, action) {
 
 const StoreContext = createContext();
 
-export function StoreProvider({ children }) {
-  const [state, dispatch] = useReducer(reducer, initialState);
+const CD_API = '/api/codedetektiv/puzzles';
+const jsonHeaders = { 'Content-Type': 'application/json' };
 
+export function StoreProvider({ children }) {
+  const [state, rawDispatch] = useReducer(reducer, initialState);
+
+  // Rätsel liegen jetzt im Kern (themen-getaggt, im Kalender planbar). Der Store
+  // spiegelt sie lokal; Anlegen/Ändern/Löschen wird an den Server geschickt.
+  const dispatch = (action) => {
+    if (action.type === 'ADD_PUZZLE' || action.type === 'UPDATE_PUZZLE') {
+      const p = action.puzzle;
+      fetch(CD_API, { method: 'PUT', headers: jsonHeaders,
+        body: JSON.stringify({ client_id: p.id, title: p.title || '', topic_id: p.topic_id ?? null, payload: p }) }).catch(() => {});
+    } else if (action.type === 'DELETE_PUZZLE') {
+      fetch(`${CD_API}/${encodeURIComponent(action.puzzleId)}`, { method: 'DELETE' }).catch(() => {});
+    }
+    rawDispatch(action);
+  };
+
+  // Beim Start: Rätsel vom Server laden. Lokale (noch nicht übertragene) Rätsel
+  // einmalig hochladen — so gehen Bestände aus dem Browser nicht verloren.
+  useEffect(() => {
+    const localCustoms = ((loadState() || {}).puzzles || []).filter(p => !samplePuzzles.some(sp => sp.id === p.id));
+    fetch(CD_API).then(r => (r.ok ? r.json() : [])).then(async (rows) => {
+      const serverIds = new Set(rows.map(r => r.client_id));
+      for (const p of localCustoms) {
+        if (!serverIds.has(p.id)) {
+          await fetch(CD_API, { method: 'PUT', headers: jsonHeaders,
+            body: JSON.stringify({ client_id: p.id, title: p.title || '', topic_id: p.topic_id ?? null, payload: p }) }).catch(() => {});
+        }
+      }
+      const fromServer = rows.map(r => ({ ...r.payload, id: r.client_id, title: r.title, topic_id: r.topic_id }));
+      const nurLokal = localCustoms.filter(p => !serverIds.has(p.id));
+      rawDispatch({ type: 'SET_PUZZLES', puzzles: [...samplePuzzles, ...fromServer, ...nurLokal] });
+    }).catch(() => {});
+  }, []);
+
+  // Nur Sessions/Anmeldung lokal halten; Rätsel kommen vom Server.
   useEffect(() => {
     const toSave = {
-      puzzles: state.puzzles.filter(p => !samplePuzzles.some(sp => sp.id === p.id)),
       sessions: state.sessions,
       currentUser: state.currentUser,
       currentSession: state.currentSession,
