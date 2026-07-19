@@ -23,6 +23,7 @@ export default function Kalender() {
   const [methods, setMethods] = useState([]); // aus Modul Methoden (falls aktiv)
   const [quizze, setQuizze] = useState([]); // CardVote-Quizze (falls aktiv), flach
   const [ladders, setLadders] = useState([]); // Lernpfad-Lernleitern (falls aktiv), flach
+  const [puzzles, setPuzzles] = useState([]); // Code-Detektiv-Rätsel (falls aktiv)
   const [aktiv, setAktiv] = useState({}); // { cardvote, karten, lernpfad } aktiv?
   const [editing, setEditing] = useState(null); // { date, ...entry } oder null
   const [tt, setTt] = useState({ periods: 6, slots: [] }); // Stundenplan
@@ -52,6 +53,7 @@ export default function Kalender() {
         (Array.isArray(paths) ? paths : []).forEach((p) => (p.ladders || []).forEach((l) => flat.push({ id: l.id, name: l.name, path: p.name })));
         setLadders(flat);
       }).catch(() => {});
+      if (on["code-detektiv"]) fetch("/api/codedetektiv/puzzles").then((r) => (r.ok ? r.json() : [])).then((d) => setPuzzles(Array.isArray(d) ? d : [])).catch(() => {});
     }).catch(() => {});
   }, []);
 
@@ -126,7 +128,7 @@ export default function Kalender() {
   };
 
   const save = async (e) => {
-    const body = { date: new Date(e.date).toISOString(), title: e.title || "", notes: e.notes || "", class_id: e.class_id || null, topic_id: e.topic_id || null, method_id: e.method_id || null, period: e.period ?? null, cardvote_set_id: e.cardvote_set_id || null, karten_deck_id: e.karten_deck_id || null, lernpfad_ladder_id: e.lernpfad_ladder_id || null };
+    const body = { date: new Date(e.date).toISOString(), title: e.title || "", notes: e.notes || "", class_id: e.class_id || null, topic_id: e.topic_id || null, method_id: e.method_id || null, period: e.period ?? null, cardvote_set_id: e.cardvote_set_id || null, karten_deck_id: e.karten_deck_id || null, lernpfad_ladder_id: e.lernpfad_ladder_id || null, codedetektiv_puzzle: e.codedetektiv_puzzle || null };
     const res = await fetch(e.id ? `${API}/entries/${e.id}` : `${API}/entries`, {
       method: e.id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     }).catch(() => null);
@@ -223,7 +225,7 @@ export default function Kalender() {
       {view === "day" && <DayView day={cursor} byDay={byDay} slotsFor={slotsFor} frei={frei} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
       {view === "timetable" && <TimetableView tt={tt} className={className} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
-      {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} aktiv={aktiv} topicName={topicName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
+      {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
       {slotEdit && <SlotModal slot={slotEdit} classes={classes} topics={topics} onSave={saveSlot} onDelete={removeSlot} onColor={setClassColor} onClose={() => setSlotEdit(null)} t={t} />}
     </div>
   );
@@ -535,7 +537,7 @@ function SlotModal({ slot, classes, onSave, onDelete, onColor, onClose, t }) {
   );
 }
 
-function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders = [], aktiv = {}, onSave, onDelete, onClose, t }) {
+function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders = [], puzzles = [], aktiv = {}, onSave, onDelete, onClose, t }) {
   const navigate = useNavigate();
   // "Ergebnis als Note": die gelaufene Session zum verknüpften Quiz suchen und
   // deren Auswertung mit direkt geöffnetem Noten-Import ansteuern.
@@ -551,6 +553,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   const [methodId, setMethodId] = useState(entry.method_id || "");
   const [quizId, setQuizId] = useState(entry.cardvote_set_id || "");
   const [ladderId, setLadderId] = useState(entry.lernpfad_ladder_id || "");
+  const [puzzleId, setPuzzleId] = useState(entry.codedetektiv_puzzle || "");
   const [deckId, setDeckId] = useState(entry.karten_deck_id || "");
   const [decks, setDecks] = useState([]); // Karten-Decks der gewaehlten Klasse
   // Decks haengen an der Klasse: neu laden, wenn Klasse wechselt und Modul aktiv.
@@ -571,6 +574,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
     quizId && (() => { const q = quizze.find((x) => x.id === Number(quizId)); return q && { to: "/cardvote/questions", label: q.folder ? `${q.folder} / ${q.name}` : q.name, kind: t("kalender.planCardvote") }; })(),
     deckId && (() => { const d = decks.find((x) => x.id === Number(deckId)); return d && { to: `/karten?class=${classId}`, label: d.name, kind: t("kalender.planKarten") }; })(),
     ladderId && (() => { const l = ladders.find((x) => x.id === Number(ladderId)); return l && { to: "/lernpfad", label: l.path ? `${l.path} / ${l.name}` : l.name, kind: t("kalender.planLernleiter") }; })(),
+    puzzleId && (() => { const p = puzzles.find((x) => x.client_id === puzzleId); return { to: `/code-detektiv/puzzle/${puzzleId}?mode=solo`, label: (p && p.title) || puzzleId, kind: t("kalender.planDetektiv") }; })(),
   ].filter(Boolean);
   const zeile = (k, v) => v ? <div style={{ display: "flex", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--border)", fontSize: 13.5 }}><span style={{ color: "var(--text3)", minWidth: 92 }}>{k}</span><span style={{ fontWeight: 500 }}>{v}</span></div> : null;
   return (
@@ -688,6 +692,15 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
             </select>
           </>
         )}
+        {aktiv["code-detektiv"] && (
+          <>
+            <div style={lbl}>{t("kalender.planDetektiv")}</div>
+            <select value={puzzleId} onChange={(e) => setPuzzleId(e.target.value)} style={sfld}>
+              <option value="">– {t("kalender.none")} –</option>
+              {puzzles.map((p) => <option key={p.client_id} value={p.client_id}>{p.title || p.client_id}</option>)}
+            </select>
+          </>
+        )}
         {(() => {
           // Verknüpfte Objekte als klickbare Links (öffnet das Modul). Nur was
           // gewählt und dessen Modul aktiv ist — Name aus den geladenen Listen.
@@ -717,7 +730,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         <div style={lbl}>{t("kalender.notes")}</div>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...fld, resize: "vertical" }} />
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
-          <button onClick={() => onSave({ ...entry, title, notes, class_id: classId ? Number(classId) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null })} style={btnPrimary}>{t("common.save")}</button>
+          <button onClick={() => onSave({ ...entry, title, notes, class_id: classId ? Number(classId) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
           {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
         </div>

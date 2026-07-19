@@ -15,7 +15,7 @@ from sqlalchemy import select, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Question, Topic, User, CardDeck, Exercise, CalendarEntry
+from ..models import Question, Topic, User, CardDeck, Exercise, CalendarEntry, CodePuzzle
 from .auth import get_current_user, rate_limit
 from .modules import is_active
 
@@ -174,6 +174,9 @@ async def topic_usage(topic_id: int, user: User = Depends(get_current_user), db:
     if await on("kalender"):
         rows = (await db.execute(select(CalendarEntry).where(CalendarEntry.owner_id == user.id, CalendarEntry.topic_id == topic_id).order_by(CalendarEntry.date.desc()).limit(50))).scalars().all()
         out["kalender"] = [{"id": e.id, "date": e.date.isoformat() if e.date else None, "title": e.title, "class_id": e.class_id} for e in rows]
+    if await on("code-detektiv"):
+        rows = (await db.execute(select(CodePuzzle).where(CodePuzzle.owner_id == user.id, CodePuzzle.topic_id == topic_id).limit(50))).scalars().all()
+        out["codedetektiv"] = [{"id": p.id, "client_id": p.client_id, "title": p.title} for p in rows]
     return out
 
 

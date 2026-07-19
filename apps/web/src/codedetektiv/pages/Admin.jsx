@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -92,6 +92,12 @@ export default function Admin() {
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [topicId, setTopicId] = useState('');
+  const [topics, setTopics] = useState([]);
+  useEffect(() => {
+    fetch('/api/topics').then(r => (r.ok ? r.json() : [])).then(d => setTopics(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
+  const topicLabel = (tp) => { const p = tp.parent_id ? topics.find(x => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
   const [type, setType] = useState('sort');
   const [difficulty, setDifficulty] = useState(1);
   const [timeLimit, setTimeLimit] = useState(120);
@@ -216,6 +222,7 @@ export default function Admin() {
     const allBlocks = [...solutionBlocks, ...distractorBlocks];
     setEditingPuzzleId(puzzle.id);
     setTitle(puzzle.title);
+    setTopicId(puzzle.topic_id || '');
     setDescription(puzzle.description || '');
     setType(puzzle.type);
     setDifficulty(puzzle.difficulty);
@@ -233,6 +240,7 @@ export default function Admin() {
   function cancelEdit() {
     setEditingPuzzleId(null);
     setTitle('');
+    setTopicId('');
     setDescription('');
     setStacks([]);
   }
@@ -252,6 +260,7 @@ export default function Admin() {
     const puzzle = {
       id: editingPuzzleId || `custom-${Date.now()}`,
       title: title.trim(),
+      topic_id: topicId ? Number(topicId) : null,
       description: description.trim(),
       type,
       difficulty,
@@ -265,6 +274,7 @@ export default function Admin() {
     alert(editingPuzzleId ? 'Rätsel aktualisiert!' : 'Rätsel gespeichert!');
     setEditingPuzzleId(null);
     setTitle('');
+    setTopicId('');
     setDescription('');
     setStacks([]);
   }
@@ -587,6 +597,13 @@ export default function Admin() {
                 <label>Beschreibung / Aufgabe</label>
                 <input value={description} onChange={e => setDescription(e.target.value)} placeholder="Was sollen die SuS tun?" />
               </div>
+            </div>
+            <div className="form-group">
+              <label>Thema (Nuvora) — optional</label>
+              <select value={topicId} onChange={e => setTopicId(e.target.value)}>
+                <option value="">– kein Thema –</option>
+                {topics.map(tp => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
+              </select>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 2fr', gap: 12 }}>
               <div className="form-group">

@@ -69,6 +69,15 @@ export default function ThemaAnsicht() {
         <div style={{ marginTop: 10 }}><Link to="/lernpfad" style={{ color: "var(--accent)", fontSize: 13, textDecoration: "none" }}>{t("thema.openLernpfad")} ↗</Link></div>
       </Section>
 
+      <Section show={a["code-detektiv"]} title={t("thema.codedetektiv")} count={(data.codedetektiv || []).length} empty={t("thema.empty")}>
+        {(data.codedetektiv || []).map((p) => (
+          <div key={p.id} style={row}>
+            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{p.title || p.client_id}</span>
+            <Link to={`/code-detektiv/puzzle/${p.client_id}?mode=solo`} style={{ color: "var(--accent)", textDecoration: "none" }}>↗</Link>
+          </div>
+        ))}
+      </Section>
+
       <Section show={a.kalender} title={t("thema.kalender")} count={(data.kalender || []).length} empty={t("thema.empty")}>
         {(data.kalender || []).map((e) => (
           <div key={e.id} style={row}>
@@ -79,7 +88,7 @@ export default function ThemaAnsicht() {
         ))}
       </Section>
 
-      {!a.cardvote && !a.karten && !a.lernpfad && !a.kalender && (
+      {!a.cardvote && !a.karten && !a.lernpfad && !a.kalender && !a["code-detektiv"] && (
         <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("thema.noModules")}</p>
       )}
     </div>

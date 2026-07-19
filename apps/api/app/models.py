@@ -492,6 +492,8 @@ class CalendarEntry(Base):
     cardvote_set_id: Mapped[Optional[int]] = mapped_column(ForeignKey("question_sets.id", ondelete="SET NULL"), nullable=True, index=True)
     karten_deck_id: Mapped[Optional[int]] = mapped_column(ForeignKey("card_decks.id", ondelete="SET NULL"), nullable=True, index=True)
     lernpfad_ladder_id: Mapped[Optional[int]] = mapped_column(ForeignKey("learning_ladders.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Code-Detektiv-Rätsel per stabiler client_id (kein FK, App-eigener ID-Raum).
+    codedetektiv_puzzle: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

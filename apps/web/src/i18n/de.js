@@ -902,4 +902,6 @@ export default {
   "kalender.noSession": "Zu diesem Quiz gibt es für die Klasse noch keine gelaufene Session.",
   "kalender.wdhTitle": "Wiederholung vorschlagen (schwache Themen der Vorwoche)",
   "kalender.wdhPrefix": "Wiederholung",
+  "kalender.planDetektiv": "Code-Detektiv-Rätsel",
+  "thema.codedetektiv": "Code-Detektiv-Rätsel",
 };

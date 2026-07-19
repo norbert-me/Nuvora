@@ -902,4 +902,6 @@ export default {
   "kalender.noSession": "Aún no hay ninguna sesión de este cuestionario para la clase.",
   "kalender.wdhTitle": "Sugerir repaso (temas flojos de la semana pasada)",
   "kalender.wdhPrefix": "Repaso",
+  "kalender.planDetektiv": "Rompecabezas Code-Detektiv",
+  "thema.codedetektiv": "Rompecabezas Code-Detektiv",
 };

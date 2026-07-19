@@ -55,6 +55,7 @@ class EntryIn(BaseModel):
     cardvote_set_id: Optional[int] = None
     karten_deck_id: Optional[int] = None
     lernpfad_ladder_id: Optional[int] = None
+    codedetektiv_puzzle: Optional[str] = None
 
 
 class EntryOut(EntryIn):

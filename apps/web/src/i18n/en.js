@@ -902,4 +902,6 @@ export default {
   "kalender.noSession": "No session has been run for this quiz and class yet.",
   "kalender.wdhTitle": "Suggest revision (weak topics from last week)",
   "kalender.wdhPrefix": "Revision",
+  "kalender.planDetektiv": "Code-Detektiv puzzle",
+  "thema.codedetektiv": "Code-Detektiv puzzles",
 };
