@@ -378,8 +378,8 @@
 
     // Daten aus dem Nuvora-Kern laden und lokalen Anzeige-Cache ersetzen.
     async function loadUserData() {
-        const [tRes, exRes, clRes] = await Promise.all([
-            api(`${API}/topics`), api(`${LP}/exercises`), api(`${API}/classes`)
+        const [tRes, exRes, clRes, kuRes] = await Promise.all([
+            api(`${API}/topics`), api(`${LP}/exercises`), api(`${API}/classes`), api(`${API}/kurse`)
         ]);
         // Nur ein echtes Auth-Problem (401) fuehrt zum Login. Ist z. B. nur das
         // Lernpfad-Modul nicht aktiv (403 auf /exercises), sollen Themen und
@@ -391,12 +391,25 @@
         topics = tRes.ok ? await tRes.json() : [];
         aufgaben = exRes.ok ? (await exRes.json()).map(vonKern) : [];
         const klassenRaw = clRes.ok ? await clRes.json() : [];
-        klassen = klassenRaw.map(c => c.name);
+        // Lernleitern hängen am KURS, nicht an der Fach-Klasse: Schüler nach Kurs
+        // gruppieren (gleichnamige der Fach-Klassen eines Kurses = eine Person).
+        const kurse = kuRes && kuRes.ok ? await kuRes.json() : [];
+        const classKurs = {};
+        kurse.forEach(k => (k.classes || []).forEach(c => { if (!(c.id in classKurs)) classKurs[c.id] = k.name; }));
+        const kursOf = c => classKurs[c.id] || c.name;
         schueler = [];
-        klassenRaw.forEach(c => (c.students || []).forEach(st => schueler.push({
-            _id: String(st.id), id: st.id, name: st.name, klasse: c.name, class_id: c.id,
-            niveau: st.niveau || '', foerder: st.foerder || [], notizen: st.notizen || ''
-        })));
+        const gesehen = new Set();
+        klassenRaw.forEach(c => (c.students || []).forEach(st => {
+            const kn = kursOf(c);
+            const key = kn + '||' + st.name;
+            if (gesehen.has(key)) return;   // Duplikat aus Geschwister-Fachklasse
+            gesehen.add(key);
+            schueler.push({
+                _id: String(st.id), id: st.id, name: st.name, klasse: kn, class_id: c.id,
+                niveau: st.niveau || '', foerder: st.foerder || [], notizen: st.notizen || ''
+            });
+        }));
+        klassen = [...new Set(klassenRaw.map(kursOf))];
         await checkKartenModul();
         lernpfade = [];
         localStorage.setItem(STORAGE_KEYS.aufgaben, JSON.stringify(aufgaben));
@@ -1413,7 +1426,7 @@
         selT.innerHTML = '<option value="">– Thema wählen –</option>' + themen.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
 
         const selK = document.getElementById('gen-klasse');
-        selK.innerHTML = '<option value="">– Klasse wählen –</option>' + sorted.map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join('');
+        selK.innerHTML = '<option value="">– Kurs wählen –</option>' + sorted.map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join('');
 
         refreshGenUnterthemen();
     }
@@ -1437,7 +1450,7 @@
     document.getElementById('btn-generate').addEventListener('click', () => {
         const thema = document.getElementById('gen-thema').value;
         const klasse = document.getElementById('gen-klasse').value;
-        if (!thema || !klasse) { toast('Thema und Klasse wählen'); return; }
+        if (!thema || !klasse) { toast('Thema und Kurs wählen'); return; }
 
         const themaAufgaben = getGenAufgaben();
         const klasseSchueler = schueler.filter(s => s.klasse === klasse).sort((a, b) => a.name.localeCompare(b.name));
@@ -1868,7 +1881,9 @@
             }
 
             const klassenRaw = await api(`${API}/classes`).then(x => x.ok ? x.json() : []);
-            const classIdVon = name => (klassenRaw.find(c => c.name === name) || {}).id || null;
+            // ll.klasse ist jetzt ein KURS-Name; als Kern-Referenz eine Klasse des
+            // Kurses nehmen (über einen Schüler dieses Kurses).
+            const classIdVon = kurs => (schueler.find(s => s.klasse === kurs) || {}).class_id || null;
 
             let pos = 0;
             for (const ll of (pfad.lernleitern || [])) {
@@ -2862,7 +2877,7 @@
         const pfadSel = document.getElementById('gen-pfad');
         pfadSel.value = pfad._id;
         document.getElementById('gen-thema').disabled = false;
-        toast('Pfad „' + pfad.name + '“ vorausgewählt – Thema und Klasse wählen');
+        toast('Pfad „' + pfad.name + '“ vorausgewählt – Thema und Kurs wählen');
     });
 
     document.getElementById('pfad-cancel-btn').addEventListener('click', () => {
