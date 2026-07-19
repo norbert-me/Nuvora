@@ -64,28 +64,13 @@ Pflicht-Env: `POSTGRES_PASSWORD`, `TOKEN_SECRET` — Compose bricht ohne sie bew
 
 ### Als Nächstes
 
-1. **Wochenplanung** (Entwurf, siehe unten) — Zusatz, kein Fundament.
+Keine offenen Fundament-Aufgaben. Die früher geplante Wochenplanung ist im **Modul Kalender** aufgegangen (Stundenplan + Planung von Quiz/Deck/Lernleiter + freie Tage). Weiteres nur nach Bedarf.
 
-Erledigt: Rahmen mit Modulregister; Klassen, Schüler und Themen im Kern; alle Module auf dem Kern; Datenübernahme aus der alten Lernleiter-Installation; CardVote-Ergebnisse als Note (mit Link zur Auswertung).
+Erledigt: Rahmen mit Modulregister; Klassen, Schüler und Themen im Kern; alle Module auf dem Kern; Datenübernahme aus der alten Lernleiter-Installation; CardVote-Ergebnisse als Note (mit Link zur Auswertung); Kalender mit Stundenplan, Planung und freien Tagen.
 
-### Wochenplanung (geplant, noch nicht gebaut)
+### Wochenplanung (im Modul Kalender umgesetzt)
 
-Der Unterricht des Nutzers läuft in Wochen: 1–3 **Themenblöcke** pro Woche, jeder Block zeigt auf ein Thema aus der Taxonomie; am Ende ein kleiner Test **im Unterricht** über die Themen der Woche.
-
-```
-Woche 12 · Klasse 7.5
-├── Block 1   Bruchrechnung / Vervielfachen
-├── Block 2   Bruchrechnung / Kürzen
-└── Test      CardVote, über beide Themen
-```
-
-Damit wird Ziel 2 konkret: das Testergebnis zeigt pro Thema, wo es klemmt; die Folgewoche zieht daraus Wiederholung.
-
-Randbedingungen aus dem Gespräch mit dem Nutzer:
-
-- **Zusatzfunktion, kein Fundament.** CardVote bleibt ohne Planung und ohne Lernpfad voll nutzbar (Regel 3).
-- **Blöcke pro Woche ist eine Einstellung**, kein fester Wert: bei ihm 2, andere Lehrkräfte haben andere Stundenzahlen.
-- Konkret für **eine Klasse (7.5)** gedacht. Wiederverwendung über Jahre/Klassen ist erwünscht, aber ausdrücklich **später** — jetzt nicht auf Vorrat bauen.
+Die ursprünglich separat gedachte Wochenplanung ist Teil des **Moduls Kalender** geworden: wiederkehrender **Stundenplan** (Wochentag × Stunde, Klasse je Slot, Uhrzeiten), an einen Kalender-Eintrag lässt sich ein **CardVote-Quiz, ein Karten-Deck oder eine Lernleiter** planen (Selektor nur bei aktivem Modul, Regel 3), das verknüpfte Deck wird am Kalendertag automatisch freigeschaltet, und **freie Zeiträume** (Ferien/Feiertage) blenden Stunden und Einträge aus. Bleibt Zusatz, kein Fundament — CardVote/Karten laufen ohne den Kalender voll.
 
 ## Was ist Nuvora
 
@@ -154,6 +139,7 @@ Die Bestandsdaten aus der alten Lernleiter-SQLite sind in den Kern übernommen; 
 - Deutsch für UI, Daten und Kommentare; Code-Bezeichner Englisch.
 - **Kein Alembic.** Es stand als ungenutzte Abhängigkeit in `requirements.txt` und hat genau das suggeriert — inzwischen entfernt. Das Schema entsteht beim Start aus `Base.metadata.create_all` plus `_ensure_columns` in `main.py` (additive Spalten und Indizes, idempotent). Neue Tabellen kommen von selbst; neue Spalten auf bestehenden Tabellen gehören in die `wanted`-Liste in `_ensure_columns`.
 - Schüler sind Daten, keine Nutzer. Jeder Vorschlag, Lernenden ein Konto zu geben, widerspricht dem Produktzweck.
+- **Live-Daten nie durch delete+recreate gefährden.** Entitäten mit Kaskaden (Schüler → Noten, Karten-Fortschritt) werden **gemergt**, nie gelöscht und neu angelegt — sonst reißt die Kaskade fremde Modul-Daten mit. Regressionstest dazu: `apps/api/tests/test_update_class.py` (`cd apps/api && pip install -r requirements-dev.txt && pytest`).
 - **Stile kommen aus `apps/web/src/components/Icons.jsx`** — `btnPrimary`, `btnSecondary`, `btnSmall`, `pageTitle`, `iconBtn`, `COLORS`. Nicht je Seite neu definieren: genau so sind vier Varianten von `btnPrimary` entstanden. Drei Gruppen weichen bewusst ab (Formularseiten, Bestätigungsseiten, Session/Beamer) — das steht an der Definition.
 - **Besonders schützenswerte Daten:** `students.foerder` und `students.notizen` sind DSGVO Art. 9 (Dyskalkulie, LRS, Nachteilsausgleiche). Sie stehen in keinem Export und in keiner Veröffentlichung. Wer ein Feld ergänzt, prüft zuerst jeden Export- und Marktplatzpfad.
 - **Das Förder-Vokabular ist fest und wortgleich** in `classes.py` (`FOERDER_VALUES`) und `Classes.jsx` (`FOERDER`) — inklusive Umlaut in „Hören". Die Bestandsdaten benutzen genau diese Zeichenketten; jede Abweichung macht sie beim Übernehmen unbrauchbar.
