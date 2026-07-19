@@ -660,6 +660,12 @@ function ColMenu({ t, cat, onRename, onDelete, onClose, dividerOn, onToggleDivid
             style={{ ...inp, fontSize: 12, padding: 5 }} />
           <DatePick onPick={setName} title={t("noten.useDate")} />
         </div>
+        {cat.source_session_id && (
+          <Link to={`/cardvote/evaluation/${cat.source_session_id}`} onClick={onClose}
+            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 10, padding: "6px 8px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--accent)", textDecoration: "none", boxSizing: "border-box" }}>
+            <Icon d={ICONS.chart} size={14} color="var(--accent)" />{t("noten.fromCardvote")}
+          </Link>
+        )}
         {onToggleDivider && (
           <button onClick={onToggleDivider} style={{ width: "100%", marginBottom: 10, padding: "6px 8px", fontSize: 12, fontWeight: 600, borderRadius: 8, cursor: "pointer", border: `1px solid ${dividerOn ? "var(--accent)" : "var(--border2)"}`, background: dividerOn ? "var(--accent)" : "transparent", color: dividerOn ? "#fff" : "var(--text2)" }}>
             {dividerOn ? t("noten.dividerOff") : t("noten.dividerOn")}
