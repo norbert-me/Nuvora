@@ -59,6 +59,7 @@ import Help from "./pages/Help.jsx";
 import NuvoraHome from "./pages/NuvoraHome.jsx";
 import Modules from "./pages/Modules.jsx";
 import Topics from "./pages/Topics.jsx";
+import ThemaAnsicht from "./pages/ThemaAnsicht.jsx";
 import LernpfadModule from "./pages/LernpfadModule.jsx";
 import CodeDetektivModule from "./pages/CodeDetektivModule.jsx";
 import Cards from "./pages/Cards.jsx";
@@ -668,6 +669,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path="/modules" element={user ? <Modules /> : <Landing />} />
           <Route path="/classes" element={user ? <Classes /> : <Landing />} />
           <Route path="/topics" element={user ? <Topics /> : <Landing />} />
+          <Route path="/thema/:id" element={user ? <ThemaAnsicht /> : <Landing />} />
           <Route path="/login" element={user ? <NuvoraHome user={user} /> : <Login onLogin={handleLogin} />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />

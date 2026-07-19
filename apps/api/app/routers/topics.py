@@ -15,8 +15,9 @@ from sqlalchemy import select, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Question, Topic, User
+from ..models import Question, Topic, User, CardDeck, Exercise, CalendarEntry
 from .auth import get_current_user, rate_limit
+from .modules import is_active
 
 router = APIRouter(prefix="/api/topics", tags=["topics"])
 
@@ -139,6 +140,41 @@ async def create_topic(
 
 class ReorderIn(BaseModel):
     ids: List[int]
+
+
+@router.get("/{topic_id}/usage")
+async def topic_usage(topic_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Modulübergreifende Themen-Ansicht: was hängt alles an diesem Thema?
+    Nur Abschnitte aktiver Module (Regel 3). Das Thema gehört dem Kern, die
+    Module arbeiten darauf."""
+    topic = await _owned(db, user, topic_id)
+    par = None
+    if topic.parent_id:
+        par = (await db.execute(select(Topic).where(Topic.id == topic.parent_id))).scalar_one_or_none()
+    out = {
+        "id": topic.id,
+        "name": (f"{par.name} / {topic.name}" if par else topic.name),
+        "active": {},
+    }
+
+    async def on(key):
+        active = await is_active(db, user.id, key)
+        out["active"][key] = active
+        return active
+
+    if await on("cardvote"):
+        rows = (await db.execute(select(Question).where(Question.owner_id == user.id, Question.topic_id == topic_id).limit(50))).scalars().all()
+        out["cardvote"] = [{"id": q.id, "text": (q.text or "")[:120]} for q in rows]
+    if await on("karten"):
+        rows = (await db.execute(select(CardDeck).where(CardDeck.owner_id == user.id, CardDeck.topic_id == topic_id).limit(50))).scalars().all()
+        out["karten"] = [{"id": d.id, "name": d.name, "class_id": d.class_id, "released": d.released_at is not None} for d in rows]
+    if await on("lernpfad"):
+        rows = (await db.execute(select(Exercise).where(Exercise.owner_id == user.id, Exercise.topic_id == topic_id).limit(50))).scalars().all()
+        out["lernpfad"] = [{"id": e.id, "code": e.code, "text": (e.aufgabentext or "")[:120], "kategorie": e.kategorie} for e in rows]
+    if await on("kalender"):
+        rows = (await db.execute(select(CalendarEntry).where(CalendarEntry.owner_id == user.id, CalendarEntry.topic_id == topic_id).order_by(CalendarEntry.date.desc()).limit(50))).scalars().all()
+        out["kalender"] = [{"id": e.id, "date": e.date.isoformat() if e.date else None, "title": e.title, "class_id": e.class_id} for e in rows]
+    return out
 
 
 @router.put("/reorder", status_code=204)

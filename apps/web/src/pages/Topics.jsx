@@ -4,6 +4,7 @@
 // Aufgaben abbilden.
 import { useState, useEffect } from "react";
 import { useLanguage } from "../i18n/index.jsx";
+import { Link } from "react-router-dom";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle } from "../components/Icons.jsx";
 import { peek, put } from "../core/cache.js";
 
@@ -172,6 +173,9 @@ export default function Topics() {
               {t("topics.addSub")}
             </button>
           )}
+          <Link to={`/thema/${tp.id}`} className="icon-btn" style={{ ...iconBtn, display: "inline-flex", color: "var(--accent)" }} title={t("thema.view")}>
+            <Icon d={ICONS.chart} size={16} color="var(--accent)" />
+          </Link>
           <button onClick={() => { setEditing(tp.id); setEditName(tp.name); }} className="icon-btn" style={iconBtn} title={t("common.rename")}>
             <Icon d={ICONS.edit} />
           </button>
