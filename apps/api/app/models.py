@@ -556,6 +556,22 @@ class CodeSession(Base):
     round_started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class ZufallDraw(Base):
+    """Modul Zufallsschüler: wann eine Person zuletzt gezogen wurde. Nur das
+    letzte Datum je Schüler (Regel 3: Schüler im Kern). Grundlage für faire
+    Gewichtung (lange nicht dran = höheres Gewicht) und „nicht zweimal am
+    Stück"."""
+    __tablename__ = "zufall_draws"
+    __table_args__ = (UniqueConstraint("owner_id", "student_id", name="uq_zufall_owner_student"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), index=True)
+    count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    drawn_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class SeatingPlan(Base):
     """Modul Sitzplan: ein Rasterlayout je Klasse. `data` haelt Spaltenzahl und
     die Zellenbelegung (Schueler-IDs) als JSON — Schueler bleiben im Kern, hier

@@ -21,6 +21,8 @@ export default function Zufall() {
   const [gewichtet, setGewichtet] = useState(false); // am seltensten dran bevorzugen
   const [gezogen, setGezogen] = useState([]); // IDs schon gezogener Schüler (diese Runde)
   const [counts, setCounts] = useState({});   // wie oft je Schüler gezogen (Klasse)
+  const [lastDrawn, setLastDrawn] = useState({}); // student_id -> letztes Zieh-Datum (ISO), serverseitig
+  const [lastId, setLastId] = useState(null);     // zuletzt gezogen (nicht zweimal am Stück)
   const [absent, setAbsent] = useState(new Set()); // heute abwesende IDs
   const [aktuell, setAktuell] = useState(null);
   const [rollt, setRollt] = useState(false);
@@ -47,18 +49,33 @@ export default function Zufall() {
       .catch(() => {});
   }, [anwesenheitAktiv, skipAbs, classId]);
 
-  // Klassenwechsel/Umschalten: Runde und Zählung zurücksetzen.
-  useEffect(() => { setGezogen([]); setAktuell(null); setCounts({}); }, [classId, ohneWdh]);
+  // Klassenwechsel: Runde zurücksetzen und Zieh-Gedächtnis vom Server laden.
+  useEffect(() => {
+    setGezogen([]); setAktuell(null);
+    if (!classId) { setCounts({}); setLastDrawn({}); setLastId(null); return; }
+    fetch(`/api/zufall/${classId}`).then((r) => (r.ok ? r.json() : null)).then((d) => {
+      if (!d) return;
+      const c = {}, ld = {};
+      Object.entries(d.history || {}).forEach(([sid, v]) => { c[sid] = v.count; ld[sid] = v.drawn_at; });
+      setCounts(c); setLastDrawn(ld); setLastId(d.last_student_id ?? null);
+    }).catch(() => {});
+  }, [classId]);
+  useEffect(() => { setGezogen([]); setAktuell(null); }, [ohneWdh]);
 
   const anwesend = students.filter((s) => !absent.has(s.id));
   const basis = anwesend.length ? anwesend : students; // alle abwesend -> nicht blockieren
   const pool = ohneWdh ? basis.filter((s) => !gezogen.includes(s.id)) : basis;
 
-  // Gewichtete Auswahl: seltener Gezogene bekommen mehr Gewicht.
+  // Tage seit letztem Ziehen (nie gezogen = groß, damit sofort bevorzugt).
+  const tageSeit = (id) => {
+    const iso = lastDrawn[id];
+    if (!iso) return 3650;
+    return Math.max(0, (Date.now() - new Date(iso).getTime()) / 86400000);
+  };
+  // Gewichtete Auswahl nach Zeit: wer lange nicht dran war, hat mehr Gewicht.
   const waehle = (list) => {
     if (!gewichtet) return list[Math.floor(Math.random() * list.length)];
-    const max = Math.max(0, ...list.map((s) => counts[s.id] || 0));
-    const w = list.map((s) => (max - (counts[s.id] || 0)) + 1); // je seltener, desto größer
+    const w = list.map((s) => 1 + tageSeit(s.id)); // Tage + 1, damit heute Gezogene nicht 0
     let r = Math.random() * w.reduce((a, b) => a + b, 0);
     for (let i = 0; i < list.length; i++) { r -= w[i]; if (r <= 0) return list[i]; }
     return list[list.length - 1];
@@ -67,8 +84,13 @@ export default function Zufall() {
   const ziehen = () => {
     if (!basis.length || rollt) return;
     const leer = ohneWdh && !pool.length;
-    const kandidaten = leer ? basis : pool;
+    let kandidaten = leer ? basis : pool;
     if (leer) setGezogen([]);
+    // Nicht zweimal am Stück dieselbe Person (außer es bliebe niemand übrig).
+    if (lastId != null && kandidaten.length > 1) {
+      const ohneLetzte = kandidaten.filter((s) => s.id !== lastId);
+      if (ohneLetzte.length) kandidaten = ohneLetzte;
+    }
     setRollt(true);
     let ticks = 0;
     const iv = setInterval(() => {
@@ -79,11 +101,17 @@ export default function Zufall() {
         setAktuell(pick);
         if (ohneWdh) setGezogen((g) => [...g, pick.id]);
         setCounts((c) => ({ ...c, [pick.id]: (c[pick.id] || 0) + 1 }));
+        setLastDrawn((ld) => ({ ...ld, [pick.id]: new Date().toISOString() }));
+        setLastId(pick.id);
         setRollt(false);
+        // Serverseitig merken (fair über Stunden/Tage hinweg).
+        fetch(`/api/zufall/${classId}/draw`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ student_id: pick.id }) }).catch(() => {});
       }
     }, 55);
   };
 
+  // Nur die aktuelle Runde („ohne Wiederholung") zurücksetzen — das Zieh-
+  // Gedächtnis für die Fairness bleibt bewusst erhalten.
   const reset = () => { setGezogen([]); setAktuell(null); };
 
   return (

@@ -907,7 +907,7 @@ export default {
   "tut.loslegen.2": "Help is context-sensitive from the menu; the marketplace shares quizzes, cards and lesson starters.",
   "tut.loslegen.3": "You can find this tour again any time via Help.",
   "sitzplan.rollcall": "Roll call (grey absent)",
-  "zufall.weighted": "Least picked first",
+  "zufall.weighted": "Longest not picked",
   "zufall.skipAbsent": "Skip absent",
   "zufall.absentSkipped": "{{n}} absent – skipped.",
   "anwesenheit.wholeDay": "Whole day",

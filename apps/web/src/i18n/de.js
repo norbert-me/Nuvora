@@ -907,7 +907,7 @@ export default {
   "tut.loslegen.2": "Hilfe gibt es kontextsensitiv über das Menü; der Marktplatz teilt Quizze, Karten und Einstiege.",
   "tut.loslegen.3": "Diese Tour findest du jederzeit über die Hilfe wieder.",
   "sitzplan.rollcall": "Aufruf (Abwesende grau)",
-  "zufall.weighted": "Am seltensten dran",
+  "zufall.weighted": "Am längsten nicht dran",
   "zufall.skipAbsent": "Abwesende überspringen",
   "zufall.absentSkipped": "{{n}} abwesend – werden übersprungen.",
   "anwesenheit.wholeDay": "Ganzer Tag",
