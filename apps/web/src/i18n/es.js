@@ -698,6 +698,8 @@ export default {
   "analyse.verdictOk": "Todos los temas evaluados alcanzan al menos el 60 % — una base sólida.",
   "analyse.toLernpfad": "Ir a ejercicios",
   "karten.title": "Tarjetas",
+  "karten.srTitle": "¿Qué es la repetición espaciada?",
+  "karten.srInfo": "Tras cada tarjeta el alumno valora cómo la sabía. Las bien sabidas vuelven tras intervalos cada vez más largos (días, luego semanas); las flojas, pronto. Así se repasa lo que aún falla, más eficiente que repetir sin más. Nuvora usa el algoritmo SM-2 (como Anki).",
   "kalender.title": "Calendario",
   "kalender.month": "Mes",
   "kalender.week": "Semana",

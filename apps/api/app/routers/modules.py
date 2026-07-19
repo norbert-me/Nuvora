@@ -90,7 +90,7 @@ REGISTRY: List[ModuleDef] = [
     ModuleDef(
         key="karten",
         group="unterricht",
-        name="Karten",
+        name="Karteikarten",
         description=(
             "Karteikarten mit Spaced Repetition. Die Lernenden üben ohne Konto "
             "per QR-Code; ihren Fortschritt siehst du im Modul."

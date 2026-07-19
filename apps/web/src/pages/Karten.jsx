@@ -103,6 +103,10 @@ export default function Karten() {
 
       {view === "cards" && (
         <>
+          <details style={{ marginBottom: 16, border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg3)", padding: "10px 14px" }}>
+            <summary style={{ cursor: "pointer", fontSize: 13.5, fontWeight: 600, color: "var(--text2)" }}>{t("karten.srTitle")}</summary>
+            <p style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.6, margin: "8px 0 0" }}>{t("karten.srInfo")}</p>
+          </details>
           <form onSubmit={async (e) => { e.preventDefault(); if (addingDeck || !newDeck.trim()) return; setAddingDeck(true); try { if (await call(() => fetch(`${API}/classes/${classId}/decks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newDeck.trim() }) }))) setNewDeck(""); } finally { setAddingDeck(false); } }}
             style={{ display: "flex", gap: 8, marginBottom: 18 }}>
             <input value={newDeck} onChange={(e) => setNewDeck(e.target.value)} placeholder={t("karten.newDeck")}

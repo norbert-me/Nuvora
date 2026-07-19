@@ -698,6 +698,8 @@ export default {
   "analyse.verdictOk": "All evaluated topics are at least 60 % — a solid basis.",
   "analyse.toLernpfad": "Go to exercises",
   "karten.title": "Cards",
+  "karten.srTitle": "What is spaced repetition?",
+  "karten.srInfo": "After each card learners rate how well they knew it. Well-known cards return after ever longer intervals (days, then weeks), weak ones come back soon. This focuses review on what is still shaky — proven more efficient than plain repetition. Nuvora uses the SM-2 algorithm (like Anki).",
   "kalender.title": "Calendar",
   "kalender.month": "Month",
   "kalender.week": "Week",
