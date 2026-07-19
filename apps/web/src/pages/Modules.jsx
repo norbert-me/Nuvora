@@ -74,8 +74,14 @@ export default function Modules() {
         </button>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {sorted.map((m) => (
+      {[["unterricht", t("modules.groupUnterricht")], ["organisation", t("modules.groupOrganisation")], ["werkzeug", t("modules.groupWerkzeug")]].map(([g, label]) => {
+        const mods = sorted.filter((m) => (m.group || "werkzeug") === g);
+        if (!mods.length) return null;
+        return (
+        <div key={g} style={{ marginBottom: 26 }}>
+          <h2 style={{ fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", color: "var(--text3)", margin: "0 0 10px" }}>{label}</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {mods.map((m) => (
           <div
             key={m.key}
             style={{
@@ -119,7 +125,10 @@ export default function Modules() {
             </button>
           </div>
         ))}
-      </div>
+          </div>
+        </div>
+        );
+      })}
     </div>
   );
 }

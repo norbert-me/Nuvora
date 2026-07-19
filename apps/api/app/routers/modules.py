@@ -36,11 +36,14 @@ class ModuleDef(BaseModel):
     # Reifegrad: "beta" = laeuft, aber in Entwicklung; "alpha" = frueh, Daten
     # koennen verloren gehen. Die Shell zeigt das als Badge.
     stage: str = "alpha"
+    # Gruppe für die Modulübersicht: "unterricht" | "organisation" | "werkzeug".
+    group: str = "werkzeug"
 
 
 REGISTRY: List[ModuleDef] = [
     ModuleDef(
         key="cardvote",
+        group="unterricht",
         name="CardVote",
         description=(
             "Abstimmen im Unterricht ohne Geraete: Lernende halten bedruckte "
@@ -52,6 +55,7 @@ REGISTRY: List[ModuleDef] = [
     ),
     ModuleDef(
         key="lernpfad",
+        group="unterricht",
         name="Lernpfad",
         description=(
             "Aufgaben und Lernpfade verwalten — mit denselben Themen und "
@@ -63,6 +67,7 @@ REGISTRY: List[ModuleDef] = [
     ),
     ModuleDef(
         key="noten",
+        group="werkzeug",
         name="Noten",
         description=(
             "Leistungsbewertung: eigene Kategorien mit Gewichten, Noten und "
@@ -74,6 +79,7 @@ REGISTRY: List[ModuleDef] = [
     ),
     ModuleDef(
         key="code-detektiv",
+        group="werkzeug",
         name="Code-Detektiv",
         description=(
             "Programmier-Rätsel für den Informatikunterricht: Code-Bausteine "
@@ -83,6 +89,7 @@ REGISTRY: List[ModuleDef] = [
     ),
     ModuleDef(
         key="karten",
+        group="unterricht",
         name="Karten",
         description=(
             "Karteikarten mit Spaced Repetition. Die Lernenden üben ohne Konto "
@@ -93,6 +100,7 @@ REGISTRY: List[ModuleDef] = [
     ),
     ModuleDef(
         key="kalender",
+        group="organisation",
         name="Kalender",
         description=(
             "Unterrichtsplanung im Kalender: Tag-, Wochen- und Monatsansicht. "
@@ -102,6 +110,7 @@ REGISTRY: List[ModuleDef] = [
     ),
     ModuleDef(
         key="ausleihe",
+        group="organisation",
         name="Material-Ausleihe",
         description=(
             "Gegenstaende verleihen und den Rueckgabe-Stand im Blick behalten — "
@@ -111,6 +120,7 @@ REGISTRY: List[ModuleDef] = [
     ),
     ModuleDef(
         key="orga",
+        group="organisation",
         name="Orga & Anwesenheit",
         description=(
             "Zwei Werkzeuge je Klasse: Sammel-Checklisten (z.B. „Unterschrift der "
@@ -121,6 +131,7 @@ REGISTRY: List[ModuleDef] = [
     ),
     ModuleDef(
         key="sitzplan",
+        group="organisation",
         name="Sitzplan",
         description=(
             "Sitzordnung je Klasse: Schueler per Drag & Drop auf ein Raster "
@@ -130,6 +141,7 @@ REGISTRY: List[ModuleDef] = [
     ),
     ModuleDef(
         key="zufall",
+        group="werkzeug",
         name="Zufallsschüler",
         description=(
             "Zieht per Knopfdruck eine zufaellige Person aus einer Klasse — "
@@ -139,6 +151,7 @@ REGISTRY: List[ModuleDef] = [
     ),
     ModuleDef(
         key="methoden",
+        group="unterricht",
         name="Einstiege",
         description=(
             "Sammlung von Ideen fuer den Unterrichtseinstieg — Idee, Ablauf mit "
