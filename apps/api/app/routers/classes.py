@@ -137,7 +137,21 @@ async def list_classes(user: User = Depends(get_current_user), db: AsyncSession 
         select(SchoolClass)
         .options(selectinload(SchoolClass.students))
         .where((SchoolClass.owner_id == user.id) | (SchoolClass.owner_id.is_(None)))
+        .where(SchoolClass.deleted_at.is_(None))  # Papierkorb-Klassen ausblenden
         .order_by(SchoolClass.name)
+    )
+    return result.scalars().all()
+
+
+@router.get("/trash", response_model=List[ClassOut])
+async def list_trash(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Gelöschte Klassen im Papierkorb (noch wiederherstellbar). Muss vor der
+    /{class_id}-Route stehen, sonst schluckt der int-Parser 'trash'."""
+    result = await db.execute(
+        select(SchoolClass)
+        .options(selectinload(SchoolClass.students))
+        .where(SchoolClass.owner_id == user.id, SchoolClass.deleted_at.is_not(None))
+        .order_by(SchoolClass.deleted_at.desc())
     )
     return result.scalars().all()
 
@@ -216,11 +230,36 @@ async def set_class_color(class_id: int, body: ColorIn, user: User = Depends(get
 
 @router.delete("/{class_id}", status_code=204)
 async def delete_class(class_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Soft-Delete: in den Papierkorb, 30 Tage wiederherstellbar. Die Kaskade
+    (Schüler → Noten/Karten/…) bleibt in dieser Zeit erhalten."""
     sc = await db.get(SchoolClass, class_id)
     if not sc:
         raise HTTPException(404)
     if sc.owner_id and sc.owner_id != user.id:
         raise HTTPException(403, "Keine Berechtigung")
+    from datetime import datetime, timezone
+    sc.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
+
+
+@router.post("/{class_id}/restore", response_model=ClassOut)
+async def restore_class(class_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    sc = await _load_class(db, class_id)
+    if not sc or (sc.owner_id and sc.owner_id != user.id):
+        raise HTTPException(404)
+    sc.deleted_at = None
+    await db.commit()
+    return sc
+
+
+@router.delete("/{class_id}/purge", status_code=204)
+async def purge_class(class_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Endgültig löschen (aus dem Papierkorb). Erst hier greift die Kaskade."""
+    sc = await db.get(SchoolClass, class_id)
+    if not sc or (sc.owner_id and sc.owner_id != user.id):
+        raise HTTPException(404)
+    if sc.deleted_at is None:
+        raise HTTPException(400, "Klasse ist nicht im Papierkorb")
     await db.delete(sc)
     await db.commit()
 

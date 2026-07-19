@@ -151,6 +151,9 @@ class SchoolClass(Base):
     color: Mapped[str] = mapped_column(String(9), default="", server_default="")
     # Einzigartiger Token fuer den Karten-Zugang (unratbar). Wird bei Bedarf gesetzt.
     karten_token: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, unique=True, index=True)
+    # Papierkorb: gesetzt = gelöscht, aber 30 Tage wiederherstellbar. Die Kaskade
+    # (Schüler → Noten/Karten/…) bleibt in dieser Zeit unangetastet.
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     students: Mapped[list["Student"]] = relationship(back_populates="school_class", order_by="Student.card_id", cascade="all, delete-orphan")
     owner: Mapped[Optional["User"]] = relationship(back_populates="classes")

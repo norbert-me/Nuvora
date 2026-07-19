@@ -54,6 +54,16 @@ export default function Classes() {
   const [color, setColor] = useState("#2563eb");
   const [students, setStudents] = useState([]);
   const [detailsFor, setDetailsFor] = useState(null);
+  const [trash, setTrash] = useState([]);
+  const [showTrash, setShowTrash] = useState(false);
+
+  const loadTrash = () => fetch(`${API}/classes/trash`).then((r) => (r.ok ? r.json() : [])).then((d) => setTrash(Array.isArray(d) ? d : [])).catch(() => {});
+  const restore = async (id) => { await fetch(`${API}/classes/${id}/restore`, { method: "POST" }).catch(() => {}); load(); loadTrash(); };
+  const purge = async (id) => {
+    if (!await askConfirm(t("classes.purgeConfirm"))) return;
+    await fetch(`${API}/classes/${id}/purge`, { method: "DELETE" }).catch(() => {});
+    loadTrash();
+  };
 
   const [loadError, setLoadError] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -67,6 +77,7 @@ export default function Classes() {
     const c = peek("classes"); if (Array.isArray(c)) { setClasses(c); setLoaded(true); }
     const timer = setTimeout(() => { if (classes.length === 0) setLoadError(true); }, 15000);
     load().then(() => clearTimeout(timer));
+    loadTrash();
     return () => clearTimeout(timer);
   }, []);
 
@@ -126,6 +137,7 @@ export default function Classes() {
     if (!await askConfirm(t("classes.deleteConfirm"))) return;
     await fetch(`${API}/classes/${id}`, { method: "DELETE" });
     load();
+    loadTrash();
   };
 
   const importJson = async () => {
@@ -349,7 +361,27 @@ export default function Classes() {
             ]}
           />
         </div>
+        {trash.length > 0 && (
+          <button onClick={() => setShowTrash((v) => !v)} style={{ ...btnSecondary, marginLeft: "auto" }}>
+            {t("classes.trash")} ({trash.length})
+          </button>
+        )}
       </div>
+
+      {showTrash && trash.length > 0 && (
+        <div style={{ border: "1px solid var(--border)", borderRadius: 14, padding: 14, marginBottom: 18, background: "var(--bg3)" }}>
+          <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 10px" }}>{t("classes.trashHint")}</p>
+          {trash.map((cls) => (
+            <div key={cls.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: "1px solid var(--border)" }}>
+              <span style={{ flex: 1, fontWeight: 500 }}>{cls.name}
+                <span style={{ fontSize: 12, color: "var(--text3)", marginLeft: 8 }}>{t("classes.trashCount", { n: cls.students?.length || 0 })}</span>
+              </span>
+              <button onClick={() => restore(cls.id)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>{t("classes.restore")}</button>
+              <button onClick={() => purge(cls.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("classes.purge")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {!loaded && !loadError && <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("common.loading")}</p>}
       {loaded && !loadError && classes.length === 0 && <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("classes.empty")}</p>}

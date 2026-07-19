@@ -172,6 +172,7 @@ def _ensure_columns(sync_conn):
         ("school_classes", "plan_blocks", "INTEGER DEFAULT 2 NOT NULL"),
         ("school_classes", "karten_token", "VARCHAR(64)"),
         ("school_classes", "color", "VARCHAR(9) DEFAULT '' NOT NULL"),
+        ("school_classes", "deleted_at", "TIMESTAMPTZ"),
         ("students", "karten_token", "VARCHAR(64)"),
         ("card_decks", "released_at", "TIMESTAMPTZ"),
         ("card_decks", "topic_id", "INTEGER"),
@@ -316,6 +317,16 @@ async def startup():
             ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
         """))
         await db.execute(text("DELETE FROM user_modules WHERE module_key = 'anwesenheit'"))
+        await db.commit()
+
+    # Papierkorb leeren: Klassen, die länger als 30 Tage gelöscht sind, endgültig
+    # entfernen (jetzt greift die Kaskade auf Noten/Karten/…). Läuft bei jedem Start.
+    async with async_session() as db:
+        res = await db.execute(text(
+            "DELETE FROM school_classes WHERE deleted_at IS NOT NULL AND deleted_at < now() - interval '30 days'"
+        ))
+        if res.rowcount:
+            print(f"[STARTUP] Papierkorb: {res.rowcount} Klasse(n) endgültig gelöscht (>30 Tage).", flush=True)
         await db.commit()
 
     # Noten: Kategorien ohne Abschnitt an einen Standard-Abschnitt haengen
