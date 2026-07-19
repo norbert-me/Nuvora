@@ -1,61 +1,87 @@
-// Modul Lernpfad im Rahmen.
+// Modul Lernpfad — nativ in die Shell gemountet (kein iframe mehr).
 //
-// Die erprobte App laeuft eingebettet unter Nuvoras Navbar; ihre eigene Navbar
-// ist ausgeblendet, die Tabs steuert Nuvora ueber ?tab= und postMessage.
-//
-// Gleiche Origin: die App liest Nuvoras Token aus demselben localStorage und
-// spricht dieselbe API. Kein zweiter Login.
+// Die erprobte Vanilla-JS-App (apps/lernpfad) wird unveraendert wiederverwendet:
+// ihr HTML wird in einen Host (#lp-app) injiziert, ihr CSS unter #lp-app
+// gescopet (style.scoped.css), dann laeuft ihre app.js im selben Fenster.
+// Kommunikation weiter per window.postMessage (gleiches window, kein iframe):
+// Theme/Tab rein, Modal/Toast/Tab raus — auf Nuvora-Ebene gerendert.
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-const APP_URL = "/lernpfad-app/";
+const BASE = "/lernpfad-app/";
+const ORIGIN = window.location.origin;
+
+// Ein Asset (CSS/JS) einmalig ins <head> laden.
+function ensureAsset(kind, href) {
+  return new Promise((resolve) => {
+    if (document.querySelector(`[data-lp-asset="${href}"]`)) return resolve();
+    const el = kind === "css" ? document.createElement("link") : document.createElement("script");
+    el.dataset.lpAsset = href;
+    if (kind === "css") { el.rel = "stylesheet"; el.href = href; }
+    else { el.src = href; el.defer = false; }
+    el.onload = () => resolve();
+    el.onerror = () => resolve();
+    document.head.appendChild(el);
+  });
+}
 
 export default function LernpfadModule() {
-  const ref = useRef(null);
-  // Modal auf Nuvora-Ebene: die eingebettete App schickt Detail-HTML, wir
-  // rendern es zentriert ueber der ganzen Seite (nicht im hohen iframe).
-  const [modal, setModal] = useState(null); // { title, html } | null
-  const [toast, setToast] = useState(""); // Toast-Meldung der App
+  const hostRef = useRef(null);
+  const [modal, setModal] = useState(null); // { title, html }
+  const [toast, setToast] = useState("");
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") || "aufgaben";
-  // Aktuellen Tab in einem Ref halten, damit onLoad/onMessage-Handler nicht
-  // eine veraltete Kopie senden (Stale-Closure).
-  const tabRef = useRef(tab);
-  tabRef.current = tab;
+  const tabRef = useRef(tab); tabRef.current = tab;
 
-  const post = (msg) => ref.current?.contentWindow?.postMessage(msg, window.location.origin);
+  const post = (msg) => window.postMessage(msg, ORIGIN);
   const sendeTheme = () => post({ type: "nuvora:theme", dark: document.documentElement.classList.contains("dark") });
   const sendeTab = () => post({ type: "nuvora:lernpfad-tab", tab: tabRef.current });
-  const sendeAlles = () => { sendeTheme(); sendeTab(); };
 
+  // App mounten: HTML injizieren, Assets laden, app.js ausfuehren.
   useEffect(() => {
+    let abgebrochen = false;
+    window.__nuvoraInPage = true;
+    (async () => {
+      const host = hostRef.current;
+      if (!host) return;
+      // Markup der App holen und (ohne ihre <script>/<link>) einsetzen.
+      const html = await fetch(BASE + "index.html").then((r) => r.text()).catch(() => "");
+      if (abgebrochen || !html) return;
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      doc.querySelectorAll("script, link, style").forEach((n) => n.remove());
+      host.innerHTML = doc.body.innerHTML;
+      await ensureAsset("css", BASE + "css/style.scoped.css");
+      await ensureAsset("css", BASE + "vendor/katex/katex.min.css");
+      await ensureAsset("js", BASE + "vendor/katex/katex.min.js");
+      await ensureAsset("js", BASE + "js/jspdf.umd.min.js");
+      if (abgebrochen) return;
+      // app.js jedes Mal frisch ausfuehren (IIFE, isoliert) und an die neu
+      // eingesetzten Knoten binden.
+      const s = document.createElement("script");
+      s.src = BASE + "js/app.js?inpage=" + Date.now();
+      s.dataset.lpApp = "1";
+      document.body.appendChild(s);
+    })();
+
     const onMessage = (e) => {
-      if (e.origin !== window.location.origin) return;
-      if (e.data?.type === "lernpfad:height" && typeof e.data.height === "number") {
-        ref.current.style.height = Math.max(400, Math.min(e.data.height, 20000)) + "px";
-      }
-      // Die App meldet, dass sie bereit ist — dann Thema und Tab (erneut) setzen.
-      if (e.data?.type === "lernpfad:ready") sendeAlles();
-      // Interner Tab-Wechsel der App (z. B. nach "+ Lernleiter") → Nuvora-Menue
-      // mitziehen: ?tab aktualisieren, damit die Navbar-Markierung stimmt.
-      if (e.data?.type === "lernpfad:tab" && e.data.tab && e.data.tab !== tabRef.current) {
-        setParams({ tab: e.data.tab }, { replace: true });
-      }
-      // Detail-Modal der App: ueber der ganzen Nuvora-Seite rendern.
-      if (e.data?.type === "lernpfad:modal" && typeof e.data.html === "string") {
-        setModal({ title: e.data.title || "", html: e.data.html });
-      }
-      // Toast der App im echten Sichtfenster zeigen (nicht am iframe-Rand).
-      if (e.data?.type === "lernpfad:toast" && e.data.msg) {
-        setToast(String(e.data.msg));
-        clearTimeout(window.__lpToast);
-        window.__lpToast = setTimeout(() => setToast(""), 2500);
-      }
+      if (e.origin !== ORIGIN) return;
+      const d = e.data || {};
+      if (d.type === "lernpfad:ready") { sendeTheme(); sendeTab(); }
+      if (d.type === "lernpfad:tab" && d.tab && d.tab !== tabRef.current) setParams({ tab: d.tab }, { replace: true });
+      if (d.type === "lernpfad:modal" && typeof d.html === "string") setModal({ title: d.title || "", html: d.html });
+      if (d.type === "lernpfad:toast" && d.msg) { setToast(String(d.msg)); clearTimeout(window.__lpToast); window.__lpToast = setTimeout(() => setToast(""), 2500); }
     };
     window.addEventListener("message", onMessage);
     const obs = new MutationObserver(sendeTheme);
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-    return () => { window.removeEventListener("message", onMessage); obs.disconnect(); };
+
+    return () => {
+      abgebrochen = true;
+      window.removeEventListener("message", onMessage);
+      obs.disconnect();
+      document.querySelectorAll('[data-lp-app="1"]').forEach((n) => n.remove());
+      if (hostRef.current) hostRef.current.innerHTML = "";
+    };
   }, []);
 
   // Tab-Wechsel aus Nuvoras Navbar an die App geben.
@@ -77,13 +103,7 @@ export default function LernpfadModule() {
       {toast && (
         <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 400, background: "#1e293b", color: "#fff", padding: "10px 18px", borderRadius: 8, fontSize: 14, boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }}>{toast}</div>
       )}
-      <iframe
-      ref={ref}
-      src={APP_URL}
-      title="Lernpfad"
-      onLoad={sendeAlles}  // sicher senden, sobald die App geladen ist
-      style={{ width: "100%", height: 800, border: "none", display: "block" }}
-    />
+      <div id="lp-app" ref={hostRef} />
     </>
   );
 }

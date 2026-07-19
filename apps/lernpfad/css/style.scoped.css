@@ -1,0 +1,1137 @@
+#lp-app *, #lp-app *::before, #lp-app *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* App ist hell gestaltet. Ohne diese Angabe rendert Safari native Popups
+   (datalist-Vorschläge) im OS-Dark-Mode: heller Kasten, weißer Text = unlesbar. */
+#lp-app { color-scheme: light; }
+
+#lp-app {
+    --bg: #f6f7f9;
+    --surface: #fff;
+    --border: #e5e7eb;
+    --text: #1a1a1a;
+    --text-muted: #6b7280;
+    /* APIForge-Stil: warmes Orange als Akzent */
+    --primary: #e8591f;
+    --primary-hover: #cf4a14;
+    --primary-soft: #fdece3;
+    --danger: #dc2626;
+    --danger-hover: #b91c1c;
+    --success: #16a34a;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06);
+    /* Einheitliche Control-Metrik: alle Inputs/Selects/Buttons gleiche Höhe */
+    --control-pad-y: 0.5rem;
+    --control-pad-x: 0.7rem;
+    --control-font: 0.9rem;
+    --control-line: 1.4;
+}
+
+#lp-app {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding: 0 1rem 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Navbar (CardVote-Stil) */
+#lp-app .navbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin: 0.75rem 0 0.5rem;
+}
+#lp-app .nav-inner {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.6rem 1rem;
+    flex-wrap: wrap;
+}
+#lp-app .nav-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-weight: 700;
+    font-size: 1.15rem;
+    color: var(--primary);
+    margin-right: auto;
+}
+#lp-app .nav-logo {
+    width: 1.6rem; height: 1.6rem;
+    border-radius: 6px;
+    background: linear-gradient(135deg, var(--primary), #f59e0b);
+    flex: 0 0 auto;
+}
+#lp-app .nav-links { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+#lp-app .nav-link {
+    padding: 0.45rem 0.9rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-family: inherit;
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    transition: background 0.15s, color 0.15s;
+}
+#lp-app .nav-link:hover { background: var(--bg); color: var(--text); }
+#lp-app .nav-link.active { background: var(--primary); color: #fff; font-weight: 600; }
+#lp-app a.nav-link { text-decoration: none; }
+
+/* Legal-Karte füllt die Breite wie Navbar/Footer (vorher 720px links = schief).
+   Text bleibt über readable-Breite lesbar. */
+#lp-app .legal-page { width: 100%; }
+#lp-app .legal-page > * { max-width: 760px; }
+#lp-app .legal-page h3 { margin: 1.1rem 0 0.35rem; font-size: 1.05rem; }
+#lp-app .legal-page p { margin-bottom: 0.6rem; }
+#lp-app .legal-page .form-group { margin-bottom: 0.85rem; max-width: 480px; }
+
+#lp-app .nav-toggle { display: none; }
+
+#lp-app .page-intro { text-align: center; margin-bottom: 0.75rem; }
+#lp-app .subtitle { color: var(--text-muted); font-size: 0.95rem; }
+
+#lp-app .tab-content { display: none; }
+#lp-app .tab-content.active { display: block; }
+
+/* Mobile: Navlinks einklappen */
+@media (max-width: 680px) {
+    #lp-app .nav-brand { margin-right: auto; }
+    #lp-app .nav-toggle {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 2.2rem; height: 2.2rem;
+        border: 1px solid var(--border); border-radius: var(--radius-sm);
+        background: var(--surface); cursor: pointer;
+        position: relative;
+    }
+    #lp-app .nav-toggle::before {
+        content: ""; width: 1rem; height: 2px; background: var(--text);
+        box-shadow: 0 -5px 0 var(--text), 0 5px 0 var(--text);
+    }
+    #lp-app .nav-links {
+        flex-basis: 100%;
+        flex-direction: column;
+        gap: 0.15rem;
+        display: none;
+        padding-top: 0.5rem;
+    }
+    #lp-app .nav-links.open { display: flex; }
+    #lp-app .nav-link { text-align: left; }
+}
+
+/* Panel */
+#lp-app .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    box-shadow: var(--shadow);
+}
+#lp-app .panel h2 { font-size: 1.15rem; margin-bottom: 0.75rem; }
+
+/* Forms */
+/* Formular in nummerierte Schritte gegliedert, damit nicht alle Felder auf
+   einmal erschlagen. Jeder Schritt ein abgesetzter Block. */
+#lp-app .form-step {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1rem 1.1rem 0.4rem;
+    margin-bottom: 1rem;
+    background: var(--bg);
+}
+#lp-app .form-step-title {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.85rem;
+}
+/* .hint bringt margin-bottom mit - im zentrierten Flex-Titel schiebt das den
+   Text nach oben. Hier neutralisieren. */
+#lp-app .form-step-title .hint { margin: 0; font-weight: 400; }
+#lp-app .form-step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    font-size: 0.8rem;
+    flex: 0 0 auto;
+}
+#lp-app .form-row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: flex-end;
+}
+/* Aufgabentyp-Zeile: linke Spalte ist durch den "nach Bruder"-Aufklapper
+   hoeher. flex-end wuerde Unteraufgaben nach unten druecken - oben ausrichten. */
+#lp-app #aufgabentyp-row .form-row { align-items: flex-start; }
+
+/* Eigenes Autocomplete (ersetzt unstylebare native datalist) */
+#lp-app .ac-wrap { position: relative; }
+#lp-app .ac-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    max-height: 220px;
+    overflow-y: auto;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    margin-top: 2px;
+}
+#lp-app .ac-item {
+    padding: 0.45rem 0.7rem;
+    cursor: pointer;
+    font-size: var(--control-font);
+}
+#lp-app .ac-item:hover, #lp-app .ac-item.active {
+    background: var(--primary);
+    color: #fff;
+}
+#lp-app .form-row > .btn {
+    align-self: flex-end;
+    height: fit-content;
+    /* gleiche Margin wie .form-group, damit Button auf Input-Höhe sitzt */
+    margin-bottom: 0.75rem;
+}
+#lp-app .form-group {
+    flex: 1;
+    min-width: 200px;
+    margin-bottom: 0.75rem;
+}
+#lp-app .form-group label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+    color: var(--text-muted);
+}
+
+#lp-app input[type="text"], #lp-app input[type="number"], #lp-app input[type="file"], #lp-app textarea, #lp-app select {
+    width: 100%;
+    padding: var(--control-pad-y) var(--control-pad-x);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: var(--control-font);
+    line-height: var(--control-line);
+    font-family: inherit;
+    background-color: var(--surface);
+    color: var(--text);
+    transition: border-color 0.2s;
+}
+/* Einheitlicher Custom-Pfeil statt nativem Doppel-Chevron */
+#lp-app select {
+    cursor: pointer;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    padding-right: 2rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+}
+#lp-app input[type="file"] { padding: 0.35rem var(--control-pad-x); cursor: pointer; }
+#lp-app textarea { line-height: 1.5; resize: vertical; }
+#lp-app select option {
+    background-color: #fff;
+    color: #222;
+    padding: 0.3rem;
+}
+#lp-app input:focus, #lp-app textarea:focus, #lp-app select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(37,99,235,0.15);
+}
+
+#lp-app .checkbox-group, #lp-app .radio-group {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+#lp-app .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    user-select: none;
+}
+#lp-app .chip:hover { border-color: var(--primary); }
+#lp-app .chip input { margin: 0; }
+#lp-app .chip input[type="radio"] { accent-color: var(--primary); }
+#lp-app .chip-delete {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    color: var(--danger);
+    padding: 0 0.2rem;
+    line-height: 1;
+}
+#lp-app .chip-delete:hover { color: var(--danger-hover); }
+#lp-app .klasse-chip { background: #eef2ff; border-color: #c7d2fe; }
+#lp-app .auto-id { background: var(--bg); color: var(--text-muted); }
+
+#lp-app .form-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+/* Buttons — gleiche Höhe wie Inputs (gleiche pad-y, line-height, border) */
+#lp-app .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: var(--control-pad-y) 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    font-size: var(--control-font);
+    line-height: var(--control-line);
+    font-family: inherit;
+    white-space: nowrap;
+    transition: background 0.2s, border-color 0.2s;
+}
+#lp-app .btn:hover { background: var(--bg); }
+#lp-app .btn.primary {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+}
+#lp-app .btn.primary:hover { background: var(--primary-hover); }
+#lp-app .btn.danger {
+    color: var(--danger);
+    border-color: var(--danger);
+}
+#lp-app .btn.danger:hover { background: #fef2f2; color: var(--danger-hover); }
+/* small = kompakter, aber gleiche Schriftgröße-Logik */
+#lp-app .btn.small { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+/* Icon-Button für Tabellen-Aktionen: quadratisch, einheitlich */
+#lp-app .btn.icon { padding: 0.3rem; width: 2rem; height: 2rem; flex: 0 0 auto; }
+#lp-app .btn svg { display: block; }
+/* Aktions-Buttons in Tabellenzellen nie umbrechen */
+#lp-app td .btn-group { flex-wrap: nowrap; }
+/* Inline-Icons in Zellen */
+#lp-app .icon-success { color: var(--success); display: inline-flex; vertical-align: middle; }
+#lp-app .detail-hint { color: var(--primary); display: inline-flex; vertical-align: middle; }
+
+#lp-app .btn-group { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+#lp-app .btn-group-vertical { display: flex; align-items: flex-end; }
+
+/* Klickbarer Listen-Balken (Lernpfade, Lernleitern) */
+#lp-app .list-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    margin-bottom: 0.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+}
+#lp-app .list-row:hover { border-color: var(--primary); background: var(--bg); }
+
+/* Filter bar */
+#lp-app .filter-bar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+}
+#lp-app .filter-bar select {
+    width: auto;
+    min-width: 140px;
+    flex: 0 0 auto;
+}
+#lp-app .search-input {
+    flex: 1;
+    min-width: 180px;
+}
+
+/* Tables */
+#lp-app .table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+#lp-app .table-header h2 { margin-bottom: 0; }
+
+#lp-app .table-wrap { overflow: auto; max-height: 60vh; }
+
+#lp-app table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+#lp-app th, #lp-app td {
+    padding: 0.5rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+}
+#lp-app th {
+    background: var(--bg);
+    font-weight: 600;
+    font-size: 0.8rem;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    white-space: nowrap;
+}
+#lp-app th:hover { color: var(--text); }
+#lp-app tr:hover td { background: #f9fafb; }
+
+#lp-app .badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin: 0.1rem;
+    white-space: nowrap;
+}
+#lp-app .badge-basis { background: #dbeafe; color: #1e40af; }
+#lp-app .badge-g { background: #fef3c7; color: #92400e; }
+#lp-app .badge-e { background: #d1fae5; color: #065f46; }
+#lp-app .badge-lrs { background: #fce7f3; color: #9d174d; }
+#lp-app .lrs-check { color: var(--success); font-weight: 700; }
+#lp-app .badge-tag { background: #f0f0f0; color: #444; }
+#lp-app .badge-operator { background: #ede9fe; color: #5b21b6; }
+#lp-app .badge-kompetenz { background: #fef3c7; color: #78350f; }
+#lp-app .badge-methode { background: #e0f2fe; color: #075985; }
+
+#lp-app .hint {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+}
+#lp-app .bruder-hint { margin-top: 0.4rem; }
+#lp-app .schnell-layout { display: flex; flex-direction: column; gap: 1rem; }
+#lp-app .schnell-bild-preview { max-height: 300px; overflow: auto; margin-bottom: 0.75rem; border: 1px solid var(--border); border-radius: 8px; }
+#lp-app .schnell-bild-preview img { width: 100%; display: block; }
+#lp-app .schnell-add-row { display: flex !important; gap: 0.4rem; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; }
+#lp-app .schnell-add-row input, #lp-app .schnell-add-row select { width: auto !important; margin-bottom: 0; }
+#lp-app .schnell-add-row .schnell-nr-input { width: 80px !important; }
+#lp-app .schnell-add-row .schnell-typ-input { width: 140px !important; }
+#lp-app .schnell-add-row .schnell-ua-input { width: 55px !important; }
+#lp-app .schnell-add-row select { width: 100px !important; }
+#lp-app .schnell-added-list { display: flex; flex-direction: column; gap: 0.25rem; }
+#lp-app .schnell-added-item { display: flex; gap: 0.5rem; align-items: center; padding: 0.3rem 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; }
+#lp-app .schnell-added-item .badge { font-size: 0.75rem; }
+#lp-app .schnell-added-item button { margin-left: auto; background: none; border: none; color: var(--danger); cursor: pointer; font-size: 1rem; }
+#lp-app .bruder-hint details { font-size: 0.8rem; color: var(--text-muted); }
+#lp-app .bruder-hint summary { cursor: pointer; color: var(--primary); }
+#lp-app .bruder-list { list-style: none; margin-top: 0.4rem; }
+#lp-app .bruder-list li { padding: 0.2rem 0; }
+
+/* Generator stats */
+#lp-app .gen-stats {
+    margin-top: 0.75rem;
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+#lp-app .gen-stat-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+#lp-app .gen-stat-num {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--text);
+}
+
+/* Preview cards */
+#lp-app .student-preview {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+}
+#lp-app .student-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+    cursor: pointer;
+    user-select: none;
+    border-bottom: 2px solid var(--primary);
+}
+#lp-app .student-preview-header h3 { font-size: 1rem; }
+#lp-app .student-preview-body {
+    padding: 1rem 1rem 0.5rem;
+}
+#lp-app .student-preview-#lp-app.collapsed { display: none; }
+
+/* Staircase / Ladder */
+#lp-app .ladder {
+    position: relative;
+    padding-left: 40px;
+}
+#lp-app .ladder::before {
+    content: '';
+    position: absolute;
+    left: 18px;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(to bottom, #2563eb, #16a34a);
+    border-radius: 2px;
+}
+
+#lp-app .ladder-section-header {
+    position: relative;
+    font-weight: 700;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.5rem 0.75rem;
+    margin: 0.75rem 0 0.25rem;
+    border-radius: 6px;
+    color: #fff;
+}
+#lp-app .ladder-section-header::before {
+    content: '';
+    position: absolute;
+    left: -30px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 2px var(--primary);
+}
+#lp-app .ladder-section-header:first-child { margin-top: 0; }
+#lp-app .ladder-section-basis { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
+#lp-app .ladder-section-basis::before { background: #2563eb; }
+#lp-app .ladder-section-g { background: linear-gradient(135deg, #d97706, #b45309); }
+#lp-app .ladder-section-g::before { background: #d97706; box-shadow: 0 0 0 2px #d97706; }
+#lp-app .ladder-section-e { background: linear-gradient(135deg, #059669, #047857); }
+#lp-app .ladder-section-e::before { background: #059669; box-shadow: 0 0 0 2px #059669; }
+#lp-app .ladder-section-erklaerung { background: linear-gradient(135deg, #d97706, #b45309); }
+#lp-app .ladder-section-erklaerung::before { background: #d97706; box-shadow: 0 0 0 2px #d97706; }
+#lp-app .ladder-section-wiederholung { background: linear-gradient(135deg, #7c3aed, #5b21b6); }
+#lp-app .ladder-section-wiederholung::before { background: #7c3aed; box-shadow: 0 0 0 2px #7c3aed; }
+
+#lp-app .ladder-step {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    margin: 0.25rem 0;
+    border-radius: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+    user-select: none;
+}
+#lp-app .ladder-zusatz-divider {
+    margin: 0.75rem 0 0.35rem;
+    padding-top: 0.4rem;
+    border-top: 1px dashed var(--border);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+#lp-app .ladder-step:hover {
+    border-color: var(--primary);
+    box-shadow: 0 2px 8px rgba(37,99,235,0.1);
+}
+#lp-app .ladder-step.deselected {
+    opacity: 0.4;
+    background: var(--bg);
+    text-decoration: line-through;
+}
+
+#lp-app .ladder-step::before {
+    content: '';
+    position: absolute;
+    left: -26px;
+    top: 50%;
+    width: 12px;
+    height: 2px;
+    background: var(--border);
+}
+
+#lp-app .step-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-weight: 700;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+    color: #fff;
+}
+#lp-app .step-basis .step-number { background: #2563eb; }
+#lp-app .step-g .step-number { background: #d97706; }
+#lp-app .step-e .step-number { background: #059669; }
+#lp-app .step-erklaerung .step-number { background: #dc2626; }
+#lp-app .step-erklaerung { border-left: 3px dashed #dc2626; background: #fef2f2; }
+#lp-app .step-wiederholung .step-number { background: #7c3aed; }
+#lp-app .step-wiederholung { border-left: 3px solid #7c3aed; background: #f5f3ff; }
+
+#lp-app .step-content { flex: 1; min-width: 0; }
+#lp-app .step-content .step-id {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--primary);
+}
+#lp-app .step-content .step-id-link {
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+}
+#lp-app .step-content .step-id-link:hover {
+    opacity: 0.7;
+}
+#lp-app .step-content .step-source {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-left: 0.5rem;
+}
+#lp-app .step-content .step-tags {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+    margin-top: 0.15rem;
+}
+#lp-app .step-content .step-tags .badge { font-size: 0.65rem; padding: 0.1rem 0.35rem; }
+#lp-app .step-content .lrs-hint {
+    font-size: 0.75rem;
+    color: #9d174d;
+    font-style: italic;
+}
+
+#lp-app .step-checkbox {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface);
+    transition: background 0.15s, border-color 0.15s;
+}
+#lp-app .ladder-step:not(.deselected) .step-checkbox {
+    background: var(--primary);
+    border-color: var(--primary);
+}
+#lp-app .ladder-step:not(.deselected) .step-checkbox::after {
+    content: '✓';
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+#lp-app .step-info-btn {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-style: normal;
+    cursor: pointer;
+    margin-left: auto;
+}
+#lp-app .step-info-btn:hover { opacity: 0.8; }
+#lp-app .pct-row {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+}
+#lp-app .pct-input {
+    width: 50px !important;
+    min-width: 50px;
+    text-align: center;
+    padding: 0.3rem 0.2rem !important;
+}
+#lp-app .pct-sep {
+    color: var(--text-muted);
+    font-weight: bold;
+}
+#lp-app .add-task-item {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+#lp-app .add-task-item:hover { background: var(--bg); }
+#lp-app .add-task-item:last-child { border-bottom: none; }
+
+#lp-app .ladder-finish {
+    position: relative;
+    text-align: center;
+    padding: 0.75rem;
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--success);
+    margin-top: 0.5rem;
+}
+#lp-app .ladder-finish::before {
+    content: '';
+    display: inline-block;
+    width: 1.1rem;
+    height: 1.1rem;
+    margin-right: 0.4rem;
+    vertical-align: -0.15rem;
+    background: currentColor;
+    /* Zielflagge als SVG-Maske statt Emoji (nur SVG erlaubt). */
+    -webkit-mask: var(--flag-icon) center/contain no-repeat;
+    mask: var(--flag-icon) center/contain no-repeat;
+}
+#lp-app {
+    --flag-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z'/%3E%3Cline x1='4' y1='22' x2='4' y2='15'/%3E%3C/svg%3E");
+}
+
+/* Section label kept for compatibility */
+#lp-app .section-label {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin: 0.75rem 0 0.25rem;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid var(--border);
+}
+#lp-app .section-label:first-child { margin-top: 0; }
+
+/* Responsive */
+@media (max-width: 600px) {
+    #lp-app .form-row { flex-direction: column; }
+    #lp-app .form-group { min-width: 100%; }
+    #lp-app .tabs { overflow-x: auto; }
+    #lp-app .tab { padding: 0.5rem 1rem; font-size: 0.9rem; white-space: nowrap; }
+    #lp-app .table-header { flex-direction: column; align-items: flex-start; }
+    #lp-app .filter-bar { flex-direction: column; }
+    #lp-app .filter-bar select { width: 100%; }
+    #lp-app .btn-group { flex-direction: column; }
+}
+
+/* Erklärung badge */
+#lp-app .badge-erklaerung { background: #fef2f2; color: #991b1b; border: 1px dashed #dc2626; }
+
+/* Bulk action bar */
+#lp-app .bulk-bar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.75rem;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    flex-wrap: wrap;
+}
+#lp-app #bulk-count { font-weight: 600; white-space: nowrap; }
+
+/* Image preview */
+#lp-app .bild-preview { margin-top: 0.5rem; }
+#lp-app .bild-preview img {
+    max-width: 200px;
+    max-height: 150px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+}
+#lp-app .bild-preview .bild-remove {
+    display: inline-block;
+    margin-left: 0.5rem;
+    color: var(--danger);
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+/* Modal */
+#lp-app .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    padding: 1rem;
+}
+#lp-app .modal-content {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    max-width: 700px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+}
+#lp-app .modal-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.75rem;
+    border: none;
+    background: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-muted);
+    line-height: 1;
+}
+#lp-app .modal-close:hover { color: var(--text); }
+#lp-app .task-detail-section { margin-bottom: 1rem; }
+#lp-app .task-detail-section h3 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+}
+#lp-app .task-detail-img {
+    max-width: 100%;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    margin-top: 0.5rem;
+}
+#lp-app .task-detail-text {
+    background: var(--bg);
+    padding: 0.75rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+}
+
+/* Generator config table */
+/* Generator-Config: klare Blöcke statt kryptischer Tabelle */
+#lp-app .cfg-grid { display: flex; flex-direction: column; gap: 0.85rem; margin-top: 0.75rem; }
+#lp-app .cfg-block {
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: 0.5rem 1rem;
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+#lp-app .cfg-block:last-child { border-bottom: none; padding-bottom: 0; }
+#lp-app .cfg-label {
+    font-weight: 600; font-size: 0.9rem;
+    flex: 0 0 240px;
+    display: inline-flex; align-items: center; gap: 0.35rem;
+}
+#lp-app .cfg-controls { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.85rem; }
+#lp-app .cfg-num {
+    width: 4.5rem;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    text-align: center;
+}
+#lp-app .cfg-range { width: 11rem; accent-color: var(--primary); cursor: pointer; vertical-align: middle; }
+#lp-app .cfg-range-val { min-width: 6.5rem; font-size: 0.9rem; font-weight: 600; color: var(--text); }
+#lp-app .cfg-pct { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.9rem; }
+/* Eine Regler-Zeile: fester Name links, Slider, dann Wert/Hint – so stehen
+   alle Slider untereinander auf gleicher Höhe (bündig). */
+#lp-app .cfg-slider-row { display: inline-flex; align-items: center; gap: 0.6rem; font-size: 0.9rem; color: var(--text-muted); }
+#lp-app .cfg-sl-name { flex: 0 0 5rem; }
+#lp-app .cfg-slider-row .cfg-range { flex: 0 0 11rem; }
+#lp-app .cfg-controls-col { flex-direction: column; align-items: flex-start; gap: 0.45rem; }
+#lp-app .cfg-hint { color: var(--text-muted); font-size: 0.85rem; }
+#lp-app .cfg-warn { color: var(--danger); font-size: 0.85rem; margin-top: 0.35rem; }
+#lp-app .cfg-sum { font-size: 0.85rem; font-weight: 600; }
+#lp-app .cfg-sum-ok { color: var(--success); }
+#lp-app .cfg-sum-bad { color: var(--danger); }
+#lp-app .cfg-types { margin-top: 0.85rem; font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; flex-wrap: wrap; gap: 0.3rem; }
+
+/* Info-Tooltip mit kleinem i */
+#lp-app .info {
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-muted); cursor: help; position: relative;
+    border-radius: 50%;
+}
+#lp-app .info:hover, #lp-app .info:focus { color: var(--primary); outline: none; }
+#lp-app .info-tip {
+    position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+    width: max-content; max-width: 260px;
+    background: #1f2937; color: #fff;
+    padding: 0.5rem 0.65rem; border-radius: 6px;
+    font-size: 0.8rem; font-weight: 400; line-height: 1.4;
+    opacity: 0; visibility: hidden; transition: opacity 0.15s;
+    z-index: 20; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    pointer-events: none;
+}
+#lp-app .info-tip::after {
+    content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 5px solid transparent; border-top-color: #1f2937;
+}
+#lp-app .info:hover .info-tip, #lp-app .info:focus .info-tip { opacity: 1; visibility: visible; }
+
+/* Clickable task row */
+#lp-app .task-row-clickable { cursor: pointer; }
+#lp-app .task-row-clickable:hover td { background: #eef2ff !important; }
+
+/* Footer + Rechtliches */
+#lp-app .site-footer {
+    text-align: center;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+#lp-app .link-btn {
+    background: none; border: none; padding: 0;
+    color: var(--text-muted); cursor: pointer;
+    font-size: 0.85rem; font-family: inherit;
+    text-decoration: underline;
+}
+#lp-app .link-btn:hover { color: var(--primary); }
+#lp-app .foot-sep { margin: 0 0.5rem; }
+#lp-app #site-modal-#lp-app h2 { margin-bottom: 0.75rem; }
+#lp-app #site-modal-#lp-app h3 { margin: 1rem 0 0.35rem; font-size: 1rem; }
+#lp-app #site-modal-#lp-app p { margin-bottom: 0.6rem; }
+#lp-app #site-modal-#lp-app .form-group { margin-bottom: 0.75rem; }
+
+/* Toast */
+#lp-app .toast {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    padding: 0.75rem 1.25rem;
+    background: #1e293b;
+    color: #fff;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    z-index: 1000;
+    animation: toast-in 0.3s ease;
+}
+@keyframes toast-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─────────────── Auth / Login (APIForge-Stil) ─────────────── */
+#lp-app .auth-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;              /* per JS ein-/ausgeblendet */
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: linear-gradient(180deg, #fff 0%, var(--bg) 100%);
+}
+/* Hauptinhalt erst nach Login sichtbar - aber NUR auf der App-Seite, die das
+   #auth-overlay enthält. Impressum/Datenschutz/Kontakt haben kein Overlay und
+   sollen immer sichtbar sein (sonst blieben sie leer). */
+#lp-app:not(.authed) #auth-overlay ~ .navbar, #lp-app:not(.authed) #auth-overlay ~ .tab-content { display: none !important; }
+
+#lp-app .auth-card {
+    width: 100%;
+    max-width: 400px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.08);
+    padding: 2rem 1.75rem;
+}
+#lp-app .auth-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 800;
+    font-size: 1.15rem;
+    margin-bottom: 1.5rem;
+}
+#lp-app .auth-title { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 0.4rem; }
+#lp-app .auth-sub { color: var(--text-muted); font-size: 0.92rem; margin-bottom: 1.5rem; }
+#lp-app .auth-form { display: flex; flex-direction: column; }
+#lp-app .auth-form label { font-weight: 600; font-size: 0.85rem; margin-bottom: 0.3rem; }
+#lp-app .auth-form input {
+    margin-bottom: 1rem;
+    padding: 0.7rem 0.85rem;
+    font-size: 1rem;
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+}
+#lp-app .auth-form input:focus { background: var(--surface); }
+#lp-app .auth-submit { width: 100%; justify-content: center; padding: 0.7rem; font-size: 1rem; margin-top: 0.25rem; }
+#lp-app .auth-error {
+    background: #fef2f2;
+    color: var(--danger);
+    border: 1px solid #fecaca;
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 0.7rem;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+#lp-app .auth-switch { text-align: center; font-size: 0.9rem; color: var(--text-muted); margin-top: 1.25rem; }
+#lp-app .auth-switch a { color: var(--primary); font-weight: 600; text-decoration: none; margin-left: 0.3rem; }
+#lp-app .auth-switch a:hover { text-decoration: underline; }
+
+/* Navbar: Nutzer + Abmelden */
+#lp-app .nav-user { color: var(--text-muted); font-size: 0.85rem; align-self: center; margin-left: 0.5rem; }
+#lp-app .nav-logout { color: var(--primary); font-weight: 600; }
+
+#lp-app .auth-legal {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.8rem;
+}
+#lp-app .auth-legal a { color: var(--text-muted); text-decoration: none; }
+#lp-app .auth-legal a:hover { color: var(--primary); }
+
+/* LaTeX-Quelle */
+#lp-app .latex-toolbar { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.4rem 0; }
+#lp-app .latex-tool {
+    min-width: 2.2rem;
+    min-height: 2.2rem;
+    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    cursor: pointer;
+    font-size: 0.95rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.12s, border-color 0.12s;
+}
+#lp-app .latex-tool:hover { background: var(--bg); border-color: var(--primary); }
+#lp-app .latex-preview-wrap { margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+#lp-app .latex-preview { min-height: 1.6rem; padding: 0.3rem 0.5rem; border: 1px dashed var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+#lp-app .step-source .katex { font-size: 1.05em; }
+
+/* Konto-Dropdown in der Navbar */
+#lp-app .nav-account { position: relative; margin-left: 0.5rem; }
+#lp-app .account-menu {
+    position: absolute;
+    right: 0;
+    top: 110%;
+    z-index: 60;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    padding: 0.6rem;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+#lp-app .account-menu .btn { width: 100%; justify-content: center; }
+#lp-app .account-email { font-size: 0.8rem; color: var(--text-muted); padding: 0.2rem 0.1rem 0.4rem; border-bottom: 1px solid var(--border); word-break: break-all; }
+
+/* ─── Eingebettet in Nuvora ───
+   Die App laeuft im iframe unter Nuvoras Navbar. Was der Rahmen schon zeigt
+   (Marke, Konto), darf hier nicht doppelt erscheinen; die Tabs bleiben, sie
+   sind die Struktur des Moduls. Ohne Einbettung (Direktaufruf) greift nichts
+   davon. */
+/* Eingebettet: die eigene Navbar (Marke, Tabs, Konto) ganz aus — Nuvoras
+   Rahmen liefert die Navigation. Die Tabs steuert Nuvora per Nachricht. */
+#lp-app .navbar { display: none !important; }
+#lp-app .site-footer { display: none !important; }
+#lp-app { background: transparent; }
+/* Der Rahmen scrollt, nicht das iframe: sonst zwei Scrollbalken. */
+#lp-app, #lp-app { overflow: visible; height: auto; }
+/* Eingebettet scrollt Nuvora selbst — kein zweiter (nested) Scrollbalken.
+   Die interne 60vh-Tabellenhoehe entfaellt, der Inhalt fliesst voll. */
+#lp-app .table-wrap { max-height: none !important; overflow: visible !important; }
+/* Aufgabenübersicht: hoechstens ~8 Zeilen, dann scrollen — auch eingebettet. */
+#lp-app .aufgaben-wrap, #lp-app .aufgaben-wrap { max-height: 25rem !important; overflow-y: auto !important; }
+/* "Neue Aufgabe" ein-/ausklappbar */
+#lp-app #aufgaben-form-title { cursor: pointer; user-select: none; }
+#lp-app #aufgaben-form-title::after { content: "▾"; float: right; font-size: 0.8em; color: var(--text-muted); }
+#lp-app #aufgaben-form-title[data-collapsed="1"]::after { content: "▸"; }
+/* Speichern gesperrt, solange Pflichtfelder fehlen */
+#lp-app #aufgabe-submit-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ─── Dark Mode ───
+   Die App hatte keinen: eingebettet in Nuvoras dunkles Design leuchtete das
+   iframe weiss. Nuvora setzt .dark auf <html> und meldet das Thema per
+   postMessage; hier werden nur die Variablen umdefiniert, kein Umbau. */
+html.dark #lp-app {
+    color-scheme: dark;
+    --bg: #000;
+    --surface: #1c1c1e;
+    --border: rgba(255,255,255,0.10);
+    --text: #f5f5f7;
+    --text-muted: #98989d;
+    --primary-soft: rgba(232,89,31,0.16);
+    --shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+html.dark #lp-app input, html.dark #lp-app select, html.dark #lp-app textarea {
+    background: #2c2c2e;
+    color: var(--text);
+    border-color: var(--border);
+}
+html.dark #lp-app .chip { background: #2c2c2e; }
+
+/* ─── Klassen gehoeren dem Kern ───
+   Die Bearbeitung von Klassen und Schuelern liegt in Nuvora unter /classes —
+   beide Module arbeiten auf denselben Daten. Die Formulare bleiben im DOM
+   (app.js haengt daran), werden aber nicht mehr gezeigt: Ansicht ja,
+   Bearbeitung nein. Ausserhalb der Einbettung greift das ebenfalls, denn die
+   Daten kommen so oder so aus dem Kern. */
+#lp-app #klasse-form-panel, #lp-app #schueler-panel, #lp-app .klasse-chip .chip-delete { display: none !important; }

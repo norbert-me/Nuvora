@@ -5,15 +5,18 @@
     // Die App laeuft im iframe unter Nuvoras Navbar. Der Rahmen kann die Hoehe
     // des Inhalts nicht kennen, also meldet sie die App — sonst entstuende ein
     // zweiter Scrollbalken oder der Inhalt waere abgeschnitten.
-    const embedded = window.parent !== window;
+    // inPage = nativ in die Shell gemountet (kein iframe, gleiches window).
+    // embedded = Nuvora-Rahmen aktiv (iframe ODER in-page): eigene Navbar/Konto
+    // ausblenden, Theme/Tab vom Rahmen uebernehmen.
+    const inPage = !!window.__nuvoraInPage;
+    const embedded = window.parent !== window || inPage;
+    // Ziel fuer Rahmen-Klassen: in-page der Host (#lp-app), sonst <html>.
+    const rootEl = () => (inPage ? document.getElementById('lp-app') : document.documentElement);
     if (embedded) {
-        // Nuvoras Navbar steht schon darueber: eigene Marke und eigenes
-        // Konto-Menue wuerden doppelt erscheinen. Die Tabs bleiben — sie sind
-        // die Struktur dieses Moduls.
-        document.documentElement.classList.add('embedded');
+        rootEl() && rootEl().classList.add('embedded');
 
         // Thema folgt dem Rahmen: Nuvora setzt .dark auf <html> und meldet
-        // Wechsel. Ohne das leuchtet das iframe im dunklen Design weiss.
+        // Wechsel. Ohne das leuchtet der Inhalt im dunklen Design weiss.
         window.addEventListener('message', (e) => {
             if (e.origin !== window.location.origin) return;
             if (e.data && e.data.type === 'nuvora:theme') {
@@ -22,20 +25,20 @@
         });
         window.parent.postMessage({ type: 'lernpfad:ready' }, window.location.origin);
 
-        const melde = () => {
-            // Nur die body-Hoehe: documentElement fuellt die iframe-Hoehe und
-            // schrumpft nie zurueck, wodurch der Rahmen nach Tab-Wechseln viel
-            // zu hoch blieb. body hat height:auto -> echte Inhaltshoehe.
-            const h = Math.max(document.body.scrollHeight, document.body.offsetHeight);
-            window.parent.postMessage({ type: 'lernpfad:height', height: h }, window.location.origin);
-        };
-        window.addEventListener('load', melde);
-        window.addEventListener('resize', melde);
-        // Die App rendert clientseitig nach: auf jede DOM-Aenderung reagieren.
-        new MutationObserver(melde).observe(document.documentElement, {
-            childList: true, subtree: true, attributes: true,
-        });
-        setInterval(melde, 1000);
+        // Hoehen-Meldung nur im iframe noetig; in-page waechst der Container von
+        // selbst und ein MutationObserver auf die ganze Shell waere Verschwendung.
+        if (!inPage) {
+            const melde = () => {
+                const h = Math.max(document.body.scrollHeight, document.body.offsetHeight);
+                window.parent.postMessage({ type: 'lernpfad:height', height: h }, window.location.origin);
+            };
+            window.addEventListener('load', melde);
+            window.addEventListener('resize', melde);
+            new MutationObserver(melde).observe(document.documentElement, {
+                childList: true, subtree: true, attributes: true,
+            });
+            setInterval(melde, 1000);
+        }
     }
 
     // ─── Nuvora-Kern statt eigenem Backend ───
@@ -366,13 +369,11 @@
     // Kein eigenes Login: fehlt der Token, zur Anmeldung des Rahmens (bricht
     // aus dem iframe aus, damit Nuvoras Seite im ganzen Fenster laedt).
     function showAuth() {
-        document.body.classList.remove('authed');
-        const ziel = '/login';
-        if (window.parent !== window) window.parent.location.href = ziel;
-        else window.location.href = ziel;
+        (inPage ? rootEl() : document.body).classList.remove('authed');
+        window.location.href = '/login';
     }
     function hideAuth() {
-        document.body.classList.add('authed');
+        (inPage ? rootEl() : document.body).classList.add('authed');
     }
 
     // Daten aus dem Nuvora-Kern laden und lokalen Anzeige-Cache ersetzen.
@@ -476,7 +477,7 @@
         const nav = document.getElementById('nav-links');
         if (nav) nav.classList.remove('open');
         // Eingebettet: Nuvora ueber den aktiven Tab informieren (Menue-Markierung).
-        if (window.parent !== window) window.parent.postMessage({ type: 'lernpfad:tab', tab }, window.location.origin);
+        if (window.parent !== window || inPage) window.parent.postMessage({ type: 'lernpfad:tab', tab }, window.location.origin);
     }
     document.querySelectorAll('.tab').forEach(btn => {
         btn.addEventListener('click', () => switchTab(btn.dataset.tab));
