@@ -369,7 +369,7 @@ function Nav({ user, onLogout }) {
   const { t } = useLanguage();
 
   const navItems = getModuleNavItems(t, location);
-  const allPages = [...navItems, { to: `${CV}/tutorial`, label: t("nav.tutorial") }, { to: `${CV}/scan`, label: t("nav.scanner") }, { to: "/profile", label: t("nav.profile") }, { to: `${CV}/evaluation`, label: t("nav.evaluation") }, { to: "/login", label: t("nav.login") }];
+  const allPages = [...navItems, { to: "/tutorial", label: t("nav.tutorial") }, { to: `${CV}/scan`, label: t("nav.scanner") }, { to: "/profile", label: t("nav.profile") }, { to: `${CV}/evaluation`, label: t("nav.evaluation") }, { to: "/login", label: t("nav.login") }];
   const pageTitle = allPages.find((item) => location.pathname.startsWith(item.to))?.label || "";
 
   const showNav = !!user;
@@ -630,7 +630,7 @@ function FirstRun({ user }) {
   if (!show) return null;
 
   const hasCardvote = active.some((m) => m.key === "cardvote");
-  const tourZiel = hasCardvote ? "/cardvote/tutorial" : "/help";
+  const tourZiel = "/tutorial";
 
   return (
     <div onClick={() => done()} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 300 }}>
@@ -708,7 +708,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={`${CV}/class-evaluation/:id`} element={user ? <ModuleGate moduleKey="cardvote"><ClassEvaluation /></ModuleGate> : <Landing />} />
           <Route path={`${CV}/student-evaluation/:classId/:cardId`} element={user ? <ModuleGate moduleKey="cardvote"><StudentEvaluation /></ModuleGate> : <Landing />} />
           <Route path={`${CV}/scan`} element={user ? <ModuleGate moduleKey="cardvote"><Scanner /></ModuleGate> : <Landing />} />
-          <Route path={`${CV}/tutorial`} element={user ? <ModuleGate moduleKey="cardvote"><Tutorial /></ModuleGate> : <Landing />} />
+          <Route path="/tutorial" element={user ? <Tutorial /> : <Landing />} />
           <Route path={`${CV}/cards`} element={user ? <ModuleGate moduleKey="cardvote"><Cards /></ModuleGate> : <Landing />} />
           <Route path={`${CV}/marketplace`} element={user ? <ModuleGate moduleKey="cardvote"><Marketplace /></ModuleGate> : <Landing />} />
 
@@ -735,7 +735,7 @@ function AppRoutes({ user, setUser, logout }) {
         <span style={{ display: "inline-flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: "0 8px", padding: "0 16px" }}>
           <Link to={`/help?area=${helpArea(location.pathname)}`} style={footerLink}>{t("footer.help")}</Link>
           <span style={footerSep}>·</span>
-          <Link to={`${CV}/tutorial`} style={footerLink}>Tutorial</Link>
+          <Link to="/tutorial" style={footerLink}>Tutorial</Link>
           <span style={footerSep}>·</span>
           <Link to="/contact" style={footerLink}>{t("footer.contact")}</Link>
           <span style={footerSep}>·</span>

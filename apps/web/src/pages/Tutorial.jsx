@@ -1,4 +1,4 @@
-// Tutorial für CardVote — vier Bereiche, jederzeit neu startbar.
+// Tutorial für Nuvora — führt durch Kern und Module, jederzeit neu startbar.
 //
 // Bewusst kein Overlay über der App: Overlays verdecken genau das, was sie
 // erklären, und lassen sich nicht nebenher lesen. Stattdessen eine eigene
@@ -9,15 +9,14 @@ import { Link } from "react-router-dom";
 import { btnPrimary, btnSecondary, pageTitle } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
-const STORAGE_KEY = "cv_tutorial_done";
-
-const CV = "/cardvote";
+const STORAGE_KEY = "nuvora_tutorial_done";
 
 const BEREICHE = [
-  { key: "fragen", ziel: `${CV}/questions` },
+  { key: "willkommen", ziel: "/modules" },
   { key: "klasse", ziel: "/classes" },
-  { key: "session", ziel: `${CV}/session` },
-  { key: "auswerten", ziel: `${CV}/tests`, keyBase: "eval" },
+  { key: "themen", ziel: "/topics" },
+  { key: "module", ziel: "/modules" },
+  { key: "loslegen", ziel: "/modules" },
 ];
 
 export default function Tutorial() {
@@ -80,7 +79,7 @@ export default function Tutorial() {
             {auf && (
               <div style={{ padding: "0 16px 16px 54px" }}>
                 <ul style={{ margin: "0 0 14px", paddingLeft: 18, color: "var(--text2)", fontSize: 14, lineHeight: 1.75 }}>
-{[1,2,3,4,5].map((k) => <li key={k}>{t(`tut.${kb(b)}.${k}`)}</li>)}
+{[1,2,3,4,5,6].map((k) => { const key = `tut.${kb(b)}.${k}`; const v = t(key); return v === key ? null : <li key={k}>{v}</li>; })}
                 </ul>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <Link to={b.ziel} style={{ ...btnPrimary, textDecoration: "none", display: "inline-block" }}>{t(`tut.${kb(b)}.goto`)}</Link>

@@ -170,11 +170,9 @@ export default function Help() {
     <div style={{ maxWidth: 700 }}>
       <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", marginBottom: 16 }}>{t("help.title")}</h2>
 
-      {aktiv.has("cardvote") && (
-        <p style={{ marginBottom: 20, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", fontSize: 14 }}>
-          {withLink(t("help.tutorialBanner"), "/cardvote/tutorial", t("help.tutorialWord"))}
-        </p>
-      )}
+      <p style={{ marginBottom: 20, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", fontSize: 14 }}>
+        {withLink(t("help.tutorialBanner"), "/tutorial", t("help.tutorialWord"))}
+      </p>
 
       {sichtbar.length > 1 && (
         <div style={{ display: "flex", gap: 6, marginBottom: 22, flexWrap: "wrap" }}>
