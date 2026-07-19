@@ -867,6 +867,7 @@ export default {
   "sitzplan.noStudents": "Esta clase no tiene alumnos.",
   "mod.sitzplan.name": "Plano de asientos",
   "mod.sitzplan.desc": "Asientos por clase: coloca a los alumnos en una cuadrícula con arrastrar y soltar. Solo se guardan las posiciones.",
+  "anwesenheit.homeDesc": "Registra rápido la asistencia y las faltas de hoy.",
   "anwesenheit.title": "Asistencia",
   "anwesenheit.day": "Día",
   "anwesenheit.overview": "Ausencias",

@@ -867,6 +867,7 @@ export default {
   "sitzplan.noStudents": "This class has no students.",
   "mod.sitzplan.name": "Seating plan",
   "mod.sitzplan.desc": "Seating per class: place students on a grid via drag & drop. Only positions are stored.",
+  "anwesenheit.homeDesc": "Quickly record attendance and absences for today.",
   "anwesenheit.title": "Attendance",
   "anwesenheit.day": "Day",
   "anwesenheit.overview": "Absences",

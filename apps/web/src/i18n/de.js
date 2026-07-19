@@ -867,6 +867,7 @@ export default {
   "sitzplan.noStudents": "Diese Klasse hat keine Schüler.",
   "mod.sitzplan.name": "Sitzplan",
   "mod.sitzplan.desc": "Sitzordnung je Klasse: Schüler per Drag & Drop auf ein Raster setzen. Nur die Positionen werden gespeichert.",
+  "anwesenheit.homeDesc": "Anwesenheit und Fehlzeiten für heute schnell eintragen.",
   "anwesenheit.title": "Anwesenheit",
   "anwesenheit.day": "Tag",
   "anwesenheit.overview": "Fehlzeiten",
