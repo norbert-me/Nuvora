@@ -834,6 +834,8 @@ export default {
   "weak.created": "Deck created ✓",
   "anwesenheit.onlyToday": "Only today's classes",
   "anwesenheit.overviewHint": "Tap a name to see and amend absences (e.g. add an excuse later).",
+  "anwesenheit.classPdf": "Absence report (PDF)",
+  "anwesenheit.studentPdf": "Report (PDF)",
   "anwesenheit.noEntries": "No absences.",
   "weak.hint2": "Topics below 60% correct. Create a topic-bound practice deck or a Lernpfad exercise (revision).",
   "weak.makeExercise": "Lernpfad task",

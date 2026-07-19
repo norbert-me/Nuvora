@@ -116,6 +116,114 @@ async def student_history(class_id: int, student_id: int, user: User = Depends(r
     return [{"date": r.date.isoformat(), "status": r.status, "note": r.note, "period": r.period} for r in rows]
 
 
+_LABEL = {"fehlt": "Fehlt", "spaet": "Verspätet", "entsch": "Entschuldigt"}
+
+
+async def _students_of(db, class_id):
+    return (await db.execute(select(Student).where(Student.class_id == class_id).order_by(Student.card_id))).scalars().all()
+
+
+def _pdf_response(build, filename: str):
+    import io
+    from fastapi.responses import StreamingResponse
+    buf = io.BytesIO()
+    build(buf)
+    buf.seek(0)
+    return StreamingResponse(buf, media_type="application/pdf",
+                             headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@router.get("/{class_id}/report.pdf")
+async def class_report(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Fehlzeiten-Übersicht der ganzen Klasse als PDF (Zeugnis/Elterngespräch)."""
+    sc = await _owned_class(db, user, class_id)
+    agg = await summary(class_id, user=user, db=db)
+    students = await _students_of(db, class_id)
+
+    def build(buf):
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import mm
+        from reportlab.pdfgen import canvas
+        c = canvas.Canvas(buf, pagesize=A4)
+        w, h = A4
+        y = h - 25 * mm
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(20 * mm, y, f"Fehlzeiten – {sc.name}")
+        c.setFont("Helvetica", 9)
+        c.drawString(20 * mm, y - 6 * mm, f"Erstellt am {datetime.now().strftime('%d.%m.%Y')} · Nuvora")
+        y -= 16 * mm
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(20 * mm, y, "Name")
+        c.drawString(120 * mm, y, "Fehlt")
+        c.drawString(142 * mm, y, "Versp.")
+        c.drawString(168 * mm, y, "Entsch.")
+        y -= 2 * mm
+        c.line(20 * mm, y, 190 * mm, y)
+        y -= 6 * mm
+        c.setFont("Helvetica", 10)
+        for s in students:
+            a = agg.get(str(s.id), {"fehlt": 0, "spaet": 0, "entsch": 0})
+            if y < 20 * mm:
+                c.showPage(); y = h - 25 * mm; c.setFont("Helvetica", 10)
+            c.drawString(20 * mm, y, s.name[:55])
+            c.drawString(120 * mm, y, str(a["fehlt"]))
+            c.drawString(142 * mm, y, str(a["spaet"]))
+            c.drawString(168 * mm, y, str(a["entsch"]))
+            y -= 6 * mm
+        c.showPage()
+        c.save()
+
+    return _pdf_response(build, f"Fehlzeiten_{sc.name}.pdf")
+
+
+@router.get("/{class_id}/student/{student_id}/report.pdf")
+async def student_report(class_id: int, student_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Fehlzeiten eines Schülers als PDF: Zähler + chronologische Liste."""
+    sc = await _owned_class(db, user, class_id)
+    st = await db.get(Student, student_id)
+    if not st or st.class_id != class_id:
+        raise HTTPException(404, "Schüler nicht in dieser Klasse")
+    rows = await student_history(class_id, student_id, user=user, db=db)
+    breaks = await _break_days(db, user)
+    zaehler = {"fehlt": 0, "spaet": 0, "entsch": 0}
+    for r in rows:
+        if r["status"] in zaehler and not _in_break(datetime.fromisoformat(r["date"]), breaks):
+            zaehler[r["status"]] += 1
+
+    def build(buf):
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import mm
+        from reportlab.pdfgen import canvas
+        c = canvas.Canvas(buf, pagesize=A4)
+        w, h = A4
+        y = h - 25 * mm
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(20 * mm, y, f"Fehlzeiten – {st.name}")
+        c.setFont("Helvetica", 9)
+        c.drawString(20 * mm, y - 6 * mm, f"Klasse {sc.name} · Erstellt am {datetime.now().strftime('%d.%m.%Y')} · Nuvora")
+        y -= 16 * mm
+        c.setFont("Helvetica", 11)
+        c.drawString(20 * mm, y, f"Fehlt: {zaehler['fehlt']}    Verspätet: {zaehler['spaet']}    Entschuldigt: {zaehler['entsch']}")
+        y -= 12 * mm
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(20 * mm, y, "Datum"); c.drawString(55 * mm, y, "Status"); c.drawString(95 * mm, y, "Notiz")
+        y -= 2 * mm; c.line(20 * mm, y, 190 * mm, y); y -= 6 * mm
+        c.setFont("Helvetica", 10)
+        for r in rows:
+            if y < 20 * mm:
+                c.showPage(); y = h - 25 * mm; c.setFont("Helvetica", 10)
+            d = datetime.fromisoformat(r["date"]).strftime("%d.%m.%Y")
+            c.drawString(20 * mm, y, d)
+            c.drawString(55 * mm, y, _LABEL.get(r["status"], r["status"]))
+            c.drawString(95 * mm, y, (r.get("note") or "")[:45])
+            y -= 6 * mm
+        if not rows:
+            c.drawString(20 * mm, y, "Keine Fehlzeiten erfasst.")
+        c.showPage(); c.save()
+
+    return _pdf_response(build, f"Fehlzeiten_{sc.name}_{st.name}.pdf")
+
+
 @router.get("/{class_id}/summary")
 async def summary(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Zusammenfassung je Schueler: Zaehler fehlt/spaet/entsch (ueber alles)."""

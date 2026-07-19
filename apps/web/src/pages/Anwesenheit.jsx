@@ -78,6 +78,15 @@ export default function Anwesenheit() {
   };
   const shift = (n) => { const d = new Date(datum + "T00:00:00"); d.setDate(d.getDate() + n); setDatum(ymd(d)); };
 
+  // PDF-Report laden (Endpunkt ist auth-geschützt, daher fetch + Blob statt <a href>).
+  const ladePdf = async (url, name) => {
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }).catch(() => null);
+    if (!r || !r.ok) return;
+    const blob = await r.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href);
+  };
+
   const oeffnen = (sid) => {
     if (offen === sid) { setOffen(null); return; }
     setOffen(sid); setVerlauf([]);
@@ -162,7 +171,10 @@ export default function Anwesenheit() {
         </>
       ) : (
         <>
-          <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 8px" }}>{t("anwesenheit.overviewHint")}</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px", flexWrap: "wrap" }}>
+            <p style={{ fontSize: 13, color: "var(--text3)", margin: 0, flex: 1 }}>{t("anwesenheit.overviewHint")}</p>
+            <button onClick={() => ladePdf(`${API}/${classId}/report.pdf`, `Fehlzeiten_${cls?.name || ""}.pdf`)} style={{ ...btnSecondary, padding: "6px 13px", fontSize: 13 }}>{t("anwesenheit.classPdf")}</button>
+          </div>
           {legende}
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {students.map((s, i) => {
@@ -185,6 +197,9 @@ export default function Anwesenheit() {
                   </button>
                   {auf && (
                     <div style={{ borderTop: "1px solid var(--border)", padding: "8px 12px" }}>
+                      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
+                        <button onClick={() => ladePdf(`${API}/${classId}/student/${s.id}/report.pdf`, `Fehlzeiten_${s.name}.pdf`)} style={{ ...btnSecondary, padding: "4px 11px", fontSize: 12 }}>{t("anwesenheit.studentPdf")}</button>
+                      </div>
                       {verlauf.length === 0 ? (
                         <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "4px 0" }}>{t("anwesenheit.noEntries")}</p>
                       ) : verlauf.map((e) => (

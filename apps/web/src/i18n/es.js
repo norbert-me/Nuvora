@@ -834,6 +834,8 @@ export default {
   "weak.created": "Mazo creado ✓",
   "anwesenheit.onlyToday": "Solo clases de hoy",
   "anwesenheit.overviewHint": "Toca un nombre para ver y corregir las ausencias (p. ej. justificar más tarde).",
+  "anwesenheit.classPdf": "Informe de faltas (PDF)",
+  "anwesenheit.studentPdf": "Informe (PDF)",
   "anwesenheit.noEntries": "Sin ausencias.",
   "weak.hint2": "Temas por debajo del 60% de aciertos. Crea un mazo de práctica o una tarea de Lernpfad (repaso).",
   "weak.makeExercise": "Tarea Lernpfad",

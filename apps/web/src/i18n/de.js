@@ -834,6 +834,8 @@ export default {
   "weak.created": "Deck angelegt ✓",
   "anwesenheit.onlyToday": "Nur heutige Klassen",
   "anwesenheit.overviewHint": "Auf einen Namen tippen, um Fehltage zu sehen und nachzutragen (z. B. Entschuldigung nachreichen).",
+  "anwesenheit.classPdf": "Fehlzeiten-Report (PDF)",
+  "anwesenheit.studentPdf": "Report (PDF)",
   "anwesenheit.noEntries": "Keine Fehltage.",
   "weak.hint2": "Themen unter 60 % Trefferquote. Lege ein themengebundenes Übungs-Deck oder eine Lernpfad-Aufgabe (Wiederholung) an.",
   "weak.makeExercise": "Lernpfad-Aufgabe",
