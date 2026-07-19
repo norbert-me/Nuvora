@@ -1,9 +1,12 @@
-const iconSvg = { width: 16, height: 16, fill: "none", stroke: "var(--text3)", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" };
+const iconSvg = { fill: "none", stroke: "var(--text3)", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" };
 
+// Icon skaliert standardmäßig mit der Schriftgröße (1em) und sitzt auf der
+// Textlinie — so bleibt jedes Symbol im Verhältnis zum umgebenden Text. Eine
+// feste Größe (px als Zahl oder z.B. "1.2em") bleibt möglich, wo gewollt.
 export function Icon({ d, color, size, ...props }) {
-  const s = size || 16;
+  const s = size || "1em";
   return (
-    <svg style={{ ...iconSvg, width: s, height: s, stroke: color || iconSvg.stroke }} viewBox="0 0 20 20" {...props}>
+    <svg style={{ ...iconSvg, width: s, height: s, stroke: color || iconSvg.stroke, verticalAlign: "-0.125em", flexShrink: 0 }} viewBox="0 0 20 20" {...props}>
       {Array.isArray(d) ? d.map((p, i) => <path key={i} d={p} />) : <path d={d} />}
     </svg>
   );
