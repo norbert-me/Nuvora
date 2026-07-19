@@ -114,7 +114,7 @@ REGISTRY: List[ModuleDef] = [
         name="Orga",
         description=(
             "Sammel-Checklisten je Klasse: Orga-Punkte anlegen (z.B. „Unterschrift "
-            "der Klassenarbeit gesehen") und pro Schueler abhaken."
+            "der Klassenarbeit gesehen“) und pro Schueler abhaken."
         ),
         path="/orga",
     ),
