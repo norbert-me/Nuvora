@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .database import engine
 from .models import Base
-from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, planung, karten, kalender, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall
+from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, planung, karten, kalender, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse
 from . import websocket as ws
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -138,6 +138,7 @@ app.include_router(orga.router)
 app.include_router(ausleihe.router)
 app.include_router(me.router)
 app.include_router(zufall.router)
+app.include_router(kurse.router)
 app.include_router(marketplace.router)
 
 UPLOAD_DIR = "/app/uploads"
@@ -174,6 +175,7 @@ def _ensure_columns(sync_conn):
         ("school_classes", "karten_token", "VARCHAR(64)"),
         ("school_classes", "color", "VARCHAR(9) DEFAULT '' NOT NULL"),
         ("school_classes", "deleted_at", "TIMESTAMPTZ"),
+        ("school_classes", "kurs_id", "INTEGER"),
         ("students", "karten_token", "VARCHAR(64)"),
         ("card_decks", "released_at", "TIMESTAMPTZ"),
         ("card_decks", "topic_id", "INTEGER"),
@@ -332,6 +334,27 @@ async def startup():
             await db.commit()
         except Exception:
             pass
+
+    # Kurs-Konzept, Phase 1: jede Klasse ohne Kurs bekommt ihren eigenen Kurs
+    # (1:1, gleicher Name/Owner). Ändert nichts am Verhalten, legt nur die
+    # Grundlage, damit Klassen später zu einem gemeinsamen Kurs gruppiert werden.
+    async with async_session() as db:
+        try:
+            rows = (await db.execute(text(
+                "SELECT id, name, owner_id FROM school_classes WHERE kurs_id IS NULL"
+            ))).all()
+            for cid, cname, owner in rows:
+                if owner is None:
+                    continue
+                kid = (await db.execute(text(
+                    "INSERT INTO kurse (owner_id, name) VALUES (:o, :n) RETURNING id"
+                ), {"o": owner, "n": cname or ""})).scalar()
+                await db.execute(text("UPDATE school_classes SET kurs_id = :k WHERE id = :c"), {"k": kid, "c": cid})
+            if rows:
+                print(f"[STARTUP] Kurse: {len(rows)} Klasse(n) je eigenem Kurs zugeordnet.", flush=True)
+            await db.commit()
+        except Exception as e:
+            print(f"[STARTUP-WARN] Kurs-Migration übersprungen: {e}", flush=True)
 
     # Marktplatz: kind muss zum Snapshot-Typ passen. Vor der kind-Spalte
     # veröffentlichte Karten-Decks/Einstiege trugen den Default

@@ -137,12 +137,27 @@ class Scan(Base):
 # ─── Nuvora-Kern: Klassen und Schueler ───
 # Kerndaten, kein Modulbesitz: beide Module arbeiten darauf. Ein Modul, das
 # eigene Klassen oder Schueler anlegt, hat den Sinn der Plattform gebrochen.
+class Kurs(Base):
+    """Eine Lerngruppe (die echten SuS). Mehrere Fach-Klassen (Mathe 7.5,
+    Lernzeit 7.5) hängen am selben Kurs und teilen sich dessen Schüler und
+    Anwesenheit — Karten/Noten/Orga bleiben pro Fach-Klasse. Phase 1: jede
+    Klasse hat vorerst ihren eigenen Kurs (1:1)."""
+    __tablename__ = "kurse"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(100), default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class SchoolClass(Base):
     __tablename__ = "school_classes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
     owner_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    # Zugehöriger Kurs (Lerngruppe). Fach-Klassen mit gleichem kurs_id teilen SuS.
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     # Standard-Anzahl Themenbloecke je Woche (Wochenplanung). Nur ein Vorschlag
     # beim Anlegen — die einzelne Woche darf abweichen.
     plan_blocks: Mapped[int] = mapped_column(Integer, default=2, server_default="2")

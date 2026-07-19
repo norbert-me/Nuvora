@@ -42,6 +42,7 @@ import Dashboard from "./pages/Dashboard.jsx";
 import Session from "./pages/Session.jsx";
 import Scanner from "./pages/Scanner.jsx";
 import Classes from "./pages/Classes.jsx";
+import Kurse from "./pages/Kurse.jsx";
 import Tests from "./pages/Tests.jsx";
 import Evaluation from "./pages/Evaluation.jsx";
 import ClassEvaluation from "./pages/ClassEvaluation.jsx";
@@ -680,6 +681,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path="/" element={user ? <NuvoraHome user={user} /> : <Landing />} />
           <Route path="/modules" element={user ? <Modules /> : <Landing />} />
           <Route path="/classes" element={user ? <Classes /> : <Landing />} />
+          <Route path="/kurse" element={user ? <Kurse /> : <Landing />} />
           <Route path="/topics" element={user ? <Topics /> : <Landing />} />
           <Route path="/thema/:id" element={user ? <ThemaAnsicht /> : <Landing />} />
           <Route path="/login" element={user ? <NuvoraHome user={user} /> : <Login onLogin={handleLogin} />} />

@@ -10,7 +10,7 @@
 // /cardvote/cards: der Kern kennt Klassen, nicht was ein Modul damit tut.
 import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -361,8 +361,9 @@ export default function Classes() {
             ]}
           />
         </div>
+        <Link to="/kurse" style={{ ...btnSecondary, textDecoration: "none", marginLeft: "auto" }}>{t("kurse.title")}</Link>
         {trash.length > 0 && (
-          <button onClick={() => setShowTrash((v) => !v)} style={{ ...btnSecondary, marginLeft: "auto" }}>
+          <button onClick={() => setShowTrash((v) => !v)} style={btnSecondary}>
             {t("classes.trash")} ({trash.length})
           </button>
         )}

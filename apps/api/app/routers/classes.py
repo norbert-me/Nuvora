@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
-from ..models import SchoolClass, Student, User
+from ..models import SchoolClass, Student, User, Kurs
 from .auth import get_current_user, rate_limit
 
 router = APIRouter(prefix="/api/classes", tags=["classes"])
@@ -113,6 +113,7 @@ class ClassOut(BaseModel):
     id: int
     name: str
     color: str = ""
+    kurs_id: Optional[int] = None
     students: List[StudentOut] = []
     model_config = {"from_attributes": True}
 
@@ -120,7 +121,11 @@ class ClassOut(BaseModel):
 @router.post("", response_model=ClassOut, status_code=201)
 async def create_class(body: ClassCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("cls_create", f"u{user.id}", 30, 60, "Zu viele Klassen in kurzer Zeit. Bitte kurz warten.")
-    sc = SchoolClass(name=body.name, owner_id=user.id, color=body.color or _auto_color(body.name))
+    # Neue Klasse bekommt ihren eigenen Kurs (Phase 1: 1:1). Gruppieren später.
+    kurs = Kurs(owner_id=user.id, name=body.name)
+    db.add(kurs)
+    await db.flush()
+    sc = SchoolClass(name=body.name, owner_id=user.id, color=body.color or _auto_color(body.name), kurs_id=kurs.id)
     db.add(sc)
     await db.flush()
     for s in body.students:
