@@ -31,11 +31,31 @@ export default function Methoden() {
   };
   const remove = async (id) => { await fetch(`${API}/${id}`, { method: "DELETE" }).catch(() => {}); load(); };
 
+  const doExport = async () => {
+    const r = await fetch(`${API}/export`).catch(() => null);
+    if (!r || !r.ok) return;
+    const blob = await r.blob(); const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "einstiege.json"; a.click(); URL.revokeObjectURL(a.href);
+  };
+  const doImport = async (file) => {
+    setError("");
+    try {
+      const data = JSON.parse(await file.text());
+      const r = await fetch(`${API}/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      if (r.ok) load(); else setError(t("common.notWork"));
+    } catch { setError(t("methoden.importError")); }
+  };
+
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
         <h1 style={pageTitle}>{t("methoden.title")}</h1>
-        <button onClick={() => setEdit({})} style={{ ...btnPrimary, marginLeft: "auto" }}>{t("methoden.new")}</button>
+        <span style={{ flex: 1 }} />
+        <button onClick={doExport} style={btnSecondary}>{t("common.export")}</button>
+        <label style={{ ...btnSecondary, cursor: "pointer" }}>{t("common.import")}
+          <input type="file" accept=".json,application/json" style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) doImport(e.target.files[0]); e.target.value = ""; }} />
+        </label>
+        <button onClick={() => setEdit({})} style={btnPrimary}>{t("methoden.new")}</button>
       </div>
       <p style={{ fontSize: 13.5, color: "var(--text2)", margin: "0 0 18px", maxWidth: 640 }}>{t("methoden.intro")}</p>
 

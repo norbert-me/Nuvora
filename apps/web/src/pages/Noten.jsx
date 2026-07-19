@@ -166,6 +166,24 @@ export default function Noten() {
   useEffect(() => { if (classId) load(classId); }, [classId, classes, term, agg]);
   const setAggPersist = (m) => { setAgg(m); try { localStorage.setItem("noten_agg", m); } catch { /* egal */ } };
 
+  const doExport = async () => {
+    if (!classId) return;
+    const r = await fetch(`${API}/classes/${classId}/export?term=${term}`).catch(() => null);
+    if (!r || !r.ok) return;
+    const blob = await r.blob(); const cls = classes.find((c) => c.id === classId);
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `noten-${(cls?.name || "klasse")}-hj${term}.json`; a.click(); URL.revokeObjectURL(a.href);
+  };
+  const doImport = async (file) => {
+    if (!classId) return;
+    setError("");
+    try {
+      const data = JSON.parse(await file.text());
+      const r = await fetch(`${API}/classes/${classId}/import?term=${term}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      if (r.ok) load(classId); else setError(t("noten.importError"));
+    } catch { setError(t("noten.importError")); }
+  };
+
   const call = async (fn) => {
     setError("");
     const res = await fn();
@@ -235,12 +253,18 @@ export default function Noten() {
                 background: agg === m ? "var(--accent)" : "transparent", color: agg === m ? "#fff" : "var(--text2)" }}>{label}</button>
           ))}
         </div>
-        {term !== "year" && (
-          <button onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}
-            className="icon-btn"
-            style={{ ...iconBtn, marginLeft: "auto", width: 36, height: 36, border: "1px solid var(--border2)", borderRadius: 10 }}>
-            <Icon d={ICONS.plus} size={20} color="var(--accent)" />
-          </button>
+        {term !== "year" && classId && (
+          <div style={{ display: "flex", gap: 8, marginLeft: "auto", alignItems: "center" }}>
+            <button onClick={doExport} style={btnSecondary}>{t("noten.export")}</button>
+            <label style={{ ...btnSecondary, cursor: "pointer" }}>{t("noten.import")}
+              <input type="file" accept=".json,application/json" style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) doImport(e.target.files[0]); e.target.value = ""; }} />
+            </label>
+            <button onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}
+              className="icon-btn"
+              style={{ ...iconBtn, width: 36, height: 36, border: "1px solid var(--border2)", borderRadius: 10 }}>
+              <Icon d={ICONS.plus} size={20} color="var(--accent)" />
+            </button>
+          </div>
         )}
       </div>
 

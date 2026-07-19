@@ -70,6 +70,20 @@ export default function Kalender() {
   };
   const delBreak = async (id) => { await fetch(`${API}/breaks/${id}`, { method: "DELETE" }).catch(() => {}); loadBreaks(); };
 
+  const exportKal = async () => {
+    const r = await fetch(`${API}/export`).catch(() => null);
+    if (!r || !r.ok) return;
+    const blob = await r.blob(); const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "kalender.json"; a.click(); URL.revokeObjectURL(a.href);
+  };
+  const importKal = async (file) => {
+    try {
+      const data = JSON.parse(await file.text());
+      const r = await fetch(`${API}/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      if (r.ok) { load(); loadTt(); loadBreaks(); }
+    } catch { /* ignorieren */ }
+  };
+
   // Sichtbarer Zeitraum je Ansicht.
   const range = (() => {
     if (view === "day") return [startOfDay(cursor), startOfDay(cursor)];
@@ -161,6 +175,14 @@ export default function Kalender() {
           </div>
         )}
       </div>
+      {view === "timetable" && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <button onClick={exportKal} style={btnSecondary}>{t("kalender.export")}</button>
+          <label style={{ ...btnSecondary, cursor: "pointer" }}>{t("kalender.import")}
+            <input type="file" accept=".json,application/json" style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) importKal(e.target.files[0]); e.target.value = ""; }} />
+          </label>
+        </div>
+      )}
       {view !== "timetable" && <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: "var(--text)" }}>{title}</div>}
 
       {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} t={t} />}

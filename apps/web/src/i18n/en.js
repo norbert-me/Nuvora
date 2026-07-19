@@ -772,4 +772,13 @@ export default {
   "profile.tutorialTitle": "Tutorial",
   "profile.tutorialHint": "Show the intro again the next time you open the app.",
   "profile.tutorialRestart": "Restart tutorial",
+  "common.export": "Export",
+  "common.import": "Import",
+  "methoden.importError": "Import failed.",
+  "kalender.export": "Export",
+  "kalender.import": "Import",
+  "kalender.importError": "Import failed.",
+  "noten.export": "Export",
+  "noten.import": "Import",
+  "noten.importError": "Import failed.",
 };

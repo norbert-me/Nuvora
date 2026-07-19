@@ -772,4 +772,13 @@ export default {
   "profile.tutorialTitle": "Tutorial",
   "profile.tutorialHint": "Mostrar la introducción de nuevo la próxima vez.",
   "profile.tutorialRestart": "Reiniciar tutorial",
+  "common.export": "Exportar",
+  "common.import": "Importar",
+  "methoden.importError": "Error al importar.",
+  "kalender.export": "Exportar",
+  "kalender.import": "Importar",
+  "kalender.importError": "Error al importar.",
+  "noten.export": "Exportar",
+  "noten.import": "Importar",
+  "noten.importError": "Error al importar.",
 };

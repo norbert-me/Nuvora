@@ -128,6 +128,83 @@ async def _release_matching_decks(db: AsyncSession, user: User, e: CalendarEntry
     await db.commit()
 
 
+async def _class_maps(db, user):
+    rows = (await db.execute(select(SchoolClass).where((SchoolClass.owner_id == user.id) | (SchoolClass.owner_id.is_(None))))).scalars().all()
+    id2name = {c.id: c.name for c in rows}
+    name2id = {c.name: c.id for c in rows}
+    return id2name, name2id
+
+
+async def _topic_maps(db, user):
+    rows = (await db.execute(select(Topic).where(Topic.owner_id == user.id))).scalars().all()
+    by_id = {t.id: t for t in rows}
+    def path(tid):
+        t = by_id.get(tid)
+        if not t:
+            return ""
+        p = by_id.get(t.parent_id) if t.parent_id else None
+        return f"{p.name} / {t.name}" if p else t.name
+    path2id = {path(t.id): t.id for t in rows}
+    return path, path2id
+
+
+@router.get("/export")
+async def export_kalender(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    id2name, _ = await _class_maps(db, user)
+    tpath, _ = await _topic_maps(db, user)
+    slots = (await db.execute(select(TimetableSlot).where(TimetableSlot.owner_id == user.id))).scalars().all()
+    entries = (await db.execute(select(CalendarEntry).where(CalendarEntry.owner_id == user.id).order_by(CalendarEntry.date))).scalars().all()
+    breaks = (await db.execute(select(CalendarBreak).where(CalendarBreak.owner_id == user.id).order_by(CalendarBreak.start_date))).scalars().all()
+    return {
+        "type": "nuvora_kalender", "version": 1,
+        "timetable": {
+            "periods": user.timetable_periods or 6,
+            "times": user.timetable_times or [],
+            "slots": [{"weekday": s.weekday, "period": s.period, "class": id2name.get(s.class_id), "title": s.title} for s in slots],
+        },
+        "breaks": [{"start_date": b.start_date.isoformat(), "end_date": b.end_date.isoformat(), "label": b.label} for b in breaks],
+        "entries": [{"date": e.date.isoformat(), "period": e.period, "title": e.title, "notes": e.notes,
+                     "class": id2name.get(e.class_id), "topic": tpath(e.topic_id) if e.topic_id else ""} for e in entries],
+    }
+
+
+@router.post("/import")
+async def import_kalender(body: dict, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    if body.get("type") != "nuvora_kalender":
+        raise HTTPException(400, "Falsches Dateiformat")
+    _, name2id = await _class_maps(db, user)
+    _, path2id = await _topic_maps(db, user)
+    tt = body.get("timetable") or {}
+    if tt.get("periods"):
+        user.timetable_periods = int(tt["periods"])
+    if isinstance(tt.get("times"), list):
+        user.timetable_times = tt["times"]
+    # Stundenplan-Slots ersetzen (Wochentag+Stunde eindeutig).
+    if isinstance(tt.get("slots"), list):
+        for s in (await db.execute(select(TimetableSlot).where(TimetableSlot.owner_id == user.id))).scalars().all():
+            await db.delete(s)
+        for s in tt["slots"]:
+            db.add(TimetableSlot(owner_id=user.id, weekday=int(s.get("weekday", 0)), period=int(s.get("period", 1)),
+                                 class_id=name2id.get(s.get("class")), title=s.get("title") or ""))
+    for b in (body.get("breaks") or []):
+        try:
+            db.add(CalendarBreak(owner_id=user.id, start_date=datetime.fromisoformat(b["start_date"]),
+                                 end_date=datetime.fromisoformat(b["end_date"]), label=(b.get("label") or "")[:120]))
+        except (KeyError, ValueError):
+            continue
+    n = 0
+    for e in (body.get("entries") or []):
+        try:
+            dt = datetime.fromisoformat(e["date"])
+        except (KeyError, ValueError):
+            continue
+        db.add(CalendarEntry(owner_id=user.id, date=dt, period=e.get("period"), title=(e.get("title") or "")[:200],
+                             notes=e.get("notes") or "", class_id=name2id.get(e.get("class")), topic_id=path2id.get(e.get("topic"))))
+        n += 1
+    await db.commit()
+    return {"imported": n}
+
+
 class BreakIn(BaseModel):
     start_date: datetime
     end_date: datetime

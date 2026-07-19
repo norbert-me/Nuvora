@@ -703,3 +703,115 @@ async def import_session(body: ImportBody, user: User = Depends(require_module),
         angelegt += 1
     await db.commit()
     return {"imported": angelegt}
+
+
+# ─── Export / Import je Klasse+Halbjahr (JSON-Sicherung) ───
+# Portabel ueber Schueler card_id und Abschnitts-/Spalten-Indizes, damit ein
+# Import auch in eine andere (deckungsgleiche) Klasse passt. Beobachtungen sind
+# mit dabei; Foerderdaten der Schueler nie (die liegen im Kern, nicht hier).
+
+@router.get("/classes/{class_id}/export")
+async def export_noten(class_id: int, term: str = "1", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    await _owned_class(db, user, class_id)
+    secs = (await db.execute(
+        select(GradeSection).options(selectinload(GradeSection.categories))
+        .where(GradeSection.class_id == class_id, GradeSection.term == term).order_by(GradeSection.position)
+    )).scalars().all()
+    # Index-Zuordnung fuer Spalten.
+    cat_index = {}   # category_id -> (s_idx, c_idx)
+    out_secs = []
+    for si, sec in enumerate(secs):
+        cats = sorted(sec.categories, key=lambda c: c.position)
+        for ci, c in enumerate(cats):
+            cat_index[c.id] = (si, ci)
+        out_secs.append({"name": sec.name, "weight": sec.weight, "position": sec.position,
+                         "categories": [{"name": c.name, "position": c.position} for c in cats]})
+    students = (await db.execute(select(Student).where(Student.class_id == class_id))).scalars().all()
+    sid2card = {s.id: s.card_id for s in students}
+    cat_ids = list(cat_index.keys())
+    entries = []
+    if cat_ids:
+        rows = (await db.execute(select(GradeEntry).where(GradeEntry.category_id.in_(cat_ids)))).scalars().all()
+        for e in rows:
+            if e.student_id not in sid2card:
+                continue
+            s_idx, c_idx = cat_index[e.category_id]
+            entries.append({"card_id": sid2card[e.student_id], "s": s_idx, "c": c_idx, "kind": e.kind,
+                            "value": e.value, "tendency": e.tendency, "note": e.note,
+                            "date": e.date.isoformat() if e.date else None})
+    sec_idx = {sec.id: si for si, sec in enumerate(secs)}
+    ov_rows = (await db.execute(select(GradeOverride).where(
+        GradeOverride.class_id == class_id, GradeOverride.owner_id == user.id))).scalars().all()
+    overrides = []
+    for o in ov_rows:
+        if o.student_id not in sid2card:
+            continue
+        if o.section_id is not None and o.section_id not in sec_idx:
+            continue
+        # Endnote gilt je Halbjahr; Bereichsnote haengt am Abschnitt.
+        if o.section_id is None and o.term != term:
+            continue
+        overrides.append({"card_id": sid2card[o.student_id], "s": sec_idx.get(o.section_id), "value": o.value})
+    div_rows = (await db.execute(select(QuartalDivider).where(
+        QuartalDivider.class_id == class_id, QuartalDivider.owner_id == user.id, QuartalDivider.term == term))).scalars().all()
+    dividers = [cat_index[d.after_category_id] for d in div_rows if d.after_category_id in cat_index]
+    return {"type": "nuvora_noten", "version": 1, "term": term, "sections": out_secs,
+            "entries": entries, "overrides": overrides,
+            "dividers": [{"s": s, "c": c} for (s, c) in dividers]}
+
+
+@router.post("/classes/{class_id}/import")
+async def import_noten(class_id: int, body: dict, term: str = "1", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    if body.get("type") != "nuvora_noten":
+        raise HTTPException(400, "Falsches Dateiformat")
+    await _owned_class(db, user, class_id)
+    students = (await db.execute(select(Student).where(Student.class_id == class_id))).scalars().all()
+    card2sid = {s.card_id: s.id for s in students}
+    # Abschnitte + Spalten neu anlegen, Index -> neue ID merken.
+    cat_map = {}  # (s_idx, c_idx) -> category_id
+    sec_map = {}  # s_idx -> section_id
+    pos0 = (await db.execute(select(GradeSection).where(GradeSection.class_id == class_id, GradeSection.term == term))).scalars().all()
+    base = len(pos0)
+    for si, sec in enumerate(body.get("sections") or []):
+        gs = GradeSection(owner_id=user.id, class_id=class_id, term=term, name=(sec.get("name") or "Abschnitt")[:120],
+                          weight=int(sec.get("weight") or 0), position=base + si)
+        db.add(gs)
+        await db.flush()
+        sec_map[si] = gs.id
+        for ci, c in enumerate(sec.get("categories") or []):
+            gc = GradeCategory(owner_id=user.id, class_id=class_id, section_id=gs.id,
+                               name=(c.get("name") or "Spalte")[:120], position=ci)
+            db.add(gc)
+            await db.flush()
+            cat_map[(si, ci)] = gc.id
+    for e in (body.get("entries") or []):
+        sid = card2sid.get(e.get("card_id"))
+        cid = cat_map.get((e.get("s"), e.get("c")))
+        if not sid or not cid:
+            continue
+        dt = None
+        if e.get("date"):
+            try:
+                dt = datetime.fromisoformat(e["date"])
+            except ValueError:
+                dt = None
+        ge = GradeEntry(category_id=cid, student_id=sid, kind=e.get("kind") or "grade",
+                        value=e.get("value"), tendency=e.get("tendency"), note=e.get("note") or "")
+        if dt:
+            ge.date = dt
+        db.add(ge)
+    for o in (body.get("overrides") or []):
+        sid = card2sid.get(o.get("card_id"))
+        if not sid or o.get("value") is None:
+            continue
+        section_id = sec_map.get(o.get("s")) if o.get("s") is not None else None
+        if o.get("s") is not None and section_id is None:
+            continue
+        db.add(GradeOverride(owner_id=user.id, class_id=class_id, student_id=sid,
+                             section_id=section_id, term=term, value=o["value"]))
+    for d in (body.get("dividers") or []):
+        cid = cat_map.get((d.get("s"), d.get("c")))
+        if cid:
+            db.add(QuartalDivider(class_id=class_id, owner_id=user.id, term=term, after_category_id=cid))
+    await db.commit()
+    return {"imported": len(body.get("sections") or [])}

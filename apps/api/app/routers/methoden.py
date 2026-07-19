@@ -88,6 +88,36 @@ async def update_method(method_id: int, body: MethodIn, user: User = Depends(req
     return m
 
 
+@router.get("/export")
+async def export_einstiege(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    rows = (await db.execute(select(Method).where(Method.owner_id == user.id).order_by(Method.title))).scalars().all()
+    return {
+        "type": "nuvora_einstiege", "version": 1,
+        "items": [{"title": m.title, "description": m.description, "ablauf": m.ablauf, "material": m.material, "dauer": m.dauer} for m in rows],
+    }
+
+
+@router.post("/import")
+async def import_einstiege(body: dict, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    if body.get("type") != "nuvora_einstiege":
+        raise HTTPException(400, "Falsches Dateiformat")
+    items = body.get("items") or []
+    if len(items) > 500:
+        raise HTTPException(400, "Zu viele Einträge")
+    n = 0
+    for it in items:
+        title = (it.get("title") or "").strip()
+        if not title:
+            continue
+        d = it.get("dauer")
+        db.add(Method(owner_id=user.id, title=title[:200], description=it.get("description") or "",
+                      ablauf=it.get("ablauf") or "", material=it.get("material") or "",
+                      dauer=int(d) if isinstance(d, (int, float)) else None))
+        n += 1
+    await db.commit()
+    return {"imported": n}
+
+
 @router.delete("/{method_id}", status_code=204)
 async def delete_method(method_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     m = await db.get(Method, method_id)
