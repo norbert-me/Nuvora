@@ -1099,6 +1099,14 @@ body:not(.authed) #auth-overlay ~ .tab-content { display: none !important; }
 /* Eingebettet scrollt Nuvora selbst — kein zweiter (nested) Scrollbalken.
    Die interne 60vh-Tabellenhoehe entfaellt, der Inhalt fliesst voll. */
 .embedded .table-wrap { max-height: none !important; overflow: visible !important; }
+/* Aufgabenübersicht: hoechstens ~8 Zeilen, dann scrollen — auch eingebettet. */
+.aufgaben-wrap, .embedded .aufgaben-wrap { max-height: 25rem !important; overflow-y: auto !important; }
+/* "Neue Aufgabe" ein-/ausklappbar */
+#aufgaben-form-title { cursor: pointer; user-select: none; }
+#aufgaben-form-title::after { content: "▾"; float: right; font-size: 0.8em; color: var(--text-muted); }
+#aufgaben-form-title[data-collapsed="1"]::after { content: "▸"; }
+/* Speichern gesperrt, solange Pflichtfelder fehlen */
+#aufgabe-submit-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* ─── Dark Mode ───
    Die App hatte keinen: eingebettet in Nuvoras dunkles Design leuchtete das

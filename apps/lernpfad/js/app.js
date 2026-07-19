@@ -535,7 +535,25 @@
         const isLatex = document.getElementById('aufgabe-quelle-typ').value === 'latex';
         document.getElementById('latex-group').style.display = isLatex ? '' : 'none';
         document.getElementById('aufgabe-quelle-detail').style.display = isLatex ? 'none' : '';
+
+        // Speichern erst moeglich, wenn die Pflichtfelder (Thema + Kategorie) da sind.
+        const submitBtn = document.getElementById('aufgabe-submit-btn');
+        if (submitBtn) submitBtn.disabled = !(thema && kat);
     }
+
+    // ─── "Neue Aufgabe" ein-/ausklappbar ───
+    (function () {
+        const title = document.getElementById('aufgaben-form-title');
+        const form = document.getElementById('aufgabe-form');
+        if (!title || !form) return;
+        window.setAufgabeFormOpen = (open) => {
+            form.style.display = open ? '' : 'none';
+            title.dataset.collapsed = open ? '0' : '1';
+        };
+        title.addEventListener('click', () => window.setAufgabeFormOpen(title.dataset.collapsed === '1'));
+        // Standard: eingeklappt, damit die Uebersicht oben steht.
+        window.setAufgabeFormOpen(false);
+    })();
 
     // KaTeX sicher rendern (gibt bei Fehler den Rohcode zurück)
     function renderLatex(el, code) {
@@ -748,6 +766,7 @@
         document.getElementById('aufgabe-latex-preview').innerHTML = '';
         updateFormVisibility();
         setNextId();
+        if (window.setAufgabeFormOpen) window.setAufgabeFormOpen(false);
     }
 
     document.getElementById('aufgabe-cancel-btn').addEventListener('click', resetAufgabeForm);
@@ -789,6 +808,7 @@
         document.getElementById('aufgaben-form-title').textContent = 'Aufgabe bearbeiten';
         document.getElementById('aufgabe-cancel-btn').style.display = '';
         document.getElementById('aufgabe-submit-btn').textContent = 'Änderung speichern';
+        if (window.setAufgabeFormOpen) window.setAufgabeFormOpen(true);
         updateFormVisibility();
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
