@@ -65,3 +65,6 @@ Thumbs.db
 *.xlsx
 *.bundle
 ~$*
+
+# ─── Persönliche Todo-Liste (nicht committen) ───
+TODO.md
