@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { askPrompt } from "../core/dialog.jsx";
 import { useParams, useNavigate } from "react-router-dom";
 import Latex from "../components/Latex.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -377,8 +378,8 @@ export default function Session() {
     return (
       <div style={{ maxWidth: 640, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20, gap: 12, flexWrap: "wrap" }}>
-          <button onClick={() => {
-            const code = prompt(t("session.codePrompt"));
+          <button onClick={async () => {
+            const code = await askPrompt(t("session.codePrompt"));
             if (code && code.trim()) navigate(`/cardvote/scan?session=${code.trim().replace(/\D/g, "").slice(0, 4)}`);
           }} style={{
             display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", fontSize: 14, fontWeight: 600, cursor: "pointer",

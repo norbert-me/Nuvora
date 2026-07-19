@@ -1,6 +1,7 @@
 // Modul Material-Ausleihe — Gegenstände verleihen und Rückgabe im Blick.
 // Ausleiher: ein Kern-Schüler (Klasse wählen) oder ein Freitextname.
 import { useState, useEffect, useCallback } from "react";
+import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { pageTitle, btnPrimary, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr } from "../core/cache.js";
@@ -35,7 +36,7 @@ export default function Ausleihe() {
     const r = await fetch(`${API}/items`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }).catch(() => null);
     if (r && r.ok) { setNeu(""); load(); }
   };
-  const loeschen = async (id) => { if (!confirm(t("ausleihe.delConfirm"))) return; await fetch(`${API}/items/${id}`, { method: "DELETE" }).catch(() => {}); if (offen === id) setOffen(null); load(); };
+  const loeschen = async (id) => { if (!await askConfirm(t("ausleihe.delConfirm"))) return; await fetch(`${API}/items/${id}`, { method: "DELETE" }).catch(() => {}); if (offen === id) setOffen(null); load(); };
 
   const oeffnen = (id) => {
     if (offen === id) { setOffen(null); return; }

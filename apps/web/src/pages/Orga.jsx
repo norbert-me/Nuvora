@@ -2,6 +2,7 @@
 // als Spalten, Schüler als Zeilen, je Zelle ein Häkchen. Nur die Häkchen liegen
 // im Modul, die Schüler im Kern.
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { pageTitle, btnPrimary, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
@@ -41,7 +42,7 @@ export default function Orga() {
     if (r && r.ok) { setNeu(""); load(classId); }
   };
   const loeschen = async (id) => {
-    if (!confirm(t("orga.delConfirm"))) return;
+    if (!await askConfirm(t("orga.delConfirm"))) return;
     await fetch(`${API}/item/${id}`, { method: "DELETE" }).catch(() => {});
     load(classId);
   };

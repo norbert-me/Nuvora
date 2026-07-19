@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link } from "react-router-dom";
 import { Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -26,7 +27,7 @@ export default function Tests() {
   useEffect(() => { load(); }, [showArchived]);
 
   const remove = async (id) => {
-    if (!confirm(t("tests.deleteConfirm"))) return;
+    if (!await askConfirm(t("tests.deleteConfirm"))) return;
     await fetch(`${API}/sessions/${id}`, { method: "DELETE" });
     load();
   };

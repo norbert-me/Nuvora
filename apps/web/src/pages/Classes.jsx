@@ -9,6 +9,7 @@
 // Kartendruck und Auswertung liegen NICHT hier, sondern im Modul unter
 // /cardvote/cards: der Kern kennt Klassen, nicht was ein Modul damit tut.
 import { useState, useEffect } from "react";
+import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { useSearchParams } from "react-router-dom";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
@@ -122,7 +123,7 @@ export default function Classes() {
   };
 
   const remove = async (id) => {
-    if (!confirm(t("classes.deleteConfirm"))) return;
+    if (!await askConfirm(t("classes.deleteConfirm"))) return;
     await fetch(`${API}/classes/${id}`, { method: "DELETE" });
     load();
   };
@@ -139,13 +140,13 @@ export default function Classes() {
       if (data.type === "cardvote_class") {
         await fetch(`${API}/import/class`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
         load();
-      } else { alert(t("classes.invalidFormat")); }
+      } else { showAlert(t("classes.invalidFormat")); }
     };
     input.click();
   };
 
   const importXlsx = async () => {
-    const className = prompt(t("classes.classNamePrompt"));
+    const className = await askPrompt(t("classes.classNamePrompt"));
     if (!className) return;
     const input = document.createElement("input");
     input.type = "file";
@@ -156,7 +157,7 @@ export default function Classes() {
       const form = new FormData();
       form.append("file", file);
       const res = await fetch(`${API}/import/class-xlsx?name=${encodeURIComponent(className)}`, { method: "POST", body: form });
-      if (res.ok) { load(); } else { const err = await res.json(); alert(err.detail || t("classes.importError")); }
+      if (res.ok) { load(); } else { const err = await res.json(); showAlert(err.detail || t("classes.importError")); }
     };
     input.click();
   };
@@ -174,8 +175,8 @@ export default function Classes() {
     setStudentField(idx, "foerder", cur.includes(wert) ? cur.filter((f) => f !== wert) : [...cur, wert]);
   };
 
-  const removeStudent = (idx) => {
-    if (!confirm(t("classes.removeCardConfirm"))) return;
+  const removeStudent = async (idx) => {
+    if (!await askConfirm(t("classes.removeCardConfirm"))) return;
     const updated = students.filter((_, i) => i !== idx);
     setStudents(updated.map((s, i) => ({ ...s, card_id: i + 1 })));
   };
@@ -265,8 +266,8 @@ export default function Classes() {
                   {(s.klassenlehrer || "").trim() && students.length > 1 && (
                     <button
                       type="button"
-                      onClick={() => {
-                        if (!confirm(t("classes.applyAllConfirm", { name: s.klassenlehrer, n: students.length }))) return;
+                      onClick={async () => {
+                        if (!await askConfirm(t("classes.applyAllConfirm", { name: s.klassenlehrer, n: students.length }))) return;
                         setStudents(students.map((st) => ({ ...st, klassenlehrer: s.klassenlehrer })));
                       }}
                       style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12.5 }}

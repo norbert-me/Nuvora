@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import Latex from "../components/Latex.jsx";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Toggle } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
@@ -203,7 +204,7 @@ export default function Dashboard() {
   };
 
   const deleteFolder = async (id) => {
-    if (!confirm(t("dash.deleteFolderConfirm"))) return;
+    if (!await askConfirm(t("dash.deleteFolderConfirm"))) return;
     await fetch(`${API}/folders/${id}`, { method: "DELETE" }); load();
   };
 
@@ -227,7 +228,7 @@ export default function Dashboard() {
   };
 
   const deleteSet = async (id) => {
-    if (!confirm(t("dash.deleteSetConfirm"))) return;
+    if (!await askConfirm(t("dash.deleteSetConfirm"))) return;
     await fetch(`${API}/question-sets/${id}`, { method: "DELETE" });
     setEditingSet(null); load();
   };
@@ -239,7 +240,7 @@ export default function Dashboard() {
   };
 
   const importXlsx = async () => {
-    const setName = prompt(t("dash.setNamePrompt"));
+    const setName = await askPrompt(t("dash.setNamePrompt"));
     if (!setName) return;
     const input = document.createElement("input");
     input.type = "file";

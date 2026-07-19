@@ -8,6 +8,7 @@
 // Klick auf einen Namen öffnet alle Infos zur Person. Beobachtungen zählen nie
 // in den Schnitt — „Anstrengungsbereitschaft“ ist kein Messwert.
 import { useState, useEffect, useRef } from "react";
+import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle } from "../components/Icons.jsx";
@@ -357,7 +358,7 @@ export default function Noten() {
                         <span style={{ color: "var(--text3)", fontWeight: 400 }}>{sec.weight} %</span>
                         <SectionMenu t={t} sec={sec}
                           onEdit={(b) => call(() => fetch(`${API}/sections/${sec.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }))}
-                          onDelete={() => { if (confirm(t("noten.delSection", { name: sec.name }))) call(() => fetch(`${API}/sections/${sec.id}`, { method: "DELETE" })); }}
+                          onDelete={async () => { if (await askConfirm(t("noten.delSection", { name: sec.name }))) call(() => fetch(`${API}/sections/${sec.id}`, { method: "DELETE" })); }}
                           onAddCol={() => setNeuSpalteIn(sec.id)} />
                       </div>
                     </th>
@@ -412,7 +413,7 @@ export default function Noten() {
                         {renameCol === c.id && (
                           <ColMenu t={t} cat={c} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
                             onRename={async (name) => { if (await call(() => fetch(`${API}/categories/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: c.position ?? i }) }))) setRenameCol(null); }}
-                            onDelete={() => { if (confirm(t("noten.delColumn", { name: c.name }))) { call(() => fetch(`${API}/categories/${c.id}`, { method: "DELETE" })); setRenameCol(null); } }}
+                            onDelete={async () => { if (await askConfirm(t("noten.delColumn", { name: c.name }))) { call(() => fetch(`${API}/categories/${c.id}`, { method: "DELETE" })); setRenameCol(null); } }}
                             onClose={() => setRenameCol(null)} />
                         )}
                       </div>

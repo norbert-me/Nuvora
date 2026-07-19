@@ -4,6 +4,7 @@
 // auf die Kern-Taxonomie (dieselbe, die CardVote-Fragen nutzen). Erst dadurch
 // findet ein schwach ausgefallenes Testthema seine Uebungsaufgaben.
 import { useState, useEffect } from "react";
+import { askConfirm } from "../../core/dialog.jsx";
 import { Icon, ICONS, iconBtn, COLORS as C } from "../../components/Icons.jsx";
 import TopicPicker from "../../components/TopicPicker.jsx";
 
@@ -65,7 +66,7 @@ export default function Exercises() {
   };
 
   const remove = async (ex) => {
-    if (!confirm("Aufgabe löschen?")) return;
+    if (!await askConfirm("Aufgabe löschen?")) return;
     await fetch(`${API}/exercises/${ex.id}`, { method: "DELETE" });
     load();
   };

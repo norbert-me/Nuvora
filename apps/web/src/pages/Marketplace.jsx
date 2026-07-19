@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api";
@@ -113,7 +114,7 @@ export default function Marketplace() {
   };
 
   const remove = async (id) => {
-    if (!confirm(t("market.removeConfirm"))) return;
+    if (!await askConfirm(t("market.removeConfirm"))) return;
     const res = await fetch(`${API}/marketplace/${id}`, { method: "DELETE" });
     if (res.ok) load();
   };

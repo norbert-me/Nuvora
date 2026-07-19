@@ -3,6 +3,7 @@
 // erst dadurch laesst sich ein schwach ausgefallenes Thema auf passende
 // Aufgaben abbilden.
 import { useState, useEffect } from "react";
+import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { Link } from "react-router-dom";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle } from "../components/Icons.jsx";
@@ -96,7 +97,7 @@ export default function Topics() {
     if (kids.length) parts.push(t("topics.delSubs", { n: kids.length }));
     const affected = tp.question_count + kids.reduce((n, k) => n + k.question_count, 0);
     if (affected) parts.push(t("topics.delQuestions", { n: affected }));
-    if (!confirm(parts.join("\n"))) return;
+    if (!await askConfirm(parts.join("\n"))) return;
     await call(() => fetch(`${API}/topics/${tp.id}`, { method: "DELETE" }));
   };
 

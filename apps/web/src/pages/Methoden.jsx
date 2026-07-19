@@ -2,6 +2,7 @@
 // Je Einstieg: Idee (Text), Ablauf mit Material, Materialliste, ca. Dauer.
 // Wiederverwendbar; im Kalender einer Stunde zuweisbar.
 import { useState, useEffect } from "react";
+import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -72,12 +73,12 @@ export default function Methoden() {
                 {m.dauer != null && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 980, background: "rgba(37,99,235,0.12)", color: "#2563eb" }}>{t("methoden.dauerBadge", { n: m.dauer })}</span>}
                 <span style={{ flex: 1 }} />
                 <button onClick={async () => {
-                  const description = window.prompt(t("methoden.publishPrompt")); if (description === null) return;
+                  const description = await askPrompt(t("methoden.publishPrompt")); if (description === null) return;
                   const r = await fetch(`/api/marketplace/publish/method`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method_id: m.id, description }) }).catch(() => null);
-                  alert(r && r.ok ? t("methoden.published") : t("methoden.publishError"));
+                  showAlert(r && r.ok ? t("methoden.published") : t("methoden.publishError"));
                 }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("methoden.publish")}><Icon d={ICONS.export} size={14} color="var(--accent)" /></button>
                 <button onClick={() => setEdit(m)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>
-                <button onClick={() => { if (confirm(t("methoden.delConfirm", { title: m.title }))) remove(m.id); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
+                <button onClick={async () => { if (await askConfirm(t("methoden.delConfirm", { title: m.title }))) remove(m.id); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
               </div>
               {m.description && <div style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{m.description}</div>}
               {m.ablauf && (<>

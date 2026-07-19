@@ -1,6 +1,7 @@
 // Modul Kalender — Unterrichtsplanung. Tag-, Wochen- und Monatsansicht; je Tag
 // Stunden eintragen und optional Klasse + Thema (Kern-Taxonomie) zuordnen.
 import { useState, useEffect, useCallback, Fragment } from "react";
+import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate } from "react-router-dom";
 import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, selectStyle } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -544,7 +545,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   const alsNote = async () => {
     const r = await fetch(`${API}/quiz-session?set_id=${entry.cardvote_set_id}&class_id=${entry.class_id}`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
     if (r && r.session_id) { onClose(); navigate(`/cardvote/evaluation/${r.session_id}?import=1`); }
-    else alert(t("kalender.noSession"));
+    else showAlert(t("kalender.noSession"));
   };
   const [title, setTitle] = useState(entry.title || "");
   const [notes, setNotes] = useState(entry.notes || "");

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { btnPrimary, btnSecondary } from "../components/Icons.jsx";
 
@@ -349,7 +350,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                             <button
                               title={t("profile.deleteUser")}
                               onClick={async () => {
-                                if (!confirm(t("profile.deleteUserConfirm", { email: u.email }))) return;
+                                if (!await askConfirm(t("profile.deleteUserConfirm", { email: u.email }))) return;
                                 const res = await fetch(`${API}/auth/admin/users/${u.id}`, { method: "DELETE" });
                                 if (res.ok) {
                                   setAdminUsers(adminUsers.filter(x => x.id !== u.id));
@@ -374,9 +375,9 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
         <button onClick={onLogout} style={{ ...btnPrimary, background: "#d1350f" }}>{t("profile.logout")}</button>
         <button onClick={async () => {
-          const pw = prompt(t("profile.deletePwPrompt"));
+          const pw = await askPrompt(t("profile.deletePwPrompt"));
           if (!pw) return;
-          if (!confirm(t("profile.deleteConfirm"))) return;
+          if (!await askConfirm(t("profile.deleteConfirm"))) return;
           const res = await fetch(`${API}/auth/delete-account`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -388,7 +389,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             location.reload();
           } else {
             const data = await res.json();
-            alert(data.detail || t("login.genericError"));
+            showAlert(data.detail || t("login.genericError"));
           }
         }} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#d1350f", fontSize: 13, cursor: "pointer" }}>
           <TrashIcon size={14} /> {t("profile.deleteUser")}
