@@ -22,7 +22,8 @@ from sqlalchemy import select, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Card, CardDeck, CardReview, SchoolClass, Student, User
+from sqlalchemy.orm import selectinload
+from ..models import Card, CardDeck, CardReview, SchoolClass, Student, User, Session, Scan, QuestionSetItem
 from .auth import get_current_user, rate_limit
 from .modules import is_active
 
@@ -368,6 +369,50 @@ async def qr_png(token: str, base: str = "", db: AsyncSession = Depends(get_db))
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return Response(content=buf.getvalue(), media_type="image/png")
+
+
+@router.get("/lernen/{token}/results")
+async def student_results(token: str, db: AsyncSession = Depends(get_db)):
+    """Oeffentlich (Token statt Login): die CardVote-Testergebnisse dieses
+    Schuelers — je Session sein Punktestand. Nur Sessions, an denen er
+    teilgenommen hat (mindestens ein Scan). Newest first."""
+    st = await _student_by_token(db, token)  # 401 bei ungueltigem Token
+    sessions = (await db.execute(
+        select(Session).where(Session.class_id == st.class_id).order_by(Session.created_at.desc())
+    )).scalars().all()
+    out = []
+    for sess in sessions:
+        if not sess.question_set_id:
+            continue
+        items = (await db.execute(
+            select(QuestionSetItem).options(selectinload(QuestionSetItem.question))
+            .where(QuestionSetItem.question_set_id == sess.question_set_id)
+        )).scalars().all()
+        qmap = sess.question_map or {}
+        # Scans dieses Schuelers in dieser Session (Scan.student_id == card_id).
+        scans = {s.question_id: s.answer for s in (await db.execute(
+            select(Scan).where(Scan.session_id == sess.id, Scan.student_id == st.card_id)
+        )).scalars().all()}
+        if not scans:
+            continue  # nicht teilgenommen
+        score = 0
+        total = 0
+        for it in items:
+            q = it.question
+            correct = qmap.get(str(q.id), q.correct_answer)
+            if not correct:
+                continue
+            total += 1
+            ans = scans.get(q.id)
+            if ans is not None and ans in correct:
+                score += 1
+        out.append({
+            "name": sess.name or "Test",
+            "date": sess.created_at.isoformat() if sess.created_at else None,
+            "score": score, "total": total,
+            "pct": round(score / total * 100) if total else 0,
+        })
+    return out
 
 
 @router.get("/lernen/{token}")

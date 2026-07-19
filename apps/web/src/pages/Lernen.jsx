@@ -12,6 +12,12 @@ export default function Lernen() {
   const [flipped, setFlipped] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const [results, setResults] = useState(null); // CardVote-Ergebnisse (Token-öffentlich)
+  const [tab, setTab] = useState(null);         // "karten" | "ergebnisse"
+
+  useEffect(() => {
+    fetch(`${API}/lernen/${token}/results`).then((r) => (r.ok ? r.json() : [])).then((d) => setResults(Array.isArray(d) ? d : [])).catch(() => setResults([]));
+  }, [token]);
 
   // all=true: freiwilliges Weiteruben — alle Karten, auch nicht faellige.
   const load = useCallback((all = false) => {
@@ -55,10 +61,27 @@ export default function Lernen() {
   if (error) return <Center><p style={{ color: "#dc2626" }}>{error}</p></Center>;
   if (!data) return <Center><p style={{ color: "var(--text3)" }}>Lädt…</p></Center>;
 
+  // Hat der Schüler überhaupt Karten? Ohne Karten-Modul/Stapel gibt es keine —
+  // dann zeigt die Seite nur die Testergebnisse.
+  const hatKarten = (data.total || 0) > 0 || (data.cards || []).length > 0 || (data.learned || 0) > 0;
+  const aktiverTab = tab || (hatKarten ? "karten" : "ergebnisse");
+  const tabBar = hatKarten ? (
+    <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 16 }}>
+      {[["karten", "Karten"], ["ergebnisse", "Ergebnisse"]].map(([k, l]) => (
+        <button key={k} onClick={() => setTab(k)} style={{ padding: "6px 16px", borderRadius: 980, border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, background: aktiverTab === k ? "var(--text)" : "var(--card)", color: aktiverTab === k ? "var(--bg)" : "var(--text2)" }}>{l}</button>
+      ))}
+    </div>
+  ) : null;
+
+  if (aktiverTab === "ergebnisse") {
+    return <Center><div style={{ width: "100%", maxWidth: 460 }}>{tabBar}<Ergebnisse name={data.name} results={results} /></div></Center>;
+  }
+
   if (done) {
     return (
       <Center>
         <div style={{ textAlign: "center", width: "100%", maxWidth: 460 }}>
+          {tabBar}
           <div style={{ fontSize: 48, marginBottom: 8 }}>✓</div>
           <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>Fertig für heute!</h2>
           <p style={{ color: "var(--text2)", marginBottom: 20 }}>Alle fälligen Karten gelernt. Komm später wieder.</p>
@@ -82,6 +105,7 @@ export default function Lernen() {
   return (
     <Center>
       <div style={{ width: "100%", maxWidth: 460 }}>
+        {tabBar}
         <div style={{ fontSize: 13, color: "var(--text3)", textAlign: "center", marginBottom: 12 }}>
           {data.name} · Karte {i + 1} von {data.cards.length}
         </div>
@@ -143,6 +167,35 @@ function MeinFortschritt({ data }) {
             <span style={{ width: 9, height: 9, borderRadius: 3, background: color }} />
             {label} {hist[k] || 0}
           </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// CardVote-Testergebnisse des Schülers (öffentlich über den Token).
+function Ergebnisse({ results }) {
+  if (results === null) return <p style={{ color: "var(--text3)", textAlign: "center" }}>Lädt…</p>;
+  if (!results.length) return (
+    <div style={{ textAlign: "center", padding: "40px 0" }}>
+      <div style={{ fontSize: 42, marginBottom: 8 }}>📊</div>
+      <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>Noch kein Ergebnis</h2>
+      <p style={{ color: "var(--text2)" }}>Deine Testergebnisse erscheinen hier, sobald der erste Test ausgewertet wurde.</p>
+    </div>
+  );
+  return (
+    <div>
+      <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, textAlign: "center" }}>Deine Ergebnisse</h2>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {results.map((r, idx) => (
+          <div key={idx} style={{ padding: "12px 16px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
+              <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.date ? new Date(r.date).toLocaleDateString() : ""}</div>
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: r.pct >= 50 ? "#0a7d3e" : "#dc2626" }}>{r.pct}%</div>
+            <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.score}/{r.total}</div>
+          </div>
         ))}
       </div>
     </div>
