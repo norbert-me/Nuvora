@@ -29,7 +29,9 @@ export default function Sitzplan() {
   const canvasRef = useRef(null);
   const dragRef = useRef(null); // { sid, dx, dy } aktives Ziehen
 
+  const [kurse, setKurse] = useState([]);
   useEffect(() => {
+    fetch("/api/kurse").then((r) => (r.ok ? r.json() : [])).then((d) => setKurse(Array.isArray(d) ? d : [])).catch(() => {});
     return swr("classes", "/api/classes", (d) => {
       const list = Array.isArray(d) ? d : [];
       setClasses(list);
@@ -40,7 +42,17 @@ export default function Sitzplan() {
   useEffect(() => { if (classId) rememberClass(classId); }, [classId]);
 
   const cls = useMemo(() => classes.find((c) => c.id === classId), [classes, classId]);
-  const students = useMemo(() => cls?.students || [], [cls]);
+  // Sitzplan gilt kursweit: Roster = kanonische SuS des Kurses (gleichnamige
+  // Fach-Klassen-SuS = eine Person), damit die gespeicherten Sitz-IDs passen.
+  const students = useMemo(() => {
+    if (!cls) return [];
+    const kurs = kurse.find((k) => (k.classes || []).some((c) => c.id === cls.id));
+    const sib = kurs ? new Set(kurs.classes.map((c) => c.id)) : new Set([cls.id]);
+    const all = classes.filter((c) => sib.has(c.id)).flatMap((c) => c.students || []);
+    const canon = {};
+    all.forEach((s) => { const n = s.name.trim(); if (!(n in canon)) canon[n] = s; });
+    return Object.values(canon).sort((a, b) => a.card_id - b.card_id);
+  }, [cls, classes, kurse]);
   const byId = (id) => students.find((s) => s.id === id);
 
   const load = useCallback((id) => {
