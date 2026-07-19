@@ -268,33 +268,19 @@ function SlotGhosts({ list, entries, className, topicName, onSlot, day, t }) {
   });
 }
 
-// Direktlink zum verknuepften Modul-Objekt eines Eintrags (falls vorhanden).
-function entryLink(e) {
-  if (e.cardvote_set_id) return "/cardvote/questions";
-  if (e.karten_deck_id) return `/karten?class=${e.class_id || ""}`;
-  if (e.lernpfad_ladder_id) return "/lernpfad";
-  return null;
-}
-
+// Eintrags-Chip: öffnet den Eintrag im Popup. Die Verweise zum verknüpften
+// Modul-Objekt (Deck/Quiz/Lernleiter) liegen dort — kein Inline-↗ mehr im
+// Kalenderraster (war Doppelung und Unruhe).
 function EntryChips({ list, className, topicName, onOpen, classColor }) {
   return list.map((e) => {
     const col = e.class_id && classColor ? classColor(e.class_id) : null;
     const label = e.title || topicName(e.topic_id) || (className && className(e.class_id)) || "—";
-    const link = entryLink(e);
     return (
-      <div key={e.id} style={{ display: "flex", alignItems: "stretch", gap: 2, marginTop: 3 }}>
-        <button onClick={() => onOpen({ ...e, date: new Date(e.date) })}
-          style={{ ...chip, marginTop: 0, flex: 1, minWidth: 0, ...(col ? { background: col + "22", color: "var(--text)", borderLeft: `3px solid ${col}` } : {}) }}
-          title={label}>
-          {label}
-        </button>
-        {link && (
-          <Link to={link} onClick={(ev) => ev.stopPropagation()} title="↗"
-            style={{ display: "inline-flex", alignItems: "center", padding: "0 4px", borderRadius: 6, background: col ? col + "22" : "var(--bg2)", color: "var(--accent)", textDecoration: "none" }}>
-            <Icon d={ICONS.open} size={12} color="var(--accent)" />
-          </Link>
-        )}
-      </div>
+      <button key={e.id} onClick={() => onOpen({ ...e, date: new Date(e.date) })}
+        style={{ ...chip, marginTop: 3, width: "100%", ...(col ? { background: col + "22", color: "var(--text)", borderLeft: `3px solid ${col}` } : {}) }}
+        title={label}>
+        {label}
+      </button>
     );
   });
 }
