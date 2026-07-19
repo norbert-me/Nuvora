@@ -546,6 +546,21 @@ class SeatingPlan(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class OrgaItem(Base):
+    """Modul Orga: ein Sammel-/Orga-Punkt je Klasse (z.B. „Unterschrift KA1").
+    `done` hält die Schueler-IDs, die erledigt sind (JSON-Liste). Schueler
+    bleiben im Kern (Regel 3)."""
+    __tablename__ = "orga_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(160), default="", server_default="")
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    done: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class CalendarBreak(Base):
     """Unterrichtsfreier Zeitraum (Ferien, beweglicher Feiertag). An Tagen
     innerhalb des Zeitraums zeigt der Kalender weder Stundenplan-Vorlagen noch

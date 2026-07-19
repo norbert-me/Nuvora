@@ -101,6 +101,15 @@ REGISTRY: List[ModuleDef] = [
         path="/kalender",
     ),
     ModuleDef(
+        key="orga",
+        name="Orga",
+        description=(
+            "Sammel-Checklisten je Klasse: Orga-Punkte anlegen (z.B. „Unterschrift "
+            "der Klassenarbeit gesehen") und pro Schueler abhaken."
+        ),
+        path="/orga",
+    ),
+    ModuleDef(
         key="anwesenheit",
         name="Anwesenheit",
         description=(
