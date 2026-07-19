@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '../data/store';
 import { IconSearch, IconGamepad, IconPuzzle } from '../components/Icons';
 
 export default function Home() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const { state, dispatch } = useStore();
   const [joinCode, setJoinCode] = useState('');
   const [playerName, setPlayerName] = useState('');
-  const [showJoin, setShowJoin] = useState(false);
+  // Beitreten-Formular direkt öffnen, wenn die Nuvora-Navbar ?join=1 setzt.
+  const [showJoin, setShowJoin] = useState(params.get('join') === '1');
   const [error, setError] = useState('');
 
   const activeSession = state.currentSession && state.sessions.find(
@@ -39,7 +41,7 @@ export default function Home() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+    <div style={{ minHeight: '68vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: 20, padding: '40px 20px' }}>
       <div style={{ textAlign: 'center', color: '#fff', maxWidth: 500 }}>
         <div style={{ marginBottom: 8 }}><IconSearch size={64} /></div>
         <h1 style={{ fontSize: 42, fontWeight: 800, marginBottom: 8 }}>Code-Detektiv</h1>

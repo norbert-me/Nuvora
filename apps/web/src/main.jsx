@@ -163,10 +163,10 @@ const getModuleNavItems = (t, location) => {
     return [{ to: AUS, label: t("ausleihe.title") }];
   }
   if (area === "code-detektiv") {
-    // Nativ eingebunden: eigene Navigation in der App (Home). Shell zeigt nur
-    // den Rueckweg zur Startseite des Moduls.
+    // Nativ eingebunden: die Nuvora-Navbar steuert die Bereiche der App direkt.
     return [
-      { to: `${CD}`, label: t("cd.create") },
+      { to: `${CD}/admin`, label: t("cd.create") },
+      { to: `${CD}?join=1`, label: t("cd.join") },
       { to: `${CD}/solo`, label: t("cd.solo") },
     ];
   }
