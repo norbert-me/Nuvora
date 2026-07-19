@@ -230,6 +230,36 @@ def _ensure_columns(sync_conn):
         ))
 
 
+# Tabellen der eigenständigen Zusatzmodule. Fehlt eine nach create_all, kann das
+# Modul nichts speichern (typisch: web neu gestartet, api nicht). Beim Start laut
+# in die Logs schreiben, statt dass Nutzer es als „speichert nicht" melden.
+_MODULE_TABLES = {
+    "Orga": "orga_items",
+    "Material-Ausleihe": ["material_items", "material_loans"],
+    "Anwesenheit": "attendance",
+    "Sitzplan": "seating_plans",
+    "Noten": "grade_sections",
+    "Karten": "card_decks",
+    "Einstiege": "methods",
+    "Kalender": "calendar_entries",
+}
+
+
+def _check_module_tables(sync_conn):
+    from sqlalchemy import inspect as sa_inspect
+    existing = set(sa_inspect(sync_conn).get_table_names())
+    fehlend = []
+    for modul, tabellen in _MODULE_TABLES.items():
+        for tab in ([tabellen] if isinstance(tabellen, str) else tabellen):
+            if tab not in existing:
+                fehlend.append(f"{modul}:{tab}")
+    if fehlend:
+        print(f"[STARTUP-WARN] Modultabellen fehlen trotz create_all: {', '.join(fehlend)} "
+              f"— betroffene Module speichern nichts. api neu bauen/starten.", flush=True)
+    else:
+        print(f"[STARTUP] Alle {len(_MODULE_TABLES)} Modultabellen vorhanden.", flush=True)
+
+
 # Konten, die vor diesem Zeitpunkt existierten, gelten als bestätigt (keine Verifizierung nötig).
 # Fester Zeitpunkt = idempotent, auch bei Neustart werden neue Konten NICHT auto-bestätigt.
 VERIFY_CUTOFF = "2026-07-13 00:00:00+00"
@@ -240,6 +270,7 @@ async def startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(_ensure_columns)
+        await conn.run_sync(_check_module_tables)
 
     from sqlalchemy import select, text
     from .models import User
