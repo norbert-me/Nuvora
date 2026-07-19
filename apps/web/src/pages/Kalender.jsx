@@ -170,11 +170,11 @@ export default function Kalender() {
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
         <h1 style={pageTitle}>{t("kalender.title")}</h1>
         <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden" }}>
-          {[["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")], ["timetable", t("kalender.timetable")]].map(([v, l]) => (
+          {[["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")], ["timetable", t("kalender.timetable")], ["breaks", t("kalender.breaksTab")]].map(([v, l]) => (
             <button key={v} onClick={() => setView(v)} style={{ padding: "6px 14px", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", background: view === v ? "var(--accent)" : "transparent", color: view === v ? "#fff" : "var(--text2)" }}>{l}</button>
           ))}
         </div>
-        {view !== "timetable" && (
+        {view !== "timetable" && view !== "breaks" && (
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
             <button onClick={() => move(-1)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 15 }} title="◀">‹</button>
             <button onClick={() => setCursor(startOfDay(new Date()))} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>{t("kalender.today")}</button>
@@ -190,12 +190,13 @@ export default function Kalender() {
           </label>
         </div>
       )}
-      {view !== "timetable" && <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: "var(--text)" }}>{title}</div>}
+      {view !== "timetable" && view !== "breaks" && <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: "var(--text)" }}>{title}</div>}
+      {view === "breaks" && <BreaksPanel breaks={breaks} onAdd={addBreak} onDel={delBreak} t={t} standalone />}
 
       {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} t={t} />}
       {view === "week" && <WeekView range={range} byDay={byDay} slotsFor={slotsFor} frei={frei} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
       {view === "day" && <DayView day={cursor} byDay={byDay} slotsFor={slotsFor} frei={frei} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
-      {view === "timetable" && <TimetableView tt={tt} className={className} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} breaks={breaks} onAddBreak={addBreak} onDelBreak={delBreak} t={t} />}
+      {view === "timetable" && <TimetableView tt={tt} className={className} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} aktiv={aktiv} topicName={topicName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
       {slotEdit && <SlotModal slot={slotEdit} classes={classes} topics={topics} onSave={saveSlot} onDelete={removeSlot} onColor={setClassColor} onClose={() => setSlotEdit(null)} t={t} />}
@@ -422,14 +423,13 @@ function TimetableView({ tt, className, classColor, topicName, onEdit, onPeriods
           </tbody>
         </table>
       </div>
-      <BreaksPanel breaks={breaks} onAdd={onAddBreak} onDel={onDelBreak} t={t} />
     </div>
   );
 }
 
 // Unterrichtsfreie Zeitraeume (Ferien, bewegliche Feiertage). An diesen Tagen
-// blendet der Kalender Vorlagen und Eintraege aus.
-function BreaksPanel({ breaks, onAdd, onDel, t }) {
+// blendet der Kalender Vorlagen und Eintraege aus. Eigener Tab (standalone).
+function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
   const [von, setVon] = useState("");
   const [bis, setBis] = useState("");
   const [label, setLabel] = useState("");
@@ -442,7 +442,7 @@ function BreaksPanel({ breaks, onAdd, onDel, t }) {
   };
   const fmt = (s) => new Date(s).toLocaleDateString();
   return (
-    <div style={{ marginTop: 26, borderTop: "1px solid var(--border)", paddingTop: 18 }}>
+    <div style={standalone ? {} : { marginTop: 26, borderTop: "1px solid var(--border)", paddingTop: 18 }}>
       <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{t("kalender.breaksTitle")}</h3>
       <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 12px", maxWidth: 620 }}>{t("kalender.breaksHint")}</p>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>

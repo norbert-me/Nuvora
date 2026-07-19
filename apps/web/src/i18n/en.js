@@ -849,4 +849,5 @@ export default {
   "kalender.toAttendance": "Attendance for this lesson",
   "kalender.classColor": "Colour",
   "kalender.toClass": "To the class",
+  "kalender.breaksTab": "Days off",
 };
