@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import Latex from "../components/Latex.jsx";
+import PublishModal from "../components/PublishModal.jsx";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Toggle, modalOverlay as sOverlay, modalPanel as sPanel } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -25,8 +26,6 @@ export default function Dashboard() {
   const [renamingSet, setRenamingSet] = useState(null);
   const [renameSetValue, setRenameSetValue] = useState("");
   const [publishingSet, setPublishingSet] = useState(null);
-  const [publishDesc, setPublishDesc] = useState("");
-  const [publishMsg, setPublishMsg] = useState("");
   // Import-Fortschritt: { stage: "reading"|"uploading"|"done"|"error", label }
   const [importStatus, setImportStatus] = useState(null);
 
@@ -58,21 +57,7 @@ export default function Dashboard() {
     setTimeout(() => setImportStatus(null), ok ? 2500 : 5000);
   };
 
-  const openPublish = (qs) => {
-    setPublishDesc("");
-    setPublishMsg("");
-    setPublishingSet(qs);
-  };
-
-  const submitPublish = async () => {
-    if (!publishingSet) return;
-    const res = await fetch(`${API}/marketplace/publish`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ set_id: publishingSet.id, description: publishDesc }),
-    });
-    if (res.ok) { setPublishMsg("ok"); setTimeout(() => setPublishingSet(null), 1200); }
-    else { const e = await res.json().catch(() => ({})); setPublishMsg(e.detail || t("dash.publishError")); }
-  };
+  const openPublish = (qs) => setPublishingSet(qs);
 
   const load = async () => {
     try {
@@ -412,23 +397,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {publishingSet && (
-        <div onClick={() => setPublishingSet(null)} style={sOverlay}>
-          <div onClick={(e) => e.stopPropagation()} style={{ ...sPanel, maxWidth: 460 }}>
-            <h3 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "var(--text)" }}>{t("dash.publishTitle")}</h3>
-            <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 16px" }}>{t("dash.publishText", { name: publishingSet.name })}</p>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)", display: "block", marginBottom: 4 }}>{t("dash.description")}</label>
-            <textarea value={publishDesc} onChange={(e) => setPublishDesc(e.target.value)} placeholder={t("dash.descriptionPh")} rows={3}
-              style={{ width: "100%", padding: "10px 12px", marginBottom: 12, border: "1px solid var(--border2)", borderRadius: 10, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit" }} />
-            {publishMsg && publishMsg !== "ok" && <div style={{ fontSize: 13, color: "#d1350f", marginBottom: 10 }}>{publishMsg}</div>}
-            {publishMsg === "ok" && <div style={{ fontSize: 13, color: "#0a7d3e", marginBottom: 10 }}>{t("dash.published")}</div>}
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={submitPublish} style={{ padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 980 }}>{t("dash.publishBtn")}</button>
-              <button onClick={() => setPublishingSet(null)} style={{ padding: "10px 20px", fontSize: 14, fontWeight: 500, cursor: "pointer", background: "var(--card)", color: "var(--text)", border: "1px solid var(--border2)", borderRadius: 980 }}>{t("common.cancel")}</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {publishingSet && <PublishModal name={publishingSet.name} onClose={() => setPublishingSet(null)}
+        onPublish={(description) => fetch(`${API}/marketplace/publish`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ set_id: publishingSet.id, description }) }).catch(() => null)} />}
 
       {importStatus && <ImportProgress status={importStatus} />}
     </div>

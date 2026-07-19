@@ -62,6 +62,13 @@ export default {
   // Común
   "common.save": "Guardar",
   "common.cancel": "Cancelar",
+  "publish.title": "Publicar en el mercado",
+  "publish.text": "«{{name}}» será visible para todo el profesorado de Nuvora. Puedes quitarlo cuando quieras.",
+  "publish.description": "Descripción breve (opcional)",
+  "publish.descriptionPh": "¿De qué trata? ¿Para quién es?",
+  "publish.btn": "Publicar",
+  "publish.done": "Publicado.",
+  "publish.error": "Error al publicar. Inténtalo de nuevo.",
   "common.delete": "Eliminar",
   "common.edit": "Editar",
   "common.close": "Cerrar",

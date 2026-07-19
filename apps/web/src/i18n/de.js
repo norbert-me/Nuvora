@@ -62,6 +62,13 @@ export default {
   // Gemeinsam
   "common.save": "Speichern",
   "common.cancel": "Abbrechen",
+  "publish.title": "Zum Marktplatz veröffentlichen",
+  "publish.text": "„{{name}}“ wird für alle Nuvora-Lehrkräfte sichtbar. Du kannst es jederzeit wieder entfernen.",
+  "publish.description": "Kurze Beschreibung (optional)",
+  "publish.descriptionPh": "Worum geht es? Für wen ist es gedacht?",
+  "publish.btn": "Veröffentlichen",
+  "publish.done": "Veröffentlicht.",
+  "publish.error": "Veröffentlichen fehlgeschlagen. Bitte erneut versuchen.",
   "common.delete": "Löschen",
   "common.edit": "Bearbeiten",
   "common.close": "Schließen",

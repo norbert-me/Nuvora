@@ -4,6 +4,7 @@
 import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, modalOverlay, modalPanel } from "../components/Icons.jsx";
+import PublishModal from "../components/PublishModal.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api/methoden";
@@ -12,6 +13,7 @@ export default function Methoden() {
   const { t } = useLanguage();
   const [items, setItems] = useState([]);
   const [edit, setEdit] = useState(null); // { id?, title, description, ablauf, material, dauer } | null
+  const [publishing, setPublishing] = useState(null); // Einstieg, der veröffentlicht wird
   const [error, setError] = useState("");
 
   const load = () => fetch(`${API}/list`).then((r) => (r.ok ? r.json() : [])).then((d) => setItems(Array.isArray(d) ? d : [])).catch(() => {});
@@ -72,11 +74,7 @@ export default function Methoden() {
                 <div style={{ fontSize: 15, fontWeight: 700 }}>{m.title}</div>
                 {m.dauer != null && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 980, background: "rgba(37,99,235,0.12)", color: "#2563eb" }}>{t("methoden.dauerBadge", { n: m.dauer })}</span>}
                 <span style={{ flex: 1 }} />
-                <button onClick={async () => {
-                  const description = await askPrompt(t("methoden.publishPrompt")); if (description === null) return;
-                  const r = await fetch(`/api/marketplace/publish/method`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method_id: m.id, description }) }).catch(() => null);
-                  showAlert(r && r.ok ? t("methoden.published") : t("methoden.publishError"));
-                }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("methoden.publish")}><Icon d={ICONS.upload} size={14} color="var(--accent)" /></button>
+                <button onClick={() => setPublishing(m)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("methoden.publish")}><Icon d={ICONS.upload} size={14} color="var(--accent)" /></button>
                 <button onClick={() => setEdit(m)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>
                 <button onClick={async () => { if (await askConfirm(t("methoden.delConfirm", { title: m.title }))) remove(m.id); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
               </div>
@@ -95,6 +93,8 @@ export default function Methoden() {
       )}
 
       {edit && <MethodModal m={edit} onSave={save} onClose={() => setEdit(null)} t={t} />}
+      {publishing && <PublishModal name={publishing.title} onClose={() => setPublishing(null)}
+        onPublish={(description) => fetch(`/api/marketplace/publish/method`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method_id: publishing.id, description }) }).catch(() => null)} />}
     </div>
   );
 }

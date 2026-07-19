@@ -7,6 +7,7 @@ import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle,
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
+import PublishModal from "../components/PublishModal.jsx";
 
 const API = "/api/karten";
 
@@ -245,6 +246,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false }) {
   const [back, setBack] = useState("");
   const [planDate, setPlanDate] = useState("");
   const [busy, setBusy] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const setTopic = (tid) => call(() => fetch(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: tid ? Number(tid) : null }) }));
   const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
   const add = async (e) => {
@@ -279,12 +281,10 @@ function Deck({ deck, t, call, topics = [], showTopic = false }) {
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{deck.cards.length} {t("karten.cards")}</span>
         {deck.cards.length > 0 && (
-          <button onClick={async () => {
-            const description = await askPrompt(t("karten.publishPrompt")); if (description === null) return;
-            const r = await fetch(`/api/marketplace/publish/deck`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deck_id: deck.id, description }) }).catch(() => null);
-            showAlert(r && r.ok ? t("karten.published") : t("karten.publishError"));
-          }} className="icon-btn" style={iconBtn} title={t("karten.publish")}><Icon d={ICONS.upload} color="var(--accent)" /></button>
+          <button onClick={() => setPublishing(true)} className="icon-btn" style={iconBtn} title={t("karten.publish")}><Icon d={ICONS.upload} color="var(--accent)" /></button>
         )}
+        {publishing && <PublishModal name={deck.name || t("karten.deck")} onClose={() => setPublishing(false)}
+          onPublish={(description) => fetch(`/api/marketplace/publish/deck`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deck_id: deck.id, description }) }).catch(() => null)} />}
         <button onClick={async () => { if (await askConfirm(t("karten.delDeck", { name: deck.name }))) call(() => fetch(`${API}/decks/${deck.id}`, { method: "DELETE" })); }}
           className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
       </div>

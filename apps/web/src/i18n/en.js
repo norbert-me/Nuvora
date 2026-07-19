@@ -62,6 +62,13 @@ export default {
   // Common
   "common.save": "Save",
   "common.cancel": "Cancel",
+  "publish.title": "Publish to marketplace",
+  "publish.text": "\"{{name}}\" becomes visible to all Nuvora teachers. You can remove it anytime.",
+  "publish.description": "Short description (optional)",
+  "publish.descriptionPh": "What is it about? Who is it for?",
+  "publish.btn": "Publish",
+  "publish.done": "Published.",
+  "publish.error": "Publishing failed. Please try again.",
   "common.delete": "Delete",
   "common.edit": "Edit",
   "common.close": "Close",
