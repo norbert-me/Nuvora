@@ -78,6 +78,10 @@ export default {
   // Home (after login)
   "home.title": "How CardVote works",
   "home.intro": "Classroom voting — students hold up cards, you scan them with your camera.",
+  "home.weakTitle": "Weak this week",
+  "home.weakHint": "Topics below 60% correct from your CardVote tests of the last two weeks — turn them into practice.",
+  "home.weakDeck": "Create deck",
+  "home.weakExercise": "Add exercise",
   "home.step1.title": "Create a class",
   "home.step1.desc": "Assign names and card numbers, print cards as PDF.",
   "home.step2.title": "Create questions",

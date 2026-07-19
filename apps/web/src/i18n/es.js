@@ -78,6 +78,10 @@ export default {
   // Inicio (tras iniciar sesión)
   "home.title": "Así funciona CardVote",
   "home.intro": "Votaciones en clase — el alumnado levanta tarjetas, tú las escaneas con la cámara.",
+  "home.weakTitle": "Flojo esta semana",
+  "home.weakHint": "Temas con menos del 60 % de aciertos en tus tests de CardVote de las últimas dos semanas — conviértelos en práctica.",
+  "home.weakDeck": "Crear mazo",
+  "home.weakExercise": "Añadir ejercicio",
   "home.step1.title": "Crear una clase",
   "home.step1.desc": "Asignar nombres y números de tarjeta, imprimir las tarjetas en PDF.",
   "home.step2.title": "Crear preguntas",

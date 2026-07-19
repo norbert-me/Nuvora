@@ -1,11 +1,11 @@
 // Nuvoras Startseite: der Rahmen, nicht ein Modul.
 // Zeigt die aktivierten Module als Einstieg. Ohne Module fuehrt sie zur
 // Modulauswahl statt eine leere Seite zu zeigen.
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
-import { StageBadge, Icon, ICONS, iconBtn } from "../components/Icons.jsx";
+import { StageBadge, Icon, ICONS, iconBtn, btnSecondary } from "../components/Icons.jsx";
 import { pageTitle } from "../components/Icons.jsx";
 
 const card = {
@@ -18,9 +18,71 @@ const card = {
   color: "var(--text)",
 };
 
+// Der Kern der Plattform sichtbar gemacht: schwache Themen aus CardVote-Tests
+// der letzten zwei Wochen — mit einem Klick zu Karten-Deck oder Lernpfad-Aufgabe.
+// Genau die Brücke zwischen den Modulen, die Nuvora von drei Einzeltools trennt.
+function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv }) {
+  const [rows, setRows] = useState(null); // [{class_id, klasse, topic_id, name, pct}]
+  const [busy, setBusy] = useState(null);
+  const [done, setDone] = useState({});
+
+  useEffect(() => {
+    let ab = false;
+    (async () => {
+      const classes = await fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).catch(() => []);
+      const to = new Date();
+      const frm = new Date(Date.now() - 14 * 86400000);
+      const q = `frm=${frm.toISOString()}&to=${to.toISOString()}`;
+      const all = [];
+      for (const c of classes) {
+        const d = await fetch(`/api/sessions/weak-topics?${q}&class_id=${c.id}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        (d?.topics || []).forEach((tp) => all.push({ class_id: c.id, klasse: c.name, ...tp }));
+      }
+      all.sort((a, b) => a.pct - b.pct);
+      if (!ab) setRows(all.slice(0, 6));
+    })();
+    return () => { ab = true; };
+  }, []);
+
+  if (!rows || rows.length === 0) return null;
+
+  const run = async (row, art, url, body) => {
+    const key = `${row.class_id}:${row.topic_id}:${art}`;
+    setBusy(key);
+    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
+    setBusy(null);
+    if (r && r.ok) setDone((d) => ({ ...d, [key]: true }));
+  };
+  const Btn = ({ row, art, label, onClick }) => {
+    const key = `${row.class_id}:${row.topic_id}:${art}`;
+    if (done[key]) return <span style={{ fontSize: 12.5, color: "#0a7d3e", fontWeight: 700 }}>✓</span>;
+    return <button onClick={onClick} disabled={busy === key} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12.5, opacity: busy === key ? 0.6 : 1 }}>{label}</button>;
+  };
+
+  return (
+    <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 18, marginBottom: 24 }}>
+      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 3 }}>{t("home.weakTitle")}</div>
+      <div style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 12 }}>{t("home.weakHint")}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {rows.map((row) => (
+          <div key={`${row.class_id}:${row.topic_id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 10, flexWrap: "wrap" }}>
+            <span style={{ flex: 1, fontWeight: 600, minWidth: 130 }}>{row.name} <span style={{ fontWeight: 400, color: "var(--text3)", fontSize: 12.5 }}>· {row.klasse}</span></span>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: row.pct < 40 ? "#d1350f" : "#b8860b" }}>{row.pct}%</span>
+            {kartenAktiv && <Btn row={row} art="karten" label={t("home.weakDeck")}
+              onClick={() => run(row, "karten", `/api/karten/classes/${row.class_id}/decks`, { name: row.name, topic_id: row.topic_id })} />}
+            {lernpfadAktiv && <Btn row={row} art="lernpfad" label={t("home.weakExercise")}
+              onClick={() => run(row, "lernpfad", `/api/lernpfad/exercises`, { topic_id: row.topic_id, kategorie: "Basis", aufgabentext: t("weak.repTitle", { thema: row.name }) })} />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function NuvoraHome({ user }) {
   const { t } = useLanguage();
   const { active, loading } = useModules();
+  const isOn = (k) => active.some((m) => m.key === k);
   const orderKey = `nuvora_modorder_${user?.id ?? "x"}`;
   const [order, setOrder] = useState(() => { try { return JSON.parse(localStorage.getItem(orderKey)) || []; } catch { return []; } });
   const [edit, setEdit] = useState(false);
@@ -88,6 +150,7 @@ export default function NuvoraHome({ user }) {
         </div>
       ) : (
         <>
+          {!edit && isOn("cardvote") && <SchwacheWoche t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} />}
           <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
             {(edit ? displayList : shown).map((m) => {
               const inner = (<>

@@ -78,6 +78,10 @@ export default {
   // Startseite (nach Login)
   "home.title": "So funktioniert CardVote",
   "home.intro": "Abstimmungen im Unterricht — Lernende halten Karten hoch, du scannst per Kamera.",
+  "home.weakTitle": "Diese Woche schwach",
+  "home.weakHint": "Themen mit unter 60 % Trefferquote aus deinen CardVote-Tests der letzten zwei Wochen — direkt üben lassen.",
+  "home.weakDeck": "Deck erstellen",
+  "home.weakExercise": "Aufgabe anlegen",
   "home.step1.title": "Klasse anlegen",
   "home.step1.desc": "Namen und Kartennummern zuweisen, Karten als PDF drucken.",
   "home.step2.title": "Fragen erstellen",
