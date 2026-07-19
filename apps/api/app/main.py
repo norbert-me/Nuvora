@@ -323,6 +323,23 @@ async def startup():
         await db.execute(text("DELETE FROM user_modules WHERE module_key = 'anwesenheit'"))
         await db.commit()
 
+    # Marktplatz: kind muss zum Snapshot-Typ passen. Vor der kind-Spalte
+    # veröffentlichte Karten-Decks/Einstiege trugen den Default
+    # "cardvote_questionset" und wurden dann als Quiz behandelt (Vorschau im
+    # Quiz-Layout, Übernahme ohne Klassenwahl). payload->>'type' ist die Wahrheit.
+    async with async_session() as db:
+        try:
+            res = await db.execute(text(
+                "UPDATE marketplace_quizzes SET kind = payload->>'type' "
+                "WHERE payload->>'type' IN ('karten_deck','method','cardvote_questionset') "
+                "AND kind IS DISTINCT FROM payload->>'type'"
+            ))
+            if res.rowcount:
+                print(f"[STARTUP] Marktplatz: kind bei {res.rowcount} Eintrag/Einträgen korrigiert.", flush=True)
+            await db.commit()
+        except Exception:
+            pass
+
     # Papierkorb leeren: Klassen, die länger als 30 Tage gelöscht sind, endgültig
     # entfernen (jetzt greift die Kaskade auf Noten/Karten/…). Läuft bei jedem Start.
     async with async_session() as db:

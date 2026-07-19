@@ -227,6 +227,12 @@ export default function Marketplace() {
                   ) : preview.author_name}
                 </div>
                 {preview.description && <p style={{ fontSize: 13.5, color: "var(--text2)", margin: "0 0 12px", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{preview.description}</p>}
+                {preview.cards && preview.cards.length > 0 && (
+                  <div style={{ display: "flex", gap: 10, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text3)", paddingBottom: 4 }}>
+                    <span style={{ flex: 1 }}>{t("karten.front")}</span>
+                    <span style={{ flex: 1 }}>{t("karten.back")}</span>
+                  </div>
+                )}
                 {(preview.cards || []).map((c, i) => (
                   <div key={i} style={{ padding: "10px 0", borderTop: "1px solid var(--border)", display: "flex", gap: 10, fontSize: 13.5 }}>
                     <span style={{ flex: 1, minWidth: 0, fontWeight: 600, color: "var(--text)", overflowWrap: "anywhere" }}>{c.front}</span>
