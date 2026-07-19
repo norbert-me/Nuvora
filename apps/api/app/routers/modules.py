@@ -12,7 +12,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
@@ -162,6 +162,9 @@ _BY_KEY = {m.key: m for m in REGISTRY}
 
 class ModuleOut(ModuleDef):
     active: bool
+    # Wie viele Lehrkräfte dieses Modul aktiviert haben — Orientierung beim
+    # Einstieg („was nutzen andere?"). Global, nicht personenbezogen.
+    popularity: int = 0
 
 
 async def _active_keys(db: AsyncSession, user_id: int) -> set[str]:
@@ -184,7 +187,11 @@ async def list_modules(
 ):
     """Alle Module mit Aktivierungsstand — die Shell baut daraus ihre Navigation."""
     active = await _active_keys(db, user.id)
-    return [ModuleOut(**m.model_dump(), active=m.key in active) for m in REGISTRY]
+    # Globale Aktivierungszahl je Modul (für „Beliebt"-Hinweis beim Einstieg).
+    counts = dict((await db.execute(
+        select(UserModule.module_key, func.count()).group_by(UserModule.module_key)
+    )).all())
+    return [ModuleOut(**m.model_dump(), active=m.key in active, popularity=counts.get(m.key, 0)) for m in REGISTRY]
 
 
 @router.post("/{key}/activate", response_model=ModuleOut)
