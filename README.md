@@ -12,7 +12,7 @@ Lernende brauchen keine Geräte und keine Konten — sie tauchen nur als Datens�
 
 Nuvora ist die Basis: Konto, Klassen und Schüler liegen hier. Module werden dazugeschaltet und arbeiten auf diesen Daten — sie besitzen sie nicht.
 
-> **Status: im Aufbau.** Der Rahmen steht: Anmeldung, Startseite, Modulverwaltung, Klassen und Themen sind Nuvora. Alle drei Module sitzen auf dem Kern — keins hat noch eigene Konten oder eine eigene Datenbank.
+> **Status: nutzbar, wächst weiter.** Der Rahmen steht — Anmeldung, Startseite, Modulverwaltung, Klassen und Themen sind Nuvora. Inzwischen sitzen zehn Module auf dem Kern; keins hat eigene Konten oder eine eigene Datenbank. Themen verbinden sie: ein in CardVote schwaches Thema erzeugt auf Knopfdruck ein Karten-Übungsdeck oder eine Lernpfad-Wiederholung, und die Themen-Ansicht zeigt zu einem Thema alles quer über die Module.
 
 ## Module
 
@@ -35,19 +35,39 @@ FastAPI · Postgres · React · OpenCV (ArUco)
 
 Verwaltung von Mathe-Aufgaben und Lernpfaden. Ein Lernpfad besteht aus mehreren Lernleitern; der Generator verteilt Aufgaben differenziert auf die Lernenden.
 
-Läuft eingebettet unter Nuvoras Navbar — die bewährte Oberfläche blieb, nur der Unterbau wurde ausgetauscht.
+Die bewährte Oberfläche blieb — sie wird **nativ in die Shell gemountet** (kein iframe, kein Nachbau): das HTML wird in einen Host injiziert, das CSS gescopet, die App läuft im selben Fenster auf Nuvoras API.
 
-Express (nur Statik) · Vanilla JS
+Statik · Vanilla JS
 
 ### Noten
 
 Notenbuch: Spalten aus deinem Leistungskonzept mit Gewichten, Noten und Beobachtungen je Person. Bedient sich wie eine leere Tabelle.
 
-Rechnet den gewichteten Schnitt deiner Noten und zeigt, wie viel des Konzepts belegt ist — die Zeugnisnote bleibt deine Entscheidung. Beobachtungen zählen nie mit.
+Rechnet den gewichteten Schnitt deiner Noten und zeigt, wie viel des Konzepts belegt ist — die Zeugnisnote bleibt deine Entscheidung. Beobachtungen zählen nie mit. CardVote-Ergebnisse lassen sich als Notenspalte übernehmen (mit Link zurück zur Auswertung).
 
 React · Postgres
 
-> CardVote wurde bis v1.4.4 eigenständig entwickelt ([Archiv](https://github.com/norbert-me/CardVote)). Weiterentwicklung findet nur noch hier statt.
+### Karten
+
+Karteikarten mit Spaced Repetition (SM-2). Ein Stapel gehört einer Klasse; die Lernenden üben **ohne Konto** über einen QR-Code (geheimer Token pro Person), ihren Fortschritt sieht die Lehrkraft. Optional an ein Thema gebunden — dann schaltet der Kalender den Stapel am geplanten Tag automatisch frei.
+
+### Kalender
+
+Unterrichtsplanung: Tag-, Wochen-, Monatsansicht und ein wiederkehrender **Stundenplan** (Klasse je Stunde, Farben, Uhrzeiten). An einen Eintrag lässt sich ein CardVote-Quiz, ein Karten-Deck oder eine Lernleiter planen; **freie Tage** (Ferien/Feiertage) blenden Stunden aus.
+
+### Einstiege
+
+Ideen für den Unterrichtseinstieg — Idee, Ablauf mit Material, Materialliste und ungefähre Dauer. Wiederverwendbar und an Kalender-Stunden zuweisbar.
+
+### Code-Detektiv
+
+Programmier-Rätsel für den Informatikunterricht: Code-Bausteine per Drag & Drop in die richtige Reihenfolge bringen, allein oder in der Klasse. Nativ in der Shell (React), reiner Client ohne Backend.
+
+### Sitzplan · Anwesenheit · Zufallsschüler
+
+Kleine Werkzeuge auf den Kern-Klassen: **Sitzplan** (Schüler per Drag & Drop aufs Raster), **Anwesenheit/Fehlzeiten** (Status je Tag, Übersicht je Person), **Zufallsschüler** (zufällige Person ziehen, optional ohne Wiederholung).
+
+> CardVote wurde bis v1.4.4 eigenständig entwickelt ([Archiv](https://github.com/norbert-me/CardVote)). Weiterentwicklung findet nur noch hier statt. Der Marktplatz teilt inzwischen auch Karten-Stapel und Einstiege.
 
 ## Architektur
 
@@ -62,16 +82,25 @@ Nuvora-Kern (apps/api, apps/web)
 ├── Konten · Klassen · Schüler · Themen        gehören dem Kern
 ├── Modulregister                              wer hat was aktiviert
 └── Module
-    ├── CardVote   /cardvote/*   Abstimmung, Auswertung, Marktplatz
-    ├── Lernpfad   /lernpfad     Aufgaben & Lernpfade (eingebettet)
-    └── Noten      /noten        Notenbuch
+    ├── CardVote      /cardvote/*     Abstimmung, Auswertung, Marktplatz
+    ├── Lernpfad      /lernpfad       Aufgaben & Lernpfade (nativ in-page)
+    ├── Noten         /noten          Notenbuch
+    ├── Karten        /karten         Karteikarten, Spaced Repetition
+    ├── Kalender      /kalender        Planung, Stundenplan, freie Tage
+    ├── Einstiege     /methoden       Unterrichtseinstiege
+    ├── Code-Detektiv /code-detektiv  Programmier-Rätsel (nativ)
+    ├── Sitzplan      /sitzplan       Sitzordnung je Klasse
+    ├── Anwesenheit   /anwesenheit    Fehlzeiten je Tag
+    └── Zufallsschüler /zufall        zufällige Person ziehen
 ```
+
+Verbindendes ist Zusatz, nie Voraussetzung: die geteilte **Themen-Taxonomie** trägt die Brücken (schwaches CardVote-Thema → Karten-Deck oder Lernpfad-Aufgabe; Themen-Ansicht quer über alle aktiven Module).
 
 | Teil       | Stack                                        |
 | ---------- | -------------------------------------------- |
 | Kern-API   | FastAPI · SQLAlchemy 2 (async) · Postgres 16 |
 | Frontend   | React 18 · Vite · react-router               |
-| Lernpfad   | Express (nur Statik) · Vanilla JS            |
+| Lernpfad   | Vanilla JS, nativ in die Shell gemountet     |
 | Proxy      | nginx — eine Domain, alle Teile              |
 
 Ein Konto sieht nur eigene Daten (`owner_id` überall); Module werden pro Lehrkraft zugeschaltet.
@@ -103,12 +132,13 @@ docker compose up -d --build
 
 Dann auf <http://localhost:8080>:
 
-| Pfad         | Was                                   |
-| ------------ | ------------------------------------- |
-| `/`          | Nuvora — Startseite, Module, Klassen  |
-| `/cardvote/` | Modul CardVote                        |
-| `/lernpfad/` | Modul Lernpfad                        |
-| `/noten`     | Modul Noten                           |
+| Pfad         | Was                                          |
+| ------------ | -------------------------------------------- |
+| `/`          | Nuvora — Startseite, Module, Klassen, Themen |
+| `/cardvote/` | Modul CardVote                               |
+| `/lernpfad`  | Modul Lernpfad                               |
+| `/noten`     | Modul Noten                                  |
+| weitere      | `/karten` · `/kalender` · `/methoden` · `/code-detektiv` · `/sitzplan` · `/anwesenheit` · `/zufall` |
 
 Ohne `POSTGRES_PASSWORD` und `TOKEN_SECRET` startet der Stack absichtlich nicht — Standardpasswörter sollen nicht versehentlich in Produktion landen. Zufallswert erzeugen mit `openssl rand -hex 32`.
 

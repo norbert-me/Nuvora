@@ -12,7 +12,7 @@ Learners need no devices and no accounts — they only appear as records the tea
 
 Nuvora is the base: account, classes and students live here. Modules are switched on and work on this data — they do not own it.
 
-> **Status: in progress.** The frame stands: sign-in, home page, module management, classes and topics are Nuvora. All three modules sit on the core — none has its own accounts or its own database.
+> **Status: usable, still growing.** The frame stands — sign-in, home page, module management, classes and topics are Nuvora. Ten modules now sit on the core; none has its own accounts or database. Topics connect them: a topic students struggled with in CardVote spawns a Karten practice deck or a Lernpfad revision task at the press of a button, and the topic view shows everything attached to a topic across the modules.
 
 ## Modules
 
@@ -35,19 +35,39 @@ FastAPI · Postgres · React · OpenCV (ArUco)
 
 Management of maths exercises and learning paths. A learning path consists of several "Lernleitern" (ladders); the generator distributes exercises to learners in a differentiated way.
 
-Runs embedded under Nuvora's navbar — the proven interface stayed, only the foundation was swapped out.
+The proven interface stayed — it is **mounted natively into the shell** (no iframe, no rebuild): its HTML is injected into a host, its CSS scoped, and the app runs in the same window on Nuvora's API.
 
-Express (static only) · Vanilla JS
+Static · Vanilla JS
 
 ### Noten (grades)
 
 Gradebook: columns from your assessment scheme with weights, grades and observations per person. Works like an empty spreadsheet.
 
-Computes the weighted average of your grades and shows how much of the scheme is covered — the report-card grade stays your decision. Observations never count toward the average.
+Computes the weighted average of your grades and shows how much of the scheme is covered — the report-card grade stays your decision. Observations never count toward the average. CardVote results can be imported as a grade column (with a link back to the evaluation).
 
 React · Postgres
 
-> CardVote was developed standalone up to v1.4.4 ([archive](https://github.com/norbert-me/CardVote)). Further development happens only here.
+### Karten (cards)
+
+Flashcards with spaced repetition (SM-2). A deck belongs to a class; learners practise **without an account** via a QR code (a secret token per person), and the teacher sees their progress. Optionally bound to a topic — then the calendar releases the deck automatically on the planned day.
+
+### Kalender (calendar)
+
+Lesson planning: day, week and month views plus a recurring **timetable** (class per period, colours, times). A CardVote quiz, a Karten deck or a learning ladder can be planned onto an entry; **days off** (holidays) hide lessons.
+
+### Einstiege (lesson starters)
+
+Ideas for opening a lesson — the idea, the procedure with materials, a materials list and an approximate duration. Reusable and assignable to calendar periods.
+
+### Code-Detektiv
+
+Programming puzzles for computer-science lessons: drag & drop code blocks into the right order, alone or as a class. Native in the shell (React), pure client, no backend.
+
+### Sitzplan · Anwesenheit · Zufallsschüler
+
+Small tools on the core classes: **seating plan** (place students on a grid via drag & drop), **attendance** (status per day, per-person overview), **random student** (draw a random person, optionally without repeats).
+
+> CardVote was developed standalone up to v1.4.4 ([archive](https://github.com/norbert-me/CardVote)). Further development happens only here. The marketplace now also shares Karten decks and lesson starters.
 
 ## Architecture
 
@@ -62,16 +82,25 @@ Nuvora core (apps/api, apps/web)
 ├── accounts · classes · students · topics      belong to the core
 ├── module registry                             who has activated what
 └── modules
-    ├── CardVote   /cardvote/*   voting, evaluation, marketplace
-    ├── Lernpfad   /lernpfad     exercises & learning paths (embedded)
-    └── Noten      /noten        gradebook
+    ├── CardVote      /cardvote/*     voting, evaluation, marketplace
+    ├── Lernpfad      /lernpfad       exercises & learning paths (native in-page)
+    ├── Noten         /noten          gradebook
+    ├── Karten        /karten         flashcards, spaced repetition
+    ├── Kalender      /kalender        planning, timetable, days off
+    ├── Einstiege     /methoden       lesson starters
+    ├── Code-Detektiv /code-detektiv  programming puzzles (native)
+    ├── Sitzplan      /sitzplan       seating plan
+    ├── Anwesenheit   /anwesenheit    attendance
+    └── Zufallsschüler /zufall        draw a random student
 ```
+
+What connects them is an add-on, never a prerequisite: the shared **topic taxonomy** carries the bridges (a weak CardVote topic → Karten deck or Lernpfad task; the topic view across every active module).
 
 | Part        | Stack                                        |
 | ----------- | -------------------------------------------- |
 | Core API    | FastAPI · SQLAlchemy 2 (async) · Postgres 16 |
 | Frontend    | React 18 · Vite · react-router               |
-| Lernpfad    | Express (static only) · Vanilla JS           |
+| Lernpfad    | Vanilla JS, mounted natively into the shell  |
 | Proxy       | nginx — one domain, all parts                |
 
 An account sees only its own data (`owner_id` everywhere); modules are switched on per teacher.
@@ -103,12 +132,13 @@ docker compose up -d --build
 
 Then on <http://localhost:8080>:
 
-| Path         | What                                  |
-| ------------ | ------------------------------------- |
-| `/`          | Nuvora — home, modules, classes       |
-| `/cardvote/` | CardVote module                       |
-| `/lernpfad/` | Lernpfad module                       |
-| `/noten`     | Noten module                          |
+| Path         | What                                         |
+| ------------ | -------------------------------------------- |
+| `/`          | Nuvora — home, modules, classes, topics      |
+| `/cardvote/` | CardVote module                              |
+| `/lernpfad`  | Lernpfad module                              |
+| `/noten`     | Noten module                                 |
+| others       | `/karten` · `/kalender` · `/methoden` · `/code-detektiv` · `/sitzplan` · `/anwesenheit` · `/zufall` |
 
 Without `POSTGRES_PASSWORD` and `TOKEN_SECRET` the stack deliberately won't start — default passwords must not accidentally end up in production. Generate a random value with `openssl rand -hex 32`.
 
