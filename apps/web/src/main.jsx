@@ -145,7 +145,10 @@ const getModuleNavItems = (t, location) => {
     return [{ to: KAL, label: t("kalender.title") }];
   }
   if (area === "methoden") {
-    return [{ to: MET, label: t("methoden.title") }];
+    return [
+      { to: MET, label: t("methoden.title") },
+      { to: "/marktplatz?area=methoden", label: t("nav.marketplace") },
+    ];
   }
   if (area === "zufall") {
     return [{ to: ZUF, label: t("zufall.title") }];
@@ -177,6 +180,7 @@ const getModuleNavItems = (t, location) => {
       { to: `${KA}?tab=cards`, label: t("karten.tabCards"), active: cur === "cards" },
       { to: `${KA}?tab=progress`, label: t("karten.tabProgress"), active: cur === "progress" },
       { to: `${KA}?tab=qr`, label: t("karten.tabQr"), active: cur === "qr" },
+      { to: "/marktplatz?area=karten", label: t("nav.marketplace") },
     ];
   }
   // Kern: der Nuvora-Schriftzug links fuehrt zur Startseite.
@@ -725,6 +729,8 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path="/tutorial" element={user ? <Tutorial /> : <Landing />} />
           <Route path={`${CV}/cards`} element={user ? <ModuleGate moduleKey="cardvote"><Cards /></ModuleGate> : <Landing />} />
           <Route path={`${CV}/marketplace`} element={user ? <ModuleGate moduleKey="cardvote"><Marketplace /></ModuleGate> : <Landing />} />
+          {/* Marktplatz teilt Quizze, Karten und Einstiege — modulübergreifend, nur Login nötig. */}
+          <Route path="/marktplatz" element={user ? <Marketplace /> : <Landing />} />
 
           {/* Alte CardVote-Adressen (Lesezeichen, Links in Mails) umleiten. */}
           <Route path={`${CV}/classes`} element={<Navigate to="/classes" replace />} />
