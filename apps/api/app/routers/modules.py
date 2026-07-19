@@ -108,7 +108,6 @@ REGISTRY: List[ModuleDef] = [
             "oder entschuldigt. Mit Fehlzeiten-Uebersicht je Person."
         ),
         path="/anwesenheit",
-        stage="beta",
     ),
     ModuleDef(
         key="sitzplan",
@@ -118,7 +117,6 @@ REGISTRY: List[ModuleDef] = [
             "setzen. Nur die Positionen werden gespeichert."
         ),
         path="/sitzplan",
-        stage="beta",
     ),
     ModuleDef(
         key="zufall",
@@ -128,7 +126,6 @@ REGISTRY: List[ModuleDef] = [
             "optional ohne Wiederholung, bis alle dran waren."
         ),
         path="/zufall",
-        stage="beta",
     ),
     ModuleDef(
         key="methoden",

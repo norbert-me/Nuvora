@@ -158,6 +158,7 @@ export default function Evaluation() {
   const [gradeMode, setGradeMode] = useState("whole"); // "whole" | "tendency"
   const { modules } = useModules();
   const notenAktiv = modules.find((m) => m.key === "noten")?.active ?? false;
+  const kartenAktiv = modules.find((m) => m.key === "karten")?.active ?? false;
   const [notenDialog, setNotenDialog] = useState(false);
   const [avgMode, setAvgMode] = useState("pts");
   const [medMode, setMedMode] = useState("pts");
@@ -529,6 +530,8 @@ const gradeDistribution = (() => {
         </div>
       </div>
       <h2 style={{ marginTop: 8, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{session_name || `Session #${id}`}</h2>
+
+      {kartenAktiv && data.class_id && <WeakTopics sessionId={Number(id)} classId={data.class_id} t={t} />}
 
       {/* Statistik-Kacheln */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
@@ -1199,6 +1202,56 @@ function TopicAnalysis({ questions, presentStudents }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// Ziel-2-Brücke: schwache Themen aus dem Test → ein Übungs-Deck im Modul Karten
+// anlegen (themengebunden, Entwurf). Nur wenn das Karten-Modul aktiv ist.
+function WeakTopics({ sessionId, classId, t }) {
+  const [topics, setTopics] = useState([]);
+  const [busy, setBusy] = useState(null);
+  const [done, setDone] = useState({});
+
+  useEffect(() => {
+    fetch(`/api/sessions/${sessionId}/topic-stats`).then((r) => (r.ok ? r.json() : null))
+      .then((d) => setTopics(d && Array.isArray(d.topics) ? d.topics : [])).catch(() => {});
+  }, [sessionId]);
+
+  // Schwach = unter 60 % Trefferquote.
+  const schwach = topics.filter((tp) => tp.topic_id && tp.pct < 60);
+  if (!schwach.length) return null;
+
+  const deckAnlegen = async (tp) => {
+    setBusy(tp.topic_id);
+    const r = await fetch(`/api/karten/classes/${classId}/decks`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: tp.name, topic_id: tp.topic_id }),
+    }).catch(() => null);
+    setBusy(null);
+    if (r && r.ok) setDone((d) => ({ ...d, [tp.topic_id]: true }));
+  };
+
+  return (
+    <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, marginBottom: 16 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{t("weak.title")}</div>
+      <div style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 12 }}>{t("weak.hint")}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {schwach.map((tp) => (
+          <div key={tp.topic_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <span style={{ flex: 1, fontWeight: 600, minWidth: 0 }}>{tp.name}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: tp.pct < 40 ? "#d1350f" : "#b8860b" }}>{tp.pct}%</span>
+            {done[tp.topic_id] ? (
+              <span style={{ fontSize: 12.5, color: "#0a7d3e", fontWeight: 600 }}>{t("weak.created")}</span>
+            ) : (
+              <button onClick={() => deckAnlegen(tp)} disabled={busy === tp.topic_id}
+                style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12.5, opacity: busy === tp.topic_id ? 0.6 : 1 }}>
+                {t("weak.makeDeck")}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

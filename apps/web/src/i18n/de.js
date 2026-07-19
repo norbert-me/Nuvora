@@ -824,4 +824,8 @@ export default {
   "anwesenheit.entschShort": "E",
   "mod.anwesenheit.name": "Anwesenheit",
   "mod.anwesenheit.desc": "Anwesenheit und Fehlzeiten je Klasse und Tag — fehlt, verspätet oder entschuldigt. Mit Fehlzeiten-Übersicht je Person.",
+  "weak.title": "Schwache Themen",
+  "weak.hint": "Themen unter 60 % Trefferquote. Ein Klick legt ein themengebundenes Übungs-Deck (Entwurf) im Modul Karten an.",
+  "weak.makeDeck": "Karten-Deck anlegen",
+  "weak.created": "Deck angelegt ✓",
 };

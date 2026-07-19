@@ -25,6 +25,7 @@ export default function NuvoraHome({ user }) {
   const [order, setOrder] = useState(() => { try { return JSON.parse(localStorage.getItem(orderKey)) || []; } catch { return []; } });
   const [edit, setEdit] = useState(false);
   const [dragKey, setDragKey] = useState(null);
+  const [overKey, setOverKey] = useState(null);
 
   if (loading) return null;
 
@@ -36,14 +37,19 @@ export default function NuvoraHome({ user }) {
   const shown = [...active].sort((a, b) => rank(a.key) - rank(b.key));
 
   const persist = (keys) => { setOrder(keys); try { localStorage.setItem(orderKey, JSON.stringify(keys)); } catch { /* egal */ } };
-  const drop = (targetKey) => {
-    if (!dragKey || dragKey === targetKey) return;
+
+  // Vorschau-Reihenfolge waehrend des Ziehens: die gezogene Kachel sitzt schon
+  // dort, wo sie beim Loslassen landen wuerde — man sieht das Ergebnis live.
+  const previewKeys = () => {
     const keys = shown.map((m) => m.key);
-    const from = keys.indexOf(dragKey), to = keys.indexOf(targetKey);
+    if (!dragKey || !overKey || dragKey === overKey) return keys;
+    const from = keys.indexOf(dragKey), to = keys.indexOf(overKey);
+    if (from < 0 || to < 0) return keys;
     keys.splice(to, 0, keys.splice(from, 1)[0]);
-    persist(keys);
-    setDragKey(null);
+    return keys;
   };
+  const displayList = (dragKey && overKey ? previewKeys() : shown.map((m) => m.key)).map((k) => shown.find((m) => m.key === k));
+  const commit = () => { persist(previewKeys()); setDragKey(null); setOverKey(null); };
 
   return (
     <div style={{ maxWidth: 820, margin: "0 auto" }}>
@@ -83,7 +89,7 @@ export default function NuvoraHome({ user }) {
       ) : (
         <>
           <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
-            {shown.map((m) => {
+            {(edit ? displayList : shown).map((m) => {
               const inner = (<>
                 <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
                   {edit && <span style={{ color: "var(--text3)", display: "inline-flex" }}><Icon d={ICONS.grip} size={16} /></span>}
@@ -92,14 +98,18 @@ export default function NuvoraHome({ user }) {
                 <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.6 }}>{desc(m)}</div>
               </>);
               if (edit) {
-                // Bearbeiten: Karten sind ziehbar, keine Navigation.
+                // Bearbeiten: Karten sind ziehbar. Die gezogene Kachel wird zum
+                // gestrichelten Platzhalter, die restlichen weichen live aus —
+                // so sieht man die Reihenfolge schon vor dem Loslassen.
+                const isDragged = dragKey === m.key;
                 return (
                   <div key={m.key} draggable
                     onDragStart={() => setDragKey(m.key)}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => drop(m.key)}
-                    onDragEnd={() => setDragKey(null)}
-                    style={{ ...card, cursor: "grab", opacity: dragKey === m.key ? 0.4 : 1, borderStyle: "dashed" }}>
+                    onDragOver={(e) => { e.preventDefault(); if (dragKey && overKey !== m.key) setOverKey(m.key); }}
+                    onDrop={commit}
+                    onDragEnd={() => { setDragKey(null); setOverKey(null); }}
+                    style={{ ...card, cursor: "grab", borderStyle: "dashed",
+                      ...(isDragged ? { opacity: 0.35, borderColor: "var(--accent)", background: "var(--bg2)" } : {}) }}>
                     {inner}
                   </div>
                 );

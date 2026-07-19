@@ -824,4 +824,8 @@ export default {
   "anwesenheit.entschShort": "J",
   "mod.anwesenheit.name": "Asistencia",
   "mod.anwesenheit.desc": "Asistencia y ausencias por clase y día — ausente, tarde o justificado. Con resumen de ausencias por persona.",
+  "weak.title": "Temas flojos",
+  "weak.hint": "Temas por debajo del 60% de aciertos. Un clic crea un mazo de práctica (borrador) vinculado al tema en el módulo Tarjetas.",
+  "weak.makeDeck": "Crear mazo",
+  "weak.created": "Mazo creado ✓",
 };

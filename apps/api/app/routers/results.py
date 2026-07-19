@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
-from ..models import Scan, Session, SchoolClass, Student, QuestionSet, QuestionSetItem, Question, User
+from ..models import Scan, Session, SchoolClass, Student, QuestionSet, QuestionSetItem, Question, User, Topic
 from .auth import get_current_user
 from .. import websocket as ws
 
@@ -238,6 +238,68 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
         "questions": questions,
         "students": rows,
     }
+
+
+@router.get("/sessions/{session_id}/topic-stats")
+async def get_topic_stats(session_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Trefferquote je Thema für eine Session (Ziel 2: schwache Themen finden).
+    Zählt über alle Scans richtige/gesamte Antworten je Frage-Thema."""
+    session = await db.get(Session, session_id)
+    if not session:
+        raise HTTPException(404)
+    if session.owner_id and session.owner_id != user.id:
+        raise HTTPException(403, "Kein Zugriff auf diese Session")
+    if not session.question_set_id:
+        return {"class_id": session.class_id, "topics": []}
+
+    items = (await db.execute(
+        select(QuestionSetItem).options(selectinload(QuestionSetItem.question))
+        .where(QuestionSetItem.question_set_id == session.question_set_id)
+    )).scalars().all()
+    qmap = session.question_map or {}
+    q_topic = {}   # question_id -> topic_id
+    q_correct = {}  # question_id -> correct_answer
+    for it in items:
+        q = it.question
+        if q.topic_id:
+            q_topic[q.id] = q.topic_id
+        q_correct[q.id] = qmap.get(str(q.id), q.correct_answer)
+
+    scans = (await db.execute(select(Scan).where(Scan.session_id == session_id))).scalars().all()
+    agg = {}  # topic_id -> [correct, total]
+    for s in scans:
+        tid = q_topic.get(s.question_id)
+        if not tid:
+            continue
+        corr = q_correct.get(s.question_id)
+        a = agg.setdefault(tid, [0, 0])
+        a[1] += 1
+        if corr and s.answer in corr:
+            a[0] += 1
+
+    if not agg:
+        return {"class_id": session.class_id, "topics": []}
+
+    topics = (await db.execute(select(Topic).where(Topic.id.in_(list(agg.keys()))))).scalars().all()
+    by_id = {t.id: t for t in topics}
+    parents = {t.parent_id for t in topics if t.parent_id}
+    if parents:
+        for p in (await db.execute(select(Topic).where(Topic.id.in_(list(parents))))).scalars().all():
+            by_id[p.id] = p
+
+    def label(tid):
+        tp = by_id.get(tid)
+        if not tp:
+            return ""
+        par = by_id.get(tp.parent_id) if tp.parent_id else None
+        return f"{par.name} / {tp.name}" if par else tp.name
+
+    out = []
+    for tid, (corr, tot) in agg.items():
+        out.append({"topic_id": tid, "name": label(tid), "correct": corr, "total": tot,
+                    "pct": round(corr / tot * 100) if tot else 0})
+    out.sort(key=lambda x: x["pct"])  # schwächste zuerst
+    return {"class_id": session.class_id, "topics": out}
 
 
 @router.get("/questions/{question_id}/stats")

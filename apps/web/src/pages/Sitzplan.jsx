@@ -15,6 +15,7 @@ export default function Sitzplan() {
   const [cols, setCols] = useState(6);
   const [cells, setCells] = useState([]); // Länge = Zellen; Wert studentId|null
   const [drag, setDrag] = useState(null); // { from: "pool"|index, id }
+  const [over, setOver] = useState(null);  // Zielzelle-Index oder "pool" (Vorschau)
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
@@ -66,12 +67,12 @@ export default function Sitzplan() {
       next[idx] = drag.id;
       next[drag.from] = tmp;
     }
-    setCells(next); setDrag(null); persist(cols, next);
+    setCells(next); setDrag(null); setOver(null); persist(cols, next);
   };
   const dropOnPool = () => {
-    if (!drag || drag.from === "pool") { setDrag(null); return; }
+    if (!drag || drag.from === "pool") { setDrag(null); setOver(null); return; }
     const next = [...grid]; next[drag.from] = null;
-    setCells(next); setDrag(null); persist(cols, next);
+    setCells(next); setDrag(null); setOver(null); persist(cols, next);
   };
   const setColsPersist = (n) => { const v = Math.max(2, Math.min(12, n)); setCols(v); persist(v, grid); };
   const leeren = () => { setCells([]); persist(cols, []); setMsg(t("sitzplan.cleared")); setTimeout(() => setMsg(""), 2500); };
@@ -114,17 +115,21 @@ export default function Sitzplan() {
                 <div key={idx}
                   draggable={!!s}
                   onDragStart={() => s && setDrag({ from: idx, id: sid })}
-                  onDragOver={(e) => e.preventDefault()}
+                  onDragOver={(e) => { e.preventDefault(); if (drag && over !== idx) setOver(idx); }}
                   onDrop={() => dropOnCell(idx)}
-                  style={{ ...seatStyle(!!s), opacity: drag && drag.from === idx ? 0.4 : 1 }}>
-                  {s ? s.name : ""}
+                  onDragEnd={() => { setDrag(null); setOver(null); }}
+                  style={{ ...seatStyle(!!s), opacity: drag && drag.from === idx ? 0.4 : 1,
+                    // Vorschau: wo die gezogene Person landen wuerde.
+                    ...(drag && over === idx ? { outline: "2px solid var(--accent)", outlineOffset: -2, background: "var(--accent-bg, rgba(10,132,255,0.12))" } : {}) }}>
+                  {drag && over === idx && drag.id !== sid ? (byId(drag.id)?.name || (s ? s.name : "")) : (s ? s.name : "")}
                 </div>
               );
             })}
           </div>
 
-          <div onDragOver={(e) => e.preventDefault()} onDrop={dropOnPool}
-            style={{ border: "1px dashed var(--border2)", borderRadius: 12, padding: 12, minHeight: 60, background: "var(--bg2)" }}>
+          <div onDragOver={(e) => { e.preventDefault(); if (over !== "pool") setOver("pool"); }} onDrop={dropOnPool}
+            style={{ borderRadius: 12, padding: 12, minHeight: 60, background: "var(--bg2)",
+              border: drag && over === "pool" && drag.from !== "pool" ? "1px solid var(--accent)" : "1px dashed var(--border2)" }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
               {t("sitzplan.pool")} ({pool.length})
             </div>

@@ -824,4 +824,8 @@ export default {
   "anwesenheit.entschShort": "E",
   "mod.anwesenheit.name": "Attendance",
   "mod.anwesenheit.desc": "Attendance and absences per class and day — absent, late or excused. With an absence overview per person.",
+  "weak.title": "Weak topics",
+  "weak.hint": "Topics below 60% correct. One click creates a topic-bound practice deck (draft) in the Cards module.",
+  "weak.makeDeck": "Create card deck",
+  "weak.created": "Deck created ✓",
 };
