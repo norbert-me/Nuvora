@@ -2,7 +2,7 @@
 // Stunden eintragen und optional Klasse + Thema (Kern-Taxonomie) zuordnen.
 import { useState, useEffect, useCallback, Fragment } from "react";
 import { Link } from "react-router-dom";
-import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, selectStyle } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, put } from "../core/cache.js";
 
@@ -478,6 +478,7 @@ function SlotModal({ slot, classes, onSave, onDelete, onColor, onClose, t }) {
   useEffect(() => { const c = classes.find((x) => x.id === Number(classId)); setColor(c?.color || "#2563eb"); }, [classId]); // eslint-disable-line
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
   const fld = { width: "100%", padding: 9, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" };
+  const sfld = { ...selectStyle, width: "100%", fontSize: 14, padding: "10px 34px 10px 12px" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 200 }}>
@@ -485,7 +486,7 @@ function SlotModal({ slot, classes, onSave, onDelete, onColor, onClose, t }) {
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 2 }}>{t("kalender.timetable")}</h3>
         <div style={{ fontSize: 12.5, color: "var(--text3)" }}>{wdays[slot.weekday]} · {slot.period}. {t("kalender.period")}</div>
         <div style={lbl}>{t("nav.classes")}</div>
-        <select value={classId} onChange={(e) => setClassId(e.target.value)} style={fld}>
+        <select value={classId} onChange={(e) => setClassId(e.target.value)} style={sfld}>
           <option value="">– {t("kalender.noClass")} –</option>
           {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
@@ -525,6 +526,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
     fetch(`/api/karten/classes/${classId}/decks`).then((r) => (r.ok ? r.json() : [])).then((d) => setDecks(Array.isArray(d) ? d : [])).catch(() => {});
   }, [aktiv.karten, classId]);
   const fld = { width: "100%", padding: 9, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" };
+  const sfld = { ...selectStyle, width: "100%", fontSize: 14, padding: "10px 34px 10px 12px" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
   const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
   // Bestehender Eintrag oeffnet zuerst als Ansicht; neuer direkt im Bearbeiten.
@@ -594,19 +596,19 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         <div style={lbl}>{t("kalender.entryTitle")}</div>
         <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus placeholder={t("kalender.entryTitlePlaceholder")} style={fld} />
         <div style={lbl}>{t("nav.classes")}</div>
-        <select value={classId} onChange={(e) => setClassId(e.target.value)} style={fld}>
+        <select value={classId} onChange={(e) => setClassId(e.target.value)} style={sfld}>
           <option value="">– {t("kalender.noClass")} –</option>
           {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <div style={lbl}>{t("kalender.topic")}</div>
-        <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={fld}>
+        <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={sfld}>
           <option value="">– {t("kalender.noTopic")} –</option>
           {topics.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
         </select>
         {methods.length > 0 && (
           <>
             <div style={lbl}>{t("kalender.method")}</div>
-            <select value={methodId} onChange={(e) => setMethodId(e.target.value)} style={fld}>
+            <select value={methodId} onChange={(e) => setMethodId(e.target.value)} style={sfld}>
               <option value="">– {t("kalender.noMethod")} –</option>
               {methods.map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
             </select>
@@ -621,7 +623,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         {aktiv.cardvote && (
           <>
             <div style={lbl}>{t("kalender.planCardvote")}</div>
-            <select value={quizId} onChange={(e) => setQuizId(e.target.value)} style={fld}>
+            <select value={quizId} onChange={(e) => setQuizId(e.target.value)} style={sfld}>
               <option value="">– {t("kalender.none")} –</option>
               {quizze.map((q) => <option key={q.id} value={q.id}>{q.folder ? `${q.folder} / ${q.name}` : q.name}</option>)}
             </select>
@@ -630,7 +632,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         {aktiv.karten && (
           <>
             <div style={lbl}>{t("kalender.planKarten")}</div>
-            <select value={deckId} onChange={(e) => setDeckId(e.target.value)} style={fld} disabled={!classId} title={!classId ? t("kalender.pickClassFirst") : undefined}>
+            <select value={deckId} onChange={(e) => setDeckId(e.target.value)} style={sfld} disabled={!classId} title={!classId ? t("kalender.pickClassFirst") : undefined}>
               <option value="">– {t("kalender.none")} –</option>
               {decks.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
@@ -640,7 +642,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         {aktiv.lernpfad && (
           <>
             <div style={lbl}>{t("kalender.planLernleiter")}</div>
-            <select value={ladderId} onChange={(e) => setLadderId(e.target.value)} style={fld}>
+            <select value={ladderId} onChange={(e) => setLadderId(e.target.value)} style={sfld}>
               <option value="">– {t("kalender.none")} –</option>
               {ladders.map((l) => <option key={l.id} value={l.id}>{l.path ? `${l.path} / ${l.name}` : l.name}</option>)}
             </select>
