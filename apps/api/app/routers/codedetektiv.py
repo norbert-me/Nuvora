@@ -8,7 +8,7 @@ import secrets
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +16,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from ..database import get_db
 from ..models import CodePuzzle, CodeSession, Topic, User
-from .auth import get_current_user, rate_limit
+from .auth import get_current_user, rate_limit, client_ip
 from .modules import is_active
 
 router = APIRouter(prefix="/api/codedetektiv", tags=["codedetektiv"])
@@ -139,8 +139,10 @@ async def create_session(body: SessionCreate, user: User = Depends(require_modul
 
 
 @router.get("/sessions/{code}")
-async def get_session(code: str, db: AsyncSession = Depends(get_db)):
+async def get_session(code: str, request: Request, db: AsyncSession = Depends(get_db)):
     """Öffentlich: Zustand pollen (Beitreten, Spielen ohne Login)."""
+    # Öffentlich + kurzer Code -> gegen Erraten/Enumerieren begrenzen (pro IP).
+    rate_limit("cd_code", client_ip(request), 300, 60, "Zu viele Anfragen. Bitte kurz warten.")
     return _session_public(await _by_code(db, code))
 
 
@@ -149,8 +151,9 @@ class JoinIn(BaseModel):
 
 
 @router.post("/sessions/{code}/join")
-async def join_session(code: str, body: JoinIn, db: AsyncSession = Depends(get_db)):
+async def join_session(code: str, body: JoinIn, request: Request, db: AsyncSession = Depends(get_db)):
     """Öffentlich: als Spieler beitreten."""
+    rate_limit("cd_join", client_ip(request), 60, 60, "Zu viele Beitritts-Versuche. Bitte kurz warten.")
     s = await _by_code(db, code)
     if s.ended:
         raise HTTPException(400, "Session ist beendet")
