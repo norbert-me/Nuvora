@@ -2,12 +2,12 @@
 // Ausleiher: ein Kern-Schüler (Klasse wählen) oder ein Freitextname.
 import { useState, useEffect, useCallback } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
-import { pageTitle, btnPrimary, btnSecondary, selectStyle, Toggle, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
+import { pageTitle, btnPrimary, btnSecondary, selectStyle, Toggle, Icon, ICONS, iconBtn, COLORS as C, inputStyle } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr } from "../core/cache.js";
 
 const API = "/api/ausleihe";
-const fld = { padding: "9px 12px", border: "1px solid var(--border2)", borderRadius: 10, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" };
+const fld = inputStyle; // gemeinsame Texteingabe
 const UEBERFAELLIG_TAGE = 14; // ab so vielen Tagen draußen: rot markiert
 const tageDraussen = (out) => Math.floor((Date.now() - new Date(out).getTime()) / 86400000);
 

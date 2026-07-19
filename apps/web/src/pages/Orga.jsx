@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
-import { pageTitle, btnPrimary, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
+import { pageTitle, btnPrimary, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C, Tabs, th as thBase, td } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import Anwesenheit from "./Anwesenheit.jsx";
@@ -59,18 +59,14 @@ export default function Orga() {
     fetch(`${API}/item/${item.id}/toggle`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ student_id: sid }) }).catch(() => {});
   };
 
-  const th = { padding: "8px 6px", fontSize: 12, fontWeight: 600, color: "var(--text2)", borderBottom: "1px solid var(--border)", verticalAlign: "bottom" };
-  const td = { padding: "4px 6px", borderBottom: "1px solid var(--border)", textAlign: "center" };
+  const th = { ...thBase, verticalAlign: "bottom" };
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
         <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("orga.moduleTitle")}</h1>
-        <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden" }}>
-          {[["checklisten", t("orga.tabChecklists")], ["anwesenheit", t("orga.tabAttendance")]].map(([k, label]) => (
-            <button key={k} onClick={() => setTab(k)} style={{ padding: "6px 16px", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", background: tab === k ? "var(--accent)" : "transparent", color: tab === k ? "#fff" : "var(--text2)" }}>{label}</button>
-          ))}
-        </div>
+        <Tabs value={tab} onChange={setTab}
+          options={[["checklisten", t("orga.tabChecklists")], ["anwesenheit", t("orga.tabAttendance")]]} />
       </div>
 
       {tab === "anwesenheit" ? <Anwesenheit /> : (<>

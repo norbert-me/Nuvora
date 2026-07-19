@@ -99,9 +99,61 @@ export const pageIntro = { color: "var(--text2)", fontSize: 14, marginBottom: 22
 export const COLORS = {
   danger: "#d1350f",
   success: "#0a7d3e",
+  warning: "#b8860b",
   correctBg: "#d4edda",
   incorrectBg: "#fde2d9",
 };
+
+// ─── Gemeinsame Bausteine (EINE Quelle fürs Modul-Design) ───
+// Vorher definierte jede Seite fld/inputStyle/th/td/card selbst, mit leicht
+// abweichenden Werten. Ab hier zentral — nicht mehr je Seite neu erfinden.
+
+// Texteingabe. Zeilen-Variante (Standard) und volle Breite via { ...inputStyle, width:"100%" }.
+export const inputStyle = {
+  padding: "9px 12px", border: "1px solid var(--border2)", borderRadius: 10,
+  fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box",
+};
+
+// Container-Karte (Listeneintrag, Modulblock).
+export const cardStyle = {
+  border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16,
+};
+
+// Zurückhaltendes Panel (Papierkorb, Hinweisblock).
+export const panelStyle = {
+  border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg3)", padding: 14,
+};
+
+// Tabellenkopf / -zelle (Noten, Orga …).
+export const th = { padding: "8px 6px", fontSize: 12, fontWeight: 600, color: "var(--text2)", borderBottom: "1px solid var(--border)", textAlign: "center", whiteSpace: "nowrap" };
+export const td = { padding: "4px 6px", borderBottom: "1px solid var(--border)", textAlign: "center", color: "var(--text)" };
+
+// Kleiner Chip/Tag.
+export const chipStyle = {
+  display: "inline-block", fontSize: 12, fontWeight: 600, padding: "2px 9px",
+  borderRadius: 980, background: "var(--bg3)", color: "var(--text2)",
+};
+
+// Gefärbtes Badge (z.B. Zähler): badge("#d1350f") -> roter Hinweis.
+export const badge = (color) => ({
+  fontSize: 12, fontWeight: 700, padding: "2px 9px", borderRadius: 980,
+  background: color + "22", color,
+});
+
+// Pillen-Umschalter (Tabs/Ansichten). options: [[value, label], …].
+export function Tabs({ value, onChange, options, style }) {
+  return (
+    <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden", ...style }}>
+      {options.map(([v, label]) => (
+        <button key={v} onClick={() => onChange(v)} style={{
+          padding: "6px 14px", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
+          background: value === v ? "var(--accent)" : "transparent",
+          color: value === v ? "#fff" : "var(--text2)",
+        }}>{label}</button>
+      ))}
+    </div>
+  );
+}
 
 // Reifegrad-Badge (alpha/beta) fuer Module. beta = blau, alpha = orange-Warnung.
 export function StageBadge({ stage, title }) {

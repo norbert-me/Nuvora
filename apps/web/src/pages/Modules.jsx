@@ -2,7 +2,7 @@
 // des Moduls bleiben im Kern liegen und sind nach dem Wiedereinschalten da.
 import { useState } from "react";
 import { useModules } from "../core/modules.js";
-import { StageBadge } from "../components/Icons.jsx";
+import { StageBadge, Tabs } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { pageTitle } from "../components/Icons.jsx";
 
@@ -66,11 +66,8 @@ export default function Modules() {
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
         <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("modules.sortBy")}</span>
-        <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden" }}>
-          {[["name", t("modules.sortName")], ["status", t("modules.sortStatus")], ["popular", t("modules.sortPopular")]].map(([k, label]) => (
-            <button key={k} onClick={() => setSortKey(k)} style={{ padding: "5px 13px", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", background: effKey === k ? "var(--accent)" : "transparent", color: effKey === k ? "#fff" : "var(--text2)" }}>{label}</button>
-          ))}
-        </div>
+        <Tabs value={effKey} onChange={setSortKey}
+          options={[["name", t("modules.sortName")], ["status", t("modules.sortStatus")], ["popular", t("modules.sortPopular")]]} />
         <button onClick={() => setDir((d) => (d === "asc" ? "desc" : "asc"))} title={t("modules.sortDir")}
           style={{ padding: "5px 12px", fontSize: 14, fontWeight: 700, border: "1px solid var(--border2)", borderRadius: 980, cursor: "pointer", background: "transparent", color: "var(--text2)" }}>
           {dir === "asc" ? "↑" : "↓"}

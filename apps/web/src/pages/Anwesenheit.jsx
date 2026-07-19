@@ -3,7 +3,7 @@
 // und wird nicht gespeichert. Übersicht zeigt Fehlzeiten und lässt nachtragen.
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { pageTitle, btnSecondary, selectStyle, Toggle } from "../components/Icons.jsx";
+import { pageTitle, btnSecondary, selectStyle, Toggle, Tabs, inputStyle } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
@@ -12,7 +12,6 @@ const API = "/api/anwesenheit";
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const STATI = ["da", "fehlt", "spaet", "entsch"];
 const COL = { da: "#0a7d3e", fehlt: "#d1350f", spaet: "#b8860b", entsch: "#2563eb" };
-const inputStyle = { padding: "8px 11px", border: "1px solid var(--border2)", borderRadius: 10, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" };
 
 export default function Anwesenheit() {
   const { t } = useLanguage();
@@ -117,11 +116,8 @@ export default function Anwesenheit() {
         <select value={classId ?? ""} onChange={(e) => setClassId(Number(e.target.value))} style={selectStyle}>
           {sichtbareKlassen.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden", marginLeft: "auto" }}>
-          {[["tag", t("anwesenheit.day")], ["uebersicht", t("anwesenheit.overview")]].map(([v, l]) => (
-            <button key={v} onClick={() => setView(v)} style={{ padding: "6px 14px", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", background: view === v ? "var(--accent)" : "transparent", color: view === v ? "#fff" : "var(--text2)" }}>{l}</button>
-          ))}
-        </div>
+        <Tabs value={view} onChange={setView} style={{ marginLeft: "auto" }}
+          options={[["tag", t("anwesenheit.day")], ["uebersicht", t("anwesenheit.overview")]]} />
       </div>
 
       {view === "tag" && kalenderAktiv && heutigeIds.size > 0 && (
