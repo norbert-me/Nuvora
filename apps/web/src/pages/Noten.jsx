@@ -402,7 +402,7 @@ export default function Noten() {
                         <button onClick={() => setRenameCol(renameCol === c.id ? null : c.id)} title={t("noten.colOverview")}
                           style={{ width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", border: "none", background: "none", cursor: "pointer", color: "var(--text2)", fontWeight: 500, fontSize: 12, padding: "8px 6px" }}>{c.name}</button>
                         {c.source_session_id && (
-                          <Link to={`/cardvote/class-evaluation/${c.source_session_id}`} title={t("noten.fromCardvote")} onClick={(e) => e.stopPropagation()}
+                          <Link to={`/cardvote/evaluation/${c.source_session_id}`} title={t("noten.fromCardvote")} onClick={(e) => e.stopPropagation()}
                             style={{ display: "inline-flex", color: "var(--accent)", padding: "0 2px" }}>
                             <Icon d={ICONS.chart} size={13} />
                           </Link>
