@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { Icon, ICONS, modalOverlay, modalPanel } from "../components/Icons.jsx";
@@ -42,14 +43,17 @@ function Stars({ value, my, onRate, count, t }) {
   );
 }
 
-export default function Marketplace() {
+export default function Marketplace({ fixedKind }) {
   const { t } = useLanguage();
+  const [params] = useSearchParams();
   const [hintBefore, hintAfter] = t("market.publishHint").split("{{link}}");
   const user = currentUser();
+  // Aus einem Modul heraus zeigt der Marktplatz nur dessen Art (kind gesperrt).
+  const lockedKind = fixedKind || params.get("kind") || "";
   const [quizzes, setQuizzes] = useState([]);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("newest");
-  const [kind, setKind] = useState(""); // "" = alle | cardvote_questionset | karten_deck | method
+  const [kind, setKind] = useState(lockedKind); // "" = alle | cardvote_questionset | karten_deck | method
   const [loading, setLoading] = useState(true);
   const [preview, setPreview] = useState(null);
   const [msg, setMsg] = useState("");
@@ -141,6 +145,7 @@ export default function Marketplace() {
         </div>
       )}
 
+      {!lockedKind && (
       <div style={{ display: "flex", gap: 2, background: "var(--bg2)", padding: 3, borderRadius: 980, marginBottom: 14, width: "fit-content", flexWrap: "wrap" }}>
         {[["", t("market.kindAll")], ["cardvote_questionset", t("market.kindQuiz")], ["karten_deck", t("market.kindDeck")], ["method", t("market.kindMethod")]].map(([k, label]) => (
           <button key={k} onClick={() => setKind(k)} style={{
@@ -150,6 +155,7 @@ export default function Marketplace() {
           }}>{label}</button>
         ))}
       </div>
+      )}
 
       <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("market.searchPlaceholder")}

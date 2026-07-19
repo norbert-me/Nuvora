@@ -19,7 +19,9 @@ export default function CodeDetektiv() {
       <div className="cd-scope">
         <StoreProvider>
           <Routes>
-            <Route path="" element={<Home />} />
+            {/* Öffnen startet direkt in „Rätsel erstellen" (Admin). */}
+            <Route path="" element={<Admin />} />
+            <Route path="home" element={<Home />} />
             <Route path="solo" element={<Solo />} />
             <Route path="puzzle/:id" element={<PuzzlePage />} />
             <Route path="admin" element={<Admin />} />

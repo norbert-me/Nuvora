@@ -133,7 +133,6 @@ export default function ClassEvaluation() {
 
       {/* Stat tiles */}
       <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
-        <Stat label="Lernende" value={students.length} />
         <Stat label="Tests" value={tests.length} />
         <Stat label="Ø Gesamt" value={`${classAvgPct}%`} />
         {med != null && <Stat label="Median" value={`${med}%`} />}
