@@ -96,8 +96,56 @@ function KartenHilfe({ t }) {
   );
 }
 
-const AREA_COMP = { core: KernHilfe, cardvote: CardVoteHilfe, lernpfad: LernpfadHilfe, karten: KartenHilfe, noten: NotenHilfe };
-const AREA_LABEL = { core: "help.core.modulesT", cardvote: "CardVote", lernpfad: "Lernpfad", karten: "karten.title", noten: "noten.title" };
+function KalenderHilfe({ t }) {
+  return (
+    <>
+      <Section title={t("help.kal.whatT")}>{t("help.kal.what")}</Section>
+      <Section title={t("help.kal.ttT")}>{t("help.kal.tt")}</Section>
+      <Section title={t("help.kal.planT")}>{t("help.kal.plan")}</Section>
+      <Section title={t("help.kal.breaksT")}>{t("help.kal.breaks")}</Section>
+    </>
+  );
+}
+
+function EinstiegeHilfe({ t }) {
+  return (
+    <>
+      <Section title={t("help.ein.whatT")}>{t("help.ein.what")}</Section>
+      <Section title={t("help.ein.useT")}>{t("help.ein.use")}</Section>
+    </>
+  );
+}
+
+function DetektivHilfe({ t }) {
+  return (
+    <>
+      <Section title={t("help.cd.whatT")}>{t("help.cd.what")}</Section>
+      <Section title={t("help.cd.playT")}>{t("help.cd.play")}</Section>
+    </>
+  );
+}
+
+function SitzplanHilfe({ t }) {
+  return <Section title={t("help.si.whatT")}>{t("help.si.what")}</Section>;
+}
+
+function AnwesenheitHilfe({ t }) {
+  return (
+    <>
+      <Section title={t("help.an.whatT")}>{t("help.an.what")}</Section>
+      <Section title={t("help.an.overviewT")}>{t("help.an.overview")}</Section>
+    </>
+  );
+}
+
+function ZufallHilfe({ t }) {
+  return <Section title={t("help.zu.whatT")}>{t("help.zu.what")}</Section>;
+}
+
+const AREA_COMP = { core: KernHilfe, cardvote: CardVoteHilfe, lernpfad: LernpfadHilfe, karten: KartenHilfe, noten: NotenHilfe, kalender: KalenderHilfe, methoden: EinstiegeHilfe, "code-detektiv": DetektivHilfe, sitzplan: SitzplanHilfe, anwesenheit: AnwesenheitHilfe, zufall: ZufallHilfe };
+// Reiter-Beschriftung: Modulnamen aus den jeweiligen i18n-Titeln.
+const AREA_TITLE = { cardvote: "CardVote", lernpfad: "Lernpfad", "code-detektiv": "Code-Detektiv", karten: "karten.title", noten: "noten.title", kalender: "kalender.title", methoden: "methoden.title", sitzplan: "sitzplan.title", anwesenheit: "anwesenheit.title", zufall: "zufall.title" };
+const MODULE_KEYS = ["cardvote", "lernpfad", "karten", "noten", "kalender", "methoden", "code-detektiv", "sitzplan", "anwesenheit", "zufall"];
 
 export default function Help() {
   const [params, setParams] = useSearchParams();
@@ -106,13 +154,17 @@ export default function Help() {
   const aktiv = new Set(modules.filter((m) => m.active).map((m) => m.key));
 
   // Kern immer, Module nur wenn aktiv.
-  const sichtbar = ["core", ...["cardvote", "lernpfad", "karten", "noten"].filter((k) => aktiv.has(k))];
+  const sichtbar = ["core", ...MODULE_KEYS.filter((k) => aktiv.has(k))];
   const gewuenscht = params.get("area");
   const area = sichtbar.includes(gewuenscht) ? gewuenscht : sichtbar[0];
   const Comp = AREA_COMP[area];
 
-  // core-Reiter zeigt "Kern"; Modulnamen sind Eigennamen ausser Noten.
-  const label = (k) => (k === "core" ? t("help.coreLabel") : k === "noten" ? t("noten.title") : k === "karten" ? t("karten.title") : AREA_LABEL[k]);
+  // core-Reiter zeigt "Kern"; Modulnamen aus i18n-Titel (Eigennamen bleiben so).
+  const label = (k) => {
+    if (k === "core") return t("help.coreLabel");
+    const key = AREA_TITLE[k];
+    return key && key.includes(".") ? t(key) : key;
+  };
 
   return (
     <div style={{ maxWidth: 700 }}>
