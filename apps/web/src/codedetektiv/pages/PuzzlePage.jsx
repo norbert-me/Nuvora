@@ -8,6 +8,7 @@ import {
 import {
   SortableContext, verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
+import { useCdBase } from '../base.jsx';
 import { useStore } from '../data/store';
 import {
   DraggableToolboxBlock, MazeToolboxBlock, SortableBlock,
@@ -114,6 +115,7 @@ export default function PuzzlePage() {
   const sessionId = searchParams.get('session');
   const isSolo = !sessionId;
   const navigate = useNavigate();
+  const base = useCdBase();
   const { state, dispatch } = useStore();
   const puzzle = state.puzzles.find(p => p.id === id);
 
@@ -869,13 +871,13 @@ export default function PuzzlePage() {
                     <IconReset size={14} /> Zurücksetzen
                   </button>
                   {solved && isSolo && (
-                    <button className="btn btn-primary" onClick={() => navigate('/code-detektiv/solo')}>Nächstes Rätsel →</button>
+                    <button className="btn btn-primary" onClick={() => navigate(`${base}/solo`)}>Nächstes Rätsel →</button>
                   )}
                   {solved && sessionId && (
-                    <button className="btn btn-primary" onClick={() => navigate(`/code-detektiv/play/${sessionId}`)}>Zurück zur Session →</button>
+                    <button className="btn btn-primary" onClick={() => navigate(`${base}/play/${sessionId}`)}>Zurück zur Session →</button>
                   )}
                   {feedback === 'timeout' && sessionId && (
-                    <button className="btn btn-primary" onClick={() => navigate(`/code-detektiv/play/${sessionId}`)}>Zurück zur Session →</button>
+                    <button className="btn btn-primary" onClick={() => navigate(`${base}/play/${sessionId}`)}>Zurück zur Session →</button>
                   )}
                 </div>
 

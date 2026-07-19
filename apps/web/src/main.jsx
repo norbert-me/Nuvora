@@ -62,6 +62,7 @@ import Topics from "./pages/Topics.jsx";
 import ThemaAnsicht from "./pages/ThemaAnsicht.jsx";
 import LernpfadModule from "./pages/LernpfadModule.jsx";
 import CodeDetektiv from "./codedetektiv/CodeDetektiv.jsx";
+import PublicCd from "./codedetektiv/PublicCd.jsx";
 import Cards from "./pages/Cards.jsx";
 import Tutorial from "./pages/Tutorial.jsx";
 import NotenModul from "./pages/Noten.jsx";
@@ -791,6 +792,8 @@ function App() {
         <Routes>
           {/* Kartenlernen der Schueler: oeffentlich, ohne Login, ueber Token. */}
           <Route path="/lernen/:token" element={<Lernen />} />
+          {/* Code-Detektiv: öffentliches Beitreten der Schüler ohne Login. */}
+          <Route path="/cd/:code/*" element={<PublicCd />} />
           <Route path="/*" element={<AppRoutes user={user} setUser={setUser} logout={logout} />} />
         </Routes>
       </BrowserRouter>

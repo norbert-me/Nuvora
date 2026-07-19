@@ -1,17 +1,19 @@
 import { useNavigate } from 'react-router-dom';
+import { useCdBase } from '../base.jsx';
 import { useStore } from '../data/store';
 import { CATEGORIES } from '../data/samplePuzzles';
 import { IconSearch, IconPuzzle, IconMap, IconStar, IconClock, IconBack } from '../components/Icons';
 
 export default function Solo() {
   const navigate = useNavigate();
+  const base = useCdBase();
   const { state } = useStore();
 
   return (
     <div>
       <div className="app-header">
         <h1><IconSearch size={22} /> Code-Detektiv</h1>
-        <button className="btn btn-outline" onClick={() => navigate('/code-detektiv')}><IconBack size={14} /> Zurück</button>
+        <button className="btn btn-outline" onClick={() => navigate(base)}><IconBack size={14} /> Zurück</button>
       </div>
       <div className="page-container">
         <h2 style={{ marginBottom: 20 }}>Solo üben</h2>
@@ -20,7 +22,7 @@ export default function Solo() {
             <div
               key={puzzle.id}
               className="puzzle-card"
-              onClick={() => navigate(`/code-detektiv/puzzle/${puzzle.id}?mode=solo`)}
+              onClick={() => navigate(`${base}/puzzle/${puzzle.id}?mode=solo`)}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ fontSize: 24 }}>{puzzle.type === 'maze' ? <IconMap size={24} /> : <IconPuzzle size={24} />}</span>

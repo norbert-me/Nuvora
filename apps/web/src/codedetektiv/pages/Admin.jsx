@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
+import { useCdBase } from '../base.jsx';
 import {
   DndContext, pointerWithin, closestCenter, PointerSensor, useSensor, useSensors,
   DragOverlay, useDroppable, MeasuringStrategy,
@@ -88,6 +89,7 @@ function editorCollision(args) {
 
 export default function Admin() {
   const navigate = useNavigate();
+  const base = useCdBase();
   const { state, dispatch } = useStore();
 
   const [title, setTitle] = useState('');
@@ -525,6 +527,9 @@ export default function Admin() {
                           {session.puzzleIds.length} Rätsel, Runde {session.currentPuzzleIndex + 1}/{session.puzzleIds.length}
                           {currentPuzzle && ` - ${currentPuzzle.title}`}
                         </p>
+                        <p style={{ fontSize: 12.5, color: '#555', marginTop: 4 }}>
+                          Beitreten (Schüler, ohne Login): <strong>{window.location.origin}/cd/{session.id}</strong>
+                        </p>
                       </div>
                       <div style={{ display: 'flex', gap: 8 }}>
                         {!session.started && (
@@ -533,7 +538,7 @@ export default function Admin() {
                             Starten
                           </button>
                         )}
-                        <button className="btn btn-primary" onClick={() => navigate(`/code-detektiv/play/${session.id}`)}>
+                        <button className="btn btn-primary" onClick={() => navigate(`${base}/play/${session.id}`)}>
                           Ansehen
                         </button>
                         <button className="btn btn-danger" onClick={() => {
@@ -787,7 +792,7 @@ export default function Admin() {
             <h2 style={{ marginBottom: 16 }}>Vorhandene Rätsel</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {state.puzzles.map(puzzle => (
-                <div key={puzzle.id} className="puzzle-card" onClick={() => navigate(`/code-detektiv/puzzle/${puzzle.id}?mode=solo`)}>
+                <div key={puzzle.id} className="puzzle-card" onClick={() => navigate(`${base}/puzzle/${puzzle.id}?mode=solo`)}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
                       <h3 style={{ fontSize: 16, fontWeight: 600 }}>{puzzle.title}</h3>
@@ -800,7 +805,7 @@ export default function Admin() {
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       <button className="btn btn-outline"
-                        onClick={e => { e.stopPropagation(); navigate(`/code-detektiv/puzzle/${puzzle.id}?mode=solo`); }}
+                        onClick={e => { e.stopPropagation(); navigate(`${base}/puzzle/${puzzle.id}?mode=solo`); }}
                         style={{ fontSize: 12, padding: '6px 12px' }}>
                         Vorschau
                       </button>

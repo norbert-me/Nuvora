@@ -532,6 +532,27 @@ class CodePuzzle(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class CodeSession(Base):
+    """Modul Code-Detektiv: eine Klassen-Session serverseitig, damit Schueler von
+    eigenen Geraeten per Code beitreten koennen (oeffentlich, ohne Login). Die
+    gewaehlten Raetsel werden als Schnappschuss eingebettet (auch Beispiel-Raetsel,
+    die sonst nur im Browser liegen). players/results als JSON-Listen."""
+    __tablename__ = "code_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    code: Mapped[str] = mapped_column(String(8), unique=True, index=True)
+    puzzles: Mapped[list] = mapped_column(JSON, default=list)   # Schnappschuss der Raetselobjekte
+    players: Mapped[list] = mapped_column(JSON, default=list)   # [{name, joinedAt}]
+    results: Mapped[list] = mapped_column(JSON, default=list)   # [{playerName,puzzleId,solved,attempts,time}]
+    started: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    ended: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    current_index: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    round_started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class SeatingPlan(Base):
     """Modul Sitzplan: ein Rasterlayout je Klasse. `data` haelt Spaltenzahl und
     die Zellenbelegung (Schueler-IDs) als JSON — Schueler bleiben im Kern, hier
