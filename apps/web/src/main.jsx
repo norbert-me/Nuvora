@@ -70,6 +70,7 @@ import Kalender from "./pages/Kalender.jsx";
 import Methoden from "./pages/Methoden.jsx";
 import Zufall from "./pages/Zufall.jsx";
 import Sitzplan from "./pages/Sitzplan.jsx";
+import Anwesenheit from "./pages/Anwesenheit.jsx";
 import { useModules } from "./core/modules.js";
 import { btnPrimary, btnSecondary } from "./components/Icons.jsx";
 // Navigation ist modulbezogen: die Shell zeigt die Punkte des Moduls, in dem
@@ -92,6 +93,7 @@ const KAL = "/kalender";
 const MET = "/methoden";
 const ZUF = "/zufall";
 const SIT = "/sitzplan";
+const ANW = "/anwesenheit";
 
 // Menue passend zum Bereich. Man soll im Modul-Menue bleiben, auch auf
 // modulneutralen Seiten (Hilfe, Impressum), solange man aus einem Modul kam —
@@ -107,6 +109,7 @@ const getModuleNavItems = (t, location) => {
     : pathname.startsWith(MET) ? "methoden"
     : pathname.startsWith(ZUF) ? "zufall"
     : pathname.startsWith(SIT) ? "sitzplan"
+    : pathname.startsWith(ANW) ? "anwesenheit"
     : pathname.startsWith(KA) ? "karten"
     : params.get("area"); // Hilfe u.ae.: Bereich aus der Query
 
@@ -142,6 +145,9 @@ const getModuleNavItems = (t, location) => {
   }
   if (area === "sitzplan") {
     return [{ to: SIT, label: t("sitzplan.title") }];
+  }
+  if (area === "anwesenheit") {
+    return [{ to: ANW, label: t("anwesenheit.title") }];
   }
   if (area === "code-detektiv") {
     // Buttons der eingebetteten App steuern das iframe per ?view (wie Lernpfad).
@@ -680,6 +686,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={MET} element={user ? <ModuleGate moduleKey="methoden"><Methoden /></ModuleGate> : <Landing />} />
           <Route path={ZUF} element={user ? <ModuleGate moduleKey="zufall"><Zufall /></ModuleGate> : <Landing />} />
           <Route path={SIT} element={user ? <ModuleGate moduleKey="sitzplan"><Sitzplan /></ModuleGate> : <Landing />} />
+          <Route path={ANW} element={user ? <ModuleGate moduleKey="anwesenheit"><Anwesenheit /></ModuleGate> : <Landing />} />
 
           {/* ─── Modul Code-Detektiv ─── */}
           <Route path={CD} element={user ? <ModuleGate moduleKey="code-detektiv"><CodeDetektivModule /></ModuleGate> : <Landing />} />

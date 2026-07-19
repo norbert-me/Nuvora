@@ -101,6 +101,16 @@ REGISTRY: List[ModuleDef] = [
         path="/kalender",
     ),
     ModuleDef(
+        key="anwesenheit",
+        name="Anwesenheit",
+        description=(
+            "Anwesenheit und Fehlzeiten je Klasse und Tag — fehlt, verspaetet "
+            "oder entschuldigt. Mit Fehlzeiten-Uebersicht je Person."
+        ),
+        path="/anwesenheit",
+        stage="beta",
+    ),
+    ModuleDef(
         key="sitzplan",
         name="Sitzplan",
         description=(
