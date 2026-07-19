@@ -238,6 +238,7 @@ _MODULE_TABLES = {
     "Material-Ausleihe": ["material_items", "material_loans"],
     "Anwesenheit": "attendance",
     "Sitzplan": "seating_plans",
+    "Code-Detektiv": ["code_puzzles", "code_sessions"],
     "Noten": "grade_sections",
     "Karten": "card_decks",
     "Einstiege": "methods",
