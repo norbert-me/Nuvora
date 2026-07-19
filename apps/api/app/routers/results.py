@@ -315,7 +315,7 @@ async def get_topic_stats(session_id: int, user: User = Depends(get_current_user
     return {"class_id": session.class_id, "topics": out}
 
 
-@router.get("/sessions/weak-topics")
+@router.get("/weak-topics")
 async def weak_topics_range(frm: datetime, to: datetime, class_id: Optional[int] = None,
                             user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Schwache Themen (Trefferquote < 60 %) über alle Sessions in [frm, to] —

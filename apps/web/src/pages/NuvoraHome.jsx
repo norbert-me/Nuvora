@@ -35,7 +35,7 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv }) {
       const q = `frm=${frm.toISOString()}&to=${to.toISOString()}`;
       const all = [];
       for (const c of classes) {
-        const d = await fetch(`/api/sessions/weak-topics?${q}&class_id=${c.id}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        const d = await fetch(`/api/weak-topics?${q}&class_id=${c.id}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
         (d?.topics || []).forEach((tp) => all.push({ class_id: c.id, klasse: c.name, ...tp }));
       }
       all.sort((a, b) => a.pct - b.pct);

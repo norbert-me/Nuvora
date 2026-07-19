@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, Fragment } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate } from "react-router-dom";
 import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, selectStyle, Tabs, inputStyle, modalOverlay, modalPanel } from "../components/Icons.jsx";
+import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, put } from "../core/cache.js";
 
@@ -74,7 +75,7 @@ export default function Kalender() {
     if (view !== "week" || !aktiv.cardvote) { setWdhVorschlag([]); return; }
     const vorMo = addDays(mondayOf(cursor), -7);
     const vorSo = addDays(vorMo, 6);
-    fetch(`/api/sessions/weak-topics?frm=${vorMo.toISOString()}&to=${addDays(vorSo, 1).toISOString()}`)
+    fetch(`/api/weak-topics?frm=${vorMo.toISOString()}&to=${addDays(vorSo, 1).toISOString()}`)
       .then((r) => (r.ok ? r.json() : null)).then((d) => setWdhVorschlag(d && Array.isArray(d.topics) ? d.topics : [])).catch(() => {});
   }, [view, cursor, aktiv.cardvote]);
   // Ist der Tag unterrichtsfrei (in einem Ferien-/Feiertags-Zeitraum)?
