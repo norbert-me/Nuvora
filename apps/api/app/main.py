@@ -331,6 +331,27 @@ async def startup():
             print(f"[STARTUP] Papierkorb: {res.rowcount} Klasse(n) endgültig gelöscht (>30 Tage).", flush=True)
         await db.commit()
 
+    # Mandantentrennung: owner_id IS NULL galt historisch als „für alle sichtbar"
+    # (Einzelmandant nach der Datenübernahme). Bei öffentlichem Betrieb ist das ein
+    # Leck. Alle Alt-Zeilen ohne Owner gehören dem ersten Konto (Admin) — einmalig
+    # zuweisen; danach existiert kein NULL-Owner mehr und die alten IS-NULL-Regeln
+    # matchen nichts. Idempotent.
+    async with async_session() as db:
+        admin = (await db.execute(text("SELECT id FROM users ORDER BY id LIMIT 1"))).scalar()
+        if admin:
+            total = 0
+            for tbl in ("school_classes", "folders", "questions", "sessions", "topics",
+                        "exercises", "learning_paths", "grade_sections", "grade_categories",
+                        "grade_overrides", "card_decks", "quartal_dividers", "plan_weeks"):
+                try:
+                    r = await db.execute(text(f"UPDATE {tbl} SET owner_id = :a WHERE owner_id IS NULL"), {"a": admin})
+                    total += r.rowcount or 0
+                except Exception:
+                    pass  # Tabelle existiert (noch) nicht — überspringen
+            if total:
+                print(f"[STARTUP] Mandanten-Backfill: {total} Alt-Zeile(n) ohne Owner dem Admin zugewiesen.", flush=True)
+            await db.commit()
+
     # Noten: Kategorien ohne Abschnitt an einen Standard-Abschnitt haengen
     # (zweistufiges Modell kam spaeter). Pro Klasse ein "Sonstige Mitarbeit"
     # mit 100 %, damit der gewichtete Schnitt sofort rechnet.

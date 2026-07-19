@@ -82,6 +82,18 @@ async def test_isolation_class_list(session):
 
 
 @pytest.mark.asyncio
+async def test_null_owner_class_nicht_oeffentlich(session):
+    # Früher galt owner_id IS NULL als „für alle sichtbar" (Leck). Jetzt strikt:
+    # eine Klasse ohne Owner taucht bei niemandem in der Liste auf.
+    b = await _teacher(session, "b@x.de")
+    orphan = SchoolClass(name="Alt", owner_id=None)
+    session.add(orphan)
+    await session.commit()
+    seen = await classes.list_classes(user=b, db=session)
+    assert seen == [], "NULL-owner-Klasse ist für Fremde sichtbar"
+
+
+@pytest.mark.asyncio
 async def test_isolation_class_access(session):
     a = await _teacher(session, "a@x.de")
     b = await _teacher(session, "b@x.de")

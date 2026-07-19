@@ -136,7 +136,7 @@ async def list_classes(user: User = Depends(get_current_user), db: AsyncSession 
     result = await db.execute(
         select(SchoolClass)
         .options(selectinload(SchoolClass.students))
-        .where((SchoolClass.owner_id == user.id) | (SchoolClass.owner_id.is_(None)))
+        .where(SchoolClass.owner_id == user.id)
         .where(SchoolClass.deleted_at.is_(None))  # Papierkorb-Klassen ausblenden
         .order_by(SchoolClass.name)
     )
@@ -161,7 +161,7 @@ async def get_class(class_id: int, user: User = Depends(get_current_user), db: A
     sc = await _load_class(db, class_id)
     if not sc:
         raise HTTPException(404)
-    if sc.owner_id and sc.owner_id != user.id:
+    if sc.owner_id != user.id:
         raise HTTPException(403)
     return sc
 
@@ -171,7 +171,7 @@ async def update_class(class_id: int, body: ClassCreate, user: User = Depends(ge
     sc = await db.get(SchoolClass, class_id)
     if not sc:
         raise HTTPException(404)
-    if sc.owner_id and sc.owner_id != user.id:
+    if sc.owner_id != user.id:
         raise HTTPException(403, "Keine Berechtigung")
     sc.name = body.name
     sc.color = body.color or sc.color or _auto_color(body.name)
@@ -219,7 +219,7 @@ async def set_class_color(class_id: int, body: ColorIn, user: User = Depends(get
     sc = await db.get(SchoolClass, class_id)
     if not sc:
         raise HTTPException(404)
-    if sc.owner_id and sc.owner_id != user.id:
+    if sc.owner_id != user.id:
         raise HTTPException(403, "Keine Berechtigung")
     sc.color = body.color or _auto_color(sc.name)
     if not sc.owner_id:
@@ -235,7 +235,7 @@ async def delete_class(class_id: int, user: User = Depends(get_current_user), db
     sc = await db.get(SchoolClass, class_id)
     if not sc:
         raise HTTPException(404)
-    if sc.owner_id and sc.owner_id != user.id:
+    if sc.owner_id != user.id:
         raise HTTPException(403, "Keine Berechtigung")
     from datetime import datetime, timezone
     sc.deleted_at = datetime.now(timezone.utc)
@@ -245,7 +245,7 @@ async def delete_class(class_id: int, user: User = Depends(get_current_user), db
 @router.post("/{class_id}/restore", response_model=ClassOut)
 async def restore_class(class_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     sc = await _load_class(db, class_id)
-    if not sc or (sc.owner_id and sc.owner_id != user.id):
+    if not sc or sc.owner_id != user.id:
         raise HTTPException(404)
     sc.deleted_at = None
     await db.commit()
@@ -256,7 +256,7 @@ async def restore_class(class_id: int, user: User = Depends(get_current_user), d
 async def purge_class(class_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Endgültig löschen (aus dem Papierkorb). Erst hier greift die Kaskade."""
     sc = await db.get(SchoolClass, class_id)
-    if not sc or (sc.owner_id and sc.owner_id != user.id):
+    if not sc or sc.owner_id != user.id:
         raise HTTPException(404)
     if sc.deleted_at is None:
         raise HTTPException(400, "Klasse ist nicht im Papierkorb")
