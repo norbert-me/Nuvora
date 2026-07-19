@@ -109,23 +109,13 @@ REGISTRY: List[ModuleDef] = [
         path="/kalender",
     ),
     ModuleDef(
-        key="ausleihe",
-        group="organisation",
-        name="Material-Ausleihe",
-        description=(
-            "Gegenstaende verleihen und den Rueckgabe-Stand im Blick behalten — "
-            "an Schueler (aus dem Kern) oder an frei eingetragene Personen."
-        ),
-        path="/ausleihe",
-    ),
-    ModuleDef(
         key="orga",
         group="organisation",
         name="Orga",
         description=(
-            "Zwei Werkzeuge je Klasse: Sammel-Checklisten (z.B. „Unterschrift der "
-            "Klassenarbeit gesehen“, pro Schueler abhaken) und Anwesenheit/Fehlzeiten "
-            "(fehlt, verspaetet, entschuldigt) mit Fehlzeiten-Report als PDF."
+            "Drei Werkzeuge je Klasse: Sammel-Checklisten (z.B. „Unterschrift der "
+            "Klassenarbeit gesehen“), Anwesenheit/Fehlzeiten (mit PDF-Report) und "
+            "Material-Ausleihe (verleihen, Rückgabe im Blick)."
         ),
         path="/orga",
     ),

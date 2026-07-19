@@ -74,7 +74,6 @@ import Methoden from "./pages/Methoden.jsx";
 import Zufall from "./pages/Zufall.jsx";
 import Sitzplan from "./pages/Sitzplan.jsx";
 import Orga from "./pages/Orga.jsx";
-import Ausleihe from "./pages/Ausleihe.jsx";
 import { useModules } from "./core/modules.js";
 import { DialogHost } from "./core/dialog.jsx";
 import { btnPrimary, btnSecondary } from "./components/Icons.jsx";
@@ -116,7 +115,6 @@ const getModuleNavItems = (t, location) => {
     : pathname.startsWith(ZUF) ? "zufall"
     : pathname.startsWith(SIT) ? "sitzplan"
     : pathname.startsWith(ORG) ? "orga"
-    : pathname.startsWith(AUS) ? "ausleihe"
     : pathname.startsWith(KA) ? "karten"
     : params.get("area"); // Hilfe u.ae.: Bereich aus der Query
 
@@ -159,12 +157,10 @@ const getModuleNavItems = (t, location) => {
   if (area === "orga") {
     const tab = params.get("tab");
     return [
-      { to: `${ORG}?tab=checklisten`, label: t("orga.tabChecklists"), active: tab !== "anwesenheit" },
+      { to: `${ORG}?tab=checklisten`, label: t("orga.tabChecklists"), active: !["anwesenheit", "ausleihe"].includes(tab) },
       { to: `${ORG}?tab=anwesenheit`, label: t("anwesenheit.title"), active: tab === "anwesenheit" },
+      { to: `${ORG}?tab=ausleihe`, label: t("ausleihe.title"), active: tab === "ausleihe" },
     ];
-  }
-  if (area === "ausleihe") {
-    return [{ to: AUS, label: t("ausleihe.title") }];
   }
   if (area === "code-detektiv") {
     // Nativ eingebunden: die Nuvora-Navbar steuert die Bereiche der App direkt.
@@ -708,7 +704,6 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={ZUF} element={user ? <ModuleGate moduleKey="zufall"><Zufall /></ModuleGate> : <Landing />} />
           <Route path={SIT} element={user ? <ModuleGate moduleKey="sitzplan"><Sitzplan /></ModuleGate> : <Landing />} />
           <Route path={ORG} element={user ? <ModuleGate moduleKey="orga"><Orga /></ModuleGate> : <Landing />} />
-          <Route path={AUS} element={user ? <ModuleGate moduleKey="ausleihe"><Ausleihe /></ModuleGate> : <Landing />} />
 
           {/* ─── Modul Code-Detektiv ─── */}
           <Route path={`${CD}/*`} element={user ? <ModuleGate moduleKey="code-detektiv"><CodeDetektiv /></ModuleGate> : <Landing />} />

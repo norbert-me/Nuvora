@@ -327,6 +327,13 @@ async def startup():
             ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
         """))
         await db.execute(text("DELETE FROM user_modules WHERE module_key = 'anwesenheit'"))
+        # Material-Ausleihe ebenso ins Modul „Orga" aufgegangen.
+        await db.execute(text("""
+            INSERT INTO user_modules (user_id, module_key)
+            SELECT DISTINCT user_id, 'orga' FROM user_modules WHERE module_key = 'ausleihe'
+            ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
+        """))
+        await db.execute(text("DELETE FROM user_modules WHERE module_key = 'ausleihe'"))
         await db.commit()
 
     # Anwesenheit ist jetzt pro Stunde (student, date, period) statt pro Tag.

@@ -16,7 +16,8 @@ from .auth import get_current_user, rate_limit
 from .modules import is_active
 
 router = APIRouter(prefix="/api/ausleihe", tags=["ausleihe"])
-MODULE_KEY = "ausleihe"
+# Material-Ausleihe lebt jetzt im Modul „Orga" (Tab) — daher über orga gegated.
+MODULE_KEY = "orga"
 
 
 async def require_module(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> User:
