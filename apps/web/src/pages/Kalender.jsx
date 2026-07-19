@@ -468,12 +468,23 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   const fld = { width: "100%", padding: 9, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
   const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
+  // Bestehender Eintrag oeffnet zuerst als Ansicht; neuer direkt im Bearbeiten.
+  const [edit, setEdit] = useState(!entry.id);
+  const clsName = classId && (classes.find((c) => c.id === Number(classId)) || {}).name;
+  const topName = topicId && (() => { const tp = topics.find((x) => x.id === Number(topicId)); return tp ? topicLabel(tp) : ""; })();
+  const methName = methodId && (methods.find((m) => m.id === Number(methodId)) || {}).title;
+  const linkList = [
+    quizId && (() => { const q = quizze.find((x) => x.id === Number(quizId)); return q && { to: "/cardvote/questions", label: q.folder ? `${q.folder} / ${q.name}` : q.name, kind: t("kalender.planCardvote") }; })(),
+    deckId && (() => { const d = decks.find((x) => x.id === Number(deckId)); return d && { to: `/karten?class=${classId}`, label: d.name, kind: t("kalender.planKarten") }; })(),
+    ladderId && (() => { const l = ladders.find((x) => x.id === Number(ladderId)); return l && { to: "/lernpfad", label: l.path ? `${l.path} / ${l.name}` : l.name, kind: t("kalender.planLernleiter") }; })(),
+  ].filter(Boolean);
+  const zeile = (k, v) => v ? <div style={{ display: "flex", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--border)", fontSize: 13.5 }}><span style={{ color: "var(--text3)", minWidth: 92 }}>{k}</span><span style={{ fontWeight: 500 }}>{v}</span></div> : null;
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 200 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--card)", borderRadius: 18, maxWidth: 460, width: "100%", padding: 0, border: "1px solid var(--border)", maxHeight: "88vh", overflow: "auto", boxShadow: "0 20px 50px rgba(0,0,0,0.28)" }}>
         <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "flex-start", gap: 12 }}>
           <div style={{ flex: 1 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 5 }}>{(entry.id || entry.period != null) ? t("kalender.editEntry") : t("kalender.newEntry")}</h3>
+            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 5 }}>{!edit ? (title || t("kalender.entry")) : ((entry.id || entry.period != null) ? t("kalender.editEntry") : t("kalender.newEntry"))}</h3>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               {entry.period != null && <span style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 9px", borderRadius: 980, background: "var(--accent)", color: "#fff" }}>{entry.period}. {t("kalender.period")}</span>}
               <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{new Date(entry.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>
@@ -482,6 +493,38 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
           <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
         </div>
         <div style={{ padding: "6px 24px 22px" }}>
+        {!edit && (
+          <div>
+            {(clsName || topName || methName) && (
+              <div style={{ marginTop: 4 }}>
+                {zeile(t("nav.classes"), clsName)}
+                {zeile(t("kalender.topic"), topName)}
+                {zeile(t("kalender.method"), methName)}
+              </div>
+            )}
+            {linkList.length > 0 && (
+              <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={lbl}>{t("kalender.openLinked")}</div>
+                {linkList.map((lk) => (
+                  <Link key={lk.to} to={lk.to} onClick={onClose}
+                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", textDecoration: "none", color: "var(--accent)", fontSize: 13.5 }}>
+                    <Icon d={ICONS.open} size={15} color="var(--accent)" />
+                    <span style={{ color: "var(--text3)", fontSize: 11.5 }}>{lk.kind}</span>
+                    <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lk.label}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+            {notes && <div style={{ marginTop: 14, fontSize: 13.5, whiteSpace: "pre-wrap", color: "var(--text2)" }}>{notes}</div>}
+            {!clsName && !topName && !methName && !linkList.length && !notes && <p style={{ fontSize: 13.5, color: "var(--text3)", marginTop: 8 }}>{t("kalender.emptyEntry")}</p>}
+            <div style={{ display: "flex", gap: 8, marginTop: 20, alignItems: "center" }}>
+              <button onClick={() => setEdit(true)} style={btnPrimary}>{t("common.edit")}</button>
+              <button onClick={onClose} style={btnSecondary}>{t("common.close")}</button>
+              {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
+            </div>
+          </div>
+        )}
+        {edit && (<>
         <div style={lbl}>{t("kalender.entryTitle")}</div>
         <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus placeholder={t("kalender.entryTitlePlaceholder")} style={fld} />
         <div style={lbl}>{t("nav.classes")}</div>
@@ -570,6 +613,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
           {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
         </div>
+        </>)}
         </div>
       </div>
     </div>

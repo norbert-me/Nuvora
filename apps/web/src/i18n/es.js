@@ -683,6 +683,8 @@ export default {
   "kalender.deckReleaseHint": "Se publica automáticamente el día del calendario.",
   "kalender.openLinked": "Abrir vinculado",
   "kalender.planning": "Planificación",
+  "kalender.entry": "Entrada",
+  "kalender.emptyEntry": "Sin contenido - solo título y fecha.",
   "kalender.free": "sin clases",
   "kalender.breaksTitle": "Días sin clase",
   "kalender.breaksHint": "Vacaciones y días festivos. En estos días el calendario oculta las clases y las entradas.",

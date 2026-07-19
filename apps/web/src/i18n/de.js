@@ -683,6 +683,8 @@ export default {
   "kalender.deckReleaseHint": "Wird am Kalendertag automatisch freigeschaltet.",
   "kalender.openLinked": "Verknüpftes öffnen",
   "kalender.planning": "Planung",
+  "kalender.entry": "Eintrag",
+  "kalender.emptyEntry": "Kein Inhalt - nur Titel und Datum.",
   "kalender.free": "unterrichtsfrei",
   "kalender.breaksTitle": "Unterrichtsfreie Tage",
   "kalender.breaksHint": "Ferien und bewegliche Feiertage. An diesen Tagen zeigt der Kalender keine Stunden und Eintraege.",

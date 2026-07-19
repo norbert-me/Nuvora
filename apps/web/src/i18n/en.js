@@ -683,6 +683,8 @@ export default {
   "kalender.deckReleaseHint": "Released automatically on the calendar day.",
   "kalender.openLinked": "Open linked",
   "kalender.planning": "Planning",
+  "kalender.entry": "Entry",
+  "kalender.emptyEntry": "No content - title and date only.",
   "kalender.free": "no lessons",
   "kalender.breaksTitle": "Days off",
   "kalender.breaksHint": "Holidays and movable feast days. On these days the calendar hides lessons and entries.",
