@@ -101,6 +101,15 @@ REGISTRY: List[ModuleDef] = [
         path="/kalender",
     ),
     ModuleDef(
+        key="ausleihe",
+        name="Material-Ausleihe",
+        description=(
+            "Gegenstaende verleihen und den Rueckgabe-Stand im Blick behalten — "
+            "an Schueler (aus dem Kern) oder an frei eingetragene Personen."
+        ),
+        path="/ausleihe",
+    ),
+    ModuleDef(
         key="orga",
         name="Orga",
         description=(

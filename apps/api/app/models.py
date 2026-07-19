@@ -561,6 +561,34 @@ class OrgaItem(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class MaterialItem(Base):
+    """Modul Material-Ausleihe: ein Gegenstand, den die Lehrkraft verleiht."""
+    __tablename__ = "material_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(160), default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    loans: Mapped[list["MaterialLoan"]] = relationship(back_populates="item", cascade="all, delete-orphan")
+
+
+class MaterialLoan(Base):
+    """Eine Ausleihe: Gegenstand an eine Person (Kern-Schueler oder Freitext).
+    returned_at NULL = noch offen. student_id ON DELETE SET NULL (Regel 3)."""
+    __tablename__ = "material_loans"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("material_items.id", ondelete="CASCADE"), index=True)
+    student_id: Mapped[Optional[int]] = mapped_column(ForeignKey("students.id", ondelete="SET NULL"), nullable=True)
+    borrower: Mapped[str] = mapped_column(String(160), default="", server_default="")  # Anzeigename
+    out_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    returned_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    item: Mapped[MaterialItem] = relationship(back_populates="loans")
+
+
 class CalendarBreak(Base):
     """Unterrichtsfreier Zeitraum (Ferien, beweglicher Feiertag). An Tagen
     innerhalb des Zeitraums zeigt der Kalender weder Stundenplan-Vorlagen noch

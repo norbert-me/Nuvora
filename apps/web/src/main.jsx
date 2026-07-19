@@ -73,6 +73,7 @@ import Zufall from "./pages/Zufall.jsx";
 import Sitzplan from "./pages/Sitzplan.jsx";
 import Anwesenheit from "./pages/Anwesenheit.jsx";
 import Orga from "./pages/Orga.jsx";
+import Ausleihe from "./pages/Ausleihe.jsx";
 import { useModules } from "./core/modules.js";
 import { btnPrimary, btnSecondary } from "./components/Icons.jsx";
 // Navigation ist modulbezogen: die Shell zeigt die Punkte des Moduls, in dem
@@ -97,6 +98,7 @@ const ZUF = "/zufall";
 const SIT = "/sitzplan";
 const ANW = "/anwesenheit";
 const ORG = "/orga";
+const AUS = "/ausleihe";
 
 // Menue passend zum Bereich. Man soll im Modul-Menue bleiben, auch auf
 // modulneutralen Seiten (Hilfe, Impressum), solange man aus einem Modul kam —
@@ -114,6 +116,7 @@ const getModuleNavItems = (t, location) => {
     : pathname.startsWith(SIT) ? "sitzplan"
     : pathname.startsWith(ANW) ? "anwesenheit"
     : pathname.startsWith(ORG) ? "orga"
+    : pathname.startsWith(AUS) ? "ausleihe"
     : pathname.startsWith(KA) ? "karten"
     : params.get("area"); // Hilfe u.ae.: Bereich aus der Query
 
@@ -155,6 +158,9 @@ const getModuleNavItems = (t, location) => {
   }
   if (area === "orga") {
     return [{ to: ORG, label: t("orga.title") }];
+  }
+  if (area === "ausleihe") {
+    return [{ to: AUS, label: t("ausleihe.title") }];
   }
   if (area === "code-detektiv") {
     // Nativ eingebunden: eigene Navigation in der App (Home). Shell zeigt nur
@@ -696,6 +702,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={SIT} element={user ? <ModuleGate moduleKey="sitzplan"><Sitzplan /></ModuleGate> : <Landing />} />
           <Route path={ANW} element={user ? <ModuleGate moduleKey="anwesenheit"><Anwesenheit /></ModuleGate> : <Landing />} />
           <Route path={ORG} element={user ? <ModuleGate moduleKey="orga"><Orga /></ModuleGate> : <Landing />} />
+          <Route path={AUS} element={user ? <ModuleGate moduleKey="ausleihe"><Ausleihe /></ModuleGate> : <Landing />} />
 
           {/* ─── Modul Code-Detektiv ─── */}
           <Route path={`${CD}/*`} element={user ? <ModuleGate moduleKey="code-detektiv"><CodeDetektiv /></ModuleGate> : <Landing />} />
