@@ -3,6 +3,7 @@
 // "Ohne Wiederholung" merkt sich die schon Gezogenen, bis die Klasse durch ist.
 import { useState, useEffect, useMemo } from "react";
 import { pageTitle, btnPrimary, btnSecondary, selectStyle, Toggle } from "../components/Icons.jsx";
+import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
@@ -119,9 +120,7 @@ export default function Zufall() {
       <h1 style={pageTitle}>{t("zufall.title")}</h1>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <select value={classId ?? ""} onChange={(e) => setClassId(Number(e.target.value))} style={selectStyle}>
-          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        <KursKlasseSelect value={classId} onChange={setClassId} />
         <Toggle checked={ohneWdh} onChange={setOhneWdh} label={t("zufall.noRepeat")} />
         <Toggle checked={gewichtet} onChange={setGewichtet} label={t("zufall.weighted")} />
         {anwesenheitAktiv && <Toggle checked={skipAbs} onChange={setSkipAbs} label={t("zufall.skipAbsent")} />}

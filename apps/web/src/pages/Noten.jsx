@@ -12,6 +12,7 @@ import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, modalOverlay, modalPanel } from "../components/Icons.jsx";
+import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api/noten";
@@ -236,10 +237,7 @@ export default function Noten() {
         <h1 style={pageTitle}>{t("noten.title")}</h1>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
           {t("nav.classes")}
-          <select value={classId ?? ""} onChange={(e) => setClassId(Number(e.target.value))}
-            style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)" }}>
-            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <KursKlasseSelect value={classId} onChange={setClassId} />
         </label>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
           {t("noten.term")}

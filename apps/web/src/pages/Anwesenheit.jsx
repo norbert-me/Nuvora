@@ -4,6 +4,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { pageTitle, btnSecondary, selectStyle, Toggle, Tabs, inputStyle } from "../components/Icons.jsx";
+import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
@@ -116,9 +117,7 @@ export default function Anwesenheit() {
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
         <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("anwesenheit.title")}</h1>
-        <select value={classId ?? ""} onChange={(e) => setClassId(Number(e.target.value))} style={selectStyle}>
-          {sichtbareKlassen.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        <KursKlasseSelect value={classId} onChange={setClassId} />
         <Tabs value={view} onChange={setView} style={{ marginLeft: "auto" }}
           options={[["tag", t("anwesenheit.day")], ["uebersicht", t("anwesenheit.overview")]]} />
       </div>

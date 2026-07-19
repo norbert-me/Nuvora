@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { pageTitle, btnPrimary, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C, Tabs, th as thBase, td } from "../components/Icons.jsx";
+import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import Anwesenheit from "./Anwesenheit.jsx";
@@ -71,9 +72,7 @@ export default function Orga() {
 
       {tab === "anwesenheit" ? <Anwesenheit /> : (<>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
-        <select value={classId ?? ""} onChange={(e) => setClassId(Number(e.target.value))} style={selectStyle}>
-          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        <KursKlasseSelect value={classId} onChange={setClassId} />
       </div>
       <p style={{ fontSize: 13, color: "var(--text3)", margin: "8px 0 16px" }}>{t("orga.hint")}</p>
 

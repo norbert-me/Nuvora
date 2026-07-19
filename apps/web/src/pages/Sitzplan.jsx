@@ -3,6 +3,7 @@
 // Schüler bleiben im Kern; hier nur ihre Positionen (Regel 3).
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { pageTitle, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
+import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
@@ -113,9 +114,7 @@ export default function Sitzplan() {
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
         <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("sitzplan.title")}</h1>
-        <select value={classId ?? ""} onChange={(e) => setClassId(Number(e.target.value))} style={selectStyle}>
-          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        <KursKlasseSelect value={classId} onChange={setClassId} />
         {anwesenheitAktiv && (
           <button onClick={() => setAufruf((a) => !a)} style={{ padding: "6px 13px", fontSize: 13, fontWeight: 600, borderRadius: 980, cursor: "pointer", border: aufruf ? "1px solid var(--accent)" : "1px solid var(--border2)", background: aufruf ? "var(--accent)" : "transparent", color: aufruf ? "#fff" : "var(--text2)" }}>{t("sitzplan.rollcall")}</button>
         )}
