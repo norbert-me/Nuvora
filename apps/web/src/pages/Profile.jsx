@@ -11,10 +11,20 @@ const Spinner = ({ size = 14 }) => (
   </svg>
 );
 
-// Kleiner Info-Punkt: erklaerender Text als Tooltip statt als Fliesstext.
-const InfoDot = ({ text }) => (
-  <span title={text} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--border2)", color: "var(--text3)", fontSize: 10, fontWeight: 700, fontStyle: "normal", cursor: "help", marginLeft: 6, flexShrink: 0 }}>i</span>
-);
+// Kleiner Info-Punkt: erklaerender Text. Auf Klick UND Hover, damit er auch
+// auf Touch/Mobile funktioniert (reiner title-Tooltip tut das nicht).
+const InfoDot = ({ text }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <span style={{ position: "relative", display: "inline-flex", marginLeft: 6, flexShrink: 0 }}>
+      <button type="button" title={text} onClick={() => setOpen((o) => !o)} onBlur={() => setTimeout(() => setOpen(false), 150)}
+        style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--border2)", background: open ? "var(--accent)" : "transparent", color: open ? "#fff" : "var(--text3)", fontSize: 10, fontWeight: 700, cursor: "pointer", padding: 0 }}>i</button>
+      {open && (
+        <span style={{ position: "absolute", top: 22, left: 0, zIndex: 30, width: 240, maxWidth: "70vw", background: "var(--card)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 11px", fontSize: 12.5, lineHeight: 1.5, boxShadow: "0 8px 24px rgba(0,0,0,0.18)", fontWeight: 400 }}>{text}</span>
+      )}
+    </span>
+  );
+};
 
 const TrashIcon = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#d1350f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
