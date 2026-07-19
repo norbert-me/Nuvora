@@ -68,7 +68,6 @@ export default function Tests() {
                 style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 14, textDecoration: "none", color: "var(--text)" }}>
                 <Icon d={ICONS.chart} color="#0066cc" />
                 <span style={{ fontWeight: 600, fontSize: 14 }}>{c.name}</span>
-                <span style={{ fontSize: 12, color: "var(--text3)" }}>{(c.students || []).length}</span>
               </Link>
             ))}
           </div>
