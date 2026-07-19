@@ -102,10 +102,11 @@ REGISTRY: List[ModuleDef] = [
     ),
     ModuleDef(
         key="methoden",
-        name="Methoden",
+        name="Einstiege",
         description=(
-            "Sammlung von Unterrichtseinstiegen und -methoden. Wiederverwenden "
-            "und an Kalender-Stunden zuordnen."
+            "Sammlung von Ideen fuer den Unterrichtseinstieg — Idee, Ablauf mit "
+            "Material, Materialliste und ungefaehre Dauer. Wiederverwenden und an "
+            "Kalender-Stunden zuordnen."
         ),
         path="/methoden",
     ),

@@ -26,24 +26,26 @@ async def require_module(user: User = Depends(get_current_user), db: AsyncSessio
     return user
 
 
-# Kleine Startsammlung typischer Einstiege/Methoden — wird einmalig angelegt,
-# wenn die Lehrkraft noch keine eigenen Eintraege hat.
+# Kleine Startsammlung typischer Einstiege — wird einmalig angelegt, wenn die
+# Lehrkraft noch keine eigenen Eintraege hat. (title, idee, ablauf, material, dauer)
 _SEED = [
-    ("einstieg", "Blitzlicht", "Reihum ein kurzer Satz zum Thema/zur Stimmung — schneller Stimmungs- und Vorwissenscheck.", "Einstieg"),
-    ("einstieg", "Impulsbild", "Ein Bild/Zitat projizieren und offene Fragen sammeln — weckt Neugier und aktiviert Vorwissen.", "Einstieg"),
-    ("einstieg", "Provokante These", "Eine zugespitzte Aussage in den Raum stellen, Zustimmung/Ablehnung per Positionslinie.", "Einstieg"),
-    ("methode", "Think-Pair-Share", "Erst allein denken, dann zu zweit austauschen, dann im Plenum teilen.", "Erarbeitung"),
-    ("methode", "Placemat", "Gruppentisch: erst jede/r in sein Feld, dann gemeinsame Mitte — sichert Einzelbeitraege.", "Erarbeitung"),
-    ("methode", "Gruppenpuzzle", "Expertengruppen erarbeiten Teilthemen, Stammgruppen tragen zusammen.", "Erarbeitung"),
-    ("methode", "Museumsrundgang", "Ergebnisse aushaengen, Gruppen wandern und geben Feedback per Klebepunkt.", "Sicherung"),
-    ("methode", "Exit Ticket", "Kurze schriftliche Rueckmeldung am Stundenende (Was mitgenommen? Was offen?).", "Sicherung"),
+    ("Blitzlicht", "Reihum ein kurzer Satz zum Thema oder zur Stimmung — schneller Stimmungs- und Vorwissenscheck.",
+     "1. Impulsfrage stellen.\n2. Reihum je ein Satz, ohne Kommentare.\n3. Auffaelliges kurz aufgreifen.", "keins", 5),
+    ("Impulsbild", "Ein Bild oder Zitat projizieren und offene Fragen sammeln — weckt Neugier und aktiviert Vorwissen.",
+     "1. Bild zeigen, 1 Minute wirken lassen.\n2. Beobachtungen/Fragen sammeln.\n3. Zum Thema ueberleiten.", "Beamer, Bild/Zitat", 10),
+    ("Provokante These", "Eine zugespitzte Aussage in den Raum stellen, Zustimmung/Ablehnung per Positionslinie.",
+     "1. These an die Tafel.\n2. SuS positionieren sich im Raum.\n3. Einzelne begruenden.", "Tafel, ggf. Klebeband fuer Linie", 10),
 ]
 
 
 class MethodIn(BaseModel):
-    kind: str = "einstieg"
     title: str = ""
-    description: str = ""
+    description: str = ""   # die Idee
+    ablauf: str = ""
+    material: str = ""
+    dauer: Optional[int] = None
+    # Altfelder, weiterhin akzeptiert, aber nicht mehr genutzt.
+    kind: str = "einstieg"
     phase: str = ""
 
 
@@ -54,13 +56,13 @@ class MethodOut(MethodIn):
 
 @router.get("/list", response_model=List[MethodOut])
 async def list_methods(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    rows = (await db.execute(select(Method).where(Method.owner_id == user.id).order_by(Method.kind, Method.title))).scalars().all()
+    rows = (await db.execute(select(Method).where(Method.owner_id == user.id).order_by(Method.title))).scalars().all()
     if not rows:
         # Einmalig die Startsammlung anlegen.
-        for kind, title, desc, phase in _SEED:
-            db.add(Method(owner_id=user.id, kind=kind, title=title, description=desc, phase=phase))
+        for title, idee, ablauf, material, dauer in _SEED:
+            db.add(Method(owner_id=user.id, title=title, description=idee, ablauf=ablauf, material=material, dauer=dauer))
         await db.commit()
-        rows = (await db.execute(select(Method).where(Method.owner_id == user.id).order_by(Method.kind, Method.title))).scalars().all()
+        rows = (await db.execute(select(Method).where(Method.owner_id == user.id).order_by(Method.title))).scalars().all()
     return rows
 
 

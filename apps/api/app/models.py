@@ -506,16 +506,20 @@ class CalendarBreak(Base):
 
 
 class Method(Base):
-    """Modul Methoden: ein Unterrichtseinstieg oder eine Unterrichtsmethode als
-    wiederverwendbarer Sammlungseintrag."""
+    """Modul Einstiege: eine Idee fuer den Unterrichtseinstieg — Kurzbeschreibung
+    (Idee), Ablauf mit Material, Materialliste und ungefaehre Dauer.
+    (Tabellenname bleibt "methods"; kind/phase bleiben als Altspalten erhalten.)"""
     __tablename__ = "methods"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    kind: Mapped[str] = mapped_column(String(20), default="einstieg", server_default="einstieg")  # einstieg | methode
+    kind: Mapped[str] = mapped_column(String(20), default="einstieg", server_default="einstieg")  # Altspalte
     title: Mapped[str] = mapped_column(String(200), default="", server_default="")
-    description: Mapped[str] = mapped_column(Text, default="", server_default="")
-    phase: Mapped[str] = mapped_column(String(40), default="", server_default="")  # z. B. Einstieg/Erarbeitung/Sicherung
+    description: Mapped[str] = mapped_column(Text, default="", server_default="")  # die Idee als Text
+    ablauf: Mapped[str] = mapped_column(Text, default="", server_default="")       # Ablauf mit Material
+    material: Mapped[str] = mapped_column(Text, default="", server_default="")     # Materialliste
+    dauer: Mapped[Optional[int]] = mapped_column(nullable=True)                    # ca. Dauer in Minuten
+    phase: Mapped[str] = mapped_column(String(40), default="", server_default="")  # Altspalte
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

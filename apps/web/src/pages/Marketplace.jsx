@@ -229,8 +229,10 @@ export default function Marketplace() {
                 ))}
                 {preview.method && (
                   <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, fontSize: 13.5, color: "var(--text2)" }}>
-                    {preview.method.phase && <div style={{ marginBottom: 6 }}><span style={{ color: "var(--text3)" }}>{t("kalender.method")}: </span>{preview.method.phase}</div>}
+                    {preview.method.dauer != null && <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, color: "#2563eb" }}>{t("methoden.dauerBadge", { n: preview.method.dauer })}</div>}
                     <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{preview.method.description}</div>
+                    {preview.method.ablauf && <div style={{ marginTop: 10 }}><b style={{ color: "var(--text3)", fontSize: 11.5 }}>{t("methoden.ablauf")}</b><div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{preview.method.ablauf}</div></div>}
+                    {preview.method.material && <div style={{ marginTop: 10 }}><b style={{ color: "var(--text3)", fontSize: 11.5 }}>{t("methoden.material")}</b><div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{preview.method.material}</div></div>}
                   </div>
                 )}
                 {(preview.questions || []).map((q, i) => (

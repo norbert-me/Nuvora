@@ -80,10 +80,11 @@ def _snapshot_from_method(m: Method) -> dict:
     return {
         "type": "method",
         "version": 1,
-        "kind": m.kind,
         "title": m.title,
         "description": m.description,
-        "phase": m.phase,
+        "ablauf": m.ablauf,
+        "material": m.material,
+        "dauer": m.dauer,
     }
 
 
@@ -184,7 +185,7 @@ async def get_quiz(quiz_id: int, user: User = Depends(get_current_user), db: Asy
         # Vorschau: die Karten (Vorder-/Rueckseite).
         base["cards"] = [{"front": c.get("front", ""), "back": c.get("back", "")} for c in data.get("cards", [])]
     elif kind == "method":
-        base["method"] = {"kind": data.get("kind", "einstieg"), "phase": data.get("phase", ""), "description": data.get("description", "")}
+        base["method"] = {"description": data.get("description", ""), "ablauf": data.get("ablauf", ""), "material": data.get("material", ""), "dauer": data.get("dauer")}
     else:
         # Fragen mit Loesung, damit die Lehrkraft pruefen kann.
         base["questions"] = [
@@ -351,8 +352,9 @@ async def _copy_deck(quiz, data, body, user, db):
 
 
 async def _copy_method(quiz, data, user, db):
-    m = Method(owner_id=user.id, kind=data.get("kind", "einstieg"), title=data.get("title", quiz.title),
-               description=data.get("description", ""), phase=data.get("phase", ""))
+    m = Method(owner_id=user.id, title=data.get("title", quiz.title),
+               description=data.get("description", ""), ablauf=data.get("ablauf", ""),
+               material=data.get("material", ""), dauer=data.get("dauer"))
     db.add(m)
     await db.commit()
     await db.refresh(m)
