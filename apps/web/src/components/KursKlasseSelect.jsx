@@ -4,7 +4,9 @@
 import { useEffect, useState } from "react";
 import { selectStyle } from "./Icons.jsx";
 
-export default function KursKlasseSelect({ value, onChange, style }) {
+// allowNone + noneLabel: erlaubt eine Leer-Option (z.B. „Freitext") — dann kann
+// value "" sein und onChange("") gemeldet werden.
+export default function KursKlasseSelect({ value, onChange, style, allowNone = false, noneLabel = "–" }) {
   const [groups, setGroups] = useState([]); // [{ id, name, classes:[{id,name}] }]
 
   useEffect(() => {
@@ -28,12 +30,12 @@ export default function KursKlasseSelect({ value, onChange, style }) {
     if (g && !g.classes.some((c) => c.id === value)) onChange(g.classes[0].id);
   };
 
-  if (!groups.length) return null;
+  if (!groups.length && !allowNone) return null;
 
   return (
     <>
-      <select value={cur?.id ?? ""} onChange={(e) => pickKurs(e.target.value)} style={s}>
-        {!cur && <option value="">–</option>}
+      <select value={cur?.id ?? ""} onChange={(e) => (e.target.value === "" ? onChange(allowNone ? "" : value) : pickKurs(e.target.value))} style={s}>
+        {allowNone ? <option value="">{noneLabel}</option> : (!cur && <option value="">–</option>)}
         {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
       </select>
       {cur && cur.classes.length > 1 && (

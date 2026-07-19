@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { pageTitle, btnPrimary, btnSecondary, selectStyle, Toggle, Icon, ICONS, iconBtn, COLORS as C, inputStyle } from "../components/Icons.jsx";
+import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr } from "../core/cache.js";
 
@@ -98,10 +99,8 @@ export default function Ausleihe() {
                 <div style={{ borderTop: "1px solid var(--border)", padding: 14 }}>
                   {/* Verleihen */}
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
-                    <select value={classId} onChange={(e) => { setClassId(e.target.value); setStudentId(""); }} style={selectStyle}>
-                      <option value="">– {t("ausleihe.freeText")} –</option>
-                      {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
+                    <KursKlasseSelect value={classId === "" ? "" : Number(classId)} allowNone noneLabel={`– ${t("ausleihe.freeText")} –`}
+                      onChange={(id) => { setClassId(id === "" ? "" : String(id)); setStudentId(""); }} />
                     {classId ? (
                       <select value={studentId} onChange={(e) => setStudentId(e.target.value)} style={selectStyle}>
                         <option value="">– {t("ausleihe.pickStudent")} –</option>
