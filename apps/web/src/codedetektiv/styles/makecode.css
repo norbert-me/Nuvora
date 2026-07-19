@@ -258,7 +258,7 @@
   height: 4px;
   margin: -2px 0;
   border-radius: 2px;
-  background: rgba(0, 0, 0, 0.15);
+  background: #2563eb;
   z-index: 3;
   position: relative;
 }
@@ -273,7 +273,11 @@
   color: #fff;
   font-weight: 600;
   background: var(--mc-cat-color, #888);
-  opacity: 0.35;
+  opacity: 0.4;
+  /* Gestrichelte Akzent-Umrandung wie die Ablege-Vorschau im restlichen Nuvora
+     (Dashboard/Sitzplan): klar sichtbar, wo der Block landet. */
+  outline: 2px dashed #2563eb;
+  outline-offset: 1px;
   pointer-events: none;
 }
 .cd-scope .mc-ghost-block.mc-ghost-tall {
