@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Attendance, SchoolClass, Student, User
+from ..models import Attendance, CalendarBreak, SchoolClass, Student, User
 from .auth import get_current_user, rate_limit
 from .modules import is_active
 
@@ -50,7 +50,7 @@ async def get_day(class_id: int, date: datetime, user: User = Depends(require_mo
         Attendance.class_id == class_id, Attendance.owner_id == user.id,
         Attendance.date >= lo, Attendance.date <= hi,
     ))).scalars().all()
-    return {str(r.student_id): {"status": r.status, "note": r.note} for r in rows}
+    return {str(r.student_id): {"status": r.status, "note": r.note, "period": r.period} for r in rows}
 
 
 class MarkIn(BaseModel):
@@ -58,6 +58,7 @@ class MarkIn(BaseModel):
     date: datetime
     status: str
     note: str = ""
+    period: Optional[int] = None
 
 
 @router.put("/{class_id}")
@@ -82,11 +83,26 @@ async def mark(class_id: int, body: MarkIn, user: User = Depends(require_module)
     if row:
         row.status = body.status
         row.note = body.note.strip()[:500]
+        row.period = body.period
     else:
         db.add(Attendance(owner_id=user.id, class_id=class_id, student_id=body.student_id,
-                          date=lo, status=body.status, note=body.note.strip()[:500]))
+                          date=lo, status=body.status, note=body.note.strip()[:500], period=body.period))
     await db.commit()
     return {"ok": True}
+
+
+async def _break_days(db: AsyncSession, user: User) -> list:
+    """Ferien-/Feiertags-Zeitraeume der Lehrkraft als (lo, hi)-Paare."""
+    rows = (await db.execute(select(CalendarBreak).where(CalendarBreak.owner_id == user.id))).scalars().all()
+    return [(b.start_date, b.end_date) for b in rows]
+
+
+def _in_break(d, ranges) -> bool:
+    day = d.date() if hasattr(d, "date") else d
+    for lo, hi in ranges:
+        if lo.date() <= day <= hi.date():
+            return True
+    return False
 
 
 @router.get("/{class_id}/student/{student_id}")
@@ -97,7 +113,7 @@ async def student_history(class_id: int, student_id: int, user: User = Depends(r
     rows = (await db.execute(select(Attendance).where(
         Attendance.class_id == class_id, Attendance.owner_id == user.id, Attendance.student_id == student_id,
     ).order_by(Attendance.date.desc()))).scalars().all()
-    return [{"date": r.date.isoformat(), "status": r.status, "note": r.note} for r in rows]
+    return [{"date": r.date.isoformat(), "status": r.status, "note": r.note, "period": r.period} for r in rows]
 
 
 @router.get("/{class_id}/summary")
@@ -107,8 +123,12 @@ async def summary(class_id: int, user: User = Depends(require_module), db: Async
     rows = (await db.execute(select(Attendance).where(
         Attendance.class_id == class_id, Attendance.owner_id == user.id,
     ))).scalars().all()
+    # An unterrichtsfreien Tagen (Ferien/Feiertage) zaehlen Fehlzeiten nicht.
+    breaks = await _break_days(db, user)
     agg: dict = {}
     for r in rows:
+        if _in_break(r.date, breaks):
+            continue
         a = agg.setdefault(str(r.student_id), {"fehlt": 0, "spaet": 0, "entsch": 0})
         if r.status in a:
             a[r.status] += 1

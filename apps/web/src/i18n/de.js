@@ -896,4 +896,6 @@ export default {
   "zufall.weighted": "Am seltensten dran",
   "zufall.skipAbsent": "Abwesende überspringen",
   "zufall.absentSkipped": "{{n}} abwesend – werden übersprungen.",
+  "anwesenheit.wholeDay": "Ganzer Tag",
+  "anwesenheit.periodHint": "Fehltag optional an eine Stunde hängen",
 };

@@ -508,6 +508,9 @@ class Attendance(Base):
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     status: Mapped[str] = mapped_column(String(10), default="da", server_default="da")
     note: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # Optional: auf welche Stunde (Stundenplan-Period) sich der Fehltag bezieht.
+    # 0/NULL = ganzer Tag. Ein Datensatz je (Schueler, Datum).
+    period: Mapped[Optional[int]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

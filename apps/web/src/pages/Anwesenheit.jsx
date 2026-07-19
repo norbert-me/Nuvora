@@ -32,6 +32,7 @@ export default function Anwesenheit() {
   const [nurHeute, setNurHeute] = useState(!params.get("class"));
   const [offen, setOffen] = useState(null); // aufgeklappter Schüler in der Übersicht
   const [verlauf, setVerlauf] = useState([]);
+  const [stunde, setStunde] = useState(0); // 0 = ganzer Tag, sonst Stundenplan-Period
 
   useEffect(() => {
     const stop = swr("classes", "/api/classes", (d) => setClasses(Array.isArray(d) ? d : []));
@@ -42,6 +43,8 @@ export default function Anwesenheit() {
   // Klassen, die am gewählten Wochentag im Stundenplan stehen.
   const weekday = (new Date(datum + "T00:00:00").getDay() + 6) % 7; // 0 = Montag
   const heutigeIds = useMemo(() => new Set(slots.filter((s) => s.weekday === weekday && s.class_id).map((s) => s.class_id)), [slots, weekday]);
+  // Stunden dieser Klasse am gewählten Wochentag (für die optionale Stunden-Zuordnung).
+  const tagStunden = useMemo(() => [...new Set(slots.filter((s) => s.weekday === weekday && s.class_id === classId).map((s) => s.period))].sort((a, b) => a - b), [slots, weekday, classId]);
   const filterAktiv = kalenderAktiv && nurHeute && view === "tag" && heutigeIds.size > 0;
   const sichtbareKlassen = filterAktiv ? classes.filter((c) => heutigeIds.has(c.id)) : classes;
 
@@ -67,11 +70,11 @@ export default function Anwesenheit() {
   useEffect(() => { if (view === "uebersicht") { loadSumme(); setOffen(null); } }, [view, loadSumme]);
 
   const statusOf = (sid) => tag[String(sid)]?.status || "da";
-  const mark = (sid, status, dateIso) => fetch(`${API}/${classId}`, { method: "PUT", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ student_id: sid, date: dateIso, status, note: "" }) });
+  const mark = (sid, status, dateIso, period = null) => fetch(`${API}/${classId}`, { method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ student_id: sid, date: dateIso, status, note: "", period }) });
   const setStatus = (sid, status) => {
     setTag((prev) => ({ ...prev, [String(sid)]: { status, note: prev[String(sid)]?.note || "" } }));
-    mark(sid, status, isoOf(datum)).catch(() => {});
+    mark(sid, status, isoOf(datum), stunde || null).catch(() => {});
   };
   const shift = (n) => { const d = new Date(datum + "T00:00:00"); d.setDate(d.getDate() + n); setDatum(ymd(d)); };
 
@@ -127,6 +130,12 @@ export default function Anwesenheit() {
             <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} style={inputStyle} />
             <button onClick={() => shift(1)} style={{ ...btnSecondary, padding: "6px 13px" }}>›</button>
             <button onClick={() => setDatum(ymd(new Date()))} style={{ ...btnSecondary, padding: "6px 13px" }}>{t("anwesenheit.today")}</button>
+            {tagStunden.length > 0 && (
+              <select value={stunde} onChange={(e) => setStunde(Number(e.target.value))} style={{ ...selectStyle, marginLeft: "auto" }} title={t("anwesenheit.periodHint")}>
+                <option value={0}>{t("anwesenheit.wholeDay")}</option>
+                {tagStunden.map((p) => <option key={p} value={p}>{p}. {t("kalender.period")}</option>)}
+              </select>
+            )}
           </div>
           {legende}
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -180,7 +189,7 @@ export default function Anwesenheit() {
                         <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "4px 0" }}>{t("anwesenheit.noEntries")}</p>
                       ) : verlauf.map((e) => (
                         <div key={e.date} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0" }}>
-                          <span style={{ flex: 1, fontSize: 13 }}>{new Date(e.date).toLocaleDateString()}</span>
+                          <span style={{ flex: 1, fontSize: 13 }}>{new Date(e.date).toLocaleDateString()}{e.period ? ` · ${e.period}. ${t("kalender.period")}` : ""}</span>
                           <div style={{ display: "inline-flex", gap: 4 }}>
                             {STATI.map((st) => (
                               <button key={st} onClick={() => verlaufAendern(s.id, e.date, st)} title={t(`anwesenheit.${st}`)}

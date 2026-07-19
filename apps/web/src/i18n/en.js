@@ -896,4 +896,6 @@ export default {
   "zufall.weighted": "Least picked first",
   "zufall.skipAbsent": "Skip absent",
   "zufall.absentSkipped": "{{n}} absent – skipped.",
+  "anwesenheit.wholeDay": "Whole day",
+  "anwesenheit.periodHint": "Optionally attach the absence to a period",
 };
