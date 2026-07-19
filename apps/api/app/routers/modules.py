@@ -101,6 +101,16 @@ REGISTRY: List[ModuleDef] = [
         path="/kalender",
     ),
     ModuleDef(
+        key="zufall",
+        name="Zufallsschüler",
+        description=(
+            "Zieht per Knopfdruck eine zufaellige Person aus einer Klasse — "
+            "optional ohne Wiederholung, bis alle dran waren."
+        ),
+        path="/zufall",
+        stage="beta",
+    ),
+    ModuleDef(
         key="methoden",
         name="Einstiege",
         description=(

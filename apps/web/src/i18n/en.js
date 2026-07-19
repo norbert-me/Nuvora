@@ -789,4 +789,13 @@ export default {
   "home.arrangeHint": "Drag the cards to reorder them.",
   "common.done": "Done",
   "noten.fromCardvote": "To CardVote results",
+  "zufall.title": "Random student",
+  "zufall.noRepeat": "No repeats",
+  "zufall.draw": "Draw",
+  "zufall.hint": "Pick a class and draw.",
+  "zufall.noStudents": "This class has no students.",
+  "zufall.progress": "{{done}} of {{total}} drawn",
+  "zufall.reset": "Reset round",
+  "mod.zufall.name": "Random student",
+  "mod.zufall.desc": "Draws a random person from a class at the press of a button — optionally without repeats until everyone has been picked.",
 };

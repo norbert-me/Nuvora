@@ -789,4 +789,13 @@ export default {
   "home.arrangeHint": "Arrastra las tarjetas para reordenarlas.",
   "common.done": "Hecho",
   "noten.fromCardvote": "Ver resultados de CardVote",
+  "zufall.title": "Alumno al azar",
+  "zufall.noRepeat": "Sin repetición",
+  "zufall.draw": "Sortear",
+  "zufall.hint": "Elige una clase y sortea.",
+  "zufall.noStudents": "Esta clase no tiene alumnos.",
+  "zufall.progress": "{{done}} de {{total}} sorteados",
+  "zufall.reset": "Reiniciar ronda",
+  "mod.zufall.name": "Alumno al azar",
+  "mod.zufall.desc": "Saca al azar a una persona de una clase con un botón — opcionalmente sin repetir hasta que todos hayan salido.",
 };

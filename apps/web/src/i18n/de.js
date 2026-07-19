@@ -789,4 +789,13 @@ export default {
   "home.arrangeHint": "Karten ziehen, um die Reihenfolge zu ändern.",
   "common.done": "Fertig",
   "noten.fromCardvote": "Zur CardVote-Auswertung",
+  "zufall.title": "Zufallsschüler",
+  "zufall.noRepeat": "Ohne Wiederholung",
+  "zufall.draw": "Ziehen",
+  "zufall.hint": "Klasse wählen und ziehen.",
+  "zufall.noStudents": "Diese Klasse hat keine Schüler.",
+  "zufall.progress": "{{done}} von {{total}} gezogen",
+  "zufall.reset": "Runde zurücksetzen",
+  "mod.zufall.name": "Zufallsschüler",
+  "mod.zufall.desc": "Zieht per Knopfdruck eine zufällige Person aus einer Klasse — optional ohne Wiederholung, bis alle dran waren.",
 };
