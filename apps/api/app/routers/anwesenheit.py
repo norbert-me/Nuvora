@@ -43,16 +43,61 @@ def _day_bounds(d: datetime):
     return start, start.replace(hour=23, minute=59, second=59)
 
 
+# Schwere eines Status, um bei mehreren Stunden am Tag den „Tages-Status" zu
+# bestimmen (Fehlzeiten-Zaehlung, Tagesansicht ohne Stunde). fehlt > entsch >
+# spaet: entschuldigt bleibt eine Abwesenheit, verspaetet ist die leichteste.
+_RANK = {"fehlt": 3, "entsch": 2, "spaet": 1, "da": 0}
+
+
+def _tages_status(rows):
+    """Aus den Stunden-Eintraegen eines Tages den staerksten je Schueler."""
+    best = {}
+    for r in rows:
+        cur = best.get(r.student_id)
+        if cur is None or _RANK.get(r.status, 0) > _RANK.get(cur.status, 0):
+            best[r.student_id] = r
+    return best
+
+
 @router.get("/{class_id}")
-async def get_day(class_id: int, date: datetime, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    """Status je Schueler an einem Tag: { student_id: {status, note} }."""
+async def get_day(class_id: int, date: datetime, period: Optional[int] = None,
+                  user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Status je Schueler an einem Tag. Ohne `period`: der staerkste Status des
+    Tages je Schueler (fuer Tagesansicht/Zufall/Kalender). Mit `period`: die
+    Eintraege genau dieser Stunde — fehlt einer, wird er automatisch aus der
+    letzten frueheren erfassten Stunde des Tages **uebernommen** (persistiert),
+    denn wer frueh fehlt, fehlt oft auch spaeter; die Lehrkraft prueft dann nur."""
     await _owned_class(db, user, class_id)
     lo, hi = _day_bounds(date)
     rows = (await db.execute(select(Attendance).where(
         Attendance.class_id == class_id, Attendance.owner_id == user.id,
         Attendance.date >= lo, Attendance.date <= hi,
     ))).scalars().all()
-    return {str(r.student_id): {"status": r.status, "note": r.note, "period": r.period} for r in rows}
+
+    if not period:
+        best = _tages_status(rows)
+        return {str(sid): {"status": r.status, "note": r.note, "period": r.period} for sid, r in best.items()}
+
+    exact = {r.student_id: r for r in rows if r.period == period}
+    # Vorbelegen: Schueler ohne Eintrag in dieser Stunde aus der juengsten
+    # frueheren Stunde des Tages uebernehmen (nur echte Abwesenheiten).
+    neu = False
+    fehlend = {r.student_id for r in rows if r.student_id not in exact}
+    for sid in fehlend:
+        vorher = [r for r in rows if r.student_id == sid and r.period is not None and r.period < period]
+        if not vorher:
+            continue
+        quelle = max(vorher, key=lambda r: r.period)
+        if quelle.status == "da":
+            continue
+        kopie = Attendance(owner_id=user.id, class_id=class_id, student_id=sid, date=lo,
+                           status=quelle.status, note=quelle.note, period=period)
+        db.add(kopie)
+        exact[sid] = kopie
+        neu = True
+    if neu:
+        await db.commit()
+    return {str(sid): {"status": r.status, "note": r.note, "period": r.period} for sid, r in exact.items()}
 
 
 class MarkIn(BaseModel):
@@ -73,8 +118,10 @@ async def mark(class_id: int, body: MarkIn, user: User = Depends(require_module)
     if not st or st.class_id != class_id:
         raise HTTPException(404, "Schüler nicht in dieser Klasse")
     lo, hi = _day_bounds(body.date)
+    # Genau die Stunde treffen (period NULL = ganzer Tag), damit Stunden getrennt bleiben.
     row = (await db.execute(select(Attendance).where(
         Attendance.student_id == body.student_id, Attendance.date >= lo, Attendance.date <= hi,
+        Attendance.period == body.period,
     ))).scalar_one_or_none()
     # "da" ist der Normalfall: kein Eintrag noetig -> vorhandenen loeschen.
     if body.status == "da" and not body.note.strip():
@@ -115,7 +162,15 @@ async def student_history(class_id: int, student_id: int, user: User = Depends(r
     rows = (await db.execute(select(Attendance).where(
         Attendance.class_id == class_id, Attendance.owner_id == user.id, Attendance.student_id == student_id,
     ).order_by(Attendance.date.desc()))).scalars().all()
-    return [{"date": r.date.isoformat(), "status": r.status, "note": r.note, "period": r.period} for r in rows]
+    # Pro Tag nur ein Eintrag (staerkster Status) — mehrere Stunden am selben Tag
+    # sind eine Abwesenheit, keine drei.
+    proTag = {}
+    for r in rows:
+        key = r.date.date()
+        cur = proTag.get(key)
+        if cur is None or _RANK.get(r.status, 0) > _RANK.get(cur["status"], 0):
+            proTag[key] = {"date": r.date.isoformat(), "status": r.status, "note": r.note, "period": r.period}
+    return sorted(proTag.values(), key=lambda x: x["date"], reverse=True)
 
 
 _LABEL = {"fehlt": "Fehlt", "spaet": "Verspätet", "entsch": "Entschuldigt"}
@@ -235,11 +290,18 @@ async def summary(class_id: int, user: User = Depends(require_module), db: Async
     ))).scalars().all()
     # An unterrichtsfreien Tagen (Ferien/Feiertage) zaehlen Fehlzeiten nicht.
     breaks = await _break_days(db, user)
-    agg: dict = {}
+    # Pro (Schueler, Tag) den staerksten Status bestimmen — mehrere Stunden am
+    # selben Tag sind EINE Abwesenheit, sonst zaehlt ein Fehltag drei-/vierfach.
+    proTag: dict = {}
     for r in rows:
         if _in_break(r.date, breaks):
             continue
-        a = agg.setdefault(str(r.student_id), {"fehlt": 0, "spaet": 0, "entsch": 0})
-        if r.status in a:
-            a[r.status] += 1
+        key = (r.student_id, r.date.date())
+        if key not in proTag or _RANK.get(r.status, 0) > _RANK.get(proTag[key], 0):
+            proTag[key] = r.status
+    agg: dict = {}
+    for (sid, _day), status in proTag.items():
+        a = agg.setdefault(str(sid), {"fehlt": 0, "spaet": 0, "entsch": 0})
+        if status in a:
+            a[status] += 1
     return agg

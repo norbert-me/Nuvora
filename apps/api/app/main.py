@@ -323,6 +323,16 @@ async def startup():
         await db.execute(text("DELETE FROM user_modules WHERE module_key = 'anwesenheit'"))
         await db.commit()
 
+    # Anwesenheit ist jetzt pro Stunde (student, date, period) statt pro Tag.
+    # Der alte Unique-Constraint auf (student, date) würde die zweite Stunde
+    # blockieren — droppen; das Modell bringt den neuen mit period selbst mit.
+    async with async_session() as db:
+        try:
+            await db.execute(text("ALTER TABLE attendance DROP CONSTRAINT IF EXISTS uq_attendance_student_date"))
+            await db.commit()
+        except Exception:
+            pass
+
     # Marktplatz: kind muss zum Snapshot-Typ passen. Vor der kind-Spalte
     # veröffentlichte Karten-Decks/Einstiege trugen den Default
     # "cardvote_questionset" und wurden dann als Quiz behandelt (Vorschau im

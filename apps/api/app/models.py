@@ -503,10 +503,11 @@ class CalendarEntry(Base):
 
 
 class Attendance(Base):
-    """Modul Anwesenheit: ein Status je (Schueler, Datum). Schueler bleiben im
-    Kern (Regel 3). status: da | fehlt | spaet | entsch (entschuldigt)."""
+    """Modul Anwesenheit: ein Status je (Schueler, Datum, Stunde). Schueler
+    bleiben im Kern (Regel 3). status: da | fehlt | spaet | entsch. period NULL =
+    ganzer Tag; je Stunde eine Zeile, damit sich Stunden unterscheiden."""
     __tablename__ = "attendance"
-    __table_args__ = (UniqueConstraint("student_id", "date", name="uq_attendance_student_date"),)
+    __table_args__ = (UniqueConstraint("student_id", "date", "period", name="uq_attendance_student_date_period"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)

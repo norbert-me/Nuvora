@@ -59,8 +59,11 @@ export default function Anwesenheit() {
   const isoOf = (d) => new Date(d + "T00:00:00").toISOString();
   const loadTag = useCallback(() => {
     if (!classId) return;
-    fetch(`${API}/${classId}?date=${isoOf(datum)}`).then((r) => (r.ok ? r.json() : {})).then((d) => setTag(d || {})).catch(() => {});
-  }, [classId, datum]);
+    // Bei gewählter Stunde diese Stunde laden (Server belegt sie aus der
+    // vorherigen vor); Stunde 0 = ganzer Tag (stärkster Status).
+    const p = stunde ? `&period=${stunde}` : "";
+    fetch(`${API}/${classId}?date=${isoOf(datum)}${p}`).then((r) => (r.ok ? r.json() : {})).then((d) => setTag(d || {})).catch(() => {});
+  }, [classId, datum, stunde]);
   const loadSumme = useCallback(() => {
     if (!classId) return;
     fetch(`${API}/${classId}/summary`).then((r) => (r.ok ? r.json() : {})).then((d) => setSumme(d || {})).catch(() => {});
