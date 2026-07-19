@@ -389,21 +389,24 @@ async def student_results(token: str, db: AsyncSession = Depends(get_db)):
             .where(QuestionSetItem.question_set_id == sess.question_set_id)
         )).scalars().all()
         qmap = sess.question_map or {}
-        # Scans dieses Schuelers in dieser Session (Scan.student_id == card_id).
-        scans = {s.question_id: s.answer for s in (await db.execute(
-            select(Scan).where(Scan.session_id == sess.id, Scan.student_id == st.card_id)
-        )).scalars().all()}
-        if not scans:
+        # Alle Scans der Session: nur die TATSAECHLICH gestellten Fragen zaehlen
+        # (eine Live-Session laeuft oft nur ueber einen Teil des Fragesets).
+        alle = (await db.execute(select(Scan).where(Scan.session_id == sess.id))).scalars().all()
+        gestellt = {s.question_id for s in alle}
+        if not gestellt:
+            continue
+        eigene = {s.question_id: s.answer for s in alle if s.student_id == st.card_id}
+        if not eigene:
             continue  # nicht teilgenommen
         score = 0
         total = 0
         for it in items:
             q = it.question
             correct = qmap.get(str(q.id), q.correct_answer)
-            if not correct:
+            if not correct or q.id not in gestellt:
                 continue
             total += 1
-            ans = scans.get(q.id)
+            ans = eigene.get(q.id)
             if ans is not None and ans in correct:
                 score += 1
         out.append({
