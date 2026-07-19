@@ -788,4 +788,5 @@ export default {
   "home.arrange": "Anordnen",
   "home.arrangeHint": "Karten ziehen, um die Reihenfolge zu ändern.",
   "common.done": "Fertig",
+  "noten.fromCardvote": "Zur CardVote-Auswertung",
 };

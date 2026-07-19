@@ -406,6 +406,10 @@ class GradeCategory(Base):
     # Bleibt fuer Altdaten, wird aber nicht mehr zur Gewichtung genutzt.
     weight: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Wurde die Spalte aus einer CardVote-Session uebernommen? Dann zeigt das
+    # Notenbuch einen Link zur Auswertung. SET NULL: Session-Loeschung laesst die
+    # Note bestehen (Regel 3 — kein Modul reisst das andere mit).
+    source_session_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sessions.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     section: Mapped[Optional["GradeSection"]] = relationship(back_populates="categories")

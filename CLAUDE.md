@@ -24,7 +24,7 @@ Der Rahmen steht, alle drei Module sitzen auf dem Kern:
 | Lernpfad | `/lernpfad`  | bestehende App, eingebettet (iframe)     |
 | Noten    | `/noten`     | React im Rahmen                          |
 
-Keins hat noch eigene Konten, Klassen oder Datenbank. **Offen ist nur die Datenübernahme** der Bestandsdaten aus der alten Lernleiter-Installation (`scripts/migrate-lernleiter.py`).
+Keins hat noch eigene Konten, Klassen oder Datenbank. Die Datenübernahme der Bestandsdaten aus der alten Lernleiter-Installation ist erledigt; das Skript wurde entfernt.
 
 ### Aufbau heute
 
@@ -64,11 +64,9 @@ Pflicht-Env: `POSTGRES_PASSWORD`, `TOKEN_SECRET` — Compose bricht ohne sie bew
 
 ### Als Nächstes
 
-1. **Datenübernahme** aus der alten Lernleiter-Installation — `scripts/migrate-lernleiter.py`, Trockenlauf zuerst.
-2. **CardVote-Ergebnisse als Note** ins Modul Noten übernehmen (liegen dort schon berechnet vor).
-3. **Wochenplanung** (Entwurf, siehe unten) — Zusatz, kein Fundament.
+1. **Wochenplanung** (Entwurf, siehe unten) — Zusatz, kein Fundament.
 
-Erledigt: Rahmen mit Modulregister; Klassen, Schüler und Themen im Kern; alle drei Module auf dem Kern.
+Erledigt: Rahmen mit Modulregister; Klassen, Schüler und Themen im Kern; alle Module auf dem Kern; Datenübernahme aus der alten Lernleiter-Installation; CardVote-Ergebnisse als Note (mit Link zur Auswertung).
 
 ### Wochenplanung (geplant, noch nicht gebaut)
 
@@ -147,15 +145,9 @@ Zwei Dinge tut es bewusst **nicht**, und das darf nicht aufweichen:
 
 Gewichte gibt das Werkzeug keine vor — das Leistungskonzept ist Fachkonferenz-Recht. Es zeigt nur die Summe und markiert, wenn sie nicht 100 % ergibt.
 
-## Datenübernahme (offen)
+## Datenübernahme (erledigt)
 
-`scripts/migrate-lernleiter.py` holt die Bestandsdaten aus der alten Lernleiter-SQLite in den Kern. Es übersetzt, statt zu kopieren: `thema`/`unterthema` werden Themen, der Klassenname wird `class_id`, Aufgaben-IDs je Schüler werden umgeschrieben. Idempotent, mit `--dry-run` als Standardweg.
-
-```bash
-docker compose cp scripts/migrate-lernleiter.py api:/tmp/m.py
-docker compose cp /pfad/lernleiter.db api:/tmp/alt.db
-docker compose exec api python /tmp/m.py --sqlite /tmp/alt.db --email DEINE@MAIL --dry-run
-```
+Die Bestandsdaten aus der alten Lernleiter-SQLite sind in den Kern übernommen; das Skript `scripts/migrate-lernleiter.py` wurde danach entfernt.
 
 ## Konventionen
 

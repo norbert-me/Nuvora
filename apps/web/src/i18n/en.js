@@ -788,4 +788,5 @@ export default {
   "home.arrange": "Arrange",
   "home.arrangeHint": "Drag the cards to reorder them.",
   "common.done": "Done",
+  "noten.fromCardvote": "To CardVote results",
 };

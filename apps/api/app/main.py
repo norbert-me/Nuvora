@@ -173,6 +173,7 @@ def _ensure_columns(sync_conn):
         ("methods", "ablauf", "TEXT DEFAULT '' NOT NULL"),
         ("methods", "material", "TEXT DEFAULT '' NOT NULL"),
         ("methods", "dauer", "INTEGER"),
+        ("grade_categories", "source_session_id", "INTEGER"),
         ("calendar_entries", "method_id", "INTEGER"),
         ("calendar_entries", "period", "INTEGER"),
         ("calendar_entries", "cardvote_set_id", "INTEGER"),

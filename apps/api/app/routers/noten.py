@@ -94,6 +94,8 @@ class CategoryOut(BaseModel):
     section_id: Optional[int]
     name: str
     position: int
+    # Aus welcher CardVote-Session übernommen (für den Link zur Auswertung).
+    source_session_id: Optional[int] = None
     created_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
 
@@ -684,7 +686,7 @@ async def import_session(body: ImportBody, user: User = Depends(require_module),
     pos = len((await db.execute(
         select(GradeCategory).where(GradeCategory.section_id == sec.id)
     )).scalars().all())
-    cat = GradeCategory(name=body.column_name, section_id=sec.id, class_id=sec.class_id, owner_id=user.id, position=pos)
+    cat = GradeCategory(name=body.column_name, section_id=sec.id, class_id=sec.class_id, owner_id=user.id, position=pos, source_session_id=sess.id)
     db.add(cat)
     await db.flush()
 
