@@ -2,12 +2,14 @@
 // Ausleiher: ein Kern-Schüler (Klasse wählen) oder ein Freitextname.
 import { useState, useEffect, useCallback } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
-import { pageTitle, btnPrimary, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
+import { pageTitle, btnPrimary, btnSecondary, selectStyle, Toggle, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr } from "../core/cache.js";
 
 const API = "/api/ausleihe";
 const fld = { padding: "9px 12px", border: "1px solid var(--border2)", borderRadius: 10, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" };
+const UEBERFAELLIG_TAGE = 14; // ab so vielen Tagen draußen: rot markiert
+const tageDraussen = (out) => Math.floor((Date.now() - new Date(out).getTime()) / 86400000);
 
 export default function Ausleihe() {
   const { t } = useLanguage();
@@ -19,6 +21,7 @@ export default function Ausleihe() {
   const [borrower, setBorrower] = useState("");
   const [classId, setClassId] = useState("");
   const [studentId, setStudentId] = useState("");
+  const [nurOffene, setNurOffene] = useState(false); // nur verliehene Gegenstände
 
   useEffect(() => {
     return swr("classes", "/api/classes", (d) => setClasses(Array.isArray(d) ? d : []));
@@ -63,16 +66,23 @@ export default function Ausleihe() {
       <h1 style={pageTitle}>{t("ausleihe.title")}</h1>
       <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 16px" }}>{t("ausleihe.hint")}</p>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <input value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()} placeholder={t("ausleihe.newPlaceholder")} style={{ ...fld, flex: 1, minWidth: 200 }} />
         <button onClick={anlegen} style={btnPrimary}>{t("ausleihe.add")}</button>
       </div>
+      {items.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <Toggle checked={nurOffene} onChange={setNurOffene} label={t("ausleihe.onlyOpen")} />
+        </div>
+      )}
 
       {items.length === 0 ? (
         <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("ausleihe.noItems")}</p>
+      ) : (nurOffene ? items.filter((it) => it.open > 0) : items).length === 0 ? (
+        <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("ausleihe.noneOut")}</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {items.map((it) => (
+          {(nurOffene ? items.filter((it) => it.open > 0) : items).map((it) => (
             <div key={it.id} style={{ border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px" }}>
                 <button onClick={() => oeffnen(it.id)} style={{ flex: 1, textAlign: "left", background: "none", border: "none", cursor: "pointer", color: "var(--text)", fontSize: 15, fontWeight: 600, display: "flex", alignItems: "center", gap: 10 }}>
@@ -80,6 +90,7 @@ export default function Ausleihe() {
                   {it.name}
                 </button>
                 {it.open > 0 && <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 9px", borderRadius: 980, background: "rgba(209,53,15,0.12)", color: "#d1350f" }}>{t("ausleihe.outCount", { n: it.open })}</span>}
+                {it.overdue > 0 && <span title={t("ausleihe.overdueHint", { d: UEBERFAELLIG_TAGE })} style={{ fontSize: 12, fontWeight: 800, padding: "2px 9px", borderRadius: 980, background: "#d1350f", color: "#fff" }}>{t("ausleihe.overdueCount", { n: it.overdue })}</span>}
                 <button onClick={() => loeschen(it.id)} className="icon-btn" style={{ ...iconBtn, padding: 5 }} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
               </div>
 
@@ -106,13 +117,17 @@ export default function Ausleihe() {
                     <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 8px" }}>{t("ausleihe.noOpen")}</p>
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: zurueckLoans.length ? 12 : 0 }}>
-                      {offeneLoans.map((l) => (
-                        <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", border: "1px solid var(--border)", borderRadius: 8 }}>
+                      {offeneLoans.map((l) => {
+                        const tage = tageDraussen(l.out_at);
+                        const ueber = tage >= UEBERFAELLIG_TAGE;
+                        return (
+                        <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", border: ueber ? "1px solid #d1350f" : "1px solid var(--border)", borderRadius: 8, background: ueber ? "rgba(209,53,15,0.06)" : undefined }}>
                           <span style={{ flex: 1, fontWeight: 500 }}>{l.borrower}</span>
-                          <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("ausleihe.since", { d: fmt(l.out_at) })}</span>
+                          <span style={{ fontSize: 12, color: ueber ? "#d1350f" : "var(--text3)", fontWeight: ueber ? 700 : 400 }}>{t("ausleihe.sinceDays", { n: tage })}</span>
                           <button onClick={() => zurueck(l.id, it.id)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>{t("ausleihe.return")}</button>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                   {zurueckLoans.length > 0 && (

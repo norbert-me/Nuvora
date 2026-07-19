@@ -49,8 +49,16 @@ async def list_items(user: User = Depends(require_module), db: AsyncSession = De
     rows = (await db.execute(
         select(MaterialItem).options(selectinload(MaterialItem.loans)).where(MaterialItem.owner_id == user.id).order_by(MaterialItem.name)
     )).scalars().all()
+    from datetime import datetime, timezone, timedelta
+    grenze = datetime.now(timezone.utc) - timedelta(days=14)  # überfällig ab 14 Tagen
+    def _ueberfaellig(l):
+        if l.returned_at is not None or l.out_at is None:
+            return False
+        out = l.out_at if l.out_at.tzinfo else l.out_at.replace(tzinfo=timezone.utc)
+        return out < grenze
     return [{"id": it.id, "name": it.name,
-             "open": sum(1 for l in it.loans if l.returned_at is None)} for it in rows]
+             "open": sum(1 for l in it.loans if l.returned_at is None),
+             "overdue": sum(1 for l in it.loans if _ueberfaellig(l))} for it in rows]
 
 
 @router.post("/items", status_code=201)
