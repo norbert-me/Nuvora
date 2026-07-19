@@ -105,7 +105,11 @@ export default function NuvoraHome({ user }) {
                 return (
                   <div key={m.key} draggable
                     onDragStart={() => setDragKey(m.key)}
-                    onDragOver={(e) => { e.preventDefault(); if (dragKey && overKey !== m.key) setOverKey(m.key); }}
+                    onDragOver={(e) => e.preventDefault()}
+                    // Nur beim Betreten einer ANDEREN Kachel neu einsortieren —
+                    // die gezogene (gedimmte) selbst ignorieren, sonst oszilliert
+                    // die Vorschau (Flackern) direkt vor dem Ablegen.
+                    onDragEnter={() => { if (dragKey && m.key !== dragKey && overKey !== m.key) setOverKey(m.key); }}
                     onDrop={commit}
                     onDragEnd={() => { setDragKey(null); setOverKey(null); }}
                     style={{ ...card, cursor: "grab", borderStyle: "dashed",
