@@ -11,7 +11,7 @@ export default function Modules() {
   const { modules, loading, toggle } = useModules();
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState("");
-  const [sortKey, setSortKey] = useState("name"); // name | status
+  const [sortKey, setSortKey] = useState("popular"); // popular | name | status
   const [dir, setDir] = useState("asc");           // asc | desc
 
   if (loading) return null;
