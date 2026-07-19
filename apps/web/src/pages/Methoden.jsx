@@ -55,6 +55,11 @@ export default function Methoden() {
                 </span>
                 {m.phase && <span style={{ fontSize: 11, color: "var(--text3)" }}>{m.phase}</span>}
                 <span style={{ flex: 1 }} />
+                <button onClick={async () => {
+                  const description = window.prompt(t("methoden.publishPrompt")); if (description === null) return;
+                  const r = await fetch(`/api/marketplace/publish/method`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method_id: m.id, description }) }).catch(() => null);
+                  alert(r && r.ok ? t("methoden.published") : t("methoden.publishError"));
+                }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("methoden.publish")}><Icon d={ICONS.export} size={14} color="var(--accent)" /></button>
                 <button onClick={() => setEdit(m)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>
                 <button onClick={() => { if (confirm(t("methoden.delConfirm", { title: m.title }))) remove(m.id); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
               </div>

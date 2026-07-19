@@ -250,6 +250,13 @@ function Deck({ deck, t, call, topics = [], showTopic = false }) {
         )}
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{deck.cards.length} {t("karten.cards")}</span>
+        {deck.cards.length > 0 && (
+          <button onClick={async () => {
+            const description = window.prompt(t("karten.publishPrompt")); if (description === null) return;
+            const r = await fetch(`/api/marketplace/publish/deck`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deck_id: deck.id, description }) }).catch(() => null);
+            alert(r && r.ok ? t("karten.published") : t("karten.publishError"));
+          }} className="icon-btn" style={iconBtn} title={t("karten.publish")}><Icon d={ICONS.export} color="var(--accent)" /></button>
+        )}
         <button onClick={() => { if (confirm(t("karten.delDeck", { name: deck.name }))) call(() => fetch(`${API}/decks/${deck.id}`, { method: "DELETE" })); }}
           className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
       </div>

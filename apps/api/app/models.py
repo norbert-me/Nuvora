@@ -197,12 +197,15 @@ class MarketplaceQuiz(Base):
     __tablename__ = "marketplace_quizzes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Art des Inhalts: "cardvote_questionset" | "karten_deck" | "method".
+    # Default = Quiz, damit Bestandszeilen ohne Migration gueltig bleiben.
+    kind: Mapped[str] = mapped_column(String(30), default="cardvote_questionset", server_default="cardvote_questionset")
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, default="")
     author_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     author_name: Mapped[str] = mapped_column(String(200), default="")
-    payload: Mapped[dict] = mapped_column(JSON)  # snapshot in cardvote_questionset format
-    question_count: Mapped[int] = mapped_column(Integer, default=0)
+    payload: Mapped[dict] = mapped_column(JSON)  # Snapshot je nach kind
+    question_count: Mapped[int] = mapped_column(Integer, default=0)  # Zahl der Elemente (Fragen/Karten)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     ratings: Mapped[list["MarketplaceRating"]] = relationship(back_populates="quiz", cascade="all, delete-orphan")
 

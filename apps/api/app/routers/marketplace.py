@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 from ..database import get_db
 from ..models import (
     MarketplaceQuiz, MarketplaceRating, QuestionSet, QuestionSetItem, Question, User, Folder,
+    CardDeck, Card, Method, SchoolClass,
 )
 from .auth import get_current_user, rate_limit
 
@@ -20,6 +21,23 @@ class PublishBody(BaseModel):
     set_id: int
     description: str = ""
     author_name: str = ""
+
+
+class PublishDeckBody(BaseModel):
+    deck_id: int
+    description: str = ""
+    author_name: str = ""
+
+
+class PublishMethodBody(BaseModel):
+    method_id: int
+    description: str = ""
+    author_name: str = ""
+
+
+class CopyBody(BaseModel):
+    # Nur fuer karten_deck noetig: Zielklasse, an die der uebernommene Stapel haengt.
+    class_id: Optional[int] = None
 
 
 class RateBody(BaseModel):
@@ -48,6 +66,27 @@ def _snapshot_from_items(qs: QuestionSet, items: list[QuestionSetItem]) -> dict:
     }
 
 
+def _snapshot_from_deck(deck: CardDeck, cards: list[Card]) -> dict:
+    # Kein Klassenbezug, kein Ausroll-Status, keine Schuelerdaten — nur die Karten.
+    return {
+        "type": "karten_deck",
+        "version": 1,
+        "name": deck.name,
+        "cards": [{"front": c.front, "back": c.back, "position": c.position} for c in cards],
+    }
+
+
+def _snapshot_from_method(m: Method) -> dict:
+    return {
+        "type": "method",
+        "version": 1,
+        "kind": m.kind,
+        "title": m.title,
+        "description": m.description,
+        "phase": m.phase,
+    }
+
+
 def _live_author_name(quiz: MarketplaceQuiz, current_names: dict) -> str:
     # Zeigt den AKTUELLEN Benutzernamen der veroeffentlichenden Person (Live-Pointer),
     # nicht den zum Veroeffentlichungszeitpunkt gespeicherten Schnappschuss. Fallback auf
@@ -63,6 +102,7 @@ async def _quiz_to_dict(quiz: MarketplaceQuiz, user_id: int, current_names: dict
     my = next((r.stars for r in ratings if r.user_id == user_id), None)
     out = {
         "id": quiz.id,
+        "kind": quiz.kind or "cardvote_questionset",
         "title": quiz.title,
         "description": quiz.description,
         "author_name": _live_author_name(quiz, current_names),
@@ -83,6 +123,7 @@ async def _quiz_to_dict(quiz: MarketplaceQuiz, user_id: int, current_names: dict
 async def list_quizzes(
     search: str = "",
     sort: str = "newest",
+    kind: str = "",
     author_id: Optional[int] = None,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -90,6 +131,8 @@ async def list_quizzes(
     stmt = select(MarketplaceQuiz).options(selectinload(MarketplaceQuiz.ratings))
     if author_id is not None:
         stmt = stmt.where(MarketplaceQuiz.author_id == author_id)
+    if kind.strip():
+        stmt = stmt.where((MarketplaceQuiz.kind == kind.strip()))
     if search.strip():
         term = f"%{search.strip().lower()}%"
         stmt = stmt.where(
@@ -135,17 +178,24 @@ async def get_quiz(quiz_id: int, user: User = Depends(get_current_user), db: Asy
             if is_admin:
                 author_email = author.email
     base = await _quiz_to_dict(quiz, user.id, current_names, is_admin, author_email)
-    # Vorschau: Fragen ohne Loesung offenlegen? -> mit Loesung, damit Lehrkraft pruefen kann
-    questions = (quiz.payload or {}).get("questions", [])
-    base["questions"] = [
-        {
-            "text": q.get("text", ""),
-            "choices": q.get("choices", {}),
-            "correct_answer": q.get("correct_answer"),
-            "num_choices": q.get("num_choices", 4),
-        }
-        for q in questions
-    ]
+    data = quiz.payload or {}
+    kind = quiz.kind or "cardvote_questionset"
+    if kind == "karten_deck":
+        # Vorschau: die Karten (Vorder-/Rueckseite).
+        base["cards"] = [{"front": c.get("front", ""), "back": c.get("back", "")} for c in data.get("cards", [])]
+    elif kind == "method":
+        base["method"] = {"kind": data.get("kind", "einstieg"), "phase": data.get("phase", ""), "description": data.get("description", "")}
+    else:
+        # Fragen mit Loesung, damit die Lehrkraft pruefen kann.
+        base["questions"] = [
+            {
+                "text": q.get("text", ""),
+                "choices": q.get("choices", {}),
+                "correct_answer": q.get("correct_answer"),
+                "num_choices": q.get("num_choices", 4),
+            }
+            for q in data.get("questions", [])
+        ]
     return base
 
 
@@ -186,13 +236,61 @@ async def publish_quiz(body: PublishBody, user: User = Depends(get_current_user)
     return {"id": quiz.id, "title": quiz.title}
 
 
+@router.post("/publish/deck", status_code=201)
+async def publish_deck(body: PublishDeckBody, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    rate_limit("mp_publish", f"u{user.id}", 30, 3600, "Zu viele Veröffentlichungen. Bitte später erneut versuchen.")
+    deck = await db.get(CardDeck, body.deck_id)
+    if not deck:
+        raise HTTPException(404, "Stapel nicht gefunden")
+    if deck.owner_id and deck.owner_id != user.id:
+        raise HTTPException(403, "Nur eigene Stapel koennen veroeffentlicht werden")
+    cards = (await db.execute(select(Card).where(Card.deck_id == deck.id).order_by(Card.position))).scalars().all()
+    if not cards:
+        raise HTTPException(400, "Stapel ist leer")
+    author = (body.author_name or "").strip() or (getattr(user, "marketplace_name", "") or "").strip() or user.name.strip() or "Unbekannt"
+    quiz = MarketplaceQuiz(
+        kind="karten_deck", title=deck.name or "Kartenstapel",
+        description=(body.description or "").strip()[:2000], author_id=user.id, author_name=author[:100],
+        payload=_snapshot_from_deck(deck, cards), question_count=len(cards),
+    )
+    db.add(quiz)
+    await db.commit()
+    await db.refresh(quiz)
+    return {"id": quiz.id, "title": quiz.title}
+
+
+@router.post("/publish/method", status_code=201)
+async def publish_method(body: PublishMethodBody, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    rate_limit("mp_publish", f"u{user.id}", 30, 3600, "Zu viele Veröffentlichungen. Bitte später erneut versuchen.")
+    m = await db.get(Method, body.method_id)
+    if not m:
+        raise HTTPException(404, "Eintrag nicht gefunden")
+    if m.owner_id != user.id:
+        raise HTTPException(403, "Nur eigene Eintraege koennen veroeffentlicht werden")
+    author = (body.author_name or "").strip() or (getattr(user, "marketplace_name", "") or "").strip() or user.name.strip() or "Unbekannt"
+    quiz = MarketplaceQuiz(
+        kind="method", title=m.title or "Einstieg",
+        description=(body.description or "").strip()[:2000] or m.description[:2000], author_id=user.id, author_name=author[:100],
+        payload=_snapshot_from_method(m), question_count=1,
+    )
+    db.add(quiz)
+    await db.commit()
+    await db.refresh(quiz)
+    return {"id": quiz.id, "title": quiz.title}
+
+
 @router.post("/{quiz_id}/copy", status_code=201)
-async def copy_quiz(quiz_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def copy_quiz(quiz_id: int, body: Optional[CopyBody] = None, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("mp_copy", f"u{user.id}", 120, 3600, "Zu viele Übernahmen. Bitte kurz warten.")
     quiz = await db.get(MarketplaceQuiz, quiz_id)
     if not quiz:
-        raise HTTPException(404, "Quiz nicht gefunden")
+        raise HTTPException(404, "Eintrag nicht gefunden")
     data = quiz.payload or {}
+    kind = quiz.kind or "cardvote_questionset"
+    if kind == "karten_deck":
+        return await _copy_deck(quiz, data, body, user, db)
+    if kind == "method":
+        return await _copy_method(quiz, data, user, db)
     questions = data.get("questions", [])
     if len(questions) > 200:
         raise HTTPException(400, "Maximal 200 Fragen pro Set")
@@ -230,6 +328,35 @@ async def copy_quiz(quiz_id: int, user: User = Depends(get_current_user), db: As
         db.add(QuestionSetItem(question_set_id=qs.id, question_id=q.id, position=pos))
     await db.commit()
     return {"id": qs.id, "name": qs.name}
+
+
+async def _copy_deck(quiz, data, body, user, db):
+    class_id = body.class_id if body else None
+    if not class_id:
+        raise HTTPException(400, "Zielklasse fehlt")
+    cls = await db.get(SchoolClass, class_id)
+    if not cls or (cls.owner_id and cls.owner_id != user.id):
+        raise HTTPException(403, "Klasse nicht gefunden")
+    cards = data.get("cards", [])
+    if len(cards) > 500:
+        raise HTTPException(400, "Maximal 500 Karten pro Stapel")
+    # Entwurf (released_at NULL), keine Themenbindung — nichts von den SuS uebernommen.
+    deck = CardDeck(owner_id=user.id, class_id=class_id, name=data.get("name", quiz.title), topic_id=None, released_at=None)
+    db.add(deck)
+    await db.flush()
+    for pos, c in enumerate(cards):
+        db.add(Card(deck_id=deck.id, front=c.get("front", ""), back=c.get("back", ""), position=c.get("position", pos)))
+    await db.commit()
+    return {"id": deck.id, "name": deck.name}
+
+
+async def _copy_method(quiz, data, user, db):
+    m = Method(owner_id=user.id, kind=data.get("kind", "einstieg"), title=data.get("title", quiz.title),
+               description=data.get("description", ""), phase=data.get("phase", ""))
+    db.add(m)
+    await db.commit()
+    await db.refresh(m)
+    return {"id": m.id, "title": m.title}
 
 
 @router.post("/{quiz_id}/rate")

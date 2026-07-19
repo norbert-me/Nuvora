@@ -47,14 +47,26 @@ export default function Marketplace() {
   const [quizzes, setQuizzes] = useState([]);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("newest");
+  const [kind, setKind] = useState(""); // "" = alle | cardvote_questionset | karten_deck | method
   const [loading, setLoading] = useState(true);
   const [preview, setPreview] = useState(null);
   const [msg, setMsg] = useState("");
   const [authorFilter, setAuthorFilter] = useState(null); // { id, name } oder null
+  const [classes, setClasses] = useState([]);
+  const [copyDeckFor, setCopyDeckFor] = useState(null); // { id, title } — Klassenwahl fuers Deck
+
+  useEffect(() => {
+    fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).then((d) => setClasses(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
+
+  // Zahl-/Autor-Zeile je Art (Prefix vor dem Autorennamen).
+  const countLabel = (q) => q.kind === "karten_deck" ? t("market.cardsBy", { count: q.question_count })
+    : q.kind === "method" ? t("market.methodBy") : t("market.questionsBy", { count: q.question_count });
 
   const load = () => {
     setLoading(true);
     const params = new URLSearchParams({ search, sort });
+    if (kind) params.set("kind", kind);
     if (authorFilter) params.set("author_id", authorFilter.id);
     fetch(`${API}/marketplace?${params}`)
       .then((r) => r.ok ? r.json() : [])
@@ -62,7 +74,7 @@ export default function Marketplace() {
       .catch(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [sort, authorFilter]);
+  useEffect(() => { load(); }, [sort, authorFilter, kind]);
 
   useEffect(() => {
     const t = setTimeout(load, 300);
@@ -85,9 +97,18 @@ export default function Marketplace() {
     else { setPreview(null); setMsg(t("market.previewError")); }
   };
 
-  const copy = async (id, title) => {
-    const res = await fetch(`${API}/marketplace/${id}/copy`, { method: "POST" });
-    if (res.ok) { setMsg(t("market.added", { title })); setTimeout(() => setMsg(""), 4000); }
+  const copy = async (q, classId) => {
+    // Karten-Stapel brauchen eine Zielklasse: erst Klassenwahl oeffnen.
+    if (q.kind === "karten_deck" && !classId) {
+      if (!classes.length) { setMsg(t("market.needClass")); return; }
+      setCopyDeckFor({ id: q.id, title: q.title });
+      return;
+    }
+    const res = await fetch(`${API}/marketplace/${q.id}/copy`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(classId ? { class_id: classId } : {}),
+    });
+    if (res.ok) { setMsg(t("market.added", { title: q.title })); setTimeout(() => setMsg(""), 4000); setCopyDeckFor(null); }
     else setMsg(t("market.adoptError"));
   };
 
@@ -114,6 +135,16 @@ export default function Marketplace() {
         </div>
       )}
 
+      <div style={{ display: "flex", gap: 2, background: "var(--bg2)", padding: 3, borderRadius: 980, marginBottom: 14, width: "fit-content", flexWrap: "wrap" }}>
+        {[["", t("market.kindAll")], ["cardvote_questionset", t("market.kindQuiz")], ["karten_deck", t("market.kindDeck")], ["method", t("market.kindMethod")]].map(([k, label]) => (
+          <button key={k} onClick={() => setKind(k)} style={{
+            padding: "6px 14px", fontSize: 13, fontWeight: kind === k ? 600 : 400, cursor: "pointer",
+            background: kind === k ? "var(--card)" : "transparent", color: kind === k ? "var(--text)" : "var(--text2)",
+            border: "none", borderRadius: 980,
+          }}>{label}</button>
+        ))}
+      </div>
+
       <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("market.searchPlaceholder")}
           style={{ flex: 1, minWidth: 180, padding: "9px 14px", border: "1px solid var(--border2)", borderRadius: 980, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }} />
@@ -139,7 +170,7 @@ export default function Marketplace() {
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{q.title}</div>
                 <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
-                  {t("market.questionsBy", { count: q.question_count })}{" "}
+                  {countLabel(q)}{" "}
                   {q.author_id ? (
                     <button onClick={() => setAuthorFilter({ id: q.author_id, name: q.author_name || t("market.unknown") })}
                       style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--accent)", fontSize: 12, fontWeight: 500 }}>
@@ -153,7 +184,7 @@ export default function Marketplace() {
               </div>
               <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                 <button onClick={() => openPreview(q.id)} style={{ padding: "7px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer", background: "var(--card)", color: "var(--text)", border: "1px solid var(--border2)", borderRadius: 980, whiteSpace: "nowrap" }}>{t("market.preview")}</button>
-                <button onClick={() => copy(q.id, q.title)} style={{ padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 980, whiteSpace: "nowrap" }}>{t("market.adopt")}</button>
+                <button onClick={() => copy(q)} style={{ padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 980, whiteSpace: "nowrap" }}>{t("market.adopt")}</button>
                 {(user && (user.id === q.author_id || user.id === 1)) && (
                   <button onClick={() => remove(q.id)} title={t("market.removeTitle")} style={{ padding: 7, background: "none", border: "1px solid var(--border2)", borderRadius: 980, cursor: "pointer", color: "#d1350f", display: "flex", alignItems: "center" }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></svg>
@@ -181,7 +212,7 @@ export default function Marketplace() {
                   </button>
                 </div>
                 <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 16 }}>
-                  {t("market.questionsBy", { count: preview.question_count })}{" "}
+                  {countLabel(preview)}{" "}
                   {preview.author_id ? (
                     <button onClick={() => { setAuthorFilter({ id: preview.author_id, name: preview.author_name || t("market.unknown") }); setPreview(null); }}
                       style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--accent)", fontSize: 12, fontWeight: 500 }}>
@@ -189,6 +220,19 @@ export default function Marketplace() {
                     </button>
                   ) : preview.author_name}
                 </div>
+                {preview.description && <p style={{ fontSize: 13.5, color: "var(--text2)", margin: "0 0 12px", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{preview.description}</p>}
+                {(preview.cards || []).map((c, i) => (
+                  <div key={i} style={{ padding: "10px 0", borderTop: "1px solid var(--border)", display: "flex", gap: 10, fontSize: 13.5 }}>
+                    <span style={{ flex: 1, minWidth: 0, fontWeight: 600, color: "var(--text)", overflowWrap: "anywhere" }}>{c.front}</span>
+                    <span style={{ flex: 1, minWidth: 0, color: "var(--text2)", overflowWrap: "anywhere" }}>{c.back}</span>
+                  </div>
+                ))}
+                {preview.method && (
+                  <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, fontSize: 13.5, color: "var(--text2)" }}>
+                    {preview.method.phase && <div style={{ marginBottom: 6 }}><span style={{ color: "var(--text3)" }}>{t("kalender.method")}: </span>{preview.method.phase}</div>}
+                    <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{preview.method.description}</div>
+                  </div>
+                )}
                 {(preview.questions || []).map((q, i) => (
                   <div key={i} style={{ padding: "12px 0", borderTop: "1px solid var(--border)" }}>
                     {/* overflowWrap + minWidth:0: Flex-Kinder haben eine
@@ -211,11 +255,27 @@ export default function Marketplace() {
                   </div>
                 ))}
                 <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
-                  <button onClick={() => { copy(preview.id, preview.title); setPreview(null); }} style={{ padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 980 }}>{t("market.adopt")}</button>
+                  <button onClick={() => { const p = preview; setPreview(null); copy(p); }} style={{ padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 980 }}>{t("market.adopt")}</button>
                   <button onClick={() => setPreview(null)} style={{ padding: "10px 20px", fontSize: 14, fontWeight: 500, cursor: "pointer", background: "var(--card)", color: "var(--text)", border: "1px solid var(--border2)", borderRadius: 980 }}>{t("common.close")}</button>
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {copyDeckFor && (
+        <div onClick={() => setCopyDeckFor(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 210 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--card)", borderRadius: 18, maxWidth: 400, width: "100%", padding: 22, border: "1px solid var(--border)" }}>
+            <h3 style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 700, color: "var(--text)" }}>{t("market.chooseClass")}</h3>
+            <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 14px" }}>{t("market.chooseClassHint", { title: copyDeckFor.title })}</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflow: "auto" }}>
+              {classes.map((c) => (
+                <button key={c.id} onClick={() => copy({ id: copyDeckFor.id, title: copyDeckFor.title, kind: "karten_deck" }, c.id)}
+                  style={{ textAlign: "left", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>{c.name}</button>
+              ))}
+            </div>
+            <button onClick={() => setCopyDeckFor(null)} style={{ marginTop: 14, padding: "8px 16px", fontSize: 13.5, cursor: "pointer", background: "var(--card)", color: "var(--text)", border: "1px solid var(--border2)", borderRadius: 980 }}>{t("common.abort")}</button>
           </div>
         </div>
       )}

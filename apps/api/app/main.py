@@ -138,6 +138,7 @@ def _ensure_columns(sync_conn):
         ("students", "karten_token", "VARCHAR(64)"),
         ("card_decks", "released_at", "TIMESTAMPTZ"),
         ("card_decks", "topic_id", "INTEGER"),
+        ("marketplace_quizzes", "kind", "VARCHAR(30) DEFAULT 'cardvote_questionset' NOT NULL"),
         ("calendar_entries", "method_id", "INTEGER"),
         ("calendar_entries", "period", "INTEGER"),
         ("calendar_entries", "cardvote_set_id", "INTEGER"),
