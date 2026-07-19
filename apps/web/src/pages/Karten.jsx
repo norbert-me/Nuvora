@@ -5,7 +5,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, selectStyle } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
-import { swr } from "../core/cache.js";
+import { swr , lastClass, rememberClass } from "../core/cache.js";
 
 const API = "/api/karten";
 
@@ -38,9 +38,11 @@ export default function Karten() {
       setClasses(list);
       // Vorauswahl per ?class=<id> (z. B. Link aus dem Kalender), sonst erste Klasse.
       const wanted = Number(params.get("class")) || null;
-      if (classId === null) setClassId((wanted && list.some((c) => c.id === wanted)) ? wanted : (list[0]?.id ?? null));
+      if (classId === null) { const w = lastClass(); setClassId((wanted && list.some((c) => c.id === wanted)) ? wanted : (list.some((c) => c.id === w) ? w : (list[0]?.id ?? null))); }
     });
   }, []);
+
+  useEffect(() => { if (classId) rememberClass(classId); }, [classId]);
 
   const loadDecks = (id) => id && fetch(`${API}/classes/${id}/decks`).then((r) => (r.ok ? r.json() : [])).then(setDecks).catch(() => {});
   useEffect(() => { loadDecks(classId); }, [classId]);

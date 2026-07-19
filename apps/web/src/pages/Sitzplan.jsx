@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { pageTitle, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
-import { swr } from "../core/cache.js";
+import { swr , lastClass, rememberClass } from "../core/cache.js";
 
 const API = "/api/sitzplan";
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -29,9 +29,11 @@ export default function Sitzplan() {
     return swr("classes", "/api/classes", (d) => {
       const list = Array.isArray(d) ? d : [];
       setClasses(list);
-      if (classId === null && list.length) setClassId(list[0].id);
+      if (classId === null && list.length) { const w = lastClass(); setClassId(list.some((c) => c.id === w) ? w : list[0].id); }
     });
   }, []);
+
+  useEffect(() => { if (classId) rememberClass(classId); }, [classId]);
 
   const cls = useMemo(() => classes.find((c) => c.id === classId), [classes, classId]);
   const students = useMemo(() => cls?.students || [], [cls]);

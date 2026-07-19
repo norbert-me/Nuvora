@@ -9,7 +9,7 @@
 // in den Schnitt — „Anstrengungsbereitschaft“ ist kein Messwert.
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { swr } from "../core/cache.js";
+import { swr , lastClass, rememberClass } from "../core/cache.js";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -137,9 +137,11 @@ export default function Noten() {
     return swr("classes", "/api/classes", (d) => {
       const list = Array.isArray(d) ? d : [];
       setClasses(list);
-      if (list.length && classId === null) setClassId(list[0].id);
+      if (list.length && classId === null) { const w = lastClass(); setClassId(list.some((c) => c.id === w) ? w : list[0].id); }
     });
   }, []);
+
+  useEffect(() => { if (classId) rememberClass(classId); }, [classId]);
 
   const load = async (id) => {
     if (!id) return;

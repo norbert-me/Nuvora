@@ -6,7 +6,7 @@ import { useSearchParams } from "react-router-dom";
 import { pageTitle, btnSecondary, selectStyle, Toggle } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
-import { swr } from "../core/cache.js";
+import { swr , lastClass, rememberClass } from "../core/cache.js";
 
 const API = "/api/anwesenheit";
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -51,7 +51,7 @@ export default function Anwesenheit() {
   // Gültige Klasse sicherstellen, wenn Filter greift.
   useEffect(() => {
     if (!sichtbareKlassen.length) return;
-    if (classId === null || !sichtbareKlassen.some((c) => c.id === classId)) setClassId(sichtbareKlassen[0].id);
+    if (classId === null || !sichtbareKlassen.some((c) => c.id === classId)) { const w = lastClass(); setClassId(sichtbareKlassen.some((c) => c.id === w) ? w : sichtbareKlassen[0].id); }
   }, [sichtbareKlassen, classId]);
 
   const cls = useMemo(() => classes.find((c) => c.id === classId), [classes, classId]);

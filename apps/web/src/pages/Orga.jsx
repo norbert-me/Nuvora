@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { pageTitle, btnPrimary, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { swr } from "../core/cache.js";
+import { swr , lastClass, rememberClass } from "../core/cache.js";
 
 const API = "/api/orga";
 
@@ -19,9 +19,11 @@ export default function Orga() {
     return swr("classes", "/api/classes", (d) => {
       const list = Array.isArray(d) ? d : [];
       setClasses(list);
-      if (classId === null && list.length) setClassId(list[0].id);
+      if (classId === null && list.length) { const w = lastClass(); setClassId(list.some((c) => c.id === w) ? w : list[0].id); }
     });
   }, []);
+
+  useEffect(() => { if (classId) rememberClass(classId); }, [classId]);
 
   const cls = useMemo(() => classes.find((c) => c.id === classId), [classes, classId]);
   const students = cls?.students || [];

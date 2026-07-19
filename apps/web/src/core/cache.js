@@ -71,3 +71,13 @@ export function peek(key) { const e = readEntry(key); return e ? e.d : null; }
 
 /** Frischen Stand in den Cache schreiben (z.B. nach einer eigenen Mutation). */
 export function put(key, data) { writeEntry(key, data, null); }
+
+// Zuletzt gewaehlte Klasse — modulübergreifend gemerkt, damit die Auswahl beim
+// Zurueckkommen (oder Seitenwechsel) nicht auf die erste Klasse zurueckspringt.
+const CLASS_KEY = "nuvora_selected_class";
+export function lastClass() {
+  try { const v = Number(localStorage.getItem(CLASS_KEY)); return v || null; } catch { return null; }
+}
+export function rememberClass(id) {
+  try { if (id) localStorage.setItem(CLASS_KEY, String(id)); } catch { /* egal */ }
+}
