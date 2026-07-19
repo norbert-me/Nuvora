@@ -22,6 +22,7 @@ export default function Sitzplan() {
   const [seats, setSeats] = useState([]); // [{sid,x,y,rot}]
   const [tafel, setTafel] = useState({ x: 200, y: 8 }); // bewegliche Tafel
   const tafelRef = useRef(null);
+  const [zoom, setZoom] = useState(1); // Anzeige-Zoom (Positionen bleiben unskaliert gespeichert)
   const [abwesend, setAbwesend] = useState({});
   const [aufruf, setAufruf] = useState(false);
   const [msg, setMsg] = useState("");
@@ -78,15 +79,15 @@ export default function Sitzplan() {
     if (aufruf) return;
     e.preventDefault();
     const rect = canvasRef.current.getBoundingClientRect();
-    tafelRef.current = { dx: e.clientX - rect.left - tafel.x, dy: e.clientY - rect.top - tafel.y };
+    tafelRef.current = { dx: (e.clientX - rect.left) / zoom - tafel.x, dy: (e.clientY - rect.top) / zoom - tafel.y };
     window.addEventListener("pointermove", onTafelMove);
     window.addEventListener("pointerup", onTafelUp);
   };
   const onTafelMove = (e) => {
     const d = tafelRef.current; if (!d) return;
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min(e.clientX - rect.left - d.dx, rect.width - TAFEL_W));
-    const y = Math.max(0, Math.min(e.clientY - rect.top - d.dy, rect.height - TAFEL_H));
+    const x = Math.max(0, Math.min((e.clientX - rect.left) / zoom - d.dx, rect.width / zoom - TAFEL_W));
+    const y = Math.max(0, Math.min((e.clientY - rect.top) / zoom - d.dy, rect.height / zoom - TAFEL_H));
     setTafel({ x, y });
   };
   const onTafelUp = () => {
@@ -103,15 +104,15 @@ export default function Sitzplan() {
     if (aufruf) return;
     e.preventDefault();
     const rect = canvasRef.current.getBoundingClientRect();
-    dragRef.current = { sid: seat.sid, dx: e.clientX - rect.left - seat.x, dy: e.clientY - rect.top - seat.y };
+    dragRef.current = { sid: seat.sid, dx: (e.clientX - rect.left) / zoom - seat.x, dy: (e.clientY - rect.top) / zoom - seat.y };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   };
   const onMove = (e) => {
     const d = dragRef.current; if (!d) return;
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min(e.clientX - rect.left - d.dx, rect.width - SEAT_W));
-    const y = Math.max(0, Math.min(e.clientY - rect.top - d.dy, rect.height - SEAT_H));
+    const x = Math.max(0, Math.min((e.clientX - rect.left) / zoom - d.dx, rect.width / zoom - SEAT_W));
+    const y = Math.max(0, Math.min((e.clientY - rect.top) / zoom - d.dy, rect.height / zoom - SEAT_H));
     setSeats((prev) => prev.map((s) => (s.sid === d.sid ? { ...s, x, y } : s)));
   };
   const onUp = () => {
@@ -129,8 +130,8 @@ export default function Sitzplan() {
     const sid = Number(e.dataTransfer.getData("text/plain"));
     if (!sid || platziert.has(sid)) return;
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min(e.clientX - rect.left - SEAT_W / 2, rect.width - SEAT_W));
-    const y = Math.max(0, Math.min(e.clientY - rect.top - SEAT_H / 2, rect.height - SEAT_H));
+    const x = Math.max(0, Math.min((e.clientX - rect.left) / zoom - SEAT_W / 2, rect.width / zoom - SEAT_W));
+    const y = Math.max(0, Math.min((e.clientY - rect.top) / zoom - SEAT_H / 2, rect.height / zoom - SEAT_H));
     persist([...seats, { sid, x, y, rot: 0 }]);
   };
 
@@ -153,8 +154,16 @@ export default function Sitzplan() {
         <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("sitzplan.noStudents")}</p>
       ) : (
         <>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+            <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("sitzplan.zoom")}</span>
+            <button onClick={() => setZoom((z) => Math.max(0.5, Math.round((z - 0.1) * 10) / 10))} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8, width: 28, height: 28, fontSize: 16 }}>−</button>
+            <span style={{ fontSize: 12.5, color: "var(--text2)", minWidth: 40, textAlign: "center" }}>{Math.round(zoom * 100)}%</span>
+            <button onClick={() => setZoom((z) => Math.min(2, Math.round((z + 0.1) * 10) / 10))} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8, width: 28, height: 28, fontSize: 16 }}>+</button>
+            {zoom !== 1 && <button onClick={() => setZoom(1)} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 12 }}>{t("sitzplan.zoomReset")}</button>}
+          </div>
+          <div style={{ height: 520, overflow: "auto", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", marginBottom: 18 }}>
           <div ref={canvasRef} onDragOver={(e) => e.preventDefault()} onDrop={onCanvasDrop}
-            style={{ position: "relative", height: 520, border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", overflow: "hidden", marginBottom: 18,
+            style={{ position: "relative", height: 520, width: "100%", transform: `scale(${zoom})`, transformOrigin: "0 0",
               backgroundImage: "radial-gradient(var(--border) 1px, transparent 1px)", backgroundSize: "24px 24px" }}>
             {/* Bewegliche Tafel */}
             <div onPointerDown={onTafelDown}
@@ -190,6 +199,7 @@ export default function Sitzplan() {
                 </div>
               );
             })}
+          </div>
           </div>
 
           <div style={{ border: "1px dashed var(--border2)", borderRadius: 12, padding: 12, minHeight: 56, background: "var(--bg2)" }}>

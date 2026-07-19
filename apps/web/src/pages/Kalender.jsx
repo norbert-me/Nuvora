@@ -588,10 +588,8 @@ function SlotModal({ slot, classes, onSave, onDelete, onColor, onClose, t }) {
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 2 }}>{t("kalender.timetable")}</h3>
         <div style={{ fontSize: 12.5, color: "var(--text3)" }}>{wdays[slot.weekday]} · {slot.period}. {t("kalender.period")}</div>
         <div style={lbl}>{t("nav.classes")}</div>
-        <select value={classId} onChange={(e) => setClassId(e.target.value)} style={sfld}>
-          <option value="">– {t("kalender.noClass")} –</option>
-          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        <KursKlasseSelect value={classId === "" ? "" : Number(classId)} allowNone noneLabel={`– ${t("kalender.noClass")} –`}
+          onChange={(id) => setClassId(id === "" ? "" : String(id))} style={sfld} />
         {classId && (
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)" }}>
@@ -715,10 +713,8 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         <div style={lbl}>{t("kalender.entryTitle")}</div>
         <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus placeholder={t("kalender.entryTitlePlaceholder")} style={fld} />
         <div style={lbl}>{t("nav.classes")}</div>
-        <select value={classId} onChange={(e) => setClassId(e.target.value)} style={sfld}>
-          <option value="">– {t("kalender.noClass")} –</option>
-          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        <KursKlasseSelect value={classId === "" ? "" : Number(classId)} allowNone noneLabel={`– ${t("kalender.noClass")} –`}
+          onChange={(id) => setClassId(id === "" ? "" : String(id))} style={sfld} />
         <div style={lbl}>{t("kalender.topic")}</div>
         <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={sfld}>
           <option value="">– {t("kalender.noTopic")} –</option>

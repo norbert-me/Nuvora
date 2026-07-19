@@ -860,6 +860,8 @@ export default {
   "sitzplan.clear": "Sitzplan leeren",
   "sitzplan.cleared": "Sitzplan geleert.",
   "sitzplan.board": "Tafel",
+  "sitzplan.zoom": "Zoom",
+  "sitzplan.zoomReset": "100%",
   "sitzplan.pool": "Noch nicht gesetzt",
   "sitzplan.allSeated": "Alle sitzen.",
   "sitzplan.noStudents": "Diese Klasse hat keine Schüler.",
