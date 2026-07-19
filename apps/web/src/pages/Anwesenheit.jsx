@@ -126,9 +126,7 @@ export default function Anwesenheit() {
         </div>
       )}
 
-      {students.length === 0 ? (
-        <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("anwesenheit.noStudents")}</p>
-      ) : view === "tag" ? (
+      {view === "tag" ? (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
             <button onClick={() => shift(-1)} style={{ ...btnSecondary, padding: "6px 13px" }}>‹</button>
@@ -143,6 +141,9 @@ export default function Anwesenheit() {
             )}
           </div>
           {legende}
+          {students.length === 0 ? (
+            <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("anwesenheit.noStudents")}</p>
+          ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {students.map((s, i) => {
               const cur = statusOf(s.id);
@@ -164,6 +165,7 @@ export default function Anwesenheit() {
               );
             })}
           </div>
+          )}
         </>
       ) : (
         <>
@@ -172,6 +174,7 @@ export default function Anwesenheit() {
             <button onClick={() => ladePdf(`${API}/${classId}/report.pdf`, `Fehlzeiten_${cls?.name || ""}.pdf`)} style={{ ...btnSecondary, padding: "6px 13px", fontSize: 13 }}>{t("anwesenheit.classPdf")}</button>
           </div>
           {legende}
+          {students.length === 0 && <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("anwesenheit.noStudents")}</p>}
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {students.map((s, i) => {
               const a = summe[String(s.id)] || { fehlt: 0, spaet: 0, entsch: 0 };
