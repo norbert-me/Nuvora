@@ -3,6 +3,8 @@
 Eigenstaendig (Regel 3): speichert nur Positionen (Schueler bleiben im Kern).
 `data` = { "cols": int, "cells": [studentId|null, ...] }.
 """
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -35,6 +37,8 @@ async def _owned_class(db: AsyncSession, user: User, class_id: int) -> SchoolCla
 class PlanIn(BaseModel):
     # Freie Flaeche: Sitze als {sid, x, y, rot}. (Alt: cols/cells-Raster.)
     seats: list = []
+    # Bewegliche Tafel als {x, y}. Optional.
+    tafel: Optional[dict] = None
 
 
 @router.get("/{class_id}")
@@ -68,6 +72,8 @@ async def put_plan(class_id: int, body: PlanIn, user: User = Depends(require_mod
             "rot": round(_num(s.get("rot")), 1),
         })
     data = {"seats": seats}
+    if isinstance(body.tafel, dict):
+        data["tafel"] = {"x": round(_num(body.tafel.get("x")), 1), "y": round(_num(body.tafel.get("y")), 1)}
     row = (await db.execute(
         select(SeatingPlan).where(SeatingPlan.owner_id == user.id, SeatingPlan.class_id == class_id)
     )).scalar_one_or_none()

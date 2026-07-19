@@ -20,6 +20,8 @@ export default function Sitzplan() {
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
   const [seats, setSeats] = useState([]); // [{sid,x,y,rot}]
+  const [tafel, setTafel] = useState({ x: 200, y: 8 }); // bewegliche Tafel
+  const tafelRef = useRef(null);
   const [abwesend, setAbwesend] = useState({});
   const [aufruf, setAufruf] = useState(false);
   const [msg, setMsg] = useState("");
@@ -44,6 +46,7 @@ export default function Sitzplan() {
     if (!id) return;
     fetch(`${API}/${id}`).then((r) => (r.ok ? r.json() : null)).then((d) => {
       if (!d) { setSeats([]); return; }
+      setTafel(d.tafel && typeof d.tafel.x === "number" ? d.tafel : { x: 200, y: 8 });
       // Altes Raster (cells) einmalig in freie Positionen umrechnen.
       if (Array.isArray(d.seats)) { setSeats(d.seats); return; }
       if (Array.isArray(d.cells)) {
@@ -64,9 +67,32 @@ export default function Sitzplan() {
       .catch(() => {});
   }, [anwesenheitAktiv, aufruf, classId]);
 
-  const persist = (next) => {
+  const persist = (next, tf = tafel) => {
     setSeats(next);
-    if (classId) fetch(`${API}/${classId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seats: next }) }).catch(() => {});
+    if (classId) fetch(`${API}/${classId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seats: next, tafel: tf }) }).catch(() => {});
+  };
+
+  // Tafel ziehen (Pointer). Breite/Höhe der Tafel-Fläche.
+  const TAFEL_W = 200, TAFEL_H = 30;
+  const onTafelDown = (e) => {
+    if (aufruf) return;
+    e.preventDefault();
+    const rect = canvasRef.current.getBoundingClientRect();
+    tafelRef.current = { dx: e.clientX - rect.left - tafel.x, dy: e.clientY - rect.top - tafel.y };
+    window.addEventListener("pointermove", onTafelMove);
+    window.addEventListener("pointerup", onTafelUp);
+  };
+  const onTafelMove = (e) => {
+    const d = tafelRef.current; if (!d) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(e.clientX - rect.left - d.dx, rect.width - TAFEL_W));
+    const y = Math.max(0, Math.min(e.clientY - rect.top - d.dy, rect.height - TAFEL_H));
+    setTafel({ x, y });
+  };
+  const onTafelUp = () => {
+    window.removeEventListener("pointermove", onTafelMove);
+    window.removeEventListener("pointerup", onTafelUp);
+    if (tafelRef.current) { tafelRef.current = null; setTafel((tf) => { persist(seats, tf); return tf; }); }
   };
 
   const platziert = new Set(seats.map((s) => s.sid));
@@ -127,11 +153,17 @@ export default function Sitzplan() {
         <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("sitzplan.noStudents")}</p>
       ) : (
         <>
-          <div style={{ textAlign: "center", fontSize: 11.5, letterSpacing: "0.1em", color: "var(--text3)", textTransform: "uppercase", padding: "6px 0", marginBottom: 8, border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg2)" }}>{t("sitzplan.board")}</div>
-
           <div ref={canvasRef} onDragOver={(e) => e.preventDefault()} onDrop={onCanvasDrop}
             style={{ position: "relative", height: 520, border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", overflow: "hidden", marginBottom: 18,
               backgroundImage: "radial-gradient(var(--border) 1px, transparent 1px)", backgroundSize: "24px 24px" }}>
+            {/* Bewegliche Tafel */}
+            <div onPointerDown={onTafelDown}
+              style={{ position: "absolute", left: tafel.x, top: tafel.y, width: TAFEL_W, height: TAFEL_H,
+                display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
+                fontSize: 11.5, letterSpacing: "0.1em", color: "var(--text2)", textTransform: "uppercase", fontWeight: 700,
+                border: "2px solid var(--text3)", borderRadius: 6, background: "var(--bg2)",
+                cursor: aufruf ? "default" : "grab", userSelect: "none", boxShadow: "0 1px 3px rgba(0,0,0,0.12)" }}
+              title={t("sitzplan.board")}>{t("sitzplan.board")}</div>
             {seats.map((seat) => {
               const s = byId(seat.sid); if (!s) return null;
               const abs = aufruf ? abwesend[String(seat.sid)] : null;
