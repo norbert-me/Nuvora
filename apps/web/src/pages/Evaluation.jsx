@@ -3,7 +3,7 @@ import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
-import { DownloadLink, Icon, ICONS, btnPrimary, btnSecondary, modalOverlay, modalPanel } from "../components/Icons.jsx";
+import { DownloadLink, Icon, ICONS, btnPrimary, btnSecondary, modalOverlay, modalPanel, inputStyle } from "../components/Icons.jsx";
 
 const API = "/api";
 const COLORS = { A: "#0066cc", B: "#5856d6", C: "#b8860b", D: "#d1350f" };
@@ -1083,7 +1083,7 @@ function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
         ) : (
           <>
             {error && <p style={{ color: "var(--danger, #dc2626)", fontSize: 13, marginBottom: 10 }}>{error}</p>}
-            {(() => { const fld = { width: "100%", padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }; const lbl = { fontSize: 12.5, color: "var(--text2)", marginBottom: 6, marginTop: 12 }; return (
+            {(() => { const fld = { ...inputStyle, width: "100%" }; const lbl = { fontSize: 12.5, color: "var(--text2)", marginBottom: 6, marginTop: 12 }; return (
               <>
                 <div style={{ ...lbl, marginTop: 0 }}>{t("noten.term")}</div>
                 <select value={term} onChange={(e) => setTerm(e.target.value)} style={fld}>

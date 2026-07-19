@@ -3,7 +3,7 @@
 // Wiederverwendbar; im Kalender einer Stunde zuweisbar.
 import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
-import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, modalOverlay, modalPanel } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, modalOverlay, modalPanel, inputStyle } from "../components/Icons.jsx";
 import PublishModal from "../components/PublishModal.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -105,7 +105,7 @@ function MethodModal({ m, onSave, onClose, t }) {
   const [description, setDescription] = useState(m.description || "");
   const [ablauf, setAblauf] = useState(m.ablauf || "");
   const [material, setMaterial] = useState(m.material || "");
-  const fld = { width: "100%", padding: 9, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" };
+  const fld = { ...inputStyle, width: "100%" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
   return (
     <div onClick={onClose} style={modalOverlay}>
