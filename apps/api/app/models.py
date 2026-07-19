@@ -187,6 +187,10 @@ class Student(Base):
     card_id: Mapped[int] = mapped_column(Integer)
     name: Mapped[str] = mapped_column(String(200))
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"))
+    # Zugehöriger Kurs (Lerngruppe der Klasse). Anwesenheit wird über den Kurs
+    # geteilt: gleichnamige SuS der Fach-Klassen desselben Kurses gelten als
+    # dieselbe Person. Karten/Noten bleiben pro Klasse (Student-Zeile).
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # ─── Angaben zur Person, nicht zu einem Modul ───
     # Der Kern haelt, was ueber die Lernenden bekannt ist; jedes Modul

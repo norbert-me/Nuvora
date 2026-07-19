@@ -129,7 +129,7 @@ async def create_class(body: ClassCreate, user: User = Depends(get_current_user)
     db.add(sc)
     await db.flush()
     for s in body.students:
-        db.add(Student(card_id=s.card_id, name=s.name, class_id=sc.id,
+        db.add(Student(card_id=s.card_id, name=s.name, class_id=sc.id, kurs_id=kurs.id,
                        niveau=s.niveau, foerder=s.foerder, notizen=s.notizen,
                        klassenlehrer=s.klassenlehrer))
     await db.commit()
@@ -201,7 +201,7 @@ async def update_class(class_id: int, body: ClassCreate, user: User = Depends(ge
             cur.notizen = s.notizen
             cur.klassenlehrer = s.klassenlehrer
         else:
-            db.add(Student(card_id=s.card_id, name=s.name, class_id=class_id,
+            db.add(Student(card_id=s.card_id, name=s.name, class_id=class_id, kurs_id=sc.kurs_id,
                            niveau=s.niveau, foerder=s.foerder, notizen=s.notizen,
                            klassenlehrer=s.klassenlehrer))
     # Nur wirklich entfernte Karten loeschen (deren Daten sollen dann auch weg).

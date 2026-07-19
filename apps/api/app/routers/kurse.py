@@ -8,11 +8,11 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Kurs, SchoolClass, User
+from ..models import Kurs, SchoolClass, Student, User
 from .auth import get_current_user
 
 router = APIRouter(prefix="/api/kurse", tags=["kurse"])
@@ -86,6 +86,8 @@ async def assign_class(kurs_id: int, class_id: int, user: User = Depends(get_cur
     await _owned_kurs(db, user, kurs_id)
     c = await _own_class(db, user, class_id)
     c.kurs_id = kurs_id
+    # Schüler der Klasse in den Kurs übernehmen (geteilte Anwesenheit).
+    await db.execute(update(Student).where(Student.class_id == class_id).values(kurs_id=kurs_id))
     await db.commit()
 
 
@@ -97,4 +99,5 @@ async def unlink_class(class_id: int, user: User = Depends(get_current_user), db
     db.add(k)
     await db.flush()
     c.kurs_id = k.id
+    await db.execute(update(Student).where(Student.class_id == class_id).values(kurs_id=k.id))
     await db.commit()

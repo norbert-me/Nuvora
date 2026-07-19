@@ -176,6 +176,7 @@ def _ensure_columns(sync_conn):
         ("school_classes", "color", "VARCHAR(9) DEFAULT '' NOT NULL"),
         ("school_classes", "deleted_at", "TIMESTAMPTZ"),
         ("school_classes", "kurs_id", "INTEGER"),
+        ("students", "kurs_id", "INTEGER"),
         ("students", "karten_token", "VARCHAR(64)"),
         ("card_decks", "released_at", "TIMESTAMPTZ"),
         ("card_decks", "topic_id", "INTEGER"),
@@ -352,6 +353,11 @@ async def startup():
                 await db.execute(text("UPDATE school_classes SET kurs_id = :k WHERE id = :c"), {"k": kid, "c": cid})
             if rows:
                 print(f"[STARTUP] Kurse: {len(rows)} Klasse(n) je eigenem Kurs zugeordnet.", flush=True)
+            # Schüler erben den Kurs ihrer Klasse (für geteilte Anwesenheit).
+            await db.execute(text(
+                "UPDATE students SET kurs_id = (SELECT kurs_id FROM school_classes WHERE id = students.class_id) "
+                "WHERE kurs_id IS NULL"
+            ))
             await db.commit()
         except Exception as e:
             print(f"[STARTUP-WARN] Kurs-Migration übersprungen: {e}", flush=True)

@@ -43,6 +43,34 @@ def _day_bounds(d: datetime):
     return start, start.replace(hour=23, minute=59, second=59)
 
 
+async def _kurs_maps(db, user, class_id):
+    """Anwesenheit wird über den Kurs geteilt: gleichnamige SuS der Fach-Klassen
+    desselben Kurses sind dieselbe Person. Kanonisch = kleinste student_id je
+    Name im Kurs; darauf werden Anwesenheits-Zeilen gespeichert.
+
+    Liefert:
+      canon_ids  – alle kanonischen student_ids des Kurses
+      to_canon   – student_id (dieser Klasse) -> kanonische id
+      canon_back – kanonische id -> student_id dieser Klasse (Rückabbildung fürs UI)
+    """
+    sc = await db.get(SchoolClass, class_id)
+    kurs_id = sc.kurs_id if sc else None
+    if kurs_id:
+        kurs_studs = (await db.execute(select(Student).where(Student.kurs_id == kurs_id))).scalars().all()
+    else:
+        kurs_studs = (await db.execute(select(Student).where(Student.class_id == class_id))).scalars().all()
+    # Name -> kanonische (kleinste) id
+    canon = {}
+    for s in sorted(kurs_studs, key=lambda x: x.id):
+        canon.setdefault(s.name.strip(), s.id)
+    this = [s for s in kurs_studs if s.class_id == class_id]
+    to_canon = {s.id: canon.get(s.name.strip(), s.id) for s in this}
+    canon_back = {}
+    for s in this:
+        canon_back[canon.get(s.name.strip(), s.id)] = s.id
+    return list(canon.values()), to_canon, canon_back
+
+
 # Schwere eines Status, um bei mehreren Stunden am Tag den „Tages-Status" zu
 # bestimmen (Fehlzeiten-Zaehlung, Tagesansicht ohne Stunde). fehlt > entsch >
 # spaet: entschuldigt bleibt eine Abwesenheit, verspaetet ist die leichteste.
@@ -69,18 +97,23 @@ async def get_day(class_id: int, date: datetime, period: Optional[int] = None,
     denn wer frueh fehlt, fehlt oft auch spaeter; die Lehrkraft prueft dann nur."""
     await _owned_class(db, user, class_id)
     lo, hi = _day_bounds(date)
+    canon_ids, _to_canon, canon_back = await _kurs_maps(db, user, class_id)
+    # Anwesenheit liegt auf den kanonischen SuS des Kurses (kursweit geteilt).
     rows = (await db.execute(select(Attendance).where(
-        Attendance.class_id == class_id, Attendance.owner_id == user.id,
+        Attendance.owner_id == user.id, Attendance.student_id.in_(canon_ids or [-1]),
         Attendance.date >= lo, Attendance.date <= hi,
     ))).scalars().all()
 
+    def out(r):
+        return {"status": r.status, "note": r.note, "period": r.period}
+    # Kanonische id -> student_id dieser Klasse fürs UI.
+    back = lambda sid: canon_back.get(sid, sid)
+
     if not period:
         best = _tages_status(rows)
-        return {str(sid): {"status": r.status, "note": r.note, "period": r.period} for sid, r in best.items()}
+        return {str(back(sid)): out(r) for sid, r in best.items()}
 
     exact = {r.student_id: r for r in rows if r.period == period}
-    # Vorbelegen: Schueler ohne Eintrag in dieser Stunde aus der juengsten
-    # frueheren Stunde des Tages uebernehmen (nur echte Abwesenheiten).
     neu = False
     fehlend = {r.student_id for r in rows if r.student_id not in exact}
     for sid in fehlend:
@@ -90,14 +123,16 @@ async def get_day(class_id: int, date: datetime, period: Optional[int] = None,
         quelle = max(vorher, key=lambda r: r.period)
         if quelle.status == "da":
             continue
-        kopie = Attendance(owner_id=user.id, class_id=class_id, student_id=sid, date=lo,
+        # class_id der kanonischen Zeile behalten (gehört evtl. einer Fach-Klasse
+        # des Kurses); Anwesenheit ist ohnehin kursweit geteilt.
+        kopie = Attendance(owner_id=user.id, class_id=quelle.class_id, student_id=sid, date=lo,
                            status=quelle.status, note=quelle.note, period=period)
         db.add(kopie)
         exact[sid] = kopie
         neu = True
     if neu:
         await db.commit()
-    return {str(sid): {"status": r.status, "note": r.note, "period": r.period} for sid, r in exact.items()}
+    return {str(back(sid)): out(r) for sid, r in exact.items()}
 
 
 class MarkIn(BaseModel):
@@ -117,10 +152,13 @@ async def mark(class_id: int, body: MarkIn, user: User = Depends(require_module)
     st = await db.get(Student, body.student_id)
     if not st or st.class_id != class_id:
         raise HTTPException(404, "Schüler nicht in dieser Klasse")
+    # Auf die kanonische Person des Kurses schreiben -> kursweit geteilt.
+    _canon_ids, to_canon, _back = await _kurs_maps(db, user, class_id)
+    canon_id = to_canon.get(body.student_id, body.student_id)
     lo, hi = _day_bounds(body.date)
     # Genau die Stunde treffen (period NULL = ganzer Tag), damit Stunden getrennt bleiben.
     row = (await db.execute(select(Attendance).where(
-        Attendance.student_id == body.student_id, Attendance.date >= lo, Attendance.date <= hi,
+        Attendance.student_id == canon_id, Attendance.date >= lo, Attendance.date <= hi,
         Attendance.period == body.period,
     ))).scalar_one_or_none()
     # "da" ist der Normalfall: kein Eintrag noetig -> vorhandenen loeschen.
@@ -134,7 +172,8 @@ async def mark(class_id: int, body: MarkIn, user: User = Depends(require_module)
         row.note = body.note.strip()[:500]
         row.period = body.period
     else:
-        db.add(Attendance(owner_id=user.id, class_id=class_id, student_id=body.student_id,
+        canon = await db.get(Student, canon_id)
+        db.add(Attendance(owner_id=user.id, class_id=(canon.class_id if canon else class_id), student_id=canon_id,
                           date=lo, status=body.status, note=body.note.strip()[:500], period=body.period))
     await db.commit()
     return {"ok": True}
@@ -159,8 +198,10 @@ async def student_history(class_id: int, student_id: int, user: User = Depends(r
     """Alle nicht-'da'-Einträge eines Schülers, neueste zuerst — zum Nachtragen
     (z.B. Entschuldigung nachreichen)."""
     await _owned_class(db, user, class_id)
+    _c, to_canon, _b = await _kurs_maps(db, user, class_id)
+    canon_id = to_canon.get(student_id, student_id)
     rows = (await db.execute(select(Attendance).where(
-        Attendance.class_id == class_id, Attendance.owner_id == user.id, Attendance.student_id == student_id,
+        Attendance.owner_id == user.id, Attendance.student_id == canon_id,
     ).order_by(Attendance.date.desc()))).scalars().all()
     # Pro Tag nur ein Eintrag (staerkster Status) — mehrere Stunden am selben Tag
     # sind eine Abwesenheit, keine drei.
@@ -285,8 +326,9 @@ async def student_report(class_id: int, student_id: int, user: User = Depends(re
 async def summary(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Zusammenfassung je Schueler: Zaehler fehlt/spaet/entsch (ueber alles)."""
     await _owned_class(db, user, class_id)
+    canon_ids, _to, canon_back = await _kurs_maps(db, user, class_id)
     rows = (await db.execute(select(Attendance).where(
-        Attendance.class_id == class_id, Attendance.owner_id == user.id,
+        Attendance.owner_id == user.id, Attendance.student_id.in_(canon_ids or [-1]),
     ))).scalars().all()
     # An unterrichtsfreien Tagen (Ferien/Feiertage) zaehlen Fehlzeiten nicht.
     breaks = await _break_days(db, user)
@@ -301,7 +343,8 @@ async def summary(class_id: int, user: User = Depends(require_module), db: Async
             proTag[key] = r.status
     agg: dict = {}
     for (sid, _day), status in proTag.items():
-        a = agg.setdefault(str(sid), {"fehlt": 0, "spaet": 0, "entsch": 0})
+        # kanonische id -> student_id dieser Klasse fürs UI.
+        a = agg.setdefault(str(canon_back.get(sid, sid)), {"fehlt": 0, "spaet": 0, "entsch": 0})
         if status in a:
             a[status] += 1
     return agg
