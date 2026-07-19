@@ -129,22 +129,32 @@ MODULE_ROWS = [
 
 @pytest.mark.asyncio
 async def test_delete_account_purges_everything(session):
+    from app.routers.auth import _purge_user_content
     a = await _teacher(session, "a@x.de")
     b = await _teacher(session, "b@x.de")
     await _class_with_data(session, a)
-    keep_cls, _ = await _class_with_data(session, b)  # B bleibt unberührt
+    await _class_with_data(session, b)  # B bleibt unberührt
+    # A hat auch etwas veröffentlicht — muss mit weg (author_id ist SET NULL).
+    session.add(m.MarketplaceQuiz(title="A's Quiz", author_id=a.id, payload={}, question_count=1))
+    session.add(m.MarketplaceQuiz(title="B's Quiz", author_id=b.id, payload={}, question_count=1))
+    await session.commit()
 
     a_id = a.id
+    await _purge_user_content(session, a_id)  # wie im echten delete_account
     await session.delete(a)
     await session.commit()
     session.expunge_all()
 
     # Keine einzige Zeile von A darf übrig sein.
     for model in MODULE_ROWS:
-        col = "owner_id" if hasattr(model, "owner_id") else None
-        if col:
+        if hasattr(model, "owner_id"):
             n = (await session.execute(select(func.count()).select_from(model).where(model.owner_id == a_id))).scalar()
             assert n == 0, f"{model.__tablename__}: {n} Zeilen von A übrig"
+    # Marktplatz-Veröffentlichung von A ist weg, die von B bleibt.
+    mp_a = (await session.execute(select(func.count()).select_from(m.MarketplaceQuiz).where(m.MarketplaceQuiz.author_id == a_id))).scalar()
+    assert mp_a == 0, "A's Marktplatz-Veröffentlichung übrig"
+    mp_b = (await session.execute(select(func.count()).select_from(m.MarketplaceQuiz).where(m.MarketplaceQuiz.author_id == b.id))).scalar()
+    assert mp_b == 1, "B's Veröffentlichung wurde mitgelöscht"
     # B ist unversehrt.
     b_classes = (await session.execute(select(func.count()).select_from(m.SchoolClass).where(m.SchoolClass.owner_id == b.id))).scalar()
     assert b_classes == 1, "B's Klasse wurde mitgelöscht"

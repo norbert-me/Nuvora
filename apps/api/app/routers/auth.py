@@ -13,12 +13,47 @@ logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import User
+from ..models import User, Question, MarketplaceQuiz
 from .. import mailer
+
+UPLOAD_DIR = "/app/uploads"
+
+
+async def _purge_user_content(db: AsyncSession, user_id: int):
+    """Vor dem Löschen eines Kontos ALLE Inhalte tilgen, die die DB-Kaskade nicht
+    erfasst: die Marktplatz-Veröffentlichungen der Person (author_id ist SET NULL,
+    bliebe sonst verwaist stehen) und ihre hochgeladenen Bilddateien auf der Platte.
+    Der Rest hängt an owner_id ON DELETE CASCADE und geht mit dem User-Row."""
+    # 1) Bilddateien der eigenen Fragen einsammeln (image_url + choice_images).
+    eigene = (await db.execute(select(Question).where(Question.owner_id == user_id))).scalars().all()
+    urls = set()
+    for q in eigene:
+        if q.image_url:
+            urls.add(q.image_url)
+        if isinstance(q.choice_images, dict):
+            urls.update(v for v in q.choice_images.values() if isinstance(v, str))
+    # 2) Marktplatz-Veröffentlichungen der Person löschen (Ratings kaskadieren).
+    await db.execute(delete(MarketplaceQuiz).where(MarketplaceQuiz.author_id == user_id))
+    # 3) Dateien löschen — aber nur, wenn keine fremde Frage sie noch nutzt
+    #    (übernommene Kopien referenzieren dieselbe URL, sollen nicht kaputtgehen).
+    for url in urls:
+        if not url.startswith("/api/uploads/"):
+            continue
+        andere = (await db.execute(
+            select(Question.id).where(Question.owner_id != user_id, Question.image_url == url).limit(1)
+        )).scalar_one_or_none()
+        if andere:
+            continue
+        name = url.rsplit("/", 1)[-1]
+        if name and "/" not in name and ".." not in name:
+            try:
+                os.remove(os.path.join(UPLOAD_DIR, name))
+            except OSError:
+                pass  # Datei schon weg / nicht vorhanden
 
 RESET_TTL = 3600  # Passwort-Reset-Link 1 Stunde gültig
 SITE_URL = os.environ.get("SITE_URL", "").rstrip("/")
@@ -536,6 +571,7 @@ async def delete_account(body: DeleteAccountBody, user: User = Depends(get_curre
         raise HTTPException(400, "Das Admin-Konto kann nicht gelöscht werden")
     if not _verify_pw(body.password, user.password_hash):
         raise HTTPException(400, "Passwort falsch")
+    await _purge_user_content(db, user.id)
     await db.delete(user)
     await db.commit()
     return {"ok": True}
@@ -560,6 +596,7 @@ async def admin_delete_user(user_id: int, user: User = Depends(get_current_user)
     target = await db.get(User, user_id)
     if not target:
         raise HTTPException(404)
+    await _purge_user_content(db, target.id)
     await db.delete(target)
     await db.commit()
     return {"ok": True}
