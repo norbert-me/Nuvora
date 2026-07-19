@@ -33,8 +33,8 @@ async def _owned_class(db: AsyncSession, user: User, class_id: int) -> SchoolCla
 
 
 class PlanIn(BaseModel):
-    cols: int = 6
-    cells: list = []  # [studentId|null, ...]
+    # Freie Flaeche: Sitze als {sid, x, y, rot}. (Alt: cols/cells-Raster.)
+    seats: list = []
 
 
 @router.get("/{class_id}")
@@ -43,17 +43,31 @@ async def get_plan(class_id: int, user: User = Depends(require_module), db: Asyn
     row = (await db.execute(
         select(SeatingPlan).where(SeatingPlan.owner_id == user.id, SeatingPlan.class_id == class_id)
     )).scalar_one_or_none()
-    return row.data if row and row.data else {"cols": 6, "cells": []}
+    return row.data if row and row.data else {"seats": []}
+
+
+def _num(v, default=0.0):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return default
 
 
 @router.put("/{class_id}")
 async def put_plan(class_id: int, body: PlanIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("sitzplan", f"u{user.id}", 300, 60, "Zu viele Änderungen. Bitte kurz warten.")
     await _owned_class(db, user, class_id)
-    cols = max(1, min(20, int(body.cols)))
-    # Nur echte IDs oder None uebernehmen; Laenge begrenzen.
-    cells = [(int(c) if isinstance(c, (int, float)) else None) for c in (body.cells or [])][:400]
-    data = {"cols": cols, "cells": cells}
+    seats = []
+    for s in (body.seats or [])[:400]:
+        if not isinstance(s, dict) or not isinstance(s.get("sid"), (int, float)):
+            continue
+        seats.append({
+            "sid": int(s["sid"]),
+            "x": round(_num(s.get("x")), 1),
+            "y": round(_num(s.get("y")), 1),
+            "rot": round(_num(s.get("rot")), 1),
+        })
+    data = {"seats": seats}
     row = (await db.execute(
         select(SeatingPlan).where(SeatingPlan.owner_id == user.id, SeatingPlan.class_id == class_id)
     )).scalar_one_or_none()

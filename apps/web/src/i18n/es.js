@@ -921,4 +921,7 @@ export default {
   "ausleihe.history": "Devueltos",
   "mod.ausleihe.name": "Préstamo de material",
   "mod.ausleihe.desc": "Presta objetos y controla las devoluciones — a alumnos o personas introducidas libremente.",
+  "sitzplan.hintFree": "Arrastra alumnos del grupo a la zona. Mueve las mesas libremente, gíralas con ↻ (mesas inclinadas), quítalas con × al grupo. Se guarda automáticamente.",
+  "sitzplan.rotate": "Girar",
+  "sitzplan.removeSeat": "Quitar",
 };

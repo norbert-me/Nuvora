@@ -932,4 +932,7 @@ export default {
   "ausleihe.history": "Zurückgegeben",
   "mod.ausleihe.name": "Material-Ausleihe",
   "mod.ausleihe.desc": "Gegenstände verleihen und den Rückgabe-Stand im Blick behalten — an Schüler oder frei eingetragene Personen.",
+  "sitzplan.hintFree": "Schüler aus dem Pool auf die Fläche ziehen. Tische frei verschieben, mit ↻ drehen (schräge Tische), mit × zurück in den Pool. Wird automatisch gespeichert.",
+  "sitzplan.rotate": "Drehen",
+  "sitzplan.removeSeat": "Entfernen",
 };

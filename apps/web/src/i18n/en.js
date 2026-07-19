@@ -921,4 +921,7 @@ export default {
   "ausleihe.history": "Returned",
   "mod.ausleihe.name": "Material lending",
   "mod.ausleihe.desc": "Lend out items and track returns — to students or freely entered people.",
+  "sitzplan.hintFree": "Drag students from the pool onto the area. Move tables freely, rotate with ↻ (angled tables), remove with × back to the pool. Saved automatically.",
+  "sitzplan.rotate": "Rotate",
+  "sitzplan.removeSeat": "Remove",
 };
