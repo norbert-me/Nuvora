@@ -31,6 +31,7 @@ export default function Kalender() {
   const [breaks, setBreaks] = useState([]); // unterrichtsfreie Zeitraeume (Ferien/Feiertage)
   const [wdhVorschlag, setWdhVorschlag] = useState([]); // schwache Themen der Vorwoche
   const [slotEdit, setSlotEdit] = useState(null); // { weekday, period, ...slot } oder null
+  const [heuteAbsent, setHeuteAbsent] = useState({}); // class_id -> Anzahl Fehlende heute
 
   useEffect(() => {
     swr("classes", "/api/classes", (d) => setClasses(Array.isArray(d) ? d : []));
@@ -78,6 +79,20 @@ export default function Kalender() {
   }, [view, cursor, aktiv.cardvote]);
   // Ist der Tag unterrichtsfrei (in einem Ferien-/Feiertags-Zeitraum)?
   const frei = (d) => breaks.find((b) => ymd(d) >= ymd(new Date(b.start_date)) && ymd(d) <= ymd(new Date(b.end_date)));
+
+  // „Heute"-Ansicht: Fehlende je heute unterrichteter Klasse laden (Anwesenheit
+  // liegt im Modul Orga). Bündelt den Tag über alle Module.
+  useEffect(() => {
+    if (view !== "today" || !aktiv.orga) { setHeuteAbsent({}); return; }
+    const heute = startOfDay(new Date());
+    const cids = [...new Set(tt.slots.filter((s) => s.weekday === weekdayOf(heute) && s.class_id).map((s) => s.class_id))];
+    if (!cids.length) { setHeuteAbsent({}); return; }
+    const iso = new Date(ymd(heute) + "T00:00:00").toISOString();
+    Promise.all(cids.map((cid) => fetch(`/api/anwesenheit/${cid}?date=${iso}`).then((r) => (r.ok ? r.json() : {})).then((d) => {
+      const n = Object.values(d || {}).filter((v) => v.status && v.status !== "da").length;
+      return [cid, n];
+    }).catch(() => [cid, 0]))).then((pairs) => setHeuteAbsent(Object.fromEntries(pairs)));
+  }, [view, aktiv.orga, tt.slots]);
   const addBreak = async (b) => {
     const res = await fetch(`${API}/breaks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }).catch(() => null);
     if (res && res.ok) loadBreaks();
@@ -183,11 +198,11 @@ export default function Kalender() {
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
         <h1 style={pageTitle}>{t("kalender.title")}</h1>
         <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden" }}>
-          {[["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")], ["timetable", t("kalender.timetable")], ["breaks", t("kalender.breaksTab")]].map(([v, l]) => (
+          {[["today", t("kalender.todayView")], ["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")], ["timetable", t("kalender.timetable")], ["breaks", t("kalender.breaksTab")]].map(([v, l]) => (
             <button key={v} onClick={() => setView(v)} style={{ padding: "6px 14px", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", background: view === v ? "var(--accent)" : "transparent", color: view === v ? "#fff" : "var(--text2)" }}>{l}</button>
           ))}
         </div>
-        {view !== "timetable" && view !== "breaks" && (
+        {view !== "timetable" && view !== "breaks" && view !== "today" && (
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
             <button onClick={() => move(-1)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 15 }} title="◀">‹</button>
             <button onClick={() => setCursor(startOfDay(new Date()))} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>{t("kalender.today")}</button>
@@ -203,8 +218,14 @@ export default function Kalender() {
           </label>
         </div>
       )}
-      {view !== "timetable" && view !== "breaks" && <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: "var(--text)" }}>{title}</div>}
+      {view !== "timetable" && view !== "breaks" && view !== "today" && <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: "var(--text)" }}>{title}</div>}
       {view === "breaks" && <BreaksPanel breaks={breaks} onAdd={addBreak} onDel={delBreak} t={t} standalone />}
+
+      {view === "today" && (
+        <HeuteView t={t} tt={tt} weekdayOf={weekdayOf} byDay={byDay}
+          className={className} classColor={classColor} topicName={topicName} frei={frei}
+          heuteAbsent={heuteAbsent} orgaAktiv={!!aktiv.orga} onOpen={setEditing} onSlot={fromSlot} />
+      )}
 
       {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} t={t} />}
       {view === "week" && wdhVorschlag.length > 0 && (
@@ -279,6 +300,76 @@ function EntryChips({ list, className, topicName, onOpen, classColor }) {
       </div>
     );
   });
+}
+
+// „Heute" — der Tag über alle Module gebündelt: Stunde, Uhrzeit, Klasse, das
+// geplante Objekt (Deck/Quiz/Lernleiter/Einstieg) und wie viele heute fehlen.
+function HeuteView({ t, tt, weekdayOf, byDay, className, classColor, topicName, frei, heuteAbsent, orgaAktiv, onOpen, onSlot }) {
+  const heute = startOfDay(new Date());
+  const istFrei = frei(heute);
+  const slots = (tt.slots || []).filter((s) => s.weekday === weekdayOf(heute)).sort((a, b) => a.period - b.period);
+  const eintraege = byDay(heute);
+  const zeit = (period) => { const w = (tt.times || [])[period - 1]; return w && (w.from || w.to) ? `${w.from || ""}–${w.to || ""}` : ""; };
+  // Zeilen: pro Stundenplan-Slot; zusätzlich Einträge ohne Stunde (period null).
+  const belegtePerioden = new Set(slots.map((s) => s.period));
+  const extras = eintraege.filter((e) => e.period == null || !belegtePerioden.has(e.period));
+
+  const dateStr = heute.toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long" });
+
+  return (
+    <div>
+      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 14, textTransform: "capitalize" }}>{dateStr}</div>
+      {istFrei && (
+        <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(184,134,11,0.12)", color: "#8a6d00", fontSize: 13.5, fontWeight: 600, marginBottom: 14 }}>
+          {t("kalender.freeDay")}: {istFrei.title || ""}
+        </div>
+      )}
+      {slots.length === 0 && extras.length === 0 ? (
+        <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("kalender.todayEmpty")}</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {slots.map((s) => {
+            const col = s.class_id ? classColor(s.class_id) : "var(--border2)";
+            const eintrag = eintraege.find((e) => e.period === s.period);
+            const absent = s.class_id ? (heuteAbsent[s.class_id] || 0) : 0;
+            return (
+              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", border: "1px solid var(--border)", borderLeft: `4px solid ${col}`, borderRadius: 10, background: "var(--card)", flexWrap: "wrap" }}>
+                <div style={{ minWidth: 46, textAlign: "center" }}>
+                  <div style={{ fontSize: 15, fontWeight: 800 }}>{s.period}.</div>
+                  <div style={{ fontSize: 10.5, color: "var(--text3)" }}>{zeit(s.period)}</div>
+                </div>
+                <div style={{ flex: 1, minWidth: 120 }}>
+                  <div style={{ fontWeight: 600 }}>{className(s.class_id) || s.title || topicName(s.topic_id) || "—"}</div>
+                  {eintrag ? (
+                    <button onClick={() => onOpen({ ...eintrag, date: new Date(eintrag.date) })} style={{ ...chip, marginTop: 4, display: "inline-block", width: "auto", maxWidth: "100%" }}>
+                      {eintrag.title || topicName(eintrag.topic_id) || t("kalender.planned")}
+                      {(eintrag.cardvote_set_id || eintrag.karten_deck_id || eintrag.lernpfad_ladder_id || eintrag.method_id || eintrag.codedetektiv_puzzle) ? " ↗" : ""}
+                    </button>
+                  ) : (
+                    <button onClick={() => onSlot(heute, s)} style={{ ...ghost, marginTop: 4, display: "inline-block", width: "auto" }}>{t("kalender.planNow")}</button>
+                  )}
+                </div>
+                {orgaAktiv && s.class_id && (
+                  <span title={t("anwesenheit.overview")} style={{ fontSize: 12.5, fontWeight: 700, padding: "3px 10px", borderRadius: 980,
+                    background: absent > 0 ? "rgba(209,53,15,0.12)" : "rgba(10,125,62,0.10)", color: absent > 0 ? "#d1350f" : "#0a7d3e" }}>
+                    {absent > 0 ? t("kalender.absentN", { n: absent }) : t("kalender.allPresent")}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+          {extras.map((e) => (
+            <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", border: "1px dashed var(--border2)", borderRadius: 10, flexWrap: "wrap" }}>
+              <div style={{ minWidth: 46, textAlign: "center", color: "var(--text3)", fontSize: 12 }}>—</div>
+              <button onClick={() => onOpen({ ...e, date: new Date(e.date) })} style={{ ...chip, marginTop: 0, display: "inline-block", width: "auto", maxWidth: "100%" }}>
+                {e.title || (e.class_id && className(e.class_id)) || topicName(e.topic_id) || t("kalender.planned")}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function MonthGrid({ range, cursor, byDay, slotsFor, onSlot, frei, className, topicName, classColor, onAdd, onOpen, t }) {
