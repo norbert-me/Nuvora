@@ -343,6 +343,29 @@ async def weak_topics_range(frm: datetime, to: datetime, class_id: Optional[int]
             a = agg.setdefault(tid, [0, 0]); a[1] += 1
             if q_correct.get(s.question_id) and s.answer in q_correct[s.question_id]:
                 a[0] += 1
+
+    # Code-Detektiv einspeisen: Raetsel sind themen-getaggt, aber Sessions sind
+    # klassenlos — darum nur in die fachuebergreifende Sicht (kein class_id),
+    # nicht in die per-Klasse-Liste (sonst taucht ein Info-Thema unter Mathe auf).
+    if class_id is None:
+        from ..models import CodeSession, CodePuzzle
+        cd_topic = {p.client_id: p.topic_id for p in (await db.execute(
+            select(CodePuzzle).where(CodePuzzle.owner_id == user.id, CodePuzzle.topic_id.is_not(None)))).scalars().all()}
+        cdq = select(CodeSession).where(CodeSession.owner_id == user.id)
+        if frm is not None:
+            cdq = cdq.where(CodeSession.created_at >= frm)
+        if to is not None:
+            cdq = cdq.where(CodeSession.created_at <= to)
+        cd_sessions = (await db.execute(cdq)).scalars().all()
+        for sess in cd_sessions:
+            for r in (sess.results or []):
+                tid = cd_topic.get(r.get("puzzleId"))
+                if not tid:
+                    continue
+                a = agg.setdefault(tid, [0, 0]); a[1] += 1
+                if r.get("solved"):
+                    a[0] += 1
+
     if not agg:
         return {"topics": []}
     topics = (await db.execute(select(Topic).where(Topic.id.in_(list(agg.keys()))))).scalars().all()

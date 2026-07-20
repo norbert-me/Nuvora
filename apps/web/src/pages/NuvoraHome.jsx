@@ -38,6 +38,11 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv }) {
         const d = await fetch(`/api/weak-review?days=14&class_id=${c.id}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
         (d?.topics || []).forEach((tp) => all.push({ class_id: c.id, klasse: c.name, ...tp }));
       }
+      // Fachübergreifend (klassenlos, inkl. Code-Detektiv): nur Themen, die nicht
+      // schon über eine Klasse auftauchen. Ohne Klasse → nur Info, keine Knöpfe.
+      const seen = new Set(all.map((r) => r.topic_id));
+      const dx = await fetch(`/api/weak-review?days=14`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      (dx?.topics || []).forEach((tp) => { if (!seen.has(tp.topic_id)) all.push({ class_id: null, klasse: t("home.crossSubject"), ...tp }); });
       // Ungeübte zuerst (Handlungsbedarf), dann nach Trefferquote.
       all.sort((a, b) => (a.geuebt === b.geuebt ? a.pct - b.pct : a.geuebt ? 1 : -1));
       if (!ab) setRows(all.slice(0, 6));
@@ -71,7 +76,7 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv }) {
             <span style={{ fontSize: 12.5, fontWeight: 700, color: row.pct < 40 ? "#d1350f" : "#b8860b" }}>{row.pct}%</span>
             {row.geuebt ? (
               <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0a7d3e", display: "inline-flex", alignItems: "center", gap: 4 }}>✓ {t("home.weakPracticed")}</span>
-            ) : (<>
+            ) : row.class_id == null ? null : (<>
               {kartenAktiv && <Btn row={row} art="karten" label={t("home.weakDeck")}
                 onClick={() => run(row, "karten", `/api/karten/classes/${row.class_id}/decks`, { name: row.name, topic_id: row.topic_id })} />}
               {lernpfadAktiv && <Btn row={row} art="lernpfad" label={t("home.weakExercise")}
