@@ -923,6 +923,8 @@ export default {
   "home.arrangeHint": "Drag the cards to reorder them.",
   "common.done": "Done",
   "noten.fromCardvote": "To CardVote results",
+  "noten.trendUp": "Trend: improving (recent grades better than earlier)",
+  "noten.trendDown": "Trend: declining (recent grades worse than earlier)",
   "noten.fromKarten": "To card mastery",
   "noten.fromCd": "From Code Detective",
   "noten.fromCdHint": "Turn a finished Code Detective session into a grade column",

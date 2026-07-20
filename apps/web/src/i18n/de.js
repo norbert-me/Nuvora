@@ -923,6 +923,8 @@ export default {
   "home.arrangeHint": "Karten ziehen, um die Reihenfolge zu ändern.",
   "common.done": "Fertig",
   "noten.fromCardvote": "Zur CardVote-Auswertung",
+  "noten.trendUp": "Trend: Leistung verbessert sich (neuere Noten besser als frühere)",
+  "noten.trendDown": "Trend: Leistung verschlechtert sich (neuere Noten schlechter als frühere)",
   "noten.fromKarten": "Zur Karten-Meisterung",
   "noten.fromCd": "Aus Code-Detektiv",
   "noten.fromCdHint": "Eine beendete Code-Detektiv-Session als Notenspalte übernehmen",

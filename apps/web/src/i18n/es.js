@@ -923,6 +923,8 @@ export default {
   "home.arrangeHint": "Arrastra las tarjetas para reordenarlas.",
   "common.done": "Hecho",
   "noten.fromCardvote": "Ver resultados de CardVote",
+  "noten.trendUp": "Tendencia: mejora (notas recientes mejores que las anteriores)",
+  "noten.trendDown": "Tendencia: empeora (notas recientes peores que las anteriores)",
   "noten.fromKarten": "Ver dominio de tarjetas",
   "noten.fromCd": "Desde Code Detective",
   "noten.fromCdHint": "Convertir una sesión finalizada de Code Detective en una columna de notas",

@@ -253,6 +253,28 @@ export default function Noten() {
   };
   const sumOf = (studentId) => summary.find((s) => s.student_id === studentId);
 
+  // Spalten des Halbjahres in chronologischer Reihenfolge (Abschnitt, dann
+  // Spalte). Grundlage fuer den Trend je SuS.
+  const orderedCatIds = sections
+    .flatMap((sec) => (sec.categories || []).map((c) => ({ id: c.id, sp: sec.position ?? 0, cp: c.position ?? 0 })))
+    .sort((a, b) => a.sp - b.sp || a.cp - b.cp)
+    .map((c) => c.id);
+  // Trend je SuS: Ausgleichsgerade ueber die Notenfolge. Note niedriger = besser,
+  // also Steigung < 0 = Leistung steigt. Erst ab 3 Noten aussagekraeftig.
+  const trendFor = (sid) => {
+    const seq = orderedCatIds
+      .map((cid) => { const es = notenVon(sid, cid).filter((e) => e.value != null); return es.length ? es[es.length - 1].value : null; })
+      .filter((v) => v != null);
+    if (seq.length < 3) return null;
+    const n = seq.length, mx = (n - 1) / 2, my = seq.reduce((a, b) => a + b, 0) / n;
+    let num = 0, den = 0;
+    seq.forEach((v, i) => { num += (i - mx) * (v - my); den += (i - mx) ** 2; });
+    const slope = den ? num / den : 0;
+    if (slope <= -0.15) return "up";     // Leistung verbessert sich
+    if (slope >= 0.15) return "down";    // Leistung verschlechtert sich
+    return "flat";
+  };
+
   if (classes.length === 0) {
     return (
       <div style={{ maxWidth: 700 }}>
@@ -523,6 +545,12 @@ export default function Noten() {
                     <button onClick={() => setInfoFuer(s.student_id)} title={t("noten.studentInfo")}
                       style={{ width: "100%", textAlign: "left", padding: "6px 8px", border: "none", background: "none", color: "var(--text)", fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}>
                       <span style={{ color: "var(--text3)", fontWeight: 400, marginRight: 6 }}>{si + 1}.</span>{s.name}
+                      {(() => { const tr = trendFor(s.student_id); return tr && tr !== "flat" ? (
+                        <span title={t(tr === "up" ? "noten.trendUp" : "noten.trendDown")}
+                          style={{ marginLeft: 6, fontSize: 12, fontWeight: 700, color: tr === "up" ? "#0a7d3e" : "#d1350f" }}>
+                          {tr === "up" ? "▲" : "▼"}
+                        </span>
+                      ) : null; })()}
                     </button>
                   </td>
                   {sections.map((sec) => {
