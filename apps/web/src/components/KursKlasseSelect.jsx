@@ -8,6 +8,11 @@ import { selectStyle } from "./Icons.jsx";
 // value "" sein und onChange("") gemeldet werden.
 export default function KursKlasseSelect({ value, onChange, style, allowNone = false, noneLabel = "–" }) {
   const [groups, setGroups] = useState([]); // [{ id, name, classes:[{id,name}] }]
+  // Der gewählte Kurs wird EXPLIZIT gehalten, nicht aus value abgeleitet: eine
+  // Klasse kann in mehreren Kursen liegen (many-to-many). Würde man den Kurs aus
+  // value (class_id) raten, spränge die Auswahl beim Klick auf einen anderen
+  // Kurs mit derselben ersten Klasse zurück.
+  const [kursId, setKursId] = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -25,11 +30,28 @@ export default function KursKlasseSelect({ value, onChange, style, allowNone = f
     });
   }, []);
 
-  const cur = groups.find((g) => g.classes.some((c) => c.id === value));
+  // Kurs-Auswahl mit value abgleichen: nur neu ableiten, wenn der aktuell
+  // gewählte Kurs die value-Klasse NICHT (mehr) enthält (Erstladen oder value
+  // wurde von außen auf eine fremde Klasse gesetzt). Sonst den Kurs stehen
+  // lassen — sonst überschriebe das Ableiten die gerade getroffene Wahl.
+  useEffect(() => {
+    if (!groups.length) return;
+    const cur = groups.find((g) => String(g.id) === String(kursId));
+    if (cur && cur.classes.some((c) => c.id === value)) return; // Wahl gilt weiter
+    const g = groups.find((x) => x.classes.some((c) => c.id === value));
+    // Ohne Treffer: nur beim Erstladen (kursId noch null) und nur wenn keine
+    // Leer-Option erlaubt ist auf den ersten Kurs fallen; sonst Wahl belassen.
+    setKursId(g ? String(g.id) : (kursId == null && groups.length && !allowNone ? String(groups[0].id) : kursId));
+  }, [groups, value]); // eslint-disable-line
+
+  const cur = groups.find((g) => String(g.id) === String(kursId));
   const s = { ...selectStyle, ...style };
 
   const pickKurs = (kid) => {
+    setKursId(kid);
     const g = groups.find((x) => String(x.id) === String(kid));
+    // Beim Kurswechsel immer die erste Fach-Klasse des Kurses melden — außer die
+    // aktuelle value gehört ohnehin schon zu diesem Kurs.
     if (g && !g.classes.some((c) => c.id === value)) onChange(g.classes[0].id);
   };
 
@@ -37,12 +59,13 @@ export default function KursKlasseSelect({ value, onChange, style, allowNone = f
 
   return (
     <>
-      <select value={cur?.id ?? ""} onChange={(e) => (e.target.value === "" ? onChange(allowNone ? "" : value) : pickKurs(e.target.value))} style={s}>
+      <select value={cur ? String(cur.id) : ""} onChange={(e) => (e.target.value === "" ? onChange(allowNone ? "" : value) : pickKurs(e.target.value))} style={s}>
         {allowNone ? <option value="">{noneLabel}</option> : (!cur && <option value="">–</option>)}
         {groups.map((g) => <option key={g.id} value={g.id}>{g.name || "—"}</option>)}
       </select>
       {cur && cur.classes.length > 1 && (
-        <select value={value ?? ""} onChange={(e) => onChange(Number(e.target.value))} style={s}>
+        <select value={cur.classes.some((c) => c.id === value) ? String(value) : ""} onChange={(e) => onChange(Number(e.target.value))} style={s}>
+          {!cur.classes.some((c) => c.id === value) && <option value="">–</option>}
           {cur.classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       )}
