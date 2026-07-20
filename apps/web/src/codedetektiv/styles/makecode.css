@@ -24,8 +24,8 @@
 
 .cd-scope {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #f5f5f5;
-  color: #222;
+  background: var(--bg2);
+  color: var(--text);
 }
 
 /* ── Statement block with puzzle notch (top indent + bottom tab) ── */
@@ -258,7 +258,7 @@
   height: 4px;
   margin: -2px 0;
   border-radius: 2px;
-  background: #2563eb;
+  background: var(--accent);
   z-index: 3;
   position: relative;
 }
@@ -367,7 +367,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #555;
+  color: var(--text2);
   margin-bottom: 2px;
   margin-top: 8px;
   cursor: pointer;
@@ -375,12 +375,12 @@
   user-select: none;
 }
 .cd-scope .toolbox-category-header:first-child { margin-top: 0; }
-.cd-scope .toolbox-category-header:hover { color: #333; }
+.cd-scope .toolbox-category-header:hover { color: var(--text); }
 
 .cd-scope .toolbox-toggle {
   font-size: 9px;
   transition: transform 0.2s;
-  color: #888;
+  color: var(--text3);
 }
 .cd-scope .toolbox-toggle.collapsed { transform: rotate(-90deg); }
 
@@ -404,8 +404,8 @@
   margin-top: 12px;
 }
 .cd-scope .toolbox-return-zone.active {
-  border-color: #ccc;
-  color: #999;
+  border-color: var(--border2);
+  color: var(--text3);
   min-height: 48px;
 }
 .cd-scope .toolbox-return-zone.over {
@@ -423,9 +423,9 @@
 }
 
 .cd-scope .block-toolbox {
-  background: #fff;
+  background: var(--card);
   border-radius: 8px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border);
   padding: 12px;
   overflow-y: auto;
   max-height: 80vh;
@@ -435,20 +435,20 @@
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #888;
+  color: var(--text3);
   margin-bottom: 6px;
 }
 
 .cd-scope .solution-area {
-  background: #fff;
+  background: var(--card);
   border-radius: 8px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border);
   padding: 16px;
 }
 
 .cd-scope .solution-area h3 {
   font-size: 14px;
-  color: #666;
+  color: var(--text2);
   margin-bottom: 10px;
 }
 
@@ -459,7 +459,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #aaa;
+  color: var(--text3);
   font-size: 13px;
   transition: all 0.2s;
 }
@@ -486,21 +486,21 @@
 }
 .cd-scope .maze-cell {
   width: 48px; height: 48px;
-  border: 1px solid #eee;
+  border: 1px solid var(--border);
   display: flex; align-items: center; justify-content: center;
   font-size: 24px;
 }
 .cd-scope .maze-cell.wall { background: #333; }
-.cd-scope .maze-cell.path { background: #fff; }
+.cd-scope .maze-cell.path { background: var(--card); }
 .cd-scope .maze-cell.goal { background: #ffe082; }
 .cd-scope .maze-cell.visited { background: rgba(30,144,255,0.15); }
 .cd-scope .character { font-size: 28px; transition: all 0.3s ease; z-index: 2; }
 
 /* ── Scoreboard ── */
 .cd-scope .scoreboard {
-  background: #fff;
+  background: var(--card);
   border-radius: 8px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border);
   overflow: hidden;
 }
 .cd-scope .scoreboard-header {
@@ -516,7 +516,7 @@
   border-bottom: 1px solid #f0f0f0;
   gap: 12px;
 }
-.cd-scope .scoreboard-row:nth-child(even) { background: #fafafa; }
+.cd-scope .scoreboard-row:nth-child(even) { background: var(--bg3); }
 .cd-scope .scoreboard-rank {
   width: 30px; height: 30px;
   border-radius: 50%;
@@ -526,11 +526,11 @@
   flex-shrink: 0;
 }
 .cd-scope .scoreboard-rank.gold { background: #ffd700; color: #7a5c00; }
-.cd-scope .scoreboard-rank.silver { background: #c0c0c0; color: #555; }
+.cd-scope .scoreboard-rank.silver { background: #c0c0c0; color: var(--text2); }
 .cd-scope .scoreboard-rank.bronze { background: #cd7f32; color: #fff; }
 .cd-scope .scoreboard-name { flex: 1; font-weight: 500; }
-.cd-scope .scoreboard-points { font-weight: 700; color: #1e90ff; font-size: 16px; }
-.cd-scope .scoreboard-detail { font-size: 12px; color: #888; }
+.cd-scope .scoreboard-points { font-weight: 700; color: var(--accent); font-size: 16px; }
+.cd-scope .scoreboard-detail { font-size: 12px; color: var(--text3); }
 
 /* ── Feedback ── */
 .cd-scope .feedback-correct {
@@ -558,29 +558,29 @@
   transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
 }
 .cd-scope .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.cd-scope .btn-primary { background: #1e90ff; color: #fff; }
-.cd-scope .btn-primary:hover:not(:disabled) { background: #0078d4; }
+.cd-scope .btn-primary { background: var(--accent); color: #fff; }
+.cd-scope .btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
 .cd-scope .btn-success { background: #4caf50; color: #fff; }
 .cd-scope .btn-success:hover:not(:disabled) { background: #388e3c; }
 .cd-scope .btn-danger { background: #f44336; color: #fff; }
 .cd-scope .btn-danger:hover:not(:disabled) { background: #d32f2f; }
-.cd-scope .btn-outline { background: transparent; border: 2px solid #1e90ff; color: #1e90ff; }
+.cd-scope .btn-outline { background: transparent; border: 2px solid var(--accent); color: var(--accent); }
 .cd-scope .btn-outline:hover:not(:disabled) { background: rgba(30,144,255,0.08); }
 
 /* ── Layout ── */
 .cd-scope .app-header {
-  background: #fff; border-bottom: 1px solid #e0e0e0;
+  background: var(--card); border-bottom: 1px solid #e0e0e0;
   padding: 12px 24px; display: flex; align-items: center; justify-content: space-between;
 }
 .cd-scope .app-header h1 { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
 .cd-scope .page-container { max-width: 1100px; margin: 0 auto; padding: 24px; }
 
 /* ── Admin ── */
-.cd-scope .admin-form { background: #fff; border-radius: 8px; border: 1px solid #e0e0e0; padding: 24px; }
+.cd-scope .admin-form { background: var(--card); border-radius: 8px; border: 1px solid var(--border); padding: 24px; }
 .cd-scope .form-group { margin-bottom: 16px; }
-.cd-scope .form-group label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 6px; }
+.cd-scope .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 6px; }
 .cd-scope .form-group input, .cd-scope .form-group select, .cd-scope .form-group textarea {
-  width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;
+  width: 100%; padding: 8px 12px; border: 1px solid var(--border2); border-radius: 6px; font-size: 14px;
 }
 .cd-scope .form-group textarea { min-height: 80px; resize: vertical; }
 
@@ -590,14 +590,14 @@
 }
 
 .cd-scope .puzzle-card {
-  background: #fff; border-radius: 8px; border: 1px solid #e0e0e0;
+  background: var(--card); border-radius: 8px; border: 1px solid var(--border);
   padding: 20px; cursor: pointer; transition: all 0.15s;
 }
-.cd-scope .puzzle-card:hover { border-color: #1e90ff; box-shadow: 0 2px 12px rgba(30,144,255,0.15); }
+.cd-scope .puzzle-card:hover { border-color: var(--accent); box-shadow: 0 2px 12px rgba(0,0,0,0.12); }
 
 /* ── Timer ── */
-.cd-scope .timer { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; color: #333; }
-.cd-scope .timer.counting-up { color: #666; }
+.cd-scope .timer { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+.cd-scope .timer.counting-up { color: var(--text2); }
 .cd-scope .timer.urgent { color: #f44336; }
 
 /* ── Session player list ── */
@@ -691,4 +691,4 @@
   padding: 1px 4px;
   cursor: pointer;
 }
-.cd-scope .block-select option { color: #222; }
+.cd-scope .block-select option { color: var(--text); }
