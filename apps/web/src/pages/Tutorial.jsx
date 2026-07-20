@@ -14,6 +14,7 @@ const STORAGE_KEY = "nuvora_tutorial_done";
 const BEREICHE = [
   { key: "willkommen", ziel: "/modules" },
   { key: "klasse", ziel: "/classes" },
+  { key: "kurse", ziel: "/kurse" },
   { key: "themen", ziel: "/topics" },
   { key: "module", ziel: "/modules" },
   { key: "loslegen", ziel: "/modules" },
