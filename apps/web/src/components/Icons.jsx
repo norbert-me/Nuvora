@@ -182,7 +182,7 @@ export function Tabs({ value, onChange, options, style }) {
 
 // Reifegrad-Badge (alpha/beta) fuer Module. beta = blau, alpha = orange-Warnung.
 export function StageBadge({ stage, title }) {
-  if (!stage) return null;
+  if (!stage || stage === "stable") return null;
   const beta = stage === "beta";
   return (
     <span title={title} style={{

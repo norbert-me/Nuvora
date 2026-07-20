@@ -75,7 +75,7 @@ REGISTRY: List[ModuleDef] = [
             "Noten — die Zeugnisnote bleibt deine Entscheidung."
         ),
         path="/noten",
-        stage="beta",
+        stage="stable",
     ),
     ModuleDef(
         key="code-detektiv",
@@ -118,6 +118,7 @@ REGISTRY: List[ModuleDef] = [
             "Material-Ausleihe (verleihen, Rückgabe im Blick)."
         ),
         path="/orga",
+        stage="stable",
     ),
     ModuleDef(
         key="sitzplan",
