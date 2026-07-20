@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<title>Nuvora einrichten</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0;
+         display: flex; align-items: center; justify-content: center; height: 100vh;
+         background: #f5f6f8; color: #1b1d22; }
+  @media (prefers-color-scheme: dark) { body { background: #16171b; color: #e8e9ec; } }
+  .card { width: 420px; max-width: 90vw; padding: 32px; border-radius: 16px;
+          background: #fff; box-shadow: 0 8px 40px rgba(0,0,0,0.12); }
+  @media (prefers-color-scheme: dark) { .card { background: #202227; box-shadow: 0 8px 40px rgba(0,0,0,0.5); } }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  p { font-size: 13.5px; color: #6b7280; margin: 0 0 18px; line-height: 1.6; }
+  label { font-size: 12.5px; color: #6b7280; display: block; margin-bottom: 6px; }
+  input { width: 100%; padding: 11px 13px; font-size: 15px; border-radius: 10px;
+          border: 1px solid #cbd0d8; box-sizing: border-box; background: transparent; color: inherit; }
+  input:focus { outline: none; border-color: #2563eb; }
+  button { width: 100%; margin-top: 16px; padding: 12px; font-size: 15px; font-weight: 600;
+           border: none; border-radius: 999px; background: #1b1d22; color: #fff; cursor: pointer; }
+  @media (prefers-color-scheme: dark) { button { background: #e8e9ec; color: #16171b; } }
+  .err { color: #d1350f; font-size: 12.5px; margin-top: 10px; min-height: 16px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Nuvora verbinden</h1>
+    <p>Adresse deines Nuvora-Servers eingeben — dieselbe, die du im Browser aufrufst.
+       Beispiel: <code>http://192.168.10.75:8080</code> oder <code>https://nuvora.deine-domain.de</code>.</p>
+    <label for="url">Server-Adresse</label>
+    <input id="url" type="url" placeholder="https://…" autofocus />
+    <button id="go">Verbinden</button>
+    <div class="err" id="err"></div>
+  </div>
+<script>
+  // Falls die Adresse schon bekannt ist (Menü „ändern"), vorbefüllen.
+  const params = new URLSearchParams(location.search);
+  if (params.get("url")) document.getElementById("url").value = params.get("url");
+  const inp = document.getElementById("url");
+  const err = document.getElementById("err");
+  async function submit() {
+    err.textContent = "";
+    const res = await window.nuvora.setUrl(inp.value);
+    if (res && !res.ok) err.textContent = res.error || "Adresse ungültig.";
+  }
+  document.getElementById("go").addEventListener("click", submit);
+  inp.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+</script>
+</body>
+</html>

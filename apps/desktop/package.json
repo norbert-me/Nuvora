@@ -1,0 +1,25 @@
+{
+  "name": "nuvora-desktop",
+  "version": "0.1.0",
+  "description": "Nuvora als native Mac-App (Phase 0: Fenster auf den Server, offline lesbar via Service-Worker).",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "de.nuvora.desktop",
+    "productName": "Nuvora",
+    "files": ["main.js", "preload.js", "setup.html", "package.json"],
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.education"
+    }
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0"
+  }
+}
