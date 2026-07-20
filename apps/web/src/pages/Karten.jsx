@@ -249,6 +249,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false }) {
   const [planDate, setPlanDate] = useState("");
   const [busy, setBusy] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [importing, setImporting] = useState(false);
   const saveDeck = (patch) => call(() => fetch(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", ...patch }) }));
   const setTopic = (tid) => saveDeck({ topic_id: tid ? Number(tid) : null });
   const setNiveau = (n) => saveDeck({ niveau: n });
@@ -326,7 +327,72 @@ function Deck({ deck, t, call, topics = [], showTopic = false }) {
         <input value={front} onChange={(e) => setFront(e.target.value)} placeholder={t("karten.front")} style={{ flex: 1, minWidth: 120, ...inp }} />
         <input value={back} onChange={(e) => setBack(e.target.value)} placeholder={t("karten.back")} style={{ flex: 1, minWidth: 120, ...inp }} />
         <button type="submit" disabled={busy || !front.trim() || !back.trim()} style={{ ...btnPrimary, padding: "6px 14px", opacity: (!busy && front.trim() && back.trim()) ? 1 : 0.4 }}>{t("common.add")}</button>
+        <button type="button" onClick={() => setImporting(true)} style={{ ...btnSecondary, padding: "6px 14px" }}>{t("karten.import")}</button>
       </form>
+      {importing && <ImportModal deckName={deck.name || t("karten.deck")} t={t}
+        onClose={() => setImporting(false)}
+        onImport={async (cards) => call(() => fetch(`${API}/decks/${deck.id}/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cards }) }))} />}
+    </div>
+  );
+}
+
+// CSV/TSV/Anki-Text in {front, back}-Paare. Trenner automatisch erkannt (Tab,
+// Semikolon, Komma). Anki-Export-Kopfzeilen (mit '#') werden uebersprungen.
+function parseCards(text) {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim() && !l.trim().startsWith("#"));
+  if (!lines.length) return [];
+  // Trenner an der ersten Datenzeile bestimmen: Tab > Semikolon > Komma.
+  const first = lines[0];
+  const delim = first.includes("\t") ? "\t" : first.includes(";") ? ";" : ",";
+  const splitLine = (line) => {
+    // Einfaches CSV mit Anfuehrungszeichen: "a,b","c" bleibt zusammen.
+    const out = []; let cur = ""; let q = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { if (q && line[i + 1] === '"') { cur += '"'; i++; } else q = !q; }
+      else if (ch === delim && !q) { out.push(cur); cur = ""; }
+      else cur += ch;
+    }
+    out.push(cur);
+    return out;
+  };
+  return lines.map(splitLine).filter((c) => c.length >= 2 && (c[0].trim() || c[1].trim()))
+    .map((c) => ({ front: c[0].trim(), back: c[1].trim() }));
+}
+
+function ImportModal({ deckName, onClose, onImport, t }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const parsed = parseCards(text);
+  const onFile = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => setText(String(r.result || ""));
+    r.readAsText(f);
+  };
+  const doImport = async () => {
+    if (!parsed.length || busy) return;
+    setBusy(true);
+    const ok = await onImport(parsed);
+    setBusy(false);
+    if (ok) onClose();
+  };
+  return (
+    <div onClick={onClose} style={modalOverlay}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 560 }}>
+        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>{t("karten.importTitle", { name: deckName })}</h3>
+        <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 12px" }}>{t("karten.importHint")}</p>
+        <input type="file" accept=".csv,.tsv,.txt" onChange={onFile} style={{ fontSize: 13, marginBottom: 10 }} />
+        <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={"Frage,Antwort\nHauptstadt Frankreich,Paris"} rows={8}
+          style={{ ...inp, width: "100%", boxSizing: "border-box", fontFamily: "monospace", fontSize: 13, resize: "vertical" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14 }}>
+          <button onClick={doImport} disabled={!parsed.length || busy} style={{ ...btnPrimary, opacity: (parsed.length && !busy) ? 1 : 0.4 }}>
+            {busy ? t("karten.importing") : t("karten.importCount", { n: parsed.length })}
+          </button>
+          <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
+        </div>
+      </div>
     </div>
   );
 }

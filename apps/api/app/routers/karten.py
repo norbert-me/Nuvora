@@ -269,6 +269,30 @@ async def add_card(deck_id: int, body: CardIn, user: User = Depends(require_modu
     return card
 
 
+class ImportIn(BaseModel):
+    # Karten aus CSV/TSV oder Anki-Text-Export. Client parst, schickt Paare.
+    cards: List[CardIn]
+
+
+@router.post("/decks/{deck_id}/import")
+async def import_cards(deck_id: int, body: ImportIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Mehrere Karten auf einmal anhaengen (CSV/Anki-Import)."""
+    rate_limit("karten_import", f"u{user.id}", 20, 60, "Zu viele Importe. Bitte kurz warten.")
+    await _owned_deck(db, user, deck_id)
+    paare = [(c.front.strip(), c.back.strip()) for c in body.cards if c.front.strip() or c.back.strip()]
+    if not paare:
+        return {"added": 0}
+    if len(paare) > 2000:
+        raise HTTPException(400, "Zu viele Karten auf einmal (max. 2000)")
+    last = (await db.execute(select(Card.position).where(Card.deck_id == deck_id).order_by(Card.position.desc()))).scalars().first()
+    pos = (last if last is not None else -1) + 1
+    for front, back in paare:
+        db.add(Card(deck_id=deck_id, front=front, back=back, position=pos))
+        pos += 1
+    await db.commit()
+    return {"added": len(paare)}
+
+
 @router.put("/cards/{card_id}", response_model=CardOut)
 async def update_card(card_id: int, body: CardIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     card = await db.get(Card, card_id)
