@@ -12,7 +12,7 @@ import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, modalOverlay, modalPanel, Empty } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, modalOverlay, modalPanel, Empty, Skeleton } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -33,6 +33,7 @@ export default function Noten() {
   const kp = kursId != null ? `&kurs_id=${kursId}` : "";
   const [students, setStudents] = useState([]);
   const [sections, setSections] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [entries, setEntries] = useState([]);
   const [summary, setSummary] = useState([]);
   const [error, setError] = useState("");
@@ -153,10 +154,11 @@ export default function Noten() {
   const loadRoster = (id) => fetch(`${API}/classes/${id}/students`).then((r) => (r.ok ? r.json() : [])).then((d) => setStudents(Array.isArray(d) ? d : [])).catch(() => {});
   const load = async (id) => {
     if (!id) return;
+    setLoading(true);
     loadRoster(id);
     if (term === "year") {
       const y = await fetch(`${API}/classes/${id}/year?agg=${agg}${kp}`).then((r) => (r.ok ? r.json() : { sections: [], rows: [] }));
-      setYearData(y);
+      setYearData(y); setLoading(false);
       return;
     }
     const [sec, ent, sum] = await Promise.all([
@@ -164,7 +166,7 @@ export default function Noten() {
       fetch(`${API}/classes/${id}/entries?x=1${kp}`).then((r) => (r.ok ? r.json() : [])),
       fetch(`${API}/classes/${id}/summary?term=${term}&agg=${agg}${kp}`).then((r) => (r.ok ? r.json() : [])),
     ]);
-    setSections(sec); setEntries(ent); setSummary(sum);
+    setSections(sec); setEntries(ent); setSummary(sum); setLoading(false);
     fetch(`${API}/classes/${id}/dividers?term=${term}${kp}`).then((r) => (r.ok ? r.json() : [])).then((d) => setDividers(Array.isArray(d) ? d : [])).catch(() => {});
   };
   const toggleDivider = async (catId) => {
@@ -350,7 +352,9 @@ export default function Noten() {
         ? (yearData.rows || []).length > 0 && <NotenStatistik noten={(yearData.rows || []).map((r) => (r.year_override != null ? r.year_override : r.year))} t={t} />
         : sections.length > 0 && <NotenStatistik noten={(summary || []).map((s) => (s.total_override != null ? s.total_override : s.weighted))} t={t} />}
 
-      {term === "year" ? (
+      {loading && sections.length === 0 && term !== "year" ? (
+        <Skeleton rows={6} height={38} />
+      ) : term === "year" ? (
         <YearTable t={t} data={yearData} cls={cls}
           onSet={(sid, txt) => overrideSetzen(sid, null, txt)}
           onReset={(sid) => overrideReset(sid, null)}

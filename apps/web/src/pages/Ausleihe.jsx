@@ -2,6 +2,7 @@
 // Ausleiher: ein Kern-Schüler (Klasse wählen) oder ein Freitextname.
 import { useState, useEffect, useCallback } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
+import { undoDelete } from "../core/undo.jsx";
 import { pageTitle, btnPrimary, btnSecondary, selectStyle, Toggle, Icon, ICONS, iconBtn, COLORS as C, inputStyle, Empty } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -40,7 +41,12 @@ export default function Ausleihe() {
     const r = await fetch(`${API}/items`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }).catch(() => null);
     if (r && r.ok) { setNeu(""); load(); }
   };
-  const loeschen = async (id) => { if (!await askConfirm(t("ausleihe.delConfirm"))) return; await fetch(`${API}/items/${id}`, { method: "DELETE" }).catch(() => {}); if (offen === id) setOffen(null); load(); };
+  const loeschen = (id) => {
+    const it = items.find((x) => x.id === id);
+    if (offen === id) setOffen(null);
+    setItems((prev) => prev.filter((x) => x.id !== id)); // sofort weg
+    undoDelete({ message: t("undo.deleted", { name: it?.name || "" }), undo: () => load(), commit: async () => { await fetch(`${API}/items/${id}`, { method: "DELETE" }).catch(() => {}); } });
+  };
 
   const oeffnen = (id) => {
     if (offen === id) { setOffen(null); return; }
