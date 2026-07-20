@@ -202,6 +202,16 @@ export function Empty({ title, hint, action, onAction }) {
   );
 }
 
+// Ladefehler: statt stiller Leere ein Hinweis + „Erneut versuchen".
+export function LoadError({ message, onRetry, retryLabel = "Erneut versuchen" }) {
+  return (
+    <div style={{ textAlign: "center", padding: "28px 20px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--bg2)" }}>
+      <div style={{ fontSize: 14, color: "#d1350f", fontWeight: 600, marginBottom: onRetry ? 14 : 0 }}>{message || "Konnte nicht geladen werden."}</div>
+      {onRetry && <button onClick={onRetry} style={btnSecondary}>{retryLabel}</button>}
+    </div>
+  );
+}
+
 // Skeleton-Platzhalter: graue, pulsierende Balken in Inhaltsform statt „lädt…".
 export function Skeleton({ rows = 3, height = 44, gap = 10 }) {
   return (

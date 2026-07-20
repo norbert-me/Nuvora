@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import { LoadError } from "../components/Icons.jsx";
 
 const API = "/api";
 
@@ -45,20 +46,20 @@ export default function ClassEvaluation() {
   const [loadError, setLoadError] = useState(false);
   const [chartView, setChartView] = useState("none");
 
-  useEffect(() => {
-    const timer = setTimeout(() => { if (!data) setLoadError(true); }, 15000);
+  const load = () => {
+    setLoadError(false);
     fetch(`${API}/classes/${id}/evaluation`)
       .then(async (r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
-      .then((d) => { setData(d); clearTimeout(timer); })
+      .then((d) => setData(d))
       .catch(() => setLoadError(true));
-    return () => clearTimeout(timer);
-  }, [id]);
+  };
+  useEffect(() => { load(); }, [id]); // eslint-disable-line
 
-  if (loadError && !data) return <p style={{ color: "#d1350f", padding: 20 }}>Auswertung konnte nicht geladen werden.</p>;
+  if (loadError && !data) return <div style={{ padding: 20 }}><LoadError message="Auswertung konnte nicht geladen werden." onRetry={load} /></div>;
   if (!data) return <div style={{ minHeight: "70vh" }} />;
   // Fehler-Payload (z. B. {detail: …}) statt Auswertung: nicht am fehlenden
   // Feld abstürzen, sondern melden.
-  if (!Array.isArray(data.tests)) return <p style={{ color: "#d1350f", padding: 20 }}>Auswertung konnte nicht geladen werden.</p>;
+  if (!Array.isArray(data.tests)) return <div style={{ padding: 20 }}><LoadError message="Auswertung konnte nicht geladen werden." onRetry={load} /></div>;
 
   const { class_name, students, tests } = data;
 
