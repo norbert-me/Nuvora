@@ -265,7 +265,7 @@ function NotenBrueckeModal({ t, classId, kursId, progress, scale, onClose }) {
     setBusy(true); setErr("");
     const res = await fetch("/api/noten/import-grades", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ class_id: classId, kurs_id: kursId, section_id: Number(sectionId), column_name: name.trim(), note: t("karten.masteryNote"), grades }),
+      body: JSON.stringify({ class_id: classId, kurs_id: kursId, section_id: Number(sectionId), column_name: name.trim(), note: t("karten.masteryNote"), source_kind: "karten", grades }),
     }).catch(() => null);
     setBusy(false);
     if (res && res.ok) onClose();

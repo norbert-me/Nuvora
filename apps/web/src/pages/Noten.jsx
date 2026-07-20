@@ -482,14 +482,23 @@ export default function Noten() {
                       <div style={{ display: "flex", alignItems: "center", gap: 3, justifyContent: "center", position: "relative" }}>
                         <button onClick={() => setRenameCol(renameCol === c.id ? null : c.id)} title={t("noten.colOverview")}
                           style={{ width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", border: "none", background: "none", cursor: "pointer", color: "var(--text2)", fontWeight: 500, fontSize: 12, padding: "8px 6px" }}>{c.name}</button>
-                        {c.source_session_id && (
+                        {c.source_session_id ? (
                           <Link to={`/cardvote/evaluation/${c.source_session_id}`} title={t("noten.fromCardvote")} onClick={(e) => e.stopPropagation()}
                             style={{ display: "inline-flex", color: "var(--accent)", padding: "0 2px" }}>
                             <Icon d={ICONS.chart} size={13} />
                           </Link>
-                        )}
+                        ) : c.source_kind === "karten" ? (
+                          <Link to={`/karten?tab=progress&class=${classId}`} title={t("noten.fromKarten")} onClick={(e) => e.stopPropagation()}
+                            style={{ display: "inline-flex", color: "#0a7d3e", padding: "0 2px" }}>
+                            <Icon d={ICONS.chart} size={13} />
+                          </Link>
+                        ) : c.source_kind === "codedetektiv" ? (
+                          <span title={t("noten.fromCd")} style={{ display: "inline-flex", color: "var(--text3)", padding: "0 2px" }}>
+                            <Icon d={ICONS.chart} size={13} />
+                          </span>
+                        ) : null}
                         {renameCol === c.id && (
-                          <ColMenu t={t} cat={c} stats={colStats(c.id)} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
+                          <ColMenu t={t} cat={c} classId={classId} stats={colStats(c.id)} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
                             onRename={async (name) => { if (await call(() => fetch(`${API}/categories/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: c.position ?? i }) }))) setRenameCol(null); }}
                             onDelete={() => {
                               setRenameCol(null);
@@ -806,7 +815,7 @@ function SectionMenu({ t, sec, onEdit, onDelete, onAddCol }) {
 }
 
 // Kleine Uebersicht zur Spalte: Anlagedatum plus Umbenennen/Loeschen.
-function ColMenu({ t, cat, stats, onStats, onRename, onDelete, onClose, dividerOn, onToggleDivider }) {
+function ColMenu({ t, cat, stats, onStats, onRename, onDelete, onClose, dividerOn, onToggleDivider, classId }) {
   const [name, setName] = useState(cat.name);
   const datum = cat.created_at ? new Date(cat.created_at).toLocaleDateString("de-DE") : "—";
   const de1 = (n) => String(Math.round(n * 100) / 100).replace(".", ",");
@@ -830,6 +839,17 @@ function ColMenu({ t, cat, stats, onStats, onRename, onDelete, onClose, dividerO
             style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 10, padding: "6px 8px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--accent)", textDecoration: "none", boxSizing: "border-box" }}>
             <Icon d={ICONS.chart} size={14} color="var(--accent)" />{t("noten.fromCardvote")}
           </Link>
+        )}
+        {!cat.source_session_id && cat.source_kind === "karten" && (
+          <Link to={`/karten?tab=progress&class=${classId}`} onClick={onClose}
+            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 10, padding: "6px 8px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "#0a7d3e", textDecoration: "none", boxSizing: "border-box" }}>
+            <Icon d={ICONS.chart} size={14} color="#0a7d3e" />{t("noten.fromKarten")}
+          </Link>
+        )}
+        {cat.source_kind === "codedetektiv" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 10, padding: "6px 8px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text3)", boxSizing: "border-box" }}>
+            <Icon d={ICONS.chart} size={14} color="var(--text3)" />{t("noten.fromCd")}
+          </div>
         )}
         {onToggleDivider && (
           <button onClick={onToggleDivider} style={{ width: "100%", marginBottom: 10, padding: "6px 8px", fontSize: 12, fontWeight: 600, borderRadius: 8, cursor: "pointer", border: `1px solid ${dividerOn ? "var(--accent)" : "var(--border2)"}`, background: dividerOn ? "var(--accent)" : "transparent", color: dividerOn ? "#fff" : "var(--text2)" }}>

@@ -467,6 +467,9 @@ class GradeCategory(Base):
     # Notenbuch einen Link zur Auswertung. SET NULL: Session-Loeschung laesst die
     # Note bestehen (Regel 3 — kein Modul reisst das andere mit).
     source_session_id: Mapped[Optional[int]] = mapped_column(ForeignKey("sessions.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Herkunft der Spalte, damit das Notenbuch die Quelle kennzeichnet:
+    # "cardvote" | "karten" | "codedetektiv" (leer = von Hand angelegt).
+    source_kind: Mapped[str] = mapped_column(String(20), default="", server_default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     section: Mapped[Optional["GradeSection"]] = relationship(back_populates="categories")

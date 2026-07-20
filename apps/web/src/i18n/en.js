@@ -919,6 +919,7 @@ export default {
   "home.arrangeHint": "Drag the cards to reorder them.",
   "common.done": "Done",
   "noten.fromCardvote": "To CardVote results",
+  "noten.fromKarten": "To card mastery",
   "noten.fromCd": "From Code Detective",
   "noten.fromCdHint": "Turn a finished Code Detective session into a grade column",
   "noten.fromCdSession": "Session",

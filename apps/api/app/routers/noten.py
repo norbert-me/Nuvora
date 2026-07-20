@@ -115,6 +115,7 @@ class CategoryOut(BaseModel):
     position: int
     # Aus welcher CardVote-Session übernommen (für den Link zur Auswertung).
     source_session_id: Optional[int] = None
+    source_kind: Optional[str] = None  # "cardvote" | "karten" | "codedetektiv" | ""
     created_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
 
@@ -729,7 +730,7 @@ async def import_session(body: ImportBody, user: User = Depends(require_module),
     pos = len((await db.execute(
         select(GradeCategory).where(GradeCategory.section_id == sec.id)
     )).scalars().all())
-    cat = GradeCategory(name=body.column_name, section_id=sec.id, class_id=sec.class_id, owner_id=user.id, position=pos, source_session_id=sess.id)
+    cat = GradeCategory(name=body.column_name, section_id=sec.id, class_id=sec.class_id, owner_id=user.id, position=pos, source_session_id=sess.id, source_kind="cardvote")
     db.add(cat)
     await db.flush()
 
@@ -768,6 +769,7 @@ class ImportGradesBody(BaseModel):
     section_id: int
     column_name: str
     note: str = ""
+    source_kind: str = ""   # Herkunft, z.B. "karten" (fuer die Kennzeichnung im Notenbuch)
     grades: List[GradeCell]
 
     @field_validator("column_name")
@@ -796,7 +798,8 @@ async def import_grades(body: ImportGradesBody, user: User = Depends(require_mod
     pos = len((await db.execute(
         select(GradeCategory).where(GradeCategory.section_id == sec.id)
     )).scalars().all())
-    cat = GradeCategory(name=body.column_name, section_id=sec.id, class_id=sec.class_id, owner_id=user.id, position=pos)
+    cat = GradeCategory(name=body.column_name, section_id=sec.id, class_id=sec.class_id, owner_id=user.id, position=pos,
+                        source_kind=(body.source_kind or "")[:20])
     db.add(cat)
     await db.flush()
 
@@ -904,7 +907,7 @@ async def import_code_session(body: ImportCodeBody, user: User = Depends(require
 
     scale = user.grade_scale or _DEFAULT_SCALE
     pos = len((await db.execute(select(GradeCategory).where(GradeCategory.section_id == sec.id))).scalars().all())
-    cat = GradeCategory(name=body.column_name, section_id=sec.id, class_id=sec.class_id, owner_id=user.id, position=pos)
+    cat = GradeCategory(name=body.column_name, section_id=sec.id, class_id=sec.class_id, owner_id=user.id, position=pos, source_kind="codedetektiv")
     db.add(cat)
     await db.flush()
 
