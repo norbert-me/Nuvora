@@ -357,6 +357,60 @@ async def nachholbedarf(category_id: int, body: NachholIn, user: User = Depends(
     return {"weak": len(weak), "cards_requeued": requeued, "student_names": sorted(names.values())}
 
 
+# ─── Klassenarbeit vergleichen: mit anderen Klassen (Kurs) + über die Zeit ───
+
+def _grade_stats(vals):
+    vals = [v for v in vals if v is not None]
+    if not vals:
+        return {"n": 0, "avg": None, "dist": [0, 0, 0, 0, 0, 0]}
+    dist = [sum(1 for v in vals if round(v) == g) for g in (1, 2, 3, 4, 5, 6)]
+    return {"n": len(vals), "avg": round(sum(vals) / len(vals), 2), "dist": dist}
+
+
+async def _cat_vals(db, category_id):
+    rows = (await db.execute(select(GradeEntry.value).where(
+        GradeEntry.category_id == category_id, GradeEntry.kind == "grade", GradeEntry.value.is_not(None)))).scalars().all()
+    return list(rows)
+
+
+@router.get("/categories/{category_id}/compare")
+async def compare_category(category_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Vergleich einer Spalte (Klassenarbeit): dieselbe Arbeit in den anderen
+    Fach-Klassen des Kurses + der Verlauf der Spalten dieser Klasse im Halbjahr."""
+    cat = await _owned_category(db, user, category_id)
+    sec = await db.get(GradeSection, cat.section_id) if cat.section_id else None
+    term = sec.term if sec else "1"
+    cls_names = {c.id: c.name for c in (await db.execute(select(SchoolClass).where(SchoolClass.owner_id == user.id))).scalars().all()}
+
+    # Über Klassen: gleichnamige Spalte in den Geschwister-Klassen des Kurses.
+    from .kurse import sibling_class_ids
+    sib = await sibling_class_ids(db, cat.class_id) if cat.class_id else {cat.class_id}
+    same = (await db.execute(
+        select(GradeCategory).join(GradeSection, GradeCategory.section_id == GradeSection.id)
+        .where(GradeCategory.owner_id == user.id, GradeCategory.name == cat.name,
+               GradeCategory.class_id.in_(list(sib)), GradeSection.term == term))).scalars().all()
+    classes = []
+    for c in same:
+        st = _grade_stats(await _cat_vals(db, c.id))
+        st["class_name"] = cls_names.get(c.class_id, "?")
+        st["is_self"] = (c.id == cat.id)
+        classes.append(st)
+    classes.sort(key=lambda x: (not x["is_self"], x["class_name"]))
+
+    # Über die Zeit: die Spalten DIESER Klasse im Halbjahr, chronologisch.
+    my_cats = (await db.execute(
+        select(GradeCategory).join(GradeSection, GradeCategory.section_id == GradeSection.id)
+        .where(GradeCategory.owner_id == user.id, GradeCategory.class_id == cat.class_id, GradeSection.term == term)
+        .order_by(GradeSection.position, GradeCategory.position, GradeCategory.id))).scalars().all()
+    over_time = []
+    for c in my_cats:
+        st = _grade_stats(await _cat_vals(db, c.id))
+        if st["n"]:
+            over_time.append({"name": c.name, "avg": st["avg"], "is_self": c.id == cat.id})
+
+    return {"name": cat.name, "term": term, "classes": classes, "over_time": over_time}
+
+
 # ─── Eintraege: Noten und Beobachtungen ───
 
 class EntryIn(BaseModel):

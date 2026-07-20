@@ -44,6 +44,7 @@ export default function Noten() {
   const [neuSpalteIn, setNeuSpalteIn] = useState(null);
   const [renameCol, setRenameCol] = useState(null);
   const [statsCol, setStatsCol] = useState(null); // Spalte für die zentrale Auswertung
+  const [compareCat, setCompareCat] = useState(null); // Spalte für den Klassen-/Zeit-Vergleich
   const [beobFuer, setBeobFuer] = useState(null);
   const [infoFuer, setInfoFuer] = useState(null);
   const [term, setTerm] = useState("1");
@@ -390,6 +391,8 @@ export default function Noten() {
         </Modal>
       )}
 
+      {compareCat && <CompareModal t={t} cat={compareCat} onClose={() => setCompareCat(null)} />}
+
       {cdDialog && (
         <Modal title={t("noten.fromCd")} onClose={() => setCdDialog(false)}>
           <CodeSessionImport t={t} classId={classId} kursId={kursId} sections={sections}
@@ -552,7 +555,7 @@ export default function Noten() {
                           </span>
                         ) : null}
                         {renameCol === c.id && (
-                          <ColMenu t={t} cat={c} classId={classId} topics={topics} kartenAktiv={kartenAktiv} onNachhol={runNachhol} stats={colStats(c.id)} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
+                          <ColMenu t={t} cat={c} classId={classId} topics={topics} kartenAktiv={kartenAktiv} onNachhol={runNachhol} onCompare={setCompareCat} stats={colStats(c.id)} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
                             onRename={async (name, topicId) => { if (await call(() => fetch(`${API}/categories/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: c.position ?? i, topic_id: topicId }) }))) setRenameCol(null); }}
                             onDelete={() => {
                               setRenameCol(null);
@@ -875,7 +878,7 @@ function SectionMenu({ t, sec, onEdit, onDelete, onAddCol }) {
 }
 
 // Kleine Uebersicht zur Spalte: Anlagedatum plus Umbenennen/Loeschen.
-function ColMenu({ t, cat, stats, onStats, onRename, onDelete, onClose, dividerOn, onToggleDivider, classId, topics = [], onNachhol, kartenAktiv }) {
+function ColMenu({ t, cat, stats, onStats, onRename, onDelete, onClose, dividerOn, onToggleDivider, classId, topics = [], onNachhol, onCompare, kartenAktiv }) {
   const [name, setName] = useState(cat.name);
   const [topicId, setTopicId] = useState(cat.topic_id ?? "");
   const datum = cat.created_at ? new Date(cat.created_at).toLocaleDateString("de-DE") : "—";
@@ -890,6 +893,9 @@ function ColMenu({ t, cat, stats, onStats, onRename, onDelete, onClose, dividerO
         {/* Auswertung: schlichter Details-Knopf, öffnet das zentrale Modal. */}
         <button onClick={() => { onStats(); onClose(); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 10, padding: "7px 9px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer" }}>
           <Icon d={ICONS.chart} size={14} color="var(--accent)" />{t("noten.colDetails")}
+        </button>
+        <button onClick={() => { onCompare(cat); onClose(); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 10, padding: "7px 9px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer" }}>
+          <Icon d={ICONS.chart} size={14} color="#2563eb" />{t("noten.compare")}
         </button>
         <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 10 }}>
           <input value={name} onChange={(e) => setName(e.target.value)} autoFocus
@@ -967,6 +973,60 @@ function ColForm({ t, onSave, onCancel, initial = "" }) {
       <DatePick onPick={setName} title={t("noten.useDate")} size={20} />
       <button onClick={() => name.trim() && onSave(name.trim())} style={{ ...btnPrimary }}>OK</button>
       <button onClick={onCancel} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.abort")}><Icon d={ICONS.close} size={20} /></button>
+    </div>
+  );
+}
+
+// Vergleich einer Klassenarbeit: dieselbe Arbeit in den anderen Fach-Klassen des
+// Kurses + der Notenverlauf dieser Klasse im Halbjahr. Rein deskriptiv.
+const GRADE_COL = ["#0a7d3e", "#0a7d3e", "#b8860b", "#b8860b", "#d1350f", "#d1350f"];
+function CompareModal({ t, cat, onClose }) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => {
+    fetch(`/api/noten/categories/${cat.id}/compare`).then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then(setData).catch(() => setErr(true));
+  }, [cat.id]);
+  const de1 = (n) => (n == null ? "—" : String(Math.round(n * 100) / 100).replace(".", ","));
+  return (
+    <div onClick={onClose} style={overlay}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...modal, maxWidth: 520 }}>
+        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>{t("noten.compare")}: {cat.name}</h3>
+        {err ? <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("common.notWork")}</p> : !data ? <p style={{ fontSize: 13, color: "var(--text3)" }}>…</p> : (
+          <>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text3)", margin: "12px 0 8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>{t("noten.compareClasses")}</div>
+            {data.classes.length <= 1 && <p style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 8 }}>{t("noten.compareNoClasses")}</p>}
+            {data.classes.map((c, i) => {
+              const max = Math.max(...c.dist, 1);
+              return (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: i ? "1px solid var(--border)" : "none" }}>
+                  <span style={{ flex: 1, minWidth: 90, fontSize: 13, fontWeight: c.is_self ? 700 : 500, color: c.is_self ? "var(--accent)" : "var(--text)" }}>{c.class_name}{c.is_self ? " ●" : ""}</span>
+                  <span style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 30 }}>
+                    {c.dist.map((n, g) => <span key={g} title={`${g + 1}: ${n}`} style={{ width: 9, height: Math.max(2, (n / max) * 30), background: GRADE_COL[g], borderRadius: 2, opacity: n ? 1 : 0.25 }} />)}
+                  </span>
+                  <span style={{ fontSize: 13, fontWeight: 700, minWidth: 54, textAlign: "right" }}>⌀ {de1(c.avg)}</span>
+                  <span style={{ fontSize: 11.5, color: "var(--text3)", minWidth: 30, textAlign: "right" }}>n={c.n}</span>
+                </div>
+              );
+            })}
+            {data.over_time.length > 1 && (<>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text3)", margin: "18px 0 8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>{t("noten.compareOverTime")}</div>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 90, paddingTop: 6 }}>
+                {data.over_time.map((o, i) => (
+                  <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                    {/* Balken: niedrigere (bessere) Note = höher. Skala 1..6 → 6-avg. */}
+                    <div title={`⌀ ${de1(o.avg)}`} style={{ width: "70%", height: `${Math.max(4, ((6 - o.avg) / 5) * 66)}px`, background: o.is_self ? "var(--accent)" : "var(--border3)", borderRadius: 3 }} />
+                    <span style={{ fontSize: 11, fontWeight: 700 }}>{de1(o.avg)}</span>
+                    <span style={{ fontSize: 10.5, color: "var(--text3)", maxWidth: 60, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.name}</span>
+                  </div>
+                ))}
+              </div>
+            </>)}
+            <p style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 14 }}>{t("noten.compareHint")}</p>
+          </>
+        )}
+        <div style={{ marginTop: 16 }}><button onClick={onClose} style={btnSecondary}>{t("common.close")}</button></div>
+      </div>
     </div>
   );
 }
