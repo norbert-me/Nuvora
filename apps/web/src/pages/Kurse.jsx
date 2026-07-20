@@ -16,6 +16,8 @@ export default function Kurse() {
   const [allClasses, setAllClasses] = useState([]);
   const [showTrash, setShowTrash] = useState(false);
   const [neu, setNeu] = useState("");
+  const [editKurs, setEditKurs] = useState(null); // aufgeklappter Bearbeiten-Bereich (Name, E/G)
+  const [editName, setEditName] = useState("");
 
   const load = () => fetch(`${API}/kurse`).then((r) => (r.ok ? r.json() : [])).then((d) => setKurse(Array.isArray(d) ? d : [])).catch(() => {});
   const loadTrash = () => fetch(`${API}/kurse/trash`).then((r) => (r.ok ? r.json() : [])).then((d) => setTrash(Array.isArray(d) ? d : [])).catch(() => {});
@@ -27,10 +29,11 @@ export default function Kurse() {
     await fetch(`${API}/kurse`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }).catch(() => {});
     setNeu(""); load();
   };
-  const rename = async (k) => {
-    const name = await askPrompt(t("kurse.renamePrompt"), { initial: k.name });
-    if (name == null || !name.trim()) return;
-    await fetch(`${API}/kurse/${k.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim() }) }).catch(() => {});
+  const openEdit = (k) => { if (editKurs === k.id) { setEditKurs(null); } else { setEditKurs(k.id); setEditName(k.name); } };
+  const saveName = async (k) => {
+    const name = editName.trim();
+    if (!name) return;
+    await fetch(`${API}/kurse/${k.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }).catch(() => {});
     load();
   };
   const setNiveauAktiv = async (k, val) => {
@@ -88,7 +91,7 @@ export default function Kurse() {
           <div key={k.id} style={cardStyle}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
               <strong style={{ fontSize: 15, flex: 1 }}>{k.name}</strong>
-              <button onClick={() => rename(k)} className="icon-btn" style={iconBtn} title={t("common.rename")}><Icon d={ICONS.edit} size={15} /></button>
+              <button onClick={() => openEdit(k)} className="icon-btn" style={{ ...iconBtn, border: editKurs === k.id ? "1px solid var(--accent)" : undefined }} title={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
               <button onClick={() => delKurs(k)} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
             </div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
@@ -109,10 +112,20 @@ export default function Kurse() {
                 </select>
               )}
             </div>
-            {k.classes.length > 0 && (
-              <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
-                <Toggle checked={!!k.niveau_aktiv} onChange={(v) => setNiveauAktiv(k, v)} label={t("kurse.niveauToggle")} />
-                {k.niveau_aktiv && <NiveauPanel kursId={k.id} t={t} />}
+            {/* Bearbeiten-Bereich: Name + E/G. Erst hinter dem Stift-Knopf, damit
+                die SuS-Liste nicht dauernd offen steht. */}
+            {editKurs === k.id && (
+              <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+                <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+                  <input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t("kurse.renamePrompt")}
+                    onKeyDown={(e) => e.key === "Enter" && saveName(k)}
+                    style={{ ...inputStyle, flex: 1, minWidth: 160 }} />
+                  <button onClick={() => saveName(k)} style={btnPrimary}>{t("common.save")}</button>
+                </div>
+                {k.classes.length > 0 && (<>
+                  <Toggle checked={!!k.niveau_aktiv} onChange={(v) => setNiveauAktiv(k, v)} label={t("kurse.niveauToggle")} />
+                  {k.niveau_aktiv && <NiveauPanel kursId={k.id} t={t} />}
+                </>)}
               </div>
             )}
           </div>
