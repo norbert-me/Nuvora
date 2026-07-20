@@ -158,6 +158,7 @@ def _ensure_columns(sync_conn):
         ("users", "pending_email", "VARCHAR(255)"),
         ("questions", "owner_id", "INTEGER"),
         ("users", "modules_initialized", "BOOLEAN DEFAULT false NOT NULL"),
+        ("users", "methoden_seeded", "BOOLEAN DEFAULT false NOT NULL"),
         ("questions", "topic_id", "INTEGER"),
         ("students", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
         ("students", "foerder", "JSON"),
@@ -316,6 +317,9 @@ async def startup():
             ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
         """))
         await db.execute(text("UPDATE users SET modules_initialized = true WHERE modules_initialized = false"))
+        # Wer schon Einstiege hat, gilt als geseedet — sonst wuerde die
+        # Startsammlung nach dem Loeschen aller Einstiege einmal neu auftauchen.
+        await db.execute(text("UPDATE users SET methoden_seeded = true WHERE methoden_seeded = false AND EXISTS (SELECT 1 FROM methods m WHERE m.owner_id = users.id)"))
         await db.commit()
 
     # Anwesenheit ist ins Modul „Orga & Anwesenheit" aufgegangen. Wer Anwesenheit

@@ -57,10 +57,12 @@ class MethodOut(MethodIn):
 @router.get("/list", response_model=List[MethodOut])
 async def list_methods(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rows = (await db.execute(select(Method).where(Method.owner_id == user.id).order_by(Method.title))).scalars().all()
-    if not rows:
-        # Einmalig die Startsammlung anlegen.
+    if not rows and not user.methoden_seeded:
+        # Startsammlung genau EINMAL anlegen (Kennenlernen). Loescht die Lehrkraft
+        # danach alles, bleibt es leer — das Flag verhindert erneutes Seeden.
         for title, idee, ablauf, material, dauer in _SEED:
             db.add(Method(owner_id=user.id, title=title, description=idee, ablauf=ablauf, material=material, dauer=dauer))
+        user.methoden_seeded = True
         await db.commit()
         rows = (await db.execute(select(Method).where(Method.owner_id == user.id).order_by(Method.title))).scalars().all()
     return rows

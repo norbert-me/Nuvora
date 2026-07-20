@@ -33,6 +33,9 @@ class User(Base):
     # Wurde das Konto schon einmal ans Modulregister angeschlossen? Verhindert,
     # dass der Backfill beim Start ein abgeschaltetes Modul wieder aktiviert.
     modules_initialized: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Einstiege-Startsammlung einmalig angelegt? Danach nicht erneut seeden,
+    # auch wenn die Lehrkraft alle Einstiege loescht (sonst tauchen sie wieder auf).
+    methoden_seeded: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Modul Kalender: Stunden pro Tag im hinterlegten Stundenplan (Einstellung).
     timetable_periods: Mapped[int] = mapped_column(Integer, default=6, server_default="6")
     # Uhrzeiten je Stunde: Liste [{start,end}] (Index = Stunde-1). Optional.
