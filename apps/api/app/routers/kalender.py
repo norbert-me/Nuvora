@@ -494,8 +494,14 @@ async def external_events(user: User = Depends(require_module)):
             ip = ipaddress.ip_address(res[4][0])
             if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
                 raise ValueError("Ziel-IP nicht erlaubt")
+        # Redirects sperren: ein Redirect koennte nach dem IP-Check auf eine
+        # private IP umleiten (SSRF). Feeds (Google/iCloud) liefern direkt.
+        class _NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, *a, **k):
+                return None
+        opener = urllib.request.build_opener(_NoRedirect)
         req = urllib.request.Request(url, headers={"User-Agent": "Nuvora"})
-        with urllib.request.urlopen(req, timeout=6) as r:
+        with opener.open(req, timeout=6) as r:
             return r.read(2_000_000).decode("utf-8", "replace")  # max 2 MB
     try:
         text = await asyncio.get_event_loop().run_in_executor(None, _fetch)
