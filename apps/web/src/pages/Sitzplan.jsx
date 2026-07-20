@@ -92,7 +92,6 @@ export default function Sitzplan() {
   // Tafel ziehen (Pointer). Breite/Höhe der Tafel-Fläche.
   const TAFEL_W = 200, TAFEL_H = 30;
   const onTafelDown = (e) => {
-    if (aufruf) return;
     e.preventDefault();
     const rect = canvasRef.current.getBoundingClientRect();
     tafelRef.current = { dx: (e.clientX - rect.left) / zoom - tafel.x, dy: (e.clientY - rect.top) / zoom - tafel.y };
@@ -118,7 +117,6 @@ export default function Sitzplan() {
 
   // ── Ziehen platzierter Tische (Pointer, damit es flüssig folgt) ──
   const onSeatDown = (e, seat) => {
-    if (aufruf) return;
     e.preventDefault();
     const rect = canvasRef.current.getBoundingClientRect();
     dragRef.current = { sid: seat.sid, dx: (e.clientX - rect.left) / zoom - seat.x, dy: (e.clientY - rect.top) / zoom - seat.y, rot: seat.rot || 0 };
@@ -149,7 +147,6 @@ export default function Sitzplan() {
     return Math.atan2((e.clientY - rect.top) / zoom - cy, (e.clientX - rect.left) / zoom - cx) * 180 / Math.PI;
   };
   const onRotDown = (e, seat) => {
-    if (aufruf) return;
     e.preventDefault(); e.stopPropagation();
     const cx = seat.x + SEAT_W / 2, cy = seat.y + SEAT_H / 2;
     // Relativ drehen: Start-Zeigerwinkel und Start-Drehung merken, damit das
@@ -173,7 +170,6 @@ export default function Sitzplan() {
   // Tafel drehen (gleicher Eck-Griff-Mechanismus).
   const tafelRotRef = useRef(null);
   const onTafelRotDown = (e) => {
-    if (aufruf) return;
     e.preventDefault(); e.stopPropagation();
     const cx = tafel.x + TAFEL_W / 2, cy = tafel.y + TAFEL_H / 2;
     tafelRotRef.current = { cx, cy, startAngle: _angle(e, cx, cy), startRot: tafel.rot || 0 };
@@ -247,7 +243,7 @@ export default function Sitzplan() {
   const scrollRef = useRef(null);
   const panRef = useRef(null);
   const onCanvasDown = (e) => {
-    if (aufruf || e.target !== canvasRef.current) return;
+    if (e.target !== canvasRef.current) return;
     panRef.current = { x: e.clientX, y: e.clientY, l: scrollRef.current.scrollLeft, t: scrollRef.current.scrollTop };
     window.addEventListener("pointermove", onPanMove);
     window.addEventListener("pointerup", onPanUp);
@@ -297,7 +293,7 @@ export default function Sitzplan() {
           <div ref={scrollRef} style={{ height: 520, overflow: "auto", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", marginBottom: 18 }}>
           <div ref={canvasRef} onPointerDown={onCanvasDown} onDragOver={(e) => e.preventDefault()} onDrop={onCanvasDrop}
             style={{ position: "relative", height: 760, width: "calc(100% - 40px)", minWidth: 720, margin: "0 20px", transform: `scale(${zoom})`, transformOrigin: "0 0",
-              cursor: aufruf ? "default" : "grab",
+              cursor: "grab",
               backgroundImage: "radial-gradient(var(--border) 1px, transparent 1px)", backgroundSize: "24px 24px" }}>
             {/* Bewegliche Tafel */}
             <div onPointerDown={onTafelDown}
@@ -306,9 +302,9 @@ export default function Sitzplan() {
                 display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
                 fontSize: 11.5, letterSpacing: "0.1em", color: "var(--text2)", textTransform: "uppercase", fontWeight: 700,
                 border: "2px solid var(--text3)", borderRadius: 6, background: "var(--bg2)",
-                cursor: aufruf ? "default" : "grab", userSelect: "none", boxShadow: "0 1px 3px rgba(0,0,0,0.12)" }}
+                cursor: "grab", userSelect: "none", boxShadow: "0 1px 3px rgba(0,0,0,0.12)" }}
               title={t("sitzplan.board")}>{t("sitzplan.board")}
-              {!aufruf && (
+              {(
                 <span onPointerDown={onTafelRotDown} title={t("sitzplan.rotate")}
                   style={{ position: "absolute", right: -9, top: -9, width: 18, height: 18, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center",
                     background: "var(--card)", border: "1px solid var(--border2)", color: "var(--text2)", fontSize: 12, lineHeight: 1, cursor: "grab", touchAction: "none", boxShadow: "0 1px 2px rgba(0,0,0,0.15)" }}>↻</span>
@@ -326,11 +322,11 @@ export default function Sitzplan() {
                     display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
                     padding: "6px 22px 6px 8px", borderRadius: 8, border: "1px solid var(--border2)",
                     background: abs ? "var(--bg2)" : "var(--bg)", color: "var(--text)", fontSize: 12.5, fontWeight: 600,
-                    cursor: aufruf ? "default" : "grab", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", userSelect: "none",
+                    cursor: "grab", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", userSelect: "none",
                     opacity: abs ? 0.5 : 1, textDecoration: abs ? "line-through" : "none" }}>
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
                   {abs && <span style={{ position: "absolute", top: 3, right: 24, width: 8, height: 8, borderRadius: 4, background: ABS_COL[abs] }} title={t(`anwesenheit.${abs}`)} />}
-                  {!aufruf && (
+                  {(
                     <>
                       {/* Dreh-Griff (Icon) an der oberen rechten Ecke: ziehen = frei drehen. */}
                       <span onPointerDown={(e) => onRotDown(e, seat)} title={t("sitzplan.rotate")}
@@ -352,8 +348,8 @@ export default function Sitzplan() {
               {pool.map((s) => {
                 const abs = aufruf ? abwesend[String(s.id)] : null;
                 return (
-                  <div key={s.id} draggable={!aufruf} onDragStart={(e) => e.dataTransfer.setData("text/plain", String(s.id))}
-                    style={{ padding: "7px 12px", borderRadius: 980, border: "1px solid var(--border2)", background: "var(--card)", fontSize: 13, fontWeight: 600, cursor: aufruf ? "default" : "grab", display: "inline-flex", alignItems: "center", gap: 6, ...(abs ? { opacity: 0.45, textDecoration: "line-through" } : {}) }}>
+                  <div key={s.id} draggable onDragStart={(e) => e.dataTransfer.setData("text/plain", String(s.id))}
+                    style={{ padding: "7px 12px", borderRadius: 980, border: "1px solid var(--border2)", background: "var(--card)", fontSize: 13, fontWeight: 600, cursor: "grab", display: "inline-flex", alignItems: "center", gap: 6, ...(abs ? { opacity: 0.45, textDecoration: "line-through" } : {}) }}>
                     {abs && <span style={{ width: 8, height: 8, borderRadius: 4, background: ABS_COL[abs] }} />}
                     {s.name}
                   </div>

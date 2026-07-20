@@ -802,7 +802,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
             <div style={{ display: "flex", gap: 8, marginTop: 20, alignItems: "center" }}>
               <button onClick={() => setEdit(true)} style={btnPrimary}>{t("common.edit")}</button>
               <button onClick={onClose} style={btnSecondary}>{t("common.close")}</button>
-              {entry.id && <button onClick={() => onDelete(entry.id)} style={{ ...btnSecondary, marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, color: C.danger }} title={t("common.delete")}><Icon d={ICONS.trash} size={17} color={C.danger} />{t("common.delete")}</button>}
+              {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
             </div>
           </div>
         )}
@@ -900,7 +900,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
           <button onClick={() => onSave({ ...entry, title, notes, class_id: classId ? Number(classId) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
-          {entry.id && <button onClick={() => onDelete(entry.id)} style={{ ...btnSecondary, marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, color: C.danger }} title={t("common.delete")}><Icon d={ICONS.trash} size={17} color={C.danger} />{t("common.delete")}</button>}
+          {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
         </div>
         </>)}
         </div>
