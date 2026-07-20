@@ -781,14 +781,13 @@ async def admin_setup(user=Depends(_require_admin)):
     from . import mailer
     site = _pathlib.Path("/app/config/site.json")
     admin_email = (os.environ.get("ADMIN_EMAIL") or "").strip()
-    # Empfaenger des Kontaktformulars: ADMIN_EMAIL (wenn echte Adresse), sonst SMTP_FROM.
-    contact_to = admin_email if "@" in admin_email else (os.environ.get("SMTP_FROM") or "").strip()
+    contact_to = contact_recipient()  # ADMIN_EMAIL (echte Adresse) sonst SMTP_FROM
     return {
         "smtp": mailer.email_configured(),
         "site_json": site.exists(),
         "admin_email": bool(admin_email),
         # Kann das Kontaktformular wirklich zustellen? (echte Empfaengeradresse + SMTP)
-        "contact_deliverable": ("@" in contact_to) and mailer.email_configured(),
+        "contact_deliverable": bool(contact_to) and mailer.email_configured(),
         "contact_to": contact_to,
     }
 
@@ -825,19 +824,27 @@ class ContactBody(_BaseModel):
         return v.strip()[:200]
 
 
+def contact_recipient() -> str:
+    """Zustellbare Empfaengeradresse fuers Kontaktformular.
+
+    ADMIN_EMAIL ist zugleich der Admin-LOGIN und oft KEINE echte Mailadresse
+    (z.B. "admin"). Dann faellt der Empfaenger auf SMTP_FROM (das eigene Postfach
+    des Betreibers) zurueck. Ist auch das keine Adresse, gibt es keinen Empfaenger
+    (leerer String) — genau hier scheiterte der Versand bisher lautlos.
+    """
+    to = (os.environ.get("ADMIN_EMAIL") or "").strip()
+    if "@" not in to:
+        to = (os.environ.get("SMTP_FROM") or "").strip()
+    return to if "@" in to else ""
+
+
 @app.post("/api/contact")
 async def contact(body: ContactBody, request: Request):
     from . import mailer
     from .routers.auth import rate_limit, client_ip
     rate_limit("contact", client_ip(request), 5, 3600, "Zu viele Nachrichten. Bitte später erneut versuchen.")
-    # Empfaenger: ADMIN_EMAIL ist zugleich der Admin-LOGIN und oft KEINE echte
-    # Mailadresse (z.B. "admin"). Fuers Kontaktformular brauchen wir eine
-    # zustellbare Adresse — sonst faellt sie auf SMTP_FROM (das eigene Postfach
-    # des Betreibers) zurueck. Genau hier scheiterte der Versand bisher lautlos.
-    to = (os.environ.get("ADMIN_EMAIL") or "").strip()
-    if "@" not in to:
-        to = (os.environ.get("SMTP_FROM") or "").strip()
-    if "@" not in to:
+    to = contact_recipient()
+    if not to:
         raise HTTPException(503, "Kontaktformular derzeit nicht verfügbar")
     # Zeilenumbrueche aus Nutzereingaben strippen — verhindert E-Mail-Header-Injection im Subject
     def _hdr(s: str) -> str:
