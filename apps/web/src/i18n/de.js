@@ -811,6 +811,7 @@ export default {
   "karten.niveauAll": "Alle Niveaus",
   "karten.niveauE": "Nur E",
   "karten.niveauG": "Nur G",
+  "karten.export": "Export",
   "karten.import": "Import",
   "karten.importTitle": "Karten importieren — {{name}}",
   "karten.importHint": "CSV, TSV oder Text-Export (Tab-getrennt). Erste Spalte = Vorderseite, zweite = Rückseite. Trenner (Tab/Semikolon/Komma) wird erkannt, #-Zeilen übersprungen.",

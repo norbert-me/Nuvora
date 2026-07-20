@@ -240,7 +240,20 @@ export default function Kalender() {
                 style={{ ...selectStyle, padding: "5px 24px 5px 8px", fontSize: 13 }} title={t("kalender.jumpToDay")}>
                 {Array.from({ length: 53 }, (_, i) => i + 1).map((w) => <option key={w} value={w}>{t("kalender.kw")} {w}</option>)}
               </select>
-            ) : (
+            ) : null}
+            {(view === "month" || view === "week") && (() => {
+              const y0 = new Date().getFullYear();
+              const cy = view === "week" ? isoWeek(cursor).week : cursor.getMonth();
+              return (
+                <select value={cursor.getFullYear()} onChange={(e) => {
+                  const y = Number(e.target.value);
+                  setCursor(view === "week" ? weekValToDate(`${y}-W${String(cy).padStart(2, "0")}`) : startOfDay(new Date(y, cy, 1)));
+                }} style={{ ...selectStyle, padding: "5px 24px 5px 8px", fontSize: 13 }} title={t("kalender.jumpToDay")}>
+                  {Array.from({ length: 7 }, (_, i) => y0 - 3 + i).map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
+              );
+            })()}
+            {view === "day" && (
               <input type="date" value={ymd(cursor)} onChange={(e) => e.target.value && setCursor(startOfDay(new Date(e.target.value + "T00:00:00")))}
                 style={{ ...inputStyle, padding: "5px 8px", fontSize: 13 }} title={t("kalender.jumpToDay")} />
             )}

@@ -811,6 +811,7 @@ export default {
   "karten.niveauAll": "Todos los niveles",
   "karten.niveauE": "Solo E",
   "karten.niveauG": "Solo G",
+  "karten.export": "Exportar",
   "karten.import": "Importar",
   "karten.importTitle": "Importar tarjetas — {{name}}",
   "karten.importHint": "CSV, TSV o exportación de texto (separado por tabuladores). Primera columna = anverso, segunda = reverso. El separador (tab/punto y coma/coma) se detecta, las líneas con # se omiten.",

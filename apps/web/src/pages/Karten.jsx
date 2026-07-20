@@ -330,6 +330,17 @@ function Deck({ deck, t, call, topics = [], showTopic = false }) {
         <input value={back} onChange={(e) => setBack(e.target.value)} placeholder={t("karten.back")} style={{ flex: 1, minWidth: 120, ...inp }} />
         <button type="submit" disabled={busy || !front.trim() || !back.trim()} style={{ ...btnPrimary, padding: "6px 14px", opacity: (!busy && front.trim() && back.trim()) ? 1 : 0.4 }}>{t("common.add")}</button>
         <button type="button" onClick={() => setImporting(true)} style={{ ...btnSecondary, padding: "6px 14px" }}>{t("karten.import")}</button>
+        {deck.cards.length > 0 && (
+          <button type="button" onClick={() => {
+            // Export als CSV (Vorderseite,Rückseite) — Trenner Semikolon, damit
+            // Kommas im Text nicht stören; Anführungszeichen escaped.
+            const esc = (v) => `"${String(v).replace(/"/g, '""')}"`;
+            const csv = deck.cards.map((c) => `${esc(c.front)};${esc(c.back)}`).join("\n");
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+            a.download = `${(deck.name || "stapel").replace(/[^\w-]+/g, "_")}.csv`; a.click(); URL.revokeObjectURL(a.href);
+          }} style={{ ...btnSecondary, padding: "6px 14px" }}>{t("karten.export")}</button>
+        )}
       </form>
       {importing && <ImportModal deckName={deck.name || t("karten.deck")} t={t}
         onClose={() => setImporting(false)}

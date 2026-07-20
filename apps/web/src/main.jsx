@@ -170,13 +170,15 @@ const getModuleNavItems = (t, location) => {
     ];
   }
   if (area === "karten") {
-    // Tabs der Kartenseite laufen ueber die Nuvora-Navbar (?tab).
-    const cur = params.get("tab") || "cards";
+    // Tabs der Kartenseite laufen ueber die Nuvora-Navbar (?tab). Auf dem
+    // Marktplatz darf KEIN Karten-Tab aktiv sein — sonst leuchtet „Karten".
+    const markt = pathname.startsWith("/marktplatz");
+    const cur = markt ? null : params.get("tab") || "cards";
     return [
       { to: `${KA}?tab=cards`, label: t("karten.tabCards"), active: cur === "cards" },
       { to: `${KA}?tab=progress`, label: t("karten.tabProgress"), active: cur === "progress" },
       { to: `${KA}?tab=qr`, label: t("karten.tabQr"), active: cur === "qr" },
-      { to: "/marktplatz?area=karten&kind=karten_deck", label: t("nav.marketplace") },
+      { to: "/marktplatz?area=karten&kind=karten_deck", label: t("nav.marketplace"), active: markt },
     ];
   }
   // Kern: der Nuvora-Schriftzug links fuehrt zur Startseite.

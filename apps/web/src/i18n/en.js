@@ -811,6 +811,7 @@ export default {
   "karten.niveauAll": "All levels",
   "karten.niveauE": "E only",
   "karten.niveauG": "G only",
+  "karten.export": "Export",
   "karten.import": "Import",
   "karten.importTitle": "Import cards — {{name}}",
   "karten.importHint": "CSV, TSV or tab-separated text export. First column = front, second = back. Delimiter (tab/semicolon/comma) is detected, #-lines skipped.",

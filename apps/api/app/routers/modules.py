@@ -107,6 +107,7 @@ REGISTRY: List[ModuleDef] = [
             "Stunden eintragen und Themen aus der Taxonomie zuordnen."
         ),
         path="/kalender",
+        stage="stable",
     ),
     ModuleDef(
         key="orga",
@@ -141,6 +142,7 @@ REGISTRY: List[ModuleDef] = [
             "Kalender-Stunden zuordnen."
         ),
         path="/methoden",
+        stage="stable",
     ),
 ]
 
