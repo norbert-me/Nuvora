@@ -81,8 +81,6 @@ Werkzeuge zur Klassenführung, in Reitern:
 
 Zieht per Knopfdruck eine zufällige Person aus einer Klasse — fair gewichtet nach der Zeit seit dem letzten Ziehen, nicht zweimal am Stück.
 
-> CardVote wurde bis v1.4.4 eigenständig entwickelt ([Archiv](https://github.com/norbert-me/CardVote)). Weiterentwicklung findet nur noch hier statt. Der Marktplatz teilt inzwischen auch Karten-Stapel, Einstiege und Lernleitern.
-
 ## Architektur
 
 Nuvora ist die Basis, Module sind Gäste. Drei Regeln, die jede Änderung einhält:
