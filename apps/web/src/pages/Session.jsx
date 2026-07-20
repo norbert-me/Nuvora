@@ -3,6 +3,7 @@ import { askPrompt } from "../core/dialog.jsx";
 import { useParams, useNavigate } from "react-router-dom";
 import Latex from "../components/Latex.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 
 const API = "/api";
 const COLORS = { A: "#0066cc", B: "#5856d6", C: "#b8860b", D: "#d1350f" };
@@ -439,36 +440,15 @@ export default function Session() {
           {classes.length === 0 ? (
             <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("session.noClasses")} <a href="/classes" style={{ color: "var(--accent)" }}>{t("session.createClass")}</a></p>
           ) : (
-            (() => {
-              // Nach Kurs gruppieren; Kurs-Überschrift nur bei mehreren Fach-Klassen.
-              const btn = (cls) => {
-                const active = selectedClass?.id === cls.id;
-                return (
-                  <button key={cls.id} onClick={() => setSelectedClass(cls)} style={{
-                    padding: "10px 16px", fontSize: 14, cursor: "pointer", borderRadius: 12,
-                    border: active ? "2px solid var(--accent)" : "2px solid var(--border)",
-                    background: active ? "var(--accent-bg)" : "var(--card)",
-                    color: "var(--text)", transition: "all 0.15s", fontWeight: active ? 600 : 400,
-                  }}>
-                    {cls.name}
-                    <span style={{ color: "var(--text3)", marginLeft: 6, fontSize: 12, fontWeight: 400 }}>{cls.students.length} {t("classes.learners")}</span>
-                  </button>
-                );
-              };
-              const groups = kurse.map((k) => {
-                const ids = new Set((k.classes || []).map((c) => c.id));
-                return { name: k.name, list: classes.filter((c) => ids.has(c.id)) };
-              }).filter((g) => g.list.length);
-              const grouped = new Set(groups.flatMap((g) => g.list.map((c) => c.id)));
-              const rest = classes.filter((c) => !grouped.has(c.id));
-              if (rest.length) groups.push({ name: null, list: rest });
-              return groups.map((g, gi) => (
-                <div key={gi} style={{ marginBottom: 6 }}>
-                  {g.name && g.list.length > 1 && <div style={{ fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text3)", margin: "2px 0 6px" }}>{g.name}</div>}
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>{g.list.map(btn)}</div>
-                </div>
-              ));
-            })()
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              {/* Kurs zuerst, dann Fach — derselbe Selektor wie überall. Für die
+                  Live-Session wird eine konkrete Fach-Klasse gebraucht. */}
+              <KursKlasseSelect value={selectedClass?.id ?? ""}
+                onChange={(id) => setSelectedClass(classes.find((c) => c.id === Number(id)) || null)} />
+              {selectedClass && (
+                <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{(selectedClass.students || []).length} {t("classes.learners")}</span>
+              )}
+            </div>
           )}
         </div>
 
