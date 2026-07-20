@@ -395,12 +395,17 @@ async def weak_review(class_id: Optional[int] = None, days: int = 7,
     if not topics:
         return {"topics": []}
     tids = [t["topic_id"] for t in topics]
-    # Geübt = ausgerolltes Deck ODER Aufgabe zum Thema (nach dem Test angelegt
-    # zählt genauso wie vorhanden — Hauptsache es gibt jetzt Übungsmaterial).
-    from ..models import CardDeck, Exercise
+    # Geübt = zum Thema wurde WIRKLICH geübt (nicht nur Material da): ein
+    # ausgerolltes Deck, dessen Karten mind. einmal gelernt wurden (CardReview
+    # mit reps>0), ODER eine Lernpfad-Aufgabe zum Thema.
+    from ..models import CardDeck, Exercise, Card, CardReview
     deck_topics = set((await db.execute(
-        select(CardDeck.topic_id).where(CardDeck.owner_id == user.id, CardDeck.topic_id.in_(tids),
-                                        CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None))
+        select(CardDeck.topic_id)
+        .join(Card, Card.deck_id == CardDeck.id)
+        .join(CardReview, CardReview.card_id == Card.id)
+        .where(CardDeck.owner_id == user.id, CardDeck.topic_id.in_(tids),
+               CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None),
+               CardReview.reps > 0)
     )).scalars().all())
     ex_topics = set((await db.execute(
         select(Exercise.topic_id).where(Exercise.owner_id == user.id, Exercise.topic_id.in_(tids))
