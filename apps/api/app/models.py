@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import ForeignKey, String, Text, DateTime, Integer, JSON, Boolean, UniqueConstraint, func
+from sqlalchemy import ForeignKey, String, Text, DateTime, Integer, JSON, Boolean, LargeBinary, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -855,3 +855,22 @@ class CardReview(Base):
     lapses: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     due: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     last_reviewed: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Material(Base):
+    """Datei-/Materialablage der Lehrkraft, an ein Thema und/oder eine Stunde
+    (Kalender-Eintrag) gehaengt. Beides optional und ON DELETE SET NULL (Regel 3:
+    das Material bleibt, wenn Thema/Eintrag verschwinden). Inhalt liegt in der DB
+    (durabel, owner-scoped, faellt mit dem Konto weg). Nicht geteilt, nicht im
+    Marktplatz — reine private Ablage."""
+    __tablename__ = "materials"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
+    entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("calendar_entries.id", ondelete="SET NULL"), nullable=True, index=True)
+    filename: Mapped[str] = mapped_column(String(255))
+    mime: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    size: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

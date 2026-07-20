@@ -8,6 +8,7 @@ import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, put } from "../core/cache.js";
 import { undoDelete } from "../core/undo.jsx";
+import MaterialPanel from "../components/MaterialPanel.jsx";
 import ferienDE from "../data/ferien-de.json";
 
 // Bundeslaender fuer den Ferien-Import (Kuerzel muss zu ferien-de.json passen).
@@ -872,6 +873,8 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
             )}
             {notes && <div style={{ marginTop: 14, fontSize: 13.5, whiteSpace: "pre-wrap", color: "var(--text2)" }}>{notes}</div>}
             {!clsName && !topName && !methName && !linkList.length && !notes && <p style={{ fontSize: 13.5, color: "var(--text3)", marginTop: 8 }}>{t("kalender.emptyEntry")}</p>}
+            {/* Material an dieser Stunde — nur beim gespeicherten Eintrag. */}
+            {entry.id && <div style={{ marginTop: 14 }}><MaterialPanel entryId={entry.id} /></div>}
             <div style={{ display: "flex", gap: 8, marginTop: 20, alignItems: "center" }}>
               <button onClick={() => setEdit(true)} style={btnPrimary}>{t("common.edit")}</button>
               <button onClick={onClose} style={btnSecondary}>{t("common.close")}</button>

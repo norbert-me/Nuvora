@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { pageTitle } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import MaterialPanel from "../components/MaterialPanel.jsx";
 
 export default function ThemaAnsicht() {
   const { t } = useLanguage();
@@ -88,8 +89,11 @@ export default function ThemaAnsicht() {
         ))}
       </Section>
 
+      {/* Material haengt am Thema — Kern-Feature, immer sichtbar (kein Modul). */}
+      <MaterialPanel topicId={Number(id)} />
+
       {!a.cardvote && !a.karten && !a.lernpfad && !a.kalender && !a["code-detektiv"] && (
-        <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("thema.noModules")}</p>
+        <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("thema.noModulesButMaterial")}</p>
       )}
     </div>
   );

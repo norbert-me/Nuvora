@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .database import engine
 from .models import Base
-from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, planung, karten, kalender, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse
+from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, planung, karten, kalender, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material
 from . import websocket as ws
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -139,6 +139,7 @@ app.include_router(ausleihe.router)
 app.include_router(me.router)
 app.include_router(zufall.router)
 app.include_router(kurse.router)
+app.include_router(material.router)
 app.include_router(marketplace.router)
 
 UPLOAD_DIR = "/app/uploads"
