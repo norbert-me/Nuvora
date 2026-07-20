@@ -8,6 +8,7 @@ import { askPrompt, askConfirm } from "../core/dialog.jsx";
 import { pageTitle, pageIntro, btnPrimary, btnSecondary, selectStyle, chipStyle, Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, Toggle } from "../components/Icons.jsx";
 
 const API = "/api";
+const editLabel = { fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text3)", marginBottom: 6 };
 
 export default function Kurse() {
   const { t } = useLanguage();
@@ -94,38 +95,53 @@ export default function Kurse() {
               <button onClick={() => openEdit(k)} className="icon-btn" style={iconBtn} title={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
               <button onClick={() => delKurs(k)} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
             </div>
+            {/* Ansicht: nur die Klassen als Chips (Ändern läuft übers Bearbeiten). */}
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
               {k.classes.length === 0 && <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("kurse.empty")}</span>}
-              {k.classes.map((c) => (
-                <span key={c.id} style={{ ...chipStyle, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  {c.name}
-                  <button onClick={() => removeMember(k.id, c.id)} title={t("kurse.unlink")}
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", padding: 0, display: "flex" }}>
-                    <Icon d={ICONS.close} size={12} />
-                  </button>
-                </span>
-              ))}
+              {k.classes.map((c) => <span key={c.id} style={chipStyle}>{c.name}</span>)}
             </div>
-            {/* Bearbeiten-Bereich: Name + E/G. Erst hinter dem Stift-Knopf, damit
-                die SuS-Liste nicht dauernd offen steht. */}
+
+            {/* Bearbeiten-Bereich (hinter dem Stift): klar gegliedert in Name,
+                Klassen (hinzufügen/entfernen) und E/G. */}
             {editKurs === k.id && (
-              <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
-                <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-                  <input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t("kurse.renamePrompt")}
-                    onKeyDown={(e) => e.key === "Enter" && saveName(k)}
-                    style={{ ...inputStyle, flex: 1, minWidth: 160 }} />
-                  <button onClick={() => saveName(k)} style={btnPrimary}>{t("common.save")}</button>
+              <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12, display: "flex", flexDirection: "column", gap: 16 }}>
+                <div>
+                  <div style={editLabel}>{t("kurse.editName")}</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t("kurse.renamePrompt")}
+                      onKeyDown={(e) => e.key === "Enter" && saveName(k)} style={{ ...inputStyle, flex: 1, minWidth: 160 }} />
+                    <button onClick={() => saveName(k)} style={btnPrimary}>{t("common.save")}</button>
+                  </div>
                 </div>
-                {frei(k).length > 0 && (
-                  <select value="" onChange={(e) => e.target.value && addMember(k.id, Number(e.target.value))} style={{ ...selectStyle, fontSize: 12.5, marginBottom: 12 }}>
-                    <option value="">+ {t("kurse.addClass")}</option>
-                    {frei(k).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+
+                <div>
+                  <div style={editLabel}>{t("kurse.editClasses")}</div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                    {k.classes.map((c) => (
+                      <span key={c.id} style={{ ...chipStyle, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        {c.name}
+                        <button onClick={() => removeMember(k.id, c.id)} title={t("kurse.unlink")}
+                          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", padding: 0, display: "flex" }}>
+                          <Icon d={ICONS.close} size={12} />
+                        </button>
+                      </span>
+                    ))}
+                    {frei(k).length > 0 && (
+                      <select value="" onChange={(e) => e.target.value && addMember(k.id, Number(e.target.value))} style={{ ...selectStyle, fontSize: 12.5 }}>
+                        <option value="">+ {t("kurse.addClass")}</option>
+                        {frei(k).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    )}
+                  </div>
+                </div>
+
+                {k.classes.length > 0 && (
+                  <div>
+                    <div style={editLabel}>{t("kurse.editLevels")}</div>
+                    <Toggle checked={!!k.niveau_aktiv} onChange={(v) => setNiveauAktiv(k, v)} label={t("kurse.niveauToggle")} />
+                    {k.niveau_aktiv && <NiveauPanel kursId={k.id} t={t} />}
+                  </div>
                 )}
-                {k.classes.length > 0 && (<>
-                  <Toggle checked={!!k.niveau_aktiv} onChange={(v) => setNiveauAktiv(k, v)} label={t("kurse.niveauToggle")} />
-                  {k.niveau_aktiv && <NiveauPanel kursId={k.id} t={t} />}
-                </>)}
               </div>
             )}
           </div>
