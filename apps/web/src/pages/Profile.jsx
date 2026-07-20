@@ -258,10 +258,10 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             <div style={{ height: 1, flex: 1, background: "var(--border2)" }} />
           </div>
 
-          {setup && !(setup.smtp && setup.site_json && setup.admin_email) && (
+          {setup && !(setup.smtp && setup.site_json && setup.admin_email && setup.contact_deliverable) && (
             <div style={{ padding: 24, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 16 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("profile.setup")}</div>
-              {[["smtp", t("profile.setupSmtp")], ["site_json", t("profile.setupSite")], ["admin_email", t("profile.setupAdminMail")]].map(([k, label]) => (
+              {[["smtp", t("profile.setupSmtp")], ["site_json", t("profile.setupSite")], ["admin_email", t("profile.setupAdminMail")], ["contact_deliverable", t("profile.setupContact")]].map(([k, label]) => (
                 <div key={k} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, padding: "5px 0", color: "var(--text)" }}>
                   <span style={{ display: "inline-flex", width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center", background: setup[k] ? "#0a7d3e" : "var(--border3)", color: "#fff", flexShrink: 0 }}>
                     {setup[k]
@@ -272,6 +272,8 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                 </div>
               ))}
               {!setup.smtp && <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>{t("profile.setupSmtpHint")}</p>}
+              {setup.smtp && !setup.contact_deliverable && <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>{t("profile.setupContactHint")}</p>}
+              {setup.contact_to && <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>{t("profile.setupContactTo", { to: setup.contact_to })}</p>}
             </div>
           )}
 

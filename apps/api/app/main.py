@@ -780,10 +780,16 @@ async def admin_setup(user=Depends(_require_admin)):
     """Einrichtungsstatus fuer das Admin-Profil: was fehlt noch?"""
     from . import mailer
     site = _pathlib.Path("/app/config/site.json")
+    admin_email = (os.environ.get("ADMIN_EMAIL") or "").strip()
+    # Empfaenger des Kontaktformulars: ADMIN_EMAIL (wenn echte Adresse), sonst SMTP_FROM.
+    contact_to = admin_email if "@" in admin_email else (os.environ.get("SMTP_FROM") or "").strip()
     return {
         "smtp": mailer.email_configured(),
         "site_json": site.exists(),
-        "admin_email": bool(os.environ.get("ADMIN_EMAIL")),
+        "admin_email": bool(admin_email),
+        # Kann das Kontaktformular wirklich zustellen? (echte Empfaengeradresse + SMTP)
+        "contact_deliverable": ("@" in contact_to) and mailer.email_configured(),
+        "contact_to": contact_to,
     }
 
 
@@ -824,17 +830,26 @@ async def contact(body: ContactBody, request: Request):
     from . import mailer
     from .routers.auth import rate_limit, client_ip
     rate_limit("contact", client_ip(request), 5, 3600, "Zu viele Nachrichten. Bitte später erneut versuchen.")
-    to = os.environ.get("ADMIN_EMAIL", "")
-    if not to:
+    # Empfaenger: ADMIN_EMAIL ist zugleich der Admin-LOGIN und oft KEINE echte
+    # Mailadresse (z.B. "admin"). Fuers Kontaktformular brauchen wir eine
+    # zustellbare Adresse — sonst faellt sie auf SMTP_FROM (das eigene Postfach
+    # des Betreibers) zurueck. Genau hier scheiterte der Versand bisher lautlos.
+    to = (os.environ.get("ADMIN_EMAIL") or "").strip()
+    if "@" not in to:
+        to = (os.environ.get("SMTP_FROM") or "").strip()
+    if "@" not in to:
         raise HTTPException(503, "Kontaktformular derzeit nicht verfügbar")
     # Zeilenumbrueche aus Nutzereingaben strippen — verhindert E-Mail-Header-Injection im Subject
     def _hdr(s: str) -> str:
         return s.replace("\r", " ").replace("\n", " ").strip()
     sender = _hdr(body.name) or _hdr(body.email)
+    # Reply-To auf den Absender, damit der Betreiber direkt antworten kann
+    # (die Mail selbst kommt von SMTP_FROM, nicht vom Besucher).
     ok = await mailer.send_email(
         to,
-        f"CardVote Kontaktanfrage von {sender}",
+        f"Nuvora Kontaktanfrage von {sender}",
         f"Von: {sender} <{_hdr(body.email)}>\n\n{body.message.strip()}",
+        reply_to=_hdr(body.email),
     )
     if not ok:
         raise HTTPException(503, "Nachricht konnte nicht gesendet werden")

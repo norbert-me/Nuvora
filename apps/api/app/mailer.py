@@ -12,19 +12,21 @@ def email_configured() -> bool:
     return bool(os.environ.get("SMTP_HOST") and os.environ.get("SMTP_FROM"))
 
 
-def _send_sync(to: str, subject: str, body: str) -> bool:
+def _send_sync(to: str, subject: str, body: str, reply_to: str = "") -> bool:
     host = os.environ.get("SMTP_HOST")
     port = int(os.environ.get("SMTP_PORT", "465"))
     user = os.environ.get("SMTP_USER")
     password = os.environ.get("SMTP_PASSWORD")
     sender = os.environ.get("SMTP_FROM")
-    from_name = os.environ.get("SMTP_FROM_NAME", "CardVote")
+    from_name = os.environ.get("SMTP_FROM_NAME", "Nuvora")
     if not host or not sender:
         return False
 
     msg = EmailMessage()
     msg["From"] = f"{from_name} <{sender}>" if from_name else sender
     msg["To"] = to
+    if reply_to:
+        msg["Reply-To"] = reply_to
     msg["Subject"] = subject
     msg.set_content(body)
 
@@ -44,13 +46,13 @@ def _send_sync(to: str, subject: str, body: str) -> bool:
     return True
 
 
-async def send_email(to: str, subject: str, body: str) -> bool:
+async def send_email(to: str, subject: str, body: str, reply_to: str = "") -> bool:
     """Versendet best-effort — wirft nie, blockiert nie den Request (läuft im Threadpool)."""
     if not email_configured():
         logger.info("SMTP nicht konfiguriert — E-Mail an %s übersprungen", to)
         return False
     try:
-        return await asyncio.to_thread(_send_sync, to, subject, body)
+        return await asyncio.to_thread(_send_sync, to, subject, body, reply_to)
     except Exception as e:
         logger.warning("E-Mail-Versand an %s fehlgeschlagen: %s", to, e)
         return False
