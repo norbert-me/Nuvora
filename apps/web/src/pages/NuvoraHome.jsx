@@ -88,7 +88,8 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv }) {
 // Eintraege, direkt auf der Startseite. Nur Anzeige — Klick fuehrt in den
 // Kalender. Erscheint nur, wenn das Modul Kalender aktiv ist.
 const wochentag = () => (new Date().getDay() + 6) % 7; // Mo=0 … So=6
-function HeutePanel({ t }) {
+function HeutePanel({ t, orgaAktiv }) {
+  const heuteYmd = new Date().toISOString().slice(0, 10);
   const [data, setData] = useState(null); // { slots, times, entries, classes, frei }
   useEffect(() => {
     let ab = false;
@@ -135,8 +136,10 @@ function HeutePanel({ t }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {slots.map((s) => {
             const e = eintrag(s.period);
+            // 1-Klick: mit Klasse + aktivem Orga direkt in die Anwesenheit heute.
+            const to = orgaAktiv && s.class_id ? `/orga?tab=anwesenheit&class=${s.class_id}&date=${heuteYmd}` : "/kalender";
             return (
-              <Link key={s.id} to="/kalender" style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px solid var(--border)", borderLeft: `4px solid ${s.class_id ? ccolor(s.class_id) : "var(--border2)"}`, borderRadius: 10, textDecoration: "none", color: "var(--text)" }}>
+              <Link key={s.id} to={to} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px solid var(--border)", borderLeft: `4px solid ${s.class_id ? ccolor(s.class_id) : "var(--border2)"}`, borderRadius: 10, textDecoration: "none", color: "var(--text)" }}>
                 <div style={{ minWidth: 42, textAlign: "center" }}>
                   <div style={{ fontSize: 14, fontWeight: 800 }}>{s.period}.</div>
                   <div style={{ fontSize: 10, color: "var(--text3)" }}>{zeit(s.period)}</div>
@@ -231,7 +234,7 @@ export default function NuvoraHome({ user }) {
         </div>
       ) : (
         <>
-          {!edit && isOn("kalender") && <HeutePanel t={t} />}
+          {!edit && isOn("kalender") && <HeutePanel t={t} orgaAktiv={isOn("orga")} />}
           {!edit && isOn("cardvote") && <SchwacheWoche t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} />}
           <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
             {(edit ? displayList : shown).map((m) => {
