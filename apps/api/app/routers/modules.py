@@ -113,22 +113,13 @@ REGISTRY: List[ModuleDef] = [
         group="organisation",
         name="Orga",
         description=(
-            "Drei Werkzeuge je Klasse: Sammel-Checklisten (z.B. „Unterschrift der "
-            "Klassenarbeit gesehen“), Anwesenheit/Fehlzeiten (mit PDF-Report) und "
-            "Material-Ausleihe (verleihen, Rückgabe im Blick)."
+            "Werkzeuge zur Klassenführung: Sammel-Checklisten (z.B. „Unterschrift "
+            "der Klassenarbeit gesehen“), Anwesenheit/Fehlzeiten (mit PDF-Report), "
+            "Material-Ausleihe (verleihen, Rückgabe im Blick) und Sitzplan (Tische "
+            "frei platzieren)."
         ),
         path="/orga",
         stage="stable",
-    ),
-    ModuleDef(
-        key="sitzplan",
-        group="organisation",
-        name="Sitzplan",
-        description=(
-            "Sitzordnung je Klasse: Schueler per Drag & Drop auf ein Raster "
-            "setzen. Nur die Positionen werden gespeichert."
-        ),
-        path="/sitzplan",
     ),
     ModuleDef(
         key="zufall",

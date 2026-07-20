@@ -72,7 +72,6 @@ import Karten from "./pages/Karten.jsx";
 import Kalender from "./pages/Kalender.jsx";
 import Methoden from "./pages/Methoden.jsx";
 import Zufall from "./pages/Zufall.jsx";
-import Sitzplan from "./pages/Sitzplan.jsx";
 import Orga from "./pages/Orga.jsx";
 import { useModules } from "./core/modules.js";
 import { DialogHost } from "./core/dialog.jsx";
@@ -96,7 +95,6 @@ const KA = "/karten";
 const KAL = "/kalender";
 const MET = "/methoden";
 const ZUF = "/zufall";
-const SIT = "/sitzplan";
 const ORG = "/orga";
 const AUS = "/ausleihe";
 
@@ -113,7 +111,6 @@ const getModuleNavItems = (t, location) => {
     : pathname.startsWith(KAL) ? "kalender"
     : pathname.startsWith(MET) ? "methoden"
     : pathname.startsWith(ZUF) ? "zufall"
-    : pathname.startsWith(SIT) ? "sitzplan"
     : pathname.startsWith(ORG) ? "orga"
     : pathname.startsWith(KA) ? "karten"
     : params.get("area"); // Hilfe u.ae.: Bereich aus der Query
@@ -151,15 +148,13 @@ const getModuleNavItems = (t, location) => {
   if (area === "zufall") {
     return [{ to: ZUF, label: t("zufall.title") }];
   }
-  if (area === "sitzplan") {
-    return [{ to: SIT, label: t("sitzplan.title") }];
-  }
   if (area === "orga") {
     const tab = params.get("tab");
     return [
-      { to: `${ORG}?tab=checklisten`, label: t("orga.tabChecklists"), active: !["anwesenheit", "ausleihe"].includes(tab) },
+      { to: `${ORG}?tab=checklisten`, label: t("orga.tabChecklists"), active: !["anwesenheit", "ausleihe", "sitzplan"].includes(tab) },
       { to: `${ORG}?tab=anwesenheit`, label: t("anwesenheit.title"), active: tab === "anwesenheit" },
       { to: `${ORG}?tab=ausleihe`, label: t("ausleihe.title"), active: tab === "ausleihe" },
+      { to: `${ORG}?tab=sitzplan`, label: t("sitzplan.title"), active: tab === "sitzplan" },
     ];
   }
   if (area === "code-detektiv") {
@@ -702,7 +697,6 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={KAL} element={user ? <ModuleGate moduleKey="kalender"><Kalender /></ModuleGate> : <Landing />} />
           <Route path={MET} element={user ? <ModuleGate moduleKey="methoden"><Methoden /></ModuleGate> : <Landing />} />
           <Route path={ZUF} element={user ? <ModuleGate moduleKey="zufall"><Zufall /></ModuleGate> : <Landing />} />
-          <Route path={SIT} element={user ? <ModuleGate moduleKey="sitzplan"><Sitzplan /></ModuleGate> : <Landing />} />
           <Route path={ORG} element={user ? <ModuleGate moduleKey="orga"><Orga /></ModuleGate> : <Landing />} />
 
           {/* ─── Modul Code-Detektiv ─── */}

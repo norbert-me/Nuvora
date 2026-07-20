@@ -10,6 +10,7 @@ import { useLanguage } from "../i18n/index.jsx";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import Anwesenheit from "./Anwesenheit.jsx";
 import Ausleihe from "./Ausleihe.jsx";
+import Sitzplan from "./Sitzplan.jsx";
 
 const API = "/api/orga";
 
@@ -22,9 +23,9 @@ export default function Orga() {
   const [params] = useSearchParams();
   // Zwei Werkzeuge unter einem Dach: Checklisten und Anwesenheit. Kalender kann
   // per ?tab=anwesenheit direkt in die Anwesenheit springen.
-  const [tab, setTab] = useState(["anwesenheit", "ausleihe"].includes(params.get("tab")) ? params.get("tab") : "checklisten");
+  const [tab, setTab] = useState(["anwesenheit", "ausleihe", "sitzplan"].includes(params.get("tab")) ? params.get("tab") : "checklisten");
   // Auf ?tab-Wechsel aus der Navbar reagieren (nicht nur beim ersten Laden).
-  useEffect(() => { setTab(["anwesenheit", "ausleihe"].includes(params.get("tab")) ? params.get("tab") : "checklisten"); }, [params]);
+  useEffect(() => { setTab(["anwesenheit", "ausleihe", "sitzplan"].includes(params.get("tab")) ? params.get("tab") : "checklisten"); }, [params]);
 
   useEffect(() => {
     return swr("classes", "/api/classes", (d) => {
@@ -70,10 +71,10 @@ export default function Orga() {
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
         <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("orga.moduleTitle")}</h1>
         <Tabs value={tab} onChange={setTab}
-          options={[["checklisten", t("orga.tabChecklists")], ["anwesenheit", t("orga.tabAttendance")], ["ausleihe", t("ausleihe.title")]]} />
+          options={[["checklisten", t("orga.tabChecklists")], ["anwesenheit", t("orga.tabAttendance")], ["ausleihe", t("ausleihe.title")], ["sitzplan", t("sitzplan.title")]]} />
       </div>
 
-      {tab === "anwesenheit" ? <Anwesenheit /> : tab === "ausleihe" ? <Ausleihe /> : (<>
+      {tab === "anwesenheit" ? <Anwesenheit /> : tab === "ausleihe" ? <Ausleihe /> : tab === "sitzplan" ? <Sitzplan /> : (<>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
         <KursKlasseSelect value={classId} onChange={setClassId} />
       </div>

@@ -16,7 +16,8 @@ from .auth import get_current_user, rate_limit
 from .modules import is_active
 
 router = APIRouter(prefix="/api/sitzplan", tags=["sitzplan"])
-MODULE_KEY = "sitzplan"
+# Sitzplan lebt jetzt als Tab im Modul „Orga" — daher über orga gegated.
+MODULE_KEY = "orga"
 
 
 async def require_module(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> User:
