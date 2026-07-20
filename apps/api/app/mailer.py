@@ -74,7 +74,7 @@ async def send_test(to: str):
     if not email_configured():
         return {"ok": False, "error": "SMTP nicht konfiguriert (SMTP_HOST oder SMTP_FROM leer)", "config": config_status()}
     try:
-        await asyncio.to_thread(_send_sync, to, "CardVote — Test-E-Mail", "Test erfolgreich. SMTP funktioniert.")
+        await asyncio.to_thread(_send_sync, to, "Nuvora — Test-E-Mail", "Test erfolgreich. SMTP funktioniert.")
         return {"ok": True, "config": config_status()}
     except Exception as e:
         return {"ok": False, "error": f"{type(e).__name__}: {e}", "config": config_status()}

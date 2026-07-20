@@ -579,7 +579,7 @@ export default {
   "tut.eval.4": "Export as PDF, Excel or iDoceo CSV — per person or as an overview.",
   "tut.eval.5": "In the marketplace you publish your own question sets or adopt others with one click.",
   "help.title": "Help",
-  "help.tutorialBanner": "First time here? The {{link}} walks you through CardVote — restartable any time.",
+  "help.tutorialBanner": "First time here? The {{link}} walks you through Nuvora — restartable any time.",
   "help.tutorialWord": "tutorial",
   "help.contact": "Question not covered? Get in touch via {{link}}.",
   "help.core.classesT": "Classes and students",

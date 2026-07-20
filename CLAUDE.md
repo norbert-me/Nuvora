@@ -12,7 +12,7 @@ Daraus folgen drei Regeln, die jede Änderung einhalten muss:
 - **Kein Modul hat eigene Konten.** Der Kern authentifiziert, Module erben.
 - **Module hängen nicht voneinander ab.** CardVote muss ohne Lernpfad vollständig funktionieren und umgekehrt. Verbindendes (Themen, später die Wochenplanung) ist **Zusatz, nie Voraussetzung**: `questions.topic_id` ist deshalb optional und `ON DELETE SET NULL`. Ein Feature, das CardVote ohne Lernpfad kaputt macht, ist falsch gebaut — auch wenn es fachlich reizvoll klingt.
 
-Verzeichnisse folgen der Architektur, nicht der Herkunft: `apps/api` (Kern + Modul-Router), `apps/web` (Shell + Modul-Seiten), `apps/lernpfad` (noch eigenständig). Es gibt kein `apps/cardvote` — der Kern kann nicht in einem seiner Module liegen.
+Verzeichnisse folgen der Architektur, nicht der Herkunft: `apps/api` (Kern + Modul-Router) und `apps/web` (Shell + Modul-Seiten). Die Lernpfad-Statik liegt **in** `apps/web/public/lp/` und wird in-page gemountet — es gibt **kein** `apps/lernpfad` mehr. Es gibt auch kein `apps/cardvote` — der Kern kann nicht in einem seiner Module liegen.
 
 ## Status
 
@@ -59,7 +59,7 @@ Bestandskonten werden beim Start einmalig angeschlossen (`users.modules_initiali
 
 Pflicht-Env: `POSTGRES_PASSWORD`, `TOKEN_SECRET` — Compose bricht ohne sie bewusst ab, damit keine Default-Credentials in Produktion landen.
 
-`config/site.json` ist die **einzige** Quelle der Betreiberdaten. Lernpfad bekommt `./config` nach `/app/config` gemountet und liest sie über `server.js`; CardVotes `Legal.jsx` fetcht `/site.json`, das der Proxy aus demselben Mount ausliefert. Früher hatte jedes Modul seine eigene Datei (`config/site.json` vs. `frontend/public/legal-config.json`) mit eigenem Schema — die waren bereits inhaltlich auseinandergelaufen. Schema ist jetzt das deutsche (`betreiber`, `strasse`, `plz_ort`, …).
+`config/site.json` ist die **einzige** Quelle der Betreiberdaten. `Legal.jsx` (im Rahmen) fetcht `/site.json`, das der Proxy aus dem `config`-Mount ausliefert — kein per-Modul-Config, kein `server.js` mehr. Früher hatte jedes Modul seine eigene Datei (`config/site.json` vs. `frontend/public/legal-config.json`) mit eigenem Schema — die waren bereits inhaltlich auseinandergelaufen. Schema ist jetzt das deutsche (`betreiber`, `strasse`, `plz_ort`, …).
 
 ### Als Nächstes
 
@@ -93,12 +93,12 @@ Im Rahmen, unter `/cardvote/*`. Herkunft: eigenständiges Projekt bis v1.4.4 ([A
 - **Scan** — OpenCV (`opencv-contrib-python-headless`), ArUco `DICT_6X6_50`.
 - **Auth** — PBKDF2 (SHA-256, 100k Iterationen), E-Mail-Bestätigungspflicht, Reset per Einmal-Link (1h), Rate-Limits. Token im `localStorage`, globaler `fetch`-Interceptor in `main.jsx`.
 
-### Lernpfad — `apps/lernpfad`
+### Lernpfad — `apps/web/public/lp/` (in-page in `apps/web` gemountet)
 
-Auf dem Kern, aber **nicht in React nachgebaut**: die bestehende App läuft eingebettet unter `/lernpfad` weiter. Ihre Oberfläche ist erprobt (Aufgaben, Klasse, Generator, Lernpfade) — ein Nachbau wäre Verschwendung und ist bewusst verworfen worden.
+Auf dem Kern, aber **nicht in React nachgebaut**: die bestehende App läuft eingebettet unter `/lernpfad` weiter. Ihre Oberfläche ist erprobt (Aufgaben, Klasse, Generator, Lernpfade) — ein Nachbau wäre Verschwendung und ist bewusst verworfen worden. `LernpfadModule.jsx` mountet die Statik **nativ in-page** (kein iframe, kein eigener Container).
 
-- Frontend `js/app.js` — ~2000 Zeilen, ein IIFE, kein Framework, kein Build. KaTeX liegt gebündelt in `vendor/` (kein Dependency-Ordner — nicht löschen, der Docker-Build braucht ihn).
-- `server.js` liefert **nur noch Statik**. Kein eigenes Backend, keine SQLite, keine eigenen Konten.
+- Frontend `apps/web/public/lp/js/app.js` — ein IIFE, kein Framework, kein Build. KaTeX liegt gebündelt in `vendor/` (kein Dependency-Ordner — nicht löschen).
+- **Nur Statik**, vom `web`-Container ausgeliefert. Kein eigenes Backend, keine SQLite, keine eigenen Konten, kein `server.js`.
 - Daten kommen aus dem Kern: `/api/lernpfad/*` (Aufgaben, Pfade, Lernleitern), `/api/classes`, `/api/topics`.
 
 **Der Adapter ist der Kern der Sache.** `vonKern`/`zuKern` in `app.js` übersetzen an der Datengrenze, damit die 2000 Zeilen Oberfläche ihre alten Formen behalten:

@@ -235,7 +235,7 @@ fi
 echo "  ✓ Datenbank-Zugang in Ordnung."
 
 echo "→ Container bauen (${BUILD_SERVICES:-alle})..."
-# nginx loest die Upstream-Namen (api, web, lernpfad) EINMAL beim Start auf und
+# nginx loest die Upstream-Namen (api, web) EINMAL beim Start auf und
 # merkt sich die IPs. Werden die Container neu erstellt, bekommen sie neue IPs —
 # der unveraenderte Proxy zeigt dann auf tote Adressen und liefert 502, obwohl
 # alles laeuft. Deshalb am Ende immer neu starten: das kostet einen Wimpernschlag

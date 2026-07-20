@@ -165,12 +165,12 @@ async def _send_verify_mail(user: User):
     link = f"{SITE_URL}/verify-email?token={token}" if SITE_URL else f"/verify-email?token={token}"
     await mailer.send_email(
         user.email,
-        "CardVote — E-Mail bestätigen",
+        "Nuvora — E-Mail bestätigen",
         "Hallo,\n\n"
-        "bitte bestätige deine E-Mail-Adresse, um dein CardVote-Konto zu aktivieren:\n\n"
+        "bitte bestätige deine E-Mail-Adresse, um dein Nuvora-Konto zu aktivieren:\n\n"
         f"{link}\n\n"
         "Wichtig: Wird die Adresse nicht innerhalb von 14 Tagen bestätigt, wird das Konto automatisch gelöscht.\n\n"
-        "Viele Grüße\nDein CardVote-Team",
+        "Viele Grüße\nDein Nuvora-Team",
     )
 
 
@@ -393,13 +393,13 @@ async def forgot_password(body: ForgotPasswordBody, request: Request, db: AsyncS
         link = f"{SITE_URL}/reset-password?token={token}" if SITE_URL else f"/reset-password?token={token}"
         await mailer.send_email(
             user.email,
-            "CardVote — Passwort zurücksetzen",
+            "Nuvora — Passwort zurücksetzen",
             "Hallo,\n\n"
-            "du hast angefordert, dein CardVote-Passwort zurückzusetzen. "
+            "du hast angefordert, dein Nuvora-Passwort zurückzusetzen. "
             "Öffne dazu den folgenden Link (1 Stunde gültig):\n\n"
             f"{link}\n\n"
             "Wenn du das nicht warst, kannst du diese E-Mail ignorieren — dein Passwort bleibt unverändert.\n\n"
-            "Viele Grüße\nDein CardVote-Team",
+            "Viele Grüße\nDein Nuvora-Team",
         )
     # Keine Auskunft, ob das Konto existiert (kein Account-Enumeration)
     return {"ok": True}
@@ -503,12 +503,12 @@ async def change_email(body: ChangeEmailBody, request: Request, user: User = Dep
     link = f"{SITE_URL}/confirm-email-change?token={token}" if SITE_URL else f"/confirm-email-change?token={token}"
     sent = await mailer.send_email(
         new_email,
-        "CardVote — Neue E-Mail-Adresse bestätigen",
+        "Nuvora — Neue E-Mail-Adresse bestätigen",
         "Hallo,\n\n"
-        "bitte bestätige deine neue E-Mail-Adresse für dein CardVote-Konto:\n\n"
+        "bitte bestätige deine neue E-Mail-Adresse für dein Nuvora-Konto:\n\n"
         f"{link}\n\n"
         "Wenn du das nicht warst, kannst du diese E-Mail ignorieren — deine bisherige Adresse bleibt gültig.\n\n"
-        "Viele Grüße\nDein CardVote-Team",
+        "Viele Grüße\nDein Nuvora-Team",
     )
     # Ohne zustellbare Bestaetigungsmail darf die Adresse nicht wechseln:
     # sonst haengt ein pending_email fest, das nie bestaetigt werden kann.

@@ -579,7 +579,7 @@ export default {
   "tut.eval.4": "Exporta como PDF, Excel o CSV de iDoceo, por persona o como resumen.",
   "tut.eval.5": "En el mercado publicas tus conjuntos o adoptas otros con un clic.",
   "help.title": "Ayuda",
-  "help.tutorialBanner": "¿Primera vez? El {{link}} te guía por CardVote, reiniciable cuando quieras.",
+  "help.tutorialBanner": "¿Primera vez? El {{link}} te guía por Nuvora, reiniciable cuando quieras.",
   "help.tutorialWord": "tutorial",
   "help.contact": "¿Falta tu pregunta? Escríbenos por {{link}}.",
   "help.core.classesT": "Clases y alumnado",
