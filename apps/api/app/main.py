@@ -161,6 +161,7 @@ def _ensure_columns(sync_conn):
         ("users", "methoden_seeded", "BOOLEAN DEFAULT false NOT NULL"),
         ("users", "calendar_token", "VARCHAR(64)"),
         ("users", "external_ics_url", "TEXT"),
+        ("marketplace_quizzes", "copies", "INTEGER DEFAULT 0"),
         ("kurse", "niveau_aktiv", "BOOLEAN DEFAULT false NOT NULL"),
         ("seating_plans", "kurs_id", "INTEGER"),
         ("orga_items", "kurs_id", "INTEGER"),

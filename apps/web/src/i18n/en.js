@@ -228,6 +228,7 @@ export default {
   "market.needClass": "Create a class first, then adopt the deck.",
   "market.chooseClass": "Choose class",
   "market.chooseClassHint": "Which class should «{{title}}» be copied into?",
+  "market.copies": "copied {{n}}×",
   "market.unknown": "Unknown",
   "market.adminOnly": "Only visible to admin",
   "market.preview": "Preview",

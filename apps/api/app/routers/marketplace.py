@@ -109,6 +109,7 @@ async def _quiz_to_dict(quiz: MarketplaceQuiz, user_id: int, current_names: dict
         "author_name": _live_author_name(quiz, current_names),
         "author_id": quiz.author_id,
         "question_count": quiz.question_count,
+        "copies": quiz.copies or 0,
         "created_at": quiz.created_at.isoformat() if quiz.created_at else None,
         "avg_rating": avg,
         "rating_count": count,
@@ -286,6 +287,7 @@ async def copy_quiz(quiz_id: int, body: Optional[CopyBody] = None, user: User = 
     quiz = await db.get(MarketplaceQuiz, quiz_id)
     if not quiz:
         raise HTTPException(404, "Eintrag nicht gefunden")
+    quiz.copies = (quiz.copies or 0) + 1  # Übernahme zählen (wird mit dem Copy committet)
     data = quiz.payload or {}
     kind = quiz.kind or "cardvote_questionset"
     if kind == "karten_deck":

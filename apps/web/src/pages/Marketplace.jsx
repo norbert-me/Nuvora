@@ -205,7 +205,10 @@ export default function Marketplace({ fixedKind }) {
               </div>
             </div>
             {q.description && <p style={{ fontSize: 13, color: "var(--text2)", margin: "6px 0 10px", lineHeight: 1.5 }}>{q.description}</p>}
-            <Stars value={q.avg_rating} my={q.my_rating} count={q.rating_count} onRate={(n) => rate(q.id, n)} t={t} />
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <Stars value={q.avg_rating} my={q.my_rating} count={q.rating_count} onRate={(n) => rate(q.id, n)} t={t} />
+              {q.copies > 0 && <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("market.copies", { n: q.copies })}</span>}
+            </div>
           </div>
         ))
       )}

@@ -257,6 +257,8 @@ class MarketplaceQuiz(Base):
     author_name: Mapped[str] = mapped_column(String(200), default="")
     payload: Mapped[dict] = mapped_column(JSON)  # Snapshot je nach kind
     question_count: Mapped[int] = mapped_column(Integer, default=0)  # Zahl der Elemente (Fragen/Karten)
+    # Wie oft übernommen — Orientierung („beliebt?"). Steigt bei jeder Kopie.
+    copies: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     ratings: Mapped[list["MarketplaceRating"]] = relationship(back_populates="quiz", cascade="all, delete-orphan")
 

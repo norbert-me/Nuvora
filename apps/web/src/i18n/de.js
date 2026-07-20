@@ -228,6 +228,7 @@ export default {
   "market.needClass": "Erst eine Klasse anlegen, dann Stapel übernehmen.",
   "market.chooseClass": "Klasse wählen",
   "market.chooseClassHint": "In welche Klasse soll „{{title}}“ übernommen werden?",
+  "market.copies": "{{n}}× übernommen",
   "market.unknown": "Unbekannt",
   "market.adminOnly": "Nur für Admin sichtbar",
   "market.preview": "Vorschau",

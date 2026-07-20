@@ -228,6 +228,7 @@ export default {
   "market.needClass": "Crea primero una clase y luego copia el mazo.",
   "market.chooseClass": "Elegir clase",
   "market.chooseClassHint": "¿A qué clase copiar «{{title}}»?",
+  "market.copies": "copiado {{n}}×",
   "market.unknown": "Desconocido",
   "market.adminOnly": "Solo visible para admin",
   "market.preview": "Vista previa",
