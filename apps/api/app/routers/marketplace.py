@@ -54,15 +54,16 @@ _EX_FIELDS = ("kategorie", "aufgabentext", "loesung", "operator", "kompetenz", "
 
 
 def _snapshot_from_ladder(path_name: str, topic_name: str, ladder: LearningLadder, exercises: list) -> dict:
-    # Eine Lernleiter als Aufgabensammlung: Thema (als Text, instanzunabhaengig),
-    # Notizen und der Aufgabenpool. KEIN class_id, KEINE assignments (Schuelerbezug
-    # ist lokal), keine topic_id (wird beim Kopieren per Name neu aufgeloest).
+    # Eine Lernleiter als Aufgabensammlung: Thema (als Text, instanzunabhaengig)
+    # und der Aufgabenpool. KEIN class_id, KEINE assignments (Schuelerbezug ist
+    # lokal), keine topic_id (wird beim Kopieren per Name neu aufgeloest) und
+    # BEWUSST keine Notizen: das ist Lehrkraft-Freitext, der Schuelernamen
+    # enthalten kann — im oeffentlichen Marktplatz hat er nichts zu suchen.
     return {
         "type": "lernpfad_ladder",
         "version": 1,
         "path_name": path_name,
         "topic_name": topic_name,
-        "notizen": ladder.notizen or "",
         "config": ladder.config or {},
         "exercises": [{k: getattr(e, k) for k in _EX_FIELDS} for e in exercises],
     }
@@ -124,7 +125,7 @@ def _live_author_name(quiz: MarketplaceQuiz, current_names: dict) -> str:
     return live or quiz.author_name or "Unbekannt"
 
 
-async def _quiz_to_dict(quiz: MarketplaceQuiz, user_id: int, current_names: dict, is_admin: bool = False, author_email: str | None = None) -> dict:
+async def _quiz_to_dict(quiz: MarketplaceQuiz, user_id: int, current_names: dict, is_admin: bool = False, author_email: Optional[str] = None) -> dict:
     ratings = quiz.ratings
     count = len(ratings)
     avg = round(sum(r.stars for r in ratings) / count, 2) if count else 0
@@ -218,7 +219,6 @@ async def get_quiz(quiz_id: int, user: User = Depends(get_current_user), db: Asy
     elif kind == "lernpfad_ladder":
         base["ladder"] = {
             "topic_name": data.get("topic_name", ""),
-            "notizen": data.get("notizen", ""),
             "exercises": [{"kategorie": e.get("kategorie", ""), "aufgabentext": e.get("aufgabentext", "")} for e in data.get("exercises", [])],
         }
     else:
@@ -487,7 +487,7 @@ async def _copy_ladder(quiz, data, user, db):
     # Ohne Klasse, ohne Zuweisungen — die Aufgaben haengen am Thema, die neue
     # Lehrkraft weist sie im Lernpfad ihren eigenen SuS zu.
     db.add(LearningLadder(path_id=path.id, topic_id=topic_id, position=pos,
-                          notizen=data.get("notizen", ""), assignments=[], config=data.get("config") or {}))
+                          notizen="", assignments=[], config=data.get("config") or {}))
     await db.commit()
     return {"id": path.id, "name": path.name}
 

@@ -816,7 +816,11 @@ _DEFAULT_SCALE = {"1": 87, "2": 73, "3": 59, "4": 45, "5": 20, "6": 0}
 
 def _grade_from_pct(pct: float, scale: dict) -> float:
     """Prozent -> Note, identisch zur Frontend-Skala (core/grades.js)."""
-    s = {int(k): v for k, v in (scale or _DEFAULT_SCALE).items()}
+    try:
+        s = {int(k): v for k, v in (scale or {}).items()}
+        s = {g: s[g] for g in (1, 2, 3, 4, 5, 6)}  # vollstaendig? sonst Default
+    except (ValueError, TypeError, KeyError):
+        s = {int(k): v for k, v in _DEFAULT_SCALE.items()}
     ranges = [(1, s[1], 100), (2, s[2], s[1]), (3, s[3], s[2]), (4, s[4], s[3]), (5, s[5], s[4])]
     for grade, lower, upper in ranges:
         if pct >= lower:

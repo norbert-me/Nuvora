@@ -4,6 +4,7 @@ import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
 import { DownloadLink, Icon, ICONS, btnPrimary, btnSecondary, modalOverlay, modalPanel, inputStyle } from "../components/Icons.jsx";
+import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
 
 const API = "/api";
 const COLORS = { A: "#0066cc", B: "#5856d6", C: "#b8860b", D: "#d1350f" };
@@ -21,27 +22,9 @@ function stddev(arr) {
   return Math.sqrt(arr.reduce((s, x) => s + (x - m) ** 2, 0) / (arr.length - 1));
 }
 
-const DEFAULT_SCALE = { 1: 87, 2: 73, 3: 59, 4: 45, 5: 20, 6: 0 };
 const GRADE_COLORS = { 1: "#0a7d3e", 2: "#0a7d3e", 3: "#b8860b", 4: "#b8860b", 5: "#d1350f", 6: "#d1350f" };
-
-function gradeFromPct(pct, scale) {
-  const s = scale || DEFAULT_SCALE;
-  const ranges = [
-    [1, s[1], 100],
-    [2, s[2], s[1]],
-    [3, s[3], s[2]],
-    [4, s[4], s[3]],
-    [5, s[5], s[4]],
-  ];
-  for (const [grade, lower, upper] of ranges) {
-    if (pct >= lower) {
-      const span = upper - lower;
-      if (span <= 0) return grade;
-      return Math.round((grade + (upper - pct) / span) * 10) / 10;
-    }
-  }
-  return 6.0;
-}
+// gradeFromPct + DEFAULT_SCALE liegen zentral in core/grades.js (eine Quelle,
+// auch von der Karten-Meisterung genutzt).
 
 function fmt(n) { return n % 1 === 0 ? String(n) : n.toFixed(1); }
 

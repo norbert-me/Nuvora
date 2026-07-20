@@ -261,7 +261,6 @@ export default function Marketplace({ fixedKind }) {
                 {preview.ladder && (
                   <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, fontSize: 13.5, color: "var(--text2)" }}>
                     {preview.ladder.topic_name && <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, color: "#2563eb" }}>{preview.ladder.topic_name}</div>}
-                    {preview.ladder.notizen && <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5, marginBottom: 10 }}>{preview.ladder.notizen}</div>}
                     {(preview.ladder.exercises || []).map((e, i) => (
                       <div key={i} style={{ padding: "8px 0", borderTop: i ? "1px solid var(--border)" : "none" }}>
                         {e.kategorie && <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", marginRight: 6 }}>{e.kategorie}</span>}
