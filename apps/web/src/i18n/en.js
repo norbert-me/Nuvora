@@ -227,6 +227,8 @@ export default {
   "market.kindQuiz": "Quiz",
   "market.kindDeck": "Cards",
   "market.kindMethod": "Starters",
+  "market.kindLadder": "Learning ladders",
+  "market.exercisesBy": "{{count}} exercises · by",
   "market.needClass": "Create a class first, then adopt the deck.",
   "market.chooseClass": "Choose class",
   "market.chooseClassHint": "Which class should «{{title}}» be copied into?",

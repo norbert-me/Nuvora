@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from ..database import get_db
 from ..models import (
     MarketplaceQuiz, MarketplaceRating, QuestionSet, QuestionSetItem, Question, User, Folder,
-    CardDeck, Card, Method, SchoolClass,
+    CardDeck, Card, Method, SchoolClass, Exercise, LearningPath, LearningLadder, Topic,
 )
 from .auth import get_current_user, rate_limit
 
@@ -35,9 +35,37 @@ class PublishMethodBody(BaseModel):
     author_name: str = ""
 
 
+class PublishLadderBody(BaseModel):
+    ladder_id: int
+    description: str = ""
+    author_name: str = ""
+
+
 class CopyBody(BaseModel):
     # Nur fuer karten_deck noetig: Zielklasse, an die der uebernommene Stapel haengt.
     class_id: Optional[int] = None
+
+
+# Nur inhaltliche Aufgabenfelder — keine ids/owner/code, kein Schuelerbezug. Die
+# Foerder-Tags gehoeren zur Aufgabe (welchen Schwerpunkt sie bedient), nicht zu einer Person.
+_EX_FIELDS = ("kategorie", "aufgabentext", "loesung", "operator", "kompetenz", "methode",
+              "unteraufgaben", "quelle_typ", "quelle_detail", "lrs", "lrs_text",
+              "foerderschwerpunkte", "latex")
+
+
+def _snapshot_from_ladder(path_name: str, topic_name: str, ladder: LearningLadder, exercises: list) -> dict:
+    # Eine Lernleiter als Aufgabensammlung: Thema (als Text, instanzunabhaengig),
+    # Notizen und der Aufgabenpool. KEIN class_id, KEINE assignments (Schuelerbezug
+    # ist lokal), keine topic_id (wird beim Kopieren per Name neu aufgeloest).
+    return {
+        "type": "lernpfad_ladder",
+        "version": 1,
+        "path_name": path_name,
+        "topic_name": topic_name,
+        "notizen": ladder.notizen or "",
+        "config": ladder.config or {},
+        "exercises": [{k: getattr(e, k) for k in _EX_FIELDS} for e in exercises],
+    }
 
 
 class RateBody(BaseModel):
@@ -187,6 +215,12 @@ async def get_quiz(quiz_id: int, user: User = Depends(get_current_user), db: Asy
         base["cards"] = [{"front": c.get("front", ""), "back": c.get("back", "")} for c in data.get("cards", [])]
     elif kind == "method":
         base["method"] = {"description": data.get("description", ""), "ablauf": data.get("ablauf", ""), "material": data.get("material", ""), "dauer": data.get("dauer")}
+    elif kind == "lernpfad_ladder":
+        base["ladder"] = {
+            "topic_name": data.get("topic_name", ""),
+            "notizen": data.get("notizen", ""),
+            "exercises": [{"kategorie": e.get("kategorie", ""), "aufgabentext": e.get("aufgabentext", "")} for e in data.get("exercises", [])],
+        }
     else:
         # Fragen mit Loesung, damit die Lehrkraft pruefen kann.
         base["questions"] = [
@@ -281,6 +315,46 @@ async def publish_method(body: PublishMethodBody, user: User = Depends(get_curre
     return {"id": quiz.id, "title": quiz.title}
 
 
+@router.post("/publish/ladder", status_code=201)
+async def publish_ladder(body: PublishLadderBody, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    rate_limit("mp_publish", f"u{user.id}", 30, 3600, "Zu viele Veröffentlichungen. Bitte später erneut versuchen.")
+    ladder = await db.get(LearningLadder, body.ladder_id)
+    if not ladder:
+        raise HTTPException(404, "Lernleiter nicht gefunden")
+    path = await db.get(LearningPath, ladder.path_id)
+    if not path or path.owner_id != user.id:
+        raise HTTPException(403, "Nur eigene Lernleitern koennen veroeffentlicht werden")
+    # Aufgabenpool = alle in den Zuweisungen referenzierten Aufgaben (die Differenzierung).
+    ex_ids: set[int] = set()
+    for a in (ladder.assignments or []):
+        for eid in (a.get("exercise_ids") or []):
+            ex_ids.add(eid)
+    exercises = []
+    if ex_ids:
+        exercises = (await db.execute(
+            select(Exercise).where(Exercise.id.in_(ex_ids), Exercise.owner_id == user.id)
+        )).scalars().all()
+    if not exercises:
+        raise HTTPException(400, "Die Lernleiter enthält keine Aufgaben")
+    topic_name = ""
+    if ladder.topic_id:
+        tp = await db.get(Topic, ladder.topic_id)
+        if tp:
+            parent = await db.get(Topic, tp.parent_id) if tp.parent_id else None
+            topic_name = f"{parent.name} / {tp.name}" if parent else tp.name
+    author = (body.author_name or "").strip() or (getattr(user, "marketplace_name", "") or "").strip() or user.name.strip() or "Unbekannt"
+    title = (topic_name or path.name or "Lernleiter")
+    quiz = MarketplaceQuiz(
+        kind="lernpfad_ladder", title=title[:200],
+        description=(body.description or "").strip()[:2000], author_id=user.id, author_name=author[:100],
+        payload=_snapshot_from_ladder(path.name, topic_name, ladder, exercises), question_count=len(exercises),
+    )
+    db.add(quiz)
+    await db.commit()
+    await db.refresh(quiz)
+    return {"id": quiz.id, "title": quiz.title}
+
+
 @router.post("/{quiz_id}/copy", status_code=201)
 async def copy_quiz(quiz_id: int, body: Optional[CopyBody] = None, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("mp_copy", f"u{user.id}", 120, 3600, "Zu viele Übernahmen. Bitte kurz warten.")
@@ -294,6 +368,8 @@ async def copy_quiz(quiz_id: int, body: Optional[CopyBody] = None, user: User = 
         return await _copy_deck(quiz, data, body, user, db)
     if kind == "method":
         return await _copy_method(quiz, data, user, db)
+    if kind == "lernpfad_ladder":
+        return await _copy_ladder(quiz, data, user, db)
     questions = data.get("questions", [])
     if len(questions) > 200:
         raise HTTPException(400, "Maximal 200 Fragen pro Set")
@@ -361,6 +437,59 @@ async def _copy_method(quiz, data, user, db):
     await db.commit()
     await db.refresh(m)
     return {"id": m.id, "title": m.title}
+
+
+async def _get_or_create_topic(db, user, name: str, parent_id):
+    q = select(Topic.id).where(Topic.owner_id == user.id, Topic.name == name)
+    q = q.where(Topic.parent_id == parent_id) if parent_id is not None else q.where(Topic.parent_id.is_(None))
+    tid = (await db.execute(q)).scalar_one_or_none()
+    if tid:
+        return tid
+    tp = Topic(name=name[:200], parent_id=parent_id, owner_id=user.id)
+    db.add(tp)
+    await db.flush()
+    return tp.id
+
+
+async def _resolve_topic(db, user, topic_name: str):
+    """'Oberthema / Unterthema' (oder nur 'Thema') im eigenen Konto anlegen/finden.
+    Genau der Adapter-Weg des Lernpfads: Thema als Text, ID lokal aufgeloest."""
+    if not topic_name:
+        return None
+    parts = [p.strip() for p in topic_name.split("/", 1)]
+    if len(parts) == 2 and parts[0] and parts[1]:
+        parent_id = await _get_or_create_topic(db, user, parts[0], None)
+        return await _get_or_create_topic(db, user, parts[1], parent_id)
+    return await _get_or_create_topic(db, user, parts[0], None)
+
+
+async def _copy_ladder(quiz, data, user, db):
+    exs = data.get("exercises", [])
+    if len(exs) > 300:
+        raise HTTPException(400, "Maximal 300 Aufgaben pro Lernleiter")
+    if not exs:
+        raise HTTPException(400, "Die Lernleiter enthält keine Aufgaben")
+    topic_id = await _resolve_topic(db, user, (data.get("topic_name") or "").strip())
+    for e in exs:
+        # Leere Strings statt None, damit NOT-NULL-Textspalten nicht brechen.
+        fields = {k: (e.get(k) if e.get(k) is not None else ("" if k not in ("foerderschwerpunkte", "unteraufgaben") else e.get(k))) for k in _EX_FIELDS}
+        if fields.get("unteraufgaben") is None:
+            fields["unteraufgaben"] = 1
+        db.add(Exercise(owner_id=user.id, topic_id=topic_id, **fields))
+    # Ziel-Lernpfad: gleichnamigen wiederverwenden (unique owner+name), sonst neu.
+    pname = ((data.get("path_name") or quiz.title or "Marktplatz").strip() or "Marktplatz")[:200]
+    path = (await db.execute(select(LearningPath).where(LearningPath.owner_id == user.id, LearningPath.name == pname))).scalars().first()
+    if not path:
+        path = LearningPath(name=pname, owner_id=user.id)
+        db.add(path)
+        await db.flush()
+    pos = len((await db.execute(select(LearningLadder).where(LearningLadder.path_id == path.id))).scalars().all())
+    # Ohne Klasse, ohne Zuweisungen — die Aufgaben haengen am Thema, die neue
+    # Lehrkraft weist sie im Lernpfad ihren eigenen SuS zu.
+    db.add(LearningLadder(path_id=path.id, topic_id=topic_id, position=pos,
+                          notizen=data.get("notizen", ""), assignments=[], config=data.get("config") or {}))
+    await db.commit()
+    return {"id": path.id, "name": path.name}
 
 
 @router.post("/{quiz_id}/rate")

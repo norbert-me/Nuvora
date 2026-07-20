@@ -227,6 +227,8 @@ export default {
   "market.kindQuiz": "Quiz",
   "market.kindDeck": "Karten",
   "market.kindMethod": "Einstiege",
+  "market.kindLadder": "Lernleitern",
+  "market.exercisesBy": "{{count}} Aufgaben · von",
   "market.needClass": "Erst eine Klasse anlegen, dann Stapel übernehmen.",
   "market.chooseClass": "Klasse wählen",
   "market.chooseClassHint": "In welche Klasse soll „{{title}}“ übernommen werden?",

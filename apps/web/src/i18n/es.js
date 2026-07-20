@@ -227,6 +227,8 @@ export default {
   "market.kindQuiz": "Cuestionario",
   "market.kindDeck": "Tarjetas",
   "market.kindMethod": "Inicios",
+  "market.kindLadder": "Escaleras de aprendizaje",
+  "market.exercisesBy": "{{count}} ejercicios · de",
   "market.needClass": "Crea primero una clase y luego copia el mazo.",
   "market.chooseClass": "Elegir clase",
   "market.chooseClassHint": "¿A qué clase copiar «{{title}}»?",

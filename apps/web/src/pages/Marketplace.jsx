@@ -67,7 +67,9 @@ export default function Marketplace({ fixedKind }) {
 
   // Zahl-/Autor-Zeile je Art (Prefix vor dem Autorennamen).
   const countLabel = (q) => q.kind === "karten_deck" ? t("market.cardsBy", { count: q.question_count })
-    : q.kind === "method" ? t("market.methodBy") : t("market.questionsBy", { count: q.question_count });
+    : q.kind === "method" ? t("market.methodBy")
+    : q.kind === "lernpfad_ladder" ? t("market.exercisesBy", { count: q.question_count })
+    : t("market.questionsBy", { count: q.question_count });
 
   const load = () => {
     setLoading(true);
@@ -147,7 +149,7 @@ export default function Marketplace({ fixedKind }) {
 
       {!lockedKind && (
       <div style={{ display: "flex", gap: 2, background: "var(--bg2)", padding: 3, borderRadius: 980, marginBottom: 14, width: "fit-content", flexWrap: "wrap" }}>
-        {[["", t("market.kindAll")], ["cardvote_questionset", t("market.kindQuiz")], ["karten_deck", t("market.kindDeck")], ["method", t("market.kindMethod")]].map(([k, label]) => (
+        {[["", t("market.kindAll")], ["cardvote_questionset", t("market.kindQuiz")], ["karten_deck", t("market.kindDeck")], ["method", t("market.kindMethod")], ["lernpfad_ladder", t("market.kindLadder")]].map(([k, label]) => (
           <button key={k} onClick={() => setKind(k)} style={{
             padding: "6px 14px", fontSize: 13, fontWeight: kind === k ? 600 : 400, cursor: "pointer",
             background: kind === k ? "var(--card)" : "transparent", color: kind === k ? "var(--text)" : "var(--text2)",
@@ -254,6 +256,18 @@ export default function Marketplace({ fixedKind }) {
                     <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{preview.method.description}</div>
                     {preview.method.ablauf && <div style={{ marginTop: 10 }}><b style={{ color: "var(--text3)", fontSize: 11.5 }}>{t("methoden.ablauf")}</b><div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{preview.method.ablauf}</div></div>}
                     {preview.method.material && <div style={{ marginTop: 10 }}><b style={{ color: "var(--text3)", fontSize: 11.5 }}>{t("methoden.material")}</b><div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{preview.method.material}</div></div>}
+                  </div>
+                )}
+                {preview.ladder && (
+                  <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, fontSize: 13.5, color: "var(--text2)" }}>
+                    {preview.ladder.topic_name && <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, color: "#2563eb" }}>{preview.ladder.topic_name}</div>}
+                    {preview.ladder.notizen && <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5, marginBottom: 10 }}>{preview.ladder.notizen}</div>}
+                    {(preview.ladder.exercises || []).map((e, i) => (
+                      <div key={i} style={{ padding: "8px 0", borderTop: i ? "1px solid var(--border)" : "none" }}>
+                        {e.kategorie && <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", marginRight: 6 }}>{e.kategorie}</span>}
+                        <span style={{ overflowWrap: "anywhere" }}>{e.aufgabentext}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
                 {(preview.questions || []).map((q, i) => (

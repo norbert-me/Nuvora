@@ -2649,7 +2649,8 @@
         down: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>',
         chevron: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>',
         check: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>',
-        info: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>'
+        info: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
+        share: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>'
     };
 
     // ─── Lernpfade ───
@@ -2802,6 +2803,7 @@
                 </div>
                 <div class="btn-group">
                     <button class="btn icon" data-ll-id="${ll._id}" data-action="rename" title="Umbenennen">${ICON.edit}</button>
+                    <button class="btn icon" data-ll-id="${ll._id}" data-action="share" title="Im Marktplatz teilen">${ICON.share}</button>
                     ${i > 0 ? `<button class="btn icon" data-ll-id="${ll._id}" data-action="up" title="Nach oben">${ICON.up}</button>` : ''}
                     ${i < list.length - 1 ? `<button class="btn icon" data-ll-id="${ll._id}" data-action="down" title="Nach unten">${ICON.down}</button>` : ''}
                     <button class="btn icon danger" data-ll-id="${ll._id}" data-action="delete" title="Entfernen">${ICON.delete}</button>
@@ -2817,6 +2819,24 @@
                 const idx = currentPfad.lernleitern.findIndex(ll => ll._id === llId);
                 if (action === 'open') {
                     openLernleiter(currentPfad, currentPfad.lernleitern[idx]);
+                    return;
+                }
+                if (action === 'share') {
+                    // ll._id ist die Server-Ladder-id (siehe loadLernpfade). Der
+                    // Marktplatz nimmt daraus den Aufgabenpool (ohne Schülerbezug).
+                    const ll = currentPfad.lernleitern[idx];
+                    if (!ll.schueler.some(s => (s.aufgabenIds || []).length)) {
+                        toast('Diese Lernleiter hat noch keine zugewiesenen Aufgaben.');
+                        return;
+                    }
+                    const desc = prompt('Kurze Beschreibung für den Marktplatz (optional):', '');
+                    if (desc === null) return;  // abgebrochen
+                    const r = await api(`/api/marketplace/publish/ladder`, {
+                        method: 'POST',
+                        body: JSON.stringify({ ladder_id: Number(ll._id), description: desc.trim() })
+                    }).catch(() => null);
+                    if (r && r.ok) toast('Im Marktplatz veröffentlicht.');
+                    else { const b = r ? await r.json().catch(() => ({})) : {}; toast(typeof b.detail === 'string' ? b.detail : 'Hat nicht geklappt.'); }
                     return;
                 }
                 if (action === 'rename') {
