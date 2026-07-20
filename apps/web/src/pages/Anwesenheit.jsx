@@ -51,6 +51,10 @@ export default function Anwesenheit() {
   const heutigeIds = useMemo(() => new Set(slots.filter((s) => s.weekday === weekday && s.class_id).map((s) => s.class_id)), [slots, weekday]);
   // Stunden dieser Klasse am gewählten Wochentag (für die optionale Stunden-Zuordnung).
   const tagStunden = useMemo(() => [...new Set(slots.filter((s) => s.weekday === weekday && s.class_id === classId).map((s) => s.period))].sort((a, b) => a - b), [slots, weekday, classId]);
+  // Alle Stunden des Tages (Stunde → Klasse): in der Tag-Ansicht wählt man die
+  // Stunde, das öffnet automatisch den zugehörigen Kurs/die Klasse.
+  const tagSlots = useMemo(() => slots.filter((s) => s.weekday === weekday && s.class_id).sort((a, b) => a.period - b.period), [slots, weekday]);
+  const stundenWahl = kalenderAktiv && view === "tag" && tagSlots.length > 0;
   // Tag-Ansicht: nur Klassen, die am gewählten Tag Unterricht haben (Stundenplan).
   // Übersicht: alle Klassen. Ohne Kalender/Stundenplan: alle.
   const filterAktiv = kalenderAktiv && view === "tag" && heutigeIds.size > 0;
@@ -62,11 +66,13 @@ export default function Anwesenheit() {
     if (classId === null || !sichtbareKlassen.some((c) => c.id === classId)) { const w = lastClass(); setClassId(sichtbareKlassen.some((c) => c.id === w) ? w : sichtbareKlassen[0].id); }
   }, [sichtbareKlassen, classId]);
 
-  // Stunde auf die erste des Tages setzen, wenn die aktuelle nicht (mehr) passt.
+  // Stunde+Kurs auf die erste Stunde des Tages, wenn die aktuelle nicht passt.
   useEffect(() => {
-    if (tagStunden.length && !tagStunden.includes(stunde)) setStunde(tagStunden[0]);
-    if (!tagStunden.length && stunde !== 0) setStunde(0);
-  }, [tagStunden]); // eslint-disable-line
+    if (stundenWahl) {
+      if (!tagSlots.some((s) => s.period === stunde && s.class_id === classId)) { setStunde(tagSlots[0].period); setClassId(tagSlots[0].class_id); }
+    } else if (tagStunden.length && !tagStunden.includes(stunde)) setStunde(tagStunden[0]);
+    else if (!tagStunden.length && stunde !== 0) setStunde(0);
+  }, [tagSlots, tagStunden, stundenWahl]); // eslint-disable-line
 
   const cls = useMemo(() => classes.find((c) => c.id === classId), [classes, classId]);
   const students = cls?.students || [];
@@ -131,7 +137,18 @@ export default function Anwesenheit() {
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
         <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("anwesenheit.title")}</h1>
-        <KursKlasseSelect value={classId} onChange={setClassId} />
+        {stundenWahl ? (
+          <select value={`${stunde}:${classId}`} onChange={(e) => { const [p, c] = e.target.value.split(":").map(Number); setStunde(p); setClassId(c); }}
+            style={{ ...selectStyle, minWidth: 200 }} title={t("anwesenheit.periodHint")}>
+            {tagSlots.map((s) => (
+              <option key={`${s.period}:${s.class_id}`} value={`${s.period}:${s.class_id}`}>
+                {s.period}. {t("kalender.period")} — {(classes.find((c) => c.id === s.class_id) || {}).name || ""}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <KursKlasseSelect value={classId} onChange={setClassId} />
+        )}
         <Tabs value={view} onChange={setView} style={{ marginLeft: "auto" }}
           options={[["tag", t("anwesenheit.day")], ["uebersicht", t("anwesenheit.overview")]]} />
       </div>
@@ -146,11 +163,6 @@ export default function Anwesenheit() {
             <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} style={inputStyle} />
             <button onClick={() => shift(1)} style={{ ...btnSecondary, padding: "6px 13px" }}>›</button>
             <button onClick={() => setDatum(ymd(new Date()))} style={{ ...btnSecondary, padding: "6px 13px" }}>{t("anwesenheit.today")}</button>
-            {tagStunden.length > 0 && (
-              <select value={stunde} onChange={(e) => setStunde(Number(e.target.value))} style={{ ...selectStyle, marginLeft: "auto" }} title={t("anwesenheit.periodHint")}>
-                {tagStunden.map((p) => <option key={p} value={p}>{p}. {t("kalender.period")}</option>)}
-              </select>
-            )}
           </div>
           {legende}
           {istFrei ? (

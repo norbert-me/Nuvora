@@ -104,7 +104,8 @@ export default function Sitzplan() {
     const rect = canvasRef.current.getBoundingClientRect();
     const x = Math.max(0, Math.min((e.clientX - rect.left) / zoom - d.dx, rect.width / zoom - TAFEL_W));
     const y = Math.max(0, Math.min((e.clientY - rect.top) / zoom - d.dy, rect.height / zoom - TAFEL_H));
-    setTafel({ x, y });
+    // rot beibehalten — sonst verliert die Tafel beim Verschieben ihre Drehung.
+    setTafel((tf) => ({ ...tf, x, y }));
   };
   const onTafelUp = () => {
     window.removeEventListener("pointermove", onTafelMove);
