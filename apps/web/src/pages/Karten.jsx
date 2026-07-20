@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, selectStyle, modalOverlay, modalPanel, Empty } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, selectStyle, modalOverlay, modalPanel, Empty, Skeleton } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
@@ -51,7 +51,8 @@ export default function Karten() {
   const [deckTrash, setDeckTrash] = useState([]);
   const [showTrash, setShowTrash] = useState(false);
   const kq = kursId != null ? `?kurs_id=${kursId}` : "";
-  const loadDecks = (id) => id && fetch(`${API}/classes/${id}/decks${kq}`).then((r) => (r.ok ? r.json() : [])).then(setDecks).catch(() => {});
+  const [loadingDecks, setLoadingDecks] = useState(true);
+  const loadDecks = (id) => { if (!id) return; setLoadingDecks(true); return fetch(`${API}/classes/${id}/decks${kq}`).then((r) => (r.ok ? r.json() : [])).then(setDecks).catch(() => {}).finally(() => setLoadingDecks(false)); };
   const loadTrash = (id) => id && fetch(`${API}/classes/${id}/decks/trash${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => setDeckTrash(Array.isArray(d) ? d : [])).catch(() => {});
   useEffect(() => { loadDecks(classId); loadTrash(classId); }, [classId, kursId]);
   const restoreDeck = async (id) => { await fetch(`${API}/decks/${id}/restore`, { method: "POST" }).catch(() => {}); loadDecks(classId); loadTrash(classId); };
@@ -115,7 +116,8 @@ export default function Karten() {
               style={{ flex: 1, maxWidth: 320, padding: "8px 12px", border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)" }} />
             <button type="submit" disabled={addingDeck || !newDeck.trim()} style={{ ...btnPrimary, opacity: (!addingDeck && newDeck.trim()) ? 1 : 0.4 }}>{t("common.add")}</button>
           </form>
-          {decks.length === 0 && <Empty title={t("karten.noDecks")} hint={t("karten.noDecksHint")} />}
+          {loadingDecks && decks.length === 0 ? <Skeleton rows={3} height={60} />
+            : decks.length === 0 ? <Empty title={t("karten.noDecks")} hint={t("karten.noDecksHint")} /> : null}
           {decks.map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} />)}
           {deckTrash.length > 0 && (
             <div style={{ marginTop: 8 }}>

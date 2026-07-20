@@ -96,7 +96,7 @@ REGISTRY: List[ModuleDef] = [
             "per QR-Code; ihren Fortschritt siehst du im Modul."
         ),
         path="/karten",
-        stage="beta",
+        stage="stable",
     ),
     ModuleDef(
         key="kalender",
