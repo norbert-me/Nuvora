@@ -712,6 +712,7 @@ export default {
   "kalender.end": "Fin",
   "kalender.addPeriod": "Añadir hora",
   "kalender.removePeriod": "Quitar última hora",
+  "kalender.jumpToDay": "Ir al día",
   "kalender.today": "Hoy",
   "kalender.todayView": "Hoy",
   "kalender.todayEmpty": "Hoy no hay horas en el horario ni entradas.",

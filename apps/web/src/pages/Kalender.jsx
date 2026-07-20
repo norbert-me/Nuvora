@@ -214,6 +214,9 @@ export default function Kalender() {
             <button onClick={() => move(-1)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 15 }} title="◀">‹</button>
             <button onClick={() => setCursor(startOfDay(new Date()))} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>{t("kalender.today")}</button>
             <button onClick={() => move(1)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 15 }} title="▶">›</button>
+            {/* Direkt zu einem bestimmten Tag springen. */}
+            <input type="date" value={ymd(cursor)} onChange={(e) => e.target.value && setCursor(startOfDay(new Date(e.target.value + "T00:00:00")))}
+              style={{ ...inputStyle, padding: "5px 8px", fontSize: 13 }} title={t("kalender.jumpToDay")} />
           </div>
         )}
       </div>

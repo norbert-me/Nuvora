@@ -712,6 +712,7 @@ export default {
   "kalender.end": "End",
   "kalender.addPeriod": "Add period",
   "kalender.removePeriod": "Remove last period",
+  "kalender.jumpToDay": "Jump to day",
   "kalender.today": "Today",
   "kalender.todayView": "Today",
   "kalender.todayEmpty": "No timetable periods or entries for today.",

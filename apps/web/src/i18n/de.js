@@ -712,6 +712,7 @@ export default {
   "kalender.end": "Ende",
   "kalender.addPeriod": "Stunde hinzufügen",
   "kalender.removePeriod": "Letzte Stunde entfernen",
+  "kalender.jumpToDay": "Zu Tag springen",
   "kalender.today": "Heute",
   "kalender.todayView": "Heute",
   "kalender.todayEmpty": "Heute keine Stunden im Stundenplan und keine Einträge.",
