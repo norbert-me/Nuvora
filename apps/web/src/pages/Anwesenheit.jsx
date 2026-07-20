@@ -45,8 +45,9 @@ export default function Anwesenheit() {
   const heutigeIds = useMemo(() => new Set(slots.filter((s) => s.weekday === weekday && s.class_id).map((s) => s.class_id)), [slots, weekday]);
   // Stunden dieser Klasse am gewählten Wochentag (für die optionale Stunden-Zuordnung).
   const tagStunden = useMemo(() => [...new Set(slots.filter((s) => s.weekday === weekday && s.class_id === classId).map((s) => s.period))].sort((a, b) => a - b), [slots, weekday, classId]);
-  const filterAktiv = kalenderAktiv && nurHeute && view === "tag" && heutigeIds.size > 0;
-  const sichtbareKlassen = filterAktiv ? classes.filter((c) => heutigeIds.has(c.id)) : classes;
+  // Klassenliste zeigt IMMER alle Klassen — der Tag ist frei wählbar (auch
+  // Vergangenheit/Ferien), ein Filter auf „heutige Kurse" passte dazu nicht.
+  const sichtbareKlassen = classes;
 
   // Gültige Klasse sicherstellen, wenn Filter greift.
   useEffect(() => {
@@ -54,8 +55,11 @@ export default function Anwesenheit() {
     if (classId === null || !sichtbareKlassen.some((c) => c.id === classId)) { const w = lastClass(); setClassId(sichtbareKlassen.some((c) => c.id === w) ? w : sichtbareKlassen[0].id); }
   }, [sichtbareKlassen, classId]);
 
-  // Tag-Ansicht ist immer heute (Tagesauswahl entfernt).
-  useEffect(() => { if (view === "tag") setDatum(ymd(new Date())); }, [view]);
+  // Stunde auf die erste des Tages setzen, wenn die aktuelle nicht (mehr) passt.
+  useEffect(() => {
+    if (tagStunden.length && !tagStunden.includes(stunde)) setStunde(tagStunden[0]);
+    if (!tagStunden.length && stunde !== 0) setStunde(0);
+  }, [tagStunden]); // eslint-disable-line
 
   const cls = useMemo(() => classes.find((c) => c.id === classId), [classes, classId]);
   const students = cls?.students || [];
@@ -127,16 +131,16 @@ export default function Anwesenheit() {
 
       {view === "tag" ? (
         <>
-          {/* Anwesenheit ist immer für HEUTE — keine Tagesauswahl mehr. Die
-              Klassenliste zeigt nur die heutigen Kurse (Stundenplan). Nachtragen
-              geht weiter über die Übersicht. */}
+          {/* Tag frei wählbar (auch Vergangenheit/Ferien). Voreinstellung heute.
+              Die Stunde ersetzt „ganzer Tag" — Abwesenheit wird je Stunde
+              erfasst; nur wenn kein Stundenplan da ist, gilt der ganze Tag. */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 14, fontWeight: 600, textTransform: "capitalize" }}>
-              {new Date().toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long" })}
-            </span>
+            <button onClick={() => shift(-1)} style={{ ...btnSecondary, padding: "6px 13px" }}>‹</button>
+            <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} style={inputStyle} />
+            <button onClick={() => shift(1)} style={{ ...btnSecondary, padding: "6px 13px" }}>›</button>
+            <button onClick={() => setDatum(ymd(new Date()))} style={{ ...btnSecondary, padding: "6px 13px" }}>{t("anwesenheit.today")}</button>
             {tagStunden.length > 0 && (
               <select value={stunde} onChange={(e) => setStunde(Number(e.target.value))} style={{ ...selectStyle, marginLeft: "auto" }} title={t("anwesenheit.periodHint")}>
-                <option value={0}>{t("anwesenheit.wholeDay")}</option>
                 {tagStunden.map((p) => <option key={p} value={p}>{p}. {t("kalender.period")}</option>)}
               </select>
             )}
