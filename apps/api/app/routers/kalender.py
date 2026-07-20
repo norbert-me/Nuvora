@@ -476,12 +476,25 @@ def _parse_ics(text: str):
     return events
 
 
+# Kleiner Prozess-Cache für externe Feeds: pro Nutzer ein Eintrag
+# (url, verfaellt_ts, ergebnis). Ein fremder Kalender ändert sich selten, jeder
+# Seitenaufruf holte ihn bisher neu — bei großen Feeds spürbar. Key enthält die
+# URL, damit ein Wechsel den alten Eintrag nicht wiederverwendet.
+_EXT_CACHE: dict[int, tuple[str, float, list]] = {}
+_EXT_TTL = 600  # 10 Minuten
+
+
 @router.get("/external-events")
 async def external_events(user: User = Depends(require_module)):
     """Holt den externen ICS-Feed (falls gesetzt) und liefert Events als
-    {date: YYYY-MM-DD, title}. Read-only, nur zur Anzeige."""
+    {date: YYYY-MM-DD, title}. Read-only, nur zur Anzeige. 10-Min-Cache."""
     if not user.external_ics_url:
+        _EXT_CACHE.pop(user.id, None)
         return []
+    import time
+    hit = _EXT_CACHE.get(user.id)
+    if hit and hit[0] == user.external_ics_url and hit[1] > time.time():
+        return hit[2]
     import asyncio, urllib.request, urllib.parse, socket, ipaddress
     def _fetch():
         url = user.external_ics_url
@@ -527,4 +540,6 @@ async def external_events(user: User = Depends(require_module)):
                 cur += timedelta(days=1); n += 1
         else:
             out.append({"date": d0.isoformat(), "title": title})
-    return out[:2000]
+    result = out[:2000]
+    _EXT_CACHE[user.id] = (user.external_ics_url, time.time() + _EXT_TTL, result)
+    return result
