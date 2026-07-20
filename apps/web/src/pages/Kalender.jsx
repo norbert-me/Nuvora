@@ -39,6 +39,11 @@ export default function Kalender() {
   const { t } = useLanguage();
   const [view, setView] = useState("month"); // month | week | day
   const [cursor, setCursor] = useState(() => startOfDay(new Date()));
+  const [abo, setAbo] = useState(null); // Abo-URLs { url, webcal }
+  const openAbo = async () => {
+    const r = await fetch(`${API}/subscribe`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+    if (r) setAbo(r);
+  };
   const [entries, setEntries] = useState([]);
   const [classes, setClasses] = useState([]);
   const [topics, setTopics] = useState([]);
@@ -230,6 +235,7 @@ export default function Kalender() {
         <h1 style={pageTitle}>{t("kalender.title")}</h1>
         <Tabs value={view} onChange={setView}
           options={[["today", t("kalender.todayView")], ["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")], ["timetable", t("kalender.timetable")], ["breaks", t("kalender.breaksTab")]]} />
+        <button onClick={openAbo} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }} title={t("kalender.subscribeHint")}>{t("kalender.subscribe")}</button>
         {view !== "timetable" && view !== "breaks" && view !== "today" && (
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
             <button onClick={() => move(-1)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 15 }} title="◀">‹</button>
@@ -308,6 +314,23 @@ export default function Kalender() {
       {view === "timetable" && <TimetableView tt={tt} className={className} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
+      {abo && (
+        <div onClick={() => setAbo(null)} style={modalOverlay}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 500 }}>
+            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>{t("kalender.subscribeTitle")}</h3>
+            <p style={{ fontSize: 13, color: "var(--text2)", marginBottom: 14, lineHeight: 1.5 }}>{t("kalender.subscribeText")}</p>
+            <a href={abo.webcal} style={{ ...btnPrimary, display: "inline-block", textDecoration: "none", marginBottom: 14 }}>{t("kalender.subscribeNow")}</a>
+            <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 4 }}>{t("kalender.subscribeManual")}</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input readOnly value={abo.url} onFocus={(e) => e.target.select()} style={{ ...inputStyle, flex: 1, fontSize: 12 }} />
+              <button onClick={() => { navigator.clipboard?.writeText(abo.url); }} style={btnSecondary}>{t("common.copy") !== "common.copy" ? t("common.copy") : "Kopieren"}</button>
+            </div>
+            <div style={{ marginTop: 16, textAlign: "right" }}>
+              <button onClick={() => setAbo(null)} style={btnSecondary}>{t("common.close") !== "common.close" ? t("common.close") : "Schließen"}</button>
+            </div>
+          </div>
+        </div>
+      )}
       {slotEdit && <SlotModal slot={slotEdit} classes={classes} topics={topics} onSave={saveSlot} onDelete={removeSlot} onColor={setClassColor} onClose={() => setSlotEdit(null)} t={t} />}
     </div>
   );

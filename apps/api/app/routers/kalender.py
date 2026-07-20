@@ -352,3 +352,78 @@ async def delete_slot(slot_id: int, user: User = Depends(require_module), db: As
         raise HTTPException(404, "Stunde nicht gefunden")
     await db.delete(s)
     await db.commit()
+
+
+# ─── Kalender abonnieren (ICS-Feed fuer Apple/Google, dauerhaft) ───
+import secrets as _secrets
+from fastapi import Request as _Request
+from fastapi.responses import PlainTextResponse as _Plain
+
+
+@router.get("/subscribe")
+async def subscribe_url(request: _Request, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Gibt die Abo-URL zurueck (erzeugt bei Bedarf ein Token). Der Kalender
+    wird per URL abonniert — kein Login, kein Einzel-Download."""
+    if not user.calendar_token:
+        user.calendar_token = _secrets.token_urlsafe(24)
+        await db.commit()
+    base = str(request.base_url).rstrip("/")  # z.B. https://host
+    path = f"/api/kalender/feed/{user.calendar_token}.ics"
+    return {"url": base + path, "webcal": ("webcal://" + base.split("://", 1)[-1] + path) if "://" in base else base + path}
+
+
+@router.delete("/subscribe", status_code=204)
+async def revoke_subscribe(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Abo-Token zuruecksetzen — alte Abo-URLs werden ungueltig."""
+    user.calendar_token = None
+    await db.commit()
+
+
+def _ics_escape(s: str) -> str:
+    return (s or "").replace("\\", "\\\\").replace(";", r"\;").replace(",", r"\,").replace("\n", r"\n")
+
+
+@router.get("/feed/{token}.ics")
+async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
+    """ICS-Feed eines Kontos (Token statt Login). Kalender-Eintraege als
+    Ganztags-Events, freie Zeitraeume (Ferien) als mehrtaegige Events."""
+    from datetime import date, timedelta
+    u = (await db.execute(select(User).where(User.calendar_token == token))).scalar_one_or_none()
+    if not u:
+        raise HTTPException(404, "Kalender nicht gefunden")
+    entries = (await db.execute(select(CalendarEntry).where(CalendarEntry.owner_id == u.id).order_by(CalendarEntry.date))).scalars().all()
+    breaks = (await db.execute(select(CalendarBreak).where(CalendarBreak.owner_id == u.id))).scalars().all()
+    classes = {c.id: c.name for c in (await db.execute(select(SchoolClass).where(SchoolClass.owner_id == u.id))).scalars().all()}
+
+    def d8(d):
+        return d.strftime("%Y%m%d")
+    now = datetime.now().strftime("%Y%m%dT%H%M%SZ")
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Nuvora//Kalender//DE", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:Nuvora"]
+    for e in entries:
+        day = e.date.date() if hasattr(e.date, "date") else e.date
+        title = e.title or (classes.get(e.class_id) or "Termin")
+        lines += [
+            "BEGIN:VEVENT",
+            f"UID:nuvora-entry-{e.id}@nuvora",
+            f"DTSTAMP:{now}",
+            f"DTSTART;VALUE=DATE:{d8(day)}",
+            f"DTEND;VALUE=DATE:{d8(day + timedelta(days=1))}",
+            f"SUMMARY:{_ics_escape(title)}",
+        ]
+        if e.notes:
+            lines.append(f"DESCRIPTION:{_ics_escape(e.notes)}")
+        lines.append("END:VEVENT")
+    for b in breaks:
+        s = b.start_date.date() if hasattr(b.start_date, "date") else b.start_date
+        en = b.end_date.date() if hasattr(b.end_date, "date") else b.end_date
+        lines += [
+            "BEGIN:VEVENT",
+            f"UID:nuvora-break-{b.id}@nuvora",
+            f"DTSTAMP:{now}",
+            f"DTSTART;VALUE=DATE:{d8(s)}",
+            f"DTEND;VALUE=DATE:{d8(en + timedelta(days=1))}",
+            f"SUMMARY:{_ics_escape(b.label or 'Unterrichtsfrei')}",
+            "END:VEVENT",
+        ]
+    lines.append("END:VCALENDAR")
+    return _Plain("\r\n".join(lines), media_type="text/calendar; charset=utf-8")

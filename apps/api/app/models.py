@@ -33,6 +33,9 @@ class User(Base):
     # Wurde das Konto schon einmal ans Modulregister angeschlossen? Verhindert,
     # dass der Backfill beim Start ein abgeschaltetes Modul wieder aktiviert.
     modules_initialized: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Unratbares Token fuer den ICS-Kalender-Abo-Feed (Apple/Google abonnieren
+    # per URL ohne Login). Erst bei Bedarf gesetzt.
+    calendar_token: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, unique=True, index=True)
     # Einstiege-Startsammlung einmalig angelegt? Danach nicht erneut seeden,
     # auch wenn die Lehrkraft alle Einstiege loescht (sonst tauchen sie wieder auf).
     methoden_seeded: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
