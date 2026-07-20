@@ -140,18 +140,23 @@ export default function Sitzplan() {
   // ── Freie Drehung per Eck-Griff (oben rechts). Winkel = Richtung vom
   // Tisch-Mittelpunkt zum Zeiger. ──
   const rotRef = useRef(null);
+  const _angle = (e, cx, cy) => {
+    const rect = canvasRef.current.getBoundingClientRect();
+    return Math.atan2((e.clientY - rect.top) / zoom - cy, (e.clientX - rect.left) / zoom - cx) * 180 / Math.PI;
+  };
   const onRotDown = (e, seat) => {
     if (aufruf) return;
     e.preventDefault(); e.stopPropagation();
-    rotRef.current = { sid: seat.sid, cx: seat.x + SEAT_W / 2, cy: seat.y + SEAT_H / 2 };
+    const cx = seat.x + SEAT_W / 2, cy = seat.y + SEAT_H / 2;
+    // Relativ drehen: Start-Zeigerwinkel und Start-Drehung merken, damit das
+    // Greifen des Griffs nicht sofort auf einen absoluten Winkel springt.
+    rotRef.current = { sid: seat.sid, cx, cy, startAngle: _angle(e, cx, cy), startRot: seat.rot || 0 };
     window.addEventListener("pointermove", onRotMove);
     window.addEventListener("pointerup", onRotUp);
   };
   const onRotMove = (e) => {
     const d = rotRef.current; if (!d) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const px = (e.clientX - rect.left) / zoom, py = (e.clientY - rect.top) / zoom;
-    let deg = Math.round(Math.atan2(py - d.cy, px - d.cx) * 180 / Math.PI + 90);
+    let deg = Math.round(d.startRot + (_angle(e, d.cx, d.cy) - d.startAngle));
     deg = ((deg % 360) + 360) % 360;
     setSeats((prev) => prev.map((s) => (s.sid === d.sid ? { ...s, rot: deg } : s)));
   };
@@ -166,15 +171,14 @@ export default function Sitzplan() {
   const onTafelRotDown = (e) => {
     if (aufruf) return;
     e.preventDefault(); e.stopPropagation();
-    tafelRotRef.current = { cx: tafel.x + TAFEL_W / 2, cy: tafel.y + TAFEL_H / 2 };
+    const cx = tafel.x + TAFEL_W / 2, cy = tafel.y + TAFEL_H / 2;
+    tafelRotRef.current = { cx, cy, startAngle: _angle(e, cx, cy), startRot: tafel.rot || 0 };
     window.addEventListener("pointermove", onTafelRotMove);
     window.addEventListener("pointerup", onTafelRotUp);
   };
   const onTafelRotMove = (e) => {
     const d = tafelRotRef.current; if (!d) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const px = (e.clientX - rect.left) / zoom, py = (e.clientY - rect.top) / zoom;
-    let deg = Math.round(Math.atan2(py - d.cy, px - d.cx) * 180 / Math.PI + 90);
+    let deg = Math.round(d.startRot + (_angle(e, d.cx, d.cy) - d.startAngle));
     deg = ((deg % 360) + 360) % 360;
     setTafel((tf) => ({ ...tf, rot: deg }));
   };
@@ -207,7 +211,7 @@ export default function Sitzplan() {
         )}
         <button onClick={() => setShowHint((v) => !v)} className="icon-btn" title={t("sitzplan.hintFree")}
           style={{ ...iconBtn, border: showHint ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 999, width: 30, height: 30, fontWeight: 700, color: showHint ? "var(--accent)" : "var(--text3)" }}>i</button>
-        <button onClick={leeren} className="icon-btn" style={{ ...iconBtn, marginLeft: anwesenheitAktiv ? 0 : "auto" }} title={t("sitzplan.clear")}><Icon d={ICONS.restore} color={C.danger} /></button>
+        <button onClick={leeren} className="icon-btn" style={{ ...iconBtn, marginLeft: anwesenheitAktiv ? 0 : "auto" }} title={t("sitzplan.clear")}><Icon d={ICONS.trash} color={C.danger} /></button>
       </div>
       {showHint && <p style={{ fontSize: 13, color: "var(--text3)", margin: "8px 0 14px" }}>{t("sitzplan.hintFree")}</p>}
       {msg && <p style={{ fontSize: 13, color: "#0a7d3e", marginBottom: 10 }}>{msg}</p>}
@@ -238,8 +242,8 @@ export default function Sitzplan() {
               title={t("sitzplan.board")}>{t("sitzplan.board")}
               {!aufruf && (
                 <span onPointerDown={onTafelRotDown} title={t("sitzplan.rotate")}
-                  style={{ position: "absolute", right: -7, top: -7, width: 14, height: 14, borderRadius: 7,
-                    background: "var(--accent)", border: "2px solid var(--card)", cursor: "grab", touchAction: "none" }} />
+                  style={{ position: "absolute", right: -9, top: -9, width: 18, height: 18, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center",
+                    background: "var(--card)", border: "1px solid var(--border2)", color: "var(--text2)", fontSize: 12, lineHeight: 1, cursor: "grab", touchAction: "none", boxShadow: "0 1px 2px rgba(0,0,0,0.15)" }}>↻</span>
               )}
             </div>
             {seats.map((seat) => {
@@ -259,10 +263,10 @@ export default function Sitzplan() {
                   {abs && <span style={{ position: "absolute", top: 3, right: 24, width: 8, height: 8, borderRadius: 4, background: ABS_COL[abs] }} title={t(`anwesenheit.${abs}`)} />}
                   {!aufruf && (
                     <>
-                      {/* Dreh-Griff an der oberen rechten Ecke: ziehen = frei drehen. */}
+                      {/* Dreh-Griff (Icon) an der oberen rechten Ecke: ziehen = frei drehen. */}
                       <span onPointerDown={(e) => onRotDown(e, seat)} title={t("sitzplan.rotate")}
-                        style={{ position: "absolute", right: -7, top: -7, width: 14, height: 14, borderRadius: 7,
-                          background: "var(--accent)", border: "2px solid var(--card)", cursor: "grab", touchAction: "none" }} />
+                        style={{ position: "absolute", right: -9, top: -9, width: 18, height: 18, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center",
+                          background: "var(--card)", border: "1px solid var(--border2)", color: "var(--text2)", fontSize: 12, lineHeight: 1, cursor: "grab", touchAction: "none", boxShadow: "0 1px 2px rgba(0,0,0,0.15)" }}>↻</span>
                       <button onPointerDown={(e) => e.stopPropagation()} onClick={() => entfernen(seat.sid)} title={t("sitzplan.removeSeat")}
                         style={{ position: "absolute", right: 2, top: 2, width: 16, height: 16, border: "none", background: "transparent", cursor: "pointer", color: C.danger, fontSize: 12, padding: 0, lineHeight: 1 }}>×</button>
                     </>

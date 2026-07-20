@@ -91,7 +91,7 @@ export default function Kurse() {
           <div key={k.id} style={cardStyle}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
               <strong style={{ fontSize: 15, flex: 1 }}>{k.name}</strong>
-              <button onClick={() => openEdit(k)} className="icon-btn" style={{ ...iconBtn, border: editKurs === k.id ? "1px solid var(--accent)" : undefined }} title={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
+              <button onClick={() => openEdit(k)} className="icon-btn" style={iconBtn} title={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
               <button onClick={() => delKurs(k)} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
             </div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
@@ -105,12 +105,6 @@ export default function Kurse() {
                   </button>
                 </span>
               ))}
-              {frei(k).length > 0 && (
-                <select value="" onChange={(e) => e.target.value && addMember(k.id, Number(e.target.value))} style={{ ...selectStyle, fontSize: 12.5 }}>
-                  <option value="">+ {t("kurse.addClass")}</option>
-                  {frei(k).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              )}
             </div>
             {/* Bearbeiten-Bereich: Name + E/G. Erst hinter dem Stift-Knopf, damit
                 die SuS-Liste nicht dauernd offen steht. */}
@@ -122,6 +116,12 @@ export default function Kurse() {
                     style={{ ...inputStyle, flex: 1, minWidth: 160 }} />
                   <button onClick={() => saveName(k)} style={btnPrimary}>{t("common.save")}</button>
                 </div>
+                {frei(k).length > 0 && (
+                  <select value="" onChange={(e) => e.target.value && addMember(k.id, Number(e.target.value))} style={{ ...selectStyle, fontSize: 12.5, marginBottom: 12 }}>
+                    <option value="">+ {t("kurse.addClass")}</option>
+                    {frei(k).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                )}
                 {k.classes.length > 0 && (<>
                   <Toggle checked={!!k.niveau_aktiv} onChange={(v) => setNiveauAktiv(k, v)} label={t("kurse.niveauToggle")} />
                   {k.niveau_aktiv && <NiveauPanel kursId={k.id} t={t} />}
