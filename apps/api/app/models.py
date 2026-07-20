@@ -642,6 +642,8 @@ class OrgaItem(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    # Checkliste hängt am Kurs (Fach). NULL = Klasse ohne Kurs (Fallback).
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="CASCADE"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(160), default="", server_default="")
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     done: Mapped[list] = mapped_column(JSON, default=list)

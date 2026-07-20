@@ -18,6 +18,7 @@ export default function Orga() {
   const { t } = useLanguage();
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
+  const [kursId, setKursId] = useState(null); // Checkliste hängt am Kurs (Fach)
   const [items, setItems] = useState([]);
   const [neu, setNeu] = useState("");
   const [params] = useSearchParams();
@@ -40,16 +41,17 @@ export default function Orga() {
   const cls = useMemo(() => classes.find((c) => c.id === classId), [classes, classId]);
   const students = cls?.students || [];
 
+  const kursQ = kursId != null ? `?kurs_id=${kursId}` : "";
   const load = useCallback((id) => {
     if (!id) return;
-    fetch(`${API}/${id}`).then((r) => (r.ok ? r.json() : [])).then((d) => setItems(Array.isArray(d) ? d : [])).catch(() => {});
-  }, []);
-  useEffect(() => { load(classId); }, [classId, load]);
+    fetch(`${API}/${id}${kursId != null ? `?kurs_id=${kursId}` : ""}`).then((r) => (r.ok ? r.json() : [])).then((d) => setItems(Array.isArray(d) ? d : [])).catch(() => {});
+  }, [kursId]);
+  useEffect(() => { load(classId); }, [classId, kursId, load]);
 
   const anlegen = async () => {
     const name = neu.trim();
     if (!name || !classId) return;
-    const r = await fetch(`${API}/${classId}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }).catch(() => null);
+    const r = await fetch(`${API}/${classId}${kursQ}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }).catch(() => null);
     if (r && r.ok) { setNeu(""); load(classId); }
   };
   const loeschen = async (id) => {
@@ -74,7 +76,7 @@ export default function Orga() {
       {tab === "anwesenheit" ? <Anwesenheit /> : tab === "ausleihe" ? <Ausleihe /> : tab === "sitzplan" ? <Sitzplan /> : (<>
       <h1 style={{ ...pageTitle, marginBottom: 14 }}>{t("orga.moduleTitle")}</h1>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
-        <KursKlasseSelect value={classId} onChange={setClassId} />
+        <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
       </div>
       <p style={{ fontSize: 13, color: "var(--text3)", margin: "8px 0 16px" }}>{t("orga.hint")}</p>
 

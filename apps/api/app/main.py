@@ -161,6 +161,7 @@ def _ensure_columns(sync_conn):
         ("users", "methoden_seeded", "BOOLEAN DEFAULT false NOT NULL"),
         ("kurse", "niveau_aktiv", "BOOLEAN DEFAULT false NOT NULL"),
         ("seating_plans", "kurs_id", "INTEGER"),
+        ("orga_items", "kurs_id", "INTEGER"),
         ("questions", "topic_id", "INTEGER"),
         ("students", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
         ("students", "foerder", "JSON"),

@@ -58,23 +58,29 @@ class ToggleIn(BaseModel):
     student_id: int
 
 
+def _key_where(user, class_id, kurs_id):
+    """Checkliste hängt am Kurs (Fach); Fallback Klasse ohne Kurs."""
+    if kurs_id is not None:
+        return (OrgaItem.owner_id == user.id, OrgaItem.kurs_id == kurs_id)
+    return (OrgaItem.owner_id == user.id, OrgaItem.class_id == class_id, OrgaItem.kurs_id.is_(None))
+
+
 @router.get("/{class_id}", response_model=List[ItemOut])
-async def list_items(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def list_items(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
-    rows = (await db.execute(select(OrgaItem).where(
-        OrgaItem.class_id == class_id, OrgaItem.owner_id == user.id).order_by(OrgaItem.position, OrgaItem.id))).scalars().all()
+    rows = (await db.execute(select(OrgaItem).where(*_key_where(user, class_id, kurs_id)).order_by(OrgaItem.position, OrgaItem.id))).scalars().all()
     return rows
 
 
 @router.post("/{class_id}", response_model=ItemOut, status_code=201)
-async def create_item(class_id: int, body: ItemIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def create_item(class_id: int, body: ItemIn, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("orga", f"u{user.id}", 200, 60, "Zu viele Punkte. Bitte kurz warten.")
     await _owned_class(db, user, class_id)
     name = (body.name or "").strip()
     if not name:
         raise HTTPException(400, "Name darf nicht leer sein")
-    pos = len((await db.execute(select(OrgaItem).where(OrgaItem.class_id == class_id, OrgaItem.owner_id == user.id))).scalars().all())
-    it = OrgaItem(owner_id=user.id, class_id=class_id, name=name[:160], position=pos, done=[])
+    pos = len((await db.execute(select(OrgaItem).where(*_key_where(user, class_id, kurs_id)))).scalars().all())
+    it = OrgaItem(owner_id=user.id, class_id=class_id, kurs_id=kurs_id, name=name[:160], position=pos, done=[])
     db.add(it)
     await db.commit()
     await db.refresh(it)
