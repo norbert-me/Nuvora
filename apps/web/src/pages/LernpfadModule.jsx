@@ -103,7 +103,7 @@ export default function LernpfadModule() {
         </div>
       )}
       {toast && (
-        <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 400, background: "#1e293b", color: "#fff", padding: "10px 18px", borderRadius: 8, fontSize: 14, boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }}>{toast}</div>
+        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 400, background: "#1e293b", color: "#fff", padding: "10px 18px", borderRadius: 10, fontSize: 14, boxShadow: "0 6px 20px rgba(0,0,0,0.3)" }}>{toast}</div>
       )}
       <div id="lp-app" ref={hostRef} />
     </>
