@@ -203,6 +203,26 @@ export default function Sitzplan() {
 
   const leeren = () => { persist([]); setMsg(t("sitzplan.cleared")); setTimeout(() => setMsg(""), 2500); };
 
+  // Export/Import: nur das Layout (Positionen + Drehungen + Tafel), ohne feste
+  // Schüler. Beim Import werden die SuS der aktuellen Klasse der Reihe nach auf
+  // die Plätze gesetzt — so lässt sich eine Sitzordnung auf eine andere Klasse
+  // (oder ein anderes Fach) übertragen.
+  const doExport = () => {
+    const data = { type: "nuvora_sitzplan", slots: seats.map((s) => ({ x: s.x, y: s.y, rot: s.rot || 0 })), tafel };
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: "application/json" }));
+    a.download = `Sitzplan_${cls?.name || "klasse"}.json`; a.click(); URL.revokeObjectURL(a.href);
+  };
+  const doImport = async (file) => {
+    try {
+      const data = JSON.parse(await file.text());
+      if (data.type !== "nuvora_sitzplan" || !Array.isArray(data.slots)) { setMsg(t("sitzplan.importError")); return; }
+      const next = students.slice(0, data.slots.length).map((st, i) => ({ sid: st.id, x: data.slots[i].x, y: data.slots[i].y, rot: data.slots[i].rot || 0 }));
+      persist(next, data.tafel && typeof data.tafel.x === "number" ? data.tafel : tafel);
+      setMsg(t("sitzplan.imported")); setTimeout(() => setMsg(""), 2500);
+    } catch { setMsg(t("sitzplan.importError")); }
+  };
+
   // Ebene verschieben: leere Fläche greifen und die ganze Ansicht schieben
   // (pant den Scroll-Container). Nur wenn direkt auf die Fläche geklickt wird.
   const scrollRef = useRef(null);
@@ -234,7 +254,11 @@ export default function Sitzplan() {
         )}
         <button onClick={() => setShowHint((v) => !v)} className="icon-btn" title={t("sitzplan.hintFree")}
           style={{ ...iconBtn, border: showHint ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 999, width: 30, height: 30, fontWeight: 700, color: showHint ? "var(--accent)" : "var(--text3)" }}>i</button>
-        <button onClick={leeren} className="icon-btn" style={{ ...iconBtn, marginLeft: anwesenheitAktiv ? 0 : "auto" }} title={t("sitzplan.clear")}><Icon d={ICONS.trash} color={C.danger} /></button>
+        <button onClick={doExport} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13, marginLeft: anwesenheitAktiv ? 0 : "auto" }}>{t("sitzplan.export")}</button>
+        <label style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13, cursor: "pointer" }}>{t("sitzplan.import")}
+          <input type="file" accept=".json,application/json" style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) doImport(e.target.files[0]); e.target.value = ""; }} />
+        </label>
+        <button onClick={leeren} className="icon-btn" style={iconBtn} title={t("sitzplan.clear")}><Icon d={ICONS.trash} color={C.danger} /></button>
       </div>
       {showHint && <p style={{ fontSize: 13, color: "var(--text3)", margin: "8px 0 14px" }}>{t("sitzplan.hintFree")}</p>}
       {msg && <p style={{ fontSize: 13, color: "#0a7d3e", marginBottom: 10 }}>{msg}</p>}
