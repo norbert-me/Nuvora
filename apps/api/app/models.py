@@ -813,7 +813,7 @@ class Card(Base):
 
 class CardReview(Base):
     """SM-2-Zustand je (Schueler, Karte). Fortschritt liegt am Server, damit
-    die Lehrkraft ihn sieht — anders als bei Anki (Fortschritt am Geraet)."""
+    die Lehrkraft ihn sieht — der Fortschritt liegt am Server, nicht am Geraet."""
     __tablename__ = "card_reviews"
     __table_args__ = (UniqueConstraint("student_id", "card_id", name="uq_review_student_card"),)
 

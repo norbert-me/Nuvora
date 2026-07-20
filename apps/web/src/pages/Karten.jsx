@@ -336,8 +336,8 @@ function Deck({ deck, t, call, topics = [], showTopic = false }) {
   );
 }
 
-// CSV/TSV/Anki-Text in {front, back}-Paare. Trenner automatisch erkannt (Tab,
-// Semikolon, Komma). Anki-Export-Kopfzeilen (mit '#') werden uebersprungen.
+// CSV/TSV/Text in {front, back}-Paare. Trenner automatisch erkannt (Tab,
+// Semikolon, Komma). Kopfzeilen (mit '#') werden uebersprungen.
 function parseCards(text) {
   const lines = text.split(/\r?\n/).filter((l) => l.trim() && !l.trim().startsWith("#"));
   if (!lines.length) return [];
