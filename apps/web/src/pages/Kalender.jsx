@@ -314,7 +314,7 @@ function HeuteView({ t, tt, weekdayOf, byDay, className, classColor, topicName, 
       <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 14, textTransform: "capitalize" }}>{dateStr}</div>
       {istFrei && (
         <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(184,134,11,0.12)", color: "#8a6d00", fontSize: 13.5, fontWeight: 600, marginBottom: 14 }}>
-          {t("kalender.freeDay")}: {istFrei.title || ""}
+          {t("kalender.freeDay")}: {istFrei.label || ""}
         </div>
       )}
       {slots.length === 0 && extras.length === 0 ? (
@@ -381,7 +381,7 @@ function MonthGrid({ range, cursor, byDay, slotsFor, onSlot, frei, className, to
                 const other = d.getMonth() !== cursor.getMonth();
                 const f = frei && frei(d);
                 return (
-                  <td key={ymd(d)} style={{ ...cell, opacity: other ? 0.5 : 1, background: f ? "var(--bg)" : undefined, outline: ymd(d) === heute ? "2px solid var(--accent)" : "none", outlineOffset: -2 }}>
+                  <td key={ymd(d)} style={{ ...cell, opacity: other ? 0.5 : 1, background: f ? "rgba(184,134,11,0.09)" : undefined, outline: ymd(d) === heute ? "2px solid var(--accent)" : "none", outlineOffset: -2 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>{d.getDate()}</span>
                       {!f && <button onClick={() => onAdd(d)} className="icon-btn" style={{ ...iconBtn, padding: 0 }} title={t("kalender.add")}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>}
@@ -409,7 +409,7 @@ function WeekView({ range, byDay, slotsFor, frei, className, classColor, topicNa
       {days.map((d) => {
         const f = frei && frei(d);
         return (
-        <div key={ymd(d)} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 8, minHeight: 160, background: f ? "var(--bg)" : "var(--card)", minWidth: 90 }}>
+        <div key={ymd(d)} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 8, minHeight: 160, background: f ? "rgba(184,134,11,0.09)" : "var(--card)", minWidth: 90 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
             <span style={{ fontSize: 12, fontWeight: 600 }}>{d.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}</span>
             {!f && <button onClick={() => onAdd(d)} className="icon-btn" style={{ ...iconBtn, padding: 0 }}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>}
@@ -426,9 +426,13 @@ function WeekView({ range, byDay, slotsFor, frei, className, classColor, topicNa
 }
 
 function FreiMarker({ label, t }) {
+  // Ferien/Feiertag deutlich hervorheben: Amber-Badge statt blasser Kursivzeile.
+  // An diesen Tagen ist der Stundenplan bewusst ausgeblendet.
   return (
-    <div style={{ fontSize: 11.5, color: "var(--text3)", fontStyle: "italic", padding: "4px 2px" }}>
-      {label || t("kalender.free")}
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700,
+      color: "#8a6d00", background: "rgba(184,134,11,0.16)", borderRadius: 6, padding: "3px 7px", lineHeight: 1.3 }}
+      title={t("kalender.freeDay")}>
+      <span style={{ fontSize: 12 }}>🌴</span>{label || t("kalender.free")}
     </div>
   );
 }
