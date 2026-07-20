@@ -68,7 +68,6 @@ export default function Kurse() {
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <h1 style={{ ...pageTitle, marginBottom: 0, flex: 1 }}>{t("kurse.title")}</h1>
         {trash.length > 0 && <button onClick={() => setShowTrash((v) => !v)} style={btnSecondary}>{t("classes.trash")} ({trash.length})</button>}
-        <Link to="/classes" style={{ ...btnSecondary, textDecoration: "none" }}>{t("nav.classes")}</Link>
       </div>
       <p style={pageIntro}>{t("kurse.intro")}</p>
 

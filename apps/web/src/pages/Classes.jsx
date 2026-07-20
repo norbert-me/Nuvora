@@ -362,9 +362,8 @@ export default function Classes() {
             ]}
           />
         </div>
-        <Link to="/kurse" style={{ ...btnSecondary, textDecoration: "none", marginLeft: "auto" }}>{t("kurse.title")}</Link>
         {trash.length > 0 && (
-          <button onClick={() => setShowTrash((v) => !v)} style={btnSecondary}>
+          <button onClick={() => setShowTrash((v) => !v)} style={{ ...btnSecondary, marginLeft: "auto" }}>
             {t("classes.trash")} ({trash.length})
           </button>
         )}
