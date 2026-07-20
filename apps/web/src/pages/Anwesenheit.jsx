@@ -54,6 +54,9 @@ export default function Anwesenheit() {
     if (classId === null || !sichtbareKlassen.some((c) => c.id === classId)) { const w = lastClass(); setClassId(sichtbareKlassen.some((c) => c.id === w) ? w : sichtbareKlassen[0].id); }
   }, [sichtbareKlassen, classId]);
 
+  // Tag-Ansicht ist immer heute (Tagesauswahl entfernt).
+  useEffect(() => { if (view === "tag") setDatum(ymd(new Date())); }, [view]);
+
   const cls = useMemo(() => classes.find((c) => c.id === classId), [classes, classId]);
   const students = cls?.students || [];
 
@@ -122,19 +125,15 @@ export default function Anwesenheit() {
           options={[["tag", t("anwesenheit.day")], ["uebersicht", t("anwesenheit.overview")]]} />
       </div>
 
-      {view === "tag" && kalenderAktiv && heutigeIds.size > 0 && (
-        <div style={{ marginBottom: 12 }}>
-          <Toggle checked={nurHeute} onChange={setNurHeute} label={t("anwesenheit.onlyToday")} />
-        </div>
-      )}
-
       {view === "tag" ? (
         <>
+          {/* Anwesenheit ist immer für HEUTE — keine Tagesauswahl mehr. Die
+              Klassenliste zeigt nur die heutigen Kurse (Stundenplan). Nachtragen
+              geht weiter über die Übersicht. */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-            <button onClick={() => shift(-1)} style={{ ...btnSecondary, padding: "6px 13px" }}>‹</button>
-            <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} style={inputStyle} />
-            <button onClick={() => shift(1)} style={{ ...btnSecondary, padding: "6px 13px" }}>›</button>
-            <button onClick={() => setDatum(ymd(new Date()))} style={{ ...btnSecondary, padding: "6px 13px" }}>{t("anwesenheit.today")}</button>
+            <span style={{ fontSize: 14, fontWeight: 600, textTransform: "capitalize" }}>
+              {new Date().toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long" })}
+            </span>
             {tagStunden.length > 0 && (
               <select value={stunde} onChange={(e) => setStunde(Number(e.target.value))} style={{ ...selectStyle, marginLeft: "auto" }} title={t("anwesenheit.periodHint")}>
                 <option value={0}>{t("anwesenheit.wholeDay")}</option>
