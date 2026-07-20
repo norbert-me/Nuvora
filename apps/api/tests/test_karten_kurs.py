@@ -1,8 +1,8 @@
-"""Karteikarten kursweit: Decks + Fortschritt gelten für den ganzen Kurs.
+"""Karteikarten pro Fach: Decks + Fortschritt gelten je Fach-Klasse getrennt.
 
-Ein Stapel, den man in einer Fach-Klasse anlegt, ist in den Geschwister-Klassen
-desselben Kurses sichtbar; das Roster (Tokens/Fortschritt) ist per Name
-dedupliziert — eine Person, ein Fortschritt.
+Ein Stapel, den man in einer Fach-Klasse anlegt, ist NICHT in den Geschwister-
+Klassen desselben Kurses sichtbar — jede Fach-Klasse hat ihre eigenen Karten.
+(SuS werden im Kern geteilt, der Karten-Fortschritt aber je Fach gefuehrt.)
 """
 import pytest
 import pytest_asyncio
@@ -42,15 +42,17 @@ async def _kurs(s):
 
 
 @pytest.mark.asyncio
-async def test_deck_kursweit(s):
+async def test_deck_pro_fach(s):
     u, A, B = await _kurs(s)
     await K.create_deck(A.id, K.DeckIn(name="Vokabeln"), user=u, db=s)
+    decks_a = await K.list_decks(A.id, user=u, db=s)
     decks_b = await K.list_decks(B.id, user=u, db=s)
-    assert any(d.name == "Vokabeln" for d in decks_b)
+    assert any(d.name == "Vokabeln" for d in decks_a), "eigene Fach-Klasse sieht den Stapel"
+    assert not any(d.name == "Vokabeln" for d in decks_b), "Geschwister-Klasse sieht ihn NICHT (pro Fach getrennt)"
 
 
 @pytest.mark.asyncio
-async def test_roster_dedupliziert(s):
+async def test_roster_pro_fach(s):
     u, A, B = await _kurs(s)
     toks = await K.ensure_tokens(A.id, user=u, db=s)
-    assert sorted(t.name for t in toks) == ["Lena", "Max"], "Max nur einmal trotz zwei Fach-Klassen"
+    assert sorted(t.name for t in toks) == ["Lena", "Max"], "Roster der Fach-Klasse A"

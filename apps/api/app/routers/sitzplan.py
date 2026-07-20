@@ -34,14 +34,6 @@ async def _owned_class(db: AsyncSession, user: User, class_id: int) -> SchoolCla
     return sc
 
 
-async def _kurs_class(db, class_id) -> int:
-    """Der Sitzplan gilt kursweit: alle Fach-Klassen eines Kurses teilen ihn.
-    Wir speichern ihn auf der kleinsten Klassen-id des Kurses (kanonisch)."""
-    from .kurse import sibling_class_ids
-    sib = await sibling_class_ids(db, class_id)
-    return min(sib) if sib else class_id
-
-
 class PlanIn(BaseModel):
     # Freie Flaeche: Sitze als {sid, x, y, rot}. (Alt: cols/cells-Raster.)
     seats: list = []
@@ -52,9 +44,11 @@ class PlanIn(BaseModel):
 @router.get("/{class_id}")
 async def get_plan(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
-    cid = await _kurs_class(db, class_id)
+    # Sitzplan pro Fach-Klasse: jede Fach-Klasse eines Kurses hat ihre eigene
+    # Sitzordnung (gleiche SuS, aber je Fach anders gesetzt). Roster bleibt
+    # kursweit (Frontend), nur die Positionen sind je Klasse.
     row = (await db.execute(
-        select(SeatingPlan).where(SeatingPlan.owner_id == user.id, SeatingPlan.class_id == cid)
+        select(SeatingPlan).where(SeatingPlan.owner_id == user.id, SeatingPlan.class_id == class_id)
     )).scalar_one_or_none()
     return row.data if row and row.data else {"seats": []}
 
@@ -70,7 +64,6 @@ def _num(v, default=0.0):
 async def put_plan(class_id: int, body: PlanIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("sitzplan", f"u{user.id}", 300, 60, "Zu viele Änderungen. Bitte kurz warten.")
     await _owned_class(db, user, class_id)
-    class_id = await _kurs_class(db, class_id)
     seats = []
     for s in (body.seats or [])[:400]:
         if not isinstance(s, dict) or not isinstance(s.get("sid"), (int, float)):

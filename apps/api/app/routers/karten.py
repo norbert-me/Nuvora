@@ -84,29 +84,20 @@ async def _owned_deck(db, user, deck_id) -> CardDeck:
 
 
 async def _kurs_roster(db, user, class_id):
-    """Kanonische SuS des Kurses (gleichnamige der Fach-Klassen dedupliziert,
-    kleinste id). Karten-Fortschritt/QR gelten kursweit je Person."""
-    from .kurse import sibling_class_ids
-    sib = await sibling_class_ids(db, class_id)
-    studs = (await db.execute(select(Student).where(Student.class_id.in_(sib)).order_by(Student.id))).scalars().all()
-    canon = {}
-    for s in studs:
-        canon.setdefault(s.name.strip(), s)
-    return sorted(canon.values(), key=lambda s: (s.card_id, s.id))
+    """SuS DIESER Fach-Klasse. Karten sind pro Fach getrennt: jede Fach-Klasse
+    hat eigene Stapel und eigenen Fortschritt (SuS werden im Kern geteilt, der
+    Karten-Fortschritt aber je Fach gefuehrt)."""
+    return (await db.execute(select(Student).where(Student.class_id == class_id).order_by(Student.card_id, Student.id))).scalars().all()
 
 
 async def _kurs_decks_where(cls):
-    """Decks des Kurses einer Klasse (Fallback: nur diese Klasse)."""
-    if cls.kurs_id:
-        return CardDeck.kurs_id == cls.kurs_id
+    """Stapel pro Fach-Klasse (nicht kursweit) — je Fach eigene Karten."""
     return CardDeck.class_id == cls.id
 
 
 async def _student_deck_where(db, st):
-    """Deck-Filter für einen Schüler (öffentliches Lernen) — kursweit."""
-    cls = await db.get(SchoolClass, st.class_id)
-    if cls and cls.kurs_id:
-        return CardDeck.kurs_id == cls.kurs_id
+    """Deck-Filter fuer einen Schueler (oeffentliches Lernen): die Stapel seiner
+    Fach-Klasse."""
     return CardDeck.class_id == st.class_id
 
 
