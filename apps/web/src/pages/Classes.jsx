@@ -10,6 +10,7 @@
 // /cardvote/cards: der Kern kennt Klassen, nicht was ein Modul damit tut.
 import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
+import { undoDelete } from "../core/undo.jsx";
 import { useSearchParams, Link } from "react-router-dom";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
@@ -133,12 +134,15 @@ export default function Classes() {
     load();
   };
 
-  const remove = async (id) => {
-    if (!await askConfirm(t("classes.deleteConfirm"))) return;
-    const r = await fetch(`${API}/classes/${id}`, { method: "DELETE" });
-    if (r.ok) { const next = classes.filter((c) => c.id !== id); setClasses(next); put("classes", next); } // sofort weg
-    load();
-    loadTrash();
+  const remove = (id) => {
+    const cls = classes.find((c) => c.id === id);
+    const next = classes.filter((c) => c.id !== id);
+    setClasses(next); put("classes", next); // sofort weg
+    undoDelete({
+      message: t("undo.deleted", { name: cls?.name || "" }),
+      undo: () => { load(); },
+      commit: async () => { await fetch(`${API}/classes/${id}`, { method: "DELETE" }).catch(() => {}); loadTrash(); },
+    });
   };
 
   const importJson = async () => {

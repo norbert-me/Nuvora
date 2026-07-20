@@ -9,6 +9,7 @@
 // in den Schnitt — „Anstrengungsbereitschaft“ ist kein Messwert.
 import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
+import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, modalOverlay, modalPanel } from "../components/Icons.jsx";
@@ -466,7 +467,12 @@ export default function Noten() {
                         {renameCol === c.id && (
                           <ColMenu t={t} cat={c} stats={colStats(c.id)} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
                             onRename={async (name) => { if (await call(() => fetch(`${API}/categories/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: c.position ?? i }) }))) setRenameCol(null); }}
-                            onDelete={async () => { if (await askConfirm(t("noten.delColumn", { name: c.name }))) { call(() => fetch(`${API}/categories/${c.id}`, { method: "DELETE" })); setRenameCol(null); } }}
+                            onDelete={() => {
+                              setRenameCol(null);
+                              // Spalte sofort raus, 5 s Undo; erst dann Server-Delete.
+                              setSections((prev) => prev.map((x) => ({ ...x, categories: (x.categories || []).filter((cc) => cc.id !== c.id) })));
+                              undoDelete({ message: t("undo.deleted", { name: c.name }), undo: () => load(classId), commit: async () => { await fetch(`${API}/categories/${c.id}`, { method: "DELETE" }).catch(() => {}); load(classId); } });
+                            }}
                             onClose={() => setRenameCol(null)} />
                         )}
                       </div>
