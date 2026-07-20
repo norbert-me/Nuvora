@@ -745,6 +745,67 @@ async def import_session(body: ImportBody, user: User = Depends(require_module),
     return {"imported": angelegt}
 
 
+class GradeCell(BaseModel):
+    student_id: int
+    value: float
+
+    @field_validator("value")
+    @classmethod
+    def value_ok(cls, v):
+        if v < 1.0 or v > 6.0:
+            raise ValueError("Note muss zwischen 1,0 und 6,0 liegen")
+        return round(v, 1)
+
+
+class ImportGradesBody(BaseModel):
+    class_id: int
+    kurs_id: Optional[int] = None
+    section_id: int
+    column_name: str
+    note: str = ""
+    grades: List[GradeCell]
+
+    @field_validator("column_name")
+    @classmethod
+    def name_ok(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("Spaltenname darf nicht leer sein")
+        return v
+
+
+@router.post("/import-grades", status_code=201)
+async def import_grades(body: ImportGradesBody, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Generische Notenspalte aus vorberechneten Werten (student_id → Note).
+
+    Bewusst modulunabhaengig (Regel 3): Noten weiss nichts vom Karten-Modul.
+    Der Aufrufer (z.B. Karten-Meisterung) rechnet den Wert selbst und liefert
+    fertige Noten — die Note bleibt eine paedagogische Entscheidung, die Spalte
+    ist frei editierbar."""
+    rate_limit("noten_import", f"u{user.id}", 30, 60, "Zu viele Übernahmen in kurzer Zeit. Bitte kurz warten.")
+    await _owned_class(db, user, body.class_id)
+    sec = await _owned_section(db, user, body.section_id)
+    if sec.class_id != body.class_id:
+        raise HTTPException(400, "Abschnitt und Klasse passen nicht zusammen")
+
+    pos = len((await db.execute(
+        select(GradeCategory).where(GradeCategory.section_id == sec.id)
+    )).scalars().all())
+    cat = GradeCategory(name=body.column_name, section_id=sec.id, class_id=sec.class_id, owner_id=user.id, position=pos)
+    db.add(cat)
+    await db.flush()
+
+    roster = {s.id for s in await _kurs_roster(db, user, body.class_id)}
+    angelegt = 0
+    for g in body.grades:
+        if g.student_id not in roster:
+            continue
+        db.add(GradeEntry(category_id=cat.id, student_id=g.student_id, kind="grade", value=g.value, note=body.note or ""))
+        angelegt += 1
+    await db.commit()
+    return {"imported": angelegt}
+
+
 # ─── Export / Import je Klasse+Halbjahr (JSON-Sicherung) ───
 # Portabel ueber Schueler card_id und Abschnitts-/Spalten-Indizes, damit ein
 # Import auch in eine andere (deckungsgleiche) Klasse passt. Beobachtungen sind

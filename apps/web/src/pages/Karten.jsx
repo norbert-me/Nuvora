@@ -9,6 +9,17 @@ import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import PublishModal from "../components/PublishModal.jsx";
+import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
+
+// Meisterung aus dem Reifegrad: gewichteter Anteil reifer Karten. Neu zählt
+// nicht, langfristig voll. Ergibt 0–100 %, das die Notenskala in eine Note übersetzt.
+const MASTERY_W = { neu: 0, lernen: 0.25, kurz: 0.5, mittel: 0.8, lang: 1 };
+function masteryPct(hist) {
+  const total = Object.values(hist || {}).reduce((a, b) => a + b, 0);
+  if (!total) return null;
+  const w = Object.entries(MASTERY_W).reduce((s, [k, v]) => s + ((hist[k] || 0) * v), 0);
+  return (w / total) * 100;
+}
 
 const API = "/api/karten";
 
@@ -31,10 +42,20 @@ export default function Karten() {
   // Themen-Bindung ist nur mit Kalender sinnvoll (Auto-Freischaltung). Ohne das
   // Modul bleibt die Option aus (Regel 3: Zusatz, nie Voraussetzung).
   const kalenderAktiv = modules.find((m) => m.key === "kalender")?.active ?? false;
+  // Brücke zum Notenbuch (Regel 3: Zusatz). Nur wenn das Modul Noten aktiv ist.
+  const notenAktiv = modules.find((m) => m.key === "noten")?.active ?? false;
+  const [gradeScale, setGradeScale] = useState(DEFAULT_SCALE);
+  const [notenDialog, setNotenDialog] = useState(false);
 
   useEffect(() => {
     if (kalenderAktiv) return swr("topics", "/api/topics", (d) => setTopics(Array.isArray(d) ? d : []));
   }, [kalenderAktiv]);
+
+  useEffect(() => {
+    if (!notenAktiv) return;
+    // Notenskala der Lehrkraft (wie in der CardVote-Auswertung) aus dem Cache.
+    try { const u = JSON.parse(localStorage.getItem("user")); if (u?.grade_scale) setGradeScale(u.grade_scale); } catch {}
+  }, [notenAktiv]);
 
   useEffect(() => {
     return swr("classes", "/api/classes", (d) => {
@@ -157,6 +178,7 @@ export default function Karten() {
                 <span style={{ fontSize: 14, fontWeight: 700 }}>{t("karten.progress")}</span>
                 <span style={{ fontSize: 12.5, padding: "4px 10px", borderRadius: 980, background: "rgba(10,125,62,0.12)", color: "#0a7d3e", fontWeight: 600 }}>{t("karten.thisWeek")}: {dieseWoche}/{nStud}</span>
                 {nieGelernt > 0 && <span style={{ fontSize: 12.5, padding: "4px 10px", borderRadius: 980, background: "var(--bg2)", color: "var(--text3)", fontWeight: 600 }}>{t("karten.neverLearned")}: {nieGelernt}</span>}
+                {notenAktiv && <button onClick={() => setNotenDialog(true)} style={{ ...btnSecondary, padding: "5px 12px", marginLeft: "auto" }}>{t("karten.toNoten")}</button>}
               </div>
             )}
             <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 12 }}>
@@ -204,6 +226,70 @@ export default function Karten() {
       )}
 
       {detail && <StudentDetail detail={detail} t={t} onClose={() => setDetail(null)} />}
+      {notenDialog && <NotenBrueckeModal t={t} classId={classId} kursId={kursId} progress={progress} scale={gradeScale} onClose={() => setNotenDialog(false)} />}
+    </div>
+  );
+}
+
+// Brücke Karten → Notenbuch: rechnet je SuS die Meisterung in eine Note (über die
+// Notenskala der Lehrkraft) und legt daraus eine neue Spalte an. Nur SuS, die schon
+// gelernt haben — nie-Gelernte bekommen keine 6 untergeschoben. Die Spalte ist frei
+// editierbar; die Note bleibt pädagogische Entscheidung.
+function NotenBrueckeModal({ t, classId, kursId, progress, scale, onClose }) {
+  const [sections, setSections] = useState(null);
+  const [sectionId, setSectionId] = useState("");
+  const [name, setName] = useState(`${t("karten.masteryColumn")} ${new Date().toLocaleDateString()}`);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const kq = kursId != null ? `?kurs_id=${kursId}` : "";
+
+  useEffect(() => {
+    fetch(`/api/noten/classes/${classId}/sections${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+      const list = Array.isArray(d) ? d : [];
+      setSections(list);
+      if (list[0]) setSectionId(String(list[0].id));
+    }).catch(() => setSections([]));
+  }, [classId, kursId]);
+
+  const grades = progress
+    .filter((p) => p.reviewed > 0)
+    .map((p) => ({ student_id: p.student_id, value: gradeFromPct(masteryPct(p.hist), scale) }))
+    .filter((g) => g.value >= 1 && g.value <= 6);
+
+  const submit = async () => {
+    if (!sectionId) { setErr(t("karten.masteryNoSection")); return; }
+    if (!name.trim()) { setErr(t("noten.columnName")); return; }
+    setBusy(true); setErr("");
+    const res = await fetch("/api/noten/import-grades", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ class_id: classId, kurs_id: kursId, section_id: Number(sectionId), column_name: name.trim(), note: t("karten.masteryNote"), grades }),
+    }).catch(() => null);
+    setBusy(false);
+    if (res && res.ok) onClose();
+    else { const b = res ? await res.json().catch(() => ({})) : {}; setErr(typeof b.detail === "string" ? b.detail : t("common.notWork")); }
+  };
+
+  return (
+    <div onClick={onClose} style={modalOverlay}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 440 }}>
+        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t("karten.toNoten")}</h3>
+        <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 14px" }}>{t("karten.masteryHint", { n: grades.length })}</p>
+        {sections && sections.length === 0 ? (
+          <p style={{ fontSize: 13, color: "#d1350f" }}>{t("karten.masteryNoSection")}</p>
+        ) : (<>
+          <div style={{ fontSize: 12.5, color: "var(--text2)", margin: "0 0 5px" }}>{t("karten.masterySection")}</div>
+          <select value={sectionId} onChange={(e) => setSectionId(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
+            {(sections || []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <div style={{ fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" }}>{t("noten.columnName")}</div>
+          <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, width: "100%" }} />
+        </>)}
+        {err && <p style={{ color: "#d1350f", fontSize: 12.5, marginTop: 10 }}>{err}</p>}
+        <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+          <button onClick={submit} disabled={busy || grades.length === 0 || (sections && sections.length === 0)} style={{ ...btnPrimary, opacity: busy || grades.length === 0 ? 0.6 : 1 }}>{t("common.save")}</button>
+          <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
+        </div>
+      </div>
     </div>
   );
 }
