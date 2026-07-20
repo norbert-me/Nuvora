@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "../i18n/index.jsx";
 import { askPrompt, askConfirm } from "../core/dialog.jsx";
+import { undoDelete } from "../core/undo.jsx";
 import { pageTitle, pageIntro, btnPrimary, btnSecondary, selectStyle, chipStyle, Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, Toggle, Empty } from "../components/Icons.jsx";
 
 const API = "/api";
@@ -43,11 +44,14 @@ export default function Kurse() {
   };
   const addMember = async (kursId, classId) => { await fetch(`${API}/kurse/${kursId}/classes/${classId}`, { method: "POST" }).catch(() => {}); load(); };
   const removeMember = async (kursId, classId) => { await fetch(`${API}/kurse/${kursId}/classes/${classId}`, { method: "DELETE" }).catch(() => {}); load(); };
-  const delKurs = async (k) => {
-    if (!await askConfirm(t("kurse.delConfirm", { name: k.name }))) return;
-    const r = await fetch(`${API}/kurse/${k.id}`, { method: "DELETE" }).catch(() => null);
-    if (r && r.ok) setKurse((prev) => prev.filter((x) => x.id !== k.id)); // sofort weg
-    loadTrash(); load();
+  const delKurs = (k) => {
+    // Sofort aus der Liste, 5 s Undo-Toast; erst dann wirklich löschen.
+    setKurse((prev) => prev.filter((x) => x.id !== k.id));
+    undoDelete({
+      message: t("undo.deleted", { name: k.name }),
+      undo: () => load(),
+      commit: async () => { await fetch(`${API}/kurse/${k.id}`, { method: "DELETE" }).catch(() => {}); loadTrash(); },
+    });
   };
   const restore = async (id) => { await fetch(`${API}/kurse/${id}/restore`, { method: "POST" }).catch(() => {}); load(); loadTrash(); };
   const purge = async (id) => {

@@ -69,6 +69,8 @@ export default {
   "publish.btn": "Veröffentlichen",
   "publish.done": "Veröffentlicht.",
   "publish.error": "Veröffentlichen fehlgeschlagen. Bitte erneut versuchen.",
+  "undo.deleted": "{{name}} gelöscht",
+  "undo.deletedGeneric": "Gelöscht",
   "common.delete": "Löschen",
   "common.edit": "Bearbeiten",
   "common.close": "Schließen",

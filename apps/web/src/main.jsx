@@ -75,6 +75,7 @@ import Zufall from "./pages/Zufall.jsx";
 import Orga from "./pages/Orga.jsx";
 import { useModules } from "./core/modules.js";
 import { DialogHost } from "./core/dialog.jsx";
+import { UndoHost } from "./core/undo.jsx";
 import { btnPrimary, btnSecondary } from "./components/Icons.jsx";
 // Navigation ist modulbezogen: die Shell zeigt die Punkte des Moduls, in dem
 // man gerade ist. Ausserhalb eines Moduls navigiert Nuvora selbst.
@@ -808,6 +809,7 @@ function App() {
       <BrowserRouter>
         <ConnectionMonitor />
         <DialogHost />
+        <UndoHost />
         <Routes>
           {/* Kartenlernen der Schueler: oeffentlich, ohne Login, ueber Token. */}
           <Route path="/lernen/:token" element={<Lernen />} />

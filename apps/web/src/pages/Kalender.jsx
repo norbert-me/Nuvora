@@ -7,6 +7,7 @@ import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C,
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, put } from "../core/cache.js";
+import { undoDelete } from "../core/undo.jsx";
 import ferienDE from "../data/ferien-de.json";
 
 // Bundeslaender fuer den Ferien-Import (Kuerzel muss zu ferien-de.json passen).
@@ -180,12 +181,14 @@ export default function Kalender() {
     }).catch(() => null);
     if (res && res.ok) { setEditing(null); load(); }
   };
-  const remove = async (id) => {
-    const r = await fetch(`${API}/entries/${id}`, { method: "DELETE" }).catch(() => null);
+  const remove = (id) => {
     setEditing(null);
-    // Server bestätigt → sofort lokal entfernen, kein erneutes Laden.
-    if (r && (r.ok || r.status === 204)) setEntries((prev) => prev.filter((e) => e.id !== id));
-    else load();
+    setEntries((prev) => prev.filter((e) => e.id !== id)); // sofort weg
+    undoDelete({
+      message: t("undo.deletedGeneric"),
+      undo: () => load(),
+      commit: async () => { await fetch(`${API}/entries/${id}`, { method: "DELETE" }).catch(() => {}); },
+    });
   };
 
   const className = (id) => (classes.find((c) => c.id === id) || {}).name || "";
