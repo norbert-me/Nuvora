@@ -207,6 +207,23 @@ export default function Sitzplan() {
   // Schüler. Beim Import werden die SuS der aktuellen Klasse der Reihe nach auf
   // die Plätze gesetzt — so lässt sich eine Sitzordnung auf eine andere Klasse
   // (oder ein anderes Fach) übertragen.
+  // Auto-Zoom: alle Elemente einpassen, mit ~30 % Rand ringsum.
+  const fitView = () => {
+    if (!seats.length) { setZoom(1); return; }
+    const items = [...seats.map((s) => ({ x: s.x, y: s.y, w: SEAT_W, h: SEAT_H })), { x: tafel.x, y: tafel.y, w: TAFEL_W, h: TAFEL_H }];
+    const minX = Math.min(...items.map((i) => i.x)), minY = Math.min(...items.map((i) => i.y));
+    const maxX = Math.max(...items.map((i) => i.x + i.w)), maxY = Math.max(...items.map((i) => i.y + i.h));
+    const cw = Math.max(1, maxX - minX), ch = Math.max(1, maxY - minY);
+    const vw = scrollRef.current.clientWidth, vh = scrollRef.current.clientHeight;
+    const z = Math.min(2, Math.max(0.5, Math.min(vw / (cw * 1.3), vh / (ch * 1.3))));
+    setZoom(z);
+    requestAnimationFrame(() => {
+      if (!scrollRef.current) return;
+      scrollRef.current.scrollLeft = (minX + maxX) / 2 * z - vw / 2;
+      scrollRef.current.scrollTop = (minY + maxY) / 2 * z - vh / 2;
+    });
+  };
+
   const doExport = () => {
     const data = { type: "nuvora_sitzplan", slots: seats.map((s) => ({ x: s.x, y: s.y, rot: s.rot || 0 })), tafel };
     const a = document.createElement("a");
@@ -273,6 +290,7 @@ export default function Sitzplan() {
             <span style={{ fontSize: 12.5, color: "var(--text2)", minWidth: 40, textAlign: "center" }}>{Math.round(zoom * 100)}%</span>
             <button onClick={() => setZoom((z) => Math.min(2, Math.round((z + 0.1) * 10) / 10))} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8, width: 28, height: 28, fontSize: 16 }}>+</button>
             {zoom !== 1 && <button onClick={() => setZoom(1)} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 12 }}>{t("sitzplan.zoomReset")}</button>}
+            <button onClick={fitView} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 12 }} title={t("sitzplan.fitHint")}>{t("sitzplan.fit")}</button>
           </div>
           <div ref={scrollRef} style={{ height: 520, overflow: "auto", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", marginBottom: 18 }}>
           <div ref={canvasRef} onPointerDown={onCanvasDown} onDragOver={(e) => e.preventDefault()} onDrop={onCanvasDrop}

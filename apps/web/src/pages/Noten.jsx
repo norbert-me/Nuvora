@@ -507,7 +507,7 @@ export default function Noten() {
                         const id = `${s.student_id}:${c.id}`;
                         const noten = notenVon(s.student_id, c.id);
                         return (
-                          <td key={c.id} style={{ ...td, padding: 0, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined }}>
+                          <td key={c.id} style={{ ...td, padding: 0, width: 56, minWidth: 56, maxWidth: 56, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined }}>
                             {zelle === id
                               ? <Zelle initial={noten[0] ? de(noten[0].value) : ""} onSave={(txt) => noteSetzen(s.student_id, c.id, txt)} onCancel={() => setZelle(null)} />
                               : <button onClick={() => setZelle(id)}
@@ -569,7 +569,7 @@ function Zelle({ onSave, onCancel, initial = "" }) {
   const ref = useRef(null);
   useEffect(() => { ref.current?.focus(); ref.current?.select(); }, []);
   return (
-    <input ref={ref} defaultValue={initial}
+    <input ref={ref} defaultValue={initial} size={1}
       onBlur={(e) => (e.target.value.trim() ? onSave(e.target.value) : onCancel())}
       onKeyDown={(e) => { if (e.key === "Enter") onSave(e.target.value); if (e.key === "Escape") onCancel(); }}
       placeholder="2,3"

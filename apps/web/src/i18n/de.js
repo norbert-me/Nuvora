@@ -902,6 +902,8 @@ export default {
   "sitzplan.import": "Import",
   "sitzplan.imported": "Sitzordnung übernommen.",
   "sitzplan.importError": "Datei nicht lesbar.",
+  "sitzplan.fit": "Einpassen",
+  "sitzplan.fitHint": "Zoom und Ansicht automatisch auf alle Tische setzen",
   "sitzplan.pool": "Noch nicht platziert",
   "sitzplan.allSeated": "Alle sitzen.",
   "sitzplan.noStudents": "Diese Klasse hat keine Schüler.",
