@@ -180,6 +180,14 @@ export default function Noten() {
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
     a.download = `noten-${(cls?.name || "klasse")}-hj${term}.json`; a.click(); URL.revokeObjectURL(a.href);
   };
+  const doZeugnis = async () => {
+    if (!classId) return;
+    const r = await fetch(`${API}/classes/${classId}/zeugnis.pdf?term=${term}&agg=${agg}`).catch(() => null);
+    if (!r || !r.ok) return;
+    const blob = await r.blob(); const cls = classes.find((c) => c.id === classId);
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `Zeugnis_${(cls?.name || "klasse")}_hj${term}.pdf`; a.click(); URL.revokeObjectURL(a.href);
+  };
   const doImport = async (file) => {
     if (!classId) return;
     setError("");
@@ -259,6 +267,7 @@ export default function Noten() {
         {term !== "year" && classId && (
           <div style={{ display: "flex", gap: 8, marginLeft: "auto", alignItems: "center" }}>
             <button onClick={doExport} style={btnSecondary}>{t("noten.export")}</button>
+            <button onClick={doZeugnis} style={btnSecondary} title={t("noten.zeugnisHint")}>{t("noten.zeugnis")}</button>
             <label style={{ ...btnSecondary, cursor: "pointer" }}>{t("noten.import")}
               <input type="file" accept=".json,application/json" style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) doImport(e.target.files[0]); e.target.value = ""; }} />
             </label>

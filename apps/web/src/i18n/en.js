@@ -842,6 +842,8 @@ export default {
   "kalender.export": "Export",
   "kalender.import": "Import",
   "kalender.importError": "Import failed.",
+  "noten.zeugnis": "Report PDF",
+  "noten.zeugnisHint": "Bundled parent/report PDF per student: grades, absences, card progress (no support data)",
   "noten.export": "Export",
   "noten.import": "Import",
   "noten.importError": "Import failed.",

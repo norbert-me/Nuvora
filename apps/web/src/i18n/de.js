@@ -842,6 +842,8 @@ export default {
   "kalender.export": "Exportieren",
   "kalender.import": "Importieren",
   "kalender.importError": "Import fehlgeschlagen.",
+  "noten.zeugnis": "Zeugnis-PDF",
+  "noten.zeugnisHint": "Gebündeltes Eltern-/Zeugnis-PDF je Schüler: Noten, Fehlzeiten, Karten-Fortschritt (ohne Förderdaten)",
   "noten.export": "Exportieren",
   "noten.import": "Importieren",
   "noten.importError": "Import fehlgeschlagen.",

@@ -839,3 +839,116 @@ async def import_noten(class_id: int, body: dict, term: str = "1", user: User = 
             db.add(QuartalDivider(class_id=class_id, owner_id=user.id, term=term, after_category_id=cid))
     await db.commit()
     return {"imported": len(body.get("sections") or [])}
+
+
+# ─── Zeugnis-/Eltern-Export: ein gebuendeltes PDF je Schueler ───
+
+@router.get("/classes/{class_id}/zeugnis.pdf")
+async def zeugnis_export(class_id: int, term: str = "1", agg: str = "mean",
+                         user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Gebuendelter Eltern-/Zeugnis-Export: je Schueler eine Seite mit Noten
+    (gewichteter Schnitt + Abschnitte), Fehlzeiten und Karten-Fortschritt.
+    Fehlzeiten/Karten nur, wenn die Module aktiv sind (Regel 3 — Noten laeuft
+    ohne sie voll). Besonders schuetzenswerte Daten (foerder/notizen) sind
+    bewusst NICHT enthalten."""
+    sc = await _owned_class(db, user, class_id)
+    sections, summaries = await _summarize(db, user, class_id, term, agg="median" if agg == "median" else "mean")
+    sum_by_id = {s.student_id: s for s in summaries}
+    students = await _kurs_roster(db, user, class_id)
+    halb = "1. Halbjahr" if term == "1" else "2. Halbjahr"
+
+    # Optional: Fehlzeiten (Modul Orga/Anwesenheit) und Karten-Fortschritt.
+    fehl: dict = {}
+    if await is_active(db, user.id, "orga"):
+        try:
+            from .anwesenheit import summary as _att_summary
+            fehl = await _att_summary(class_id, user=user, db=db)
+        except Exception:
+            fehl = {}
+    karten: dict = {}
+    if await is_active(db, user.id, "karten"):
+        try:
+            from .karten import progress as _card_progress
+            for p in await _card_progress(class_id, user=user, db=db):
+                karten[p.student_id] = {"reviewed": p.reviewed, "total": p.total}
+        except Exception:
+            karten = {}
+
+    def build(buf):
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import mm
+        from reportlab.pdfgen import canvas
+        c = canvas.Canvas(buf, pagesize=A4)
+        w, h = A4
+        for st in students:
+            s = sum_by_id.get(st.id)
+            y = h - 25 * mm
+            c.setFont("Helvetica-Bold", 16)
+            c.drawString(20 * mm, y, st.name[:60])
+            c.setFont("Helvetica", 9)
+            c.drawString(20 * mm, y - 6 * mm, f"{sc.name} · {halb} · erstellt am {datetime.now().strftime('%d.%m.%Y')} · Nuvora")
+            y -= 18 * mm
+
+            # Noten je Abschnitt
+            c.setFont("Helvetica-Bold", 12)
+            c.drawString(20 * mm, y, "Noten")
+            y -= 8 * mm
+            c.setFont("Helvetica", 10)
+            eff = (s.section_effective if s else {}) or {}
+            if sections:
+                for sec in sections:
+                    val = eff.get(str(sec.id))
+                    txt = f"{val:.2f}".replace(".", ",") if val is not None else "–"
+                    gew = f"  ({sec.weight} %)" if sec.weight else ""
+                    if y < 30 * mm:
+                        c.showPage(); y = h - 25 * mm; c.setFont("Helvetica", 10)
+                    c.drawString(24 * mm, y, f"{sec.name[:48]}{gew}")
+                    c.drawRightString(120 * mm, y, txt)
+                    y -= 6 * mm
+            else:
+                c.drawString(24 * mm, y, "keine Abschnitte angelegt"); y -= 6 * mm
+            y -= 2 * mm
+            # Gewichteter Schnitt (Endnote-Override schlaegt den Schnitt)
+            gesamt = None
+            if s:
+                gesamt = s.total_override if s.total_override is not None else s.weighted
+            c.setFont("Helvetica-Bold", 11)
+            gtxt = f"{gesamt:.2f}".replace(".", ",") if gesamt is not None else "–"
+            hinweis = "" if (s and not s.unweighted_fallback) else "  (ungewichtet — keine Gewichte gesetzt)"
+            c.drawString(24 * mm, y, "Gewichteter Schnitt")
+            c.drawRightString(120 * mm, y, gtxt)
+            if hinweis:
+                c.setFont("Helvetica", 8); c.drawString(122 * mm, y, hinweis.strip())
+            y -= 6 * mm
+            c.setFont("Helvetica-Oblique", 8)
+            c.drawString(24 * mm, y, "Der Schnitt ist eine Rechenhilfe. Die Zeugnisnote bleibt eine paedagogische Entscheidung.")
+            y -= 12 * mm
+
+            # Fehlzeiten
+            if fehl:
+                a = fehl.get(str(st.id), {"fehlt": 0, "spaet": 0, "entsch": 0})
+                c.setFont("Helvetica-Bold", 12); c.drawString(20 * mm, y, "Fehlzeiten"); y -= 8 * mm
+                c.setFont("Helvetica", 10)
+                c.drawString(24 * mm, y, f"Fehltage: {a.get('fehlt', 0)}   davon entschuldigt: {a.get('entsch', 0)}   Verspaetungen: {a.get('spaet', 0)}")
+                y -= 12 * mm
+
+            # Karten-Fortschritt
+            if karten:
+                k = karten.get(st.id)
+                if k:
+                    c.setFont("Helvetica-Bold", 12); c.drawString(20 * mm, y, "Karteikarten"); y -= 8 * mm
+                    c.setFont("Helvetica", 10)
+                    c.drawString(24 * mm, y, f"Gelernt: {k['reviewed']} von {k['total']} Karten")
+                    y -= 12 * mm
+
+            c.showPage()
+        # Leeres PDF vermeiden
+        if not students:
+            c.setFont("Helvetica", 12); c.drawString(20 * mm, h - 30 * mm, "Keine Schueler in dieser Klasse."); c.showPage()
+        c.save()
+
+    import io
+    from fastapi.responses import StreamingResponse
+    buf = io.BytesIO(); build(buf); buf.seek(0)
+    return StreamingResponse(buf, media_type="application/pdf",
+                             headers={"Content-Disposition": f'attachment; filename="Zeugnis_{sc.name}_{halb}.pdf"'})

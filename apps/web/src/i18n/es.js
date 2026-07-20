@@ -842,6 +842,8 @@ export default {
   "kalender.export": "Exportar",
   "kalender.import": "Importar",
   "kalender.importError": "Error al importar.",
+  "noten.zeugnis": "PDF de boletín",
+  "noten.zeugnisHint": "PDF de boletín agrupado por alumno: notas, faltas, progreso de tarjetas (sin datos de apoyo)",
   "noten.export": "Exportar",
   "noten.import": "Importar",
   "noten.importError": "Error al importar.",
