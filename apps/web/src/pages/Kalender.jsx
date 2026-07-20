@@ -759,7 +759,13 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
           <div>
             {(clsName || topName || methName) && (
               <div style={{ marginTop: 4 }}>
-                {zeile(t("nav.classes"), clsName)}
+                {clsName && (
+                  <div style={{ display: "flex", gap: 8, fontSize: 13.5, padding: "3px 0" }}>
+                    <span style={{ color: "var(--text3)", minWidth: 90 }}>{t("nav.classes")}</span>
+                    {/* Kurs anklickbar: öffnet die Klasse/den Kurs im Kern. */}
+                    <Link to={`/classes?open=${classId}`} onClick={onClose} style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>{clsName} ↗</Link>
+                  </div>
+                )}
                 {zeile(t("kalender.topic"), topName)}
                 {zeile(t("kalender.method"), methName)}
               </div>
