@@ -173,6 +173,18 @@ export default function Kalender() {
     else if (view === "week") setCursor(addDays(cursor, dir * 7));
     else setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + dir, 1));
   };
+  // Pfeiltasten ←/→ blättern (nur in Monat/Woche/Tag, nicht beim Tippen).
+  useEffect(() => {
+    const onKey = (e) => {
+      if (["timetable", "breaks", "today"].includes(view)) return;
+      const el = document.activeElement;
+      if (el && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) return;
+      if (e.key === "ArrowLeft") move(-1);
+      else if (e.key === "ArrowRight") move(1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [view, cursor]); // eslint-disable-line
 
   const save = async (e) => {
     const body = { date: new Date(e.date).toISOString(), title: e.title || "", notes: e.notes || "", class_id: e.class_id || null, topic_id: e.topic_id || null, method_id: e.method_id || null, period: e.period ?? null, cardvote_set_id: e.cardvote_set_id || null, karten_deck_id: e.karten_deck_id || null, lernpfad_ladder_id: e.lernpfad_ladder_id || null, codedetektiv_puzzle: e.codedetektiv_puzzle || null };

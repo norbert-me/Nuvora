@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 const iconSvg = { fill: "none", stroke: "var(--text3)", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" };
 
 // Icon skaliert standardmäßig mit der Schriftgröße (1em) und sitzt auf der
@@ -157,6 +159,12 @@ export const modalPanel = {
   maxHeight: "88vh", overflow: "auto", boxSizing: "border-box",
 };
 export function Modal({ children, onClose, width = 480, style }) {
+  // Esc schließt — durchgängig für alle Modals, die diese Komponente nutzen.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   return (
     <div onClick={onClose} style={modalOverlay}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: width, ...style }}>
