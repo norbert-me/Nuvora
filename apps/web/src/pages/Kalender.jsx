@@ -336,8 +336,8 @@ export default function Kalender() {
           </div>
         </div>
       )}
-      {view === "week" && <WeekView range={range} byDay={byDay} slotsFor={slotsFor} frei={frei} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
-      {view === "day" && <DayView day={cursor} byDay={byDay} slotsFor={slotsFor} frei={frei} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
+      {view === "week" && <WeekView range={range} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} frei={frei} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
+      {view === "day" && <DayView day={cursor} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} frei={frei} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
       {view === "timetable" && <TimetableView tt={tt} className={className} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
@@ -395,6 +395,14 @@ function SlotGhosts({ list, entries, className, topicName, onSlot, day, t }) {
 // Eintrags-Chip: öffnet den Eintrag im Popup. Die Verweise zum verknüpften
 // Modul-Objekt (Deck/Quiz/Lernleiter) liegen dort — kein Inline-↗ mehr im
 // Kalenderraster (war Doppelung und Unruhe).
+// Externe (abonnierte) Termine — read-only, grau, nicht klickbar.
+function ExtChips({ list }) {
+  if (!list || !list.length) return null;
+  return list.map((ev, i) => (
+    <div key={`ext-${i}`} title={ev.title} style={{ fontSize: 11, color: "var(--text3)", background: "var(--bg2)", border: "1px dashed var(--border2)", borderRadius: 6, padding: "1px 5px", margin: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>🔗 {ev.title || "—"}</div>
+  ));
+}
+
 function EntryChips({ list, className, topicName, onOpen, classColor }) {
   return list.map((e) => {
     const col = e.class_id && classColor ? classColor(e.class_id) : null;
@@ -503,10 +511,7 @@ function MonthGrid({ range, cursor, byDay, extByDay, slotsFor, onSlot, frei, cla
                     </div>
                     {f ? <FreiMarker label={f.label} t={t} /> : (<>
                       <EntryChips list={byDay(d)} className={className} topicName={topicName} onOpen={onOpen} classColor={classColor} />
-                      {/* Externe Kalender-Events (read-only, grau, nicht klickbar). */}
-                      {extByDay && extByDay(d).map((ev, i) => (
-                        <div key={`ext-${i}`} title={ev.title} style={{ fontSize: 11, color: "var(--text3)", background: "var(--bg2)", border: "1px dashed var(--border2)", borderRadius: 6, padding: "1px 5px", margin: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>🔗 {ev.title || "—"}</div>
-                      ))}
+                      <ExtChips list={extByDay && extByDay(d)} />
                       {slotsFor && <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} topicName={topicName} onSlot={onSlot} day={d} t={t} />}
                     </>)}
                   </td>
@@ -520,7 +525,7 @@ function MonthGrid({ range, cursor, byDay, extByDay, slotsFor, onSlot, frei, cla
   );
 }
 
-function WeekView({ range, byDay, slotsFor, frei, className, classColor, topicName, onAdd, onOpen, onSlot, t }) {
+function WeekView({ range, byDay, extByDay, slotsFor, frei, className, classColor, topicName, onAdd, onOpen, onSlot, t }) {
   const days = [];
   for (let d = new Date(range[0]); d <= range[1]; d = addDays(d, 1)) days.push(new Date(d));
   return (
@@ -536,6 +541,7 @@ function WeekView({ range, byDay, slotsFor, frei, className, classColor, topicNa
           {f ? <FreiMarker label={f.label} t={t} /> : (<>
             <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} topicName={topicName} onSlot={onSlot} day={d} t={t} />
             <EntryChips list={byDay(d)} className={className} topicName={topicName} onOpen={onOpen} classColor={classColor} />
+            <ExtChips list={extByDay && extByDay(d)} />
           </>)}
         </div>
         );
@@ -556,9 +562,10 @@ function FreiMarker({ label, t }) {
   );
 }
 
-function DayView({ day, byDay, slotsFor, frei, className, classColor, topicName, onAdd, onOpen, onSlot, t }) {
+function DayView({ day, byDay, extByDay, slotsFor, frei, className, classColor, topicName, onAdd, onOpen, onSlot, t }) {
   const list = byDay(day);
   const slots = slotsFor(day);
+  const ext = extByDay ? extByDay(day) : [];
   const f = frei && frei(day);
   if (f) return <p style={{ fontSize: 14, color: "var(--text3)", fontStyle: "italic" }}>{f.label ? `${f.label} — ${t("kalender.free")}` : t("kalender.free")}</p>;
   return (
@@ -569,7 +576,8 @@ function DayView({ day, byDay, slotsFor, frei, className, classColor, topicName,
           <SlotGhosts list={slots} entries={list} className={className} topicName={topicName} onSlot={onSlot} day={day} t={t} />
         </div>
       )}
-      {list.length === 0 ? <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("kalender.empty")}</p> : list.map((e) => (
+      {ext.length > 0 && <div style={{ marginBottom: 10 }}><ExtChips list={ext} /></div>}
+      {list.length === 0 && ext.length === 0 ? <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("kalender.empty")}</p> : list.map((e) => (
         <button key={e.id} onClick={() => onOpen({ ...e, date: new Date(e.date) })} style={{ display: "block", width: "100%", textAlign: "left", padding: 14, marginBottom: 8, borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer" }}>
           <div style={{ fontSize: 15, fontWeight: 600 }}>{e.title || topicName(e.topic_id) || "—"}</div>
           {e.topic_id && e.title && <div style={{ fontSize: 12.5, color: "var(--accent)" }}>{topicName(e.topic_id)}</div>}
