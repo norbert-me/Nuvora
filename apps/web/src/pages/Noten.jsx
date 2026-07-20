@@ -37,6 +37,7 @@ export default function Noten() {
   const [neuAbschnitt, setNeuAbschnitt] = useState(false);
   const [neuSpalteIn, setNeuSpalteIn] = useState(null);
   const [renameCol, setRenameCol] = useState(null);
+  const [statsCol, setStatsCol] = useState(null); // Spalte für die zentrale Auswertung
   const [beobFuer, setBeobFuer] = useState(null);
   const [infoFuer, setInfoFuer] = useState(null);
   const [term, setTerm] = useState("1");
@@ -225,9 +226,13 @@ export default function Noten() {
   const notenVon = (sid, cid) => entries.filter((e) => e.student_id === sid && e.category_id === cid && e.kind === "grade");
   // Auswertung je Spalte: Anzahl, Schnitt, Spanne über alle eingetragenen Noten.
   const colStats = (cid) => {
-    const vals = entries.filter((e) => e.category_id === cid && e.kind === "grade" && e.value != null).map((e) => e.value);
+    const vals = entries.filter((e) => e.category_id === cid && e.kind === "grade" && e.value != null).map((e) => e.value).sort((a, b) => a - b);
     if (!vals.length) return null;
-    return { n: vals.length, avg: Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100, min: Math.min(...vals), max: Math.max(...vals) };
+    const n = vals.length;
+    const median = n % 2 ? vals[(n - 1) / 2] : (vals[n / 2 - 1] + vals[n / 2]) / 2;
+    // Verteilung auf ganze Notenstufen 1–6 (2,3 zählt zu 2).
+    const dist = [1, 2, 3, 4, 5, 6].map((g) => ({ g, n: vals.filter((v) => Math.floor(v) === g).length }));
+    return { n, avg: Math.round((vals.reduce((a, b) => a + b, 0) / n) * 100) / 100, median: Math.round(median * 100) / 100, min: vals[0], max: vals[n - 1], dist };
   };
   const sumOf = (studentId) => summary.find((s) => s.student_id === studentId);
 
@@ -294,6 +299,38 @@ export default function Noten() {
             onSave={async (b) => { if (await call(() => fetch(`${API}/classes/${classId}/sections?term=${term}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...b, position: sections.length }) }))) setNeuAbschnitt(false); }} />
         </Modal>
       )}
+
+      {statsCol && (() => {
+        const st = colStats(statsCol.id);
+        const de1 = (n) => String(Math.round(n * 100) / 100).replace(".", ",");
+        const maxN = st ? Math.max(...st.dist.map((d) => d.n), 1) : 1;
+        return (
+          <Modal title={t("noten.colStatsTitle", { name: statsCol.name })} onClose={() => setStatsCol(null)}>
+            {!st ? <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("noten.colNoGrades")}</p> : (
+              <div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 18 }}>
+                  {[[t("noten.colAvg"), de1(st.avg)], [t("noten.colMedian"), de1(st.median)], [t("noten.colCount", { n: st.n }), ""], [t("noten.colBest"), de1(st.min)], [t("noten.colWorst"), de1(st.max)]].map(([lbl, val], i) => (
+                    <div key={i} style={{ padding: "10px 12px", borderRadius: 10, background: "var(--bg2)" }}>
+                      <div style={{ fontSize: 11.5, color: "var(--text3)" }}>{lbl}</div>
+                      {val !== "" && <div style={{ fontSize: 20, fontWeight: 800 }}>{val}</div>}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text3)", marginBottom: 8 }}>{t("noten.colDist")}</div>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 100 }}>
+                  {st.dist.map((d) => (
+                    <div key={d.g} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                      <div style={{ fontSize: 11, color: "var(--text3)" }}>{d.n || ""}</div>
+                      <div style={{ width: "100%", height: `${(d.n / maxN) * 70}px`, minHeight: d.n ? 3 : 0, background: "var(--accent)", borderRadius: 4 }} />
+                      <div style={{ fontSize: 12, fontWeight: 700 }}>{d.g}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Modal>
+        );
+      })()}
 
       {neuSpalteIn != null && (() => {
         const sec = sections.find((s) => s.id === neuSpalteIn);
@@ -425,7 +462,7 @@ export default function Noten() {
                           </Link>
                         )}
                         {renameCol === c.id && (
-                          <ColMenu t={t} cat={c} stats={colStats(c.id)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
+                          <ColMenu t={t} cat={c} stats={colStats(c.id)} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
                             onRename={async (name) => { if (await call(() => fetch(`${API}/categories/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: c.position ?? i }) }))) setRenameCol(null); }}
                             onDelete={async () => { if (await askConfirm(t("noten.delColumn", { name: c.name }))) { call(() => fetch(`${API}/categories/${c.id}`, { method: "DELETE" })); setRenameCol(null); } }}
                             onClose={() => setRenameCol(null)} />
@@ -663,7 +700,7 @@ function SectionMenu({ t, sec, onEdit, onDelete, onAddCol }) {
 }
 
 // Kleine Uebersicht zur Spalte: Anlagedatum plus Umbenennen/Loeschen.
-function ColMenu({ t, cat, stats, onRename, onDelete, onClose, dividerOn, onToggleDivider }) {
+function ColMenu({ t, cat, stats, onStats, onRename, onDelete, onClose, dividerOn, onToggleDivider }) {
   const [name, setName] = useState(cat.name);
   const datum = cat.created_at ? new Date(cat.created_at).toLocaleDateString("de-DE") : "—";
   const de1 = (n) => String(Math.round(n * 100) / 100).replace(".", ",");
@@ -672,15 +709,10 @@ function ColMenu({ t, cat, stats, onRename, onDelete, onClose, dividerOn, onTogg
       <span onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 9 }} />
       <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", zIndex: 10, top: 26, left: "50%", transform: "translateX(-50%)", minWidth: 210, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: 12, boxShadow: "0 6px 20px rgba(0,0,0,0.2)", textAlign: "left", fontWeight: 400 }}>
         <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 8 }}>{t("noten.colCreated")}: {datum}</div>
-        {/* Spalten-Auswertung: Schnitt + Spanne über die eingetragenen Noten. */}
-        <div style={{ fontSize: 12, marginBottom: 10, padding: "7px 9px", borderRadius: 8, background: "var(--bg2)" }}>
-          {stats ? (
-            <>
-              <div style={{ fontWeight: 700 }}>{t("noten.colAvg")}: {de1(stats.avg)}</div>
-              <div style={{ color: "var(--text3)", marginTop: 2 }}>{t("noten.colCount", { n: stats.n })} · {t("noten.colRange", { min: de1(stats.min), max: de1(stats.max) })}</div>
-            </>
-          ) : <span style={{ color: "var(--text3)" }}>{t("noten.colNoGrades")}</span>}
-        </div>
+        {/* Kurz-Schnitt hier, ausführliche Auswertung zentral im Modal. */}
+        <button onClick={() => { onStats(); onClose(); }} style={{ width: "100%", marginBottom: 10, padding: "7px 9px", fontSize: 12, textAlign: "left", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer" }}>
+          {stats ? <><span style={{ fontWeight: 700 }}>{t("noten.colAvg")}: {de1(stats.avg)}</span> · {t("noten.colCount", { n: stats.n })} · <span style={{ color: "var(--accent)" }}>{t("noten.colDetails")} ↗</span></> : <span style={{ color: "var(--text3)" }}>{t("noten.colNoGrades")}</span>}
+        </button>
         <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 10 }}>
           <input value={name} onChange={(e) => setName(e.target.value)} autoFocus
             onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) onRename(name.trim()); if (e.key === "Escape") onClose(); }}

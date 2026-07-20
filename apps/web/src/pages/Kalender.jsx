@@ -23,6 +23,17 @@ const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 const mondayOf = (d) => { const x = startOfDay(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
+// Monat/KW-Sprung für den Kalender (<input type=month|week>).
+const monthVal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+const monthValToDate = (s) => { const [y, m] = s.split("-").map(Number); return startOfDay(new Date(y, m - 1, 1)); };
+const isoWeek = (d) => {
+  const x = startOfDay(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7) + 3); // Donnerstag dieser Woche
+  const firstThu = new Date(x.getFullYear(), 0, 4);
+  firstThu.setDate(firstThu.getDate() - ((firstThu.getDay() + 6) % 7) + 3);
+  return { year: x.getFullYear(), week: 1 + Math.round((x - firstThu) / (7 * 86400000)) };
+};
+const weekVal = (d) => { const { year, week } = isoWeek(d); return `${year}-W${String(week).padStart(2, "0")}`; };
+const weekValToDate = (s) => { const [y, w] = s.split("-W").map(Number); return addDays(mondayOf(new Date(y, 0, 4)), (w - 1) * 7); };
 
 export default function Kalender() {
   const { t } = useLanguage();
@@ -214,9 +225,17 @@ export default function Kalender() {
             <button onClick={() => move(-1)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 15 }} title="◀">‹</button>
             <button onClick={() => setCursor(startOfDay(new Date()))} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>{t("kalender.today")}</button>
             <button onClick={() => move(1)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 15 }} title="▶">›</button>
-            {/* Direkt zu einem bestimmten Tag springen. */}
-            <input type="date" value={ymd(cursor)} onChange={(e) => e.target.value && setCursor(startOfDay(new Date(e.target.value + "T00:00:00")))}
-              style={{ ...inputStyle, padding: "5px 8px", fontSize: 13 }} title={t("kalender.jumpToDay")} />
+            {/* Direkt springen — Tag per Datum, Woche per KW, Monat per Monat. */}
+            {view === "month" ? (
+              <input type="month" value={monthVal(cursor)} onChange={(e) => e.target.value && setCursor(monthValToDate(e.target.value))}
+                style={{ ...inputStyle, padding: "5px 8px", fontSize: 13 }} title={t("kalender.jumpToDay")} />
+            ) : view === "week" ? (
+              <input type="week" value={weekVal(cursor)} onChange={(e) => e.target.value && setCursor(weekValToDate(e.target.value))}
+                style={{ ...inputStyle, padding: "5px 8px", fontSize: 13 }} title={t("kalender.jumpToDay")} />
+            ) : (
+              <input type="date" value={ymd(cursor)} onChange={(e) => e.target.value && setCursor(startOfDay(new Date(e.target.value + "T00:00:00")))}
+                style={{ ...inputStyle, padding: "5px 8px", fontSize: 13 }} title={t("kalender.jumpToDay")} />
+            )}
           </div>
         )}
       </div>
