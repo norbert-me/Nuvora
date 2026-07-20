@@ -133,10 +133,18 @@ export default function Noten() {
     const val = parseNote(text);
     setZelle(null);
     if (val === null) return;
-    await call(() => fetch(`${API}/overrides`, {
+    // Optimistisch: Bereichs- bzw. Endnote sofort zeigen (auch offline).
+    setSummary((prev) => prev.map((s) => {
+      if (s.student_id !== studentId) return s;
+      if (sectionId == null) return { ...s, total_override: val };
+      return { ...s, section_overrides: { ...s.section_overrides, [String(sectionId)]: val },
+               section_effective: { ...s.section_effective, [String(sectionId)]: val } };
+    }));
+    const ok = await call(() => fetch(`${API}/overrides`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ class_id: classId, kurs_id: kursId, student_id: studentId, section_id: sectionId, term, value: val }),
     }));
+    if (ok === false) load(classId);
   };
   const overrideReset = async (studentId, sectionId) => {
     const q = new URLSearchParams({ class_id: classId, student_id: studentId, term, ...(kursId != null ? { kurs_id: kursId } : {}) });
@@ -218,24 +226,34 @@ export default function Noten() {
 
   const call = async (fn) => {
     setError("");
-    const res = await fn();
+    const res = await fn().catch(() => null);
+    if (!res) { setError(t("common.notWork")); return false; }
     if (!res.ok) {
       const b = await res.json().catch(() => ({}));
       setError(typeof b.detail === "string" ? b.detail : t("common.notWork"));
       return false;
     }
-    await load(classId);
-    return true;
+    // Offline gepuffert (X-Nuvora-Queued): NICHT neu laden — der Reload würde
+    // offline scheitern/veralten und die optimistische Anzeige zurücksetzen.
+    const queued = res.headers && res.headers.get("X-Nuvora-Queued");
+    if (!queued) await load(classId);
+    return queued ? "queued" : true;
   };
 
   const noteSetzen = async (studentId, catId, text) => {
     setZelle(null);
     const wert = parseNote(text);
     if (wert === null) return;
-    await call(() => fetch(`${API}/entries`, {
+    // Optimistisch lokal setzen, damit die Note auch offline sofort steht.
+    setSummary((prev) => prev.map((s) => s.student_id === studentId
+      ? { ...s, per_category: { ...s.per_category, [String(catId)]: wert } } : s));
+    setEntries((prev) => [...prev.filter((e) => !(e.student_id === studentId && e.category_id === catId && e.kind === "grade")),
+      { student_id: studentId, category_id: catId, kind: "grade", value: wert }]);
+    const ok = await call(() => fetch(`${API}/entries`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ category_id: catId, student_id: studentId, kind: "grade", value: wert, note: "" }),
     }));
+    if (ok === false) load(classId); // echter Server-Fehler: Wahrheit zurückholen
   };
 
   const allCats = sections.flatMap((s) => s.categories || []);

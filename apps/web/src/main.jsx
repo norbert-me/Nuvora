@@ -43,7 +43,9 @@ window.fetch = function(input, init) {
     try { bodyObj = init && typeof init.body === "string" ? JSON.parse(init.body) : null; } catch { /* kein JSON */ }
     if (isApi && isQueueable(method, url, bodyObj)) {
       await enqueue(method, url, typeof init.body === "string" ? init.body : null);
-      return new Response(JSON.stringify({ queued: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+      // Header markiert die synthetische Antwort, damit Seiten optimistisch
+      // bleiben (nicht vom offline-scheiternden Reload überschreiben lassen).
+      return new Response(JSON.stringify({ queued: true }), { status: 200, headers: { "Content-Type": "application/json", "X-Nuvora-Queued": "1" } });
     }
     throw err;
   });
