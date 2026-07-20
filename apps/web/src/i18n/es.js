@@ -387,7 +387,7 @@ export default {
   "session.open": "Sesiones abiertas",
   "session.finish": "Finalizar",
   "session.resume": "Continuar",
-  "session.step1": "1. Elegir clase",
+  "session.step1": "1. Elegir curso",
   "session.step2": "2. Elegir banco de preguntas",
   "session.step3": "3. Opciones",
   "session.noClasses": "Aún no hay clases.",
