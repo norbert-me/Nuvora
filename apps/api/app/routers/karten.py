@@ -576,6 +576,9 @@ class ReviewIn(BaseModel):
 @router.post("/lernen/{token}/review")
 async def submit_review(token: str, body: ReviewIn, db: AsyncSession = Depends(get_db)):
     """SM-2-Schritt fuer eine Karte."""
+    # Oeffentlich per Token: leichtes Limit gegen Hammering (Schreiben ist je
+    # Karte gebunden, aber ein geleaktes Token soll nichts fluten koennen).
+    rate_limit("karten_review", token, 600, 60, "Zu viele Anfragen. Bitte kurz warten.")
     st = await _student_by_token(db, token)
     card = await db.get(Card, body.card_id)
     if not card:

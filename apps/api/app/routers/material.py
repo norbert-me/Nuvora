@@ -91,10 +91,15 @@ async def download_material(material_id: int, user: User = Depends(get_current_u
     m = await db.get(Material, material_id)
     if not m or m.owner_id != user.id:
         raise HTTPException(404, "Material nicht gefunden")
-    # Content-Disposition: inline anzeigen, wenn moeglich; Dateiname gesetzt.
     safe = m.filename.replace("\r", " ").replace("\n", " ").replace('"', "'")
+    # Inline nur fuer sichere, nicht-skriptfaehige Typen (PDF, Rasterbilder).
+    # Alles andere — besonders HTML/SVG — als Download, damit hochgeladener Code
+    # nicht im eigenen Origin ausgefuehrt wird (SVG kann Skript tragen).
+    inline_ok = {"application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp"}
+    disp = "inline" if (m.mime in inline_ok) else "attachment"
     return Response(content=m.data, media_type=m.mime or "application/octet-stream",
-                    headers={"Content-Disposition": f'inline; filename="{safe}"'})
+                    headers={"Content-Disposition": f'{disp}; filename="{safe}"',
+                             "X-Content-Type-Options": "nosniff"})
 
 
 @router.delete("/{material_id}", status_code=204)

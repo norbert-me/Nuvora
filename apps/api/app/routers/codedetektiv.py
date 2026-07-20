@@ -181,14 +181,27 @@ class ResultIn(BaseModel):
 
 
 @router.post("/sessions/{code}/result")
-async def submit_result(code: str, body: ResultIn, db: AsyncSession = Depends(get_db)):
-    """Öffentlich: Ergebnis einer Runde melden (einmal je Spieler+Rätsel)."""
+async def submit_result(code: str, body: ResultIn, request: Request, db: AsyncSession = Depends(get_db)):
+    """Öffentlich: Ergebnis einer Runde melden (einmal je Spieler+Rätsel).
+
+    Oeffentlich + ohne Login: darum rate-limitiert, mit Laengen- und Groessen-
+    Grenzen, damit niemand die results-Liste vollschreiben kann (DB-Bloat/DoS)."""
+    rate_limit("cd_result", client_ip(request), 120, 60, "Zu viele Anfragen. Bitte kurz warten.")
     s = await _by_code(db, code)
+    if s.ended:
+        raise HTTPException(400, "Session ist beendet")
+    pn = (body.playerName or "").strip()[:40]
+    pid = (body.puzzleId or "").strip()[:64]
+    if not pn or not pid:
+        raise HTTPException(400, "Ungültige Angaben")
     results = list(s.results or [])
-    if any(r.get("playerName") == body.playerName and r.get("puzzleId") == body.puzzleId for r in results):
+    if any(r.get("playerName") == pn and r.get("puzzleId") == pid for r in results):
         return _session_public(s)
-    results.append({"playerName": body.playerName, "puzzleId": body.puzzleId,
-                    "solved": bool(body.solved), "attempts": int(body.attempts), "time": float(body.time)})
+    if len(results) >= 5000:
+        raise HTTPException(400, "Zu viele Ergebnisse in dieser Session")
+    results.append({"playerName": pn, "puzzleId": pid,
+                    "solved": bool(body.solved), "attempts": max(0, min(int(body.attempts), 10000)),
+                    "time": max(0.0, min(float(body.time), 1e7))})
     s.results = results
     flag_modified(s, "results")
     await db.commit()
