@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
-import { StageBadge, Icon, ICONS, iconBtn, btnSecondary } from "../components/Icons.jsx";
+import { StageBadge, Icon, ICONS, iconBtn, btnSecondary, selectStyle } from "../components/Icons.jsx";
 import { pageTitle } from "../components/Icons.jsx";
 
 const card = {
@@ -100,10 +100,10 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv, methodenAktiv }) {
               const eff = row.class_id ?? pickFor[row.topic_id] ?? null;
               const r2 = eff === row.class_id ? row : { ...row, class_id: eff };
               return (<>
-                {row.class_id == null && (
+                {row.class_id == null && (kartenAktiv || lernpfadAktiv) && (
                   <select value={pickFor[row.topic_id] ?? ""} aria-label={t("home.weakPickClass")}
                     onChange={(e) => setPickFor((m) => ({ ...m, [row.topic_id]: e.target.value ? Number(e.target.value) : undefined }))}
-                    style={{ padding: "5px 8px", fontSize: 12.5, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)" }}>
+                    style={{ ...selectStyle, padding: "5px 8px", fontSize: 12.5 }}>
                     <option value="">{t("home.weakPickClass")}</option>
                     {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
