@@ -240,6 +240,19 @@ export default function Noten() {
     return queued ? "queued" : true;
   };
 
+  // Anlegen (Abschnitt/Spalte): online frisch laden; offline (X-Nuvora-Queued)
+  // die zurueckgegebene Behelfs-ID optimistisch einfuegen (insert(id)), damit
+  // das neue Element sofort da ist. Beim Sync wird die Behelfs-ID umgehaengt.
+  const callCreate = async (fn, insert) => {
+    setError("");
+    const res = await fn().catch(() => null);
+    if (!res || !res.ok) { setError(t("common.notWork")); return false; }
+    const j = await res.json().catch(() => ({}));
+    if (res.headers && res.headers.get("X-Nuvora-Queued")) insert(j.id);
+    else await load(classId);
+    return true;
+  };
+
   const noteSetzen = async (studentId, catId, text) => {
     setZelle(null);
     const wert = parseNote(text);
@@ -354,7 +367,10 @@ export default function Noten() {
       {neuAbschnitt && (
         <Modal title={t("noten.addSection")} onClose={() => setNeuAbschnitt(false)}>
           <SectionForm t={t} onCancel={() => setNeuAbschnitt(false)}
-            onSave={async (b) => { if (await call(() => fetch(`${API}/classes/${classId}/sections?term=${term}${kp}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...b, position: sections.length }) }))) setNeuAbschnitt(false); }} />
+            onSave={async (b) => { if (await callCreate(
+              () => fetch(`${API}/classes/${classId}/sections?term=${term}${kp}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...b, position: sections.length }) }),
+              (id) => setSections((prev) => [...prev, { id, name: b.name, weight: b.weight || 0, position: sections.length, term, class_id: classId, kurs_id: kursId, categories: [] }]),
+            )) setNeuAbschnitt(false); }} />
         </Modal>
       )}
 
@@ -403,7 +419,10 @@ export default function Noten() {
         return (
           <Modal title={t("noten.addColumn")} onClose={() => setNeuSpalteIn(null)}>
             <ColForm t={t} onCancel={() => setNeuSpalteIn(null)}
-              onSave={async (name) => { if (await call(() => fetch(`${API}/categories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: neuSpalteIn, position: pos }) }))) setNeuSpalteIn(null); }} />
+              onSave={async (name) => { if (await callCreate(
+                () => fetch(`${API}/categories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: neuSpalteIn, position: pos }) }),
+                (id) => setSections((prev) => prev.map((s) => s.id === neuSpalteIn ? { ...s, categories: [...(s.categories || []), { id, name, section_id: neuSpalteIn, position: pos }] } : s)),
+              )) setNeuSpalteIn(null); }} />
           </Modal>
         );
       })()}

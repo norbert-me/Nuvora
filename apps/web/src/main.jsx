@@ -7,7 +7,7 @@ import "@fontsource/inter/600.css";
 import "@fontsource/inter/700.css";
 import "@fontsource/inter/800.css";
 import { LanguageProvider, useLanguage, LANGUAGES } from "./i18n/index.jsx";
-import { enqueue, isQueueable, flush as flushOutbox } from "./core/outbox.js";
+import { enqueue, classify, newTmp, flush as flushOutbox } from "./core/outbox.js";
 
 // Global fetch interceptor: add auth token to all /api/ requests
 const _origFetch = window.fetch;
@@ -41,11 +41,18 @@ window.fetch = function(input, init) {
     const method = (init && init.method) || "GET";
     let bodyObj = null;
     try { bodyObj = init && typeof init.body === "string" ? JSON.parse(init.body) : null; } catch { /* kein JSON */ }
-    if (isApi && isQueueable(method, url, bodyObj)) {
-      await enqueue(method, url, typeof init.body === "string" ? init.body : null);
-      // Header markiert die synthetische Antwort, damit Seiten optimistisch
-      // bleiben (nicht vom offline-scheiternden Reload überschreiben lassen).
-      return new Response(JSON.stringify({ queued: true }), { status: 200, headers: { "Content-Type": "application/json", "X-Nuvora-Queued": "1" } });
+    const kind = isApi ? classify(method, url, bodyObj) : null;
+    if (kind) {
+      const hdr = { "Content-Type": "application/json", "X-Nuvora-Queued": "1" };
+      if (kind === "create") {
+        // Behelfs-ID vergeben; die Seite arbeitet optimistisch damit weiter.
+        // Beim Sync vergibt der Server die echte ID (siehe outbox.flush).
+        const tmp = newTmp();
+        await enqueue(method, url, bodyObj, { kind: "create", tmp });
+        return new Response(JSON.stringify({ id: tmp, queued: true }), { status: 200, headers: hdr });
+      }
+      await enqueue(method, url, bodyObj, { kind });
+      return new Response(JSON.stringify({ queued: true }), { status: 200, headers: hdr });
     }
     throw err;
   });
