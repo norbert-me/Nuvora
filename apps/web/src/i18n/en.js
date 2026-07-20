@@ -882,7 +882,7 @@ export default {
   "sitzplan.board": "Board",
   "sitzplan.zoom": "Zoom",
   "sitzplan.zoomReset": "100%",
-  "sitzplan.pool": "Not seated yet",
+  "sitzplan.pool": "Not placed yet",
   "sitzplan.allSeated": "Everyone is seated.",
   "sitzplan.noStudents": "This class has no students.",
   "mod.sitzplan.name": "Seating plan",

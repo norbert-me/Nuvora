@@ -77,7 +77,8 @@ async def put_plan(class_id: int, body: PlanIn, user: User = Depends(require_mod
         })
     data = {"seats": seats}
     if isinstance(body.tafel, dict):
-        data["tafel"] = {"x": round(_num(body.tafel.get("x")), 1), "y": round(_num(body.tafel.get("y")), 1)}
+        data["tafel"] = {"x": round(_num(body.tafel.get("x")), 1), "y": round(_num(body.tafel.get("y")), 1),
+                         "rot": round(_num(body.tafel.get("rot")), 1)}
     row = (await db.execute(
         select(SeatingPlan).where(SeatingPlan.owner_id == user.id, SeatingPlan.class_id == class_id)
     )).scalar_one_or_none()

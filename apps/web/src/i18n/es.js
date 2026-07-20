@@ -882,7 +882,7 @@ export default {
   "sitzplan.board": "Pizarra",
   "sitzplan.zoom": "Zoom",
   "sitzplan.zoomReset": "100%",
-  "sitzplan.pool": "Sin sitio aún",
+  "sitzplan.pool": "Aún sin colocar",
   "sitzplan.allSeated": "Todos sentados.",
   "sitzplan.noStudents": "Esta clase no tiene alumnos.",
   "mod.sitzplan.name": "Plano de asientos",
