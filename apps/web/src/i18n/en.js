@@ -1063,6 +1063,8 @@ export default {
   "tut.loslegen.2": "Help is context-sensitive from the menu; the marketplace shares quizzes, cards and lesson starters.",
   "tut.loslegen.3": "You can find this tour again any time via Help.",
   "sitzplan.rollcall": "Roll call (grey absent)",
+  "sitzplan.view": "View",
+  "sitzplan.segelToggle": "Show SEGEL levels",
   "sitzplan.segelHint": "Show/hide SEGEL levels on seats (Harbour → Coast → Sea → World)",
   "sitzplan.segelSet": "Set SEGEL level",
   "sitzplan.segelLegend": "SEGEL level",

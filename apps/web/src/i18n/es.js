@@ -1063,6 +1063,8 @@ export default {
   "tut.loslegen.2": "La ayuda es contextual desde el menú; el mercado comparte cuestionarios, tarjetas e inicios.",
   "tut.loslegen.3": "Puedes volver a este recorrido cuando quieras desde la Ayuda.",
   "sitzplan.rollcall": "Pasar lista (ausentes en gris)",
+  "sitzplan.view": "Vista",
+  "sitzplan.segelToggle": "Mostrar niveles SEGEL",
   "sitzplan.segelHint": "Mostrar/ocultar niveles SEGEL en los asientos (Puerto → Costa → Mar → Mundo)",
   "sitzplan.segelSet": "Fijar nivel SEGEL",
   "sitzplan.segelLegend": "Nivel SEGEL",

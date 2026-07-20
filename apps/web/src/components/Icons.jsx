@@ -37,6 +37,9 @@ export const ICONS = {
   minus: ["M4 10h12"],
   more: ["M5 10h.01M10 10h.01M15 10h.01"],
   calendar: ["M4 5h12v11H4z", "M4 8h12M7 3v4M13 3v4"],
+  // Zahnrad: Mittelkreis + 8 Speichen (Ansicht-/Einstellungen-Menü).
+  settings: ["M10 7.6a2.4 2.4 0 100 4.8 2.4 2.4 0 000-4.8z",
+    "M10 2v2.2M10 15.8V18M2 10h2.2M15.8 10H18M4.4 4.4l1.6 1.6M14 14l1.6 1.6M15.6 4.4L14 6M6 14l-1.6 1.6"],
 };
 
 export const iconBtn = { cursor: "pointer", padding: "6px", border: "none", background: "transparent", borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s" };

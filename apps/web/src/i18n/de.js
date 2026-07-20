@@ -1063,6 +1063,8 @@ export default {
   "tut.loslegen.2": "Hilfe gibt es kontextsensitiv über das Menü; der Marktplatz teilt Quizze, Karten und Einstiege.",
   "tut.loslegen.3": "Diese Tour findest du jederzeit über die Hilfe wieder.",
   "sitzplan.rollcall": "Aufruf (Abwesende grau)",
+  "sitzplan.view": "Ansicht",
+  "sitzplan.segelToggle": "SEGEL-Stufen anzeigen",
   "sitzplan.segelHint": "SEGEL-Stufen am Platz ein-/ausblenden (Hafen → Küste → Meer → Welt)",
   "sitzplan.segelSet": "SEGEL-Stufe setzen",
   "sitzplan.segelLegend": "SEGEL-Stufe",

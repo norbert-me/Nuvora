@@ -4,6 +4,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { pageTitle, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C, Empty } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
+import ViewMenu from "../components/ViewMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
@@ -38,7 +39,7 @@ export default function Sitzplan() {
   const [aufruf, setAufruf] = useState(false);
   const [showHint, setShowHint] = useState(false); // Erklärung per „i" ein-/ausblenden
   const [msg, setMsg] = useState("");
-  const [segelOn, setSegelOn] = useState(() => { try { return localStorage.getItem("sitzplan_segel") === "1"; } catch { return false; } });
+  const [segelOn, setSegelOn] = useState(false);   // Voreinstellung pro Kurs (siehe unten)
   const [segel, setSegel] = useState({}); // student_id → Stufe
   const canvasRef = useRef(null);
   const dragRef = useRef(null); // { sid, dx, dy } aktives Ziehen
@@ -92,7 +93,18 @@ export default function Sitzplan() {
     if (!classId) { setSegel({}); return; }
     fetch(`${API}/${classId}/segel${kursQ}`).then((r) => (r.ok ? r.json() : {})).then((d) => setSegel(d || {})).catch(() => {});
   }, [classId, kursId]);
-  useEffect(() => { try { localStorage.setItem("sitzplan_segel", segelOn ? "1" : "0"); } catch {} }, [segelOn]);
+  // „Ansicht"-Voreinstellung PRO KURS (Fallback Klasse): welche Zusatz-Anzeigen
+  // an sind. Beim Kurswechsel neu laden — so merkt sich jeder Kurs seine Ansicht.
+  const viewKey = classId ? (kursId != null ? `k${kursId}` : `c${classId}`) : null;
+  useEffect(() => {
+    if (!viewKey) return;
+    try { const v = JSON.parse(localStorage.getItem(`sitzplan_view_${viewKey}`) || "{}"); setSegelOn(!!v.segel); setAufruf(!!v.aufruf); }
+    catch { setSegelOn(false); setAufruf(false); }
+  }, [viewKey]);
+  const saveView = (patch) => {
+    if (!viewKey) return;
+    try { const cur = JSON.parse(localStorage.getItem(`sitzplan_view_${viewKey}`) || "{}"); localStorage.setItem(`sitzplan_view_${viewKey}`, JSON.stringify({ ...cur, ...patch })); } catch {}
+  };
   const setStage = (sid, stage) => {
     setSegel((m) => { const n = { ...m }; if (stage) n[String(sid)] = stage; else delete n[String(sid)]; return n; });
     if (classId) fetch(`${API}/${classId}/segel${kursQ}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ student_id: sid, stage }) }).catch(() => {});
@@ -225,7 +237,9 @@ export default function Sitzplan() {
     persist([...seats, { sid, x, y, rot: 0 }]);
   };
 
-  const leeren = () => { persist([]); setMsg(t("sitzplan.cleared")); setTimeout(() => setMsg(""), 2500); };
+  // Leeren setzt auch die Tafel zurueck — sonst blieb sie an ihrer verschobenen
+  // Stelle stehen, obwohl der Plan leer ist.
+  const leeren = () => { const tf = { x: 200, y: 8 }; setTafel(tf); persist([], tf); setMsg(t("sitzplan.cleared")); setTimeout(() => setMsg(""), 2500); };
 
   // Export/Import: nur das Layout (Positionen + Drehungen + Tafel), ohne feste
   // Schüler. Beim Import werden die SuS der aktuellen Klasse der Reihe nach auf
@@ -300,11 +314,10 @@ export default function Sitzplan() {
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
         <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("sitzplan.title")}</h1>
         <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
-        {anwesenheitAktiv && (
-          <button onClick={() => setAufruf((a) => !a)} style={{ padding: "6px 13px", fontSize: 13, fontWeight: 600, borderRadius: 980, cursor: "pointer", border: aufruf ? "1px solid var(--accent)" : "1px solid var(--border2)", background: aufruf ? "var(--accent)" : "transparent", color: aufruf ? "#fff" : "var(--text2)" }}>{t("sitzplan.rollcall")}</button>
-        )}
-        <button onClick={() => setSegelOn((v) => !v)} title={t("sitzplan.segelHint")}
-          style={{ padding: "6px 13px", fontSize: 13, fontWeight: 600, borderRadius: 980, cursor: "pointer", border: segelOn ? "1px solid var(--accent)" : "1px solid var(--border2)", background: segelOn ? "var(--accent)" : "transparent", color: segelOn ? "#fff" : "var(--text2)" }}>⛵ SEGEL</button>
+        <ViewMenu title={t("sitzplan.view")} items={[
+          ...(anwesenheitAktiv ? [{ key: "aufruf", label: t("sitzplan.rollcall"), value: aufruf, onChange: (v) => { setAufruf(v); saveView({ aufruf: v }); } }] : []),
+          { key: "segel", label: t("sitzplan.segelToggle"), hint: t("sitzplan.segelHint"), value: segelOn, onChange: (v) => { setSegelOn(v); saveView({ segel: v }); } },
+        ]} />
         <button onClick={() => setShowHint((v) => !v)} className="icon-btn" title={t("sitzplan.hintFree")}
           style={{ ...iconBtn, border: showHint ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 999, width: 30, height: 30, fontWeight: 700, color: showHint ? "var(--accent)" : "var(--text3)" }}>i</button>
         <button onClick={doExport} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13, marginLeft: anwesenheitAktiv ? 0 : "auto" }}>{t("sitzplan.export")}</button>
