@@ -160,6 +160,7 @@ def _ensure_columns(sync_conn):
         ("users", "modules_initialized", "BOOLEAN DEFAULT false NOT NULL"),
         ("users", "methoden_seeded", "BOOLEAN DEFAULT false NOT NULL"),
         ("kurse", "niveau_aktiv", "BOOLEAN DEFAULT false NOT NULL"),
+        ("seating_plans", "kurs_id", "INTEGER"),
         ("questions", "topic_id", "INTEGER"),
         ("students", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
         ("students", "foerder", "JSON"),
@@ -355,6 +356,15 @@ async def startup():
     async with async_session() as db:
         try:
             await db.execute(text("ALTER TABLE attendance DROP CONSTRAINT IF EXISTS uq_attendance_student_date"))
+            await db.commit()
+        except Exception:
+            pass
+
+    # Sitzplan hängt jetzt am Kurs (kurs_id); der alte Unique-Constraint auf
+    # (owner, class_id) würde mehrere Fach-Kurse derselben Klasse blockieren.
+    async with async_session() as db:
+        try:
+            await db.execute(text("ALTER TABLE seating_plans DROP CONSTRAINT IF EXISTS uq_seating_owner_class"))
             await db.commit()
         except Exception:
             pass

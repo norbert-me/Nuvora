@@ -6,7 +6,7 @@ import { selectStyle } from "./Icons.jsx";
 
 // allowNone + noneLabel: erlaubt eine Leer-Option (z.B. „Freitext") — dann kann
 // value "" sein und onChange("") gemeldet werden.
-export default function KursKlasseSelect({ value, onChange, style, allowNone = false, noneLabel = "–" }) {
+export default function KursKlasseSelect({ value, onChange, onKurs, style, allowNone = false, noneLabel = "–" }) {
   const [groups, setGroups] = useState([]); // [{ id, name, classes:[{id,name}] }]
   // Der gewählte Kurs wird EXPLIZIT gehalten, nicht aus value abgeleitet: eine
   // Klasse kann in mehreren Kursen liegen (many-to-many). Würde man den Kurs aus
@@ -52,19 +52,27 @@ export default function KursKlasseSelect({ value, onChange, style, allowNone = f
     const g = groups.find((x) => String(x.id) === String(kid));
     // Beim Kurswechsel immer die erste Fach-Klasse des Kurses melden — außer die
     // aktuelle value gehört ohnehin schon zu diesem Kurs.
-    if (g && !g.classes.some((c) => c.id === value)) onChange(g.classes[0].id);
+    const kursNum = kid === "none" ? null : Number(kid);
+    if (g && !g.classes.some((c) => c.id === value)) onChange(g.classes[0].id, kursNum);
   };
+
+  // Zweites Argument von onChange ist die Kurs-id (oder null bei „Ohne Kurs"):
+  // Module, deren Inhalt am Kurs hängt (Sitzplan, …), speichern darüber.
+  const curKurs = cur && cur.id !== "none" ? Number(cur.id) : null;
+  // Auch ohne Klick den aktuellen Kurs melden (Erstladen), damit z.B. der
+  // Sitzplan gleich den kursweiten Datensatz lädt, nicht den Klassen-Fallback.
+  useEffect(() => { if (onKurs) onKurs(curKurs); }, [curKurs]); // eslint-disable-line
 
   if (!groups.length && !allowNone) return null;
 
   return (
     <>
-      <select value={cur ? String(cur.id) : ""} onChange={(e) => (e.target.value === "" ? onChange(allowNone ? "" : value) : pickKurs(e.target.value))} style={s}>
+      <select value={cur ? String(cur.id) : ""} onChange={(e) => (e.target.value === "" ? onChange(allowNone ? "" : value, null) : pickKurs(e.target.value))} style={s}>
         {allowNone ? <option value="">{noneLabel}</option> : (!cur && <option value="">–</option>)}
         {groups.map((g) => <option key={g.id} value={g.id}>{g.name || "—"}</option>)}
       </select>
       {cur && cur.classes.length > 1 && (
-        <select value={cur.classes.some((c) => c.id === value) ? String(value) : ""} onChange={(e) => onChange(Number(e.target.value))} style={s}>
+        <select value={cur.classes.some((c) => c.id === value) ? String(value) : ""} onChange={(e) => onChange(Number(e.target.value), curKurs)} style={s}>
           {!cur.classes.some((c) => c.id === value) && <option value="">–</option>}
           {cur.classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>

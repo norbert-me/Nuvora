@@ -622,11 +622,13 @@ class SeatingPlan(Base):
     die Zellenbelegung (Schueler-IDs) als JSON — Schueler bleiben im Kern, hier
     liegen nur ihre Positionen (Regel 3)."""
     __tablename__ = "seating_plans"
-    __table_args__ = (UniqueConstraint("owner_id", "class_id", name="uq_seating_owner_class"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    # Sitzplan haengt am Kurs (Fach): dieselbe Klasse sitzt in Mathe anders als
+    # in Info. kurs_id NULL = Klasse ohne Kurs (Fallback auf class_id).
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="CASCADE"), nullable=True, index=True)
     data: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

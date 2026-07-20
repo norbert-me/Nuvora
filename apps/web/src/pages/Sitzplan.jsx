@@ -20,6 +20,7 @@ export default function Sitzplan() {
   const anwesenheitAktiv = modules.find((m) => m.key === "orga")?.active ?? false;
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
+  const [kursId, setKursId] = useState(null); // Sitzplan hängt am Kurs (Fach)
   const [seats, setSeats] = useState([]); // [{sid,x,y,rot}]
   const [tafel, setTafel] = useState({ x: 200, y: 8 }); // bewegliche Tafel
   const tafelRef = useRef(null);
@@ -57,9 +58,10 @@ export default function Sitzplan() {
   }, [cls, classes, kurse]);
   const byId = (id) => students.find((s) => s.id === id);
 
+  const kursQ = kursId != null ? `?kurs_id=${kursId}` : "";
   const load = useCallback((id) => {
     if (!id) return;
-    fetch(`${API}/${id}`).then((r) => (r.ok ? r.json() : null)).then((d) => {
+    fetch(`${API}/${id}${kursId != null ? `?kurs_id=${kursId}` : ""}`).then((r) => (r.ok ? r.json() : null)).then((d) => {
       if (!d) { setSeats([]); return; }
       setTafel(d.tafel && typeof d.tafel.x === "number" ? d.tafel : { x: 200, y: 8 });
       // Altes Raster (cells) einmalig in freie Positionen umrechnen.
@@ -71,8 +73,8 @@ export default function Sitzplan() {
         setSeats(migr);
       } else setSeats([]);
     }).catch(() => {});
-  }, []);
-  useEffect(() => { load(classId); }, [classId, load]);
+  }, [kursId]);
+  useEffect(() => { load(classId); }, [classId, kursId, load]);
 
   useEffect(() => {
     if (!anwesenheitAktiv || !aufruf || !classId) { setAbwesend({}); return; }
@@ -84,7 +86,7 @@ export default function Sitzplan() {
 
   const persist = (next, tf = tafel) => {
     setSeats(next);
-    if (classId) fetch(`${API}/${classId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seats: next, tafel: tf }) }).catch(() => {});
+    if (classId) fetch(`${API}/${classId}${kursQ}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seats: next, tafel: tf }) }).catch(() => {});
   };
 
   // Tafel ziehen (Pointer). Breite/Höhe der Tafel-Fläche.
@@ -205,7 +207,7 @@ export default function Sitzplan() {
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
         <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("sitzplan.title")}</h1>
-        <KursKlasseSelect value={classId} onChange={setClassId} />
+        <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
         {anwesenheitAktiv && (
           <button onClick={() => setAufruf((a) => !a)} style={{ padding: "6px 13px", fontSize: 13, fontWeight: 600, borderRadius: 980, cursor: "pointer", border: aufruf ? "1px solid var(--accent)" : "1px solid var(--border2)", background: aufruf ? "var(--accent)" : "transparent", color: aufruf ? "#fff" : "var(--text2)" }}>{t("sitzplan.rollcall")}</button>
         )}
