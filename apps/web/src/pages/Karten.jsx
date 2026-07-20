@@ -53,8 +53,12 @@ export default function Karten() {
 
   useEffect(() => {
     if (!notenAktiv) return;
-    // Notenskala der Lehrkraft (wie in der CardVote-Auswertung) aus dem Cache.
-    try { const u = JSON.parse(localStorage.getItem("user")); if (u?.grade_scale) setGradeScale(u.grade_scale); } catch {}
+    // Notenskala der Lehrkraft vom Server (autoritativ) — der localStorage-Cache
+    // kann veraltet sein, wenn die Skala in dieser Sitzung geaendert wurde.
+    fetch("/api/auth/me").then((r) => (r.ok ? r.json() : null)).then((u) => {
+      if (u?.grade_scale) setGradeScale(u.grade_scale);
+      else { try { const c = JSON.parse(localStorage.getItem("user")); if (c?.grade_scale) setGradeScale(c.grade_scale); } catch {} }
+    }).catch(() => { try { const c = JSON.parse(localStorage.getItem("user")); if (c?.grade_scale) setGradeScale(c.grade_scale); } catch {} });
   }, [notenAktiv]);
 
   useEffect(() => {
