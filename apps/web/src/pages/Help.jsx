@@ -38,6 +38,7 @@ function KernHilfe({ t }) {
       <Section title={t("help.core.classesT")}>{withLink(t("help.core.classes"), "/classes", t("nav.classes"))}</Section>
       <Section title={t("help.core.kurseT")}>{withLink(t("help.core.kurse"), "/kurse", t("kurse.title"))}</Section>
       <Section title={t("help.core.topicsT")}>{withLink(t("help.core.topics"), "/topics", t("help.lp.topicWord"))}</Section>
+      <Section title={t("help.core.materialT")}>{t("help.core.material")}</Section>
       <Section title={t("help.core.modulesT")}>{withLink(t("help.core.modules"), "/modules", t("nav.modules"))}</Section>
       <Faq q={t("help.core.faqQ")}>{withLink(t("help.core.faqA"), "/legal", t("help.privacyWord"))}</Faq>
     </>
@@ -79,8 +80,9 @@ function NotenHilfe({ t }) {
     <>
       <Section title={t("help.nt.howT")}>{t("help.nt.how")}</Section>
       <Section title={t("help.nt.avgT")}>{t("help.nt.avg")}</Section>
+      <Section title={t("help.nt.trendT")}>{t("help.nt.trend")}</Section>
       <Section title={t("help.nt.obsT")}>{t("help.nt.obs")}</Section>
-      <Section title={t("help.nt.impT")}>{t("help.nt.imp")}</Section>
+      <Section title={t("help.nt.impT")}>{t("help.nt.imp")} {t("help.nt.imp2")}</Section>
     </>
   );
 }
@@ -127,15 +129,16 @@ function DetektivHilfe({ t }) {
   );
 }
 
-function SitzplanHilfe({ t }) {
-  return <Section title={t("help.si.whatT")}>{t("help.si.what")}</Section>;
-}
-
-function AnwesenheitHilfe({ t }) {
+// Orga bündelt vier Reiter (Checklisten, Anwesenheit, Ausleihe, Sitzplan).
+function OrgaHilfe({ t }) {
   return (
     <>
+      <Section title={t("help.orga.whatT")}>{t("help.orga.what")}</Section>
       <Section title={t("help.an.whatT")}>{t("help.an.what")}</Section>
       <Section title={t("help.an.overviewT")}>{t("help.an.overview")}</Section>
+      <Section title={t("help.orga.lendT")}>{t("help.orga.lend")}</Section>
+      <Section title={t("help.si.whatT")}>{t("help.si.what")}</Section>
+      <Section title={t("help.orga.segelT")}>{t("help.orga.segel")}</Section>
     </>
   );
 }
@@ -144,10 +147,10 @@ function ZufallHilfe({ t }) {
   return <Section title={t("help.zu.whatT")}>{t("help.zu.what")}</Section>;
 }
 
-const AREA_COMP = { core: KernHilfe, cardvote: CardVoteHilfe, lernpfad: LernpfadHilfe, karten: KartenHilfe, noten: NotenHilfe, kalender: KalenderHilfe, methoden: EinstiegeHilfe, "code-detektiv": DetektivHilfe, sitzplan: SitzplanHilfe, anwesenheit: AnwesenheitHilfe, zufall: ZufallHilfe };
+const AREA_COMP = { core: KernHilfe, cardvote: CardVoteHilfe, lernpfad: LernpfadHilfe, karten: KartenHilfe, noten: NotenHilfe, kalender: KalenderHilfe, methoden: EinstiegeHilfe, "code-detektiv": DetektivHilfe, orga: OrgaHilfe, zufall: ZufallHilfe };
 // Reiter-Beschriftung: Modulnamen aus den jeweiligen i18n-Titeln.
-const AREA_TITLE = { cardvote: "CardVote", lernpfad: "Lernpfad", "code-detektiv": "Code-Detektiv", karten: "karten.title", noten: "noten.title", kalender: "kalender.title", methoden: "methoden.title", sitzplan: "sitzplan.title", anwesenheit: "anwesenheit.title", zufall: "zufall.title" };
-const MODULE_KEYS = ["cardvote", "lernpfad", "karten", "noten", "kalender", "methoden", "code-detektiv", "sitzplan", "anwesenheit", "zufall"];
+const AREA_TITLE = { cardvote: "CardVote", lernpfad: "Lernpfad", "code-detektiv": "Code-Detektiv", karten: "karten.title", noten: "noten.title", kalender: "kalender.title", methoden: "methoden.title", orga: "orga.title", zufall: "zufall.title" };
+const MODULE_KEYS = ["cardvote", "lernpfad", "karten", "noten", "kalender", "methoden", "code-detektiv", "orga", "zufall"];
 
 export default function Help() {
   const [params, setParams] = useSearchParams();
