@@ -90,6 +90,7 @@ export default {
   "home.toCalendar": "Zum Kalender",
   "home.weakPracticed": "geübt",
   "home.weakEinstieg": "Einstieg",
+  "home.weakPickClass": "Klasse wählen …",
   "home.crossSubject": "fachübergreifend",
   "home.weakTitle": "Diese Woche schwach",
   "home.weakHint": "Themen mit unter 60 % Trefferquote aus deinen CardVote-Tests der letzten zwei Wochen — direkt üben lassen.",

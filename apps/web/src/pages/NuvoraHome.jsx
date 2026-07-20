@@ -26,6 +26,8 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv, methodenAktiv }) {
   const [busy, setBusy] = useState(null);
   const [done, setDone] = useState({});
   const [methodByTopic, setMethodByTopic] = useState({}); // topic_id → erster passender Einstieg
+  const [classes, setClasses] = useState([]); // fuer die Klassenwahl bei fachübergreifenden (klassenlosen) Themen
+  const [pickFor, setPickFor] = useState({}); // topic_id → gewaehlte class_id (fachübergreifende Zeile)
 
   useEffect(() => {
     if (!methodenAktiv) return;
@@ -40,6 +42,7 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv, methodenAktiv }) {
     let ab = false;
     (async () => {
       const classes = await fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).catch(() => []);
+      if (!ab) setClasses(Array.isArray(classes) ? classes : []);
       const to = new Date();
       const frm = new Date(Date.now() - 14 * 86400000);
       const q = `frm=${frm.toISOString()}&to=${to.toISOString()}`;
@@ -91,12 +94,26 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv, methodenAktiv }) {
             )}
             {row.geuebt ? (
               <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0a7d3e", display: "inline-flex", alignItems: "center", gap: 4 }}>✓ {t("home.weakPracticed")}</span>
-            ) : row.class_id == null ? null : (<>
-              {kartenAktiv && <Btn row={row} art="karten" label={t("home.weakDeck")}
-                onClick={() => run(row, "karten", `/api/karten/classes/${row.class_id}/decks`, { name: row.name, topic_id: row.topic_id })} />}
-              {lernpfadAktiv && <Btn row={row} art="lernpfad" label={t("home.weakExercise")}
-                onClick={() => run(row, "lernpfad", `/api/lernpfad/exercises`, { topic_id: row.topic_id, kategorie: "Basis", aufgabentext: t("weak.repTitle", { thema: row.name }) })} />}
-            </>)}
+            ) : (() => {
+              // Fachübergreifende (klassenlose) Zeile: erst Klasse waehlen, dann
+              // Karten/Lernpfad fuer genau die Klasse erzeugen. Klassenzeilen wie bisher.
+              const eff = row.class_id ?? pickFor[row.topic_id] ?? null;
+              const r2 = eff === row.class_id ? row : { ...row, class_id: eff };
+              return (<>
+                {row.class_id == null && (
+                  <select value={pickFor[row.topic_id] ?? ""} aria-label={t("home.weakPickClass")}
+                    onChange={(e) => setPickFor((m) => ({ ...m, [row.topic_id]: e.target.value ? Number(e.target.value) : undefined }))}
+                    style={{ padding: "5px 8px", fontSize: 12.5, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)" }}>
+                    <option value="">{t("home.weakPickClass")}</option>
+                    {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                )}
+                {eff != null && kartenAktiv && <Btn row={r2} art="karten" label={t("home.weakDeck")}
+                  onClick={() => run(r2, "karten", `/api/karten/classes/${eff}/decks`, { name: row.name, topic_id: row.topic_id })} />}
+                {eff != null && lernpfadAktiv && <Btn row={r2} art="lernpfad" label={t("home.weakExercise")}
+                  onClick={() => run(r2, "lernpfad", `/api/lernpfad/exercises`, { topic_id: row.topic_id, kategorie: "Basis", aufgabentext: t("weak.repTitle", { thema: row.name }) })} />}
+              </>);
+            })()}
           </div>
         ))}
       </div>
