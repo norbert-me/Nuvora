@@ -12,6 +12,15 @@ const API = "/api/sitzplan";
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const ABS_COL = { fehlt: "#d1350f", spaet: "#b8860b", entsch: "#2563eb" };
 const SEAT_W = 108, SEAT_H = 46;
+// SEGEL-Stufen (Helios-Konzept): Boot vom Hafen bis in die Welt, zunehmende
+// Selbststeuerung. Reihenfolge = Klick-Kreislauf am Platz (leer → … → leer).
+const SEGEL = [
+  { key: "hafen", label: "Hafen", ab: "H", color: "#d1350f" },
+  { key: "kueste", label: "Küste", ab: "K", color: "#c026a3" },
+  { key: "meer", label: "Meer", ab: "M", color: "#2563eb" },
+  { key: "welt", label: "Welt", ab: "W", color: "#0a7d3e" },
+];
+const SEGEL_CYCLE = ["", "hafen", "kueste", "meer", "welt"];
 
 export default function Sitzplan() {
   const { t } = useLanguage();
@@ -29,6 +38,8 @@ export default function Sitzplan() {
   const [aufruf, setAufruf] = useState(false);
   const [showHint, setShowHint] = useState(false); // Erklärung per „i" ein-/ausblenden
   const [msg, setMsg] = useState("");
+  const [segelOn, setSegelOn] = useState(() => { try { return localStorage.getItem("sitzplan_segel") === "1"; } catch { return false; } });
+  const [segel, setSegel] = useState({}); // student_id → Stufe
   const canvasRef = useRef(null);
   const dragRef = useRef(null); // { sid, dx, dy } aktives Ziehen
 
@@ -75,6 +86,21 @@ export default function Sitzplan() {
     }).catch(() => {});
   }, [kursId]);
   useEffect(() => { load(classId); }, [classId, kursId, load]);
+
+  // SEGEL-Stufen je SuS laden (pro Kurs). Toggle in localStorage merken.
+  useEffect(() => {
+    if (!classId) { setSegel({}); return; }
+    fetch(`${API}/${classId}/segel${kursQ}`).then((r) => (r.ok ? r.json() : {})).then((d) => setSegel(d || {})).catch(() => {});
+  }, [classId, kursId]);
+  useEffect(() => { try { localStorage.setItem("sitzplan_segel", segelOn ? "1" : "0"); } catch {} }, [segelOn]);
+  const setStage = (sid, stage) => {
+    setSegel((m) => { const n = { ...m }; if (stage) n[String(sid)] = stage; else delete n[String(sid)]; return n; });
+    if (classId) fetch(`${API}/${classId}/segel${kursQ}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ student_id: sid, stage }) }).catch(() => {});
+  };
+  const cycleStage = (sid) => {
+    const cur = segel[String(sid)] || "";
+    setStage(sid, SEGEL_CYCLE[(SEGEL_CYCLE.indexOf(cur) + 1) % SEGEL_CYCLE.length]);
+  };
 
   useEffect(() => {
     if (!anwesenheitAktiv || !aufruf || !classId) { setAbwesend({}); return; }
@@ -277,6 +303,8 @@ export default function Sitzplan() {
         {anwesenheitAktiv && (
           <button onClick={() => setAufruf((a) => !a)} style={{ padding: "6px 13px", fontSize: 13, fontWeight: 600, borderRadius: 980, cursor: "pointer", border: aufruf ? "1px solid var(--accent)" : "1px solid var(--border2)", background: aufruf ? "var(--accent)" : "transparent", color: aufruf ? "#fff" : "var(--text2)" }}>{t("sitzplan.rollcall")}</button>
         )}
+        <button onClick={() => setSegelOn((v) => !v)} title={t("sitzplan.segelHint")}
+          style={{ padding: "6px 13px", fontSize: 13, fontWeight: 600, borderRadius: 980, cursor: "pointer", border: segelOn ? "1px solid var(--accent)" : "1px solid var(--border2)", background: segelOn ? "var(--accent)" : "transparent", color: segelOn ? "#fff" : "var(--text2)" }}>⛵ SEGEL</button>
         <button onClick={() => setShowHint((v) => !v)} className="icon-btn" title={t("sitzplan.hintFree")}
           style={{ ...iconBtn, border: showHint ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 999, width: 30, height: 30, fontWeight: 700, color: showHint ? "var(--accent)" : "var(--text3)" }}>i</button>
         <button onClick={doExport} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13, marginLeft: anwesenheitAktiv ? 0 : "auto" }}>{t("sitzplan.export")}</button>
@@ -286,6 +314,18 @@ export default function Sitzplan() {
         <button onClick={leeren} className="icon-btn" style={iconBtn} title={t("sitzplan.clear")}><Icon d={ICONS.trash} color={C.danger} /></button>
       </div>
       {showHint && <p style={{ fontSize: 13, color: "var(--text3)", margin: "8px 0 14px" }}>{t("sitzplan.hintFree")}</p>}
+      {segelOn && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", margin: "8px 0 12px", fontSize: 12.5, color: "var(--text3)" }}>
+          <span>{t("sitzplan.segelLegend")}:</span>
+          {SEGEL.map((x) => (
+            <span key={x.key} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 16, height: 16, borderRadius: 8, background: x.color, color: "#fff", fontSize: 10, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{x.ab}</span>
+              {x.label}
+            </span>
+          ))}
+          <span style={{ color: "var(--text3)" }}>· {t("sitzplan.segelCycleHint")}</span>
+        </div>
+      )}
       {msg && <p style={{ fontSize: 13, color: "#0a7d3e", marginBottom: 10 }}>{msg}</p>}
 
       {students.length === 0 ? (
@@ -337,6 +377,19 @@ export default function Sitzplan() {
                     opacity: abs ? 0.5 : 1, textDecoration: abs ? "line-through" : "none" }}>
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
                   {abs && <span style={{ position: "absolute", top: 3, right: 24, width: 8, height: 8, borderRadius: 4, background: ABS_COL[abs] }} title={t(`anwesenheit.${abs}`)} />}
+                  {segelOn && (() => {
+                    const st = SEGEL.find((x) => x.key === segel[String(seat.sid)]);
+                    return (
+                      <button onPointerDown={(e) => e.stopPropagation()} onClick={() => cycleStage(seat.sid)}
+                        title={st ? `SEGEL: ${st.label}` : t("sitzplan.segelSet")}
+                        style={{ position: "absolute", left: -9, bottom: -9, width: 20, height: 20, borderRadius: 10, cursor: "pointer", fontSize: 11, fontWeight: 700, lineHeight: 1,
+                          display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+                          background: st ? st.color : "var(--card)", color: st ? "#fff" : "var(--text3)",
+                          border: st ? "none" : "1px dashed var(--border2)" }}>
+                        {st ? st.ab : "+"}
+                      </button>
+                    );
+                  })()}
                   {(
                     <>
                       {/* Dreh-Griff (Icon) an der oberen rechten Ecke: ziehen = frei drehen. */}

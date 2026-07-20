@@ -857,6 +857,20 @@ class CardReview(Base):
     last_reviewed: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class SegelStatus(Base):
+    """SEGEL-Stufe je Schueler und Kurs (Helios-Konzept: Hafen → Küste → Meer →
+    Welt, zunehmende Selbststeuerung). Wird am Sitzplatz angezeigt. Haengt wie der
+    Sitzplan am Kurs (kurs_id) mit Klassen-Fallback (class_id). Schueler CASCADE."""
+    __tablename__ = "segel_status"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), index=True)
+    class_id: Mapped[Optional[int]] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), nullable=True, index=True)
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="CASCADE"), nullable=True, index=True)
+    stage: Mapped[str] = mapped_column(String(10), default="", server_default="")  # hafen|kueste|meer|welt
+
+
 class Material(Base):
     """Datei-/Materialablage der Lehrkraft, an ein Thema und/oder eine Stunde
     (Kalender-Eintrag) gehaengt. Beides optional und ON DELETE SET NULL (Regel 3:
