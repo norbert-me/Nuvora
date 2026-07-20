@@ -309,6 +309,7 @@ export default {
   "profile.setupContact": "Kontaktformular zustellbar",
   "profile.setupContactHint": "SMTP läuft, aber der Kontakt-Empfänger fehlt. ADMIN_EMAIL auf eine echte Adresse setzen — sonst geht die Nachricht an SMTP_FROM.",
   "profile.setupContactTo": "Kontaktanfragen gehen an: {{to}}",
+  "profile.setupContactFallback": "ADMIN_EMAIL ist keine echte Adresse — Kontaktanfragen gehen ans Absender-Postfach (SMTP_FROM). Ist das nur eine Versand-Adresse ohne Postfach, kommt nichts an. ADMIN_EMAIL auf ein echtes Postfach setzen.",
   "profile.setupSmtpHint": "Ohne SMTP werden Bestätigungs- und Reset-Mails nicht versendet. SMTP_HOST/SMTP_FROM in der .env des Servers setzen.",
   "profile.checking": "Wird geprüft…",
   "profile.installed": "Installiert:",

@@ -309,6 +309,7 @@ export default {
   "profile.setupContact": "Formulario de contacto entregable",
   "profile.setupContactHint": "SMTP funciona, pero falta destinatario. Pon ADMIN_EMAIL en una dirección real — si no, los mensajes van a SMTP_FROM.",
   "profile.setupContactTo": "Los mensajes de contacto van a: {{to}}",
+  "profile.setupContactFallback": "ADMIN_EMAIL no es una dirección real — los mensajes van al buzón remitente (SMTP_FROM). Si es solo de envío sin bandeja, no llega nada. Pon ADMIN_EMAIL en un buzón real.",
   "profile.setupSmtpHint": "Sin SMTP no se envían correos de confirmación ni de restablecimiento. Configura SMTP_HOST/SMTP_FROM en el .env del servidor.",
   "profile.checking": "Comprobando…",
   "profile.installed": "Instalada:",

@@ -273,6 +273,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
               ))}
               {!setup.smtp && <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>{t("profile.setupSmtpHint")}</p>}
               {setup.smtp && !setup.contact_deliverable && <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>{t("profile.setupContactHint")}</p>}
+              {setup.contact_fallback && <p style={{ fontSize: 12, color: "#b8860b", marginTop: 8 }}>⚠️ {t("profile.setupContactFallback")}</p>}
               {setup.contact_to && <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>{t("profile.setupContactTo", { to: setup.contact_to })}</p>}
             </div>
           )}

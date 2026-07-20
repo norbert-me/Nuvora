@@ -309,6 +309,7 @@ export default {
   "profile.setupContact": "Contact form deliverable",
   "profile.setupContactHint": "SMTP works, but no contact recipient. Set ADMIN_EMAIL to a real address — otherwise messages go to SMTP_FROM.",
   "profile.setupContactTo": "Contact messages go to: {{to}}",
+  "profile.setupContactFallback": "ADMIN_EMAIL is not a real address — contact messages go to the sender mailbox (SMTP_FROM). If that is a send-only address without an inbox, nothing arrives. Set ADMIN_EMAIL to a real mailbox.",
   "profile.setupSmtpHint": "Without SMTP, confirmation and reset emails are not sent. Set SMTP_HOST/SMTP_FROM in the server's .env.",
   "profile.checking": "Checking…",
   "profile.installed": "Installed:",

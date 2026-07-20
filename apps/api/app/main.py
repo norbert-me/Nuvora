@@ -782,6 +782,12 @@ async def admin_setup(user=Depends(_require_admin)):
     site = _pathlib.Path("/app/config/site.json")
     admin_email = (os.environ.get("ADMIN_EMAIL") or "").strip()
     contact_to = contact_recipient()  # ADMIN_EMAIL (echte Adresse) sonst SMTP_FROM
+    # Faellt der Empfaenger auf SMTP_FROM zurueck? Diese Adresse ist oft eine
+    # reine Versand-Adresse OHNE Postfach (z.B. Cloudflare "welcome@…") — SMTP
+    # nimmt die Mail an (250 OK), zugestellt wird sie an niemanden. Haeufigster
+    # Grund fuer "wird gesendet, kommt aber nie an".
+    smtp_from = (os.environ.get("SMTP_FROM") or "").strip()
+    contact_fallback = bool(contact_to) and contact_to == smtp_from and "@" not in admin_email
     return {
         "smtp": mailer.email_configured(),
         "site_json": site.exists(),
@@ -789,6 +795,7 @@ async def admin_setup(user=Depends(_require_admin)):
         # Kann das Kontaktformular wirklich zustellen? (echte Empfaengeradresse + SMTP)
         "contact_deliverable": bool(contact_to) and mailer.email_configured(),
         "contact_to": contact_to,
+        "contact_fallback": contact_fallback,
     }
 
 
