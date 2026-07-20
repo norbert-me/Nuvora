@@ -3,6 +3,7 @@
 // Wiederverwendbar; im Kalender einer Stunde zuweisbar.
 import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
+import { undoDelete } from "../core/undo.jsx";
 import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, modalOverlay, modalPanel, inputStyle } from "../components/Icons.jsx";
 import PublishModal from "../components/PublishModal.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -32,7 +33,15 @@ export default function Methoden() {
     }).catch(() => null);
     if (res && res.ok) { setEdit(null); load(); } else setError(t("common.notWork"));
   };
-  const remove = async (id) => { await fetch(`${API}/${id}`, { method: "DELETE" }).catch(() => {}); load(); };
+  const remove = (id) => {
+    const it = items.find((x) => x.id === id);
+    setItems((prev) => prev.filter((x) => x.id !== id)); // sofort weg
+    undoDelete({
+      message: t("undo.deleted", { name: it?.title || "" }),
+      undo: () => load(),
+      commit: async () => { await fetch(`${API}/${id}`, { method: "DELETE" }).catch(() => {}); },
+    });
+  };
 
   const doExport = async () => {
     const r = await fetch(`${API}/export`).catch(() => null);
@@ -76,7 +85,7 @@ export default function Methoden() {
                 <span style={{ flex: 1 }} />
                 <button onClick={() => setPublishing(m)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("methoden.publish")}><Icon d={ICONS.upload} size={14} color="var(--accent)" /></button>
                 <button onClick={() => setEdit(m)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>
-                <button onClick={async () => { if (await askConfirm(t("methoden.delConfirm", { title: m.title }))) remove(m.id); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
+                <button onClick={() => remove(m.id)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
               </div>
               {m.description && <div style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{m.description}</div>}
               {m.ablauf && (<>

@@ -4,6 +4,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
+import { undoDelete } from "../core/undo.jsx";
 import { pageTitle, btnPrimary, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C, th as thBase, td } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -54,10 +55,14 @@ export default function Orga() {
     const r = await fetch(`${API}/${classId}${kursQ}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }).catch(() => null);
     if (r && r.ok) { setNeu(""); load(classId); }
   };
-  const loeschen = async (id) => {
-    if (!await askConfirm(t("orga.delConfirm"))) return;
-    await fetch(`${API}/item/${id}`, { method: "DELETE" }).catch(() => {});
-    load(classId);
+  const loeschen = (id) => {
+    const it = items.find((x) => x.id === id);
+    setItems((prev) => prev.filter((x) => x.id !== id)); // sofort weg
+    undoDelete({
+      message: t("undo.deleted", { name: it?.name || "" }),
+      undo: () => load(classId),
+      commit: async () => { await fetch(`${API}/item/${id}`, { method: "DELETE" }).catch(() => {}); },
+    });
   };
   const toggle = async (item, sid) => {
     // Optimistisch, dann Server.

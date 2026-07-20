@@ -133,10 +133,13 @@ export default function Kalender() {
     const res = await fetch(`${API}/breaks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }).catch(() => null);
     if (res && res.ok) loadBreaks();
   };
-  const delBreak = async (id) => {
-    const r = await fetch(`${API}/breaks/${id}`, { method: "DELETE" }).catch(() => null);
-    if (r && (r.ok || r.status === 204)) setBreaks((prev) => prev.filter((b) => b.id !== id));
-    else loadBreaks();
+  const delBreak = (id) => {
+    setBreaks((prev) => prev.filter((b) => b.id !== id)); // sofort weg
+    undoDelete({
+      message: t("undo.deletedGeneric"),
+      undo: () => loadBreaks(),
+      commit: async () => { await fetch(`${API}/breaks/${id}`, { method: "DELETE" }).catch(() => {}); },
+    });
   };
 
   const exportKal = async () => {
