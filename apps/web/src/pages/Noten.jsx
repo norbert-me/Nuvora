@@ -223,6 +223,12 @@ export default function Noten() {
   const allCats = sections.flatMap((s) => s.categories || []);
   const gewichtSumme = sections.reduce((n, s) => n + (s.weight || 0), 0);
   const notenVon = (sid, cid) => entries.filter((e) => e.student_id === sid && e.category_id === cid && e.kind === "grade");
+  // Auswertung je Spalte: Anzahl, Schnitt, Spanne über alle eingetragenen Noten.
+  const colStats = (cid) => {
+    const vals = entries.filter((e) => e.category_id === cid && e.kind === "grade" && e.value != null).map((e) => e.value);
+    if (!vals.length) return null;
+    return { n: vals.length, avg: Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100, min: Math.min(...vals), max: Math.max(...vals) };
+  };
   const sumOf = (studentId) => summary.find((s) => s.student_id === studentId);
 
   if (classes.length === 0) {
@@ -419,7 +425,7 @@ export default function Noten() {
                           </Link>
                         )}
                         {renameCol === c.id && (
-                          <ColMenu t={t} cat={c} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
+                          <ColMenu t={t} cat={c} stats={colStats(c.id)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
                             onRename={async (name) => { if (await call(() => fetch(`${API}/categories/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: c.position ?? i }) }))) setRenameCol(null); }}
                             onDelete={async () => { if (await askConfirm(t("noten.delColumn", { name: c.name }))) { call(() => fetch(`${API}/categories/${c.id}`, { method: "DELETE" })); setRenameCol(null); } }}
                             onClose={() => setRenameCol(null)} />
@@ -657,14 +663,24 @@ function SectionMenu({ t, sec, onEdit, onDelete, onAddCol }) {
 }
 
 // Kleine Uebersicht zur Spalte: Anlagedatum plus Umbenennen/Loeschen.
-function ColMenu({ t, cat, onRename, onDelete, onClose, dividerOn, onToggleDivider }) {
+function ColMenu({ t, cat, stats, onRename, onDelete, onClose, dividerOn, onToggleDivider }) {
   const [name, setName] = useState(cat.name);
   const datum = cat.created_at ? new Date(cat.created_at).toLocaleDateString("de-DE") : "—";
+  const de1 = (n) => String(Math.round(n * 100) / 100).replace(".", ",");
   return (
     <>
       <span onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 9 }} />
       <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", zIndex: 10, top: 26, left: "50%", transform: "translateX(-50%)", minWidth: 210, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: 12, boxShadow: "0 6px 20px rgba(0,0,0,0.2)", textAlign: "left", fontWeight: 400 }}>
         <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 8 }}>{t("noten.colCreated")}: {datum}</div>
+        {/* Spalten-Auswertung: Schnitt + Spanne über die eingetragenen Noten. */}
+        <div style={{ fontSize: 12, marginBottom: 10, padding: "7px 9px", borderRadius: 8, background: "var(--bg2)" }}>
+          {stats ? (
+            <>
+              <div style={{ fontWeight: 700 }}>{t("noten.colAvg")}: {de1(stats.avg)}</div>
+              <div style={{ color: "var(--text3)", marginTop: 2 }}>{t("noten.colCount", { n: stats.n })} · {t("noten.colRange", { min: de1(stats.min), max: de1(stats.max) })}</div>
+            </>
+          ) : <span style={{ color: "var(--text3)" }}>{t("noten.colNoGrades")}</span>}
+        </div>
         <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 10 }}>
           <input value={name} onChange={(e) => setName(e.target.value)} autoFocus
             onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) onRename(name.trim()); if (e.key === "Escape") onClose(); }}
