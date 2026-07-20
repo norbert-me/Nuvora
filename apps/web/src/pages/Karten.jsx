@@ -16,6 +16,7 @@ export default function Karten() {
   const { t } = useLanguage();
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
+  const [kursId, setKursId] = useState(null); // Karten hängen am Kurs (Fach)
   const [decks, setDecks] = useState([]);
   const [progress, setProgress] = useState([]);
   const [tokens, setTokens] = useState(null);
@@ -49,9 +50,10 @@ export default function Karten() {
 
   const [deckTrash, setDeckTrash] = useState([]);
   const [showTrash, setShowTrash] = useState(false);
-  const loadDecks = (id) => id && fetch(`${API}/classes/${id}/decks`).then((r) => (r.ok ? r.json() : [])).then(setDecks).catch(() => {});
-  const loadTrash = (id) => id && fetch(`${API}/classes/${id}/decks/trash`).then((r) => (r.ok ? r.json() : [])).then((d) => setDeckTrash(Array.isArray(d) ? d : [])).catch(() => {});
-  useEffect(() => { loadDecks(classId); loadTrash(classId); }, [classId]);
+  const kq = kursId != null ? `?kurs_id=${kursId}` : "";
+  const loadDecks = (id) => id && fetch(`${API}/classes/${id}/decks${kq}`).then((r) => (r.ok ? r.json() : [])).then(setDecks).catch(() => {});
+  const loadTrash = (id) => id && fetch(`${API}/classes/${id}/decks/trash${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => setDeckTrash(Array.isArray(d) ? d : [])).catch(() => {});
+  useEffect(() => { loadDecks(classId); loadTrash(classId); }, [classId, kursId]);
   const restoreDeck = async (id) => { await fetch(`${API}/decks/${id}/restore`, { method: "POST" }).catch(() => {}); loadDecks(classId); loadTrash(classId); };
   const purgeDeck = async (id) => {
     if (!await askConfirm(t("karten.purgeConfirm"))) return;
@@ -68,18 +70,18 @@ export default function Karten() {
     return true;
   };
 
-  const loadProgress = () => fetch(`${API}/classes/${classId}/progress`).then((r) => (r.ok ? r.json() : [])).then(setProgress).catch(() => {});
+  const loadProgress = () => fetch(`${API}/classes/${classId}/progress${kq}`).then((r) => (r.ok ? r.json() : [])).then(setProgress).catch(() => {});
   const openDetail = async (p) => {
-    const cards = await fetch(`${API}/classes/${classId}/students/${p.student_id}/cards`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+    const cards = await fetch(`${API}/classes/${classId}/students/${p.student_id}/cards${kq}`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
     setDetail({ student: p, cards });
   };
   const loadTokens = () => fetch(`${API}/classes/${classId}/tokens`, { method: "POST" }).then((r) => (r.ok ? r.json() : [])).then(setTokens).catch(() => {});
   // Daten laden, wenn der Tab (aus der Navbar) oder die Klasse wechselt.
   useEffect(() => {
     if (!classId) return;
-    if (view === "progress") loadProgress();
+    if (view === "progress") loadProgress(); // eslint-disable-line
     if (view === "qr") loadTokens();
-  }, [view, classId]);
+  }, [view, classId, kursId]);
 
   if (classes.length === 0) {
     return (
@@ -96,7 +98,7 @@ export default function Karten() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
         <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("karten.title")}</h1>
-        <KursKlasseSelect value={classId} onChange={(id) => { setClassId(id); setTokens(null); }} />
+        <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); setTokens(null); }} onKurs={setKursId} />
       </div>
 
       {error && <p style={{ color: "var(--danger, #dc2626)", fontSize: 13, marginBottom: 10 }}>{error}</p>}
@@ -107,7 +109,7 @@ export default function Karten() {
             <summary style={{ cursor: "pointer", fontSize: 13.5, fontWeight: 600, color: "var(--text2)" }}>{t("karten.srTitle")}</summary>
             <p style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.6, margin: "8px 0 0" }}>{t("karten.srInfo")}</p>
           </details>
-          <form onSubmit={async (e) => { e.preventDefault(); if (addingDeck || !newDeck.trim()) return; setAddingDeck(true); try { if (await call(() => fetch(`${API}/classes/${classId}/decks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newDeck.trim() }) }))) setNewDeck(""); } finally { setAddingDeck(false); } }}
+          <form onSubmit={async (e) => { e.preventDefault(); if (addingDeck || !newDeck.trim()) return; setAddingDeck(true); try { if (await call(() => fetch(`${API}/classes/${classId}/decks${kq}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newDeck.trim() }) }))) setNewDeck(""); } finally { setAddingDeck(false); } }}
             style={{ display: "flex", gap: 8, marginBottom: 18 }}>
             <input value={newDeck} onChange={(e) => setNewDeck(e.target.value)} placeholder={t("karten.newDeck")}
               style={{ flex: 1, maxWidth: 320, padding: "8px 12px", border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)" }} />
