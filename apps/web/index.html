@@ -33,6 +33,10 @@
       }
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html { scrollbar-gutter: stable; }
+      /* Inhalte wirkten einen Tick zu klein/rausgezoomt. Ein leichter,
+         einheitlicher Zoom vergrößert ALLE Module gleich (auch die eingebetteten
+         Lernpfad-/Code-Detektiv-Ansichten liegen in #root). */
+      #root { zoom: 1.06; }
       body {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         -webkit-font-smoothing: antialiased;
