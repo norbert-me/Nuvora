@@ -14,6 +14,7 @@ export function Icon({ d, color, size, ...props }) {
 
 export const ICONS = {
   trash: ["M4 6h12", "M8 6V4.6a1.4 1.4 0 011.4-1.4h1.2A1.4 1.4 0 0112 4.6V6", "M6 6l.7 9.6a1.6 1.6 0 001.6 1.5h3.4a1.6 1.6 0 001.6-1.5L14 6", "M8.6 9v4.4M11.4 9v4.4"],
+  fit: ["M4 7V4h3", "M13 4h3v3", "M16 13v3h-3", "M7 16H4v-3"],
   duplicate: ["M7 3h8a2 2 0 012 2v8", "M3 7h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"],
   download: ["M10 3v10M6 9l4 4 4-4", "M3 15v1a2 2 0 002 2h10a2 2 0 002-2v-1"],
   edit: ["M13.5 3.5l3 3L7 16H4v-3L13.5 3.5z"],

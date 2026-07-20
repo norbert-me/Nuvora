@@ -120,7 +120,7 @@ export default function Sitzplan() {
     if (aufruf) return;
     e.preventDefault();
     const rect = canvasRef.current.getBoundingClientRect();
-    dragRef.current = { sid: seat.sid, dx: (e.clientX - rect.left) / zoom - seat.x, dy: (e.clientY - rect.top) / zoom - seat.y };
+    dragRef.current = { sid: seat.sid, dx: (e.clientX - rect.left) / zoom - seat.x, dy: (e.clientY - rect.top) / zoom - seat.y, rot: seat.rot || 0 };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   };
@@ -129,7 +129,8 @@ export default function Sitzplan() {
     const rect = canvasRef.current.getBoundingClientRect();
     const x = Math.max(0, Math.min((e.clientX - rect.left) / zoom - d.dx, rect.width / zoom - SEAT_W));
     const y = Math.max(0, Math.min((e.clientY - rect.top) / zoom - d.dy, rect.height / zoom - SEAT_H));
-    setSeats((prev) => prev.map((s) => (s.sid === d.sid ? { ...s, x, y } : s)));
+    // rot ausdrücklich beibehalten (Drag darf die Drehung nie verwerfen).
+    setSeats((prev) => prev.map((s) => (s.sid === d.sid ? { ...s, x, y, rot: s.rot ?? d.rot } : s)));
   };
   const onUp = () => {
     window.removeEventListener("pointermove", onMove);
@@ -290,11 +291,11 @@ export default function Sitzplan() {
             <span style={{ fontSize: 12.5, color: "var(--text2)", minWidth: 40, textAlign: "center" }}>{Math.round(zoom * 100)}%</span>
             <button onClick={() => setZoom((z) => Math.min(2, Math.round((z + 0.1) * 10) / 10))} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8, width: 28, height: 28, fontSize: 16 }}>+</button>
             {zoom !== 1 && <button onClick={() => setZoom(1)} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 12 }}>{t("sitzplan.zoomReset")}</button>}
-            <button onClick={fitView} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 12 }} title={t("sitzplan.fitHint")}>{t("sitzplan.fit")}</button>
+            <button onClick={fitView} className="icon-btn" style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8, width: 28, height: 28 }} title={t("sitzplan.fitHint")} aria-label={t("sitzplan.fit")}><Icon d={ICONS.fit} size={16} /></button>
           </div>
           <div ref={scrollRef} style={{ height: 520, overflow: "auto", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", marginBottom: 18 }}>
           <div ref={canvasRef} onPointerDown={onCanvasDown} onDragOver={(e) => e.preventDefault()} onDrop={onCanvasDrop}
-            style={{ position: "relative", height: 760, width: 1200, transform: `scale(${zoom})`, transformOrigin: "0 0",
+            style={{ position: "relative", height: 760, width: "calc(100% - 40px)", minWidth: 720, margin: "0 20px", transform: `scale(${zoom})`, transformOrigin: "0 0",
               cursor: aufruf ? "default" : "grab",
               backgroundImage: "radial-gradient(var(--border) 1px, transparent 1px)", backgroundSize: "24px 24px" }}>
             {/* Bewegliche Tafel */}

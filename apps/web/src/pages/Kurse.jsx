@@ -95,11 +95,8 @@ export default function Kurse() {
               <button onClick={() => openEdit(k)} className="icon-btn" style={iconBtn} title={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
               <button onClick={() => delKurs(k)} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
             </div>
-            {/* Ansicht: nur die Klassen als Chips (Ändern läuft übers Bearbeiten). */}
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-              {k.classes.length === 0 && <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("kurse.empty")}</span>}
-              {k.classes.map((c) => <span key={c.id} style={chipStyle}>{c.name}</span>)}
-            </div>
+            {/* Zugeordnete Klasse wird NICHT mehr unter dem Kurs angezeigt —
+                sie ist nicht nötig; Verwaltung läuft übers Bearbeiten. */}
 
             {/* Bearbeiten-Bereich (hinter dem Stift): klar gegliedert in Name,
                 Klassen (hinzufügen/entfernen) und E/G. */}

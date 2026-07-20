@@ -913,6 +913,7 @@ export default {
   "anwesenheit.title": "Attendance",
   "anwesenheit.day": "Day",
   "anwesenheit.overview": "Absences",
+  "anwesenheit.freeDay": "No school — no attendance",
   "anwesenheit.today": "Today",
   "anwesenheit.noStudents": "This class has no students.",
   "anwesenheit.da": "Present",

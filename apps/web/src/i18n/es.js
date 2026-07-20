@@ -913,6 +913,7 @@ export default {
   "anwesenheit.title": "Asistencia",
   "anwesenheit.day": "Día",
   "anwesenheit.overview": "Ausencias",
+  "anwesenheit.freeDay": "Sin clase — sin asistencia",
   "anwesenheit.today": "Hoy",
   "anwesenheit.noStudents": "Esta clase no tiene alumnos.",
   "anwesenheit.da": "Presente",

@@ -36,18 +36,25 @@ export default function Anwesenheit() {
 
   useEffect(() => {
     const stop = swr("classes", "/api/classes", (d) => setClasses(Array.isArray(d) ? d : []));
-    if (kalenderAktiv) fetch("/api/kalender/timetable").then((r) => (r.ok ? r.json() : null)).then((d) => setSlots(d?.slots || [])).catch(() => {});
+    if (kalenderAktiv) {
+      fetch("/api/kalender/timetable").then((r) => (r.ok ? r.json() : null)).then((d) => setSlots(d?.slots || [])).catch(() => {});
+      fetch("/api/kalender/breaks").then((r) => (r.ok ? r.json() : [])).then((d) => setBreaks(Array.isArray(d) ? d : [])).catch(() => {});
+    }
     return stop;
   }, [kalenderAktiv]);
+  const [breaks, setBreaks] = useState([]);
+  // Ist der gewählte Tag unterrichtsfrei (Ferien/Feiertag)?
+  const istFrei = useMemo(() => breaks.find((b) => datum >= b.start_date.slice(0, 10) && datum <= b.end_date.slice(0, 10)), [breaks, datum]);
 
   // Klassen, die am gewählten Wochentag im Stundenplan stehen.
   const weekday = (new Date(datum + "T00:00:00").getDay() + 6) % 7; // 0 = Montag
   const heutigeIds = useMemo(() => new Set(slots.filter((s) => s.weekday === weekday && s.class_id).map((s) => s.class_id)), [slots, weekday]);
   // Stunden dieser Klasse am gewählten Wochentag (für die optionale Stunden-Zuordnung).
   const tagStunden = useMemo(() => [...new Set(slots.filter((s) => s.weekday === weekday && s.class_id === classId).map((s) => s.period))].sort((a, b) => a - b), [slots, weekday, classId]);
-  // Klassenliste zeigt IMMER alle Klassen — der Tag ist frei wählbar (auch
-  // Vergangenheit/Ferien), ein Filter auf „heutige Kurse" passte dazu nicht.
-  const sichtbareKlassen = classes;
+  // Tag-Ansicht: nur Klassen, die am gewählten Tag Unterricht haben (Stundenplan).
+  // Übersicht: alle Klassen. Ohne Kalender/Stundenplan: alle.
+  const filterAktiv = kalenderAktiv && view === "tag" && heutigeIds.size > 0;
+  const sichtbareKlassen = filterAktiv ? classes.filter((c) => heutigeIds.has(c.id)) : classes;
 
   // Gültige Klasse sicherstellen, wenn Filter greift.
   useEffect(() => {
@@ -146,7 +153,11 @@ export default function Anwesenheit() {
             )}
           </div>
           {legende}
-          {students.length === 0 ? (
+          {istFrei ? (
+            <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(184,134,11,0.12)", color: "#8a6d00", fontSize: 14, fontWeight: 600 }}>
+              🌴 {t("anwesenheit.freeDay")}{istFrei.label ? `: ${istFrei.label}` : ""}
+            </div>
+          ) : students.length === 0 ? (
             <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("anwesenheit.noStudents")}</p>
           ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
