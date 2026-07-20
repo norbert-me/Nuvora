@@ -233,7 +233,9 @@ export default function Sitzplan() {
       const data = JSON.parse(await file.text());
       if (data.type !== "nuvora_sitzplan" || !Array.isArray(data.slots)) { setMsg(t("sitzplan.importError")); return; }
       const next = students.slice(0, data.slots.length).map((st, i) => ({ sid: st.id, x: data.slots[i].x, y: data.slots[i].y, rot: data.slots[i].rot || 0 }));
-      persist(next, data.tafel && typeof data.tafel.x === "number" ? data.tafel : tafel);
+      const tf = data.tafel && typeof data.tafel.x === "number" ? { x: data.tafel.x, y: data.tafel.y, rot: data.tafel.rot || 0 } : tafel;
+      setTafel(tf);          // lokal übernehmen (nicht nur an den Server senden)
+      persist(next, tf);
       setMsg(t("sitzplan.imported")); setTimeout(() => setMsg(""), 2500);
     } catch { setMsg(t("sitzplan.importError")); }
   };
