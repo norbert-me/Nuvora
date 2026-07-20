@@ -36,6 +36,7 @@ function KernHilfe({ t }) {
   return (
     <>
       <Section title={t("help.core.classesT")}>{withLink(t("help.core.classes"), "/classes", t("nav.classes"))}</Section>
+      <Section title={t("help.core.kurseT")}>{withLink(t("help.core.kurse"), "/kurse", t("kurse.title"))}</Section>
       <Section title={t("help.core.topicsT")}>{withLink(t("help.core.topics"), "/topics", t("help.lp.topicWord"))}</Section>
       <Section title={t("help.core.modulesT")}>{withLink(t("help.core.modules"), "/modules", t("nav.modules"))}</Section>
       <Faq q={t("help.core.faqQ")}>{withLink(t("help.core.faqA"), "/legal", t("help.privacyWord"))}</Faq>
