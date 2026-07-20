@@ -861,6 +861,7 @@ async def import_noten(class_id: int, body: dict, term: str = "1", kurs_id: Opti
 
 @router.get("/classes/{class_id}/zeugnis.pdf")
 async def zeugnis_export(class_id: int, term: str = "1", agg: str = "mean", kurs_id: Optional[int] = None,
+                         student_id: Optional[int] = None,
                          user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Gebuendelter Eltern-/Zeugnis-Export: je Schueler eine Seite mit Noten
     (gewichteter Schnitt + Abschnitte), Fehlzeiten und Karten-Fortschritt.
@@ -871,6 +872,8 @@ async def zeugnis_export(class_id: int, term: str = "1", agg: str = "mean", kurs
     sections, summaries = await _summarize(db, user, class_id, term, agg="median" if agg == "median" else "mean", kurs_id=kurs_id)
     sum_by_id = {s.student_id: s for s in summaries}
     students = await _kurs_roster(db, user, class_id)
+    if student_id is not None:  # nur ein Schueler (Einzel-Zeugnis)
+        students = [s for s in students if s.id == student_id]
     halb = "1. Halbjahr" if term == "1" else "2. Halbjahr"
 
     # Optional: Fehlzeiten (Modul Orga/Anwesenheit) und Karten-Fortschritt.

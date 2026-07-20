@@ -194,6 +194,14 @@ export default function Noten() {
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
     a.download = `Zeugnis_${(cls?.name || "klasse")}_hj${term}.pdf`; a.click(); URL.revokeObjectURL(a.href);
   };
+  const doZeugnisStudent = async (sid) => {
+    if (!classId || !sid) return;
+    const r = await fetch(`${API}/classes/${classId}/zeugnis.pdf?term=${term}&agg=${agg}&student_id=${sid}${kp}`).catch(() => null);
+    if (!r || !r.ok) return;
+    const blob = await r.blob(); const st = students.find((x) => x.id === sid);
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `Zeugnis_${(st?.name || "schueler").replace(/[^\w-]+/g, "_")}_hj${term}.pdf`; a.click(); URL.revokeObjectURL(a.href);
+  };
   const doImport = async (file) => {
     if (!classId) return;
     setError("");
@@ -569,7 +577,7 @@ export default function Noten() {
       )}
 
       {infoFuer && (
-        <StudentInfo t={t} student={students.find((st) => st.id === infoFuer)} summary={sumOf(infoFuer)} sections={sections} className={cls?.name} onClose={() => setInfoFuer(null)} />
+        <StudentInfo t={t} student={students.find((st) => st.id === infoFuer)} summary={sumOf(infoFuer)} sections={sections} className={cls?.name} onZeugnis={() => doZeugnisStudent(infoFuer)} onClose={() => setInfoFuer(null)} />
       )}
     </div>
   );
@@ -779,13 +787,18 @@ function ColForm({ t, onSave, onCancel, initial = "" }) {
   );
 }
 
-function StudentInfo({ t, student, summary, sections, className, onClose }) {
+function StudentInfo({ t, student, summary, sections, className, onZeugnis, onClose }) {
   if (!student) return null;
   return (
     <div onClick={onClose} style={overlay}>
       <div onClick={(e) => e.stopPropagation()} style={modal}>
-        <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 2 }}>{student.name}</h3>
-        <p style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 16 }}>{className}</p>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <div style={{ flex: 1 }}>
+            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 2 }}>{student.name}</h3>
+            <p style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 16 }}>{className}</p>
+          </div>
+          {onZeugnis && <button onClick={onZeugnis} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13, whiteSpace: "nowrap" }} title={t("noten.zeugnisHint")}>{t("noten.zeugnis")}</button>}
+        </div>
 
         <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "6px 14px", fontSize: 13.5, marginBottom: 18 }}>
           <dt style={dtS}>{t("noten.course")}</dt>
