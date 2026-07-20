@@ -21,10 +21,20 @@ const card = {
 // Der Kern der Plattform sichtbar gemacht: schwache Themen aus CardVote-Tests
 // der letzten zwei Wochen — mit einem Klick zu Karten-Deck oder Lernpfad-Aufgabe.
 // Genau die Brücke zwischen den Modulen, die Nuvora von drei Einzeltools trennt.
-function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv }) {
+function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv, methodenAktiv }) {
   const [rows, setRows] = useState(null); // [{class_id, klasse, topic_id, name, pct}]
   const [busy, setBusy] = useState(null);
   const [done, setDone] = useState({});
+  const [methodByTopic, setMethodByTopic] = useState({}); // topic_id → erster passender Einstieg
+
+  useEffect(() => {
+    if (!methodenAktiv) return;
+    fetch("/api/methoden/list").then((r) => (r.ok ? r.json() : [])).then((d) => {
+      const map = {};
+      (Array.isArray(d) ? d : []).forEach((m) => { if (m.topic_id != null && !map[m.topic_id]) map[m.topic_id] = m; });
+      setMethodByTopic(map);
+    }).catch(() => {});
+  }, [methodenAktiv]);
 
   useEffect(() => {
     let ab = false;
@@ -74,6 +84,11 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv }) {
           <div key={`${row.class_id}:${row.topic_id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 10, flexWrap: "wrap" }}>
             <span style={{ flex: 1, fontWeight: 600, minWidth: 130 }}>{row.name} <span style={{ fontWeight: 400, color: "var(--text3)", fontSize: 12.5 }}>· {row.klasse}</span></span>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: row.pct < 40 ? "#d1350f" : "#b8860b" }}>{row.pct}%</span>
+            {methodByTopic[row.topic_id] && (
+              <Link to="/methoden" title={methodByTopic[row.topic_id].title} style={{ fontSize: 12, fontWeight: 700, color: "#2563eb", textDecoration: "none", padding: "3px 9px", borderRadius: 980, background: "rgba(37,99,235,0.12)" }}>
+                💡 {t("home.weakEinstieg")}
+              </Link>
+            )}
             {row.geuebt ? (
               <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0a7d3e", display: "inline-flex", alignItems: "center", gap: 4 }}>✓ {t("home.weakPracticed")}</span>
             ) : row.class_id == null ? null : (<>
@@ -240,7 +255,7 @@ export default function NuvoraHome({ user }) {
       ) : (
         <>
           {!edit && isOn("kalender") && <HeutePanel t={t} orgaAktiv={isOn("orga")} />}
-          {!edit && isOn("cardvote") && <SchwacheWoche t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} />}
+          {!edit && isOn("cardvote") && <SchwacheWoche t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} methodenAktiv={isOn("methoden")} />}
           <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
             {(edit ? displayList : shown).map((m) => {
               const inner = (<>

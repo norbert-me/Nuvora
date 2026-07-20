@@ -12,12 +12,20 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Method, User
+from ..models import Method, Topic, User
 from .auth import get_current_user, rate_limit
 from .modules import is_active
 
 router = APIRouter(prefix="/api/methoden", tags=["methoden"])
 MODULE_KEY = "methoden"
+
+
+async def _check_topic(db: AsyncSession, user_id: int, topic_id: Optional[int]) -> Optional[int]:
+    """Themen-Bindung nur auf eigenes Thema. Fremdes/unbekanntes wird verworfen (None)."""
+    if topic_id is None:
+        return None
+    ok = (await db.execute(select(Topic.id).where(Topic.id == topic_id, Topic.owner_id == user_id))).scalar_one_or_none()
+    return ok
 
 
 async def require_module(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> User:
@@ -44,6 +52,7 @@ class MethodIn(BaseModel):
     ablauf: str = ""
     material: str = ""
     dauer: Optional[int] = None
+    topic_id: Optional[int] = None
     # Altfelder, weiterhin akzeptiert, aber nicht mehr genutzt.
     kind: str = "einstieg"
     phase: str = ""
@@ -71,7 +80,9 @@ async def list_methods(user: User = Depends(require_module), db: AsyncSession = 
 @router.post("/", response_model=MethodOut, status_code=201)
 async def create_method(body: MethodIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("methoden", f"u{user.id}", 200, 60, "Zu viele Eintraege. Bitte kurz warten.")
-    m = Method(owner_id=user.id, **body.model_dump())
+    data = body.model_dump()
+    data["topic_id"] = await _check_topic(db, user.id, data.get("topic_id"))
+    m = Method(owner_id=user.id, **data)
     db.add(m)
     await db.commit()
     await db.refresh(m)
@@ -83,7 +94,9 @@ async def update_method(method_id: int, body: MethodIn, user: User = Depends(req
     m = await db.get(Method, method_id)
     if not m or m.owner_id != user.id:
         raise HTTPException(404, "Eintrag nicht gefunden")
-    for k, v in body.model_dump().items():
+    data = body.model_dump()
+    data["topic_id"] = await _check_topic(db, user.id, data.get("topic_id"))
+    for k, v in data.items():
         setattr(m, k, v)
     await db.commit()
     await db.refresh(m)
@@ -95,6 +108,8 @@ async def export_einstiege(user: User = Depends(require_module), db: AsyncSessio
     rows = (await db.execute(select(Method).where(Method.owner_id == user.id).order_by(Method.title))).scalars().all()
     return {
         "type": "nuvora_einstiege", "version": 1,
+        # topic_id bewusst NICHT im Export: Themen-IDs sind instanzlokal, beim Import
+        # in fremdem Konto bedeutungslos. Bindung wird lokal neu gesetzt.
         "items": [{"title": m.title, "description": m.description, "ablauf": m.ablauf, "material": m.material, "dauer": m.dauer} for m in rows],
     }
 

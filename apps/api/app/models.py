@@ -719,6 +719,9 @@ class Method(Base):
     material: Mapped[str] = mapped_column(Text, default="", server_default="")     # Materialliste
     dauer: Mapped[Optional[int]] = mapped_column(nullable=True)                    # ca. Dauer in Minuten
     phase: Mapped[str] = mapped_column(String(40), default="", server_default="")  # Altspalte
+    # Optionale Themen-Bindung (Kern-Taxonomie), damit ein schwaches Thema einen
+    # passenden Einstieg vorschlagen kann. ON DELETE SET NULL (Regel 3).
+    topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

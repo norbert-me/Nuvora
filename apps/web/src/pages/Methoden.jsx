@@ -16,9 +16,12 @@ export default function Methoden() {
   const [edit, setEdit] = useState(null); // { id?, title, description, ablauf, material, dauer } | null
   const [publishing, setPublishing] = useState(null); // Einstieg, der veröffentlicht wird
   const [error, setError] = useState("");
+  const [topics, setTopics] = useState([]);
 
   const load = () => fetch(`${API}/list`).then((r) => (r.ok ? r.json() : [])).then((d) => setItems(Array.isArray(d) ? d : [])).catch(() => {});
   useEffect(() => { load(); }, []);
+  // Themen optional (Kern-Taxonomie): erlaubt Vorschlag aus schwachen Themen. Fehlt lautlos, wenn nicht vorhanden.
+  useEffect(() => { fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
 
   const save = async (m) => {
     setError("");
@@ -26,6 +29,7 @@ export default function Methoden() {
       title: (m.title || "").trim(), description: m.description || "",
       ablauf: m.ablauf || "", material: m.material || "",
       dauer: m.dauer === "" || m.dauer == null ? null : Number(m.dauer),
+      topic_id: m.topic_id ?? null,
     };
     if (!body.title) { setError(t("methoden.titleRequired")); return; }
     const res = await fetch(m.id ? `${API}/${m.id}` : `${API}/`, {
@@ -101,19 +105,21 @@ export default function Methoden() {
         </div>
       )}
 
-      {edit && <MethodModal m={edit} onSave={save} onClose={() => setEdit(null)} t={t} />}
+      {edit && <MethodModal m={edit} topics={topics} onSave={save} onClose={() => setEdit(null)} t={t} />}
       {publishing && <PublishModal name={publishing.title} onClose={() => setPublishing(null)}
         onPublish={(description) => fetch(`/api/marketplace/publish/method`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method_id: publishing.id, description }) }).catch(() => null)} />}
     </div>
   );
 }
 
-function MethodModal({ m, onSave, onClose, t }) {
+function MethodModal({ m, topics = [], onSave, onClose, t }) {
   const [title, setTitle] = useState(m.title || "");
   const [dauer, setDauer] = useState(m.dauer ?? "");
   const [description, setDescription] = useState(m.description || "");
   const [ablauf, setAblauf] = useState(m.ablauf || "");
   const [material, setMaterial] = useState(m.material || "");
+  const [topicId, setTopicId] = useState(m.topic_id ?? "");
+  const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
   const fld = { ...inputStyle, width: "100%" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
   return (
@@ -136,8 +142,17 @@ function MethodModal({ m, onSave, onClose, t }) {
         <textarea value={ablauf} onChange={(e) => setAblauf(e.target.value)} rows={4} placeholder={t("methoden.ablaufPlaceholder")} style={{ ...fld, resize: "vertical" }} />
         <div style={lbl}>{t("methoden.material")}</div>
         <textarea value={material} onChange={(e) => setMaterial(e.target.value)} rows={2} placeholder={t("methoden.materialPlaceholder")} style={{ ...fld, resize: "vertical" }} />
+        {topics.length > 0 && (
+          <>
+            <div style={lbl}>{t("methoden.topic")}</div>
+            <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={fld}>
+              <option value="">{t("methoden.topicNone")}</option>
+              {topics.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
+            </select>
+          </>
+        )}
         <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
-          <button onClick={() => onSave({ id: m.id, title, description, ablauf, material, dauer })} style={btnPrimary}>{t("common.save")}</button>
+          <button onClick={() => onSave({ id: m.id, title, description, ablauf, material, dauer, topic_id: topicId === "" ? null : Number(topicId) })} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
         </div>
       </div>
