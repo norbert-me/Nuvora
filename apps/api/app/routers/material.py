@@ -15,11 +15,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from ..models import Material, Topic, CalendarEntry, User
+from sqlalchemy import func
+
 from .auth import get_current_user, rate_limit
 
 router = APIRouter(prefix="/api/material", tags=["material"])
 
-MAX_BYTES = 15 * 1024 * 1024  # 15 MB je Datei — reicht fuer Arbeitsblaetter/PDFs
+MAX_BYTES = 15 * 1024 * 1024          # 15 MB je Datei — reicht fuer Arbeitsblaetter/PDFs
+QUOTA_BYTES = 200 * 1024 * 1024       # 200 MB je Konto — gegen unbegrenztes Vollladen (Public-Betrieb)
 
 
 class MaterialOut(BaseModel):
@@ -77,6 +80,9 @@ async def upload_material(file: UploadFile = File(...), topic_id: Optional[int] 
         raise HTTPException(400, "Datei ist leer")
     if len(data) > MAX_BYTES:
         raise HTTPException(413, "Datei zu groß (max. 15 MB)")
+    used = (await db.execute(select(func.coalesce(func.sum(Material.size), 0)).where(Material.owner_id == user.id))).scalar_one()
+    if used + len(data) > QUOTA_BYTES:
+        raise HTTPException(413, "Speicher voll (max. 200 MB je Konto). Bitte alte Dateien löschen.")
     m = Material(owner_id=user.id, topic_id=topic_id, entry_id=entry_id,
                  filename=(file.filename or "datei")[:255], mime=(file.content_type or "")[:120],
                  size=len(data), data=data)
