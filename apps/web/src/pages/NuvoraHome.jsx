@@ -35,10 +35,11 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv }) {
       const q = `frm=${frm.toISOString()}&to=${to.toISOString()}`;
       const all = [];
       for (const c of classes) {
-        const d = await fetch(`/api/weak-topics?${q}&class_id=${c.id}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        const d = await fetch(`/api/weak-review?days=14&class_id=${c.id}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
         (d?.topics || []).forEach((tp) => all.push({ class_id: c.id, klasse: c.name, ...tp }));
       }
-      all.sort((a, b) => a.pct - b.pct);
+      // Ungeübte zuerst (Handlungsbedarf), dann nach Trefferquote.
+      all.sort((a, b) => (a.geuebt === b.geuebt ? a.pct - b.pct : a.geuebt ? 1 : -1));
       if (!ab) setRows(all.slice(0, 6));
     })();
     return () => { ab = true; };
@@ -68,10 +69,14 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv }) {
           <div key={`${row.class_id}:${row.topic_id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 10, flexWrap: "wrap" }}>
             <span style={{ flex: 1, fontWeight: 600, minWidth: 130 }}>{row.name} <span style={{ fontWeight: 400, color: "var(--text3)", fontSize: 12.5 }}>· {row.klasse}</span></span>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: row.pct < 40 ? "#d1350f" : "#b8860b" }}>{row.pct}%</span>
-            {kartenAktiv && <Btn row={row} art="karten" label={t("home.weakDeck")}
-              onClick={() => run(row, "karten", `/api/karten/classes/${row.class_id}/decks`, { name: row.name, topic_id: row.topic_id })} />}
-            {lernpfadAktiv && <Btn row={row} art="lernpfad" label={t("home.weakExercise")}
-              onClick={() => run(row, "lernpfad", `/api/lernpfad/exercises`, { topic_id: row.topic_id, kategorie: "Basis", aufgabentext: t("weak.repTitle", { thema: row.name }) })} />}
+            {row.geuebt ? (
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0a7d3e", display: "inline-flex", alignItems: "center", gap: 4 }}>✓ {t("home.weakPracticed")}</span>
+            ) : (<>
+              {kartenAktiv && <Btn row={row} art="karten" label={t("home.weakDeck")}
+                onClick={() => run(row, "karten", `/api/karten/classes/${row.class_id}/decks`, { name: row.name, topic_id: row.topic_id })} />}
+              {lernpfadAktiv && <Btn row={row} art="lernpfad" label={t("home.weakExercise")}
+                onClick={() => run(row, "lernpfad", `/api/lernpfad/exercises`, { topic_id: row.topic_id, kategorie: "Basis", aufgabentext: t("weak.repTitle", { thema: row.name }) })} />}
+            </>)}
           </div>
         ))}
       </div>

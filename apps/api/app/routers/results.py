@@ -1,5 +1,5 @@
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -355,6 +355,40 @@ async def weak_topics_range(frm: datetime, to: datetime, class_id: Optional[int]
     out = [{"topic_id": tid, "name": label(tid), "pct": round(c / t * 100) if t else 0}
            for tid, (c, t) in agg.items() if t and c / t < 0.6]
     out.sort(key=lambda x: x["pct"])
+    return {"topics": out}
+
+
+@router.get("/weak-review")
+async def weak_review(class_id: Optional[int] = None, days: int = 7,
+                      user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Wochenrückblick 'schwach → geübt': schwache Themen der letzten `days` Tage
+    plus die Info, ob seither dazu geübt wurde — ein ausgerolltes Karten-Deck
+    oder eine Lernpfad-Aufgabe zum selben Thema. Schliesst die Modul-Brücke
+    sichtbar (Ziel 2)."""
+    to = datetime.utcnow()
+    frm = to - timedelta(days=max(1, min(days, 60)))
+    base = await weak_topics_range(frm=frm, to=to, class_id=class_id, user=user, db=db)
+    topics = base.get("topics", [])
+    if not topics:
+        return {"topics": []}
+    tids = [t["topic_id"] for t in topics]
+    # Geübt = ausgerolltes Deck ODER Aufgabe zum Thema (nach dem Test angelegt
+    # zählt genauso wie vorhanden — Hauptsache es gibt jetzt Übungsmaterial).
+    from ..models import CardDeck, Exercise
+    deck_topics = set((await db.execute(
+        select(CardDeck.topic_id).where(CardDeck.owner_id == user.id, CardDeck.topic_id.in_(tids),
+                                        CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None))
+    )).scalars().all())
+    ex_topics = set((await db.execute(
+        select(Exercise.topic_id).where(Exercise.owner_id == user.id, Exercise.topic_id.in_(tids))
+    )).scalars().all())
+    out = []
+    for t in topics:
+        tid = t["topic_id"]
+        hat_deck = tid in deck_topics
+        hat_ex = tid in ex_topics
+        out.append({**t, "geuebt": hat_deck or hat_ex,
+                    "via": ("karten" if hat_deck else "") + ("+lernpfad" if hat_deck and hat_ex else ("lernpfad" if hat_ex else ""))})
     return {"topics": out}
 
 

@@ -86,6 +86,7 @@ export default {
   "home.title": "How CardVote works",
   "home.intro": "Classroom voting — students hold up cards, you scan them with your camera.",
   "home.toCalendar": "To calendar",
+  "home.weakPracticed": "practised",
   "home.weakTitle": "Weak this week",
   "home.weakHint": "Topics below 60% correct from your CardVote tests of the last two weeks — turn them into practice.",
   "home.weakDeck": "Create deck",
