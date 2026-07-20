@@ -46,33 +46,37 @@ REGISTRY: List[ModuleDef] = [
         group="unterricht",
         name="CardVote",
         description=(
-            "Abstimmen im Unterricht ohne Geraete: Lernende halten bedruckte "
-            "Karten hoch, du scannst sie mit dem Handy. Mit Auswertung, Noten "
-            "und Export."
+            "Abstimmen im Unterricht ohne Geräte: Lernende halten bedruckte "
+            "Karten hoch, du scannst sie mit dem Handy. Live-Ergebnisse, "
+            "Spiel-Modus, Auswertung mit Notenschlüssel, Übernahme als "
+            "Notenspalte, Export und Marktplatz."
         ),
         path="/cardvote",
-        stage="beta",
+        stage="stable",
     ),
     ModuleDef(
         key="lernpfad",
         group="unterricht",
         name="Lernpfad",
         description=(
-            "Aufgaben und Lernpfade verwalten — mit denselben Themen und "
-            "Klassen wie der Rest von Nuvora. Die alte, eigenständige App "
-            "bleibt vorerst unter /lernpfad-alt/ erreichbar, bis die Daten "
-            "übernommen sind."
+            "Aufgaben und Lernpfade (aus mehreren Lernleitern) verwalten — auf "
+            "denselben Themen, Klassen und Kursen wie der Rest von Nuvora. Der "
+            "Generator verteilt Aufgaben differenziert je Schüler; Lernleitern "
+            "lassen sich über den Marktplatz teilen."
         ),
         path="/lernpfad",
+        stage="stable",
     ),
     ModuleDef(
         key="noten",
         group="werkzeug",
         name="Noten",
         description=(
-            "Leistungsbewertung: eigene Kategorien mit Gewichten, Noten und "
-            "Beobachtungen je Person. Rechnet den gewichteten Schnitt der "
-            "Noten — die Zeugnisnote bleibt deine Entscheidung."
+            "Notenbuch: eigene Spalten mit Gewichten, Noten und Beobachtungen je "
+            "Person. Rechnet den gewichteten Schnitt und zeigt einen Trend je "
+            "Schüler — die Zeugnisnote bleibt deine Entscheidung, Beobachtungen "
+            "zählen nie mit. CardVote-, Karten- und Code-Detektiv-Ergebnisse als "
+            "Spalte übernehmbar."
         ),
         path="/noten",
         stage="stable",
@@ -82,10 +86,12 @@ REGISTRY: List[ModuleDef] = [
         group="werkzeug",
         name="Code-Detektiv",
         description=(
-            "Programmier-Rätsel für den Informatikunterricht: Code-Bausteine "
-            "in die richtige Reihenfolge bringen, allein oder in der Klasse."
+            "Programmier-Rätsel für den Informatikunterricht: Code-Bausteine per "
+            "Drag & Drop in die richtige Reihenfolge bringen — allein oder in "
+            "einer Klassen-Session (Beitritt per Code, ohne Login). Themen-getaggt."
         ),
         path="/code-detektiv",
+        stage="stable",
     ),
     ModuleDef(
         key="karten",
@@ -93,7 +99,9 @@ REGISTRY: List[ModuleDef] = [
         name="Karteikarten",
         description=(
             "Karteikarten mit Spaced Repetition. Die Lernenden üben ohne Konto "
-            "per QR-Code; ihren Fortschritt siehst du im Modul."
+            "per QR-Code; ihren Reifegrad siehst du im Modul. Optional an ein "
+            "Thema gebunden (der Kalender schaltet den Stapel am Tag frei); die "
+            "Meisterung als Notenspalte übernehmbar."
         ),
         path="/karten",
         stage="stable",
@@ -103,8 +111,11 @@ REGISTRY: List[ModuleDef] = [
         group="organisation",
         name="Kalender",
         description=(
-            "Unterrichtsplanung im Kalender: Tag-, Wochen- und Monatsansicht. "
-            "Stunden eintragen und Themen aus der Taxonomie zuordnen."
+            "Unterrichtsplanung: Tag-, Wochen-, Monatsansicht und ein "
+            "wiederkehrender Stundenplan. An einen Eintrag lässt sich ein Quiz, "
+            "ein Karten-Deck oder eine Lernleiter planen; freie Tage blenden "
+            "Stunden aus. Kalender-Sync in beide Richtungen (eigener ICS-Feed zum "
+            "Abonnieren + externer Kalender read-only)."
         ),
         path="/kalender",
         stage="stable",
@@ -114,10 +125,11 @@ REGISTRY: List[ModuleDef] = [
         group="organisation",
         name="Orga",
         description=(
-            "Werkzeuge zur Klassenführung: Sammel-Checklisten (z.B. „Unterschrift "
-            "der Klassenarbeit gesehen“), Anwesenheit/Fehlzeiten (mit PDF-Report), "
-            "Material-Ausleihe (verleihen, Rückgabe im Blick) und Sitzplan (Tische "
-            "frei platzieren)."
+            "Werkzeuge zur Klassenführung in Reitern: Sammel-Checklisten (z.B. "
+            "„Unterschrift der Klassenarbeit gesehen“), Anwesenheit/Fehlzeiten "
+            "(mit PDF-Report), Material-Ausleihe (verleihen, Rückgabe im Blick) "
+            "und Sitzplan (Tische frei platzieren, optional SEGEL-Stufen je "
+            "Schüler)."
         ),
         path="/orga",
         stage="stable",
@@ -127,19 +139,21 @@ REGISTRY: List[ModuleDef] = [
         group="werkzeug",
         name="Zufallsschüler",
         description=(
-            "Zieht per Knopfdruck eine zufaellige Person aus einer Klasse — "
-            "optional ohne Wiederholung, bis alle dran waren."
+            "Zieht per Knopfdruck eine zufällige Person aus einer Klasse — fair "
+            "gewichtet nach der Zeit seit dem letzten Ziehen, nicht zweimal am "
+            "Stück."
         ),
         path="/zufall",
+        stage="stable",
     ),
     ModuleDef(
         key="methoden",
         group="unterricht",
         name="Einstiege",
         description=(
-            "Sammlung von Ideen fuer den Unterrichtseinstieg — Idee, Ablauf mit "
-            "Material, Materialliste und ungefaehre Dauer. Wiederverwenden und an "
-            "Kalender-Stunden zuordnen."
+            "Sammlung von Ideen für den Unterrichtseinstieg — Idee, Ablauf, "
+            "Material und ungefähre Dauer. Wiederverwendbar, an Kalender-Stunden "
+            "zuweisbar und themen-getaggt: zu einem schwachen Thema vorschlagbar."
         ),
         path="/methoden",
         stage="stable",
