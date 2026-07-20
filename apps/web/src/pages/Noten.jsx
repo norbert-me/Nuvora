@@ -12,7 +12,7 @@ import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, modalOverlay, modalPanel } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, modalOverlay, modalPanel, Empty } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -357,7 +357,7 @@ export default function Noten() {
           editing={zelle} setEditing={setZelle} onInfo={setInfoFuer} />
       ) : sections.length === 0 ? (
         <>
-          <p style={{ fontSize: 13.5, color: "var(--text3)", marginTop: 8, marginBottom: 12 }}>{t("noten.noSections")}</p>
+          <div style={{ marginBottom: 14 }}><Empty title={t("noten.noSections")} hint={t("noten.noSectionsHint")} /></div>
           <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 12, WebkitOverflowScrolling: "touch", maxWidth: 360 }}>
             <table style={{ borderCollapse: "collapse", fontSize: 13.5, width: "100%" }}>
               <thead>

@@ -2,7 +2,7 @@
 // Ausleiher: ein Kern-Schüler (Klasse wählen) oder ein Freitextname.
 import { useState, useEffect, useCallback } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
-import { pageTitle, btnPrimary, btnSecondary, selectStyle, Toggle, Icon, ICONS, iconBtn, COLORS as C, inputStyle } from "../components/Icons.jsx";
+import { pageTitle, btnPrimary, btnSecondary, selectStyle, Toggle, Icon, ICONS, iconBtn, COLORS as C, inputStyle, Empty } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr } from "../core/cache.js";
@@ -78,7 +78,7 @@ export default function Ausleihe() {
       )}
 
       {items.length === 0 ? (
-        <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("ausleihe.noItems")}</p>
+        <Empty title={t("ausleihe.noItems")} hint={t("ausleihe.noItemsHint")} />
       ) : (nurOffene ? items.filter((it) => it.open > 0) : items).length === 0 ? (
         <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("ausleihe.noneOut")}</p>
       ) : (

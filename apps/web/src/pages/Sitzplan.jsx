@@ -2,7 +2,7 @@
 // drehen (z.B. schräge Tische). Gespeichert wird { seats: [{sid,x,y,rot}] }.
 // Schüler bleiben im Kern; hier nur ihre Positionen (Regel 3).
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { pageTitle, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
+import { pageTitle, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C, Empty } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
@@ -281,7 +281,7 @@ export default function Sitzplan() {
       {msg && <p style={{ fontSize: 13, color: "#0a7d3e", marginBottom: 10 }}>{msg}</p>}
 
       {students.length === 0 ? (
-        <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("sitzplan.noStudents")}</p>
+        <Empty title={t("sitzplan.noStudents")} hint={t("sitzplan.noStudentsHint")} />
       ) : (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
