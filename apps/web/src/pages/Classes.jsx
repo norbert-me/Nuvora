@@ -217,7 +217,7 @@ export default function Classes() {
         <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{editing.id ? t("classes.editTitle") : t("classes.newTitle")}</h2>
         <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}>
           <input placeholder={t("classes.namePlaceholder")} value={name} onChange={(e) => setName(e.target.value)}
-            style={{ padding: "10px 14px", fontSize: 18, width: 300, border: "1px solid var(--border2)", borderRadius: 10 }} autoFocus />
+            autoComplete="off" style={{ padding: "10px 14px", fontSize: 18, width: 300, border: "1px solid var(--border2)", borderRadius: 10 }} autoFocus />
           <input type="color" value={color} onChange={(e) => setColor(e.target.value)} title={t("classes.color")}
             style={{ width: 40, height: 40, padding: 0, border: "1px solid var(--border2)", borderRadius: 8, background: "none", cursor: "pointer" }} />
         </div>
@@ -238,6 +238,7 @@ export default function Classes() {
                 {cardvote ? `#${s.card_id}` : `${idx + 1}.`}
               </span>
               <input value={s.name} onChange={(e) => updateStudent(idx, e.target.value)} placeholder={t("common.name")}
+                autoComplete="off" name={`stud-${idx}`} data-lpignore="true"
                 style={{ flex: 1, padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)" }} />
               <select
                 value={s.niveau || ""} onChange={(e) => setStudentField(idx, "niveau", e.target.value)}
@@ -338,9 +339,11 @@ export default function Classes() {
           <button onClick={save} disabled={!name.trim()} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={() => setEditing(null)} style={btnSecondary}>{t("common.cancel")}</button>
         </div>
-        <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>
-          {t("classes.limit", { max: MAX_CARDS, count: students.length })}
-        </p>
+        {cardvote && (
+          <p style={{ fontSize: 12, color: students.length >= MAX_CARDS ? "#d1350f" : "var(--text3)", margin: 0 }}>
+            {t("classes.limit", { max: MAX_CARDS, count: students.length })}
+          </p>
+        )}
       </div>
     );
   }

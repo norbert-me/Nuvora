@@ -125,7 +125,7 @@ export default {
   "classes.addRow": "+ Row",
   "classes.removeCard": "Remove card",
   "classes.removeCardConfirm": "Remove this card? All cards after this position shift up — the cards must be reprinted.",
-  "classes.limit": "System limit: max. {{max}} cards (ArUco 6x6_50). {{count}}/{{max}} used.",
+  "classes.limit": "CardVote limit: scanning supports max. {{max}} cards per class (ArUco 6x6_50). Used: {{count}}/{{max}}.",
   "classes.deleteConfirm": "Move class to trash? Restorable for 30 days.",
   "classes.trash": "Trash",
   "kurse.title": "Courses",

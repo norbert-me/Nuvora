@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
-import { pageTitle, btnPrimary, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C, Tabs, th as thBase, td } from "../components/Icons.jsx";
+import { pageTitle, btnPrimary, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C, th as thBase, td } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
@@ -68,13 +68,11 @@ export default function Orga() {
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
-        <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("orga.moduleTitle")}</h1>
-        <Tabs value={tab} onChange={setTab}
-          options={[["checklisten", t("orga.tabChecklists")], ["anwesenheit", t("orga.tabAttendance")], ["ausleihe", t("ausleihe.title")], ["sitzplan", t("sitzplan.title")]]} />
-      </div>
-
+      {/* Kein eigenes Tab-Band mehr: zwischen den vier Werkzeugen wird über die
+          Navbar gewechselt (?tab=…), siehe main.jsx. Der Titel steht nur beim
+          Checklisten-Tab; die eingebetteten Werkzeuge bringen ihren eigenen mit. */}
       {tab === "anwesenheit" ? <Anwesenheit /> : tab === "ausleihe" ? <Ausleihe /> : tab === "sitzplan" ? <Sitzplan /> : (<>
+      <h1 style={{ ...pageTitle, marginBottom: 14 }}>{t("orga.moduleTitle")}</h1>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
         <KursKlasseSelect value={classId} onChange={setClassId} />
       </div>

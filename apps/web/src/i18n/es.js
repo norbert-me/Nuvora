@@ -125,7 +125,7 @@ export default {
   "classes.addRow": "+ Fila",
   "classes.removeCard": "Quitar tarjeta",
   "classes.removeCardConfirm": "¿Quitar esta tarjeta? Todas las tarjetas posteriores suben una posición — habrá que reimprimirlas.",
-  "classes.limit": "Límite del sistema: máx. {{max}} tarjetas (ArUco 6x6_50). {{count}}/{{max}} ocupadas.",
+  "classes.limit": "Límite de CardVote: el escaneo admite máx. {{max}} tarjetas por clase (ArUco 6x6_50). Ocupadas: {{count}}/{{max}}.",
   "classes.deleteConfirm": "¿Mover la clase a la papelera? Recuperable durante 30 días.",
   "classes.trash": "Papelera",
   "kurse.title": "Cursos",

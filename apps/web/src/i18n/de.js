@@ -125,7 +125,7 @@ export default {
   "classes.addRow": "+ Zeile",
   "classes.removeCard": "Karte entfernen",
   "classes.removeCardConfirm": "Karte entfernen? Alle Karten ab dieser Position rutschen nach oben — die Karten müssen neu gedruckt werden.",
-  "classes.limit": "Systemlimit: max. {{max}} Karten (ArUco 6x6_50). {{count}}/{{max}} belegt.",
+  "classes.limit": "CardVote-Grenze: Das Scannen erkennt max. {{max}} Karten je Klasse (ArUco 6x6_50). Belegt: {{count}}/{{max}}.",
   "classes.deleteConfirm": "Klasse in den Papierkorb verschieben? 30 Tage wiederherstellbar.",
   "classes.trash": "Papierkorb",
   "kurse.title": "Kurse",

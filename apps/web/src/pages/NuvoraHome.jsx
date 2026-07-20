@@ -273,14 +273,6 @@ export default function NuvoraHome({ user }) {
                 ? <a key={m.key} href={m.path} style={card}>{inner}</a>
                 : <Link key={m.key} to={m.path} style={card}>{inner}</Link>;
             })}
-            {/* Anwesenheit steckt als Tab im Orga-Modul, ist aber ein eigener
-                taeglicher Einstieg — daher eine eigene Kachel direkt dorthin. */}
-            {!edit && isOn("orga") && (
-              <Link to="/orga?tab=anwesenheit" style={card}>
-                <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t("anwesenheit.title")}</div>
-                <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.6 }}>{t("anwesenheit.homeDesc")}</div>
-              </Link>
-            )}
           </div>
         </>
       )}
