@@ -203,6 +203,27 @@ export default function Sitzplan() {
 
   const leeren = () => { persist([]); setMsg(t("sitzplan.cleared")); setTimeout(() => setMsg(""), 2500); };
 
+  // Ebene verschieben: leere Fläche greifen und die ganze Ansicht schieben
+  // (pant den Scroll-Container). Nur wenn direkt auf die Fläche geklickt wird.
+  const scrollRef = useRef(null);
+  const panRef = useRef(null);
+  const onCanvasDown = (e) => {
+    if (aufruf || e.target !== canvasRef.current) return;
+    panRef.current = { x: e.clientX, y: e.clientY, l: scrollRef.current.scrollLeft, t: scrollRef.current.scrollTop };
+    window.addEventListener("pointermove", onPanMove);
+    window.addEventListener("pointerup", onPanUp);
+  };
+  const onPanMove = (e) => {
+    const p = panRef.current; if (!p) return;
+    scrollRef.current.scrollLeft = p.l - (e.clientX - p.x);
+    scrollRef.current.scrollTop = p.t - (e.clientY - p.y);
+  };
+  const onPanUp = () => {
+    window.removeEventListener("pointermove", onPanMove);
+    window.removeEventListener("pointerup", onPanUp);
+    panRef.current = null;
+  };
+
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
@@ -229,9 +250,10 @@ export default function Sitzplan() {
             <button onClick={() => setZoom((z) => Math.min(2, Math.round((z + 0.1) * 10) / 10))} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8, width: 28, height: 28, fontSize: 16 }}>+</button>
             {zoom !== 1 && <button onClick={() => setZoom(1)} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 12 }}>{t("sitzplan.zoomReset")}</button>}
           </div>
-          <div style={{ height: 520, overflow: "auto", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", marginBottom: 18 }}>
-          <div ref={canvasRef} onDragOver={(e) => e.preventDefault()} onDrop={onCanvasDrop}
-            style={{ position: "relative", height: 520, width: "100%", transform: `scale(${zoom})`, transformOrigin: "0 0",
+          <div ref={scrollRef} style={{ height: 520, overflow: "auto", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", marginBottom: 18 }}>
+          <div ref={canvasRef} onPointerDown={onCanvasDown} onDragOver={(e) => e.preventDefault()} onDrop={onCanvasDrop}
+            style={{ position: "relative", height: 760, width: 1200, transform: `scale(${zoom})`, transformOrigin: "0 0",
+              cursor: aufruf ? "default" : "grab",
               backgroundImage: "radial-gradient(var(--border) 1px, transparent 1px)", backgroundSize: "24px 24px" }}>
             {/* Bewegliche Tafel */}
             <div onPointerDown={onTafelDown}
