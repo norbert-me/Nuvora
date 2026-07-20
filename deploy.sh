@@ -4,9 +4,9 @@
 #
 # Nutzung: ./deploy.sh                          -> baut alle Services
 #          ./deploy.sh api                      -> baut nur diesen Service
-#          ./deploy.sh lernpfad proxy           -> baut mehrere
+#          ./deploy.sh web proxy               -> baut mehrere
 #          ./deploy.sh --port 8090              -> anderer Port, wird in .deploy.env gemerkt
-#          ./deploy.sh --port 8090 lernpfad     -> beides kombinierbar
+#          ./deploy.sh --port 8090 web           -> beides kombinierbar
 #
 # Secrets (TOKEN_SECRET, POSTGRES_PASSWORD, SMTP_*) leben nur auf dem Server
 # und werden hier nie angefasst. PORT und SITE_URL dagegen gehoeren zum
@@ -246,14 +246,15 @@ ssh "$SERVER" "cd '$REMOTE_DIR' && docker compose build $BUILD_SERVICES && docke
 echo "→ Status & Logs..."
 sleep 6
 # shellcheck disable=SC2029
-ssh "$SERVER" "cd '$REMOTE_DIR' && docker compose ps; echo '--- api log (letzte 30) ---'; docker compose logs --tail=30 api; echo '--- lernpfad log (letzte 15) ---'; docker compose logs --tail=15 lernpfad"
+ssh "$SERVER" "cd '$REMOTE_DIR' && docker compose ps; echo '--- api log (letzte 30) ---'; docker compose logs --tail=30 api"
 
 PORT="${PORT:-8080}"
 echo "→ Health-Checks (auf dem Server, Port $PORT)..."
 CV=$(ssh "$SERVER" "curl -s -o /dev/null -w '%{http_code}' http://localhost:$PORT/api/health" || echo "000")
-LP=$(ssh "$SERVER" "curl -s -o /dev/null -w '%{http_code}' http://localhost:$PORT/lernpfad-app/" || echo "000")
+# Lernpfad ist ins Web eingebaut: seine Statik kommt vom web-Container (/lp/).
+LP=$(ssh "$SERVER" "curl -s -o /dev/null -w '%{http_code}' http://localhost:$PORT/lp/index.html" || echo "000")
 echo "  /api/health  -> $CV   (Nuvora-Kern)"
-echo "  /lernpfad-app/ -> $LP   (Modul Lernpfad)"
+echo "  /lp/         -> $LP   (Lernpfad-Statik im web)"
 
 echo ""
 echo "========================================"

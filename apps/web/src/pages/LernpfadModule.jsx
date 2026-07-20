@@ -1,15 +1,16 @@
 import { modalOverlay, modalPanel } from "../components/Icons.jsx";
-// Modul Lernpfad — nativ in die Shell gemountet (kein iframe mehr).
+// Modul Lernpfad — nativ in die Shell eingebaut (kein eigener Container mehr).
 //
-// Die erprobte Vanilla-JS-App (apps/lernpfad) wird unveraendert wiederverwendet:
-// ihr HTML wird in einen Host (#lp-app) injiziert, ihr CSS unter #lp-app
-// gescopet (style.scoped.css), dann laeuft ihre app.js im selben Fenster.
-// Kommunikation weiter per window.postMessage (gleiches window, kein iframe):
-// Theme/Tab rein, Modal/Toast/Tab raus — auf Nuvora-Ebene gerendert.
+// Die erprobte Vanilla-JS-App wurde ins Web-Projekt uebernommen: ihre Statik
+// liegt jetzt unter apps/web/public/lp/ und wird vom selben Web-Server
+// ausgeliefert (frueher ein eigener lernpfad-Container hinter /lernpfad-app/).
+// Der Mount ist die Schnittstelle: HTML in einen Host (#lp-app) injizieren, CSS
+// unter #lp-app gescopet (style.scoped.css), dann app.js im selben Fenster.
+// Kommunikation per window.postMessage: Theme/Tab rein, Modal/Toast/Tab raus.
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-const BASE = "/lernpfad-app/";
+const BASE = "/lp/";
 const ORIGIN = window.location.origin;
 
 // Ein Asset (CSS/JS) einmalig ins <head> laden.

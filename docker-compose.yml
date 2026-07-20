@@ -59,14 +59,8 @@ services:
     depends_on:
       - api
 
-  lernpfad:
-    # Nur noch Statik: Konten, Klassen, Schueler und Themen liegen im Kern,
-    # die Fachdaten unter /api/lernpfad. Deshalb kein DB-Volume und kein
-    # ADMIN_EMAIL mehr — das Modul haelt keine Daten.
-    # Kein config-Mount mehr: Impressum/Datenschutz/Kontakt kommen aus Nuvora
-    # (Footer verlinkt auf /legal, /contact), damit sie ueberall gleich sind.
-    build: ./apps/lernpfad
-    restart: unless-stopped
+  # Lernpfad ist ins Web-Projekt eingebaut (apps/web/public/lp/) — kein eigener
+  # Container mehr. Frueher: eigener Statik-Container hinter /lernpfad-app/.
 
   proxy:
     image: nginx:alpine
@@ -80,7 +74,6 @@ services:
       - ./config:/srv/config:ro
     depends_on:
       - web
-      - lernpfad
 
 volumes:
   pgdata:
