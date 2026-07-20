@@ -738,6 +738,8 @@ export default {
   "kalender.subscribeText": "Suscribe tu calendario Nuvora en Apple, Google, etc. — se actualiza solo, sin descargas repetidas.",
   "kalender.subscribeNow": "Abrir en la app de calendario",
   "kalender.subscribeManual": "O añade esta URL como suscripción:",
+  "kalender.extTitle": "Mostrar un calendario externo",
+  "kalender.extText": "Pega el enlace ICS de tu calendario Google/Apple — los eventos se muestran de solo lectura. Vacía el campo para desactivar.",
   "kalender.today": "Hoy",
   "kalender.todayView": "Hoy",
   "kalender.todayEmpty": "Hoy no hay horas en el horario ni entradas.",

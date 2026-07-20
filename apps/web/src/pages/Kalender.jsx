@@ -41,10 +41,19 @@ export default function Kalender() {
   const [view, setView] = useState("month"); // month | week | day
   const [cursor, setCursor] = useState(() => startOfDay(new Date()));
   const [abo, setAbo] = useState(null); // Abo-URLs { url, webcal }
+  const [extUrl, setExtUrl] = useState("");   // externer ICS-Feed (read-only Anzeige)
+  const [extEvents, setExtEvents] = useState([]); // [{date:'YYYY-MM-DD', title}]
   const openAbo = async () => {
     const r = await fetch(`${API}/subscribe`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
-    if (r) setAbo(r);
+    if (r) { const ex = await fetch(`${API}/external`).then((x) => (x.ok ? x.json() : { url: "" })).catch(() => ({ url: "" })); setAbo({ ...r, ext: ex.url || "" }); }
   };
+  const loadExt = () => fetch(`${API}/external-events`).then((r) => (r.ok ? r.json() : [])).then((d) => setExtEvents(Array.isArray(d) ? d : [])).catch(() => {});
+  const saveExt = async (url) => {
+    await fetch(`${API}/external`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) }).catch(() => {});
+    setExtUrl(url); loadExt();
+  };
+  useEffect(() => { fetch(`${API}/external`).then((r) => (r.ok ? r.json() : { url: "" })).then((d) => { setExtUrl(d.url || ""); if (d.url) loadExt(); }).catch(() => {}); }, []);
+  const extByDay = (d) => extEvents.filter((e) => e.date === ymd(d));
   const [entries, setEntries] = useState([]);
   const [classes, setClasses] = useState([]);
   const [topics, setTopics] = useState([]);
@@ -308,7 +317,7 @@ export default function Kalender() {
           heuteAbsent={heuteAbsent} orgaAktiv={!!aktiv.orga} onOpen={setEditing} onSlot={fromSlot} />
       )}
 
-      {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} t={t} />}
+      {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} t={t} />}
       {view === "week" && wdhVorschlag.length > 0 && (
         <div style={{ marginBottom: 12, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)" }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t("kalender.wdhTitle")}</div>
@@ -340,6 +349,17 @@ export default function Kalender() {
               <input readOnly value={abo.url} onFocus={(e) => e.target.select()} style={{ ...inputStyle, flex: 1, fontSize: 12 }} />
               <button onClick={() => { navigator.clipboard?.writeText(abo.url); }} style={btnSecondary}>{t("common.copy") !== "common.copy" ? t("common.copy") : "Kopieren"}</button>
             </div>
+
+            {/* Andere Richtung: externen Kalender (ICS-URL) read-only einblenden. */}
+            <div style={{ borderTop: "1px solid var(--border)", marginTop: 18, paddingTop: 14 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 4 }}>{t("kalender.extTitle")}</div>
+              <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8 }}>{t("kalender.extText")}</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input defaultValue={abo.ext || ""} placeholder="https://…/basic.ics" id="lp-ext-url" style={{ ...inputStyle, flex: 1, fontSize: 12 }} />
+                <button onClick={() => { const v = document.getElementById("lp-ext-url").value.trim(); saveExt(v); setAbo((a) => ({ ...a, ext: v })); }} style={btnPrimary}>{t("common.save")}</button>
+              </div>
+            </div>
+
             <div style={{ marginTop: 16, textAlign: "right" }}>
               <button onClick={() => setAbo(null)} style={btnSecondary}>{t("common.close") !== "common.close" ? t("common.close") : "Schließen"}</button>
             </div>
@@ -457,7 +477,7 @@ function HeuteView({ t, tt, weekdayOf, byDay, className, classColor, topicName, 
   );
 }
 
-function MonthGrid({ range, cursor, byDay, slotsFor, onSlot, frei, className, topicName, classColor, onAdd, onOpen, t }) {
+function MonthGrid({ range, cursor, byDay, extByDay, slotsFor, onSlot, frei, className, topicName, classColor, onAdd, onOpen, t }) {
   const days = [];
   for (let d = new Date(range[0]); d <= range[1]; d = addDays(d, 1)) days.push(new Date(d));
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
@@ -480,6 +500,10 @@ function MonthGrid({ range, cursor, byDay, slotsFor, onSlot, frei, className, to
                     </div>
                     {f ? <FreiMarker label={f.label} t={t} /> : (<>
                       <EntryChips list={byDay(d)} className={className} topicName={topicName} onOpen={onOpen} classColor={classColor} />
+                      {/* Externe Kalender-Events (read-only, grau, nicht klickbar). */}
+                      {extByDay && extByDay(d).map((ev, i) => (
+                        <div key={`ext-${i}`} title={ev.title} style={{ fontSize: 11, color: "var(--text3)", background: "var(--bg2)", border: "1px dashed var(--border2)", borderRadius: 6, padding: "1px 5px", margin: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>🔗 {ev.title || "—"}</div>
+                      ))}
                       {slotsFor && <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} topicName={topicName} onSlot={onSlot} day={d} t={t} />}
                     </>)}
                   </td>

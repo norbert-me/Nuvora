@@ -36,6 +36,9 @@ class User(Base):
     # Unratbares Token fuer den ICS-Kalender-Abo-Feed (Apple/Google abonnieren
     # per URL ohne Login). Erst bei Bedarf gesetzt.
     calendar_token: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, unique=True, index=True)
+    # Externer Kalender (ICS-URL, z.B. Google/Apple), den Nuvora read-only
+    # einblendet — die „andere Richtung". Leer = aus. Isoliert/leicht entfernbar.
+    external_ics_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # Einstiege-Startsammlung einmalig angelegt? Danach nicht erneut seeden,
     # auch wenn die Lehrkraft alle Einstiege loescht (sonst tauchen sie wieder auf).
     methoden_seeded: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")

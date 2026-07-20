@@ -738,6 +738,8 @@ export default {
   "kalender.subscribeText": "Abonniere deinen Nuvora-Kalender in Apple Kalender, Google Kalender o.ä. — er aktualisiert sich automatisch, kein erneuter Download nötig.",
   "kalender.subscribeNow": "In Kalender-App öffnen",
   "kalender.subscribeManual": "Oder diese URL im Kalender als Abo eintragen:",
+  "kalender.extTitle": "Externen Kalender einblenden",
+  "kalender.extText": "ICS-Link deines Google-/Apple-Kalenders einfügen — die Termine werden hier read-only angezeigt. Feld leeren = aus.",
   "kalender.today": "Heute",
   "kalender.todayView": "Heute",
   "kalender.todayEmpty": "Heute keine Stunden im Stundenplan und keine Einträge.",

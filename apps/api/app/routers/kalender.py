@@ -427,3 +427,73 @@ async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
         ]
     lines.append("END:VCALENDAR")
     return _Plain("\r\n".join(lines), media_type="text/calendar; charset=utf-8")
+
+
+# ─── Externer Kalender (ICS-URL read-only einblenden — „andere Richtung") ───
+class ExtIn(BaseModel):
+    url: str = ""
+
+
+@router.get("/external")
+async def get_external(user: User = Depends(require_module)):
+    return {"url": user.external_ics_url or ""}
+
+
+@router.put("/external")
+async def set_external(body: ExtIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    url = (body.url or "").strip()
+    if url and not (url.startswith("http://") or url.startswith("https://") or url.startswith("webcal://")):
+        raise HTTPException(400, "URL muss mit http(s):// oder webcal:// beginnen")
+    user.external_ics_url = url.replace("webcal://", "https://", 1) if url else None
+    await db.commit()
+    return {"url": user.external_ics_url or ""}
+
+
+def _parse_ics(text: str):
+    """Sehr einfacher ICS-Parser: VEVENTs mit DTSTART/DTEND/SUMMARY."""
+    import re
+    # Gefaltete Zeilen (Fortsetzung mit Leerzeichen/Tab) zusammenführen.
+    text = re.sub(r"\r?\n[ \t]", "", text)
+    events = []
+    cur = None
+    for line in text.split("\n"):
+        line = line.rstrip("\r")
+        if line == "BEGIN:VEVENT":
+            cur = {}
+        elif line == "END:VEVENT":
+            if cur and cur.get("start"):
+                events.append(cur)
+            cur = None
+        elif cur is not None and ":" in line:
+            key, val = line.split(":", 1)
+            k = key.split(";", 1)[0].upper()
+            if k == "DTSTART":
+                cur["start"] = val.strip()[:8]  # YYYYMMDD (Datum-Teil reicht)
+            elif k == "DTEND":
+                cur["end"] = val.strip()[:8]
+            elif k == "SUMMARY":
+                cur["title"] = val.strip().replace("\\,", ",").replace("\;", ";").replace("\\n", " ")
+    return events
+
+
+@router.get("/external-events")
+async def external_events(user: User = Depends(require_module)):
+    """Holt den externen ICS-Feed (falls gesetzt) und liefert Events als
+    {date: YYYY-MM-DD, title}. Read-only, nur zur Anzeige."""
+    if not user.external_ics_url:
+        return []
+    import asyncio, urllib.request
+    def _fetch():
+        req = urllib.request.Request(user.external_ics_url, headers={"User-Agent": "Nuvora"})
+        with urllib.request.urlopen(req, timeout=6) as r:
+            return r.read(2_000_000).decode("utf-8", "replace")  # max 2 MB
+    try:
+        text = await asyncio.get_event_loop().run_in_executor(None, _fetch)
+    except Exception:
+        return []
+    out = []
+    for e in _parse_ics(text):
+        s = e["start"]
+        if len(s) == 8 and s.isdigit():
+            out.append({"date": f"{s[0:4]}-{s[4:6]}-{s[6:8]}", "title": e.get("title", "")[:200]})
+    return out[:1000]
