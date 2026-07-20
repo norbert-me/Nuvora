@@ -66,7 +66,6 @@ export default function Tests() {
             {classes.map((c) => (
               <Link key={c.id} to={`/cardvote/class-evaluation/${c.id}`}
                 style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 14, textDecoration: "none", color: "var(--text)" }}>
-                <Icon d={ICONS.chart} color="#0066cc" />
                 <span style={{ fontWeight: 600, fontSize: 14 }}>{c.name}</span>
               </Link>
             ))}

@@ -159,10 +159,14 @@ const getModuleNavItems = (t, location) => {
   }
   if (area === "code-detektiv") {
     // Nativ eingebunden: die Nuvora-Navbar steuert die Bereiche der App direkt.
+    // Beim Öffnen (Index) startet die App im Erstellen-Bereich — den heben wir
+    // dann auch in der Navbar hervor.
+    const p = pathname.replace(/\/$/, "");
+    const create = p === CD || p.startsWith(`${CD}/admin`);
     return [
-      { to: `${CD}/admin`, label: t("cd.create") },
-      { to: `${CD}/home?join=1`, label: t("cd.join") },
-      { to: `${CD}/solo`, label: t("cd.solo") },
+      { to: `${CD}/admin`, label: t("cd.create"), active: create },
+      { to: `${CD}/home?join=1`, label: t("cd.join"), active: p.startsWith(`${CD}/home`) },
+      { to: `${CD}/solo`, label: t("cd.solo"), active: p.startsWith(`${CD}/solo`) },
     ];
   }
   if (area === "karten") {

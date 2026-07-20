@@ -317,7 +317,8 @@ function HeuteView({ t, tt, weekdayOf, byDay, className, classColor, topicName, 
           {t("kalender.freeDay")}: {istFrei.label || ""}
         </div>
       )}
-      {slots.length === 0 && extras.length === 0 ? (
+      {/* An freien Tagen (Ferien/Feiertag) den Stundenplan komplett ausblenden. */}
+      {istFrei ? null : slots.length === 0 && extras.length === 0 ? (
         <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("kalender.todayEmpty")}</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
