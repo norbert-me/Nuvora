@@ -425,6 +425,59 @@ async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
             f"SUMMARY:{_ics_escape(b.label or 'Unterrichtsfrei')}",
             "END:VEVENT",
         ]
+
+    # Wiederkehrende Stundenplan-Stunden ("ungeplante" reguläre Stunden) über ein
+    # rollierendes Fenster ausgeben, damit der abonnierte Kalender den Stundenplan
+    # zeigt, nicht nur Ad-hoc-Einträge. Ferien werden übersprungen; Stunden, für die
+    # es an dem Tag schon einen Eintrag gibt (gleiche Stunde), werden ausgelassen —
+    # genau wie die In-App-Logik die Vorlage hinter einem Eintrag ausblendet.
+    slots = (await db.execute(select(TimetableSlot).where(TimetableSlot.owner_id == u.id))).scalars().all()
+    if slots:
+        times = u.timetable_times or []
+        belegt = set()
+        for e in entries:
+            if e.period is not None:
+                d = e.date.date() if hasattr(e.date, "date") else e.date
+                belegt.add((d, e.period))
+        frei = []
+        for b in breaks:
+            bs = b.start_date.date() if hasattr(b.start_date, "date") else b.start_date
+            be = b.end_date.date() if hasattr(b.end_date, "date") else b.end_date
+            frei.append((bs, be))
+
+        def hms(t):
+            try:
+                hh, mm = (t or "").split(":")[:2]
+                return f"{int(hh):02d}{int(mm):02d}00"
+            except Exception:
+                return None
+
+        by_wd = {}
+        for s in slots:
+            by_wd.setdefault(s.weekday, []).append(s)
+        today = date.today()
+        start = today - timedelta(days=30)
+        for i in range(151):  # heute -30 .. +120 Tage
+            day = start + timedelta(days=i)
+            if any(bs <= day <= be for bs, be in frei):
+                continue
+            for s in by_wd.get(day.weekday(), []):
+                if (day, s.period) in belegt:
+                    continue
+                title = classes.get(s.class_id) or s.title or "Unterricht"
+                tr = times[s.period - 1] if 0 <= s.period - 1 < len(times) else None
+                a = hms(tr.get("from")) if isinstance(tr, dict) else None
+                b2 = hms(tr.get("to")) if isinstance(tr, dict) else None
+                uid = f"UID:nuvora-slot-{s.id}-{d8(day)}@nuvora"
+                if a and b2:
+                    lines += ["BEGIN:VEVENT", uid, f"DTSTAMP:{now}",
+                              f"DTSTART:{d8(day)}T{a}", f"DTEND:{d8(day)}T{b2}",
+                              f"SUMMARY:{_ics_escape(title)}", "END:VEVENT"]
+                else:
+                    lines += ["BEGIN:VEVENT", uid, f"DTSTAMP:{now}",
+                              f"DTSTART;VALUE=DATE:{d8(day)}", f"DTEND;VALUE=DATE:{d8(day + timedelta(days=1))}",
+                              f"SUMMARY:{_ics_escape(title)}", "END:VEVENT"]
+
     lines.append("END:VCALENDAR")
     return _Plain("\r\n".join(lines), media_type="text/calendar; charset=utf-8")
 
