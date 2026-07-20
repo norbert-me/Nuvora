@@ -116,6 +116,7 @@ class CategoryOut(BaseModel):
     # Aus welcher CardVote-Session übernommen (für den Link zur Auswertung).
     source_session_id: Optional[int] = None
     source_kind: Optional[str] = None  # "cardvote" | "karten" | "codedetektiv" | ""
+    topic_id: Optional[int] = None
     created_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
 
@@ -264,6 +265,7 @@ class CategoryIn(BaseModel):
     name: str
     section_id: int
     position: int = 0
+    topic_id: Optional[int] = None   # Thema der Spalte (z.B. was die Klassenarbeit abdeckt)
 
     @field_validator("name")
     @classmethod
@@ -274,11 +276,21 @@ class CategoryIn(BaseModel):
         return v
 
 
+async def _check_topic(db: AsyncSession, user_id: int, topic_id: Optional[int]) -> Optional[int]:
+    """Themenbindung nur aufs eigene Thema; fremdes/unbekanntes -> None."""
+    if topic_id is None:
+        return None
+    from ..models import Topic
+    ok = (await db.execute(select(Topic.id).where(Topic.id == topic_id, Topic.owner_id == user_id))).scalar_one_or_none()
+    return ok
+
+
 @router.post("/categories", response_model=CategoryOut, status_code=201)
 async def create_category(body: CategoryIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("noten_cat", f"u{user.id}", 200, 60, "Zu viele Spalten in kurzer Zeit. Bitte kurz warten.")
     sec = await _owned_section(db, user, body.section_id)
-    cat = GradeCategory(name=body.name, position=body.position, section_id=sec.id, class_id=sec.class_id, owner_id=user.id)
+    tid = await _check_topic(db, user.id, body.topic_id)
+    cat = GradeCategory(name=body.name, position=body.position, section_id=sec.id, class_id=sec.class_id, owner_id=user.id, topic_id=tid)
     db.add(cat)
     await db.commit()
     await db.refresh(cat)
@@ -293,6 +305,7 @@ async def update_category(category_id: int, body: CategoryIn, user: User = Depen
     cat.position = body.position
     cat.section_id = sec.id
     cat.class_id = sec.class_id
+    cat.topic_id = await _check_topic(db, user.id, body.topic_id)
     await db.commit()
     await db.refresh(cat)
     return cat
@@ -303,6 +316,45 @@ async def delete_category(category_id: int, user: User = Depends(require_module)
     cat = await _owned_category(db, user, category_id)
     await db.delete(cat)
     await db.commit()
+
+
+# ─── Nachholbedarf: aus einer (themen-getaggten) Klassenarbeit ───
+# Schwache SuS (Note schlechter als der Schwellwert) → deren Karten des Themas
+# WIEDER FÄLLIG setzen, damit sie im Üben erneut auftauchen ("verschieben").
+# Bridge (Zusatz, Regel 3): Karten-Modelle lazy importiert; ohne gelernte Karten
+# passiert nichts. BESTEHENDE Noten werden nicht angefasst.
+
+class NachholIn(BaseModel):
+    threshold: float = 4.0   # Note > threshold gilt als Nachholbedarf
+
+
+@router.post("/categories/{category_id}/nachholbedarf")
+async def nachholbedarf(category_id: int, body: NachholIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    from datetime import timezone
+    from sqlalchemy import update as _update
+    from ..models import CardDeck, Card, CardReview
+    cat = await _owned_category(db, user, category_id)
+    if not cat.topic_id:
+        raise HTTPException(400, "Die Spalte hat kein Thema — bitte zuerst ein Thema zuweisen.")
+    rows = (await db.execute(select(GradeEntry).where(
+        GradeEntry.category_id == category_id, GradeEntry.kind == "grade", GradeEntry.value.is_not(None)))).scalars().all()
+    weak = sorted({r.student_id for r in rows if r.value is not None and r.value > body.threshold})
+    requeued = 0
+    if weak:
+        deck_ids = (await db.execute(select(CardDeck.id).where(
+            CardDeck.owner_id == user.id, CardDeck.topic_id == cat.topic_id, CardDeck.deleted_at.is_(None)))).scalars().all()
+        if deck_ids:
+            card_ids = (await db.execute(select(Card.id).where(Card.deck_id.in_(deck_ids)))).scalars().all()
+            if card_ids:
+                res = await db.execute(_update(CardReview).where(
+                    CardReview.student_id.in_(weak), CardReview.card_id.in_(card_ids), CardReview.reps > 0
+                ).values(due=datetime.now(timezone.utc)))
+                requeued = res.rowcount or 0
+        await db.commit()
+    names = {}
+    if weak:
+        names = {s.id: s.name for s in (await db.execute(select(Student).where(Student.id.in_(weak)))).scalars().all()}
+    return {"weak": len(weak), "cards_requeued": requeued, "student_names": sorted(names.values())}
 
 
 # ─── Eintraege: Noten und Beobachtungen ───

@@ -35,6 +35,7 @@ export default function Noten() {
   const [students, setStudents] = useState([]);
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
+  const loadedOnce = useRef(false); // Skeleton nur beim allerersten Laden, nicht bei Reloads
   const [entries, setEntries] = useState([]);
   const [summary, setSummary] = useState([]);
   const [error, setError] = useState("");
@@ -48,7 +49,10 @@ export default function Noten() {
   const [term, setTerm] = useState("1");
   const { modules } = useModules();
   const cdAktiv = modules.find((m) => m.key === "codedetektiv")?.active ?? false;
+  const kartenAktiv = modules.find((m) => m.key === "karten")?.active ?? false;
   const [cdDialog, setCdDialog] = useState(false);
+  const [topics, setTopics] = useState([]); // Kern-Themen: Spalte einem Thema zuordnen (Nachholbedarf)
+  useEffect(() => { fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
   // Wie mehrere Einzelnoten zusammengefasst werden: Mittel oder Median. Merkt
   // sich die Wahl pro Browser. Die Abschnitts-Gewichtung bleibt unberuehrt.
   const [agg, setAgg] = useState(() => { try { return localStorage.getItem("noten_agg") === "median" ? "median" : "mean"; } catch { return "mean"; } });
@@ -179,6 +183,7 @@ export default function Noten() {
       fetch(`${API}/classes/${id}/summary?term=${term}&agg=${agg}${kp}`).then((r) => (r.ok ? r.json() : [])),
     ]);
     setSections(sec); setEntries(ent); setSummary(sum); setLoading(false);
+    loadedOnce.current = true; // ab jetzt kein Skeleton mehr (Reloads z.B. bei Median/Mittel nicht flackern lassen)
     fetch(`${API}/classes/${id}/dividers?term=${term}${kp}`).then((r) => (r.ok ? r.json() : [])).then((d) => setDividers(Array.isArray(d) ? d : [])).catch(() => {});
   };
   const toggleDivider = async (catId) => {
@@ -251,6 +256,17 @@ export default function Noten() {
     if (res.headers && res.headers.get("X-Nuvora-Queued")) insert(j.id);
     else await load(classId);
     return true;
+  };
+
+  // Nachholbedarf aus einer themen-getaggten Klassenarbeit: schwache SuS →
+  // deren Karten des Themas wieder fällig setzen (im Üben tauchen sie erneut auf).
+  const runNachhol = async (cat) => {
+    const res = await fetch(`${API}/categories/${cat.id}/nachholbedarf`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ threshold: 4.0 }),
+    }).catch(() => null);
+    if (!res || !res.ok) { const b = res ? await res.json().catch(() => ({})) : {}; showAlert(typeof b.detail === "string" ? b.detail : t("common.notWork")); return; }
+    const j = await res.json();
+    showAlert(t("noten.nachholDone", { weak: j.weak, cards: j.cards_requeued }));
   };
 
   const noteSetzen = async (studentId, catId, text) => {
@@ -390,7 +406,7 @@ export default function Noten() {
             {!st ? <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("noten.colNoGrades")}</p> : (
               <div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 18 }}>
-                  {[[t("noten.colAvg"), de1(st.avg)], [t("noten.colMedian"), de1(st.median)], [t("noten.colCount", { n: st.n }), ""], [t("noten.colBest"), de1(st.min)], [t("noten.colWorst"), de1(st.max)]].map(([lbl, val], i) => (
+                  {[[t("noten.colAvg"), de1(st.avg)], [t("noten.colMedian"), de1(st.median)], [t("noten.colBest"), de1(st.min)], [t("noten.colWorst"), de1(st.max)]].map(([lbl, val], i) => (
                     <div key={i} style={{ padding: "10px 12px", borderRadius: 10, background: "var(--bg2)" }}>
                       <div style={{ fontSize: 11.5, color: "var(--text3)" }}>{lbl}</div>
                       {val !== "" && <div style={{ fontSize: 20, fontWeight: 800 }}>{val}</div>}
@@ -431,7 +447,7 @@ export default function Noten() {
         ? (yearData.rows || []).length > 0 && <NotenStatistik noten={(yearData.rows || []).map((r) => (r.year_override != null ? r.year_override : r.year))} t={t} />
         : sections.length > 0 && <NotenStatistik noten={(summary || []).map((s) => (s.total_override != null ? s.total_override : s.weighted))} t={t} />}
 
-      {loading && sections.length === 0 && term !== "year" ? (
+      {loading && !loadedOnce.current && term !== "year" ? (
         <Skeleton rows={6} height={38} />
       ) : term === "year" ? (
         <YearTable t={t} data={yearData} cls={cls}
@@ -439,31 +455,10 @@ export default function Noten() {
           onReset={(sid) => overrideReset(sid, null)}
           editing={zelle} setEditing={setZelle} onInfo={setInfoFuer} />
       ) : sections.length === 0 ? (
-        <>
-          <div style={{ marginBottom: 14 }}><Empty title={t("noten.noSections")} hint={t("noten.noSectionsHint")} /></div>
-          <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 12, WebkitOverflowScrolling: "touch", maxWidth: 360 }}>
-            <table style={{ borderCollapse: "collapse", fontSize: 13.5, width: "100%" }}>
-              <thead>
-                <tr><th style={{ ...th, textAlign: "left" }}>{cls?.name}</th></tr>
-              </thead>
-              <tbody>
-                {students.map((st, si) => (
-                  <tr key={st.id}>
-                    <td style={{ ...td, textAlign: "left", padding: 0 }}>
-                      <button onClick={() => setInfoFuer(st.id)} title={t("noten.studentInfo")}
-                        style={{ width: "100%", textAlign: "left", padding: "6px 10px", border: "none", background: "none", color: "var(--text)", fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}>
-                        <span style={{ color: "var(--text3)", fontWeight: 400, marginRight: 6 }}>{si + 1}.</span>{st.name}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {students.length === 0 && (
-                  <tr><td style={{ ...td, textAlign: "left", color: "var(--text3)" }}>{t("noten.noStudents")}</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </>
+        // Noch keine Abschnitte: nur der Hinweis, NICHT die SuS-Liste (die kommt
+        // erst mit einer Bewertungsstruktur — eine nackte Namensliste ohne Spalten
+        // verwirrt mehr als sie hilft).
+        <div style={{ marginBottom: 14 }}><Empty title={t("noten.noSections")} hint={t("noten.noSectionsHint")} /></div>
       ) : (
         <div style={{ overflowX: "auto", overflowY: "visible", border: "1px solid var(--border)", borderRadius: 12, WebkitOverflowScrolling: "touch" }}>
           <table style={{ borderCollapse: "collapse", fontSize: 13.5, minWidth: "100%" }}>
@@ -557,8 +552,8 @@ export default function Noten() {
                           </span>
                         ) : null}
                         {renameCol === c.id && (
-                          <ColMenu t={t} cat={c} classId={classId} stats={colStats(c.id)} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
-                            onRename={async (name) => { if (await call(() => fetch(`${API}/categories/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: c.position ?? i }) }))) setRenameCol(null); }}
+                          <ColMenu t={t} cat={c} classId={classId} topics={topics} kartenAktiv={kartenAktiv} onNachhol={runNachhol} stats={colStats(c.id)} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
+                            onRename={async (name, topicId) => { if (await call(() => fetch(`${API}/categories/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: c.position ?? i, topic_id: topicId }) }))) setRenameCol(null); }}
                             onDelete={() => {
                               setRenameCol(null);
                               // Spalte sofort raus, 5 s Undo; erst dann Server-Delete.
@@ -870,7 +865,7 @@ function SectionMenu({ t, sec, onEdit, onDelete, onAddCol }) {
           <span onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 9 }} />
           <div style={{ position: "absolute", zIndex: 10, top: 24, right: 0, minWidth: 168, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: 4, boxShadow: "0 6px 20px rgba(0,0,0,0.2)" }}>
             <button style={item} onClick={() => { setOpen(false); onAddCol(); }}><Icon d={ICONS.plus} size={14} color="var(--accent)" /> {t("noten.addColumn")}</button>
-            <button style={item} onClick={() => { setOpen(false); setEdit(true); }}><Icon d={ICONS.edit} size={14} /> {t("common.rename")}</button>
+            <button style={item} onClick={() => { setOpen(false); setEdit(true); }}><Icon d={ICONS.edit} size={14} /> {t("common.edit")}</button>
             <button style={{ ...item, color: C.danger }} onClick={() => { setOpen(false); onDelete(); }}><Icon d={ICONS.trash} size={14} color={C.danger} /> {t("common.delete")}</button>
           </div>
         </>
@@ -880,10 +875,13 @@ function SectionMenu({ t, sec, onEdit, onDelete, onAddCol }) {
 }
 
 // Kleine Uebersicht zur Spalte: Anlagedatum plus Umbenennen/Loeschen.
-function ColMenu({ t, cat, stats, onStats, onRename, onDelete, onClose, dividerOn, onToggleDivider, classId }) {
+function ColMenu({ t, cat, stats, onStats, onRename, onDelete, onClose, dividerOn, onToggleDivider, classId, topics = [], onNachhol, kartenAktiv }) {
   const [name, setName] = useState(cat.name);
+  const [topicId, setTopicId] = useState(cat.topic_id ?? "");
   const datum = cat.created_at ? new Date(cat.created_at).toLocaleDateString("de-DE") : "—";
   const de1 = (n) => String(Math.round(n * 100) / 100).replace(".", ",");
+  const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
+  const save = () => name.trim() && onRename(name.trim(), topicId === "" ? null : Number(topicId));
   return (
     <>
       <span onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 9 }} />
@@ -895,10 +893,25 @@ function ColMenu({ t, cat, stats, onStats, onRename, onDelete, onClose, dividerO
         </button>
         <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 10 }}>
           <input value={name} onChange={(e) => setName(e.target.value)} autoFocus
-            onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) onRename(name.trim()); if (e.key === "Escape") onClose(); }}
+            onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") onClose(); }}
             style={{ ...inp, fontSize: 12, padding: 5 }} />
           <DatePick onPick={setName} title={t("noten.useDate")} />
         </div>
+        {topics.length > 0 && (
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 4 }}>{t("noten.colTopic")}</div>
+            <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={{ ...inp, fontSize: 12, padding: 5 }}>
+              <option value="">{t("noten.colTopicNone")}</option>
+              {topics.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
+            </select>
+          </div>
+        )}
+        {cat.topic_id && kartenAktiv && (
+          <button onClick={() => { onNachhol(cat); onClose(); }}
+            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 10, padding: "7px 9px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "#b8860b", cursor: "pointer" }}>
+            💡 {t("noten.nachhol")}
+          </button>
+        )}
         {cat.source_session_id && (
           <Link to={`/cardvote/evaluation/${cat.source_session_id}`} onClick={onClose}
             style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 10, padding: "6px 8px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--accent)", textDecoration: "none", boxSizing: "border-box" }}>
@@ -922,7 +935,7 @@ function ColMenu({ t, cat, stats, onStats, onRename, onDelete, onClose, dividerO
           </button>
         )}
         <div style={{ display: "flex", gap: 6, justifyContent: "space-between", alignItems: "center" }}>
-          <button onClick={() => name.trim() && onRename(name.trim())} style={{ ...btnPrimary, padding: "5px 12px", fontSize: 12 }}>{t("common.save")}</button>
+          <button onClick={save} style={{ ...btnPrimary, padding: "5px 12px", fontSize: 12 }}>{t("common.save")}</button>
           <button onClick={onDelete} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
         </div>
       </div>

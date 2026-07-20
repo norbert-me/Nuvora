@@ -470,6 +470,10 @@ class GradeCategory(Base):
     # Herkunft der Spalte, damit das Notenbuch die Quelle kennzeichnet:
     # "cardvote" | "karten" | "codedetektiv" (leer = von Hand angelegt).
     source_kind: Mapped[str] = mapped_column(String(20), default="", server_default="")
+    # Thema der Spalte (z.B. eine Klassenarbeit deckt ein Thema ab). Optional,
+    # SET NULL. Grundlage fuer den Nachholbedarf: schwache SuS -> Karten des
+    # Themas wieder faellig setzen / Aufgaben vorschlagen.
+    topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     section: Mapped[Optional["GradeSection"]] = relationship(back_populates="categories")

@@ -203,6 +203,7 @@ def _ensure_columns(sync_conn):
         ("methods", "dauer", "INTEGER"),
         ("grade_categories", "source_session_id", "INTEGER"),
         ("grade_categories", "source_kind", "VARCHAR(20)"),
+        ("grade_categories", "topic_id", "INTEGER"),
         ("attendance", "period", "INTEGER"),
         ("calendar_entries", "method_id", "INTEGER"),
         ("calendar_entries", "period", "INTEGER"),
