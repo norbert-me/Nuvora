@@ -182,6 +182,30 @@ export function Tabs({ value, onChange, options, style }) {
 }
 
 // Reifegrad-Badge (alpha/beta) fuer Module. beta = blau, alpha = orange-Warnung.
+// Leerer Zustand: statt „keine Daten" ein Satz + optional ein erster-Schritt-
+// Knopf. Macht Listen selbsterklaerend.
+export function Empty({ title, hint, action, onAction }) {
+  return (
+    <div style={{ textAlign: "center", padding: "36px 20px", border: "1px dashed var(--border2)", borderRadius: 14, background: "var(--bg2)" }}>
+      <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: hint ? 6 : 0 }}>{title}</div>
+      {hint && <div style={{ fontSize: 13.5, color: "var(--text2)", marginBottom: action ? 16 : 0, maxWidth: 420, marginLeft: "auto", marginRight: "auto", lineHeight: 1.5 }}>{hint}</div>}
+      {action && onAction && <button onClick={onAction} style={btnPrimary}>{action}</button>}
+    </div>
+  );
+}
+
+// Skeleton-Platzhalter: graue, pulsierende Balken in Inhaltsform statt „lädt…".
+export function Skeleton({ rows = 3, height = 44, gap = 10 }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap }} aria-hidden="true">
+      <style>{"@keyframes nuvora-pulse{0%,100%{opacity:.55}50%{opacity:1}}"}</style>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} style={{ height, borderRadius: 10, background: "var(--bg3)", border: "1px solid var(--border)", animation: "nuvora-pulse 1.2s ease-in-out infinite", animationDelay: `${i * 0.1}s` }} />
+      ))}
+    </div>
+  );
+}
+
 export function StageBadge({ stage, title }) {
   if (!stage || stage === "stable") return null;
   const beta = stage === "beta";

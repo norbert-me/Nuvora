@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "../i18n/index.jsx";
 import { askPrompt, askConfirm } from "../core/dialog.jsx";
-import { pageTitle, pageIntro, btnPrimary, btnSecondary, selectStyle, chipStyle, Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, Toggle } from "../components/Icons.jsx";
+import { pageTitle, pageIntro, btnPrimary, btnSecondary, selectStyle, chipStyle, Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, Toggle, Empty } from "../components/Icons.jsx";
 
 const API = "/api";
 const editLabel = { fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text3)", marginBottom: 6 };
@@ -87,6 +87,7 @@ export default function Kurse() {
         </div>
       )}
 
+      {kurse.length === 0 && <Empty title={t("kurse.emptyTitle")} hint={t("kurse.emptyHint")} />}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {kurse.map((k) => (
           <div key={k.id} style={cardStyle}>
