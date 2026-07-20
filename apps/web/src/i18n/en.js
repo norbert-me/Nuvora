@@ -133,6 +133,8 @@ export default {
   "kurse.newPlaceholder": "New course, e.g. 7.5",
   "kurse.add": "Create course",
   "kurse.empty": "No class in this course yet.",
+  "kurse.niveauToggle": "Use E/G levels in this course",
+  "kurse.niveauNoStudents": "No students in the course yet.",
   "kurse.addClass": "Add class",
   "kurse.delConfirm": "Delete course \"{{name}}\"? Its classes get ungrouped (restorable for 30 days).",
   "kurse.purgeConfirm": "Delete course permanently?",

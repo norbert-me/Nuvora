@@ -133,6 +133,8 @@ export default {
   "kurse.newPlaceholder": "Neuer Kurs, z.B. 7.5",
   "kurse.add": "Kurs anlegen",
   "kurse.empty": "Noch keine Klasse in diesem Kurs.",
+  "kurse.niveauToggle": "E-/G-Niveau in diesem Kurs nutzen",
+  "kurse.niveauNoStudents": "Noch keine Schüler im Kurs.",
   "kurse.addClass": "Klasse hinzufügen",
   "kurse.delConfirm": "Kurs „{{name}}“ löschen? Die Klassen werden entgruppiert (30 Tage wiederherstellbar).",
   "kurse.purgeConfirm": "Kurs endgültig löschen?",

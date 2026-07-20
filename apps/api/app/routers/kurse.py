@@ -8,7 +8,7 @@ Mitgliedschaft ist many-to-many (Tabelle kurs_tags): eine Klasse kann in
 mehreren Kursen sein. Alle Mitglieder eines Kurses teilen — es gibt keinen
 Unterschied „Sharing vs. Tag" mehr.
 """
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
 
 from ..database import get_db
-from ..models import Kurs, KursTag, SchoolClass, User
+from ..models import Kurs, KursTag, SchoolClass, Student, User
 from .auth import get_current_user
 
 router = APIRouter(prefix="/api/kurse", tags=["kurse"])
@@ -26,6 +26,12 @@ router = APIRouter(prefix="/api/kurse", tags=["kurse"])
 
 class KursIn(BaseModel):
     name: str
+    niveau_aktiv: Optional[bool] = None
+
+
+class NiveauIn(BaseModel):
+    name: str            # Person (Anzeigename, kursweit eindeutig)
+    niveau: str = ""     # "" | "E" | "G"
 
 
 class ClassRef(BaseModel):
@@ -37,6 +43,7 @@ class KursOut(BaseModel):
     id: int
     name: str
     classes: List[ClassRef] = []
+    niveau_aktiv: bool = False
 
 
 async def _owned_kurs(db, user, kurs_id) -> Kurs:
@@ -101,14 +108,14 @@ async def list_kurse(user: User = Depends(get_current_user), db: AsyncSession = 
     kurse = (await db.execute(select(Kurs).where(
         Kurs.owner_id == user.id, Kurs.deleted_at.is_(None)).order_by(Kurs.name))).scalars().all()
     by = await _classes_by_kurs(db, user, kurse)
-    return [KursOut(id=k.id, name=k.name, classes=by.get(k.id, [])) for k in kurse]
+    return [KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv) for k in kurse]
 
 
 @router.get("/trash", response_model=List[KursOut])
 async def list_kurs_trash(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     kurse = (await db.execute(select(Kurs).where(
         Kurs.owner_id == user.id, Kurs.deleted_at.is_not(None)).order_by(Kurs.deleted_at.desc()))).scalars().all()
-    return [KursOut(id=k.id, name=k.name, classes=[]) for k in kurse]
+    return [KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv) for k in kurse]
 
 
 @router.post("", response_model=KursOut, status_code=201)
@@ -120,7 +127,7 @@ async def create_kurs(body: KursIn, user: User = Depends(get_current_user), db: 
     db.add(k)
     await db.commit()
     await db.refresh(k)
-    return KursOut(id=k.id, name=k.name, classes=[])
+    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv)
 
 
 @router.put("/{kurs_id}", response_model=KursOut)
@@ -129,8 +136,10 @@ async def rename_kurs(kurs_id: int, body: KursIn, user: User = Depends(get_curre
     name = (body.name or "").strip()
     if name:
         k.name = name[:100]
+    if body.niveau_aktiv is not None:
+        k.niveau_aktiv = bool(body.niveau_aktiv)
     await db.commit()
-    return KursOut(id=k.id, name=k.name, classes=[])
+    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv)
 
 
 @router.post("/{kurs_id}/classes/{class_id}", status_code=204)
@@ -149,6 +158,48 @@ async def remove_member(kurs_id: int, class_id: int, user: User = Depends(get_cu
     """Klasse aus diesem Kurs entfernen (bleibt in ihren anderen Kursen)."""
     await _owned_kurs(db, user, kurs_id)
     await db.execute(delete(KursTag).where(KursTag.kurs_id == kurs_id, KursTag.class_id == class_id))
+    await db.commit()
+
+
+# ─── E-/G-Niveau (pro Kurs gepflegt, betrifft die Person) ───
+
+@router.get("/{kurs_id}/students")
+async def kurs_students(kurs_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """SuS des Kurses (per Name dedupliziert) mit ihrem E/G-Niveau. E/G ist eine
+    Eigenschaft der Person, nicht der Fach-Klasse — darum hier gepflegt."""
+    await _owned_kurs(db, user, kurs_id)
+    members = list(await member_class_ids(db, [kurs_id]))
+    if not members:
+        return []
+    studs = (await db.execute(select(Student).where(Student.class_id.in_(members)).order_by(Student.card_id, Student.id))).scalars().all()
+    out = {}
+    for s in studs:
+        n = s.name.strip()
+        if not n:
+            continue
+        if n not in out:
+            out[n] = {"name": n, "niveau": s.niveau or ""}
+        elif not out[n]["niveau"] and s.niveau:
+            out[n]["niveau"] = s.niveau
+    return list(out.values())
+
+
+@router.put("/{kurs_id}/niveau", status_code=204)
+async def set_niveau(kurs_id: int, body: NiveauIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """E/G einer Person im Kurs setzen — wirkt auf ALLE ihre Fach-Klassen-Zeilen
+    (gleicher Name), damit z.B. Karten je Niveau überall greifen."""
+    await _owned_kurs(db, user, kurs_id)
+    niveau = body.niveau if body.niveau in ("E", "G") else ""
+    name = (body.name or "").strip()
+    if not name:
+        raise HTTPException(400, "Name fehlt")
+    members = list(await member_class_ids(db, [kurs_id]))
+    if not members:
+        return
+    studs = (await db.execute(select(Student).where(Student.class_id.in_(members)))).scalars().all()
+    for s in studs:
+        if s.name.strip() == name:
+            s.niveau = niveau
     await db.commit()
 
 
@@ -181,7 +232,7 @@ async def restore_kurs(kurs_id: int, user: User = Depends(get_current_user), db:
     k.deleted_members = None
     await db.commit()
     by = await _classes_by_kurs(db, user, [k])
-    return KursOut(id=k.id, name=k.name, classes=by.get(k.id, []))
+    return KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv)
 
 
 @router.delete("/{kurs_id}/purge", status_code=204)

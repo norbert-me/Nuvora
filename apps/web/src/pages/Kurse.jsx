@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "../i18n/index.jsx";
 import { askPrompt, askConfirm } from "../core/dialog.jsx";
-import { pageTitle, pageIntro, btnPrimary, btnSecondary, selectStyle, chipStyle, Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle } from "../components/Icons.jsx";
+import { pageTitle, pageIntro, btnPrimary, btnSecondary, selectStyle, chipStyle, Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, Toggle } from "../components/Icons.jsx";
 
 const API = "/api";
 
@@ -31,6 +31,10 @@ export default function Kurse() {
     const name = await askPrompt(t("kurse.renamePrompt"), { initial: k.name });
     if (name == null || !name.trim()) return;
     await fetch(`${API}/kurse/${k.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim() }) }).catch(() => {});
+    load();
+  };
+  const setNiveauAktiv = async (k, val) => {
+    await fetch(`${API}/kurse/${k.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: k.name, niveau_aktiv: val }) }).catch(() => {});
     load();
   };
   const addMember = async (kursId, classId) => { await fetch(`${API}/kurse/${kursId}/classes/${classId}`, { method: "POST" }).catch(() => {}); load(); };
@@ -105,9 +109,45 @@ export default function Kurse() {
                 </select>
               )}
             </div>
+            {k.classes.length > 0 && (
+              <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+                <Toggle checked={!!k.niveau_aktiv} onChange={(v) => setNiveauAktiv(k, v)} label={t("kurse.niveauToggle")} />
+                {k.niveau_aktiv && <NiveauPanel kursId={k.id} t={t} />}
+              </div>
+            )}
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// E/G je Person im Kurs. Setzt das Niveau kursweit (alle Fach-Klassen-Zeilen der
+// Person), damit z.B. die Karteikarten-Niveaustapel überall greifen.
+function NiveauPanel({ kursId, t }) {
+  const [studs, setStuds] = useState(null);
+  useEffect(() => {
+    fetch(`${API}/kurse/${kursId}/students`).then((r) => (r.ok ? r.json() : [])).then((d) => setStuds(Array.isArray(d) ? d : [])).catch(() => setStuds([]));
+  }, [kursId]);
+  const setNiveau = async (name, niveau) => {
+    setStuds((prev) => prev.map((s) => (s.name === name ? { ...s, niveau } : s)));
+    await fetch(`${API}/kurse/${kursId}/niveau`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, niveau }) }).catch(() => {});
+  };
+  if (!studs) return null;
+  if (studs.length === 0) return <p style={{ fontSize: 12.5, color: "var(--text3)", marginTop: 8 }}>{t("kurse.niveauNoStudents")}</p>;
+  return (
+    <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6 }}>
+      {studs.map((s) => (
+        <div key={s.name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+          <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
+          <select value={s.niveau || ""} onChange={(e) => setNiveau(s.name, e.target.value)}
+            style={{ ...selectStyle, fontSize: 12.5, padding: "4px 24px 4px 8px" }}>
+            <option value="">–</option>
+            <option value="E">{t("classes.eCourse")}</option>
+            <option value="G">{t("classes.gCourse")}</option>
+          </select>
+        </div>
+      ))}
     </div>
   );
 }

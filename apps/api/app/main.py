@@ -159,6 +159,7 @@ def _ensure_columns(sync_conn):
         ("questions", "owner_id", "INTEGER"),
         ("users", "modules_initialized", "BOOLEAN DEFAULT false NOT NULL"),
         ("users", "methoden_seeded", "BOOLEAN DEFAULT false NOT NULL"),
+        ("kurse", "niveau_aktiv", "BOOLEAN DEFAULT false NOT NULL"),
         ("questions", "topic_id", "INTEGER"),
         ("students", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
         ("students", "foerder", "JSON"),

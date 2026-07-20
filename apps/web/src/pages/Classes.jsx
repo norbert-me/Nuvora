@@ -240,15 +240,8 @@ export default function Classes() {
               <input value={s.name} onChange={(e) => updateStudent(idx, e.target.value)} placeholder={t("common.name")}
                 autoComplete="off" name={`stud-${idx}`} data-lpignore="true"
                 style={{ flex: 1, padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)" }} />
-              <select
-                value={s.niveau || ""} onChange={(e) => setStudentField(idx, "niveau", e.target.value)}
-                title={t("classes.courseTitle")}
-                style={{ width: 88, flexShrink: 0, padding: 7, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 13, background: "var(--bg)", color: "var(--text)" }}
-              >
-                <option value="">E/G</option>
-                <option value="E">{t("classes.eCourse")}</option>
-                <option value="G">{t("classes.gCourse")}</option>
-              </select>
+              {/* E/G wird nicht mehr hier gepflegt, sondern im Kurs (betrifft die
+                  Person, nicht die Fach-Klasse) — siehe Kurse.jsx. */}
               <button
                 type="button" onClick={() => setDetailsFor(detailsFor === idx ? null : idx)}
                 title={t("classes.detailsTitle")}

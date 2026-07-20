@@ -154,6 +154,10 @@ class Kurs(Base):
     # merkt sich die (Sharing-)Klassen beim Löschen, damit Restore sie neu gruppiert.
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     deleted_members: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # Nutzt dieser Kurs E-/G-Niveaus? Nur dann zeigt die UI die E/G-Auswahl —
+    # bei Kursen ohne Niveau-Differenzierung nervt sie sonst. E/G wird im Kurs
+    # gepflegt (nicht je Fach-Klasse), weil es die Person betrifft.
+    niveau_aktiv: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
