@@ -15,10 +15,14 @@ export default function PublishModal({ name, onPublish, onClose }) {
   const [state, setState] = useState(""); // "" | "busy" | "ok" | "error"
 
   const submit = async () => {
+    if (state === "busy") return;
     setState("busy");
     const r = await onPublish(desc.trim());
     const ok = r === true || (r && r.ok);
-    if (ok) { setState("ok"); setTimeout(onClose, 1200); }
+    // Server hat bestaetigt → Dialog sofort schliessen. Kein „ok"-Zwischenzustand
+    // mit Timer mehr: der konnte bei einem Re-Render kurz verschwinden und wieder
+    // aufpoppen (Flackern). Erfolg meldet der Marktplatz beim naechsten Laden.
+    if (ok) onClose();
     else setState("error");
   };
 
