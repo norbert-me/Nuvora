@@ -456,7 +456,7 @@ export default function Session() {
                 );
               };
               const groups = kurse.map((k) => {
-                const ids = new Set((k.classes || []).filter((c) => c.shared).map((c) => c.id));
+                const ids = new Set((k.classes || []).map((c) => c.id));
                 return { name: k.name, list: classes.filter((c) => ids.has(c.id)) };
               }).filter((g) => g.list.length);
               const grouped = new Set(groups.flatMap((g) => g.list.map((c) => c.id)));
