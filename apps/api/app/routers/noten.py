@@ -147,11 +147,16 @@ def _sec_kurs_where(user, class_id, kurs_id):
 @router.get("/classes/{class_id}/sections", response_model=List[SectionOut])
 async def list_sections(class_id: int, term: str = "1", kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
+    # term="all": alle Halbjahre (fuer die Import-Dialoge, die kein Halbjahr kennen —
+    # sonst waeren im 2. Halbjahr keine Abschnitte waehlbar).
+    where = [*_sec_kurs_where(user, class_id, kurs_id)]
+    if term != "all":
+        where.append(GradeSection.term == term)
     r = await db.execute(
         select(GradeSection)
-        .where(*_sec_kurs_where(user, class_id, kurs_id), GradeSection.term == term)
+        .where(*where)
         .options(selectinload(GradeSection.categories))
-        .order_by(GradeSection.position, GradeSection.id)
+        .order_by(GradeSection.term, GradeSection.position, GradeSection.id)
     )
     return r.scalars().all()
 

@@ -241,7 +241,10 @@ function NotenBrueckeModal({ t, classId, kursId, progress, scale, onClose }) {
   const [name, setName] = useState(`${t("karten.masteryColumn")} ${new Date().toLocaleDateString()}`);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const kq = kursId != null ? `?kurs_id=${kursId}` : "";
+  // term=all: Karten hat keinen Halbjahr-Selektor — sonst waeren im 2. Halbjahr
+  // keine Abschnitte waehlbar. Das Halbjahr steht als Label an der Option.
+  const kq = `?term=all${kursId != null ? `&kurs_id=${kursId}` : ""}`;
+  const secLabel = (s) => `${s.term === "2" ? "2. Hj · " : "1. Hj · "}${s.name}`;
 
   useEffect(() => {
     fetch(`/api/noten/classes/${classId}/sections${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => {
@@ -279,7 +282,7 @@ function NotenBrueckeModal({ t, classId, kursId, progress, scale, onClose }) {
         ) : (<>
           <div style={{ fontSize: 12.5, color: "var(--text2)", margin: "0 0 5px" }}>{t("karten.masterySection")}</div>
           <select value={sectionId} onChange={(e) => setSectionId(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
-            {(sections || []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {(sections || []).map((s) => <option key={s.id} value={s.id}>{secLabel(s)}</option>)}
           </select>
           <div style={{ fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" }}>{t("noten.columnName")}</div>
           <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, width: "100%" }} />
