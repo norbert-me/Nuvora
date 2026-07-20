@@ -725,6 +725,7 @@ export default {
   "kalender.end": "Fin",
   "kalender.addPeriod": "Añadir hora",
   "kalender.removePeriod": "Quitar última hora",
+  "kalender.kw": "Sem.",
   "kalender.jumpToDay": "Ir al día",
   "kalender.today": "Hoy",
   "kalender.todayView": "Hoy",

@@ -225,13 +225,21 @@ export default function Kalender() {
             <button onClick={() => move(-1)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 15 }} title="◀">‹</button>
             <button onClick={() => setCursor(startOfDay(new Date()))} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>{t("kalender.today")}</button>
             <button onClick={() => move(1)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 15 }} title="▶">›</button>
-            {/* Direkt springen — Tag per Datum, Woche per KW, Monat per Monat. */}
+            {/* Direkt springen — Tag per Datum, Woche per KW-Auswahl, Monat per
+                Monats-Auswahl (saubere Dropdowns statt der nativen Wochen-/
+                Monatsfelder, die je Browser unterschiedlich und sperrig sind). */}
             {view === "month" ? (
-              <input type="month" value={monthVal(cursor)} onChange={(e) => e.target.value && setCursor(monthValToDate(e.target.value))}
-                style={{ ...inputStyle, padding: "5px 8px", fontSize: 13 }} title={t("kalender.jumpToDay")} />
+              <select value={cursor.getMonth()} onChange={(e) => setCursor(startOfDay(new Date(cursor.getFullYear(), Number(e.target.value), 1)))}
+                style={{ ...selectStyle, padding: "5px 24px 5px 8px", fontSize: 13 }} title={t("kalender.jumpToDay")}>
+                {Array.from({ length: 12 }, (_, m) => (
+                  <option key={m} value={m}>{new Date(2000, m, 1).toLocaleDateString(undefined, { month: "long" })}</option>
+                ))}
+              </select>
             ) : view === "week" ? (
-              <input type="week" value={weekVal(cursor)} onChange={(e) => e.target.value && setCursor(weekValToDate(e.target.value))}
-                style={{ ...inputStyle, padding: "5px 8px", fontSize: 13 }} title={t("kalender.jumpToDay")} />
+              <select value={isoWeek(cursor).week} onChange={(e) => setCursor(weekValToDate(`${isoWeek(cursor).year}-W${String(e.target.value).padStart(2, "0")}`))}
+                style={{ ...selectStyle, padding: "5px 24px 5px 8px", fontSize: 13 }} title={t("kalender.jumpToDay")}>
+                {Array.from({ length: 53 }, (_, i) => i + 1).map((w) => <option key={w} value={w}>{t("kalender.kw")} {w}</option>)}
+              </select>
             ) : (
               <input type="date" value={ymd(cursor)} onChange={(e) => e.target.value && setCursor(startOfDay(new Date(e.target.value + "T00:00:00")))}
                 style={{ ...inputStyle, padding: "5px 8px", fontSize: 13 }} title={t("kalender.jumpToDay")} />

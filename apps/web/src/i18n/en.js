@@ -725,6 +725,7 @@ export default {
   "kalender.end": "End",
   "kalender.addPeriod": "Add period",
   "kalender.removePeriod": "Remove last period",
+  "kalender.kw": "Week",
   "kalender.jumpToDay": "Jump to day",
   "kalender.today": "Today",
   "kalender.todayView": "Today",
