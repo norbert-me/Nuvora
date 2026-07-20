@@ -118,7 +118,11 @@ export default function Kalender() {
     const res = await fetch(`${API}/breaks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }).catch(() => null);
     if (res && res.ok) loadBreaks();
   };
-  const delBreak = async (id) => { await fetch(`${API}/breaks/${id}`, { method: "DELETE" }).catch(() => {}); loadBreaks(); };
+  const delBreak = async (id) => {
+    const r = await fetch(`${API}/breaks/${id}`, { method: "DELETE" }).catch(() => null);
+    if (r && (r.ok || r.status === 204)) setBreaks((prev) => prev.filter((b) => b.id !== id));
+    else loadBreaks();
+  };
 
   const exportKal = async () => {
     const r = await fetch(`${API}/export`).catch(() => null);
@@ -171,7 +175,13 @@ export default function Kalender() {
     }).catch(() => null);
     if (res && res.ok) { setEditing(null); load(); }
   };
-  const remove = async (id) => { await fetch(`${API}/entries/${id}`, { method: "DELETE" }).catch(() => {}); setEditing(null); load(); };
+  const remove = async (id) => {
+    const r = await fetch(`${API}/entries/${id}`, { method: "DELETE" }).catch(() => null);
+    setEditing(null);
+    // Server bestätigt → sofort lokal entfernen, kein erneutes Laden.
+    if (r && (r.ok || r.status === 204)) setEntries((prev) => prev.filter((e) => e.id !== id));
+    else load();
+  };
 
   const className = (id) => (classes.find((c) => c.id === id) || {}).name || "";
   const classColor = (id) => (classes.find((c) => c.id === id) || {}).color || "#2563eb";
@@ -786,7 +796,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
             <div style={{ display: "flex", gap: 8, marginTop: 20, alignItems: "center" }}>
               <button onClick={() => setEdit(true)} style={btnPrimary}>{t("common.edit")}</button>
               <button onClick={onClose} style={btnSecondary}>{t("common.close")}</button>
-              {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
+              {entry.id && <button onClick={() => onDelete(entry.id)} style={{ ...btnSecondary, marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, color: C.danger }} title={t("common.delete")}><Icon d={ICONS.trash} size={17} color={C.danger} />{t("common.delete")}</button>}
             </div>
           </div>
         )}
@@ -884,7 +894,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
           <button onClick={() => onSave({ ...entry, title, notes, class_id: classId ? Number(classId) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
-          {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
+          {entry.id && <button onClick={() => onDelete(entry.id)} style={{ ...btnSecondary, marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, color: C.danger }} title={t("common.delete")}><Icon d={ICONS.trash} size={17} color={C.danger} />{t("common.delete")}</button>}
         </div>
         </>)}
         </div>
