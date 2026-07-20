@@ -515,6 +515,8 @@ export default {
   "common.rename": "Umbenennen",
   "common.abort": "Abbrechen",
   "common.ok": "OK",
+  "outbox.pending": "{{n}} Änderung(en) warten auf Sync",
+  "outbox.synced": "synchronisiert",
   "common.options": "Optionen",
   "common.notWork": "Das hat nicht geklappt",
   "cards.title": "Karten & Auswertung",

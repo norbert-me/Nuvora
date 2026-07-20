@@ -7,6 +7,7 @@ import "@fontsource/inter/600.css";
 import "@fontsource/inter/700.css";
 import "@fontsource/inter/800.css";
 import { LanguageProvider, useLanguage, LANGUAGES } from "./i18n/index.jsx";
+import { enqueue, isQueueable, flush as flushOutbox } from "./core/outbox.js";
 
 // Global fetch interceptor: add auth token to all /api/ requests
 const _origFetch = window.fetch;
@@ -31,12 +32,32 @@ window.fetch = function(input, init) {
       location.reload();
     }
     return res;
-  }).catch((err) => {
-    // Netzwerkfehler (Server nicht erreichbar) → offline melden, Fehler weiterreichen
+  }).catch(async (err) => {
+    // Netzwerkfehler (Server nicht erreichbar) → offline melden.
     if (isApi) window.dispatchEvent(new CustomEvent("cardvote:offline"));
+    // Offline-Outbox (Phase 1): gefahrlose Writes puffern statt zu verlieren.
+    // Der Aufrufer bekommt eine synthetische OK-Antwort und macht optimistisch
+    // weiter; bei Verbindung wird der Eintrag automatisch nachgespielt.
+    const method = (init && init.method) || "GET";
+    let bodyObj = null;
+    try { bodyObj = init && typeof init.body === "string" ? JSON.parse(init.body) : null; } catch { /* kein JSON */ }
+    if (isApi && isQueueable(method, url, bodyObj)) {
+      await enqueue(method, url, typeof init.body === "string" ? init.body : null);
+      return new Response(JSON.stringify({ queued: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
     throw err;
   });
 };
+
+// Auto-Sync der Outbox: bei echtem Reconnect (window online), beim Start (Reste
+// aus der letzten Sitzung) und beim Übergang offline→online, der über die
+// API-Aufrufe erkannt wird. flush nutzt den Original-fetch (keine Endlosschleife).
+let _wasOffline = false;
+const _flush = () => flushOutbox(_origFetch);
+window.addEventListener("online", _flush);
+window.addEventListener("cardvote:offline", () => { _wasOffline = true; });
+window.addEventListener("cardvote:online", () => { if (_wasOffline) { _wasOffline = false; _flush(); } });
+setTimeout(_flush, 2000);
 import { BrowserRouter, Routes, Route, NavLink, Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import Dashboard from "./pages/Dashboard.jsx";
 import Session from "./pages/Session.jsx";
@@ -76,6 +97,7 @@ import Orga from "./pages/Orga.jsx";
 import { useModules } from "./core/modules.js";
 import { DialogHost } from "./core/dialog.jsx";
 import { UndoHost } from "./core/undo.jsx";
+import { OutboxHost } from "./core/OutboxHost.jsx";
 import { btnPrimary, btnSecondary } from "./components/Icons.jsx";
 // Navigation ist modulbezogen: die Shell zeigt die Punkte des Moduls, in dem
 // man gerade ist. Ausserhalb eines Moduls navigiert Nuvora selbst.
@@ -810,6 +832,7 @@ function App() {
         <ConnectionMonitor />
         <DialogHost />
         <UndoHost />
+        <OutboxHost />
         <Routes>
           {/* Kartenlernen der Schueler: oeffentlich, ohne Login, ueber Token. */}
           <Route path="/lernen/:token" element={<Lernen />} />

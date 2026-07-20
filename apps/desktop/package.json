@@ -2,6 +2,7 @@
   "name": "nuvora-desktop",
   "version": "0.1.0",
   "description": "Nuvora als native Mac-App (Phase 0: Fenster auf den Server, offline lesbar via Service-Worker).",
+  "author": "Nuvora",
   "private": true,
   "main": "main.js",
   "scripts": {
