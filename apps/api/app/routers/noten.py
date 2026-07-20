@@ -23,7 +23,7 @@ from sqlalchemy.orm import selectinload
 from ..database import get_db
 from ..models import (
     GradeCategory, GradeEntry, GradeSection, GradeOverride, QuartalDivider, SchoolClass,
-    Session as TestSession, Student, User,
+    Session as TestSession, Student, User, CodeSession,
 )
 from .auth import get_current_user, rate_limit
 from .modules import is_active
@@ -804,6 +804,117 @@ async def import_grades(body: ImportGradesBody, user: User = Depends(require_mod
         angelegt += 1
     await db.commit()
     return {"imported": angelegt}
+
+
+# ─── Code-Detektiv-Session als Notenspalte ───
+# CD ist klassenlos: Schueler treten oeffentlich mit einem frei getippten Namen
+# bei. Uebernahme matcht diesen Namen gegen die SuS des Kurses (normalisiert).
+# Nicht zuordenbare Namen werden gemeldet, nicht geraten.
+
+_DEFAULT_SCALE = {"1": 87, "2": 73, "3": 59, "4": 45, "5": 20, "6": 0}
+
+
+def _grade_from_pct(pct: float, scale: dict) -> float:
+    """Prozent -> Note, identisch zur Frontend-Skala (core/grades.js)."""
+    s = {int(k): v for k, v in (scale or _DEFAULT_SCALE).items()}
+    ranges = [(1, s[1], 100), (2, s[2], s[1]), (3, s[3], s[2]), (4, s[4], s[3]), (5, s[5], s[4])]
+    for grade, lower, upper in ranges:
+        if pct >= lower:
+            span = upper - lower
+            if span <= 0:
+                return float(grade)
+            return round(grade + (upper - pct) / span, 1)
+    return 6.0
+
+
+def _norm(name: str) -> str:
+    return " ".join((name or "").strip().lower().split())
+
+
+@router.get("/code-sessions")
+async def list_code_sessions(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Beendete Code-Detektiv-Sessions der Lehrkraft (Quelle fuer eine Notenspalte)."""
+    rows = (await db.execute(
+        select(CodeSession).where(CodeSession.owner_id == user.id, CodeSession.ended.is_(True))
+        .order_by(CodeSession.created_at.desc())
+    )).scalars().all()
+    out = []
+    for s in rows:
+        names = {r.get("playerName") for r in (s.results or []) if r.get("playerName")}
+        out.append({"id": s.id, "code": s.code, "puzzles": len(s.puzzles or []),
+                    "players": len(names), "created_at": s.created_at})
+    return out
+
+
+class ImportCodeBody(BaseModel):
+    code_session_id: int
+    class_id: int
+    kurs_id: Optional[int] = None
+    section_id: int
+    column_name: str
+
+    @field_validator("column_name")
+    @classmethod
+    def name_ok(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("Spaltenname darf nicht leer sein")
+        return v
+
+
+@router.post("/import-code-session", status_code=201)
+async def import_code_session(body: ImportCodeBody, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Aus einer CD-Session eine Notenspalte: je Spieler geloeste Raetsel / Anzahl
+    -> Prozent -> Note (Skala der Lehrkraft). Name gegen den Kurs gematcht."""
+    rate_limit("noten_import", f"u{user.id}", 30, 60, "Zu viele Übernahmen in kurzer Zeit. Bitte kurz warten.")
+    sess = await db.get(CodeSession, body.code_session_id)
+    if not sess or sess.owner_id != user.id:
+        raise HTTPException(404, "Session nicht gefunden")
+    await _owned_class(db, user, body.class_id)
+    sec = await _owned_section(db, user, body.section_id)
+    if sec.class_id != body.class_id:
+        raise HTTPException(400, "Abschnitt und Klasse passen nicht zusammen")
+    total = len(sess.puzzles or [])
+    if total == 0:
+        raise HTTPException(400, "Die Session hat keine Rätsel")
+
+    # Je Spieler die Menge geloester Raetsel (distinct puzzleId mit solved).
+    solved: dict[str, set] = {}
+    for r in (sess.results or []):
+        pn = r.get("playerName")
+        if not pn:
+            continue
+        solved.setdefault(pn, set())
+        if r.get("solved"):
+            solved[pn].add(r.get("puzzleId"))
+
+    roster = await _kurs_roster(db, user, body.class_id)
+    by_name = {}
+    for st in roster:
+        by_name.setdefault(_norm(st.name), st.id)
+
+    scale = user.grade_scale or _DEFAULT_SCALE
+    pos = len((await db.execute(select(GradeCategory).where(GradeCategory.section_id == sec.id))).scalars().all())
+    cat = GradeCategory(name=body.column_name, section_id=sec.id, class_id=sec.class_id, owner_id=user.id, position=pos)
+    db.add(cat)
+    await db.flush()
+
+    angelegt, unmatched = 0, []
+    for pn, done in solved.items():
+        sid = by_name.get(_norm(pn))
+        if not sid:
+            unmatched.append(pn)
+            continue
+        pct = (len(done) / total) * 100
+        db.add(GradeEntry(category_id=cat.id, student_id=sid, kind="grade",
+                          value=_grade_from_pct(pct, scale), note="Aus Code-Detektiv (Vorschlag)"))
+        angelegt += 1
+    if angelegt == 0:
+        # Keine einzige Zuordnung -> leere Spalte waere nur Ballast.
+        await db.rollback()
+        raise HTTPException(400, "Kein Spielername passte zu einem Schüler dieses Kurses")
+    await db.commit()
+    return {"imported": angelegt, "unmatched": sorted(set(unmatched))}
 
 
 # ─── Export / Import je Klasse+Halbjahr (JSON-Sicherung) ───

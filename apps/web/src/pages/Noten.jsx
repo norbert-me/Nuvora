@@ -14,6 +14,7 @@ import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, modalOverlay, modalPanel, Empty, Skeleton } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
+import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api/noten";
@@ -45,6 +46,9 @@ export default function Noten() {
   const [beobFuer, setBeobFuer] = useState(null);
   const [infoFuer, setInfoFuer] = useState(null);
   const [term, setTerm] = useState("1");
+  const { modules } = useModules();
+  const cdAktiv = modules.find((m) => m.key === "codedetektiv")?.active ?? false;
+  const [cdDialog, setCdDialog] = useState(false);
   // Wie mehrere Einzelnoten zusammengefasst werden: Mittel oder Median. Merkt
   // sich die Wahl pro Browser. Die Abschnitts-Gewichtung bleibt unberuehrt.
   const [agg, setAgg] = useState(() => { try { return localStorage.getItem("noten_agg") === "median" ? "median" : "mean"; } catch { return "mean"; } });
@@ -295,6 +299,7 @@ export default function Noten() {
             <label style={{ ...btnSecondary, cursor: "pointer" }}>{t("noten.import")}
               <input type="file" accept=".json,application/json" style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) doImport(e.target.files[0]); e.target.value = ""; }} />
             </label>
+            {cdAktiv && sections.length > 0 && <button onClick={() => setCdDialog(true)} style={btnSecondary} title={t("noten.fromCdHint")}>{t("noten.fromCd")}</button>}
             <button onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}
               className="icon-btn"
               style={{ ...iconBtn, width: 36, height: 36, border: "1px solid var(--border2)", borderRadius: 10 }}>
@@ -310,6 +315,13 @@ export default function Noten() {
         <Modal title={t("noten.addSection")} onClose={() => setNeuAbschnitt(false)}>
           <SectionForm t={t} onCancel={() => setNeuAbschnitt(false)}
             onSave={async (b) => { if (await call(() => fetch(`${API}/classes/${classId}/sections?term=${term}${kp}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...b, position: sections.length }) }))) setNeuAbschnitt(false); }} />
+        </Modal>
+      )}
+
+      {cdDialog && (
+        <Modal title={t("noten.fromCd")} onClose={() => setCdDialog(false)}>
+          <CodeSessionImport t={t} classId={classId} kursId={kursId} sections={sections}
+            onClose={() => setCdDialog(false)} onDone={() => { setCdDialog(false); load(classId); }} />
         </Modal>
       )}
 
@@ -685,6 +697,80 @@ function SectionForm({ t, onSave, onCancel, initial }) {
       <input type="number" min={0} max={100} value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="%" style={{ width: 80, ...inp }} />
       <button onClick={() => name.trim() && onSave({ name: name.trim(), weight: Number(weight) || 0 })} style={btnPrimary}>{t("common.save")}</button>
       <button onClick={onCancel} style={btnSecondary}>{t("common.abort")}</button>
+    </div>
+  );
+}
+
+// Import einer Code-Detektiv-Session als Notenspalte: Session + Abschnitt waehlen,
+// der Server matcht die (frei getippten) Spielernamen gegen die SuS des Kurses und
+// rechnet geloeste Raetsel in eine Note. Nicht zuordenbare Namen werden gemeldet.
+function CodeSessionImport({ t, classId, kursId, sections, onClose, onDone }) {
+  const [list, setList] = useState(null);
+  const [sessionId, setSessionId] = useState("");
+  const [sectionId, setSectionId] = useState(sections[0] ? String(sections[0].id) : "");
+  const [name, setName] = useState(`Code-Detektiv ${new Date().toLocaleDateString()}`);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [unmatched, setUnmatched] = useState(null);
+
+  useEffect(() => {
+    fetch("/api/noten/code-sessions").then((r) => (r.ok ? r.json() : [])).then((d) => {
+      const l = Array.isArray(d) ? d : [];
+      setList(l);
+      if (l[0]) setSessionId(String(l[0].id));
+    }).catch(() => setList([]));
+  }, []);
+
+  const submit = async () => {
+    if (!sessionId) { setErr(t("noten.fromCdNoSession")); return; }
+    if (!sectionId || !name.trim()) { setErr(t("noten.columnName")); return; }
+    setBusy(true); setErr("");
+    const res = await fetch("/api/noten/import-code-session", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code_session_id: Number(sessionId), class_id: classId, kurs_id: kursId, section_id: Number(sectionId), column_name: name.trim() }),
+    }).catch(() => null);
+    setBusy(false);
+    if (res && res.ok) {
+      const b = await res.json().catch(() => ({}));
+      if ((b.unmatched || []).length) { setUnmatched(b.unmatched); return; }
+      onDone();
+    } else { const b = res ? await res.json().catch(() => ({})) : {}; setErr(typeof b.detail === "string" ? b.detail : t("common.notWork")); }
+  };
+
+  if (unmatched) return (
+    <div>
+      <p style={{ fontSize: 13.5, color: "var(--text2)", marginBottom: 10 }}>{t("noten.fromCdDone", { n: unmatched.length })}</p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+        {unmatched.map((n) => <span key={n} style={{ fontSize: 12.5, padding: "3px 9px", borderRadius: 980, background: "var(--bg2)", color: "var(--text3)" }}>{n}</span>)}
+      </div>
+      <button onClick={onDone} style={btnPrimary}>{t("common.ok")}</button>
+    </div>
+  );
+
+  if (list === null) return <p style={{ fontSize: 13, color: "var(--text3)" }}>…</p>;
+  if (list.length === 0) return (
+    <div><p style={{ fontSize: 13.5, color: "var(--text2)" }}>{t("noten.fromCdEmpty")}</p>
+      <button onClick={onClose} style={{ ...btnSecondary, marginTop: 12 }}>{t("common.abort")}</button></div>
+  );
+
+  const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
+  return (
+    <div>
+      <div style={{ ...lbl, marginTop: 0 }}>{t("noten.fromCdSession")}</div>
+      <select value={sessionId} onChange={(e) => setSessionId(e.target.value)} style={inp}>
+        {list.map((s) => <option key={s.id} value={s.id}>{s.code} · {t("noten.fromCdMeta", { players: s.players, puzzles: s.puzzles })}</option>)}
+      </select>
+      <div style={lbl}>{t("karten.masterySection")}</div>
+      <select value={sectionId} onChange={(e) => setSectionId(e.target.value)} style={inp}>
+        {sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+      <div style={lbl}>{t("noten.columnName")}</div>
+      <input value={name} onChange={(e) => setName(e.target.value)} style={inp} />
+      {err && <p style={{ color: C.danger, fontSize: 12.5, marginTop: 10 }}>{err}</p>}
+      <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+        <button onClick={submit} disabled={busy} style={{ ...btnPrimary, opacity: busy ? 0.6 : 1 }}>{t("common.save")}</button>
+        <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
+      </div>
     </div>
   );
 }
