@@ -317,8 +317,9 @@ export default function Sitzplan() {
               const s = byId(seat.sid); if (!s) return null;
               const abs = aufruf ? abwesend[String(seat.sid)] : null;
               return (
-                <div key={seat.sid}
+                <div key={seat.sid} draggable={false}
                   onPointerDown={(e) => onSeatDown(e, seat)}
+                  onDragStart={(e) => e.preventDefault()}
                   style={{ position: "absolute", left: seat.x, top: seat.y, width: SEAT_W, minHeight: SEAT_H,
                     transform: `rotate(${seat.rot || 0}deg)`, transformOrigin: "center",
                     display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
