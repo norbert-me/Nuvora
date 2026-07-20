@@ -401,6 +401,21 @@ async def startup():
                 UPDATE grade_overrides o SET kurs_id = s.kurs_id
                 FROM single s WHERE o.class_id = s.class_id AND o.kurs_id IS NULL
             """))
+            # Ebenso Sitzplan + Orga-Checklisten: Bestand (kurs_id NULL) an den
+            # einzigen Kurs der Klasse hängen, sonst „verschwindet" er, sobald
+            # der Selektor den Kurs mitschickt. Karten haben ihre kurs_id schon
+            # beim Anlegen bekommen (cls.kurs_id).
+            for tbl in ("seating_plans", "orga_items", "card_decks"):
+                await db.execute(text(f"""
+                    WITH single AS (
+                      SELECT class_id, MIN(kurs_id) AS kurs_id FROM (
+                        SELECT class_id, kurs_id FROM kurs_tags
+                        UNION SELECT id AS class_id, kurs_id FROM school_classes WHERE kurs_id IS NOT NULL
+                      ) m GROUP BY class_id HAVING COUNT(DISTINCT kurs_id) = 1
+                    )
+                    UPDATE {tbl} x SET kurs_id = s.kurs_id
+                    FROM single s WHERE x.class_id = s.class_id AND x.kurs_id IS NULL
+                """))
             await db.commit()
         except Exception:
             pass

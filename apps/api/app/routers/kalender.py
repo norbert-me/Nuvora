@@ -472,7 +472,7 @@ def _parse_ics(text: str):
             elif k == "DTEND":
                 cur["end"] = val.strip()[:8]
             elif k == "SUMMARY":
-                cur["title"] = val.strip().replace("\\,", ",").replace("\;", ";").replace("\\n", " ")
+                cur["title"] = val.strip().replace("\\,", ",").replace(r"\;", ";").replace("\\n", " ")
     return events
 
 
