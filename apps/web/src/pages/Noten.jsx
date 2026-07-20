@@ -28,6 +28,8 @@ export default function Noten() {
   const { t } = useLanguage();
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
+  const [kursId, setKursId] = useState(null); // Noten hängen am Kurs (Fach)
+  const kp = kursId != null ? `&kurs_id=${kursId}` : "";
   const [students, setStudents] = useState([]);
   const [sections, setSections] = useState([]);
   const [entries, setEntries] = useState([]);
@@ -127,11 +129,11 @@ export default function Noten() {
     if (val === null) return;
     await call(() => fetch(`${API}/overrides`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ class_id: classId, student_id: studentId, section_id: sectionId, term, value: val }),
+      body: JSON.stringify({ class_id: classId, kurs_id: kursId, student_id: studentId, section_id: sectionId, term, value: val }),
     }));
   };
   const overrideReset = async (studentId, sectionId) => {
-    const q = new URLSearchParams({ class_id: classId, student_id: studentId, term });
+    const q = new URLSearchParams({ class_id: classId, student_id: studentId, term, ...(kursId != null ? { kurs_id: kursId } : {}) });
     if (sectionId != null) q.set("section_id", sectionId);
     await call(() => fetch(`${API}/overrides?${q}`, { method: "DELETE" }));
   };
@@ -152,30 +154,30 @@ export default function Noten() {
     if (!id) return;
     loadRoster(id);
     if (term === "year") {
-      const y = await fetch(`${API}/classes/${id}/year?agg=${agg}`).then((r) => (r.ok ? r.json() : { sections: [], rows: [] }));
+      const y = await fetch(`${API}/classes/${id}/year?agg=${agg}${kp}`).then((r) => (r.ok ? r.json() : { sections: [], rows: [] }));
       setYearData(y);
       return;
     }
     const [sec, ent, sum] = await Promise.all([
-      fetch(`${API}/classes/${id}/sections?term=${term}`).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API}/classes/${id}/entries`).then((r) => (r.ok ? r.json() : [])),
-      fetch(`${API}/classes/${id}/summary?term=${term}&agg=${agg}`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`${API}/classes/${id}/sections?term=${term}${kp}`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`${API}/classes/${id}/entries?x=1${kp}`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`${API}/classes/${id}/summary?term=${term}&agg=${agg}${kp}`).then((r) => (r.ok ? r.json() : [])),
     ]);
     setSections(sec); setEntries(ent); setSummary(sum);
-    fetch(`${API}/classes/${id}/dividers?term=${term}`).then((r) => (r.ok ? r.json() : [])).then((d) => setDividers(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch(`${API}/classes/${id}/dividers?term=${term}${kp}`).then((r) => (r.ok ? r.json() : [])).then((d) => setDividers(Array.isArray(d) ? d : [])).catch(() => {});
   };
   const toggleDivider = async (catId) => {
-    const r = await fetch(`${API}/classes/${classId}/dividers/toggle?term=${term}`, {
+    const r = await fetch(`${API}/classes/${classId}/dividers/toggle?term=${term}${kp}`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ after_category_id: catId }),
     }).catch(() => null);
     if (r && r.ok) setDividers(await r.json());
   };
-  useEffect(() => { if (classId) load(classId); }, [classId, classes, term, agg]);
+  useEffect(() => { if (classId) load(classId); }, [classId, kursId, classes, term, agg]);
   const setAggPersist = (m) => { setAgg(m); try { localStorage.setItem("noten_agg", m); } catch { /* egal */ } };
 
   const doExport = async () => {
     if (!classId) return;
-    const r = await fetch(`${API}/classes/${classId}/export?term=${term}`).catch(() => null);
+    const r = await fetch(`${API}/classes/${classId}/export?term=${term}${kp}`).catch(() => null);
     if (!r || !r.ok) return;
     const blob = await r.blob(); const cls = classes.find((c) => c.id === classId);
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
@@ -183,7 +185,7 @@ export default function Noten() {
   };
   const doZeugnis = async () => {
     if (!classId) return;
-    const r = await fetch(`${API}/classes/${classId}/zeugnis.pdf?term=${term}&agg=${agg}`).catch(() => null);
+    const r = await fetch(`${API}/classes/${classId}/zeugnis.pdf?term=${term}&agg=${agg}${kp}`).catch(() => null);
     if (!r || !r.ok) return;
     const blob = await r.blob(); const cls = classes.find((c) => c.id === classId);
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
@@ -194,7 +196,7 @@ export default function Noten() {
     setError("");
     try {
       const data = JSON.parse(await file.text());
-      const r = await fetch(`${API}/classes/${classId}/import?term=${term}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      const r = await fetch(`${API}/classes/${classId}/import?term=${term}${kp}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
       if (r.ok) load(classId); else setError(t("noten.importError"));
     } catch { setError(t("noten.importError")); }
   };
@@ -257,7 +259,7 @@ export default function Noten() {
         <h1 style={pageTitle}>{t("noten.title")}</h1>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
           {t("nav.classes")}
-          <KursKlasseSelect value={classId} onChange={setClassId} />
+          <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
         </label>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
           {t("noten.term")}
@@ -296,7 +298,7 @@ export default function Noten() {
       {neuAbschnitt && (
         <Modal title={t("noten.addSection")} onClose={() => setNeuAbschnitt(false)}>
           <SectionForm t={t} onCancel={() => setNeuAbschnitt(false)}
-            onSave={async (b) => { if (await call(() => fetch(`${API}/classes/${classId}/sections?term=${term}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...b, position: sections.length }) }))) setNeuAbschnitt(false); }} />
+            onSave={async (b) => { if (await call(() => fetch(`${API}/classes/${classId}/sections?term=${term}${kp}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...b, position: sections.length }) }))) setNeuAbschnitt(false); }} />
         </Modal>
       )}
 
@@ -709,9 +711,9 @@ function ColMenu({ t, cat, stats, onStats, onRename, onDelete, onClose, dividerO
       <span onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 9 }} />
       <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", zIndex: 10, top: 26, left: "50%", transform: "translateX(-50%)", minWidth: 210, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: 12, boxShadow: "0 6px 20px rgba(0,0,0,0.2)", textAlign: "left", fontWeight: 400 }}>
         <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 8 }}>{t("noten.colCreated")}: {datum}</div>
-        {/* Kurz-Schnitt hier, ausführliche Auswertung zentral im Modal. */}
-        <button onClick={() => { onStats(); onClose(); }} style={{ width: "100%", marginBottom: 10, padding: "7px 9px", fontSize: 12, textAlign: "left", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer" }}>
-          {stats ? <><span style={{ fontWeight: 700 }}>{t("noten.colAvg")}: {de1(stats.avg)}</span> · {t("noten.colCount", { n: stats.n })} · <span style={{ color: "var(--accent)" }}>{t("noten.colDetails")} ↗</span></> : <span style={{ color: "var(--text3)" }}>{t("noten.colNoGrades")}</span>}
+        {/* Auswertung: schlichter Details-Knopf, öffnet das zentrale Modal. */}
+        <button onClick={() => { onStats(); onClose(); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 10, padding: "7px 9px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer" }}>
+          <Icon d={ICONS.chart} size={14} color="var(--accent)" />{t("noten.colDetails")}
         </button>
         <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 10 }}>
           <input value={name} onChange={(e) => setName(e.target.value)} autoFocus

@@ -419,8 +419,10 @@ class GradeSection(Base):
     owner_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )
-    # Abschnitte gelten pro Kurs/Klasse: verschiedene Faecher wiegen anders.
+    # Abschnitte gelten pro Kurs (Fach): dieselbe Klasse (SuS) wird in Mathe
+    # anders bewertet als in Info. kurs_id NULL = Klasse ohne Kurs (Fallback).
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="CASCADE"), nullable=True, index=True)
     # Halbjahr: jedes Halbjahr ein eigenes Notenbuch (eigene Abschnitte, Gewichte,
     # Endnote). "1"/"2" heute; String laesst spaeter "2024/1" zu.
     term: Mapped[str] = mapped_column(String(8), default="1", server_default="1", index=True)
@@ -503,6 +505,8 @@ class GradeOverride(Base):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    # Endnote-Override (section_id NULL) haengt am Kurs (Fach) wie die Abschnitte.
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="CASCADE"), nullable=True, index=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), index=True)
     # NULL = Endnote, sonst die Bereichsnote dieses Abschnitts.
     section_id: Mapped[Optional[int]] = mapped_column(

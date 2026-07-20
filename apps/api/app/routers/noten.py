@@ -137,12 +137,19 @@ async def kurs_students(class_id: int, user: User = Depends(require_module), db:
     return [{"id": s.id, "card_id": s.card_id, "name": s.name} for s in await _kurs_roster(db, user, class_id)]
 
 
+def _sec_kurs_where(user, class_id, kurs_id):
+    """Abschnitte hängen am Kurs (Fach); Fallback Klasse ohne Kurs."""
+    if kurs_id is not None:
+        return (GradeSection.owner_id == user.id, GradeSection.kurs_id == kurs_id)
+    return (GradeSection.owner_id == user.id, GradeSection.class_id == class_id, GradeSection.kurs_id.is_(None))
+
+
 @router.get("/classes/{class_id}/sections", response_model=List[SectionOut])
-async def list_sections(class_id: int, term: str = "1", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def list_sections(class_id: int, term: str = "1", kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
     r = await db.execute(
         select(GradeSection)
-        .where(GradeSection.owner_id == user.id, GradeSection.class_id == class_id, GradeSection.term == term)
+        .where(*_sec_kurs_where(user, class_id, kurs_id), GradeSection.term == term)
         .options(selectinload(GradeSection.categories))
         .order_by(GradeSection.position, GradeSection.id)
     )
@@ -150,10 +157,10 @@ async def list_sections(class_id: int, term: str = "1", user: User = Depends(req
 
 
 @router.post("/classes/{class_id}/sections", response_model=SectionOut, status_code=201)
-async def create_section(class_id: int, body: SectionIn, term: str = "1", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def create_section(class_id: int, body: SectionIn, term: str = "1", kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("noten_sec", f"u{user.id}", 100, 60, "Zu viele Abschnitte in kurzer Zeit. Bitte kurz warten.")
     await _owned_class(db, user, class_id)
-    sec = GradeSection(**body.model_dump(), term=term, class_id=class_id, owner_id=user.id)
+    sec = GradeSection(**body.model_dump(), term=term, class_id=class_id, kurs_id=kurs_id, owner_id=user.id)
     db.add(sec)
     await db.commit()
     await db.refresh(sec, ["categories"])
@@ -360,12 +367,14 @@ async def _check_entry(db: AsyncSession, user: User, body: EntryIn) -> GradeCate
 
 
 @router.get("/classes/{class_id}/entries", response_model=List[EntryOut])
-async def list_entries(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def list_entries(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
+    # Noten hängen (über Spalte→Abschnitt) am Kurs (Fach): nur die des Kurses.
     r = await db.execute(
         select(GradeEntry)
         .join(GradeCategory, GradeEntry.category_id == GradeCategory.id)
-        .where(GradeCategory.owner_id == user.id, GradeCategory.class_id == class_id)
+        .join(GradeSection, GradeCategory.section_id == GradeSection.id)
+        .where(GradeCategory.owner_id == user.id, *_sec_kurs_where(user, class_id, kurs_id))
         .order_by(GradeEntry.date.desc(), GradeEntry.id.desc())
     )
     return r.scalars().all()
@@ -418,6 +427,7 @@ async def delete_entry(entry_id: int, user: User = Depends(require_module), db: 
 
 class OverrideIn(BaseModel):
     class_id: int
+    kurs_id: Optional[int] = None     # Kurs (Fach) — für die Endnote (section_id None) relevant
     student_id: int
     section_id: Optional[int] = None  # None = Endnote
     term: str = "1"                   # nur fuer die Endnote (section_id None) relevant
@@ -431,14 +441,16 @@ class OverrideIn(BaseModel):
         return round(v, 2)
 
 
-async def _find_override(db, user, class_id, student_id, section_id, term):
+async def _find_override(db, user, class_id, student_id, section_id, term, kurs_id=None):
     q = select(GradeOverride).where(
         GradeOverride.owner_id == user.id,
         GradeOverride.class_id == class_id,
         GradeOverride.student_id == student_id,
     )
     if section_id is None:
-        q = q.where(GradeOverride.section_id.is_(None), GradeOverride.term == term)
+        # Endnote hängt am Kurs (Fach).
+        q = q.where(GradeOverride.section_id.is_(None), GradeOverride.term == term,
+                    GradeOverride.kurs_id == kurs_id if kurs_id is not None else GradeOverride.kurs_id.is_(None))
     else:
         q = q.where(GradeOverride.section_id == section_id)
     return (await db.execute(q)).scalar_one_or_none()
@@ -452,20 +464,20 @@ async def set_override(body: OverrideIn, user: User = Depends(require_module), d
         await _owned_section(db, user, body.section_id)
     if not await _student_in_kurs(db, body.class_id, body.student_id):
         raise HTTPException(400, "Schüler gehört nicht zu diesem Kurs")
-    ex = await _find_override(db, user, body.class_id, body.student_id, body.section_id, body.term)
+    ex = await _find_override(db, user, body.class_id, body.student_id, body.section_id, body.term, body.kurs_id)
     if ex:
         ex.value = body.value
     else:
-        db.add(GradeOverride(owner_id=user.id, class_id=body.class_id, student_id=body.student_id,
+        db.add(GradeOverride(owner_id=user.id, class_id=body.class_id, kurs_id=body.kurs_id, student_id=body.student_id,
                              section_id=body.section_id, term=body.term, value=body.value))
     await db.commit()
 
 
 @router.delete("/overrides", status_code=204)
 async def clear_override(class_id: int, student_id: int, section_id: Optional[int] = None, term: str = "1",
-                         user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+                         kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
-    ex = await _find_override(db, user, class_id, student_id, section_id, term)
+    ex = await _find_override(db, user, class_id, student_id, section_id, term, kurs_id)
     if ex:
         await db.delete(ex)
         await db.commit()
@@ -507,11 +519,12 @@ def _agg(werte, mode):
     return round(sum(werte) / len(werte), 2)
 
 
-async def _summarize(db, user, class_id, term, agg="mean"):
+async def _summarize(db, user, class_id, term, agg="mean", kurs_id=None):
     """Berechnet die Uebersicht eines Halbjahrs. Gibt (sections, out) zurueck.
-    agg steuert nur, wie mehrere Einzelnoten zusammengefasst werden."""
+    agg steuert nur, wie mehrere Einzelnoten zusammengefasst werden.
+    Abschnitte/Endnoten hängen am Kurs (Fach)."""
     sections = (await db.execute(
-        select(GradeSection).where(GradeSection.owner_id == user.id, GradeSection.class_id == class_id, GradeSection.term == term)
+        select(GradeSection).where(*_sec_kurs_where(user, class_id, kurs_id), GradeSection.term == term)
         .order_by(GradeSection.position, GradeSection.id)
     )).scalars().all()
     sec_weight = {s.id: s.weight for s in sections}
@@ -537,7 +550,9 @@ async def _summarize(db, user, class_id, term, agg="mean"):
     )).scalars().all()
     # (student_id, section_id) -> value; section_id None = Endnote
     sec_over = {(o.student_id, o.section_id): o.value for o in overrides if o.section_id in sec_ids}
-    total_over = {o.student_id: o.value for o in overrides if o.section_id is None and o.term == term}
+    # Endnote-Override (section_id NULL) am Kurs: nur die des gewaehlten Kurses.
+    total_over = {o.student_id: o.value for o in overrides
+                  if o.section_id is None and o.term == term and (o.kurs_id == kurs_id if kurs_id is not None else o.kurs_id is None)}
 
     out = []
     for st in students:
@@ -589,9 +604,9 @@ async def _summarize(db, user, class_id, term, agg="mean"):
 
 
 @router.get("/classes/{class_id}/summary", response_model=List[StudentSummary])
-async def summary(class_id: int, term: str = "1", agg: str = "mean", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def summary(class_id: int, term: str = "1", agg: str = "mean", kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
-    _, out = await _summarize(db, user, class_id, term, agg="median" if agg == "median" else "mean")
+    _, out = await _summarize(db, user, class_id, term, agg="median" if agg == "median" else "mean", kurs_id=kurs_id)
     return out
 
 
@@ -622,16 +637,17 @@ class YearOut(BaseModel):
 
 
 @router.get("/classes/{class_id}/year", response_model=YearOut)
-async def year_summary(class_id: int, agg: str = "mean", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def year_summary(class_id: int, agg: str = "mean", kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
     mode = "median" if agg == "median" else "mean"
-    sec1, sum1 = await _summarize(db, user, class_id, "1", agg=mode)
-    sec2, sum2 = await _summarize(db, user, class_id, "2", agg=mode)
+    sec1, sum1 = await _summarize(db, user, class_id, "1", agg=mode, kurs_id=kurs_id)
+    sec2, sum2 = await _summarize(db, user, class_id, "2", agg=mode, kurs_id=kurs_id)
 
     year_over = {o.student_id: o.value for o in (await db.execute(
         select(GradeOverride).where(
             GradeOverride.owner_id == user.id, GradeOverride.class_id == class_id,
             GradeOverride.section_id.is_(None), GradeOverride.term == "year",
+            GradeOverride.kurs_id == kurs_id if kurs_id is not None else GradeOverride.kurs_id.is_(None),
         )
     )).scalars().all()}
 
@@ -735,11 +751,11 @@ async def import_session(body: ImportBody, user: User = Depends(require_module),
 # mit dabei; Foerderdaten der Schueler nie (die liegen im Kern, nicht hier).
 
 @router.get("/classes/{class_id}/export")
-async def export_noten(class_id: int, term: str = "1", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def export_noten(class_id: int, term: str = "1", kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
     secs = (await db.execute(
         select(GradeSection).options(selectinload(GradeSection.categories))
-        .where(GradeSection.class_id == class_id, GradeSection.term == term).order_by(GradeSection.position)
+        .where(*_sec_kurs_where(user, class_id, kurs_id), GradeSection.term == term).order_by(GradeSection.position)
     )).scalars().all()
     # Index-Zuordnung fuer Spalten.
     cat_index = {}   # category_id -> (s_idx, c_idx)
@@ -785,7 +801,7 @@ async def export_noten(class_id: int, term: str = "1", user: User = Depends(requ
 
 
 @router.post("/classes/{class_id}/import")
-async def import_noten(class_id: int, body: dict, term: str = "1", user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def import_noten(class_id: int, body: dict, term: str = "1", kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     if body.get("type") != "nuvora_noten":
         raise HTTPException(400, "Falsches Dateiformat")
     await _owned_class(db, user, class_id)
@@ -794,10 +810,10 @@ async def import_noten(class_id: int, body: dict, term: str = "1", user: User = 
     # Abschnitte + Spalten neu anlegen, Index -> neue ID merken.
     cat_map = {}  # (s_idx, c_idx) -> category_id
     sec_map = {}  # s_idx -> section_id
-    pos0 = (await db.execute(select(GradeSection).where(GradeSection.class_id == class_id, GradeSection.term == term))).scalars().all()
+    pos0 = (await db.execute(select(GradeSection).where(*_sec_kurs_where(user, class_id, kurs_id), GradeSection.term == term))).scalars().all()
     base = len(pos0)
     for si, sec in enumerate(body.get("sections") or []):
-        gs = GradeSection(owner_id=user.id, class_id=class_id, term=term, name=(sec.get("name") or "Abschnitt")[:120],
+        gs = GradeSection(owner_id=user.id, class_id=class_id, kurs_id=kurs_id, term=term, name=(sec.get("name") or "Abschnitt")[:120],
                           weight=int(sec.get("weight") or 0), position=base + si)
         db.add(gs)
         await db.flush()
@@ -831,8 +847,8 @@ async def import_noten(class_id: int, body: dict, term: str = "1", user: User = 
         section_id = sec_map.get(o.get("s")) if o.get("s") is not None else None
         if o.get("s") is not None and section_id is None:
             continue
-        db.add(GradeOverride(owner_id=user.id, class_id=class_id, student_id=sid,
-                             section_id=section_id, term=term, value=o["value"]))
+        db.add(GradeOverride(owner_id=user.id, class_id=class_id, kurs_id=(None if section_id is not None else kurs_id),
+                             student_id=sid, section_id=section_id, term=term, value=o["value"]))
     for d in (body.get("dividers") or []):
         cid = cat_map.get((d.get("s"), d.get("c")))
         if cid:
@@ -844,7 +860,7 @@ async def import_noten(class_id: int, body: dict, term: str = "1", user: User = 
 # ─── Zeugnis-/Eltern-Export: ein gebuendeltes PDF je Schueler ───
 
 @router.get("/classes/{class_id}/zeugnis.pdf")
-async def zeugnis_export(class_id: int, term: str = "1", agg: str = "mean",
+async def zeugnis_export(class_id: int, term: str = "1", agg: str = "mean", kurs_id: Optional[int] = None,
                          user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Gebuendelter Eltern-/Zeugnis-Export: je Schueler eine Seite mit Noten
     (gewichteter Schnitt + Abschnitte), Fehlzeiten und Karten-Fortschritt.
@@ -852,7 +868,7 @@ async def zeugnis_export(class_id: int, term: str = "1", agg: str = "mean",
     ohne sie voll). Besonders schuetzenswerte Daten (foerder/notizen) sind
     bewusst NICHT enthalten."""
     sc = await _owned_class(db, user, class_id)
-    sections, summaries = await _summarize(db, user, class_id, term, agg="median" if agg == "median" else "mean")
+    sections, summaries = await _summarize(db, user, class_id, term, agg="median" if agg == "median" else "mean", kurs_id=kurs_id)
     sum_by_id = {s.student_id: s for s in summaries}
     students = await _kurs_roster(db, user, class_id)
     halb = "1. Halbjahr" if term == "1" else "2. Halbjahr"

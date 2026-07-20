@@ -162,6 +162,8 @@ def _ensure_columns(sync_conn):
         ("kurse", "niveau_aktiv", "BOOLEAN DEFAULT false NOT NULL"),
         ("seating_plans", "kurs_id", "INTEGER"),
         ("orga_items", "kurs_id", "INTEGER"),
+        ("grade_sections", "kurs_id", "INTEGER"),
+        ("grade_overrides", "kurs_id", "INTEGER"),
         ("questions", "topic_id", "INTEGER"),
         ("students", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
         ("students", "foerder", "JSON"),
@@ -366,6 +368,36 @@ async def startup():
     async with async_session() as db:
         try:
             await db.execute(text("ALTER TABLE seating_plans DROP CONSTRAINT IF EXISTS uq_seating_owner_class"))
+            await db.commit()
+        except Exception:
+            pass
+
+    # Bestandsnoten an den Kurs anschliessen: wo eine Klasse in GENAU EINEM Kurs
+    # liegt, bekommen ihre Abschnitte/Endnoten-Overrides dessen kurs_id — sonst
+    # (Klasse in mehreren Kursen = mehrdeutig) bleibt NULL und die Lehrkraft
+    # ordnet neu zu. Nur Zeilen mit kurs_id IS NULL, damit es idempotent bleibt.
+    async with async_session() as db:
+        try:
+            await db.execute(text("""
+                WITH single AS (
+                  SELECT class_id, MIN(kurs_id) AS kurs_id FROM (
+                    SELECT class_id, kurs_id FROM kurs_tags
+                    UNION SELECT id AS class_id, kurs_id FROM school_classes WHERE kurs_id IS NOT NULL
+                  ) m GROUP BY class_id HAVING COUNT(DISTINCT kurs_id) = 1
+                )
+                UPDATE grade_sections g SET kurs_id = s.kurs_id
+                FROM single s WHERE g.class_id = s.class_id AND g.kurs_id IS NULL
+            """))
+            await db.execute(text("""
+                WITH single AS (
+                  SELECT class_id, MIN(kurs_id) AS kurs_id FROM (
+                    SELECT class_id, kurs_id FROM kurs_tags
+                    UNION SELECT id AS class_id, kurs_id FROM school_classes WHERE kurs_id IS NOT NULL
+                  ) m GROUP BY class_id HAVING COUNT(DISTINCT kurs_id) = 1
+                )
+                UPDATE grade_overrides o SET kurs_id = s.kurs_id
+                FROM single s WHERE o.class_id = s.class_id AND o.kurs_id IS NULL
+            """))
             await db.commit()
         except Exception:
             pass
