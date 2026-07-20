@@ -501,9 +501,24 @@ async def external_events(user: User = Depends(require_module)):
         text = await asyncio.get_event_loop().run_in_executor(None, _fetch)
     except Exception:
         return []
+    from datetime import date, timedelta
+    def _d(v):
+        return date(int(v[0:4]), int(v[4:6]), int(v[6:8])) if v and len(v) >= 8 and v[:8].isdigit() else None
     out = []
     for e in _parse_ics(text):
-        s = e["start"]
-        if len(s) == 8 and s.isdigit():
-            out.append({"date": f"{s[0:4]}-{s[4:6]}-{s[6:8]}", "title": e.get("title", "")[:200]})
-    return out[:1000]
+        d0 = _d(e.get("start"))
+        if not d0:
+            continue
+        title = e.get("title", "")[:200]
+        d1 = _d(e.get("end"))
+        # Mehrtägige (Ganztags-)Events über alle Tage anzeigen; DTEND ist bei
+        # Ganztags exklusiv. Ohne/gleiches Ende: nur der eine Tag. Max 60 Tage.
+        if d1 and d1 > d0:
+            cur = d0
+            n = 0
+            while cur < d1 and n < 60:
+                out.append({"date": cur.isoformat(), "title": title})
+                cur += timedelta(days=1); n += 1
+        else:
+            out.append({"date": d0.isoformat(), "title": title})
+    return out[:2000]
