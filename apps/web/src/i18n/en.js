@@ -461,6 +461,7 @@ export default {
   "topics.newPlaceholder": "New topic, e.g. Fractions",
   "topics.subPlaceholder": "Subtopic, e.g. Multiplying and dividing",
   "topics.empty": "No topics yet. Create one — subtopics go underneath.",
+  "topics.emptyHint": "Create a subject (e.g. Maths), then topics and subtopics.",
   "topics.addSub": "+ Subtopic",
   "topics.questionCount": "{{n}} question(s)",
   "topics.delConfirm": "Delete “{{name}}”?",

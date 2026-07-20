@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { Link } from "react-router-dom";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, Empty, Skeleton } from "../components/Icons.jsx";
 import { peek, put } from "../core/cache.js";
 
 const API = "/api";
@@ -235,12 +235,8 @@ export default function Topics() {
         </button>
       </form>
 
-      {!loaded && <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("common.loading2")}</p>}
-      {loaded && roots.length === 0 && (
-        <p style={{ color: "var(--text3)", fontSize: 14 }}>
-          {t("topics.empty")}
-        </p>
-      )}
+      {!loaded && <Skeleton rows={5} />}
+      {loaded && roots.length === 0 && <Empty title={t("topics.empty")} hint={t("topics.emptyHint")} />}
 
       {roots.map((tp) => renderNode(tp, 0))}
     </div>

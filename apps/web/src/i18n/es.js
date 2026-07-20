@@ -461,6 +461,7 @@ export default {
   "topics.newPlaceholder": "Nuevo tema, p. ej. Fracciones",
   "topics.subPlaceholder": "Subtema, p. ej. Multiplicar y dividir",
   "topics.empty": "Aún no hay temas. Crea uno; los subtemas van debajo.",
+  "topics.emptyHint": "Crea una asignatura (p.ej. Mates), luego temas y subtemas.",
   "topics.addSub": "+ Subtema",
   "topics.questionCount": "{{n}} pregunta(s)",
   "topics.delConfirm": "¿Eliminar «{{name}}»?",

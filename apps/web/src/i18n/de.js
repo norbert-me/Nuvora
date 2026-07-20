@@ -461,6 +461,7 @@ export default {
   "topics.newPlaceholder": "Neues Thema, z. B. Bruchrechnung",
   "topics.subPlaceholder": "Unterthema, z. B. Vervielfachen und Teilen",
   "topics.empty": "Noch keine Themen. Lege eins an — Unterthemen kommen darunter.",
+  "topics.emptyHint": "Lege ein Fach an (z.B. Mathe), darunter Themen und Unterthemen.",
   "topics.addSub": "+ Unterthema",
   "topics.questionCount": "{{n}} Frage(n)",
   "topics.delConfirm": "„{{name}}“ löschen?",
