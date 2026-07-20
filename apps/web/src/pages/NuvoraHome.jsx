@@ -79,6 +79,82 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv }) {
   );
 }
 
+// Tages-Dashboard: die heutigen Stunden aus dem Stundenplan + geplante
+// Eintraege, direkt auf der Startseite. Nur Anzeige — Klick fuehrt in den
+// Kalender. Erscheint nur, wenn das Modul Kalender aktiv ist.
+const wochentag = () => (new Date().getDay() + 6) % 7; // Mo=0 … So=6
+function HeutePanel({ t }) {
+  const [data, setData] = useState(null); // { slots, times, entries, classes, frei }
+  useEffect(() => {
+    let ab = false;
+    (async () => {
+      const heute = new Date();
+      const j = (r) => (r.ok ? r.json() : null);
+      const [tt, classes, breaks] = await Promise.all([
+        fetch("/api/kalender/timetable").then(j).catch(() => null),
+        fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).catch(() => []),
+        fetch("/api/kalender/breaks").then((r) => (r.ok ? r.json() : [])).catch(() => []),
+      ]);
+      const ymd = (d) => d.toISOString().slice(0, 10);
+      const frm = new Date(heute); frm.setHours(0, 0, 0, 0);
+      const to = new Date(heute); to.setHours(23, 59, 59, 0);
+      const entries = await fetch(`/api/kalender/entries?frm=${frm.toISOString()}&to=${to.toISOString()}`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+      const freiHeute = (Array.isArray(breaks) ? breaks : []).find((b) => ymd(heute) >= b.start_date.slice(0, 10) && ymd(heute) <= b.end_date.slice(0, 10));
+      if (!ab) setData({ slots: (tt?.slots || []), times: (tt?.times || []), entries: Array.isArray(entries) ? entries : [], classes, frei: freiHeute });
+    })();
+    return () => { ab = true; };
+  }, []);
+
+  if (!data) return null;
+  const slots = data.slots.filter((s) => s.weekday === wochentag()).sort((a, b) => a.period - b.period);
+  const extras = data.entries.filter((e) => e.period == null || !slots.some((s) => s.period === e.period));
+  if (slots.length === 0 && extras.length === 0 && !data.frei) return null;
+  const cname = (id) => data.classes.find((c) => c.id === id)?.name || "";
+  const ccolor = (id) => data.classes.find((c) => c.id === id)?.color || "var(--border2)";
+  const zeit = (p) => { const w = data.times[p - 1]; return w && (w.from || w.to) ? `${w.from || ""}–${w.to || ""}` : ""; };
+  const eintrag = (p) => data.entries.find((e) => e.period === p);
+  const dateStr = new Date().toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long" });
+
+  return (
+    <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 18, marginBottom: 24 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 15, fontWeight: 700, textTransform: "capitalize" }}>{dateStr}</div>
+        <Link to="/kalender" style={{ fontSize: 12.5, color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>{t("home.toCalendar")} ↗</Link>
+      </div>
+      {data.frei && (
+        <div style={{ padding: "8px 12px", borderRadius: 10, background: "rgba(184,134,11,0.12)", color: "#8a6d00", fontSize: 13, fontWeight: 600 }}>
+          {t("kalender.freeDay")}: {data.frei.label || ""}
+        </div>
+      )}
+      {!data.frei && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {slots.map((s) => {
+            const e = eintrag(s.period);
+            return (
+              <Link key={s.id} to="/kalender" style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px solid var(--border)", borderLeft: `4px solid ${s.class_id ? ccolor(s.class_id) : "var(--border2)"}`, borderRadius: 10, textDecoration: "none", color: "var(--text)" }}>
+                <div style={{ minWidth: 42, textAlign: "center" }}>
+                  <div style={{ fontSize: 14, fontWeight: 800 }}>{s.period}.</div>
+                  <div style={{ fontSize: 10, color: "var(--text3)" }}>{zeit(s.period)}</div>
+                </div>
+                <div style={{ flex: 1, minWidth: 100 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{cname(s.class_id) || s.title || "—"}</div>
+                  {e && <div style={{ fontSize: 12.5, color: "var(--text3)", marginTop: 2 }}>{e.title || t("kalender.planned")}</div>}
+                </div>
+              </Link>
+            );
+          })}
+          {extras.map((e) => (
+            <Link key={e.id} to="/kalender" style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px dashed var(--border2)", borderRadius: 10, textDecoration: "none", color: "var(--text)" }}>
+              <div style={{ minWidth: 42, textAlign: "center", color: "var(--text3)", fontSize: 12 }}>—</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{e.title || (e.class_id && cname(e.class_id)) || t("kalender.planned")}</div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function NuvoraHome({ user }) {
   const { t } = useLanguage();
   const { active, loading } = useModules();
@@ -150,6 +226,7 @@ export default function NuvoraHome({ user }) {
         </div>
       ) : (
         <>
+          {!edit && isOn("kalender") && <HeutePanel t={t} />}
           {!edit && isOn("cardvote") && <SchwacheWoche t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} />}
           <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
             {(edit ? displayList : shown).map((m) => {

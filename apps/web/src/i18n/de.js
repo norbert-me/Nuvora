@@ -85,6 +85,7 @@ export default {
   // Startseite (nach Login)
   "home.title": "So funktioniert CardVote",
   "home.intro": "Abstimmungen im Unterricht — Lernende halten Karten hoch, du scannst per Kamera.",
+  "home.toCalendar": "Zum Kalender",
   "home.weakTitle": "Diese Woche schwach",
   "home.weakHint": "Themen mit unter 60 % Trefferquote aus deinen CardVote-Tests der letzten zwei Wochen — direkt üben lassen.",
   "home.weakDeck": "Deck erstellen",
