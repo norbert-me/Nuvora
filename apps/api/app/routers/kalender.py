@@ -482,9 +482,19 @@ async def external_events(user: User = Depends(require_module)):
     {date: YYYY-MM-DD, title}. Read-only, nur zur Anzeige."""
     if not user.external_ics_url:
         return []
-    import asyncio, urllib.request
+    import asyncio, urllib.request, urllib.parse, socket, ipaddress
     def _fetch():
-        req = urllib.request.Request(user.external_ics_url, headers={"User-Agent": "Nuvora"})
+        url = user.external_ics_url
+        # SSRF-Schutz: Ziel-Host darf nicht auf eine private/lokale IP zeigen
+        # (kein Zugriff auf interne Dienste/Metadaten). Nur http(s).
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            return ""
+        for res in socket.getaddrinfo(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80)):
+            ip = ipaddress.ip_address(res[4][0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+                raise ValueError("Ziel-IP nicht erlaubt")
+        req = urllib.request.Request(url, headers={"User-Agent": "Nuvora"})
         with urllib.request.urlopen(req, timeout=6) as r:
             return r.read(2_000_000).decode("utf-8", "replace")  # max 2 MB
     try:
