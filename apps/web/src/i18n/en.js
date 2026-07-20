@@ -917,6 +917,8 @@ export default {
   "sitzplan.import": "Import",
   "sitzplan.imported": "Seating applied.",
   "sitzplan.importError": "File not readable.",
+  "sitzplan.arrange": "Rows",
+  "sitzplan.arrangeHint": "Arrange all students in rows automatically",
   "sitzplan.fit": "Fit",
   "sitzplan.fitHint": "Auto zoom and center on all desks",
   "sitzplan.pool": "Not placed yet",

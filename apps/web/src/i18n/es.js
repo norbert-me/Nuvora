@@ -917,6 +917,8 @@ export default {
   "sitzplan.import": "Importar",
   "sitzplan.imported": "Distribución aplicada.",
   "sitzplan.importError": "Archivo no legible.",
+  "sitzplan.arrange": "Filas",
+  "sitzplan.arrangeHint": "Colocar a todos los alumnos en filas automáticamente",
   "sitzplan.fit": "Ajustar",
   "sitzplan.fitHint": "Zoom y vista automáticos a todas las mesas",
   "sitzplan.pool": "Aún sin colocar",

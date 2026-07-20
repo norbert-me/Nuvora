@@ -222,6 +222,14 @@ export default function Sitzplan() {
     });
   };
 
+  // Vorlage: alle SuS automatisch in Reihen anordnen (6 pro Reihe).
+  const anordnen = () => {
+    const cols = 6, gx = SEAT_W + 16, gy = SEAT_H + 22, x0 = 20, y0 = 60;
+    const next = students.map((s, i) => ({ sid: s.id, x: x0 + (i % cols) * gx, y: y0 + Math.floor(i / cols) * gy, rot: 0 }));
+    persist(next);
+    setTafel((tf) => { const t2 = { ...tf, x: 200, y: 8, rot: 0 }; persist(next, t2); return t2; });
+  };
+
   const doExport = () => {
     const data = { type: "nuvora_sitzplan", slots: seats.map((s) => ({ x: s.x, y: s.y, rot: s.rot || 0 })), tafel };
     const a = document.createElement("a");
@@ -291,6 +299,7 @@ export default function Sitzplan() {
             <button onClick={() => setZoom((z) => Math.min(2, Math.round((z + 0.1) * 10) / 10))} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8, width: 28, height: 28, fontSize: 16 }}>+</button>
             {zoom !== 1 && <button onClick={() => setZoom(1)} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 12 }}>{t("sitzplan.zoomReset")}</button>}
             <button onClick={fitView} className="icon-btn" style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8, width: 28, height: 28 }} title={t("sitzplan.fitHint")} aria-label={t("sitzplan.fit")}><Icon d={ICONS.fit} size={16} /></button>
+            <button onClick={anordnen} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 12 }} title={t("sitzplan.arrangeHint")}>{t("sitzplan.arrange")}</button>
           </div>
           <div ref={scrollRef} style={{ height: 520, overflow: "auto", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", marginBottom: 18 }}>
           <div ref={canvasRef} onPointerDown={onCanvasDown} onDragOver={(e) => e.preventDefault()} onDrop={onCanvasDrop}
