@@ -177,6 +177,14 @@
     async function syncAufgaben(data) {
         try {
             const serverIds = new Set((await api(`${LP}/exercises`).then(r => r.ok ? r.json() : [])).map(e => e.id));
+            // Sicherung (CLAUDE.md: Live-Daten nie durch delete+recreate gefaehrden):
+            // eine leere lokale Liste gegen mehrere Server-Aufgaben ist praktisch
+            // immer ein nicht-geladener/stale Cache oder ein Ladefehler — KEIN echtes
+            // „alles loeschen". Dann nichts spiegeln, sonst reisst es echte Daten weg.
+            if (!data.length && serverIds.size > 1) {
+                console.warn('syncAufgaben: leere Liste gegen', serverIds.size, 'Server-Aufgaben — uebersprungen (Schutz vor Datenverlust)');
+                return;
+            }
             for (const a of data) {
                 const body = JSON.stringify(await zuKern(a));
                 const vorhanden = a.id && serverIds.has(a.id);
@@ -509,7 +517,12 @@
             delete a.kategorien;
         }
     });
-    save(STORAGE_KEYS.aufgaben, aufgaben);
+    // NUR lokal sichern, NICHT ueber save() zum Server spiegeln: hier steht noch
+    // der (evtl. leere/stale) localStorage-Cache, denn loadUserData hat die
+    // autoritativen Server-Daten noch nicht geladen. Ein syncAufgaben hier
+    // wuerde bei leerem Cache ALLE Server-Aufgaben loeschen und fuer jedes
+    // (noch nicht gecachte) Thema ein 409 provozieren.
+    localStorage.setItem(STORAGE_KEYS.aufgaben, JSON.stringify(aufgaben));
 
     if (aufgaben.length) {
         const maxNum = aufgaben.reduce((max, a) => {
