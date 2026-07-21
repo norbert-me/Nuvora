@@ -861,6 +861,29 @@ class CardReview(Base):
     last_reviewed: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class WorkAnalysis(Base):
+    """Modul „Klassenarbeit auswerten": eine Arbeit als Aufgaben-Raster.
+
+    Je Aufgabe ein Thema (topic_id); je SuS richtig/falsch. Daraus entsteht pro
+    SuS ein Fehlerprofil nach Thema → gezielte Wiederholung (Karten wieder fällig
+    / Lernpfad-Aufgabe). Eigenständig (Regel 3): eigene Tabelle, keine Abhängigkeit;
+    die Themen kommen aus dem Kern, Karten/Lernpfad sind optionale Brücken.
+
+    tasks (JSON):   [{"id": "t1", "label": "Bruch addieren", "topic_id": 5}, …]
+    results (JSON): {"<student_id>": ["t2", "t5"]}  — je SuS die FALSCHEN Aufgaben-ids
+    """
+    __tablename__ = "work_analyses"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="CASCADE"), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    tasks: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    results: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class SegelStatus(Base):
     """SEGEL-Stufe je Schueler und Kurs (Helios-Konzept: Hafen → Küste → Meer →
     Welt, zunehmende Selbststeuerung). Wird am Sitzplatz angezeigt. Haengt wie der

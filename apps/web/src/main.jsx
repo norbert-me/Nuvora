@@ -103,6 +103,7 @@ import Kalender from "./pages/Kalender.jsx";
 import Methoden from "./pages/Methoden.jsx";
 import Zufall from "./pages/Zufall.jsx";
 import Orga from "./pages/Orga.jsx";
+import Klassenarbeit from "./pages/Klassenarbeit.jsx";
 import { useModules } from "./core/modules.js";
 import { DialogHost } from "./core/dialog.jsx";
 import { UndoHost } from "./core/undo.jsx";
@@ -129,6 +130,7 @@ const MET = "/methoden";
 const ZUF = "/zufall";
 const ORG = "/orga";
 const AUS = "/ausleihe";
+const KLA = "/klassenarbeit";
 
 // Menue passend zum Bereich. Man soll im Modul-Menue bleiben, auch auf
 // modulneutralen Seiten (Hilfe, Impressum), solange man aus einem Modul kam —
@@ -144,6 +146,7 @@ const getModuleNavItems = (t, location) => {
     : pathname.startsWith(MET) ? "methoden"
     : pathname.startsWith(ZUF) ? "zufall"
     : pathname.startsWith(ORG) ? "orga"
+    : pathname.startsWith(KLA) ? "klassenarbeit"
     : pathname.startsWith(KA) ? "karten"
     : params.get("area"); // Hilfe u.ae.: Bereich aus der Query
 
@@ -179,6 +182,9 @@ const getModuleNavItems = (t, location) => {
   }
   if (area === "zufall") {
     return [{ to: ZUF, label: t("zufall.title") }];
+  }
+  if (area === "klassenarbeit") {
+    return [{ to: KLA, label: t("klassenarbeit.title") }];
   }
   if (area === "orga") {
     const tab = params.get("tab");
@@ -748,6 +754,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={KAL} element={user ? <ModuleGate moduleKey="kalender"><Kalender /></ModuleGate> : <Landing />} />
           <Route path={MET} element={user ? <ModuleGate moduleKey="methoden"><Methoden /></ModuleGate> : <Landing />} />
           <Route path={ZUF} element={user ? <ModuleGate moduleKey="zufall"><Zufall /></ModuleGate> : <Landing />} />
+          <Route path={KLA} element={user ? <ModuleGate moduleKey="klassenarbeit"><Klassenarbeit /></ModuleGate> : <Landing />} />
           <Route path={ORG} element={user ? <ModuleGate moduleKey="orga"><Orga /></ModuleGate> : <Landing />} />
 
           {/* ─── Modul Code-Detektiv ─── */}

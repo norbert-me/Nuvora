@@ -1,0 +1,235 @@
+"""Modul „Klassenarbeit auswerten".
+
+Eine Arbeit als Aufgaben-Raster (je Aufgabe ein Thema, je SuS richtig/falsch).
+Daraus je SuS ein Fehlerprofil nach Thema → gezielte Wiederholung.
+
+Eigenständig (Regel 3): eigene Tabelle, keine Abhängigkeit. Themen aus dem Kern;
+Karten (wieder fällig setzen) sind eine optionale Brücke — ohne das Modul Karten
+passiert dort nichts.
+"""
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..database import get_db
+from ..models import WorkAnalysis, SchoolClass, Student, Topic, User
+from .auth import get_current_user, rate_limit
+from .modules import is_active
+
+router = APIRouter(prefix="/api/klassenarbeit", tags=["klassenarbeit"])
+MODULE_KEY = "klassenarbeit"
+
+
+async def require_module(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> User:
+    if not await is_active(db, user.id, MODULE_KEY):
+        raise HTTPException(403, "Modul Klassenarbeit ist nicht aktiviert")
+    return user
+
+
+async def _owned_class(db, user, class_id) -> SchoolClass:
+    sc = await db.get(SchoolClass, class_id)
+    if not sc:
+        raise HTTPException(404, "Klasse nicht gefunden")
+    if sc.owner_id and sc.owner_id != user.id:
+        raise HTTPException(403, "Keine Berechtigung")
+    return sc
+
+
+async def _owned_work(db, user, work_id) -> WorkAnalysis:
+    w = await db.get(WorkAnalysis, work_id)
+    if not w or w.owner_id != user.id:
+        raise HTTPException(404, "Arbeit nicht gefunden")
+    return w
+
+
+async def _roster(db, class_id):
+    """Kanonische SuS des Kurses (gleichnamige Fach-Klassen-SuS dedupliziert)."""
+    from .kurse import sibling_class_ids
+    sib = await sibling_class_ids(db, class_id)
+    studs = (await db.execute(select(Student).where(Student.class_id.in_(sib)).order_by(Student.id))).scalars().all()
+    canon = {}
+    for s in studs:
+        canon.setdefault(s.name.strip(), s)
+    return sorted(canon.values(), key=lambda s: (s.card_id, s.id))
+
+
+class WorkIn(BaseModel):
+    class_id: int
+    kurs_id: Optional[int] = None
+    name: str = ""
+
+
+class WorkPut(BaseModel):
+    name: Optional[str] = None
+    tasks: Optional[list] = None       # [{id,label,topic_id}]
+    results: Optional[dict] = None      # {student_id: [wrong_task_id]}
+
+
+class WorkOut(BaseModel):
+    id: int
+    class_id: int
+    kurs_id: Optional[int] = None
+    name: str
+    tasks: list = []
+    results: dict = {}
+    model_config = {"from_attributes": True}
+
+
+def _keyw(user, class_id, kurs_id):
+    if kurs_id is not None:
+        return (WorkAnalysis.owner_id == user.id, WorkAnalysis.kurs_id == kurs_id)
+    return (WorkAnalysis.owner_id == user.id, WorkAnalysis.class_id == class_id, WorkAnalysis.kurs_id.is_(None))
+
+
+@router.get("/classes/{class_id}/students")
+async def roster(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    await _owned_class(db, user, class_id)
+    return [{"id": s.id, "name": s.name} for s in await _roster(db, class_id)]
+
+
+@router.get("/classes/{class_id}/works", response_model=List[WorkOut])
+async def list_works(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    await _owned_class(db, user, class_id)
+    rows = (await db.execute(select(WorkAnalysis).where(*_keyw(user, class_id, kurs_id)).order_by(WorkAnalysis.created_at.desc()))).scalars().all()
+    return [WorkOut(id=w.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}) for w in rows]
+
+
+@router.post("/works", response_model=WorkOut, status_code=201)
+async def create_work(body: WorkIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    rate_limit("ka_work", f"u{user.id}", 100, 60, "Zu viele Arbeiten. Bitte kurz warten.")
+    await _owned_class(db, user, body.class_id)
+    w = WorkAnalysis(owner_id=user.id, class_id=body.class_id, kurs_id=body.kurs_id, name=(body.name or "Klassenarbeit").strip()[:200], tasks=[], results={})
+    db.add(w)
+    await db.commit()
+    await db.refresh(w)
+    return WorkOut(id=w.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=[], results={})
+
+
+@router.put("/works/{work_id}", response_model=WorkOut)
+async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    w = await _owned_work(db, user, work_id)
+    if body.name is not None:
+        w.name = body.name.strip()[:200]
+    if body.tasks is not None:
+        # Themenbindung nur aufs eigene Thema; fremdes/unbekanntes → None.
+        own = {t for (t,) in (await db.execute(select(Topic.id).where(Topic.owner_id == user.id))).all()}
+        clean = []
+        for t in body.tasks[:100]:
+            if not isinstance(t, dict) or not t.get("id"):
+                continue
+            tid = t.get("topic_id")
+            clean.append({"id": str(t["id"])[:40], "label": str(t.get("label") or "")[:200],
+                          "topic_id": tid if (isinstance(tid, int) and tid in own) else None})
+        w.tasks = clean
+    if body.results is not None:
+        w.results = {str(k): [str(x)[:40] for x in (v or [])] for k, v in list(body.results.items())[:400]}
+    await db.commit()
+    await db.refresh(w)
+    return WorkOut(id=w.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {})
+
+
+@router.delete("/works/{work_id}", status_code=204)
+async def delete_work(work_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    w = await _owned_work(db, user, work_id)
+    await db.delete(w)
+    await db.commit()
+
+
+# ─── Auswertung + Wiederholung ───
+
+class RemediateIn(BaseModel):
+    # Anteil falscher Aufgaben eines Themas, ab dem das Thema für den SuS "schwach" ist.
+    threshold: float = 0.5
+
+
+def _profile(work: WorkAnalysis):
+    """Je SuS je Thema: (falsch, gesamt) über die Aufgaben dieses Themas."""
+    tasks = work.tasks or []
+    topic_of = {t["id"]: t.get("topic_id") for t in tasks}
+    topic_tasks = {}
+    for t in tasks:
+        if t.get("topic_id"):
+            topic_tasks.setdefault(t["topic_id"], set()).add(t["id"])
+    results = work.results or {}
+    out = {}  # student_id -> {topic_id: [falsch, gesamt]}
+    for sid, wrong in results.items():
+        wrongset = set(wrong or [])
+        prof = {}
+        for topic_id, tids in topic_tasks.items():
+            total = len(tids)
+            falsch = len(tids & wrongset)
+            prof[topic_id] = [falsch, total]
+        out[sid] = prof
+    return out, topic_tasks
+
+
+@router.get("/works/{work_id}/analysis")
+async def analysis(work_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Auswertung: je Thema Trefferquote der Klasse + je SuS die schwachen Themen."""
+    w = await _owned_work(db, user, work_id)
+    prof, topic_tasks = _profile(w)
+    names = {t.id: t.name for t in (await db.execute(select(Topic).where(Topic.owner_id == user.id))).scalars().all()}
+    parents = {t.id: t.parent_id for t in (await db.execute(select(Topic).where(Topic.owner_id == user.id))).scalars().all()}
+    def label(tid):
+        nm = names.get(tid, "?"); p = parents.get(tid)
+        return f"{names.get(p)} / {nm}" if p and names.get(p) else nm
+    # Klassenweit je Thema
+    klass = {}
+    for tid in topic_tasks:
+        falsch = total = 0
+        for sid, pr in prof.items():
+            f, tt = pr.get(tid, [0, 0]); falsch += f; total += tt
+        klass[tid] = {"topic_id": tid, "label": label(tid), "pct": round((1 - falsch / total) * 100) if total else 0}
+    # Je SuS schwache Themen (< 50 % richtig)
+    studs = {s.id: s.name for s in (await db.execute(select(Student).where(Student.id.in_([int(x) for x in prof.keys()])))).scalars().all()} if prof else {}
+    per_student = []
+    for sid, pr in prof.items():
+        schwach = [label(tid) for tid, (f, tt) in pr.items() if tt and f / tt >= 0.5]
+        if schwach:
+            per_student.append({"student_id": int(sid), "name": studs.get(int(sid), "?"), "weak": sorted(schwach)})
+    return {"topics": sorted(klass.values(), key=lambda x: x["pct"]), "students": sorted(per_student, key=lambda x: x["name"])}
+
+
+@router.post("/works/{work_id}/remediate")
+async def remediate(work_id: int, body: RemediateIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Gezielte Wiederholung: je SuS die Karten seiner SCHWACHEN Themen (Anteil
+    falscher Aufgaben ≥ Schwelle) wieder fällig setzen. Brücke zu Karten (optional).
+    Bestehende Noten/Daten bleiben — nur Fälligkeiten werden vorgezogen."""
+    from datetime import datetime, timezone
+    from sqlalchemy import update as _update
+    from ..models import CardDeck, Card, CardReview
+    w = await _owned_work(db, user, work_id)
+    prof, _ = _profile(w)
+    # student_id -> set(schwache topic_ids)
+    weak_by_student = {}
+    for sid, pr in prof.items():
+        weak = {tid for tid, (f, tt) in pr.items() if tt and f / tt >= body.threshold}
+        if weak:
+            weak_by_student[int(sid)] = weak
+    if not weak_by_student:
+        return {"students": 0, "cards_requeued": 0}
+    # Decks je Thema (einmal laden)
+    all_topics = set().union(*weak_by_student.values())
+    deck_by_topic = {}
+    for tid in all_topics:
+        ids = (await db.execute(select(CardDeck.id).where(
+            CardDeck.owner_id == user.id, CardDeck.topic_id == tid, CardDeck.deleted_at.is_(None)))).scalars().all()
+        if ids:
+            deck_by_topic[tid] = ids
+    requeued = 0
+    now = datetime.now(timezone.utc)
+    for sid, topics in weak_by_student.items():
+        deck_ids = [d for tid in topics for d in deck_by_topic.get(tid, [])]
+        if not deck_ids:
+            continue
+        card_ids = (await db.execute(select(Card.id).where(Card.deck_id.in_(deck_ids)))).scalars().all()
+        if not card_ids:
+            continue
+        res = await db.execute(_update(CardReview).where(
+            CardReview.student_id == sid, CardReview.card_id.in_(card_ids), CardReview.reps > 0).values(due=now))
+        requeued += res.rowcount or 0
+    await db.commit()
+    return {"students": len(weak_by_student), "cards_requeued": requeued}

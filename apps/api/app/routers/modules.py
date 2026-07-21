@@ -147,6 +147,19 @@ REGISTRY: List[ModuleDef] = [
         stage="stable",
     ),
     ModuleDef(
+        key="klassenarbeit",
+        group="werkzeug",
+        name="Klassenarbeit",
+        description=(
+            "Klassenarbeit auswerten: je Aufgabe ein Thema, je Schüler richtig/"
+            "falsch. Daraus ein Fehlerprofil pro Person nach Thema — und auf "
+            "Knopfdruck gezielte Wiederholung (Karten des schwachen Themas wieder "
+            "fällig)."
+        ),
+        path="/klassenarbeit",
+        stage="beta",
+    ),
+    ModuleDef(
         key="methoden",
         group="unterricht",
         name="Einstiege",
