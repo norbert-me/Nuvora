@@ -346,3 +346,100 @@ function NotenUebernahme({ t, classId, kursId, students, work, onClose }) {
     </div>
   );
 }
+
+// ── Vergleich ────────────────────────────────────────────────────────────────
+// Je Arbeit die erreichten Prozent je bewertetem (nicht abwesendem) SuS.
+// Altformat (results[sid] = [falsche Aufgaben-IDs]) wird mitgerechnet.
+function pctList(work) {
+  const tasks = work.tasks || [];
+  const tm = tasks.reduce((n, tk) => n + (Number(tk.max) > 0 ? Number(tk.max) : 1), 0);
+  if (!tm) return [];
+  const out = [];
+  for (const r of Object.values(work.results || {})) {
+    if (!r || r === "abwesend") continue;
+    let e = 0;
+    if (Array.isArray(r)) { const bad = new Set(r.map(String)); tasks.forEach((tk) => { if (!bad.has(String(tk.id))) e += (Number(tk.max) > 0 ? Number(tk.max) : 1); }); }
+    else tasks.forEach((tk) => { const v = r[tk.id]; e += (v == null ? 0 : Number(v)); });
+    out.push(Math.round((e / tm) * 100));
+  }
+  return out;
+}
+
+function quartiles(arr) {
+  const a = [...arr].sort((x, y) => x - y); const n = a.length;
+  if (!n) return null;
+  const q = (p) => { const idx = (n - 1) * p, lo = Math.floor(idx), hi = Math.ceil(idx); return a[lo] + (a[hi] - a[lo]) * (idx - lo); };
+  return { n, min: a[0], q1: q(0.25), med: q(0.5), q3: q(0.75), max: a[n - 1], avg: a.reduce((s, x) => s + x, 0) / n };
+}
+
+const boxColor = (med) => (med < 50 ? "#d1350f" : med < 75 ? "#b8860b" : "#0a7d3e");
+
+// Ein horizontaler Boxplot auf 0–100 %-Achse (Whisker min–max, Box Q1–Q3, Median).
+function Boxplot({ q }) {
+  const pos = (v) => `${v}%`;
+  const col = boxColor(q.med);
+  return (
+    <div style={{ position: "relative", height: 26, flex: 1, minWidth: 200 }}>
+      {[0, 25, 50, 75, 100].map((g) => <div key={g} style={{ position: "absolute", left: pos(g), top: 0, bottom: 0, width: 1, background: g === 50 ? "var(--border)" : "var(--bg2)" }} />)}
+      <div style={{ position: "absolute", top: "50%", left: pos(q.min), width: pos(q.max - q.min), height: 2, transform: "translateY(-50%)", background: col, opacity: 0.5 }} />
+      {[q.min, q.max].map((v, i) => <div key={i} style={{ position: "absolute", top: "25%", bottom: "25%", left: pos(v), width: 2, background: col, opacity: 0.6 }} />)}
+      <div style={{ position: "absolute", top: 4, bottom: 4, left: pos(q.q1), width: pos(q.q3 - q.q1), background: col, opacity: 0.22, border: `1px solid ${col}`, borderRadius: 3 }} />
+      <div style={{ position: "absolute", top: 2, bottom: 2, left: pos(q.med), width: 2, background: col }} />
+    </div>
+  );
+}
+
+export function KlassenarbeitVergleich() {
+  const { t } = useLanguage();
+  const [classId, setClassId] = useState(null);
+  const [kursId, setKursId] = useState(null);
+  const [works, setWorks] = useState([]);
+  const [scale, setScale] = useState(DEFAULT_SCALE);
+  useEffect(() => { try { const u = JSON.parse(localStorage.getItem("user")); if (u?.grade_scale) setScale(u.grade_scale); } catch { /* Default */ } }, []);
+  const kq = kursId != null ? `?kurs_id=${kursId}` : "";
+  useEffect(() => {
+    if (!classId) { setWorks([]); return; }
+    fetch(`${API}/classes/${classId}/works${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => setWorks(Array.isArray(d) ? d : [])).catch(() => setWorks([]));
+  }, [classId, kursId]);
+
+  const rows = useMemo(() => works.map((w) => {
+    const pl = pctList(w); const q = quartiles(pl);
+    const noten = pl.map((p) => gradeFromPct(p, scale));
+    const avgNote = noten.length ? noten.reduce((s, x) => s + x, 0) / noten.length : null;
+    return { id: w.id, name: w.name, q, avgNote };
+  }).filter((r) => r.q), [works, scale]);
+
+  const fmt = (x) => Math.round(x) + "%";
+  const nt = (x) => x == null ? "–" : String(Math.round(x * 10) / 10).replace(".", ",");
+
+  return (
+    <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 16px 40px" }}>
+      <h1 style={pageTitle}>{t("klassenarbeit.compareTitle")}</h1>
+      <p style={{ fontSize: 13, color: "var(--text3)", marginTop: -4, marginBottom: 16 }}>{t("klassenarbeit.compareHint")}</p>
+      <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
+
+      {classId && rows.length === 0 && <div style={{ marginTop: 24 }}><Empty title={t("klassenarbeit.compareEmpty")} /></div>}
+      {rows.length > 0 && (
+        <div style={{ marginTop: 20, border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 14px", fontSize: 11, color: "var(--text3)", borderBottom: "1px solid var(--border)" }}>
+            <span style={{ width: 150, flexShrink: 0 }}>{t("klassenarbeit.compareWork")}</span>
+            <span style={{ flex: 1, minWidth: 200 }}>0 % – 100 %</span>
+            <span style={{ width: 44, textAlign: "right", flexShrink: 0 }}>n</span>
+            <span style={{ width: 54, textAlign: "right", flexShrink: 0 }}>⌀ %</span>
+            <span style={{ width: 54, textAlign: "right", flexShrink: 0 }}>⌀ {t("klassenarbeit.grade")}</span>
+          </div>
+          {rows.map((r) => (
+            <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
+              <span style={{ width: 150, flexShrink: 0, fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.name}>{r.name}</span>
+              <Boxplot q={r.q} />
+              <span style={{ width: 44, textAlign: "right", flexShrink: 0, fontSize: 12.5, color: "var(--text3)" }}>{r.q.n}</span>
+              <span style={{ width: 54, textAlign: "right", flexShrink: 0, fontSize: 12.5, fontWeight: 600 }}>{fmt(r.q.avg)}</span>
+              <span style={{ width: 54, textAlign: "right", flexShrink: 0, fontSize: 13, fontWeight: 700, color: boxColor(r.q.med) }}>{nt(r.avgNote)}</span>
+            </div>
+          ))}
+          <div style={{ padding: "8px 14px", fontSize: 11, color: "var(--text3)" }}>{t("klassenarbeit.boxplotLegend")}</div>
+        </div>
+      )}
+    </div>
+  );
+}

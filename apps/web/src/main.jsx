@@ -103,7 +103,7 @@ import Kalender from "./pages/Kalender.jsx";
 import Methoden from "./pages/Methoden.jsx";
 import Zufall from "./pages/Zufall.jsx";
 import Orga from "./pages/Orga.jsx";
-import Klassenarbeit from "./pages/Klassenarbeit.jsx";
+import Klassenarbeit, { KlassenarbeitVergleich } from "./pages/Klassenarbeit.jsx";
 import { useModules } from "./core/modules.js";
 import { DialogHost } from "./core/dialog.jsx";
 import { UndoHost } from "./core/undo.jsx";
@@ -184,7 +184,10 @@ const getModuleNavItems = (t, location) => {
     return [{ to: ZUF, label: t("zufall.title") }];
   }
   if (area === "klassenarbeit") {
-    return [{ to: KLA, label: t("klassenarbeit.title") }];
+    return [
+      { to: KLA, label: t("klassenarbeit.navWorks"), active: pathname === KLA },
+      { to: `${KLA}/vergleich`, label: t("klassenarbeit.navCompare"), active: pathname.startsWith(`${KLA}/vergleich`) },
+    ];
   }
   if (area === "orga") {
     const tab = params.get("tab");
@@ -755,6 +758,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={MET} element={user ? <ModuleGate moduleKey="methoden"><Methoden /></ModuleGate> : <Landing />} />
           <Route path={ZUF} element={user ? <ModuleGate moduleKey="zufall"><Zufall /></ModuleGate> : <Landing />} />
           <Route path={KLA} element={user ? <ModuleGate moduleKey="klassenarbeit"><Klassenarbeit /></ModuleGate> : <Landing />} />
+          <Route path={`${KLA}/vergleich`} element={user ? <ModuleGate moduleKey="klassenarbeit"><KlassenarbeitVergleich /></ModuleGate> : <Landing />} />
           <Route path={ORG} element={user ? <ModuleGate moduleKey="orga"><Orga /></ModuleGate> : <Landing />} />
 
           {/* ─── Modul Code-Detektiv ─── */}
