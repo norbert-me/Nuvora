@@ -290,6 +290,27 @@
         return '#' + String(n).padStart(6, '0');
     }
 
+    // Bestandsdaten und aus der alten Lernleiter uebernommene Aufgaben haben teils
+    // einen leeren `code` und zeigten darum ueber `a.code || a.id` die GLOBALE
+    // Server-id an (grosse, lueckige Nummern wie 23 — nicht pro User). Jeden leeren
+    // code einmalig mit der naechsten freien #-Nummer fuellen, in id-Reihenfolge,
+    // damit die Vergabe stabil und nachvollziehbar bleibt. Gibt zurueck, ob etwas
+    // gesetzt wurde (dann einmal zum Server spiegeln).
+    function backfillCodes() {
+        const isCode = c => /^#\d+$/.test(String(c || ''));
+        const used = new Set();
+        aufgaben.forEach(a => { const m = String(a.code || '').match(/^#(\d+)$/); if (m) used.add(parseInt(m[1], 10)); });
+        let n = 1, changed = false;
+        aufgaben.filter(a => !isCode(a.code))
+            .sort((x, y) => (x.id || 0) - (y.id || 0))
+            .forEach(a => {
+                while (used.has(n)) n++;
+                a.code = '#' + String(n).padStart(6, '0');
+                used.add(n); changed = true;
+            });
+        return changed;
+    }
+
     // Anzeige-ID immer als #xxxxxx: nach dem Sync ist a.id die numerische
     // Server-ID; die Oberflaeche zeigt sie einheitlich im #-Format.
     function fmtId(id) {
@@ -393,6 +414,7 @@
         }
         topics = tRes.ok ? await tRes.json() : [];
         aufgaben = exRes.ok ? (await exRes.json()).map(vonKern) : [];
+        if (backfillCodes()) syncAufgaben(aufgaben);   // leere Codes einmalig fuellen + spiegeln
         const klassenRaw = clRes.ok ? await clRes.json() : [];
         // Lernleitern hängen am KURS, nicht an der Fach-Klasse: Schüler nach Kurs
         // gruppieren (gleichnamige der Fach-Klassen eines Kurses = eine Person).
