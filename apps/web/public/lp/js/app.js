@@ -1152,23 +1152,23 @@
         e.target.value = '';
     });
 
-    // Aufgaben-POOL als Vorlage exportieren: NUR die Aufgaben, KEINE Schüler-/
+    // Aufgaben als Vorlage exportieren: NUR die Aufgaben, KEINE Schüler-/
     // Klassendaten (DSGVO-sauber, teilbar/wiederverwendbar). Server-IDs werden
-    // beim Import ohnehin neu vergeben, daher unkritisch.
-    document.getElementById('btn-export-aufgaben').addEventListener('click', () => {
-        const data = { type: 'lernleiter_aufgaben', version: 1, aufgaben };
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    // beim Import ohnehin neu vergeben. `liste` = ganzer Pool oder eine Auswahl.
+    function exportAufgabenListe(liste, filename) {
+        if (!liste.length) { toast('Keine Aufgaben ausgewählt'); return; }
+        const blob = new Blob([JSON.stringify({ type: 'lernleiter_aufgaben', version: 1, aufgaben: liste }, null, 2)], { type: 'application/json' });
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'lernleiter_aufgaben_vorlage.json';
-        a.click();
-        URL.revokeObjectURL(a.href);
-        toast('Aufgaben-Vorlage exportiert');
-    });
+        a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href);
+        toast(liste.length + ' Aufgaben exportiert');
+    }
+    const exportPool = () => exportAufgabenListe(aufgaben, 'lernleiter_aufgaben_vorlage.json');
+    const importPicker = () => document.getElementById('aufgaben-file-input').click();
 
-    document.getElementById('btn-import-aufgaben').addEventListener('click', () => {
-        document.getElementById('aufgaben-file-input').click();
-    });
+    document.getElementById('btn-export-aufgaben').addEventListener('click', exportPool);        // Konto-Menü
+    document.getElementById('btn-import-aufgaben').addEventListener('click', importPicker);       // Konto-Menü
+    document.getElementById('btn-export-aufgaben-tab').addEventListener('click', exportPool);     // Aufgaben-Tab
+    document.getElementById('btn-import-aufgaben-tab').addEventListener('click', importPicker);   // Aufgaben-Tab
     document.getElementById('aufgaben-file-input').addEventListener('change', e => {
         const file = e.target.files[0];
         if (!file) return;
@@ -2391,6 +2391,11 @@
         updateFilters();
         updateBulkBar();
         toast(ids.length + ' Aufgaben gelöscht');
+    });
+
+    document.getElementById('btn-bulk-export').addEventListener('click', () => {
+        const idSet = new Set(getSelectedBulkIds());
+        exportAufgabenListe(aufgaben.filter(a => idSet.has(a._id)), 'aufgaben_auswahl.json');
     });
 
     document.getElementById('btn-bulk-cancel').addEventListener('click', () => {

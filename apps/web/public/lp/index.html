@@ -260,6 +260,8 @@
                     <option value="E-Niveau">E-Niveau</option>
                     <option value="Erklärung">Erklärung</option>
                 </select>
+                <button type="button" class="btn small" id="btn-export-aufgaben-tab" title="Alle Aufgaben als Vorlage exportieren (ohne Schülerdaten)">Vorlage exportieren</button>
+                <button type="button" class="btn small" id="btn-import-aufgaben-tab" title="Aufgaben-Vorlage importieren (anhängen)">Vorlage importieren</button>
             </div>
             <div id="bulk-bar" class="bulk-bar" style="display:none">
                 <span id="bulk-count">0 ausgewählt</span>
@@ -267,6 +269,7 @@
                     <input type="text" id="bulk-thema" placeholder="Thema zuweisen" list="themen-list" style="min-width:140px;margin:0">
                     <input type="text" id="bulk-unterthema" placeholder="Unterthema zuweisen" list="unterthemen-list" style="min-width:160px;margin:0">
                     <button type="button" class="btn primary small" id="btn-bulk-assign">Zuweisen</button>
+                    <button type="button" class="btn small" id="btn-bulk-export">Auswahl exportieren</button>
                     <button type="button" class="btn danger small" id="btn-bulk-delete">Auswahl löschen</button>
                     <button type="button" class="btn small" id="btn-bulk-cancel">Abbrechen</button>
                 </div>
