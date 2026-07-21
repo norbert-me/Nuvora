@@ -321,7 +321,7 @@ export default function Kalender() {
           heuteAbsent={heuteAbsent} orgaAktiv={!!aktiv.orga} onOpen={setEditing} onSlot={fromSlot} />
       )}
 
-      {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} t={t} />}
+      {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
       {view === "week" && wdhVorschlag.length > 0 && (
         <div style={{ marginBottom: 12, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)" }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t("kalender.wdhTitle")}</div>
@@ -489,7 +489,7 @@ function HeuteView({ t, tt, weekdayOf, byDay, className, classColor, topicName, 
   );
 }
 
-function MonthGrid({ range, cursor, byDay, extByDay, slotsFor, onSlot, frei, className, topicName, classColor, onAdd, onOpen, t }) {
+function MonthGrid({ range, cursor, byDay, extByDay, slotsFor, onSlot, frei, className, topicName, classColor, onAdd, onOpen, onDayView, onWeekView, t }) {
   const days = [];
   for (let d = new Date(range[0]); d <= range[1]; d = addDays(d, 1)) days.push(new Date(d));
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
@@ -497,17 +497,27 @@ function MonthGrid({ range, cursor, byDay, extByDay, slotsFor, onSlot, frei, cla
   return (
     <div>
       <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
-        <thead><tr>{wdays.map((w) => <th key={w} style={{ padding: 6, fontSize: 12, color: "var(--text3)", textAlign: "left" }}>{w}</th>)}</tr></thead>
+        <thead><tr>
+          <th style={{ width: 34, padding: 6, fontSize: 11, color: "var(--text3)", textAlign: "center" }}>{t("kalender.kw")}</th>
+          {wdays.map((w) => <th key={w} style={{ padding: 6, fontSize: 12, color: "var(--text3)", textAlign: "left" }}>{w}</th>)}
+        </tr></thead>
         <tbody>
-          {Array.from({ length: days.length / 7 }).map((_, r) => (
+          {Array.from({ length: days.length / 7 }).map((_, r) => {
+            const rowMonday = days[r * 7];
+            const kw = isoWeek(rowMonday).week;
+            return (
             <tr key={r}>
+              <td style={{ ...cell, padding: 0, textAlign: "center", verticalAlign: "middle", background: "var(--bg)" }}>
+                <button onClick={() => onWeekView(rowMonday)} title={t("kalender.toWeek")}
+                  style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "var(--text3)", width: "100%", height: "100%", padding: "6px 2px" }}>{kw}</button>
+              </td>
               {days.slice(r * 7, r * 7 + 7).map((d) => {
                 const other = d.getMonth() !== cursor.getMonth();
                 const f = frei && frei(d);
                 return (
                   <td key={ymd(d)} style={{ ...cell, opacity: other ? 0.5 : 1, background: f ? "rgba(184,134,11,0.09)" : undefined, outline: ymd(d) === heute ? "2px solid var(--accent)" : "none", outlineOffset: -2 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>{d.getDate()}</span>
+                      <button onClick={() => onDayView(d)} title={t("kalender.toDay")} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--text2)", padding: 0 }}>{d.getDate()}</button>
                       {!f && <button onClick={() => onAdd(d)} className="icon-btn" style={{ ...iconBtn, padding: 0 }} title={t("kalender.add")}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>}
                     </div>
                     {f ? <FreiMarker label={f.label} t={t} /> : (<>
@@ -519,7 +529,8 @@ function MonthGrid({ range, cursor, byDay, extByDay, slotsFor, onSlot, frei, cla
                 );
               })}
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
