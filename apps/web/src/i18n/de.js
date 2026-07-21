@@ -965,6 +965,8 @@ export default {
   "klassenarbeit.remediate": "Wiederholung erzeugen",
   "klassenarbeit.remediateDone": "{{students}} SuS mit Nachholbedarf · {{cards}} Karten wieder fällig · {{exercises}} Wiederholungsaufgaben angelegt.",
   "klassenarbeit.byTopic": "Trefferquote je Thema",
+  "klassenarbeit.byTask": "Trefferquote je Aufgabe",
+  "klassenarbeit.gradeResult": "Notenverteilung",
   "klassenarbeit.noTopics": "Noch keine Aufgabe hat ein Thema.",
   "klassenarbeit.weakStudents": "Schwache Themen je Schüler",
   "klassenarbeit.empty": "Noch keine Klassenarbeit.",

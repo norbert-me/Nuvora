@@ -965,6 +965,8 @@ export default {
   "klassenarbeit.remediate": "Create repetition",
   "klassenarbeit.remediateDone": "{{students}} students to catch up · {{cards}} cards set due · {{exercises}} repetition tasks created.",
   "klassenarbeit.byTopic": "Hit rate per topic",
+  "klassenarbeit.byTask": "Hit rate per task",
+  "klassenarbeit.gradeResult": "Grade distribution",
   "klassenarbeit.noTopics": "No task has a topic yet.",
   "klassenarbeit.weakStudents": "Weak topics per student",
   "klassenarbeit.empty": "No class test yet.",

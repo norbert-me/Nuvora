@@ -21,6 +21,8 @@ export default function Klassenarbeit() {
   const lernpfadAktiv = modules.find((m) => m.key === "lernpfad")?.active ?? false;
   const notenAktiv = modules.find((m) => m.key === "noten")?.active ?? false;
   const [notenModal, setNotenModal] = useState(false);
+  const [scale, setScale] = useState(DEFAULT_SCALE);
+  useEffect(() => { try { const u = JSON.parse(localStorage.getItem("user")); if (u?.grade_scale) setScale(u.grade_scale); } catch { /* Default */ } }, []);
   const [classId, setClassId] = useState(null);
   const [kursId, setKursId] = useState(null);
   const [classes, setClasses] = useState([]);
@@ -106,8 +108,19 @@ export default function Klassenarbeit() {
       const weak = Object.entries(topicTasks).filter(([, tids]) => { let e = 0, m = 0; tids.forEach((id) => { e += p(s.id, id); m += mx[id]; }); return m && e / m < 0.5; }).map(([tid]) => topicLabel(Number(tid)));
       return weak.length ? { student_id: s.id, name: s.name, weak } : null;
     }).filter(Boolean);
-    return { topics: topicsOut, students: studentsOut };
-  }, [work, students, topics]);
+    // #46 je Aufgabe: durchschnittliche Trefferquote (Punkte/Max über bewertete SuS).
+    const perTask = tasks.map((tk, i) => {
+      let e = 0; graded.forEach((s) => { e += p(s.id, tk.id); });
+      const m = graded.length * mx[tk.id];
+      return { id: tk.id, label: tk.label || `${i + 1}.`, pct: m ? Math.round((e / m) * 100) : 0 };
+    });
+    // #47 Endnote: je SuS Σ/Max → Note (Skala), Schnitt + Verteilung 1–6.
+    const tm = tasks.reduce((n, tk) => n + mx[tk.id], 0);
+    const noten = graded.map((s) => gradeFromPct(tm ? (tasks.reduce((n, tk) => n + p(s.id, tk.id), 0) / tm) * 100 : 0, scale));
+    const dist = [1, 2, 3, 4, 5, 6].map((g) => noten.filter((v) => Math.round(v) === g).length);
+    const avg = noten.length ? Math.round((noten.reduce((a, b) => a + b, 0) / noten.length) * 100) / 100 : null;
+    return { topics: topicsOut, students: studentsOut, perTask, noten: { avg, dist, n: noten.length } };
+  }, [work, students, topics, scale]);
   const wiederholen = async () => {
     if (!work) return;
     setBusy(true);
@@ -219,6 +232,32 @@ export default function Klassenarbeit() {
                 {analyse.students.map((s) => (
                   <div key={s.student_id} style={{ fontSize: 13, padding: "3px 0" }}><b>{s.name}:</b> <span style={{ color: "#d1350f" }}>{s.weak.join(", ")}</span></div>
                 ))}
+              </>)}
+
+              {/* #46 je Aufgabe */}
+              {analyse.perTask.length > 0 && (<>
+                <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.byTask")}</div>
+                {analyse.perTask.map((tk) => (
+                  <div key={tk.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "3px 0" }}>
+                    <span style={{ flex: 1, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tk.label}</span>
+                    <span style={{ width: 100, height: 7, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}><span style={{ display: "block", width: `${tk.pct}%`, height: "100%", background: tk.pct < 50 ? "#d1350f" : tk.pct < 75 ? "#b8860b" : "#0a7d3e" }} /></span>
+                    <span style={{ fontSize: 12, fontWeight: 700, minWidth: 34, textAlign: "right" }}>{tk.pct}%</span>
+                  </div>
+                ))}
+              </>)}
+
+              {/* #47 Endnote */}
+              {analyse.noten.n > 0 && (<>
+                <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.gradeResult")} <span style={{ fontWeight: 400, color: "var(--text3)", fontSize: 12.5 }}>· ⌀ {String(analyse.noten.avg).replace(".", ",")}</span></div>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 70 }}>
+                  {analyse.noten.dist.map((c, i) => { const mxc = Math.max(...analyse.noten.dist, 1); return (
+                    <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                      <div style={{ width: "60%", height: `${Math.max(2, (c / mxc) * 50)}px`, background: i < 2 ? "#0a7d3e" : i < 4 ? "#b8860b" : "#d1350f", borderRadius: 3 }} title={`${c}`} />
+                      <span style={{ fontSize: 11, color: "var(--text3)" }}>{c}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700 }}>{i + 1}</span>
+                    </div>
+                  ); })}
+                </div>
               </>)}
             </div>
           )}

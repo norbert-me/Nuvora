@@ -965,6 +965,8 @@ export default {
   "klassenarbeit.remediate": "Crear repaso",
   "klassenarbeit.remediateDone": "{{students}} alumnos a recuperar · {{cards}} tarjetas reactivadas · {{exercises}} tareas de repaso creadas.",
   "klassenarbeit.byTopic": "Aciertos por tema",
+  "klassenarbeit.byTask": "Aciertos por tarea",
+  "klassenarbeit.gradeResult": "Distribución de notas",
   "klassenarbeit.noTopics": "Ninguna tarea tiene tema aún.",
   "klassenarbeit.weakStudents": "Temas débiles por alumno",
   "klassenarbeit.empty": "Aún no hay examen.",
