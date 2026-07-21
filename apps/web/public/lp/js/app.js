@@ -187,9 +187,12 @@
         } catch(e) { console.error('Sync-Fehler:', e); }
     }
     function toast(msg) {
-        // Eingebettet: an Nuvora geben — position:fixed im hohen iframe landet
-        // sonst am unteren iframe-Rand, ausserhalb des Sichtfensters.
-        if (window.parent !== window) {
+        // Eingebettet (iframe ODER in-page): an Nuvora geben. In-page ist
+        // window.parent === window, aber ein an document.body gehängter .toast
+        // liegt ausserhalb #lp-app, wo das gescopete CSS nicht greift — er
+        // erschiene als ungestylter Text. Darum immer per postMessage an die
+        // Shell (fängt 'message' auf demselben Fenster ab).
+        if (window.parent !== window || inPage) {
             window.parent.postMessage({ type: 'lernpfad:toast', msg: String(msg) }, window.location.origin);
             return;
         }
@@ -1163,35 +1166,11 @@
         toast(liste.length + ' Aufgaben exportiert');
     }
     const exportPool = () => exportAufgabenListe(aufgaben, 'lernleiter_aufgaben_vorlage.json');
-    const importPicker = () => document.getElementById('aufgaben-file-input').click();
 
     document.getElementById('btn-export-aufgaben').addEventListener('click', exportPool);        // Konto-Menü
-    document.getElementById('btn-import-aufgaben').addEventListener('click', importPicker);       // Konto-Menü
     document.getElementById('btn-export-aufgaben-tab').addEventListener('click', exportPool);     // Aufgaben-Tab
-    document.getElementById('btn-import-aufgaben-tab').addEventListener('click', importPicker);   // Aufgaben-Tab
-    document.getElementById('aufgaben-file-input').addEventListener('change', e => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = async ev => {
-            try {
-                const data = JSON.parse(ev.target.result);
-                const liste = Array.isArray(data.aufgaben) ? data.aufgaben : (Array.isArray(data) ? data : null);
-                if (!liste) { toast('Keine Aufgaben in der Datei'); return; }
-                // Vorlage = ANHÄNGEN, nicht ersetzen: IDs entfernen, damit der
-                // Server sie als NEUE Aufgaben anlegt (nichts wird überschrieben).
-                const neu = liste.map(a => { const c = { ...a }; delete c.id; delete c._id; return c; });
-                aufgaben = [...aufgaben, ...neu];
-                await syncAufgaben(aufgaben);
-                renderAufgaben();
-                toast(neu.length + ' Aufgaben als Vorlage importiert');
-            } catch (err) {
-                toast('Fehler: ' + err.message);
-            }
-        };
-        reader.readAsText(file);
-        e.target.value = '';
-    });
+    // Vorlage IMPORTIEREN entfernt: der volle "Aufgaben importieren" (json-file-input)
+    // deckt das Anhängen bereits ab; ein zweiter Weg war verwirrend.
 
     document.getElementById('btn-export-klasse').addEventListener('click', () => {
         const data = { schueler, klassen };
