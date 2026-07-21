@@ -23,6 +23,7 @@ export default function Klassenarbeit() {
   const [notenModal, setNotenModal] = useState(false);
   const [scale, setScale] = useState(DEFAULT_SCALE);
   useEffect(() => { try { const u = JSON.parse(localStorage.getItem("user")); if (u?.grade_scale) setScale(u.grade_scale); } catch { /* Default */ } }, []);
+  const [hideIndividual, setHideIndividual] = useState(false); // #55: SuS-Ansicht — einzelne Leistungen aus
   const [classId, setClassId] = useState(null);
   const [kursId, setKursId] = useState(null);
   const [classes, setClasses] = useState([]);
@@ -229,6 +230,13 @@ export default function Klassenarbeit() {
 
           {analyse && (analyse.topics.length > 0 || analyse.students.length > 0) && (
             <div style={{ marginTop: 18, border: "1px solid var(--border)", borderRadius: 12, padding: 16, background: "var(--card)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, borderBottom: "1px solid var(--border)", paddingBottom: 10 }}>
+                <span style={{ fontSize: 15, fontWeight: 800 }}>{t("klassenarbeit.analysisTitle")}</span>
+                <button onClick={() => setHideIndividual((v) => !v)} title={t("klassenarbeit.presentHint")}
+                  style={{ border: "1px solid var(--border)", background: hideIndividual ? "var(--accent)" : "transparent", color: hideIndividual ? "#fff" : "var(--text2)", borderRadius: 8, padding: "5px 11px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  {hideIndividual ? "👁" : "🎬"} {t("klassenarbeit.presentMode")}
+                </button>
+              </div>
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{t("klassenarbeit.byTopic")}</div>
               {analyse.topics.length === 0 ? <p style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("klassenarbeit.noTopics")}</p> : analyse.topics.map((tp) => (
                 <div key={tp.topic_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0" }}>
@@ -237,7 +245,7 @@ export default function Klassenarbeit() {
                   <span style={{ fontSize: 12.5, fontWeight: 700, minWidth: 38, textAlign: "right" }}>{tp.pct}%</span>
                 </div>
               ))}
-              {analyse.students.length > 0 && (<>
+              {!hideIndividual && analyse.students.length > 0 && (<>
                 <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.weakStudents")}</div>
                 {analyse.students.map((s) => (
                   <div key={s.student_id} style={{ fontSize: 13, padding: "3px 0" }}><b>{s.name}:</b> <span style={{ color: "#d1350f" }}>{s.weak.join(", ")}</span></div>
