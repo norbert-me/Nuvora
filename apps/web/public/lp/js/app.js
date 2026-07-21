@@ -2753,29 +2753,44 @@
     function llSnapshot(ll) {
         return { thema: ll.thema, unterthema: ll.unterthema || '', notizen: ll.notizen || '', config: ll.config || null };
     }
-    function exportPfad(pfad) {
+    // full=true: mit Schülerzuweisungen (Name + Aufgaben-IDs) — vollständig, für
+    // eigenes Backup/Transfer. full=false: Vorlage ohne Schülerdaten (teilbar).
+    function llFull(ll, full) {
+        const snap = llSnapshot(ll);
+        if (full) snap.schueler = (ll.schueler || []).map(s => ({ name: s.name, aufgabenIds: (s.aufgabenIds || []).map(String) }));
+        return snap;
+    }
+    function exportPfad(pfad, full) {
         const used = new Set();
         (pfad.lernleitern || []).forEach(ll => ladderAufgaben(ll).forEach(a => used.add(a)));
-        dlJson({ type: 'lernpfad', version: 1, name: pfad.name, lernleitern: (pfad.lernleitern || []).map(llSnapshot), aufgaben: [...used] }, `lernpfad_${(pfad.name || 'pfad').replace(/[^\w-]+/g, '_')}.json`);
-        toast('Lernpfad exportiert');
+        dlJson({ type: 'lernpfad', version: 1, name: pfad.name, lernleitern: (pfad.lernleitern || []).map(ll => llFull(ll, full)), aufgaben: [...used] },
+               `lernpfad_${(pfad.name || 'pfad').replace(/[^\w-]+/g, '_')}${full ? '' : '_vorlage'}.json`);
+        toast(full ? 'Lernpfad exportiert' : 'Lernpfad als Vorlage exportiert');
     }
-    function exportLernleiter(pfad, ll) {
-        dlJson({ type: 'lernleiter', version: 1, ...llSnapshot(ll), aufgaben: ladderAufgaben(ll) }, `lernleiter_${((ll.thema || 'lernleiter')).replace(/[^\w-]+/g, '_')}.json`);
-        toast('Lernleiter exportiert');
+    function exportLernleiter(pfad, ll, full) {
+        dlJson({ type: 'lernleiter', version: 1, ...llFull(ll, full), aufgaben: ladderAufgaben(ll) },
+               `lernleiter_${((ll.thema || 'lernleiter')).replace(/[^\w-]+/g, '_')}${full ? '' : '_vorlage'}.json`);
+        toast(full ? 'Lernleiter exportiert' : 'Lernleiter als Vorlage exportiert');
     }
     async function importPfadDatei(data) {
         // Eine Lernleiter-Datei als 1-Leiter-Pfad wrappen.
-        if (data.type === 'lernleiter') data = { type: 'lernpfad', name: data.thema || 'Importierte Lernleiter', lernleitern: [{ thema: data.thema, unterthema: data.unterthema, notizen: data.notizen, config: data.config }], aufgaben: data.aufgaben };
+        if (data.type === 'lernleiter') data = { type: 'lernpfad', name: data.thema || 'Importierte Lernleiter', lernleitern: [{ thema: data.thema, unterthema: data.unterthema, notizen: data.notizen, config: data.config, schueler: data.schueler }], aufgaben: data.aufgaben };
         if (!Array.isArray(data.lernleitern)) { toast('Keine Lernpfad-Datei'); return; }
-        // 1. Aufgaben anlegen (id-los → neu), damit der Pool sie kennt.
-        const neu = (data.aufgaben || []).map(a => { const c = { ...a }; delete c.id; delete c._id; return c; });
+        // 1. Aufgaben anlegen (id-los → neu). Alte IDs merken fürs Umhängen.
+        const neu = (data.aufgaben || []).map(a => { const c = { ...a }; c.__old = String(a.id != null ? a.id : (a._id != null ? a._id : '')); delete c.id; delete c._id; return c; });
         if (neu.length) { aufgaben = [...aufgaben, ...neu]; await syncAufgaben(aufgaben); }
-        // 2. Neuen Pfad mit Lernleiter-Hüllen (Vorlage: keine Schülerzuweisung).
+        const map = {}; neu.forEach(a => { if (a.__old) map[a.__old] = a.id; delete a.__old; });
+        // 2. Schüler per NAMEN aufs eigene Roster mappen (nur bei Voll-Export vorhanden).
+        const byName = {}; schueler.forEach(s => { byName[(s.name || '').trim()] = s; });
         let name = data.name || 'Importierter Pfad';
         const namen = new Set(lernpfade.map(p => p.name));
         if (namen.has(name)) { let i = 2; while (namen.has(`${name} (${i})`)) i++; name = `${name} (${i})`; }
-        const pfad = { _id: `pfad_${Date.now()}`, name, lernleitern: data.lernleitern.map((ll, i) => ({ _id: `ll_${Date.now()}_${i}`, thema: ll.thema || '', unterthema: ll.unterthema || '', klasse: '', notizen: ll.notizen || '', config: ll.config || null, schueler: [] })) };
-        if (await savePfad(pfad)) { toast(`Lernpfad „${name}" importiert${neu.length ? ` (${neu.length} Aufgaben)` : ''}`); loadLernpfade(); }
+        const pfad = { _id: `pfad_${Date.now()}`, name, lernleitern: data.lernleitern.map((ll, i) => ({
+            _id: `ll_${Date.now()}_${i}`, thema: ll.thema || '', unterthema: ll.unterthema || '', klasse: '', notizen: ll.notizen || '', config: ll.config || null,
+            schueler: (ll.schueler || []).map(s => { const st = byName[(s.name || '').trim()]; return st ? { _id: String(st.id), id: st.id, name: st.name, aufgabenIds: (s.aufgabenIds || []).map(x => map[String(x)]).filter(Boolean) } : null; }).filter(Boolean),
+        })) };
+        const mitZuw = pfad.lernleitern.some(ll => ll.schueler.length);
+        if (await savePfad(pfad)) { toast(`Lernpfad „${name}" importiert${neu.length ? ` (${neu.length} Aufgaben${mitZuw ? ', mit Zuweisungen' : ''})` : ''}`); loadLernpfade(); }
     }
     function importPfadPicker() {
         const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json';
@@ -2792,7 +2807,8 @@
                     <span style="color:var(--text-muted)">– ${(p.lernleitern || []).length} Lernleitern</span>
                 </div>
                 <div class="btn-group">
-                    <button class="btn icon" data-action="export" data-id="${p._id}" title="Als Vorlage exportieren">${ICON.download}</button>
+                    <button class="btn" data-action="export-full" data-id="${p._id}" style="font-size:11px;padding:3px 8px" title="Vollständig, mit Schülerzuweisungen">${ICON.download} Export</button>
+                    <button class="btn" data-action="export-vorlage" data-id="${p._id}" style="font-size:11px;padding:3px 8px" title="Ohne Schülerdaten (teilbar)">${ICON.download} Vorlage</button>
                     <button class="btn icon" data-action="edit" data-id="${p._id}" title="Bearbeiten">${ICON.edit}</button>
                     <button class="btn icon danger" data-action="delete" data-id="${p._id}" title="Löschen">${ICON.delete}</button>
                 </div>
@@ -2820,7 +2836,8 @@
                 e.stopPropagation();
                 const act = btn.dataset.action;
                 if (act === 'edit') openPfad(btn.dataset.id);
-                else if (act === 'export') exportPfad(lernpfade.find(p => p._id === btn.dataset.id));
+                else if (act === 'export-full') exportPfad(lernpfade.find(p => p._id === btn.dataset.id), true);
+                else if (act === 'export-vorlage') exportPfad(lernpfade.find(p => p._id === btn.dataset.id), false);
                 else if (act === 'delete') deletePfad(btn.dataset.id);
             });
         });
@@ -2900,7 +2917,8 @@
                 </div>
                 <div class="btn-group">
                     <button class="btn icon" data-ll-id="${ll._id}" data-action="rename" title="Umbenennen">${ICON.edit}</button>
-                    <button class="btn icon" data-ll-id="${ll._id}" data-action="export" title="Als Vorlage exportieren">${ICON.download}</button>
+                    <button class="btn" data-ll-id="${ll._id}" data-action="export-full" style="font-size:11px;padding:3px 8px" title="Vollständig, mit Schülerzuweisungen">${ICON.download} Export</button>
+                    <button class="btn" data-ll-id="${ll._id}" data-action="export-vorlage" style="font-size:11px;padding:3px 8px" title="Ohne Schülerdaten (teilbar)">${ICON.download} Vorlage</button>
                     <button class="btn icon" data-ll-id="${ll._id}" data-action="share" title="Im Marktplatz teilen">${ICON.share}</button>
                     ${i > 0 ? `<button class="btn icon" data-ll-id="${ll._id}" data-action="up" title="Nach oben">${ICON.up}</button>` : ''}
                     ${i < list.length - 1 ? `<button class="btn icon" data-ll-id="${ll._id}" data-action="down" title="Nach unten">${ICON.down}</button>` : ''}
@@ -2919,8 +2937,12 @@
                     openLernleiter(currentPfad, currentPfad.lernleitern[idx]);
                     return;
                 }
-                if (action === 'export') {
-                    exportLernleiter(currentPfad, currentPfad.lernleitern[idx]);
+                if (action === 'export-full') {
+                    exportLernleiter(currentPfad, currentPfad.lernleitern[idx], true);
+                    return;
+                }
+                if (action === 'export-vorlage') {
+                    exportLernleiter(currentPfad, currentPfad.lernleitern[idx], false);
                     return;
                 }
                 if (action === 'share') {
