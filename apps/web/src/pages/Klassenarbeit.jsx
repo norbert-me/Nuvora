@@ -2,13 +2,14 @@
 // (Label + Thema), Spalten = SuS, Zelle = richtig/falsch. Daraus je SuS ein
 // Fehlerprofil nach Thema und auf Knopfdruck gezielte Wiederholung (Karten des
 // schwachen Themas wieder fällig).
-import { useState, useEffect, useRef } from "react";
-import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty } from "../components/Icons.jsx";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, modalOverlay, modalPanel } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { lastClass, rememberClass } from "../core/cache.js";
+import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
 
 const API = "/api/klassenarbeit";
 const newId = () => "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -18,6 +19,8 @@ export default function Klassenarbeit() {
   const { modules } = useModules();
   const kartenAktiv = modules.find((m) => m.key === "karten")?.active ?? false;
   const lernpfadAktiv = modules.find((m) => m.key === "lernpfad")?.active ?? false;
+  const notenAktiv = modules.find((m) => m.key === "noten")?.active ?? false;
+  const [notenModal, setNotenModal] = useState(false);
   const [classId, setClassId] = useState(null);
   const [kursId, setKursId] = useState(null);
   const [classes, setClasses] = useState([]);
@@ -25,7 +28,6 @@ export default function Klassenarbeit() {
   const [topics, setTopics] = useState([]);
   const [works, setWorks] = useState([]);
   const [work, setWork] = useState(null); // { id, name, tasks:[{id,label,topic_id}], results:{sid:[taskId]} }
-  const [analysis, setAnalysis] = useState(null);
   const [busy, setBusy] = useState(false);
   const kq = kursId != null ? `?kurs_id=${kursId}` : "";
   const saveTimer = useRef(null);
@@ -50,7 +52,7 @@ export default function Klassenarbeit() {
 
   // Änderung lokal + gebündelt speichern (PUT der ganzen Arbeit).
   const persist = (next) => {
-    setWork(next); setAnalysis(null);
+    setWork(next);
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       fetch(`${API}/works/${next.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: next.name, tasks: next.tasks, results: next.results }) }).catch(() => {});
@@ -76,7 +78,25 @@ export default function Klassenarbeit() {
     persist({ ...work, results: { ...(work.results || {}), [String(sid)]: [...cur] } });
   };
 
-  const auswerten = () => { if (work) fetch(`${API}/works/${work.id}/analysis`).then((r) => (r.ok ? r.json() : null)).then(setAnalysis).catch(() => {}); };
+  // Auswertung LIVE aus dem Raster (kein Button, kein Server-Call): je Thema die
+  // Trefferquote der Klasse + je SuS die schwachen Themen (≥ 50 % falsch).
+  const analyse = useMemo(() => {
+    if (!work) return null;
+    const topicTasks = {};
+    (work.tasks || []).forEach((tk) => { if (tk.topic_id) (topicTasks[tk.topic_id] ||= []).push(tk.id); });
+    const wrong = (sid) => new Set((work.results || {})[String(sid)] || []);
+    const topicsOut = Object.entries(topicTasks).map(([tid, tids]) => {
+      let f = 0, tot = 0;
+      students.forEach((s) => { const w = wrong(s.id); tids.forEach((id) => { tot++; if (w.has(id)) f++; }); });
+      return { topic_id: Number(tid), label: topicLabel(Number(tid)), pct: tot ? Math.round((1 - f / tot) * 100) : 0 };
+    }).sort((a, b) => a.pct - b.pct);
+    const studentsOut = students.map((s) => {
+      const w = wrong(s.id);
+      const weak = Object.entries(topicTasks).filter(([, tids]) => { const f = tids.filter((id) => w.has(id)).length; return tids.length && f / tids.length >= 0.5; }).map(([tid]) => topicLabel(Number(tid)));
+      return weak.length ? { student_id: s.id, name: s.name, weak } : null;
+    }).filter(Boolean);
+    return { topics: topicsOut, students: studentsOut };
+  }, [work, students, topics]);
   const wiederholen = async () => {
     if (!work) return;
     setBusy(true);
@@ -156,23 +176,24 @@ export default function Klassenarbeit() {
           <button onClick={addTask} style={{ ...btnSecondary, marginTop: 10 }}>+ {t("klassenarbeit.addTask")}</button>
 
           <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
-            <button onClick={auswerten} style={btnPrimary}>{t("klassenarbeit.evaluate")}</button>
+            {notenAktiv && (work.tasks || []).length > 0 && <button onClick={() => setNotenModal(true)} style={btnPrimary}>{t("klassenarbeit.toNoten")}</button>}
             {(kartenAktiv || lernpfadAktiv) && <button onClick={wiederholen} disabled={busy} style={{ ...btnSecondary, opacity: busy ? 0.6 : 1 }}>💡 {t("klassenarbeit.remediate")}</button>}
           </div>
+          {notenModal && <NotenUebernahme t={t} classId={classId} kursId={kursId} students={students} work={work} onClose={() => setNotenModal(false)} />}
 
-          {analysis && (
+          {analyse && (analyse.topics.length > 0 || analyse.students.length > 0) && (
             <div style={{ marginTop: 18, border: "1px solid var(--border)", borderRadius: 12, padding: 16, background: "var(--card)" }}>
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{t("klassenarbeit.byTopic")}</div>
-              {analysis.topics.length === 0 ? <p style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("klassenarbeit.noTopics")}</p> : analysis.topics.map((tp) => (
+              {analyse.topics.length === 0 ? <p style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("klassenarbeit.noTopics")}</p> : analyse.topics.map((tp) => (
                 <div key={tp.topic_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0" }}>
                   <span style={{ flex: 1, fontSize: 13 }}>{tp.label}</span>
                   <span style={{ width: 120, height: 8, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}><span style={{ display: "block", width: `${tp.pct}%`, height: "100%", background: tp.pct < 50 ? "#d1350f" : tp.pct < 75 ? "#b8860b" : "#0a7d3e" }} /></span>
                   <span style={{ fontSize: 12.5, fontWeight: 700, minWidth: 38, textAlign: "right" }}>{tp.pct}%</span>
                 </div>
               ))}
-              {analysis.students.length > 0 && (<>
+              {analyse.students.length > 0 && (<>
                 <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.weakStudents")}</div>
-                {analysis.students.map((s) => (
+                {analyse.students.map((s) => (
                   <div key={s.student_id} style={{ fontSize: 13, padding: "3px 0" }}><b>{s.name}:</b> <span style={{ color: "#d1350f" }}>{s.weak.join(", ")}</span></div>
                 ))}
               </>)}
@@ -182,6 +203,63 @@ export default function Klassenarbeit() {
       )}
       {classId && !work && <Empty title={t("klassenarbeit.empty")} hint={t("klassenarbeit.emptyHint")} action={t("klassenarbeit.new")} onAction={neueArbeit} />}
       {classId && work && students.length === 0 && <Empty title={t("klassenarbeit.noStudents")} />}
+    </div>
+  );
+}
+
+// In Noten übernehmen: aus der Trefferquote (richtige/gesamt) je SuS eine Note
+// über die Notenskala der Lehrkraft, als neue Spalte im gewählten Abschnitt.
+// Nur SuS mit mind. einer markierten falschen Aufgabe ODER allen richtig — die
+// Spalte ist frei editierbar (Abwesende später herausnehmen).
+function NotenUebernahme({ t, classId, kursId, students, work, onClose }) {
+  const [sections, setSections] = useState(null);
+  const [sectionId, setSectionId] = useState("");
+  const [name, setName] = useState(work.name || t("klassenarbeit.newName"));
+  const [scale, setScale] = useState(DEFAULT_SCALE);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const kq = `?term=all${kursId != null ? `&kurs_id=${kursId}` : ""}`;
+  useEffect(() => {
+    fetch(`/api/noten/classes/${classId}/sections${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => { const l = Array.isArray(d) ? d : []; setSections(l); if (l[0]) setSectionId(String(l[0].id)); }).catch(() => setSections([]));
+    try { const u = JSON.parse(localStorage.getItem("user")); if (u?.grade_scale) setScale(u.grade_scale); } catch { /* Default */ }
+  }, []);
+  const total = (work.tasks || []).length;
+  const grades = students.map((s) => {
+    const wrong = ((work.results || {})[String(s.id)] || []).length;
+    return { student_id: s.id, value: gradeFromPct(((total - wrong) / total) * 100, scale) };
+  }).filter((g) => g.value >= 1 && g.value <= 6);
+  const secLabel = (s) => `${s.term === "2" ? "2. Hj · " : "1. Hj · "}${s.name}`;
+  const submit = async () => {
+    if (!sectionId) { setErr(t("karten.masteryNoSection")); return; }
+    setBusy(true); setErr("");
+    const res = await fetch("/api/noten/import-grades", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ class_id: classId, kurs_id: kursId, section_id: Number(sectionId), column_name: name.trim(), note: t("klassenarbeit.title"), source_kind: "klassenarbeit", grades }) }).catch(() => null);
+    setBusy(false);
+    if (res && res.ok) onClose();
+    else { const b = res ? await res.json().catch(() => ({})) : {}; setErr(typeof b.detail === "string" ? b.detail : t("common.notWork")); }
+  };
+  const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
+  return (
+    <div onClick={onClose} style={modalOverlay}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 440 }}>
+        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t("klassenarbeit.toNoten")}</h3>
+        <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 12px" }}>{t("klassenarbeit.toNotenHint", { n: grades.length })}</p>
+        {sections && sections.length === 0 ? (
+          <p style={{ fontSize: 13, color: "#d1350f" }}>{t("karten.masteryNoSection")}</p>
+        ) : (<>
+          <div style={{ ...lbl, marginTop: 0 }}>{t("karten.masterySection")}</div>
+          <select value={sectionId} onChange={(e) => setSectionId(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
+            {(sections || []).map((s) => <option key={s.id} value={s.id}>{secLabel(s)}</option>)}
+          </select>
+          <div style={lbl}>{t("noten.columnName")}</div>
+          <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, width: "100%" }} />
+        </>)}
+        {err && <p style={{ color: "#d1350f", fontSize: 12.5, marginTop: 10 }}>{err}</p>}
+        <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+          <button onClick={submit} disabled={busy || grades.length === 0 || (sections && sections.length === 0)} style={{ ...btnPrimary, opacity: busy ? 0.6 : 1 }}>{t("common.save")}</button>
+          <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
+        </div>
+      </div>
     </div>
   );
 }

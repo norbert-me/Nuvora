@@ -946,6 +946,8 @@ export default {
   "noten.fromCdDone": "Spalte angelegt. {{n}} Spielernamen ließen sich keinem Schüler zuordnen:",
   "zufall.title": "Zufallsschüler",
   "klassenarbeit.title": "Klassenarbeit",
+  "klassenarbeit.toNoten": "In Noten übernehmen",
+  "klassenarbeit.toNotenHint": "Aus der Trefferquote wird je Schüler eine Note (über deine Notenskala) und als neue Spalte angelegt ({{n}} SuS). Frei editierbar — Abwesende danach entfernen.",
   "klassenarbeit.hint": "Aufgaben mit Thema anlegen und je Schüler richtig oder falsch ankreuzen. Die Auswertung zeigt dann, wer bei welchem Thema Nachholbedarf hat.",
   "klassenarbeit.none": "— keine Arbeit —",
   "klassenarbeit.new": "Neue Arbeit",

@@ -946,6 +946,8 @@ export default {
   "noten.fromCdDone": "Columna creada. {{n}} nombres no se pudieron asignar a un alumno:",
   "zufall.title": "Alumno al azar",
   "klassenarbeit.title": "Examen",
+  "klassenarbeit.toNoten": "Pasar a notas",
+  "klassenarbeit.toNotenHint": "El porcentaje de aciertos se convierte en nota (según tu escala) en una columna nueva ({{n}} alumnos). Editable — quita ausentes después.",
   "klassenarbeit.hint": "Crea tareas con tema y marca correcto o incorrecto por alumno. La evaluación muestra quién necesita repasar qué tema.",
   "klassenarbeit.none": "— sin examen —",
   "klassenarbeit.new": "Nuevo examen",
