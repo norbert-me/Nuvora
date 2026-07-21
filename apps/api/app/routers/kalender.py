@@ -520,12 +520,19 @@ def _parse_ics(text: str):
         elif cur is not None and ":" in line:
             key, val = line.split(":", 1)
             k = key.split(";", 1)[0].upper()
+            raw = val.strip()
             if k == "DTSTART":
-                cur["start"] = val.strip()[:8]  # YYYYMMDD (Datum-Teil reicht)
+                cur["start"] = raw[:8]  # YYYYMMDD (Datum-Teil)
+                if "T" in raw and len(raw) >= 13:   # YYYYMMDDTHHMMSS -> Uhrzeit
+                    cur["time"] = raw[9:11] + ":" + raw[11:13]
             elif k == "DTEND":
-                cur["end"] = val.strip()[:8]
+                cur["end"] = raw[:8]
             elif k == "SUMMARY":
-                cur["title"] = val.strip().replace("\\,", ",").replace(r"\;", ";").replace("\\n", " ")
+                cur["title"] = raw.replace("\\,", ",").replace(r"\;", ";").replace("\\n", " ")
+            elif k == "LOCATION":
+                cur["location"] = raw.replace("\\,", ",").replace(r"\;", ";").replace("\\n", " ")[:200]
+            elif k == "DESCRIPTION":
+                cur["description"] = raw.replace("\\,", ",").replace(r"\;", ";").replace("\\n", "\n").replace("\\N", "\n")[:1000]
     return events
 
 
@@ -583,16 +590,21 @@ async def external_events(user: User = Depends(require_module)):
             continue
         title = e.get("title", "")[:200]
         d1 = _d(e.get("end"))
+        # Info-Felder je Event (fuer das Detail-Popup); read-only.
+        multi = bool(d1 and d1 > d0)
+        last = (d1 - timedelta(days=1)) if multi else d0
+        info = {"title": title, "time": e.get("time"), "location": e.get("location", ""),
+                "description": e.get("description", ""), "start": d0.isoformat(), "end": last.isoformat()}
         # Mehrtägige (Ganztags-)Events über alle Tage anzeigen; DTEND ist bei
         # Ganztags exklusiv. Ohne/gleiches Ende: nur der eine Tag. Max 60 Tage.
-        if d1 and d1 > d0:
+        if multi:
             cur = d0
             n = 0
             while cur < d1 and n < 60:
-                out.append({"date": cur.isoformat(), "title": title})
+                out.append({**info, "date": cur.isoformat()})
                 cur += timedelta(days=1); n += 1
         else:
-            out.append({"date": d0.isoformat(), "title": title})
+            out.append({**info, "date": d0.isoformat()})
     result = out[:2000]
     _EXT_CACHE[user.id] = (user.external_ics_url, time.time() + _EXT_TTL, result)
     return result

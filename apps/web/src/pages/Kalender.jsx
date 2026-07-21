@@ -69,6 +69,7 @@ export default function Kalender() {
   const [wdhVorschlag, setWdhVorschlag] = useState([]); // schwache Themen der Vorwoche
   const [slotEdit, setSlotEdit] = useState(null); // { weekday, period, ...slot } oder null
   const [heuteAbsent, setHeuteAbsent] = useState({}); // class_id -> Anzahl Fehlende heute
+  const [extInfo, setExtInfo] = useState(null); // angeklickter externer (abonnierter) Termin
 
   useEffect(() => {
     swr("classes", "/api/classes", (d) => setClasses(Array.isArray(d) ? d : []));
@@ -321,7 +322,7 @@ export default function Kalender() {
           heuteAbsent={heuteAbsent} orgaAktiv={!!aktiv.orga} onOpen={setEditing} onSlot={fromSlot} />
       )}
 
-      {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
+      {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
       {view === "week" && wdhVorschlag.length > 0 && (
         <div style={{ marginBottom: 12, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)" }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t("kalender.wdhTitle")}</div>
@@ -337,8 +338,8 @@ export default function Kalender() {
           </div>
         </div>
       )}
-      {view === "week" && <WeekView range={range} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} frei={frei} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
-      {view === "day" && <DayView day={cursor} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} frei={frei} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onSlot={fromSlot} t={t} />}
+      {view === "week" && <WeekView range={range} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} frei={frei} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
+      {view === "day" && <DayView day={cursor} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} frei={frei} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
       {view === "timetable" && <TimetableView tt={tt} className={className} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
@@ -371,6 +372,38 @@ export default function Kalender() {
         </div>
       )}
       {slotEdit && <SlotModal slot={slotEdit} classes={classes} topics={topics} onSave={saveSlot} onDelete={removeSlot} onColor={setClassColor} onClose={() => setSlotEdit(null)} t={t} />}
+      {extInfo && <ExtInfoModal ev={extInfo} onClose={() => setExtInfo(null)} t={t} />}
+    </div>
+  );
+}
+
+// Read-only-Info zu einem angeklickten externen (abonnierten) Termin. Nicht
+// editierbar — fremder Kalender; nur Anzeige der ICS-Felder.
+function ExtInfoModal({ ev, onClose, t }) {
+  const fmt = (iso) => { try { return new Date(iso + "T00:00:00").toLocaleDateString(); } catch { return iso; } };
+  const zeitraum = ev.end && ev.end !== ev.start ? `${fmt(ev.start)} – ${fmt(ev.end)}` : fmt(ev.start || ev.date);
+  const Zeile = ({ label, children }) => (
+    <div style={{ display: "flex", gap: 10, padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
+      <span style={{ width: 96, flexShrink: 0, fontSize: 12.5, color: "var(--text3)" }}>{label}</span>
+      <span style={{ fontSize: 13.5, color: "var(--text)", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{children}</span>
+    </div>
+  );
+  return (
+    <div onClick={onClose} style={modalOverlay}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 440 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <span>🔗</span>
+          <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, flex: 1 }}>{ev.title || "—"}</h3>
+        </div>
+        <p style={{ fontSize: 12, color: "var(--text3)", margin: "0 0 12px" }}>{t("kalender.extEventNote")}</p>
+        <Zeile label={t("kalender.extDate")}>{zeitraum}</Zeile>
+        {ev.time && <Zeile label={t("kalender.extTime")}>{ev.time}</Zeile>}
+        {ev.location && <Zeile label={t("kalender.extLocation")}>{ev.location}</Zeile>}
+        {ev.description && <Zeile label={t("kalender.extDesc")}>{ev.description}</Zeile>}
+        <div style={{ marginTop: 16, textAlign: "right" }}>
+          <button onClick={onClose} style={btnSecondary}>{t("common.close") !== "common.close" ? t("common.close") : "Schließen"}</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -397,10 +430,11 @@ function SlotGhosts({ list, entries, className, topicName, onSlot, day, t }) {
 // Modul-Objekt (Deck/Quiz/Lernleiter) liegen dort — kein Inline-↗ mehr im
 // Kalenderraster (war Doppelung und Unruhe).
 // Externe (abonnierte) Termine — read-only, grau, nicht klickbar.
-function ExtChips({ list }) {
+function ExtChips({ list, onOpen }) {
   if (!list || !list.length) return null;
   return list.map((ev, i) => (
-    <div key={`ext-${i}`} title={ev.title} style={{ fontSize: 11, color: "var(--text3)", background: "var(--bg2)", border: "1px dashed var(--border2)", borderRadius: 6, padding: "1px 5px", margin: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>🔗 {ev.title || "—"}</div>
+    <button key={`ext-${i}`} onClick={onOpen ? () => onOpen(ev) : undefined} title={ev.title}
+      style={{ display: "block", width: "100%", textAlign: "left", fontSize: 11, color: "var(--text3)", background: "var(--bg2)", border: "1px dashed var(--border2)", borderRadius: 6, padding: "1px 5px", margin: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: onOpen ? "pointer" : "default" }}>🔗 {ev.title || "—"}</button>
   ));
 }
 
@@ -489,7 +523,7 @@ function HeuteView({ t, tt, weekdayOf, byDay, className, classColor, topicName, 
   );
 }
 
-function MonthGrid({ range, cursor, byDay, extByDay, slotsFor, onSlot, frei, className, topicName, classColor, onAdd, onOpen, onDayView, onWeekView, t }) {
+function MonthGrid({ range, cursor, byDay, extByDay, slotsFor, onSlot, frei, className, topicName, classColor, onAdd, onOpen, onExt, onDayView, onWeekView, t }) {
   const days = [];
   for (let d = new Date(range[0]); d <= range[1]; d = addDays(d, 1)) days.push(new Date(d));
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
@@ -522,7 +556,7 @@ function MonthGrid({ range, cursor, byDay, extByDay, slotsFor, onSlot, frei, cla
                     </div>
                     {f ? <FreiMarker label={f.label} t={t} /> : (<>
                       <EntryChips list={byDay(d)} className={className} topicName={topicName} onOpen={onOpen} classColor={classColor} />
-                      <ExtChips list={extByDay && extByDay(d)} />
+                      <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} />
                       {slotsFor && <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} topicName={topicName} onSlot={onSlot} day={d} t={t} />}
                     </>)}
                   </td>
@@ -537,7 +571,7 @@ function MonthGrid({ range, cursor, byDay, extByDay, slotsFor, onSlot, frei, cla
   );
 }
 
-function WeekView({ range, byDay, extByDay, slotsFor, frei, className, classColor, topicName, onAdd, onOpen, onSlot, t }) {
+function WeekView({ range, byDay, extByDay, slotsFor, frei, className, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
   const days = [];
   for (let d = new Date(range[0]); d <= range[1]; d = addDays(d, 1)) days.push(new Date(d));
   return (
@@ -553,7 +587,7 @@ function WeekView({ range, byDay, extByDay, slotsFor, frei, className, classColo
           {f ? <FreiMarker label={f.label} t={t} /> : (<>
             <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} topicName={topicName} onSlot={onSlot} day={d} t={t} />
             <EntryChips list={byDay(d)} className={className} topicName={topicName} onOpen={onOpen} classColor={classColor} />
-            <ExtChips list={extByDay && extByDay(d)} />
+            <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} />
           </>)}
         </div>
         );
@@ -576,7 +610,7 @@ function FreiMarker({ label, t }) {
   );
 }
 
-function DayView({ day, byDay, extByDay, slotsFor, frei, className, classColor, topicName, onAdd, onOpen, onSlot, t }) {
+function DayView({ day, byDay, extByDay, slotsFor, frei, className, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
   const list = byDay(day);
   const slots = slotsFor(day);
   const ext = extByDay ? extByDay(day) : [];
@@ -590,7 +624,7 @@ function DayView({ day, byDay, extByDay, slotsFor, frei, className, classColor, 
           <SlotGhosts list={slots} entries={list} className={className} topicName={topicName} onSlot={onSlot} day={day} t={t} />
         </div>
       )}
-      {ext.length > 0 && <div style={{ marginBottom: 10 }}><ExtChips list={ext} /></div>}
+      {ext.length > 0 && <div style={{ marginBottom: 10 }}><ExtChips list={ext} onOpen={onExt} /></div>}
       {list.length === 0 && ext.length === 0 ? <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("kalender.empty")}</p> : list.map((e) => (
         <button key={e.id} onClick={() => onOpen({ ...e, date: new Date(e.date) })} style={{ display: "block", width: "100%", textAlign: "left", padding: 14, marginBottom: 8, borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer" }}>
           <div style={{ fontSize: 15, fontWeight: 600 }}>{e.title || topicName(e.topic_id) || "—"}</div>
