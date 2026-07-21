@@ -20,6 +20,7 @@ export default function Klassenarbeit() {
   const lernpfadAktiv = modules.find((m) => m.key === "lernpfad")?.active ?? false;
   const [classId, setClassId] = useState(null);
   const [kursId, setKursId] = useState(null);
+  const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
   const [topics, setTopics] = useState([]);
   const [works, setWorks] = useState([]);
@@ -30,6 +31,14 @@ export default function Klassenarbeit() {
   const saveTimer = useRef(null);
 
   useEffect(() => { fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
+  // Beim ersten Besuch gleich eine Klasse wählen (zuletzt genutzte, sonst erste),
+  // damit die Arbeitsauswahl nicht ausgeblendet bleibt, bis man von Hand klickt.
+  useEffect(() => {
+    fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).then((list) => {
+      const l = Array.isArray(list) ? list : []; setClasses(l);
+      if (classId == null && l.length) { const w = lastClass(); setClassId(l.some((c) => c.id === w) ? w : l[0].id); }
+    }).catch(() => {});
+  }, []); // eslint-disable-line
   useEffect(() => {
     if (classId) rememberClass(classId);
     if (!classId) { setStudents([]); setWorks([]); setWork(null); return; }
@@ -101,7 +110,8 @@ export default function Klassenarbeit() {
 
       {classId && work && students.length > 0 && (
         <>
-          <input value={work.name} onChange={(e) => persist({ ...work, name: e.target.value })} placeholder={t("klassenarbeit.newName")}
+          {/* Name sofort auch im Auswahl-Dropdown zeigen (nicht erst nach Reload). */}
+          <input value={work.name} onChange={(e) => { const name = e.target.value; persist({ ...work, name }); setWorks((ws) => ws.map((x) => (x.id === work.id ? { ...x, name } : x))); }} placeholder={t("klassenarbeit.newName")}
             style={{ ...inputStyle, fontSize: 16, fontWeight: 600, marginBottom: 12, maxWidth: 360 }} />
 
           <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 12 }}>
@@ -137,7 +147,7 @@ export default function Klassenarbeit() {
                         </td>
                       );
                     })}
-                    <td style={td}><button onClick={() => delTask(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} size={13} color="var(--text3)" /></button></td>
+                    <td style={td}><button onClick={() => delTask(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button></td>
                   </tr>
                 ))}
               </tbody>

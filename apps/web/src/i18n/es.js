@@ -946,7 +946,7 @@ export default {
   "noten.fromCdDone": "Columna creada. {{n}} nombres no se pudieron asignar a un alumno:",
   "zufall.title": "Alumno al azar",
   "klassenarbeit.title": "Examen",
-  "klassenarbeit.hint": "Un tema por tarea, correcto/incorrecto por alumno. Ves los temas débiles de cada uno — y reactivas tarjetas a propósito.",
+  "klassenarbeit.hint": "Crea tareas con tema y marca correcto o incorrecto por alumno. La evaluación muestra quién necesita repasar qué tema.",
   "klassenarbeit.none": "— sin examen —",
   "klassenarbeit.new": "Nuevo examen",
   "klassenarbeit.newName": "Examen",

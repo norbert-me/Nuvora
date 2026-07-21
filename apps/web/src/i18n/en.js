@@ -946,7 +946,7 @@ export default {
   "noten.fromCdDone": "Column created. {{n}} player names could not be matched to a student:",
   "zufall.title": "Random student",
   "klassenarbeit.title": "Class test",
-  "klassenarbeit.hint": "One topic per task, right/wrong per student. See each person's weak topics — and re-queue cards on purpose.",
+  "klassenarbeit.hint": "Add tasks with a topic and tick right or wrong per student. The evaluation then shows who needs to catch up on which topic.",
   "klassenarbeit.none": "— no test —",
   "klassenarbeit.new": "New test",
   "klassenarbeit.newName": "Class test",

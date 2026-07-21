@@ -946,7 +946,7 @@ export default {
   "noten.fromCdDone": "Spalte angelegt. {{n}} Spielernamen ließen sich keinem Schüler zuordnen:",
   "zufall.title": "Zufallsschüler",
   "klassenarbeit.title": "Klassenarbeit",
-  "klassenarbeit.hint": "Je Aufgabe ein Thema, je Schüler richtig/falsch. Daraus siehst du je Person die schwachen Themen — und setzt gezielt Karten wieder fällig.",
+  "klassenarbeit.hint": "Aufgaben mit Thema anlegen und je Schüler richtig oder falsch ankreuzen. Die Auswertung zeigt dann, wer bei welchem Thema Nachholbedarf hat.",
   "klassenarbeit.none": "— keine Arbeit —",
   "klassenarbeit.new": "Neue Arbeit",
   "klassenarbeit.newName": "Klassenarbeit",
