@@ -11,7 +11,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -61,7 +61,10 @@ SITE_URL = os.environ.get("SITE_URL", "").rstrip("/")
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 SECRET = os.environ.get("TOKEN_SECRET", secrets.token_hex(32))
-TOKEN_TTL = 86400 * 7
+TOKEN_TTL = 86400 * 30  # 30 Tage; per Sliding-Renewal (siehe get_current_user)
+                        # bekommt ein aktiver Nutzer laufend einen frischen Token,
+                        # laeuft also praktisch nie ab. Nur echtes Nichtstun > 30 Tage
+                        # (oder token_version-Wechsel) meldet ab.
 
 # Rate limiting: {ip: [(timestamp, ...)]}
 _login_attempts: dict[str, list[float]] = defaultdict(list)
@@ -174,7 +177,7 @@ async def _send_verify_mail(user: User):
     )
 
 
-async def get_current_user(request: Request, db: AsyncSession = Depends(get_db)) -> User:
+async def get_current_user(request: Request, response: Response, db: AsyncSession = Depends(get_db)) -> User:
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         raise HTTPException(401, "Nicht angemeldet")
@@ -189,6 +192,12 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db))
         raise HTTPException(401, "Konto nicht gefunden")
     if tv != user.token_version:
         raise HTTPException(401, "Token wurde ungültig – bitte neu anmelden")
+    # Sliding-Renewal: ist der Token ueber die halbe TTL alt, einen frischen
+    # per Header mitschicken. Der Client (fetch-Interceptor) speichert ihn, so
+    # verlaengert sich das Fenster bei jeder Nutzung — aktive Konten fliegen
+    # nicht mehr nach fester Frist raus.
+    if int(time.time()) - ts > TOKEN_TTL // 2:
+        response.headers["X-Refresh-Token"] = _make_token(user.id, user.token_version)
     return user
 
 

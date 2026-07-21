@@ -26,6 +26,9 @@ window.fetch = function(input, init) {
   return _origFetch.call(this, input, init).then((res) => {
     // Server ist erreichbar (auch bei 4xx/5xx) → online
     if (isApi) window.dispatchEvent(new CustomEvent("cardvote:online"));
+    // Sliding-Renewal: schickt der Server einen frischen Token, uebernehmen.
+    // So bleibt ein aktiver Nutzer angemeldet, statt nach fester Frist rauszufliegen.
+    if (isApi) { try { const rt = res.headers.get("X-Refresh-Token"); if (rt) localStorage.setItem("token", rt); } catch { /* egal */ } }
     if (res.status === 401 && isApi && !url.includes("/auth/")) {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
