@@ -984,12 +984,17 @@
         if (filterUnterthema) filtered = filtered.filter(a => a.unterthema === filterUnterthema);
         if (filterKat) filtered = filtered.filter(a => getKategorie(a) === filterKat);
         if (search) {
+            // Auch nach der ANGEZEIGTEN ID (#000043) suchbar, nicht nur nach der
+            // rohen Server-id — sonst findet die Suche nach dem sichtbaren Code
+            // nichts. "#" wird zusaetzlich weggelassen, damit "43" ebenso trifft.
+            const s2 = search.replace(/^#/, '');
             filtered = filtered.filter(a => {
+                const code = fmtId(a.code || a.id);
                 const haystack = [
-                    a.id, a.thema, a.unterthema, getKategorie(a), a.quelle,
+                    code, code.replace('#', ''), a.code, a.id, a.thema, a.unterthema, getKategorie(a), a.quelle,
                     a.operator, a.kompetenz, a.methode, a.loesung
                 ].filter(Boolean).join(' ').toLowerCase();
-                return haystack.includes(search);
+                return haystack.includes(search) || haystack.includes(s2);
             });
         }
 
