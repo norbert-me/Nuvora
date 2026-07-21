@@ -2,7 +2,7 @@
 // Stunden eintragen und optional Klasse + Thema (Kern-Taxonomie) zuordnen.
 import { useState, useEffect, useCallback, Fragment } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, selectStyle, Tabs, inputStyle, modalOverlay, modalPanel } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -39,7 +39,11 @@ const weekValToDate = (s) => { const [y, w] = s.split("-W").map(Number); return 
 
 export default function Kalender() {
   const { t } = useLanguage();
-  const [view, setView] = useState("month"); // month | week | day
+  // Ansicht in der URL (?view=), damit der Stundenplan aus dem Navbar-Menü
+  // ansteuerbar ist. Ohne Parameter = Monat. Andere Query-Params bleiben.
+  const [params, setParams] = useSearchParams();
+  const view = params.get("view") || "month";
+  const setView = (v) => setParams((p) => { const n = new URLSearchParams(p); if (v === "month") n.delete("view"); else n.set("view", v); return n; }, { replace: true });
   const [cursor, setCursor] = useState(() => startOfDay(new Date()));
   const [abo, setAbo] = useState(null); // Abo-URLs { url, webcal }
   const [extUrl, setExtUrl] = useState("");   // externer ICS-Feed (read-only Anzeige)
@@ -262,8 +266,10 @@ export default function Kalender() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
         <h1 style={pageTitle}>{t("kalender.title")}</h1>
+        {/* Stundenplan ist in die Navbar ausgelagert (?view=timetable), nicht mehr
+            als inline-Tab — er ist Konfiguration, kein taeglicher Blick. */}
         <Tabs value={view} onChange={setView}
-          options={[["today", t("kalender.todayView")], ["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")], ["timetable", t("kalender.timetable")], ["breaks", t("kalender.breaksTab")]]} />
+          options={[["today", t("kalender.todayView")], ["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")], ["breaks", t("kalender.breaksTab")]]} />
         <button onClick={openAbo} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }} title={t("kalender.subscribeHint")}>{t("kalender.subscribe")}</button>
         {view !== "timetable" && view !== "breaks" && view !== "today" && (
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>

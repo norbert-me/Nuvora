@@ -172,7 +172,11 @@ const getModuleNavItems = (t, location) => {
     return [{ to: NO, label: t("nav.grades") }];
   }
   if (area === "kalender") {
-    return [{ to: KAL, label: t("kalender.title") }];
+    const cur = params.get("view");
+    return [
+      { to: KAL, label: t("kalender.title"), active: cur !== "timetable" },
+      { to: `${KAL}?view=timetable`, label: t("kalender.timetable"), active: cur === "timetable" },
+    ];
   }
   if (area === "methoden") {
     return [
