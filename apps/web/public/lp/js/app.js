@@ -1152,6 +1152,47 @@
         e.target.value = '';
     });
 
+    // Aufgaben-POOL als Vorlage exportieren: NUR die Aufgaben, KEINE Schüler-/
+    // Klassendaten (DSGVO-sauber, teilbar/wiederverwendbar). Server-IDs werden
+    // beim Import ohnehin neu vergeben, daher unkritisch.
+    document.getElementById('btn-export-aufgaben').addEventListener('click', () => {
+        const data = { type: 'lernleiter_aufgaben', version: 1, aufgaben };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'lernleiter_aufgaben_vorlage.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
+        toast('Aufgaben-Vorlage exportiert');
+    });
+
+    document.getElementById('btn-import-aufgaben').addEventListener('click', () => {
+        document.getElementById('aufgaben-file-input').click();
+    });
+    document.getElementById('aufgaben-file-input').addEventListener('change', e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async ev => {
+            try {
+                const data = JSON.parse(ev.target.result);
+                const liste = Array.isArray(data.aufgaben) ? data.aufgaben : (Array.isArray(data) ? data : null);
+                if (!liste) { toast('Keine Aufgaben in der Datei'); return; }
+                // Vorlage = ANHÄNGEN, nicht ersetzen: IDs entfernen, damit der
+                // Server sie als NEUE Aufgaben anlegt (nichts wird überschrieben).
+                const neu = liste.map(a => { const c = { ...a }; delete c.id; delete c._id; return c; });
+                aufgaben = [...aufgaben, ...neu];
+                await syncAufgaben(aufgaben);
+                renderAufgaben();
+                toast(neu.length + ' Aufgaben als Vorlage importiert');
+            } catch (err) {
+                toast('Fehler: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+    });
+
     document.getElementById('btn-export-klasse').addEventListener('click', () => {
         const data = { schueler, klassen };
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
