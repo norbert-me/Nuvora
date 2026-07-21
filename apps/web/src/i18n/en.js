@@ -959,7 +959,7 @@ export default {
   "klassenarbeit.addTask": "Task",
   "klassenarbeit.evaluate": "Evaluate",
   "klassenarbeit.remediate": "Create repetition",
-  "klassenarbeit.remediateDone": "{{students}} students to catch up · {{cards}} cards set due again.",
+  "klassenarbeit.remediateDone": "{{students}} students to catch up · {{cards}} cards set due · {{exercises}} repetition tasks created.",
   "klassenarbeit.byTopic": "Hit rate per topic",
   "klassenarbeit.noTopics": "No task has a topic yet.",
   "klassenarbeit.weakStudents": "Weak topics per student",

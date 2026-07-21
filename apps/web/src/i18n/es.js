@@ -959,7 +959,7 @@ export default {
   "klassenarbeit.addTask": "Tarea",
   "klassenarbeit.evaluate": "Evaluar",
   "klassenarbeit.remediate": "Crear repaso",
-  "klassenarbeit.remediateDone": "{{students}} alumnos a recuperar · {{cards}} tarjetas reactivadas.",
+  "klassenarbeit.remediateDone": "{{students}} alumnos a recuperar · {{cards}} tarjetas reactivadas · {{exercises}} tareas de repaso creadas.",
   "klassenarbeit.byTopic": "Aciertos por tema",
   "klassenarbeit.noTopics": "Ninguna tarea tiene tema aún.",
   "klassenarbeit.weakStudents": "Temas débiles por alumno",

@@ -17,6 +17,7 @@ export default function Klassenarbeit() {
   const { t } = useLanguage();
   const { modules } = useModules();
   const kartenAktiv = modules.find((m) => m.key === "karten")?.active ?? false;
+  const lernpfadAktiv = modules.find((m) => m.key === "lernpfad")?.active ?? false;
   const [classId, setClassId] = useState(null);
   const [kursId, setKursId] = useState(null);
   const [students, setStudents] = useState([]);
@@ -70,9 +71,9 @@ export default function Klassenarbeit() {
   const wiederholen = async () => {
     if (!work) return;
     setBusy(true);
-    const res = await fetch(`${API}/works/${work.id}/remediate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ threshold: 0.5 }) }).catch(() => null);
+    const res = await fetch(`${API}/works/${work.id}/remediate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ threshold: 0.5, cards: kartenAktiv, exercises: lernpfadAktiv }) }).catch(() => null);
     setBusy(false);
-    if (res && res.ok) { const j = await res.json(); showAlert(t("klassenarbeit.remediateDone", { students: j.students, cards: j.cards_requeued })); }
+    if (res && res.ok) { const j = await res.json(); showAlert(t("klassenarbeit.remediateDone", { students: j.students, cards: j.cards_requeued, exercises: j.exercises_created || 0 })); }
     else showAlert(t("common.notWork"));
   };
 
@@ -146,7 +147,7 @@ export default function Klassenarbeit() {
 
           <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
             <button onClick={auswerten} style={btnPrimary}>{t("klassenarbeit.evaluate")}</button>
-            {kartenAktiv && <button onClick={wiederholen} disabled={busy} style={{ ...btnSecondary, opacity: busy ? 0.6 : 1 }}>💡 {t("klassenarbeit.remediate")}</button>}
+            {(kartenAktiv || lernpfadAktiv) && <button onClick={wiederholen} disabled={busy} style={{ ...btnSecondary, opacity: busy ? 0.6 : 1 }}>💡 {t("klassenarbeit.remediate")}</button>}
           </div>
 
           {analysis && (

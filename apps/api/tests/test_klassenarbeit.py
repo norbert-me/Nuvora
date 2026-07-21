@@ -9,7 +9,7 @@ from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 from app.models import (
-    Base, User, SchoolClass, Student, Topic, CardDeck, Card, CardReview, WorkAnalysis,
+    Base, User, SchoolClass, Student, Topic, CardDeck, Card, CardReview, WorkAnalysis, UserModule,
 )
 from app.routers import klassenarbeit as K
 
@@ -31,6 +31,8 @@ async def s():
 
 async def _setup(s):
     u = User(email="a@b.de", password_hash="x", name="L"); s.add(u); await s.flush()
+    # Karten-Brücke: remediate setzt nur bei aktivem Modul Karten die Fälligkeit.
+    s.add(UserModule(user_id=u.id, module_key="karten"))
     cls = SchoolClass(name="7a", owner_id=u.id); s.add(cls); await s.flush()
     A = Topic(name="Brüche", owner_id=u.id); B = Topic(name="Geometrie", owner_id=u.id)
     s.add(A); s.add(B); await s.flush()

@@ -143,6 +143,8 @@ async def delete_work(work_id: int, user: User = Depends(require_module), db: As
 class RemediateIn(BaseModel):
     # Anteil falscher Aufgaben eines Themas, ab dem das Thema für den SuS "schwach" ist.
     threshold: float = 0.5
+    cards: bool = True       # Karten des Themas wieder fällig (nur mit Modul Karten)
+    exercises: bool = True   # Lernpfad-Wiederholungsaufgabe je Thema (nur mit Modul Lernpfad)
 
 
 def _profile(work: WorkAnalysis):
@@ -195,41 +197,56 @@ async def analysis(work_id: int, user: User = Depends(require_module), db: Async
 
 @router.post("/works/{work_id}/remediate")
 async def remediate(work_id: int, body: RemediateIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    """Gezielte Wiederholung: je SuS die Karten seiner SCHWACHEN Themen (Anteil
-    falscher Aufgaben ≥ Schwelle) wieder fällig setzen. Brücke zu Karten (optional).
-    Bestehende Noten/Daten bleiben — nur Fälligkeiten werden vorgezogen."""
+    """Gezielte Wiederholung aus dem Fehlerprofil (Anteil falscher Aufgaben eines
+    Themas ≥ Schwelle = schwach). Je aktivem Modul:
+    - Karten: je SuS die Karten seiner schwachen Themen wieder fällig.
+    - Lernpfad: je schwachem Thema eine Wiederholungs-Aufgabe im Pool anlegen.
+    Beides Brücke (Regel 3) — ohne das jeweilige Modul passiert dort nichts.
+    Bestehende Daten bleiben unberührt (nur Fälligkeiten vorziehen / neue Aufgabe)."""
     from datetime import datetime, timezone
     from sqlalchemy import update as _update
-    from ..models import CardDeck, Card, CardReview
+    from ..models import CardDeck, Card, CardReview, Exercise
     w = await _owned_work(db, user, work_id)
     prof, _ = _profile(w)
-    # student_id -> set(schwache topic_ids)
     weak_by_student = {}
     for sid, pr in prof.items():
         weak = {tid for tid, (f, tt) in pr.items() if tt and f / tt >= body.threshold}
         if weak:
             weak_by_student[int(sid)] = weak
-    if not weak_by_student:
-        return {"students": 0, "cards_requeued": 0}
-    # Decks je Thema (einmal laden)
-    all_topics = set().union(*weak_by_student.values())
-    deck_by_topic = {}
-    for tid in all_topics:
-        ids = (await db.execute(select(CardDeck.id).where(
-            CardDeck.owner_id == user.id, CardDeck.topic_id == tid, CardDeck.deleted_at.is_(None)))).scalars().all()
-        if ids:
-            deck_by_topic[tid] = ids
+    all_topics = set().union(*weak_by_student.values()) if weak_by_student else set()
+
     requeued = 0
-    now = datetime.now(timezone.utc)
-    for sid, topics in weak_by_student.items():
-        deck_ids = [d for tid in topics for d in deck_by_topic.get(tid, [])]
-        if not deck_ids:
-            continue
-        card_ids = (await db.execute(select(Card.id).where(Card.deck_id.in_(deck_ids)))).scalars().all()
-        if not card_ids:
-            continue
-        res = await db.execute(_update(CardReview).where(
-            CardReview.student_id == sid, CardReview.card_id.in_(card_ids), CardReview.reps > 0).values(due=now))
-        requeued += res.rowcount or 0
+    if body.cards and weak_by_student and await is_active(db, user.id, "karten"):
+        deck_by_topic = {}
+        for tid in all_topics:
+            ids = (await db.execute(select(CardDeck.id).where(
+                CardDeck.owner_id == user.id, CardDeck.topic_id == tid, CardDeck.deleted_at.is_(None)))).scalars().all()
+            if ids:
+                deck_by_topic[tid] = ids
+        now = datetime.now(timezone.utc)
+        for sid, topics in weak_by_student.items():
+            deck_ids = [d for tid in topics for d in deck_by_topic.get(tid, [])]
+            if not deck_ids:
+                continue
+            card_ids = (await db.execute(select(Card.id).where(Card.deck_id.in_(deck_ids)))).scalars().all()
+            if not card_ids:
+                continue
+            res = await db.execute(_update(CardReview).where(
+                CardReview.student_id == sid, CardReview.card_id.in_(card_ids), CardReview.reps > 0).values(due=now))
+            requeued += res.rowcount or 0
+
+    exercises = 0
+    if body.exercises and all_topics and await is_active(db, user.id, "lernpfad"):
+        names = {t.id: t.name for t in (await db.execute(select(Topic).where(Topic.id.in_(list(all_topics))))).scalars().all()}
+        for tid in all_topics:
+            text = f"Wiederholung: {names.get(tid, '')} (aus {w.name})"
+            # Dedup: dieselbe Wiederholungsaufgabe nicht doppelt anlegen.
+            exists = (await db.execute(select(Exercise.id).where(
+                Exercise.owner_id == user.id, Exercise.topic_id == tid, Exercise.aufgabentext == text))).scalar_one_or_none()
+            if exists:
+                continue
+            db.add(Exercise(owner_id=user.id, topic_id=tid, kategorie="Wiederholung", aufgabentext=text))
+            exercises += 1
+
     await db.commit()
-    return {"students": len(weak_by_student), "cards_requeued": requeued}
+    return {"students": len(weak_by_student), "cards_requeued": requeued, "exercises_created": exercises}

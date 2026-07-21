@@ -959,7 +959,7 @@ export default {
   "klassenarbeit.addTask": "Aufgabe",
   "klassenarbeit.evaluate": "Auswerten",
   "klassenarbeit.remediate": "Wiederholung erzeugen",
-  "klassenarbeit.remediateDone": "{{students}} SuS mit Nachholbedarf · {{cards}} Karten wieder fällig gesetzt.",
+  "klassenarbeit.remediateDone": "{{students}} SuS mit Nachholbedarf · {{cards}} Karten wieder fällig · {{exercises}} Wiederholungsaufgaben angelegt.",
   "klassenarbeit.byTopic": "Trefferquote je Thema",
   "klassenarbeit.noTopics": "Noch keine Aufgabe hat ein Thema.",
   "klassenarbeit.weakStudents": "Schwache Themen je Schüler",
