@@ -88,17 +88,26 @@
         let ober = topics.find(t => !t.parent_id && t.name === thema);
         if (!ober) {
             const r = await api(`${API}/topics`, { method: 'POST', body: JSON.stringify({ name: thema, parent_id: null }) });
-            if (!r.ok) return null;
-            ober = await r.json();
-            topics.push(ober);
+            if (r.ok) { ober = await r.json(); topics.push(ober); }
+            else {
+                // 409: gibt es serverseitig schon (lokaler Cache war stale). Frisch
+                // laden und wiederfinden — sonst waere topic_id null und die
+                // Lernleiter landete OHNE Thema.
+                topics = await api(`${API}/topics`).then(x => x.ok ? x.json() : topics);
+                ober = topics.find(t => !t.parent_id && t.name === thema);
+                if (!ober) return null;
+            }
         }
         if (!unterthema) return ober.id;
         let unter = topics.find(t => t.parent_id === ober.id && t.name === unterthema);
         if (!unter) {
             const r = await api(`${API}/topics`, { method: 'POST', body: JSON.stringify({ name: unterthema, parent_id: ober.id }) });
-            if (!r.ok) return ober.id;
-            unter = await r.json();
-            topics.push(unter);
+            if (r.ok) { unter = await r.json(); topics.push(unter); }
+            else {
+                topics = await api(`${API}/topics`).then(x => x.ok ? x.json() : topics);
+                unter = topics.find(t => t.parent_id === ober.id && t.name === unterthema);
+                if (!unter) return ober.id;
+            }
         }
         return unter.id;
     }
@@ -1918,17 +1927,17 @@
         try {
             // Pfad anlegen, falls neu. Der Kern kennt Namen als eindeutig je Konto.
             if (!pfad.id) {
-                const r = await api(`${LP}/paths`, { method: 'POST', body: JSON.stringify({ name: pfad.name }) });
-                if (r.status === 409) {
-                    // Existiert schon: seine id holen statt zu scheitern.
-                    const alle = await api(`${LP}/paths`).then(x => x.ok ? x.json() : []);
-                    const da = alle.find(x => x.name === pfad.name);
-                    if (!da) throw new Error('HTTP 409');
+                // Erst schauen, ob der Name schon existiert (z.B. Sammel-Pfad
+                // „Einzeln"), statt blind zu POSTen und ein 409 in der Konsole zu
+                // provozieren. Existiert er, wiederverwenden + alte Ladders raeumen.
+                const alle = await api(`${LP}/paths`).then(x => x.ok ? x.json() : []);
+                const da = alle.find(x => x.name === pfad.name);
+                if (da) {
                     pfad.id = da.id;
                     for (const ll of (da.ladders || [])) await api(`${LP}/ladders/${ll.id}`, { method: 'DELETE' });
-                } else if (!r.ok) {
-                    throw new Error('HTTP ' + r.status);
                 } else {
+                    const r = await api(`${LP}/paths`, { method: 'POST', body: JSON.stringify({ name: pfad.name }) });
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
                     pfad.id = (await r.json()).id;
                 }
             } else {
