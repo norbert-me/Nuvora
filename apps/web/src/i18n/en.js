@@ -954,6 +954,7 @@ export default {
   "mod.zufall.name": "Random student",
   "mod.zufall.desc": "Draws a random person from a class at the press of a button — optionally without repeats until everyone has been picked.",
   "sitzplan.title": "Seating plan",
+  "orga.tabsSettings": "Show/hide tabs",
   "sitzplan.hint": "Drag a student from the pool onto a seat. Drag back to the pool to remove. Saved automatically.",
   "sitzplan.cols": "Columns",
   "sitzplan.clear": "Clear plan",

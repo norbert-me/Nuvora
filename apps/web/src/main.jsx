@@ -182,12 +182,18 @@ const getModuleNavItems = (t, location) => {
   }
   if (area === "orga") {
     const tab = params.get("tab");
-    return [
-      { to: `${ORG}?tab=checklisten`, label: t("orga.tabChecklists"), active: !["anwesenheit", "ausleihe", "sitzplan"].includes(tab) },
-      { to: `${ORG}?tab=anwesenheit`, label: t("anwesenheit.title"), active: tab === "anwesenheit" },
-      { to: `${ORG}?tab=ausleihe`, label: t("ausleihe.title"), active: tab === "ausleihe" },
-      { to: `${ORG}?tab=sitzplan`, label: t("sitzplan.title"), active: tab === "sitzplan" },
+    const items = [
+      { key: "checklisten", to: `${ORG}?tab=checklisten`, label: t("orga.tabChecklists"), active: !["anwesenheit", "ausleihe", "sitzplan"].includes(tab) },
+      { key: "anwesenheit", to: `${ORG}?tab=anwesenheit`, label: t("anwesenheit.title"), active: tab === "anwesenheit" },
+      { key: "ausleihe", to: `${ORG}?tab=ausleihe`, label: t("ausleihe.title"), active: tab === "ausleihe" },
+      { key: "sitzplan", to: `${ORG}?tab=sitzplan`, label: t("sitzplan.title"), active: tab === "sitzplan" },
     ];
+    // Vom Modul-Zahnrad (Orga-Seite) ausgeblendete Reiter raus — aber den aktiven
+    // nie verstecken, und nie eine leere Leiste erzeugen (Fallback Checklisten).
+    let hidden = [];
+    try { hidden = JSON.parse(localStorage.getItem("orga_hidden_tabs") || "[]"); } catch { /* egal */ }
+    const vis = items.filter((i) => !hidden.includes(i.key) || i.active);
+    return vis.length ? vis : [items[0]];
   }
   if (area === "code-detektiv") {
     // Nativ eingebunden: die Nuvora-Navbar steuert die Bereiche der App direkt.
@@ -414,6 +420,13 @@ function Nav({ user, onLogout }) {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const { t } = useLanguage();
+  // Re-Render, wenn ein Modul-Zahnrad die sichtbaren Reiter ändert (localStorage).
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const h = () => setTick((x) => x + 1);
+    window.addEventListener("nuvora:settings", h);
+    return () => window.removeEventListener("nuvora:settings", h);
+  }, []);
 
   const navItems = getModuleNavItems(t, location);
   const allPages = [...navItems, { to: "/tutorial", label: t("nav.tutorial") }, { to: `${CV}/scan`, label: t("nav.scanner") }, { to: "/profile", label: t("nav.profile") }, { to: `${CV}/evaluation`, label: t("nav.evaluation") }, { to: "/login", label: t("nav.login") }];

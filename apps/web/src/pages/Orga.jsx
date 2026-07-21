@@ -7,6 +7,7 @@ import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { pageTitle, btnPrimary, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C, th as thBase, td } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
+import ViewMenu from "../components/ViewMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import Anwesenheit from "./Anwesenheit.jsx";
@@ -28,6 +29,19 @@ export default function Orga() {
   const [tab, setTab] = useState(["anwesenheit", "ausleihe", "sitzplan"].includes(params.get("tab")) ? params.get("tab") : "checklisten");
   // Auf ?tab-Wechsel aus der Navbar reagieren (nicht nur beim ersten Laden).
   useEffect(() => { setTab(["anwesenheit", "ausleihe", "sitzplan"].includes(params.get("tab")) ? params.get("tab") : "checklisten"); }, [params]);
+
+  // Modul-Zahnrad: welche Orga-Reiter in der Navbar erscheinen. Ausgeblendete
+  // stehen in localStorage; die Navbar (main.jsx) liest das und re-rendert auf
+  // das 'nuvora:settings'-Event.
+  const ORGA_TABS = ["checklisten", "anwesenheit", "ausleihe", "sitzplan"];
+  const tabLabel = { checklisten: t("orga.tabChecklists"), anwesenheit: t("anwesenheit.title"), ausleihe: t("ausleihe.title"), sitzplan: t("sitzplan.title") };
+  const [hidden, setHidden] = useState(() => { try { return JSON.parse(localStorage.getItem("orga_hidden_tabs") || "[]"); } catch { return []; } });
+  const toggleTab = (key, show) => {
+    const next = show ? hidden.filter((k) => k !== key) : [...new Set([...hidden, key])];
+    setHidden(next);
+    try { localStorage.setItem("orga_hidden_tabs", JSON.stringify(next)); } catch { /* egal */ }
+    window.dispatchEvent(new Event("nuvora:settings")); // Navbar neu berechnen
+  };
 
   useEffect(() => {
     return swr("classes", "/api/classes", (d) => {
@@ -75,6 +89,10 @@ export default function Orga() {
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
+      {/* Modul-Zahnrad: Reiter ein-/ausblenden (immer sichtbar, über allen Werkzeugen). */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
+        <ViewMenu title={t("orga.tabsSettings")} items={ORGA_TABS.map((k) => ({ key: k, label: tabLabel[k], value: !hidden.includes(k), onChange: (v) => toggleTab(k, v) }))} />
+      </div>
       {/* Kein eigenes Tab-Band mehr: zwischen den vier Werkzeugen wird über die
           Navbar gewechselt (?tab=…), siehe main.jsx. Der Titel steht nur beim
           Checklisten-Tab; die eingebetteten Werkzeuge bringen ihren eigenen mit. */}

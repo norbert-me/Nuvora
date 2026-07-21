@@ -954,6 +954,7 @@ export default {
   "mod.zufall.name": "Alumno al azar",
   "mod.zufall.desc": "Saca al azar a una persona de una clase con un botón — opcionalmente sin repetir hasta que todos hayan salido.",
   "sitzplan.title": "Plano de asientos",
+  "orga.tabsSettings": "Mostrar/ocultar pestañas",
   "sitzplan.hint": "Arrastra un alumno del grupo a un sitio. Arrástralo de vuelta al grupo para quitarlo. Se guarda automáticamente.",
   "sitzplan.cols": "Columnas",
   "sitzplan.clear": "Vaciar plano",

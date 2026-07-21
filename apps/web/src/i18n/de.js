@@ -1106,6 +1106,7 @@ export default {
   "orga.title": "Orga",
   "orga.moduleTitle": "Orga",
   "orga.tabChecklists": "Checklisten",
+  "orga.tabsSettings": "Reiter ein-/ausblenden",
   "orga.tabAttendance": "Anwesenheit",
   "orga.hint": "Sammel-Checklisten je Klasse — z.B. „Unterschrift der Klassenarbeit gesehen“. Punkt anlegen, dann je Schüler abhaken.",
   "orga.newPlaceholder": "Neuer Punkt, z.B. Unterschrift KA1",
