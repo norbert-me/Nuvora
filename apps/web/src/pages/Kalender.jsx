@@ -566,10 +566,12 @@ function FreiMarker({ label, t }) {
   // Ferien/Feiertag deutlich hervorheben: Amber-Badge statt blasser Kursivzeile.
   // An diesen Tagen ist der Stundenplan bewusst ausgeblendet.
   return (
-    <div style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700,
-      color: "#8a6d00", background: "rgba(184,134,11,0.16)", borderRadius: 6, padding: "3px 7px", lineHeight: 1.3 }}
-      title={t("kalender.freeDay")}>
-      <span style={{ fontSize: 12 }}>🌴</span>{label || t("kalender.free")}
+    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700,
+      color: "#8a6d00", background: "rgba(184,134,11,0.16)", borderRadius: 6, padding: "3px 7px", lineHeight: 1.3,
+      maxWidth: "100%", boxSizing: "border-box" }}
+      title={label ? `${label} — ${t("kalender.freeDay")}` : t("kalender.freeDay")}>
+      <span style={{ fontSize: 12, flexShrink: 0 }}>🌴</span>
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label || t("kalender.free")}</span>
     </div>
   );
 }
