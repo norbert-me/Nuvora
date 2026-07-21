@@ -12,7 +12,7 @@ import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, modalOverlay, modalPanel, Empty, Skeleton } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, modalOverlay, modalPanel, Empty, Skeleton, ExportButton, ImportButton } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
@@ -364,11 +364,9 @@ export default function Noten() {
         </div>
         {term !== "year" && classId && (
           <div style={{ display: "flex", gap: 8, marginLeft: "auto", alignItems: "center" }}>
-            <button onClick={doExport} style={btnSecondary}>{t("noten.export")}</button>
+            <ExportButton label={t("noten.export")} onClick={doExport} />
             <button onClick={doZeugnis} style={btnSecondary} title={t("noten.zeugnisHint")}>{t("noten.zeugnis")}</button>
-            <label style={{ ...btnSecondary, cursor: "pointer" }}>{t("noten.import")}
-              <input type="file" accept=".json,application/json" style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) doImport(e.target.files[0]); e.target.value = ""; }} />
-            </label>
+            <ImportButton label={t("noten.import")} onFile={doImport} />
             {cdAktiv && sections.length > 0 && <button onClick={() => setCdDialog(true)} style={btnSecondary} title={t("noten.fromCdHint")}>{t("noten.fromCd")}</button>}
             <button onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}
               className="icon-btn"

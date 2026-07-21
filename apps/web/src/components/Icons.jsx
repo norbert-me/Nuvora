@@ -24,7 +24,11 @@ export const ICONS = {
   shuffle: ["M3 6h2l4 8h2l4-8h2M3 14h2l2-3M13 6h2l-2 3"],
   open: ["M10 3L17 10L10 17", "M17 10H3"],
   pdf: ["M5 2h7l4 4v11a2 2 0 01-2 2H5a2 2 0 01-2-2V4a2 2 0 012-2z", "M12 2v4h4"],
+  // Matched Paar Export/Import: gleiche Box + gleicher Schaft, nur die Pfeilspitze
+  // wechselt die Seite (raus = export, rein = import). IMMER dieses Paar für
+  // Datei-Export/-Import verwenden — modulübergreifend einheitlich.
   export: ["M12 3h5v5", "M17 3L9 11", "M15 11v5a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h5"],
+  import: ["M9 6v5h5", "M17 3L9 11", "M15 11v5a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h5"],
   // Einheitliches "Veröffentlichen/Hochladen zum Marktplatz" — Pfeil nach oben
   // auf eine Grundlinie. IMMER dieses Icon für Marktplatz-Upload verwenden.
   upload: ["M12 16V4M12 4L7 9M12 4l5 5", "M4 20h16"],
@@ -82,6 +86,24 @@ export const btnSecondary = {
 
 // Kleinere Variante fuer Knoepfe in Zeilen und Tabellen.
 export const btnSmall = { padding: "5px 12px", fontSize: 13 };
+
+// Einheitliche Export-/Import-Knoepfe (Icon + Label) — moduluebergreifend
+// dasselbe Aussehen und Verhalten. Nie je Seite nachbauen.
+export function ExportButton({ label, onClick, style, ...props }) {
+  return (
+    <button onClick={onClick} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6, ...style }} {...props}>
+      <Icon d={ICONS.export} size={15} /> {label}
+    </button>
+  );
+}
+export function ImportButton({ label, onFile, accept = ".json,application/json", style, ...props }) {
+  return (
+    <label style={{ ...btnSecondary, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, ...style }} {...props}>
+      <Icon d={ICONS.import} size={15} /> {label}
+      <input type="file" accept={accept} style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) onFile(e.target.files[0]); e.target.value = ""; }} />
+    </label>
+  );
+}
 
 // Bewusst NICHT vereinheitlicht, weil kontextgebunden und je Gruppe stimmig:
 //   Formularseiten (Login, Contact, ResetPassword) — volle Breite, 15px

@@ -395,7 +395,7 @@ export default function Classes() {
             <span style={{ color: "var(--text3)", fontSize: 13 }}>{cls.students.length} {t("classes.learners")}</span>
           </button>
           <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-            <button onClick={() => downloadFile(`${API}/export/class/${cls.id}`, `${cls.name}.json`)} className="icon-btn" style={iconBtn} title={t("classes.export")}><Icon d={ICONS.download} /></button>
+            <button onClick={() => downloadFile(`${API}/export/class/${cls.id}`, `${cls.name}.json`)} className="icon-btn" style={iconBtn} title={t("classes.export")}><Icon d={ICONS.export} /></button>
             <button onClick={() => remove(cls.id)} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
           </div>
         </div>

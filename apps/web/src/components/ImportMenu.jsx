@@ -1,17 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useLanguage } from "../i18n/index.jsx";
-
-const UploadIcon = ({ size = 14 }) => (
-  <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M10 13V3M6 7l4-4 4 4" /><path d="M3 15v1a2 2 0 002 2h10a2 2 0 002-2v-1" />
-  </svg>
-);
-
-const DownloadIcon = ({ size = 14 }) => (
-  <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M10 3v10M6 9l4 4 4-4" /><path d="M3 15v1a2 2 0 002 2h10a2 2 0 002-2v-1" />
-  </svg>
-);
+import { Icon, ICONS } from "./Icons.jsx";
 
 // item: { label, onClick } für Importieren, oder { label, href } für Vorlagen-Downloads
 function MenuRow({ item, onClose }) {
@@ -31,7 +20,7 @@ function MenuRow({ item, onClose }) {
       onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg2)")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
     >
-      {isDownload ? <DownloadIcon /> : <UploadIcon />}
+      <Icon d={isDownload ? ICONS.export : ICONS.import} size={14} />
       {item.label}
     </Tag>
   );
@@ -68,7 +57,7 @@ export default function ImportMenu({ importItems = [], templateItems = [] }) {
           background: "var(--card)", color: "var(--text)", fontSize: 14, fontWeight: 500, letterSpacing: "-0.1px",
         }}
       >
-        <UploadIcon />
+        <Icon d={ICONS.import} size={14} />
         {t("importMenu.label")}
         <svg width="1em" height="1em" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
           <path d="M5 8l5 5 5-5" />

@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
-import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, modalOverlay, modalPanel, inputStyle } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, modalOverlay, modalPanel, inputStyle, ExportButton, ImportButton } from "../components/Icons.jsx";
 import PublishModal from "../components/PublishModal.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -67,10 +67,8 @@ export default function Methoden() {
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
         <h1 style={pageTitle}>{t("methoden.title")}</h1>
         <span style={{ flex: 1 }} />
-        <button onClick={doExport} style={btnSecondary}>{t("common.export")}</button>
-        <label style={{ ...btnSecondary, cursor: "pointer" }}>{t("common.import")}
-          <input type="file" accept=".json,application/json" style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) doImport(e.target.files[0]); e.target.value = ""; }} />
-        </label>
+        <ExportButton label={t("common.export")} onClick={doExport} />
+        <ImportButton label={t("common.import")} onFile={doImport} />
         <button onClick={() => setEdit({})} style={btnPrimary}>{t("methoden.new")}</button>
       </div>
       <p style={{ fontSize: 13.5, color: "var(--text2)", margin: "0 0 18px", maxWidth: 640 }}>{t("methoden.intro")}</p>

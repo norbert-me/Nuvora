@@ -341,7 +341,7 @@ export default function Dashboard() {
               )}
             </span>
             <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={(e) => { e.stopPropagation(); exportFolder(f.id, f.name); }} className="icon-btn" style={iconBtn} title={t("classes.export")}><Icon d={ICONS.download} /></button>
+              <button onClick={(e) => { e.stopPropagation(); exportFolder(f.id, f.name); }} className="icon-btn" style={iconBtn} title={t("classes.export")}><Icon d={ICONS.export} /></button>
               <button onClick={(e) => { e.stopPropagation(); setMovingFolder(f.id); }} className="icon-btn" style={iconBtn} title={t("dash.move")}><Icon d={ICONS.move} /></button>
               <button onClick={(e) => { e.stopPropagation(); startRenameFolder(f.id, f.name); }} className="icon-btn" style={iconBtn} title={t("dash.rename")}><Icon d={ICONS.edit} /></button>
               <button onClick={(e) => { e.stopPropagation(); deleteFolder(f.id); }} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
@@ -364,7 +364,7 @@ export default function Dashboard() {
                   <Icon d={ICONS.upload} color="var(--accent)" />
                 </button>
                 <button onClick={(e) => { e.stopPropagation(); duplicateSet(qs.id); }} className="icon-btn" style={iconBtn} title={t("dash.duplicate")}><Icon d={ICONS.duplicate} /></button>
-                <button onClick={async (e) => { e.stopPropagation(); const r = await fetch(`${API}/export/question-set/${qs.id}`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${qs.name}.json`; a.click(); URL.revokeObjectURL(a.href); }} className="icon-btn" style={iconBtn} title={t("classes.export")}><Icon d={ICONS.download} /></button>
+                <button onClick={async (e) => { e.stopPropagation(); const r = await fetch(`${API}/export/question-set/${qs.id}`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${qs.name}.json`; a.click(); URL.revokeObjectURL(a.href); }} className="icon-btn" style={iconBtn} title={t("classes.export")}><Icon d={ICONS.export} /></button>
                 <button onClick={(e) => { e.stopPropagation(); deleteSet(qs.id); }} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
               </div>
             </div>

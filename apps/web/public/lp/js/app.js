@@ -2697,7 +2697,11 @@
         check: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>',
         info: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
         share: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>',
-        download: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>'
+        download: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>',
+        // Gleiches Export/Import-Paar wie im Rahmen (components/Icons.jsx): gleiche
+        // Box + Schaft, nur die Pfeilspitze wechselt die Seite (raus/rein).
+        export: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5"/></svg>',
+        import: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 7v6h6"/><path d="M20 4l-9 9"/><path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5"/></svg>'
     };
 
     // ─── Lernpfade ───
@@ -2800,15 +2804,15 @@
 
     function renderLernpfade() {
         const list = document.getElementById('pfade-list');
-        list.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn small" id="btn-import-pfad">${ICON.download} Lernpfad/Lernleiter importieren</button></div>` + lernpfade.map(p => `
+        list.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn small" id="btn-import-pfad">${ICON.import} Lernpfad/Lernleiter importieren</button></div>` + lernpfade.map(p => `
             <div class="list-row" data-action="edit" data-id="${p._id}">
                 <div>
                     <strong>${esc(p.name)}</strong>
                     <span style="color:var(--text-muted)">– ${(p.lernleitern || []).length} Lernleitern</span>
                 </div>
                 <div class="btn-group">
-                    <button class="btn" data-action="export-full" data-id="${p._id}" style="font-size:11px;padding:3px 8px" title="Vollständig, mit Schülerzuweisungen">${ICON.download} Export</button>
-                    <button class="btn" data-action="export-vorlage" data-id="${p._id}" style="font-size:11px;padding:3px 8px" title="Ohne Schülerdaten (teilbar)">${ICON.download} Vorlage</button>
+                    <button class="btn" data-action="export-full" data-id="${p._id}" style="font-size:11px;padding:3px 8px" title="Vollständig, mit Schülerzuweisungen">${ICON.export} Export</button>
+                    <button class="btn" data-action="export-vorlage" data-id="${p._id}" style="font-size:11px;padding:3px 8px" title="Ohne Schülerdaten (teilbar)">${ICON.export} Vorlage</button>
                     <button class="btn icon" data-action="edit" data-id="${p._id}" title="Bearbeiten">${ICON.edit}</button>
                     <button class="btn icon danger" data-action="delete" data-id="${p._id}" title="Löschen">${ICON.delete}</button>
                 </div>
@@ -2917,8 +2921,8 @@
                 </div>
                 <div class="btn-group">
                     <button class="btn icon" data-ll-id="${ll._id}" data-action="rename" title="Umbenennen">${ICON.edit}</button>
-                    <button class="btn" data-ll-id="${ll._id}" data-action="export-full" style="font-size:11px;padding:3px 8px" title="Vollständig, mit Schülerzuweisungen">${ICON.download} Export</button>
-                    <button class="btn" data-ll-id="${ll._id}" data-action="export-vorlage" style="font-size:11px;padding:3px 8px" title="Ohne Schülerdaten (teilbar)">${ICON.download} Vorlage</button>
+                    <button class="btn" data-ll-id="${ll._id}" data-action="export-full" style="font-size:11px;padding:3px 8px" title="Vollständig, mit Schülerzuweisungen">${ICON.export} Export</button>
+                    <button class="btn" data-ll-id="${ll._id}" data-action="export-vorlage" style="font-size:11px;padding:3px 8px" title="Ohne Schülerdaten (teilbar)">${ICON.export} Vorlage</button>
                     <button class="btn icon" data-ll-id="${ll._id}" data-action="share" title="Im Marktplatz teilen">${ICON.share}</button>
                     ${i > 0 ? `<button class="btn icon" data-ll-id="${ll._id}" data-action="up" title="Nach oben">${ICON.up}</button>` : ''}
                     ${i < list.length - 1 ? `<button class="btn icon" data-ll-id="${ll._id}" data-action="down" title="Nach unten">${ICON.down}</button>` : ''}

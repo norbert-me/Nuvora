@@ -2,7 +2,7 @@
 // drehen (z.B. schräge Tische). Gespeichert wird { seats: [{sid,x,y,rot}] }.
 // Schüler bleiben im Kern; hier nur ihre Positionen (Regel 3).
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { pageTitle, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C, Empty } from "../components/Icons.jsx";
+import { pageTitle, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, ExportButton, ImportButton } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import ViewMenu from "../components/ViewMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -320,10 +320,8 @@ export default function Sitzplan() {
         ]} />
         <button onClick={() => setShowHint((v) => !v)} className="icon-btn" title={t("sitzplan.hintFree")}
           style={{ ...iconBtn, border: showHint ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 999, width: 30, height: 30, fontWeight: 700, color: showHint ? "var(--accent)" : "var(--text3)" }}>i</button>
-        <button onClick={doExport} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13, marginLeft: anwesenheitAktiv ? 0 : "auto" }}>{t("sitzplan.export")}</button>
-        <label style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13, cursor: "pointer" }}>{t("sitzplan.import")}
-          <input type="file" accept=".json,application/json" style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) doImport(e.target.files[0]); e.target.value = ""; }} />
-        </label>
+        <ExportButton label={t("sitzplan.export")} onClick={doExport} style={{ padding: "6px 12px", fontSize: 13, marginLeft: anwesenheitAktiv ? 0 : "auto" }} />
+        <ImportButton label={t("sitzplan.import")} onFile={doImport} style={{ padding: "6px 12px", fontSize: 13 }} />
         <button onClick={leeren} className="icon-btn" style={iconBtn} title={t("sitzplan.clear")}><Icon d={ICONS.trash} color={C.danger} /></button>
       </div>
       {showHint && <p style={{ fontSize: 13, color: "var(--text3)", margin: "8px 0 14px" }}>{t("sitzplan.hintFree")}</p>}
