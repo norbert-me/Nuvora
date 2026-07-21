@@ -294,21 +294,31 @@
     // einen leeren `code` und zeigten darum ueber `a.code || a.id` die GLOBALE
     // Server-id an (grosse, lueckige Nummern wie 23 — nicht pro User). Jeden leeren
     // code einmalig mit der naechsten freien #-Nummer fuellen, in id-Reihenfolge,
-    // damit die Vergabe stabil und nachvollziehbar bleibt. Gibt zurueck, ob etwas
-    // gesetzt wurde (dann einmal zum Server spiegeln).
+    // damit die Vergabe stabil und nachvollziehbar bleibt. Gibt die geaenderten
+    // Aufgaben zurueck (nur die werden persistiert — kein voller Re-Sync).
     function backfillCodes() {
         const isCode = c => /^#\d+$/.test(String(c || ''));
         const used = new Set();
         aufgaben.forEach(a => { const m = String(a.code || '').match(/^#(\d+)$/); if (m) used.add(parseInt(m[1], 10)); });
-        let n = 1, changed = false;
-        aufgaben.filter(a => !isCode(a.code))
-            .sort((x, y) => (x.id || 0) - (y.id || 0))
-            .forEach(a => {
-                while (used.has(n)) n++;
-                a.code = '#' + String(n).padStart(6, '0');
-                used.add(n); changed = true;
-            });
+        let n = 1;
+        const changed = aufgaben.filter(a => !isCode(a.code)).sort((x, y) => (x.id || 0) - (y.id || 0));
+        changed.forEach(a => {
+            while (used.has(n)) n++;
+            a.code = '#' + String(n).padStart(6, '0');
+            used.add(n);
+        });
         return changed;
+    }
+
+    // Nur die aufgefuellten Codes zum Server schreiben (gezielte PUTs statt einem
+    // vollen syncAufgaben-Diff ueber alle Aufgaben). Einmalig beim ersten Laden.
+    async function persistCodes(changed) {
+        for (const a of changed) {
+            if (!a.id) continue;
+            try { await api(`${LP}/exercises/${a.id}`, { method: 'PUT', body: JSON.stringify(await zuKern(a)) }); }
+            catch (e) { console.error('Code-Backfill:', e); }
+        }
+        localStorage.setItem(STORAGE_KEYS.aufgaben, JSON.stringify(aufgaben));
     }
 
     // Anzeige-ID immer als #xxxxxx: nach dem Sync ist a.id die numerische
@@ -414,7 +424,8 @@
         }
         topics = tRes.ok ? await tRes.json() : [];
         aufgaben = exRes.ok ? (await exRes.json()).map(vonKern) : [];
-        if (backfillCodes()) syncAufgaben(aufgaben);   // leere Codes einmalig fuellen + spiegeln
+        const nachgefuellt = backfillCodes();          // leere Codes einmalig fuellen
+        if (nachgefuellt.length) persistCodes(nachgefuellt);   // nur die geaenderten spiegeln
         const klassenRaw = clRes.ok ? await clRes.json() : [];
         // Lernleitern hängen am KURS, nicht an der Fach-Klasse: Schüler nach Kurs
         // gruppieren (gleichnamige der Fach-Klassen eines Kurses = eine Person).
