@@ -2691,7 +2691,8 @@
         chevron: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>',
         check: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>',
         info: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
-        share: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>'
+        share: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>',
+        download: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>'
     };
 
     // ─── Lernpfade ───
@@ -2732,20 +2733,68 @@
         renderGenPfade();
     }
 
+    // Referenzierte Aufgaben einer Lernleiter (distinct über alle Schüler).
+    function ladderAufgaben(ll) {
+        const ids = new Set((ll.schueler || []).flatMap(s => (s.aufgabenIds || []).map(String)));
+        return aufgaben.filter(a => ids.has(String(a.id)) || ids.has(String(a._id)));
+    }
+    function dlJson(obj, name) {
+        const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = name; a.click(); URL.revokeObjectURL(a.href);
+    }
+    // Struktur OHNE Schülerdaten: Thema/Config/Notizen je Lernleiter + die
+    // referenzierten Aufgaben. Beim Import legt der Server neue IDs an.
+    function llSnapshot(ll) {
+        return { thema: ll.thema, unterthema: ll.unterthema || '', notizen: ll.notizen || '', config: ll.config || null };
+    }
+    function exportPfad(pfad) {
+        const used = new Set();
+        (pfad.lernleitern || []).forEach(ll => ladderAufgaben(ll).forEach(a => used.add(a)));
+        dlJson({ type: 'lernpfad', version: 1, name: pfad.name, lernleitern: (pfad.lernleitern || []).map(llSnapshot), aufgaben: [...used] }, `lernpfad_${(pfad.name || 'pfad').replace(/[^\w-]+/g, '_')}.json`);
+        toast('Lernpfad exportiert');
+    }
+    function exportLernleiter(pfad, ll) {
+        dlJson({ type: 'lernleiter', version: 1, ...llSnapshot(ll), aufgaben: ladderAufgaben(ll) }, `lernleiter_${((ll.thema || 'lernleiter')).replace(/[^\w-]+/g, '_')}.json`);
+        toast('Lernleiter exportiert');
+    }
+    async function importPfadDatei(data) {
+        // Eine Lernleiter-Datei als 1-Leiter-Pfad wrappen.
+        if (data.type === 'lernleiter') data = { type: 'lernpfad', name: data.thema || 'Importierte Lernleiter', lernleitern: [{ thema: data.thema, unterthema: data.unterthema, notizen: data.notizen, config: data.config }], aufgaben: data.aufgaben };
+        if (!Array.isArray(data.lernleitern)) { toast('Keine Lernpfad-Datei'); return; }
+        // 1. Aufgaben anlegen (id-los → neu), damit der Pool sie kennt.
+        const neu = (data.aufgaben || []).map(a => { const c = { ...a }; delete c.id; delete c._id; return c; });
+        if (neu.length) { aufgaben = [...aufgaben, ...neu]; await syncAufgaben(aufgaben); }
+        // 2. Neuen Pfad mit Lernleiter-Hüllen (Vorlage: keine Schülerzuweisung).
+        let name = data.name || 'Importierter Pfad';
+        const namen = new Set(lernpfade.map(p => p.name));
+        if (namen.has(name)) { let i = 2; while (namen.has(`${name} (${i})`)) i++; name = `${name} (${i})`; }
+        const pfad = { _id: `pfad_${Date.now()}`, name, lernleitern: data.lernleitern.map((ll, i) => ({ _id: `ll_${Date.now()}_${i}`, thema: ll.thema || '', unterthema: ll.unterthema || '', klasse: '', notizen: ll.notizen || '', config: ll.config || null, schueler: [] })) };
+        if (await savePfad(pfad)) { toast(`Lernpfad „${name}" importiert${neu.length ? ` (${neu.length} Aufgaben)` : ''}`); loadLernpfade(); }
+    }
+    function importPfadPicker() {
+        const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json';
+        inp.onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => { try { importPfadDatei(JSON.parse(ev.target.result)); } catch (err) { toast('Fehler: ' + err.message); } }; r.readAsText(f); };
+        inp.click();
+    }
+
     function renderLernpfade() {
         const list = document.getElementById('pfade-list');
-        list.innerHTML = lernpfade.map(p => `
+        list.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn small" id="btn-import-pfad">${ICON.download} Lernpfad/Lernleiter importieren</button></div>` + lernpfade.map(p => `
             <div class="list-row" data-action="edit" data-id="${p._id}">
                 <div>
                     <strong>${esc(p.name)}</strong>
                     <span style="color:var(--text-muted)">– ${(p.lernleitern || []).length} Lernleitern</span>
                 </div>
                 <div class="btn-group">
+                    <button class="btn icon" data-action="export" data-id="${p._id}" title="Als Vorlage exportieren">${ICON.download}</button>
                     <button class="btn icon" data-action="edit" data-id="${p._id}" title="Bearbeiten">${ICON.edit}</button>
                     <button class="btn icon danger" data-action="delete" data-id="${p._id}" title="Löschen">${ICON.delete}</button>
                 </div>
             </div>
         `).join('');
+        const impBtn = document.getElementById('btn-import-pfad');
+        if (impBtn) impBtn.addEventListener('click', importPfadPicker);
 
         const openPfad = id => editPfad(lernpfade.find(p => p._id === id));
         const deletePfad = async id => {
@@ -2764,8 +2813,10 @@
         list.querySelectorAll('.btn[data-action]').forEach(btn => {
             btn.addEventListener('click', e => {
                 e.stopPropagation();
-                if (btn.dataset.action === 'edit') openPfad(btn.dataset.id);
-                else deletePfad(btn.dataset.id);
+                const act = btn.dataset.action;
+                if (act === 'edit') openPfad(btn.dataset.id);
+                else if (act === 'export') exportPfad(lernpfade.find(p => p._id === btn.dataset.id));
+                else if (act === 'delete') deletePfad(btn.dataset.id);
             });
         });
         renderPfadTrash(list);
@@ -2844,6 +2895,7 @@
                 </div>
                 <div class="btn-group">
                     <button class="btn icon" data-ll-id="${ll._id}" data-action="rename" title="Umbenennen">${ICON.edit}</button>
+                    <button class="btn icon" data-ll-id="${ll._id}" data-action="export" title="Als Vorlage exportieren">${ICON.download}</button>
                     <button class="btn icon" data-ll-id="${ll._id}" data-action="share" title="Im Marktplatz teilen">${ICON.share}</button>
                     ${i > 0 ? `<button class="btn icon" data-ll-id="${ll._id}" data-action="up" title="Nach oben">${ICON.up}</button>` : ''}
                     ${i < list.length - 1 ? `<button class="btn icon" data-ll-id="${ll._id}" data-action="down" title="Nach unten">${ICON.down}</button>` : ''}
@@ -2860,6 +2912,10 @@
                 const idx = currentPfad.lernleitern.findIndex(ll => ll._id === llId);
                 if (action === 'open') {
                     openLernleiter(currentPfad, currentPfad.lernleitern[idx]);
+                    return;
+                }
+                if (action === 'export') {
+                    exportLernleiter(currentPfad, currentPfad.lernleitern[idx]);
                     return;
                 }
                 if (action === 'share') {
