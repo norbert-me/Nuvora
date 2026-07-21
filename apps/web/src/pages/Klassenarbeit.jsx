@@ -86,7 +86,9 @@ export default function Klassenarbeit() {
   };
   // Summe erreichter Punkte / Maximum je SuS (nur bewertete Aufgaben zählen zum Max nicht — Max ist fix).
   const totalMax = () => (work.tasks || []).reduce((n, tk) => n + maxOf(tk), 0);
-  const sumOf = (sid) => (work.tasks || []).reduce((n, tk) => { const v = ((work.results || {})[String(sid)] || {})[tk.id]; return n + (v == null ? 0 : Number(v)); }, 0);
+  const sumOf = (sid) => (work.tasks || []).reduce((n, tk) => { const r = (work.results || {})[String(sid)]; const v = (r && r !== "abwesend") ? r[tk.id] : null; return n + (v == null ? 0 : Number(v)); }, 0);
+  const isAbsent = (sid) => (work.results || {})[String(sid)] === "abwesend";
+  const toggleAbsent = (sid) => { const results = { ...(work.results || {}) }; if (results[String(sid)] === "abwesend") delete results[String(sid)]; else results[String(sid)] = "abwesend"; persist({ ...work, results }); };
 
   // Auswertung LIVE aus dem Raster (kein Button, kein Server-Call): je Thema die
   // Trefferquote der Klasse + je SuS die schwachen Themen (≥ 50 % falsch).
@@ -98,7 +100,7 @@ export default function Klassenarbeit() {
     const topicTasks = {};
     tasks.forEach((tk) => { if (tk.topic_id) (topicTasks[tk.topic_id] ||= []).push(tk.id); });
     const p = (sid, tid) => { const v = (results[String(sid)] || {})[tid]; return v == null ? 0 : Number(v); };
-    const graded = students.filter((s) => results[String(s.id)]); // nur bewertete SuS zählen
+    const graded = students.filter((s) => { const r = results[String(s.id)]; return r && r !== "abwesend"; }); // bewertet, nicht abwesend zählen
     const topicsOut = Object.entries(topicTasks).map(([tid, tids]) => {
       let e = 0, m = 0;
       graded.forEach((s) => tids.forEach((id) => { e += p(s.id, id); m += mx[id]; }));
@@ -192,17 +194,25 @@ export default function Klassenarbeit() {
                 </thead>
                 <tbody>
                   {students.map((s) => {
-                    const sum = sumOf(s.id); const tm = totalMax();
+                    const sum = sumOf(s.id); const tm = totalMax(); const abw = isAbsent(s.id);
                     return (
-                      <tr key={s.id}>
-                        <td style={{ ...td, textAlign: "left", padding: "4px 8px", position: "sticky", left: 0, background: "var(--card)", fontWeight: 500, whiteSpace: "nowrap" }}>{s.name}</td>
+                      <tr key={s.id} style={abw ? { opacity: 0.5 } : undefined}>
+                        <td style={{ ...td, textAlign: "left", padding: "4px 8px", position: "sticky", left: 0, background: "var(--card)", fontWeight: 500, whiteSpace: "nowrap" }}>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <button onClick={() => toggleAbsent(s.id)} title={abw ? t("klassenarbeit.present") : t("klassenarbeit.absent")}
+                              style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, color: abw ? "#b8860b" : "var(--text3)", padding: 0 }}>{abw ? "🚫" : "○"}</button>
+                            {s.name}
+                          </span>
+                        </td>
                         {(work.tasks || []).map((tk) => (
                           <td key={tk.id} style={td}>
-                            <input type="number" min="0" max={maxOf(tk)} value={pointsOf(s.id, tk.id)} onChange={(e) => setPoints(s.id, tk.id, e.target.value === "" ? "" : Math.min(maxOf(tk), Math.max(0, Number(e.target.value))))}
-                              style={{ width: 44, height: 30, border: "none", background: "transparent", textAlign: "center", fontSize: 13, color: "var(--text)" }} />
+                            {abw ? <span style={{ fontSize: 11, color: "var(--text3)" }}>–</span> : (
+                              <input type="number" min="0" max={maxOf(tk)} value={pointsOf(s.id, tk.id)} onChange={(e) => setPoints(s.id, tk.id, e.target.value === "" ? "" : Math.min(maxOf(tk), Math.max(0, Number(e.target.value))))}
+                                style={{ width: 44, height: 30, border: "none", background: "transparent", textAlign: "center", fontSize: 13, color: "var(--text)" }} />
+                            )}
                           </td>
                         ))}
-                        <td style={{ ...td, fontWeight: 700, color: tm && sum / tm < 0.5 ? "#d1350f" : "var(--text)" }}>{sum}/{tm}</td>
+                        <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : (tm && sum / tm < 0.5 ? "#d1350f" : "var(--text)") }}>{abw ? t("klassenarbeit.absentShort") : `${sum}/${tm}`}</td>
                       </tr>
                     );
                   })}
@@ -287,7 +297,7 @@ function NotenUebernahme({ t, classId, kursId, students, work, onClose }) {
   }, []);
   const totalMax = (work.tasks || []).reduce((n, tk) => n + (Number(tk.max) > 0 ? Number(tk.max) : 1), 0);
   const grades = students
-    .filter((s) => (work.results || {})[String(s.id)])   // nur bewertete SuS
+    .filter((s) => { const r = (work.results || {})[String(s.id)]; return r && r !== "abwesend"; })   // bewertet, nicht abwesend
     .map((s) => {
       const row = (work.results || {})[String(s.id)] || {};
       const sum = (work.tasks || []).reduce((n, tk) => n + (Number(row[tk.id]) || 0), 0);

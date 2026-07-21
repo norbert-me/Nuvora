@@ -131,7 +131,9 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
         # Aufgaben) wird beim Lesen (_profile) mitübersetzt, hier nur Punkte-Maps.
         out = {}
         for k, v in list(body.results.items())[:400]:
-            if isinstance(v, dict):
+            if v == "abwesend":
+                out[str(k)] = "abwesend"                 # abwesend: zählt nicht in die Auswertung
+            elif isinstance(v, dict):
                 out[str(k)] = {str(tid)[:40]: (float(p) if isinstance(p, (int, float)) else 0) for tid, p in list(v.items())[:200]}
             elif isinstance(v, list):
                 out[str(k)] = [str(x)[:40] for x in v]  # Altformat unverändert durchreichen
@@ -177,6 +179,8 @@ def _profile(work: WorkAnalysis):
 
     out = {}  # student_id -> {topic_id: [erreicht, max]}
     for sid, entry in results.items():
+        if entry == "abwesend":
+            continue   # abwesende SuS zählen nicht in die Auswertung/Wiederholung
         prof = {}
         for topic_id, tids in topic_tasks.items():
             erreicht = sum(pts(entry, tid) for tid in tids)
