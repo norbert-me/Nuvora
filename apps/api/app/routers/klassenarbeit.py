@@ -121,11 +121,21 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
             if not isinstance(t, dict) or not t.get("id"):
                 continue
             tid = t.get("topic_id")
+            mx = t.get("max")
+            mx = int(mx) if isinstance(mx, (int, float)) and 0 < mx <= 1000 else 1  # Maximalpunkte, Default 1
             clean.append({"id": str(t["id"])[:40], "label": str(t.get("label") or "")[:200],
-                          "topic_id": tid if (isinstance(tid, int) and tid in own) else None})
+                          "topic_id": tid if (isinstance(tid, int) and tid in own) else None, "max": mx})
         w.tasks = clean
     if body.results is not None:
-        w.results = {str(k): [str(x)[:40] for x in (v or [])] for k, v in list(body.results.items())[:400]}
+        # {student_id: {task_id: erreichte Punkte}}. Altformat (Liste falscher
+        # Aufgaben) wird beim Lesen (_profile) mitübersetzt, hier nur Punkte-Maps.
+        out = {}
+        for k, v in list(body.results.items())[:400]:
+            if isinstance(v, dict):
+                out[str(k)] = {str(tid)[:40]: (float(p) if isinstance(p, (int, float)) else 0) for tid, p in list(v.items())[:200]}
+            elif isinstance(v, list):
+                out[str(k)] = [str(x)[:40] for x in v]  # Altformat unverändert durchreichen
+        w.results = out
     await db.commit()
     await db.refresh(w)
     return WorkOut(id=w.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {})
@@ -148,22 +158,30 @@ class RemediateIn(BaseModel):
 
 
 def _profile(work: WorkAnalysis):
-    """Je SuS je Thema: (falsch, gesamt) über die Aufgaben dieses Themas."""
+    """Je SuS je Thema: (erreichte Punkte, Maximalpunkte) über die Aufgaben des
+    Themas. Punkte-Modell; Altformat (Liste falscher Aufgaben) wird übersetzt
+    (gelistet = 0, sonst volle Punkte)."""
     tasks = work.tasks or []
-    topic_of = {t["id"]: t.get("topic_id") for t in tasks}
+    task_max = {t["id"]: (int(t["max"]) if isinstance(t.get("max"), (int, float)) and t["max"] > 0 else 1) for t in tasks}
     topic_tasks = {}
     for t in tasks:
         if t.get("topic_id"):
-            topic_tasks.setdefault(t["topic_id"], set()).add(t["id"])
+            topic_tasks.setdefault(t["topic_id"], []).append(t["id"])
     results = work.results or {}
-    out = {}  # student_id -> {topic_id: [falsch, gesamt]}
-    for sid, wrong in results.items():
-        wrongset = set(wrong or [])
+
+    def pts(entry, tid):
+        if isinstance(entry, list):
+            return 0 if tid in entry else task_max.get(tid, 1)   # Altformat
+        v = (entry or {}).get(tid)
+        return float(v) if isinstance(v, (int, float)) else 0    # nicht bewertet = 0
+
+    out = {}  # student_id -> {topic_id: [erreicht, max]}
+    for sid, entry in results.items():
         prof = {}
         for topic_id, tids in topic_tasks.items():
-            total = len(tids)
-            falsch = len(tids & wrongset)
-            prof[topic_id] = [falsch, total]
+            erreicht = sum(pts(entry, tid) for tid in tids)
+            mx = sum(task_max.get(tid, 1) for tid in tids)
+            prof[topic_id] = [erreicht, mx]
         out[sid] = prof
     return out, topic_tasks
 
@@ -178,18 +196,18 @@ async def analysis(work_id: int, user: User = Depends(require_module), db: Async
     def label(tid):
         nm = names.get(tid, "?"); p = parents.get(tid)
         return f"{names.get(p)} / {nm}" if p and names.get(p) else nm
-    # Klassenweit je Thema
+    # Klassenweit je Thema: erreichte / maximale Punkte.
     klass = {}
     for tid in topic_tasks:
-        falsch = total = 0
+        erreicht = mx = 0
         for sid, pr in prof.items():
-            f, tt = pr.get(tid, [0, 0]); falsch += f; total += tt
-        klass[tid] = {"topic_id": tid, "label": label(tid), "pct": round((1 - falsch / total) * 100) if total else 0}
-    # Je SuS schwache Themen (< 50 % richtig)
+            e, m = pr.get(tid, [0, 0]); erreicht += e; mx += m
+        klass[tid] = {"topic_id": tid, "label": label(tid), "pct": round(erreicht / mx * 100) if mx else 0}
+    # Je SuS schwache Themen (< 50 % der Punkte erreicht)
     studs = {s.id: s.name for s in (await db.execute(select(Student).where(Student.id.in_([int(x) for x in prof.keys()])))).scalars().all()} if prof else {}
     per_student = []
     for sid, pr in prof.items():
-        schwach = [label(tid) for tid, (f, tt) in pr.items() if tt and f / tt >= 0.5]
+        schwach = [label(tid) for tid, (e, m) in pr.items() if m and e / m < 0.5]
         if schwach:
             per_student.append({"student_id": int(sid), "name": studs.get(int(sid), "?"), "weak": sorted(schwach)})
     return {"topics": sorted(klass.values(), key=lambda x: x["pct"]), "students": sorted(per_student, key=lambda x: x["name"])}
@@ -210,7 +228,7 @@ async def remediate(work_id: int, body: RemediateIn, user: User = Depends(requir
     prof, _ = _profile(w)
     weak_by_student = {}
     for sid, pr in prof.items():
-        weak = {tid for tid, (f, tt) in pr.items() if tt and f / tt >= body.threshold}
+        weak = {tid for tid, (e, m) in pr.items() if m and e / m < body.threshold}
         if weak:
             weak_by_student[int(sid)] = weak
     all_topics = set().union(*weak_by_student.values()) if weak_by_student else set()

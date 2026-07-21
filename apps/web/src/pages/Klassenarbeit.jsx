@@ -1,7 +1,7 @@
-// Modul „Klassenarbeit auswerten": eine Arbeit als Raster — Zeilen = Aufgaben
-// (Label + Thema), Spalten = SuS, Zelle = richtig/falsch. Daraus je SuS ein
-// Fehlerprofil nach Thema und auf Knopfdruck gezielte Wiederholung (Karten des
-// schwachen Themas wieder fällig).
+// Modul „Klassenarbeit auswerten": Aufgaben mit Thema + Maximalpunkten, dann ein
+// Punkte-Raster (Zeilen = SuS, Spalten = Aufgaben, Zelle = erreichte Punkte).
+// Daraus LIVE je SuS ein Fehlerprofil nach Thema, eine Note (Punkte/Max → Skala)
+// und gezielte Wiederholung (Karten des schwachen Themas wieder fällig).
 import { useState, useEffect, useRef, useMemo } from "react";
 import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, modalOverlay, modalPanel } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
@@ -69,30 +69,41 @@ export default function Klassenarbeit() {
     setWorks((p) => p.filter((x) => x.id !== work.id)); setWork(null);
   };
 
-  const addTask = () => persist({ ...work, tasks: [...(work.tasks || []), { id: newId(), label: "", topic_id: null }] });
+  const addTask = () => persist({ ...work, tasks: [...(work.tasks || []), { id: newId(), label: "", topic_id: null, max: 1 }] });
   const setTask = (id, patch) => persist({ ...work, tasks: work.tasks.map((x) => (x.id === id ? { ...x, ...patch } : x)) });
-  const delTask = (id) => persist({ ...work, tasks: work.tasks.filter((x) => x.id !== id), results: Object.fromEntries(Object.entries(work.results || {}).map(([s, arr]) => [s, (arr || []).filter((tid) => tid !== id)])) });
-  const wrongOf = (sid) => new Set((work.results || {})[String(sid)] || []);
-  const toggleCell = (taskId, sid) => {
-    const cur = wrongOf(sid); cur.has(taskId) ? cur.delete(taskId) : cur.add(taskId);
-    persist({ ...work, results: { ...(work.results || {}), [String(sid)]: [...cur] } });
+  const delTask = (id) => persist({ ...work, tasks: work.tasks.filter((x) => x.id !== id),
+    results: Object.fromEntries(Object.entries(work.results || {}).map(([s, m]) => [s, Object.fromEntries(Object.entries(m || {}).filter(([tid]) => tid !== id))])) });
+  const maxOf = (task) => (Number(task.max) > 0 ? Number(task.max) : 1);
+  const pointsOf = (sid, tid) => { const v = ((work.results || {})[String(sid)] || {})[tid]; return v == null ? "" : v; };
+  const setPoints = (sid, tid, val) => {
+    const row = { ...((work.results || {})[String(sid)] || {}) };
+    if (val === "" || val == null) delete row[tid]; else row[tid] = Math.max(0, Number(val));
+    const results = { ...(work.results || {}) };
+    if (Object.keys(row).length) results[String(sid)] = row; else delete results[String(sid)];
+    persist({ ...work, results });
   };
+  // Summe erreichter Punkte / Maximum je SuS (nur bewertete Aufgaben zählen zum Max nicht — Max ist fix).
+  const totalMax = () => (work.tasks || []).reduce((n, tk) => n + maxOf(tk), 0);
+  const sumOf = (sid) => (work.tasks || []).reduce((n, tk) => { const v = ((work.results || {})[String(sid)] || {})[tk.id]; return n + (v == null ? 0 : Number(v)); }, 0);
 
   // Auswertung LIVE aus dem Raster (kein Button, kein Server-Call): je Thema die
   // Trefferquote der Klasse + je SuS die schwachen Themen (≥ 50 % falsch).
   const analyse = useMemo(() => {
     if (!work) return null;
+    const tasks = work.tasks || [];
+    const results = work.results || {};
+    const mx = {}; tasks.forEach((tk) => { mx[tk.id] = Number(tk.max) > 0 ? Number(tk.max) : 1; });
     const topicTasks = {};
-    (work.tasks || []).forEach((tk) => { if (tk.topic_id) (topicTasks[tk.topic_id] ||= []).push(tk.id); });
-    const wrong = (sid) => new Set((work.results || {})[String(sid)] || []);
+    tasks.forEach((tk) => { if (tk.topic_id) (topicTasks[tk.topic_id] ||= []).push(tk.id); });
+    const p = (sid, tid) => { const v = (results[String(sid)] || {})[tid]; return v == null ? 0 : Number(v); };
+    const graded = students.filter((s) => results[String(s.id)]); // nur bewertete SuS zählen
     const topicsOut = Object.entries(topicTasks).map(([tid, tids]) => {
-      let f = 0, tot = 0;
-      students.forEach((s) => { const w = wrong(s.id); tids.forEach((id) => { tot++; if (w.has(id)) f++; }); });
-      return { topic_id: Number(tid), label: topicLabel(Number(tid)), pct: tot ? Math.round((1 - f / tot) * 100) : 0 };
+      let e = 0, m = 0;
+      graded.forEach((s) => tids.forEach((id) => { e += p(s.id, id); m += mx[id]; }));
+      return { topic_id: Number(tid), label: topicLabel(Number(tid)), pct: m ? Math.round((e / m) * 100) : 0 };
     }).sort((a, b) => a.pct - b.pct);
-    const studentsOut = students.map((s) => {
-      const w = wrong(s.id);
-      const weak = Object.entries(topicTasks).filter(([, tids]) => { const f = tids.filter((id) => w.has(id)).length; return tids.length && f / tids.length >= 0.5; }).map(([tid]) => topicLabel(Number(tid)));
+    const studentsOut = graded.map((s) => {
+      const weak = Object.entries(topicTasks).filter(([, tids]) => { let e = 0, m = 0; tids.forEach((id) => { e += p(s.id, id); m += mx[id]; }); return m && e / m < 0.5; }).map(([tid]) => topicLabel(Number(tid)));
       return weak.length ? { student_id: s.id, name: s.name, weak } : null;
     }).filter(Boolean);
     return { topics: topicsOut, students: studentsOut };
@@ -134,46 +145,58 @@ export default function Klassenarbeit() {
           <input value={work.name} onChange={(e) => { const name = e.target.value; persist({ ...work, name }); setWorks((ws) => ws.map((x) => (x.id === work.id ? { ...x, name } : x))); }} placeholder={t("klassenarbeit.newName")}
             style={{ ...inputStyle, fontSize: 16, fontWeight: 600, marginBottom: 12, maxWidth: 360 }} />
 
-          <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 12 }}>
-            <table style={{ borderCollapse: "collapse", fontSize: 13 }}>
-              <thead>
-                <tr>
-                  <th style={{ ...th, textAlign: "left", minWidth: 150, position: "sticky", left: 0, background: "var(--card)" }}>{t("klassenarbeit.task")}</th>
-                  <th style={{ ...th, textAlign: "left", minWidth: 130 }}>{t("klassenarbeit.topic")}</th>
-                  {students.map((s) => <th key={s.id} style={{ ...th, minWidth: 30, maxWidth: 34, writingMode: "vertical-rl", transform: "rotate(180deg)", whiteSpace: "nowrap", height: 90 }} title={s.name}>{s.name}</th>)}
-                  <th style={th}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {(work.tasks || []).map((task, i) => (
-                  <tr key={task.id}>
-                    <td style={{ ...td, textAlign: "left", position: "sticky", left: 0, background: "var(--card)" }}>
-                      <input value={task.label} onChange={(e) => setTask(task.id, { label: e.target.value })} placeholder={`${i + 1}.`} style={{ ...inputStyle, fontSize: 12.5, padding: "6px 8px", width: 140, border: "none", background: "transparent" }} />
-                    </td>
-                    <td style={{ ...td, textAlign: "left" }}>
-                      <select value={task.topic_id || ""} onChange={(e) => setTask(task.id, { topic_id: e.target.value ? Number(e.target.value) : null })} style={{ ...selectStyle, fontSize: 12, padding: "6px 8px", minWidth: 120, border: "none", background: "transparent" }}>
-                        <option value="">{t("klassenarbeit.topicNone")}</option>
-                        {topics.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp.id)}</option>)}
-                      </select>
-                    </td>
-                    {students.map((s) => {
-                      const falsch = wrongOf(s.id).has(task.id);
-                      return (
-                        <td key={s.id} style={td}>
-                          <button onClick={() => toggleCell(task.id, s.id)} title={falsch ? t("klassenarbeit.wrong") : t("klassenarbeit.right")}
-                            style={{ width: 30, height: 30, border: "none", cursor: "pointer", fontSize: 14, fontWeight: 700, background: "transparent", color: falsch ? "#d1350f" : "#0a7d3e" }}>
-                            {falsch ? "✗" : "✓"}
-                          </button>
-                        </td>
-                      );
-                    })}
-                    <td style={td}><button onClick={() => delTask(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* 1) Aufgaben definieren: Bezeichnung + Thema + Maximalpunkte. */}
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text2)", margin: "4px 0 8px" }}>{t("klassenarbeit.tasksHeading")}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
+            {(work.tasks || []).map((task, i) => (
+              <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12, color: "var(--text3)", width: 18 }}>{i + 1}.</span>
+                <input value={task.label} onChange={(e) => setTask(task.id, { label: e.target.value })} placeholder={t("klassenarbeit.task")} style={{ ...inputStyle, fontSize: 13, padding: "7px 9px", flex: 1, minWidth: 130 }} />
+                <select value={task.topic_id || ""} onChange={(e) => setTask(task.id, { topic_id: e.target.value ? Number(e.target.value) : null })} style={{ ...selectStyle, fontSize: 12.5, padding: "7px 9px", minWidth: 130 }}>
+                  <option value="">{t("klassenarbeit.topicNone")}</option>
+                  {topics.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp.id)}</option>)}
+                </select>
+                <label style={{ fontSize: 12, color: "var(--text3)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  {t("klassenarbeit.maxPoints")}
+                  <input type="number" min="1" value={task.max ?? 1} onChange={(e) => setTask(task.id, { max: Math.max(1, Number(e.target.value) || 1) })} style={{ ...inputStyle, fontSize: 13, padding: "6px 6px", width: 56, textAlign: "center" }} />
+                </label>
+                <button onClick={() => delTask(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
+              </div>
+            ))}
           </div>
-          <button onClick={addTask} style={{ ...btnSecondary, marginTop: 10 }}>+ {t("klassenarbeit.addTask")}</button>
+          <button onClick={addTask} style={{ ...btnSecondary, marginBottom: 18 }}>+ {t("klassenarbeit.addTask")}</button>
+
+          {/* 2) Punkte-Raster: Zeilen = Schüler, Spalten = Aufgaben (0..max). */}
+          {(work.tasks || []).length > 0 && (
+            <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 12 }}>
+              <table style={{ borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...th, textAlign: "left", minWidth: 130, position: "sticky", left: 0, background: "var(--card)" }}>{t("common.name")}</th>
+                    {(work.tasks || []).map((tk, i) => <th key={tk.id} style={{ ...th, minWidth: 52 }} title={tk.label}>{tk.label || (i + 1)}<div style={{ fontSize: 10, color: "var(--text3)", fontWeight: 400 }}>/{maxOf(tk)}</div></th>)}
+                    <th style={{ ...th, minWidth: 56 }}>Σ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.map((s) => {
+                    const sum = sumOf(s.id); const tm = totalMax();
+                    return (
+                      <tr key={s.id}>
+                        <td style={{ ...td, textAlign: "left", padding: "4px 8px", position: "sticky", left: 0, background: "var(--card)", fontWeight: 500, whiteSpace: "nowrap" }}>{s.name}</td>
+                        {(work.tasks || []).map((tk) => (
+                          <td key={tk.id} style={td}>
+                            <input type="number" min="0" max={maxOf(tk)} value={pointsOf(s.id, tk.id)} onChange={(e) => setPoints(s.id, tk.id, e.target.value === "" ? "" : Math.min(maxOf(tk), Math.max(0, Number(e.target.value))))}
+                              style={{ width: 44, height: 30, border: "none", background: "transparent", textAlign: "center", fontSize: 13, color: "var(--text)" }} />
+                          </td>
+                        ))}
+                        <td style={{ ...td, fontWeight: 700, color: tm && sum / tm < 0.5 ? "#d1350f" : "var(--text)" }}>{sum}/{tm}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
             {notenAktiv && (work.tasks || []).length > 0 && <button onClick={() => setNotenModal(true)} style={btnPrimary}>{t("klassenarbeit.toNoten")}</button>}
@@ -223,11 +246,14 @@ function NotenUebernahme({ t, classId, kursId, students, work, onClose }) {
     fetch(`/api/noten/classes/${classId}/sections${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => { const l = Array.isArray(d) ? d : []; setSections(l); if (l[0]) setSectionId(String(l[0].id)); }).catch(() => setSections([]));
     try { const u = JSON.parse(localStorage.getItem("user")); if (u?.grade_scale) setScale(u.grade_scale); } catch { /* Default */ }
   }, []);
-  const total = (work.tasks || []).length;
-  const grades = students.map((s) => {
-    const wrong = ((work.results || {})[String(s.id)] || []).length;
-    return { student_id: s.id, value: gradeFromPct(((total - wrong) / total) * 100, scale) };
-  }).filter((g) => g.value >= 1 && g.value <= 6);
+  const totalMax = (work.tasks || []).reduce((n, tk) => n + (Number(tk.max) > 0 ? Number(tk.max) : 1), 0);
+  const grades = students
+    .filter((s) => (work.results || {})[String(s.id)])   // nur bewertete SuS
+    .map((s) => {
+      const row = (work.results || {})[String(s.id)] || {};
+      const sum = (work.tasks || []).reduce((n, tk) => n + (Number(row[tk.id]) || 0), 0);
+      return { student_id: s.id, value: gradeFromPct(totalMax ? (sum / totalMax) * 100 : 0, scale) };
+    }).filter((g) => g.value >= 1 && g.value <= 6);
   const secLabel = (s) => `${s.term === "2" ? "2. Hj · " : "1. Hj · "}${s.name}`;
   const submit = async () => {
     if (!sectionId) { setErr(t("karten.masteryNoSection")); return; }

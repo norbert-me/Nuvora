@@ -45,16 +45,17 @@ async def _setup(s):
 async def test_analyse_und_wiederholung(s):
     u, cls, A, B, s1, s2 = await _setup(s)
     w = await K.create_work(K.WorkIn(class_id=cls.id, name="KA1"), user=u, db=s)
-    tasks = [{"id": "t1", "label": "", "topic_id": A.id}, {"id": "t2", "label": "", "topic_id": A.id}, {"id": "t3", "label": "", "topic_id": B.id}]
-    results = {str(s1.id): ["t1", "t2"], str(s2.id): ["t1"]}  # Ann 2/2 A falsch, Bob 1/2 A falsch
+    # Punkte-Modell: je Aufgabe max 2 Punkte.
+    tasks = [{"id": "t1", "label": "", "topic_id": A.id, "max": 2}, {"id": "t2", "label": "", "topic_id": A.id, "max": 2}, {"id": "t3", "label": "", "topic_id": B.id, "max": 2}]
+    # Thema A (max 4/SuS): Ann 0+1=1/4, Bob 1+0=1/4 → beide 25 % (< 50 % = schwach). Thema B voll.
+    results = {str(s1.id): {"t1": 0, "t2": 1, "t3": 2}, str(s2.id): {"t1": 1, "t2": 0, "t3": 2}}
     await K.update_work(w.id, K.WorkPut(tasks=tasks, results=results), user=u, db=s)
 
     an = await K.analysis(w.id, user=u, db=s)
-    # Thema A: 3 richtig von 6 (Ann 0/2, Bob 1/2, plus B 2/2 richtig) → A = 25%
     a_stat = next(x for x in an["topics"] if x["topic_id"] == A.id)
-    assert a_stat["pct"] == 25
+    assert a_stat["pct"] == 25   # (1+1) von (4+4) Punkten
     weak_names = {x["name"] for x in an["students"]}
-    assert weak_names == {"Ann", "Bob"}  # beide schwach in Brüche
+    assert weak_names == {"Ann", "Bob"}  # beide < 50 % in Brüche
 
     # Karten des Themas A + Reviews (gelernt, in der Zukunft fällig)
     deck = CardDeck(owner_id=u.id, class_id=cls.id, name="Brüche", topic_id=A.id, released_at=datetime.now(timezone.utc))

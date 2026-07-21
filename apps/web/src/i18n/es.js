@@ -954,6 +954,8 @@ export default {
   "klassenarbeit.newName": "Examen",
   "klassenarbeit.delConfirm": "¿Eliminar el examen «{{name}}»?",
   "klassenarbeit.task": "Tarea",
+  "klassenarbeit.tasksHeading": "Tareas (con tema y puntos máximos)",
+  "klassenarbeit.maxPoints": "máx",
   "klassenarbeit.topic": "Tema",
   "klassenarbeit.topicNone": "— sin tema —",
   "klassenarbeit.right": "correcto",

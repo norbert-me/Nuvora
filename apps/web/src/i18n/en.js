@@ -954,6 +954,8 @@ export default {
   "klassenarbeit.newName": "Class test",
   "klassenarbeit.delConfirm": "Delete test “{{name}}”?",
   "klassenarbeit.task": "Task",
+  "klassenarbeit.tasksHeading": "Tasks (with topic and max points)",
+  "klassenarbeit.maxPoints": "max",
   "klassenarbeit.topic": "Topic",
   "klassenarbeit.topicNone": "— no topic —",
   "klassenarbeit.right": "correct",
