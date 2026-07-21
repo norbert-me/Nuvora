@@ -800,7 +800,7 @@ function SlotModal({ slot, classes, onSave, onDelete, onColor, onClose, t }) {
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 2 }}>{t("kalender.timetable")}</h3>
         <div style={{ fontSize: 12.5, color: "var(--text3)" }}>{wdays[slot.weekday]} · {slot.period}. {t("kalender.period")}</div>
         <div style={lbl}>{t("nav.classes")}</div>
-        <KursKlasseSelect value={classId === "" ? "" : Number(classId)} allowNone noneLabel={`– ${t("kalender.noClass")} –`}
+        <KursKlasseSelect value={classId === "" ? "" : Number(classId)} allowNone noneLabel={`– ${t("kalender.noClass")} –`} autoFocus
           onChange={(id) => setClassId(id === "" ? "" : String(id))} style={sfld} />
         {classId && (
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
