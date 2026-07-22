@@ -197,12 +197,17 @@
     // Aufgaben zum Kern spiegeln: anlegen, aendern, geloeschte entfernen.
     async function syncAufgaben(data) {
         try {
-            const serverIds = new Set((await api(`${LP}/exercises`).then(r => r.ok ? r.json() : [])).map(e => e.id));
+            const listRes = await api(`${LP}/exercises`);
+            // Konnte der Server-Stand gerade NICHT geladen werden (Netz/Fehler),
+            // niemals spiegeln — sonst faende die Loesch-Schleife „0 Server-Aufgaben"
+            // und/oder wir arbeiteten auf falscher Basis.
+            if (!listRes.ok) { console.warn('syncAufgaben: Server-Liste nicht ladbar — uebersprungen'); return; }
+            const serverIds = new Set((await listRes.json()).map(e => e.id));
             // Sicherung (CLAUDE.md: Live-Daten nie durch delete+recreate gefaehrden):
-            // eine leere lokale Liste gegen mehrere Server-Aufgaben ist praktisch
+            // eine leere lokale Liste gegen vorhandene Server-Aufgaben ist praktisch
             // immer ein nicht-geladener/stale Cache oder ein Ladefehler — KEIN echtes
             // „alles loeschen". Dann nichts spiegeln, sonst reisst es echte Daten weg.
-            if (!data.length && serverIds.size > 1) {
+            if (!data.length && serverIds.size >= 1) {
                 console.warn('syncAufgaben: leere Liste gegen', serverIds.size, 'Server-Aufgaben — uebersprungen (Schutz vor Datenverlust)');
                 return;
             }
@@ -220,10 +225,17 @@
                     syncSigs[a.id] = aufgabeSig(a);
                 }
             }
-            // Was der Server noch hat, die Oberflaeche aber nicht mehr: loeschen.
-            for (const weg of serverIds) {
-                await api(`${LP}/exercises/${weg}`, { method: 'DELETE' });
-                delete syncSigs[weg];
+            // Was der Server noch hat, die Oberflaeche aber nicht mehr: loeschen —
+            // ABER nur, wenn die Aufgaben diese Sitzung wirklich vom Server geladen
+            // wurden. Ein partieller/stale Cache (z.B. Cache-First vor dem Load)
+            // wuerde sonst alle fehlenden Server-Aufgaben massenhaft loeschen.
+            if (aufgabenVomServer) {
+                for (const weg of serverIds) {
+                    await api(`${LP}/exercises/${weg}`, { method: 'DELETE' });
+                    delete syncSigs[weg];
+                }
+            } else if (serverIds.size) {
+                console.warn('syncAufgaben: Loeschen uebersprungen —', serverIds.size, 'Server-Aufgaben nicht in lokaler Liste, aber Basis noch nicht vom Server geladen (Schutz vor Datenverlust)');
             }
             localStorage.setItem(STORAGE_KEYS.aufgaben, JSON.stringify(data));
         } catch(e) { console.error('Sync-Fehler:', e); }
@@ -382,6 +394,11 @@
 
     // ─── State ───
     let aufgaben = load(STORAGE_KEYS.aufgaben);
+    // Erst wenn die Aufgaben diese Sitzung wirklich vom Server geladen wurden,
+    // darf syncAufgaben serverseitig loeschen. Sonst koennte ein stale/partieller
+    // Cache (Cache-First vor dem Load) beim naechsten save() echte Aufgaben
+    // wegreissen (Datenverlust). Vor dem Load: nur anlegen/aendern, nie loeschen.
+    let aufgabenVomServer = false;
     let schueler = load(STORAGE_KEYS.schueler);
     let klassen = load(STORAGE_KEYS.klassen);
     let lernpfade = [];
@@ -488,7 +505,8 @@
             await alertDlg('Aufgaben konnten nicht geladen werden — ist das Modul „Lernpfad" aktiviert? (Status ' + exRes.status + ')');
         }
         topics = tRes.ok ? await tRes.json() : [];
-        aufgaben = exRes.ok ? (await exRes.json()).map(vonKern) : [];
+        if (exRes.ok) { aufgaben = (await exRes.json()).map(vonKern); aufgabenVomServer = true; }
+        else aufgaben = [];   // Ladefehler: NICHT als „alles geloescht" spiegeln (Flag bleibt false)
         // Fehlende Codes serverseitig in EINEM Request auffuellen (statt je Aufgabe
         // ein PUT — das war der 429-Sturm). Nur wenn ueberhaupt welche leer sind.
         if (aufgaben.some(a => !/^#\d+$/.test(String(a.code || '')))) {
