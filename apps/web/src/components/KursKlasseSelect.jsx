@@ -8,7 +8,7 @@ import { selectStyle } from "./Icons.jsx";
 // value "" sein und onChange("") gemeldet werden.
 // autoFocus: erstes Feld beim Einblenden fokussieren (natives autoFocus, ohne
 // showPicker — das warf je nach Browser/fehlender Nutzergeste und wirkte kaputt).
-export default function KursKlasseSelect({ value, onChange, onKurs, style, allowNone = false, noneLabel = "–", autoFocus = false }) {
+export default function KursKlasseSelect({ value, kursValue = null, onChange, onKurs, style, allowNone = false, noneLabel = "–", autoFocus = false }) {
   const [groups, setGroups] = useState([]); // [{ id, name, classes:[{id,name}] }]
   // Der gewählte Kurs wird EXPLIZIT gehalten, nicht aus value abgeleitet: eine
   // Klasse kann in mehreren Kursen liegen (many-to-many). Würde man den Kurs aus
@@ -40,11 +40,17 @@ export default function KursKlasseSelect({ value, onChange, onKurs, style, allow
     if (!groups.length) return;
     const cur = groups.find((g) => String(g.id) === String(kursId));
     if (cur && cur.classes.some((c) => c.id === value)) return; // Wahl gilt weiter
-    const g = groups.find((x) => x.classes.some((c) => c.id === value));
+    // Gespeicherten Kurs bevorzugen (kursValue): eine Klasse kann in mehreren
+    // Kursen liegen — ohne diesen Hinweis riete das Ableiten den ERSTEN Kurs und
+    // ueberschriebe die gespeicherte Wahl (z.B. „mathe 7.5" zurueck auf „lz 7.5").
+    const preferred = kursValue != null
+      ? groups.find((x) => String(x.id) === String(kursValue) && x.classes.some((c) => c.id === value))
+      : null;
+    const g = preferred || groups.find((x) => x.classes.some((c) => c.id === value));
     // Ohne Treffer: nur beim Erstladen (kursId noch null) und nur wenn keine
     // Leer-Option erlaubt ist auf den ersten Kurs fallen; sonst Wahl belassen.
     setKursId(g ? String(g.id) : (kursId == null && groups.length && !allowNone ? String(groups[0].id) : kursId));
-  }, [groups, value]); // eslint-disable-line
+  }, [groups, value, kursValue]); // eslint-disable-line
 
   const cur = groups.find((g) => String(g.id) === String(kursId));
   const s = { ...selectStyle, ...style };
