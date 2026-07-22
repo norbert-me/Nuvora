@@ -515,12 +515,10 @@
         syncSigs = {};
         aufgaben.forEach(a => { if (a.id) syncSigs[a.id] = aufgabeSig(a); });
         const klassenRaw = clRes.ok ? await clRes.json() : [];
-        // Lernleitern hängen am KURS, nicht an der Fach-Klasse: Schüler nach Kurs
-        // gruppieren (gleichnamige der Fach-Klassen eines Kurses = eine Person).
-        const kurse = kuRes && kuRes.ok ? await kuRes.json() : [];
-        const classKurs = {};
-        kurse.forEach(k => (k.classes || []).forEach(c => { if (!(c.id in classKurs)) classKurs[c.id] = k.name; }));
-        const kursOf = c => classKurs[c.id] || c.name;
+        // Im Lernpfad wird je FACH-KLASSE gearbeitet (Mathematik 7.5 ≠ Lernzeit 7.5),
+        // nicht je Lerngruppe — sonst verschwinden einzelne Fächer aus der Auswahl.
+        // Die SuS-/Anwesenheits-Teilung geteilter Kurse liegt im Kern, nicht hier.
+        const kursOf = c => c.name;
         schueler = [];
         const gesehen = new Set();
         klassenRaw.forEach(c => (c.students || []).forEach(st => {
@@ -1613,15 +1611,11 @@
         // Server ziehen — dann fuellt sich der Selektor auch ohne vollen Reload.
         if (!kurseNamen.length) {
             try {
-                const [cl, ku] = await Promise.all([
-                    api(`${API}/classes`).then(r => r.ok ? r.json() : []),
-                    api(`${API}/kurse`).then(r => r.ok ? r.json() : []),
-                ]);
-                const ck = {};
-                (ku || []).forEach(k => (k.classes || []).forEach(c => { if (!(c.id in ck)) ck[c.id] = k.name; }));
-                kurseNamen = [...new Set((cl || []).map(c => ck[c.id] || c.name).filter(Boolean))].sort();
-                console.warn('[Generator] Kurse direkt geladen: %d (classes=%d, kurse=%d)', kurseNamen.length, (cl || []).length, (ku || []).length);
-            } catch (e) { console.warn('[Generator] Kurs-Direktabruf fehlgeschlagen:', e); }
+                const cl = await api(`${API}/classes`).then(r => r.ok ? r.json() : []);
+                // Je Fach-Klasse (eigener Name), damit alle Fächer auftauchen.
+                kurseNamen = [...new Set((cl || []).map(c => c.name).filter(Boolean))].sort();
+                console.warn('[Generator] Klassen direkt geladen: %d Fach-Klassen', kurseNamen.length);
+            } catch (e) { console.warn('[Generator] Klassen-Direktabruf fehlgeschlagen:', e); }
         }
 
         const selT = document.getElementById('gen-thema');
