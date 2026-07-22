@@ -258,8 +258,10 @@ export default function Kalender() {
   // Fächer derselben Lerngruppe eigene Farben behalten. Sofort lokal, dann speichern.
   const setSlotColor = async (kursId, classId, color) => {
     if (!classId) return;
+    console.warn("[Kalender] Farbe setzen: classId=%s (kursId=%s) -> %s", classId, kursId, color);
     setClasses((prev) => { const next = prev.map((c) => (c.id === classId ? { ...c, color } : c)); put("classes", next); return next; });
-    await fetch(`/api/classes/${classId}/color`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) }).catch(() => {});
+    const r = await fetch(`/api/classes/${classId}/color`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) }).catch(() => null);
+    console.warn("[Kalender] Farbe gespeichert: HTTP %s für classId=%s", r ? r.status : "netzfehler", classId);
   };
 
   const saveSlot = async (s) => {
@@ -931,14 +933,20 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onClo
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)" }}>
               {t("kalender.classColor")}
-              <input type="color" value={color} onChange={(e) => { setColor(e.target.value); onColor && onColor(kursId, Number(classId), e.target.value); }}
+              {/* Farbe NUR lokal ändern — angewendet/gespeichert wird sie erst über
+                  „Speichern" (sonst schrieb jeder Zwischenwert des Farbwählers live). */}
+              <input type="color" value={color} onChange={(e) => setColor(e.target.value)}
                 style={{ width: 34, height: 28, border: "1px solid var(--border2)", borderRadius: 6, background: "none", cursor: "pointer", padding: 0 }} />
             </label>
             <Link to={`/classes?open=${classId}`} onClick={onClose} style={{ fontSize: 13, color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>{t("kalender.toClass")} ↗</Link>
           </div>
         )}
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
-          <button onClick={() => onSave({ weekday: slot.weekday, period: slot.period, title: "", class_id: classId ? Number(classId) : null, kurs_id: classId ? kursId : null, topic_id: null })} style={btnPrimary}>{t("common.save")}</button>
+          <button onClick={() => {
+            // Farbe erst beim Speichern anwenden — und nur, wenn sie sich geändert hat.
+            if (classId && color && color !== clsColorOf(classId)) onColor && onColor(kursId, Number(classId), color);
+            onSave({ weekday: slot.weekday, period: slot.period, title: "", class_id: classId ? Number(classId) : null, kurs_id: classId ? kursId : null, topic_id: null });
+          }} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
           {slot.id && <button onClick={() => onDelete(slot.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
         </div>
