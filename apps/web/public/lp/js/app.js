@@ -3198,41 +3198,52 @@
             </div>
         `).join('');
 
-        // Drag & Drop zum Sortieren, mit Live-Vorschau der Ablageposition.
-        let dragId = null;
+        // Drag & Drop zum Sortieren, mit ECHTER Platzhalter-Vorschau: die Liste
+        // oeffnet sich an der Stelle, an der losgelassen wird (einheitlich mit den
+        // anderen Drag&Drops der App). dropTarget/dropAfter treiben die Umordnung.
+        let dragId = null, dropTargetId = null, dropAfter = false, placeholder = null, committed = false;
         const rows = [...container.querySelectorAll('.ll-row')];
-        const clearHints = () => rows.forEach(r => r.classList.remove('drop-before', 'drop-after'));
+        const removePh = () => { if (placeholder) { placeholder.remove(); placeholder = null; } };
+        const commitDrop = async () => {
+            if (committed) return; committed = true;
+            removePh();
+            if (!dragId || !dropTargetId || dragId === dropTargetId) return;
+            const from = currentPfad.lernleitern.findIndex(l => l._id === dragId);
+            if (from < 0) return;
+            const [moved] = currentPfad.lernleitern.splice(from, 1);
+            let to = currentPfad.lernleitern.findIndex(l => l._id === dropTargetId);
+            if (to < 0) to = currentPfad.lernleitern.length - 1;
+            currentPfad.lernleitern.splice(dropAfter ? to + 1 : to, 0, moved);
+            if (bereinigeErsteWiederholung(currentPfad)) toast('Wiederholungs-Aufgaben der ersten Lernleiter entfernt (kein Thema davor).');
+            await savePfad(currentPfad);
+            await loadLernpfade();
+            currentPfad = lernpfade.find(p => p.id === currentPfad.id) || currentPfad;
+            renderPfadLernleitern();
+        };
         rows.forEach(row => {
-            row.addEventListener('dragstart', (e) => { dragId = row.dataset.llId; row.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
-            row.addEventListener('dragend', () => { dragId = null; rows.forEach(r => r.classList.remove('dragging')); clearHints(); });
+            row.addEventListener('dragstart', (e) => {
+                dragId = row.dataset.llId; committed = false; row.classList.add('dragging');
+                placeholder = document.createElement('div');
+                placeholder.className = 'll-placeholder';
+                placeholder.style.height = row.offsetHeight + 'px';
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            row.addEventListener('dragend', () => { dragId = null; dropTargetId = null; rows.forEach(r => r.classList.remove('dragging')); removePh(); });
             row.addEventListener('dragover', (e) => {
                 if (!dragId || row.dataset.llId === dragId) return;
                 e.preventDefault();
                 const rect = row.getBoundingClientRect();
-                const after = (e.clientY - rect.top) > rect.height / 2;
-                clearHints();
-                row.classList.add(after ? 'drop-after' : 'drop-before');   // Vorschau
+                dropAfter = (e.clientY - rect.top) > rect.height / 2;
+                dropTargetId = row.dataset.llId;
+                if (placeholder) { if (dropAfter) row.after(placeholder); else row.before(placeholder); }   // Vorschau
             });
-            row.addEventListener('drop', async (e) => {
-                e.preventDefault();
-                const targetId = row.dataset.llId;
-                const rect = row.getBoundingClientRect();
-                const after = (e.clientY - rect.top) > rect.height / 2;
-                clearHints();
-                if (!dragId || dragId === targetId) return;
-                const from = currentPfad.lernleitern.findIndex(l => l._id === dragId);
-                if (from < 0) return;
-                const [moved] = currentPfad.lernleitern.splice(from, 1);
-                let to = currentPfad.lernleitern.findIndex(l => l._id === targetId);
-                if (to < 0) to = currentPfad.lernleitern.length - 1;
-                currentPfad.lernleitern.splice(after ? to + 1 : to, 0, moved);
-                if (bereinigeErsteWiederholung(currentPfad)) toast('Wiederholungs-Aufgaben der ersten Lernleiter entfernt (kein Thema davor).');
-                await savePfad(currentPfad);
-                await loadLernpfade();
-                currentPfad = lernpfade.find(p => p.id === currentPfad.id) || currentPfad;
-                renderPfadLernleitern();
-            });
+            row.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); commitDrop(); });
         });
+        // Auch ein Drop auf den Platzhalter-Zwischenraum (nicht direkt auf eine Zeile)
+        // zaehlt. Property-Zuweisung (nicht addEventListener), damit sich die Handler
+        // bei jedem Re-Render nicht aufstauen.
+        container.ondragover = (e) => { if (dragId) e.preventDefault(); };
+        container.ondrop = (e) => { e.preventDefault(); commitDrop(); };
 
         container.querySelectorAll('[data-ll-id]').forEach(el => {
             el.addEventListener('click', async (e) => {
