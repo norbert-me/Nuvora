@@ -202,6 +202,18 @@ export const popoverPanel = {
   background: "var(--card)", color: "var(--text)", border: "1px solid var(--border)",
   borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
 };
+// Statistik-Kachel (Auswertungen): großer Wert + Label. EINE Quelle, damit die
+// Auswertungen (CardVote, Klassenarbeit) gleich aussehen.
+export function StatCard({ label, value, color, sub }) {
+  return (
+    <div style={{ padding: "10px 16px", background: "var(--bg2)", borderRadius: 12, textAlign: "center", minWidth: 80 }}>
+      <div style={{ fontSize: 22, fontWeight: 700, color: color || "var(--text)" }}>{value}</div>
+      <div style={{ fontSize: 12, color: "var(--text3)" }}>{label}</div>
+      {sub != null && <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 1 }}>{sub}</div>}
+    </div>
+  );
+}
+
 // ─── Boxplot (EINE Quelle) ───────────────────────────────────────────────────
 // Horizontaler Boxplot mit Markierungen (Min · Q1 · Median · Q3 · Max) und
 // Ausreißern (1,5·IQR). Vorher hatte jede Auswertung ihren eigenen — CardVote,

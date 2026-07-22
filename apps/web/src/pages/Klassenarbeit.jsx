@@ -3,7 +3,7 @@
 // Daraus LIVE je SuS ein Fehlerprofil nach Thema, eine Note (Punkte/Max → Skala)
 // und gezielte Wiederholung (Karten des schwachen Themas wieder fällig).
 import { useState, useEffect, useRef, useMemo } from "react";
-import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, modalOverlay, modalPanel, Boxplot } from "../components/Icons.jsx";
+import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, modalOverlay, modalPanel, Boxplot, StatCard } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
@@ -213,7 +213,15 @@ export default function Klassenarbeit() {
     const r2 = (x) => Math.round(x * 100) / 100;
     const stats = werte.length ? { min: werte[0], q1: r2(quantile(werte, 0.25)), med: r2(quantile(werte, 0.5)), q3: r2(quantile(werte, 0.75)), max: werte[werte.length - 1], sd: r2(stdev(werte)) } : null;
     const minPts = [1, 2, 3, 4, 5].map((g) => ({ grade: g, pts: Math.ceil(((effScale[g] || 0) / 100) * tm) }));
-    return { topics: topicsOut, students: studentsOut, perTask, perUnit, noten: { avg, dist, n: notes.length, notes, stats, minPts, max: tm } };
+    // Klassen-Kennzahlen wie CardVote: Ø-Prozent, Median-Prozent, 95%-KI, Anwesend.
+    const pctArr = graded.map((s) => (tm ? (tasks.reduce((n, tk) => n + pt(s.id, tk), 0) / tm) * 100 : 0));
+    const avgPct = pctArr.length ? Math.round(mean(pctArr)) : null;
+    const medPct = pctArr.length ? Math.round(quantile([...pctArr].sort((a, b) => a - b), 0.5)) : null;
+    const sdPct = pctArr.length ? Math.round(sdOf(pctArr) * 10) / 10 : null;
+    let ciLow = null, ciHigh = null;
+    if (pctArr.length >= 2) { const half = 1.96 * (sdOf(pctArr) / Math.sqrt(pctArr.length)); ciLow = Math.max(0, Math.round(mean(pctArr) - half)); ciHigh = Math.min(100, Math.round(mean(pctArr) + half)); }
+    const present = graded.length, total = students.length;
+    return { topics: topicsOut, students: studentsOut, perTask, perUnit, noten: { avg, dist, n: notes.length, notes, stats, minPts, max: tm, avgPct, medPct, sdPct, ciLow, ciHigh, present, total } };
   }, [work, students, topics, scale, effScale]);
   const wiederholen = async () => {
     if (!work) return;
@@ -464,37 +472,40 @@ export default function Klassenarbeit() {
                 ))}
               </>)}
 
-              {/* Endnote: Verteilung + Kennzahlen (Notenwert) + min-Punkte je Note */}
+              {/* Noten-Auswertung im CardVote-Design: Kennzahl-Kacheln + Panel mit
+                  Notenverteilung/Boxplot-Umschalter. */}
               {analyse.noten.n > 0 && (<>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, margin: "16px 0 8px", flexWrap: "wrap" }}>
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>{t("klassenarbeit.gradeResult")} <span style={{ fontWeight: 400, color: "var(--text3)", fontSize: 12.5 }}>· ⌀ {String(analyse.noten.avg).replace(".", ",")}</span></div>
-                  <div style={{ display: "inline-flex", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
-                    {[["bar", t("klassenarbeit.distBar")], ["box", t("klassenarbeit.distBox")]].map(([m, lbl]) => (
-                      <button key={m} onClick={() => setDistMode(m)} style={{ border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, padding: "4px 10px", background: distMode === m ? "var(--accent)" : "transparent", color: distMode === m ? "#fff" : "var(--text2)" }}>{lbl}</button>
+                <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.gradeResult")}</div>
+                {/* Statistik-Kacheln (Anwesend … 95%-KI) — wie CardVote. */}
+                <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+                  <StatCard label={t("klassenarbeit.attendance")} value={`${analyse.noten.present} / ${analyse.noten.total}`} />
+                  <StatCard label={t("klassenarbeit.avgGrade")} value={String(analyse.noten.avg).replace(".", ",")} />
+                  {analyse.noten.avgPct != null && <StatCard label={t("klassenarbeit.avgPct")} value={`${analyse.noten.avgPct}%`} />}
+                  {analyse.noten.medPct != null && <StatCard label={t("klassenarbeit.median")} value={`${analyse.noten.medPct}%`} />}
+                  {analyse.noten.sdPct != null && <StatCard label={t("klassenarbeit.stdev")} value={`${String(analyse.noten.sdPct).replace(".", ",")}%`} />}
+                  {analyse.noten.ciLow != null && <StatCard label={t("klassenarbeit.ci")} value={`${analyse.noten.ciLow}–${analyse.noten.ciHigh}%`} />}
+                </div>
+                {/* Verteilung / Boxplot — Panel + Pillen-Umschalter wie CardVote. */}
+                <div style={{ padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                    {[["bar", t("klassenarbeit.distGrades")], ["box", t("klassenarbeit.distBox")]].map(([m, lbl]) => (
+                      <button key={m} onClick={() => setDistMode(m)} style={{ fontSize: 13, fontWeight: 600, padding: "5px 12px", borderRadius: 980, border: "none", cursor: "pointer", background: distMode === m ? "var(--accent)" : "var(--bg2)", color: distMode === m ? "#fff" : "var(--text3)", transition: "all 0.2s" }}>{lbl}</button>
                     ))}
                   </div>
-                </div>
-                {distMode === "bar" ? (
-                <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 105 }}>
-                  {analyse.noten.dist.map((c, i) => { const mxc = Math.max(...analyse.noten.dist, 1); return (
-                    <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                      <div style={{ width: "60%", height: `${Math.max(3, (c / mxc) * 75)}px`, background: i < 2 ? C.success : i < 4 ? C.warning : C.danger, borderRadius: 3 }} title={`${c}`} />
-                      <span style={{ fontSize: 11, color: "var(--text3)" }}>{c}</span>
-                      <span style={{ fontSize: 11, fontWeight: 700 }}>{i + 1}</span>
-                    </div>
-                  ); })}
-                </div>
-                ) : (
-                  // Boxplot auf der %-Achse (Klassenleistung) — zentrale Kern-Komponente.
-                  <Boxplot values={pctList(work)} max={100} unit="%" />
-                )}
-                {analyse.noten.stats && (
-                  <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: "5px 16px", fontSize: 12.5 }}>
-                    {[[t("klassenarbeit.stdev"), analyse.noten.stats.sd], [t("klassenarbeit.min"), analyse.noten.stats.min], ["Q1", analyse.noten.stats.q1], [t("klassenarbeit.median"), analyse.noten.stats.med], ["Q3", analyse.noten.stats.q3], [t("klassenarbeit.max"), analyse.noten.stats.max]].map(([k, v]) => (
-                      <span key={k}><span style={{ color: "var(--text3)" }}>{k}:</span> <b>{String(v).replace(".", ",")}</b></span>
-                    ))}
+                  {distMode === "bar" ? (
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 105 }}>
+                    {analyse.noten.dist.map((c, i) => { const mxc = Math.max(...analyse.noten.dist, 1); return (
+                      <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                        <div style={{ width: "60%", height: `${Math.max(3, (c / mxc) * 75)}px`, background: i < 2 ? C.success : i < 4 ? C.warning : C.danger, borderRadius: 3 }} title={`${c}`} />
+                        <span style={{ fontSize: 11, color: "var(--text3)" }}>{c}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700 }}>{i + 1}</span>
+                      </div>
+                    ); })}
                   </div>
-                )}
+                  ) : (
+                    <Boxplot values={pctList(work)} max={100} unit="%" />
+                  )}
+                </div>
                 {analyse.noten.max > 0 && (
                   <div style={{ marginTop: 8, fontSize: 12 }}>
                     <span style={{ color: "var(--text3)" }}>{t("klassenarbeit.minPoints")}: </span>
