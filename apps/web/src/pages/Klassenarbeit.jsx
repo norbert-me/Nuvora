@@ -161,6 +161,10 @@ export default function Klassenarbeit() {
     const absent = new Set([...((work.absent) || []).map(String), ...Object.entries(results).filter(([, v]) => v === "abwesend").map(([k]) => k)]);
     const hasAny = students.some((s) => { const r = results[String(s.id)]; return !absent.has(String(s.id)) && r && r !== "abwesend" && Object.keys(r).length; });
     const graded = hasAny ? students.filter((s) => !absent.has(String(s.id))) : [];
+    // Gesamtpunkte je SuS (für Trennschärfe = Item-Total-Korrelation).
+    const totals = graded.map((s) => tasks.reduce((n, tk) => n + pt(s.id, tk), 0));
+    const mean = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
+    const sdOf = (arr) => { if (arr.length < 2) return 0; const m = mean(arr); return Math.sqrt(arr.reduce((s, x) => s + (x - m) ** 2, 0) / (arr.length - 1)); };
 
     const topicsOut = Object.entries(topicTasks).map(([tid, tks]) => {
       let e = 0, m = 0; graded.forEach((s) => tks.forEach((tk) => { e += pt(s.id, tk); m += tkMax(tk); }));
@@ -170,9 +174,32 @@ export default function Klassenarbeit() {
       const weak = Object.entries(topicTasks).filter(([, tks]) => { let e = 0, m = 0; tks.forEach((tk) => { e += pt(s.id, tk); m += tkMax(tk); }); return m && e / m < 0.5; }).map(([tid]) => topicLabel(Number(tid)));
       return weak.length ? { student_id: s.id, name: s.name, weak } : null;
     }).filter(Boolean);
-    // je Aufgabe: durchschnittliche Punkte (⌀/Max) UND Trefferquote — die Punkte
-    // gesamt je Aufgabe, nicht nur je Teilaufgabe.
-    const perTask = tasks.map((tk, i) => { let e = 0; graded.forEach((s) => { e += pt(s.id, tk); }); const mx = tkMax(tk); const m = graded.length * mx; const avgP = graded.length ? e / graded.length : 0; return { id: tk.id, label: tk.label || `${i + 1}.`, pct: m ? Math.round((e / m) * 100) : 0, avgP: Math.round(avgP * 10) / 10, max: mx }; });
+    // je Aufgabe: Ø-Punkte (⌀/Max), Trefferquote, Trennschärfe (Item-Total-
+    // Korrelation) und 95%-Konfidenzintervall der mittleren Trefferquote.
+    const perTask = tasks.map((tk, i) => {
+      const xs = graded.map((s) => pt(s.id, tk));
+      const mx = tkMax(tk);
+      const e = xs.reduce((a, b) => a + b, 0);
+      const m = graded.length * mx;
+      const avgP = mean(xs);
+      // Trennschärfe: Korrelation Aufgabenpunkte ↔ Gesamtpunkte (−1..+1).
+      let disc = null;
+      if (graded.length >= 3) {
+        const mxk = mean(xs), myk = mean(totals);
+        let cov = 0, sx = 0, sy = 0;
+        xs.forEach((x, idx) => { const dx = x - mxk, dy = totals[idx] - myk; cov += dx * dy; sx += dx * dx; sy += dy * dy; });
+        disc = (sx > 0 && sy > 0) ? cov / Math.sqrt(sx * sy) : null;
+      }
+      // 95%-KI der mittleren Trefferquote (Prozent): Mittel ± 1,96·SE.
+      let ciLow = null, ciHigh = null;
+      if (graded.length >= 2 && mx > 0) {
+        const pcts = xs.map((x) => (x / mx) * 100);
+        const half = 1.96 * (sdOf(pcts) / Math.sqrt(pcts.length));
+        ciLow = Math.max(0, Math.round(mean(pcts) - half));
+        ciHigh = Math.min(100, Math.round(mean(pcts) + half));
+      }
+      return { id: tk.id, label: tk.label || `${i + 1}.`, pct: m ? Math.round((e / m) * 100) : 0, avgP: Math.round(avgP * 10) / 10, max: mx, disc, ciLow, ciHigh };
+    });
     // Ø je Teilaufgabe (nur wo eine Aufgabe echte Teile hat) — wie in der Excel.
     const perUnit = [];
     tasks.forEach((tk, i) => { const us = units(tk); if (us.length < 2) return; us.forEach((u) => { let e = 0; graded.forEach((s) => { e += pu(s.id, u.id); }); const avgP = graded.length ? e / graded.length : 0; perUnit.push({ id: u.id, label: `${tk.label || (i + 1)} ${u.label}`, avgP: Math.round(avgP * 10) / 10, max: uMax[u.id], pct: uMax[u.id] ? Math.round((avgP / uMax[u.id]) * 100) : 0 }); }); });
@@ -400,17 +427,28 @@ export default function Klassenarbeit() {
                 ))}
               </>)}
 
-              {/* #46 je Aufgabe */}
+              {/* je Aufgabe: Ø, Trefferquote + Trennschärfe/95%-KI */}
               {analyse.perTask.length > 0 && (<>
                 <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.byTask")}</div>
-                {analyse.perTask.map((tk) => (
-                  <div key={tk.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "3px 0" }}>
-                    <span style={{ flex: 1, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tk.label}</span>
-                    <span style={{ fontSize: 11.5, color: "var(--text3)" }}>⌀ {String(tk.avgP).replace(".", ",")}/{tk.max}</span>
-                    <span style={{ width: 100, height: 7, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}><span style={{ display: "block", width: `${tk.pct}%`, height: "100%", background: tk.pct < 50 ? C.danger : tk.pct < 75 ? C.warning : C.success }} /></span>
-                    <span style={{ fontSize: 12, fontWeight: 700, minWidth: 34, textAlign: "right" }}>{tk.pct}%</span>
+                {analyse.perTask.map((tk) => {
+                  const dc = tk.disc == null ? "var(--text3)" : tk.disc >= 0.4 ? C.success : tk.disc >= 0.2 ? C.warning : C.danger;
+                  return (
+                  <div key={tk.id} style={{ padding: "4px 0" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ flex: 1, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tk.label}</span>
+                      <span style={{ fontSize: 11.5, color: "var(--text3)" }}>⌀ {String(tk.avgP).replace(".", ",")}/{tk.max}</span>
+                      <span style={{ width: 100, height: 7, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}><span style={{ display: "block", width: `${tk.pct}%`, height: "100%", background: tk.pct < 50 ? C.danger : tk.pct < 75 ? C.warning : C.success }} /></span>
+                      <span style={{ fontSize: 12, fontWeight: 700, minWidth: 34, textAlign: "right" }}>{tk.pct}%</span>
+                    </div>
+                    {(tk.disc != null || tk.ciLow != null) && (
+                      <div style={{ display: "flex", gap: 14, fontSize: 11, color: "var(--text3)", marginTop: 1, paddingLeft: 2 }}>
+                        {tk.disc != null && <span title={t("klassenarbeit.discHint")}>{t("klassenarbeit.disc")}: <b style={{ color: dc }}>{tk.disc.toFixed(2).replace(".", ",")}</b></span>}
+                        {tk.ciLow != null && <span title={t("klassenarbeit.ciHint")}>{t("klassenarbeit.ci")}: <b style={{ color: "var(--text2)" }}>{tk.ciLow}–{tk.ciHigh}%</b></span>}
+                      </div>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </>)}
 
               {/* Ø je Teilaufgabe (nur wo Aufgaben Teile haben) */}
