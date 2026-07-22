@@ -3534,7 +3534,7 @@
         updateGenConfig();
         // Regler auf die gespeicherte Konfig der Lernleiter setzen (sonst zeigen
         // sie die Defaults). cfg-max zuerst — es begrenzt cfg-pflicht.
-        console.warn('openLernleiter config:', ll.config, '(null => Lernleiter ohne gespeicherte Konfig; einmal neu speichern)');
+        if (!ll.config) console.warn('openLernleiter: keine gespeicherte Konfig (vor v2.7.54?) — Regler/Zusatz bleiben Default; einmal neu speichern.');
         setGenConfig(ll.config);
         // Der Tab-Klick oben stösst ein asynchrones refreshGeneratorDropdowns an,
         // das die Regler kurz danach neu bauen (Defaults) kann. Nach dem Settle
@@ -3549,9 +3549,6 @@
         // bei leerem ll.thema (haeufigstes Thema der Aufgaben).
         const istErste = (pfad.lernleitern || []).findIndex(x => x._id === ll._id) === 0;
         const eigen = istErste ? eigenesThema(ll) : '';
-        // Diagnose (#44): wieviel gespeichert, wieviel gezeigt, was gefiltert.
-        console.warn('openLernleiter: _id=%s, istErste=%s, ll.thema="%s", eigenesThema="%s", schueler=%d',
-            ll._id, istErste, ll.thema || '', eigen, (ll.schueler || []).length);
         // Bilanz-Diagnose: gespeichert -> aufgeloest -> gezeigt. Zeigt eindeutig,
         // ob (a) nichts gespeichert wurde, (b) IDs nicht auf Aufgaben mappen
         // (geloescht/neu?), oder (c) der Thema-Filter alles entfernt.
@@ -3586,8 +3583,11 @@
             tasks.forEach(t => { if (regSek.includes(t.section)) { t.zusatz = regIdx >= pflichtCount; regIdx++; } });
             return { student, tasks, thema: ll.thema, unterthema: ll.unterthema || '' };
         });
-        console.warn('openLernleiter Bilanz: gespeichert=%d, aufgeloest=%d, gezeigt=%d, aufgaben-Pool=%d, gezeigte Themen=%o, unaufgeloeste IDs (Beispiele)=%o',
-            dSaved, dResolved, dShown, aufgaben.length, [...themenGezeigt], sampleUnresolved);
+        // Nur bei einem Problem loggen (nichts gezeigt oder ungeloeste IDs).
+        if (dShown === 0 || sampleUnresolved.length) {
+            console.warn('openLernleiter Bilanz: gespeichert=%d, aufgeloest=%d, gezeigt=%d, aufgaben-Pool=%d, gezeigte Themen=%o, unaufgeloeste IDs (Beispiele)=%o',
+                dSaved, dResolved, dShown, aufgaben.length, [...themenGezeigt], sampleUnresolved);
+        }
         if (previewData.some(e => e.tasks.length)) {
             renderPreview();
             document.getElementById('preview-area').style.display = '';
