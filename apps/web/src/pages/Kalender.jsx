@@ -348,7 +348,7 @@ export default function Kalender() {
         </div>
       )}
       {view === "week" && <WeekView range={range} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} frei={frei} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
-      {view === "day" && <DayView day={cursor} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} frei={frei} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
+      {view === "day" && <DayView day={cursor} tt={tt} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} frei={frei} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
       {view === "timetable" && <TimetableView tt={tt} className={className} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
@@ -430,7 +430,7 @@ function SlotGhosts({ list, entries, className, topicName, onSlot, day, t }) {
   return list.filter((s) => !belegt.has(s.period)).map((s) => {
     const label = [s.period + ". " + t("kalender.period"), className(s.class_id) || s.title || topicName(s.topic_id)].filter(Boolean).join(" · ");
     return (
-      <button key={s.id} onClick={() => onSlot(day, s)} style={ghost} title={label + " — " + t("kalender.fromTimetable")}>{label}</button>
+      <button key={s.id} onClick={(e) => { e.stopPropagation(); onSlot(day, s); }} style={ghost} title={label + " — " + t("kalender.fromTimetable")}>{label}</button>
     );
   });
 }
@@ -442,7 +442,7 @@ function SlotGhosts({ list, entries, className, topicName, onSlot, day, t }) {
 function ExtChips({ list, onOpen }) {
   if (!list || !list.length) return null;
   return list.map((ev, i) => (
-    <button key={`ext-${i}`} onClick={onOpen ? () => onOpen(ev) : undefined} title={ev.title}
+    <button key={`ext-${i}`} onClick={onOpen ? (e) => { e.stopPropagation(); onOpen(ev); } : undefined} title={ev.title}
       style={{ display: "block", width: "100%", textAlign: "left", fontSize: 11, color: "var(--text3)", background: "var(--bg2)", border: "1px dashed var(--border2)", borderRadius: 6, padding: "1px 5px", margin: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: onOpen ? "pointer" : "default" }}>🔗 {ev.title || "—"}</button>
   ));
 }
@@ -452,7 +452,7 @@ function EntryChips({ list, className, topicName, onOpen, classColor }) {
     const col = e.class_id && classColor ? classColor(e.class_id) : null;
     const label = e.title || topicName(e.topic_id) || (className && className(e.class_id)) || "—";
     return (
-      <button key={e.id} onClick={() => onOpen({ ...e, date: new Date(e.date) })}
+      <button key={e.id} onClick={(ev) => { ev.stopPropagation(); onOpen({ ...e, date: new Date(e.date) }); }}
         style={{ ...chip, marginTop: 3, width: "100%", ...(col ? { background: col + "22", color: "var(--text)", borderLeft: `3px solid ${col}` } : {}) }}
         title={label}>
         {label}
@@ -562,7 +562,7 @@ function MonthGrid({ range, cursor, byDay, extByDay, slotsFor, onSlot, frei, cla
                     style={{ ...cell, cursor: "pointer", opacity: other ? 0.5 : 1, background: f ? "rgba(184,134,11,0.09)" : undefined, outline: ymd(d) === heute ? "2px solid var(--accent)" : "none", outlineOffset: -2 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <button onClick={() => onDayView(d)} title={t("kalender.toDay")} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--text2)", padding: 0 }}>{d.getDate()}</button>
-                      {!f && <button onClick={() => onAdd(d)} className="icon-btn" style={{ ...iconBtn, padding: 0 }} title={t("kalender.add")}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>}
+                      {!f && <button onClick={(e) => { e.stopPropagation(); onAdd(d); }} className="icon-btn" style={{ ...iconBtn, padding: 0 }} title={t("kalender.add")}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>}
                     </div>
                     {f ? <FreiMarker label={f.label} t={t} /> : (<>
                       <EntryChips list={byDay(d)} className={className} topicName={topicName} onOpen={onOpen} classColor={classColor} />
@@ -593,7 +593,7 @@ function WeekView({ range, byDay, extByDay, slotsFor, frei, className, classColo
           style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 8, minHeight: 160, background: f ? "rgba(184,134,11,0.09)" : "var(--card)", minWidth: 90, cursor: "pointer" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
             <button onClick={() => onDayView(d)} title={t("kalender.toDay")} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--text)", padding: 0 }}>{d.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}</button>
-            {!f && <button onClick={() => onAdd(d)} className="icon-btn" style={{ ...iconBtn, padding: 0 }}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>}
+            {!f && <button onClick={(e) => { e.stopPropagation(); onAdd(d); }} className="icon-btn" style={{ ...iconBtn, padding: 0 }}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>}
           </div>
           {f ? <FreiMarker label={f.label} t={t} /> : (<>
             <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} topicName={topicName} onSlot={onSlot} day={d} t={t} />
@@ -621,28 +621,57 @@ function FreiMarker({ label, t }) {
   );
 }
 
-function DayView({ day, byDay, extByDay, slotsFor, frei, className, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
+function DayView({ day, tt = { times: [] }, byDay, extByDay, slotsFor, frei, className, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
   const list = byDay(day);
   const slots = slotsFor(day);
   const ext = extByDay ? extByDay(day) : [];
   const f = frei && frei(day);
+  const zeit = (period) => { const w = (tt.times || [])[period - 1]; return w && (w.from || w.to) ? `${w.from || ""}–${w.to || ""}` : ""; };
+  const belegte = new Set(slots.map((s) => s.period));
+  const extras = list.filter((e) => e.period == null || !belegte.has(e.period)); // Einträge ohne (eigene) Stunde
+  const linked = (e) => e.cardvote_set_id || e.karten_deck_id || e.lernpfad_ladder_id || e.method_id || e.codedetektiv_puzzle;
   if (f) return <p style={{ fontSize: 14, color: "var(--text3)", fontStyle: "italic" }}>{f.label ? `${f.label} — ${t("kalender.free")}` : t("kalender.free")}</p>;
   return (
     <div>
       <button onClick={() => onAdd(day)} style={{ ...btnPrimary, marginBottom: 14 }}>{t("kalender.add")}</button>
-      {slots.length > 0 && (
-        <div style={{ marginBottom: 14 }}>
-          <SlotGhosts list={slots} entries={list} className={className} topicName={topicName} onSlot={onSlot} day={day} t={t} />
+      {slots.length === 0 && extras.length === 0 && ext.length === 0 ? (
+        <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("kalender.empty")}</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {/* Zeitachse: je Stundenplan-Stunde eine Zeile mit Uhrzeit + geplantem Eintrag. */}
+          {slots.map((s) => {
+            const col = s.class_id ? classColor(s.class_id) : "var(--border2)";
+            const eintrag = list.find((e) => e.period === s.period);
+            return (
+              <div key={s.id} style={{ display: "flex", alignItems: "stretch", gap: 12, padding: "10px 14px", border: "1px solid var(--border)", borderLeft: `4px solid ${col}`, borderRadius: 10, background: "var(--card)" }}>
+                <div style={{ minWidth: 58, textAlign: "center", flexShrink: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 800 }}>{s.period}.</div>
+                  <div style={{ fontSize: 10.5, color: "var(--text3)" }}>{zeit(s.period)}</div>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600 }}>{className(s.class_id) || s.title || topicName(s.topic_id) || "—"}</div>
+                  {eintrag ? (
+                    <button onClick={() => onOpen({ ...eintrag, date: new Date(eintrag.date) })} style={{ ...chip, marginTop: 4, display: "inline-block", width: "auto", maxWidth: "100%" }}>
+                      {eintrag.title || topicName(eintrag.topic_id) || t("kalender.planned")}{linked(eintrag) ? " ↗" : ""}
+                    </button>
+                  ) : (
+                    <button onClick={() => onSlot(day, s)} style={{ ...ghost, marginTop: 4, width: "auto" }}>+ {t("kalender.add")}</button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {/* Einträge ohne Stunde (z.B. ganztägig geplant). */}
+          {extras.map((e) => (
+            <button key={e.id} onClick={() => onOpen({ ...e, date: new Date(e.date) })} style={{ display: "block", width: "100%", textAlign: "left", padding: 14, borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer" }}>
+              <div style={{ fontSize: 15, fontWeight: 600 }}>{e.title || topicName(e.topic_id) || "—"}{linked(e) ? " ↗" : ""}</div>
+              {e.topic_id && e.title && <div style={{ fontSize: 12.5, color: "var(--accent)" }}>{topicName(e.topic_id)}</div>}
+              {e.notes && <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 4 }}>{e.notes}</div>}
+            </button>
+          ))}
+          {ext.length > 0 && <ExtChips list={ext} onOpen={onExt} />}
         </div>
       )}
-      {ext.length > 0 && <div style={{ marginBottom: 10 }}><ExtChips list={ext} onOpen={onExt} /></div>}
-      {list.length === 0 && ext.length === 0 ? <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("kalender.empty")}</p> : list.map((e) => (
-        <button key={e.id} onClick={() => onOpen({ ...e, date: new Date(e.date) })} style={{ display: "block", width: "100%", textAlign: "left", padding: 14, marginBottom: 8, borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer" }}>
-          <div style={{ fontSize: 15, fontWeight: 600 }}>{e.title || topicName(e.topic_id) || "—"}</div>
-          {e.topic_id && e.title && <div style={{ fontSize: 12.5, color: "var(--accent)" }}>{topicName(e.topic_id)}</div>}
-          {e.notes && <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 4 }}>{e.notes}</div>}
-        </button>
-      ))}
     </div>
   );
 }
