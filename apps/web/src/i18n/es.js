@@ -1006,6 +1006,8 @@ export default {
   "klassenarbeit.avgGrade": "Ø Nota",
   "klassenarbeit.avgPct": "Ø Porcentaje",
   "klassenarbeit.distGrades": "Distribución de notas",
+  "klassenarbeit.distWhole": "Notas",
+  "klassenarbeit.distFine": "Notas finas",
   "klassenarbeit.byTask": "Aciertos por tarea",
   "klassenarbeit.addPart": "Subtarea",
   "klassenarbeit.addPartHint": "Dividir en subtareas (a, b, c …) con puntos propios",

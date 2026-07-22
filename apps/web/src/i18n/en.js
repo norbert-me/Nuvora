@@ -1006,6 +1006,8 @@ export default {
   "klassenarbeit.avgGrade": "Ø Grade",
   "klassenarbeit.avgPct": "Ø Percent",
   "klassenarbeit.distGrades": "Grade distribution",
+  "klassenarbeit.distWhole": "Grades",
+  "klassenarbeit.distFine": "Fine grades",
   "klassenarbeit.byTask": "Hit rate per task",
   "klassenarbeit.addPart": "Sub-task",
   "klassenarbeit.addPartHint": "Split into sub-tasks (a, b, c …) with own points",

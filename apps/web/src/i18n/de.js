@@ -1006,6 +1006,8 @@ export default {
   "klassenarbeit.avgGrade": "Ø Note",
   "klassenarbeit.avgPct": "Ø Prozent",
   "klassenarbeit.distGrades": "Notenverteilung",
+  "klassenarbeit.distWhole": "Noten",
+  "klassenarbeit.distFine": "Teilnoten",
   "klassenarbeit.byTask": "Trefferquote je Aufgabe",
   "klassenarbeit.addPart": "Teilaufgabe",
   "klassenarbeit.addPartHint": "In Teilaufgaben (a, b, c …) mit eigenen Punkten aufteilen",
