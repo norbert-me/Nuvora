@@ -61,6 +61,7 @@ export default function Kalender() {
   const extByDay = (d) => extEvents.filter((e) => e.date === ymd(d));
   const [entries, setEntries] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [kurse, setKurse] = useState([]); // Fächer — die Anzeige zeigt den Kurs, nicht die Klasse
   const [topics, setTopics] = useState([]);
   const [methods, setMethods] = useState([]); // aus Modul Methoden (falls aktiv)
   const [quizze, setQuizze] = useState([]); // CardVote-Quizze (falls aktiv), flach
@@ -74,9 +75,13 @@ export default function Kalender() {
   const [slotEdit, setSlotEdit] = useState(null); // { weekday, period, ...slot } oder null
   const [heuteAbsent, setHeuteAbsent] = useState({}); // class_id -> Anzahl Fehlende heute
   const [extInfo, setExtInfo] = useState(null); // angeklickter externer (abonnierter) Termin
+  const [jumpOpen, setJumpOpen] = useState(false); // Datums-Sprung-Popover (Klick aufs Datum)
 
   useEffect(() => {
     swr("classes", "/api/classes", (d) => setClasses(Array.isArray(d) ? d : []));
+    // Kurse (Fächer) laden: der Stundenplan/Kalender denkt in Kursen, nicht in
+    // Fach-Klassen — die Anzeige nutzt darum den Kurs-Namen (siehe className).
+    fetch("/api/kurse").then((r) => (r.ok ? r.json() : [])).then((d) => setKurse(Array.isArray(d) ? d : [])).catch(() => {});
     swr("topics", "/api/topics", (d) => setTopics(Array.isArray(d) ? d : []));
     // Methoden nur, wenn das Modul aktiv ist (sonst 403 -> leer, kein Selektor).
     fetch("/api/methoden/list").then((r) => (r.ok ? r.json() : [])).then((d) => setMethods(Array.isArray(d) ? d : [])).catch(() => {});
@@ -221,7 +226,13 @@ export default function Kalender() {
     });
   };
 
-  const className = (id) => (classes.find((c) => c.id === id) || {}).name || "";
+  // Anzeige-Name eines Slots/Eintrags: der KURS (Fach), zu dem die Klasse gehört;
+  // nur wenn keine Kurs-Zuordnung existiert, der Klassenname als Fallback.
+  const className = (id) => {
+    const k = kurse.find((k) => (k.classes || []).some((c) => c.id === id));
+    if (k) return k.name;
+    return (classes.find((c) => c.id === id) || {}).name || "";
+  };
   const classColor = (id) => (classes.find((c) => c.id === id) || {}).color || "#2563eb";
   const weekdayOf = (d) => (new Date(d).getDay() + 6) % 7; // 0 = Montag
   const slotsFor = (d) => tt.slots.filter((s) => s.weekday === weekdayOf(d)).sort((a, b) => a.period - b.period);
@@ -289,23 +300,40 @@ export default function Kalender() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 14, position: "relative" }}>
           <button onClick={() => move(-1)} title="◀" style={{ ...btnSecondary, padding: "4px 13px", fontSize: 17, lineHeight: 1 }}>‹</button>
           <button onClick={() => setCursor(startOfDay(new Date()))} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>{t("kalender.today")}</button>
-          {/* Direktsprung: das native Feld liegt TRANSPARENT ueber dem Datum. Ein
-              Klick trifft das Feld und oeffnet den OS-Picker — auch in Safari, das
-              showPicker() nicht kann. Der Datumstext liegt sichtbar dahinter. */}
-          {(() => {
-            const overlay = { position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", border: "none", margin: 0, padding: 0 };
-            const inp = view === "month"
-              ? <input type="month" value={monthVal(cursor)} onChange={(e) => e.target.value && setCursor(monthValToDate(e.target.value))} style={overlay} title={t("kalender.jumpToDay")} />
-              : view === "week"
-              ? <input type="week" value={weekVal(cursor)} onChange={(e) => e.target.value && setCursor(weekValToDate(e.target.value))} style={overlay} title={t("kalender.jumpToDay")} />
-              : <input type="date" value={ymd(cursor)} onChange={(e) => e.target.value && setCursor(startOfDay(new Date(e.target.value + "T00:00:00")))} style={overlay} title={t("kalender.jumpToDay")} />;
-            return (
-              <span style={{ position: "relative", display: "inline-block", minWidth: 170, textAlign: "center", cursor: "pointer" }} title={t("kalender.jumpToDay")}>
-                <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", borderBottom: "1px dotted var(--border2)", paddingBottom: 1 }}>{title}</span>
-                {inp}
-              </span>
-            );
-          })()}
+          {/* Direktsprung als eigenes Popover (keine nativen showPicker/Overlay-
+              Tricks — die öffneten in Safari nichts). Klick aufs Datum klappt
+              Auswahl-Dropdowns auf; Auswahl springt und schließt. */}
+          <div style={{ position: "relative" }}>
+            <button onClick={() => setJumpOpen((v) => !v)} title={t("kalender.jumpToDay")}
+              style={{ border: "none", background: "none", fontSize: 15, fontWeight: 700, color: "var(--text)", minWidth: 170, textAlign: "center", cursor: "pointer", padding: "4px 8px", borderRadius: 8, borderBottom: "1px dotted var(--border2)" }}>{title} ▾</button>
+            {jumpOpen && (<>
+              <div onClick={() => setJumpOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+              <div style={{ position: "absolute", top: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)", zIndex: 50, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.18)", padding: 8, display: "flex", gap: 6, alignItems: "center" }}>
+                {view === "month" && (
+                  <select value={cursor.getMonth()} onChange={(e) => { setCursor(startOfDay(new Date(cursor.getFullYear(), Number(e.target.value), 1))); setJumpOpen(false); }} style={{ ...selectStyle, padding: "6px 24px 6px 8px", fontSize: 13 }}>
+                    {Array.from({ length: 12 }, (_, m) => <option key={m} value={m}>{new Date(2000, m, 1).toLocaleDateString(undefined, { month: "long" })}</option>)}
+                  </select>
+                )}
+                {view === "week" && (
+                  <select value={isoWeek(cursor).week} onChange={(e) => { setCursor(weekValToDate(`${isoWeek(cursor).year}-W${String(e.target.value).padStart(2, "0")}`)); setJumpOpen(false); }} style={{ ...selectStyle, padding: "6px 24px 6px 8px", fontSize: 13 }}>
+                    {Array.from({ length: 53 }, (_, i) => i + 1).map((w) => <option key={w} value={w}>{t("kalender.kw")} {w}</option>)}
+                  </select>
+                )}
+                {view === "day" && (
+                  <input type="date" value={ymd(cursor)} onChange={(e) => { if (e.target.value) { setCursor(startOfDay(new Date(e.target.value + "T00:00:00"))); setJumpOpen(false); } }} style={{ ...inputStyle, padding: "6px 8px", fontSize: 13 }} />
+                )}
+                {(view === "month" || view === "week") && (() => {
+                  const y0 = new Date().getFullYear();
+                  const cy = view === "week" ? isoWeek(cursor).week : cursor.getMonth();
+                  return (
+                    <select value={cursor.getFullYear()} onChange={(e) => { const y = Number(e.target.value); setCursor(view === "week" ? weekValToDate(`${y}-W${String(cy).padStart(2, "0")}`) : startOfDay(new Date(y, cy, 1))); setJumpOpen(false); }} style={{ ...selectStyle, padding: "6px 24px 6px 8px", fontSize: 13 }}>
+                      {Array.from({ length: 7 }, (_, i) => y0 - 3 + i).map((y) => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                  );
+                })()}
+              </div>
+            </>)}
+          </div>
           <button onClick={() => move(1)} title="▶" style={{ ...btnSecondary, padding: "4px 13px", fontSize: 17, lineHeight: 1 }}>›</button>
         </div>
       )}
