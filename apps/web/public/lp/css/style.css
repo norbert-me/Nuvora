@@ -361,6 +361,25 @@ td .btn-group { flex-wrap: nowrap; }
 .btn-group { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
 .btn-group-vertical { display: flex; align-items: flex-end; }
 
+/* Export-Dropdown: ein Icon-Knopf, darunter Export + Vorlage. */
+.export-menu { position: relative; }
+.export-menu > summary { list-style: none; cursor: pointer; display: inline-flex; }
+.export-menu > summary::-webkit-details-marker { display: none; }
+.export-pop {
+    position: absolute; right: 0; top: calc(100% + 4px); z-index: 30;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 4px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); min-width: 150px;
+    display: flex; flex-direction: column; gap: 2px;
+}
+.export-pop .btn { justify-content: flex-start; width: 100%; }
+
+/* Drag & Drop zum Sortieren der Lernleitern, mit Live-Vorschau der Ablage. */
+.ll-row { align-items: center; }
+.drag-handle { cursor: grab; color: var(--text-muted); display: inline-flex; align-items: center; padding: 0 2px; flex-shrink: 0; }
+.ll-row.dragging { opacity: 0.4; }
+.ll-row.drop-before { box-shadow: inset 0 3px 0 var(--primary); }
+.ll-row.drop-after { box-shadow: inset 0 -3px 0 var(--primary); }
+
 /* Klickbarer Listen-Balken (Lernpfade, Lernleitern) */
 .list-row {
     display: flex;

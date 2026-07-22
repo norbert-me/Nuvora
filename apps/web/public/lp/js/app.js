@@ -3043,8 +3043,13 @@
                     <span style="color:var(--text-muted)">– ${(p.lernleitern || []).length} Lernleitern</span>
                 </div>
                 <div class="btn-group">
-                    <button class="btn" data-action="export-full" data-id="${p._id}" style="font-size:11px;padding:3px 8px" title="Vollständig, mit Schülerzuweisungen">${ICON.export} Export</button>
-                    <button class="btn" data-action="export-vorlage" data-id="${p._id}" style="font-size:11px;padding:3px 8px" title="Ohne Schülerdaten (teilbar)">${ICON.export} Vorlage</button>
+                    <details class="export-menu">
+                        <summary class="btn icon" title="Exportieren">${ICON.export}</summary>
+                        <div class="export-pop">
+                            <button class="btn small" data-action="export-full" data-id="${p._id}" title="Vollständig, mit Schülerzuweisungen">${ICON.export} Export</button>
+                            <button class="btn small" data-action="export-vorlage" data-id="${p._id}" title="Ohne Schülerdaten (teilbar)">${ICON.download} Vorlage</button>
+                        </div>
+                    </details>
                     <button class="btn icon" data-action="edit" data-id="${p._id}" title="Bearbeiten">${ICON.edit}</button>
                     <button class="btn icon danger" data-action="delete" data-id="${p._id}" title="Löschen">${ICON.delete}</button>
                 </div>
@@ -3067,6 +3072,8 @@
         list.querySelectorAll('.list-row').forEach(row => {
             row.addEventListener('click', () => openPfad(row.dataset.id));
         });
+        // Export-Menü aufklappen darf den Pfad nicht öffnen.
+        list.querySelectorAll('.export-menu > summary').forEach(sm => sm.addEventListener('click', e => e.stopPropagation()));
         list.querySelectorAll('.btn[data-action]').forEach(btn => {
             btn.addEventListener('click', e => {
                 e.stopPropagation();
@@ -3075,6 +3082,7 @@
                 else if (act === 'export-full') exportPfad(lernpfade.find(p => p._id === btn.dataset.id), true);
                 else if (act === 'export-vorlage') exportPfad(lernpfade.find(p => p._id === btn.dataset.id), false);
                 else if (act === 'delete') deletePfad(btn.dataset.id);
+                btn.closest('details')?.removeAttribute('open');   // Export-Menü nach Wahl schliessen
             });
         });
         renderPfadTrash(list);
@@ -3169,22 +3177,62 @@
             return;
         }
         container.innerHTML = list.map((ll, i) => `
-            <div class="list-row">
-                <div data-ll-id="${ll._id}" data-action="open" title="Zum Bearbeiten öffnen" style="cursor:pointer;flex:1">
+            <div class="list-row ll-row" draggable="true" data-ll-id="${ll._id}">
+                <span class="drag-handle" title="Ziehen zum Sortieren">${ICON.grip}</span>
+                <div data-ll-id="${ll._id}" data-action="open" title="Zum Bearbeiten öffnen" style="cursor:pointer;flex:1;min-width:0">
                     ${esc(ll.thema || '(ohne Thema)')}${ll.unterthema ? ' <span style="color:var(--text-muted)">&gt; ' + esc(ll.unterthema) + '</span>' : ''}
                     <span style="color:var(--text-muted)">– ${ll.schueler.length} Schüler</span>
                 </div>
-                <div class="btn-group">
+                <div class="btn-group" style="flex-shrink:0">
                     <button class="btn icon" data-ll-id="${ll._id}" data-action="rename" title="Umbenennen">${ICON.edit}</button>
-                    <button class="btn" data-ll-id="${ll._id}" data-action="export-full" style="font-size:11px;padding:3px 8px" title="Vollständig, mit Schülerzuweisungen">${ICON.export} Export</button>
-                    <button class="btn" data-ll-id="${ll._id}" data-action="export-vorlage" style="font-size:11px;padding:3px 8px" title="Ohne Schülerdaten (teilbar)">${ICON.export} Vorlage</button>
+                    <details class="export-menu">
+                        <summary class="btn icon" title="Exportieren">${ICON.export}</summary>
+                        <div class="export-pop">
+                            <button class="btn small" data-ll-id="${ll._id}" data-action="export-full" title="Vollständig, mit Schülerzuweisungen">${ICON.export} Export</button>
+                            <button class="btn small" data-ll-id="${ll._id}" data-action="export-vorlage" title="Ohne Schülerdaten (teilbar)">${ICON.download} Vorlage</button>
+                        </div>
+                    </details>
                     <button class="btn icon" data-ll-id="${ll._id}" data-action="share" title="Im Marktplatz teilen">${ICON.share}</button>
-                    ${i > 0 ? `<button class="btn icon" data-ll-id="${ll._id}" data-action="up" title="Nach oben">${ICON.up}</button>` : ''}
-                    ${i < list.length - 1 ? `<button class="btn icon" data-ll-id="${ll._id}" data-action="down" title="Nach unten">${ICON.down}</button>` : ''}
                     <button class="btn icon danger" data-ll-id="${ll._id}" data-action="delete" title="Entfernen">${ICON.delete}</button>
                 </div>
             </div>
         `).join('');
+
+        // Drag & Drop zum Sortieren, mit Live-Vorschau der Ablageposition.
+        let dragId = null;
+        const rows = [...container.querySelectorAll('.ll-row')];
+        const clearHints = () => rows.forEach(r => r.classList.remove('drop-before', 'drop-after'));
+        rows.forEach(row => {
+            row.addEventListener('dragstart', (e) => { dragId = row.dataset.llId; row.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+            row.addEventListener('dragend', () => { dragId = null; rows.forEach(r => r.classList.remove('dragging')); clearHints(); });
+            row.addEventListener('dragover', (e) => {
+                if (!dragId || row.dataset.llId === dragId) return;
+                e.preventDefault();
+                const rect = row.getBoundingClientRect();
+                const after = (e.clientY - rect.top) > rect.height / 2;
+                clearHints();
+                row.classList.add(after ? 'drop-after' : 'drop-before');   // Vorschau
+            });
+            row.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                const targetId = row.dataset.llId;
+                const rect = row.getBoundingClientRect();
+                const after = (e.clientY - rect.top) > rect.height / 2;
+                clearHints();
+                if (!dragId || dragId === targetId) return;
+                const from = currentPfad.lernleitern.findIndex(l => l._id === dragId);
+                if (from < 0) return;
+                const [moved] = currentPfad.lernleitern.splice(from, 1);
+                let to = currentPfad.lernleitern.findIndex(l => l._id === targetId);
+                if (to < 0) to = currentPfad.lernleitern.length - 1;
+                currentPfad.lernleitern.splice(after ? to + 1 : to, 0, moved);
+                if (bereinigeErsteWiederholung(currentPfad)) toast('Wiederholungs-Aufgaben der ersten Lernleiter entfernt (kein Thema davor).');
+                await savePfad(currentPfad);
+                await loadLernpfade();
+                currentPfad = lernpfade.find(p => p.id === currentPfad.id) || currentPfad;
+                renderPfadLernleitern();
+            });
+        });
 
         container.querySelectorAll('[data-ll-id]').forEach(el => {
             el.addEventListener('click', async (e) => {
@@ -3197,10 +3245,12 @@
                     return;
                 }
                 if (action === 'export-full') {
+                    e.currentTarget.closest('details')?.removeAttribute('open');
                     exportLernleiter(currentPfad, currentPfad.lernleitern[idx], true);
                     return;
                 }
                 if (action === 'export-vorlage') {
+                    e.currentTarget.closest('details')?.removeAttribute('open');
                     exportLernleiter(currentPfad, currentPfad.lernleitern[idx], false);
                     return;
                 }
