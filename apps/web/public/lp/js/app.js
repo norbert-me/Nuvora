@@ -1595,7 +1595,7 @@
     });
 
     // ─── Generator ───
-    function refreshGeneratorDropdowns() {
+    async function refreshGeneratorDropdowns() {
         // Themen aus vorhandenen Aufgaben UND aus der Kern-Taxonomie (topics =
         // „Profil"), damit man auch ohne bestehende Aufgabe ein Kern-Thema waehlen
         // kann — sonst war die Auswahl leer, obwohl Themen im Kern gepflegt sind.
@@ -1604,19 +1604,36 @@
         // Kurse robust: aus der Kursliste UND aus den Schuelern (deren .klasse ist
         // der Kurs-Name) — falls klassen mal leer/stale ist, fuellt sich der
         // Selektor trotzdem, solange irgendwo Kurs-Namen bekannt sind.
-        const kurseNamen = [...new Set([
+        let kurseNamen = [...new Set([
             ...klassen,
             ...schueler.map(s => s.klasse).filter(Boolean),
         ].filter(Boolean))].sort();
 
+        // Self-Healing: ist die Liste leer (State noch/again leer), direkt vom
+        // Server ziehen — dann fuellt sich der Selektor auch ohne vollen Reload.
+        if (!kurseNamen.length) {
+            try {
+                const [cl, ku] = await Promise.all([
+                    api(`${API}/classes`).then(r => r.ok ? r.json() : []),
+                    api(`${API}/kurse`).then(r => r.ok ? r.json() : []),
+                ]);
+                const ck = {};
+                (ku || []).forEach(k => (k.classes || []).forEach(c => { if (!(c.id in ck)) ck[c.id] = k.name; }));
+                kurseNamen = [...new Set((cl || []).map(c => ck[c.id] || c.name).filter(Boolean))].sort();
+                console.warn('[Generator] Kurse direkt geladen: %d (classes=%d, kurse=%d)', kurseNamen.length, (cl || []).length, (ku || []).length);
+            } catch (e) { console.warn('[Generator] Kurs-Direktabruf fehlgeschlagen:', e); }
+        }
+
         const selT = document.getElementById('gen-thema');
-        selT.innerHTML = '<option value="">– Thema wählen –</option>' + themen.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+        if (selT) selT.innerHTML = '<option value="">– Thema wählen –</option>' + themen.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
 
         const selK = document.getElementById('gen-klasse');
-        const cur = selK.value;   // Auswahl erhalten, wenn nur neu befuellt wird
-        selK.innerHTML = '<option value="">– Kurs wählen –</option>' + kurseNamen.map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join('');
-        if (cur && kurseNamen.includes(cur)) selK.value = cur;
-        if (!kurseNamen.length) console.warn('[Generator] Kurs-Selektor leer: klassen=%d, schueler=%d — Klassen/Kurse nicht geladen?', klassen.length, schueler.length);
+        if (selK) {
+            const cur = selK.value;   // Auswahl erhalten, wenn nur neu befuellt wird
+            selK.innerHTML = '<option value="">– Kurs wählen –</option>' + kurseNamen.map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join('');
+            if (cur && kurseNamen.includes(cur)) selK.value = cur;
+        }
+        if (!kurseNamen.length) console.warn('[Generator] Kurs-Selektor bleibt leer: klassen=%d, schueler=%d, classes/kurse direkt auch leer — hat das Konto im Kern Klassen?', klassen.length, schueler.length);
 
         refreshGenUnterthemen();
     }
