@@ -238,10 +238,12 @@ export default function Kalender() {
   // per className raten. Eine Klasse kann in mehreren Kursen liegen — nur kurs_id
   // weiß, welcher gemeint war.
   const slotName = (s) => (s && s.kurs_id && kursName(s.kurs_id)) || className(s && s.class_id);
-  // Farbe gehört dem FACH (Fach-Klasse/SchoolClass): „Mathe 7.5" und „Lernzeit
-  // 7.5" der gleichen Lerngruppe dürfen verschiedene Farben haben. Darum an der
-  // class_id, nicht am Kurs.
-  const classColor = (id) => (classes.find((c) => c.id === id) || {}).color || C.info;
+  // Farbe gehört dem KURS (das, was im Slot gewählt wurde) — nicht der dahinter
+  // liegenden Fach-Klasse. Sonst teilen sich mehrere Kurse mit derselben Klasse
+  // (geteilte SuS) DIESELBE Farbe. Am slot.kurs_id (eindeutig), nicht per class_id.
+  const classColor = (id) => (classes.find((c) => c.id === id) || {}).color || C.info; // Fallback (Einträge ohne Kurs)
+  const kursColor = (id) => (kurse.find((k) => k.id === id) || {}).color || "";
+  const slotColor = (s) => (s && s.kurs_id && kursColor(s.kurs_id)) || (s && s.class_id ? classColor(s.class_id) : C.info);
   const weekdayOf = (d) => (new Date(d).getDay() + 6) % 7; // 0 = Montag
   const slotsFor = (d) => tt.slots.filter((s) => s.weekday === weekdayOf(d)).sort((a, b) => a.period - b.period);
   // Klick auf eine Stundenplan-Vorlage: gibt es an dem Tag schon einen Eintrag
@@ -257,11 +259,17 @@ export default function Kalender() {
   // Farbe aus dem Stundenplan setzen: am FACH (Fach-Klasse), damit verschiedene
   // Fächer derselben Lerngruppe eigene Farben behalten. Sofort lokal, dann speichern.
   const setSlotColor = async (kursId, classId, color) => {
-    if (!classId) return;
-    console.warn("[Kalender] Farbe setzen: classId=%s (kursId=%s) -> %s", classId, kursId, color);
-    setClasses((prev) => { const next = prev.map((c) => (c.id === classId ? { ...c, color } : c)); put("classes", next); return next; });
-    const r = await fetch(`/api/classes/${classId}/color`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) }).catch(() => null);
-    console.warn("[Kalender] Farbe gespeichert: HTTP %s für classId=%s", r ? r.status : "netzfehler", classId);
+    // Bevorzugt am KURS (kurs_id) — so hat jeder Kurs seine eigene Farbe, auch
+    // wenn mehrere Kurse dieselbe Fach-Klasse teilen. Nur ohne Kurs an der Klasse.
+    if (kursId) {
+      setKurse((prev) => prev.map((k) => (k.id === kursId ? { ...k, color } : k)));
+      const r = await fetch(`/api/kurse/${kursId}/color`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) }).catch(() => null);
+      console.warn("[Kalender] Kurs-Farbe: kursId=%s -> %s (HTTP %s)", kursId, color, r ? r.status : "netzfehler");
+    } else if (classId) {
+      setClasses((prev) => { const next = prev.map((c) => (c.id === classId ? { ...c, color } : c)); put("classes", next); return next; });
+      const r = await fetch(`/api/classes/${classId}/color`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) }).catch(() => null);
+      console.warn("[Kalender] Klassen-Farbe: classId=%s -> %s (HTTP %s)", classId, color, r ? r.status : "netzfehler");
+    }
   };
 
   const saveSlot = async (s) => {
@@ -353,7 +361,7 @@ export default function Kalender() {
 
       {view === "today" && (
         <HeuteView t={t} tt={tt} weekdayOf={weekdayOf} byDay={byDay}
-          className={className} slotName={slotName} classColor={classColor} topicName={topicName} frei={frei}
+          className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} frei={frei}
           heuteAbsent={heuteAbsent} orgaAktiv={!!aktiv.orga} onOpen={setEditing} onSlot={fromSlot} />
       )}
 
@@ -374,8 +382,8 @@ export default function Kalender() {
         </div>
       )}
       {view === "week" && <WeekView range={range} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} frei={frei} className={className} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
-      {view === "day" && <DayView day={cursor} tt={tt} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} frei={frei} className={className} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
-      {view === "timetable" && <TimetableView tt={tt} className={className} slotName={slotName} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
+      {view === "day" && <DayView day={cursor} tt={tt} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} frei={frei} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
+      {view === "timetable" && <TimetableView tt={tt} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
       {abo && (
@@ -489,7 +497,7 @@ function EntryChips({ list, className, topicName, onOpen, classColor }) {
 
 // „Heute" — der Tag über alle Module gebündelt: Stunde, Uhrzeit, Klasse, das
 // geplante Objekt (Deck/Quiz/Lernleiter/Einstieg) und wie viele heute fehlen.
-function HeuteView({ t, tt, weekdayOf, byDay, className, slotName, classColor, topicName, frei, heuteAbsent, orgaAktiv, onOpen, onSlot }) {
+function HeuteView({ t, tt, weekdayOf, byDay, className, slotName, slotColor, classColor, topicName, frei, heuteAbsent, orgaAktiv, onOpen, onSlot }) {
   const heute = startOfDay(new Date());
   const istFrei = frei(heute);
   const slots = (tt.slots || []).filter((s) => s.weekday === weekdayOf(heute)).sort((a, b) => a.period - b.period);
@@ -532,7 +540,7 @@ function HeuteView({ t, tt, weekdayOf, byDay, className, slotName, classColor, t
       ) : slots.length === 0 && extras.length === 0 ? null : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {slots.map((s) => {
-            const col = s.class_id ? classColor(s.class_id) : "var(--border2)";
+            const col = s.class_id || s.kurs_id ? slotColor(s) : "var(--border2)";
             const eintrag = eintraege.find((e) => e.period === s.period);
             const absent = s.class_id ? (heuteAbsent[s.class_id] || 0) : 0;
             return (
@@ -664,7 +672,7 @@ function FreiMarker({ label, t }) {
   );
 }
 
-function DayView({ day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFor, frei, className, slotName, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
+function DayView({ day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFor, frei, className, slotName, slotColor, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
   const list = byDay(day);
   const slots = slotsFor(day);
   const ext = extByDay ? extByDay(day) : [];
@@ -691,7 +699,7 @@ function DayView({ day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFo
     if (sm == null) return;
     const eintrag = list.find((e) => e.period === s.period);
     timed.push({ key: "s" + s.id, start: sm, end: em != null ? em : sm + 45,
-      col: s.class_id ? classColor(s.class_id) : "var(--accent)",
+      col: s.class_id || s.kurs_id ? slotColor(s) : "var(--accent)",
       label: slotName(s) || s.title || topicName(s.topic_id) || "—",
       sub: eintrag ? (eintrag.title || topicName(eintrag.topic_id) || t("kalender.planned")) + (linked(eintrag) ? " ↗" : "") : "",
       onClick: eintrag ? () => onOpen({ ...eintrag, date: new Date(eintrag.date) }) : () => onSlot(day, s) });
@@ -760,7 +768,7 @@ function DayView({ day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFo
   );
 }
 
-function TimetableView({ tt, className, slotName, classColor, topicName, onEdit, onPeriods, onTimes, breaks = [], onAddBreak, onDelBreak, t }) {
+function TimetableView({ tt, className, slotName, slotColor, classColor, topicName, onEdit, onPeriods, onTimes, breaks = [], onAddBreak, onDelBreak, t }) {
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri")];
   const periods = Array.from({ length: tt.periods }, (_, i) => i + 1);
   const slot = (wd, p) => tt.slots.find((s) => s.weekday === wd && s.period === p);
@@ -803,7 +811,7 @@ function TimetableView({ tt, className, slotName, classColor, topicName, onEdit,
                     {wdays.map((_, wd) => {
                       const s = slot(wd, p);
                       const label = s ? slotName(s) : "";
-                      const col = s ? classColor(s.class_id) : null;
+                      const col = s ? slotColor(s) : null;
                       return (
                         <td key={wd} style={{ ...tdBase, padding: 0, height: h }}>
                           <button onClick={() => onEdit(s ? { ...s } : { weekday: wd, period: p })} title={s ? t("kalender.editSlot") : t("kalender.addSlot")}
@@ -912,10 +920,10 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
 function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onClose, t }) {
   const [classId, setClassId] = useState(slot.class_id || "");
   const [kursId, setKursId] = useState(slot.kurs_id ?? null); // gewaehlter Kurs (Anzeige)
-  // Farbe gehört dem Fach (Fach-Klasse): aus der gewählten Klasse.
-  const clsColorOf = (cid) => (classes.find((c) => c.id === Number(cid)) || {}).color || C.info;
-  const [color, setColor] = useState(clsColorOf(classId));
-  useEffect(() => { setColor(clsColorOf(classId)); }, [classId]); // eslint-disable-line
+  // Farbe gehört dem KURS: aus dem gewählten Kurs, sonst (ohne Kurs) der Klasse.
+  const clsColorOf = (kid, cid) => (kurse.find((k) => k.id === kid) || {}).color || (classes.find((c) => c.id === Number(cid)) || {}).color || C.info;
+  const [color, setColor] = useState(clsColorOf(kursId, classId));
+  useEffect(() => { setColor(clsColorOf(kursId, classId)); }, [classId, kursId]); // eslint-disable-line
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
   const fld = { ...inputStyle, width: "100%" };
   const sfld = { ...selectStyle, width: "100%", fontSize: 14, padding: "10px 34px 10px 12px" };
@@ -944,7 +952,7 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onClo
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
           <button onClick={() => {
             // Farbe erst beim Speichern anwenden — und nur, wenn sie sich geändert hat.
-            if (classId && color && color !== clsColorOf(classId)) onColor && onColor(kursId, Number(classId), color);
+            if ((kursId || classId) && color && color !== clsColorOf(kursId, classId)) onColor && onColor(kursId, classId ? Number(classId) : null, color);
             onSave({ weekday: slot.weekday, period: slot.period, title: "", class_id: classId ? Number(classId) : null, kurs_id: classId ? kursId : null, topic_id: null });
           }} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
