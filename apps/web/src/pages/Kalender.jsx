@@ -276,9 +276,7 @@ export default function Kalender() {
         {view !== "timetable" && view !== "breaks" && <button onClick={openAbo} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }} title={t("kalender.subscribeHint")}>{t("kalender.subscribe")}</button>}
         {view !== "timetable" && view !== "breaks" && view !== "today" && (
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
-            <button onClick={() => move(-1)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 15 }} title="◀">‹</button>
             <button onClick={() => setCursor(startOfDay(new Date()))} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>{t("kalender.today")}</button>
-            <button onClick={() => move(1)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 15 }} title="▶">›</button>
             {/* Direkt springen — Tag per Datum, Woche per KW-Auswahl, Monat per
                 Monats-Auswahl (saubere Dropdowns statt der nativen Wochen-/
                 Monatsfelder, die je Browser unterschiedlich und sperrig sind). */}
@@ -322,7 +320,14 @@ export default function Kalender() {
           </label>
         </div>
       )}
-      {view !== "timetable" && view !== "breaks" && view !== "today" && <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: "var(--text)" }}>{title}</div>}
+      {/* Datums-Navigator: Pfeile flankieren das Datum/Woche/Monat (nicht in Heute). */}
+      {view !== "timetable" && view !== "breaks" && view !== "today" && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 14 }}>
+          <button onClick={() => move(-1)} title="◀" style={{ ...btnSecondary, padding: "4px 13px", fontSize: 17, lineHeight: 1 }}>‹</button>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", minWidth: 180, textAlign: "center" }}>{title}</div>
+          <button onClick={() => move(1)} title="▶" style={{ ...btnSecondary, padding: "4px 13px", fontSize: 17, lineHeight: 1 }}>›</button>
+        </div>
+      )}
       {view === "breaks" && <BreaksPanel breaks={breaks} onAdd={addBreak} onDel={delBreak} t={t} standalone />}
 
       {view === "today" && (
@@ -468,7 +473,7 @@ function HeuteView({ t, tt, weekdayOf, byDay, className, classColor, topicName, 
   const istFrei = frei(heute);
   const slots = (tt.slots || []).filter((s) => s.weekday === weekdayOf(heute)).sort((a, b) => a.period - b.period);
   const eintraege = byDay(heute);
-  const zeit = (period) => { const w = (tt.times || [])[period - 1]; return w && (w.from || w.to) ? `${w.from || ""}–${w.to || ""}` : ""; };
+  const zeit = (period) => { const w = (tt.times || [])[period - 1]; return w && (w.start || w.end) ? `${w.start || ""}–${w.end || ""}` : ""; };
   // Zeilen: pro Stundenplan-Slot; zusätzlich Einträge ohne Stunde (period null).
   const belegtePerioden = new Set(slots.map((s) => s.period));
   const extras = eintraege.filter((e) => e.period == null || !belegtePerioden.has(e.period));
@@ -626,52 +631,69 @@ function DayView({ day, tt = { times: [] }, byDay, extByDay, slotsFor, frei, cla
   const slots = slotsFor(day);
   const ext = extByDay ? extByDay(day) : [];
   const f = frei && frei(day);
-  const zeit = (period) => { const w = (tt.times || [])[period - 1]; return w && (w.from || w.to) ? `${w.from || ""}–${w.to || ""}` : ""; };
-  const belegte = new Set(slots.map((s) => s.period));
-  const extras = list.filter((e) => e.period == null || !belegte.has(e.period)); // Einträge ohne (eigene) Stunde
+  const zeit = (period) => { const w = (tt.times || [])[period - 1]; return w && (w.start || w.end) ? `${w.start || ""}–${w.end || ""}` : ""; };
   const linked = (e) => e.cardvote_set_id || e.karten_deck_id || e.lernpfad_ladder_id || e.method_id || e.codedetektiv_puzzle;
+  const ganztags = list.filter((e) => e.period == null); // Ereignisse ohne Stunde = ganztägig
+  // Zeitachse: alle Schulstunden (1..periods), erweitert um evtl. hoehere Stunden
+  // aus Stundenplan-Slots oder Eintraegen. Immer sichtbar — das ist die Achse.
+  const maxP = Math.max(tt.periods || 0, 0, ...slots.map((s) => s.period), ...list.filter((e) => e.period != null).map((e) => e.period));
+  const periods = Array.from({ length: maxP }, (_, i) => i + 1);
   if (f) return <p style={{ fontSize: 14, color: "var(--text3)", fontStyle: "italic" }}>{f.label ? `${f.label} — ${t("kalender.free")}` : t("kalender.free")}</p>;
+  const leerTag = ganztags.length === 0 && ext.length === 0 && periods.length === 0;
   return (
     <div>
       <button onClick={() => onAdd(day)} style={{ ...btnPrimary, marginBottom: 14 }}>{t("kalender.add")}</button>
-      {slots.length === 0 && extras.length === 0 && ext.length === 0 ? (
-        <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("kalender.empty")}</p>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {/* Zeitachse: je Stundenplan-Stunde eine Zeile mit Uhrzeit + geplantem Eintrag. */}
-          {slots.map((s) => {
-            const col = s.class_id ? classColor(s.class_id) : "var(--border2)";
-            const eintrag = list.find((e) => e.period === s.period);
+
+      {/* Ganztägige Ereignisse ganz oben, als Banner. */}
+      {(ganztags.length > 0 || ext.length > 0) && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>{t("kalender.allDay")}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {ganztags.map((e) => (
+              <button key={e.id} onClick={() => onOpen({ ...e, date: new Date(e.date) })}
+                style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--accent)", background: "var(--accent-bg, rgba(10,132,255,0.10))", color: "var(--text)", cursor: "pointer" }}>
+                <span style={{ fontSize: 14, fontWeight: 700 }}>{e.title || topicName(e.topic_id) || "—"}{linked(e) ? " ↗" : ""}</span>
+                {e.topic_id && e.title && <span style={{ display: "block", fontSize: 12.5, color: "var(--accent)" }}>{topicName(e.topic_id)}</span>}
+                {e.notes && <span style={{ display: "block", fontSize: 12.5, color: "var(--text3)", marginTop: 2 }}>{e.notes}</span>}
+              </button>
+            ))}
+            {ext.length > 0 && <ExtChips list={ext} onOpen={onExt} />}
+          </div>
+        </div>
+      )}
+
+      {/* Zeitachse: je Stunde eine Zeile mit Uhrzeit, Klasse und geplantem Eintrag. */}
+      {periods.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {periods.map((p) => {
+            const slot = slots.find((s) => s.period === p);
+            const eintrag = list.find((e) => e.period === p);
+            const col = slot && slot.class_id ? classColor(slot.class_id) : "var(--border2)";
+            const leer = !slot && !eintrag;
             return (
-              <div key={s.id} style={{ display: "flex", alignItems: "stretch", gap: 12, padding: "10px 14px", border: "1px solid var(--border)", borderLeft: `4px solid ${col}`, borderRadius: 10, background: "var(--card)" }}>
-                <div style={{ minWidth: 58, textAlign: "center", flexShrink: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 800 }}>{s.period}.</div>
-                  <div style={{ fontSize: 10.5, color: "var(--text3)" }}>{zeit(s.period)}</div>
+              <div key={p} style={{ display: "flex", alignItems: "stretch", gap: 12, padding: "8px 14px", border: "1px solid var(--border)", borderLeft: `4px solid ${leer ? "transparent" : col}`, borderRadius: 10, background: leer ? "transparent" : "var(--card)", opacity: leer ? 0.55 : 1 }}>
+                <div style={{ minWidth: 64, textAlign: "center", flexShrink: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 800 }}>{p}.</div>
+                  <div style={{ fontSize: 10.5, color: "var(--text3)" }}>{zeit(p)}</div>
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600 }}>{className(s.class_id) || s.title || topicName(s.topic_id) || "—"}</div>
+                  {slot && <div style={{ fontWeight: 600 }}>{className(slot.class_id) || slot.title || topicName(slot.topic_id) || "—"}</div>}
                   {eintrag ? (
-                    <button onClick={() => onOpen({ ...eintrag, date: new Date(eintrag.date) })} style={{ ...chip, marginTop: 4, display: "inline-block", width: "auto", maxWidth: "100%" }}>
+                    <button onClick={() => onOpen({ ...eintrag, date: new Date(eintrag.date) })} style={{ ...chip, marginTop: slot ? 4 : 0, display: "inline-block", width: "auto", maxWidth: "100%" }}>
                       {eintrag.title || topicName(eintrag.topic_id) || t("kalender.planned")}{linked(eintrag) ? " ↗" : ""}
                     </button>
+                  ) : slot ? (
+                    <button onClick={() => onSlot(day, slot)} style={{ ...ghost, marginTop: 4, width: "auto" }}>+ {t("kalender.add")}</button>
                   ) : (
-                    <button onClick={() => onSlot(day, s)} style={{ ...ghost, marginTop: 4, width: "auto" }}>+ {t("kalender.add")}</button>
+                    <button onClick={() => onAdd(day)} style={{ ...ghost, width: "auto" }}>+ {t("kalender.add")}</button>
                   )}
                 </div>
               </div>
             );
           })}
-          {/* Einträge ohne Stunde (z.B. ganztägig geplant). */}
-          {extras.map((e) => (
-            <button key={e.id} onClick={() => onOpen({ ...e, date: new Date(e.date) })} style={{ display: "block", width: "100%", textAlign: "left", padding: 14, borderRadius: 12, border: "1px solid var(--border)", background: "var(--card)", cursor: "pointer" }}>
-              <div style={{ fontSize: 15, fontWeight: 600 }}>{e.title || topicName(e.topic_id) || "—"}{linked(e) ? " ↗" : ""}</div>
-              {e.topic_id && e.title && <div style={{ fontSize: 12.5, color: "var(--accent)" }}>{topicName(e.topic_id)}</div>}
-              {e.notes && <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 4 }}>{e.notes}</div>}
-            </button>
-          ))}
-          {ext.length > 0 && <ExtChips list={ext} onOpen={onExt} />}
         </div>
       )}
+      {leerTag && <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("kalender.empty")}</p>}
     </div>
   );
 }
