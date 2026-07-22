@@ -1,6 +1,6 @@
 // Modul Kalender — Unterrichtsplanung. Tag-, Wochen- und Monatsansicht; je Tag
 // Stunden eintragen und optional Klasse + Thema (Kern-Taxonomie) zuordnen.
-import { useState, useEffect, useCallback, Fragment } from "react";
+import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, selectStyle, Tabs, inputStyle, modalOverlay, modalPanel } from "../components/Icons.jsx";
@@ -74,6 +74,7 @@ export default function Kalender() {
   const [slotEdit, setSlotEdit] = useState(null); // { weekday, period, ...slot } oder null
   const [heuteAbsent, setHeuteAbsent] = useState({}); // class_id -> Anzahl Fehlende heute
   const [extInfo, setExtInfo] = useState(null); // angeklickter externer (abonnierter) Termin
+  const pickerRef = useRef(null); // verstecktes natives Feld für den Direktsprung (Klick aufs Datum)
 
   useEffect(() => {
     swr("classes", "/api/classes", (d) => setClasses(Array.isArray(d) ? d : []));
@@ -273,44 +274,7 @@ export default function Kalender() {
           <Tabs value={view} onChange={setView}
             options={[["today", t("kalender.todayView")], ["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")]]} />
         )}
-        {view !== "timetable" && view !== "breaks" && <button onClick={openAbo} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }} title={t("kalender.subscribeHint")}>{t("kalender.subscribe")}</button>}
-        {view !== "timetable" && view !== "breaks" && view !== "today" && (
-          <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
-            <button onClick={() => setCursor(startOfDay(new Date()))} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>{t("kalender.today")}</button>
-            {/* Direkt springen — Tag per Datum, Woche per KW-Auswahl, Monat per
-                Monats-Auswahl (saubere Dropdowns statt der nativen Wochen-/
-                Monatsfelder, die je Browser unterschiedlich und sperrig sind). */}
-            {view === "month" ? (
-              <select value={cursor.getMonth()} onChange={(e) => setCursor(startOfDay(new Date(cursor.getFullYear(), Number(e.target.value), 1)))}
-                style={{ ...selectStyle, padding: "5px 24px 5px 8px", fontSize: 13 }} title={t("kalender.jumpToDay")}>
-                {Array.from({ length: 12 }, (_, m) => (
-                  <option key={m} value={m}>{new Date(2000, m, 1).toLocaleDateString(undefined, { month: "long" })}</option>
-                ))}
-              </select>
-            ) : view === "week" ? (
-              <select value={isoWeek(cursor).week} onChange={(e) => setCursor(weekValToDate(`${isoWeek(cursor).year}-W${String(e.target.value).padStart(2, "0")}`))}
-                style={{ ...selectStyle, padding: "5px 24px 5px 8px", fontSize: 13 }} title={t("kalender.jumpToDay")}>
-                {Array.from({ length: 53 }, (_, i) => i + 1).map((w) => <option key={w} value={w}>{t("kalender.kw")} {w}</option>)}
-              </select>
-            ) : null}
-            {(view === "month" || view === "week") && (() => {
-              const y0 = new Date().getFullYear();
-              const cy = view === "week" ? isoWeek(cursor).week : cursor.getMonth();
-              return (
-                <select value={cursor.getFullYear()} onChange={(e) => {
-                  const y = Number(e.target.value);
-                  setCursor(view === "week" ? weekValToDate(`${y}-W${String(cy).padStart(2, "0")}`) : startOfDay(new Date(y, cy, 1)));
-                }} style={{ ...selectStyle, padding: "5px 24px 5px 8px", fontSize: 13 }} title={t("kalender.jumpToDay")}>
-                  {Array.from({ length: 7 }, (_, i) => y0 - 3 + i).map((y) => <option key={y} value={y}>{y}</option>)}
-                </select>
-              );
-            })()}
-            {view === "day" && (
-              <input type="date" value={ymd(cursor)} onChange={(e) => e.target.value && setCursor(startOfDay(new Date(e.target.value + "T00:00:00")))}
-                style={{ ...inputStyle, padding: "5px 8px", fontSize: 13 }} title={t("kalender.jumpToDay")} />
-            )}
-          </div>
-        )}
+        {view !== "timetable" && view !== "breaks" && <button onClick={openAbo} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13, marginLeft: "auto" }} title={t("kalender.subscribeHint")}>{t("kalender.subscribe")}</button>}
       </div>
       {view === "timetable" && (
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
@@ -320,12 +284,23 @@ export default function Kalender() {
           </label>
         </div>
       )}
-      {/* Datums-Navigator: Pfeile flankieren das Datum/Woche/Monat (nicht in Heute). */}
+      {/* Datums-Navigator: Pfeile flankieren das Datum; Klick aufs Datum springt
+          direkt (nativer Picker), „Heute" integriert. Kein Selektor mehr oben rechts. */}
       {view !== "timetable" && view !== "breaks" && view !== "today" && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 14, position: "relative" }}>
           <button onClick={() => move(-1)} title="◀" style={{ ...btnSecondary, padding: "4px 13px", fontSize: 17, lineHeight: 1 }}>‹</button>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", minWidth: 180, textAlign: "center" }}>{title}</div>
+          <button onClick={() => setCursor(startOfDay(new Date()))} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>{t("kalender.today")}</button>
+          <button onClick={() => { const el = pickerRef.current; if (el) { el.showPicker ? el.showPicker() : el.focus(); } }} title={t("kalender.jumpToDay")}
+            style={{ border: "none", background: "none", fontSize: 15, fontWeight: 700, color: "var(--text)", minWidth: 170, textAlign: "center", cursor: "pointer", padding: "4px 8px", borderRadius: 8 }}>{title}</button>
           <button onClick={() => move(1)} title="▶" style={{ ...btnSecondary, padding: "4px 13px", fontSize: 17, lineHeight: 1 }}>›</button>
+          {/* Direktsprung ohne sperrigen Selektor: unsichtbares natives Feld, per
+              Klick aufs Datum geoeffnet (OS-Picker). Monat/Woche/Tag je Ansicht. */}
+          {(() => {
+            const hidden = { position: "absolute", left: "50%", bottom: 0, width: 1, height: 1, opacity: 0, pointerEvents: "none", border: "none", padding: 0 };
+            if (view === "month") return <input ref={pickerRef} type="month" value={monthVal(cursor)} onChange={(e) => e.target.value && setCursor(monthValToDate(e.target.value))} style={hidden} tabIndex={-1} aria-hidden />;
+            if (view === "week") return <input ref={pickerRef} type="week" value={weekVal(cursor)} onChange={(e) => e.target.value && setCursor(weekValToDate(e.target.value))} style={hidden} tabIndex={-1} aria-hidden />;
+            return <input ref={pickerRef} type="date" value={ymd(cursor)} onChange={(e) => e.target.value && setCursor(startOfDay(new Date(e.target.value + "T00:00:00")))} style={hidden} tabIndex={-1} aria-hidden />;
+          })()}
         </div>
       )}
       {view === "breaks" && <BreaksPanel breaks={breaks} onAdd={addBreak} onDel={delBreak} t={t} standalone />}
