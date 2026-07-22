@@ -14,6 +14,32 @@ import { gradeFromPct, gradeDetailed, quantile, stdev, DEFAULT_SCALE } from "../
 const API = "/api/klassenarbeit";
 const newId = () => "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
+// Eine Zeile „je Aufgabe/Teilaufgabe": Label, Ø-Punkte, farbige %-Zahl, Balken
+// auf eigener Zeile und (optional) Trennschärfe + 95%-KI darunter. Gemeinsam für
+// „je Aufgabe" und „je Teilaufgabe", damit beide gleich aussehen.
+function StatRow({ row, t }) {
+  const col = row.pct < 50 ? C.danger : row.pct < 75 ? C.warning : C.success;
+  const dc = row.disc == null ? "var(--text3)" : row.disc >= 0.4 ? C.success : row.disc >= 0.2 ? C.warning : C.danger;
+  return (
+    <div style={{ padding: "8px 10px", borderRadius: 8, background: "var(--bg2)", marginBottom: 5 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ flex: 1, fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.label}</span>
+        <span style={{ fontSize: 11.5, color: "var(--text3)", whiteSpace: "nowrap" }}>⌀ {String(row.avgP).replace(".", ",")}/{row.max}</span>
+        <span style={{ fontSize: 13, fontWeight: 800, color: col, minWidth: 40, textAlign: "right" }}>{row.pct}%</span>
+      </div>
+      <div style={{ marginTop: 5, height: 8, background: "var(--card)", borderRadius: 5, overflow: "hidden" }}>
+        <span style={{ display: "block", width: `${row.pct}%`, height: "100%", background: col, borderRadius: 5 }} />
+      </div>
+      {(row.disc != null || row.ciLow != null) && (
+        <div style={{ display: "flex", gap: 14, fontSize: 11, color: "var(--text3)", marginTop: 5 }}>
+          {row.disc != null && <span title={t("klassenarbeit.discHint")}>{t("klassenarbeit.disc")}: <b style={{ color: dc }}>{row.disc.toFixed(2).replace(".", ",")}</b></span>}
+          {row.ciLow != null && <span title={t("klassenarbeit.ciHint")}>{t("klassenarbeit.ci")}: <b style={{ color: "var(--text2)" }}>{row.ciLow}–{row.ciHigh}%</b></span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Klassenarbeit() {
   const { t } = useLanguage();
   const { modules } = useModules();
@@ -200,9 +226,32 @@ export default function Klassenarbeit() {
       }
       return { id: tk.id, label: tk.label || `${i + 1}.`, pct: m ? Math.round((e / m) * 100) : 0, avgP: Math.round(avgP * 10) / 10, max: mx, disc, ciLow, ciHigh };
     });
-    // Ø je Teilaufgabe (nur wo eine Aufgabe echte Teile hat) — wie in der Excel.
+    // Ø je Teilaufgabe (nur wo eine Aufgabe echte Teile hat) — inkl. Trennschärfe
+    // (Item-Total-Korrelation) + 95%-KI, wie bei den ganzen Aufgaben.
     const perUnit = [];
-    tasks.forEach((tk, i) => { const us = units(tk); if (us.length < 2) return; us.forEach((u) => { let e = 0; graded.forEach((s) => { e += pu(s.id, u.id); }); const avgP = graded.length ? e / graded.length : 0; perUnit.push({ id: u.id, label: `${tk.label || (i + 1)} ${u.label}`, avgP: Math.round(avgP * 10) / 10, max: uMax[u.id], pct: uMax[u.id] ? Math.round((avgP / uMax[u.id]) * 100) : 0 }); }); });
+    tasks.forEach((tk, i) => {
+      const us = units(tk); if (us.length < 2) return;
+      us.forEach((u) => {
+        const xs = graded.map((s) => pu(s.id, u.id));
+        const umx = uMax[u.id];
+        const avgP = mean(xs);
+        let disc = null;
+        if (graded.length >= 3) {
+          const mxk = mean(xs), myk = mean(totals);
+          let cov = 0, sx = 0, sy = 0;
+          xs.forEach((x, idx) => { const dx = x - mxk, dy = totals[idx] - myk; cov += dx * dy; sx += dx * dx; sy += dy * dy; });
+          disc = (sx > 0 && sy > 0) ? cov / Math.sqrt(sx * sy) : null;
+        }
+        let ciLow = null, ciHigh = null;
+        if (graded.length >= 2 && umx > 0) {
+          const pcts = xs.map((x) => (x / umx) * 100);
+          const half = 1.96 * (sdOf(pcts) / Math.sqrt(pcts.length));
+          ciLow = Math.max(0, Math.round(mean(pcts) - half));
+          ciHigh = Math.min(100, Math.round(mean(pcts) + half));
+        }
+        perUnit.push({ id: u.id, label: `${tk.label || (i + 1)} ${u.label}`, avgP: Math.round(avgP * 10) / 10, max: umx, pct: umx ? Math.round((avgP / umx) * 100) : 0, disc, ciLow, ciHigh });
+      });
+    });
 
     // Endnote je SuS: Σ/Max → Note mit Tendenz + Notenwert; Verteilung + Kennzahlen.
     const tm = tasks.reduce((n, tk) => n + tkMax(tk), 0);
@@ -381,7 +430,7 @@ export default function Klassenarbeit() {
             )}
             {(work.tasks || []).length > 0 && (
               <button onClick={() => setScaleOpen((v) => !v)} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}
-                title={t("klassenarbeit.scaleHint")}><Icon d={ICONS.settings} size={15} /> {t("klassenarbeit.scale")}{(work.scale && Object.keys(work.scale).length) ? " •" : ""}</button>
+                title={t("klassenarbeit.scaleHint")}>{t("klassenarbeit.scale")}{(work.scale && Object.keys(work.scale).length) ? " •" : ""}</button>
             )}
           </div>
           {scaleOpen && (work.tasks || []).length > 0 && (
@@ -438,38 +487,13 @@ export default function Klassenarbeit() {
               {/* je Aufgabe: Ø, Trefferquote + Trennschärfe/95%-KI */}
               {analyse.perTask.length > 0 && (<>
                 <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.byTask")}</div>
-                {analyse.perTask.map((tk) => {
-                  const dc = tk.disc == null ? "var(--text3)" : tk.disc >= 0.4 ? C.success : tk.disc >= 0.2 ? C.warning : C.danger;
-                  return (
-                  <div key={tk.id} style={{ padding: "4px 0" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{ flex: 1, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tk.label}</span>
-                      <span style={{ fontSize: 11.5, color: "var(--text3)" }}>⌀ {String(tk.avgP).replace(".", ",")}/{tk.max}</span>
-                      <span style={{ width: 100, height: 7, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}><span style={{ display: "block", width: `${tk.pct}%`, height: "100%", background: tk.pct < 50 ? C.danger : tk.pct < 75 ? C.warning : C.success }} /></span>
-                      <span style={{ fontSize: 12, fontWeight: 700, minWidth: 34, textAlign: "right" }}>{tk.pct}%</span>
-                    </div>
-                    {(tk.disc != null || tk.ciLow != null) && (
-                      <div style={{ display: "flex", gap: 14, fontSize: 11, color: "var(--text3)", marginTop: 1, paddingLeft: 2 }}>
-                        {tk.disc != null && <span title={t("klassenarbeit.discHint")}>{t("klassenarbeit.disc")}: <b style={{ color: dc }}>{tk.disc.toFixed(2).replace(".", ",")}</b></span>}
-                        {tk.ciLow != null && <span title={t("klassenarbeit.ciHint")}>{t("klassenarbeit.ci")}: <b style={{ color: "var(--text2)" }}>{tk.ciLow}–{tk.ciHigh}%</b></span>}
-                      </div>
-                    )}
-                  </div>
-                  );
-                })}
+                {analyse.perTask.map((tk) => <StatRow key={tk.id} row={tk} t={t} />)}
               </>)}
 
-              {/* Ø je Teilaufgabe (nur wo Aufgaben Teile haben) */}
+              {/* je Teilaufgabe (nur wo Aufgaben Teile haben) — inkl. Trennschärfe/KI */}
               {analyse.perUnit.length > 0 && (<>
                 <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.byPart")}</div>
-                {analyse.perUnit.map((u) => (
-                  <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "2px 0" }}>
-                    <span style={{ flex: 1, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.label}</span>
-                    <span style={{ fontSize: 11.5, color: "var(--text3)" }}>⌀ {String(u.avgP).replace(".", ",")}/{u.max}</span>
-                    <span style={{ width: 90, height: 7, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}><span style={{ display: "block", width: `${u.pct}%`, height: "100%", background: u.pct < 50 ? C.danger : u.pct < 75 ? C.warning : C.success }} /></span>
-                    <span style={{ fontSize: 12, fontWeight: 700, minWidth: 34, textAlign: "right" }}>{u.pct}%</span>
-                  </div>
-                ))}
+                {analyse.perUnit.map((u) => <StatRow key={u.id} row={u} t={t} />)}
               </>)}
 
               {/* Noten-Auswertung im CardVote-Design: Kennzahl-Kacheln + Panel mit
@@ -506,12 +530,7 @@ export default function Klassenarbeit() {
                     <Boxplot values={pctList(work)} max={100} unit="%" />
                   )}
                 </div>
-                {analyse.noten.max > 0 && (
-                  <div style={{ marginTop: 8, fontSize: 12 }}>
-                    <span style={{ color: "var(--text3)" }}>{t("klassenarbeit.minPoints")}: </span>
-                    {analyse.noten.minPts.map((m) => <span key={m.grade} style={{ marginRight: 12 }}><b>{m.grade}</b> {t("klassenarbeit.fromPts", { pts: String(m.pts).replace(".", ",") })}</span>)}
-                  </div>
-                )}
+                {/* Min-Punkte je Note entfernt — steht im Notenschlüssel. */}
               </>)}
             </div>
           )}
