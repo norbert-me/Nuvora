@@ -62,7 +62,7 @@ export default function Klassenarbeit() {
     saveTimer.current = setTimeout(() => {
       // scale: echtes dict = Override, sonst {} (Server setzt zurueck auf Profil).
       const scaleOut = (next.scale && Object.keys(next.scale).length) ? next.scale : {};
-      fetch(`${API}/works/${next.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: next.name, tasks: next.tasks, results: next.results, scale: scaleOut }) }).catch(() => {});
+      fetch(`${API}/works/${next.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: next.name, tasks: next.tasks, results: next.results, scale: scaleOut, absent: next.absent || [] }) }).catch(() => {});
     }, 600);
   };
 
@@ -125,8 +125,19 @@ export default function Klassenarbeit() {
   };
   const totalMax = () => (work.tasks || []).reduce((n, tk) => n + taskMax(tk), 0);
   const sumOf = (sid) => { const r = (work.results || {})[String(sid)]; if (!r || r === "abwesend") return 0; return (work.tasks || []).reduce((n, tk) => n + units(tk).reduce((m, u) => { const v = r[u.id]; return m + (v == null ? 0 : Number(v)); }, 0), 0); };
-  const isAbsent = (sid) => (work.results || {})[String(sid)] === "abwesend";
-  const toggleAbsent = (sid) => { const results = { ...(work.results || {}) }; if (results[String(sid)] === "abwesend") delete results[String(sid)]; else results[String(sid)] = "abwesend"; persist({ ...work, results }); };
+  // Abwesend ist ein eigenes Feld (work.absent) — die Punkte in results bleiben
+  // erhalten, „abwesend" heisst nur „aus der Klassenstatistik raus". Alt-Marker
+  // (results[sid] === "abwesend", ohne Punkte) wird weiter als abwesend erkannt.
+  const isAbsent = (sid) => ((work.absent || []).map(String).includes(String(sid))) || (work.results || {})[String(sid)] === "abwesend";
+  const toggleAbsent = (sid) => {
+    const key = String(sid);
+    const cur = new Set((work.absent || []).map(String));
+    const results = { ...(work.results || {}) };
+    const wasLegacy = results[key] === "abwesend";
+    if (wasLegacy) delete results[key];                 // alten Marker aufloesen
+    if (cur.has(key) || wasLegacy) cur.delete(key); else cur.add(key);
+    persist({ ...work, results, absent: [...cur] });
+  };
 
   // Gültiger Notenschlüssel: Override der Arbeit, sonst Profil-Voreinstellung.
   const effScale = (work && work.scale && Object.keys(work.scale).length) ? work.scale : scale;
@@ -146,8 +157,9 @@ export default function Klassenarbeit() {
     // Zeilen ohne jeden Eintrag zählen als 0 (leere/durchgefallene Arbeit) — nur
     // „krank" (abwesend) bleibt aussen vor. Damit die Auswertung aber nicht schon
     // vor der ersten Eingabe voller Nullen steht, erst wenn irgendein Wert da ist.
-    const hasAny = students.some((s) => { const r = results[String(s.id)]; return r && r !== "abwesend" && Object.keys(r).length; });
-    const graded = hasAny ? students.filter((s) => results[String(s.id)] !== "abwesend") : [];
+    const absent = new Set([...((work.absent) || []).map(String), ...Object.entries(results).filter(([, v]) => v === "abwesend").map(([k]) => k)]);
+    const hasAny = students.some((s) => { const r = results[String(s.id)]; return !absent.has(String(s.id)) && r && r !== "abwesend" && Object.keys(r).length; });
+    const graded = hasAny ? students.filter((s) => !absent.has(String(s.id))) : [];
 
     const topicsOut = Object.entries(topicTasks).map(([tid, tks]) => {
       let e = 0, m = 0; graded.forEach((s) => tks.forEach((tk) => { e += pt(s.id, tk); m += tkMax(tk); }));
@@ -275,7 +287,9 @@ export default function Klassenarbeit() {
                 <tbody>
                   {students.map((s) => {
                     const sum = sumOf(s.id); const tm = totalMax(); const abw = isAbsent(s.id);
-                    const note = (!abw && tm) ? gradeDetailed((sum / tm) * 100, effScale).note : "";
+                    // Note auch für Abwesende zeigen (Punkte bleiben ja erhalten) — nur
+                    // die Klassenstatistik unten rechnet sie raus.
+                    const note = tm ? gradeDetailed((sum / tm) * 100, effScale).note : "";
                     return (
                       <tr key={s.id} style={abw ? { opacity: 0.5 } : undefined}>
                         <td style={{ ...td, textAlign: "left", padding: "4px 8px", position: "sticky", left: 0, background: "var(--card)", fontWeight: 500, whiteSpace: "nowrap" }}>
@@ -287,14 +301,14 @@ export default function Klassenarbeit() {
                         </td>
                         {(work.tasks || []).flatMap((tk) => units(tk).map((u, j) => (
                           <td key={u.id} style={{ ...td, borderLeft: j === 0 ? "1px solid var(--border)" : undefined }}>
-                            {abw ? <span style={{ fontSize: 11, color: "var(--text3)" }}>–</span> : (
-                              <input type="number" min="0" step="0.5" max={unitMax(u)} value={pointsOf(s.id, u.id)} onChange={(e) => setPoints(s.id, u.id, e.target.value === "" ? "" : Math.min(unitMax(u), Math.max(0, Number(e.target.value))))}
-                                style={{ width: 42, height: 30, border: "none", background: "transparent", textAlign: "center", fontSize: 13, color: "var(--text)" }} />
-                            )}
+                            {/* Abwesende bleiben editierbar — Punkte werden nur nicht in die
+                                Klassenstatistik gerechnet, aber nicht gelöscht. */}
+                            <input type="number" min="0" step="0.5" max={unitMax(u)} value={pointsOf(s.id, u.id)} onChange={(e) => setPoints(s.id, u.id, e.target.value === "" ? "" : Math.min(unitMax(u), Math.max(0, Number(e.target.value))))}
+                              style={{ width: 42, height: 30, border: "none", background: "transparent", textAlign: "center", fontSize: 13, color: "var(--text)" }} />
                           </td>
                         )))}
-                        <td style={{ ...td, fontWeight: 700, borderLeft: "1px solid var(--border)", color: abw ? "var(--text3)" : (tm && sum / tm < 0.5 ? C.danger : "var(--text)") }}>{abw ? t("klassenarbeit.absentShort") : `${sum}/${tm}`}</td>
-                        {!hideIndividual && <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : "var(--text)" }}>{abw ? "–" : note}</td>}
+                        <td style={{ ...td, fontWeight: 700, borderLeft: "1px solid var(--border)", color: abw ? "var(--text3)" : (tm && sum / tm < 0.5 ? C.danger : "var(--text)") }}>{`${sum}/${tm}`}{abw ? ` (${t("klassenarbeit.absentShort")})` : ""}</td>
+                        {!hideIndividual && <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : "var(--text)" }}>{note}</td>}
                       </tr>
                     );
                   })}
@@ -459,8 +473,9 @@ function NotenUebernahme({ t, classId, kursId, students, work, scale = DEFAULT_S
   const uIds = (tk) => (tk.parts && tk.parts.length) ? tk.parts.map((u) => u.id) : [tk.id];
   const uMaxT = (tk) => (tk.parts && tk.parts.length) ? tk.parts.reduce((n, u) => n + (Number(u.max) > 0 ? Number(u.max) : 1), 0) : (Number(tk.max) > 0 ? Number(tk.max) : 1);
   const totalMax = (work.tasks || []).reduce((n, tk) => n + uMaxT(tk), 0);
+  const absentU = new Set((work.absent || []).map(String));
   const grades = students
-    .filter((s) => (work.results || {})[String(s.id)] !== "abwesend")   // alle Anwesenden (leer = 0, wie im Raster/Auswertung); nur krank ausgenommen
+    .filter((s) => !absentU.has(String(s.id)) && (work.results || {})[String(s.id)] !== "abwesend")   // Anwesende (leer = 0); krank/abwesend raus, bekommt keine Note
     .map((s) => {
       const row = (work.results || {})[String(s.id)] || {};
       const sum = (work.tasks || []).reduce((n, tk) => n + uIds(tk).reduce((m, id) => m + (Number(row[id]) || 0), 0), 0);
@@ -512,9 +527,10 @@ function pctList(work) {
   const uMaxT = (tk) => (tk.parts && tk.parts.length) ? tk.parts.reduce((n, u) => n + (Number(u.max) > 0 ? Number(u.max) : 1), 0) : (Number(tk.max) > 0 ? Number(tk.max) : 1);
   const tm = tasks.reduce((n, tk) => n + uMaxT(tk), 0);
   if (!tm) return [];
+  const absent = new Set((work.absent || []).map(String));
   const out = [];
-  for (const r of Object.values(work.results || {})) {
-    if (!r || r === "abwesend") continue;
+  for (const [sid, r] of Object.entries(work.results || {})) {
+    if (!r || r === "abwesend" || absent.has(String(sid))) continue;
     let e = 0;
     if (Array.isArray(r)) { const bad = new Set(r.map(String)); tasks.forEach((tk) => { if (!bad.has(String(tk.id))) e += uMaxT(tk); }); }
     else tasks.forEach((tk) => uIds(tk).forEach((id) => { const v = r[id]; e += (v == null ? 0 : Number(v)); }));

@@ -67,6 +67,7 @@ class WorkPut(BaseModel):
     tasks: Optional[list] = None       # [{id,label,topic_id}]
     results: Optional[dict] = None      # {student_id: [wrong_task_id]}
     scale: Optional[dict] = None        # Notenschlüssel {"1":87,…} oder null = Profil
+    absent: Optional[list] = None       # abwesende student_ids (Punkte bleiben)
 
 
 class WorkOut(BaseModel):
@@ -77,6 +78,7 @@ class WorkOut(BaseModel):
     tasks: list = []
     results: dict = {}
     scale: Optional[dict] = None
+    absent: list = []
     model_config = {"from_attributes": True}
 
 
@@ -96,7 +98,7 @@ async def roster(class_id: int, user: User = Depends(require_module), db: AsyncS
 async def list_works(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
     rows = (await db.execute(select(WorkAnalysis).where(*_keyw(user, class_id, kurs_id)).order_by(WorkAnalysis.created_at.desc()))).scalars().all()
-    return [WorkOut(id=w.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale) for w in rows]
+    return [WorkOut(id=w.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or []) for w in rows]
 
 
 @router.post("/works", response_model=WorkOut, status_code=201)
@@ -107,7 +109,7 @@ async def create_work(body: WorkIn, user: User = Depends(require_module), db: As
     db.add(w)
     await db.commit()
     await db.refresh(w)
-    return WorkOut(id=w.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=[], results={})
+    return WorkOut(id=w.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=[], results={}, absent=[])
 
 
 @router.put("/works/{work_id}", response_model=WorkOut)
@@ -158,9 +160,12 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
             if isinstance(v, (int, float)):
                 clean[g] = max(0, min(100, float(v)))
         w.scale = clean or None
+    if body.absent is not None:
+        # Abwesende als eindeutige String-IDs; Punkte in results bleiben unberuehrt.
+        w.absent = list({str(x)[:40] for x in body.absent[:400]}) or None
     await db.commit()
     await db.refresh(w)
-    return WorkOut(id=w.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale)
+    return WorkOut(id=w.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [])
 
 
 @router.delete("/works/{work_id}", status_code=204)
@@ -206,9 +211,10 @@ def _profile(work: WorkAnalysis):
         v = (entry or {}).get(uid)
         return float(v) if isinstance(v, (int, float)) else 0    # nicht bewertet = 0
 
+    absent = {str(x) for x in (work.absent or [])}
     out = {}  # student_id -> {topic_id: [erreicht, max]}
     for sid, entry in results.items():
-        if entry == "abwesend":
+        if entry == "abwesend" or str(sid) in absent:   # abwesend: raus aus der Statistik
             continue
         prof = {}
         for topic_id, tks in topic_tasks.items():

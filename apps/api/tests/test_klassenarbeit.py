@@ -113,6 +113,32 @@ async def test_notenschluessel_override(s):
 
 
 @pytest.mark.asyncio
+async def test_abwesend_behaelt_punkte(s):
+    """Abwesend rechnet den SuS aus der Analyse raus, LÖSCHT aber die Punkte
+    nicht — sie bleiben in results erhalten."""
+    u, cls, A, B, s1, s2 = await _setup(s)
+    w = await K.create_work(K.WorkIn(class_id=cls.id, name="KA"), user=u, db=s)
+    tasks = [{"id": "t1", "label": "", "topic_id": A.id, "max": 2}]
+    results = {str(s1.id): {"t1": 2}, str(s2.id): {"t1": 1}}
+    await K.update_work(w.id, K.WorkPut(tasks=tasks, results=results), user=u, db=s)
+    # s2 abwesend melden — Punkte bleiben.
+    out = await K.update_work(w.id, K.WorkPut(absent=[str(s2.id)]), user=u, db=s)
+    assert str(s2.id) in out.absent
+    assert out.results[str(s2.id)] == {"t1": 1.0}   # Punkte NICHT geloescht
+
+    an = await K.analysis(w.id, user=u, db=s)
+    a_stat = next(x for x in an["topics"] if x["topic_id"] == A.id)
+    assert a_stat["pct"] == 100   # nur s1 (2/2) zaehlt, s2 raus
+
+    # Wieder anwesend: Punkte sind noch da, zaehlen wieder mit.
+    out = await K.update_work(w.id, K.WorkPut(absent=[]), user=u, db=s)
+    assert out.absent == []
+    an = await K.analysis(w.id, user=u, db=s)
+    a_stat = next(x for x in an["topics"] if x["topic_id"] == A.id)
+    assert a_stat["pct"] == 75   # (2+1)/(2+2)
+
+
+@pytest.mark.asyncio
 async def test_fremdes_thema_verworfen(s):
     u, cls, A, B, s1, s2 = await _setup(s)
     v = User(email="v@b.de", password_hash="x", name="V"); s.add(v); await s.flush()

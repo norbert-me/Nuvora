@@ -888,6 +888,10 @@ class WorkAnalysis(Base):
     name: Mapped[str] = mapped_column(String(200), default="", server_default="")
     tasks: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     results: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    # Abwesende SuS (Liste von student_id als String). Orthogonal zu results:
+    # abwesend heisst „aus der Klassenstatistik rausrechnen", loescht aber die
+    # erreichten Punkte NICHT — kommt der SuS zurueck, sind sie noch da.
+    absent: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     # Notenschlüssel dieser Arbeit ({"1":87,…}). NULL = Voreinstellung aus dem
     # Profil (users.grade_scale). Der Schlüssel ist eine paedagogische Wahl je
     # Arbeit, darum ueberschreibbar — Default bleibt das Profil.
