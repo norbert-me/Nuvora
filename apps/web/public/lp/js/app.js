@@ -1722,6 +1722,18 @@
                 nach.forEach(a => tasks.push({ ...a, section: getKategorie(a) === 'Basis' ? 'Basis' : (getKategorie(a) === 'E-Niveau' ? 'E-Niveau' : 'G-Niveau'), selected: true }));
             }
 
+            // Reihenfolge im Ladder: NIE nach id. Sektion bleibt (Wiederholung,
+            // Erklärung, Basis, G, E — die Lernleiter-Progression), INNERHALB einer
+            // Sektion nach Quelle (Seite, dann Nummer, siehe quelleKey). Erst danach
+            // der Pflicht/Zusatz-Split, damit der auf der sortierten Reihe basiert.
+            const sektRang = { 'Wiederholung': 0, 'Erklärung': 1, 'Basis': 2, 'G-Niveau': 3, 'E-Niveau': 4 };
+            tasks.sort((a, b) => {
+                const ra = sektRang[a.section] ?? 5, rb = sektRang[b.section] ?? 5;
+                if (ra !== rb) return ra - rb;
+                const [pa, na, ta] = quelleKey(a.quelle), [pb, nb, tb] = quelleKey(b.quelle);
+                return (pa - pb) || (na - nb) || ta.localeCompare(tb);
+            });
+
             // Reguläre Aufgaben in Pflicht/Zusatz aufteilen: die ersten
             // pflichtCount bleiben Pflicht, der Rest wird als Zusatz markiert.
             // Wiederholung/Erklärung zählen nicht mit.
