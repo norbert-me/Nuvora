@@ -2150,6 +2150,26 @@
         }
     }
 
+    // Die ERSTE Lernleiter eines Pfads darf keine Wiederholungs-Aufgaben (aus
+    // vorherigen Themen) enthalten — davor liegt nichts. Nach Loeschen/Umsortieren
+    // die neue erste bereinigen: nur Aufgaben ihres eigenen Themas behalten.
+    // Unbekannte IDs bleiben (nichts versehentlich verlieren). Gibt zurueck, ob
+    // etwas entfernt wurde.
+    function bereinigeErsteWiederholung(pfad) {
+        const ll = (pfad.lernleitern || [])[0];
+        if (!ll || !ll.thema) return false;
+        let changed = false;
+        (ll.schueler || []).forEach(sch => {
+            const vor = (sch.aufgabenIds || []).length;
+            sch.aufgabenIds = (sch.aufgabenIds || []).filter(id => {
+                const a = aufgaben.find(x => String(x.id) === String(id) || String(x._id) === String(id));
+                return !a || a.thema === ll.thema;   // fremd-thema (= Wiederholung) raus
+            });
+            if (sch.aufgabenIds.length !== vor) changed = true;
+        });
+        return changed;
+    }
+
     // LaTeX-Formel -> PNG-DataURL (für jsPDF). Nutzt KaTeX + SVG-foreignObject
     // -> Canvas. Cache pro Code. Gibt {url,w,h} oder null bei Fehler.
     const latexImgCache = {};
@@ -3217,6 +3237,11 @@
                 } else if (action === 'delete') {
                     if (!await confirmDlg('Lernleiter aus Pfad entfernen?', { ok: 'Entfernen' })) return;
                     currentPfad.lernleitern.splice(idx, 1);
+                }
+                // Ordnung geaendert? Dann die (evtl. neue) erste Lernleiter von
+                // ihren Wiederholungs-Aufgaben befreien — davor gibt es kein Thema.
+                if (action === 'up' || action === 'down' || action === 'delete') {
+                    if (bereinigeErsteWiederholung(currentPfad)) toast('Wiederholungs-Aufgaben der ersten Lernleiter entfernt (kein Thema davor).');
                 }
                 await savePfad(currentPfad);
                 // Frisch vom Server laden, damit die Lernleiter-Zahl am Pfad sofort
