@@ -187,8 +187,9 @@ const getModuleNavItems = (t, location) => {
   if (area === "kalender") {
     const cur = params.get("view");
     return [
-      { to: KAL, label: t("kalender.title"), active: cur !== "timetable" },
+      { to: KAL, label: t("kalender.title"), active: cur !== "timetable" && cur !== "breaks" },
       { to: `${KAL}?view=timetable`, label: t("kalender.timetable"), active: cur === "timetable" },
+      { to: `${KAL}?view=breaks`, label: t("kalender.breaksTab"), active: cur === "breaks" },
     ];
   }
   if (area === "methoden") {

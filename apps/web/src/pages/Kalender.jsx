@@ -266,11 +266,14 @@ export default function Kalender() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
         <h1 style={pageTitle}>{t("kalender.title")}</h1>
-        {/* Stundenplan ist in die Navbar ausgelagert (?view=timetable), nicht mehr
-            als inline-Tab — er ist Konfiguration, kein taeglicher Blick. */}
-        <Tabs value={view} onChange={setView}
-          options={[["today", t("kalender.todayView")], ["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")], ["breaks", t("kalender.breaksTab")]]} />
-        <button onClick={openAbo} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }} title={t("kalender.subscribeHint")}>{t("kalender.subscribe")}</button>
+        {/* Stundenplan UND Freie Tage sind in die Navbar ausgelagert (?view=…) —
+            beides Konfiguration. Der Ansicht-Umschalter erscheint darum nur in den
+            eigentlichen Kalenderansichten, nicht in Stundenplan/Freie Tage. */}
+        {view !== "timetable" && view !== "breaks" && (
+          <Tabs value={view} onChange={setView}
+            options={[["today", t("kalender.todayView")], ["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")]]} />
+        )}
+        {view !== "timetable" && view !== "breaks" && <button onClick={openAbo} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }} title={t("kalender.subscribeHint")}>{t("kalender.subscribe")}</button>}
         {view !== "timetable" && view !== "breaks" && view !== "today" && (
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
             <button onClick={() => move(-1)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 15 }} title="◀">‹</button>
@@ -555,7 +558,8 @@ function MonthGrid({ range, cursor, byDay, extByDay, slotsFor, onSlot, frei, cla
                 const other = d.getMonth() !== cursor.getMonth();
                 const f = frei && frei(d);
                 return (
-                  <td key={ymd(d)} style={{ ...cell, opacity: other ? 0.5 : 1, background: f ? "rgba(184,134,11,0.09)" : undefined, outline: ymd(d) === heute ? "2px solid var(--accent)" : "none", outlineOffset: -2 }}>
+                  <td key={ymd(d)} onClick={(e) => { if (!e.target.closest("button")) onDayView(d); }} title={t("kalender.toDay")}
+                    style={{ ...cell, cursor: "pointer", opacity: other ? 0.5 : 1, background: f ? "rgba(184,134,11,0.09)" : undefined, outline: ymd(d) === heute ? "2px solid var(--accent)" : "none", outlineOffset: -2 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <button onClick={() => onDayView(d)} title={t("kalender.toDay")} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--text2)", padding: 0 }}>{d.getDate()}</button>
                       {!f && <button onClick={() => onAdd(d)} className="icon-btn" style={{ ...iconBtn, padding: 0 }} title={t("kalender.add")}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>}
@@ -585,7 +589,8 @@ function WeekView({ range, byDay, extByDay, slotsFor, frei, className, classColo
       {days.map((d) => {
         const f = frei && frei(d);
         return (
-        <div key={ymd(d)} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 8, minHeight: 160, background: f ? "rgba(184,134,11,0.09)" : "var(--card)", minWidth: 90 }}>
+        <div key={ymd(d)} onClick={(e) => { if (!e.target.closest("button")) onDayView(d); }} title={t("kalender.toDay")}
+          style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 8, minHeight: 160, background: f ? "rgba(184,134,11,0.09)" : "var(--card)", minWidth: 90, cursor: "pointer" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
             <button onClick={() => onDayView(d)} title={t("kalender.toDay")} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--text)", padding: 0 }}>{d.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}</button>
             {!f && <button onClick={() => onAdd(d)} className="icon-btn" style={{ ...iconBtn, padding: 0 }}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>}
