@@ -267,8 +267,22 @@ input:focus, textarea:focus, select:focus {
     gap: 0.5rem;
     flex-wrap: wrap;
 }
-/* Native Checkboxen einheitlich: Akzentfarbe + groesser + Zeiger. */
-input[type="checkbox"] { accent-color: var(--primary); width: 1.05rem; height: 1.05rem; cursor: pointer; vertical-align: middle; }
+/* Checkboxen im App-Stil (wie .step-checkbox): eigenes Kaestchen statt Browser-
+   Default, gefuellt + weisser Haken im Ausgewaehlt-Zustand. */
+input[type="checkbox"] {
+    appearance: none; -webkit-appearance: none;
+    width: 1.15rem; height: 1.15rem; margin: 0; flex-shrink: 0;
+    border: 2px solid var(--border); border-radius: 5px;
+    background: var(--surface); cursor: pointer; vertical-align: middle; position: relative;
+    transition: background 0.15s, border-color 0.15s;
+}
+input[type="checkbox"]:checked { background: var(--primary); border-color: var(--primary); }
+input[type="checkbox"]:checked::after {
+    content: '✓'; position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 0.8rem; font-weight: 700; line-height: 1;
+}
+input[type="checkbox"]:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .chip {
     display: inline-flex;
     align-items: center;

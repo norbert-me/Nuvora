@@ -1929,7 +1929,9 @@
             const addBtn = document.createElement('button');
             addBtn.className = 'btn small';
             addBtn.style.marginTop = '0.5rem';
-            addBtn.textContent = '+ Aufgabe hinzufügen';
+            addBtn.textContent = '+';
+            addBtn.title = 'Aufgabe hinzufügen';
+            addBtn.setAttribute('aria-label', 'Aufgabe hinzufügen');
             addBtn.addEventListener('click', () => showAddTaskPicker(entry));
             body.appendChild(addBtn);
 
