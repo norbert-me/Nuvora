@@ -66,6 +66,7 @@ class WorkPut(BaseModel):
     name: Optional[str] = None
     tasks: Optional[list] = None       # [{id,label,topic_id}]
     results: Optional[dict] = None      # {student_id: [wrong_task_id]}
+    scale: Optional[dict] = None        # Notenschlüssel {"1":87,…} oder null = Profil
 
 
 class WorkOut(BaseModel):
@@ -75,6 +76,7 @@ class WorkOut(BaseModel):
     name: str
     tasks: list = []
     results: dict = {}
+    scale: Optional[dict] = None
     model_config = {"from_attributes": True}
 
 
@@ -94,7 +96,7 @@ async def roster(class_id: int, user: User = Depends(require_module), db: AsyncS
 async def list_works(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
     rows = (await db.execute(select(WorkAnalysis).where(*_keyw(user, class_id, kurs_id)).order_by(WorkAnalysis.created_at.desc()))).scalars().all()
-    return [WorkOut(id=w.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}) for w in rows]
+    return [WorkOut(id=w.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale) for w in rows]
 
 
 @router.post("/works", response_model=WorkOut, status_code=201)
@@ -147,9 +149,18 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
             elif isinstance(v, list):
                 out[str(k)] = [str(x)[:40] for x in v]  # Altformat unverändert durchreichen
         w.results = out
+    if body.scale is not None:
+        # Notenschlüssel {grade: min-prozent}. Leeres/ungueltiges dict -> null
+        # (zurueck zur Profil-Voreinstellung). Werte auf 0..100 begrenzen.
+        clean = {}
+        for g in ("1", "2", "3", "4", "5", "6"):
+            v = body.scale.get(g, body.scale.get(int(g))) if isinstance(body.scale, dict) else None
+            if isinstance(v, (int, float)):
+                clean[g] = max(0, min(100, float(v)))
+        w.scale = clean or None
     await db.commit()
     await db.refresh(w)
-    return WorkOut(id=w.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {})
+    return WorkOut(id=w.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale)
 
 
 @router.delete("/works/{work_id}", status_code=204)

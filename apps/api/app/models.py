@@ -888,6 +888,10 @@ class WorkAnalysis(Base):
     name: Mapped[str] = mapped_column(String(200), default="", server_default="")
     tasks: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     results: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    # Notenschlüssel dieser Arbeit ({"1":87,…}). NULL = Voreinstellung aus dem
+    # Profil (users.grade_scale). Der Schlüssel ist eine paedagogische Wahl je
+    # Arbeit, darum ueberschreibbar — Default bleibt das Profil.
+    scale: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

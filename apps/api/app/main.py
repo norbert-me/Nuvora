@@ -171,6 +171,7 @@ def _ensure_columns(sync_conn):
         ("grade_sections", "kurs_id", "INTEGER"),
         ("grade_overrides", "kurs_id", "INTEGER"),
         ("timetable_slots", "kurs_id", "INTEGER"),
+        ("work_analyses", "scale", "JSON"),
         ("questions", "topic_id", "INTEGER"),
         ("students", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
         ("students", "foerder", "JSON"),

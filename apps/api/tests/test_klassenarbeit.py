@@ -97,6 +97,22 @@ async def test_teilaufgaben(s):
 
 
 @pytest.mark.asyncio
+async def test_notenschluessel_override(s):
+    """Per-Arbeit-Notenschlüssel: dict wird gespeichert (0..100 begrenzt),
+    leeres dict setzt zurueck auf null (= Profil-Voreinstellung)."""
+    u, cls, A, B, s1, s2 = await _setup(s)
+    w = await K.create_work(K.WorkIn(class_id=cls.id, name="KA"), user=u, db=s)
+    out = await K.update_work(w.id, K.WorkPut(scale={"1": 90, "2": 75, "3": 60, "4": 45, "5": 150, "6": 0}), user=u, db=s)
+    assert out.scale["1"] == 90 and out.scale["5"] == 100   # 150 -> auf 100 begrenzt
+    # Andere Felder bleiben unberuehrt, wenn nur scale kommt.
+    out = await K.update_work(w.id, K.WorkPut(name="KA2"), user=u, db=s)
+    assert out.scale["1"] == 90 and out.name == "KA2"
+    # Leeres dict -> zurueck auf Profil (null).
+    out = await K.update_work(w.id, K.WorkPut(scale={}), user=u, db=s)
+    assert out.scale is None
+
+
+@pytest.mark.asyncio
 async def test_fremdes_thema_verworfen(s):
     u, cls, A, B, s1, s2 = await _setup(s)
     v = User(email="v@b.de", password_hash="x", name="V"); s.add(v); await s.flush()

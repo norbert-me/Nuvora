@@ -23,7 +23,9 @@ export default function Klassenarbeit() {
   const [notenModal, setNotenModal] = useState(false);
   const [scale, setScale] = useState(DEFAULT_SCALE);
   useEffect(() => { try { const u = JSON.parse(localStorage.getItem("user")); if (u?.grade_scale) setScale(u.grade_scale); } catch { /* Default */ } }, []);
-  const [hideIndividual, setHideIndividual] = useState(false); // #55: SuS-Ansicht — einzelne Leistungen aus
+  const [hideIndividual, setHideIndividual] = useState(false); // #55: SuS-Ansicht — einzelne Leistungen + Noten aus
+  const [scaleOpen, setScaleOpen] = useState(false); // Notenschlüssel-Editor auf/zu
+  const [distMode, setDistMode] = useState("bar");   // Notenverteilung: "bar" | "box"
   const [classId, setClassId] = useState(null);
   const [kursId, setKursId] = useState(null);
   const [classes, setClasses] = useState([]);
@@ -58,7 +60,9 @@ export default function Klassenarbeit() {
     setWork(next);
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      fetch(`${API}/works/${next.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: next.name, tasks: next.tasks, results: next.results }) }).catch(() => {});
+      // scale: echtes dict = Override, sonst {} (Server setzt zurueck auf Profil).
+      const scaleOut = (next.scale && Object.keys(next.scale).length) ? next.scale : {};
+      fetch(`${API}/works/${next.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: next.name, tasks: next.tasks, results: next.results, scale: scaleOut }) }).catch(() => {});
     }, 600);
   };
 
@@ -124,6 +128,10 @@ export default function Klassenarbeit() {
   const isAbsent = (sid) => (work.results || {})[String(sid)] === "abwesend";
   const toggleAbsent = (sid) => { const results = { ...(work.results || {}) }; if (results[String(sid)] === "abwesend") delete results[String(sid)]; else results[String(sid)] = "abwesend"; persist({ ...work, results }); };
 
+  // Gültiger Notenschlüssel: Override der Arbeit, sonst Profil-Voreinstellung.
+  const effScale = (work && work.scale && Object.keys(work.scale).length) ? work.scale : scale;
+  const setWorkScale = (next) => persist({ ...work, scale: next });
+
   // Auswertung LIVE aus dem Raster (kein Button, kein Server-Call): je Thema die
   // Trefferquote der Klasse + je SuS die schwachen Themen (≥ 50 % falsch).
   const analyse = useMemo(() => {
@@ -153,15 +161,15 @@ export default function Klassenarbeit() {
 
     // Endnote je SuS: Σ/Max → Note mit Tendenz + Notenwert; Verteilung + Kennzahlen.
     const tm = tasks.reduce((n, tk) => n + tkMax(tk), 0);
-    const notes = graded.map((s) => { const sum = tasks.reduce((n, tk) => n + pt(s.id, tk), 0); const d = gradeDetailed(tm ? (sum / tm) * 100 : 0, scale); return { name: s.name, note: d.note, wert: d.wert, grade: d.grade }; });
+    const notes = graded.map((s) => { const sum = tasks.reduce((n, tk) => n + pt(s.id, tk), 0); const d = gradeDetailed(tm ? (sum / tm) * 100 : 0, effScale); return { name: s.name, note: d.note, wert: d.wert, grade: d.grade }; });
     const werte = notes.map((x) => x.wert).sort((a, b) => a - b);
     const dist = [1, 2, 3, 4, 5, 6].map((g) => notes.filter((x) => x.grade === g).length);
     const avg = werte.length ? Math.round((werte.reduce((a, b) => a + b, 0) / werte.length) * 100) / 100 : null;
     const r2 = (x) => Math.round(x * 100) / 100;
     const stats = werte.length ? { min: werte[0], q1: r2(quantile(werte, 0.25)), med: r2(quantile(werte, 0.5)), q3: r2(quantile(werte, 0.75)), max: werte[werte.length - 1], sd: r2(stdev(werte)) } : null;
-    const minPts = [1, 2, 3, 4, 5].map((g) => ({ grade: g, pts: Math.ceil(((scale[g] || 0) / 100) * tm) }));
+    const minPts = [1, 2, 3, 4, 5].map((g) => ({ grade: g, pts: Math.ceil(((effScale[g] || 0) / 100) * tm) }));
     return { topics: topicsOut, students: studentsOut, perTask, perUnit, noten: { avg, dist, n: notes.length, notes, stats, minPts, max: tm } };
-  }, [work, students, topics, scale]);
+  }, [work, students, topics, scale, effScale]);
   const wiederholen = async () => {
     if (!work) return;
     setBusy(true);
@@ -250,7 +258,8 @@ export default function Klassenarbeit() {
                     <th rowSpan={2} style={{ ...th, textAlign: "left", minWidth: 130, position: "sticky", left: 0, background: "var(--card)" }}>{t("common.name")}</th>
                     {(work.tasks || []).map((tk, i) => <th key={tk.id} colSpan={units(tk).length} style={{ ...th, minWidth: 46, borderLeft: "1px solid var(--border)" }} title={tk.label}>{tk.label || (i + 1)}</th>)}
                     <th rowSpan={2} style={{ ...th, minWidth: 58, borderLeft: "1px solid var(--border)" }}>Σ / {totalMax()}</th>
-                    <th rowSpan={2} style={{ ...th, minWidth: 44 }}>{t("klassenarbeit.grade")}</th>
+                    {/* SuS-/Präsentationsansicht: Note oben ausblenden (nicht vor der Klasse zeigen). */}
+                    {!hideIndividual && <th rowSpan={2} style={{ ...th, minWidth: 44 }}>{t("klassenarbeit.grade")}</th>}
                   </tr>
                   <tr>
                     {(work.tasks || []).flatMap((tk) => units(tk).map((u, j) => (
@@ -261,7 +270,7 @@ export default function Klassenarbeit() {
                 <tbody>
                   {students.map((s) => {
                     const sum = sumOf(s.id); const tm = totalMax(); const abw = isAbsent(s.id);
-                    const note = (!abw && tm) ? gradeDetailed((sum / tm) * 100, scale).note : "";
+                    const note = (!abw && tm) ? gradeDetailed((sum / tm) * 100, effScale).note : "";
                     return (
                       <tr key={s.id} style={abw ? { opacity: 0.5 } : undefined}>
                         <td style={{ ...td, textAlign: "left", padding: "4px 8px", position: "sticky", left: 0, background: "var(--card)", fontWeight: 500, whiteSpace: "nowrap" }}>
@@ -280,7 +289,7 @@ export default function Klassenarbeit() {
                           </td>
                         )))}
                         <td style={{ ...td, fontWeight: 700, borderLeft: "1px solid var(--border)", color: abw ? "var(--text3)" : (tm && sum / tm < 0.5 ? C.danger : "var(--text)") }}>{abw ? t("klassenarbeit.absentShort") : `${sum}/${tm}`}</td>
-                        <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : "var(--text)" }}>{abw ? "–" : note}</td>
+                        {!hideIndividual && <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : "var(--text)" }}>{abw ? "–" : note}</td>}
                       </tr>
                     );
                   })}
@@ -289,11 +298,39 @@ export default function Klassenarbeit() {
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap", alignItems: "center" }}>
             {notenAktiv && (work.tasks || []).length > 0 && <button onClick={() => setNotenModal(true)} style={btnPrimary}>{t("klassenarbeit.toNoten")}</button>}
             {(kartenAktiv || lernpfadAktiv) && <button onClick={wiederholen} disabled={busy} style={{ ...btnSecondary, opacity: busy ? 0.6 : 1 }}>💡 {t("klassenarbeit.remediate")}</button>}
+            {(work.tasks || []).length > 0 && (
+              <button onClick={() => setScaleOpen((v) => !v)} style={{ ...btnSecondary, marginLeft: "auto" }}
+                title={t("klassenarbeit.scaleHint")}>⚙ {t("klassenarbeit.scale")}{(work.scale && Object.keys(work.scale).length) ? " •" : ""}</button>
+            )}
           </div>
-          {notenModal && <NotenUebernahme t={t} classId={classId} kursId={kursId} students={students} work={work} onClose={() => setNotenModal(false)} />}
+          {scaleOpen && (work.tasks || []).length > 0 && (
+            <div style={{ marginTop: 10, border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", background: "var(--card)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>{t("klassenarbeit.scaleTitle")}</span>
+                <span style={{ fontSize: 12, color: (work.scale && Object.keys(work.scale).length) ? C.warning : "var(--text3)" }}>
+                  {(work.scale && Object.keys(work.scale).length) ? t("klassenarbeit.scaleOwn") : t("klassenarbeit.scaleProfile")}
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+                {[1, 2, 3, 4, 5].map((g) => (
+                  <label key={g} style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 12, color: "var(--text2)" }}>
+                    <span>{t("klassenarbeit.gradeFrom", { g })}</span>
+                    <input type="number" min="0" max="100" step="1" value={Math.round(effScale[g] ?? DEFAULT_SCALE[g])}
+                      onChange={(e) => { const base = { ...DEFAULT_SCALE, ...effScale }; base[g] = Math.max(0, Math.min(100, Number(e.target.value) || 0)); base[6] = 0; setWorkScale(base); }}
+                      style={{ ...inputStyle, width: 64, padding: "6px 8px", textAlign: "center" }} />
+                  </label>
+                ))}
+                <span style={{ fontSize: 12, color: "var(--text3)" }}>% {t("klassenarbeit.scaleUnit")}</span>
+                {(work.scale && Object.keys(work.scale).length) ? (
+                  <button onClick={() => setWorkScale({})} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12.5 }}>{t("klassenarbeit.scaleReset")}</button>
+                ) : null}
+              </div>
+            </div>
+          )}
+          {notenModal && <NotenUebernahme t={t} classId={classId} kursId={kursId} students={students} work={work} scale={effScale} onClose={() => setNotenModal(false)} />}
 
           {analyse && (analyse.topics.length > 0 || analyse.students.length > 0 || analyse.perUnit.length > 0 || analyse.noten.n > 0) && (
             <div style={{ marginTop: 18, border: "1px solid var(--border)", borderRadius: 12, padding: 16, background: "var(--card)" }}>
@@ -346,7 +383,15 @@ export default function Klassenarbeit() {
 
               {/* Endnote: Verteilung + Kennzahlen (Notenwert) + min-Punkte je Note */}
               {analyse.noten.n > 0 && (<>
-                <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.gradeResult")} <span style={{ fontWeight: 400, color: "var(--text3)", fontSize: 12.5 }}>· ⌀ {String(analyse.noten.avg).replace(".", ",")}</span></div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, margin: "16px 0 8px", flexWrap: "wrap" }}>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>{t("klassenarbeit.gradeResult")} <span style={{ fontWeight: 400, color: "var(--text3)", fontSize: 12.5 }}>· ⌀ {String(analyse.noten.avg).replace(".", ",")}</span></div>
+                  <div style={{ display: "inline-flex", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+                    {[["bar", t("klassenarbeit.distBar")], ["box", t("klassenarbeit.distBox")]].map(([m, lbl]) => (
+                      <button key={m} onClick={() => setDistMode(m)} style={{ border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, padding: "4px 10px", background: distMode === m ? "var(--accent)" : "transparent", color: distMode === m ? "#fff" : "var(--text2)" }}>{lbl}</button>
+                    ))}
+                  </div>
+                </div>
+                {distMode === "bar" ? (
                 <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 70 }}>
                   {analyse.noten.dist.map((c, i) => { const mxc = Math.max(...analyse.noten.dist, 1); return (
                     <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
@@ -356,6 +401,17 @@ export default function Klassenarbeit() {
                     </div>
                   ); })}
                 </div>
+                ) : (() => {
+                  // Boxplot auf der %-Achse (Klassenleistung), gleiche Komponente wie Vergleich.
+                  const q = quartiles(pctList(work));
+                  return q ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0" }}>
+                      <span style={{ fontSize: 11, color: "var(--text3)", width: 20 }}>0%</span>
+                      <Boxplot q={q} />
+                      <span style={{ fontSize: 11, color: "var(--text3)", width: 32 }}>100%</span>
+                    </div>
+                  ) : null;
+                })()}
                 {analyse.noten.stats && (
                   <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: "5px 16px", fontSize: 12.5 }}>
                     {[[t("klassenarbeit.stdev"), analyse.noten.stats.sd], [t("klassenarbeit.min"), analyse.noten.stats.min], ["Q1", analyse.noten.stats.q1], [t("klassenarbeit.median"), analyse.noten.stats.med], ["Q3", analyse.noten.stats.q3], [t("klassenarbeit.max"), analyse.noten.stats.max]].map(([k, v]) => (
@@ -384,17 +440,15 @@ export default function Klassenarbeit() {
 // über die Notenskala der Lehrkraft, als neue Spalte im gewählten Abschnitt.
 // Nur SuS mit mind. einer markierten falschen Aufgabe ODER allen richtig — die
 // Spalte ist frei editierbar (Abwesende später herausnehmen).
-function NotenUebernahme({ t, classId, kursId, students, work, onClose }) {
+function NotenUebernahme({ t, classId, kursId, students, work, scale = DEFAULT_SCALE, onClose }) {
   const [sections, setSections] = useState(null);
   const [sectionId, setSectionId] = useState("");
   const [name, setName] = useState(work.name || t("klassenarbeit.newName"));
-  const [scale, setScale] = useState(DEFAULT_SCALE);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const kq = `?term=all${kursId != null ? `&kurs_id=${kursId}` : ""}`;
   useEffect(() => {
     fetch(`/api/noten/classes/${classId}/sections${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => { const l = Array.isArray(d) ? d : []; setSections(l); if (l[0]) setSectionId(String(l[0].id)); }).catch(() => setSections([]));
-    try { const u = JSON.parse(localStorage.getItem("user")); if (u?.grade_scale) setScale(u.grade_scale); } catch { /* Default */ }
   }, []);
   const uIds = (tk) => (tk.parts && tk.parts.length) ? tk.parts.map((u) => u.id) : [tk.id];
   const uMaxT = (tk) => (tk.parts && tk.parts.length) ? tk.parts.reduce((n, u) => n + (Number(u.max) > 0 ? Number(u.max) : 1), 0) : (Number(tk.max) > 0 ? Number(tk.max) : 1);
