@@ -2042,6 +2042,9 @@
         // Stabile Server-id des bearbeiteten Eintrags uebernehmen, damit savePfad
         // ihn per PUT aktualisiert statt neu anzulegen (sonst Duplikat + Alte in Papierkorb).
         if (backup && backup.id) ll.id = backup.id;
+        // Bestehende Thema-id mitnehmen: loest der Name nicht auf (stale topics),
+        // faellt savePfad darauf zurueck statt das Thema zu nullen.
+        if (backup && backup.topic_id != null) ll.topic_id = backup.topic_id;
         if (editIdx >= 0) pfad.lernleitern[editIdx] = ll;
         else pfad.lernleitern.push(ll);
 
@@ -2092,7 +2095,11 @@
                     student_id: parseInt(sch.id || sch._id) || null,
                     exercise_ids: (sch.aufgabenIds || []).map(x => parseInt(x)).filter(Boolean)
                 })).filter(a => a.student_id);
-                const topic_id = await topicId(ll.thema, ll.unterthema);
+                // Thema aus dem Namen aufloesen; scheitert das (leer/stale topics),
+                // NICHT nullen, sondern die mitgefuehrte Roh-topic_id behalten —
+                // sonst verliert eine Lernleiter beim Re-Save ihr Thema.
+                let topic_id = await topicId(ll.thema, ll.unterthema);
+                if (!topic_id && ll.topic_id != null) topic_id = ll.topic_id;
                 // Bevorzugt die am Ladder gespeicherte class_id; Fallback ueber den
                 // Kurs-Namen (kann leer sein) oder einen zugewiesenen Schueler.
                 const class_id = (ll.class_id ?? null)
@@ -2891,6 +2898,9 @@
 
     async function loadLernpfade() {
         try {
+            // Themen sicherstellen, bevor wir Ladder-topic_ids in Namen aufloesen —
+            // sonst blieben alle Themen leer (topicPfad findet nichts).
+            if (!topics.length) { try { topics = await api(`${API}/topics`).then(r => r.ok ? r.json() : topics); } catch (e) { /* Netz — mit vorhandenem Stand weiter */ } }
             const paths = await api(`${LP}/paths`).then(r => r.ok ? r.json() : []);
             const byId = new Map(schueler.map(s => [s.id, s]));
             lernpfade = paths.map(p => ({
@@ -2908,6 +2918,7 @@
                     return {
                         _id: String(l.id),
                         id: l.id,                        // stabile Server-id fuer Upsert (savePfad PUTtet statt neu anzulegen)
+                        topic_id: l.topic_id ?? null,    // Roh-Thema-id mitfuehren: falls topicPfad den Namen nicht aufloest, NICHT mit null ueberschreiben
                         thema: tp.thema,
                         unterthema: tp.unterthema,
                         klasse: klasseVonStud || klasseVonCls || '',
