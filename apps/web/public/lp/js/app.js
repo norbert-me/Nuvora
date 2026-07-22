@@ -396,6 +396,12 @@
     let lernpfade = [];
     // Aktive Klassenfilterung der Übersicht (ersetzt das frühere Select).
     let overviewKlasse = '';
+    // Render-Pagination der Aufgaben-Liste: nur die ersten N Zeilen ins DOM
+    // (1000 Zeilen zu rendern ist der spuerbare Bremser). Suche/Filter arbeiten
+    // weiter auf ALLEN Aufgaben im Speicher (der Generator braucht sie ohnehin
+    // komplett) — nur die Anzeige ist gestueckelt, per „Mehr laden".
+    const AUFGABEN_PAGE = 50;
+    let aufgabenLimit = AUFGABEN_PAGE;
     let previewData = null;
     // gesetzt, wenn im Generator eine bestehende Lernleiter bearbeitet wird
     let editingLlId = null;
@@ -1068,7 +1074,9 @@
             filtered = applySort(filtered);
         }
 
-        tbody.innerHTML = filtered.map(a => {
+        const gesamt = filtered.length;
+        const sichtbar = filtered.slice(0, aufgabenLimit);
+        tbody.innerHTML = sichtbar.map(a => {
             const kat = getKategorie(a);
             const hasDetail = a.bild || a.aufgabentext;
             return `
@@ -1111,8 +1119,20 @@
             cb.addEventListener('change', updateBulkBar);
         });
 
+        // „Mehr laden": weitere AUFGABEN_PAGE Zeilen ins DOM, ohne Server-Anfrage.
+        if (gesamt > aufgabenLimit) {
+            const tr = document.createElement('tr');
+            tr.className = 'aufgaben-more-row';
+            tr.innerHTML = `<td colspan="9" style="text-align:center;padding:10px">
+                <button class="btn" id="btn-more-aufgaben">Mehr laden (${gesamt - aufgabenLimit} weitere)</button></td>`;
+            tbody.appendChild(tr);
+            tr.querySelector('#btn-more-aufgaben').addEventListener('click', () => { aufgabenLimit += AUFGABEN_PAGE; renderAufgaben(); });
+        }
+
         updateFilters();
     }
+    // Neue Abfrage (Filter/Suche geaendert): wieder bei den ersten 50 anfangen.
+    function renderAufgabenReset() { aufgabenLimit = AUFGABEN_PAGE; renderAufgaben(); }
 
     function updateFilters() {
         // Themen: aus vorhandenen Aufgaben UND aus der Kern-Taxonomie (topics),
@@ -1147,11 +1167,11 @@
 
     document.getElementById('filter-thema').addEventListener('change', () => {
         document.getElementById('filter-unterthema').value = '';
-        renderAufgaben();
+        renderAufgabenReset();
     });
-    document.getElementById('filter-unterthema').addEventListener('change', renderAufgaben);
-    document.getElementById('filter-kategorie').addEventListener('change', renderAufgaben);
-    document.getElementById('aufgaben-suche').addEventListener('input', renderAufgaben);
+    document.getElementById('filter-unterthema').addEventListener('change', renderAufgabenReset);
+    document.getElementById('filter-kategorie').addEventListener('change', renderAufgabenReset);
+    document.getElementById('aufgaben-suche').addEventListener('input', renderAufgabenReset);
 
     // ─── JSON Import ───
     document.getElementById('btn-json-import').addEventListener('click', () => {
