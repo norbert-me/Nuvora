@@ -361,11 +361,11 @@ export default function Klassenarbeit() {
 
           {/* 2) Punkte-Raster: Zeilen = Schüler, Spalten = Aufgaben (0..max). */}
           {(work.tasks || []).length > 0 && (
-            <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 12 }}>
+            <div style={{ overflowX: "auto", overscrollBehaviorX: "contain", border: "1px solid var(--border)", borderRadius: 12 }}>
               <table style={{ borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr>
-                    <th rowSpan={2} style={{ ...th, textAlign: "left", minWidth: 130, position: "sticky", left: 0, background: "var(--card)" }}>{t("common.name")}</th>
+                    <th rowSpan={2} style={{ ...th, textAlign: "left", minWidth: 130, position: "sticky", left: 0, zIndex: 2, background: "var(--card)" }}>{t("common.name")}</th>
                     {(work.tasks || []).map((tk, i) => <th key={tk.id} colSpan={units(tk).length + (units(tk).length > 1 ? 1 : 0)} style={{ ...th, minWidth: 46, borderLeft: "1px solid var(--border)" }} title={tk.label}>{tk.label || (i + 1)}</th>)}
                     <th rowSpan={2} style={{ ...th, minWidth: 58, borderLeft: "1px solid var(--border)" }}>Σ / {totalMax()}</th>
                     {/* SuS-/Präsentationsansicht: Note oben ausblenden (nicht vor der Klasse zeigen). */}
@@ -393,7 +393,7 @@ export default function Klassenarbeit() {
                     const note = gd ? (gradeMode === "wert" ? String(gd.wert).replace(".", ",") : gd.note) : "";
                     return (
                       <tr key={s.id} style={abw ? { opacity: 0.5 } : undefined}>
-                        <td style={{ ...td, textAlign: "left", padding: "4px 8px", position: "sticky", left: 0, background: "var(--card)", fontWeight: 500, whiteSpace: "nowrap" }}>
+                        <td style={{ ...td, textAlign: "left", padding: "4px 8px", position: "sticky", left: 0, zIndex: 1, background: "var(--card)", fontWeight: 500, whiteSpace: "nowrap" }}>
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                             <button onClick={() => toggleAbsent(s.id)} title={abw ? t("klassenarbeit.present") : t("klassenarbeit.absent")}
                               style={{ border: "none", background: "none", cursor: "pointer", color: abw ? C.warning : "var(--text3)", padding: 0, display: "inline-flex" }}><Icon d={abw ? ICONS.ban : ICONS.circle} size={14} /></button>
