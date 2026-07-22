@@ -406,6 +406,9 @@ class LearningLadder(Base):
     assignments: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Soft-Delete: eine entfernte Lernleiter wandert in den Papierkorb (statt hart
+    # geloescht zu werden) und ist wiederherstellbar.
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
     path: Mapped[LearningPath] = relationship(back_populates="ladders")
 

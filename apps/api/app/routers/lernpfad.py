@@ -229,7 +229,8 @@ async def list_paths(
     result = await db.execute(
         select(LearningPath)
         .where(LearningPath.owner_id == user.id, LearningPath.deleted_at.is_(None))
-        .options(selectinload(LearningPath.ladders))
+        # Nur aktive Lernleitern — die im Papierkorb (deleted_at gesetzt) nicht mitliefern.
+        .options(selectinload(LearningPath.ladders.and_(LearningLadder.deleted_at.is_(None))))
         .order_by(LearningPath.name)
     )
     return result.scalars().all()
@@ -350,15 +351,64 @@ async def update_ladder(
     return ladder
 
 
+@router.get("/ladders/trash")
+async def list_ladder_trash(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Gelöschte Lernleitern (Papierkorb), samt Pfadname zur Einordnung. Thema
+    loest der Client ueber topic_id auf (topicPfad)."""
+    rows = (await db.execute(
+        select(LearningLadder, LearningPath.name)
+        .join(LearningPath, LearningLadder.path_id == LearningPath.id)
+        .where(LearningPath.owner_id == user.id, LearningLadder.deleted_at.is_not(None))
+        .order_by(LearningLadder.deleted_at.desc())
+    )).all()
+    return [{
+        "id": l.id, "path_id": l.path_id, "path_name": pname,
+        "topic_id": l.topic_id, "class_id": l.class_id,
+        "notizen": l.notizen or "", "assignments": l.assignments, "config": l.config,
+        "deleted_at": l.deleted_at.isoformat() if l.deleted_at else None,
+    } for (l, pname) in rows]
+
+
 @router.delete("/ladders/{ladder_id}", status_code=204)
 async def delete_ladder(
     ladder_id: int,
     user: User = Depends(require_module),
     db: AsyncSession = Depends(get_db),
 ):
+    """Soft-Delete: in den Papierkorb (wiederherstellbar), statt hart zu loeschen.
+    So reisst ein Save (Upsert) entfernte Lernleitern nicht unwiederbringlich weg."""
+    from datetime import datetime, timezone
     ladder = await db.get(LearningLadder, ladder_id)
     if not ladder:
         raise HTTPException(404, "Lernleiter nicht gefunden")
     await _owned_path(db, user, ladder.path_id)
+    ladder.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
+
+
+@router.post("/ladders/{ladder_id}/restore", response_model=LadderOut)
+async def restore_ladder(ladder_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    ladder = await db.get(LearningLadder, ladder_id)
+    if not ladder:
+        raise HTTPException(404, "Lernleiter nicht gefunden")
+    path = await _owned_path(db, user, ladder.path_id)
+    # In einen Pfad im Papierkorb laesst sich nichts sinnvoll zurueckholen —
+    # dann erst den Pfad wiederherstellen.
+    if path.deleted_at is not None:
+        raise HTTPException(400, "Der Lernpfad liegt selbst im Papierkorb — erst ihn wiederherstellen")
+    ladder.deleted_at = None
+    await db.commit()
+    await db.refresh(ladder)
+    return ladder
+
+
+@router.delete("/ladders/{ladder_id}/purge", status_code=204)
+async def purge_ladder(ladder_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    ladder = await db.get(LearningLadder, ladder_id)
+    if not ladder:
+        raise HTTPException(404, "Lernleiter nicht gefunden")
+    await _owned_path(db, user, ladder.path_id)
+    if ladder.deleted_at is None:
+        raise HTTPException(400, "Lernleiter ist nicht im Papierkorb")
     await db.delete(ladder)
     await db.commit()

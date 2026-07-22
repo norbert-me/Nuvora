@@ -64,3 +64,31 @@ async def test_path_trash(session):
     await lernpfad.delete_path(p.id, user=u, db=session)
     await lernpfad.purge_path(p.id, user=u, db=session)
     assert (await session.execute(select(func.count()).select_from(m.LearningLadder))).scalar() == 0
+
+
+@pytest.mark.asyncio
+async def test_ladder_trash(session):
+    """Einzelne Lernleiter loeschen = Soft-Delete (Papierkorb), wiederherstellbar;
+    erst purge entfernt sie physisch. list_paths liefert nur aktive Lernleitern."""
+    u, c = await _user_class(session)
+    p = m.LearningPath(owner_id=u.id, name="Bruch"); session.add(p); await session.flush()
+    l1 = m.LearningLadder(path_id=p.id, position=0)
+    l2 = m.LearningLadder(path_id=p.id, position=1)
+    session.add_all([l1, l2]); await session.commit()
+    l1_id = l1.id
+    aktiv = lambda: session.execute(select(func.count()).select_from(m.LearningLadder).where(m.LearningLadder.deleted_at.is_(None)))
+    gesamt = lambda: session.execute(select(func.count()).select_from(m.LearningLadder))
+
+    await lernpfad.delete_ladder(l1_id, user=u, db=session)     # Soft-Delete
+    assert (await gesamt()).scalar() == 2                        # physisch noch beide
+    assert (await aktiv()).scalar() == 1                         # aktiv nur eine
+    trash = await lernpfad.list_ladder_trash(user=u, db=session)
+    assert len(trash) == 1 and trash[0]["id"] == l1_id and trash[0]["path_name"] == "Bruch"
+
+    await lernpfad.restore_ladder(l1_id, user=u, db=session)
+    assert len(await lernpfad.list_ladder_trash(user=u, db=session)) == 0
+    assert (await aktiv()).scalar() == 2
+
+    await lernpfad.delete_ladder(l1_id, user=u, db=session)
+    await lernpfad.purge_ladder(l1_id, user=u, db=session)      # endgueltig
+    assert (await gesamt()).scalar() == 1

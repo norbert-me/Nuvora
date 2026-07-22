@@ -2039,6 +2039,9 @@
         // Beim Bearbeiten bestehenden Eintrag ersetzen, sonst anhängen.
         const editIdx = editingLlId ? pfad.lernleitern.findIndex(x => x._id === editingLlId) : -1;
         const backup = editIdx >= 0 ? pfad.lernleitern[editIdx] : null;
+        // Stabile Server-id des bearbeiteten Eintrags uebernehmen, damit savePfad
+        // ihn per PUT aktualisiert statt neu anzulegen (sonst Duplikat + Alte in Papierkorb).
+        if (backup && backup.id) ll.id = backup.id;
         if (editIdx >= 0) pfad.lernleitern[editIdx] = ll;
         else pfad.lernleitern.push(ll);
 
@@ -2060,31 +2063,27 @@
     // verschluckt wird - sonst sieht der Nutzer Daten, die es nicht mehr gibt.
     async function savePfad(pfad) {
         try {
-            // Pfad anlegen, falls neu. Der Kern kennt Namen als eindeutig je Konto.
+            // Bestehende Pfade EINMAL holen (fuer Find-or-create per Name und um die
+            // aktuellen Ladder-IDs zu kennen — fuer den Upsert).
+            const alle = await api(`${LP}/paths`).then(x => x.ok ? x.json() : []);
             if (!pfad.id) {
-                // Erst schauen, ob der Name schon existiert (z.B. Sammel-Pfad
-                // „Einzeln"), statt blind zu POSTen und ein 409 in der Konsole zu
-                // provozieren. Existiert er, wiederverwenden + alte Ladders raeumen.
-                const alle = await api(`${LP}/paths`).then(x => x.ok ? x.json() : []);
+                // Existiert der Name schon (z.B. Sammel-Pfad „Einzeln")? Dann
+                // wiederverwenden, statt blind zu POSTen (409). Ladders NICHT loeschen.
                 const da = alle.find(x => x.name === pfad.name);
-                if (da) {
-                    pfad.id = da.id;
-                    for (const ll of (da.ladders || [])) await api(`${LP}/ladders/${ll.id}`, { method: 'DELETE' });
-                } else {
+                if (da) pfad.id = da.id;
+                else {
                     const r = await api(`${LP}/paths`, { method: 'POST', body: JSON.stringify({ name: pfad.name }) });
                     if (!r.ok) throw new Error('HTTP ' + r.status);
                     pfad.id = (await r.json()).id;
                 }
-            } else {
-                // Bestehender Pfad: Lernleitern ersetzen, statt zu duplizieren.
-                const alle = await api(`${LP}/paths`).then(x => x.ok ? x.json() : []);
-                const da = alle.find(x => x.id === pfad.id);
-                for (const ll of ((da && da.ladders) || [])) await api(`${LP}/ladders/${ll.id}`, { method: 'DELETE' });
             }
+            // Upsert statt Delete-Recreate: bestehende Lernleitern per PUT aendern
+            // (IDs bleiben stabil — kein Churn, kein Papierkorb-Muell), neue per POST.
+            // Was der Server noch hat, wir aber nicht mehr, wandert in den Papierkorb.
+            const da = alle.find(x => x.id === pfad.id);
+            const uebrig = new Set(((da && da.ladders) || []).map(l => l.id));
 
-            const klassenRaw = await api(`${API}/classes`).then(x => x.ok ? x.json() : []);
-            // ll.klasse ist jetzt ein KURS-Name; als Kern-Referenz eine Klasse des
-            // Kurses nehmen (über einen Schüler dieses Kurses).
+            // ll.klasse ist ein KURS-Name; Kern-Referenz ueber einen Schueler des Kurses.
             const classIdVon = kurs => (schueler.find(s => s.klasse === kurs) || {}).class_id || null;
 
             let pos = 0;
@@ -2094,34 +2093,37 @@
                     exercise_ids: (sch.aufgabenIds || []).map(x => parseInt(x)).filter(Boolean)
                 })).filter(a => a.student_id);
                 const topic_id = await topicId(ll.thema, ll.unterthema);
-                // Bevorzugt die am Ladder gespeicherte class_id; nur als Fallback
-                // ueber den Kurs-Namen suchen (der kann leer sein) oder ueber einen
-                // der zugewiesenen Schueler.
+                // Bevorzugt die am Ladder gespeicherte class_id; Fallback ueber den
+                // Kurs-Namen (kann leer sein) oder einen zugewiesenen Schueler.
                 const class_id = (ll.class_id ?? null)
                     || classIdVon(ll.klasse)
                     || (schueler.find(s => (ll.schueler || []).some(x => (x.id || parseInt(x._id)) === s.id)) || {}).class_id
                     || null;
-                // Diagnose (#59): weist eine gespeicherte Lernleiter leer aus, steht
-                // hier in der Konsole WAS fehlte — Thema, Kurs oder Zuweisungen.
+                // Diagnose (#59): weist eine Lernleiter leer aus, steht in der Konsole WAS fehlte.
                 if (!topic_id || !class_id || !assignments.length) {
                     console.warn('Lernleiter unvollstaendig gespeichert:', {
                         thema: ll.thema, topic_id, klasse: ll.klasse, class_id,
                         schueler: (ll.schueler || []).length, zuweisungen: assignments.length
                     });
                 }
-                const r = await api(`${LP}/paths/${pfad.id}/ladders`, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        class_id,
-                        topic_id,
-                        position: pos++,
-                        notizen: ll.notizen || '',
-                        assignments: assignments.length ? assignments : null,
-                        config: ll.config || null
-                    })
+                const body = JSON.stringify({
+                    class_id, topic_id, position: pos++,
+                    notizen: ll.notizen || '',
+                    assignments: assignments.length ? assignments : null,
+                    config: ll.config || null
                 });
+                let r;
+                if (ll.id && uebrig.has(ll.id)) {
+                    r = await api(`${LP}/ladders/${ll.id}`, { method: 'PUT', body });
+                    uebrig.delete(ll.id);   // bleibt bestehen, nicht in den Papierkorb
+                } else {
+                    r = await api(`${LP}/paths/${pfad.id}/ladders`, { method: 'POST', body });
+                    if (r.ok) { const neu = await r.json(); ll.id = neu.id; ll._id = String(neu.id); }
+                }
                 if (!r.ok) throw new Error('HTTP ' + r.status);
             }
+            // Entfernte Lernleitern (nicht mehr in der Liste) in den Papierkorb.
+            for (const weg of uebrig) await api(`${LP}/ladders/${weg}`, { method: 'DELETE' });
             return true;
         } catch (e) {
             toast('Speichern fehlgeschlagen: ' + e.message);
@@ -2896,7 +2898,7 @@
                 id: p.id,
                 name: p.name,
                 aufgaben_order: [],
-                lernleitern: (p.ladders || []).map(l => {
+                lernleitern: (p.ladders || []).slice().sort((a, b) => (a.position || 0) - (b.position || 0)).map(l => {
                     const tp = topicPfad(l.topic_id);
                     // Kurs-Name aus der class_id ableiten, wenn die Schuelersuche
                     // scheitert (z.B. Schueler noch nicht geladen) — sonst waere
@@ -2905,6 +2907,7 @@
                     const klasseVonCls = (schueler.find(s => s.class_id === l.class_id) || {}).klasse;
                     return {
                         _id: String(l.id),
+                        id: l.id,                        // stabile Server-id fuer Upsert (savePfad PUTtet statt neu anzulegen)
                         thema: tp.thema,
                         unterthema: tp.unterthema,
                         klasse: klasseVonStud || klasseVonCls || '',
@@ -3034,39 +3037,62 @@
         renderPfadTrash(list);
     }
 
-    // Papierkorb der Lernpfade: gelöschte Pfade (30 Tage) mit Wiederherstellen /
-    // endgültig löschen. Wird unter die Liste gehängt.
+    // Papierkorb: gelöschte Lernpfade UND einzelne gelöschte Lernleitern, mit
+    // Wiederherstellen / endgültig löschen. Wird unter die Liste gehängt.
     async function renderPfadTrash(list) {
-        let trash = [];
-        try { trash = await api(`${LP}/paths/trash`).then(r => r.ok ? r.json() : []); } catch (e) { trash = []; }
+        let pTrash = [], lTrash = [];
+        try { pTrash = await api(`${LP}/paths/trash`).then(r => r.ok ? r.json() : []); } catch (e) { pTrash = []; }
+        try { lTrash = await api(`${LP}/ladders/trash`).then(r => r.ok ? r.json() : []); } catch (e) { lTrash = []; }
         const old = document.getElementById('pfade-trash');
         if (old) old.remove();
-        if (!trash.length) return;
+        if (!pTrash.length && !lTrash.length) return;
         const box = document.createElement('div');
         box.id = 'pfade-trash';
         box.style.marginTop = '12px';
+        const pfadRows = pTrash.map(p => `
+            <div class="list-row" style="opacity:.85">
+                <div><strong>${esc(p.name)}</strong> <span style="color:var(--text-muted)">– Lernpfad · ${(p.lernleitern || []).length} Lernleitern</span></div>
+                <div class="btn-group">
+                    <button class="btn" data-restore-path="${p.id}">Wiederherstellen</button>
+                    <button class="btn icon danger" data-purge-path="${p.id}" title="Endgültig löschen">${ICON.delete}</button>
+                </div>
+            </div>`).join('');
+        const ladderRows = lTrash.map(l => {
+            const tp = topicPfad(l.topic_id);
+            const name = [tp.thema, tp.unterthema].filter(Boolean).join(' / ') || 'Lernleiter';
+            const n = (l.assignments || []).length;
+            return `
+            <div class="list-row" style="opacity:.85">
+                <div><strong>${esc(name)}</strong> <span style="color:var(--text-muted)">– Lernleiter aus „${esc(l.path_name)}"${n ? ` · ${n} Schüler` : ''}</span></div>
+                <div class="btn-group">
+                    <button class="btn" data-restore-ladder="${l.id}">Wiederherstellen</button>
+                    <button class="btn icon danger" data-purge-ladder="${l.id}" title="Endgültig löschen">${ICON.delete}</button>
+                </div>
+            </div>`;
+        }).join('');
         box.innerHTML = `
             <details>
-                <summary style="cursor:pointer;color:var(--text-muted);font-size:13px">Papierkorb (${trash.length})</summary>
-                <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
-                    ${trash.map(p => `
-                        <div class="list-row" style="opacity:.85">
-                            <div><strong>${esc(p.name)}</strong> <span style="color:var(--text-muted)">– ${(p.lernleitern || []).length} Lernleitern</span></div>
-                            <div class="btn-group">
-                                <button class="btn" data-restore="${p.id}">Wiederherstellen</button>
-                                <button class="btn icon danger" data-purge="${p.id}" title="Endgültig löschen">${ICON.delete}</button>
-                            </div>
-                        </div>`).join('')}
-                </div>
+                <summary style="cursor:pointer;color:var(--text-muted);font-size:13px">Papierkorb (${pTrash.length + lTrash.length})</summary>
+                <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">${pfadRows}${ladderRows}</div>
             </details>`;
         list.parentNode.insertBefore(box, list.nextSibling);
-        box.querySelectorAll('[data-restore]').forEach(b => b.addEventListener('click', async () => {
-            await api(`${LP}/paths/${b.dataset.restore}/restore`, { method: 'POST' }).catch(() => {});
+        box.querySelectorAll('[data-restore-path]').forEach(b => b.addEventListener('click', async () => {
+            await api(`${LP}/paths/${b.dataset.restorePath}/restore`, { method: 'POST' }).catch(() => {});
             loadLernpfade();
         }));
-        box.querySelectorAll('[data-purge]').forEach(b => b.addEventListener('click', async () => {
+        box.querySelectorAll('[data-purge-path]').forEach(b => b.addEventListener('click', async () => {
             if (!await confirmDlg('Lernpfad endgültig löschen? Die Lernleitern gehen verloren.', { ok: 'Endgültig löschen' })) return;
-            await api(`${LP}/paths/${b.dataset.purge}/purge`, { method: 'DELETE' }).catch(() => {});
+            await api(`${LP}/paths/${b.dataset.purgePath}/purge`, { method: 'DELETE' }).catch(() => {});
+            renderPfadTrash(list);
+        }));
+        box.querySelectorAll('[data-restore-ladder]').forEach(b => b.addEventListener('click', async () => {
+            const r = await api(`${LP}/ladders/${b.dataset.restoreLadder}/restore`, { method: 'POST' }).catch(() => null);
+            if (r && !r.ok) { const e = await r.json().catch(() => ({})); toast(e.detail || 'Wiederherstellen fehlgeschlagen'); return; }
+            loadLernpfade();
+        }));
+        box.querySelectorAll('[data-purge-ladder]').forEach(b => b.addEventListener('click', async () => {
+            if (!await confirmDlg('Lernleiter endgültig löschen?', { ok: 'Endgültig löschen' })) return;
+            await api(`${LP}/ladders/${b.dataset.purgeLadder}/purge`, { method: 'DELETE' }).catch(() => {});
             renderPfadTrash(list);
         }));
     }

@@ -180,6 +180,7 @@ def _ensure_columns(sync_conn):
         # bestehende Tabellen nicht — deshalb hier nachziehen.
         ("learning_ladders", "topic_id", "INTEGER"),
         ("learning_ladders", "assignments", "JSON"),
+        ("learning_ladders", "deleted_at", "TIMESTAMPTZ"),
         ("grade_categories", "section_id", "INTEGER"),
         ("grade_sections", "term", "VARCHAR(8) DEFAULT '1' NOT NULL"),
         ("grade_overrides", "term", "VARCHAR(8) DEFAULT '1' NOT NULL"),
