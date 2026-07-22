@@ -221,6 +221,9 @@ export default function Klassenarbeit() {
 
       {classId && work && students.length > 0 && (
         <>
+          {/* SuS-Ansicht (Präsentation): alles über der Auswertung ausblenden —
+              Aufgaben-Editor, Punkte-Raster, Aktionen. Nur die Auswertung bleibt. */}
+          {!hideIndividual && (<>
           {/* Name sofort auch im Auswahl-Dropdown zeigen (nicht erst nach Reload). */}
           <input value={work.name} onChange={(e) => { const name = e.target.value; persist({ ...work, name }); setWorks((ws) => ws.map((x) => (x.id === work.id ? { ...x, name } : x))); }} placeholder={t("klassenarbeit.newName")}
             style={{ ...inputStyle, fontSize: 16, fontWeight: 600, marginBottom: 12, maxWidth: 360 }} />
@@ -304,7 +307,7 @@ export default function Klassenarbeit() {
                         <td style={{ ...td, textAlign: "left", padding: "4px 8px", position: "sticky", left: 0, background: "var(--card)", fontWeight: 500, whiteSpace: "nowrap" }}>
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                             <button onClick={() => toggleAbsent(s.id)} title={abw ? t("klassenarbeit.present") : t("klassenarbeit.absent")}
-                              style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, color: abw ? C.warning : "var(--text3)", padding: 0 }}>{abw ? "🚫" : "○"}</button>
+                              style={{ border: "none", background: "none", cursor: "pointer", color: abw ? C.warning : "var(--text3)", padding: 0, display: "inline-flex" }}><Icon d={abw ? ICONS.ban : ICONS.circle} size={14} /></button>
                             {s.name}
                           </span>
                         </td>
@@ -371,6 +374,7 @@ export default function Klassenarbeit() {
             </div>
           )}
           {notenModal && <NotenUebernahme t={t} classId={classId} kursId={kursId} students={students} work={work} scale={effScale} onClose={() => setNotenModal(false)} />}
+          </>)}
 
           {analyse && (analyse.topics.length > 0 || analyse.students.length > 0 || analyse.perUnit.length > 0 || analyse.noten.n > 0) && (
             <div style={{ marginTop: 18, border: "1px solid var(--border)", borderRadius: 12, padding: 16, background: "var(--card)" }}>
@@ -378,7 +382,7 @@ export default function Klassenarbeit() {
                 <span style={{ fontSize: 15, fontWeight: 800 }}>{t("klassenarbeit.analysisTitle")}</span>
                 <button onClick={() => setHideIndividual((v) => !v)} title={t("klassenarbeit.presentHint")}
                   style={{ border: "1px solid var(--border)", background: hideIndividual ? "var(--accent)" : "transparent", color: hideIndividual ? "#fff" : "var(--text2)", borderRadius: 8, padding: "5px 11px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  {hideIndividual ? "👁" : "🎬"} {t("klassenarbeit.presentMode")}
+                  <Icon d={ICONS.eye} size={15} color={hideIndividual ? "#fff" : "var(--text2)"} /> {t("klassenarbeit.presentMode")}
                 </button>
               </div>
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{t("klassenarbeit.byTopic")}</div>
