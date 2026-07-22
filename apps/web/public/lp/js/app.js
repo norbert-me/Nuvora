@@ -2171,18 +2171,36 @@
     // die neue erste bereinigen: nur Aufgaben ihres eigenen Themas behalten.
     // Unbekannte IDs bleiben (nichts versehentlich verlieren). Gibt zurueck, ob
     // etwas entfernt wurde.
+    // Das „eigene" Thema der (ersten) Lernleiter. ll.thema kann leer sein (Topic
+    // nicht aufgeloest) — dann das HÄUFIGSTE Thema unter ihren Aufgaben nehmen.
+    // Nur so wird die Wiederholung (fremd-thema) auch bei leerem ll.thema erkannt.
+    function eigenesThema(ll) {
+        if (ll.thema) return ll.thema;
+        const c = {};
+        (ll.schueler || []).forEach(sch => (sch.aufgabenIds || []).forEach(id => {
+            const a = aufgaben.find(x => String(x.id) === String(id) || String(x._id) === String(id));
+            if (a && a.thema) c[a.thema] = (c[a.thema] || 0) + 1;
+        }));
+        let best = '', n = -1;
+        for (const [th, k] of Object.entries(c)) if (k > n) { n = k; best = th; }
+        return best;
+    }
     function bereinigeErsteWiederholung(pfad) {
         const ll = (pfad.lernleitern || [])[0];
-        if (!ll || !ll.thema) return false;
-        let changed = false;
+        if (!ll) return false;
+        const thema = eigenesThema(ll);
+        if (!thema) return false;   // kein bestimmbares Thema -> nichts entfernen
+        let changed = false, entfernt = 0;
         (ll.schueler || []).forEach(sch => {
             const vor = (sch.aufgabenIds || []).length;
             sch.aufgabenIds = (sch.aufgabenIds || []).filter(id => {
                 const a = aufgaben.find(x => String(x.id) === String(id) || String(x._id) === String(id));
-                return !a || a.thema === ll.thema;   // fremd-thema (= Wiederholung) raus
+                return !a || a.thema === thema;   // fremd-thema (= Wiederholung) raus
             });
+            entfernt += vor - sch.aufgabenIds.length;
             if (sch.aufgabenIds.length !== vor) changed = true;
         });
+        if (changed) console.warn('bereinigeErsteWiederholung: Thema="%s", %d Wiederholungs-Zuweisungen entfernt', thema, entfernt);
         return changed;
     }
 
@@ -3356,16 +3374,23 @@
         const sektVon = a => { const k = getKategorie(a); return k === 'Erklärung' ? 'Erklärung' : k === 'E-Niveau' ? 'E-Niveau' : k === 'G-Niveau' ? 'G-Niveau' : 'Basis'; };
         const rang = { 'Erklärung': 1, 'Basis': 2, 'G-Niveau': 3, 'E-Niveau': 4 };
         // Ist das die erste Lernleiter des Pfads? Dann Wiederholung (fremd-thema) beim
-        // Anzeigen weglassen — davor gibt es kein Thema (wird beim Speichern fixiert).
+        // Anzeigen weglassen — davor gibt es kein Thema. „Eigenes Thema" robust auch
+        // bei leerem ll.thema (haeufigstes Thema der Aufgaben).
         const istErste = (pfad.lernleitern || []).findIndex(x => x._id === ll._id) === 0;
+        const eigen = istErste ? eigenesThema(ll) : '';
+        // Diagnose (#44): wieviel gespeichert, wieviel gezeigt, was gefiltert.
+        console.warn('openLernleiter: _id=%s, istErste=%s, ll.thema="%s", eigenesThema="%s", schueler=%d',
+            ll._id, istErste, ll.thema || '', eigen, (ll.schueler || []).length);
         previewData = (ll.schueler || []).map(sch => {
             const student = schueler.find(s => s.id === (sch.id || parseInt(sch._id)))
                 || { _id: String(sch._id), id: sch.id, name: sch.name, niveau: '', foerder: [] };
+            const gespeichert = (sch.aufgabenIds || []).length;
             const tasks = (sch.aufgabenIds || [])
                 .map(id => aufgaben.find(x => String(x.id) === String(id) || String(x._id) === String(id)))
                 .filter(Boolean)
-                .filter(a => !istErste || !ll.thema || a.thema === ll.thema)   // erste: keine Wiederholung
+                .filter(a => !istErste || !eigen || a.thema === eigen)   // erste: keine Wiederholung
                 .map(a => ({ ...a, section: sektVon(a), selected: true }));
+            if (istErste && gespeichert !== tasks.length) console.warn('  %s: gespeichert %d -> gezeigt %d (Wiederholung gefiltert)', sch.name, gespeichert, tasks.length);
             tasks.sort((a, b) => {
                 const ra = rang[a.section] ?? 5, rb = rang[b.section] ?? 5;
                 if (ra !== rb) return ra - rb;
