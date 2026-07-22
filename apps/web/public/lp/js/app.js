@@ -1542,6 +1542,14 @@
         const klasse = document.getElementById('gen-klasse').value;
         if (!thema || !klasse) { toast('Thema und Kurs wählen'); return; }
 
+        // Beim erneuten Generieren (z.B. nach Verschieben der Balken) die zuvor
+        // ABGEWAEHLTEN Aufgaben je Schueler merken, damit sie deaktiviert bleiben
+        // und nicht wieder auftauchen (#49). Wird nach dem Neuaufbau reappliziert.
+        const zuvorAus = {};
+        if (previewData) previewData.forEach(e => {
+            zuvorAus[e.student._id] = new Set(e.tasks.filter(t => !t.selected).map(t => String(t._id)));
+        });
+
         const themaAufgaben = getGenAufgaben();
         const klasseSchueler = schueler.filter(s => s.klasse === klasse).sort((a, b) => a.name.localeCompare(b.name));
         const selectedUt = [...document.querySelectorAll('.gen-ut-cb:checked')].map(cb => cb.value);
@@ -1657,6 +1665,13 @@
             });
 
             return { student: s, tasks, thema, unterthema: unterthema || '' };
+        });
+
+        // Zuvor abgewaehlte Aufgaben wieder deaktivieren (#49): bleiben nach dem
+        // Neu-Generieren weiterhin abgewaehlt, statt erneut aufzutauchen.
+        previewData.forEach(e => {
+            const aus = zuvorAus[e.student._id];
+            if (aus) e.tasks.forEach(t => { if (aus.has(String(t._id))) t.selected = false; });
         });
 
         renderPreview();
