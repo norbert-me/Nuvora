@@ -276,7 +276,9 @@ function ConnectionMonitor() {
     try {
       const r = await _origFetch("/api/health", { cache: "no-store", signal: ctrl.signal });
       if (aliveRef && !aliveRef.alive) return;
-      if (r.ok) { setOnline(true); return; }
+      // 429 = Server ist da, nur rate-limited — NICHT offline melden (sonst
+      // pollt der Monitor schneller und heizt den Sturm weiter an).
+      if (r.ok || r.status === 429) { setOnline(true); return; }
       // Server antwortet, aber nicht ok → z.B. Datenbank down (503 db_down)
       let body = {};
       try { body = await r.json(); } catch {}

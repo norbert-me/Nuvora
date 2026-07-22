@@ -242,6 +242,31 @@
             localStorage.setItem(STORAGE_KEYS.aufgaben, JSON.stringify(data));
         } catch(e) { console.error('Sync-Fehler:', e); }
     }
+
+    // Nur die genannten (Temp-)Aufgaben serverseitig anlegen und Temp-id -> echte
+    // id in idRemap eintragen. Gezielt statt Voll-Sync, um keinen Request-Sturm
+    // (nginx/Abuse-Guard 429) auszuloesen. Kleiner Abstand zwischen den POSTs.
+    async function ensureAufgabenGesynct(tempIds) {
+        for (const tid of tempIds) {
+            if (idRemap[tid]) continue;
+            const a = aufgaben.find(x => String(x._id) === String(tid) || String(x.id) === String(tid));
+            if (!a) { console.warn('ensureAufgabenGesynct: Aufgabe zu Temp-id nicht gefunden:', tid); continue; }
+            if (/^\d+$/.test(String(a.id))) { idRemap[tid] = String(a.id); continue; }  // schon echt
+            try {
+                const r = await api(`${LP}/exercises`, { method: 'POST', body: JSON.stringify(await zuKern(a)) });
+                if (r.ok) {
+                    const neu = await r.json();
+                    a.id = neu.id; a._id = String(neu.id); idRemap[tid] = String(neu.id);
+                    syncSigs[a.id] = aufgabeSig(a);
+                } else {
+                    console.warn('ensureAufgabenGesynct: POST fehlgeschlagen (%s) für Temp-id %s', r.status, tid);
+                }
+            } catch (e) { console.warn('ensureAufgabenGesynct: Netzfehler bei', tid, e); }
+            await new Promise(res => setTimeout(res, 60));   // ~16/s, weit unter dem Limit
+        }
+        localStorage.setItem(STORAGE_KEYS.aufgaben, JSON.stringify(aufgaben));
+    }
+
     function toast(msg) {
         // Eingebettet (iframe ODER in-page): an Nuvora geben. In-page ist
         // window.parent === window, aber ein an document.body gehängter .toast
@@ -2162,7 +2187,16 @@
 
     // Zentral speichern, damit ein fehlgeschlagener Request nicht still
     // verschluckt wird - sonst sieht der Nutzer Daten, die es nicht mehr gibt.
+    let savePfadLaeuft = false;
+    let savePfadZuletzt = 0;
     async function savePfad(pfad) {
+        // Schutz vor Runaway: keine ueberlappenden Speichervorgaenge (sonst legt
+        // jeder halbfertige Lauf neue Lernleitern an) und ein kurzer Mindestabstand
+        // zwischen zwei Speichervorgaengen.
+        if (savePfadLaeuft) { console.warn('savePfad: laeuft bereits — Aufruf ignoriert (Schutz vor Mehrfach-Anlage)'); return false; }
+        const jetzt = Date.now();
+        if (jetzt - savePfadZuletzt < 400) { console.warn('savePfad: zu schnell hintereinander — ignoriert'); return false; }
+        savePfadLaeuft = true; savePfadZuletzt = jetzt;
         try {
             // Bestehende Pfade EINMAL holen (fuer Find-or-create per Name und um die
             // aktuellen Ladder-IDs zu kennen — fuer den Upsert).
@@ -2196,13 +2230,17 @@
             const classIdVon = kurs => classIdVonKurs(kurs);
 
             // Zeigen Zuweisungen noch auf Temp-ids (neu erstellte, ungesyncte
-            // Aufgaben)? Dann erst syncen (vergibt echte ids, füllt idRemap) —
-            // sonst gingen die Zuweisungen verloren (Temp-id ist nicht numerisch).
+            // Aufgaben)? Dann NUR diese wenigen Aufgaben anlegen (nicht die ganze
+            // Liste syncen — das war ein 429-Sturm) und über idRemap übersetzen.
             const istEchte = id => /^\d+$/.test(String(id));
             const remap = id => idRemap[String(id)] || String(id);
-            const hatTemp = (pfad.lernleitern || []).some(ll => (ll.schueler || []).some(s =>
-                (s.aufgabenIds || []).some(id => !istEchte(remap(id)))));
-            if (hatTemp) { try { await syncAufgaben(aufgaben); } catch (e) { console.warn('savePfad: Sync vor dem Speichern fehlgeschlagen', e); } }
+            const tempIds = [...new Set((pfad.lernleitern || []).flatMap(ll =>
+                (ll.schueler || []).flatMap(s => (s.aufgabenIds || []).map(String))
+            ).filter(id => !istEchte(remap(id))))];
+            if (tempIds.length) {
+                console.warn('savePfad: %d ungesyncte Aufgaben (Temp-id) — lege sie einzeln an', tempIds.length);
+                await ensureAufgabenGesynct(tempIds);
+            }
 
             let pos = 0;
             for (const ll of (pfad.lernleitern || [])) {
@@ -2256,6 +2294,8 @@
         } catch (e) {
             toast('Speichern fehlgeschlagen: ' + e.message);
             return false;
+        } finally {
+            savePfadLaeuft = false;
         }
     }
 
