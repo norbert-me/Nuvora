@@ -3448,16 +3448,25 @@
         // Diagnose (#44): wieviel gespeichert, wieviel gezeigt, was gefiltert.
         console.warn('openLernleiter: _id=%s, istErste=%s, ll.thema="%s", eigenesThema="%s", schueler=%d',
             ll._id, istErste, ll.thema || '', eigen, (ll.schueler || []).length);
+        // Bilanz-Diagnose: gespeichert -> aufgeloest -> gezeigt. Zeigt eindeutig,
+        // ob (a) nichts gespeichert wurde, (b) IDs nicht auf Aufgaben mappen
+        // (geloescht/neu?), oder (c) der Thema-Filter alles entfernt.
+        let dSaved = 0, dResolved = 0, dShown = 0; const sampleUnresolved = []; const themenGezeigt = new Set();
         previewData = (ll.schueler || []).map(sch => {
             const student = schueler.find(s => s.id === (sch.id || parseInt(sch._id)))
                 || { _id: String(sch._id), id: sch.id, name: sch.name, niveau: '', foerder: [] };
-            const gespeichert = (sch.aufgabenIds || []).length;
-            const tasks = (sch.aufgabenIds || [])
-                .map(id => aufgaben.find(x => String(x.id) === String(id) || String(x._id) === String(id)))
-                .filter(Boolean)
+            const ids = sch.aufgabenIds || [];
+            dSaved += ids.length;
+            const resolved = ids.map(id => {
+                const a = aufgaben.find(x => String(x.id) === String(id) || String(x._id) === String(id));
+                if (!a && sampleUnresolved.length < 8) sampleUnresolved.push(id);
+                return a;
+            }).filter(Boolean);
+            dResolved += resolved.length;
+            const tasks = resolved
                 .filter(a => !istErste || !eigen || a.thema === eigen)   // erste: keine Wiederholung
-                .map(a => ({ ...a, section: sektVon(a), selected: true }));
-            if (istErste && gespeichert !== tasks.length) console.warn('  %s: gespeichert %d -> gezeigt %d (Wiederholung gefiltert)', sch.name, gespeichert, tasks.length);
+                .map(a => { themenGezeigt.add(a.thema || '∅'); return { ...a, section: sektVon(a), selected: true }; });
+            dShown += tasks.length;
             tasks.sort((a, b) => {
                 const ra = rang[a.section] ?? 5, rb = rang[b.section] ?? 5;
                 if (ra !== rb) return ra - rb;
@@ -3466,12 +3475,26 @@
             });
             return { student, tasks, thema: ll.thema, unterthema: ll.unterthema || '' };
         });
+        console.warn('openLernleiter Bilanz: gespeichert=%d, aufgeloest=%d, gezeigt=%d, aufgaben-Pool=%d, gezeigte Themen=%o, unaufgeloeste IDs (Beispiele)=%o',
+            dSaved, dResolved, dShown, aufgaben.length, [...themenGezeigt], sampleUnresolved);
         if (previewData.some(e => e.tasks.length)) {
             renderPreview();
             document.getElementById('preview-area').style.display = '';
         } else {
-            // Keine (aufloesbaren) Zuweisungen gespeichert -> als Fallback generieren.
-            document.getElementById('btn-generate').click();
+            // Nichts anzuzeigen. Ehrlich melden, WARUM — nicht still eine andere
+            // Lernleiter generieren (das verwirrt: „andere/Wiederholungs-Aufgaben").
+            if (dSaved > 0 && dResolved === 0) {
+                console.warn('openLernleiter: %d gespeicherte Aufgaben-IDs, aber KEINE im aktuellen Aufgaben-Pool gefunden — Aufgaben geloescht/neu angelegt? IDs:', dSaved, sampleUnresolved);
+                toast('Gespeicherte Aufgaben nicht mehr im Bestand auffindbar — nichts geöffnet. (Konsole zeigt die IDs.)');
+            } else if (dSaved === 0) {
+                console.warn('openLernleiter: es wurden GAR KEINE Aufgaben-IDs gespeichert (leere assignments).');
+                toast('Diese Lernleiter hat keine gespeicherten Aufgaben — nichts zu öffnen.');
+            } else {
+                // aufgeloest>0 aber gezeigt=0 -> Thema-Filter hat alles entfernt.
+                console.warn('openLernleiter: %d aufgeloest, aber Thema-Filter (eigen="%s") entfernte alles.', dResolved, eigen);
+                toast('Gespeicherte Aufgaben passten nicht zum Thema der Lernleiter.');
+            }
+            return;   // NICHT neu generieren
         }
         toast('Lernleiter geöffnet – Änderungen mit „In Lernpfad speichern“ übernehmen');
     }
