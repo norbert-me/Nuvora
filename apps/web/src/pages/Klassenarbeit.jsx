@@ -143,7 +143,11 @@ export default function Klassenarbeit() {
     const pu = (sid, uid) => { const r = results[String(sid)]; if (!r || r === "abwesend") return 0; const v = r[uid]; return v == null ? 0 : Number(v); };
     const pt = (sid, tk) => units(tk).reduce((n, u) => n + pu(sid, u.id), 0);      // Punkte einer Aufgabe
     const tkMax = (tk) => units(tk).reduce((n, u) => n + uMax[u.id], 0);
-    const graded = students.filter((s) => { const r = results[String(s.id)]; return r && r !== "abwesend"; });
+    // Zeilen ohne jeden Eintrag zählen als 0 (leere/durchgefallene Arbeit) — nur
+    // „krank" (abwesend) bleibt aussen vor. Damit die Auswertung aber nicht schon
+    // vor der ersten Eingabe voller Nullen steht, erst wenn irgendein Wert da ist.
+    const hasAny = students.some((s) => { const r = results[String(s.id)]; return r && r !== "abwesend" && Object.keys(r).length; });
+    const graded = hasAny ? students.filter((s) => results[String(s.id)] !== "abwesend") : [];
 
     const topicsOut = Object.entries(topicTasks).map(([tid, tks]) => {
       let e = 0, m = 0; graded.forEach((s) => tks.forEach((tk) => { e += pt(s.id, tk); m += tkMax(tk); }));
@@ -153,8 +157,9 @@ export default function Klassenarbeit() {
       const weak = Object.entries(topicTasks).filter(([, tks]) => { let e = 0, m = 0; tks.forEach((tk) => { e += pt(s.id, tk); m += tkMax(tk); }); return m && e / m < 0.5; }).map(([tid]) => topicLabel(Number(tid)));
       return weak.length ? { student_id: s.id, name: s.name, weak } : null;
     }).filter(Boolean);
-    // je Aufgabe: durchschnittliche Trefferquote (Punkte/Max über bewertete SuS).
-    const perTask = tasks.map((tk, i) => { let e = 0; graded.forEach((s) => { e += pt(s.id, tk); }); const m = graded.length * tkMax(tk); return { id: tk.id, label: tk.label || `${i + 1}.`, pct: m ? Math.round((e / m) * 100) : 0 }; });
+    // je Aufgabe: durchschnittliche Punkte (⌀/Max) UND Trefferquote — die Punkte
+    // gesamt je Aufgabe, nicht nur je Teilaufgabe.
+    const perTask = tasks.map((tk, i) => { let e = 0; graded.forEach((s) => { e += pt(s.id, tk); }); const mx = tkMax(tk); const m = graded.length * mx; const avgP = graded.length ? e / graded.length : 0; return { id: tk.id, label: tk.label || `${i + 1}.`, pct: m ? Math.round((e / m) * 100) : 0, avgP: Math.round(avgP * 10) / 10, max: mx }; });
     // Ø je Teilaufgabe (nur wo eine Aufgabe echte Teile hat) — wie in der Excel.
     const perUnit = [];
     tasks.forEach((tk, i) => { const us = units(tk); if (us.length < 2) return; us.forEach((u) => { let e = 0; graded.forEach((s) => { e += pu(s.id, u.id); }); const avgP = graded.length ? e / graded.length : 0; perUnit.push({ id: u.id, label: `${tk.label || (i + 1)} ${u.label}`, avgP: Math.round(avgP * 10) / 10, max: uMax[u.id], pct: uMax[u.id] ? Math.round((avgP / uMax[u.id]) * 100) : 0 }); }); });
@@ -362,6 +367,7 @@ export default function Klassenarbeit() {
                 {analyse.perTask.map((tk) => (
                   <div key={tk.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "3px 0" }}>
                     <span style={{ flex: 1, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tk.label}</span>
+                    <span style={{ fontSize: 11.5, color: "var(--text3)" }}>⌀ {String(tk.avgP).replace(".", ",")}/{tk.max}</span>
                     <span style={{ width: 100, height: 7, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}><span style={{ display: "block", width: `${tk.pct}%`, height: "100%", background: tk.pct < 50 ? C.danger : tk.pct < 75 ? C.warning : C.success }} /></span>
                     <span style={{ fontSize: 12, fontWeight: 700, minWidth: 34, textAlign: "right" }}>{tk.pct}%</span>
                   </div>
@@ -454,7 +460,7 @@ function NotenUebernahme({ t, classId, kursId, students, work, scale = DEFAULT_S
   const uMaxT = (tk) => (tk.parts && tk.parts.length) ? tk.parts.reduce((n, u) => n + (Number(u.max) > 0 ? Number(u.max) : 1), 0) : (Number(tk.max) > 0 ? Number(tk.max) : 1);
   const totalMax = (work.tasks || []).reduce((n, tk) => n + uMaxT(tk), 0);
   const grades = students
-    .filter((s) => { const r = (work.results || {})[String(s.id)]; return r && r !== "abwesend"; })   // bewertet, nicht abwesend
+    .filter((s) => (work.results || {})[String(s.id)] !== "abwesend")   // alle Anwesenden (leer = 0, wie im Raster/Auswertung); nur krank ausgenommen
     .map((s) => {
       const row = (work.results || {})[String(s.id)] || {};
       const sum = (work.tasks || []).reduce((n, tk) => n + uIds(tk).reduce((m, id) => m + (Number(row[id]) || 0), 0), 0);
