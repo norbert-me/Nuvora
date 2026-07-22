@@ -2201,11 +2201,17 @@
                     || classIdVon(ll.klasse)
                     || (schueler.find(s => (ll.schueler || []).some(x => (x.id || parseInt(x._id)) === s.id)) || {}).class_id
                     || null;
-                // Diagnose (#59): weist eine Lernleiter leer aus, steht in der Konsole WAS fehlte.
-                if (!topic_id || !class_id || !assignments.length) {
-                    console.warn('Lernleiter unvollstaendig gespeichert:', {
+                // Diagnose: rohe aufgabenIds vs. tatsaechlich gesendete exercise_ids.
+                // rohIds=0 -> Quelle hatte keine (Import-Remap gescheitert / Generate
+                // leer). exIds<rohIds -> hier gedroppt (nicht-numerische IDs).
+                const rohIds = (ll.schueler || []).reduce((n, s) => n + (s.aufgabenIds || []).length, 0);
+                const exIds = assignments.reduce((n, a) => n + a.exercise_ids.length, 0);
+                if (!topic_id || !class_id || !assignments.length || exIds < rohIds || exIds === 0) {
+                    console.warn('Lernleiter Save-Diagnose:', {
                         thema: ll.thema, topic_id, klasse: ll.klasse, class_id,
-                        schueler: (ll.schueler || []).length, zuweisungen: assignments.length
+                        schueler: (ll.schueler || []).length, zuweisungen: assignments.length,
+                        aufgabenIds_roh: rohIds, exercise_ids_gesendet: exIds,
+                        beispiel_ids: (ll.schueler || []).flatMap(s => (s.aufgabenIds || [])).slice(0, 5),
                     });
                 }
                 const body = JSON.stringify({
@@ -3127,6 +3133,13 @@
             schueler: (ll.schueler || []).map(s => { const st = byName[(s.name || '').trim()]; return st ? { _id: String(st.id), id: st.id, name: st.name, aufgabenIds: (s.aufgabenIds || []).map(x => map[String(x)]).filter(Boolean) } : null; }).filter(Boolean),
         })) };
         const mitZuw = pfad.lernleitern.some(ll => ll.schueler.length);
+        // Diagnose/Schutz: hatte die Quelle Zuweisungen, die beim ID-Remap wegfielen?
+        const quelleZuw = (data.lernleitern || []).reduce((n, ll) => n + (ll.schueler || []).reduce((m, s) => m + (s.aufgabenIds || []).length, 0), 0);
+        const importZuw = pfad.lernleitern.reduce((n, ll) => n + ll.schueler.reduce((m, s) => m + (s.aufgabenIds || []).length, 0), 0);
+        if (quelleZuw > 0 && importZuw < quelleZuw) {
+            console.warn('Import: %d von %d Aufgaben-Zuweisungen konnten nicht zugeordnet werden (fehlende Aufgaben in der Datei / unbekannte IDs).', quelleZuw - importZuw, quelleZuw);
+            if (importZuw === 0) toast('Achtung: Die zugewiesenen Aufgaben der Datei konnten nicht zugeordnet werden — Lernleiter ohne Aufgaben. (War es eine Vorlage ohne Aufgaben?)');
+        }
         if (await savePfad(pfad)) { toast(`Lernpfad „${name}" importiert${neu.length ? ` (${neu.length} Aufgaben${mitZuw ? ', mit Zuweisungen' : ''})` : ''}`); loadLernpfade(); }
     }
     function importPfadPicker() {
