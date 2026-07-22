@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import CalendarBreak, CalendarEntry, CardDeck, SchoolClass, TimetableSlot, Topic, User, Session as TestSession
+from ..models import CalendarBreak, CalendarEntry, CardDeck, Kurs, SchoolClass, TimetableSlot, Topic, User, Session as TestSession
 from .auth import get_current_user, rate_limit
 from .modules import is_active
 
@@ -42,6 +42,14 @@ async def _check_topic(db: AsyncSession, user: User, topic_id: Optional[int]) ->
     r = await db.execute(select(Topic.id).where(Topic.id == topic_id, Topic.owner_id == user.id))
     if not r.scalar_one_or_none():
         raise HTTPException(404, "Thema nicht gefunden")
+
+
+async def _check_kurs(db: AsyncSession, user: User, kurs_id: Optional[int]) -> None:
+    if kurs_id is None:
+        return
+    r = await db.execute(select(Kurs.id).where(Kurs.id == kurs_id, Kurs.owner_id == user.id))
+    if not r.scalar_one_or_none():
+        raise HTTPException(404, "Kurs nicht gefunden")
 
 
 class EntryIn(BaseModel):
@@ -273,6 +281,7 @@ class SlotIn(BaseModel):
     weekday: int
     period: int
     class_id: Optional[int] = None
+    kurs_id: Optional[int] = None   # gewaehlter Kurs (Fach) — Anzeige daraus
     title: str = ""
     topic_id: Optional[int] = None
 
@@ -328,6 +337,7 @@ async def upsert_slot(body: SlotIn, user: User = Depends(require_module), db: As
     if not 0 <= body.weekday <= 6 or body.period < 1:
         raise HTTPException(400, "Ungueltige Stunde")
     await _check_class(db, user, body.class_id)
+    await _check_kurs(db, user, body.kurs_id)
     await _check_topic(db, user, body.topic_id)
     s = (await db.execute(select(TimetableSlot).where(
         TimetableSlot.owner_id == user.id,

@@ -747,6 +747,10 @@ class TimetableSlot(Base):
     weekday: Mapped[int] = mapped_column(Integer)  # 0 = Montag
     period: Mapped[int] = mapped_column(Integer)    # 1-basiert
     class_id: Mapped[Optional[int]] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), nullable=True, index=True)
+    # Der gewaehlte Kurs (Fach) — die Anzeige denkt in Kursen. class_id bleibt fuer
+    # den Inhalt (eine Fach-Klasse), kurs_id haelt fest, WELCHER Kurs gemeint war
+    # (eine Klasse kann in mehreren Kursen liegen — sonst raet die Anzeige).
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(200), default="", server_default="")
     topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
 

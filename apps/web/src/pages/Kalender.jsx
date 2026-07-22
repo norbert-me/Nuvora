@@ -233,6 +233,11 @@ export default function Kalender() {
     if (k) return k.name;
     return (classes.find((c) => c.id === id) || {}).name || "";
   };
+  const kursName = (id) => (kurse.find((k) => k.id === id) || {}).name || "";
+  // Stundenplan-Label: den GEWÄHLTEN Kurs zeigen (eindeutig gespeichert), sonst
+  // per className raten. Eine Klasse kann in mehreren Kursen liegen — nur kurs_id
+  // weiß, welcher gemeint war.
+  const slotName = (s) => (s && s.kurs_id && kursName(s.kurs_id)) || className(s && s.class_id);
   const classColor = (id) => (classes.find((c) => c.id === id) || {}).color || C.info;
   const weekdayOf = (d) => (new Date(d).getDay() + 6) % 7; // 0 = Montag
   const slotsFor = (d) => tt.slots.filter((s) => s.weekday === weekdayOf(d)).sort((a, b) => a.period - b.period);
@@ -341,11 +346,11 @@ export default function Kalender() {
 
       {view === "today" && (
         <HeuteView t={t} tt={tt} weekdayOf={weekdayOf} byDay={byDay}
-          className={className} classColor={classColor} topicName={topicName} frei={frei}
+          className={className} slotName={slotName} classColor={classColor} topicName={topicName} frei={frei}
           heuteAbsent={heuteAbsent} orgaAktiv={!!aktiv.orga} onOpen={setEditing} onSlot={fromSlot} />
       )}
 
-      {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
+      {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} slotName={slotName} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
       {view === "week" && wdhVorschlag.length > 0 && (
         <div style={{ marginBottom: 12, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)" }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t("kalender.wdhTitle")}</div>
@@ -361,9 +366,9 @@ export default function Kalender() {
           </div>
         </div>
       )}
-      {view === "week" && <WeekView range={range} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} frei={frei} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
-      {view === "day" && <DayView day={cursor} tt={tt} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} frei={frei} className={className} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
-      {view === "timetable" && <TimetableView tt={tt} className={className} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
+      {view === "week" && <WeekView range={range} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} frei={frei} className={className} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
+      {view === "day" && <DayView day={cursor} tt={tt} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} frei={frei} className={className} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
+      {view === "timetable" && <TimetableView tt={tt} className={className} slotName={slotName} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
       {abo && (
@@ -436,13 +441,13 @@ const chip = { display: "block", width: "100%", textAlign: "left", fontSize: 11.
 // Vorlage aus dem Stundenplan: gestrichelt, gedaempft — anklicken macht daraus einen Termin.
 const ghost = { ...chip, background: "transparent", color: "var(--text3)", border: "1px dashed var(--border2)" };
 
-function SlotGhosts({ list, entries, className, topicName, onSlot, day, t }) {
+function SlotGhosts({ list, entries, className, slotName, topicName, onSlot, day, t }) {
   // Vorlagen ausblenden, sobald an dem Tag schon ein Eintrag dieser Klasse
   // existiert — der wird dann als Chip gezeigt und dort bearbeitet, statt
   // dass ein Klick auf die Geister-Vorlage einen zweiten Eintrag anlegt.
   const belegt = new Set((entries || []).filter((e) => e.period != null).map((e) => e.period));
   return list.filter((s) => !belegt.has(s.period)).map((s) => {
-    const label = [s.period + ". " + t("kalender.period"), className(s.class_id) || s.title || topicName(s.topic_id)].filter(Boolean).join(" · ");
+    const label = [s.period + ". " + t("kalender.period"), (slotName ? slotName(s) : className(s.class_id)) || s.title || topicName(s.topic_id)].filter(Boolean).join(" · ");
     return (
       <button key={s.id} onClick={(e) => { e.stopPropagation(); onSlot(day, s); }} style={ghost} title={label + " — " + t("kalender.fromTimetable")}>{label}</button>
     );
@@ -477,7 +482,7 @@ function EntryChips({ list, className, topicName, onOpen, classColor }) {
 
 // „Heute" — der Tag über alle Module gebündelt: Stunde, Uhrzeit, Klasse, das
 // geplante Objekt (Deck/Quiz/Lernleiter/Einstieg) und wie viele heute fehlen.
-function HeuteView({ t, tt, weekdayOf, byDay, className, classColor, topicName, frei, heuteAbsent, orgaAktiv, onOpen, onSlot }) {
+function HeuteView({ t, tt, weekdayOf, byDay, className, slotName, classColor, topicName, frei, heuteAbsent, orgaAktiv, onOpen, onSlot }) {
   const heute = startOfDay(new Date());
   const istFrei = frei(heute);
   const slots = (tt.slots || []).filter((s) => s.weekday === weekdayOf(heute)).sort((a, b) => a.period - b.period);
@@ -530,7 +535,7 @@ function HeuteView({ t, tt, weekdayOf, byDay, className, classColor, topicName, 
                   <div style={{ fontSize: 10.5, color: "var(--text3)" }}>{zeit(s.period)}</div>
                 </div>
                 <div style={{ flex: 1, minWidth: 120 }}>
-                  <div style={{ fontWeight: 600 }}>{className(s.class_id) || s.title || topicName(s.topic_id) || "—"}</div>
+                  <div style={{ fontWeight: 600 }}>{slotName(s) || s.title || topicName(s.topic_id) || "—"}</div>
                   {eintrag ? (
                     <button onClick={() => onOpen({ ...eintrag, date: new Date(eintrag.date) })} style={{ ...chip, marginTop: 4, display: "inline-block", width: "auto", maxWidth: "100%" }}>
                       {eintrag.title || topicName(eintrag.topic_id) || t("kalender.planned")}
@@ -563,7 +568,7 @@ function HeuteView({ t, tt, weekdayOf, byDay, className, classColor, topicName, 
   );
 }
 
-function MonthGrid({ range, cursor, byDay, extByDay, slotsFor, onSlot, frei, className, topicName, classColor, onAdd, onOpen, onExt, onDayView, onWeekView, t }) {
+function MonthGrid({ range, cursor, byDay, extByDay, slotsFor, onSlot, frei, className, slotName, topicName, classColor, onAdd, onOpen, onExt, onDayView, onWeekView, t }) {
   const days = [];
   for (let d = new Date(range[0]); d <= range[1]; d = addDays(d, 1)) days.push(new Date(d));
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
@@ -598,7 +603,7 @@ function MonthGrid({ range, cursor, byDay, extByDay, slotsFor, onSlot, frei, cla
                     {f ? <FreiMarker label={f.label} t={t} /> : (<>
                       <EntryChips list={byDay(d)} className={className} topicName={topicName} onOpen={onOpen} classColor={classColor} />
                       <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} />
-                      {slotsFor && <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} topicName={topicName} onSlot={onSlot} day={d} t={t} />}
+                      {slotsFor && <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} slotName={slotName} topicName={topicName} onSlot={onSlot} day={d} t={t} />}
                     </>)}
                   </td>
                 );
@@ -612,7 +617,7 @@ function MonthGrid({ range, cursor, byDay, extByDay, slotsFor, onSlot, frei, cla
   );
 }
 
-function WeekView({ range, byDay, extByDay, slotsFor, frei, className, classColor, topicName, onAdd, onOpen, onExt, onSlot, onDayView, t }) {
+function WeekView({ range, byDay, extByDay, slotsFor, frei, className, slotName, classColor, topicName, onAdd, onOpen, onExt, onSlot, onDayView, t }) {
   const days = [];
   for (let d = new Date(range[0]); d <= range[1]; d = addDays(d, 1)) days.push(new Date(d));
   return (
@@ -627,7 +632,7 @@ function WeekView({ range, byDay, extByDay, slotsFor, frei, className, classColo
             {!f && <button onClick={(e) => { e.stopPropagation(); onAdd(d); }} className="icon-btn" style={{ ...iconBtn, padding: 0 }}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>}
           </div>
           {f ? <FreiMarker label={f.label} t={t} /> : (<>
-            <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} topicName={topicName} onSlot={onSlot} day={d} t={t} />
+            <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} slotName={slotName} topicName={topicName} onSlot={onSlot} day={d} t={t} />
             <EntryChips list={byDay(d)} className={className} topicName={topicName} onOpen={onOpen} classColor={classColor} />
             <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} />
           </>)}
@@ -652,7 +657,7 @@ function FreiMarker({ label, t }) {
   );
 }
 
-function DayView({ day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFor, frei, className, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
+function DayView({ day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFor, frei, className, slotName, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
   const list = byDay(day);
   const slots = slotsFor(day);
   const ext = extByDay ? extByDay(day) : [];
@@ -680,7 +685,7 @@ function DayView({ day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFo
     const eintrag = list.find((e) => e.period === s.period);
     timed.push({ key: "s" + s.id, start: sm, end: em != null ? em : sm + 45,
       col: s.class_id ? classColor(s.class_id) : "var(--accent)",
-      label: className(s.class_id) || s.title || topicName(s.topic_id) || "—",
+      label: slotName(s) || s.title || topicName(s.topic_id) || "—",
       sub: eintrag ? (eintrag.title || topicName(eintrag.topic_id) || t("kalender.planned")) + (linked(eintrag) ? " ↗" : "") : "",
       onClick: eintrag ? () => onOpen({ ...eintrag, date: new Date(eintrag.date) }) : () => onSlot(day, s) });
   });
@@ -748,7 +753,7 @@ function DayView({ day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFo
   );
 }
 
-function TimetableView({ tt, className, classColor, topicName, onEdit, onPeriods, onTimes, breaks = [], onAddBreak, onDelBreak, t }) {
+function TimetableView({ tt, className, slotName, classColor, topicName, onEdit, onPeriods, onTimes, breaks = [], onAddBreak, onDelBreak, t }) {
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri")];
   const periods = Array.from({ length: tt.periods }, (_, i) => i + 1);
   const slot = (wd, p) => tt.slots.find((s) => s.weekday === wd && s.period === p);
@@ -790,7 +795,7 @@ function TimetableView({ tt, className, classColor, topicName, onEdit, onPeriods
                     </td>
                     {wdays.map((_, wd) => {
                       const s = slot(wd, p);
-                      const label = s ? className(s.class_id) : "";
+                      const label = s ? slotName(s) : "";
                       const col = s ? classColor(s.class_id) : null;
                       return (
                         <td key={wd} style={{ ...tdBase, padding: 0, height: h }}>
@@ -899,6 +904,7 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
 
 function SlotModal({ slot, classes, onSave, onDelete, onColor, onClose, t }) {
   const [classId, setClassId] = useState(slot.class_id || "");
+  const [kursId, setKursId] = useState(slot.kurs_id ?? null); // gewaehlter Kurs (Anzeige)
   const cls = classes.find((c) => c.id === Number(classId));
   const [color, setColor] = useState(cls?.color || C.info);
   useEffect(() => { const c = classes.find((x) => x.id === Number(classId)); setColor(c?.color || C.info); }, [classId]); // eslint-disable-line
@@ -913,7 +919,8 @@ function SlotModal({ slot, classes, onSave, onDelete, onColor, onClose, t }) {
         <div style={{ fontSize: 12.5, color: "var(--text3)" }}>{wdays[slot.weekday]} · {slot.period}. {t("kalender.period")}</div>
         <div style={lbl}>{t("nav.classes")}</div>
         <KursKlasseSelect value={classId === "" ? "" : Number(classId)} allowNone noneLabel={`– ${t("kalender.noClass")} –`} autoFocus
-          onChange={(id) => setClassId(id === "" ? "" : String(id))} style={sfld} />
+          onChange={(id, kid) => { setClassId(id === "" ? "" : String(id)); setKursId(id === "" ? null : (kid ?? null)); }}
+          onKurs={setKursId} style={sfld} />
         {classId && (
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)" }}>
@@ -925,7 +932,7 @@ function SlotModal({ slot, classes, onSave, onDelete, onColor, onClose, t }) {
           </div>
         )}
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
-          <button onClick={() => onSave({ weekday: slot.weekday, period: slot.period, title: "", class_id: classId ? Number(classId) : null, topic_id: null })} style={btnPrimary}>{t("common.save")}</button>
+          <button onClick={() => onSave({ weekday: slot.weekday, period: slot.period, title: "", class_id: classId ? Number(classId) : null, kurs_id: classId ? kursId : null, topic_id: null })} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
           {slot.id && <button onClick={() => onDelete(slot.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
         </div>
