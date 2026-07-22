@@ -116,15 +116,24 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
     if body.tasks is not None:
         # Themenbindung nur aufs eigene Thema; fremdes/unbekanntes → None.
         own = {t for (t,) in (await db.execute(select(Topic.id).where(Topic.owner_id == user.id))).all()}
+        def _num(x, default):
+            return float(x) if isinstance(x, (int, float)) and 0 < x <= 1000 else default
         clean = []
         for t in body.tasks[:100]:
             if not isinstance(t, dict) or not t.get("id"):
                 continue
             tid = t.get("topic_id")
-            mx = t.get("max")
-            mx = int(mx) if isinstance(mx, (int, float)) and 0 < mx <= 1000 else 1  # Maximalpunkte, Default 1
-            clean.append({"id": str(t["id"])[:40], "label": str(t.get("label") or "")[:200],
-                          "topic_id": tid if (isinstance(tid, int) and tid in own) else None, "max": mx})
+            ct = {"id": str(t["id"])[:40], "label": str(t.get("label") or "")[:200],
+                  "topic_id": tid if (isinstance(tid, int) and tid in own) else None,
+                  "max": _num(t.get("max"), 1)}   # Maximalpunkte (Halbpunkte erlaubt)
+            # Teilaufgaben (a, b, c …) mit eigenem Maximum — optional.
+            parts = t.get("parts")
+            if isinstance(parts, list) and parts:
+                cp = [{"id": str(p["id"])[:40], "label": str(p.get("label") or "")[:40], "max": _num(p.get("max"), 1)}
+                      for p in parts[:50] if isinstance(p, dict) and p.get("id")]
+                if cp:
+                    ct["parts"] = cp
+            clean.append(ct)
         w.tasks = clean
     if body.results is not None:
         # {student_id: {task_id: erreichte Punkte}}. Altformat (Liste falscher
@@ -159,35 +168,48 @@ class RemediateIn(BaseModel):
     exercises: bool = True   # Lernpfad-Wiederholungsaufgabe je Thema (nur mit Modul Lernpfad)
 
 
+def _units(t):
+    """Wertungseinheiten einer Aufgabe: ihre Teilaufgaben (a, b, c …) oder — ohne
+    Teile — die Aufgabe selbst. Liefert [(unit_id, max), …]."""
+    parts = t.get("parts")
+    if isinstance(parts, list) and parts:
+        return [(str(p.get("id")), (float(p["max"]) if isinstance(p.get("max"), (int, float)) and p["max"] > 0 else 1))
+                for p in parts if p.get("id")]
+    return [(t["id"], (float(t["max"]) if isinstance(t.get("max"), (int, float)) and t["max"] > 0 else 1))]
+
+
 def _profile(work: WorkAnalysis):
     """Je SuS je Thema: (erreichte Punkte, Maximalpunkte) über die Aufgaben des
-    Themas. Punkte-Modell; Altformat (Liste falscher Aufgaben) wird übersetzt
-    (gelistet = 0, sonst volle Punkte)."""
+    Themas — inkl. Teilaufgaben. Altformat (Liste falscher Aufgaben) wird
+    übersetzt (gelistet = 0, sonst volle Punkte)."""
     tasks = work.tasks or []
-    task_max = {t["id"]: (int(t["max"]) if isinstance(t.get("max"), (int, float)) and t["max"] > 0 else 1) for t in tasks}
-    topic_tasks = {}
+    topic_tasks = {}   # topic_id -> [Aufgaben]
     for t in tasks:
         if t.get("topic_id"):
-            topic_tasks.setdefault(t["topic_id"], []).append(t["id"])
+            topic_tasks.setdefault(t["topic_id"], []).append(t)
     results = work.results or {}
 
-    def pts(entry, tid):
+    def unit_pts(entry, uid, umax):
         if isinstance(entry, list):
-            return 0 if tid in entry else task_max.get(tid, 1)   # Altformat
-        v = (entry or {}).get(tid)
+            return 0 if uid in entry else umax   # Altformat (keine Teilaufgaben)
+        v = (entry or {}).get(uid)
         return float(v) if isinstance(v, (int, float)) else 0    # nicht bewertet = 0
 
     out = {}  # student_id -> {topic_id: [erreicht, max]}
     for sid, entry in results.items():
         if entry == "abwesend":
-            continue   # abwesende SuS zählen nicht in die Auswertung/Wiederholung
+            continue
         prof = {}
-        for topic_id, tids in topic_tasks.items():
-            erreicht = sum(pts(entry, tid) for tid in tids)
-            mx = sum(task_max.get(tid, 1) for tid in tids)
+        for topic_id, tks in topic_tasks.items():
+            erreicht = 0.0
+            mx = 0.0
+            for t in tks:
+                for uid, umax in _units(t):
+                    erreicht += unit_pts(entry, uid, umax)
+                    mx += umax
             prof[topic_id] = [erreicht, mx]
         out[sid] = prof
-    return out, topic_tasks
+    return out, {tid: [t["id"] for t in tks] for tid, tks in topic_tasks.items()}
 
 
 @router.get("/works/{work_id}/analysis")

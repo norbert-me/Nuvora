@@ -9,7 +9,7 @@ import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { lastClass, rememberClass } from "../core/cache.js";
-import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
+import { gradeFromPct, gradeDetailed, quantile, stdev, DEFAULT_SCALE } from "../core/grades.js";
 
 const API = "/api/klassenarbeit";
 const newId = () => "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -72,22 +72,55 @@ export default function Klassenarbeit() {
     setWorks((p) => p.filter((x) => x.id !== work.id)); setWork(null);
   };
 
-  const addTask = () => persist({ ...work, tasks: [...(work.tasks || []), { id: newId(), label: "", topic_id: null, max: 1 }] });
+  // Ein „Teil" (Teilaufgabe a/b/c…) ist die kleinste Wertungseinheit. Hat eine
+  // Aufgabe keine Teile, gilt sie selbst als eine Einheit (id + max) — so bleibt
+  // das alte Format (Aufgabe ohne Teile) unverändert gültig.
+  const units = (task) => (task.parts && task.parts.length) ? task.parts : [{ id: task.id, label: "", max: Number(task.max) > 0 ? Number(task.max) : 1 }];
+  const unitMax = (u) => (Number(u.max) > 0 ? Number(u.max) : 1);
+  const taskMax = (task) => units(task).reduce((n, u) => n + unitMax(u), 0);
+  const partLabel = (i) => String.fromCharCode(97 + i); // a, b, c …
+  const cleanResults = (results, removeIds) => Object.fromEntries(
+    Object.entries(results || {})
+      .map(([s, m]) => (m === "abwesend" ? [s, m] : [s, Object.fromEntries(Object.entries(m || {}).filter(([k]) => !removeIds.has(String(k))))]))
+      .filter(([, m]) => m === "abwesend" || Object.keys(m).length));
+
+  const addTask = () => persist({ ...work, tasks: [...(work.tasks || []), { id: newId(), label: "", topic_id: null, max: 1, parts: [] }] });
   const setTask = (id, patch) => persist({ ...work, tasks: work.tasks.map((x) => (x.id === id ? { ...x, ...patch } : x)) });
-  const delTask = (id) => persist({ ...work, tasks: work.tasks.filter((x) => x.id !== id),
-    results: Object.fromEntries(Object.entries(work.results || {}).map(([s, m]) => [s, Object.fromEntries(Object.entries(m || {}).filter(([tid]) => tid !== id))])) });
-  const maxOf = (task) => (Number(task.max) > 0 ? Number(task.max) : 1);
-  const pointsOf = (sid, tid) => { const v = ((work.results || {})[String(sid)] || {})[tid]; return v == null ? "" : v; };
-  const setPoints = (sid, tid, val) => {
+  const delTask = (id) => {
+    const tk = (work.tasks || []).find((x) => x.id === id);
+    const ids = new Set(tk ? units(tk).map((u) => String(u.id)) : [String(id)]);
+    persist({ ...work, tasks: work.tasks.filter((x) => x.id !== id), results: cleanResults(work.results, ids) });
+  };
+  // Teilaufgaben: eine erste Teilaufgabe erbt id+max der Aufgabe (Punkte bleiben).
+  const addPart = (tid) => {
+    const tk = work.tasks.find((x) => x.id === tid); if (!tk) return;
+    const parts = (tk.parts && tk.parts.length) ? [...tk.parts] : [{ id: tk.id, label: "a", max: Number(tk.max) > 0 ? Number(tk.max) : 1 }];
+    parts.push({ id: newId(), label: partLabel(parts.length), max: 1 });
+    setTask(tid, { parts });
+  };
+  const setPart = (tid, pid, patch) => {
+    const tk = work.tasks.find((x) => x.id === tid); if (!tk) return;
+    setTask(tid, { parts: units(tk).map((u) => (u.id === pid ? { ...u, ...patch } : u)) });
+  };
+  const delPart = (tid, pid) => {
+    const tk = work.tasks.find((x) => x.id === tid); if (!tk) return;
+    const parts = units(tk).filter((u) => u.id !== pid);
+    const results = cleanResults(work.results, new Set([String(pid)]));
+    // Bleibt nur ein Teil übrig: zurück zur „ohne Teile"-Form (Max an der Aufgabe).
+    if (parts.length <= 1) { const only = parts[0]; persist({ ...work, tasks: work.tasks.map((x) => (x.id === tid ? { ...x, parts: [], max: only ? unitMax(only) : 1 } : x)), results }); }
+    else persist({ ...work, tasks: work.tasks.map((x) => (x.id === tid ? { ...x, parts } : x)), results });
+  };
+  const maxOf = (task) => taskMax(task);
+  const pointsOf = (sid, uid) => { const v = ((work.results || {})[String(sid)] || {})[uid]; return v == null ? "" : v; };
+  const setPoints = (sid, uid, val) => {
     const row = { ...((work.results || {})[String(sid)] || {}) };
-    if (val === "" || val == null) delete row[tid]; else row[tid] = Math.max(0, Number(val));
+    if (val === "" || val == null) delete row[uid]; else row[uid] = Math.max(0, Number(val));
     const results = { ...(work.results || {}) };
     if (Object.keys(row).length) results[String(sid)] = row; else delete results[String(sid)];
     persist({ ...work, results });
   };
-  // Summe erreichter Punkte / Maximum je SuS (nur bewertete Aufgaben zählen zum Max nicht — Max ist fix).
-  const totalMax = () => (work.tasks || []).reduce((n, tk) => n + maxOf(tk), 0);
-  const sumOf = (sid) => (work.tasks || []).reduce((n, tk) => { const r = (work.results || {})[String(sid)]; const v = (r && r !== "abwesend") ? r[tk.id] : null; return n + (v == null ? 0 : Number(v)); }, 0);
+  const totalMax = () => (work.tasks || []).reduce((n, tk) => n + taskMax(tk), 0);
+  const sumOf = (sid) => { const r = (work.results || {})[String(sid)]; if (!r || r === "abwesend") return 0; return (work.tasks || []).reduce((n, tk) => n + units(tk).reduce((m, u) => { const v = r[u.id]; return m + (v == null ? 0 : Number(v)); }, 0), 0); };
   const isAbsent = (sid) => (work.results || {})[String(sid)] === "abwesend";
   const toggleAbsent = (sid) => { const results = { ...(work.results || {}) }; if (results[String(sid)] === "abwesend") delete results[String(sid)]; else results[String(sid)] = "abwesend"; persist({ ...work, results }); };
 
@@ -97,32 +130,37 @@ export default function Klassenarbeit() {
     if (!work) return null;
     const tasks = work.tasks || [];
     const results = work.results || {};
-    const mx = {}; tasks.forEach((tk) => { mx[tk.id] = Number(tk.max) > 0 ? Number(tk.max) : 1; });
-    const topicTasks = {};
-    tasks.forEach((tk) => { if (tk.topic_id) (topicTasks[tk.topic_id] ||= []).push(tk.id); });
-    const p = (sid, tid) => { const v = (results[String(sid)] || {})[tid]; return v == null ? 0 : Number(v); };
-    const graded = students.filter((s) => { const r = results[String(s.id)]; return r && r !== "abwesend"; }); // bewertet, nicht abwesend zählen
-    const topicsOut = Object.entries(topicTasks).map(([tid, tids]) => {
-      let e = 0, m = 0;
-      graded.forEach((s) => tids.forEach((id) => { e += p(s.id, id); m += mx[id]; }));
+    const uMax = {}; tasks.forEach((tk) => units(tk).forEach((u) => { uMax[u.id] = unitMax(u); }));
+    const topicTasks = {}; tasks.forEach((tk) => { if (tk.topic_id) (topicTasks[tk.topic_id] ||= []).push(tk); });
+    const pu = (sid, uid) => { const r = results[String(sid)]; if (!r || r === "abwesend") return 0; const v = r[uid]; return v == null ? 0 : Number(v); };
+    const pt = (sid, tk) => units(tk).reduce((n, u) => n + pu(sid, u.id), 0);      // Punkte einer Aufgabe
+    const tkMax = (tk) => units(tk).reduce((n, u) => n + uMax[u.id], 0);
+    const graded = students.filter((s) => { const r = results[String(s.id)]; return r && r !== "abwesend"; });
+
+    const topicsOut = Object.entries(topicTasks).map(([tid, tks]) => {
+      let e = 0, m = 0; graded.forEach((s) => tks.forEach((tk) => { e += pt(s.id, tk); m += tkMax(tk); }));
       return { topic_id: Number(tid), label: topicLabel(Number(tid)), pct: m ? Math.round((e / m) * 100) : 0 };
     }).sort((a, b) => a.pct - b.pct);
     const studentsOut = graded.map((s) => {
-      const weak = Object.entries(topicTasks).filter(([, tids]) => { let e = 0, m = 0; tids.forEach((id) => { e += p(s.id, id); m += mx[id]; }); return m && e / m < 0.5; }).map(([tid]) => topicLabel(Number(tid)));
+      const weak = Object.entries(topicTasks).filter(([, tks]) => { let e = 0, m = 0; tks.forEach((tk) => { e += pt(s.id, tk); m += tkMax(tk); }); return m && e / m < 0.5; }).map(([tid]) => topicLabel(Number(tid)));
       return weak.length ? { student_id: s.id, name: s.name, weak } : null;
     }).filter(Boolean);
-    // #46 je Aufgabe: durchschnittliche Trefferquote (Punkte/Max über bewertete SuS).
-    const perTask = tasks.map((tk, i) => {
-      let e = 0; graded.forEach((s) => { e += p(s.id, tk.id); });
-      const m = graded.length * mx[tk.id];
-      return { id: tk.id, label: tk.label || `${i + 1}.`, pct: m ? Math.round((e / m) * 100) : 0 };
-    });
-    // #47 Endnote: je SuS Σ/Max → Note (Skala), Schnitt + Verteilung 1–6.
-    const tm = tasks.reduce((n, tk) => n + mx[tk.id], 0);
-    const noten = graded.map((s) => gradeFromPct(tm ? (tasks.reduce((n, tk) => n + p(s.id, tk.id), 0) / tm) * 100 : 0, scale));
-    const dist = [1, 2, 3, 4, 5, 6].map((g) => noten.filter((v) => Math.round(v) === g).length);
-    const avg = noten.length ? Math.round((noten.reduce((a, b) => a + b, 0) / noten.length) * 100) / 100 : null;
-    return { topics: topicsOut, students: studentsOut, perTask, noten: { avg, dist, n: noten.length } };
+    // je Aufgabe: durchschnittliche Trefferquote (Punkte/Max über bewertete SuS).
+    const perTask = tasks.map((tk, i) => { let e = 0; graded.forEach((s) => { e += pt(s.id, tk); }); const m = graded.length * tkMax(tk); return { id: tk.id, label: tk.label || `${i + 1}.`, pct: m ? Math.round((e / m) * 100) : 0 }; });
+    // Ø je Teilaufgabe (nur wo eine Aufgabe echte Teile hat) — wie in der Excel.
+    const perUnit = [];
+    tasks.forEach((tk, i) => { const us = units(tk); if (us.length < 2) return; us.forEach((u) => { let e = 0; graded.forEach((s) => { e += pu(s.id, u.id); }); const avgP = graded.length ? e / graded.length : 0; perUnit.push({ id: u.id, label: `${tk.label || (i + 1)} ${u.label}`, avgP: Math.round(avgP * 10) / 10, max: uMax[u.id], pct: uMax[u.id] ? Math.round((avgP / uMax[u.id]) * 100) : 0 }); }); });
+
+    // Endnote je SuS: Σ/Max → Note mit Tendenz + Notenwert; Verteilung + Kennzahlen.
+    const tm = tasks.reduce((n, tk) => n + tkMax(tk), 0);
+    const notes = graded.map((s) => { const sum = tasks.reduce((n, tk) => n + pt(s.id, tk), 0); const d = gradeDetailed(tm ? (sum / tm) * 100 : 0, scale); return { name: s.name, note: d.note, wert: d.wert, grade: d.grade }; });
+    const werte = notes.map((x) => x.wert).sort((a, b) => a - b);
+    const dist = [1, 2, 3, 4, 5, 6].map((g) => notes.filter((x) => x.grade === g).length);
+    const avg = werte.length ? Math.round((werte.reduce((a, b) => a + b, 0) / werte.length) * 100) / 100 : null;
+    const r2 = (x) => Math.round(x * 100) / 100;
+    const stats = werte.length ? { min: werte[0], q1: r2(quantile(werte, 0.25)), med: r2(quantile(werte, 0.5)), q3: r2(quantile(werte, 0.75)), max: werte[werte.length - 1], sd: r2(stdev(werte)) } : null;
+    const minPts = [1, 2, 3, 4, 5].map((g) => ({ grade: g, pts: Math.ceil(((scale[g] || 0) / 100) * tm) }));
+    return { topics: topicsOut, students: studentsOut, perTask, perUnit, noten: { avg, dist, n: notes.length, notes, stats, minPts, max: tm } };
   }, [work, students, topics, scale]);
   const wiederholen = async () => {
     if (!work) return;
@@ -164,21 +202,42 @@ export default function Klassenarbeit() {
           {/* 1) Aufgaben definieren: Bezeichnung + Thema + Maximalpunkte. */}
           <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text2)", margin: "4px 0 8px" }}>{t("klassenarbeit.tasksHeading")}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
-            {(work.tasks || []).map((task, i) => (
-              <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 12, color: "var(--text3)", width: 18 }}>{i + 1}.</span>
-                <input value={task.label} onChange={(e) => setTask(task.id, { label: e.target.value })} placeholder={t("klassenarbeit.task")} style={{ ...inputStyle, fontSize: 13, padding: "7px 9px", flex: 1, minWidth: 130 }} />
-                <select value={task.topic_id || ""} onChange={(e) => setTask(task.id, { topic_id: e.target.value ? Number(e.target.value) : null })} style={{ ...selectStyle, fontSize: 12.5, padding: "7px 9px", minWidth: 130 }}>
-                  <option value="">{t("klassenarbeit.topicNone")}</option>
-                  {topics.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp.id)}</option>)}
-                </select>
-                <label style={{ fontSize: 12, color: "var(--text3)", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  {t("klassenarbeit.maxPoints")}
-                  <input type="number" min="1" value={task.max ?? 1} onChange={(e) => setTask(task.id, { max: Math.max(1, Number(e.target.value) || 1) })} style={{ ...inputStyle, fontSize: 13, padding: "6px 6px", width: 56, textAlign: "center" }} />
-                </label>
-                <button onClick={() => delTask(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
+            {(work.tasks || []).map((task, i) => {
+              const hasParts = !!(task.parts && task.parts.length);
+              return (
+              <div key={task.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "8px 10px", background: "var(--card)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 12, color: "var(--text3)", width: 18 }}>{i + 1}.</span>
+                  <input value={task.label} onChange={(e) => setTask(task.id, { label: e.target.value })} placeholder={t("klassenarbeit.task")} style={{ ...inputStyle, fontSize: 13, padding: "7px 9px", flex: 1, minWidth: 130 }} />
+                  <select value={task.topic_id || ""} onChange={(e) => setTask(task.id, { topic_id: e.target.value ? Number(e.target.value) : null })} style={{ ...selectStyle, fontSize: 12.5, padding: "7px 9px", minWidth: 130 }}>
+                    <option value="">{t("klassenarbeit.topicNone")}</option>
+                    {topics.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp.id)}</option>)}
+                  </select>
+                  {hasParts ? (
+                    <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("klassenarbeit.maxPoints")}: <b>{taskMax(task)}</b></span>
+                  ) : (
+                    <label style={{ fontSize: 12, color: "var(--text3)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      {t("klassenarbeit.maxPoints")}
+                      <input type="number" min="0.5" step="0.5" value={task.max ?? 1} onChange={(e) => setTask(task.id, { max: Math.max(0.5, Number(e.target.value) || 0.5) })} style={{ ...inputStyle, fontSize: 13, padding: "6px 6px", width: 56, textAlign: "center" }} />
+                    </label>
+                  )}
+                  <button onClick={() => addPart(task.id)} style={{ ...btnSecondary, padding: "5px 10px", fontSize: 12 }} title={t("klassenarbeit.addPartHint")}>+ {t("klassenarbeit.addPart")}</button>
+                  <button onClick={() => delTask(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
+                </div>
+                {hasParts && (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8, paddingLeft: 26 }}>
+                    {units(task).map((u) => (
+                      <div key={u.id} style={{ display: "inline-flex", alignItems: "center", gap: 3, background: "var(--bg2)", borderRadius: 8, padding: "3px 6px" }}>
+                        <input value={u.label} onChange={(e) => setPart(task.id, u.id, { label: e.target.value })} title={t("klassenarbeit.partLabel")} style={{ ...inputStyle, fontSize: 12, padding: "4px 4px", width: 34, textAlign: "center" }} />
+                        <input type="number" min="0.5" step="0.5" value={u.max} onChange={(e) => setPart(task.id, u.id, { max: Math.max(0.5, Number(e.target.value) || 0.5) })} title={t("klassenarbeit.maxPoints")} style={{ ...inputStyle, fontSize: 12, padding: "4px 4px", width: 44, textAlign: "center" }} />
+                        <button onClick={() => delPart(task.id, u.id)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title={t("common.delete")}><Icon d={ICONS.close} size={13} color={C.danger} /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
           <button onClick={addTask} style={{ ...btnSecondary, marginBottom: 18 }}>+ {t("klassenarbeit.addTask")}</button>
 
@@ -188,14 +247,21 @@ export default function Klassenarbeit() {
               <table style={{ borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr>
-                    <th style={{ ...th, textAlign: "left", minWidth: 130, position: "sticky", left: 0, background: "var(--card)" }}>{t("common.name")}</th>
-                    {(work.tasks || []).map((tk, i) => <th key={tk.id} style={{ ...th, minWidth: 52 }} title={tk.label}>{tk.label || (i + 1)}<div style={{ fontSize: 10, color: "var(--text3)", fontWeight: 400 }}>/{maxOf(tk)}</div></th>)}
-                    <th style={{ ...th, minWidth: 56 }}>Σ</th>
+                    <th rowSpan={2} style={{ ...th, textAlign: "left", minWidth: 130, position: "sticky", left: 0, background: "var(--card)" }}>{t("common.name")}</th>
+                    {(work.tasks || []).map((tk, i) => <th key={tk.id} colSpan={units(tk).length} style={{ ...th, minWidth: 46, borderLeft: "1px solid var(--border)" }} title={tk.label}>{tk.label || (i + 1)}</th>)}
+                    <th rowSpan={2} style={{ ...th, minWidth: 58, borderLeft: "1px solid var(--border)" }}>Σ / {totalMax()}</th>
+                    <th rowSpan={2} style={{ ...th, minWidth: 44 }}>{t("klassenarbeit.grade")}</th>
+                  </tr>
+                  <tr>
+                    {(work.tasks || []).flatMap((tk) => units(tk).map((u, j) => (
+                      <th key={u.id} style={{ ...th, minWidth: 44, fontWeight: 500, borderLeft: j === 0 ? "1px solid var(--border)" : undefined }}>{u.label || ""}<div style={{ fontSize: 10, color: "var(--text3)", fontWeight: 400 }}>/{unitMax(u)}</div></th>
+                    )))}
                   </tr>
                 </thead>
                 <tbody>
                   {students.map((s) => {
                     const sum = sumOf(s.id); const tm = totalMax(); const abw = isAbsent(s.id);
+                    const note = (!abw && tm) ? gradeDetailed((sum / tm) * 100, scale).note : "";
                     return (
                       <tr key={s.id} style={abw ? { opacity: 0.5 } : undefined}>
                         <td style={{ ...td, textAlign: "left", padding: "4px 8px", position: "sticky", left: 0, background: "var(--card)", fontWeight: 500, whiteSpace: "nowrap" }}>
@@ -205,15 +271,16 @@ export default function Klassenarbeit() {
                             {s.name}
                           </span>
                         </td>
-                        {(work.tasks || []).map((tk) => (
-                          <td key={tk.id} style={td}>
+                        {(work.tasks || []).flatMap((tk) => units(tk).map((u, j) => (
+                          <td key={u.id} style={{ ...td, borderLeft: j === 0 ? "1px solid var(--border)" : undefined }}>
                             {abw ? <span style={{ fontSize: 11, color: "var(--text3)" }}>–</span> : (
-                              <input type="number" min="0" max={maxOf(tk)} value={pointsOf(s.id, tk.id)} onChange={(e) => setPoints(s.id, tk.id, e.target.value === "" ? "" : Math.min(maxOf(tk), Math.max(0, Number(e.target.value))))}
-                                style={{ width: 44, height: 30, border: "none", background: "transparent", textAlign: "center", fontSize: 13, color: "var(--text)" }} />
+                              <input type="number" min="0" step="0.5" max={unitMax(u)} value={pointsOf(s.id, u.id)} onChange={(e) => setPoints(s.id, u.id, e.target.value === "" ? "" : Math.min(unitMax(u), Math.max(0, Number(e.target.value))))}
+                                style={{ width: 42, height: 30, border: "none", background: "transparent", textAlign: "center", fontSize: 13, color: "var(--text)" }} />
                             )}
                           </td>
-                        ))}
-                        <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : (tm && sum / tm < 0.5 ? C.danger : "var(--text)") }}>{abw ? t("klassenarbeit.absentShort") : `${sum}/${tm}`}</td>
+                        )))}
+                        <td style={{ ...td, fontWeight: 700, borderLeft: "1px solid var(--border)", color: abw ? "var(--text3)" : (tm && sum / tm < 0.5 ? C.danger : "var(--text)") }}>{abw ? t("klassenarbeit.absentShort") : `${sum}/${tm}`}</td>
+                        <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : "var(--text)" }}>{abw ? "–" : note}</td>
                       </tr>
                     );
                   })}
@@ -228,7 +295,7 @@ export default function Klassenarbeit() {
           </div>
           {notenModal && <NotenUebernahme t={t} classId={classId} kursId={kursId} students={students} work={work} onClose={() => setNotenModal(false)} />}
 
-          {analyse && (analyse.topics.length > 0 || analyse.students.length > 0) && (
+          {analyse && (analyse.topics.length > 0 || analyse.students.length > 0 || analyse.perUnit.length > 0 || analyse.noten.n > 0) && (
             <div style={{ marginTop: 18, border: "1px solid var(--border)", borderRadius: 12, padding: 16, background: "var(--card)" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, borderBottom: "1px solid var(--border)", paddingBottom: 10 }}>
                 <span style={{ fontSize: 15, fontWeight: 800 }}>{t("klassenarbeit.analysisTitle")}</span>
@@ -264,7 +331,20 @@ export default function Klassenarbeit() {
                 ))}
               </>)}
 
-              {/* #47 Endnote */}
+              {/* Ø je Teilaufgabe (nur wo Aufgaben Teile haben) */}
+              {analyse.perUnit.length > 0 && (<>
+                <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.byPart")}</div>
+                {analyse.perUnit.map((u) => (
+                  <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "2px 0" }}>
+                    <span style={{ flex: 1, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.label}</span>
+                    <span style={{ fontSize: 11.5, color: "var(--text3)" }}>⌀ {String(u.avgP).replace(".", ",")}/{u.max}</span>
+                    <span style={{ width: 90, height: 7, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}><span style={{ display: "block", width: `${u.pct}%`, height: "100%", background: u.pct < 50 ? C.danger : u.pct < 75 ? C.warning : C.success }} /></span>
+                    <span style={{ fontSize: 12, fontWeight: 700, minWidth: 34, textAlign: "right" }}>{u.pct}%</span>
+                  </div>
+                ))}
+              </>)}
+
+              {/* Endnote: Verteilung + Kennzahlen (Notenwert) + min-Punkte je Note */}
               {analyse.noten.n > 0 && (<>
                 <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.gradeResult")} <span style={{ fontWeight: 400, color: "var(--text3)", fontSize: 12.5 }}>· ⌀ {String(analyse.noten.avg).replace(".", ",")}</span></div>
                 <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 70 }}>
@@ -276,6 +356,19 @@ export default function Klassenarbeit() {
                     </div>
                   ); })}
                 </div>
+                {analyse.noten.stats && (
+                  <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: "5px 16px", fontSize: 12.5 }}>
+                    {[[t("klassenarbeit.stdev"), analyse.noten.stats.sd], [t("klassenarbeit.min"), analyse.noten.stats.min], ["Q1", analyse.noten.stats.q1], [t("klassenarbeit.median"), analyse.noten.stats.med], ["Q3", analyse.noten.stats.q3], [t("klassenarbeit.max"), analyse.noten.stats.max]].map(([k, v]) => (
+                      <span key={k}><span style={{ color: "var(--text3)" }}>{k}:</span> <b>{String(v).replace(".", ",")}</b></span>
+                    ))}
+                  </div>
+                )}
+                {analyse.noten.max > 0 && (
+                  <div style={{ marginTop: 8, fontSize: 12 }}>
+                    <span style={{ color: "var(--text3)" }}>{t("klassenarbeit.minPoints")}: </span>
+                    {analyse.noten.minPts.map((m) => <span key={m.grade} style={{ marginRight: 12 }}><b>{m.grade}</b> {t("klassenarbeit.fromPts", { pts: String(m.pts).replace(".", ",") })}</span>)}
+                  </div>
+                )}
               </>)}
             </div>
           )}
@@ -303,13 +396,16 @@ function NotenUebernahme({ t, classId, kursId, students, work, onClose }) {
     fetch(`/api/noten/classes/${classId}/sections${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => { const l = Array.isArray(d) ? d : []; setSections(l); if (l[0]) setSectionId(String(l[0].id)); }).catch(() => setSections([]));
     try { const u = JSON.parse(localStorage.getItem("user")); if (u?.grade_scale) setScale(u.grade_scale); } catch { /* Default */ }
   }, []);
-  const totalMax = (work.tasks || []).reduce((n, tk) => n + (Number(tk.max) > 0 ? Number(tk.max) : 1), 0);
+  const uIds = (tk) => (tk.parts && tk.parts.length) ? tk.parts.map((u) => u.id) : [tk.id];
+  const uMaxT = (tk) => (tk.parts && tk.parts.length) ? tk.parts.reduce((n, u) => n + (Number(u.max) > 0 ? Number(u.max) : 1), 0) : (Number(tk.max) > 0 ? Number(tk.max) : 1);
+  const totalMax = (work.tasks || []).reduce((n, tk) => n + uMaxT(tk), 0);
   const grades = students
     .filter((s) => { const r = (work.results || {})[String(s.id)]; return r && r !== "abwesend"; })   // bewertet, nicht abwesend
     .map((s) => {
       const row = (work.results || {})[String(s.id)] || {};
-      const sum = (work.tasks || []).reduce((n, tk) => n + (Number(row[tk.id]) || 0), 0);
-      return { student_id: s.id, value: gradeFromPct(totalMax ? (sum / totalMax) * 100 : 0, scale) };
+      const sum = (work.tasks || []).reduce((n, tk) => n + uIds(tk).reduce((m, id) => m + (Number(row[id]) || 0), 0), 0);
+      // Notenwert mit Tendenz (±0,3) — wie in der Excel-Auswertung.
+      return { student_id: s.id, value: gradeDetailed(totalMax ? (sum / totalMax) * 100 : 0, scale).wert };
     }).filter((g) => g.value >= 1 && g.value <= 6);
   const secLabel = (s) => `${s.term === "2" ? "2. Hj · " : "1. Hj · "}${s.name}`;
   const submit = async () => {
@@ -352,14 +448,16 @@ function NotenUebernahme({ t, classId, kursId, students, work, onClose }) {
 // Altformat (results[sid] = [falsche Aufgaben-IDs]) wird mitgerechnet.
 function pctList(work) {
   const tasks = work.tasks || [];
-  const tm = tasks.reduce((n, tk) => n + (Number(tk.max) > 0 ? Number(tk.max) : 1), 0);
+  const uIds = (tk) => (tk.parts && tk.parts.length) ? tk.parts.map((u) => u.id) : [tk.id];
+  const uMaxT = (tk) => (tk.parts && tk.parts.length) ? tk.parts.reduce((n, u) => n + (Number(u.max) > 0 ? Number(u.max) : 1), 0) : (Number(tk.max) > 0 ? Number(tk.max) : 1);
+  const tm = tasks.reduce((n, tk) => n + uMaxT(tk), 0);
   if (!tm) return [];
   const out = [];
   for (const r of Object.values(work.results || {})) {
     if (!r || r === "abwesend") continue;
     let e = 0;
-    if (Array.isArray(r)) { const bad = new Set(r.map(String)); tasks.forEach((tk) => { if (!bad.has(String(tk.id))) e += (Number(tk.max) > 0 ? Number(tk.max) : 1); }); }
-    else tasks.forEach((tk) => { const v = r[tk.id]; e += (v == null ? 0 : Number(v)); });
+    if (Array.isArray(r)) { const bad = new Set(r.map(String)); tasks.forEach((tk) => { if (!bad.has(String(tk.id))) e += uMaxT(tk); }); }
+    else tasks.forEach((tk) => uIds(tk).forEach((id) => { const v = r[id]; e += (v == null ? 0 : Number(v)); }));
     out.push(Math.round((e / tm) * 100));
   }
   return out;

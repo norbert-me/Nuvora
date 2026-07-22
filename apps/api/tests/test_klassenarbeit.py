@@ -76,6 +76,27 @@ async def test_analyse_und_wiederholung(s):
 
 
 @pytest.mark.asyncio
+async def test_teilaufgaben(s):
+    """Aufgabe mit Teilaufgaben (a,b) + Halbpunkte: _profile summiert je Thema
+    ueber die Teile; das Maximum ist die Summe der Teil-Maxima."""
+    u, cls, A, B, s1, s2 = await _setup(s)
+    w = await K.create_work(K.WorkIn(class_id=cls.id, name="KA2"), user=u, db=s)
+    # Aufgabe 1 (Thema A) hat zwei Teile a (max 2) + b (max 2) = max 4.
+    tasks = [{"id": "t1", "label": "A1", "topic_id": A.id, "max": 1,
+              "parts": [{"id": "p1a", "label": "a", "max": 2}, {"id": "p1b", "label": "b", "max": 2}]}]
+    # Ann: a=1, b=0.5 -> 1.5/4 ; Bob: a=2, b=2 -> 4/4. Klasse: 5.5/8 ≈ 69 %.
+    results = {str(s1.id): {"p1a": 1, "p1b": 0.5}, str(s2.id): {"p1a": 2, "p1b": 2}}
+    out = await K.update_work(w.id, K.WorkPut(tasks=tasks, results=results), user=u, db=s)
+    assert out.tasks[0]["parts"][0]["max"] == 2   # Teil-Maximum bleibt erhalten
+
+    an = await K.analysis(w.id, user=u, db=s)
+    a_stat = next(x for x in an["topics"] if x["topic_id"] == A.id)
+    assert a_stat["pct"] == 69   # round(5.5/8*100)
+    # Ann (1.5/4 = 37,5 % < 50 %) ist schwach in Bruecke, Bob (100 %) nicht.
+    assert {x["name"] for x in an["students"]} == {"Ann"}
+
+
+@pytest.mark.asyncio
 async def test_fremdes_thema_verworfen(s):
     u, cls, A, B, s1, s2 = await _setup(s)
     v = User(email="v@b.de", password_hash="x", name="V"); s.add(v); await s.flush()
