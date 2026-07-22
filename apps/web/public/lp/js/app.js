@@ -2048,6 +2048,10 @@
         if (editIdx >= 0) pfad.lernleitern[editIdx] = ll;
         else pfad.lernleitern.push(ll);
 
+        // Die erste Lernleiter darf nie Wiederholung haben (kein Thema davor) —
+        // bei JEDEM Speichern erzwingen, nicht nur beim Umsortieren.
+        bereinigeErsteWiederholung(pfad);
+
         const ok = await savePfad(pfad);
         if (!ok) {
             if (editIdx >= 0) pfad.lernleitern[editIdx] = backup;
@@ -3340,12 +3344,16 @@
         // Vorschau aus den gespeicherten Aufgaben-IDs je Schueler rekonstruieren.
         const sektVon = a => { const k = getKategorie(a); return k === 'Erklärung' ? 'Erklärung' : k === 'E-Niveau' ? 'E-Niveau' : k === 'G-Niveau' ? 'G-Niveau' : 'Basis'; };
         const rang = { 'Erklärung': 1, 'Basis': 2, 'G-Niveau': 3, 'E-Niveau': 4 };
+        // Ist das die erste Lernleiter des Pfads? Dann Wiederholung (fremd-thema) beim
+        // Anzeigen weglassen — davor gibt es kein Thema (wird beim Speichern fixiert).
+        const istErste = (pfad.lernleitern || []).findIndex(x => x._id === ll._id) === 0;
         previewData = (ll.schueler || []).map(sch => {
             const student = schueler.find(s => s.id === (sch.id || parseInt(sch._id)))
                 || { _id: String(sch._id), id: sch.id, name: sch.name, niveau: '', foerder: [] };
             const tasks = (sch.aufgabenIds || [])
                 .map(id => aufgaben.find(x => String(x.id) === String(id) || String(x._id) === String(id)))
                 .filter(Boolean)
+                .filter(a => !istErste || !ll.thema || a.thema === ll.thema)   // erste: keine Wiederholung
                 .map(a => ({ ...a, section: sektVon(a), selected: true }));
             tasks.sort((a, b) => {
                 const ra = rang[a.section] ?? 5, rb = rang[b.section] ?? 5;
