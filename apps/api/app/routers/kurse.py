@@ -44,6 +44,7 @@ class KursOut(BaseModel):
     name: str
     classes: List[ClassRef] = []
     niveau_aktiv: bool = False
+    color: str = ""
 
 
 async def _owned_kurs(db, user, kurs_id) -> Kurs:
@@ -108,14 +109,14 @@ async def list_kurse(user: User = Depends(get_current_user), db: AsyncSession = 
     kurse = (await db.execute(select(Kurs).where(
         Kurs.owner_id == user.id, Kurs.deleted_at.is_(None)).order_by(Kurs.name))).scalars().all()
     by = await _classes_by_kurs(db, user, kurse)
-    return [KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv) for k in kurse]
+    return [KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv, color=k.color) for k in kurse]
 
 
 @router.get("/trash", response_model=List[KursOut])
 async def list_kurs_trash(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     kurse = (await db.execute(select(Kurs).where(
         Kurs.owner_id == user.id, Kurs.deleted_at.is_not(None)).order_by(Kurs.deleted_at.desc()))).scalars().all()
-    return [KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv) for k in kurse]
+    return [KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color) for k in kurse]
 
 
 @router.post("", response_model=KursOut, status_code=201)
@@ -127,7 +128,7 @@ async def create_kurs(body: KursIn, user: User = Depends(get_current_user), db: 
     db.add(k)
     await db.commit()
     await db.refresh(k)
-    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv)
+    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color)
 
 
 @router.put("/{kurs_id}", response_model=KursOut)
@@ -139,7 +140,21 @@ async def rename_kurs(kurs_id: int, body: KursIn, user: User = Depends(get_curre
     if body.niveau_aktiv is not None:
         k.niveau_aktiv = bool(body.niveau_aktiv)
     await db.commit()
-    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv)
+    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color)
+
+
+class ColorIn(BaseModel):
+    color: str = ""
+
+
+@router.put("/{kurs_id}/color", response_model=KursOut)
+async def set_kurs_color(kurs_id: int, body: ColorIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Kursfarbe (Stundenplan/Kalender). Alle Fach-Klassen des Kurses teilen sie."""
+    k = await _owned_kurs(db, user, kurs_id)
+    c = (body.color or "").strip()[:9]
+    k.color = c if (c.startswith("#") and len(c) in (4, 7, 9)) else ""
+    await db.commit()
+    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color)
 
 
 @router.post("/{kurs_id}/classes/{class_id}", status_code=204)
@@ -232,7 +247,7 @@ async def restore_kurs(kurs_id: int, user: User = Depends(get_current_user), db:
     k.deleted_members = None
     await db.commit()
     by = await _classes_by_kurs(db, user, [k])
-    return KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv)
+    return KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv, color=k.color)
 
 
 @router.delete("/{kurs_id}/purge", status_code=204)

@@ -238,7 +238,13 @@ export default function Kalender() {
   // per className raten. Eine Klasse kann in mehreren Kursen liegen — nur kurs_id
   // weiß, welcher gemeint war.
   const slotName = (s) => (s && s.kurs_id && kursName(s.kurs_id)) || className(s && s.class_id);
-  const classColor = (id) => (classes.find((c) => c.id === id) || {}).color || C.info;
+  // Farbe gehört dem KURS (nicht der Fach-Klasse): zeigt die Kurs-Farbe, fällt
+  // nur ohne Kurs auf die Klassenfarbe zurück.
+  const kursColor = (id) => (kurse.find((k) => k.id === id) || {}).color || "";
+  const classColor = (id) => {
+    const k = kurse.find((k) => (k.classes || []).some((c) => c.id === id));
+    return (k && k.color) || (classes.find((c) => c.id === id) || {}).color || C.info;
+  };
   const weekdayOf = (d) => (new Date(d).getDay() + 6) % 7; // 0 = Montag
   const slotsFor = (d) => tt.slots.filter((s) => s.weekday === weekdayOf(d)).sort((a, b) => a.period - b.period);
   // Klick auf eine Stundenplan-Vorlage: gibt es an dem Tag schon einen Eintrag
@@ -251,10 +257,16 @@ export default function Kalender() {
     else setEditing({ date: startOfDay(day), period: s.period, title: s.title || "", class_id: s.class_id || null, topic_id: s.topic_id || null });
   };
 
-  // Klassenfarbe aus dem Stundenplan setzen: sofort lokal, dann speichern.
-  const setClassColor = async (id, color) => {
-    setClasses((prev) => { const next = prev.map((c) => (c.id === id ? { ...c, color } : c)); put("classes", next); return next; });
-    await fetch(`/api/classes/${id}/color`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) }).catch(() => {});
+  // Farbe aus dem Stundenplan setzen: bevorzugt am KURS (alle Fach-Klassen teilen
+  // sie), nur ohne Kurs an der Klasse. Sofort lokal, dann speichern.
+  const setSlotColor = async (kursId, classId, color) => {
+    if (kursId) {
+      setKurse((prev) => prev.map((k) => (k.id === kursId ? { ...k, color } : k)));
+      await fetch(`/api/kurse/${kursId}/color`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) }).catch(() => {});
+    } else if (classId) {
+      setClasses((prev) => { const next = prev.map((c) => (c.id === classId ? { ...c, color } : c)); put("classes", next); return next; });
+      await fetch(`/api/classes/${classId}/color`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) }).catch(() => {});
+    }
   };
 
   const saveSlot = async (s) => {
@@ -399,7 +411,7 @@ export default function Kalender() {
           </div>
         </div>
       )}
-      {slotEdit && <SlotModal slot={slotEdit} classes={classes} topics={topics} onSave={saveSlot} onDelete={removeSlot} onColor={setClassColor} onClose={() => setSlotEdit(null)} t={t} />}
+      {slotEdit && <SlotModal slot={slotEdit} classes={classes} kurse={kurse} topics={topics} onSave={saveSlot} onDelete={removeSlot} onColor={setSlotColor} onClose={() => setSlotEdit(null)} t={t} />}
       {extInfo && <ExtInfoModal ev={extInfo} onClose={() => setExtInfo(null)} t={t} />}
     </div>
   );
@@ -902,12 +914,13 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
   );
 }
 
-function SlotModal({ slot, classes, onSave, onDelete, onColor, onClose, t }) {
+function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onClose, t }) {
   const [classId, setClassId] = useState(slot.class_id || "");
   const [kursId, setKursId] = useState(slot.kurs_id ?? null); // gewaehlter Kurs (Anzeige)
-  const cls = classes.find((c) => c.id === Number(classId));
-  const [color, setColor] = useState(cls?.color || C.info);
-  useEffect(() => { const c = classes.find((x) => x.id === Number(classId)); setColor(c?.color || C.info); }, [classId]); // eslint-disable-line
+  // Farbe gehört dem Kurs: aus dem gewählten Kurs, sonst Klassenfarbe.
+  const kursColorOf = (kid, cid) => (kurse.find((k) => k.id === kid) || {}).color || (classes.find((c) => c.id === Number(cid)) || {}).color || C.info;
+  const [color, setColor] = useState(kursColorOf(kursId, classId));
+  useEffect(() => { setColor(kursColorOf(kursId, classId)); }, [classId, kursId]); // eslint-disable-line
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
   const fld = { ...inputStyle, width: "100%" };
   const sfld = { ...selectStyle, width: "100%", fontSize: 14, padding: "10px 34px 10px 12px" };
@@ -925,7 +938,7 @@ function SlotModal({ slot, classes, onSave, onDelete, onColor, onClose, t }) {
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)" }}>
               {t("kalender.classColor")}
-              <input type="color" value={color} onChange={(e) => { setColor(e.target.value); onColor && onColor(Number(classId), e.target.value); }}
+              <input type="color" value={color} onChange={(e) => { setColor(e.target.value); onColor && onColor(kursId, Number(classId), e.target.value); }}
                 style={{ width: 34, height: 28, border: "1px solid var(--border2)", borderRadius: 6, background: "none", cursor: "pointer", padding: 0 }} />
             </label>
             <Link to={`/classes?open=${classId}`} onClick={onClose} style={{ fontSize: 13, color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>{t("kalender.toClass")} ↗</Link>

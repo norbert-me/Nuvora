@@ -164,6 +164,9 @@ class Kurs(Base):
     # bei Kursen ohne Niveau-Differenzierung nervt sie sonst. E/G wird im Kurs
     # gepflegt (nicht je Fach-Klasse), weil es die Person betrifft.
     niveau_aktiv: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Farbe des Kurses (Stundenplan/Kalender). Die Fach-Klassen teilen sie sich —
+    # darum am Kurs, nicht je Klasse.
+    color: Mapped[str] = mapped_column(String(9), default="", server_default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
