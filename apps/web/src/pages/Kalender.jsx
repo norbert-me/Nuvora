@@ -74,7 +74,6 @@ export default function Kalender() {
   const [slotEdit, setSlotEdit] = useState(null); // { weekday, period, ...slot } oder null
   const [heuteAbsent, setHeuteAbsent] = useState({}); // class_id -> Anzahl Fehlende heute
   const [extInfo, setExtInfo] = useState(null); // angeklickter externer (abonnierter) Termin
-  const pickerRef = useRef(null); // verstecktes natives Feld für den Direktsprung (Klick aufs Datum)
 
   useEffect(() => {
     swr("classes", "/api/classes", (d) => setClasses(Array.isArray(d) ? d : []));
@@ -290,17 +289,24 @@ export default function Kalender() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 14, position: "relative" }}>
           <button onClick={() => move(-1)} title="◀" style={{ ...btnSecondary, padding: "4px 13px", fontSize: 17, lineHeight: 1 }}>‹</button>
           <button onClick={() => setCursor(startOfDay(new Date()))} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>{t("kalender.today")}</button>
-          <button onClick={() => { const el = pickerRef.current; if (el) { el.showPicker ? el.showPicker() : el.focus(); } }} title={t("kalender.jumpToDay")}
-            style={{ border: "none", background: "none", fontSize: 15, fontWeight: 700, color: "var(--text)", minWidth: 170, textAlign: "center", cursor: "pointer", padding: "4px 8px", borderRadius: 8 }}>{title}</button>
-          <button onClick={() => move(1)} title="▶" style={{ ...btnSecondary, padding: "4px 13px", fontSize: 17, lineHeight: 1 }}>›</button>
-          {/* Direktsprung ohne sperrigen Selektor: unsichtbares natives Feld, per
-              Klick aufs Datum geoeffnet (OS-Picker). Monat/Woche/Tag je Ansicht. */}
+          {/* Direktsprung: das native Feld liegt TRANSPARENT ueber dem Datum. Ein
+              Klick trifft das Feld und oeffnet den OS-Picker — auch in Safari, das
+              showPicker() nicht kann. Der Datumstext liegt sichtbar dahinter. */}
           {(() => {
-            const hidden = { position: "absolute", left: "50%", bottom: 0, width: 1, height: 1, opacity: 0, pointerEvents: "none", border: "none", padding: 0 };
-            if (view === "month") return <input ref={pickerRef} type="month" value={monthVal(cursor)} onChange={(e) => e.target.value && setCursor(monthValToDate(e.target.value))} style={hidden} tabIndex={-1} aria-hidden />;
-            if (view === "week") return <input ref={pickerRef} type="week" value={weekVal(cursor)} onChange={(e) => e.target.value && setCursor(weekValToDate(e.target.value))} style={hidden} tabIndex={-1} aria-hidden />;
-            return <input ref={pickerRef} type="date" value={ymd(cursor)} onChange={(e) => e.target.value && setCursor(startOfDay(new Date(e.target.value + "T00:00:00")))} style={hidden} tabIndex={-1} aria-hidden />;
+            const overlay = { position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", border: "none", margin: 0, padding: 0 };
+            const inp = view === "month"
+              ? <input type="month" value={monthVal(cursor)} onChange={(e) => e.target.value && setCursor(monthValToDate(e.target.value))} style={overlay} title={t("kalender.jumpToDay")} />
+              : view === "week"
+              ? <input type="week" value={weekVal(cursor)} onChange={(e) => e.target.value && setCursor(weekValToDate(e.target.value))} style={overlay} title={t("kalender.jumpToDay")} />
+              : <input type="date" value={ymd(cursor)} onChange={(e) => e.target.value && setCursor(startOfDay(new Date(e.target.value + "T00:00:00")))} style={overlay} title={t("kalender.jumpToDay")} />;
+            return (
+              <span style={{ position: "relative", display: "inline-block", minWidth: 170, textAlign: "center", cursor: "pointer" }} title={t("kalender.jumpToDay")}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", borderBottom: "1px dotted var(--border2)", paddingBottom: 1 }}>{title}</span>
+                {inp}
+              </span>
+            );
           })()}
+          <button onClick={() => move(1)} title="▶" style={{ ...btnSecondary, padding: "4px 13px", fontSize: 17, lineHeight: 1 }}>›</button>
         </div>
       )}
       {view === "breaks" && <BreaksPanel breaks={breaks} onAdd={addBreak} onDel={delBreak} t={t} standalone />}
@@ -626,14 +632,18 @@ function DayView({ day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFo
   const linked = (e) => e.cardvote_set_id || e.karten_deck_id || e.lernpfad_ladder_id || e.method_id || e.codedetektiv_puzzle;
   const toMin = (hhmm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || ""); return m ? (+m[1]) * 60 + (+m[2]) : null; };
   const pTime = (p) => { const w = (tt.times || [])[p - 1]; return w ? { s: toMin(w.start), e: toMin(w.end) } : { s: null, e: null }; };
+  // Zeitleiste 0–24 Uhr, aber scrollbar: der Blick startet standardmaessig bei
+  // 6 Uhr (nach oben scrollen fuer die Nachtstunden).
+  const HOUR = 40;
+  const scrollRef = useRef(null);
+  const dayKey = ymd(day);
+  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 6 * HOUR; }, [dayKey]);
   if (f) return <p style={{ fontSize: 14, color: "var(--text3)", fontStyle: "italic" }}>{f.label ? `${f.label} — ${t("kalender.free")}` : t("kalender.free")}</p>;
 
   // Ganztägig / ohne verortbare Uhrzeit -> Banner oben (auch externe Termine).
   const ganztags = list.filter((e) => e.period == null);
   const belegte = new Set(slots.map((s) => s.period));
 
-  // Zeitleiste 0–24 Uhr: alles mit Uhrzeit hier verorten.
-  const HOUR = 40;
   const yOf = (min) => (min / 60) * HOUR;
   const timed = [];
   slots.forEach((s) => {
@@ -683,9 +693,10 @@ function DayView({ day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFo
         </div>
       )}
 
-      {/* Zeitleiste 0–24 Uhr: Stundenlinien + verortete Termine. */}
+      {/* Zeitleiste 0–24 Uhr: scrollbar, Start bei 6 Uhr (Ref setzt scrollTop). */}
       {timed.length > 0 && (
-        <div style={{ position: "relative", height: 24 * HOUR, border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)", overflow: "hidden" }}>
+        <div ref={scrollRef} style={{ maxHeight: "62vh", overflowY: "auto", border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)" }}>
+        <div style={{ position: "relative", height: 24 * HOUR }}>
           {Array.from({ length: 25 }, (_, h) => (
             <div key={h} style={{ position: "absolute", top: yOf(h * 60), left: 46, right: 0, borderTop: h === 0 || h === 24 ? "none" : "1px solid var(--border)" }}>
               {h < 24 && <span style={{ position: "absolute", top: -1, left: -44, fontSize: 10.5, color: "var(--text3)" }}>{String(h).padStart(2, "0")}:00</span>}
@@ -701,6 +712,7 @@ function DayView({ day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFo
               {it.sub && <div style={{ fontSize: 11, color: "var(--text2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.sub}</div>}
             </button>
           ))}
+        </div>
         </div>
       )}
       {!hasBanner && timed.length === 0 && <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("kalender.empty")}</p>}
