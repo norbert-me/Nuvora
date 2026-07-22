@@ -2615,7 +2615,10 @@
         const basisCount = themaAufgaben.filter(a => getKategorie(a) === 'Basis').length;
         const gCount = themaAufgaben.filter(a => getKategorie(a) === 'G-Niveau').length;
         const eCount = themaAufgaben.filter(a => getKategorie(a) === 'E-Niveau').length;
-        const erklCount = aufgaben.filter(a => a.thema === thema && getKategorie(a) === 'Erklärung').length;
+        // Erklärungen wie die anderen Zaehler nach gewaehltem Unterthema filtern
+        // (sonst zeigt „verfügbar" alle des Themas, obwohl das Unterthema nur 1 hat).
+        const selUt = [...document.querySelectorAll('.gen-ut-cb:checked')].map(cb => cb.value);
+        const erklCount = aufgaben.filter(a => a.thema === thema && getKategorie(a) === 'Erklärung' && (!selUt.length || selUt.includes(a.unterthema))).length;
         const operators = [...new Set(themaAufgaben.map(a => a.operator).filter(Boolean))].sort();
         const total = basisCount + Math.max(gCount, eCount);
         const defaultMax = Math.min(8, total);
