@@ -396,6 +396,7 @@
     let aufgabenVomServer = false;
     let schueler = load(STORAGE_KEYS.schueler);
     let klassen = load(STORAGE_KEYS.klassen);
+    let kurseData = [];   // geladene Kurse (mit .classes) — für Kursliste + Roster je Kurs
     let lernpfade = [];
     // Aktive Klassenfilterung der Übersicht (ersetzt das frühere Select).
     let overviewKlasse = '';
@@ -515,10 +516,15 @@
         syncSigs = {};
         aufgaben.forEach(a => { if (a.id) syncSigs[a.id] = aufgabeSig(a); });
         const klassenRaw = clRes.ok ? await clRes.json() : [];
-        // Im Lernpfad wird je FACH-KLASSE gearbeitet (Mathematik 7.5 ≠ Lernzeit 7.5),
-        // nicht je Lerngruppe — sonst verschwinden einzelne Fächer aus der Auswahl.
-        // Die SuS-/Anwesenheits-Teilung geteilter Kurse liegt im Kern, nicht hier.
-        const kursOf = c => c.name;
+        // Lernleitern hängen am KURS (Lerngruppe): Schüler nach Kurs gruppieren.
+        // Kurse global merken, damit die Auswahl ALLE Kurse zeigt (auch solche,
+        // deren Klasse in mehreren Kursen liegt) und der Roster je Kurs aufgelöst
+        // werden kann.
+        const kurse = kuRes && kuRes.ok ? await kuRes.json() : [];
+        kurseData = Array.isArray(kurse) ? kurse : [];
+        const classKurs = {};
+        kurse.forEach(k => (k.classes || []).forEach(c => { if (!(c.id in classKurs)) classKurs[c.id] = k.name; }));
+        const kursOf = c => classKurs[c.id] || c.name;
         schueler = [];
         const gesehen = new Set();
         klassenRaw.forEach(c => (c.students || []).forEach(st => {
@@ -1593,29 +1599,49 @@
     });
 
     // ─── Generator ───
+    // SuS eines Kurses: über die Mitgliedsklassen des Kurses (robust, auch wenn
+    // eine Klasse in mehreren Kursen liegt), Fallback über den am Schüler
+    // gespeicherten Kurs-Namen.
+    function schuelerVonKurs(kursName) {
+        const k = kurseData.find(k => k.name === kursName);
+        if (k && (k.classes || []).length) {
+            const ids = new Set(k.classes.map(c => c.id));
+            const aus = schueler.filter(s => ids.has(s.class_id));
+            if (aus.length) return aus;
+        }
+        return schueler.filter(s => s.klasse === kursName);
+    }
+    // Eine Klasse (class_id) des Kurses — für die Kern-Referenz beim Speichern.
+    function classIdVonKurs(kursName) {
+        const k = kurseData.find(k => k.name === kursName);
+        if (k && (k.classes || [])[0]) return k.classes[0].id;
+        return (schueler.find(s => s.klasse === kursName) || {}).class_id || null;
+    }
+
     async function refreshGeneratorDropdowns() {
         // Themen aus vorhandenen Aufgaben UND aus der Kern-Taxonomie (topics =
         // „Profil"), damit man auch ohne bestehende Aufgabe ein Kern-Thema waehlen
         // kann — sonst war die Auswahl leer, obwohl Themen im Kern gepflegt sind.
         const kernOber = topics.filter(t => !t.parent_id).map(t => t.name);
         const themen = [...new Set([...aufgaben.map(a => a.thema).filter(Boolean), ...kernOber])].sort();
-        // Kurse robust: aus der Kursliste UND aus den Schuelern (deren .klasse ist
-        // der Kurs-Name) — falls klassen mal leer/stale ist, fuellt sich der
-        // Selektor trotzdem, solange irgendwo Kurs-Namen bekannt sind.
+        // ALLE Kurse zeigen — direkt aus der Kursliste (kurseData), nicht nur die,
+        // denen eine Klasse zugeordnet ist. So fehlt kein Kurs mehr. Ergänzt um
+        // die aus Schuelern bekannten Kurs-Namen (Robustheit).
         let kurseNamen = [...new Set([
+            ...kurseData.map(k => k.name).filter(Boolean),
             ...klassen,
             ...schueler.map(s => s.klasse).filter(Boolean),
         ].filter(Boolean))].sort();
 
-        // Self-Healing: ist die Liste leer (State noch/again leer), direkt vom
-        // Server ziehen — dann fuellt sich der Selektor auch ohne vollen Reload.
+        // Self-Healing: ist die Liste leer (State noch/again leer), Kurse direkt
+        // vom Server ziehen — dann fuellt sich der Selektor auch ohne Reload.
         if (!kurseNamen.length) {
             try {
-                const cl = await api(`${API}/classes`).then(r => r.ok ? r.json() : []);
-                // Je Fach-Klasse (eigener Name), damit alle Fächer auftauchen.
-                kurseNamen = [...new Set((cl || []).map(c => c.name).filter(Boolean))].sort();
-                console.warn('[Generator] Klassen direkt geladen: %d Fach-Klassen', kurseNamen.length);
-            } catch (e) { console.warn('[Generator] Klassen-Direktabruf fehlgeschlagen:', e); }
+                const ku = await api(`${API}/kurse`).then(r => r.ok ? r.json() : []);
+                if (Array.isArray(ku) && ku.length) kurseData = ku;
+                kurseNamen = [...new Set((ku || []).map(k => k.name).filter(Boolean))].sort();
+                console.warn('[Generator] Kurse direkt geladen: %d', kurseNamen.length);
+            } catch (e) { console.warn('[Generator] Kurs-Direktabruf fehlgeschlagen:', e); }
         }
 
         const selT = document.getElementById('gen-thema');
@@ -1662,7 +1688,7 @@
         });
 
         const themaAufgaben = getGenAufgaben();
-        const klasseSchueler = schueler.filter(s => s.klasse === klasse).sort((a, b) => a.name.localeCompare(b.name));
+        const klasseSchueler = schuelerVonKurs(klasse).sort((a, b) => a.name.localeCompare(b.name));
         const selectedUt = [...document.querySelectorAll('.gen-ut-cb:checked')].map(cb => cb.value);
         const unterthema = selectedUt.join(', ');
 
@@ -2156,7 +2182,7 @@
             });
 
             // ll.klasse ist ein KURS-Name; Kern-Referenz ueber einen Schueler des Kurses.
-            const classIdVon = kurs => (schueler.find(s => s.klasse === kurs) || {}).class_id || null;
+            const classIdVon = kurs => classIdVonKurs(kurs);
 
             let pos = 0;
             for (const ll of (pfad.lernleitern || [])) {
