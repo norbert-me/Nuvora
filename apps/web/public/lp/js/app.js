@@ -1599,6 +1599,12 @@
             // nicht nochmal als reguläre Aufgabe auftauchen.
             const wdhIds = new Set(wdh.map(a => a._id));
 
+            // Erklär-Seiten an den Anfang: GENAU so viele wie eingestellt (config.erkl),
+            // aus dem gefilterten Pool — NICHT je Unterthema, sonst kaemen mehr heraus
+            // als eingestellt (Bug: „1 eingestellt, 2 erzeugt").
+            erklPool.filter(a => !wdhIds.has(a._id)).slice(0, config.erkl)
+                .forEach(a => tasks.push({ ...a, section: 'Erklärung', selected: true }));
+
             utList.forEach((ut, ui) => {
                 const utBasis = basisAufgaben.filter(a => (a.unterthema || '') === ut && !wdhIds.has(a._id));
                 const utG = gAufgaben.filter(a => (a.unterthema || '') === ut && !wdhIds.has(a._id));
@@ -1607,9 +1613,6 @@
                 const bNum = ui < utCount - 1 ? Math.floor(totalBasis / utCount) : totalBasis - Math.floor(totalBasis / utCount) * (utCount - 1);
                 const gNum = ui < utCount - 1 ? Math.floor(totalG / utCount) : totalG - Math.floor(totalG / utCount) * (utCount - 1);
                 const eNum = ui < utCount - 1 ? Math.floor(totalE / utCount) : totalE - Math.floor(totalE / utCount) * (utCount - 1);
-
-                const erkl = erklPool.filter(a => (a.unterthema || '') === ut);
-                erkl.forEach(a => tasks.push({ ...a, section: 'Erklärung', selected: true }));
 
                 const selBasis = selectForStudent(utBasis, Math.min(bNum, utBasis.length), s.foerder);
                 selBasis.forEach(a => tasks.push({ ...a, section: 'Basis', selected: true }));
@@ -1748,7 +1751,7 @@
                 <div>
                     <span class="badge badge-${s.niveau === 'E' ? 'e' : 'g'}">${s.niveau}-Kurs</span>
                     ${s.foerder.map(f => `<span class="badge badge-lrs">${esc(f)}</span>`).join(' ')}
-                    <span style="font-size:0.8rem;color:var(--text-muted);margin-left:0.5rem">${entry.tasks.length} Stufen</span>
+                    <span style="font-size:0.8rem;color:var(--text-muted);margin-left:0.5rem">${entry.tasks.filter(t => t.selected && t.section !== 'Erklärung').length} Aufgaben</span>
                 </div>
             `;
             header.addEventListener('click', () => {

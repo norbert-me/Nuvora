@@ -502,7 +502,7 @@
 #lp-app .student-preview-body {
     padding: 1rem 1rem 0.5rem;
 }
-#lp-app .student-preview-#lp-app.collapsed { display: none; }
+#lp-app .student-preview-body.collapsed { display: none; }
 
 /* Staircase / Ladder */
 #lp-app .ladder {
@@ -942,10 +942,10 @@
 }
 #lp-app .link-btn:hover { color: var(--primary); }
 #lp-app .foot-sep { margin: 0 0.5rem; }
-#lp-app #site-modal-#lp-app h2 { margin-bottom: 0.75rem; }
-#lp-app #site-modal-#lp-app h3 { margin: 1rem 0 0.35rem; font-size: 1rem; }
-#lp-app #site-modal-#lp-app p { margin-bottom: 0.6rem; }
-#lp-app #site-modal-#lp-app .form-group { margin-bottom: 0.75rem; }
+#lp-app #site-modal-body h2 { margin-bottom: 0.75rem; }
+#lp-app #site-modal-body h3 { margin: 1rem 0 0.35rem; font-size: 1rem; }
+#lp-app #site-modal-body p { margin-bottom: 0.6rem; }
+#lp-app #site-modal-body .form-group { margin-bottom: 0.75rem; }
 
 /* Toast */
 #lp-app .toast {
