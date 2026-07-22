@@ -2055,7 +2055,11 @@
             return;
         }
         toast(editIdx >= 0 ? 'Lernleiter aktualisiert' : (pfadId ? 'Lernleiter in Pfad gespeichert' : 'Lernleiter unter „Einzeln" gespeichert'));
-        editingLlId = null;
+        // WICHTIG gegen Duplikate: die gerade gespeicherte Lernleiter weiter als
+        // „in Bearbeitung" halten. Ein zweiter Klick auf „Speichern" aktualisiert
+        // sie dann (PUT), statt eine NEUE anzulegen (POST). Erst beim Wechsel von
+        // Thema/Kurs/Pfad wird editingLlId zurueckgesetzt (dort schon verdrahtet).
+        editingLlId = ll._id;
         renderGenPfade();
         // renderGenPfade baut den Dropdown neu - Auswahl erhalten, damit ein
         // Folge-Save nicht an "Lernpfad auswählen" scheitert.
@@ -2085,6 +2089,14 @@
             // Was der Server noch hat, wir aber nicht mehr, wandert in den Papierkorb.
             const da = alle.find(x => x.id === pfad.id);
             const uebrig = new Set(((da && da.ladders) || []).map(l => l.id));
+
+            // Defensive: dieselbe Lernleiter nicht doppelt speichern (gleiche id).
+            const gesehen = new Set();
+            pfad.lernleitern = (pfad.lernleitern || []).filter(ll => {
+                if (ll.id == null) return true;
+                if (gesehen.has(ll.id)) return false;
+                gesehen.add(ll.id); return true;
+            });
 
             // ll.klasse ist ein KURS-Name; Kern-Referenz ueber einen Schueler des Kurses.
             const classIdVon = kurs => (schueler.find(s => s.klasse === kurs) || {}).class_id || null;
@@ -3207,8 +3219,11 @@
                     currentPfad.lernleitern.splice(idx, 1);
                 }
                 await savePfad(currentPfad);
+                // Frisch vom Server laden, damit die Lernleiter-Zahl am Pfad sofort
+                // stimmt (nicht erst nach Neuladen) — und currentPfad neu zeigen.
+                await loadLernpfade();
+                currentPfad = lernpfade.find(p => p.id === currentPfad.id) || currentPfad;
                 renderPfadLernleitern();
-                renderLernpfade();
             });
         });
     }
