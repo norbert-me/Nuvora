@@ -60,7 +60,17 @@
     async function api(url, opts) {
         const o = Object.assign({}, opts || {});
         o.headers = Object.assign(o.body ? jsonHeaders() : authHeaders(), o.headers || {});
-        return fetch(url, o);
+        // 429 (Rate-Limit) ist meist ein kurzer Engpass, kein echter Fehler —
+        // bis zu 3 Versuche mit kleinem Backoff, bevor der Aufrufer den Status
+        // sieht. So werden bei „Lernpfad generieren" (viele schnelle Requests)
+        // nicht staendig Fehler gemeldet.
+        let res;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            res = await fetch(url, o);
+            if (res.status !== 429) return res;
+            await new Promise(r => setTimeout(r, 350 * (attempt + 1)));
+        }
+        return res;
     }
 
     // localStorage ist nur noch Anzeige-Cache, nicht mehr Wahrheit: der Server

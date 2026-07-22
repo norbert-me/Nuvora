@@ -23,7 +23,17 @@ window.fetch = function(input, init) {
     }
   }
   const isApi = url && url.startsWith("/api/");
-  return _origFetch.call(this, input, init).then((res) => {
+  // 429 (Rate-Limit) ist meist ein kurzer Engpass: bis zu 3 Versuche mit
+  // kleinem Backoff, bevor der Aufrufer den Status sieht — sonst poppen bei
+  // kleinen Aussetzern staendig Fehler auf. Netzwerkfehler (throw) gehen direkt
+  // in die Offline-Behandlung unten, ohne Retry.
+  const withRetry = (n) => _origFetch.call(this, input, init).then((res) => {
+    if (isApi && res.status === 429 && n < 2) {
+      return new Promise((r) => setTimeout(r, 350 * (n + 1))).then(() => withRetry(n + 1));
+    }
+    return res;
+  });
+  return withRetry(0).then((res) => {
     // Server ist erreichbar (auch bei 4xx/5xx) → online
     if (isApi) window.dispatchEvent(new CustomEvent("cardvote:online"));
     // Sliding-Renewal: schickt der Server einen frischen Token, uebernehmen.
