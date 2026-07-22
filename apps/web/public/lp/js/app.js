@@ -3003,6 +3003,22 @@
         };
     }
 
+    // Regler auf eine gespeicherte Konfig setzen (openLernleiter). cfg-max zuerst,
+    // weil es das Maximum von cfg-pflicht bestimmt. 'input' feuern, damit die
+    // Ausgaben/abhängigen Anzeigen mitgehen.
+    function setGenConfig(cfg) {
+        if (!cfg) return;
+        const set = (id, v) => {
+            const el = document.getElementById(id);
+            if (el && v != null && v !== '') { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); }
+        };
+        set('cfg-max', cfg.max);
+        set('cfg-pflicht', cfg.pflicht);
+        set('cfg-g-basis', cfg.gBasis); set('cfg-g-g', cfg.gG);
+        set('cfg-e-basis', cfg.eBasis); set('cfg-e-g', cfg.eG); set('cfg-e-e', cfg.eE);
+        set('cfg-erkl', cfg.erkl);
+    }
+
     // Seeded RNG für deterministic Auswahl
     let rngState = 0;
     function seedRng(seed) {
@@ -3509,6 +3525,9 @@
 
         document.getElementById('gen-klasse').value = ll.klasse || '';
         updateGenConfig();
+        // Regler auf die gespeicherte Konfig der Lernleiter setzen (sonst zeigen
+        // sie die Defaults). cfg-max zuerst — es begrenzt cfg-pflicht.
+        setGenConfig(ll.config);
 
         // Vorschau aus den gespeicherten Aufgaben-IDs je Schueler rekonstruieren.
         const sektVon = a => { const k = getKategorie(a); return k === 'Erklärung' ? 'Erklärung' : k === 'E-Niveau' ? 'E-Niveau' : k === 'G-Niveau' ? 'G-Niveau' : 'Basis'; };
@@ -3546,6 +3565,13 @@
                 const [pa, na] = quelleKey(a.quelle), [pb, nb] = quelleKey(b.quelle);
                 return (pa - pb) || (na - nb);
             });
+            // Pflicht/Zusatz wie beim Generieren wiederherstellen: die ersten
+            // config.pflicht regulaeren Aufgaben sind Pflicht, der Rest Zusatz
+            // (Wiederholung/Erklaerung zaehlen nicht mit). Ohne config: alles Pflicht.
+            const pflichtCount = (ll.config && ll.config.pflicht != null) ? ll.config.pflicht : Infinity;
+            const regSek = ['Basis', 'G-Niveau', 'E-Niveau'];
+            let regIdx = 0;
+            tasks.forEach(t => { if (regSek.includes(t.section)) { t.zusatz = regIdx >= pflichtCount; regIdx++; } });
             return { student, tasks, thema: ll.thema, unterthema: ll.unterthema || '' };
         });
         console.warn('openLernleiter Bilanz: gespeichert=%d, aufgeloest=%d, gezeigt=%d, aufgaben-Pool=%d, gezeigte Themen=%o, unaufgeloeste IDs (Beispiele)=%o',
