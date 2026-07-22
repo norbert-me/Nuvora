@@ -398,7 +398,7 @@ export default function Session() {
             display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", fontSize: 14, fontWeight: 600, cursor: "pointer",
             background: "var(--card)", color: "var(--text)", border: "1px solid var(--border2)", borderRadius: 980,
           }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
             {t("session.joinScanner")}
           </button>
         </div>
@@ -410,7 +410,7 @@ export default function Session() {
               {activeSessions.map((s) => (
                 <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "var(--card)", borderRadius: 12, border: "1px solid var(--border)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    {s.mode === "game" && <SvgGamepad size={14} color="var(--text3)" />}
+                    {s.mode === "game" && <SvgGamepad size={16} color="var(--text3)" />}
                     <span style={{ fontWeight: 600, color: "var(--text)", fontSize: 14 }}>{s.name || `Session #${s.code}`}</span>
                   </div>
                   {s.mode === "game" ? (
@@ -711,7 +711,7 @@ export default function Session() {
       {/* Top bar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1vh" }}>
         <h2 style={{ margin: 0, fontSize: "clamp(18px, 2.5vh, 26px)", fontWeight: 700, color: "var(--text)" }}>
-          {gameMode && <><SvgGamepad size={14} color="var(--text3)" />{" "}</>}{selectedClass?.name}
+          {gameMode && <><SvgGamepad size={16} color="var(--text3)" />{" "}</>}{selectedClass?.name}
         </h2>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ color: "var(--text3)", fontSize: "clamp(13px, 1.8vh, 16px)", fontWeight: 600 }}>
@@ -728,16 +728,16 @@ export default function Session() {
             padding: "5px 10px", fontSize: 14, cursor: "pointer",
             background: "none", color: "var(--text3)", border: "1px solid var(--border2)", borderRadius: 980,
           }} title={t("session.openScanner")}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
           </button>
           <button onClick={toggleMute} style={{
             padding: "5px 10px", fontSize: 14, cursor: "pointer",
             background: "none", color: muted ? "#d1350f" : "var(--text3)", border: "1px solid var(--border2)", borderRadius: 980,
           }} title={muted ? t("session.unmute") : t("session.mute")}>
             {muted ? (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M23 9l-6 6M17 9l6 6"/></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M23 9l-6 6M17 9l6 6"/></svg>
             ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>
             )}
           </button>
           {!muted && (
@@ -749,7 +749,7 @@ export default function Session() {
             padding: "5px 10px", fontSize: 14, cursor: "pointer",
             background: "none", color: "var(--text3)", border: "1px solid var(--border2)", borderRadius: 980,
           }} title={t("session.fullscreen")}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
           </button>
           <button onClick={finishSession} style={{
             padding: "5px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer",
@@ -950,7 +950,7 @@ function FolderPicker({ folders, selected, onSelect, depth = 0 }) {
             <span style={{ color: "var(--text3)", fontSize: 10, width: 14, textAlign: "center", transition: "transform 0.15s", transform: expanded[f.id] ? "rotate(90deg)" : "rotate(0deg)" }}>
               {(f.children?.length > 0 || f.question_sets?.length > 0) ? "▶" : ""}
             </span>
-            <span style={{ fontWeight: 600, color: "var(--text)", fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>{f.name}</span>
+            <span style={{ fontWeight: 600, color: "var(--text)", fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>{f.name}</span>
           </div>
           {expanded[f.id] && (
             <div style={{ marginLeft: 22 }}>

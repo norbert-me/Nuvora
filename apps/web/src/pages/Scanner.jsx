@@ -421,7 +421,7 @@ export default function Scanner() {
                       flexShrink: 0, fontSize: 12, color: "#fff", background: "#0a7d3e", padding: "2px 8px",
                       borderRadius: 980, fontWeight: 600, animation: "scanFlash 0.8s ease-out forwards",
                     }}>
-                      {s.name} <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign: "-1px"}}><path d="M20 6L9 17l-5-5"/></svg>
+                      {s.name} <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign: "-1px"}}><path d="M20 6L9 17l-5-5"/></svg>
                     </span>
                   );
                 })}
@@ -439,7 +439,7 @@ export default function Scanner() {
           )}
           {classStudents.length > 0 && unscanned.length === 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 6, padding: "0 4px" }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#0a7d3e" }}>{t("scanner.allCaptured", { count: classStudents.length })} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0a7d3e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign: "-1px"}}><path d="M20 6L9 17l-5-5"/></svg></span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#0a7d3e" }}>{t("scanner.allCaptured", { count: classStudents.length })} <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0a7d3e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign: "-1px"}}><path d="M20 6L9 17l-5-5"/></svg></span>
             </div>
           )}
         </>

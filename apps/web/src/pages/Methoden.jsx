@@ -85,7 +85,7 @@ export default function Methoden() {
                 <div style={{ fontSize: 15, fontWeight: 700 }}>{m.title}</div>
                 {m.dauer != null && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 980, background: "rgba(37,99,235,0.12)", color: "#2563eb" }}>{t("methoden.dauerBadge", { n: m.dauer })}</span>}
                 <span style={{ flex: 1 }} />
-                <button onClick={() => setPublishing(m)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("methoden.publish")}><Icon d={ICONS.upload} size={14} color="var(--accent)" /></button>
+                <button onClick={() => setPublishing(m)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("methoden.publish")}><Icon d={ICONS.share} size={17} color="var(--accent)" /></button>
                 <button onClick={() => setEdit(m)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>
                 <button onClick={() => remove(m.id)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
               </div>

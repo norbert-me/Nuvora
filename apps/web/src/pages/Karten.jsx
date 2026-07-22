@@ -392,7 +392,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false }) {
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{deck.cards.length} {t("karten.cards")}</span>
         {deck.cards.length > 0 && (
-          <button onClick={() => setPublishing(true)} className="icon-btn" style={iconBtn} title={t("karten.publish")}><Icon d={ICONS.upload} color="var(--accent)" /></button>
+          <button onClick={() => setPublishing(true)} className="icon-btn" style={iconBtn} title={t("karten.publish")}><Icon d={ICONS.share} size={18} color="var(--accent)" /></button>
         )}
         {publishing && <PublishModal name={deck.name || t("karten.deck")} onClose={() => setPublishing(false)}
           onPublish={(description) => fetch(`/api/marketplace/publish/deck`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deck_id: deck.id, description }) }).catch(() => null)} />}

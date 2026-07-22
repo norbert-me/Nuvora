@@ -361,7 +361,7 @@ export default function Dashboard() {
               </span>
               <div style={{ display: "flex", gap: 6 }}>
                 <button onClick={(e) => { e.stopPropagation(); openPublish(qs); }} className="icon-btn" style={iconBtn} title={t("dash.publishTitle")}>
-                  <Icon d={ICONS.upload} color="var(--accent)" />
+                  <Icon d={ICONS.share} size={18} color="var(--accent)" />
                 </button>
                 <button onClick={(e) => { e.stopPropagation(); duplicateSet(qs.id); }} className="icon-btn" style={iconBtn} title={t("dash.duplicate")}><Icon d={ICONS.duplicate} /></button>
                 <button onClick={async (e) => { e.stopPropagation(); const r = await fetch(`${API}/export/question-set/${qs.id}`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${qs.name}.json`; a.click(); URL.revokeObjectURL(a.href); }} className="icon-btn" style={iconBtn} title={t("classes.export")}><Icon d={ICONS.export} /></button>

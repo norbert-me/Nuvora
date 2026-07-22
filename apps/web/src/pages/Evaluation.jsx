@@ -766,7 +766,7 @@ const gradeDistribution = (() => {
                       title="PDF herunterladen"
                     >
                       {student.name}{" "}
-                      <Icon d={ICONS.download} size={12} color="var(--text3)" />
+                      <Icon d={ICONS.download} size={15} color="var(--text3)" />
                     </a>
                   </td>
                   {student.answers.map((a, i) => (

@@ -29,8 +29,8 @@ export const ICONS = {
   // Datei-Export/-Import verwenden — modulübergreifend einheitlich.
   export: ["M12 3h5v5", "M17 3L9 11", "M15 11v5a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h5"],
   import: ["M9 6v5h5", "M17 3L9 11", "M15 11v5a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h5"],
-  // Einheitliches "Veröffentlichen/Hochladen zum Marktplatz" — Pfeil nach oben
-  // auf eine Grundlinie. IMMER dieses Icon für Marktplatz-Upload verwenden.
+  // Pfeil nach oben auf eine Grundlinie — reines Hochladen (Datei o.ä.).
+  // Fürs „Teilen/Veröffentlichen zum Marktplatz" gilt jetzt `share` (einheitlich).
   upload: ["M12 16V4M12 4L7 9M12 4l5 5", "M4 20h16"],
   chart: ["M3 17h14", "M5 13v4M9 9v8M13 11v6M17 7v10"],
   archive: ["M3 5a2 2 0 012-2h10a2 2 0 012 2v1H3V5z", "M4 6h12v11a2 2 0 01-2 2H6a2 2 0 01-2-2V6z", "M8 10h4"],
@@ -40,6 +40,8 @@ export const ICONS = {
   plus: ["M10 4v12M4 10h12"],
   minus: ["M4 10h12"],
   more: ["M5 10h.01M10 10h.01M15 10h.01"],
+  // Teilen: drei verbundene Knoten. EINHEITLICH fuer „Teilen/Veroeffentlichen".
+  share: ["M14.5 3a2 2 0 100 4 2 2 0 100-4z", "M5.5 8a2 2 0 100 4 2 2 0 100-4z", "M14.5 13a2 2 0 100 4 2 2 0 100-4z", "M7.3 9.1l5.9 3.3M13.2 6.6L7.3 9.9"],
   calendar: ["M4 5h12v11H4z", "M4 8h12M7 3v4M13 3v4"],
   // Zahnrad: Mittelkreis + 8 Speichen (Ansicht-/Einstellungen-Menü).
   settings: ["M10 7.6a2.4 2.4 0 100 4.8 2.4 2.4 0 000-4.8z",
