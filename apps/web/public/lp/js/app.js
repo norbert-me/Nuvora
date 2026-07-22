@@ -231,6 +231,39 @@
     }
     function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
+    // Gestylter Bestätigungs-/Hinweis-Dialog statt des nativen confirm()/alert()
+    // (die optisch nicht zum Rest passen). Wird unter #lp-app gehängt, damit die
+    // gescopeten Stile greifen; Buttons nutzen die vorhandenen .btn-Klassen.
+    // confirmDlg gibt ein Promise<boolean> zurück.
+    function lpDialogHost() { return document.getElementById('lp-app') || document.body; }
+    function confirmDlg(msg, { ok = 'OK', cancel = 'Abbrechen', danger = true } = {}) {
+        return new Promise(resolve => {
+            const ov = document.createElement('div');
+            ov.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);padding:16px';
+            const panel = document.createElement('div');
+            panel.style.cssText = 'background:var(--card,#fff);color:var(--text,#111);border:1px solid var(--border,#ddd);border-radius:14px;max-width:400px;width:100%;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,0.25)';
+            const p = document.createElement('p');
+            p.style.cssText = 'font-size:14px;line-height:1.5;margin:0 0 18px;white-space:pre-wrap';
+            p.textContent = msg;
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;gap:8px;justify-content:flex-end';
+            const bCancel = document.createElement('button');
+            bCancel.className = 'btn'; bCancel.textContent = cancel;
+            const bOk = document.createElement('button');
+            bOk.className = 'btn' + (danger ? ' danger' : ''); bOk.textContent = ok;
+            row.append(bCancel, bOk); panel.append(p, row); ov.append(panel);
+            const close = (val) => { ov.remove(); document.removeEventListener('keydown', onKey); resolve(val); };
+            ov.addEventListener('click', e => { if (e.target === ov) close(false); });
+            bCancel.addEventListener('click', () => close(false));
+            bOk.addEventListener('click', () => close(true));
+            const onKey = e => { if (e.key === 'Escape') close(false); else if (e.key === 'Enter') close(true); };
+            document.addEventListener('keydown', onKey);
+            lpDialogHost().appendChild(ov);
+            bOk.focus();
+        });
+    }
+    function alertDlg(msg) { return confirmDlg(msg, { ok: 'OK', cancel: 'Schließen', danger: false }); }
+
     // Eigenes Autocomplete statt <datalist>: Safari rendert das native
     // datalist-Popup unlesbar (weisser Text, per CSS nicht korrigierbar).
     // Datenquelle bleibt die versteckte <datalist> - wird an anderer Stelle
@@ -447,7 +480,7 @@
         // Klassen trotzdem erscheinen — sonst wirkt die ganze App leer.
         if (tRes.status === 401 || clRes.status === 401 || exRes.status === 401) { showAuth(); return false; }
         if (!exRes.ok) {
-            alert('Aufgaben konnten nicht geladen werden — ist das Modul „Lernpfad" aktiviert? (Status ' + exRes.status + ')');
+            await alertDlg('Aufgaben konnten nicht geladen werden — ist das Modul „Lernpfad" aktiviert? (Status ' + exRes.status + ')');
         }
         topics = tRes.ok ? await tRes.json() : [];
         aufgaben = exRes.ok ? (await exRes.json()).map(vonKern) : [];
@@ -895,8 +928,8 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    function deleteAufgabe(_id) {
-        if (!confirm('Aufgabe wirklich löschen?')) return;
+    async function deleteAufgabe(_id) {
+        if (!await confirmDlg('Aufgabe wirklich löschen?', { ok: 'Löschen' })) return;
         aufgaben = aufgaben.filter(a => a._id !== _id);
         save(STORAGE_KEYS.aufgaben, aufgaben);
         renderAufgaben();
@@ -1338,7 +1371,7 @@
             `Mitgelöscht: ${kSchueler.length} Schüler, ${wegeCount} Lernwege. ` +
             `Lernpfade, die dadurch leer werden, werden ebenfalls entfernt.\n\n` +
             `Das lässt sich nicht rückgängig machen.`;
-        if (!confirm(msg)) return;
+        if (!await confirmDlg(msg, { ok: 'Löschen' })) return;
 
         // Schüler entfernen (Backend + lokal)
         // Schueler gehoeren dem Kern und werden unter /classes gepflegt —
@@ -1452,8 +1485,8 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    function deleteSchueler(_id) {
-        if (!confirm('Schüler wirklich löschen?')) return;
+    async function deleteSchueler(_id) {
+        if (!await confirmDlg('Schüler wirklich löschen?', { ok: 'Löschen' })) return;
         schueler = schueler.filter(s => s._id !== _id);
         save(STORAGE_KEYS.schueler, schueler);
         renderSchueler();
@@ -2444,10 +2477,10 @@
         toast(count + ' Aufgaben aktualisiert');
     });
 
-    document.getElementById('btn-bulk-delete').addEventListener('click', () => {
+    document.getElementById('btn-bulk-delete').addEventListener('click', async () => {
         const ids = getSelectedBulkIds();
         if (!ids.length) return;
-        if (!confirm(ids.length + ' ausgewählte Aufgabe(n) wirklich löschen?')) return;
+        if (!await confirmDlg(ids.length + ' ausgewählte Aufgabe(n) wirklich löschen?', { ok: 'Löschen' })) return;
         const idSet = new Set(ids);
         // Backend + lokal löschen
         ids.forEach(id => api(`${LP}/exercises/` + id, { method: 'DELETE' }).catch(() => {}));
@@ -2891,7 +2924,7 @@
         const openPfad = id => editPfad(lernpfade.find(p => p._id === id));
         const deletePfad = async id => {
             // Soft-Delete: 30 Tage im Papierkorb wiederherstellbar.
-            if (!confirm('Pfad in den Papierkorb verschieben? 30 Tage wiederherstellbar.')) return;
+            if (!await confirmDlg('Pfad in den Papierkorb verschieben? 30 Tage wiederherstellbar.', { ok: 'In den Papierkorb' })) return;
             lernpfade = lernpfade.filter(p => p._id !== id);
             // Erst löschen, dann neu laden — sonst holt loadLernpfade den Pfad
             // noch aus dem Backend zurück (Race), er erscheint wieder.
@@ -2946,7 +2979,7 @@
             loadLernpfade();
         }));
         box.querySelectorAll('[data-purge]').forEach(b => b.addEventListener('click', async () => {
-            if (!confirm('Lernpfad endgültig löschen? Die Lernleitern gehen verloren.')) return;
+            if (!await confirmDlg('Lernpfad endgültig löschen? Die Lernleitern gehen verloren.', { ok: 'Endgültig löschen' })) return;
             await api(`${LP}/paths/${b.dataset.purge}/purge`, { method: 'DELETE' }).catch(() => {});
             renderPfadTrash(list);
         }));
@@ -3047,7 +3080,7 @@
                 } else if (action === 'down' && idx < currentPfad.lernleitern.length - 1) {
                     [currentPfad.lernleitern[idx + 1], currentPfad.lernleitern[idx]] = [currentPfad.lernleitern[idx], currentPfad.lernleitern[idx + 1]];
                 } else if (action === 'delete') {
-                    if (!confirm('Lernleiter aus Pfad entfernen?')) return;
+                    if (!await confirmDlg('Lernleiter aus Pfad entfernen?', { ok: 'Entfernen' })) return;
                     currentPfad.lernleitern.splice(idx, 1);
                 }
                 await savePfad(currentPfad);
