@@ -618,74 +618,92 @@ function FreiMarker({ label, t }) {
   );
 }
 
-function DayView({ day, tt = { times: [] }, byDay, extByDay, slotsFor, frei, className, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
+function DayView({ day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFor, frei, className, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
   const list = byDay(day);
   const slots = slotsFor(day);
   const ext = extByDay ? extByDay(day) : [];
   const f = frei && frei(day);
-  const zeit = (period) => { const w = (tt.times || [])[period - 1]; return w && (w.start || w.end) ? `${w.start || ""}–${w.end || ""}` : ""; };
   const linked = (e) => e.cardvote_set_id || e.karten_deck_id || e.lernpfad_ladder_id || e.method_id || e.codedetektiv_puzzle;
-  const ganztags = list.filter((e) => e.period == null); // Ereignisse ohne Stunde = ganztägig
-  // Zeitachse: alle Schulstunden (1..periods), erweitert um evtl. hoehere Stunden
-  // aus Stundenplan-Slots oder Eintraegen. Immer sichtbar — das ist die Achse.
-  const maxP = Math.max(tt.periods || 0, 0, ...slots.map((s) => s.period), ...list.filter((e) => e.period != null).map((e) => e.period));
-  const periods = Array.from({ length: maxP }, (_, i) => i + 1);
+  const toMin = (hhmm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || ""); return m ? (+m[1]) * 60 + (+m[2]) : null; };
+  const pTime = (p) => { const w = (tt.times || [])[p - 1]; return w ? { s: toMin(w.start), e: toMin(w.end) } : { s: null, e: null }; };
   if (f) return <p style={{ fontSize: 14, color: "var(--text3)", fontStyle: "italic" }}>{f.label ? `${f.label} — ${t("kalender.free")}` : t("kalender.free")}</p>;
-  const leerTag = ganztags.length === 0 && ext.length === 0 && periods.length === 0;
+
+  // Ganztägig / ohne verortbare Uhrzeit -> Banner oben (auch externe Termine).
+  const ganztags = list.filter((e) => e.period == null);
+  const belegte = new Set(slots.map((s) => s.period));
+
+  // Zeitleiste 0–24 Uhr: alles mit Uhrzeit hier verorten.
+  const HOUR = 40;
+  const yOf = (min) => (min / 60) * HOUR;
+  const timed = [];
+  slots.forEach((s) => {
+    const { s: sm, e: em } = pTime(s.period);
+    if (sm == null) return;
+    const eintrag = list.find((e) => e.period === s.period);
+    timed.push({ key: "s" + s.id, start: sm, end: em != null ? em : sm + 45,
+      col: s.class_id ? classColor(s.class_id) : "var(--accent)",
+      label: className(s.class_id) || s.title || topicName(s.topic_id) || "—",
+      sub: eintrag ? (eintrag.title || topicName(eintrag.topic_id) || t("kalender.planned")) + (linked(eintrag) ? " ↗" : "") : "",
+      onClick: eintrag ? () => onOpen({ ...eintrag, date: new Date(eintrag.date) }) : () => onSlot(day, s) });
+  });
+  list.filter((e) => e.period != null && !belegte.has(e.period)).forEach((e) => {
+    const { s: sm, e: em } = pTime(e.period);
+    if (sm == null) { ganztags.push(e); return; }   // keine Uhrzeit hinterlegt -> ganztägig
+    timed.push({ key: "e" + e.id, start: sm, end: em != null ? em : sm + 45, col: "var(--accent)",
+      label: e.title || topicName(e.topic_id) || t("kalender.planned"), sub: "", onClick: () => onOpen({ ...e, date: new Date(e.date) }) });
+  });
+  const extAllDay = ext.filter((ev) => toMin(ev.time) == null);
+  ext.filter((ev) => toMin(ev.time) != null).forEach((ev, i) => {
+    const sm = toMin(ev.time);
+    timed.push({ key: "x" + i, start: sm, end: sm + 60, col: "var(--text3)", dashed: true,
+      label: "🔗 " + (ev.title || "—"), sub: ev.location || "", onClick: () => onExt(ev) });
+  });
+
+  const hasBanner = ganztags.length > 0 || extAllDay.length > 0;
+  const bannerBtn = (key, title, sub, onClick, extern) => (
+    <button key={key} onClick={onClick}
+      style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 14px", borderRadius: 10, cursor: "pointer",
+        border: extern ? "1px dashed var(--border2)" : "1px solid var(--accent)", background: extern ? "var(--bg2)" : "var(--accent-bg, rgba(10,132,255,0.10))", color: "var(--text)" }}>
+      <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+      {sub && <span style={{ display: "block", fontSize: 12.5, color: "var(--text3)", marginTop: 2 }}>{sub}</span>}
+    </button>
+  );
+
   return (
     <div>
       <button onClick={() => onAdd(day)} style={{ ...btnPrimary, marginBottom: 14 }}>{t("kalender.add")}</button>
 
-      {/* Ganztägige Ereignisse ganz oben, als Banner. */}
-      {(ganztags.length > 0 || ext.length > 0) && (
+      {hasBanner && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>{t("kalender.allDay")}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {ganztags.map((e) => (
-              <button key={e.id} onClick={() => onOpen({ ...e, date: new Date(e.date) })}
-                style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--accent)", background: "var(--accent-bg, rgba(10,132,255,0.10))", color: "var(--text)", cursor: "pointer" }}>
-                <span style={{ fontSize: 14, fontWeight: 700 }}>{e.title || topicName(e.topic_id) || "—"}{linked(e) ? " ↗" : ""}</span>
-                {e.topic_id && e.title && <span style={{ display: "block", fontSize: 12.5, color: "var(--accent)" }}>{topicName(e.topic_id)}</span>}
-                {e.notes && <span style={{ display: "block", fontSize: 12.5, color: "var(--text3)", marginTop: 2 }}>{e.notes}</span>}
-              </button>
-            ))}
-            {ext.length > 0 && <ExtChips list={ext} onOpen={onExt} />}
+            {ganztags.map((e) => bannerBtn("g" + e.id, `${e.title || topicName(e.topic_id) || "—"}${linked(e) ? " ↗" : ""}`, e.notes || "", () => onOpen({ ...e, date: new Date(e.date) }), false))}
+            {extAllDay.map((ev, i) => bannerBtn("xa" + i, `🔗 ${ev.title || "—"}`, ev.location || "", () => onExt(ev), true))}
           </div>
         </div>
       )}
 
-      {/* Zeitachse: je Stunde eine Zeile mit Uhrzeit, Klasse und geplantem Eintrag. */}
-      {periods.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {periods.map((p) => {
-            const slot = slots.find((s) => s.period === p);
-            const eintrag = list.find((e) => e.period === p);
-            const col = slot && slot.class_id ? classColor(slot.class_id) : "var(--border2)";
-            const leer = !slot && !eintrag;
-            return (
-              <div key={p} style={{ display: "flex", alignItems: "stretch", gap: 12, padding: "8px 14px", border: "1px solid var(--border)", borderLeft: `4px solid ${leer ? "transparent" : col}`, borderRadius: 10, background: leer ? "transparent" : "var(--card)", opacity: leer ? 0.55 : 1 }}>
-                <div style={{ minWidth: 64, textAlign: "center", flexShrink: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 800 }}>{p}.</div>
-                  <div style={{ fontSize: 10.5, color: "var(--text3)" }}>{zeit(p)}</div>
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  {slot && <div style={{ fontWeight: 600 }}>{className(slot.class_id) || slot.title || topicName(slot.topic_id) || "—"}</div>}
-                  {eintrag ? (
-                    <button onClick={() => onOpen({ ...eintrag, date: new Date(eintrag.date) })} style={{ ...chip, marginTop: slot ? 4 : 0, display: "inline-block", width: "auto", maxWidth: "100%" }}>
-                      {eintrag.title || topicName(eintrag.topic_id) || t("kalender.planned")}{linked(eintrag) ? " ↗" : ""}
-                    </button>
-                  ) : slot ? (
-                    <button onClick={() => onSlot(day, slot)} style={{ ...ghost, marginTop: 4, width: "auto" }}>+ {t("kalender.add")}</button>
-                  ) : (
-                    <button onClick={() => onAdd(day)} style={{ ...ghost, width: "auto" }}>+ {t("kalender.add")}</button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+      {/* Zeitleiste 0–24 Uhr: Stundenlinien + verortete Termine. */}
+      {timed.length > 0 && (
+        <div style={{ position: "relative", height: 24 * HOUR, border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)", overflow: "hidden" }}>
+          {Array.from({ length: 25 }, (_, h) => (
+            <div key={h} style={{ position: "absolute", top: yOf(h * 60), left: 46, right: 0, borderTop: h === 0 || h === 24 ? "none" : "1px solid var(--border)" }}>
+              {h < 24 && <span style={{ position: "absolute", top: -1, left: -44, fontSize: 10.5, color: "var(--text3)" }}>{String(h).padStart(2, "0")}:00</span>}
+            </div>
+          ))}
+          {timed.map((it) => (
+            <button key={it.key} onClick={it.onClick} title={`${it.label}${it.sub ? " — " + it.sub : ""}`}
+              style={{ position: "absolute", top: yOf(it.start) + 1, height: Math.max(22, yOf(it.end) - yOf(it.start) - 2), left: 50, right: 8,
+                textAlign: "left", padding: "3px 8px", borderRadius: 6, overflow: "hidden", cursor: "pointer",
+                border: it.dashed ? "1px dashed var(--border2)" : "none", borderLeft: `3px solid ${it.col}`,
+                background: it.dashed ? "var(--bg2)" : it.col + "22", color: "var(--text)" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.label}</div>
+              {it.sub && <div style={{ fontSize: 11, color: "var(--text2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.sub}</div>}
+            </button>
+          ))}
         </div>
       )}
-      {leerTag && <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("kalender.empty")}</p>}
+      {!hasBanner && timed.length === 0 && <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("kalender.empty")}</p>}
     </div>
   );
 }
