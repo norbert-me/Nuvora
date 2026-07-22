@@ -238,13 +238,10 @@ export default function Kalender() {
   // per className raten. Eine Klasse kann in mehreren Kursen liegen — nur kurs_id
   // weiß, welcher gemeint war.
   const slotName = (s) => (s && s.kurs_id && kursName(s.kurs_id)) || className(s && s.class_id);
-  // Farbe gehört dem KURS (nicht der Fach-Klasse): zeigt die Kurs-Farbe, fällt
-  // nur ohne Kurs auf die Klassenfarbe zurück.
-  const kursColor = (id) => (kurse.find((k) => k.id === id) || {}).color || "";
-  const classColor = (id) => {
-    const k = kurse.find((k) => (k.classes || []).some((c) => c.id === id));
-    return (k && k.color) || (classes.find((c) => c.id === id) || {}).color || C.info;
-  };
+  // Farbe gehört dem FACH (Fach-Klasse/SchoolClass): „Mathe 7.5" und „Lernzeit
+  // 7.5" der gleichen Lerngruppe dürfen verschiedene Farben haben. Darum an der
+  // class_id, nicht am Kurs.
+  const classColor = (id) => (classes.find((c) => c.id === id) || {}).color || C.info;
   const weekdayOf = (d) => (new Date(d).getDay() + 6) % 7; // 0 = Montag
   const slotsFor = (d) => tt.slots.filter((s) => s.weekday === weekdayOf(d)).sort((a, b) => a.period - b.period);
   // Klick auf eine Stundenplan-Vorlage: gibt es an dem Tag schon einen Eintrag
@@ -257,16 +254,12 @@ export default function Kalender() {
     else setEditing({ date: startOfDay(day), period: s.period, title: s.title || "", class_id: s.class_id || null, topic_id: s.topic_id || null });
   };
 
-  // Farbe aus dem Stundenplan setzen: bevorzugt am KURS (alle Fach-Klassen teilen
-  // sie), nur ohne Kurs an der Klasse. Sofort lokal, dann speichern.
+  // Farbe aus dem Stundenplan setzen: am FACH (Fach-Klasse), damit verschiedene
+  // Fächer derselben Lerngruppe eigene Farben behalten. Sofort lokal, dann speichern.
   const setSlotColor = async (kursId, classId, color) => {
-    if (kursId) {
-      setKurse((prev) => prev.map((k) => (k.id === kursId ? { ...k, color } : k)));
-      await fetch(`/api/kurse/${kursId}/color`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) }).catch(() => {});
-    } else if (classId) {
-      setClasses((prev) => { const next = prev.map((c) => (c.id === classId ? { ...c, color } : c)); put("classes", next); return next; });
-      await fetch(`/api/classes/${classId}/color`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) }).catch(() => {});
-    }
+    if (!classId) return;
+    setClasses((prev) => { const next = prev.map((c) => (c.id === classId ? { ...c, color } : c)); put("classes", next); return next; });
+    await fetch(`/api/classes/${classId}/color`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) }).catch(() => {});
   };
 
   const saveSlot = async (s) => {
@@ -917,10 +910,10 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
 function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onClose, t }) {
   const [classId, setClassId] = useState(slot.class_id || "");
   const [kursId, setKursId] = useState(slot.kurs_id ?? null); // gewaehlter Kurs (Anzeige)
-  // Farbe gehört dem Kurs: aus dem gewählten Kurs, sonst Klassenfarbe.
-  const kursColorOf = (kid, cid) => (kurse.find((k) => k.id === kid) || {}).color || (classes.find((c) => c.id === Number(cid)) || {}).color || C.info;
-  const [color, setColor] = useState(kursColorOf(kursId, classId));
-  useEffect(() => { setColor(kursColorOf(kursId, classId)); }, [classId, kursId]); // eslint-disable-line
+  // Farbe gehört dem Fach (Fach-Klasse): aus der gewählten Klasse.
+  const clsColorOf = (cid) => (classes.find((c) => c.id === Number(cid)) || {}).color || C.info;
+  const [color, setColor] = useState(clsColorOf(classId));
+  useEffect(() => { setColor(clsColorOf(classId)); }, [classId]); // eslint-disable-line
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
   const fld = { ...inputStyle, width: "100%" };
   const sfld = { ...selectStyle, width: "100%", fontSize: 14, padding: "10px 34px 10px 12px" };
