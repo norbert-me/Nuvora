@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, selectStyle, Tabs, inputStyle, modalOverlay, modalPanel } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, modalOverlay, modalPanel } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, put } from "../core/cache.js";
@@ -474,7 +474,7 @@ function HeuteView({ t, tt, weekdayOf, byDay, className, classColor, topicName, 
       )}
       {!istFrei && allDay.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>{t("kalender.allDay")}</div>
+          <div style={{ ...sectionLabel, marginBottom: 6 }}>{t("kalender.allDay")}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {allDay.map((e) => (
               <button key={e.id} onClick={() => onOpen({ ...e, date: new Date(e.date) })}
@@ -685,7 +685,7 @@ function DayView({ day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFo
 
       {hasBanner && (
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>{t("kalender.allDay")}</div>
+          <div style={{ ...sectionLabel, marginBottom: 6 }}>{t("kalender.allDay")}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {ganztags.map((e) => bannerBtn("g" + e.id, `${e.title || topicName(e.topic_id) || "—"}${linked(e) ? " ↗" : ""}`, e.notes || "", () => onOpen({ ...e, date: new Date(e.date) }), false))}
             {extAllDay.map((ev, i) => bannerBtn("xa" + i, `🔗 ${ev.title || "—"}`, ev.location || "", () => onExt(ev), true))}

@@ -130,6 +130,9 @@ export const selectStyle = {
 
 export const pageTitle = { fontSize: 22, fontWeight: 700, color: "var(--text)", marginBottom: 8 };
 export const pageIntro = { color: "var(--text2)", fontSize: 14, marginBottom: 22, lineHeight: 1.6 };
+// Kleine Abschnitts-Überschrift in Versalien (z.B. „Ganztägig", „Zusatz").
+// Einheitlich aus dem Kern statt je Seite neu inlinen.
+export const sectionLabel = { fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: 0.5 };
 
 export const COLORS = {
   danger: "#d1350f",
