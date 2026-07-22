@@ -3534,7 +3534,12 @@
         updateGenConfig();
         // Regler auf die gespeicherte Konfig der Lernleiter setzen (sonst zeigen
         // sie die Defaults). cfg-max zuerst — es begrenzt cfg-pflicht.
+        console.warn('openLernleiter config:', ll.config, '(null => Lernleiter ohne gespeicherte Konfig; einmal neu speichern)');
         setGenConfig(ll.config);
+        // Der Tab-Klick oben stösst ein asynchrones refreshGeneratorDropdowns an,
+        // das die Regler kurz danach neu bauen (Defaults) kann. Nach dem Settle
+        // noch einmal setzen, damit die gespeicherten Werte gewinnen.
+        setTimeout(() => { updateGenConfig(); setGenConfig(ll.config); }, 200);
 
         // Vorschau aus den gespeicherten Aufgaben-IDs je Schueler rekonstruieren.
         const sektVon = a => { const k = getKategorie(a); return k === 'Erklärung' ? 'Erklärung' : k === 'E-Niveau' ? 'E-Niveau' : k === 'G-Niveau' ? 'G-Niveau' : 'Basis'; };
