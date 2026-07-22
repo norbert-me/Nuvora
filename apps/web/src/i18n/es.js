@@ -997,6 +997,7 @@ export default {
   "klassenarbeit.gradeFrom": "Nota {{g}} desde",
   "klassenarbeit.distBar": "Barras",
   "klassenarbeit.distBox": "Boxplot",
+  "klassenarbeit.gradeModeHint": "Cambiar visualización de nota: tendencia (2+) o valor decimal en pasos de 0,3 (2,3)",
   "klassenarbeit.byTask": "Aciertos por tarea",
   "klassenarbeit.addPart": "Subtarea",
   "klassenarbeit.addPartHint": "Dividir en subtareas (a, b, c …) con puntos propios",

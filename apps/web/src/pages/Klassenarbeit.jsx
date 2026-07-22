@@ -26,6 +26,7 @@ export default function Klassenarbeit() {
   const [hideIndividual, setHideIndividual] = useState(false); // #55: SuS-Ansicht — einzelne Leistungen + Noten aus
   const [scaleOpen, setScaleOpen] = useState(false); // Notenschlüssel-Editor auf/zu
   const [distMode, setDistMode] = useState("bar");   // Notenverteilung: "bar" | "box"
+  const [gradeMode, setGradeMode] = useState("note"); // Note zeigen als "note" (2+) | "wert" (2,3)
   const [classId, setClassId] = useState(null);
   const [kursId, setKursId] = useState(null);
   const [classes, setClasses] = useState([]);
@@ -288,8 +289,10 @@ export default function Klassenarbeit() {
                   {students.map((s) => {
                     const sum = sumOf(s.id); const tm = totalMax(); const abw = isAbsent(s.id);
                     // Note auch für Abwesende zeigen (Punkte bleiben ja erhalten) — nur
-                    // die Klassenstatistik unten rechnet sie raus.
-                    const note = tm ? gradeDetailed((sum / tm) * 100, effScale).note : "";
+                    // die Klassenstatistik unten rechnet sie raus. Anzeige umschaltbar:
+                    // Tendenznote (2+) oder Notenwert in 0,3-Schritten (2,3).
+                    const gd = tm ? gradeDetailed((sum / tm) * 100, effScale) : null;
+                    const note = gd ? (gradeMode === "wert" ? String(gd.wert).replace(".", ",") : gd.note) : "";
                     return (
                       <tr key={s.id} style={abw ? { opacity: 0.5 } : undefined}>
                         <td style={{ ...td, textAlign: "left", padding: "4px 8px", position: "sticky", left: 0, background: "var(--card)", fontWeight: 500, whiteSpace: "nowrap" }}>
@@ -319,10 +322,17 @@ export default function Klassenarbeit() {
 
           <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap", alignItems: "center" }}>
             {notenAktiv && (work.tasks || []).length > 0 && <button onClick={() => setNotenModal(true)} style={btnPrimary}>{t("klassenarbeit.toNoten")}</button>}
-            {(kartenAktiv || lernpfadAktiv) && <button onClick={wiederholen} disabled={busy} style={{ ...btnSecondary, opacity: busy ? 0.6 : 1 }}>💡 {t("klassenarbeit.remediate")}</button>}
+            {(kartenAktiv || lernpfadAktiv) && <button onClick={wiederholen} disabled={busy} style={{ ...btnSecondary, opacity: busy ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.restore} size={15} /> {t("klassenarbeit.remediate")}</button>}
             {(work.tasks || []).length > 0 && (
-              <button onClick={() => setScaleOpen((v) => !v)} style={{ ...btnSecondary, marginLeft: "auto" }}
-                title={t("klassenarbeit.scaleHint")}>⚙ {t("klassenarbeit.scale")}{(work.scale && Object.keys(work.scale).length) ? " •" : ""}</button>
+              <div style={{ display: "inline-flex", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden", marginLeft: "auto" }} title={t("klassenarbeit.gradeModeHint")}>
+                {[["note", "2+"], ["wert", "2,3"]].map(([m, lbl]) => (
+                  <button key={m} onClick={() => setGradeMode(m)} style={{ border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 700, padding: "5px 11px", background: gradeMode === m ? "var(--accent)" : "transparent", color: gradeMode === m ? "#fff" : "var(--text2)" }}>{lbl}</button>
+                ))}
+              </div>
+            )}
+            {(work.tasks || []).length > 0 && (
+              <button onClick={() => setScaleOpen((v) => !v)} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}
+                title={t("klassenarbeit.scaleHint")}><Icon d={ICONS.settings} size={15} /> {t("klassenarbeit.scale")}{(work.scale && Object.keys(work.scale).length) ? " •" : ""}</button>
             )}
           </div>
           {scaleOpen && (work.tasks || []).length > 0 && (
@@ -412,10 +422,10 @@ export default function Klassenarbeit() {
                   </div>
                 </div>
                 {distMode === "bar" ? (
-                <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 70 }}>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 105 }}>
                   {analyse.noten.dist.map((c, i) => { const mxc = Math.max(...analyse.noten.dist, 1); return (
                     <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                      <div style={{ width: "60%", height: `${Math.max(2, (c / mxc) * 50)}px`, background: i < 2 ? C.success : i < 4 ? C.warning : C.danger, borderRadius: 3 }} title={`${c}`} />
+                      <div style={{ width: "60%", height: `${Math.max(3, (c / mxc) * 75)}px`, background: i < 2 ? C.success : i < 4 ? C.warning : C.danger, borderRadius: 3 }} title={`${c}`} />
                       <span style={{ fontSize: 11, color: "var(--text3)" }}>{c}</span>
                       <span style={{ fontSize: 11, fontWeight: 700 }}>{i + 1}</span>
                     </div>

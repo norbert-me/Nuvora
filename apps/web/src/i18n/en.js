@@ -997,6 +997,7 @@ export default {
   "klassenarbeit.gradeFrom": "Grade {{g}} from",
   "klassenarbeit.distBar": "Bars",
   "klassenarbeit.distBox": "Boxplot",
+  "klassenarbeit.gradeModeHint": "Toggle grade display: tendency (2+) or decimal value in 0.3 steps (2.3)",
   "klassenarbeit.byTask": "Hit rate per task",
   "klassenarbeit.addPart": "Sub-task",
   "klassenarbeit.addPartHint": "Split into sub-tasks (a, b, c …) with own points",

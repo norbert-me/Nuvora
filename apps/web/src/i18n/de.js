@@ -997,6 +997,7 @@ export default {
   "klassenarbeit.gradeFrom": "Note {{g}} ab",
   "klassenarbeit.distBar": "Balken",
   "klassenarbeit.distBox": "Boxplot",
+  "klassenarbeit.gradeModeHint": "Notenanzeige umschalten: Tendenz (2+) oder Notenwert in 0,3-Schritten (2,3)",
   "klassenarbeit.byTask": "Trefferquote je Aufgabe",
   "klassenarbeit.addPart": "Teilaufgabe",
   "klassenarbeit.addPartHint": "In Teilaufgaben (a, b, c …) mit eigenen Punkten aufteilen",
