@@ -1579,7 +1579,11 @@
 
     // ─── Generator ───
     function refreshGeneratorDropdowns() {
-        const themen = [...new Set(aufgaben.map(a => a.thema).filter(Boolean))].sort();
+        // Themen aus vorhandenen Aufgaben UND aus der Kern-Taxonomie (topics =
+        // „Profil"), damit man auch ohne bestehende Aufgabe ein Kern-Thema waehlen
+        // kann — sonst war die Auswahl leer, obwohl Themen im Kern gepflegt sind.
+        const kernOber = topics.filter(t => !t.parent_id).map(t => t.name);
+        const themen = [...new Set([...aufgaben.map(a => a.thema).filter(Boolean), ...kernOber])].sort();
         const sorted = [...klassen].sort();
 
         const selT = document.getElementById('gen-thema');
