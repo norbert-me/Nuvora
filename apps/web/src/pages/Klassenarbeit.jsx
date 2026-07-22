@@ -274,15 +274,21 @@ export default function Klassenarbeit() {
                 <thead>
                   <tr>
                     <th rowSpan={2} style={{ ...th, textAlign: "left", minWidth: 130, position: "sticky", left: 0, background: "var(--card)" }}>{t("common.name")}</th>
-                    {(work.tasks || []).map((tk, i) => <th key={tk.id} colSpan={units(tk).length} style={{ ...th, minWidth: 46, borderLeft: "1px solid var(--border)" }} title={tk.label}>{tk.label || (i + 1)}</th>)}
+                    {(work.tasks || []).map((tk, i) => <th key={tk.id} colSpan={units(tk).length + (units(tk).length > 1 ? 1 : 0)} style={{ ...th, minWidth: 46, borderLeft: "1px solid var(--border)" }} title={tk.label}>{tk.label || (i + 1)}</th>)}
                     <th rowSpan={2} style={{ ...th, minWidth: 58, borderLeft: "1px solid var(--border)" }}>Σ / {totalMax()}</th>
                     {/* SuS-/Präsentationsansicht: Note oben ausblenden (nicht vor der Klasse zeigen). */}
                     {!hideIndividual && <th rowSpan={2} style={{ ...th, minWidth: 44 }}>{t("klassenarbeit.grade")}</th>}
                   </tr>
                   <tr>
-                    {(work.tasks || []).flatMap((tk) => units(tk).map((u, j) => (
-                      <th key={u.id} style={{ ...th, minWidth: 44, fontWeight: 500, borderLeft: j === 0 ? "1px solid var(--border)" : undefined }}>{u.label || ""}<div style={{ fontSize: 10, color: "var(--text3)", fontWeight: 400 }}>/{unitMax(u)}</div></th>
-                    )))}
+                    {(work.tasks || []).flatMap((tk) => {
+                      const sub = units(tk).length > 1;   // echte Teilaufgaben
+                      const cols = units(tk).map((u, j) => (
+                        <th key={u.id} style={{ ...th, minWidth: 44, fontWeight: 500, borderLeft: j === 0 ? "1px solid var(--border)" : undefined }}>{u.label || ""}<div style={{ fontSize: 10, color: "var(--text3)", fontWeight: 400 }}>/{unitMax(u)}</div></th>
+                      ));
+                      // Summe der Teilaufgaben je Aufgabe (nur wenn es Teile gibt).
+                      if (sub) cols.push(<th key={tk.id + "-sum"} style={{ ...th, minWidth: 46, fontWeight: 700, background: "var(--bg2)" }}>Σ<div style={{ fontSize: 10, color: "var(--text3)", fontWeight: 400 }}>/{taskMax(tk)}</div></th>);
+                      return cols;
+                    })}
                   </tr>
                 </thead>
                 <tbody>
@@ -302,14 +308,19 @@ export default function Klassenarbeit() {
                             {s.name}
                           </span>
                         </td>
-                        {(work.tasks || []).flatMap((tk) => units(tk).map((u, j) => (
-                          <td key={u.id} style={{ ...td, borderLeft: j === 0 ? "1px solid var(--border)" : undefined }}>
-                            {/* Abwesende bleiben editierbar — Punkte werden nur nicht in die
-                                Klassenstatistik gerechnet, aber nicht gelöscht. */}
-                            <input type="number" min="0" step="0.5" max={unitMax(u)} value={pointsOf(s.id, u.id)} onChange={(e) => setPoints(s.id, u.id, e.target.value === "" ? "" : Math.min(unitMax(u), Math.max(0, Number(e.target.value))))}
-                              style={{ width: 42, height: 30, border: "none", background: "transparent", textAlign: "center", fontSize: 13, color: "var(--text)" }} />
-                          </td>
-                        )))}
+                        {(work.tasks || []).flatMap((tk) => {
+                          const sub = units(tk).length > 1;
+                          const cells = units(tk).map((u, j) => (
+                            <td key={u.id} style={{ ...td, borderLeft: j === 0 ? "1px solid var(--border)" : undefined }}>
+                              {/* Abwesende bleiben editierbar — Punkte werden nur nicht in die
+                                  Klassenstatistik gerechnet, aber nicht gelöscht. */}
+                              <input type="number" min="0" step="0.5" max={unitMax(u)} value={pointsOf(s.id, u.id)} onChange={(e) => setPoints(s.id, u.id, e.target.value === "" ? "" : Math.min(unitMax(u), Math.max(0, Number(e.target.value))))}
+                                style={{ width: 42, height: 30, border: "none", background: "transparent", textAlign: "center", fontSize: 13, color: "var(--text)" }} />
+                            </td>
+                          ));
+                          if (sub) { const ts = units(tk).reduce((n, u) => n + (Number(pointsOf(s.id, u.id)) || 0), 0); cells.push(<td key={tk.id + "-sum"} style={{ ...td, fontWeight: 700, background: "var(--bg2)", color: "var(--text2)" }}>{ts}</td>); }
+                          return cells;
+                        })}
                         <td style={{ ...td, fontWeight: 700, borderLeft: "1px solid var(--border)", color: abw ? "var(--text3)" : (tm && sum / tm < 0.5 ? C.danger : "var(--text)") }}>{`${sum}/${tm}`}{abw ? ` (${t("klassenarbeit.absentShort")})` : ""}</td>
                         {!hideIndividual && <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : "var(--text)" }}>{note}</td>}
                       </tr>
