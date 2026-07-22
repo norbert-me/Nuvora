@@ -269,8 +269,6 @@ function ModuleGate({ moduleKey, children }) {
 function ConnectionMonitor() {
   const [online, setOnline] = useState(true);
   const [reason, setReason] = useState("server"); // "server" | "db"
-  const [reconnecting, setReconnecting] = useState(false);
-  const hasBeenOffline = useRef(false);
 
   const check = async (aliveRef) => {
     const ctrl = new AbortController();
@@ -318,21 +316,15 @@ function ConnectionMonitor() {
   // Im Offline-Zustand schneller nachprüfen (bestätigt DB-/Server-Status live)
   useEffect(() => {
     if (online) return;
-    hasBeenOffline.current = true;
     const ref = { alive: true };
     const fast = setInterval(() => check(ref), 4000);
     return () => { ref.alive = false; clearInterval(fast); };
   }, [online]);
 
-  // Auto-Reconnect: nach einem Ausfall Seite neu laden, damit alle Daten frisch sind
-  useEffect(() => {
-    if (online && hasBeenOffline.current) {
-      hasBeenOffline.current = false;
-      setReconnecting(true);
-      const t = setTimeout(() => window.location.reload(), 1800);
-      return () => clearTimeout(t);
-    }
-  }, [online]);
+  // Kein Auto-Reload mehr bei Reconnect: offline getippte Änderungen werden von
+  // der Outbox gepuffert und beim Wiederverbinden nachgespielt (siehe _flush /
+  // cardvote:online). Ein ganzseitiger Reload riss laufende Eingaben unnötig raus.
+  // Der Offline-Banner unten bleibt als Info; er verschwindet, sobald wieder online.
 
   // Nav-Header per CSS-Variable unter den Offline-Balken schieben (statt zu überdecken)
   useEffect(() => {
@@ -341,39 +333,6 @@ function ConnectionMonitor() {
     else root.style.removeProperty("--offline-banner-h");
     return () => root.style.removeProperty("--offline-banner-h");
   }, [online]);
-
-  if (reconnecting) {
-    return (
-      <div style={{
-        position: "fixed", inset: 0, zIndex: 1100,
-        background: "rgba(0,0,0,0.45)",
-        display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
-      }}>
-        <style>{`@keyframes cmpop{from{opacity:0;transform:scale(0.9)}to{opacity:1;transform:scale(1)}}`}</style>
-        <div style={{
-          background: "var(--card, #fff)", borderRadius: 20, padding: "28px 32px", maxWidth: 360, width: "100%",
-          textAlign: "center", boxShadow: "0 12px 40px rgba(0,0,0,0.3)", animation: "cmpop 0.2s ease-out",
-        }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: 28, margin: "0 auto 14px",
-            background: "rgba(10,125,62,0.12)", display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#0a7d3e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-          </div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text, #1d1d1f)", marginBottom: 6 }}>Verbindung wiederhergestellt</div>
-          <p style={{ fontSize: 14, color: "var(--text3, #6e6e73)", margin: "0 0 18px", lineHeight: 1.5 }}>
-            Der Server ist wieder erreichbar. Die Seite wird jetzt aktualisiert…
-          </p>
-          <button onClick={() => window.location.reload()} style={{
-            padding: "10px 24px", fontSize: 15, fontWeight: 600, cursor: "pointer",
-            background: "#0a7d3e", color: "#fff", border: "none", borderRadius: 980,
-          }}>
-            Jetzt aktualisieren
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   if (online) return null;
 
