@@ -6,7 +6,7 @@
 // wieder, weil der Fortschritt im Konto-Browser gemerkt wird.
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { btnPrimary, btnSecondary, pageTitle } from "../components/Icons.jsx";
+import { btnPrimary, btnSecondary, pageTitle, COLORS as C } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const STORAGE_KEY = "nuvora_tutorial_done";
@@ -68,7 +68,7 @@ export default function Tutorial() {
               <span style={{
                 width: 26, height: 26, borderRadius: 13, flexShrink: 0, fontSize: 13, fontWeight: 700,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                background: erledigt ? "#0a7d3e" : "var(--bg)", color: erledigt ? "#fff" : "var(--text3)",
+                background: erledigt ? C.success : "var(--bg)", color: erledigt ? "#fff" : "var(--text3)",
                 border: erledigt ? "none" : "1px solid var(--border2)",
               }}>
                 {erledigt ? "✓" : i + 1}

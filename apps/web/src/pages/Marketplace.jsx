@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { Icon, ICONS, modalOverlay, modalPanel } from "../components/Icons.jsx";
+import { Icon, ICONS, modalOverlay, modalPanel, COLORS as C } from "../components/Icons.jsx";
 
 const API = "/api";
 
@@ -200,8 +200,8 @@ export default function Marketplace({ fixedKind }) {
                 <button onClick={() => openPreview(q.id)} style={{ padding: "7px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer", background: "var(--card)", color: "var(--text)", border: "1px solid var(--border2)", borderRadius: 980, whiteSpace: "nowrap" }}>{t("market.preview")}</button>
                 <button onClick={() => copy(q)} style={{ padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 980, whiteSpace: "nowrap" }}>{t("market.adopt")}</button>
                 {(user && (user.id === q.author_id || user.id === 1)) && (
-                  <button onClick={() => remove(q.id)} title={t("market.removeTitle")} style={{ padding: 7, background: "none", border: "1px solid var(--border2)", borderRadius: 980, cursor: "pointer", color: "#d1350f", display: "flex", alignItems: "center" }}>
-                    <Icon d={ICONS.trash} size={15} color="#d1350f" />
+                  <button onClick={() => remove(q.id)} title={t("market.removeTitle")} style={{ padding: 7, background: "none", border: "1px solid var(--border2)", borderRadius: 980, cursor: "pointer", color: C.danger, display: "flex", alignItems: "center" }}>
+                    <Icon d={ICONS.trash} size={15} color={C.danger} />
                   </button>
                 )}
               </div>
@@ -280,10 +280,10 @@ export default function Marketplace({ fixedKind }) {
                       {["A", "B", "C", "D"].slice(0, q.num_choices || 4).map((k) => {
                         const isCorrect = q.correct_answer && q.correct_answer.includes(k);
                         return (
-                          <div key={k} style={{ fontSize: 13, color: isCorrect ? "#0a7d3e" : "var(--text2)", fontWeight: isCorrect ? 600 : 400, display: "flex", gap: 6, minWidth: 0, alignItems: "flex-start" }}>
+                          <div key={k} style={{ fontSize: 13, color: isCorrect ? C.success : "var(--text2)", fontWeight: isCorrect ? 600 : 400, display: "flex", gap: 6, minWidth: 0, alignItems: "flex-start" }}>
                             <span style={{ fontWeight: 700, flexShrink: 0 }}>{k}</span>
                             <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{(q.choices && q.choices[k]) || "–"}</span>
-                            {isCorrect && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0a7d3e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 1, flexShrink: 0 }}><path d="M20 6L9 17l-5-5"/></svg>}
+                            {isCorrect && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.success} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 1, flexShrink: 0 }}><path d="M20 6L9 17l-5-5"/></svg>}
                           </div>
                         );
                       })}

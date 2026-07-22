@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { DownloadLink } from "../components/Icons.jsx";
+import { DownloadLink, COLORS as C } from "../components/Icons.jsx";
 
 const API = "/api";
 
@@ -16,7 +16,7 @@ export default function StudentEvaluation() {
 
   const { class_name, students, tests } = data;
   const student = students.find((s) => String(s.card_id) === cardId);
-  if (!student) return <p style={{ color: "#d1350f" }}>Lernende/r nicht gefunden.</p>;
+  if (!student) return <p style={{ color: C.danger }}>Lernende/r nicht gefunden.</p>;
 
   const results = tests.map((test) => {
     const s = test.student_scores[student.card_id];
@@ -52,8 +52,8 @@ export default function StudentEvaluation() {
 
       <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
         <StatCard label="Ø Gesamt" value={avgPct != null ? `${avgPct}%` : "–"} color={colorForPct(avgPct)} />
-        <StatCard label="Bester Test" value={best != null ? `${best}%` : "–"} color="#0a7d3e" />
-        <StatCard label="Schwächster" value={worst != null ? `${worst}%` : "–"} color="#d1350f" />
+        <StatCard label="Bester Test" value={best != null ? `${best}%` : "–"} color={C.success} />
+        <StatCard label="Schwächster" value={worst != null ? `${worst}%` : "–"} color={C.danger} />
         <StatCard label="Median" value={median != null ? `${median}%` : "–"} />
         <StatCard label="Teilnahmen" value={`${present.length} / ${tests.length}`} />
       </div>
@@ -118,9 +118,9 @@ export default function StudentEvaluation() {
 
 function colorForPct(pct) {
   if (pct == null) return "var(--text3)";
-  if (pct >= 80) return "#0a7d3e";
-  if (pct >= 50) return "#b8860b";
-  return "#d1350f";
+  if (pct >= 80) return C.success;
+  if (pct >= 50) return C.warning;
+  return C.danger;
 }
 
 function StatCard({ label, value, color }) {

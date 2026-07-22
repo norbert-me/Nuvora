@@ -123,7 +123,7 @@ export default function Orga() {
                   <th key={it.id} style={{ ...th, minWidth: 90 }}>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
                       <span style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.name}</span>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: it.done.length === students.length ? "#0a7d3e" : "var(--text3)" }}>{it.done.length}/{students.length}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: it.done.length === students.length ? C.success : "var(--text3)" }}>{it.done.length}/{students.length}</span>
                       <button onClick={() => loeschen(it.id)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title={t("common.delete")}><Icon d={ICONS.trash} size={13} color={C.danger} /></button>
                     </div>
                   </th>
@@ -142,7 +142,7 @@ export default function Orga() {
                       <td key={it.id} style={td}>
                         <button onClick={() => toggle(it, s.id)} title={on ? t("orga.done") : t("orga.open")}
                           style={{ width: 24, height: 24, borderRadius: 6, cursor: "pointer", fontSize: 14, fontWeight: 700,
-                            border: on ? "none" : "1px solid var(--border2)", background: on ? "#0a7d3e" : "transparent", color: on ? "#fff" : "transparent" }}>
+                            border: on ? "none" : "1px solid var(--border2)", background: on ? C.success : "transparent", color: on ? "#fff" : "transparent" }}>
                           ✓
                         </button>
                       </td>

@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
-import { StageBadge, Icon, ICONS, iconBtn, btnSecondary, selectStyle } from "../components/Icons.jsx";
+import { StageBadge, Icon, ICONS, iconBtn, btnSecondary, selectStyle, COLORS as C } from "../components/Icons.jsx";
 import { pageTitle } from "../components/Icons.jsx";
 
 const card = {
@@ -74,7 +74,7 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv, methodenAktiv }) {
   };
   const Btn = ({ row, art, label, onClick }) => {
     const key = `${row.class_id}:${row.topic_id}:${art}`;
-    if (done[key]) return <span style={{ fontSize: 12.5, color: "#0a7d3e", fontWeight: 700 }}>✓</span>;
+    if (done[key]) return <span style={{ fontSize: 12.5, color: C.success, fontWeight: 700 }}>✓</span>;
     return <button onClick={onClick} disabled={busy === key} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12.5, opacity: busy === key ? 0.6 : 1 }}>{label}</button>;
   };
 
@@ -86,14 +86,14 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv, methodenAktiv }) {
         {rows.map((row) => (
           <div key={`${row.class_id}:${row.topic_id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 10, flexWrap: "wrap" }}>
             <span style={{ flex: 1, fontWeight: 600, minWidth: 130 }}>{row.name} <span style={{ fontWeight: 400, color: "var(--text3)", fontSize: 12.5 }}>· {row.klasse}</span></span>
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: row.pct < 40 ? "#d1350f" : "#b8860b" }}>{row.pct}%</span>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: row.pct < 40 ? C.danger : C.warning }}>{row.pct}%</span>
             {methodByTopic[row.topic_id] && (
               <Link to="/methoden" title={methodByTopic[row.topic_id].title} style={{ fontSize: 12, fontWeight: 700, color: "#2563eb", textDecoration: "none", padding: "3px 9px", borderRadius: 980, background: "rgba(37,99,235,0.12)" }}>
                 💡 {t("home.weakEinstieg")}
               </Link>
             )}
             {row.geuebt ? (
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0a7d3e", display: "inline-flex", alignItems: "center", gap: 4 }}>✓ {t("home.weakPracticed")}</span>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: C.success, display: "inline-flex", alignItems: "center", gap: 4 }}>✓ {t("home.weakPracticed")}</span>
             ) : (() => {
               // Fachübergreifende (klassenlose) Zeile: erst Klasse waehlen, dann
               // Karten/Lernpfad fuer genau die Klasse erzeugen. Klassenzeilen wie bisher.

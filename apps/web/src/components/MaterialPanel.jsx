@@ -3,7 +3,7 @@
 // Modul-Gate. Download laeuft ueber fetch (Bearer-Token), nicht ueber <a href>,
 // weil eine Browser-Navigation den Token nicht mitschickt.
 import { useState, useEffect } from "react";
-import { Icon, ICONS, btnSecondary } from "./Icons.jsx";
+import { Icon, ICONS, btnSecondary, COLORS as C } from "./Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { askConfirm } from "../core/dialog.jsx";
@@ -71,7 +71,7 @@ export default function MaterialPanel({ topicId = null, entryId = null }) {
             onChange={(e) => { const f = e.target.files[0]; e.target.value = ""; upload(f); }} />
         </label>
       </div>
-      {err && <p style={{ color: "#d1350f", fontSize: 12.5, margin: "0 0 8px" }}>{err}</p>}
+      {err && <p style={{ color: C.danger, fontSize: 12.5, margin: "0 0 8px" }}>{err}</p>}
       {items.length === 0 ? (
         <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("material.empty")}</p>
       ) : items.map((m) => (

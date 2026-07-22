@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { COLORS as C } from "../components/Icons.jsx";
 
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -38,7 +39,7 @@ export default function Contact() {
 
         {sent ? (
           <div style={{ textAlign: "center" }}>
-            <div style={{ color: "#0a7d3e", fontSize: 15, fontWeight: 600, marginBottom: 4 }}>{t("contact.sent")}</div>
+            <div style={{ color: C.success, fontSize: 15, fontWeight: 600, marginBottom: 4 }}>{t("contact.sent")}</div>
             <p style={{ color: "var(--text3)", fontSize: 13 }}>{t("contact.sentThanks")}</p>
           </div>
         ) : (
@@ -47,7 +48,7 @@ export default function Contact() {
             <input type="email" placeholder={t("contact.emailPlaceholder")} value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} required />
             <textarea placeholder={t("contact.messagePlaceholder")} value={message} onChange={(e) => setMessage(e.target.value)} rows={6}
               style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }} required maxLength={5000} />
-            {error && <div style={{ color: "#d1350f", fontSize: 13, marginBottom: 12 }}>{error}</div>}
+            {error && <div style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</div>}
             <button type="submit" disabled={sending} style={{ ...btnPrimary, opacity: sending ? 0.6 : 1 }}>
               {sending ? t("contact.sending") : t("contact.send")}
             </button>

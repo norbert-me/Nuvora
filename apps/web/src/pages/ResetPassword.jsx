@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { COLORS as C } from "../components/Icons.jsx";
 
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -36,10 +37,10 @@ export default function ResetPassword() {
         <p style={{ color: "var(--text3)", fontSize: 14, textAlign: "center", marginBottom: 24, marginTop: 4 }}>{t("reset.title")}</p>
 
         {!token ? (
-          <div style={{ color: "#d1350f", fontSize: 14, textAlign: "center" }}>{t("reset.noToken")}</div>
+          <div style={{ color: C.danger, fontSize: 14, textAlign: "center" }}>{t("reset.noToken")}</div>
         ) : done ? (
           <div style={{ textAlign: "center" }}>
-            <div style={{ color: "#0a7d3e", fontSize: 14, marginBottom: 16 }}>
+            <div style={{ color: C.success, fontSize: 14, marginBottom: 16 }}>
               {t("reset.done")}
             </div>
             <a href="/login" style={{ ...btnPrimary, display: "inline-block", textDecoration: "none", textAlign: "center", boxSizing: "border-box" }}>{t("verify.toLogin")}</a>
@@ -48,7 +49,7 @@ export default function ResetPassword() {
           <form onSubmit={submit}>
             <input type="password" placeholder={t("reset.pw")} value={pw} onChange={(e) => setPw(e.target.value)} style={inputStyle} autoFocus required />
             <input type="password" placeholder={t("reset.pw2")} value={pw2} onChange={(e) => setPw2(e.target.value)} style={inputStyle} required />
-            {error && <div style={{ color: "#d1350f", fontSize: 13, marginBottom: 12 }}>{error}</div>}
+            {error && <div style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</div>}
             <button type="submit" style={btnPrimary}>{t("reset.save")}</button>
             <div style={{ textAlign: "center", marginTop: 16 }}>
               <a href="/login" style={{ color: "var(--accent)", fontSize: 13, textDecoration: "none" }}>{t("login.backToLogin")}</a>

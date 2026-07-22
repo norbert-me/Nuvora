@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { COLORS as C } from "../components/Icons.jsx";
 import { askPrompt } from "../core/dialog.jsx";
 import { useParams, useNavigate } from "react-router-dom";
 import Latex from "../components/Latex.jsx";
@@ -6,7 +7,7 @@ import { useLanguage } from "../i18n/index.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 
 const API = "/api";
-const COLORS = { A: "#0066cc", B: "#5856d6", C: "#b8860b", D: "#d1350f" };
+const COLORS = { A: "#0066cc", B: "#5856d6", C: C.warning, D: C.danger };
 const PODIUM_COLORS = ["#FFD700", "#C0C0C0", "#CD7F32"];
 
 const SvgGamepad = ({ size = 16, color = "currentColor" }) => (
@@ -416,7 +417,7 @@ export default function Session() {
                   {s.mode === "game" ? (
                     <button onClick={async () => { await fetch(`${API}/sessions/${s.id}/finish`, { method: "POST" }); setActiveSessions((prev) => prev.filter((x) => x.id !== s.id)); }} style={{
                       padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
-                      background: "#d1350f", color: "white", border: "none", borderRadius: 980,
+                      background: C.danger, color: "white", border: "none", borderRadius: 980,
                     }}>
                       {t("session.finish")}
                     </button>
@@ -680,7 +681,7 @@ export default function Session() {
                 <td style={{ padding: "10px 12px", color: "var(--text)" }}><Latex>{q.text}</Latex></td>
                 <td style={{
                   padding: "10px 12px", textAlign: "center", fontWeight: 600,
-                  color: q.pct === null ? "var(--text3)" : q.pct >= 80 ? "#0a7d3e" : q.pct >= 50 ? "#b8860b" : "#d1350f",
+                  color: q.pct === null ? "var(--text3)" : q.pct >= 80 ? C.success : q.pct >= 50 ? C.warning : C.danger,
                 }}>
                   {q.pct === null ? "–" : `${q.pct}%`}
                 </td>
@@ -703,7 +704,7 @@ export default function Session() {
   // Step 3: Live session
   const isLastQuestion = questionIndex + 1 >= questions.length;
   const timerPct = timeLeft != null && timerSeconds > 0 ? (timeLeft / timerSeconds) * 100 : 100;
-  const timerColor = timeLeft !== null && timeLeft <= 5 ? "#d1350f" : timeLeft !== null && timeLeft <= 10 ? "#b8860b" : "var(--accent)";
+  const timerColor = timeLeft !== null && timeLeft <= 5 ? C.danger : timeLeft !== null && timeLeft <= 10 ? C.warning : "var(--accent)";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "calc(100vh - 120px)" }}>
@@ -732,7 +733,7 @@ export default function Session() {
           </button>
           <button onClick={toggleMute} style={{
             padding: "5px 10px", fontSize: 14, cursor: "pointer",
-            background: "none", color: muted ? "#d1350f" : "var(--text3)", border: "1px solid var(--border2)", borderRadius: 980,
+            background: "none", color: muted ? C.danger : "var(--text3)", border: "1px solid var(--border2)", borderRadius: 980,
           }} title={muted ? t("session.unmute") : t("session.mute")}>
             {muted ? (
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M23 9l-6 6M17 9l6 6"/></svg>
@@ -753,7 +754,7 @@ export default function Session() {
           </button>
           <button onClick={finishSession} style={{
             padding: "5px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer",
-            background: "none", color: "#d1350f", border: "1px solid #d1350f", borderRadius: 980,
+            background: "none", color: C.danger, border: "1px solid #d1350f", borderRadius: 980,
           }}>
             {t("session.finish")}
           </button>
@@ -816,7 +817,7 @@ export default function Session() {
                 return (
                   <div key={`${question.id}-${key}`} style={{
                     padding: "clamp(12px, 2.5vh, 28px) clamp(16px, 2vw, 28px)",
-                    background: isExtra ? "var(--bg2)" : isCorrect ? "#0a7d3e" : isWrong ? "var(--bg2)" : "var(--card)",
+                    background: isExtra ? "var(--bg2)" : isCorrect ? C.success : isWrong ? "var(--bg2)" : "var(--card)",
                     color: isCorrect ? "white" : "var(--text)",
                     borderRadius: 16,
                     fontSize: "clamp(20px, 4vh, 44px)",
@@ -861,7 +862,7 @@ export default function Session() {
               </button>
             )}
             {revealed && isLastQuestion && (
-              <button onClick={finishSession} style={{ ...btnPrimary, padding: "12px 28px", fontSize: 16, background: "#d1350f", color: "#fff", display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <button onClick={finishSession} style={{ ...btnPrimary, padding: "12px 28px", fontSize: 16, background: C.danger, color: "#fff", display: "inline-flex", alignItems: "center", gap: 6 }}>
                 {gameMode ? <><SvgTrophy size={16} color="#fff" /> {t("session.endGame")}</> : t("scanner.finishTest")}
               </button>
             )}
@@ -932,7 +933,7 @@ const stepLabel = { fontSize: 12, fontWeight: 700, color: "var(--text3)", margin
 const thStyle = { padding: "8px 12px", fontSize: 13, fontWeight: 600, color: "var(--text3)" };
 const btnPrimary = { cursor: "pointer", border: "none", borderRadius: 980, background: "var(--accent)", color: "white", fontWeight: 600, fontSize: 15, padding: "12px 28px", letterSpacing: "-0.2px" };
 const btnSecondary = { cursor: "pointer", border: "1px solid var(--border2)", borderRadius: 980, background: "var(--card)", color: "var(--text)", fontSize: 15, padding: "12px 28px" };
-const btnLarge = { ...btnPrimary, padding: "14px 36px", fontSize: 16, borderRadius: 980, background: "#0a7d3e" };
+const btnLarge = { ...btnPrimary, padding: "14px 36px", fontSize: 16, borderRadius: 980, background: C.success };
 
 function FolderPicker({ folders, selected, onSelect, depth = 0 }) {
   const [expanded, setExpanded] = useState({});

@@ -3,7 +3,7 @@
 // und wird nicht gespeichert. Übersicht zeigt Fehlzeiten und lässt nachtragen.
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { pageTitle, btnSecondary, selectStyle, Toggle, Tabs, inputStyle } from "../components/Icons.jsx";
+import { pageTitle, btnSecondary, selectStyle, Toggle, Tabs, inputStyle, COLORS as C } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
@@ -12,7 +12,7 @@ import { swr , lastClass, rememberClass } from "../core/cache.js";
 const API = "/api/anwesenheit";
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const STATI = ["da", "fehlt", "spaet", "entsch"];
-const COL = { da: "#0a7d3e", fehlt: "#d1350f", spaet: "#b8860b", entsch: "#2563eb" };
+const COL = { da: C.success, fehlt: C.danger, spaet: C.warning, entsch: "#2563eb" };
 
 export default function Anwesenheit() {
   const { t } = useLanguage();

@@ -285,7 +285,7 @@ export default function Dashboard() {
   const excludeIds = movingNode ? new Set(getAllFolderIds(movingNode)) : new Set();
   const moveTargets = flatFolders(folders).filter((f) => !excludeIds.has(f.id));
 
-  if (loadError && folders.length === 0) return <p style={{ color: "#d1350f" }}>{t("common.connectionError")}</p>;
+  if (loadError && folders.length === 0) return <p style={{ color: C.danger }}>{t("common.connectionError")}</p>;
 
   return (
     <div>
@@ -412,8 +412,8 @@ function ImportProgress({ status }) {
     reading:    { title: t("dash.impReading"), color: "var(--accent)", bar: "indet" },
     uploading:  { title: `${t("dash.impUploading")} ${pct != null ? pct + "%" : ""}`, color: "var(--accent)", bar: "det" },
     processing: { title: t("dash.impProcessing"), color: "var(--accent)", bar: "indet" },
-    done:       { title: t("dash.impDone"), color: "#0a7d3e", bar: "full" },
-    error:      { title: t("dash.impFailed"), color: "#d1350f", bar: "full" },
+    done:       { title: t("dash.impDone"), color: C.success, bar: "full" },
+    error:      { title: t("dash.impFailed"), color: C.danger, bar: "full" },
   };
   const s = map[stage] || map.reading;
   return (
@@ -422,15 +422,15 @@ function ImportProgress({ status }) {
       <div style={{ width: "min(420px, 92vw)", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 14, boxShadow: "0 8px 30px rgba(0,0,0,0.18)", padding: "14px 16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
           {stage === "done" ? (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0a7d3e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.success} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
           ) : stage === "error" ? (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d1350f" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.danger} strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
           ) : (
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="2.5" strokeLinecap="round" style={{ animation: "spin 0.9s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.2-8.5"/><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></svg>
           )}
           <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{s.title}</span>
         </div>
-        {label && <div style={{ fontSize: 12, color: stage === "error" ? "#d1350f" : "var(--text3)", marginBottom: 8, marginLeft: 24 }}>{label}</div>}
+        {label && <div style={{ fontSize: 12, color: stage === "error" ? C.danger : "var(--text3)", marginBottom: 8, marginLeft: 24 }}>{label}</div>}
         <div style={{ position: "relative", height: 6, background: "var(--bg2)", borderRadius: 3, overflow: "hidden" }}>
           {s.bar === "indet" ? (
             <div style={{ position: "absolute", top: 0, height: "100%", width: "40%", borderRadius: 3, background: s.color, animation: "impIndet 1.1s ease-in-out infinite" }} />
@@ -917,7 +917,7 @@ function QuestionStats({ questionId }) {
       </div>
       <div style={{ display: "flex", gap: 16, marginBottom: 10, flexWrap: "wrap" }}>
         <div style={{ background: "var(--bg2)", borderRadius: 8, padding: "6px 12px", textAlign: "center" }}>
-          <div style={{ fontSize: 18, fontWeight: 700, color: stats.pct_correct >= 80 ? "#0a7d3e" : stats.pct_correct >= 50 ? "#b8860b" : "#d1350f" }}>{stats.pct_correct}%</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: stats.pct_correct >= 80 ? C.success : stats.pct_correct >= 50 ? C.warning : C.danger }}>{stats.pct_correct}%</div>
           <div style={{ fontSize: 11, color: "var(--text3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             {t("dash.correct")}
             <InfoTip text={t("dash.ciTip")} />

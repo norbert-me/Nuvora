@@ -337,7 +337,7 @@ export default function Classes() {
           <button onClick={() => setEditing(null)} style={btnSecondary}>{t("common.cancel")}</button>
         </div>
         {cardvote && (
-          <p style={{ fontSize: 12, color: students.length >= MAX_CARDS ? "#d1350f" : "var(--text3)", margin: 0 }}>
+          <p style={{ fontSize: 12, color: students.length >= MAX_CARDS ? C.danger : "var(--text3)", margin: 0 }}>
             {t("classes.limit", { max: MAX_CARDS, count: students.length })}
           </p>
         )}
@@ -345,7 +345,7 @@ export default function Classes() {
     );
   }
 
-  if (loadError && classes.length === 0 && !editing) return <p style={{ color: "#d1350f" }}>{t("common.connectionError")}</p>;
+  if (loadError && classes.length === 0 && !editing) return <p style={{ color: C.danger }}>{t("common.connectionError")}</p>;
 
   return (
     <div>

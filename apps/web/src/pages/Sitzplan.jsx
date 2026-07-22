@@ -11,15 +11,15 @@ import { swr , lastClass, rememberClass } from "../core/cache.js";
 
 const API = "/api/sitzplan";
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-const ABS_COL = { fehlt: "#d1350f", spaet: "#b8860b", entsch: "#2563eb" };
+const ABS_COL = { fehlt: C.danger, spaet: C.warning, entsch: "#2563eb" };
 const SEAT_W = 108, SEAT_H = 46;
 // SEGEL-Stufen (Helios-Konzept): Boot vom Hafen bis in die Welt, zunehmende
 // Selbststeuerung. Reihenfolge = Klick-Kreislauf am Platz (leer → … → leer).
 const SEGEL = [
-  { key: "hafen", label: "Hafen", ab: "H", color: "#d1350f" },
+  { key: "hafen", label: "Hafen", ab: "H", color: C.danger },
   { key: "kueste", label: "Küste", ab: "K", color: "#c026a3" },
   { key: "meer", label: "Meer", ab: "M", color: "#2563eb" },
-  { key: "welt", label: "Welt", ab: "W", color: "#0a7d3e" },
+  { key: "welt", label: "Welt", ab: "W", color: C.success },
 ];
 const SEGEL_CYCLE = ["", "hafen", "kueste", "meer", "welt"];
 
@@ -337,7 +337,7 @@ export default function Sitzplan() {
           <span style={{ color: "var(--text3)" }}>· {t("sitzplan.segelCycleHint")}</span>
         </div>
       )}
-      {msg && <p style={{ fontSize: 13, color: "#0a7d3e", marginBottom: 10 }}>{msg}</p>}
+      {msg && <p style={{ fontSize: 13, color: C.success, marginBottom: 10 }}>{msg}</p>}
 
       {students.length === 0 ? (
         <Empty title={t("sitzplan.noStudents")} hint={t("sitzplan.noStudentsHint")} />

@@ -201,7 +201,7 @@ export default function Klassenarbeit() {
                         <td style={{ ...td, textAlign: "left", padding: "4px 8px", position: "sticky", left: 0, background: "var(--card)", fontWeight: 500, whiteSpace: "nowrap" }}>
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                             <button onClick={() => toggleAbsent(s.id)} title={abw ? t("klassenarbeit.present") : t("klassenarbeit.absent")}
-                              style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, color: abw ? "#b8860b" : "var(--text3)", padding: 0 }}>{abw ? "🚫" : "○"}</button>
+                              style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, color: abw ? C.warning : "var(--text3)", padding: 0 }}>{abw ? "🚫" : "○"}</button>
                             {s.name}
                           </span>
                         </td>
@@ -213,7 +213,7 @@ export default function Klassenarbeit() {
                             )}
                           </td>
                         ))}
-                        <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : (tm && sum / tm < 0.5 ? "#d1350f" : "var(--text)") }}>{abw ? t("klassenarbeit.absentShort") : `${sum}/${tm}`}</td>
+                        <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : (tm && sum / tm < 0.5 ? C.danger : "var(--text)") }}>{abw ? t("klassenarbeit.absentShort") : `${sum}/${tm}`}</td>
                       </tr>
                     );
                   })}
@@ -241,14 +241,14 @@ export default function Klassenarbeit() {
               {analyse.topics.length === 0 ? <p style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("klassenarbeit.noTopics")}</p> : analyse.topics.map((tp) => (
                 <div key={tp.topic_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0" }}>
                   <span style={{ flex: 1, fontSize: 13 }}>{tp.label}</span>
-                  <span style={{ width: 120, height: 8, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}><span style={{ display: "block", width: `${tp.pct}%`, height: "100%", background: tp.pct < 50 ? "#d1350f" : tp.pct < 75 ? "#b8860b" : "#0a7d3e" }} /></span>
+                  <span style={{ width: 120, height: 8, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}><span style={{ display: "block", width: `${tp.pct}%`, height: "100%", background: tp.pct < 50 ? C.danger : tp.pct < 75 ? C.warning : C.success }} /></span>
                   <span style={{ fontSize: 12.5, fontWeight: 700, minWidth: 38, textAlign: "right" }}>{tp.pct}%</span>
                 </div>
               ))}
               {!hideIndividual && analyse.students.length > 0 && (<>
                 <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.weakStudents")}</div>
                 {analyse.students.map((s) => (
-                  <div key={s.student_id} style={{ fontSize: 13, padding: "3px 0" }}><b>{s.name}:</b> <span style={{ color: "#d1350f" }}>{s.weak.join(", ")}</span></div>
+                  <div key={s.student_id} style={{ fontSize: 13, padding: "3px 0" }}><b>{s.name}:</b> <span style={{ color: C.danger }}>{s.weak.join(", ")}</span></div>
                 ))}
               </>)}
 
@@ -258,7 +258,7 @@ export default function Klassenarbeit() {
                 {analyse.perTask.map((tk) => (
                   <div key={tk.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "3px 0" }}>
                     <span style={{ flex: 1, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tk.label}</span>
-                    <span style={{ width: 100, height: 7, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}><span style={{ display: "block", width: `${tk.pct}%`, height: "100%", background: tk.pct < 50 ? "#d1350f" : tk.pct < 75 ? "#b8860b" : "#0a7d3e" }} /></span>
+                    <span style={{ width: 100, height: 7, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}><span style={{ display: "block", width: `${tk.pct}%`, height: "100%", background: tk.pct < 50 ? C.danger : tk.pct < 75 ? C.warning : C.success }} /></span>
                     <span style={{ fontSize: 12, fontWeight: 700, minWidth: 34, textAlign: "right" }}>{tk.pct}%</span>
                   </div>
                 ))}
@@ -270,7 +270,7 @@ export default function Klassenarbeit() {
                 <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 70 }}>
                   {analyse.noten.dist.map((c, i) => { const mxc = Math.max(...analyse.noten.dist, 1); return (
                     <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                      <div style={{ width: "60%", height: `${Math.max(2, (c / mxc) * 50)}px`, background: i < 2 ? "#0a7d3e" : i < 4 ? "#b8860b" : "#d1350f", borderRadius: 3 }} title={`${c}`} />
+                      <div style={{ width: "60%", height: `${Math.max(2, (c / mxc) * 50)}px`, background: i < 2 ? C.success : i < 4 ? C.warning : C.danger, borderRadius: 3 }} title={`${c}`} />
                       <span style={{ fontSize: 11, color: "var(--text3)" }}>{c}</span>
                       <span style={{ fontSize: 11, fontWeight: 700 }}>{i + 1}</span>
                     </div>
@@ -328,7 +328,7 @@ function NotenUebernahme({ t, classId, kursId, students, work, onClose }) {
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t("klassenarbeit.toNoten")}</h3>
         <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 12px" }}>{t("klassenarbeit.toNotenHint", { n: grades.length })}</p>
         {sections && sections.length === 0 ? (
-          <p style={{ fontSize: 13, color: "#d1350f" }}>{t("karten.masteryNoSection")}</p>
+          <p style={{ fontSize: 13, color: C.danger }}>{t("karten.masteryNoSection")}</p>
         ) : (<>
           <div style={{ ...lbl, marginTop: 0 }}>{t("karten.masterySection")}</div>
           <select value={sectionId} onChange={(e) => setSectionId(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
@@ -337,7 +337,7 @@ function NotenUebernahme({ t, classId, kursId, students, work, onClose }) {
           <div style={lbl}>{t("noten.columnName")}</div>
           <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, width: "100%" }} />
         </>)}
-        {err && <p style={{ color: "#d1350f", fontSize: 12.5, marginTop: 10 }}>{err}</p>}
+        {err && <p style={{ color: C.danger, fontSize: 12.5, marginTop: 10 }}>{err}</p>}
         <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
           <button onClick={submit} disabled={busy || grades.length === 0 || (sections && sections.length === 0)} style={{ ...btnPrimary, opacity: busy ? 0.6 : 1 }}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
@@ -372,7 +372,7 @@ function quartiles(arr) {
   return { n, min: a[0], q1: q(0.25), med: q(0.5), q3: q(0.75), max: a[n - 1], avg: a.reduce((s, x) => s + x, 0) / n };
 }
 
-const boxColor = (med) => (med < 50 ? "#d1350f" : med < 75 ? "#b8860b" : "#0a7d3e");
+const boxColor = (med) => (med < 50 ? C.danger : med < 75 ? C.warning : C.success);
 
 // Ein horizontaler Boxplot auf 0–100 %-Achse (Whisker min–max, Box Q1–Q3, Median).
 function Boxplot({ q }) {

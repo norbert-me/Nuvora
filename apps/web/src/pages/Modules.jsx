@@ -2,7 +2,7 @@
 // des Moduls bleiben im Kern liegen und sind nach dem Wiedereinschalten da.
 import { useState } from "react";
 import { useModules } from "../core/modules.js";
-import { StageBadge, Tabs, inputStyle, btnSecondary } from "../components/Icons.jsx";
+import { StageBadge, Tabs, inputStyle, btnSecondary, COLORS as C } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { pageTitle } from "../components/Icons.jsx";
 
@@ -104,7 +104,7 @@ export default function Modules() {
                 {t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name}
                 {" "}<StageBadge stage={m.stage} title={m.stage === "beta" ? t("stage.betaHint") : t("stage.alphaHint")} />
                 {beliebt.has(m.key) && !m.active && (
-                  <span title={t("modules.popularHint", { n: m.popularity })} style={{ fontSize: 11, fontWeight: 700, color: "#0a7d3e", background: "rgba(10,125,62,0.12)", padding: "2px 8px", borderRadius: 980, marginLeft: 8 }}>
+                  <span title={t("modules.popularHint", { n: m.popularity })} style={{ fontSize: 11, fontWeight: 700, color: C.success, background: "rgba(10,125,62,0.12)", padding: "2px 8px", borderRadius: 980, marginLeft: 8 }}>
                     {t("modules.popularBadge")}
                   </span>
                 )}

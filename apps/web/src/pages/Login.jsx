@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { COLORS as C } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api";
@@ -89,11 +90,11 @@ export default function Login({ onLogin }) {
             <input type="password" placeholder={t("login.password")} value={password} onChange={(e) => setPassword(e.target.value)} style={inputStyle} required />
           )}
 
-          {error && <div style={{ color: "#d1350f", fontSize: 13, marginBottom: 12 }}>{error}</div>}
+          {error && <div style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</div>}
           {showResend && (
             <button type="button" onClick={resendVerification} style={{ ...linkBtn, marginBottom: 12, display: "block" }}>{t("login.resendVerification")}</button>
           )}
-          {message && <div style={{ color: "#0a7d3e", fontSize: 13, marginBottom: 12 }}>{message}</div>}
+          {message && <div style={{ color: C.success, fontSize: 13, marginBottom: 12 }}>{message}</div>}
 
           <button type="submit" style={btnPrimary}>
             {mode === "login" ? t("login.submitLogin") : mode === "register" ? t("login.submitRegister") : t("login.submitForgot")}

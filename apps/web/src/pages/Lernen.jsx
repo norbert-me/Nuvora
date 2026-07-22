@@ -1,6 +1,7 @@
 // Kartenlernen für Schüler — KEIN Login, Zugriff über den Token in der URL.
 // Öffentliche Route: läuft ohne Nuvora-Konto. Der Token ist die Identität.
 import { useState, useEffect, useCallback } from "react";
+import { COLORS as C } from "../components/Icons.jsx";
 import { useParams } from "react-router-dom";
 
 const API = "/api/karten";
@@ -126,8 +127,8 @@ export default function Lernen() {
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginTop: 16 }}>
             <Grade label="Nochmal" color="#dc2626" onClick={() => bewerten(0)} />
-            <Grade label="Schwer" color="#b8860b" onClick={() => bewerten(1)} />
-            <Grade label="Gut" color="#0a7d3e" onClick={() => bewerten(2)} />
+            <Grade label="Schwer" color={C.warning} onClick={() => bewerten(1)} />
+            <Grade label="Gut" color={C.success} onClick={() => bewerten(2)} />
             <Grade label="Leicht" color="#0066cc" onClick={() => bewerten(3)} />
           </div>
         )}
@@ -143,7 +144,7 @@ const REIFE = [
   ["lernen", "Am Lernen", "#f59e0b"],
   ["kurz", "Kurzfristig", "#eab308"],
   ["mittel", "Mittelfristig", "#84cc16"],
-  ["lang", "Langfristig", "#0a7d3e"],
+  ["lang", "Langfristig", C.success],
 ];
 
 function MeinFortschritt({ data }) {
@@ -193,7 +194,7 @@ function Ergebnisse({ results }) {
               <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
               <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.date ? new Date(r.date).toLocaleDateString() : ""}</div>
             </div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: r.pct >= 50 ? "#0a7d3e" : "#dc2626" }}>{r.pct}%</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: r.pct >= 50 ? C.success : "#dc2626" }}>{r.pct}%</div>
             <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.score}/{r.total}</div>
           </div>
         ))}

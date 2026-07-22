@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { COLORS as C } from "../components/Icons.jsx";
 
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -24,13 +25,13 @@ export default function VerifyEmail() {
         {state === "loading" && <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("verify.inProgress")}</p>}
         {state === "ok" && (
           <>
-            <div style={{ color: "#0a7d3e", fontSize: 15, fontWeight: 600, marginBottom: 16 }}>{t("verify.ok")}</div>
+            <div style={{ color: C.success, fontSize: 15, fontWeight: 600, marginBottom: 16 }}>{t("verify.ok")}</div>
             <a href="/login" style={btnPrimary}>{t("verify.toLogin")}</a>
           </>
         )}
         {state === "error" && (
           <>
-            <div style={{ color: "#d1350f", fontSize: 14, marginBottom: 16 }}>{t("verify.failed")}</div>
+            <div style={{ color: C.danger, fontSize: 14, marginBottom: 16 }}>{t("verify.failed")}</div>
             <a href="/login" style={{ color: "var(--accent)", fontSize: 14, textDecoration: "none" }}>{t("verify.toLogin")}</a>
           </>
         )}

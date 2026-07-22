@@ -3,11 +3,11 @@ import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
-import { DownloadLink, Icon, ICONS, btnPrimary, btnSecondary, modalOverlay, modalPanel, inputStyle } from "../components/Icons.jsx";
+import { DownloadLink, Icon, ICONS, btnPrimary, btnSecondary, modalOverlay, modalPanel, inputStyle, COLORS as C } from "../components/Icons.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
 
 const API = "/api";
-const COLORS = { A: "#0066cc", B: "#5856d6", C: "#b8860b", D: "#d1350f" };
+const COLORS = { A: "#0066cc", B: "#5856d6", C: C.warning, D: C.danger };
 
 function median(arr) {
   if (!arr.length) return 0;
@@ -22,7 +22,7 @@ function stddev(arr) {
   return Math.sqrt(arr.reduce((s, x) => s + (x - m) ** 2, 0) / (arr.length - 1));
 }
 
-const GRADE_COLORS = { 1: "#0a7d3e", 2: "#0a7d3e", 3: "#b8860b", 4: "#b8860b", 5: "#d1350f", 6: "#d1350f" };
+const GRADE_COLORS = { 1: C.success, 2: C.success, 3: C.warning, 4: C.warning, 5: C.danger, 6: C.danger };
 // gradeFromPct + DEFAULT_SCALE liegen zentral in core/grades.js (eine Quelle,
 // auch von der Karten-Meisterung genutzt).
 
@@ -91,7 +91,7 @@ function Boxplot({ values, max, label }) {
         {outliers.map((v, i) => (
           <div key={i} style={{
             position: "absolute", top: 19, left: `${pct(v)}%`,
-            width: 10, height: 10, borderRadius: 5, background: "#d1350f", transform: "translateX(-5px)",
+            width: 10, height: 10, borderRadius: 5, background: C.danger, transform: "translateX(-5px)",
           }} />
         ))}
       </div>
@@ -211,7 +211,7 @@ export default function Evaluation() {
     saveConfig(weights, next);
   };
 
-  if (loadError && !data) return <p style={{ color: "#d1350f" }}>Verbindungsfehler — Server nicht erreichbar.</p>;
+  if (loadError && !data) return <p style={{ color: C.danger }}>Verbindungsfehler — Server nicht erreichbar.</p>;
   if (!data) return <div style={{ minHeight: "70vh" }} />;
 
   const { questions: rawQuestions = [], students: rawStudents = [], session_name } = data;
@@ -392,7 +392,7 @@ const gradeDistribution = (() => {
   const fmtDisc = (d) => {
     if (d === null) return "–";
     const v = d.toFixed(2);
-    const color = d >= 0.4 ? "#0a7d3e" : d >= 0.2 ? "#b8860b" : "#d1350f";
+    const color = d >= 0.4 ? C.success : d >= 0.2 ? C.warning : C.danger;
     const label = d >= 0.4 ? "gut" : d >= 0.2 ? "akzeptabel" : "schwach";
     return <span style={{ color }} title={label}>{v}</span>;
   };
@@ -441,11 +441,11 @@ const gradeDistribution = (() => {
         </div>
 
         <div style={{ display: "flex", gap: 20, marginBottom: 20, flexWrap: "wrap" }}>
-          <StatBox label="Richtig" value={`${stat.pct}%`} color={stat.pct >= 80 ? "#0a7d3e" : stat.pct >= 50 ? "#b8860b" : "#d1350f"} />
+          <StatBox label="Richtig" value={`${stat.pct}%`} color={stat.pct >= 80 ? C.success : stat.pct >= 50 ? C.warning : C.danger} />
           <StatBox label="95%-KI" value={stat.ciLow !== null ? `${stat.ciLow}–${stat.ciHigh}%` : "–"} />
           <StatBox label="Ratewahrsch." value={stat.guessProb !== null ? `${Math.round(stat.guessProb * 100)}%` : "–"} />
           <StatBox label="Trennschärfe" value={stat.discrimination !== null ? stat.discrimination.toFixed(2) : "–"}
-            color={stat.discrimination !== null ? (stat.discrimination >= 0.4 ? "#0a7d3e" : stat.discrimination >= 0.2 ? "#b8860b" : "#d1350f") : undefined} />
+            color={stat.discrimination !== null ? (stat.discrimination >= 0.4 ? C.success : stat.discrimination >= 0.2 ? C.warning : C.danger) : undefined} />
           <StatBox label="Std.abw." value={stat.itemSd !== null ? stat.itemSd.toFixed(2) : "–"} />
           <StatBox label="Beantwortet" value={`${stat.answered} / ${presentStudents.length}`} />
           <StatBox label="Gewichtung" value={`×${getWeight(q.id)}`} />
@@ -466,7 +466,7 @@ const gradeDistribution = (() => {
               <div style={{ flex: 1, height: 28, background: "var(--bg2)", borderRadius: 6, overflow: "hidden" }}>
                 <div style={{
                   height: "100%", width: `${pct}%`,
-                  background: isCorrect ? "#0a7d3e" : COLORS[k],
+                  background: isCorrect ? C.success : COLORS[k],
                   borderRadius: 6, display: "flex", alignItems: "center", paddingLeft: 8,
                   color: "white", fontSize: 13, fontWeight: 600, transition: "width 0.3s",
                   minWidth: count > 0 ? 28 : 0, opacity: isCorrect ? 1 : 0.6,
@@ -500,7 +500,7 @@ const gradeDistribution = (() => {
           />
         )}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {configDirty && <span style={{ fontSize: 11, color: saving ? "#b8860b" : "#0a7d3e" }}>{saving ? "Speichern…" : "Gespeichert"}</span>}
+          {configDirty && <span style={{ fontSize: 11, color: saving ? C.warning : C.success }}>{saving ? "Speichern…" : "Gespeichert"}</span>}
           {/* Nur sichtbar, wenn das Notenmodul aktiv ist — sonst fuehrt der
               Knopf ins Leere (Regel 3: CardVote haengt nicht von Noten ab). */}
           {notenAktiv && data.class_id && (
@@ -569,9 +569,9 @@ const gradeDistribution = (() => {
             Eine <strong>große</strong> σ zeigt große Leistungsunterschiede.
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: "#0a7d3e", minWidth: 64 }}>σ &lt; 10%</span><span>Homogene Gruppe — wenig Differenzierung.</span></div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: "#b8860b", minWidth: 64 }}>10–25%</span><span>Normale Streuung — gute Differenzierung.</span></div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: "#d1350f", minWidth: 64 }}>σ &gt; 25%</span><span>Heterogen — ggf. Binnendifferenzierung prüfen.</span></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.success, minWidth: 64 }}>σ &lt; 10%</span><span>Homogene Gruppe — wenig Differenzierung.</span></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.warning, minWidth: 64 }}>10–25%</span><span>Normale Streuung — gute Differenzierung.</span></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.danger, minWidth: 64 }}>σ &gt; 25%</span><span>Heterogen — ggf. Binnendifferenzierung prüfen.</span></div>
           </div>
         </div>
       )}
@@ -781,8 +781,8 @@ const gradeDistribution = (() => {
                           : a.correct_answer ? "var(--danger-bg)"
                           : "#fff",
                         color: a.answer == null ? "#ccc"
-                          : a.is_correct ? "#0a7d3e"
-                          : a.correct_answer ? "#d1350f"
+                          : a.is_correct ? C.success
+                          : a.correct_answer ? C.danger
                           : "var(--text)",
                       }}
                     >
@@ -795,7 +795,7 @@ const gradeDistribution = (() => {
                   <td style={{
                     ...td, textAlign: "center", fontWeight: "bold",
                     background: pct >= 80 ? "var(--success-bg)" : pct >= 50 ? "var(--warn-bg)" : "var(--danger-bg)",
-                    color: pct >= 80 ? "#0a7d3e" : pct >= 50 ? "#b8860b" : "#d1350f",
+                    color: pct >= 80 ? C.success : pct >= 50 ? C.warning : C.danger,
                   }}>
                     {maxScore > 0 ? `${pct}%` : "–"}
                   </td>
@@ -831,7 +831,7 @@ const gradeDistribution = (() => {
             <tr style={{ borderTop: "2px solid var(--border3)" }}>
               <td style={{ ...td, fontWeight: "bold", color: "var(--text3)", fontSize: 12 }}>Richtig</td>
               {questionStats.map((stat, i) => (
-                <td key={i} style={{ ...td, textAlign: "center", fontSize: 12, fontWeight: "bold", color: stat.pct >= 80 ? "#0a7d3e" : stat.pct >= 50 ? "#b8860b" : "#d1350f" }}>
+                <td key={i} style={{ ...td, textAlign: "center", fontSize: 12, fontWeight: "bold", color: stat.pct >= 80 ? C.success : stat.pct >= 50 ? C.warning : C.danger }}>
                   {stat.answered > 0 ? `${stat.pct}%` : "–"}
                 </td>
               ))}
@@ -920,10 +920,10 @@ const gradeDistribution = (() => {
             Die Trennschärfe (punkt-biseriale Korrelation) misst, wie gut eine einzelne Frage zwischen leistungsstarken und leistungsschwachen Lernenden unterscheidet. <strong>Wertebereich:</strong> −1 bis +1
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: "#0a7d3e", minWidth: 72 }}>≥ 0.40</span><span>Gut — die Frage trennt zuverlässig.</span></div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: "#b8860b", minWidth: 72 }}>0.20–0.39</span><span>Akzeptabel — brauchbar, aber verbesserungsfähig.</span></div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: "#d1350f", minWidth: 72 }}>&lt; 0.20</span><span>Schwach — überarbeiten oder entfernen.</span></div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: "#d1350f", minWidth: 72 }}>Negativ</span><span>Starke Lernende antworten häufiger falsch!</span></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.success, minWidth: 72 }}>≥ 0.40</span><span>Gut — die Frage trennt zuverlässig.</span></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.warning, minWidth: 72 }}>0.20–0.39</span><span>Akzeptabel — brauchbar, aber verbesserungsfähig.</span></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.danger, minWidth: 72 }}>&lt; 0.20</span><span>Schwach — überarbeiten oder entfernen.</span></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.danger, minWidth: 72 }}>Negativ</span><span>Starke Lernende antworten häufiger falsch!</span></div>
           </div>
           <p style={{ fontSize: 12, color: "var(--text3)", padding: "8px 12px", background: "var(--bg2)", borderRadius: 8 }}>Mindestens 3 beantwortete Bögen erforderlich.</p>
         </div>
@@ -1058,7 +1058,7 @@ function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
 
         {done !== null ? (
           <>
-            <p style={{ fontSize: 14, color: "#0a7d3e", marginBottom: 16 }}>
+            <p style={{ fontSize: 14, color: C.success, marginBottom: 16 }}>
 {t("notenimp.done", { n: done })}
             </p>
             <button onClick={onClose} style={btnPrimary}>{t("noten.close")}</button>
@@ -1178,9 +1178,9 @@ function TopicAnalysis({ questions, presentStudents }) {
         return (
           <div key={r.tid} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: "1px solid var(--border)", flexWrap: "wrap" }}>
             <span style={{ flex: 1, minWidth: 140, fontSize: 13.5, fontWeight: weak ? 600 : 400 }}>{label(r.tid)}</span>
-            <span style={{ fontSize: 13.5, fontWeight: 700, color: weak ? "var(--danger, #dc2626)" : "#0a7d3e", width: 48, textAlign: "right" }}>{r.pct}%</span>
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: weak ? "var(--danger, #dc2626)" : C.success, width: 48, textAlign: "right" }}>{r.pct}%</span>
             {weak && (
-              <span style={{ fontSize: 12, color: "#b8860b", display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12, color: C.warning, display: "flex", alignItems: "center", gap: 8 }}>
                 {t("analyse.weak")}
                 {lernpfad && (n > 0
                   ? <Link to="/lernpfad?tab=aufgaben" style={{ color: "var(--accent)", textDecoration: "none" }}>{t("analyse.exercisesN", { n })} →</Link>
@@ -1225,7 +1225,7 @@ function WeakTopics({ sessionId, classId, karten, lernpfad, t }) {
 
   const Btn = ({ tp, art, onClick, label }) => {
     const key = `${tp.topic_id}:${art}`;
-    if (done[key]) return <span style={{ fontSize: 12.5, color: "#0a7d3e", fontWeight: 600 }}>✓</span>;
+    if (done[key]) return <span style={{ fontSize: 12.5, color: C.success, fontWeight: 600 }}>✓</span>;
     return (
       <button onClick={() => onClick(tp)} disabled={busy === key}
         style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12.5, opacity: busy === key ? 0.6 : 1 }}>{label}</button>
@@ -1240,7 +1240,7 @@ function WeakTopics({ sessionId, classId, karten, lernpfad, t }) {
         {schwach.map((tp) => (
           <div key={tp.topic_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 10, flexWrap: "wrap" }}>
             <span style={{ flex: 1, fontWeight: 600, minWidth: 120 }}>{tp.name}</span>
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: tp.pct < 40 ? "#d1350f" : "#b8860b" }}>{tp.pct}%</span>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: tp.pct < 40 ? C.danger : C.warning }}>{tp.pct}%</span>
             {karten && <Btn tp={tp} art="karten" onClick={deckAnlegen} label={t("weak.makeDeck")} />}
             {lernpfad && <Btn tp={tp} art="lernpfad" onClick={aufgabeAnlegen} label={t("weak.makeExercise")} />}
           </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { LoadError } from "../components/Icons.jsx";
+import { LoadError, COLORS as C } from "../components/Icons.jsx";
 
 const API = "/api";
 
@@ -26,7 +26,7 @@ function Boxplot({ values }) {
         <div style={{ position: "absolute", top: 8, left: `${q1}%`, width: `${q3 - q1}%`, height: 32, background: "rgba(10,132,255,0.15)", border: "2px solid var(--accent)", borderRadius: 6 }} />
         <div style={{ position: "absolute", top: 6, left: `${med}%`, width: 3, height: 36, background: "var(--accent)", borderRadius: 2 }} />
         {outliers.map((v, i) => (
-          <div key={i} style={{ position: "absolute", top: 19, left: `${v}%`, width: 10, height: 10, borderRadius: 5, background: "#d1350f", transform: "translateX(-5px)" }} />
+          <div key={i} style={{ position: "absolute", top: 19, left: `${v}%`, width: 10, height: 10, borderRadius: 5, background: C.danger, transform: "translateX(-5px)" }} />
         ))}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", margin: "4px 20px 0", fontSize: 11, color: "var(--text3)" }}>
@@ -259,16 +259,16 @@ export default function ClassEvaluation() {
 function cellStyle(pt) {
   if (!pt.present) return { color: "var(--border2)" };
   const pct = pt.total > 0 ? (pt.score / pt.total) * 100 : 0;
-  if (pct >= 80) return { background: "var(--success-bg)", color: "#0a7d3e" };
-  if (pct >= 50) return { background: "var(--warn-bg)", color: "#b8860b" };
-  return { background: "var(--danger-bg)", color: "#d1350f" };
+  if (pct >= 80) return { background: "var(--success-bg)", color: C.success };
+  if (pct >= 50) return { background: "var(--warn-bg)", color: C.warning };
+  return { background: "var(--danger-bg)", color: C.danger };
 }
 
 function pctStyle(pct) {
   if (pct == null) return { color: "#ccc", background: "var(--bg2)" };
-  if (pct >= 80) return { background: "var(--success-bg)", color: "#0a7d3e" };
-  if (pct >= 50) return { background: "var(--warn-bg)", color: "#b8860b" };
-  return { background: "var(--danger-bg)", color: "#d1350f" };
+  if (pct >= 80) return { background: "var(--success-bg)", color: C.success };
+  if (pct >= 50) return { background: "var(--warn-bg)", color: C.warning };
+  return { background: "var(--danger-bg)", color: C.danger };
 }
 
 const backLink = { color: "var(--text3)", textDecoration: "none", fontSize: 13, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 0", transition: "color 0.15s" };

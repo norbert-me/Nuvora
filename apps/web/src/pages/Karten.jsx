@@ -181,7 +181,7 @@ export default function Karten() {
             ) : (
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
                 <span style={{ fontSize: 14, fontWeight: 700 }}>{t("karten.progress")}</span>
-                <span style={{ fontSize: 12.5, padding: "4px 10px", borderRadius: 980, background: "rgba(10,125,62,0.12)", color: "#0a7d3e", fontWeight: 600 }}>{t("karten.thisWeek")}: {dieseWoche}/{nStud}</span>
+                <span style={{ fontSize: 12.5, padding: "4px 10px", borderRadius: 980, background: "rgba(10,125,62,0.12)", color: C.success, fontWeight: 600 }}>{t("karten.thisWeek")}: {dieseWoche}/{nStud}</span>
                 {nieGelernt > 0 && <span style={{ fontSize: 12.5, padding: "4px 10px", borderRadius: 980, background: "var(--bg2)", color: "var(--text3)", fontWeight: 600 }}>{t("karten.neverLearned")}: {nieGelernt}</span>}
                 {notenAktiv && <button onClick={() => setNotenDialog(true)} style={{ ...btnSecondary, padding: "5px 12px", marginLeft: "auto" }}>{t("karten.toNoten")}</button>}
               </div>
@@ -203,7 +203,7 @@ export default function Karten() {
                       </td>
                       <td style={{ ...td, textAlign: "left" }}><ReifeBar hist={p.hist} /></td>
                       <td style={td}>{p.reviewed}{total ? ` / ${total}` : ""}</td>
-                      <td style={{ ...td, color: p.due ? "#b8860b" : "var(--text3)" }}>{p.due || "—"}</td>
+                      <td style={{ ...td, color: p.due ? C.warning : "var(--text3)" }}>{p.due || "—"}</td>
                       <td style={{ ...td, color: "var(--text3)", fontSize: 12.5 }}>{p.last_reviewed ? new Date(p.last_reviewed).toLocaleDateString() : "—"}</td>
                     </tr>
                   ))}
@@ -283,7 +283,7 @@ function NotenBrueckeModal({ t, classId, kursId, progress, scale, onClose }) {
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t("karten.toNoten")}</h3>
         <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 14px" }}>{t("karten.masteryHint", { n: grades.length })}</p>
         {sections && sections.length === 0 ? (
-          <p style={{ fontSize: 13, color: "#d1350f" }}>{t("karten.masteryNoSection")}</p>
+          <p style={{ fontSize: 13, color: C.danger }}>{t("karten.masteryNoSection")}</p>
         ) : (<>
           <div style={{ fontSize: 12.5, color: "var(--text2)", margin: "0 0 5px" }}>{t("karten.masterySection")}</div>
           <select value={sectionId} onChange={(e) => setSectionId(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
@@ -292,7 +292,7 @@ function NotenBrueckeModal({ t, classId, kursId, progress, scale, onClose }) {
           <div style={{ fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" }}>{t("noten.columnName")}</div>
           <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, width: "100%" }} />
         </>)}
-        {err && <p style={{ color: "#d1350f", fontSize: 12.5, marginTop: 10 }}>{err}</p>}
+        {err && <p style={{ color: C.danger, fontSize: 12.5, marginTop: 10 }}>{err}</p>}
         <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
           <button onClick={submit} disabled={busy || grades.length === 0 || (sections && sections.length === 0)} style={{ ...btnPrimary, opacity: busy || grades.length === 0 ? 0.6 : 1 }}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
@@ -365,8 +365,8 @@ function Deck({ deck, t, call, topics = [], showTopic = false }) {
   const now = Date.now();
   const rel = deck.released_at ? new Date(deck.released_at).getTime() : null;
   const status = rel === null ? "entwurf" : rel > now ? "geplant" : "aus";
-  const badge = status === "aus" ? { text: t("karten.rolledOut"), bg: "rgba(10,125,62,0.12)", col: "#0a7d3e" }
-    : status === "geplant" ? { text: t("karten.plannedFor", { date: new Date(deck.released_at).toLocaleString() }), bg: "rgba(184,134,11,0.12)", col: "#b8860b" }
+  const badge = status === "aus" ? { text: t("karten.rolledOut"), bg: "rgba(10,125,62,0.12)", col: C.success }
+    : status === "geplant" ? { text: t("karten.plannedFor", { date: new Date(deck.released_at).toLocaleString() }), bg: "rgba(184,134,11,0.12)", col: C.warning }
     : { text: t("karten.draft"), bg: "var(--bg3)", col: "var(--text3)" };
 
   return (
@@ -512,7 +512,7 @@ const REIFE = [
   ["lernen", "Am Lernen", "#f59e0b"],
   ["kurz", "Kurzfristig", "#eab308"],
   ["mittel", "Mittelfristig", "#84cc16"],
-  ["lang", "Langfristig", "#0a7d3e"],
+  ["lang", "Langfristig", C.success],
 ];
 
 // Gestapelter Reifegrad-Balken aus einem hist-Objekt {neu,lernen,...}.

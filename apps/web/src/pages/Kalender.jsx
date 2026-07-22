@@ -326,7 +326,7 @@ export default function Kalender() {
               <button key={tp.topic_id} onClick={() => setEditing({ date: startOfDay(mondayOf(cursor)), title: `${t("kalender.wdhPrefix")}: ${tp.name}`, topic_id: tp.topic_id })}
                 style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 980, border: "1px solid var(--border2)", background: "var(--bg)", cursor: "pointer", fontSize: 13 }}>
                 <span style={{ fontWeight: 600 }}>{tp.name}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: tp.pct < 40 ? "#d1350f" : "#b8860b" }}>{tp.pct}%</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: tp.pct < 40 ? C.danger : C.warning }}>{tp.pct}%</span>
                 <span style={{ color: "var(--accent)" }}>+</span>
               </button>
             ))}
@@ -514,7 +514,7 @@ function HeuteView({ t, tt, weekdayOf, byDay, className, classColor, topicName, 
                 </div>
                 {orgaAktiv && s.class_id && (
                   <span title={t("anwesenheit.overview")} style={{ fontSize: 12.5, fontWeight: 700, padding: "3px 10px", borderRadius: 980,
-                    background: absent > 0 ? "rgba(209,53,15,0.12)" : "rgba(10,125,62,0.10)", color: absent > 0 ? "#d1350f" : "#0a7d3e" }}>
+                    background: absent > 0 ? "rgba(209,53,15,0.12)" : "rgba(10,125,62,0.10)", color: absent > 0 ? C.danger : C.success }}>
                     {absent > 0 ? t("kalender.absentN", { n: absent }) : t("kalender.allPresent")}
                   </span>
                 )}

@@ -54,7 +54,7 @@ export default function Tests() {
     return d.toLocaleDateString({ de: "de-DE", en: "en-GB", es: "es-ES" }[lang] || "de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
   };
 
-  if (error && sessions.length === 0) return <p style={{ color: "#d1350f" }}>{t("common.connectionError")}</p>;
+  if (error && sessions.length === 0) return <p style={{ color: C.danger }}>{t("common.connectionError")}</p>;
 
   return (
     <div>

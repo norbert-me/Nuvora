@@ -96,8 +96,8 @@ export default function Ausleihe() {
                   <span style={{ color: "var(--text3)", fontSize: 12 }}>{offen === it.id ? "▾" : "▸"}</span>
                   {it.name}
                 </button>
-                {it.open > 0 && <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 9px", borderRadius: 980, background: "rgba(209,53,15,0.12)", color: "#d1350f" }}>{t("ausleihe.outCount", { n: it.open })}</span>}
-                {it.overdue > 0 && <span title={t("ausleihe.overdueHint", { d: UEBERFAELLIG_TAGE })} style={{ fontSize: 12, fontWeight: 800, padding: "2px 9px", borderRadius: 980, background: "#d1350f", color: "#fff" }}>{t("ausleihe.overdueCount", { n: it.overdue })}</span>}
+                {it.open > 0 && <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 9px", borderRadius: 980, background: "rgba(209,53,15,0.12)", color: C.danger }}>{t("ausleihe.outCount", { n: it.open })}</span>}
+                {it.overdue > 0 && <span title={t("ausleihe.overdueHint", { d: UEBERFAELLIG_TAGE })} style={{ fontSize: 12, fontWeight: 800, padding: "2px 9px", borderRadius: 980, background: C.danger, color: "#fff" }}>{t("ausleihe.overdueCount", { n: it.overdue })}</span>}
                 <button onClick={() => loeschen(it.id)} className="icon-btn" style={{ ...iconBtn, padding: 5 }} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
               </div>
 
@@ -128,7 +128,7 @@ export default function Ausleihe() {
                         return (
                         <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", border: ueber ? "1px solid #d1350f" : "1px solid var(--border)", borderRadius: 8, background: ueber ? "rgba(209,53,15,0.06)" : undefined }}>
                           <span style={{ flex: 1, fontWeight: 500 }}>{l.borrower}</span>
-                          <span style={{ fontSize: 12, color: ueber ? "#d1350f" : "var(--text3)", fontWeight: ueber ? 700 : 400 }}>{t("ausleihe.sinceDays", { n: tage })}</span>
+                          <span style={{ fontSize: 12, color: ueber ? C.danger : "var(--text3)", fontWeight: ueber ? 700 : 400 }}>{t("ausleihe.sinceDays", { n: tage })}</span>
                           <button onClick={() => zurueck(l.id, it.id)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>{t("ausleihe.return")}</button>
                         </div>
                         );

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { COLORS as C } from "../components/Icons.jsx";
 
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -30,13 +31,13 @@ export default function ConfirmEmailChange() {
         {state === "loading" && <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("emailchange.inProgress")}</p>}
         {state === "ok" && (
           <>
-            <div style={{ color: "#0a7d3e", fontSize: 15, fontWeight: 600, marginBottom: 16 }}>{t("emailchange.ok")}</div>
+            <div style={{ color: C.success, fontSize: 15, fontWeight: 600, marginBottom: 16 }}>{t("emailchange.ok")}</div>
             <a href="/login" style={btnPrimary}>{t("verify.toLogin")}</a>
           </>
         )}
         {state === "error" && (
           <>
-            <div style={{ color: "#d1350f", fontSize: 14, marginBottom: 16 }}>{error || t("emailchange.failed")}</div>
+            <div style={{ color: C.danger, fontSize: 14, marginBottom: 16 }}>{error || t("emailchange.failed")}</div>
             <a href="/profile" style={{ color: "var(--accent)", fontSize: 14, textDecoration: "none" }}>{t("emailchange.backToProfile")}</a>
           </>
         )}

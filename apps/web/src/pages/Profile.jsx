@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { btnPrimary, btnSecondary } from "../components/Icons.jsx";
+import { btnPrimary, btnSecondary, COLORS as C } from "../components/Icons.jsx";
 
 const API = "/api";
 
@@ -28,7 +28,7 @@ const InfoDot = ({ text }) => {
 };
 
 const TrashIcon = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#d1350f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={C.danger} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/>
   </svg>
 );
@@ -159,7 +159,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         <div style={{ fontSize: 15, color: "var(--text3)", marginBottom: 4 }}>{t("profile.email")}</div>
         <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>{user.email}</div>
         {pendingEmail && (
-          <div style={{ fontSize: 12, color: "#b8860b", marginBottom: 8 }}>
+          <div style={{ fontSize: 12, color: C.warning, marginBottom: 8 }}>
             {t("profile.pending", { email: pendingEmail })}
           </div>
         )}
@@ -178,7 +178,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             </div>
           </form>
         )}
-        {emailMsg && <div style={{ fontSize: 13, color: emailMsg === t("profile.linkSent") ? "#0a7d3e" : "#d1350f", marginBottom: 16 }}>{emailMsg}</div>}
+        {emailMsg && <div style={{ fontSize: 13, color: emailMsg === t("profile.linkSent") ? C.success : C.danger, marginBottom: 16 }}>{emailMsg}</div>}
 
         <form onSubmit={saveProfile}>
           <button type="button" onClick={() => setShowUsername((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: showUsername ? 10 : 0 }}>
@@ -215,7 +215,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
           </div>
           )}
 
-          {profileMsg && <div style={{ fontSize: 13, color: profileMsg === "Gespeichert" ? "#0a7d3e" : "#d1350f", marginTop: 12, marginBottom: 8 }}>{profileMsg}</div>}
+          {profileMsg && <div style={{ fontSize: 13, color: profileMsg === "Gespeichert" ? C.success : C.danger, marginTop: 12, marginBottom: 8 }}>{profileMsg}</div>}
           <button type="submit" style={{ ...btnPrimary, marginTop: 16 }}>{t("common.save")}</button>
         </form>
       </div>
@@ -232,7 +232,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             style={inputStyle} required />
           <input type="password" name="new-password" autoComplete="new-password" placeholder={t("profile.newPw")} value={newPw} onChange={(e) => setNewPw(e.target.value)}
             style={inputStyle} required />
-          {msg && <div style={{ fontSize: 13, color: msg === t("profile.pwChanged") ? "#0a7d3e" : "#d1350f", marginBottom: 8 }}>{msg}</div>}
+          {msg && <div style={{ fontSize: 13, color: msg === t("profile.pwChanged") ? C.success : C.danger, marginBottom: 8 }}>{msg}</div>}
           <button type="submit" style={btnPrimary}>{t("profile.change")}</button>
         </form>
         )}
@@ -263,17 +263,17 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
               <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("profile.setup")}</div>
               {[["smtp", t("profile.setupSmtp")], ["site_json", t("profile.setupSite")], ["admin_email", t("profile.setupAdminMail")], ["contact_deliverable", t("profile.setupContact")]].map(([k, label]) => (
                 <div key={k} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, padding: "5px 0", color: "var(--text)" }}>
-                  <span style={{ display: "inline-flex", width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center", background: setup[k] ? "#0a7d3e" : "var(--border3)", color: "#fff", flexShrink: 0 }}>
+                  <span style={{ display: "inline-flex", width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center", background: setup[k] ? C.success : "var(--border3)", color: "#fff", flexShrink: 0 }}>
                     {setup[k]
                       ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
                       : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="3.5" strokeLinecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>}
                   </span>
-                  <span style={{ color: setup[k] ? "var(--text)" : "#b8860b" }}>{label}</span>
+                  <span style={{ color: setup[k] ? "var(--text)" : C.warning }}>{label}</span>
                 </div>
               ))}
               {!setup.smtp && <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>{t("profile.setupSmtpHint")}</p>}
               {setup.smtp && !setup.contact_deliverable && <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>{t("profile.setupContactHint")}</p>}
-              {setup.contact_fallback && <p style={{ fontSize: 12, color: "#b8860b", marginTop: 8 }}>⚠️ {t("profile.setupContactFallback")}</p>}
+              {setup.contact_fallback && <p style={{ fontSize: 12, color: C.warning, marginTop: 8 }}>⚠️ {t("profile.setupContactFallback")}</p>}
               {setup.contact_to && <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>{t("profile.setupContactTo", { to: setup.contact_to })}</p>}
             </div>
           )}
@@ -290,7 +290,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 14, color: "var(--text)" }}>{t("profile.installed")} <strong>v{versionInfo.current}</strong></span>
                     {!versionInfo.update_available && (
-                      <svg title={t("profile.upToDate")} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0a7d3e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                      <svg title={t("profile.upToDate")} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.success} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
                     )}
                   </div>
                   {versionInfo.update_available && (
@@ -333,7 +333,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
               <div style={{ fontSize: 13, color: "var(--text3)" }}>{t("profile.noAccounts")}</div>
             ) : (
               <>
-                {adminMsg && <div style={{ fontSize: 13, color: adminMsg.includes("Fehler") ? "#d1350f" : "#0a7d3e", marginBottom: 10 }}>{adminMsg}</div>}
+                {adminMsg && <div style={{ fontSize: 13, color: adminMsg.includes("Fehler") ? C.danger : C.success, marginBottom: 10 }}>{adminMsg}</div>}
                 <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
                 <table style={{ width: "100%", minWidth: 520, borderCollapse: "collapse", fontSize: 14 }}>
                   <thead>
@@ -386,7 +386,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
           a.click();
           URL.revokeObjectURL(a.href);
         }} style={btnSecondary}>{t("profile.exportData")}</button>
-        <button onClick={onLogout} style={{ ...btnPrimary, background: "#d1350f" }}>{t("profile.logout")}</button>
+        <button onClick={onLogout} style={{ ...btnPrimary, background: C.danger }}>{t("profile.logout")}</button>
         <button onClick={async () => {
           const pw = await askPrompt(t("profile.deletePwPrompt"));
           if (!pw) return;
@@ -404,7 +404,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             const data = await res.json();
             showAlert(data.detail || t("login.genericError"));
           }
-        }} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#d1350f", fontSize: 13, cursor: "pointer" }}>
+        }} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: C.danger, fontSize: 13, cursor: "pointer" }}>
           <TrashIcon size={14} /> {t("profile.deleteUser")}
         </button>
       </div>

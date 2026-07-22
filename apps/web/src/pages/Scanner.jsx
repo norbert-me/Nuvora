@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { COLORS as C } from "../components/Icons.jsx";
 import { useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api";
-const ANSWER_COLORS = { A: "#0066cc", B: "#5856d6", C: "#b8860b", D: "#d1350f" };
+const ANSWER_COLORS = { A: "#0066cc", B: "#5856d6", C: C.warning, D: C.danger };
 
 export default function Scanner() {
   const { t } = useLanguage();
@@ -418,7 +419,7 @@ export default function Scanner() {
                   if (!s) return null;
                   return (
                     <span key={`recent-${id}`} style={{
-                      flexShrink: 0, fontSize: 12, color: "#fff", background: "#0a7d3e", padding: "2px 8px",
+                      flexShrink: 0, fontSize: 12, color: "#fff", background: C.success, padding: "2px 8px",
                       borderRadius: 980, fontWeight: 600, animation: "scanFlash 0.8s ease-out forwards",
                     }}>
                       {s.name} <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign: "-1px"}}><path d="M20 6L9 17l-5-5"/></svg>
@@ -432,21 +433,21 @@ export default function Scanner() {
                   </span>
                 ))}
               </div>
-              <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: "#0a7d3e" }}>
+              <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: C.success }}>
                 {scannedStudents.length}/{classStudents.length}
               </span>
             </div>
           )}
           {classStudents.length > 0 && unscanned.length === 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 6, padding: "0 4px" }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#0a7d3e" }}>{t("scanner.allCaptured", { count: classStudents.length })} <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0a7d3e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign: "-1px"}}><path d="M20 6L9 17l-5-5"/></svg></span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: C.success }}>{t("scanner.allCaptured", { count: classStudents.length })} <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.success} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign: "-1px"}}><path d="M20 6L9 17l-5-5"/></svg></span>
             </div>
           )}
         </>
       )}
 
       {sessionError && (
-        <div style={{ padding: "10px 16px", marginBottom: 8, background: "#fde2d9", borderRadius: 12, fontSize: 14, fontWeight: 500, color: "#d1350f" }}>
+        <div style={{ padding: "10px 16px", marginBottom: 8, background: "#fde2d9", borderRadius: 12, fontSize: 14, fontWeight: 500, color: C.danger }}>
           {sessionError}
         </div>
       )}
@@ -480,7 +481,7 @@ export default function Scanner() {
             hostIsLast ? (
               <button onClick={() => sendRemote("finish")} style={{
                 flex: 1, padding: "12px 14px", fontSize: 14, fontWeight: 600, cursor: "pointer",
-                background: "#d1350f", color: "white", border: "none", borderRadius: 12,
+                background: C.danger, color: "white", border: "none", borderRadius: 12,
               }}>
                 {t("scanner.finishTest")}
               </button>
@@ -507,7 +508,7 @@ export default function Scanner() {
             onClick={toggleScanning}
             style={{
               padding: "6px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
-              background: "#d1350f", color: "white", border: "none", borderRadius: 980,
+              background: C.danger, color: "white", border: "none", borderRadius: 980,
             }}
           >
             {t("scanner.stop")}

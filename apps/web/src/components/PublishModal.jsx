@@ -7,7 +7,7 @@
 // und schließt sich.
 import { useState } from "react";
 import { useLanguage } from "../i18n/index.jsx";
-import { Modal, btnPrimary, btnSecondary, inputStyle } from "./Icons.jsx";
+import { Modal, btnPrimary, btnSecondary, inputStyle, COLORS as C } from "./Icons.jsx";
 
 export default function PublishModal({ name, onPublish, onClose }) {
   const { t } = useLanguage();
@@ -33,8 +33,8 @@ export default function PublishModal({ name, onPublish, onClose }) {
       <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)", display: "block", marginBottom: 4 }}>{t("publish.description")}</label>
       <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder={t("publish.descriptionPh")} rows={3}
         style={{ ...inputStyle, width: "100%", marginBottom: 12, resize: "vertical", fontFamily: "inherit" }} />
-      {state === "error" && <div style={{ fontSize: 13, color: "#d1350f", marginBottom: 10 }}>{t("publish.error")}</div>}
-      {state === "ok" && <div style={{ fontSize: 13, color: "#0a7d3e", marginBottom: 10 }}>{t("publish.done")}</div>}
+      {state === "error" && <div style={{ fontSize: 13, color: C.danger, marginBottom: 10 }}>{t("publish.error")}</div>}
+      {state === "ok" && <div style={{ fontSize: 13, color: C.success, marginBottom: 10 }}>{t("publish.done")}</div>}
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={submit} disabled={state === "busy" || state === "ok"} style={{ ...btnPrimary, opacity: state === "busy" ? 0.6 : 1 }}>{t("publish.btn")}</button>
         <button onClick={onClose} style={btnSecondary}>{t("common.cancel")}</button>

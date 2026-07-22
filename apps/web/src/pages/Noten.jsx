@@ -465,7 +465,7 @@ export default function Noten() {
           <table style={{ borderCollapse: "collapse", fontSize: 13.5, minWidth: "100%" }}>
             <thead>
               <tr>
-                <th style={{ ...th, ...stickyL, whiteSpace: "nowrap", textAlign: "left", fontWeight: 400, fontSize: 12.5, color: gewichtSumme === 100 ? "var(--text3)" : "#b8860b" }}>
+                <th style={{ ...th, ...stickyL, whiteSpace: "nowrap", textAlign: "left", fontWeight: 400, fontSize: 12.5, color: gewichtSumme === 100 ? "var(--text3)" : C.warning }}>
                   {gewichtSumme !== 100 ? t("noten.weightNot100", { n: gewichtSumme }) : t("noten.weightSum", { n: gewichtSumme })}
                 </th>
                 {sections.map((sec) => {
@@ -544,7 +544,7 @@ export default function Noten() {
                           </Link>
                         ) : c.source_kind === "karten" ? (
                           <Link to={`/karten?tab=progress&class=${classId}`} title={t("noten.fromKarten")} onClick={(e) => e.stopPropagation()}
-                            style={{ display: "inline-flex", color: "#0a7d3e", padding: "0 2px" }}>
+                            style={{ display: "inline-flex", color: C.success, padding: "0 2px" }}>
                             <Icon d={ICONS.chart} size={13} />
                           </Link>
                         ) : c.source_kind === "codedetektiv" ? (
@@ -580,7 +580,7 @@ export default function Noten() {
                       <span style={{ color: "var(--text3)", fontWeight: 400, marginRight: 6 }}>{si + 1}.</span>{s.name}
                       {(() => { const tr = trendFor(s.student_id); return tr && tr !== "flat" ? (
                         <span title={t(tr === "up" ? "noten.trendUp" : "noten.trendDown")}
-                          style={{ marginLeft: 6, fontSize: 12, fontWeight: 700, color: tr === "up" ? "#0a7d3e" : "#d1350f" }}>
+                          style={{ marginLeft: 6, fontSize: 12, fontWeight: 700, color: tr === "up" ? C.success : C.danger }}>
                           {tr === "up" ? "▲" : "▼"}
                         </span>
                       ) : null; })()}
@@ -630,7 +630,7 @@ export default function Noten() {
                       onCancel={() => setZelle(null)}
                       onReset={() => overrideReset(s.student_id, null)} />
                     {s.total_override == null && s.weighted !== null && s.unweighted_fallback && (
-                      <div style={{ fontWeight: 400, fontSize: 10, color: "#b8860b" }}>{t("noten.unweighted")}</div>
+                      <div style={{ fontWeight: 400, fontSize: 10, color: C.warning }}>{t("noten.unweighted")}</div>
                     )}
                   </td>
                   <td style={td}>
@@ -912,7 +912,7 @@ function ColMenu({ t, cat, stats, onStats, onRename, onDelete, onClose, dividerO
         )}
         {cat.topic_id && kartenAktiv && (
           <button onClick={() => { onNachhol(cat); onClose(); }}
-            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 10, padding: "7px 9px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "#b8860b", cursor: "pointer" }}>
+            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 10, padding: "7px 9px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: C.warning, cursor: "pointer" }}>
             💡 {t("noten.nachhol")}
           </button>
         )}
@@ -924,8 +924,8 @@ function ColMenu({ t, cat, stats, onStats, onRename, onDelete, onClose, dividerO
         )}
         {!cat.source_session_id && cat.source_kind === "karten" && (
           <Link to={`/karten?tab=progress&class=${classId}`} onClick={onClose}
-            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 10, padding: "6px 8px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "#0a7d3e", textDecoration: "none", boxSizing: "border-box" }}>
-            <Icon d={ICONS.chart} size={14} color="#0a7d3e" />{t("noten.fromKarten")}
+            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 10, padding: "6px 8px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: C.success, textDecoration: "none", boxSizing: "border-box" }}>
+            <Icon d={ICONS.chart} size={14} color={C.success} />{t("noten.fromKarten")}
           </Link>
         )}
         {cat.source_kind === "codedetektiv" && (
@@ -977,7 +977,7 @@ function ColForm({ t, onSave, onCancel, initial = "" }) {
 
 // Vergleich einer Klassenarbeit: dieselbe Arbeit in den anderen Fach-Klassen des
 // Kurses + der Notenverlauf dieser Klasse im Halbjahr. Rein deskriptiv.
-const GRADE_COL = ["#0a7d3e", "#0a7d3e", "#b8860b", "#b8860b", "#d1350f", "#d1350f"];
+const GRADE_COL = [C.success, C.success, C.warning, C.warning, C.danger, C.danger];
 function CompareModal({ t, cat, onClose }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState(false);
@@ -1110,7 +1110,7 @@ function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete })
           return (
             <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 12.5 }}>
               <span style={{ width: 62, color: "var(--text3)" }}>{new Date(e.date).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" })}</span>
-              <span style={{ width: 14, fontWeight: 700, color: e.tendency > 0 ? "#0a7d3e" : e.tendency < 0 ? "var(--danger, #dc2626)" : "var(--text3)" }}>{e.tendency > 0 ? "+" : e.tendency < 0 ? "−" : "·"}</span>
+              <span style={{ width: 14, fontWeight: 700, color: e.tendency > 0 ? C.success : e.tendency < 0 ? "var(--danger, #dc2626)" : "var(--text3)" }}>{e.tendency > 0 ? "+" : e.tendency < 0 ? "−" : "·"}</span>
               <span style={{ flex: 1, minWidth: 0 }}><span style={{ color: "var(--text3)" }}>{k?.name}: </span>{e.note}</span>
               <button onClick={() => onDelete(e.id)} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
             </div>
