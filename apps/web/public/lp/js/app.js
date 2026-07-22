@@ -470,6 +470,13 @@
 
     // Daten aus dem Nuvora-Kern laden und lokalen Anzeige-Cache ersetzen.
     async function loadUserData() {
+        // Cache-First: die zuletzt gespeicherten Inhalte SOFORT zeigen, statt leer
+        // auf den Server zu warten. Rein Anzeige — es wird nichts aus dem (evtl.
+        // stalen) Cache zum Server gespiegelt (Init-Sync ist bewusst raus). Der
+        // Server-Abgleich unten ersetzt die Daten gleich und rendert neu.
+        if (aufgaben.length || schueler.length || klassen.length) {
+            try { renderAufgaben(); renderKlassen(); renderSchueler(); updateFilters(); } catch (e) { /* Cache unvollstaendig — egal, Server folgt */ }
+        }
         const [tRes, exRes, clRes, kuRes] = await Promise.all([
             api(`${API}/topics`), api(`${LP}/exercises`), api(`${API}/classes`), api(`${API}/kurse`)
         ]);
@@ -1973,6 +1980,13 @@
 
     async function saveToPfad() {
         if (!previewData || !previewData.length) { toast('Erst Vorschau generieren'); return; }
+        // Nicht leer speichern: klar melden statt still eine leere Lernleiter anzulegen.
+        if (!previewData.some(p => p.tasks.some(t => t.selected))) { toast('Keine Aufgaben ausgewählt — nichts zu speichern'); return; }
+        if (!previewData[0].thema) { toast('Kein Thema gesetzt — nicht gespeichert'); return; }
+        // Bestehende Pfade kennen, BEVOR wir „Einzeln" suchen/anlegen — sonst
+        // ueberschreibt ein Save den vorhandenen „Einzeln"-Pfad (savePfad loescht
+        // dessen Lernleitern und legt nur die neue an).
+        if (!lernpfade.length) { try { await loadLernpfade(); } catch (e) { /* offline: mit lokalem Stand weiter */ } }
         const pfadId = document.getElementById('gen-pfad').value;
 
         let pfad;
@@ -2062,11 +2076,21 @@
                     student_id: parseInt(sch.id || sch._id) || null,
                     exercise_ids: (sch.aufgabenIds || []).map(x => parseInt(x)).filter(Boolean)
                 })).filter(a => a.student_id);
+                const topic_id = await topicId(ll.thema, ll.unterthema);
+                const class_id = classIdVon(ll.klasse);
+                // Diagnose (#59): weist eine gespeicherte Lernleiter leer aus, steht
+                // hier in der Konsole WAS fehlte — Thema, Kurs oder Zuweisungen.
+                if (!topic_id || !class_id || !assignments.length) {
+                    console.warn('Lernleiter unvollstaendig gespeichert:', {
+                        thema: ll.thema, topic_id, klasse: ll.klasse, class_id,
+                        schueler: (ll.schueler || []).length, zuweisungen: assignments.length
+                    });
+                }
                 const r = await api(`${LP}/paths/${pfad.id}/ladders`, {
                     method: 'POST',
                     body: JSON.stringify({
-                        class_id: classIdVon(ll.klasse),
-                        topic_id: await topicId(ll.thema, ll.unterthema),
+                        class_id,
+                        topic_id,
                         position: pos++,
                         notizen: ll.notizen || '',
                         assignments: assignments.length ? assignments : null,
