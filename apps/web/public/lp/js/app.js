@@ -183,6 +183,17 @@
         // von hier aus wird nichts zurueckgeschrieben.
     }
 
+    // Signatur des zuletzt gespiegelten Standes je Aufgabe (id -> String). Nach
+    // dem Laden mit dem Server-Stand befuellt; danach spiegelt syncAufgaben nur
+    // noch WIRKLICH geaenderte Aufgaben, statt bei jedem Save alle ~1000 neu zu
+    // PUTten (das war der 429-Sturm).
+    let syncSigs = {};
+    function aufgabeSig(a) {
+        return JSON.stringify([a.thema, a.unterthema, a.kategorie, a.aufgabentext, a.loesung,
+            a.operator, a.kompetenz, a.methode, a.unteraufgaben, a.quelleTyp, a.quelleDetail,
+            a.lrs ? 1 : 0, a.lrsText, a.foerderschwerpunkte || [], a.latex, a.code]);
+    }
+
     // Aufgaben zum Kern spiegeln: anlegen, aendern, geloeschte entfernen.
     async function syncAufgaben(data) {
         try {
@@ -196,19 +207,23 @@
                 return;
             }
             for (const a of data) {
-                const body = JSON.stringify(await zuKern(a));
                 const vorhanden = a.id && serverIds.has(a.id);
+                serverIds.delete(a.id);
+                // Unveraendert seit dem letzten Spiegeln? Nichts tun — sonst PUTtet
+                // jeder Save die ganze Liste (429-Sturm) und loest Themen-POSTs (409) aus.
+                if (vorhanden && syncSigs[a.id] === aufgabeSig(a)) continue;
+                const body = JSON.stringify(await zuKern(a));
                 const r = await api(vorhanden ? `${LP}/exercises/${a.id}` : `${LP}/exercises`,
                                     { method: vorhanden ? 'PUT' : 'POST', body });
-                if (r.ok && !vorhanden) {
-                    const neu = await r.json();
-                    a.id = neu.id; a._id = String(neu.id);
+                if (r.ok) {
+                    if (!vorhanden) { const neu = await r.json(); a.id = neu.id; a._id = String(neu.id); }
+                    syncSigs[a.id] = aufgabeSig(a);
                 }
-                serverIds.delete(a.id);
             }
             // Was der Server noch hat, die Oberflaeche aber nicht mehr: loeschen.
             for (const weg of serverIds) {
                 await api(`${LP}/exercises/${weg}`, { method: 'DELETE' });
+                delete syncSigs[weg];
             }
             localStorage.setItem(STORAGE_KEYS.aufgaben, JSON.stringify(data));
         } catch(e) { console.error('Sync-Fehler:', e); }
@@ -350,36 +365,8 @@
         return '#' + String(n).padStart(6, '0');
     }
 
-    // Bestandsdaten und aus der alten Lernleiter uebernommene Aufgaben haben teils
-    // einen leeren `code` und zeigten darum ueber `a.code || a.id` die GLOBALE
-    // Server-id an (grosse, lueckige Nummern wie 23 — nicht pro User). Jeden leeren
-    // code einmalig mit der naechsten freien #-Nummer fuellen, in id-Reihenfolge,
-    // damit die Vergabe stabil und nachvollziehbar bleibt. Gibt die geaenderten
-    // Aufgaben zurueck (nur die werden persistiert — kein voller Re-Sync).
-    function backfillCodes() {
-        const isCode = c => /^#\d+$/.test(String(c || ''));
-        const used = new Set();
-        aufgaben.forEach(a => { const m = String(a.code || '').match(/^#(\d+)$/); if (m) used.add(parseInt(m[1], 10)); });
-        let n = 1;
-        const changed = aufgaben.filter(a => !isCode(a.code)).sort((x, y) => (x.id || 0) - (y.id || 0));
-        changed.forEach(a => {
-            while (used.has(n)) n++;
-            a.code = '#' + String(n).padStart(6, '0');
-            used.add(n);
-        });
-        return changed;
-    }
-
-    // Nur die aufgefuellten Codes zum Server schreiben (gezielte PUTs statt einem
-    // vollen syncAufgaben-Diff ueber alle Aufgaben). Einmalig beim ersten Laden.
-    async function persistCodes(changed) {
-        for (const a of changed) {
-            if (!a.id) continue;
-            try { await api(`${LP}/exercises/${a.id}`, { method: 'PUT', body: JSON.stringify(await zuKern(a)) }); }
-            catch (e) { console.error('Code-Backfill:', e); }
-        }
-        localStorage.setItem(STORAGE_KEYS.aufgaben, JSON.stringify(aufgaben));
-    }
+    // Fehlende #-Codes werden serverseitig aufgefuellt (POST /exercises/backfill-codes,
+    // siehe loadUserData) — EIN Request statt je Aufgabe ein PUT.
 
     // Anzeige-ID immer als #xxxxxx: nach dem Sync ist a.id die numerische
     // Server-ID; die Oberflaeche zeigt sie einheitlich im #-Format.
@@ -490,8 +477,18 @@
         }
         topics = tRes.ok ? await tRes.json() : [];
         aufgaben = exRes.ok ? (await exRes.json()).map(vonKern) : [];
-        const nachgefuellt = backfillCodes();          // leere Codes einmalig fuellen
-        if (nachgefuellt.length) persistCodes(nachgefuellt);   // nur die geaenderten spiegeln
+        // Fehlende Codes serverseitig in EINEM Request auffuellen (statt je Aufgabe
+        // ein PUT — das war der 429-Sturm). Nur wenn ueberhaupt welche leer sind.
+        if (aufgaben.some(a => !/^#\d+$/.test(String(a.code || '')))) {
+            try {
+                const r = await api(`${LP}/exercises/backfill-codes`, { method: 'POST' });
+                if (r.ok) { const { codes } = await r.json(); aufgaben.forEach(a => { if (codes && codes[a.id]) a.code = codes[a.id]; }); }
+            } catch (e) { console.error('Code-Backfill:', e); }
+        }
+        // Signaturen setzen: Aufgaben sind jetzt mit dem Server in Sync, spaetere
+        // Saves spiegeln nur noch wirklich Geaendertes (kein Voll-PUT mehr).
+        syncSigs = {};
+        aufgaben.forEach(a => { if (a.id) syncSigs[a.id] = aufgabeSig(a); });
         const klassenRaw = clRes.ok ? await clRes.json() : [];
         // Lernleitern hängen am KURS, nicht an der Fach-Klasse: Schüler nach Kurs
         // gruppieren (gleichnamige der Fach-Klassen eines Kurses = eine Person).

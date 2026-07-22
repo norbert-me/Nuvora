@@ -151,6 +151,40 @@ async def delete_exercise(
     await db.commit()
 
 
+@router.post("/exercises/backfill-codes")
+async def backfill_codes(
+    user: User = Depends(require_module),
+    db: AsyncSession = Depends(get_db),
+):
+    """Vergibt allen Aufgaben ohne #-Code EINMALIG eine pro-Konto eindeutige
+    Nummer (kleinste freie Luecke, in id-Reihenfolge) — serverseitig in einem
+    Request, statt dass der Client je Aufgabe ein PUT feuert (429-Sturm).
+    Gibt die neu vergebenen {id: code} zurueck, damit der Client sie lokal
+    uebernimmt, ohne neu laden zu muessen."""
+    import re
+    rows = (await db.execute(
+        select(Exercise).where(Exercise.owner_id == user.id).order_by(Exercise.id)
+    )).scalars().all()
+    used = set()
+    for e in rows:
+        m = re.fullmatch(r"#(\d+)", e.code or "")
+        if m:
+            used.add(int(m.group(1)))
+    n = 1
+    codes: dict[int, str] = {}
+    for e in rows:
+        if re.fullmatch(r"#\d+", e.code or ""):
+            continue
+        while n in used:
+            n += 1
+        e.code = "#%06d" % n
+        used.add(n)
+        codes[e.id] = e.code
+    if codes:
+        await db.commit()
+    return {"backfilled": len(codes), "codes": codes}
+
+
 # ─── Lernpfade und ihre Lernleitern ───
 
 class LadderIn(BaseModel):
