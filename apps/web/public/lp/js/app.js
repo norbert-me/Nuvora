@@ -2144,6 +2144,9 @@
             // class_id direkt vom Schueler mitspeichern — die Namenssuche
             // (classIdVon) scheiterte, wenn der Kurs-Name leer war (#59: „ohne kurs").
             class_id: (previewData[0].student && previewData[0].student.class_id) || null,
+            // Konfig mitspeichern, damit Öffnen die Regler UND den Pflicht/Zusatz-
+            // Split wiederherstellen kann (sonst ist ll.config null → alles Pflicht).
+            config: getGenConfig(),
             schueler: previewData.map(p => ({
                 _id: p.student._id,
                 name: p.student.name,
@@ -3130,13 +3133,17 @@
                     // klasse leer und ein Re-Save schriebe class_id=null (#59).
                     const klasseVonStud = (schueler.find(s => s.id === ((l.assignments || [])[0] || {}).student_id) || {}).klasse;
                     const klasseVonCls = (schueler.find(s => s.class_id === l.class_id) || {}).klasse;
+                    // Weitere Fallbacks, damit der Kurs-Name in der Liste nie „undefined"/leer
+                    // ist: Kurs der class_id (kurseData) bzw. der Klassenname selbst.
+                    const kursVonKurse = (kurseData.find(k => (k.classes || []).some(c => c.id === l.class_id)) || {}).name;
+                    const klasseVonName = (kurseData.flatMap(k => k.classes || []).find(c => c.id === l.class_id) || {}).name;
                     return {
                         _id: String(l.id),
                         id: l.id,                        // stabile Server-id fuer Upsert (savePfad PUTtet statt neu anzulegen)
                         topic_id: l.topic_id ?? null,    // Roh-Thema-id mitfuehren: falls topicPfad den Namen nicht aufloest, NICHT mit null ueberschreiben
                         thema: tp.thema,
                         unterthema: tp.unterthema,
-                        klasse: klasseVonStud || klasseVonCls || '',
+                        klasse: klasseVonStud || klasseVonCls || kursVonKurse || klasseVonName || '',
                         class_id: l.class_id ?? null,   // autoritativ vom Ladder — nicht ueber den Namen raten
                         notizen: l.notizen || '',
                         config: l.config || null,
@@ -3370,8 +3377,8 @@
             <div class="list-row ll-row" draggable="true" data-ll-id="${ll._id}">
                 <span class="drag-handle" title="Ziehen zum Sortieren">${ICON.grip}</span>
                 <div data-ll-id="${ll._id}" data-action="open" title="Zum Bearbeiten öffnen" style="cursor:pointer;flex:1;min-width:0">
-                    ${esc(ll.thema || '(ohne Thema)')}${ll.unterthema ? ' <span style="color:var(--text-muted)">&gt; ' + esc(ll.unterthema) + '</span>' : ''}
-                    <span style="color:var(--text-muted)">– ${ll.schueler.length} Schüler</span>
+                    ${ll.klasse ? '<b>' + esc(ll.klasse) + '</b> · ' : ''}${esc(ll.thema || '(ohne Thema)')}${ll.unterthema ? ' <span style="color:var(--text-muted)">&gt; ' + esc(ll.unterthema) + '</span>' : ''}
+                    <span style="color:var(--text-muted)">· ${(ll.schueler || []).length} Schüler</span>
                 </div>
                 <div class="btn-group" style="flex-shrink:0">
                     <details class="export-menu">
