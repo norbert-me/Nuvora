@@ -541,6 +541,10 @@
         localStorage.setItem(STORAGE_KEYS.klassen, JSON.stringify(klassen));
         overviewKlasse = '';
         renderAufgaben(); renderKlassen(); renderSchueler(); updateFilters();
+        // Generator-Dropdowns nach dem Laden auffrischen — sonst blieb der
+        // Kurs-Selektor leer, wenn der Generator-Tab schon offen war, bevor die
+        // Klassen/Kurse vom Server da waren.
+        try { refreshGeneratorDropdowns(); } catch (e) { /* Generator evtl. nicht im DOM */ }
         return true;
     }
 
@@ -1597,13 +1601,22 @@
         // kann — sonst war die Auswahl leer, obwohl Themen im Kern gepflegt sind.
         const kernOber = topics.filter(t => !t.parent_id).map(t => t.name);
         const themen = [...new Set([...aufgaben.map(a => a.thema).filter(Boolean), ...kernOber])].sort();
-        const sorted = [...klassen].sort();
+        // Kurse robust: aus der Kursliste UND aus den Schuelern (deren .klasse ist
+        // der Kurs-Name) — falls klassen mal leer/stale ist, fuellt sich der
+        // Selektor trotzdem, solange irgendwo Kurs-Namen bekannt sind.
+        const kurseNamen = [...new Set([
+            ...klassen,
+            ...schueler.map(s => s.klasse).filter(Boolean),
+        ].filter(Boolean))].sort();
 
         const selT = document.getElementById('gen-thema');
         selT.innerHTML = '<option value="">– Thema wählen –</option>' + themen.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
 
         const selK = document.getElementById('gen-klasse');
-        selK.innerHTML = '<option value="">– Kurs wählen –</option>' + sorted.map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join('');
+        const cur = selK.value;   // Auswahl erhalten, wenn nur neu befuellt wird
+        selK.innerHTML = '<option value="">– Kurs wählen –</option>' + kurseNamen.map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join('');
+        if (cur && kurseNamen.includes(cur)) selK.value = cur;
+        if (!kurseNamen.length) console.warn('[Generator] Kurs-Selektor leer: klassen=%d, schueler=%d — Klassen/Kurse nicht geladen?', klassen.length, schueler.length);
 
         refreshGenUnterthemen();
     }
