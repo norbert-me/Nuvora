@@ -3074,8 +3074,8 @@
         box.style.marginTop = '12px';
         const pfadRows = pTrash.map(p => `
             <div class="list-row" style="opacity:.85">
-                <div><strong>${esc(p.name)}</strong> <span style="color:var(--text-muted)">– Lernpfad · ${(p.lernleitern || []).length} Lernleitern</span></div>
-                <div class="btn-group">
+                <div style="flex:1;min-width:0"><strong>${esc(p.name)}</strong> <span style="color:var(--text-muted)">– Lernpfad · ${(p.lernleitern || []).length} Lernleitern</span></div>
+                <div class="btn-group" style="flex-shrink:0;flex-wrap:nowrap">
                     <button class="btn" data-restore-path="${p.id}">Wiederherstellen</button>
                     <button class="btn icon danger" data-purge-path="${p.id}" title="Endgültig löschen">${ICON.delete}</button>
                 </div>
@@ -3086,8 +3086,8 @@
             const n = (l.assignments || []).length;
             return `
             <div class="list-row" style="opacity:.85">
-                <div><strong>${esc(name)}</strong> <span style="color:var(--text-muted)">– Lernleiter aus „${esc(l.path_name)}"${n ? ` · ${n} Schüler` : ''}</span></div>
-                <div class="btn-group">
+                <div style="flex:1;min-width:0"><strong>${esc(name)}</strong> <span style="color:var(--text-muted)">– Lernleiter aus „${esc(l.path_name)}"${n ? ` · ${n} Schüler` : ''}</span></div>
+                <div class="btn-group" style="flex-shrink:0;flex-wrap:nowrap">
                     <button class="btn" data-restore-ladder="${l.id}">Wiederherstellen</button>
                     <button class="btn icon danger" data-purge-ladder="${l.id}" title="Endgültig löschen">${ICON.delete}</button>
                 </div>
