@@ -27,7 +27,7 @@ function Stars({ value, my, onRate, count, t }) {
               title={t("market.stars", { n })}
               style={{ background: "none", border: "none", padding: 0, cursor: "pointer", lineHeight: 0 }}
             >
-              <svg width="1em" height="1em" viewBox="0 0 24 24"
+              <svg width="18" height="18" viewBox="0 0 24 24"
                 fill={(hover ? n <= hover : filled) ? (my ? "#e5a000" : "var(--text2)") : "none"}
                 stroke={(my && !hover) ? "#e5a000" : "var(--text3)"} strokeWidth="1.5" strokeLinejoin="round">
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01L12 2z"/>
@@ -283,7 +283,7 @@ export default function Marketplace({ fixedKind }) {
                           <div key={k} style={{ fontSize: 13, color: isCorrect ? "#0a7d3e" : "var(--text2)", fontWeight: isCorrect ? 600 : 400, display: "flex", gap: 6, minWidth: 0, alignItems: "flex-start" }}>
                             <span style={{ fontWeight: 700, flexShrink: 0 }}>{k}</span>
                             <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{(q.choices && q.choices[k]) || "–"}</span>
-                            {isCorrect && <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="#0a7d3e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 1, flexShrink: 0 }}><path d="M20 6L9 17l-5-5"/></svg>}
+                            {isCorrect && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0a7d3e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 1, flexShrink: 0 }}><path d="M20 6L9 17l-5-5"/></svg>}
                           </div>
                         );
                       })}

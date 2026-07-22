@@ -562,7 +562,7 @@ const gradeDistribution = (() => {
         <div style={{ padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", fontSize: 13, color: "var(--text)", lineHeight: 1.6, marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
             <h4 style={{ fontSize: 15, fontWeight: 700 }}>Standardabweichung (σ)</h4>
-            <button onClick={() => setShowSdInfo(false)} style={{ width: 24, height: 24, borderRadius: 12, border: "none", background: "var(--bg2)", color: "var(--text3)", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+            <button onClick={() => setShowSdInfo(false)} style={{ width: 24, height: 24, borderRadius: 12, border: "none", background: "var(--bg2)", color: "var(--text3)", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
           </div>
           <p style={{ marginBottom: 10 }}>
             Misst, wie stark die Ergebnisse um den Durchschnitt streuen. Eine <strong>kleine</strong> σ bedeutet, dass alle ähnlich abgeschnitten haben.
@@ -710,7 +710,7 @@ const gradeDistribution = (() => {
       {suggestions.length > 0 && (
         <div style={{ padding: 16, background: "var(--warn-bg)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text2)", flexShrink: 0 }}><path d="M9 18h6M10 22h4M12 2a7 7 0 0 1 4 12.7V17a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1v-2.3A7 7 0 0 1 12 2z"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text2)", flexShrink: 0 }}><path d="M9 18h6M10 22h4M12 2a7 7 0 0 1 4 12.7V17a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1v-2.3A7 7 0 0 1 12 2z"/></svg>
             <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>Vorschläge</h3>
           </div>
           {suggestions.map((tip, i) => (
@@ -894,7 +894,7 @@ const gradeDistribution = (() => {
         <div style={{ marginTop: 12, padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
             <h4 style={{ fontSize: 15, fontWeight: 700 }}>Was ist die Ratewahrscheinlichkeit?</h4>
-            <button onClick={() => setShowRateInfo(false)} style={{ width: 24, height: 24, borderRadius: 12, border: "none", background: "var(--bg2)", color: "var(--text3)", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+            <button onClick={() => setShowRateInfo(false)} style={{ width: 24, height: 24, borderRadius: 12, border: "none", background: "var(--bg2)", color: "var(--text3)", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
           </div>
           <p style={{ marginBottom: 10 }}>
             Die Wahrscheinlichkeit, die richtige Antwort <strong>zufällig</strong> zu erraten — also ohne Wissen, nur durch Raten.
@@ -914,7 +914,7 @@ const gradeDistribution = (() => {
         <div style={{ marginTop: 12, padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
             <h4 style={{ fontSize: 15, fontWeight: 700 }}>Was ist Trennschärfe?</h4>
-            <button onClick={() => setShowDiscInfo(false)} style={{ width: 24, height: 24, borderRadius: 12, border: "none", background: "var(--bg2)", color: "var(--text3)", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+            <button onClick={() => setShowDiscInfo(false)} style={{ width: 24, height: 24, borderRadius: 12, border: "none", background: "var(--bg2)", color: "var(--text3)", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
           </div>
           <p style={{ marginBottom: 10 }}>
             Die Trennschärfe (punkt-biseriale Korrelation) misst, wie gut eine einzelne Frage zwischen leistungsstarken und leistungsschwachen Lernenden unterscheidet. <strong>Wertebereich:</strong> −1 bis +1
@@ -939,7 +939,7 @@ function CiInfoBox({ onClose }) {
     <div style={{ marginTop: 12, padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <h4 style={{ fontSize: 15, fontWeight: 700 }}>Was ist das 95%-Konfidenzintervall (KI)?</h4>
-        <button onClick={onClose} style={{ width: 24, height: 24, borderRadius: 12, border: "none", background: "var(--bg2)", color: "var(--text3)", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+        <button onClick={onClose} style={{ width: 24, height: 24, borderRadius: 12, border: "none", background: "var(--bg2)", color: "var(--text3)", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
       </div>
       <p style={{ marginBottom: 10 }}>
         Der Prozentwert „Richtig“ ist nur eine Stichprobe dieser einen Abfrage. Das Konfidenzintervall
