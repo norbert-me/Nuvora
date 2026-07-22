@@ -1836,6 +1836,18 @@
         const container = document.getElementById('preview-students');
         container.innerHTML = '';
 
+        // Farb-Legende: erklaert die Einfaerbung der Stufen (v.a. das lila = Wiederholung).
+        const legend = document.createElement('div');
+        legend.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:12px;font-size:0.78rem;color:var(--text-muted)';
+        const chip = (color, label, dashed) => `<span style="display:inline-flex;align-items:center;gap:6px"><span style="width:12px;height:12px;border-radius:3px;border-left:3px ${dashed ? 'dashed' : 'solid'} ${color};background:${color}22"></span>${label}</span>`;
+        legend.innerHTML =
+            chip('#7c3aed', 'Wiederholung') +
+            chip('#dc2626', 'Erklärung', true) +
+            chip('#2563eb', 'Basis') +
+            chip('#059669', 'G-/E-Niveau') +
+            '<span style="color:var(--text-muted)">· unter „Zusatzaufgaben": über der Pflicht</span>';
+        container.appendChild(legend);
+
         previewData.forEach((entry, si) => {
             const s = entry.student;
             const div = document.createElement('div');
@@ -3188,7 +3200,6 @@
                     <span style="color:var(--text-muted)">– ${ll.schueler.length} Schüler</span>
                 </div>
                 <div class="btn-group" style="flex-shrink:0">
-                    <button class="btn icon" data-ll-id="${ll._id}" data-action="rename" title="Umbenennen">${ICON.edit}</button>
                     <details class="export-menu">
                         <summary class="btn icon" title="Exportieren">${ICON.export}</summary>
                         <div class="export-pop">
