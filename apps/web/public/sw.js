@@ -16,6 +16,9 @@ function apiCacheable(url, method) {
   if (method !== "GET" || !url.pathname.startsWith("/api/")) return false;
   if (url.pathname.endsWith("/download")) return false;     // Material-/Datei-Blobs
   if (url.pathname.startsWith("/api/mail-test")) return false;
+  if (url.pathname === "/api/health") return false;         // Live-Connectivity-Probe: netzwerk-only,
+                                                            // sonst liefert der Cache-Fallback Response.error()
+                                                            // ("access control checks") und faelscht offline vor.
   if (url.pathname.includes("/qr/")) return false;          // QR-PNGs
   return true;
 }
