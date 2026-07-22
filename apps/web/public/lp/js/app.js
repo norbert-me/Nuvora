@@ -212,11 +212,18 @@
                 // Unveraendert seit dem letzten Spiegeln? Nichts tun — sonst PUTtet
                 // jeder Save die ganze Liste (429-Sturm) und loest Themen-POSTs (409) aus.
                 if (vorhanden && syncSigs[a.id] === aufgabeSig(a)) continue;
+                const preId = a._id;   // lokale (evtl. Temp-)id VOR dem Anlegen
                 const body = JSON.stringify(await zuKern(a));
                 const r = await api(vorhanden ? `${LP}/exercises/${a.id}` : `${LP}/exercises`,
                                     { method: vorhanden ? 'PUT' : 'POST', body });
                 if (r.ok) {
-                    if (!vorhanden) { const neu = await r.json(); a.id = neu.id; a._id = String(neu.id); }
+                    if (!vorhanden) {
+                        const neu = await r.json();
+                        a.id = neu.id; a._id = String(neu.id);
+                        // Temp-id -> echte id merken, damit Lernleiter-Zuweisungen,
+                        // die noch auf die Temp-id zeigen, übersetzt werden können.
+                        if (preId && String(preId) !== String(neu.id)) idRemap[String(preId)] = String(neu.id);
+                    }
                     syncSigs[a.id] = aufgabeSig(a);
                 }
             }
@@ -397,6 +404,10 @@
     let schueler = load(STORAGE_KEYS.schueler);
     let klassen = load(STORAGE_KEYS.klassen);
     let kurseData = [];   // geladene Kurse (mit .classes) — für Kursliste + Roster je Kurs
+    // Temp-_id (uid(), z.B. "mrvmr…") -> echte Server-id. Neu erstellte Aufgaben
+    // haben bis zum Sync eine lokale Temp-id; Lernleiter-Zuweisungen zeigen darauf.
+    // Ohne Übersetzung droppt savePfad sie (parseInt einer Temp-id = NaN).
+    let idRemap = {};
     let lernpfade = [];
     // Aktive Klassenfilterung der Übersicht (ersetzt das frühere Select).
     let overviewKlasse = '';
@@ -2184,11 +2195,20 @@
             // ll.klasse ist ein KURS-Name; Kern-Referenz ueber einen Schueler des Kurses.
             const classIdVon = kurs => classIdVonKurs(kurs);
 
+            // Zeigen Zuweisungen noch auf Temp-ids (neu erstellte, ungesyncte
+            // Aufgaben)? Dann erst syncen (vergibt echte ids, füllt idRemap) —
+            // sonst gingen die Zuweisungen verloren (Temp-id ist nicht numerisch).
+            const istEchte = id => /^\d+$/.test(String(id));
+            const remap = id => idRemap[String(id)] || String(id);
+            const hatTemp = (pfad.lernleitern || []).some(ll => (ll.schueler || []).some(s =>
+                (s.aufgabenIds || []).some(id => !istEchte(remap(id)))));
+            if (hatTemp) { try { await syncAufgaben(aufgaben); } catch (e) { console.warn('savePfad: Sync vor dem Speichern fehlgeschlagen', e); } }
+
             let pos = 0;
             for (const ll of (pfad.lernleitern || [])) {
                 const assignments = (ll.schueler || []).map(sch => ({
                     student_id: parseInt(sch.id || sch._id) || null,
-                    exercise_ids: (sch.aufgabenIds || []).map(x => parseInt(x)).filter(Boolean)
+                    exercise_ids: (sch.aufgabenIds || []).map(x => remap(x)).filter(istEchte).map(Number)
                 })).filter(a => a.student_id);
                 // Thema aus dem Namen aufloesen; scheitert das (leer/stale topics),
                 // NICHT nullen, sondern die mitgefuehrte Roh-topic_id behalten —
