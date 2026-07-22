@@ -341,10 +341,10 @@ export default function Dashboard() {
               )}
             </span>
             <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={(e) => { e.stopPropagation(); exportFolder(f.id, f.name); }} className="icon-btn" style={iconBtn} title={t("classes.export")}><Icon d={ICONS.export} /></button>
-              <button onClick={(e) => { e.stopPropagation(); setMovingFolder(f.id); }} className="icon-btn" style={iconBtn} title={t("dash.move")}><Icon d={ICONS.move} /></button>
-              <button onClick={(e) => { e.stopPropagation(); startRenameFolder(f.id, f.name); }} className="icon-btn" style={iconBtn} title={t("dash.rename")}><Icon d={ICONS.edit} /></button>
-              <button onClick={(e) => { e.stopPropagation(); deleteFolder(f.id); }} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
+              <button onClick={(e) => { e.stopPropagation(); exportFolder(f.id, f.name); }} className="icon-btn" style={iconBtn} title={t("classes.export")}><Icon d={ICONS.export} size={18} /></button>
+              <button onClick={(e) => { e.stopPropagation(); setMovingFolder(f.id); }} className="icon-btn" style={iconBtn} title={t("dash.move")}><Icon d={ICONS.move} size={18} /></button>
+              <button onClick={(e) => { e.stopPropagation(); startRenameFolder(f.id, f.name); }} className="icon-btn" style={iconBtn} title={t("dash.rename")}><Icon d={ICONS.edit} size={18} /></button>
+              <button onClick={(e) => { e.stopPropagation(); deleteFolder(f.id); }} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
             </div>
           </div>
         ))}
@@ -363,9 +363,9 @@ export default function Dashboard() {
                 <button onClick={(e) => { e.stopPropagation(); openPublish(qs); }} className="icon-btn" style={iconBtn} title={t("dash.publishTitle")}>
                   <Icon d={ICONS.share} size={18} color="var(--accent)" />
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); duplicateSet(qs.id); }} className="icon-btn" style={iconBtn} title={t("dash.duplicate")}><Icon d={ICONS.duplicate} /></button>
-                <button onClick={async (e) => { e.stopPropagation(); const r = await fetch(`${API}/export/question-set/${qs.id}`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${qs.name}.json`; a.click(); URL.revokeObjectURL(a.href); }} className="icon-btn" style={iconBtn} title={t("classes.export")}><Icon d={ICONS.export} /></button>
-                <button onClick={(e) => { e.stopPropagation(); deleteSet(qs.id); }} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
+                <button onClick={(e) => { e.stopPropagation(); duplicateSet(qs.id); }} className="icon-btn" style={iconBtn} title={t("dash.duplicate")}><Icon d={ICONS.duplicate} size={18} /></button>
+                <button onClick={async (e) => { e.stopPropagation(); const r = await fetch(`${API}/export/question-set/${qs.id}`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${qs.name}.json`; a.click(); URL.revokeObjectURL(a.href); }} className="icon-btn" style={iconBtn} title={t("classes.export")}><Icon d={ICONS.export} size={18} /></button>
+                <button onClick={(e) => { e.stopPropagation(); deleteSet(qs.id); }} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
               </div>
             </div>
           ))}
@@ -651,7 +651,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onQuestionsChang
             <Latex>{q.text}</Latex>
             {q.image_url && <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 6, verticalAlign: "middle" }}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>}
           </span>
-          <button onClick={() => removeQuestion(idx)} style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
+          <button onClick={() => removeQuestion(idx)} style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
         </div>
           );
         });
@@ -785,7 +785,7 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
         <button onClick={() => onUpload((url) => setQ({ ...q, image_url: url }))} type="button" style={btnSecondary}>
           {q.image_url ? t("dash.changeImg") : t("dash.uploadImg")}
         </button>
-        {q.image_url && <button onClick={() => setQ({ ...q, image_url: null })} title={t("dash.removeImg")} style={{ display: "flex", alignItems: "center", padding: 6, background: "none", border: "1px solid var(--border2)", borderRadius: 8, cursor: "pointer" }}><Icon d={ICONS.trash} color={C.danger} /></button>}
+        {q.image_url && <button onClick={() => setQ({ ...q, image_url: null })} title={t("dash.removeImg")} style={{ display: "flex", alignItems: "center", padding: 6, background: "none", border: "1px solid var(--border2)", borderRadius: 8, cursor: "pointer" }}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
         {q.image_url && (
           <select value={q.image_layout} onChange={(e) => setQ({ ...q, image_layout: e.target.value })} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border2)", fontSize: 13 }}>
             <option value="above">{t("dash.imgAbove")}</option>
@@ -856,7 +856,7 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
                   {choiceImg && (
                     <div style={{ padding: "4px 8px", background: "var(--bg2)", display: "flex", alignItems: "center", gap: 6 }}>
                       <img src={choiceImg} alt="" style={{ height: 40, borderRadius: 4 }} />
-                      <button onClick={removeChoiceImg} title={t("dash.removeImg")} style={{ border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", padding: 2 }}><Icon d={ICONS.trash} color={C.danger} /></button>
+                      <button onClick={removeChoiceImg} title={t("dash.removeImg")} style={{ border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", padding: 2 }}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
                     </div>
                   )}
                 </div>

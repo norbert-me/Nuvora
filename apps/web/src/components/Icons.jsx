@@ -6,7 +6,9 @@ const iconSvg = { fill: "none", stroke: "var(--text3)", strokeWidth: 1.5, stroke
 // Textlinie — so bleibt jedes Symbol im Verhältnis zum umgebenden Text. Eine
 // feste Größe (px als Zahl oder z.B. "1.2em") bleibt möglich, wo gewollt.
 export function Icon({ d, color, size, ...props }) {
-  const s = size || "1em";
+  // Default 18px statt 1em: die feinen Strich-Icons wirkten bei 1em (~14px)
+  // durchgehend zu klein. Explizite size-Angaben bleiben unberuehrt.
+  const s = size || 18;
   return (
     <svg style={{ ...iconSvg, width: s, height: s, stroke: color || iconSvg.stroke, verticalAlign: "-0.125em", flexShrink: 0 }} viewBox="0 0 20 20" {...props}>
       {Array.isArray(d) ? d.map((p, i) => <path key={i} d={p} />) : <path d={d} />}
