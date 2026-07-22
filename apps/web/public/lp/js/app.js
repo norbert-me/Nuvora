@@ -2024,6 +2024,9 @@
             thema: previewData[0].thema,
             unterthema: previewData[0].unterthema || '',
             klasse: document.getElementById('gen-klasse').value,
+            // class_id direkt vom Schueler mitspeichern — die Namenssuche
+            // (classIdVon) scheiterte, wenn der Kurs-Name leer war (#59: „ohne kurs").
+            class_id: (previewData[0].student && previewData[0].student.class_id) || null,
             schueler: previewData.map(p => ({
                 _id: p.student._id,
                 name: p.student.name,
@@ -2089,7 +2092,13 @@
                     exercise_ids: (sch.aufgabenIds || []).map(x => parseInt(x)).filter(Boolean)
                 })).filter(a => a.student_id);
                 const topic_id = await topicId(ll.thema, ll.unterthema);
-                const class_id = classIdVon(ll.klasse);
+                // Bevorzugt die am Ladder gespeicherte class_id; nur als Fallback
+                // ueber den Kurs-Namen suchen (der kann leer sein) oder ueber einen
+                // der zugewiesenen Schueler.
+                const class_id = (ll.class_id ?? null)
+                    || classIdVon(ll.klasse)
+                    || (schueler.find(s => (ll.schueler || []).some(x => (x.id || parseInt(x._id)) === s.id)) || {}).class_id
+                    || null;
                 // Diagnose (#59): weist eine gespeicherte Lernleiter leer aus, steht
                 // hier in der Konsole WAS fehlte — Thema, Kurs oder Zuweisungen.
                 if (!topic_id || !class_id || !assignments.length) {
@@ -2887,11 +2896,17 @@
                 aufgaben_order: [],
                 lernleitern: (p.ladders || []).map(l => {
                     const tp = topicPfad(l.topic_id);
+                    // Kurs-Name aus der class_id ableiten, wenn die Schuelersuche
+                    // scheitert (z.B. Schueler noch nicht geladen) — sonst waere
+                    // klasse leer und ein Re-Save schriebe class_id=null (#59).
+                    const klasseVonStud = (schueler.find(s => s.id === ((l.assignments || [])[0] || {}).student_id) || {}).klasse;
+                    const klasseVonCls = (schueler.find(s => s.class_id === l.class_id) || {}).klasse;
                     return {
                         _id: String(l.id),
                         thema: tp.thema,
                         unterthema: tp.unterthema,
-                        klasse: (schueler.find(s => s.id === ((l.assignments || [])[0] || {}).student_id) || {}).klasse || '',
+                        klasse: klasseVonStud || klasseVonCls || '',
+                        class_id: l.class_id ?? null,   // autoritativ vom Ladder — nicht ueber den Namen raten
                         notizen: l.notizen || '',
                         config: l.config || null,
                         schueler: (l.assignments || []).map(a => {
@@ -3159,8 +3174,9 @@
         });
     }
 
-    // Gespeicherte Lernleiter im Generator oeffnen. Dank deterministischem Seed
-    // ergibt dieselbe Thema/Klasse-Kombination wieder dieselbe Auswahl. Beim
+    // Gespeicherte Lernleiter im Generator oeffnen: die GESICHERTEN Zuweisungen
+    // exakt darstellen — NICHT neu generieren (bei geaendertem Aufgabenpool kaeme
+    // sonst eine andere Auswahl heraus, „neue statt alte Lernleiter"). Beim
     // Speichern ersetzt editingLlId den bestehenden Eintrag statt anzuhaengen.
     function openLernleiter(pfad, ll) {
         editingLlId = ll._id;
@@ -3180,7 +3196,32 @@
 
         document.getElementById('gen-klasse').value = ll.klasse || '';
         updateGenConfig();
-        document.getElementById('btn-generate').click();
+
+        // Vorschau aus den gespeicherten Aufgaben-IDs je Schueler rekonstruieren.
+        const sektVon = a => { const k = getKategorie(a); return k === 'Erklärung' ? 'Erklärung' : k === 'E-Niveau' ? 'E-Niveau' : k === 'G-Niveau' ? 'G-Niveau' : 'Basis'; };
+        const rang = { 'Erklärung': 1, 'Basis': 2, 'G-Niveau': 3, 'E-Niveau': 4 };
+        previewData = (ll.schueler || []).map(sch => {
+            const student = schueler.find(s => s.id === (sch.id || parseInt(sch._id)))
+                || { _id: String(sch._id), id: sch.id, name: sch.name, niveau: '', foerder: [] };
+            const tasks = (sch.aufgabenIds || [])
+                .map(id => aufgaben.find(x => String(x.id) === String(id) || String(x._id) === String(id)))
+                .filter(Boolean)
+                .map(a => ({ ...a, section: sektVon(a), selected: true }));
+            tasks.sort((a, b) => {
+                const ra = rang[a.section] ?? 5, rb = rang[b.section] ?? 5;
+                if (ra !== rb) return ra - rb;
+                const [pa, na] = quelleKey(a.quelle), [pb, nb] = quelleKey(b.quelle);
+                return (pa - pb) || (na - nb);
+            });
+            return { student, tasks, thema: ll.thema, unterthema: ll.unterthema || '' };
+        });
+        if (previewData.some(e => e.tasks.length)) {
+            renderPreview();
+            document.getElementById('preview-area').style.display = '';
+        } else {
+            // Keine (aufloesbaren) Zuweisungen gespeichert -> als Fallback generieren.
+            document.getElementById('btn-generate').click();
+        }
         toast('Lernleiter geöffnet – Änderungen mit „In Lernpfad speichern“ übernehmen');
     }
 
