@@ -3,7 +3,7 @@
 // Daraus LIVE je SuS ein Fehlerprofil nach Thema, eine Note (Punkte/Max → Skala)
 // und gezielte Wiederholung (Karten des schwachen Themas wieder fällig).
 import { useState, useEffect, useRef, useMemo } from "react";
-import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, modalOverlay, modalPanel } from "../components/Icons.jsx";
+import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, modalOverlay, modalPanel, Boxplot } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
@@ -446,17 +446,10 @@ export default function Klassenarbeit() {
                     </div>
                   ); })}
                 </div>
-                ) : (() => {
-                  // Boxplot auf der %-Achse (Klassenleistung), gleiche Komponente wie Vergleich.
-                  const q = quartiles(pctList(work));
-                  return q ? (
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0" }}>
-                      <span style={{ fontSize: 11, color: "var(--text3)", width: 20 }}>0%</span>
-                      <Boxplot q={q} />
-                      <span style={{ fontSize: 11, color: "var(--text3)", width: 32 }}>100%</span>
-                    </div>
-                  ) : null;
-                })()}
+                ) : (
+                  // Boxplot auf der %-Achse (Klassenleistung) — zentrale Kern-Komponente.
+                  <Boxplot values={pctList(work)} max={100} unit="%" />
+                )}
                 {analyse.noten.stats && (
                   <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: "5px 16px", fontSize: 12.5 }}>
                     {[[t("klassenarbeit.stdev"), analyse.noten.stats.sd], [t("klassenarbeit.min"), analyse.noten.stats.min], ["Q1", analyse.noten.stats.q1], [t("klassenarbeit.median"), analyse.noten.stats.med], ["Q3", analyse.noten.stats.q3], [t("klassenarbeit.max"), analyse.noten.stats.max]].map(([k, v]) => (
@@ -572,21 +565,8 @@ function quartiles(arr) {
 }
 
 const boxColor = (med) => (med < 50 ? C.danger : med < 75 ? C.warning : C.success);
-
-// Ein horizontaler Boxplot auf 0–100 %-Achse (Whisker min–max, Box Q1–Q3, Median).
-function Boxplot({ q }) {
-  const pos = (v) => `${v}%`;
-  const col = boxColor(q.med);
-  return (
-    <div style={{ position: "relative", height: 26, flex: 1, minWidth: 200 }}>
-      {[0, 25, 50, 75, 100].map((g) => <div key={g} style={{ position: "absolute", left: pos(g), top: 0, bottom: 0, width: 1, background: g === 50 ? "var(--border)" : "var(--bg2)" }} />)}
-      <div style={{ position: "absolute", top: "50%", left: pos(q.min), width: pos(q.max - q.min), height: 2, transform: "translateY(-50%)", background: col, opacity: 0.5 }} />
-      {[q.min, q.max].map((v, i) => <div key={i} style={{ position: "absolute", top: "25%", bottom: "25%", left: pos(v), width: 2, background: col, opacity: 0.6 }} />)}
-      <div style={{ position: "absolute", top: 4, bottom: 4, left: pos(q.q1), width: pos(q.q3 - q.q1), background: col, opacity: 0.22, border: `1px solid ${col}`, borderRadius: 3 }} />
-      <div style={{ position: "absolute", top: 2, bottom: 2, left: pos(q.med), width: 2, background: col }} />
-    </div>
-  );
-}
+// Boxplot kommt zentral aus Icons.jsx (eine Quelle). Der Vergleich nutzt die
+// kompakte Variante (compact) je Zeile.
 
 export function KlassenarbeitVergleich() {
   const { t } = useLanguage();
@@ -605,7 +585,7 @@ export function KlassenarbeitVergleich() {
     const pl = pctList(w); const q = quartiles(pl);
     const noten = pl.map((p) => gradeFromPct(p, scale));
     const avgNote = noten.length ? noten.reduce((s, x) => s + x, 0) / noten.length : null;
-    return { id: w.id, name: w.name, q, avgNote };
+    return { id: w.id, name: w.name, q, pl, avgNote };
   }).filter((r) => r.q), [works, scale]);
 
   const fmt = (x) => Math.round(x) + "%";
@@ -630,7 +610,7 @@ export function KlassenarbeitVergleich() {
           {rows.map((r) => (
             <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
               <span style={{ width: 150, flexShrink: 0, fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.name}>{r.name}</span>
-              <Boxplot q={r.q} />
+              <Boxplot values={r.pl} max={100} compact />
               <span style={{ width: 44, textAlign: "right", flexShrink: 0, fontSize: 12.5, color: "var(--text3)" }}>{r.q.n}</span>
               <span style={{ width: 54, textAlign: "right", flexShrink: 0, fontSize: 12.5, fontWeight: 600 }}>{fmt(r.q.avg)}</span>
               <span style={{ width: 54, textAlign: "right", flexShrink: 0, fontSize: 13, fontWeight: 700, color: boxColor(r.q.med) }}>{nt(r.avgNote)}</span>

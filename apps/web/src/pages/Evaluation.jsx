@@ -3,7 +3,7 @@ import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
-import { DownloadLink, Icon, ICONS, btnPrimary, btnSecondary, modalOverlay, modalPanel, inputStyle, COLORS as C } from "../components/Icons.jsx";
+import { DownloadLink, Icon, ICONS, btnPrimary, btnSecondary, modalOverlay, modalPanel, inputStyle, COLORS as C, Boxplot } from "../components/Icons.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
 
 const API = "/api";
@@ -47,78 +47,8 @@ function tendencyGrade(pct, scale) {
 
 const TENDENCY_GRADES = [1, 2, 3, 4, 5].flatMap((g) => [g, Math.round((g + 0.3) * 10) / 10, Math.round((g + 0.7) * 10) / 10]).concat([6]);
 
-function quantile(sorted, p) {
-  const n = sorted.length;
-  const idx = p * (n - 1);
-  const lo = Math.floor(idx);
-  const hi = Math.ceil(idx);
-  if (lo === hi) return sorted[lo];
-  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
-}
-
-function Boxplot({ values, max, label }) {
-  if (values.length < 3) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const q1 = quantile(sorted, 0.25);
-  const med = quantile(sorted, 0.5);
-  const q3 = quantile(sorted, 0.75);
-  const iqr = q3 - q1;
-  const loBound = q1 - 1.5 * iqr;
-  const hiBound = q3 + 1.5 * iqr;
-  const inliers = sorted.filter((v) => v >= loBound && v <= hiBound);
-  const lo = inliers.length > 0 ? inliers[0] : sorted[0];
-  const hi = inliers.length > 0 ? inliers[inliers.length - 1] : sorted[sorted.length - 1];
-  const outliers = sorted.filter((v) => v < loBound || v > hiBound);
-  const pct = (v) => max > 0 ? (v / max) * 100 : 0;
-
-  return (
-    <div style={{ padding: 16 }}>
-      {label && <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text3)", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</div>}
-      <div style={{ position: "relative", height: 48, margin: "0 20px" }}>
-        {/* Whisker line */}
-        <div style={{ position: "absolute", top: 22, left: `${pct(lo)}%`, width: `${pct(hi - lo)}%`, height: 4, background: "var(--border3)" }} />
-        {/* Whisker caps */}
-        <div style={{ position: "absolute", top: 14, left: `${pct(lo)}%`, width: 2, height: 20, background: "var(--text3)" }} />
-        <div style={{ position: "absolute", top: 14, left: `${pct(hi)}%`, width: 2, height: 20, background: "var(--text3)" }} />
-        {/* IQR box */}
-        <div style={{
-          position: "absolute", top: 8, left: `${pct(q1)}%`, width: `${pct(q3 - q1)}%`, height: 32,
-          background: "rgba(10,132,255,0.15)", border: "2px solid var(--accent)", borderRadius: 6,
-        }} />
-        {/* Median line */}
-        <div style={{ position: "absolute", top: 6, left: `${pct(med)}%`, width: 3, height: 36, background: "var(--accent)", borderRadius: 2, transform: "translateX(-1.5px)" }} />
-        {/* Outliers */}
-        {outliers.map((v, i) => (
-          <div key={i} style={{
-            position: "absolute", top: 19, left: `${pct(v)}%`,
-            width: 10, height: 10, borderRadius: 5, background: C.danger, transform: "translateX(-5px)",
-          }} />
-        ))}
-      </div>
-      {/* Beschriftungen an ihrer echten Position, nicht gleichmaessig verteilt —
-          sonst stehen sie nicht unter ihren Markierungen. Liegen zwei Werte nah
-          beieinander (z. B. Q3 und Max), weicht das zweite in eine zweite Zeile
-          aus, damit sich die Texte nicht ueberschneiden. */}
-      {(() => {
-        const MINGAP = 14; // Prozent Mindestabstand, sonst zweite Zeile
-        const last = [-Infinity, -Infinity];
-        const items = [["Min", sorted[0]], ["Q1", q1], ["Med", med], ["Q3", q3], ["Max", sorted[sorted.length - 1]]].map(([lbl, v]) => {
-          const x = pct(v);
-          let row = x - last[0] >= MINGAP ? 0 : x - last[1] >= MINGAP ? 1 : (last[0] <= last[1] ? 0 : 1);
-          last[row] = x;
-          return { lbl, v, x, row };
-        });
-        return (
-          <div style={{ position: "relative", height: 28, margin: "4px 20px 0", fontSize: 11, color: "var(--text3)" }}>
-            {items.map((it, i) => (
-              <span key={i} style={{ position: "absolute", top: it.row * 13, left: `${it.x}%`, transform: "translateX(-50%)", whiteSpace: "nowrap" }}>{it.lbl}: {fmt(it.v)}</span>
-            ))}
-          </div>
-        );
-      })()}
-    </div>
-  );
-}
+// Boxplot liegt jetzt zentral in Icons.jsx (eine Quelle für CardVote,
+// Klassen-Auswertung und Klassenarbeit). Hier nur noch importiert.
 
 export default function Evaluation() {
   const { t } = useLanguage();

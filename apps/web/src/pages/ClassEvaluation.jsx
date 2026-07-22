@@ -1,44 +1,11 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { LoadError, COLORS as C } from "../components/Icons.jsx";
+import { LoadError, COLORS as C, Boxplot } from "../components/Icons.jsx";
 
 const API = "/api";
 
 function fmt(n) { return n % 1 === 0 ? String(n) : n.toFixed(1); }
-
-function Boxplot({ values }) {
-  if (values.length < 3) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const q1 = sorted[Math.floor(sorted.length * 0.25)];
-  const med = sorted[Math.floor(sorted.length / 2)];
-  const q3 = sorted[Math.floor(sorted.length * 0.75)];
-  const iqr = q3 - q1;
-  const lo = Math.max(sorted[0], q1 - 1.5 * iqr);
-  const hi = Math.min(sorted[sorted.length - 1], q3 + 1.5 * iqr);
-  const outliers = sorted.filter((v) => v < lo || v > hi);
-
-  return (
-    <div style={{ padding: 16 }}>
-      <div style={{ position: "relative", height: 48, margin: "0 20px" }}>
-        <div style={{ position: "absolute", top: 22, left: `${lo}%`, width: `${hi - lo}%`, height: 4, background: "var(--border3)" }} />
-        <div style={{ position: "absolute", top: 14, left: `${lo}%`, width: 2, height: 20, background: "var(--text3)" }} />
-        <div style={{ position: "absolute", top: 14, left: `${hi}%`, width: 2, height: 20, background: "var(--text3)" }} />
-        <div style={{ position: "absolute", top: 8, left: `${q1}%`, width: `${q3 - q1}%`, height: 32, background: "rgba(10,132,255,0.15)", border: "2px solid var(--accent)", borderRadius: 6 }} />
-        <div style={{ position: "absolute", top: 6, left: `${med}%`, width: 3, height: 36, background: "var(--accent)", borderRadius: 2 }} />
-        {outliers.map((v, i) => (
-          <div key={i} style={{ position: "absolute", top: 19, left: `${v}%`, width: 10, height: 10, borderRadius: 5, background: C.danger, transform: "translateX(-5px)" }} />
-        ))}
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", margin: "4px 20px 0", fontSize: 11, color: "var(--text3)" }}>
-        <span>Min: {fmt(sorted[0])}%</span>
-        <span>Q1: {fmt(q1)}%</span>
-        <span>Med: {fmt(med)}%</span>
-        <span>Q3: {fmt(q3)}%</span>
-        <span>Max: {fmt(sorted[sorted.length - 1])}%</span>
-      </div>
-    </div>
-  );
-}
+// Boxplot zentral aus Icons.jsx (eine Quelle, mit Markierungen + Ausreißern).
 
 export default function ClassEvaluation() {
   const { id } = useParams();
@@ -156,7 +123,7 @@ export default function ClassEvaluation() {
               }}
             >Boxplot</button>
           </div>
-          {chartView === "box" && <Boxplot values={pctValues} />}
+          {chartView === "box" && <Boxplot values={pctValues} max={100} unit="%" />}
         </div>
       )}
 

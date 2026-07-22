@@ -202,6 +202,75 @@ export const popoverPanel = {
   background: "var(--card)", color: "var(--text)", border: "1px solid var(--border)",
   borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
 };
+// ─── Boxplot (EINE Quelle) ───────────────────────────────────────────────────
+// Horizontaler Boxplot mit Markierungen (Min · Q1 · Median · Q3 · Max) und
+// Ausreißern (1,5·IQR). Vorher hatte jede Auswertung ihren eigenen — CardVote,
+// Klassen-Auswertung, Klassenarbeit. Ab hier zentral: values + Skala (max).
+export function quantileOf(sorted, p) {
+  const n = sorted.length;
+  if (!n) return 0;
+  const idx = p * (n - 1), lo = Math.floor(idx), hi = Math.ceil(idx);
+  return lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+export function Boxplot({ values, max = 100, label, unit = "", compact = false }) {
+  if (!values || values.length < 3) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const q1 = quantileOf(sorted, 0.25), med = quantileOf(sorted, 0.5), q3 = quantileOf(sorted, 0.75);
+  const iqr = q3 - q1, loBound = q1 - 1.5 * iqr, hiBound = q3 + 1.5 * iqr;
+  const inliers = sorted.filter((v) => v >= loBound && v <= hiBound);
+  const lo = inliers.length ? inliers[0] : sorted[0];
+  const hi = inliers.length ? inliers[inliers.length - 1] : sorted[sorted.length - 1];
+  const outliers = sorted.filter((v) => v < loBound || v > hiBound);
+  const pct = (v) => (max > 0 ? (v / max) * 100 : 0);
+  const fmt = (n) => (n % 1 === 0 ? String(n) : n.toFixed(1)).replace(".", ",");
+  // Kompakt (Listenzeile im Vergleich): nur die Grafik, keine Beschriftungen.
+  if (compact) {
+    return (
+      <div style={{ position: "relative", height: 26, flex: 1, minWidth: 160 }}>
+        <div style={{ position: "absolute", top: 12, left: `${pct(lo)}%`, width: `${pct(hi - lo)}%`, height: 3, background: "var(--border3)" }} />
+        <div style={{ position: "absolute", top: 7, left: `${pct(lo)}%`, width: 2, height: 12, background: "var(--text3)" }} />
+        <div style={{ position: "absolute", top: 7, left: `${pct(hi)}%`, width: 2, height: 12, background: "var(--text3)" }} />
+        <div style={{ position: "absolute", top: 4, left: `${pct(q1)}%`, width: `${pct(q3 - q1)}%`, height: 18, background: "rgba(10,132,255,0.15)", border: "2px solid var(--accent)", borderRadius: 4 }} />
+        <div style={{ position: "absolute", top: 2, left: `${pct(med)}%`, width: 3, height: 22, background: "var(--accent)", borderRadius: 2, transform: "translateX(-1.5px)" }} />
+        {outliers.map((v, i) => (
+          <div key={i} style={{ position: "absolute", top: 9, left: `${pct(v)}%`, width: 8, height: 8, borderRadius: 4, background: COLORS.danger, transform: "translateX(-4px)" }} />
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div style={{ padding: 16 }}>
+      {label && <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text3)", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</div>}
+      <div style={{ position: "relative", height: 48, margin: "0 20px" }}>
+        <div style={{ position: "absolute", top: 22, left: `${pct(lo)}%`, width: `${pct(hi - lo)}%`, height: 4, background: "var(--border3)" }} />
+        <div style={{ position: "absolute", top: 14, left: `${pct(lo)}%`, width: 2, height: 20, background: "var(--text3)" }} />
+        <div style={{ position: "absolute", top: 14, left: `${pct(hi)}%`, width: 2, height: 20, background: "var(--text3)" }} />
+        <div style={{ position: "absolute", top: 8, left: `${pct(q1)}%`, width: `${pct(q3 - q1)}%`, height: 32, background: "rgba(10,132,255,0.15)", border: "2px solid var(--accent)", borderRadius: 6 }} />
+        <div style={{ position: "absolute", top: 6, left: `${pct(med)}%`, width: 3, height: 36, background: "var(--accent)", borderRadius: 2, transform: "translateX(-1.5px)" }} />
+        {outliers.map((v, i) => (
+          <div key={i} style={{ position: "absolute", top: 19, left: `${pct(v)}%`, width: 10, height: 10, borderRadius: 5, background: COLORS.danger, transform: "translateX(-5px)" }} />
+        ))}
+      </div>
+      {(() => {
+        const MINGAP = 14; const last = [-Infinity, -Infinity];
+        const items = [["Min", sorted[0]], ["Q1", q1], ["Median", med], ["Q3", q3], ["Max", sorted[sorted.length - 1]]].map(([lbl, v]) => {
+          const x = pct(v);
+          const row = x - last[0] >= MINGAP ? 0 : x - last[1] >= MINGAP ? 1 : (last[0] <= last[1] ? 0 : 1);
+          last[row] = x;
+          return { lbl, v, x, row };
+        });
+        return (
+          <div style={{ position: "relative", height: 28, margin: "4px 20px 0", fontSize: 11, color: "var(--text3)" }}>
+            {items.map((it, i) => (
+              <span key={i} style={{ position: "absolute", top: it.row * 13, left: `${it.x}%`, transform: "translateX(-50%)", whiteSpace: "nowrap" }}>{it.lbl}: {fmt(it.v)}{unit}</span>
+            ))}
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
 export function Modal({ children, onClose, width = 480, style }) {
   // Esc schließt — durchgängig für alle Modals, die diese Komponente nutzen.
   useEffect(() => {
