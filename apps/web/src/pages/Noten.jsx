@@ -12,7 +12,7 @@ import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, modalOverlay, modalPanel, Empty, Skeleton, ExportButton, ImportButton } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, modalOverlay, modalPanel, popoverPanel, Empty, Skeleton, ExportButton, ImportButton } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
@@ -852,7 +852,7 @@ function SectionMenu({ t, sec, onEdit, onDelete, onAddCol }) {
   const [edit, setEdit] = useState(false);
   if (edit) {
     return (
-      <span onClick={(e) => e.stopPropagation()} style={{ position: "absolute", zIndex: 10, top: 50, left: 0, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: 8, boxShadow: "0 6px 20px rgba(0,0,0,0.2)" }}>
+      <span onClick={(e) => e.stopPropagation()} style={{ ...popoverPanel, position: "absolute", zIndex: 10, top: 50, left: 0, padding: 8 }}>
         <SectionForm t={t} initial={sec} onCancel={() => setEdit(false)} onSave={(b) => { onEdit(b); setEdit(false); }} />
       </span>
     );
@@ -864,7 +864,7 @@ function SectionMenu({ t, sec, onEdit, onDelete, onAddCol }) {
       {open && (
         <>
           <span onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 9 }} />
-          <div style={{ position: "absolute", zIndex: 10, top: 24, right: 0, minWidth: 168, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: 4, boxShadow: "0 6px 20px rgba(0,0,0,0.2)" }}>
+          <div style={{ ...popoverPanel, position: "absolute", zIndex: 10, top: 24, right: 0, minWidth: 168, padding: 4 }}>
             <button style={item} onClick={() => { setOpen(false); onAddCol(); }}><Icon d={ICONS.plus} size={14} color="var(--accent)" /> {t("noten.addColumn")}</button>
             <button style={item} onClick={() => { setOpen(false); setEdit(true); }}><Icon d={ICONS.edit} size={14} /> {t("common.edit")}</button>
             <button style={{ ...item, color: C.danger }} onClick={() => { setOpen(false); onDelete(); }}><Icon d={ICONS.trash} size={14} color={C.danger} /> {t("common.delete")}</button>
@@ -886,7 +886,7 @@ function ColMenu({ t, cat, stats, onStats, onRename, onDelete, onClose, dividerO
   return (
     <>
       <span onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 9 }} />
-      <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", zIndex: 10, top: 26, left: "50%", transform: "translateX(-50%)", minWidth: 210, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: 12, boxShadow: "0 6px 20px rgba(0,0,0,0.2)", textAlign: "left", fontWeight: 400 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...popoverPanel, position: "absolute", zIndex: 10, top: 26, left: "50%", transform: "translateX(-50%)", minWidth: 210, padding: 12, textAlign: "left", fontWeight: 400 }}>
         <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 8 }}>{t("noten.colCreated")}: {datum}</div>
         {/* Auswertung: schlichter Details-Knopf, öffnet das zentrale Modal. */}
         <button onClick={() => { onStats(); onClose(); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 10, padding: "7px 9px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer" }}>

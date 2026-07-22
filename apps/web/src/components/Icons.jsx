@@ -191,6 +191,13 @@ export const modalPanel = {
   padding: 22, border: "1px solid var(--border)", boxShadow: "0 20px 50px rgba(0,0,0,0.3)",
   maxHeight: "88vh", overflow: "auto", boxSizing: "border-box",
 };
+// Schwebendes Panel (Dropdown, Menü, Tooltip, Sprung-Popover). NUR die Oberfläche —
+// Position/zIndex/minWidth je Aufrufer per Spread ergänzen:
+// { ...popoverPanel, position:"absolute", top:.., right:.., zIndex:.. }.
+export const popoverPanel = {
+  background: "var(--card)", color: "var(--text)", border: "1px solid var(--border)",
+  borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+};
 export function Modal({ children, onClose, width = 480, style }) {
   // Esc schließt — durchgängig für alle Modals, die diese Komponente nutzen.
   useEffect(() => {
