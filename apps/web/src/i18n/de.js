@@ -749,6 +749,8 @@ export default {
   "kalender.kw": "KW",
   "kalender.toWeek": "Zur Wochenansicht",
   "kalender.toDay": "Zur Tagesansicht",
+  "kalender.editSlot": "Stunde bearbeiten",
+  "kalender.addSlot": "Klasse für diese Stunde eintragen",
   "kalender.week": "Woche",
   "kalender.day": "Tag",
   "kalender.start": "Beginn",

@@ -1,13 +1,13 @@
 // Einheitliche Auswahl: erst Kurs, dann — nur wenn der Kurs mehrere Fach-Klassen
 // hat — das Fach. Gibt weiterhin eine class_id nach außen (Backend unverändert),
 // die Oberfläche denkt aber in Kursen. Bei 1 Klasse/Kurs nur ein Feld.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { selectStyle } from "./Icons.jsx";
 
 // allowNone + noneLabel: erlaubt eine Leer-Option (z.B. „Freitext") — dann kann
 // value "" sein und onChange("") gemeldet werden.
-// autoFocus: erstes Feld beim Einblenden fokussieren und — wo unterstützt —
-// direkt aufklappen (showPicker), damit ein Klick sofort in die Auswahl führt.
+// autoFocus: erstes Feld beim Einblenden fokussieren (natives autoFocus, ohne
+// showPicker — das warf je nach Browser/fehlender Nutzergeste und wirkte kaputt).
 export default function KursKlasseSelect({ value, onChange, onKurs, style, allowNone = false, noneLabel = "–", autoFocus = false }) {
   const [groups, setGroups] = useState([]); // [{ id, name, classes:[{id,name}] }]
   // Der gewählte Kurs wird EXPLIZIT gehalten, nicht aus value abgeleitet: eine
@@ -65,18 +65,11 @@ export default function KursKlasseSelect({ value, onChange, onKurs, style, allow
   // Sitzplan gleich den kursweiten Datensatz lädt, nicht den Klassen-Fallback.
   useEffect(() => { if (onKurs) onKurs(curKurs); }, [curKurs]); // eslint-disable-line
 
-  const firstRef = useRef(null);
-  useEffect(() => {
-    if (!autoFocus || !groups.length || !firstRef.current) return;
-    firstRef.current.focus();
-    try { firstRef.current.showPicker?.(); } catch { /* braucht ggf. Nutzergeste — Fokus genügt */ }
-  }, [autoFocus, groups.length]);
-
   if (!groups.length && !allowNone) return null;
 
   return (
     <>
-      <select ref={firstRef} value={cur ? String(cur.id) : ""} onChange={(e) => (e.target.value === "" ? onChange(allowNone ? "" : value, null) : pickKurs(e.target.value))} style={s}>
+      <select autoFocus={autoFocus} value={cur ? String(cur.id) : ""} onChange={(e) => (e.target.value === "" ? onChange(allowNone ? "" : value, null) : pickKurs(e.target.value))} style={s}>
         {allowNone ? <option value="">{noneLabel}</option> : (!cur && <option value="">–</option>)}
         {groups.map((g) => <option key={g.id} value={g.id}>{g.name || "—"}</option>)}
       </select>

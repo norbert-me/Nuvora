@@ -749,6 +749,8 @@ export default {
   "kalender.kw": "Sem",
   "kalender.toWeek": "Vista semanal",
   "kalender.toDay": "Vista diaria",
+  "kalender.editSlot": "Editar hora",
+  "kalender.addSlot": "Añadir clase a esta hora",
   "kalender.week": "Semana",
   "kalender.day": "Día",
   "kalender.start": "Inicio",
