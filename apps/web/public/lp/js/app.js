@@ -375,6 +375,10 @@
         const s = String(id);
         return s.startsWith('#') ? s : '#' + s.replace(/\D/g, '').padStart(6, '0');
     }
+    // Numerischer Wert der ANGEZEIGTEN Aufgaben-Nummer (#000054 -> 54). Fuer die
+    // Sortierung: die Anzeige zeigt den pro-User-Code, nicht die globale id — nach
+    // dem sichtbaren Code sortieren, sonst wirkt die Reihenfolge falsch.
+    function codeNum(a) { const m = String(a.code || a.id || '').match(/(\d+)/); return m ? parseInt(m[1], 10) : 0; }
 
     // ─── State ───
     let aufgaben = load(STORAGE_KEYS.aufgaben);
@@ -443,7 +447,8 @@
         }
     }
 
-    let sortState = { table: null, column: null, asc: true };
+    // Standard-Sortierung der Aufgabenliste: aufsteigend nach angezeigter ID.
+    let sortState = { table: 'aufgaben-tabelle', column: 'id', asc: true };
 
     // ─── Authentifizierung ───
     // Mit Mehrbenutzer-Backend ist der Server pro Konto die Quelle der Wahrheit.
@@ -539,7 +544,10 @@
         accountMenu.style.display = accountMenu.style.display === 'none' ? 'block' : 'none';
     });
     document.addEventListener('click', (e) => {
-        if (!document.getElementById('nav-account').contains(e.target)) accountMenu.style.display = 'none';
+        // Null-Guard: der Listener haengt am document und kann feuern, wenn die
+        // in-page gemountete App (und damit #nav-account) schon wieder weg ist.
+        const na = document.getElementById('nav-account');
+        if (na && !na.contains(e.target)) accountMenu.style.display = 'none';
     });
 
     // Abmelden gehoert Nuvora: das Modul hat kein eigenes Konto mehr. Im Rahmen
@@ -1031,10 +1039,15 @@
 
     function applySort(arr) {
         if (!sortState.table || !sortState.column) return arr;
+        const col = sortState.column;
         const sorted = arr.slice().sort((a, b) => {
-            const av = a[sortState.column];
-            const bv = b[sortState.column];
-            let cmp = (av > bv) ? 1 : (av < bv) ? -1 : 0;
+            let cmp;
+            if (col === 'id') {
+                cmp = codeNum(a) - codeNum(b);   // nach angezeigter Nummer, NUMERISCH
+            } else {
+                const av = a[col], bv = b[col];
+                cmp = (av > bv) ? 1 : (av < bv) ? -1 : 0;
+            }
             return sortState.asc ? cmp : -cmp;
         });
         return sorted;
