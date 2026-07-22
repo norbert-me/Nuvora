@@ -377,7 +377,7 @@ export default function Noten() {
         )}
       </div>
 
-      {error && <p style={{ color: "var(--danger, #dc2626)", fontSize: 13, marginBottom: 10 }}>{error}</p>}
+      {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 10 }}>{error}</p>}
 
       {neuAbschnitt && (
         <Modal title={t("noten.addSection")} onClose={() => setNeuAbschnitt(false)}>
@@ -893,7 +893,7 @@ function ColMenu({ t, cat, stats, onStats, onRename, onDelete, onClose, dividerO
           <Icon d={ICONS.chart} size={14} color="var(--accent)" />{t("noten.colDetails")}
         </button>
         <button onClick={() => { onCompare(cat); onClose(); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 10, padding: "7px 9px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer" }}>
-          <Icon d={ICONS.chart} size={14} color="#2563eb" />{t("noten.compare")}
+          <Icon d={ICONS.chart} size={14} color={C.info} />{t("noten.compare")}
         </button>
         <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 10 }}>
           <input value={name} onChange={(e) => setName(e.target.value)} autoFocus
@@ -1110,7 +1110,7 @@ function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete })
           return (
             <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 12.5 }}>
               <span style={{ width: 62, color: "var(--text3)" }}>{new Date(e.date).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" })}</span>
-              <span style={{ width: 14, fontWeight: 700, color: e.tendency > 0 ? C.success : e.tendency < 0 ? "var(--danger, #dc2626)" : "var(--text3)" }}>{e.tendency > 0 ? "+" : e.tendency < 0 ? "−" : "·"}</span>
+              <span style={{ width: 14, fontWeight: 700, color: e.tendency > 0 ? C.success : e.tendency < 0 ? C.danger : "var(--text3)" }}>{e.tendency > 0 ? "+" : e.tendency < 0 ? "−" : "·"}</span>
               <span style={{ flex: 1, minWidth: 0 }}><span style={{ color: "var(--text3)" }}>{k?.name}: </span>{e.note}</span>
               <button onClick={() => onDelete(e.id)} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
             </div>

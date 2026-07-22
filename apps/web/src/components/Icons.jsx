@@ -138,6 +138,7 @@ export const COLORS = {
   danger: "#d1350f",
   success: "#0a7d3e",
   warning: "#b8860b",
+  info: "#2563eb",       // Akzent-/Info-Blau (Badges, „entschuldigt", Standard-Klassenfarbe)
   correctBg: "#d4edda",
   incorrectBg: "#fde2d9",
 };
@@ -238,7 +239,7 @@ export function Empty({ title, hint, action, onAction }) {
 export function LoadError({ message, onRetry, retryLabel = "Erneut versuchen" }) {
   return (
     <div style={{ textAlign: "center", padding: "28px 20px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--bg2)" }}>
-      <div style={{ fontSize: 14, color: "#d1350f", fontWeight: 600, marginBottom: onRetry ? 14 : 0 }}>{message || "Konnte nicht geladen werden."}</div>
+      <div style={{ fontSize: 14, color: COLORS.danger, fontWeight: 600, marginBottom: onRetry ? 14 : 0 }}>{message || "Konnte nicht geladen werden."}</div>
       {onRetry && <button onClick={onRetry} style={btnSecondary}>{retryLabel}</button>}
     </div>
   );
@@ -264,7 +265,7 @@ export function StageBadge({ stage, title }) {
       display: "inline-block", fontSize: 10, fontWeight: 700, letterSpacing: "0.5px",
       textTransform: "uppercase", padding: "2px 6px", borderRadius: 6, verticalAlign: "middle",
       background: beta ? "rgba(10,132,255,0.15)" : "rgba(184,134,11,0.18)",
-      color: beta ? "var(--accent)" : "#b8860b",
+      color: beta ? "var(--accent)" : COLORS.warning,
     }}>{beta ? "Beta" : "Frühphase"}</span>
   );
 }

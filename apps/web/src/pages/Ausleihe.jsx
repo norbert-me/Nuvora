@@ -126,7 +126,7 @@ export default function Ausleihe() {
                         const tage = tageDraussen(l.out_at);
                         const ueber = tage >= UEBERFAELLIG_TAGE;
                         return (
-                        <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", border: ueber ? "1px solid #d1350f" : "1px solid var(--border)", borderRadius: 8, background: ueber ? "rgba(209,53,15,0.06)" : undefined }}>
+                        <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", border: ueber ? `1px solid ${C.danger}` : "1px solid var(--border)", borderRadius: 8, background: ueber ? "rgba(209,53,15,0.06)" : undefined }}>
                           <span style={{ flex: 1, fontWeight: 500 }}>{l.borrower}</span>
                           <span style={{ fontSize: 12, color: ueber ? C.danger : "var(--text3)", fontWeight: ueber ? 700 : 400 }}>{t("ausleihe.sinceDays", { n: tage })}</span>
                           <button onClick={() => zurueck(l.id, it.id)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>{t("ausleihe.return")}</button>

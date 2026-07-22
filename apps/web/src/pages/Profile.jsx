@@ -360,7 +360,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                                   setAdminMsg(t("profile.deleted", { email: u.email }));
                                 }
                               }}
-                              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 6, background: "none", border: "1px solid #d1350f", borderRadius: 8, cursor: "pointer" }}
+                              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 6, background: "none", border: `1px solid ${C.danger}`, borderRadius: 8, cursor: "pointer" }}
                             ><TrashIcon size={15} /></button>
                           )}
                         </td>

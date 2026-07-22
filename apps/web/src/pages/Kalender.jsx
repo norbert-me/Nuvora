@@ -233,7 +233,7 @@ export default function Kalender() {
     if (k) return k.name;
     return (classes.find((c) => c.id === id) || {}).name || "";
   };
-  const classColor = (id) => (classes.find((c) => c.id === id) || {}).color || "#2563eb";
+  const classColor = (id) => (classes.find((c) => c.id === id) || {}).color || C.info;
   const weekdayOf = (d) => (new Date(d).getDay() + 6) % 7; // 0 = Montag
   const slotsFor = (d) => tt.slots.filter((s) => s.weekday === weekdayOf(d)).sort((a, b) => a.period - b.period);
   // Klick auf eine Stundenplan-Vorlage: gibt es an dem Tag schon einen Eintrag
@@ -900,8 +900,8 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
 function SlotModal({ slot, classes, onSave, onDelete, onColor, onClose, t }) {
   const [classId, setClassId] = useState(slot.class_id || "");
   const cls = classes.find((c) => c.id === Number(classId));
-  const [color, setColor] = useState(cls?.color || "#2563eb");
-  useEffect(() => { const c = classes.find((x) => x.id === Number(classId)); setColor(c?.color || "#2563eb"); }, [classId]); // eslint-disable-line
+  const [color, setColor] = useState(cls?.color || C.info);
+  useEffect(() => { const c = classes.find((x) => x.id === Number(classId)); setColor(c?.color || C.info); }, [classId]); // eslint-disable-line
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
   const fld = { ...inputStyle, width: "100%" };
   const sfld = { ...selectStyle, width: "100%", fontSize: 14, padding: "10px 34px 10px 12px" };

@@ -252,7 +252,7 @@ export default function Marketplace({ fixedKind }) {
                 ))}
                 {preview.method && (
                   <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, fontSize: 13.5, color: "var(--text2)" }}>
-                    {preview.method.dauer != null && <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, color: "#2563eb" }}>{t("methoden.dauerBadge", { n: preview.method.dauer })}</div>}
+                    {preview.method.dauer != null && <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, color: C.info }}>{t("methoden.dauerBadge", { n: preview.method.dauer })}</div>}
                     <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{preview.method.description}</div>
                     {preview.method.ablauf && <div style={{ marginTop: 10 }}><b style={{ color: "var(--text3)", fontSize: 11.5 }}>{t("methoden.ablauf")}</b><div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{preview.method.ablauf}</div></div>}
                     {preview.method.material && <div style={{ marginTop: 10 }}><b style={{ color: "var(--text3)", fontSize: 11.5 }}>{t("methoden.material")}</b><div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{preview.method.material}</div></div>}
@@ -260,7 +260,7 @@ export default function Marketplace({ fixedKind }) {
                 )}
                 {preview.ladder && (
                   <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, fontSize: 13.5, color: "var(--text2)" }}>
-                    {preview.ladder.topic_name && <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, color: "#2563eb" }}>{preview.ladder.topic_name}</div>}
+                    {preview.ladder.topic_name && <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, color: C.info }}>{preview.ladder.topic_name}</div>}
                     {(preview.ladder.exercises || []).map((e, i) => (
                       <div key={i} style={{ padding: "8px 0", borderTop: i ? "1px solid var(--border)" : "none" }}>
                         {e.kategorie && <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", marginRight: 6 }}>{e.kategorie}</span>}

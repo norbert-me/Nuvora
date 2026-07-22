@@ -427,7 +427,7 @@ const gradeDistribution = (() => {
               <div key={k} style={{
                 padding: 12, borderRadius: 10, fontSize: 15,
                 background: isCorrect ? "var(--success-bg)" : "var(--bg2)",
-                border: isCorrect ? "2px solid #0a7d3e" : "2px solid transparent",
+                border: isCorrect ? `2px solid ${C.success}` : "2px solid transparent",
                 color: "var(--text)",
                 opacity: hasChoice ? 1 : 0.4,
               }}>
@@ -1065,7 +1065,7 @@ function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
           </>
         ) : (
           <>
-            {error && <p style={{ color: "var(--danger, #dc2626)", fontSize: 13, marginBottom: 10 }}>{error}</p>}
+            {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 10 }}>{error}</p>}
             {(() => { const fld = { ...inputStyle, width: "100%" }; const lbl = { fontSize: 12.5, color: "var(--text2)", marginBottom: 6, marginTop: 12 }; return (
               <>
                 <div style={{ ...lbl, marginTop: 0 }}>{t("noten.term")}</div>
@@ -1178,7 +1178,7 @@ function TopicAnalysis({ questions, presentStudents }) {
         return (
           <div key={r.tid} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: "1px solid var(--border)", flexWrap: "wrap" }}>
             <span style={{ flex: 1, minWidth: 140, fontSize: 13.5, fontWeight: weak ? 600 : 400 }}>{label(r.tid)}</span>
-            <span style={{ fontSize: 13.5, fontWeight: 700, color: weak ? "var(--danger, #dc2626)" : C.success, width: 48, textAlign: "right" }}>{r.pct}%</span>
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: weak ? C.danger : C.success, width: 48, textAlign: "right" }}>{r.pct}%</span>
             {weak && (
               <span style={{ fontSize: 12, color: C.warning, display: "flex", alignItems: "center", gap: 8 }}>
                 {t("analyse.weak")}

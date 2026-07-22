@@ -128,7 +128,7 @@ export default function Karten() {
         <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); setTokens(null); }} onKurs={setKursId} />
       </div>
 
-      {error && <p style={{ color: "var(--danger, #dc2626)", fontSize: 13, marginBottom: 10 }}>{error}</p>}
+      {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 10 }}>{error}</p>}
 
       {view === "cards" && (
         <>

@@ -57,7 +57,7 @@ export default function Modules() {
       </p>
 
       {error && (
-        <p style={{ color: "var(--danger, #dc2626)", fontSize: 13, marginBottom: 12 }}>{error}</p>
+        <p style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</p>
       )}
 
       {noneActive && beliebt.size > 0 && (

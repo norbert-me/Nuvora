@@ -447,7 +447,7 @@ export default function Scanner() {
       )}
 
       {sessionError && (
-        <div style={{ padding: "10px 16px", marginBottom: 8, background: "#fde2d9", borderRadius: 12, fontSize: 14, fontWeight: 500, color: C.danger }}>
+        <div style={{ padding: "10px 16px", marginBottom: 8, background: C.incorrectBg, borderRadius: 12, fontSize: 14, fontWeight: 500, color: C.danger }}>
           {sessionError}
         </div>
       )}

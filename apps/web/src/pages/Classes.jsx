@@ -52,7 +52,7 @@ export default function Classes() {
   const [editing, setEditing] = useState(null);
   const [params, setParams] = useSearchParams();
   const [name, setName] = useState("");
-  const [color, setColor] = useState("#2563eb");
+  const [color, setColor] = useState(C.info);
   const [students, setStudents] = useState([]);
   const [detailsFor, setDetailsFor] = useState(null);
   const [trash, setTrash] = useState([]);
@@ -87,14 +87,14 @@ export default function Classes() {
   const startNew = () => {
     setEditing({ id: null });
     setName("");
-    setColor("#2563eb");
+    setColor(C.info);
     setStudents([{ ...EMPTY_STUDENT, card_id: 1 }]);
   };
 
   const startEdit = (cls) => {
     setEditing(cls);
     setName(cls.name);
-    setColor(cls.color || "#2563eb");
+    setColor(cls.color || C.info);
     const sorted = [...cls.students].sort((a, b) => a.card_id - b.card_id);
     // Ganzen Datensatz uebernehmen, nicht nur Nummer und Name: niveau, foerder
     // und notizen wuerden sonst bei jedem Speichern still verschwinden.

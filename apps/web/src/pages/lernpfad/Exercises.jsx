@@ -79,7 +79,7 @@ export default function Exercises() {
         <h2 style={{ fontSize: 21, fontWeight: 700, marginBottom: 16 }}>
           {editing.id ? "Aufgabe bearbeiten" : "Neue Aufgabe"}
         </h2>
-        {error && <p style={{ color: "var(--danger, #dc2626)", fontSize: 13 }}>{error}</p>}
+        {error && <p style={{ color: C.danger, fontSize: 13 }}>{error}</p>}
 
         <Field label="Thema">
           <TopicPicker value={editing.topic_id} onChange={(id) => setEditing({ ...editing, topic_id: id })} />
@@ -154,7 +154,7 @@ export default function Exercises() {
         Aufgaben hängen an Themen aus dem Kern — denselben, die CardVote-Fragen nutzen.
       </p>
 
-      {error && <p style={{ color: "var(--danger, #dc2626)", fontSize: 13, marginBottom: 10 }}>{error}</p>}
+      {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 10 }}>{error}</p>}
 
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 18, flexWrap: "wrap" }}>
         <button onClick={() => setEditing({ ...EMPTY })} style={btnPrimary}>Neue Aufgabe</button>

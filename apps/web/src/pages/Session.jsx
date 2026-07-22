@@ -754,7 +754,7 @@ export default function Session() {
           </button>
           <button onClick={finishSession} style={{
             padding: "5px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer",
-            background: "none", color: C.danger, border: "1px solid #d1350f", borderRadius: 980,
+            background: "none", color: C.danger, border: `1px solid ${C.danger}`, borderRadius: 980,
           }}>
             {t("session.finish")}
           </button>
@@ -821,7 +821,7 @@ export default function Session() {
                     color: isCorrect ? "white" : "var(--text)",
                     borderRadius: 16,
                     fontSize: "clamp(20px, 4vh, 44px)",
-                    border: isExtra ? "3px dashed var(--border2)" : isCorrect ? "3px solid #0a7d3e" : "3px solid var(--border3)",
+                    border: isExtra ? "3px dashed var(--border2)" : isCorrect ? `3px solid ${C.success}` : "3px solid var(--border3)",
                     opacity: isExtra ? 0.45 : isWrong ? 0.5 : 1,
                     transition: "all 0.3s",
                     position: "relative",

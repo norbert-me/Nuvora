@@ -223,7 +223,7 @@ export default function Topics() {
         {t("topics.intro")}
       </p>
 
-      {error && <p style={{ color: "var(--danger, #dc2626)", fontSize: 13, marginBottom: 12 }}>{error}</p>}
+      {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</p>}
 
       <form onSubmit={submitRoot} style={{ display: "flex", gap: 8, marginBottom: 22 }}>
         <input

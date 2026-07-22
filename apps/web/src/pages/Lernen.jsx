@@ -59,7 +59,7 @@ export default function Lernen() {
     setI(i >= queue.length || (grade === 0 && i >= queue.length - 1) ? 0 : i);
   };
 
-  if (error) return <Center><p style={{ color: "#dc2626" }}>{error}</p></Center>;
+  if (error) return <Center><p style={{ color: C.danger }}>{error}</p></Center>;
   if (!data) return <Center><p style={{ color: "var(--text3)" }}>Lädt…</p></Center>;
 
   // Hat der Schüler überhaupt Karten? Ohne Karten-Modul/Stapel gibt es keine —
@@ -126,7 +126,7 @@ export default function Lernen() {
           <button onClick={() => setFlipped(true)} style={{ ...btn, width: "100%", marginTop: 16 }}>Umdrehen</button>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginTop: 16 }}>
-            <Grade label="Nochmal" color="#dc2626" onClick={() => bewerten(0)} />
+            <Grade label="Nochmal" color={C.danger} onClick={() => bewerten(0)} />
             <Grade label="Schwer" color={C.warning} onClick={() => bewerten(1)} />
             <Grade label="Gut" color={C.success} onClick={() => bewerten(2)} />
             <Grade label="Leicht" color="#0066cc" onClick={() => bewerten(3)} />
@@ -194,7 +194,7 @@ function Ergebnisse({ results }) {
               <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
               <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.date ? new Date(r.date).toLocaleDateString() : ""}</div>
             </div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: r.pct >= 50 ? C.success : "#dc2626" }}>{r.pct}%</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: r.pct >= 50 ? C.success : C.danger }}>{r.pct}%</div>
             <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.score}/{r.total}</div>
           </div>
         ))}

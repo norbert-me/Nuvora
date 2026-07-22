@@ -12,7 +12,7 @@ import { swr , lastClass, rememberClass } from "../core/cache.js";
 const API = "/api/anwesenheit";
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const STATI = ["da", "fehlt", "spaet", "entsch"];
-const COL = { da: C.success, fehlt: C.danger, spaet: C.warning, entsch: "#2563eb" };
+const COL = { da: C.success, fehlt: C.danger, spaet: C.warning, entsch: C.info };
 
 export default function Anwesenheit() {
   const { t } = useLanguage();

@@ -11,14 +11,14 @@ import { swr , lastClass, rememberClass } from "../core/cache.js";
 
 const API = "/api/sitzplan";
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-const ABS_COL = { fehlt: C.danger, spaet: C.warning, entsch: "#2563eb" };
+const ABS_COL = { fehlt: C.danger, spaet: C.warning, entsch: C.info };
 const SEAT_W = 108, SEAT_H = 46;
 // SEGEL-Stufen (Helios-Konzept): Boot vom Hafen bis in die Welt, zunehmende
 // Selbststeuerung. Reihenfolge = Klick-Kreislauf am Platz (leer → … → leer).
 const SEGEL = [
   { key: "hafen", label: "Hafen", ab: "H", color: C.danger },
   { key: "kueste", label: "Küste", ab: "K", color: "#c026a3" },
-  { key: "meer", label: "Meer", ab: "M", color: "#2563eb" },
+  { key: "meer", label: "Meer", ab: "M", color: C.info },
   { key: "welt", label: "Welt", ab: "W", color: C.success },
 ];
 const SEGEL_CYCLE = ["", "hafen", "kueste", "meer", "welt"];

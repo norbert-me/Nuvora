@@ -73,7 +73,7 @@ export default function Methoden() {
       </div>
       <p style={{ fontSize: 13.5, color: "var(--text2)", margin: "0 0 18px", maxWidth: 640 }}>{t("methoden.intro")}</p>
 
-      {error && <p style={{ color: "var(--danger, #dc2626)", fontSize: 13, marginBottom: 10 }}>{error}</p>}
+      {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 10 }}>{error}</p>}
 
       {items.length === 0 ? (
         <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("methoden.empty")}</p>
@@ -83,7 +83,7 @@ export default function Methoden() {
             <div key={m.id} style={{ padding: 16, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                 <div style={{ fontSize: 15, fontWeight: 700 }}>{m.title}</div>
-                {m.dauer != null && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 980, background: "rgba(37,99,235,0.12)", color: "#2563eb" }}>{t("methoden.dauerBadge", { n: m.dauer })}</span>}
+                {m.dauer != null && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 980, background: "rgba(37,99,235,0.12)", color: C.info }}>{t("methoden.dauerBadge", { n: m.dauer })}</span>}
                 <span style={{ flex: 1 }} />
                 <button onClick={() => setPublishing(m)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("methoden.publish")}><Icon d={ICONS.share} size={17} color="var(--accent)" /></button>
                 <button onClick={() => setEdit(m)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>

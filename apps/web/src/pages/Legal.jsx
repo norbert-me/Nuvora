@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { COLORS as C } from "../components/Icons.jsx";
 
 const FALLBACK = { betreiber: "[Name eintragen]", strasse: "[Straße]", plz_ort: "[PLZ Ort]", email: "kontakt@example.com" };
 
@@ -18,7 +19,7 @@ export default function Legal() {
     <div style={{ lineHeight: 1.7, color: "var(--text)" }}>
       {/* Entwicklungsstatus: die Anwendung ist im Aufbau (Alpha/Beta). Realer
           Hinweis, weil echte Daten betroffen sind. */}
-      <div style={{ marginBottom: 28, padding: "14px 16px", border: "1px solid #b8860b", borderRadius: 12, background: "rgba(184,134,11,0.10)", fontSize: 13.5 }}>
+      <div style={{ marginBottom: 28, padding: "14px 16px", border: `1px solid ${C.warning}`, borderRadius: 12, background: "rgba(184,134,11,0.10)", fontSize: 13.5 }}>
         <strong>Hinweis zum Entwicklungsstand.</strong> Nuvora befindet sich in
         aktiver Entwicklung (Alpha/Beta). Es besteht <strong>kein Anspruch auf
         die erstellten Daten</strong>: im Zuge der Weiterentwicklung können Daten
