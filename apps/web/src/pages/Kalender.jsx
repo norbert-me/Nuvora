@@ -449,9 +449,12 @@ function HeuteView({ t, tt, weekdayOf, byDay, className, classColor, topicName, 
   const slots = (tt.slots || []).filter((s) => s.weekday === weekdayOf(heute)).sort((a, b) => a.period - b.period);
   const eintraege = byDay(heute);
   const zeit = (period) => { const w = (tt.times || [])[period - 1]; return w && (w.start || w.end) ? `${w.start || ""}–${w.end || ""}` : ""; };
-  // Zeilen: pro Stundenplan-Slot; zusätzlich Einträge ohne Stunde (period null).
+  // Zeilen: pro Stundenplan-Slot; Ganztägige (ohne Stunde) als Banner oben,
+  // Einträge mit fremder Stunde (period ohne Slot) unten in der Achse.
   const belegtePerioden = new Set(slots.map((s) => s.period));
-  const extras = eintraege.filter((e) => e.period == null || !belegtePerioden.has(e.period));
+  const allDay = eintraege.filter((e) => e.period == null);
+  const extras = eintraege.filter((e) => e.period != null && !belegtePerioden.has(e.period));
+  const linked = (e) => e.cardvote_set_id || e.karten_deck_id || e.lernpfad_ladder_id || e.method_id || e.codedetektiv_puzzle;
 
   const dateStr = heute.toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long" });
 
@@ -463,10 +466,24 @@ function HeuteView({ t, tt, weekdayOf, byDay, className, classColor, topicName, 
           {t("kalender.freeDay")}: {istFrei.label || ""}
         </div>
       )}
+      {!istFrei && allDay.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>{t("kalender.allDay")}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {allDay.map((e) => (
+              <button key={e.id} onClick={() => onOpen({ ...e, date: new Date(e.date) })}
+                style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--accent)", background: "var(--accent-bg, rgba(10,132,255,0.10))", color: "var(--text)", cursor: "pointer" }}>
+                <span style={{ fontSize: 14, fontWeight: 700 }}>{e.title || (e.class_id && className(e.class_id)) || topicName(e.topic_id) || t("kalender.planned")}{linked(e) ? " ↗" : ""}</span>
+                {e.notes && <span style={{ display: "block", fontSize: 12.5, color: "var(--text3)", marginTop: 2 }}>{e.notes}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {/* An freien Tagen (Ferien/Feiertag) den Stundenplan komplett ausblenden. */}
-      {istFrei ? null : slots.length === 0 && extras.length === 0 ? (
+      {istFrei ? null : slots.length === 0 && extras.length === 0 && allDay.length === 0 ? (
         <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("kalender.todayEmpty")}</p>
-      ) : (
+      ) : slots.length === 0 && extras.length === 0 ? null : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {slots.map((s) => {
             const col = s.class_id ? classColor(s.class_id) : "var(--border2)";
