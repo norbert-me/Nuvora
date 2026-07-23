@@ -407,17 +407,38 @@ async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
 
     def d8(d):
         return d.strftime("%Y%m%d")
+
+    ttimes = u.timetable_times or []
+
+    def _hm(s):
+        """"HH:MM" -> "HHMM00" (lokale/floating Zeit) oder None."""
+        p = (s or "").split(":")
+        if len(p) == 2 and p[0].isdigit() and p[1].isdigit():
+            return f"{int(p[0]):02d}{int(p[1]):02d}00"
+        return None
+
     now = datetime.now().strftime("%Y%m%dT%H%M%SZ")
     lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Nuvora//Kalender//DE", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:Nuvora"]
     for e in entries:
         day = e.date.date() if hasattr(e.date, "date") else e.date
         title = e.title or (classes.get(e.class_id) or "Termin")
+        # Hat der Eintrag eine Stunde und gibt es dafür Uhrzeiten im Stundenplan,
+        # als getakteten Termin ausgeben (sonst als Ganztags-Termin).
+        tm = ttimes[e.period - 1] if (e.period and isinstance(ttimes, list) and 0 < e.period <= len(ttimes)) else None
+        a = _hm(tm.get("start")) if isinstance(tm, dict) else None
+        b2 = _hm(tm.get("end")) if isinstance(tm, dict) else None
+        if a and b2:
+            dtstart = f"DTSTART:{d8(day)}T{a}"
+            dtend = f"DTEND:{d8(day)}T{b2}"
+        else:
+            dtstart = f"DTSTART;VALUE=DATE:{d8(day)}"
+            dtend = f"DTEND;VALUE=DATE:{d8(day + timedelta(days=1))}"
         lines += [
             "BEGIN:VEVENT",
             f"UID:nuvora-entry-{e.id}@nuvora",
             f"DTSTAMP:{now}",
-            f"DTSTART;VALUE=DATE:{d8(day)}",
-            f"DTEND;VALUE=DATE:{d8(day + timedelta(days=1))}",
+            dtstart,
+            dtend,
             f"SUMMARY:{_ics_escape(title)}",
         ]
         if e.notes:
