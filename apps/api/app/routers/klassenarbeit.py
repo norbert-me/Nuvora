@@ -94,6 +94,22 @@ async def roster(class_id: int, user: User = Depends(require_module), db: AsyncS
     return [{"id": s.id, "name": s.name} for s in await _roster(db, class_id)]
 
 
+@router.get("/kurse/{kurs_id}/students")
+async def roster_kurs(kurs_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """SuS eines Kurses — inkl. der EINZELN hinzugefügten (Kurse aus Teilen von
+    Klassen). Deduplikat per Name wie beim Klassen-Roster."""
+    from .kurse import _owned_kurs, member_student_ids
+    await _owned_kurs(db, user, kurs_id)
+    sids = list(await member_student_ids(db, kurs_id))
+    if not sids:
+        return []
+    studs = (await db.execute(select(Student).where(Student.id.in_(sids)).order_by(Student.id))).scalars().all()
+    canon = {}
+    for s in studs:
+        canon.setdefault(s.name.strip(), s)
+    return [{"id": s.id, "name": s.name} for s in sorted(canon.values(), key=lambda s: (s.card_id, s.id))]
+
+
 @router.get("/classes/{class_id}/works", response_model=List[WorkOut])
 async def list_works(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)

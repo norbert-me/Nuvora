@@ -49,3 +49,18 @@ async def test_kurs_aus_teilen(s):
     await K.remove_student_member(kurs.id, a1.id, user=u, db=s)
     roster = await K.kurs_students(kurs.id, user=u, db=s)
     assert {r["name"] for r in roster} == {"Cara"}
+
+
+@pytest.mark.asyncio
+async def test_klassenarbeit_roster_kurs(s):
+    from app.routers import klassenarbeit as KA
+    u = User(email="c@d.de", password_hash="x", name="L"); s.add(u); await s.flush()
+    s.add(__import__("app.models", fromlist=["UserModule"]).UserModule(user_id=u.id, module_key="klassenarbeit"))
+    a = SchoolClass(name="7a", owner_id=u.id); b = SchoolClass(name="7b", owner_id=u.id); s.add(a); s.add(b); await s.flush()
+    a1 = Student(card_id=1, name="Ann", class_id=a.id); b1 = Student(card_id=2, name="Bo", class_id=b.id)
+    s.add(a1); s.add(b1)
+    kurs = Kurs(owner_id=u.id, name="Förder"); s.add(kurs); await s.commit()
+    await K.add_student_member(kurs.id, a1.id, user=u, db=s)
+    await K.add_student_member(kurs.id, b1.id, user=u, db=s)
+    r = await KA.roster_kurs(kurs.id, user=u, db=s)
+    assert {x["name"] for x in r} == {"Ann", "Bo"}

@@ -45,6 +45,7 @@ class KursOut(BaseModel):
     classes: List[ClassRef] = []
     niveau_aktiv: bool = False
     color: str = ""
+    member_count: int = 0    # einzeln hinzugefügte SuS (Kurs aus Teilen von Klassen)
 
 
 async def _owned_kurs(db, user, kurs_id) -> Kurs:
@@ -120,7 +121,12 @@ async def list_kurse(user: User = Depends(get_current_user), db: AsyncSession = 
     kurse = (await db.execute(select(Kurs).where(
         Kurs.owner_id == user.id, Kurs.deleted_at.is_(None)).order_by(Kurs.name))).scalars().all()
     by = await _classes_by_kurs(db, user, kurse)
-    return [KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv, color=k.color) for k in kurse]
+    from sqlalchemy import func as _f
+    mc = dict((await db.execute(
+        select(KursStudent.kurs_id, _f.count(KursStudent.id))
+        .where(KursStudent.kurs_id.in_([k.id for k in kurse] or [-1])).group_by(KursStudent.kurs_id)
+    )).all())
+    return [KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv, color=k.color, member_count=int(mc.get(k.id, 0))) for k in kurse]
 
 
 @router.get("/trash", response_model=List[KursOut])
