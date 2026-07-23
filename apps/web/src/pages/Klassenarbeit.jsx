@@ -57,9 +57,9 @@ export default function Klassenarbeit() {
   const [distMode, setDistMode] = useState("bar");   // Notenverteilung: "bar" | "box"
   const [barMode, setBarMode] = useState("whole");   // Balken: "whole" (1..6) | "fine" (Teilnoten)
   const [boxMode, setBoxMode] = useState("pct");     // Boxplot: "pct" (%) | "note" (Noten)
-  // Note-Anzeige aus der Profil-Präferenz vorbelegen (Tendenz 2+ vs. Notenwert).
-  const [gradeMode, setGradeMode] = useState("note"); // "note" (2+) | "wert" (2,3)
-  useEffect(() => { try { const u = JSON.parse(localStorage.getItem("user")); if (u && u.grade_tendency === false) setGradeMode("wert"); } catch { /* Default */ } }, []);
+  // Note-Anzeige NUR aus der Profil-Präferenz (eine Person, eine Präferenz —
+  // kein Umschalter je Seite mehr). "note" = Symbol 2+, "wert" = Dezimal 2,3.
+  const gradeMode = (() => { try { const u = JSON.parse(localStorage.getItem("user")); return u && u.grade_tendency === false ? "wert" : "note"; } catch { return "note"; } })();
   const [classId, setClassId] = useState(null);
   const [kursId, setKursId] = useState(null);
   const [subsetKurs, setSubsetKurs] = useState(null); // gewählter Teilkurs (Kurs aus Teilen von Klassen) oder null
@@ -459,14 +459,7 @@ export default function Klassenarbeit() {
             {notenAktiv && (work.tasks || []).length > 0 && <button onClick={() => setNotenModal(true)} style={btnPrimary}>{t("klassenarbeit.toNoten")}</button>}
             {(kartenAktiv || lernpfadAktiv) && <button onClick={wiederholen} disabled={busy} style={{ ...btnSecondary, opacity: busy ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.restore} size={15} /> {t("klassenarbeit.remediate")}</button>}
             {(work.tasks || []).length > 0 && (
-              <div style={{ display: "inline-flex", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden", marginLeft: "auto" }} title={t("klassenarbeit.gradeModeHint")}>
-                {[["note", "2+"], ["wert", "2,3"]].map(([m, lbl]) => (
-                  <button key={m} onClick={() => setGradeMode(m)} style={{ border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 700, padding: "5px 11px", background: gradeMode === m ? "var(--accent)" : "transparent", color: gradeMode === m ? "#fff" : "var(--text2)" }}>{lbl}</button>
-                ))}
-              </div>
-            )}
-            {(work.tasks || []).length > 0 && (
-              <button onClick={() => setScaleOpen((v) => !v)} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}
+              <button onClick={() => setScaleOpen((v) => !v)} style={{ ...btnSecondary, marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6 }}
                 title={t("klassenarbeit.scaleHint")}>{t("klassenarbeit.scale")}{(work.scale && Object.keys(work.scale).length) ? " •" : ""}</button>
             )}
           </div>
