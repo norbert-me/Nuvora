@@ -136,6 +136,11 @@ export default function Kurse() {
                   </div>
                 </div>
 
+                <div>
+                  <div style={editLabel}>{t("kurse.editStudents")}</div>
+                  <StudentMembers kursId={k.id} allClasses={allClasses} t={t} />
+                </div>
+
                 {k.classes.length > 0 && (
                   <div>
                     <div style={editLabel}>{t("kurse.editLevels")}</div>
@@ -147,6 +152,47 @@ export default function Kurse() {
             )}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// Einzelne SuS in einem Kurs (Kurs aus Teilen von Klassen): Chips der bereits
+// gewählten SuS + Picker (Klasse wählen -> SuS einzeln hinzufügen).
+function StudentMembers({ kursId, allClasses, t }) {
+  const [members, setMembers] = useState([]);
+  const [pickClass, setPickClass] = useState("");
+  const load = () => fetch(`${API}/kurse/${kursId}/members`).then((r) => (r.ok ? r.json() : [])).then((d) => setMembers(Array.isArray(d) ? d : [])).catch(() => {});
+  useEffect(() => { load(); }, [kursId]); // eslint-disable-line
+  const memberIds = new Set(members.map((m) => m.student_id));
+  const add = async (sid) => { await fetch(`${API}/kurse/${kursId}/members/${sid}`, { method: "POST" }).catch(() => {}); load(); };
+  const remove = async (sid) => { await fetch(`${API}/kurse/${kursId}/members/${sid}`, { method: "DELETE" }).catch(() => {}); load(); };
+  const cls = allClasses.find((c) => String(c.id) === String(pickClass));
+  const candidates = cls ? (cls.students || []).filter((sname) => !memberIds.has(sname.id)) : [];
+  return (
+    <div>
+      {members.length > 0 && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+          {members.map((m) => (
+            <span key={m.student_id} style={{ ...chipStyle, display: "inline-flex", alignItems: "center", gap: 4 }}>
+              {m.name} <span style={{ color: "var(--text3)", fontSize: 11 }}>· {m.class_name}</span>
+              <button onClick={() => remove(m.student_id)} title={t("kurse.unlink")}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", padding: 0, display: "flex" }}>
+                <Icon d={ICONS.close} size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        <select value={pickClass} onChange={(e) => setPickClass(e.target.value)} style={{ ...selectStyle, fontSize: 12.5 }}>
+          <option value="">{t("kurse.pickClass")}</option>
+          {allClasses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        {cls && candidates.map((sname) => (
+          <button key={sname.id} onClick={() => add(sname.id)} style={{ ...chipStyle, cursor: "pointer", border: "1px dashed var(--border2)", background: "none" }}>+ {sname.name}</button>
+        ))}
+        {cls && candidates.length === 0 && <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("kurse.allAdded")}</span>}
       </div>
     </div>
   );
