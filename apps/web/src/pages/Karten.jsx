@@ -111,6 +111,15 @@ export default function Karten() {
   const loadFolders = (id) => id && fetch(`${API}/classes/${id}/card-folders${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => setCardFolders(Array.isArray(d) ? d : [])).catch(() => {});
   useEffect(() => { loadDecks(classId); loadTrash(classId); loadFolders(classId); setCurrentCardFolder(null); }, [classId, kursId]);
   const folderName = (fid) => (cardFolders.find((f) => f.id === fid) || {}).name || "";
+  // Drag&Drop: Ordner in einen anderen Ordner (oder über den Breadcrumb nach oben)
+  // ziehen. Das Ziel wird beim Ziehen hervorgehoben (Vorschau, wohin es landet).
+  const [dragFolder, setDragFolder] = useState(null);
+  const [dropTarget, setDropTarget] = useState(undefined); // undefined = keins, null = Wurzel, id = Ordner
+  const folderById = () => Object.fromEntries(cardFolders.map((f) => [f.id, f]));
+  const isAncestor = (aId, bId) => { const m = folderById(); let cur = m[bId]?.parent_id ?? null; while (cur != null) { if (cur === aId) return true; cur = m[cur]?.parent_id ?? null; } return false; };
+  const canDropInto = (dragId, targetId) => dragId != null && targetId !== dragId && !isAncestor(dragId, targetId) && ((folderById()[dragId]?.parent_id ?? null) !== (targetId ?? null));
+  const moveFolderTo = async (fId, parentId) => { const f = folderById()[fId]; if (!f) return; await fetch(`${API}/card-folders/${fId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: f.name, parent_id: parentId }) }).catch(() => {}); loadFolders(classId); };
+  const endDrag = () => { setDragFolder(null); setDropTarget(undefined); };
   const folderPath = (fid) => { const byId = Object.fromEntries(cardFolders.map((f) => [f.id, f])); const path = []; let cur = fid; while (cur != null && byId[cur]) { path.unshift(byId[cur]); cur = byId[cur].parent_id ?? null; } return path; };
   const createFolder = async (name) => { if (!name || !name.trim() || !classId) return; await fetch(`${API}/classes/${classId}/card-folders${kq}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), parent_id: currentCardFolder }) }).catch(() => {}); loadFolders(classId); };
   const renameFolder = async (f) => { const n = await askPrompt(t("karten.renameFolder"), f.name); if (n == null) return; await fetch(`${API}/card-folders/${f.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n.trim(), parent_id: f.parent_id ?? null }) }).catch(() => {}); loadFolders(classId); };
@@ -222,11 +231,19 @@ export default function Karten() {
         <>
           {/* Breadcrumb: Wurzel › Ordner › Unterordner */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 12, fontSize: 13.5 }}>
-            <button onClick={() => setCurrentCardFolder(null)} style={{ background: "none", border: "none", cursor: "pointer", color: currentCardFolder == null ? "var(--text)" : "var(--accent)", fontWeight: 600, padding: 0 }}>{t("karten.allDecks")}</button>
+            <button onClick={() => setCurrentCardFolder(null)}
+              onDragOver={(e) => { if (canDropInto(dragFolder, null)) { e.preventDefault(); if (dropTarget !== null) setDropTarget(null); } }}
+              onDragLeave={() => setDropTarget((cur) => (cur === null ? undefined : cur))}
+              onDrop={(e) => { e.preventDefault(); if (canDropInto(dragFolder, null)) moveFolderTo(dragFolder, null); endDrag(); }}
+              style={{ background: dropTarget === null && canDropInto(dragFolder, null) ? "var(--accent-bg, rgba(10,132,255,0.12))" : "none", border: dropTarget === null && canDropInto(dragFolder, null) ? "1px solid var(--accent)" : "1px solid transparent", borderRadius: 8, cursor: "pointer", color: currentCardFolder == null ? "var(--text)" : "var(--accent)", fontWeight: 600, padding: "2px 6px" }}>{t("karten.allDecks")}</button>
             {folderPath(currentCardFolder).map((f, i, arr) => (
               <span key={f.id} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                 <span style={{ color: "var(--text3)" }}>›</span>
-                <button onClick={() => setCurrentCardFolder(f.id)} style={{ background: "none", border: "none", cursor: "pointer", color: i === arr.length - 1 ? "var(--text)" : "var(--accent)", fontWeight: 600, padding: 0 }}>{f.name}</button>
+                <button onClick={() => setCurrentCardFolder(f.id)}
+                  onDragOver={(e) => { if (canDropInto(dragFolder, f.id)) { e.preventDefault(); if (dropTarget !== f.id) setDropTarget(f.id); } }}
+                  onDragLeave={() => setDropTarget((cur) => (cur === f.id ? undefined : cur))}
+                  onDrop={(e) => { e.preventDefault(); if (canDropInto(dragFolder, f.id)) moveFolderTo(dragFolder, f.id); endDrag(); }}
+                  style={{ background: dropTarget === f.id && canDropInto(dragFolder, f.id) ? "var(--accent-bg, rgba(10,132,255,0.12))" : "none", border: dropTarget === f.id && canDropInto(dragFolder, f.id) ? "1px solid var(--accent)" : "1px solid transparent", borderRadius: 8, cursor: "pointer", color: i === arr.length - 1 ? "var(--text)" : "var(--accent)", fontWeight: 600, padding: "2px 6px" }}>{f.name}</button>
               </span>
             ))}
           </div>
@@ -258,17 +275,28 @@ export default function Karten() {
               templateItems={[{ label: t("karten.jsonTemplate"), href: "/beispiel-karten.json" }]} />
           </div>
 
-          {/* Unterordner des aktuellen Ordners */}
-          {cardFolders.filter((f) => (f.parent_id ?? null) === currentCardFolder).map((f) => (
-            <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", marginBottom: 8, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
+          {/* Unterordner des aktuellen Ordners — per Drag&Drop verschiebbar. */}
+          {cardFolders.filter((f) => (f.parent_id ?? null) === currentCardFolder).map((f) => {
+            const isDrag = dragFolder === f.id;
+            const isTarget = dropTarget === f.id && canDropInto(dragFolder, f.id);
+            return (
+            <div key={f.id} draggable
+              onDragStart={(e) => { setDragFolder(f.id); e.dataTransfer.effectAllowed = "move"; }}
+              onDragEnd={endDrag}
+              onDragOver={(e) => { if (canDropInto(dragFolder, f.id)) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dropTarget !== f.id) setDropTarget(f.id); } }}
+              onDragLeave={() => setDropTarget((cur) => (cur === f.id ? undefined : cur))}
+              onDrop={(e) => { e.preventDefault(); if (canDropInto(dragFolder, f.id)) moveFolderTo(dragFolder, f.id); endDrag(); }}
+              style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", marginBottom: 8, borderRadius: 14, background: isTarget ? "var(--accent-bg, rgba(10,132,255,0.10))" : "var(--card)", opacity: isDrag ? 0.4 : 1, cursor: "grab", border: isTarget ? "2px solid var(--accent)" : "1px solid var(--border)" }}>
+              <span className="drag-handle" style={{ color: "var(--text3)", cursor: "grab", fontSize: 15, flexShrink: 0 }}>⠿</span>
               <button onClick={() => setCurrentCardFolder(f.id)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", textAlign: "left", minWidth: 0, color: "var(--text)" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                <strong style={{ fontSize: 15 }}>{f.name}</strong>
+                <strong style={{ fontSize: 15 }}>{f.name}{isTarget ? ` — ${t("karten.dropHere")}` : ""}</strong>
               </button>
               <button onClick={() => renameFolder(f)} className="icon-btn" style={iconBtn} title={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
               <button onClick={() => deleteFolder(f)} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
             </div>
-          ))}
+            );
+          })}
 
           {loadingDecks && !decksLoadedOnce.current ? <Skeleton rows={3} height={60} />
             : (decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).length === 0 && cardFolders.filter((f) => (f.parent_id ?? null) === currentCardFolder).length === 0) ? <Empty title={t("karten.noDecks")} hint={t("karten.noDecksHint")} /> : null}

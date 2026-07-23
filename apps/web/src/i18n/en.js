@@ -927,6 +927,7 @@ export default {
   "karten.tabProgress": "Progress",
   "karten.tabQr": "QR codes",
   "karten.allDecks": "All decks",
+  "karten.dropHere": "drop here",
   "karten.folder": "Folder",
   "karten.newFolder": "Name of the new folder",
   "karten.renameFolder": "Rename folder",

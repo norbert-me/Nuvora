@@ -953,6 +953,7 @@ export default {
   "karten.tabProgress": "Fortschritt",
   "karten.tabQr": "QR-Codes",
   "karten.allDecks": "Alle Stapel",
+  "karten.dropHere": "hier ablegen",
   "karten.folder": "Ordner",
   "karten.newFolder": "Name des neuen Ordners",
   "karten.renameFolder": "Ordner umbenennen",

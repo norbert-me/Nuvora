@@ -927,6 +927,7 @@ export default {
   "karten.tabProgress": "Progreso",
   "karten.tabQr": "Códigos QR",
   "karten.allDecks": "Todos los mazos",
+  "karten.dropHere": "soltar aquí",
   "karten.folder": "Carpeta",
   "karten.newFolder": "Nombre de la nueva carpeta",
   "karten.renameFolder": "Renombrar carpeta",
