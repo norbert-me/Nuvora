@@ -691,6 +691,8 @@ export default {
   "noten.aggMean": "Media",
   "noten.aggMedian": "Mediana",
   "noten.aggHint": "Cómo se combinan varias notas individuales. La ponderación de las secciones no cambia.",
+  "noten.teilkurs": "Subcurso",
+  "noten.teilkursNone": "— ninguno —",
   "noten.term1": "1.º semestre",
   "noten.term2": "2.º semestre",
   "noten.sectionGrade": "Nota",

@@ -691,6 +691,8 @@ export default {
   "noten.aggMean": "Mittel",
   "noten.aggMedian": "Median",
   "noten.aggHint": "Wie mehrere Einzelnoten zusammengefasst werden. Die Abschnitts-Gewichtung bleibt gleich.",
+  "noten.teilkurs": "Teilkurs",
+  "noten.teilkursNone": "— keiner —",
   "noten.term1": "1. Halbjahr",
   "noten.term2": "2. Halbjahr",
   "noten.sectionGrade": "Note",

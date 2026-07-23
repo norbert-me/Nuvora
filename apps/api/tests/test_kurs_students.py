@@ -64,3 +64,35 @@ async def test_klassenarbeit_roster_kurs(s):
     await K.add_student_member(kurs.id, b1.id, user=u, db=s)
     r = await KA.roster_kurs(kurs.id, user=u, db=s)
     assert {x["name"] for x in r} == {"Ann", "Bo"}
+
+
+@pytest.mark.asyncio
+async def test_noten_teilkurs_roster_und_speichern(s):
+    """Noten: Teilkurs-Roster = Einzel-SuS; Note für einen SuS aus einer FREMDEN
+    Klasse (nicht repClass) wird akzeptiert (member_student_ids, nicht sibling)."""
+    from app.models import UserModule, GradeSection, GradeCategory
+    from app.routers import noten as N
+    u = User(email="e@f.de", password_hash="x", name="L"); s.add(u); await s.flush()
+    s.add(UserModule(user_id=u.id, module_key="noten"))
+    a = SchoolClass(name="7a", owner_id=u.id); b = SchoolClass(name="7b", owner_id=u.id); s.add(a); s.add(b); await s.flush()
+    a1 = Student(card_id=1, name="Ann", class_id=a.id); b1 = Student(card_id=2, name="Bo", class_id=b.id)
+    s.add(a1); s.add(b1)
+    kurs = Kurs(owner_id=u.id, name="Förder"); s.add(kurs); await s.commit()
+    await K.add_student_member(kurs.id, a1.id, user=u, db=s)
+    await K.add_student_member(kurs.id, b1.id, user=u, db=s)
+
+    # repClass ist 7a; Roster des Teilkurses enthält beide, auch Bo aus 7b.
+    roster = await N.roster_kurs(kurs.id, user=u, db=s)
+    assert {r["name"] for r in roster} == {"Ann", "Bo"}
+
+    # Abschnitt + Spalte am Teilkurs (kurs_id gesetzt, class_id=repClass 7a).
+    sec = GradeSection(name="KA", weight=100, class_id=a.id, kurs_id=kurs.id, term="1", owner_id=u.id)
+    s.add(sec); await s.flush()
+    cat = GradeCategory(name="Test", position=0, section_id=sec.id, class_id=a.id, owner_id=u.id)
+    s.add(cat); await s.commit()
+
+    # Note für Bo (aus 7b, NICHT repClass) muss durchgehen — früher abgelehnt.
+    body = N.EntryIn(category_id=cat.id, student_id=b1.id, kind="grade", value=2.0, note="2")
+    await N.create_entry(body, user=u, db=s)
+    ents = await N.list_entries(a.id, kurs_id=kurs.id, user=u, db=s)
+    assert any(e.student_id == b1.id and e.value == 2.0 for e in ents)

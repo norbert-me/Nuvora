@@ -32,6 +32,11 @@ export default function Noten() {
   const [classId, setClassId] = useState(null);
   const [kursId, setKursId] = useState(null); // Noten hängen am Kurs (Fach)
   const kp = kursId != null ? `&kurs_id=${kursId}` : "";
+  // Teilkurs (Kurse aus Teilen von Klassen): Noten-Zeilen = die Einzel-SuS des
+  // Kurses. classId zeigt dann auf die Repräsentant-Klasse (erster SuS) für die
+  // FK; kursId = Teilkurs, damit Spalten/Noten sauber am Kurs hängen.
+  const [subsetKurs, setSubsetKurs] = useState(null);
+  const [subsetKurse, setSubsetKurse] = useState([]);
   const [students, setStudents] = useState([]);
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -167,8 +172,19 @@ export default function Noten() {
 
   useEffect(() => { if (classId) rememberClass(classId); }, [classId]);
 
+  // Teilkurse (nur solche mit einzeln hinzugefügten SuS) für die Auswahl.
+  useEffect(() => {
+    fetch(`${API}/kurse`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+      setSubsetKurse((Array.isArray(d) ? d : []).filter((k) => (k.member_count || 0) > 0));
+    }).catch(() => {});
+  }, []);
+
   // Noten-Zeilen kommen aus dem KURS (dedupliziert), nicht aus der Fach-Klasse.
-  const loadRoster = (id) => fetch(`${API}/classes/${id}/students`).then((r) => (r.ok ? r.json() : [])).then((d) => setStudents(Array.isArray(d) ? d : [])).catch(() => {});
+  // Beim Teilkurs aus der Kurs-Route (enthält auch die Einzel-SuS fremder Klassen).
+  const loadRoster = (id) => {
+    const url = subsetKurs ? `${API}/noten/kurse/${subsetKurs}/students` : `${API}/classes/${id}/students`;
+    return fetch(url).then((r) => (r.ok ? r.json() : [])).then((d) => setStudents(Array.isArray(d) ? d : [])).catch(() => {});
+  };
   const load = async (id) => {
     if (!id) return;
     setLoading(true);
@@ -193,7 +209,7 @@ export default function Noten() {
     }).catch(() => null);
     if (r && r.ok) setDividers(await r.json());
   };
-  useEffect(() => { if (classId) load(classId); }, [classId, kursId, classes, term, agg]);
+  useEffect(() => { if (classId) load(classId); }, [classId, kursId, subsetKurs, classes, term, agg]);
   const setAggPersist = (m) => { setAgg(m); try { localStorage.setItem("noten_agg", m); } catch { /* egal */ } };
 
   const doExport = async () => {
@@ -344,8 +360,26 @@ export default function Noten() {
         <h1 style={pageTitle}>{t("noten.title")}</h1>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
           {t("nav.classes")}
-          <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
+          <KursKlasseSelect value={subsetKurs ? null : classId} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} />
         </label>
+        {subsetKurse.length > 0 && (
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
+            {t("noten.teilkurs")}
+            <select value={subsetKurs || ""} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)" }}
+              onChange={async (e) => {
+                const kid = e.target.value ? Number(e.target.value) : null;
+                if (!kid) { setSubsetKurs(null); return; }
+                // Repräsentant-Klasse (erster SuS) für die FK bestimmen.
+                const list = await fetch(`${API}/noten/kurse/${kid}/students`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+                const rep = Array.isArray(list) && list.length ? list[0].class_id : null;
+                if (!rep) return;
+                setSubsetKurs(kid); setClassId(rep); setKursId(kid);
+              }}>
+              <option value="">{t("noten.teilkursNone")}</option>
+              {subsetKurse.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
+            </select>
+          </label>
+        )}
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
           {t("noten.term")}
           <select value={term} onChange={(e) => setTerm(e.target.value)}

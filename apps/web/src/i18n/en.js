@@ -691,6 +691,8 @@ export default {
   "noten.aggMean": "Mean",
   "noten.aggMedian": "Median",
   "noten.aggHint": "How several individual grades are combined. Section weighting stays the same.",
+  "noten.teilkurs": "Sub-course",
+  "noten.teilkursNone": "— none —",
   "noten.term1": "1st term",
   "noten.term2": "2nd term",
   "noten.sectionGrade": "Grade",
