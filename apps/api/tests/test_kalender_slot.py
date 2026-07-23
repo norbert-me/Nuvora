@@ -115,5 +115,6 @@ async def test_release_deck_via_kurs(s):
     s.add(e); await s.commit()
 
     await KAL._release_matching_decks(s, u, e)
-    await s.refresh(deck)
-    assert deck.released_at is not None   # über den Kurs verbunden + freigeschaltet
+    await s.refresh(deck); await s.refresh(e)
+    assert deck.released_at is not None       # über den Kurs verbunden + freigeschaltet
+    assert e.karten_deck_id == deck.id        # automatisch am Eintrag verknüpft

@@ -597,7 +597,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
             <button onClick={() => { setNameVal(deck.name || ""); setRenaming(true); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("karten.renameDeck")}><Icon d={ICONS.edit} size={14} /></button>
           </>
         )}
-        <span title={status === "entwurf" ? t("karten.draftHint") : undefined} style={{ fontSize: 11.5, fontWeight: 600, padding: "2px 8px", borderRadius: 980, background: badge.bg, color: badge.col }}>{badge.text}</span>
+        {status !== "entwurf" && <span style={{ fontSize: 11.5, fontWeight: 600, padding: "2px 8px", borderRadius: 980, background: badge.bg, color: badge.col }}>{badge.text}</span>}
         {!collapsed && showTopic && (
           <select value={deck.topic_id ?? ""} onChange={(e) => setTopic(e.target.value)} title={t("karten.topicHint")}
             style={{ ...selectStyle, fontSize: 12, padding: "4px 28px 4px 9px", maxWidth: 180 }}>

@@ -135,23 +135,28 @@ async def _release_matching_decks(db: AsyncSession, user: User, e: CalendarEntry
             await db.commit()
     if not e.topic_id:
         return
+    # Alle passenden Stapel zum Thema (auch bereits ausgerollte — die sollen sich
+    # ja trotzdem am Eintrag zeigen). Stapel hängen am KURS: Deck der Klasse ODER
+    # eines Kurses, in dem die Klasse liegt.
     q = select(CardDeck).where(
         CardDeck.owner_id == user.id,
         CardDeck.topic_id == e.topic_id,
-        CardDeck.released_at.is_(None),
         CardDeck.deleted_at.is_(None),
     )
     if e.class_id:
-        # Stapel hängen am KURS — passend ist ein Deck der Klasse ODER eines Kurses,
-        # in dem die Klasse liegt (nicht nur exakt dieselbe Fach-Klasse).
         from .kurse import class_kurs_ids
         kurse = list(await class_kurs_ids(db, e.class_id))
         if kurse:
             q = q.where(or_(CardDeck.kurs_id.in_(kurse), CardDeck.class_id == e.class_id))
         else:
             q = q.where(CardDeck.class_id == e.class_id)
-    for deck in (await db.execute(q)).scalars().all():
-        deck.released_at = e.date
+    matched = (await db.execute(q.order_by(CardDeck.id))).scalars().all()
+    for deck in matched:
+        if deck.released_at is None:   # Entwürfe zum Termin freischalten
+            deck.released_at = e.date
+    # Automatisch mit dem Eintrag verknüpfen, wenn dort noch kein Stapel hängt.
+    if matched and not e.karten_deck_id:
+        e.karten_deck_id = matched[0].id
     await db.commit()
 
 
