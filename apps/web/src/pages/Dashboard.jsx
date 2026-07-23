@@ -340,12 +340,16 @@ export default function Dashboard() {
                 </>
               )}
             </span>
-            <div style={{ display: "flex", gap: 6 }}>
+            {/* Beim Umbenennen die Aktions-Buttons ausblenden — sonst liegen sie
+                auf schmalen Displays (iPhone) über dem Eingabefeld. */}
+            {renamingFolder !== f.id && (
+            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
               <button onClick={(e) => { e.stopPropagation(); exportFolder(f.id, f.name); }} className="icon-btn" style={iconBtn} title={t("classes.export")}><Icon d={ICONS.export} size={18} /></button>
               <button onClick={(e) => { e.stopPropagation(); setMovingFolder(f.id); }} className="icon-btn" style={iconBtn} title={t("dash.move")}><Icon d={ICONS.move} size={18} /></button>
               <button onClick={(e) => { e.stopPropagation(); startRenameFolder(f.id, f.name); }} className="icon-btn" style={iconBtn} title={t("dash.rename")}><Icon d={ICONS.edit} size={18} /></button>
               <button onClick={(e) => { e.stopPropagation(); deleteFolder(f.id); }} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
             </div>
+            )}
           </div>
         ))}
       </div>
@@ -383,7 +387,7 @@ export default function Dashboard() {
           <button onClick={() => setShowNewFolder(true)} style={btnSecondary}>{t("dash.newFolder")}</button>
         )}
         {currentFolder && <NewSetButton onCreate={createSet} />}
-        <div style={{ marginLeft: 8 }}>
+        <div>
           <ImportMenu
             importItems={[
               { label: t("dash.importJsonItem"), onClick: importFolder },
