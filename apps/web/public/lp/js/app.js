@@ -3553,32 +3553,50 @@
         editingLlId = ll._id;
         document.querySelector('.tab[data-tab="generator"]').click();
 
-        const pfadSel = document.getElementById('gen-pfad');
-        pfadSel.value = pfad._id;
-
-        const themaSel = document.getElementById('gen-thema');
-        themaSel.disabled = false;
-        themaSel.value = ll.thema || '';
-        refreshGenUnterthemen();
-
-        // Unterthemen der Lernleiter wieder ankreuzen
+        // Unterthemen der Lernleiter (für Anzeige + Wiederholungs-Erkennung).
         const uts = (ll.unterthema || '').split(',').map(s => s.trim()).filter(Boolean);
-        document.querySelectorAll('.gen-ut-cb').forEach(cb => { cb.checked = uts.includes(cb.value); });
-
-        document.getElementById('gen-klasse').value = ll.klasse || '';
-        updateGenConfig();
-        // Regler auf die gespeicherte Konfig der Lernleiter setzen (sonst zeigen
-        // sie die Defaults). cfg-max zuerst — es begrenzt cfg-pflicht.
         if (!ll.config) console.warn('openLernleiter: keine gespeicherte Konfig (vor v2.7.54?) — Regler/Zusatz bleiben Default; einmal neu speichern.');
-        setGenConfig(ll.config);
-        // Der Tab-Klick oben stösst ein asynchrones refreshGeneratorDropdowns an,
-        // das die Regler kurz danach neu bauen (Defaults) kann. Nach dem Settle
-        // noch einmal setzen, damit die gespeicherten Werte gewinnen.
-        setTimeout(() => { updateGenConfig(); setGenConfig(ll.config); }, 200);
+
+        // Thema/Unterthema/Klasse/Regler setzen. Der Tab-Klick oben stösst ein
+        // ASYNCHRONES refreshGeneratorDropdowns an, das die Dropdowns kurz danach
+        // neu baut (Defaults) — würde man Thema/UT nur einmal sofort setzen, wären
+        // sie danach wieder leer (#56). Darum in einen Helfer und nach dem Settle
+        // erneut anwenden (wie schon bei der Konfig).
+        const applyGenSelection = () => {
+            const pfadSel = document.getElementById('gen-pfad');
+            if (pfadSel) pfadSel.value = pfad._id;
+            const themaSel = document.getElementById('gen-thema');
+            if (themaSel) { themaSel.disabled = false; themaSel.value = ll.thema || ''; }
+            refreshGenUnterthemen();
+            document.querySelectorAll('.gen-ut-cb').forEach(cb => { cb.checked = uts.includes(cb.value); });
+            const klasseSel = document.getElementById('gen-klasse');
+            if (klasseSel) klasseSel.value = ll.klasse || '';
+            updateGenConfig();
+            setGenConfig(ll.config);
+        };
+        applyGenSelection();
+        setTimeout(applyGenSelection, 200);
 
         // Vorschau aus den gespeicherten Aufgaben-IDs je Schueler rekonstruieren.
-        const sektVon = a => { const k = getKategorie(a); return k === 'Erklärung' ? 'Erklärung' : k === 'E-Niveau' ? 'E-Niveau' : k === 'G-Niveau' ? 'G-Niveau' : 'Basis'; };
-        const rang = { 'Erklärung': 1, 'Basis': 2, 'G-Niveau': 3, 'E-Niveau': 4 };
+        // Eigenes Thema/Unterthemen dieser Lernleiter — daran erkennen wir beim
+        // Rekonstruieren die Wiederholung: Aufgaben aus fremdem Thema oder einem
+        // nicht gewaehlten Unterthema sind Wiederholung (sonst wuerde die
+        // Hervorhebung fehlen, weil die Sektion nicht mitgespeichert ist, #54).
+        const eigeneUt = new Set(uts);
+        const eigenThema = ll.thema || eigenesThema(ll);
+        const istWdh = a => {
+            if (getKategorie(a) === 'Erklärung') return false;
+            if (eigenThema && a.thema && a.thema !== eigenThema) return true;
+            if (eigeneUt.size && a.unterthema && !eigeneUt.has(a.unterthema)) return true;
+            return false;
+        };
+        const sektVon = a => {
+            const k = getKategorie(a);
+            if (k === 'Erklärung') return 'Erklärung';
+            if (istWdh(a)) return 'Wiederholung';
+            return k === 'E-Niveau' ? 'E-Niveau' : k === 'G-Niveau' ? 'G-Niveau' : 'Basis';
+        };
+        const rang = { 'Wiederholung': 0, 'Erklärung': 1, 'Basis': 2, 'G-Niveau': 3, 'E-Niveau': 4 };
         // Ist das die erste Lernleiter des Pfads? Dann Wiederholung (fremd-thema) beim
         // Anzeigen weglassen — davor gibt es kein Thema. „Eigenes Thema" robust auch
         // bei leerem ll.thema (haeufigstes Thema der Aufgaben).
