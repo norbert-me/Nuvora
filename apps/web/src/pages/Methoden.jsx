@@ -21,6 +21,7 @@ export default function Methoden() {
   const [error, setError] = useState("");
   const [topics, setTopics] = useState([]);
   const [addOpen, setAddOpen] = useState(false);
+  const [dlOpen, setDlOpen] = useState(false); // Download-Menü (Vorlage/Export)
   const [newFolder, setNewFolder] = useState(false); // Ordner-Anlege-Eingabe offen?
   const [folderName, setFolderName] = useState("");
   const [drag, setDrag] = useState(null);       // { kind: "folder"|"method", id }
@@ -149,8 +150,18 @@ export default function Methoden() {
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
         <h1 style={pageTitle}>{t("methoden.title")}</h1>
         <span style={{ flex: 1 }} />
-        <a href="/beispiel-einstiege.json" download style={{ fontSize: 12.5, color: "var(--accent)", textDecoration: "none", whiteSpace: "nowrap" }}>{t("methoden.jsonTemplate")}</a>
-        <ExportButton label="" title={t("common.export")} onClick={doExport} />
+        <div style={{ position: "relative" }}>
+          <button onClick={() => setDlOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn }} title={t("common.export")}><Icon d={ICONS.download} size={18} /></button>
+          {dlOpen && (
+            <>
+              <div onClick={() => setDlOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
+              <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", zIndex: 21, background: "var(--card)", border: "1px solid var(--border2)", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.18)", padding: 4, minWidth: 160 }}>
+                <a href="/beispiel-einstiege.json" download onClick={() => setDlOpen(false)} style={{ ...menuItem, textDecoration: "none" }}><Icon d={ICONS.download} size={14} /> {t("methoden.jsonTemplate")}</a>
+                <button onClick={() => { setDlOpen(false); doExport(); }} style={menuItem}><Icon d={ICONS.export} size={14} /> {t("common.export")}</button>
+              </div>
+            </>
+          )}
+        </div>
         <ImportButton label="" title={t("common.import")} onFile={doImport} />
         <div style={{ position: "relative" }}>
           <AddButton onClick={() => setAddOpen((v) => !v)} title={t("methoden.new")} />
