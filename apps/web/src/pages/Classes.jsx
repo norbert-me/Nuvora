@@ -350,7 +350,7 @@ export default function Classes() {
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
-        <button onClick={startNew} style={btnPrimary}>{t("classes.new")}</button>
+        <button onClick={startNew} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} /> {t("classes.new")}</button>
         <div style={{ marginLeft: 8 }}>
           <ImportMenu
             importItems={[

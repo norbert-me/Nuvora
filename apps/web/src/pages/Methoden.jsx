@@ -69,7 +69,7 @@ export default function Methoden() {
         <span style={{ flex: 1 }} />
         <ExportButton label={t("common.export")} onClick={doExport} />
         <ImportButton label={t("common.import")} onFile={doImport} />
-        <button onClick={() => setEdit({})} style={btnPrimary}>{t("methoden.new")}</button>
+        <button onClick={() => setEdit({})} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} /> {t("methoden.new")}</button>
       </div>
 
       {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 10 }}>{error}</p>}

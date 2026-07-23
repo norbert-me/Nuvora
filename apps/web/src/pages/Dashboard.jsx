@@ -384,7 +384,7 @@ export default function Dashboard() {
             <button onClick={() => setShowNewFolder(false)} style={btnSecondary}>×</button>
           </div>
         ) : (
-          <button onClick={() => setShowNewFolder(true)} style={btnSecondary}>{t("dash.newFolder")}</button>
+          <button onClick={() => setShowNewFolder(true)} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} /> {t("dash.newFolder")}</button>
         )}
         {currentFolder && <NewSetButton onCreate={createSet} />}
         <div>
@@ -464,7 +464,7 @@ function NewSetButton({ onCreate }) {
       </div>
     );
   }
-  return <button onClick={() => setEditing(true)} style={btnPrimary}>{t("dash.newSet")}</button>;
+  return <button onClick={() => setEditing(true)} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} /> {t("dash.newSet")}</button>;
 }
 
 
@@ -662,7 +662,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onQuestionsChang
       })()}
 
       <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-        <button onClick={() => setShowAdd(true)} style={btnPrimary}>{t("dash.newQ")}</button>
+        <button onClick={() => setShowAdd(true)} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} /> {t("dash.newQ")}</button>
       </div>
 
       {/* Frage bearbeiten — als zentriertes Popup, damit kein Scrollen nötig ist */}

@@ -74,7 +74,7 @@ export default function Ausleihe() {
 
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <input value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()} placeholder={t("ausleihe.newPlaceholder")} style={{ ...fld, flex: 1, minWidth: 200 }} />
-        <button onClick={anlegen} style={btnPrimary}>{t("ausleihe.add")}</button>
+        <button onClick={anlegen} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} /> {t("ausleihe.add")}</button>
       </div>
       {items.length > 0 && (
         <div style={{ marginBottom: 16 }}>
