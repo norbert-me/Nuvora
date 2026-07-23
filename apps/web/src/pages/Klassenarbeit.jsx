@@ -319,7 +319,7 @@ export default function Klassenarbeit() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
         <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("klassenarbeit.title")}</h1>
-        <KursKlasseSelect value={subsetKurs ? "" : classId} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} />
+        <span data-tour="ka-class" style={{ display: "inline-flex" }}><KursKlasseSelect value={subsetKurs ? "" : classId} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} /></span>
         {subsetKurse.length > 0 && (
           <select value={subsetKurs || ""} onChange={(e) => setSubsetKurs(e.target.value ? Number(e.target.value) : null)} style={{ ...selectStyle, fontSize: 13 }} title={t("klassenarbeit.subsetHint")}>
             <option value="">{t("klassenarbeit.subsetPick")}</option>
@@ -335,7 +335,7 @@ export default function Klassenarbeit() {
           <select value={work?.id || ""} onChange={(e) => setWork(works.find((w) => String(w.id) === e.target.value) || null)} style={{ ...selectStyle, minWidth: 180 }}>
             {works.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
-          <button onClick={neueArbeit} style={btnSecondary}>{t("klassenarbeit.new")}</button>
+          <button data-tour="ka-new" onClick={neueArbeit} style={btnSecondary}>{t("klassenarbeit.new")}</button>
           {work && <button onClick={loeschen} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
         </div>
       )}

@@ -109,7 +109,7 @@ import CodeDetektiv from "./codedetektiv/CodeDetektiv.jsx";
 import PublicCd from "./codedetektiv/PublicCd.jsx";
 import Cards from "./pages/Cards.jsx";
 import Tutorial from "./pages/Tutorial.jsx";
-import GuidedTour, { KERN_TOUR } from "./components/GuidedTour.jsx";
+import GuidedTour, { PATH_TOUR, tourFor } from "./components/GuidedTour.jsx";
 import NotenModul from "./pages/Noten.jsx";
 import Lernen from "./pages/Lernen.jsx";
 import Karten from "./pages/Karten.jsx";
@@ -417,15 +417,26 @@ function Nav({ user, onLogout }) {
     return () => window.removeEventListener("nuvora:settings", h);
   }, []);
 
-  // Geführte Kern-Tour: über ein Event startbar (das Onboarding-Modal beim ersten
-  // Login und der Button auf der Tutorial-Seite dispatchen "nuvora:start-tour").
-  const [showTour, setShowTour] = useState(false);
+  // Geführte Touren: Kern-Tour (Navbar) und je-Modul-Touren. Über ein Event
+  // startbar (detail.tour), das Onboarding-Modal/Tutorial dispatchen "kern".
+  // Modul-Touren starten zusätzlich einmalig beim ersten Besuch der Modulseite.
+  const [tourId, setTourId] = useState(null);
+  const doneKey = (id) => (id === "kern" ? "nuvora_kerntour_done" : `nuvora_tour_${id}_done`);
   useEffect(() => {
-    const h = () => setShowTour(true);
+    const h = (e) => setTourId((e.detail && e.detail.tour) || "kern");
     window.addEventListener("nuvora:start-tour", h);
     return () => window.removeEventListener("nuvora:start-tour", h);
   }, []);
-  const endTour = () => { setShowTour(false); try { localStorage.setItem("nuvora_kerntour_done", "1"); } catch { /* egal */ } };
+  useEffect(() => {
+    if (!user) return;
+    const hit = PATH_TOUR.find(([p]) => location.pathname.startsWith(p));
+    if (!hit) return;
+    const id = hit[1];
+    try { if (localStorage.getItem(doneKey(id))) return; } catch { /* egal */ }
+    const timer = setTimeout(() => setTourId((cur) => cur || id), 900);
+    return () => clearTimeout(timer);
+  }, [location.pathname, user]);
+  const endTour = () => { const id = tourId; setTourId(null); try { localStorage.setItem(doneKey(id), "1"); } catch { /* egal */ } };
 
   const navItems = getModuleNavItems(t, location);
   const allPages = [...navItems, { to: "/tutorial", label: t("nav.tutorial") }, { to: `${CV}/scan`, label: t("nav.scanner") }, { to: "/profile", label: t("nav.profile") }, { to: `${CV}/evaluation`, label: t("nav.evaluation") }, { to: "/login", label: t("nav.login") }];
@@ -579,7 +590,7 @@ function Nav({ user, onLogout }) {
           })}
         </div>
       )}
-      {showTour && user && <GuidedTour steps={KERN_TOUR} t={t} onDone={endTour} />}
+      {tourId && user && tourFor(tourId) && <GuidedTour steps={tourFor(tourId)} t={t} onDone={endTour} />}
     </>
   );
 }

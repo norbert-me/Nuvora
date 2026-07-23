@@ -82,7 +82,7 @@ export default function GuidedTour({ steps, onDone, t }) {
   );
 }
 
-// Schritte der Kern-Tour (Navbar erklären). Module können später eigene bekommen.
+// Schritte der Kern-Tour (Navbar erklären).
 export const KERN_TOUR = [
   { target: null, titleKey: "tour.k.welcome.t", textKey: "tour.k.welcome.x" },
   { target: "nav", titleKey: "tour.k.nav.t", textKey: "tour.k.nav.x" },
@@ -91,3 +91,46 @@ export const KERN_TOUR = [
   { target: "profile", titleKey: "tour.k.profile.t", textKey: "tour.k.profile.x" },
   { target: null, titleKey: "tour.k.done.t", textKey: "tour.k.done.x" },
 ];
+
+// Touren je Modul. Schlüssel = Tour-Id; die target-Werte zeigen auf data-tour-
+// Marker auf der jeweiligen Modulseite. Ein neues Modul braucht nur Marker +
+// eine Schrittliste hier (und i18n tour.<id>.*).
+export const MODULE_TOURS = {
+  kalender: [
+    { target: null, titleKey: "tour.kalender.welcome.t", textKey: "tour.kalender.welcome.x" },
+    { target: "kal-views", titleKey: "tour.kalender.views.t", textKey: "tour.kalender.views.x" },
+    { target: "kal-new", titleKey: "tour.kalender.new.t", textKey: "tour.kalender.new.x" },
+    { target: "kal-view-menu", titleKey: "tour.kalender.viewmenu.t", textKey: "tour.kalender.viewmenu.x" },
+    { target: null, titleKey: "tour.kalender.done.t", textKey: "tour.kalender.done.x" },
+  ],
+  noten: [
+    { target: null, titleKey: "tour.noten.welcome.t", textKey: "tour.noten.welcome.x" },
+    { target: "noten-class", titleKey: "tour.noten.class.t", textKey: "tour.noten.class.x" },
+    { target: "noten-add", titleKey: "tour.noten.add.t", textKey: "tour.noten.add.x" },
+    { target: null, titleKey: "tour.noten.done.t", textKey: "tour.noten.done.x" },
+  ],
+  klassenarbeit: [
+    { target: null, titleKey: "tour.klassenarbeit.welcome.t", textKey: "tour.klassenarbeit.welcome.x" },
+    { target: "ka-class", titleKey: "tour.klassenarbeit.class.t", textKey: "tour.klassenarbeit.class.x" },
+    { target: "ka-new", titleKey: "tour.klassenarbeit.new.t", textKey: "tour.klassenarbeit.new.x" },
+    { target: null, titleKey: "tour.klassenarbeit.done.t", textKey: "tour.klassenarbeit.done.x" },
+  ],
+  karten: [
+    { target: null, titleKey: "tour.karten.welcome.t", textKey: "tour.karten.welcome.x" },
+    { target: "karten-class", titleKey: "tour.karten.class.t", textKey: "tour.karten.class.x" },
+    { target: "karten-new", titleKey: "tour.karten.new.t", textKey: "tour.karten.new.x" },
+    { target: null, titleKey: "tour.karten.done.t", textKey: "tour.karten.done.x" },
+  ],
+};
+
+// Route-Präfix → Tour-Id (für Auto-Start beim ersten Besuch der Modulseite).
+export const PATH_TOUR = [
+  ["/kalender", "kalender"],
+  ["/noten", "noten"],
+  ["/klassenarbeit", "klassenarbeit"],
+  ["/karten", "karten"],
+];
+
+export function tourFor(id) {
+  return id === "kern" || !id ? KERN_TOUR : (MODULE_TOURS[id] || null);
+}

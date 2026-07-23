@@ -337,18 +337,20 @@ export default function Kalender() {
             beides Konfiguration. Der Ansicht-Umschalter erscheint darum nur in den
             eigentlichen Kalenderansichten, nicht in Stundenplan/Freie Tage. */}
         {view !== "timetable" && view !== "breaks" && (
-          <Tabs value={view} onChange={setView}
-            options={[["today", t("kalender.todayView")], ["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")]]} />
+          <span data-tour="kal-views" style={{ display: "inline-flex" }}>
+            <Tabs value={view} onChange={setView}
+              options={[["today", t("kalender.todayView")], ["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")]]} />
+          </span>
         )}
         {view !== "timetable" && view !== "breaks" && (
-          <button onClick={() => setEditing({ date: startOfDay(new Date()) })} style={{ ...btnPrimary, marginLeft: "auto", width: 34, height: 34, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }} title={t("kalender.newEntry")}>
+          <button data-tour="kal-new" onClick={() => setEditing({ date: startOfDay(new Date()) })} style={{ ...btnPrimary, marginLeft: "auto", width: 34, height: 34, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }} title={t("kalender.newEntry")}>
             <Icon d={ICONS.plus} size={18} />
           </button>
         )}
         {view !== "timetable" && view !== "breaks" && (
           <div style={{ position: "relative" }}>
             {/* Auge = „was anzeigen?": Ganztägige/Externe ein-/ausblenden + Farbe. */}
-            <button onClick={() => setViewMenuOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn, width: 34, height: 34, opacity: (showAllDay && showExt) ? 1 : 0.55 }} title={t("kalender.viewMenu")}>
+            <button data-tour="kal-view-menu" onClick={() => setViewMenuOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn, width: 34, height: 34, opacity: (showAllDay && showExt) ? 1 : 0.55 }} title={t("kalender.viewMenu")}>
               <Icon d={ICONS.eye} size={18} />
             </button>
             {viewMenuOpen && (<>

@@ -358,7 +358,7 @@ export default function Noten() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
         <h1 style={pageTitle}>{t("noten.title")}</h1>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
+        <label data-tour="noten-class" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
           {t("nav.classes")}
           <KursKlasseSelect value={subsetKurs ? null : classId} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} />
         </label>
@@ -402,7 +402,7 @@ export default function Noten() {
             <button onClick={doZeugnis} style={btnSecondary} title={t("noten.zeugnisHint")}>{t("noten.zeugnis")}</button>
             <ImportButton label={t("noten.import")} onFile={doImport} />
             {cdAktiv && sections.length > 0 && <button onClick={() => setCdDialog(true)} style={btnSecondary} title={t("noten.fromCdHint")}>{t("noten.fromCd")}</button>}
-            <button onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}
+            <button data-tour="noten-add" onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}
               className="icon-btn"
               style={{ ...iconBtn, width: 36, height: 36, border: "1px solid var(--border2)", borderRadius: 10 }}>
               <Icon d={ICONS.plus} size={20} color="var(--accent)" />
