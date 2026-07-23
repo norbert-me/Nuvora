@@ -135,7 +135,7 @@ export default function Topics() {
       onDragEnd={isRoot ? () => { setDragId(null); setDragOver(null); } : undefined}
       onDrop={isRoot ? () => dropRoot(tp.id) : undefined}
       style={{
-        display: "flex", alignItems: "center", gap: 10,
+        display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
         padding: isChild ? "8px 12px" : "12px 14px",
         marginLeft: depth * 28, marginBottom: 6,
         border: "1px solid var(--border)", borderRadius: isChild ? 10 : 14,
@@ -177,8 +177,8 @@ export default function Topics() {
             </span>
           )}
           {canHaveKids && (
-            <button onClick={() => { setAddingUnder(tp.id); setChildName(""); setExpanded((p) => new Set(p).add(tp.id)); }} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>
-              {t("topics.addSub")}
+            <button onClick={() => { setAddingUnder(tp.id); setChildName(""); setExpanded((p) => new Set(p).add(tp.id)); }} className="icon-btn" style={iconBtn} title={t("topics.addSub")}>
+              <Icon d={ICONS.plus} size={16} color="var(--accent)" />
             </button>
           )}
           <Link to={`/thema/${tp.id}`} className="icon-btn" style={{ ...iconBtn, display: "inline-flex", color: "var(--accent)" }} title={t("thema.view")}>
