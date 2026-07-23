@@ -699,6 +699,13 @@
                 // baut openLernleiter die Vorschau/Regler aus leerem Pool (Config falsch,
                 // Aufgaben fehlen) — bei frischem Mount lädt loadUserData noch.
                 for (let i = 0; i < 25 && !aufgabenVomServer; i++) await sleep(200);
+                // Init-Schutz: hat ein transientes 502 die /topics beim Erstladen
+                // getroffen, wurde der Pool via vonKern OHNE Themen gemappt (a.thema
+                // leer → der Thema-Filter in openLernleiter verwirft alles). Themen
+                // sind jetzt (über loadLernpfade) da — den Pool einmal frisch mappen.
+                if (topics.length && aufgaben.length && aufgaben.every(a => !a.thema)) {
+                    try { const ex = await api(`${LP}/exercises`); if (ex.ok) { aufgaben = (await ex.json()).map(vonKern); aufgabenVomServer = true; } } catch (err) { /* Netz — mit vorhandenem Stand weiter */ }
+                }
                 const row = document.querySelector('#pfade-list .list-row[data-id="' + pfad._id + '"]');
                 if (row) row.click();   // öffnet den Pfad (editPfad rendert die Lernleitern)
                 // Danach die konkrete Lernleiter im Pfad öffnen.
