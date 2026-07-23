@@ -94,3 +94,26 @@ async def test_slot_cancellation(s):
     assert len(lst) == 1 and lst[0]["period"] == 2
     await KAL.del_slot_cancellation(KAL.SlotCancelIn(date=d, period=2), user=u, db=s)
     assert await KAL.list_slot_cancellations(user=u, db=s) == []
+
+
+@pytest.mark.asyncio
+async def test_release_deck_via_kurs(s):
+    """Kalender-Auto-Freischaltung: ein Stapel am KURS wird auch dann freigeschaltet,
+    wenn der Eintrag eine ANDERE Fach-Klasse desselben Kurses hat (Bug: nur exakt
+    dieselbe class_id matchte, Kurs-Decks blieben unverbunden)."""
+    from datetime import datetime, timezone
+    from app.models import Kurs, KursTag, Topic, CardDeck, CalendarEntry
+    u = User(email="k@d.de", password_hash="x", name="L"); s.add(u); await s.flush()
+    a = SchoolClass(name="7a", owner_id=u.id); b = SchoolClass(name="7b", owner_id=u.id); s.add(a); s.add(b); await s.flush()
+    kurs = Kurs(owner_id=u.id, name="Mathe"); s.add(kurs); await s.flush()
+    s.add(KursTag(kurs_id=kurs.id, class_id=a.id)); s.add(KursTag(kurs_id=kurs.id, class_id=b.id))
+    topic = Topic(name="Brüche", owner_id=u.id); s.add(topic); await s.flush()
+    # Deck hängt an Klasse 7a + Kurs Mathe, Thema Brüche, noch Entwurf.
+    deck = CardDeck(owner_id=u.id, class_id=a.id, kurs_id=kurs.id, topic_id=topic.id, name="D", released_at=None); s.add(deck)
+    # Eintrag hat die ANDERE Fach-Klasse 7b (gleicher Kurs) + gleiches Thema.
+    e = CalendarEntry(owner_id=u.id, date=datetime(2026, 9, 3, 12, tzinfo=timezone.utc), class_id=b.id, topic_id=topic.id)
+    s.add(e); await s.commit()
+
+    await KAL._release_matching_decks(s, u, e)
+    await s.refresh(deck)
+    assert deck.released_at is not None   # über den Kurs verbunden + freigeschaltet

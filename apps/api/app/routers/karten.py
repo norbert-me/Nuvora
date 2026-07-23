@@ -111,6 +111,17 @@ async def _kurs_decks_where(cls, kurs_id=None):
     return and_(CardDeck.class_id == cls.id, CardDeck.kurs_id.is_(None))
 
 
+async def _class_all_decks_where(db, class_id):
+    """Alle Stapel, die zur Klasse gehören: direkt (class_id) ODER über einen Kurs,
+    in dem die Klasse liegt. Für Auswahl-Listen (z.B. Kalender-Deck-Verknüpfung),
+    die nicht auf einen bestimmten Kurs eingeschränkt sind."""
+    from .kurse import class_kurs_ids
+    kurse = list(await class_kurs_ids(db, class_id))
+    if kurse:
+        return or_(CardDeck.kurs_id.in_(kurse), CardDeck.class_id == class_id)
+    return CardDeck.class_id == class_id
+
+
 async def _student_deck_where(db, st):
     """Deck-Filter fuer einen Schueler (oeffentliches Lernen): alle Stapel der
     Kurse (Fächer), in denen seine Klasse liegt, PLUS die Teilkurse, in denen er
@@ -232,6 +243,19 @@ async def list_decks(class_id: int, kurs_id: Optional[int] = None, user: User = 
     from sqlalchemy.orm import selectinload
     r = await db.execute(
         select(CardDeck).where(CardDeck.owner_id == user.id, await _kurs_decks_where(cls, kurs_id), CardDeck.deleted_at.is_(None))
+        .options(selectinload(CardDeck.cards)).order_by(CardDeck.id)
+    )
+    return r.scalars().all()
+
+
+@router.get("/classes/{class_id}/all-decks", response_model=List[DeckOut])
+async def list_all_decks(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Alle Stapel der Klasse (kursübergreifend) — für die Kalender-Deck-Auswahl,
+    damit auch Kurs-Stapel erscheinen (nicht nur die ohne Kurs)."""
+    await _owned_class(db, user, class_id)
+    from sqlalchemy.orm import selectinload
+    r = await db.execute(
+        select(CardDeck).where(CardDeck.owner_id == user.id, await _class_all_decks_where(db, class_id), CardDeck.deleted_at.is_(None))
         .options(selectinload(CardDeck.cards)).order_by(CardDeck.id)
     )
     return r.scalars().all()

@@ -1202,7 +1202,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   // Decks haengen an der Klasse: neu laden, wenn Klasse wechselt und Modul aktiv.
   useEffect(() => {
     if (!aktiv.karten || !classId) { setDecks([]); return; }
-    fetch(`/api/karten/classes/${classId}/decks`).then((r) => (r.ok ? r.json() : [])).then((d) => setDecks(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch(`/api/karten/classes/${classId}/all-decks`).then((r) => (r.ok ? r.json() : [])).then((d) => setDecks(Array.isArray(d) ? d : [])).catch(() => {});
   }, [aktiv.karten, classId]);
   const fld = { ...inputStyle, width: "100%" };
   const sfld = { ...selectStyle, width: "100%", fontSize: 14, padding: "10px 34px 10px 12px" };
