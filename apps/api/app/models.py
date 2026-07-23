@@ -185,6 +185,18 @@ class KursTag(Base):
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
 
 
+class KursStudent(Base):
+    """Einzelne SuS in einem Kurs — für Kurse aus TEILEN von Klassen (eine Auswahl
+    von Schülern mehrerer Klassen). Zusätzlich zu den ganzen Klassen (KursTag /
+    SchoolClass.kurs_id). Der Roster eines Kurses ist die Vereinigung beider."""
+    __tablename__ = "kurs_students"
+    __table_args__ = (UniqueConstraint("kurs_id", "student_id", name="uq_kurs_student"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kurs_id: Mapped[int] = mapped_column(ForeignKey("kurse.id", ondelete="CASCADE"), index=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), index=True)
+
+
 class SchoolClass(Base):
     __tablename__ = "school_classes"
 

@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
 
 from ..database import get_db
-from ..models import Kurs, KursTag, SchoolClass, Student, User
+from ..models import Kurs, KursTag, KursStudent, SchoolClass, Student, User
 from .auth import get_current_user
 
 router = APIRouter(prefix="/api/kurse", tags=["kurse"])
@@ -71,6 +71,17 @@ async def member_class_ids(db, kurs_ids) -> set:
     a = (await db.execute(select(KursTag.class_id).where(KursTag.kurs_id.in_(kurs_ids)))).scalars().all()
     b = (await db.execute(select(SchoolClass.id).where(SchoolClass.kurs_id.in_(kurs_ids)))).scalars().all()
     return set(a) | set(b)
+
+
+async def member_student_ids(db, kurs_id) -> set:
+    """Alle SuS-IDs eines Kurses: die aller Mitgliedsklassen UND die einzeln
+    hinzugefügten (kurs_students). So funktionieren Kurse aus Teilen von Klassen."""
+    classes = list(await member_class_ids(db, [kurs_id]))
+    ids = set()
+    if classes:
+        ids |= set((await db.execute(select(Student.id).where(Student.class_id.in_(classes)))).scalars().all())
+    ids |= set((await db.execute(select(KursStudent.student_id).where(KursStudent.kurs_id == kurs_id))).scalars().all())
+    return ids
 
 
 async def class_kurs_ids(db, class_id, only_active=True) -> set:
@@ -176,6 +187,51 @@ async def remove_member(kurs_id: int, class_id: int, user: User = Depends(get_cu
     await db.commit()
 
 
+# ─── Einzelne SuS im Kurs (Kurse aus Teilen von Klassen) ───
+
+async def _own_student(db, user, student_id) -> Student:
+    s = await db.get(Student, student_id)
+    if s:
+        c = await db.get(SchoolClass, s.class_id)
+        if c and (not c.owner_id or c.owner_id == user.id):
+            return s
+    raise HTTPException(404, "Schüler nicht gefunden")
+
+
+@router.get("/{kurs_id}/members")
+async def list_student_members(kurs_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Einzeln hinzugefügte SuS des Kurses (mit Herkunftsklasse)."""
+    await _owned_kurs(db, user, kurs_id)
+    sids = (await db.execute(select(KursStudent.student_id).where(KursStudent.kurs_id == kurs_id))).scalars().all()
+    if not sids:
+        return []
+    rows = (await db.execute(
+        select(Student.id, Student.name, Student.class_id, SchoolClass.name)
+        .join(SchoolClass, Student.class_id == SchoolClass.id)
+        .where(Student.id.in_(list(sids))).order_by(Student.name)
+    )).all()
+    return [{"student_id": sid, "name": n, "class_id": cid, "class_name": cn} for (sid, n, cid, cn) in rows]
+
+
+@router.post("/{kurs_id}/members/{student_id}", status_code=204)
+async def add_student_member(kurs_id: int, student_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Einzelnen Schüler dem Kurs hinzufügen (Teilmenge einer Klasse)."""
+    await _owned_kurs(db, user, kurs_id)
+    await _own_student(db, user, student_id)
+    exists = (await db.execute(select(KursStudent).where(KursStudent.kurs_id == kurs_id, KursStudent.student_id == student_id))).scalar_one_or_none()
+    if not exists:
+        db.add(KursStudent(kurs_id=kurs_id, student_id=student_id))
+        await db.commit()
+
+
+@router.delete("/{kurs_id}/members/{student_id}", status_code=204)
+async def remove_student_member(kurs_id: int, student_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Einzelnen Schüler aus dem Kurs entfernen."""
+    await _owned_kurs(db, user, kurs_id)
+    await db.execute(delete(KursStudent).where(KursStudent.kurs_id == kurs_id, KursStudent.student_id == student_id))
+    await db.commit()
+
+
 # ─── E-/G-Niveau (pro Kurs gepflegt, betrifft die Person) ───
 
 @router.get("/{kurs_id}/students")
@@ -183,10 +239,10 @@ async def kurs_students(kurs_id: int, user: User = Depends(get_current_user), db
     """SuS des Kurses (per Name dedupliziert) mit ihrem E/G-Niveau. E/G ist eine
     Eigenschaft der Person, nicht der Fach-Klasse — darum hier gepflegt."""
     await _owned_kurs(db, user, kurs_id)
-    members = list(await member_class_ids(db, [kurs_id]))
-    if not members:
+    sids = list(await member_student_ids(db, kurs_id))
+    if not sids:
         return []
-    studs = (await db.execute(select(Student).where(Student.class_id.in_(members)).order_by(Student.card_id, Student.id))).scalars().all()
+    studs = (await db.execute(select(Student).where(Student.id.in_(sids)).order_by(Student.card_id, Student.id))).scalars().all()
     out = {}
     for s in studs:
         n = s.name.strip()
