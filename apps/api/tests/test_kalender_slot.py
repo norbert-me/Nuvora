@@ -102,8 +102,9 @@ async def test_release_deck_via_kurs(s):
     wenn der Eintrag eine ANDERE Fach-Klasse desselben Kurses hat (Bug: nur exakt
     dieselbe class_id matchte, Kurs-Decks blieben unverbunden)."""
     from datetime import datetime, timezone
-    from app.models import Kurs, KursTag, Topic, CardDeck, CalendarEntry
+    from app.models import Kurs, KursTag, Topic, CardDeck, CalendarEntry, UserModule
     u = User(email="k@d.de", password_hash="x", name="L"); s.add(u); await s.flush()
+    s.add(UserModule(user_id=u.id, module_key="karten"))  # Auto-Freischaltung nur bei aktivem Modul
     a = SchoolClass(name="7a", owner_id=u.id); b = SchoolClass(name="7b", owner_id=u.id); s.add(a); s.add(b); await s.flush()
     kurs = Kurs(owner_id=u.id, name="Mathe"); s.add(kurs); await s.flush()
     s.add(KursTag(kurs_id=kurs.id, class_id=a.id)); s.add(KursTag(kurs_id=kurs.id, class_id=b.id))

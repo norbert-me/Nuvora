@@ -1223,9 +1223,11 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   // noch den vorigen Auto-Wert traegt (manuelle Wahl bleibt unangetastet).
   const autoDeck = useRef(null);
   const autoLadder = useRef(null);
+  const autoMethod = useRef(null);
   useEffect(() => {
     if (!topicId) return;
     const tid = Number(topicId);
+    // Auto-Verknüpfung nur, wenn das jeweilige Modul aktiv ist.
     if (aktiv.karten) {
       const m = decks.find((d) => Number(d.topic_id) === tid);
       if (m && (!deckId || Number(deckId) === autoDeck.current)) { setDeckId(m.id); autoDeck.current = m.id; }
@@ -1234,8 +1236,12 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
       const m = ladders.find((l) => Number(l.topic_id) === tid);
       if (m && (!ladderId || Number(ladderId) === autoLadder.current)) { setLadderId(m.id); autoLadder.current = m.id; }
     }
+    if (aktiv.methoden) {
+      const m = methods.find((x) => Number(x.topic_id) === tid);
+      if (m && (!methodId || Number(methodId) === autoMethod.current)) { setMethodId(m.id); autoMethod.current = m.id; }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topicId, decks, ladders, aktiv.karten, aktiv.lernpfad]);
+  }, [topicId, decks, ladders, methods, aktiv.karten, aktiv.lernpfad, aktiv.methoden]);
   const fld = { ...inputStyle, width: "100%" };
   const sfld = { ...selectStyle, width: "100%", fontSize: 14, padding: "10px 34px 10px 12px" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
@@ -1349,7 +1355,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
           <option value="">– {t("kalender.noTopic")} –</option>
           {[...topics].sort(byLabel(topicLabel)).map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
         </select>
-        {methods.length > 0 && (
+        {aktiv.methoden && (
           <>
             <div style={lbl}>{t("kalender.method")}</div>
             <select value={methodId} onChange={(e) => setMethodId(e.target.value)} style={sfld}>

@@ -129,7 +129,11 @@ async def _release_matching_decks(db: AsyncSession, user: User, e: CalendarEntry
     """Zusatz (Regel 3): plant der Kalender ein Thema, wird ein passender, noch
     nicht ausgerollter Karten-Stapel automatisch zum Termin freigeschaltet.
     Nur Entwuerfe (released_at NULL) — eine manuelle Freigabe bleibt unberuehrt.
+    Laeuft nur, wenn das Karten-Modul aktiv ist (keine Auto-Verknuepfung bei
+    abgeschaltetem Modul).
     """
+    if not await is_active(db, user.id, "karten"):
+        return
     # Explizit verknuepftes Deck: am Kalendertag freischalten, falls noch Entwurf.
     if e.karten_deck_id:
         deck = await db.get(CardDeck, e.karten_deck_id)
