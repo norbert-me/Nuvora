@@ -695,6 +695,10 @@
                     await sleep(200);
                 }
                 if (!pfad) { console.warn('[Lernpfad] open-lernleiter: Lernleiter', ziel, 'in keinem Pfad gefunden'); return; }
+                // WICHTIG: erst wenn der globale Aufgaben-Pool vom Server da ist. Sonst
+                // baut openLernleiter die Vorschau/Regler aus leerem Pool (Config falsch,
+                // Aufgaben fehlen) — bei frischem Mount lädt loadUserData noch.
+                for (let i = 0; i < 25 && !aufgabenVomServer; i++) await sleep(200);
                 const row = document.querySelector('#pfade-list .list-row[data-id="' + pfad._id + '"]');
                 if (row) row.click();   // öffnet den Pfad (editPfad rendert die Lernleitern)
                 // Danach die konkrete Lernleiter im Pfad öffnen.
