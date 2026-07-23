@@ -779,6 +779,18 @@ class TimetableSlot(Base):
     topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
 
 
+class SlotCancellation(Base):
+    """Eine einzelne Stundenplan-Stunde entfällt an EINEM Tag (Datum + Stunde).
+    Die wiederkehrende Vorlage bleibt; nur diese Ausnahme blendet sie aus."""
+    __tablename__ = "slot_cancellations"
+    __table_args__ = (UniqueConstraint("owner_id", "date", "period", name="uq_slotcancel"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    period: Mapped[int] = mapped_column(Integer)
+
+
 class QuartalDivider(Base):
     """Optischer Quartalsstrich in der Notentabelle — nach welcher Spalte er
     steht. Mehrere je Klasse+Halbjahr moeglich, rein visuell."""

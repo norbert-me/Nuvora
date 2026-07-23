@@ -80,3 +80,17 @@ async def test_external_color_partial_update(s):
     out = await KAL.set_external(KAL.ExtIn(color="rot"), user=u, db=s)
     assert out["color"] == ""
     assert out["url"] == "https://example.com/f.ics"
+
+
+@pytest.mark.asyncio
+async def test_slot_cancellation(s):
+    """Stundenausfall: anlegen (idempotent), listen, löschen."""
+    from datetime import datetime, timezone
+    u = User(email="sc@d.de", password_hash="x", name="L"); s.add(u); await s.commit()
+    d = datetime(2026, 9, 3, 12, 0, tzinfo=timezone.utc)
+    await KAL.add_slot_cancellation(KAL.SlotCancelIn(date=d, period=2), user=u, db=s)
+    await KAL.add_slot_cancellation(KAL.SlotCancelIn(date=d, period=2), user=u, db=s)  # idempotent
+    lst = await KAL.list_slot_cancellations(user=u, db=s)
+    assert len(lst) == 1 and lst[0]["period"] == 2
+    await KAL.del_slot_cancellation(KAL.SlotCancelIn(date=d, period=2), user=u, db=s)
+    assert await KAL.list_slot_cancellations(user=u, db=s) == []

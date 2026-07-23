@@ -18,6 +18,10 @@ export default function Dashboard() {
   const [currentFolder, setCurrentFolder] = useState(null);
   const [editingSet, setEditingSet] = useState(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
+  // Ein „+" mit Untermenü (Ordner/Set) statt zwei getrennter Plus-Knöpfe.
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [addMode, setAddMode] = useState(null); // null | "folder" | "set"
+  const [addName, setAddName] = useState("");
   const [newFolderName, setNewFolderName] = useState("");
   const [movingFolder, setMovingFolder] = useState(null);
   const [loadError, setLoadError] = useState(false);
@@ -125,9 +129,10 @@ export default function Dashboard() {
     setEditingSet(null);
   };
 
-  const createFolder = async () => {
-    if (!newFolderName.trim()) return;
-    await fetch(`${API}/folders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newFolderName.trim(), parent_id: currentFolder }) });
+  const createFolder = async (nm) => {
+    const name = (nm ?? newFolderName).trim();
+    if (!name) return;
+    await fetch(`${API}/folders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, parent_id: currentFolder }) });
     setNewFolderName(""); setShowNewFolder(false); load();
   };
 
@@ -379,16 +384,25 @@ export default function Dashboard() {
       )}
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {showNewFolder ? (
+        {addMode ? (
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder={t("dash.folderName")} style={inputStyle} autoFocus onKeyDown={(e) => e.key === "Enter" && createFolder()} />
-            <button onClick={createFolder} style={btnSecondary}>OK</button>
-            <button onClick={() => setShowNewFolder(false)} style={btnSecondary}>×</button>
+            <input value={addName} onChange={(e) => setAddName(e.target.value)} placeholder={addMode === "folder" ? t("dash.folderName") : t("dash.setName")} style={inputStyle} autoFocus
+              onKeyDown={(e) => { if (e.key === "Enter" && addName.trim()) { (addMode === "folder" ? createFolder(addName.trim()) : createSet(addName.trim())); setAddName(""); setAddMode(null); } if (e.key === "Escape") { setAddName(""); setAddMode(null); } }} />
+            <button onClick={() => { if (addName.trim()) { (addMode === "folder" ? createFolder(addName.trim()) : createSet(addName.trim())); setAddName(""); setAddMode(null); } }} style={btnSecondary}>OK</button>
+            <button onClick={() => { setAddName(""); setAddMode(null); }} style={btnSecondary}>×</button>
           </div>
         ) : (
-          <AddButton onClick={() => setShowNewFolder(true)} title={t("dash.newFolder")} />
+          <div style={{ position: "relative" }}>
+            <AddButton onClick={() => setAddMenuOpen((v) => !v)} title={t("common.add")} />
+            {addMenuOpen && (<>
+              <div onClick={() => setAddMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+              <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50, minWidth: 180, background: "var(--card)", border: "1px solid var(--border2)", borderRadius: 12, boxShadow: "0 8px 30px rgba(0,0,0,0.18)", padding: 6 }}>
+                <button onClick={() => { setAddMenuOpen(false); setAddMode("folder"); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "9px 12px", background: "none", border: "none", borderRadius: 8, color: "var(--text)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", textAlign: "left" }}><Icon d={ICONS.plus} size={15} /> {t("dash.newFolder")}</button>
+                {currentFolder && <button onClick={() => { setAddMenuOpen(false); setAddMode("set"); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "9px 12px", background: "none", border: "none", borderRadius: 8, color: "var(--text)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", textAlign: "left" }}><Icon d={ICONS.plus} size={15} /> {t("dash.newSet")}</button>}
+              </div>
+            </>)}
+          </div>
         )}
-        {currentFolder && <NewSetButton onCreate={createSet} />}
         <div>
           <ImportMenu
             importItems={[

@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import CalendarBreak, CalendarEntry, CardDeck, Kurs, SchoolClass, TimetableSlot, Topic, User, Session as TestSession
+from ..models import CalendarBreak, CalendarEntry, CardDeck, Kurs, SchoolClass, TimetableSlot, SlotCancellation, Topic, User, Session as TestSession
 from .auth import get_current_user, rate_limit
 from .modules import is_active
 
@@ -324,6 +324,38 @@ async def get_timetable(user: User = Depends(require_module), db: AsyncSession =
     return {"periods": user.timetable_periods or 6, "slots": rows, "times": user.timetable_times or []}
 
 
+class SlotCancelIn(BaseModel):
+    date: datetime
+    period: int
+
+
+@router.get("/slot-cancellations")
+async def list_slot_cancellations(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Ausgefallene Stundenplan-Stunden (Datum + Stunde)."""
+    rows = (await db.execute(select(SlotCancellation).where(SlotCancellation.owner_id == user.id))).scalars().all()
+    return [{"date": c.date.isoformat(), "period": c.period} for c in rows]
+
+
+@router.post("/slot-cancellations", status_code=201)
+async def add_slot_cancellation(body: SlotCancelIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Eine Stundenplan-Stunde an einem Tag entfallen lassen (idempotent)."""
+    ex = (await db.execute(select(SlotCancellation).where(
+        SlotCancellation.owner_id == user.id, SlotCancellation.date == body.date, SlotCancellation.period == body.period))).scalar_one_or_none()
+    if not ex:
+        db.add(SlotCancellation(owner_id=user.id, date=body.date, period=body.period))
+        await db.commit()
+    return {"ok": True}
+
+
+@router.delete("/slot-cancellations", status_code=204)
+async def del_slot_cancellation(body: SlotCancelIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Ausfall wieder aufheben — die Stunde erscheint wieder."""
+    for c in (await db.execute(select(SlotCancellation).where(
+            SlotCancellation.owner_id == user.id, SlotCancellation.date == body.date, SlotCancellation.period == body.period))).scalars().all():
+        await db.delete(c)
+    await db.commit()
+
+
 @router.put("/timetable/times", response_model=Timetable)
 async def set_times(body: TimesIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Uhrzeiten je Stunde setzen: Liste [{start,end}]."""
@@ -488,6 +520,10 @@ async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
             if e.period is not None:
                 d = e.date.date() if hasattr(e.date, "date") else e.date
                 belegt.add((d, e.period))
+        # Ausgefallene Stunden (Datum + Stunde) genauso ausblenden wie belegte.
+        for c in (await db.execute(select(SlotCancellation).where(SlotCancellation.owner_id == u.id))).scalars().all():
+            cd = c.date.date() if hasattr(c.date, "date") else c.date
+            belegt.add((cd, c.period))
         frei = []
         for b in breaks:
             bs = b.start_date.date() if hasattr(b.start_date, "date") else b.start_date

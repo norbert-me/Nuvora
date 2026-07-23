@@ -145,6 +145,26 @@ export default function Kalender() {
   }, []);
   useEffect(() => { loadBreaks(); }, [loadBreaks]);
 
+  // Ausgefallene Stundenplan-Stunden (Datum + Stunde). Eine einzelne Stunde an
+  // einem Tag entfällt, ohne den ganzen Tag (freie Tage) auszublenden.
+  const [slotCancels, setSlotCancels] = useState([]);
+  const loadCancels = useCallback(() => {
+    fetch(`${API}/slot-cancellations`).then((r) => (r.ok ? r.json() : [])).then((d) => setSlotCancels(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
+  useEffect(() => { loadCancels(); }, [loadCancels]);
+  const cancelSet = new Set(slotCancels.map((c) => `${ymd(new Date(c.date))}|${c.period}`));
+  const isCancelled = (d, period) => cancelSet.has(`${ymd(d)}|${period}`);
+  const cancelSlot = async (d, period) => {
+    await fetch(`${API}/slot-cancellations`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: isoDay(d), period }) }).catch(() => {});
+    loadCancels();
+  };
+  const restoreSlot = async (d, period) => {
+    await fetch(`${API}/slot-cancellations`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: isoDay(d), period }) }).catch(() => {});
+    loadCancels();
+  };
+  // Ausgefallene Stunden eines Tages (für die „entfällt"-Chips mit Wiederherstellen).
+  const cancelledFor = (d) => tt.slots.filter((s) => s.weekday === weekdayOf(d) && isCancelled(d, s.period)).sort((a, b) => a.period - b.period);
+
   // Wochenansicht: schwache Themen der Vorwoche als Wiederholungs-Vorschlag.
   useEffect(() => {
     if (view !== "week" || !aktiv.cardvote) { setWdhVorschlag([]); return; }
@@ -282,7 +302,7 @@ export default function Kalender() {
   const kursColor = (id) => (kurse.find((k) => k.id === id) || {}).color || "";
   const slotColor = (s) => (s && s.kurs_id && kursColor(s.kurs_id)) || (s && s.class_id ? classColor(s.class_id) : C.info);
   const weekdayOf = (d) => (new Date(d).getDay() + 6) % 7; // 0 = Montag
-  const slotsFor = (d) => tt.slots.filter((s) => s.weekday === weekdayOf(d)).sort((a, b) => a.period - b.period);
+  const slotsFor = (d) => tt.slots.filter((s) => s.weekday === weekdayOf(d) && !isCancelled(d, s.period)).sort((a, b) => a.period - b.period);
   // Klick auf eine Stundenplan-Vorlage: gibt es an dem Tag schon einen Eintrag
   // dieser Klasse, wird der bearbeitet; sonst ein neuer aus der Vorlage.
   const fromSlot = (day, s) => {
@@ -470,7 +490,7 @@ export default function Kalender() {
         </div>
       )}
       {view === "week" && <WeekView extColor={extColor} range={range} byDay={byDayV} extByDay={extByDayV} slotsFor={slotsFor} frei={frei} className={className} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
-      {view === "day" && <DayView extColor={extColor} day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} slotsFor={slotsFor} frei={frei} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
+      {view === "day" && <DayView extColor={extColor} day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} slotsFor={slotsFor} cancelledFor={cancelledFor} onCancelSlot={cancelSlot} onRestoreSlot={restoreSlot} frei={frei} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
       {view === "timetable" && <TimetableView tt={tt} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
@@ -781,7 +801,7 @@ function FreiMarker({ label, t }) {
   );
 }
 
-function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFor, frei, className, slotName, slotColor, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
+function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFor, cancelledFor, onCancelSlot, onRestoreSlot, frei, className, slotName, slotColor, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
   const list = byDay(day);
   const slots = slotsFor(day);
   const ext = extByDay ? extByDay(day) : [];
@@ -812,6 +832,8 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
       col: s.class_id || s.kurs_id ? slotColor(s) : "var(--accent)",
       label: slotName(s) || s.title || topicName(s.topic_id) || "—",
       sub: eintrag ? (eintrag.title || topicName(eintrag.topic_id) || t("kalender.planned")) + (linked(eintrag) ? " ↗" : "") : "",
+      // Leere Stundenplan-Stunde (kein Eintrag): kann für diesen Tag entfallen.
+      onCancel: eintrag ? null : () => onCancelSlot && onCancelSlot(day, s.period),
       onClick: eintrag ? () => onOpen({ ...eintrag, date: new Date(eintrag.date) }) : () => onSlot(day, s) });
   });
   list.filter((e) => e.period != null && !belegte.has(e.period)).forEach((e) => {
@@ -880,6 +902,19 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
         </div>
       )}
 
+      {/* Ausgefallene Stunden an diesem Tag: Chip mit Wiederherstellen. */}
+      {cancelledFor && cancelledFor(day).length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+          <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("kalender.cancelledLessons")}:</span>
+          {cancelledFor(day).map((s) => (
+            <button key={s.id} onClick={() => onRestoreSlot(day, s.period)} title={t("kalender.slotRestore")}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, padding: "4px 10px", borderRadius: 980, border: "1px dashed var(--border2)", background: "var(--bg2)", color: "var(--text3)", cursor: "pointer", textDecoration: "line-through" }}>
+              {s.period}. {t("kalender.period")} {slotName(s) || s.title || ""} <span style={{ textDecoration: "none", fontWeight: 700, color: "var(--accent)" }}>↺</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Zeitleiste 0–24 Uhr: scrollbar, Start bei 6 Uhr (Ref setzt scrollTop). */}
       {timed.length > 0 && (
         <div ref={scrollRef} style={{ maxHeight: "62vh", overflowY: "auto", border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)" }}>
@@ -901,16 +936,20 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
             </div>
           ))}
           {timed.map((it) => (
-            <button key={it.key} onClick={it.onClick} title={`${it.label}${it.sub ? " — " + it.sub : ""}`}
-              style={{ position: "absolute", top: yOf(it.start) + 1, height: Math.max(22, yOf(it.end) - yOf(it.start) - 2),
-                left: `calc(50px + ${it.lane || 0} * (100% - 58px) / ${it.lanes || 1})`,
-                width: `calc((100% - 58px) / ${it.lanes || 1} - 3px)`,
-                textAlign: "left", padding: "3px 8px", borderRadius: 6, overflow: "hidden", cursor: "pointer",
-                border: it.dashed ? "1px dashed var(--border2)" : "none", borderLeft: `3px solid ${it.col}`,
-                background: it.dashed ? "var(--bg2)" : it.col + "22", color: "var(--text)" }}>
-              <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.label}</div>
-              {it.sub && <div style={{ fontSize: 11, color: "var(--text2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.sub}</div>}
-            </button>
+            <div key={it.key} style={{ position: "absolute", top: yOf(it.start) + 1, height: Math.max(22, yOf(it.end) - yOf(it.start) - 2),
+              left: `calc(50px + ${it.lane || 0} * (100% - 58px) / ${it.lanes || 1})`,
+              width: `calc((100% - 58px) / ${it.lanes || 1} - 3px)` }}>
+              <button onClick={it.onClick} title={`${it.label}${it.sub ? " — " + it.sub : ""}`}
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%",
+                  textAlign: "left", padding: "3px 8px", borderRadius: 6, overflow: "hidden", cursor: "pointer",
+                  border: it.dashed ? "1px dashed var(--border2)" : "none", borderLeft: `3px solid ${it.col}`,
+                  background: it.dashed ? "var(--bg2)" : it.col + "22", color: "var(--text)" }}>
+                <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.label}</div>
+                {it.sub && <div style={{ fontSize: 11, color: "var(--text2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.sub}</div>}
+              </button>
+              {it.onCancel && <button onClick={(e) => { e.stopPropagation(); it.onCancel(); }} title={t("kalender.slotCancel")}
+                style={{ position: "absolute", top: 1, right: 1, width: 17, height: 17, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", background: "var(--card)", color: "var(--text3)", fontSize: 13, lineHeight: 1, boxShadow: "0 1px 2px rgba(0,0,0,0.15)" }}>×</button>}
+            </div>
           ))}
         </div>
         </div>
