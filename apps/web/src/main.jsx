@@ -109,6 +109,7 @@ import CodeDetektiv from "./codedetektiv/CodeDetektiv.jsx";
 import PublicCd from "./codedetektiv/PublicCd.jsx";
 import Cards from "./pages/Cards.jsx";
 import Tutorial from "./pages/Tutorial.jsx";
+import GuidedTour, { KERN_TOUR } from "./components/GuidedTour.jsx";
 import NotenModul from "./pages/Noten.jsx";
 import Lernen from "./pages/Lernen.jsx";
 import Karten from "./pages/Karten.jsx";
@@ -416,6 +417,20 @@ function Nav({ user, onLogout }) {
     return () => window.removeEventListener("nuvora:settings", h);
   }, []);
 
+  // Geführte Kern-Tour: einmal beim ersten Einloggen automatisch, jederzeit über
+  // ein Event neu startbar (Profil/Tutorial dispatchen "nuvora:start-tour").
+  const [showTour, setShowTour] = useState(false);
+  useEffect(() => {
+    if (!user) return;
+    try { if (!localStorage.getItem("nuvora_kerntour_done")) { const id = setTimeout(() => setShowTour(true), 700); return () => clearTimeout(id); } } catch { /* egal */ }
+  }, [user]);
+  useEffect(() => {
+    const h = () => setShowTour(true);
+    window.addEventListener("nuvora:start-tour", h);
+    return () => window.removeEventListener("nuvora:start-tour", h);
+  }, []);
+  const endTour = () => { setShowTour(false); try { localStorage.setItem("nuvora_kerntour_done", "1"); } catch { /* egal */ } };
+
   const navItems = getModuleNavItems(t, location);
   const allPages = [...navItems, { to: "/tutorial", label: t("nav.tutorial") }, { to: `${CV}/scan`, label: t("nav.scanner") }, { to: "/profile", label: t("nav.profile") }, { to: `${CV}/evaluation`, label: t("nav.evaluation") }, { to: "/login", label: t("nav.login") }];
   const pageTitle = allPages.find((item) => location.pathname.startsWith(item.to))?.label || "";
@@ -440,7 +455,7 @@ function Nav({ user, onLogout }) {
           .nav-mobile-menu { display: none !important; }
         }
       `}</style>
-      <nav style={{
+      <nav data-tour="nav" style={{
         padding: "0 16px",
         borderBottom: "1px solid var(--nav-border)",
         background: "var(--nav-bg)",
@@ -454,7 +469,7 @@ function Nav({ user, onLogout }) {
         height: 52,
         gap: 4,
       }}>
-        <NavLink to="/" style={{ textDecoration: "none", flexShrink: 0 }}>
+        <NavLink to="/" data-tour="home" style={{ textDecoration: "none", flexShrink: 0 }}>
           <div style={{
             fontWeight: 700,
             fontSize: 20,
@@ -492,7 +507,7 @@ function Nav({ user, onLogout }) {
           </span>
         )}
 
-        <div className={showNav ? "nav-links-desktop" : ""} style={{ display: showNav ? "flex" : "block", gap: 2, overflow: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none", flex: 1, minWidth: 0, marginLeft: 8 }}>
+        <div data-tour="modules" className={showNav ? "nav-links-desktop" : ""} style={{ display: showNav ? "flex" : "block", gap: 2, overflow: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none", flex: 1, minWidth: 0, marginLeft: 8 }}>
           {showNav && navItems.map((item) => {
             const isActive = item.active !== undefined ? item.active : location.pathname.startsWith(item.to.split("?")[0]) && !item.to.includes("?");
             return (
@@ -521,7 +536,7 @@ function Nav({ user, onLogout }) {
 
         <LanguageSwitcher />
         <DarkModeToggle />
-        <NavLink to={user ? "/profile" : "/login"} onClick={() => { setMenuOpen(false); if (!user) window.dispatchEvent(new Event("cardvote:reset-login-mode")); }} style={{
+        <NavLink to={user ? "/profile" : "/login"} data-tour="profile" onClick={() => { setMenuOpen(false); if (!user) window.dispatchEvent(new Event("cardvote:reset-login-mode")); }} style={{
           padding: 6,
           borderRadius: 980,
           textDecoration: "none",
@@ -568,6 +583,7 @@ function Nav({ user, onLogout }) {
           })}
         </div>
       )}
+      {showTour && user && <GuidedTour steps={KERN_TOUR} t={t} onDone={endTour} />}
     </>
   );
 }

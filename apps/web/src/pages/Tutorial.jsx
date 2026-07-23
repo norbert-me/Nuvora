@@ -49,9 +49,11 @@ export default function Tutorial() {
           <button onClick={neu} style={{ marginLeft: "auto", ...btnSecondary }}>{t("tut.restart")}</button>
         )}
       </div>
-      <p style={{ color: "var(--text2)", marginBottom: 22, fontSize: 14 }}>
+      <p style={{ color: "var(--text2)", marginBottom: 14, fontSize: 14 }}>
 {t("tut.intro")}
       </p>
+      <button onClick={() => window.dispatchEvent(new Event("nuvora:start-tour"))}
+        style={{ ...btnPrimary, marginBottom: 22 }}>{t("tour.startGuided")}</button>
 
       {BEREICHE.map((b, i) => {
         const auf = offen === b.key;
