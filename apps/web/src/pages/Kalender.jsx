@@ -127,7 +127,8 @@ export default function Kalender() {
       }).catch(() => {});
       if (on.lernpfad) fetch("/api/lernpfad/paths").then((r) => (r.ok ? r.json() : [])).then((paths) => {
         const flat = [];
-        (Array.isArray(paths) ? paths : []).forEach((p) => (p.ladders || []).forEach((l) => flat.push({ id: l.id, name: l.name, path: p.name })));
+        // LadderOut hat kein name, nur topic_id — Thema/Unterthema wird per topicName aufgelöst.
+        (Array.isArray(paths) ? paths : []).forEach((p) => (p.ladders || []).forEach((l) => flat.push({ id: l.id, topic_id: l.topic_id, path: p.name })));
         setLadders(flat);
       }).catch(() => {});
       if (on["code-detektiv"]) fetch("/api/codedetektiv/puzzles").then((r) => (r.ok ? r.json() : [])).then((d) => setPuzzles(Array.isArray(d) ? d : [])).catch(() => {});
@@ -834,6 +835,27 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
       label: "🔗 " + (ev.title || "—"), sub: ev.location || "", onClick: () => onExt(ev) });
   });
 
+  // Überlappende Termine nebeneinander: jedem Termin eine Spalte (lane) zuweisen,
+  // die Breite pro Cluster durch die Spaltenzahl teilen. So verdecken sich
+  // gleichzeitige Ereignisse nicht mehr.
+  {
+    const items = timed.slice().sort((a, b) => a.start - b.start || a.end - b.end);
+    items.forEach((e) => { e.lane = 0; e.lanes = 1; });
+    for (let i = 0; i < items.length; i++) {
+      const used = new Set();
+      for (let j = 0; j < i; j++) { const f = items[j]; if (f.start < items[i].end && items[i].start < f.end) used.add(f.lane); }
+      let c = 0; while (used.has(c)) c++;
+      items[i].lane = c;
+    }
+    // Cluster (zusammenhängende Überlappungen) → gemeinsame Spaltenzahl.
+    let cStart = 0, cMax = 0, cEnd = -Infinity;
+    for (let i = 0; i < items.length; i++) {
+      if (i > cStart && items[i].start >= cEnd) { for (let k = cStart; k < i; k++) items[k].lanes = cMax + 1; cStart = i; cMax = 0; cEnd = -Infinity; }
+      cMax = Math.max(cMax, items[i].lane); cEnd = Math.max(cEnd, items[i].end);
+    }
+    for (let k = cStart; k < items.length; k++) items[k].lanes = cMax + 1;
+  }
+
   const hasBanner = ganztags.length > 0 || extAllDay.length > 0;
   const bannerBtn = (key, title, sub, onClick, extern) => (
     <button key={key} onClick={onClick}
@@ -880,7 +902,9 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
           ))}
           {timed.map((it) => (
             <button key={it.key} onClick={it.onClick} title={`${it.label}${it.sub ? " — " + it.sub : ""}`}
-              style={{ position: "absolute", top: yOf(it.start) + 1, height: Math.max(22, yOf(it.end) - yOf(it.start) - 2), left: 50, right: 8,
+              style={{ position: "absolute", top: yOf(it.start) + 1, height: Math.max(22, yOf(it.end) - yOf(it.start) - 2),
+                left: `calc(50px + ${it.lane || 0} * (100% - 58px) / ${it.lanes || 1})`,
+                width: `calc((100% - 58px) / ${it.lanes || 1} - 3px)`,
                 textAlign: "left", padding: "3px 8px", borderRadius: 6, overflow: "hidden", cursor: "pointer",
                 border: it.dashed ? "1px dashed var(--border2)" : "none", borderLeft: `3px solid ${it.col}`,
                 background: it.dashed ? "var(--bg2)" : it.col + "22", color: "var(--text)" }}>
@@ -1153,7 +1177,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   const linkList = [
     quizId && (() => { const q = quizze.find((x) => x.id === Number(quizId)); return q && { to: "/cardvote/questions", label: q.folder ? `${q.folder} / ${q.name}` : q.name, kind: t("kalender.planCardvote") }; })(),
     deckId && (() => { const d = decks.find((x) => x.id === Number(deckId)); return d && { to: `/karten?class=${classId}`, label: d.name, kind: t("kalender.planKarten") }; })(),
-    ladderId && (() => { const l = ladders.find((x) => x.id === Number(ladderId)); return l && { to: "/lernpfad", label: l.path ? `${l.path} / ${l.name}` : l.name, kind: t("kalender.planLernleiter") }; })(),
+    ladderId && (() => { const l = ladders.find((x) => x.id === Number(ladderId)); return l && { to: "/lernpfad", label: (topicName(l.topic_id) || l.path || t("kalender.planLernleiter")), kind: t("kalender.planLernleiter") }; })(),
     puzzleId && (() => { const p = puzzles.find((x) => x.client_id === puzzleId); return { to: `/code-detektiv/puzzle/${puzzleId}?mode=solo`, label: (p && p.title) || puzzleId, kind: t("kalender.planDetektiv") }; })(),
   ].filter(Boolean);
   const zeile = (k, v) => v ? <div style={{ display: "flex", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--border)", fontSize: 13.5 }}><span style={{ color: "var(--text3)", minWidth: 92 }}>{k}</span><span style={{ fontWeight: 500 }}>{v}</span></div> : null;
@@ -1288,7 +1312,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
             <div style={lbl}>{t("kalender.planLernleiter")}</div>
             <select value={ladderId} onChange={(e) => setLadderId(e.target.value)} style={sfld}>
               <option value="">– {t("kalender.none")} –</option>
-              {ladders.map((l) => <option key={l.id} value={l.id}>{l.path ? `${l.path} / ${l.name}` : l.name}</option>)}
+              {ladders.map((l) => <option key={l.id} value={l.id}>{(topicName(l.topic_id) || l.path || t("kalender.planLernleiter"))}</option>)}
             </select>
           </>
         )}
@@ -1310,7 +1334,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
           const links = [
             q && { to: "/cardvote/questions", label: q.folder ? `${q.folder} / ${q.name}` : q.name, icon: t("kalender.planCardvote") },
             d && { to: `/karten?class=${classId}`, label: d.name, icon: t("kalender.planKarten") },
-            l && { to: "/lernpfad", label: l.path ? `${l.path} / ${l.name}` : l.name, icon: t("kalender.planLernleiter") },
+            l && { to: "/lernpfad", label: (topicName(l.topic_id) || l.path || t("kalender.planLernleiter")), icon: t("kalender.planLernleiter") },
           ].filter(Boolean);
           if (!links.length) return null;
           return (

@@ -570,7 +570,9 @@ def _parse_ics(text: str):
         if line == "BEGIN:VEVENT":
             cur = {}
         elif line == "END:VEVENT":
-            if cur and cur.get("start"):
+            # Abgesagte/gelöschte Termine überspringen — Apple/Google exportieren
+            # gelöschte Einträge oft als STATUS:CANCELLED statt sie zu entfernen.
+            if cur and cur.get("start") and cur.get("status") != "CANCELLED":
                 events.append(cur)
             cur = None
         elif cur is not None and ":" in line:
@@ -591,6 +593,8 @@ def _parse_ics(text: str):
                 cur["location"] = raw.replace("\\,", ",").replace(r"\;", ";").replace("\\n", " ")[:200]
             elif k == "DESCRIPTION":
                 cur["description"] = raw.replace("\\,", ",").replace(r"\;", ";").replace("\\n", "\n").replace("\\N", "\n")[:1000]
+            elif k == "STATUS":
+                cur["status"] = raw.upper()
     return events
 
 
