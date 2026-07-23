@@ -1259,7 +1259,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
     deckId && (() => { const d = decks.find((x) => x.id === Number(deckId)); return d && { to: `/karten?class=${classId}&deck=${deckId}`, label: d.name, kind: t("kalender.planKarten"), hideName: true }; })(),
     ladderId && (() => { const l = ladders.find((x) => x.id === Number(ladderId)); return l && { to: `/lernpfad?ll=${ladderId}`, label: (topicName(l.topic_id) || l.path || t("kalender.planLernleiter")), kind: t("kalender.planLernleiter"), hideName: true }; })(),
     puzzleId && (() => { const p = puzzles.find((x) => x.client_id === puzzleId); return { to: `/code-detektiv/puzzle/${puzzleId}?mode=solo`, label: (p && p.title) || puzzleId, kind: t("kalender.planDetektiv") }; })(),
-    methodId && methName && { to: `/methoden?open=${methodId}`, label: methName, kind: t("kalender.method") },
+    methodId && methName && { to: `/methoden?open=${methodId}`, label: methName, kind: t("kalender.method"), hideName: true },
   ].filter(Boolean);
   const zeile = (k, v) => v ? <div style={{ display: "flex", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--border)", fontSize: 13.5 }}><span style={{ color: "var(--text3)", minWidth: 92 }}>{k}</span><span style={{ fontWeight: 500 }}>{v}</span></div> : null;
   return (
