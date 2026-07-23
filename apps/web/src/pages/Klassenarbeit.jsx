@@ -326,7 +326,7 @@ export default function Klassenarbeit() {
               <div key={task.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "8px 10px", background: "var(--card)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 12, color: "var(--text3)", width: 18 }}>{i + 1}.</span>
-                  <input value={task.label} onChange={(e) => setTask(task.id, { label: e.target.value })} placeholder={t("klassenarbeit.task")} style={{ ...inputStyle, fontSize: 13, padding: "7px 9px", flex: 1, minWidth: 130 }} />
+                  <input value={task.label} onChange={(e) => setTask(task.id, { label: e.target.value })} placeholder={t("klassenarbeit.taskOptional", { n: i + 1 })} title={t("klassenarbeit.taskOptionalHint")} style={{ ...inputStyle, fontSize: 13, padding: "7px 9px", flex: 1, minWidth: 130 }} />
                   <select value={task.topic_id || ""} onChange={(e) => setTask(task.id, { topic_id: e.target.value ? Number(e.target.value) : null })} style={{ ...selectStyle, fontSize: 12.5, padding: "7px 9px", minWidth: 130 }}>
                     <option value="">{t("klassenarbeit.topicNone")}</option>
                     {topics.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp.id)}</option>)}
