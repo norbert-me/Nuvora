@@ -157,7 +157,7 @@ REGISTRY: List[ModuleDef] = [
             "fällig)."
         ),
         path="/klassenarbeit",
-        stage="beta",
+        stage="stable",
     ),
     ModuleDef(
         key="methoden",

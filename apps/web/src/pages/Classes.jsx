@@ -12,7 +12,7 @@ import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { useSearchParams, Link } from "react-router-dom";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary } from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
@@ -351,7 +351,7 @@ export default function Classes() {
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
-        <button onClick={startNew} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} /> {t("classes.new")}</button>
+        <AddButton onClick={startNew} title={t("classes.new")} />
         <div style={{ marginLeft: 8 }}>
           <ImportMenu
             importItems={[

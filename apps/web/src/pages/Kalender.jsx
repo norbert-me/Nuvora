@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, modalOverlay, modalPanel, popoverPanel } from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, modalOverlay, modalPanel, popoverPanel } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, put } from "../core/cache.js";
@@ -343,9 +343,7 @@ export default function Kalender() {
           </span>
         )}
         {view !== "timetable" && view !== "breaks" && (
-          <button data-tour="kal-new" onClick={() => setEditing({ date: startOfDay(new Date()) })} style={{ ...btnPrimary, marginLeft: "auto", width: 34, height: 34, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }} title={t("kalender.newEntry")}>
-            <Icon d={ICONS.plus} size={18} />
-          </button>
+          <AddButton data-tour="kal-new" onClick={() => setEditing({ date: startOfDay(new Date()) })} title={t("kalender.newEntry")} style={{ marginLeft: "auto" }} />
         )}
         {view !== "timetable" && view !== "breaks" && (
           <div style={{ position: "relative" }}>

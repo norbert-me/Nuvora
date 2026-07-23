@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import Latex from "../components/Latex.jsx";
 import PublishModal from "../components/PublishModal.jsx";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Toggle, modalOverlay as sOverlay, modalPanel as sPanel } from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Toggle, modalOverlay as sOverlay, modalPanel as sPanel } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import TopicPicker from "../components/TopicPicker.jsx";
@@ -386,7 +386,7 @@ export default function Dashboard() {
             <button onClick={() => setShowNewFolder(false)} style={btnSecondary}>×</button>
           </div>
         ) : (
-          <button onClick={() => setShowNewFolder(true)} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} /> {t("dash.newFolder")}</button>
+          <AddButton onClick={() => setShowNewFolder(true)} title={t("dash.newFolder")} />
         )}
         {currentFolder && <NewSetButton onCreate={createSet} />}
         <div>
@@ -466,7 +466,7 @@ function NewSetButton({ onCreate }) {
       </div>
     );
   }
-  return <button onClick={() => setEditing(true)} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} /> {t("dash.newSet")}</button>;
+  return <AddButton onClick={() => setEditing(true)} title={t("dash.newSet")} />;
 }
 
 
@@ -665,7 +665,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
       })()}
 
       <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-        <button onClick={() => setShowAdd(true)} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} /> {t("dash.newQ")}</button>
+        <AddButton onClick={() => setShowAdd(true)} title={t("dash.newQ")} />
       </div>
 
       {/* Frage bearbeiten — als zentriertes Popup, damit kein Scrollen nötig ist */}

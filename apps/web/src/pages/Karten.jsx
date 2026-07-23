@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, selectStyle, modalOverlay, modalPanel, Empty, Skeleton } from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, selectStyle, modalOverlay, modalPanel, Empty, Skeleton } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
@@ -170,7 +170,7 @@ export default function Karten() {
             style={{ display: "flex", gap: 8, marginBottom: 18 }}>
             <input value={newDeck} onChange={(e) => setNewDeck(e.target.value)} placeholder={t("karten.newDeck")}
               style={{ flex: 1, maxWidth: 320, padding: "8px 12px", border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)" }} />
-            <button type="submit" disabled={addingDeck || !newDeck.trim()} style={{ ...btnPrimary, opacity: (!addingDeck && newDeck.trim()) ? 1 : 0.4 }}>{t("common.add")}</button>
+            <AddButton type="submit" disabled={addingDeck || !newDeck.trim()} title={t("common.add")} style={{ opacity: (!addingDeck && newDeck.trim()) ? 1 : 0.4 }} />
           </form>
           {loadingDecks && !decksLoadedOnce.current ? <Skeleton rows={3} height={60} />
             : decks.length === 0 ? <Empty title={t("karten.noDecks")} hint={t("karten.noDecksHint")} /> : null}

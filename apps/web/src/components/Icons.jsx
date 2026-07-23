@@ -58,6 +58,18 @@ export const ICONS = {
 
 export const iconBtn = { cursor: "pointer", padding: "6px", border: "none", background: "transparent", borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s" };
 
+// EINHEITLICHER Hinzufügen-Knopf: quadratisch, nur ein „+" (Akzentfarbe), das
+// Label steckt in title/aria-label. So sehen ALLE „Hinzufügen"-Aktionen gleich
+// aus — nicht mal Text, mal btnPrimary. Abweichung nur per Spread ableiten.
+export function AddButton({ onClick, title, size = 36, style, ...rest }) {
+  return (
+    <button onClick={onClick} title={title} aria-label={title} className="icon-btn"
+      style={{ ...iconBtn, width: size, height: size, border: "1px solid var(--border2)", borderRadius: 10, flexShrink: 0, ...style }} {...rest}>
+      <Icon d={ICONS.plus} size={20} color="var(--accent)" />
+    </button>
+  );
+}
+
 // Einheitliche Erkennbarkeit für alles, was eine Datei herunterlädt: Icon + Label,
 // immer gleiche Pille — ersetzt uneinheitliche reine Textlinks / "↓"-Zeichen.
 export const downloadBtn = {

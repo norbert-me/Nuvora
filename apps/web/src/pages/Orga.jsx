@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
-import { pageTitle, btnPrimary, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C, th as thBase, td } from "../components/Icons.jsx";
+import { AddButton, pageTitle, btnPrimary, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C, th as thBase, td } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import ViewMenu from "../components/ViewMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -105,7 +105,7 @@ export default function Orga() {
       <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
         <input value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()}
           placeholder={t("orga.newPlaceholder")} style={{ flex: 1, minWidth: 200, padding: "9px 12px", border: "1px solid var(--border2)", borderRadius: 10, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }} />
-        <button onClick={anlegen} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} /> {t("orga.add")}</button>
+        <AddButton onClick={anlegen} title={t("orga.add")} />
       </div>
 
       {students.length === 0 ? (

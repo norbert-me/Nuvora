@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import { useLanguage } from "../i18n/index.jsx";
 import { askPrompt, askConfirm } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
-import { pageTitle, pageIntro, btnPrimary, btnSecondary, selectStyle, chipStyle, Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, Toggle, Empty } from "../components/Icons.jsx";
+import { AddButton, pageTitle, pageIntro, btnPrimary, btnSecondary, selectStyle, chipStyle, Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, Toggle, Empty } from "../components/Icons.jsx";
 
 const API = "/api";
 const editLabel = { fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text3)", marginBottom: 6 };
@@ -74,7 +74,7 @@ export default function Kurse() {
       <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
         <input value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()}
           placeholder={t("kurse.newPlaceholder")} style={{ ...inputStyle, flex: 1, minWidth: 200 }} />
-        <button onClick={anlegen} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} /> {t("kurse.add")}</button>
+        <AddButton onClick={anlegen} title={t("kurse.add")} />
       </div>
 
       {showTrash && trash.length > 0 && (

@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
-import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, modalOverlay, modalPanel, inputStyle, ExportButton, ImportButton } from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, modalOverlay, modalPanel, inputStyle, ExportButton, ImportButton } from "../components/Icons.jsx";
 import PublishModal from "../components/PublishModal.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -69,7 +69,7 @@ export default function Methoden() {
         <span style={{ flex: 1 }} />
         <ExportButton label={t("common.export")} onClick={doExport} />
         <ImportButton label={t("common.import")} onFile={doImport} />
-        <button onClick={() => setEdit({})} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} /> {t("methoden.new")}</button>
+        <AddButton onClick={() => setEdit({})} title={t("methoden.new")} />
       </div>
 
       {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 10 }}>{error}</p>}

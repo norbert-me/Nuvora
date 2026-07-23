@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { Link } from "react-router-dom";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, Empty, Skeleton } from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, Empty, Skeleton } from "../components/Icons.jsx";
 import { peek, put } from "../core/cache.js";
 
 const API = "/api";
@@ -231,9 +231,7 @@ export default function Topics() {
       {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</p>}
 
       {!showRootForm ? (
-        <button onClick={() => setShowRootForm(true)} style={{ ...btnSecondary, marginBottom: 22, display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <Icon d={ICONS.plus} size={15} /> {t("topics.addTopic")}
-        </button>
+        <AddButton onClick={() => setShowRootForm(true)} title={t("topics.addTopic")} style={{ marginBottom: 22 }} />
       ) : (
         <form onSubmit={submitRoot} style={{ display: "flex", gap: 8, marginBottom: 22 }}>
           <input

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
-import { pageTitle, btnPrimary, btnSecondary, selectStyle, Toggle, Icon, ICONS, iconBtn, COLORS as C, inputStyle, Empty } from "../components/Icons.jsx";
+import { AddButton, pageTitle, btnPrimary, btnSecondary, selectStyle, Toggle, Icon, ICONS, iconBtn, COLORS as C, inputStyle, Empty } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr } from "../core/cache.js";
@@ -74,7 +74,7 @@ export default function Ausleihe() {
 
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <input value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()} placeholder={t("ausleihe.newPlaceholder")} style={{ ...fld, flex: 1, minWidth: 200 }} />
-        <button onClick={anlegen} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} /> {t("ausleihe.add")}</button>
+        <AddButton onClick={anlegen} title={t("ausleihe.add")} />
       </div>
       {items.length > 0 && (
         <div style={{ marginBottom: 16 }}>
