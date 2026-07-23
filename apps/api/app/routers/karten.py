@@ -163,6 +163,7 @@ class CardOut(BaseModel):
 class DeckOut(BaseModel):
     id: int
     class_id: int
+    kurs_id: Optional[int] = None   # Stapel hängen am Kurs — für Deep-Link aus dem Kalender
     name: str
     topic_id: Optional[int] = None
     niveau: str = ""

@@ -113,6 +113,9 @@ export default function Karten() {
   // Deep-Link ?deck=<id> (aus dem Kalender): in den Ordner des Stapels springen,
   // der Stapel klappt sich per autoOpen einmalig auf und scrollt hin.
   const [autoDeck, setAutoDeck] = useState(Number(params.get("deck")) || null);
+  // Kurs des verlinkten Stapels (aus dem Kalender): KursKlasseSelect wählt ihn
+  // vor, damit der kursgebundene Stapel überhaupt in der Liste erscheint.
+  const [wantKurs] = useState(Number(params.get("kurs")) || null);
   useEffect(() => {
     if (!autoDeck || !decks.length) return;
     const d = decks.find((x) => x.id === autoDeck);
@@ -225,7 +228,7 @@ export default function Karten() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
         <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("karten.title")}</h1>
-        <span data-tour="karten-class" style={{ display: "inline-flex" }}><KursKlasseSelect value={subsetKurs ? null : classId} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); setTokens(null); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} /></span>
+        <span data-tour="karten-class" style={{ display: "inline-flex" }}><KursKlasseSelect value={subsetKurs ? null : classId} kursValue={wantKurs} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); setTokens(null); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} /></span>
         {subsetKurse.length > 0 && (
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
             {t("noten.teilkurs")}
