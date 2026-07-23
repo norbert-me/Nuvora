@@ -31,7 +31,11 @@ export default function Sitzplan() {
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
   const [kursId, setKursId] = useState(null); // Sitzplan hängt am Kurs (Fach)
-  const [seats, setSeats] = useState([]); // [{sid,x,y,rot}]
+  const [seats, setSeats] = useState([]); // [{sid,x,y,rot}] — sid=String mit empty:true = leerer Platz
+  // Rückgängig: vor jeder Geste (Ziehen, Drehen, Löschen, Anordnen, Import,
+  // Leeren, leerer Platz) den Stand sichern; Undo stellt ihn wieder her.
+  const undoStack = useRef([]);
+  const [undoLen, setUndoLen] = useState(0);
   const [tafel, setTafel] = useState({ x: 200, y: 8 }); // bewegliche Tafel
   const tafelRef = useRef(null);
   const [zoom, setZoom] = useState(1); // Anzeige-Zoom (Positionen bleiben unskaliert gespeichert)
@@ -126,10 +130,16 @@ export default function Sitzplan() {
     setSeats(next);
     if (classId) fetch(`${API}/${classId}${kursQ}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seats: next, tafel: tf }) }).catch(() => {});
   };
+  // Vor einer Änderung den aktuellen Stand auf den Undo-Stapel legen.
+  const snapshot = () => { undoStack.current.push({ seats, tafel }); if (undoStack.current.length > 40) undoStack.current.shift(); setUndoLen(undoStack.current.length); };
+  const undo = () => { const p = undoStack.current.pop(); setUndoLen(undoStack.current.length); if (!p) return; setTafel(p.tafel); persist(p.seats, p.tafel); };
+  // Leerer Platz (kein Schüler): eigener String-sid + empty-Flag, versetzt abgelegt.
+  const addEmpty = () => { snapshot(); const n = seats.filter((s) => s.empty).length; persist([...seats, { sid: "e" + Date.now(), x: 40 + (n % 8) * 18, y: 60 + (n % 8) * 18, rot: 0, empty: true }]); };
 
   // Tafel ziehen (Pointer). Breite/Höhe der Tafel-Fläche.
   const TAFEL_W = 200, TAFEL_H = 30;
   const onTafelDown = (e) => {
+    snapshot();
     e.preventDefault();
     const rect = canvasRef.current.getBoundingClientRect();
     tafelRef.current = { dx: (e.clientX - rect.left) / zoom - tafel.x, dy: (e.clientY - rect.top) / zoom - tafel.y };
@@ -155,6 +165,7 @@ export default function Sitzplan() {
 
   // ── Ziehen platzierter Tische (Pointer, damit es flüssig folgt) ──
   const onSeatDown = (e, seat) => {
+    snapshot();
     e.preventDefault();
     const rect = canvasRef.current.getBoundingClientRect();
     dragRef.current = { sid: seat.sid, dx: (e.clientX - rect.left) / zoom - seat.x, dy: (e.clientY - rect.top) / zoom - seat.y, rot: seat.rot || 0 };
@@ -175,7 +186,7 @@ export default function Sitzplan() {
     if (dragRef.current) { dragRef.current = null; setSeats((prev) => { persist(prev); return prev; }); }
   };
 
-  const entfernen = (sid) => persist(seats.filter((s) => s.sid !== sid));
+  const entfernen = (sid) => { snapshot(); persist(seats.filter((s) => s.sid !== sid)); };
 
   // ── Freie Drehung per Eck-Griff (oben rechts). Winkel = Richtung vom
   // Tisch-Mittelpunkt zum Zeiger. ──
@@ -185,6 +196,7 @@ export default function Sitzplan() {
     return Math.atan2((e.clientY - rect.top) / zoom - cy, (e.clientX - rect.left) / zoom - cx) * 180 / Math.PI;
   };
   const onRotDown = (e, seat) => {
+    snapshot();
     e.preventDefault(); e.stopPropagation();
     const cx = seat.x + SEAT_W / 2, cy = seat.y + SEAT_H / 2;
     // Relativ drehen: Start-Zeigerwinkel und Start-Drehung merken, damit das
@@ -208,6 +220,7 @@ export default function Sitzplan() {
   // Tafel drehen (gleicher Eck-Griff-Mechanismus).
   const tafelRotRef = useRef(null);
   const onTafelRotDown = (e) => {
+    snapshot();
     e.preventDefault(); e.stopPropagation();
     const cx = tafel.x + TAFEL_W / 2, cy = tafel.y + TAFEL_H / 2;
     tafelRotRef.current = { cx, cy, startAngle: _angle(e, cx, cy), startRot: tafel.rot || 0 };
@@ -231,6 +244,7 @@ export default function Sitzplan() {
     e.preventDefault();
     const sid = Number(e.dataTransfer.getData("text/plain"));
     if (!sid || platziert.has(sid)) return;
+    snapshot();
     const rect = canvasRef.current.getBoundingClientRect();
     const x = Math.max(0, Math.min((e.clientX - rect.left) / zoom - SEAT_W / 2, rect.width / zoom - SEAT_W));
     const y = Math.max(0, Math.min((e.clientY - rect.top) / zoom - SEAT_H / 2, rect.height / zoom - SEAT_H));
@@ -239,7 +253,7 @@ export default function Sitzplan() {
 
   // Leeren setzt auch die Tafel zurueck — sonst blieb sie an ihrer verschobenen
   // Stelle stehen, obwohl der Plan leer ist.
-  const leeren = () => { const tf = { x: 200, y: 8 }; setTafel(tf); persist([], tf); setMsg(t("sitzplan.cleared")); setTimeout(() => setMsg(""), 2500); };
+  const leeren = () => { snapshot(); const tf = { x: 200, y: 8 }; setTafel(tf); persist([], tf); setMsg(t("sitzplan.cleared")); setTimeout(() => setMsg(""), 2500); };
 
   // Export/Import: nur das Layout (Positionen + Drehungen + Tafel), ohne feste
   // Schüler. Beim Import werden die SuS der aktuellen Klasse der Reihe nach auf
@@ -264,6 +278,7 @@ export default function Sitzplan() {
 
   // Vorlage: alle SuS automatisch in Reihen anordnen (6 pro Reihe).
   const anordnen = () => {
+    snapshot();
     const cols = 6, gx = SEAT_W + 16, gy = SEAT_H + 22, x0 = 20, y0 = 60;
     const next = students.map((s, i) => ({ sid: s.id, x: x0 + (i % cols) * gx, y: y0 + Math.floor(i / cols) * gy, rot: 0 }));
     persist(next);
@@ -280,6 +295,7 @@ export default function Sitzplan() {
     try {
       const data = JSON.parse(await file.text());
       if (data.type !== "nuvora_sitzplan" || !Array.isArray(data.slots)) { setMsg(t("sitzplan.importError")); return; }
+      snapshot();
       const next = students.slice(0, data.slots.length).map((st, i) => ({ sid: st.id, x: data.slots[i].x, y: data.slots[i].y, rot: data.slots[i].rot || 0 }));
       const tf = data.tafel && typeof data.tafel.x === "number" ? { x: data.tafel.x, y: data.tafel.y, rot: data.tafel.rot || 0 } : tafel;
       setTafel(tf);          // lokal übernehmen (nicht nur an den Server senden)
@@ -322,6 +338,8 @@ export default function Sitzplan() {
           style={{ ...iconBtn, border: showHint ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 999, width: 30, height: 30, fontWeight: 700, color: showHint ? "var(--accent)" : "var(--text3)" }}>i</button>
         <ExportButton label={t("sitzplan.export")} onClick={doExport} style={{ padding: "6px 12px", fontSize: 13, marginLeft: anwesenheitAktiv ? 0 : "auto" }} />
         <ImportButton label={t("sitzplan.import")} onFile={doImport} style={{ padding: "6px 12px", fontSize: 13 }} />
+        <button onClick={addEmpty} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("sitzplan.addEmpty")}><Icon d={ICONS.plus} size={15} /> {t("sitzplan.emptySeat")}</button>
+        <button onClick={undo} disabled={undoLen === 0} className="icon-btn" style={{ ...iconBtn, opacity: undoLen === 0 ? 0.4 : 1 }} title={t("sitzplan.undo")}><Icon d={ICONS.undo || ICONS.restore} size={18} /></button>
         <button onClick={leeren} className="icon-btn" style={iconBtn} title={t("sitzplan.clear")}><Icon d={ICONS.trash} color={C.danger} /></button>
       </div>
       {showHint && <p style={{ fontSize: 13, color: "var(--text3)", margin: "8px 0 14px" }}>{t("sitzplan.hintFree")}</p>}
@@ -373,7 +391,8 @@ export default function Sitzplan() {
               )}
             </div>
             {seats.map((seat) => {
-              const s = byId(seat.sid); if (!s) return null;
+              const s = byId(seat.sid);
+              if (!seat.empty && !s) return null;   // verwaister Platz (Schüler gelöscht) bleibt versteckt
               const abs = aufruf ? abwesend[String(seat.sid)] : null;
               return (
                 <div key={seat.sid} draggable={false}
@@ -386,9 +405,9 @@ export default function Sitzplan() {
                     background: abs ? "var(--bg2)" : "var(--bg)", color: "var(--text)", fontSize: 12.5, fontWeight: 600,
                     cursor: "grab", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: "none",
                     opacity: abs ? 0.5 : 1, textDecoration: abs ? "line-through" : "none" }}>
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: seat.empty ? "var(--text3)" : undefined }}>{seat.empty ? t("sitzplan.emptySeat") : s.name}</span>
                   {abs && <span style={{ position: "absolute", top: 3, right: 24, width: 8, height: 8, borderRadius: 4, background: ABS_COL[abs] }} title={t(`anwesenheit.${abs}`)} />}
-                  {segelOn && (() => {
+                  {!seat.empty && segelOn && (() => {
                     const st = SEGEL.find((x) => x.key === segel[String(seat.sid)]);
                     return (
                       <button onPointerDown={(e) => e.stopPropagation()} onClick={() => cycleStage(seat.sid)}
