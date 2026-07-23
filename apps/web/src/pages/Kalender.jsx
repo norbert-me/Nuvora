@@ -1256,7 +1256,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   const methName = methodId && (methods.find((m) => m.id === Number(methodId)) || {}).title;
   const linkList = [
     quizId && (() => { const q = quizze.find((x) => x.id === Number(quizId)); return q && { to: `/cardvote/questions?set=${quizId}`, label: q.folder ? `${q.folder} / ${q.name}` : q.name, kind: t("kalender.planCardvote"), hideName: true }; })(),
-    deckId && (() => { const d = decks.find((x) => x.id === Number(deckId)); return d && { to: `/karten?class=${classId}&deck=${deckId}`, label: d.name, kind: t("kalender.planKarten"), hideName: true }; })(),
+    deckId && (() => { const d = decks.find((x) => x.id === Number(deckId)); return d && { to: `/karten?class=${d.class_id}&deck=${deckId}`, label: d.name, kind: t("kalender.planKarten"), hideName: true }; })(),
     ladderId && (() => { const l = ladders.find((x) => x.id === Number(ladderId)); return l && { to: `/lernpfad?ll=${ladderId}`, label: (topicName(l.topic_id) || l.path || t("kalender.planLernleiter")), kind: t("kalender.planLernleiter"), hideName: true }; })(),
     puzzleId && (() => { const p = puzzles.find((x) => x.client_id === puzzleId); return { to: `/code-detektiv/puzzle/${puzzleId}?mode=solo`, label: (p && p.title) || puzzleId, kind: t("kalender.planDetektiv") }; })(),
     methodId && methName && { to: `/methoden?open=${methodId}`, label: methName, kind: t("kalender.method"), hideName: true },

@@ -680,11 +680,17 @@
         // Lernleiter enthält.
         if (e.data && e.data.type === 'nuvora:open-lernleiter' && e.data.id != null) {
             (async () => {
-                switchTab('lernpfade');
-                await loadLernpfade();
                 const ziel = String(e.data.id);
-                const pfad = lernpfade.find(p => (p.lernleitern || []).some(ll => String(ll.id) === ziel));
-                if (pfad) openPfad(pfad._id);
+                switchTab('lernpfade');
+                // Bis zu ~2s auf die Pfad-Daten warten (frischer Mount lädt Themen,
+                // Schüler, Pfade noch), dann den Pfad mit der Lernleiter öffnen.
+                for (let i = 0; i < 10; i++) {
+                    await loadLernpfade();
+                    const pfad = lernpfade.find(p => (p.lernleitern || []).some(ll => String(ll.id) === ziel));
+                    if (pfad) { openPfad(pfad._id); return; }
+                    await new Promise(r => setTimeout(r, 200));
+                }
+                console.warn('[Lernpfad] open-lernleiter: Lernleiter', ziel, 'in keinem Pfad gefunden');
             })();
         }
     });
