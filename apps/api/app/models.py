@@ -762,7 +762,21 @@ class Method(Base):
     # Optionale Themen-Bindung (Kern-Taxonomie), damit ein schwaches Thema einen
     # passenden Einstieg vorschlagen kann. ON DELETE SET NULL (Regel 3).
     topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Ordner (wie CardVote/Karten). NULL = Wurzel. ON DELETE SET NULL: löscht man
+    # einen Ordner, wandern seine Einstiege in die Wurzel statt mitzusterben.
+    folder_id: Mapped[Optional[int]] = mapped_column(ForeignKey("method_folders.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class MethodFolder(Base):
+    """Ordner für Einstiege — nur der Lehrkraft zugeordnet (Einstiege sind global,
+    nicht pro Klasse). Verschachtelbar über parent_id."""
+    __tablename__ = "method_folders"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("method_folders.id", ondelete="CASCADE"), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(120), default="", server_default="")
 
 
 class TimetableSlot(Base):

@@ -169,6 +169,7 @@ def _ensure_columns(sync_conn):
         ("users", "external_ics_color", "VARCHAR(9) DEFAULT '' NOT NULL"),
         ("marketplace_quizzes", "copies", "INTEGER DEFAULT 0"),
         ("methods", "topic_id", "INTEGER"),
+        ("methods", "folder_id", "INTEGER"),
         ("kurse", "niveau_aktiv", "BOOLEAN DEFAULT false NOT NULL"),
         ("kurse", "color", "VARCHAR(9) DEFAULT '' NOT NULL"),
         ("seating_plans", "kurs_id", "INTEGER"),
