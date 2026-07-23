@@ -685,14 +685,15 @@
             const sleep = (ms) => new Promise(r => setTimeout(r, ms));
             (async () => {
                 const ziel = String(e.data.id);
-                switchTab('lernpfade');
-                // Bis zu ~3s auf die Pfad-Daten warten (frischer Mount lädt noch).
-                let pfad = null;
-                for (let i = 0; i < 15; i++) {
+                const findePfad = () => lernpfade.find(p => (p.lernleitern || []).some(ll => String(ll.id) === ziel));
+                switchTab('lernpfade');   // stößt bereits ein loadLernpfade an
+                // Auf die Pfad-Daten warten, ohne bei jedem Versuch neu zu laden:
+                // nur wenn nach dem Tab-Load noch nichts da ist, EINMAL nachladen.
+                let pfad = findePfad();
+                if (!pfad) {
                     await loadLernpfade();
-                    pfad = lernpfade.find(p => (p.lernleitern || []).some(ll => String(ll.id) === ziel));
-                    if (pfad) break;
-                    await sleep(200);
+                    pfad = findePfad();
+                    for (let i = 0; i < 10 && !pfad; i++) { await sleep(150); pfad = findePfad(); }
                 }
                 if (!pfad) { console.warn('[Lernpfad] open-lernleiter: Lernleiter', ziel, 'in keinem Pfad gefunden'); return; }
                 // WICHTIG: erst wenn der globale Aufgaben-Pool vom Server da ist. Sonst
