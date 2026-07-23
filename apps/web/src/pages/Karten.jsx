@@ -104,6 +104,10 @@ export default function Karten() {
   // Ordner (wie CardVote) zum Gruppieren der Stapel — pro Klasse/Kurs.
   const [cardFolders, setCardFolders] = useState([]);
   const [currentCardFolder, setCurrentCardFolder] = useState(null); // null = Wurzel
+  // Ein „+" mit Untermenü (Stapel/Ordner) statt zwei getrennter Knöpfe (wie CardVote).
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [addMode, setAddMode] = useState(null); // null | "deck" | "folder"
+  const [addName, setAddName] = useState("");
   const loadFolders = (id) => id && fetch(`${API}/classes/${id}/card-folders${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => setCardFolders(Array.isArray(d) ? d : [])).catch(() => {});
   useEffect(() => { loadDecks(classId); loadTrash(classId); loadFolders(classId); setCurrentCardFolder(null); }, [classId, kursId]);
   const folderName = (fid) => (cardFolders.find((f) => f.id === fid) || {}).name || "";
@@ -112,6 +116,13 @@ export default function Karten() {
   const renameFolder = async (f) => { const n = await askPrompt(t("karten.renameFolder"), f.name); if (n == null) return; await fetch(`${API}/card-folders/${f.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n.trim(), parent_id: f.parent_id ?? null }) }).catch(() => {}); loadFolders(classId); };
   const deleteFolder = async (f) => { if (!await askConfirm(t("karten.delFolderConfirm"))) return; await fetch(`${API}/card-folders/${f.id}`, { method: "DELETE" }).catch(() => {}); if (currentCardFolder === f.id) setCurrentCardFolder(f.parent_id ?? null); loadFolders(classId); loadDecks(classId); };
   const moveDeck = async (deck, folderId) => { await fetch(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", folder_id: folderId }) }).catch(() => {}); loadDecks(classId); };
+  // Aus dem „+"-Menü gewählten Typ anlegen (Stapel im aktuellen Ordner / Ordner).
+  const commitAdd = async () => {
+    const name = addName.trim(); if (!name) return;
+    if (addMode === "deck") { await call(() => fetch(`${API}/classes/${classId}/decks${kq}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, folder_id: currentCardFolder }) })); }
+    else if (addMode === "folder") { await createFolder(name); }
+    setAddName(""); setAddMode(null);
+  };
   // Seitenweiter Import: eine JSON/CSV-Datei wird zu einem NEUEN Stapel im
   // aktuellen Ordner (wie CardVote-Import). Name aus JSON, sonst Dateiname.
   const importDeck = () => {
@@ -220,17 +231,29 @@ export default function Karten() {
             ))}
           </div>
 
-          {/* Neuer Stapel (im aktuellen Ordner) + neuer Ordner */}
-          <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
-            <form data-tour="karten-new" onSubmit={async (e) => { e.preventDefault(); if (addingDeck || !newDeck.trim()) return; setAddingDeck(true); try { if (await call(() => fetch(`${API}/classes/${classId}/decks${kq}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newDeck.trim(), folder_id: currentCardFolder }) }))) setNewDeck(""); } finally { setAddingDeck(false); } }}
-              style={{ display: "flex", gap: 8, flex: 1, minWidth: 240 }}>
-              <input value={newDeck} onChange={(e) => setNewDeck(e.target.value)} placeholder={t("karten.newDeck")}
-                style={{ flex: 1, maxWidth: 320, padding: "8px 12px", border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)" }} />
-              <AddButton type="submit" disabled={addingDeck || !newDeck.trim()} title={t("common.add")} style={{ opacity: (!addingDeck && newDeck.trim()) ? 1 : 0.4 }} />
-            </form>
-            <button onClick={async () => { const n = await askPrompt(t("karten.newFolder")); if (n) createFolder(n); }} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <Icon d={ICONS.plus} size={15} /> {t("karten.folder")}
-            </button>
+          {/* Ein „+" mit Untermenü: Stapel oder Ordner (im aktuellen Ordner). */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
+            {addMode ? (
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, minWidth: 240 }}>
+                <input value={addName} onChange={(e) => setAddName(e.target.value)} autoFocus
+                  placeholder={addMode === "deck" ? t("karten.newDeck") : t("karten.newFolder")}
+                  onKeyDown={(e) => { if (e.key === "Enter") commitAdd(); if (e.key === "Escape") { setAddName(""); setAddMode(null); } }}
+                  style={{ flex: 1, maxWidth: 320, padding: "8px 12px", border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)" }} />
+                <button onClick={commitAdd} disabled={!addName.trim()} style={{ ...btnPrimary, padding: "8px 14px", opacity: addName.trim() ? 1 : 0.4 }}>{t("common.add")}</button>
+                <button onClick={() => { setAddName(""); setAddMode(null); }} style={btnSecondary}>{t("common.abort")}</button>
+              </div>
+            ) : (
+              <div data-tour="karten-new" style={{ position: "relative" }}>
+                <AddButton onClick={() => setAddMenuOpen((v) => !v)} title={t("common.add")} />
+                {addMenuOpen && (<>
+                  <div onClick={() => setAddMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+                  <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50, minWidth: 190, background: "var(--card)", border: "1px solid var(--border2)", borderRadius: 12, boxShadow: "0 8px 30px rgba(0,0,0,0.18)", padding: 6 }}>
+                    <button onClick={() => { setAddMenuOpen(false); setAddMode("deck"); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "9px 12px", background: "none", border: "none", borderRadius: 8, color: "var(--text)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", textAlign: "left" }}><Icon d={ICONS.plus} size={15} /> {t("karten.newDeckItem")}</button>
+                    <button onClick={() => { setAddMenuOpen(false); setAddMode("folder"); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "9px 12px", background: "none", border: "none", borderRadius: 8, color: "var(--text)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", textAlign: "left" }}><Icon d={ICONS.plus} size={15} /> {t("karten.newFolderItem")}</button>
+                  </div>
+                </>)}
+              </div>
+            )}
             <ImportMenu importItems={[{ label: t("karten.importDeck"), onClick: importDeck }]}
               templateItems={[{ label: t("karten.jsonTemplate"), href: "/beispiel-karten.json" }]} />
           </div>

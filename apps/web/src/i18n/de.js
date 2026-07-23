@@ -959,6 +959,8 @@ export default {
   "karten.delFolderConfirm": "Ordner löschen? Unterordner werden mitgelöscht; die Stapel darin wandern in die Ebene darüber.",
   "karten.moveToFolder": "In Ordner verschieben",
   "karten.rootFolder": "kein Ordner",
+  "karten.newDeckItem": "Neuer Stapel",
+  "karten.newFolderItem": "Neuer Ordner",
   "karten.newDeck": "Neuer Stapel, z. B. Vokabeln",
   "karten.noDecks": "Noch kein Stapel. Lege einen an und füge Karten hinzu.",
   "karten.noDecksHint": "Lege oben einen Stapel an und fülle ihn mit Karten (Vorder-/Rückseite).",

@@ -933,6 +933,8 @@ export default {
   "karten.delFolderConfirm": "¿Eliminar la carpeta? Las subcarpetas también; los mazos suben un nivel.",
   "karten.moveToFolder": "Mover a carpeta",
   "karten.rootFolder": "sin carpeta",
+  "karten.newDeckItem": "Nuevo mazo",
+  "karten.newFolderItem": "Nueva carpeta",
   "karten.newDeck": "Nuevo mazo, p. ej. Vocabulario",
   "karten.noDecks": "Aún no hay mazo. Crea uno y añade tarjetas.",
   "karten.noDecksHint": "Crea una baraja arriba y llénala con tarjetas (anverso/reverso).",

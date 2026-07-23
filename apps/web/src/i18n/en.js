@@ -933,6 +933,8 @@ export default {
   "karten.delFolderConfirm": "Delete folder? Subfolders are deleted too; the decks inside move up one level.",
   "karten.moveToFolder": "Move to folder",
   "karten.rootFolder": "no folder",
+  "karten.newDeckItem": "New deck",
+  "karten.newFolderItem": "New folder",
   "karten.newDeck": "New deck, e.g. Vocabulary",
   "karten.noDecks": "No deck yet. Create one and add cards.",
   "karten.noDecksHint": "Create a deck above and fill it with cards (front/back).",
