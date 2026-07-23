@@ -56,6 +56,7 @@ export default function Kalender() {
   const [cursor, setCursor] = useState(() => startOfDay(new Date()));
   const [abo, setAbo] = useState(null); // Abo-URLs { url, webcal }
   const [moreOpen, setMoreOpen] = useState(false); // „⋯"-Menü (Teilen/Abonnieren)
+  const [viewMenuOpen, setViewMenuOpen] = useState(false); // „Auge"-Menü (was ein-/ausblenden)
   const [showAllDay, setShowAllDay] = useState(() => { try { return localStorage.getItem("kal_allday") !== "0"; } catch { return true; } });
   const toggleAllDay = () => setShowAllDay((v) => { const n = !v; try { localStorage.setItem("kal_allday", n ? "1" : "0"); } catch { /* egal */ } return n; });
   const [showExt, setShowExt] = useState(() => { try { return localStorage.getItem("kal_ext") !== "0"; } catch { return true; } });
@@ -330,21 +331,40 @@ export default function Kalender() {
             options={[["today", t("kalender.todayView")], ["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")]]} />
         )}
         {view !== "timetable" && view !== "breaks" && (
-          <button onClick={() => setEditing({ date: startOfDay(new Date()) })} style={{ ...btnPrimary, marginLeft: "auto", padding: "6px 14px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("kalender.newEntry")}>
-            <Icon d={ICONS.plus} size={16} /> {t("kalender.newEntry")}
+          <button onClick={() => setEditing({ date: startOfDay(new Date()) })} style={{ ...btnPrimary, marginLeft: "auto", width: 34, height: 34, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }} title={t("kalender.newEntry")}>
+            <Icon d={ICONS.plus} size={18} />
           </button>
         )}
         {view !== "timetable" && view !== "breaks" && (
-          <button onClick={toggleAllDay} className="icon-btn" style={{ ...iconBtn, width: 34, height: 34, opacity: showAllDay ? 1 : 0.45 }}
-            title={t("kalender.toggleAllDay")}>
-            <Icon d={showAllDay ? ICONS.eye : (ICONS.eyeOff || ICONS.eye)} size={18} />
-          </button>
-        )}
-        {view !== "timetable" && view !== "breaks" && extEvents.length > 0 && (
-          <button onClick={toggleExt} className="icon-btn" style={{ ...iconBtn, width: 34, height: 34, opacity: showExt ? 1 : 0.45 }}
-            title={t("kalender.toggleExt")}>
-            <Icon d={ICONS.link || ICONS.share} size={17} />
-          </button>
+          <div style={{ position: "relative" }}>
+            {/* Auge = „was anzeigen?": Ganztägige/Externe ein-/ausblenden + Farbe. */}
+            <button onClick={() => setViewMenuOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn, width: 34, height: 34, opacity: (showAllDay && showExt) ? 1 : 0.55 }} title={t("kalender.viewMenu")}>
+              <Icon d={ICONS.eye} size={18} />
+            </button>
+            {viewMenuOpen && (<>
+              <div onClick={() => setViewMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+              <div style={{ ...popoverPanel, position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 50, minWidth: 220, padding: 6 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", padding: "6px 12px 4px", textTransform: "uppercase", letterSpacing: 0.4 }}>{t("kalender.showHide")}</div>
+                <label style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", boxSizing: "border-box", padding: "8px 12px", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: "pointer", borderRadius: 8 }}>
+                  <input type="checkbox" checked={showAllDay} onChange={toggleAllDay} />
+                  {t("kalender.allDay")}
+                </label>
+                {extEvents.length > 0 && (
+                  <label style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", boxSizing: "border-box", padding: "8px 12px", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: "pointer", borderRadius: 8 }}>
+                    <input type="checkbox" checked={showExt} onChange={toggleExt} />
+                    {t("kalender.extEvents")}
+                  </label>
+                )}
+                {extEvents.length > 0 && showExt && (
+                  <label style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", boxSizing: "border-box", padding: "8px 12px", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: "pointer", borderRadius: 8 }}>
+                    {t("kalender.extColor")}
+                    <input type="color" value={extColor || "#8e8e93"} onChange={(e) => saveExtColor(e.target.value)} style={{ marginLeft: "auto", width: 28, height: 22, padding: 0, border: "none", background: "none", cursor: "pointer" }} />
+                    {extColor && <button onClick={() => saveExtColor("")} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.close} size={13} /></button>}
+                  </label>
+                )}
+              </div>
+            </>)}
+          </div>
         )}
         {view !== "timetable" && view !== "breaks" && (
           <div style={{ position: "relative" }}>
@@ -358,14 +378,6 @@ export default function Kalender() {
                   style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "8px 12px", background: "none", border: "none", borderRadius: 8, color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: "pointer", textAlign: "left" }}>
                   <Icon d={ICONS.share} size={15} /> {t("kalender.subscribe")}
                 </button>
-                {extEvents.length > 0 && (
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "8px 12px", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>
-                    <span style={{ display: "inline-flex", width: 15, height: 15, borderRadius: 4, border: "1px solid var(--border2)", background: extColor || "var(--text3)" }} />
-                    {t("kalender.extColor")}
-                    <input type="color" value={extColor || "#8e8e93"} onChange={(e) => saveExtColor(e.target.value)} style={{ marginLeft: "auto", width: 26, height: 22, padding: 0, border: "none", background: "none", cursor: "pointer" }} />
-                    {extColor && <button onClick={() => saveExtColor("")} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.close} size={13} /></button>}
-                  </label>
-                )}
               </div>
             </>)}
           </div>
@@ -824,9 +836,10 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
             // vorbelegter Uhrzeit (auf 5 Min gerundet). Klicks auf Termine nicht.
             if (ev.target.closest("button")) return;
             const y = ev.clientY - ev.currentTarget.getBoundingClientRect().top;
-            let m = Math.round(((y / HOUR) * 60) / 5) * 5;
-            m = Math.max(0, Math.min(23 * 60 + 55, m));
-            const hhmm = String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+            // Auf die volle Stunde abrunden (Klick auf 16:20 -> 16:00).
+            let h = Math.floor((y / HOUR));
+            h = Math.max(0, Math.min(23, h));
+            const hhmm = String(h).padStart(2, "0") + ":00";
             onOpen({ date: day, start_time: hhmm });
           }}>
           {Array.from({ length: 25 }, (_, h) => (

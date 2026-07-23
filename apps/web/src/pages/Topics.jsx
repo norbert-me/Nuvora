@@ -17,6 +17,7 @@ export default function Topics() {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
   const [newRoot, setNewRoot] = useState("");
+  const [showRootForm, setShowRootForm] = useState(false);
   const [addingUnder, setAddingUnder] = useState(null);
   const [childName, setChildName] = useState("");
   const [editing, setEditing] = useState(null);
@@ -107,7 +108,7 @@ export default function Topics() {
   const submitRoot = async (e) => {
     e.preventDefault();
     if (!newRoot.trim()) return;
-    if (await add(newRoot.trim(), null)) setNewRoot("");
+    if (await add(newRoot.trim(), null)) { setNewRoot(""); setShowRootForm(false); }
   };
 
   const submitChild = async (e, parentId) => {
@@ -229,15 +230,25 @@ export default function Topics() {
 
       {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</p>}
 
-      <form onSubmit={submitRoot} style={{ display: "flex", gap: 8, marginBottom: 22 }}>
-        <input
-          value={newRoot} onChange={(e) => setNewRoot(e.target.value)} placeholder={t("topics.newPlaceholder")}
-          style={{ flex: 1, maxWidth: 340, padding: "9px 12px", border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)" }}
-        />
-        <button type="submit" disabled={!newRoot.trim()} style={{ ...btnPrimary, opacity: newRoot.trim() ? 1 : 0.4 }}>
-          {t("common.add")}
+      {!showRootForm ? (
+        <button onClick={() => setShowRootForm(true)} style={{ ...btnSecondary, marginBottom: 22, display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <Icon d={ICONS.plus} size={15} /> {t("topics.newPlaceholder")}
         </button>
-      </form>
+      ) : (
+        <form onSubmit={submitRoot} style={{ display: "flex", gap: 8, marginBottom: 22 }}>
+          <input
+            value={newRoot} onChange={(e) => setNewRoot(e.target.value)} placeholder={t("topics.newPlaceholder")} autoFocus
+            onKeyDown={(e) => { if (e.key === "Escape") { setShowRootForm(false); setNewRoot(""); } }}
+            style={{ flex: 1, maxWidth: 340, padding: "9px 12px", border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)" }}
+          />
+          <button type="submit" disabled={!newRoot.trim()} style={{ ...btnPrimary, opacity: newRoot.trim() ? 1 : 0.4 }}>
+            {t("common.add")}
+          </button>
+          <button type="button" onClick={() => { setShowRootForm(false); setNewRoot(""); }} style={btnSecondary}>
+            {t("common.abort")}
+          </button>
+        </form>
+      )}
 
       {!loaded && <Skeleton rows={5} />}
       {loaded && roots.length === 0 && <Empty title={t("topics.empty")} hint={t("topics.emptyHint")} />}
