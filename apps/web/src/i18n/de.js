@@ -842,6 +842,8 @@ export default {
   "kalender.period": "Stunde",
   "kalender.periods": "Stunden pro Tag",
   "kalender.timetableHint": "Wiederkehrender Wochenplan. In Wochen- und Tagesansicht erscheinen die Stunden als Vorlage — anklicken legt daraus einen Termin an.",
+  "kalender.timesShow": "Uhrzeiten einstellen",
+  "kalender.timesHide": "Uhrzeiten ausblenden",
   "kalender.slotEmpty": "frei",
   "kalender.fromTimetable": "aus Stundenplan",
   "karten.needClass": "Noch keine Klasse. Lege sie unter {{link}} an.",

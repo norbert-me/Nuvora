@@ -769,6 +769,8 @@ function DayView({ day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFo
 }
 
 function TimetableView({ tt, className, slotName, slotColor, classColor, topicName, onEdit, onPeriods, onTimes, breaks = [], onAddBreak, onDelBreak, t }) {
+  // Uhrzeiten sind nur fürs Einstellen wichtig — standardmäßig ausgeblendet.
+  const [showTimes, setShowTimes] = useState(false);
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri")];
   const periods = Array.from({ length: tt.periods }, (_, i) => i + 1);
   const slot = (wd, p) => tt.slots.find((s) => s.weekday === wd && s.period === p);
@@ -789,7 +791,12 @@ function TimetableView({ tt, className, slotName, slotColor, classColor, topicNa
   const gapH = (p) => { const a = toMin(timeVal(p - 1, "end")), b = toMin(timeVal(p, "start")); return a != null && b != null && b > a ? (b - a) * PXMIN : 0; };
   return (
     <div>
-      <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 12px", maxWidth: 620 }}>{t("kalender.timetableHint")}</p>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "0 0 12px", flexWrap: "wrap" }}>
+        <p style={{ fontSize: 13, color: "var(--text3)", margin: 0, maxWidth: 620, flex: 1 }}>{t("kalender.timetableHint")}</p>
+        <button onClick={() => setShowTimes((v) => !v)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>
+          {showTimes ? t("kalender.timesHide") : t("kalender.timesShow")}
+        </button>
+      </div>
       <div>
         <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
           <thead><tr>
@@ -805,8 +812,10 @@ function TimetableView({ tt, className, slotName, slotColor, classColor, topicNa
                   <tr>
                     <td style={{ ...tdBase, textAlign: "center", padding: 4, background: "transparent", border: "none", width: 96 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>{p}.</div>
-                      <input type="time" defaultValue={timeVal(p - 1, "start")} onBlur={(e) => commitTime(p - 1, "start", e.target.value)} style={timeInput} title={t("kalender.start")} />
-                      <input type="time" defaultValue={timeVal(p - 1, "end")} onBlur={(e) => commitTime(p - 1, "end", e.target.value)} style={timeInput} title={t("kalender.end")} />
+                      {showTimes && (<>
+                        <input type="time" defaultValue={timeVal(p - 1, "start")} onBlur={(e) => commitTime(p - 1, "start", e.target.value)} style={timeInput} title={t("kalender.start")} />
+                        <input type="time" defaultValue={timeVal(p - 1, "end")} onBlur={(e) => commitTime(p - 1, "end", e.target.value)} style={timeInput} title={t("kalender.end")} />
+                      </>)}
                     </td>
                     {wdays.map((_, wd) => {
                       const s = slot(wd, p);

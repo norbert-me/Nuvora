@@ -842,6 +842,8 @@ export default {
   "kalender.period": "Hora",
   "kalender.periods": "Horas por día",
   "kalender.timetableHint": "Horario semanal recurrente. En la vista de semana y día las horas aparecen como plantilla — pulsa una para crear una entrada.",
+  "kalender.timesShow": "Ajustar horas",
+  "kalender.timesHide": "Ocultar horas",
   "kalender.slotEmpty": "libre",
   "kalender.fromTimetable": "del horario",
   "karten.needClass": "Aún no hay clase. Créala en {{link}}.",

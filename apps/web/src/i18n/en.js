@@ -842,6 +842,8 @@ export default {
   "kalender.period": "Period",
   "kalender.periods": "Periods per day",
   "kalender.timetableHint": "Recurring weekly plan. In week and day view the periods appear as a template — click one to create an entry from it.",
+  "kalender.timesShow": "Set times",
+  "kalender.timesHide": "Hide times",
   "kalender.slotEmpty": "free",
   "kalender.fromTimetable": "from timetable",
   "karten.needClass": "No class yet. Create one under {{link}}.",
