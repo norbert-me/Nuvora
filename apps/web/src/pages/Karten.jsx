@@ -583,16 +583,21 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           <span style={{ display: "inline-flex", transform: collapsed ? "none" : "rotate(90deg)", transition: "transform 0.15s", color: "var(--text3)" }}><Icon d={ICONS.open} size={16} /></span>
         </button>
         {renaming ? (
-          <input value={nameVal} onChange={(e) => setNameVal(e.target.value)} autoFocus onBlur={doRename}
-            onKeyDown={(e) => { if (e.key === "Enter") doRename(); if (e.key === "Escape") { setNameVal(deck.name || ""); setRenaming(false); } }}
-            style={{ fontSize: 16, fontWeight: 700, padding: "3px 8px", border: "1px solid var(--border2)", borderRadius: 8, background: "var(--bg)", color: "var(--text)" }} />
+          <>
+            <input value={nameVal} onChange={(e) => setNameVal(e.target.value)} autoFocus onBlur={(e) => { if (!e.relatedTarget || !e.relatedTarget.dataset || e.relatedTarget.dataset.keep !== "1") doRename(); }}
+              onKeyDown={(e) => { if (e.key === "Enter") doRename(); if (e.key === "Escape") { setNameVal(deck.name || ""); setRenaming(false); } }}
+              style={{ fontSize: 16, fontWeight: 700, padding: "3px 8px", border: "1px solid var(--border2)", borderRadius: 8, background: "var(--bg)", color: "var(--text)" }} />
+            {/* Löschen erscheint erst im Bearbeiten-Modus (nicht dauerhaft im Kopf). */}
+            <button data-keep="1" onMouseDown={(e) => e.preventDefault()} onClick={async () => { if (await askConfirm(t("karten.delDeck", { name: deck.name }))) call(() => fetch(`${API}/decks/${deck.id}`, { method: "DELETE" })); }}
+              className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={16} /></button>
+          </>
         ) : (
           <>
             <strong onClick={() => setCollapsed((v) => !v)} style={{ fontSize: 16, cursor: "pointer" }}>{deck.name || t("karten.deck")}</strong>
             <button onClick={() => { setNameVal(deck.name || ""); setRenaming(true); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("karten.renameDeck")}><Icon d={ICONS.edit} size={14} /></button>
           </>
         )}
-        <span style={{ fontSize: 11.5, fontWeight: 600, padding: "2px 8px", borderRadius: 980, background: badge.bg, color: badge.col }}>{badge.text}</span>
+        <span title={status === "entwurf" ? t("karten.draftHint") : undefined} style={{ fontSize: 11.5, fontWeight: 600, padding: "2px 8px", borderRadius: 980, background: badge.bg, color: badge.col }}>{badge.text}</span>
         {!collapsed && showTopic && (
           <select value={deck.topic_id ?? ""} onChange={(e) => setTopic(e.target.value)} title={t("karten.topicHint")}
             style={{ ...selectStyle, fontSize: 12, padding: "4px 28px 4px 9px", maxWidth: 180 }}>
@@ -612,8 +617,8 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         )}
         {!collapsed && onMove && folders.length > 0 && (
           <div style={{ position: "relative" }}>
-            <button onClick={() => setMoveOpen((v) => !v)} style={{ ...btnSecondary, fontSize: 12, padding: "5px 11px", display: "inline-flex", alignItems: "center", gap: 6 }} title={t("karten.moveToFolder")}>
-              <Icon d={ICONS.move || ICONS.export} size={14} /> {t("karten.move")}
+            <button onClick={() => setMoveOpen((v) => !v)} className="icon-btn" style={iconBtn} title={t("karten.moveToFolder")}>
+              <Icon d={ICONS.move || ICONS.export} size={18} />
             </button>
             {moveOpen && (<>
               <div onClick={() => setMoveOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
@@ -644,8 +649,6 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         </>)}
         {publishing && <PublishModal name={deck.name || t("karten.deck")} onClose={() => setPublishing(false)}
           onPublish={(description) => fetch(`/api/marketplace/publish/deck`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deck_id: deck.id, description }) }).catch(() => null)} />}
-        <button onClick={async () => { if (await askConfirm(t("karten.delDeck", { name: deck.name }))) call(() => fetch(`${API}/decks/${deck.id}`, { method: "DELETE" })); }}
-          className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
       </div>
 
       {!collapsed && (<>
