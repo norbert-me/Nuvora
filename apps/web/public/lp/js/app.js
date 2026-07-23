@@ -3658,12 +3658,10 @@
                 .filter(a => !istErste || !eigen || a.thema === eigen)   // erste: keine Wiederholung
                 .map(a => { themenGezeigt.add(a.thema || '∅'); return { ...a, section: sektVon(a), selected: true }; });
             dShown += tasks.length;
-            tasks.sort((a, b) => {
-                const ra = rang[a.section] ?? 5, rb = rang[b.section] ?? 5;
-                if (ra !== rb) return ra - rb;
-                const [pa, na] = quelleKey(a.quelle), [pb, nb] = quelleKey(b.quelle);
-                return (pa - pb) || (na - nb);
-            });
+            // NICHT neu sortieren: die gespeicherte Reihenfolge (aufgabenIds) IST
+            // die Lernleiter, wie sie erzeugt und dem Schüler gezeigt wurde. Ein
+            // Re-Sort beim Öffnen ließ Erklärung/Wiederholung springen und Pflicht/
+            // Zusatz anders ausfallen (Ansicht wich vom Gespeicherten ab).
             // Pflicht/Zusatz wie beim Generieren wiederherstellen: die ersten
             // config.pflicht regulaeren Aufgaben sind Pflicht, der Rest Zusatz
             // (Wiederholung/Erklaerung zaehlen nicht mit). Ohne config: alles Pflicht.
