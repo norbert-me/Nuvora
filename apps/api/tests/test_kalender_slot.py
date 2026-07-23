@@ -65,3 +65,18 @@ async def test_ics_freie_uhrzeit(s):
     assert "DTSTART:20250903T075500" in body
     assert "DTEND:20250903T124000" in body
     assert "SUMMARY:Konferenz" in body
+
+
+@pytest.mark.asyncio
+async def test_external_color_partial_update(s):
+    """Farbe extern speichern darf die abonnierte URL nicht löschen (partiell)."""
+    u = User(email="x@y.de", password_hash="p", name="L"); s.add(u); await s.flush()
+    u.external_ics_url = "https://example.com/f.ics"; await s.commit()
+    # Nur Farbe setzen -> URL bleibt.
+    out = await KAL.set_external(KAL.ExtIn(color="#ff8800"), user=u, db=s)
+    assert out["url"] == "https://example.com/f.ics"
+    assert out["color"] == "#ff8800"
+    # Ungültige Farbe -> leer.
+    out = await KAL.set_external(KAL.ExtIn(color="rot"), user=u, db=s)
+    assert out["color"] == ""
+    assert out["url"] == "https://example.com/f.ics"

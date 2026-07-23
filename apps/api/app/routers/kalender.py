@@ -5,6 +5,7 @@ dem Kern. Ein Eintrag kann optional an eine Klasse und ein Thema haengen; das
 Thema ist ON DELETE SET NULL, damit das Loeschen eines Themas keinen Eintrag
 mitreisst.
 """
+import re
 from datetime import datetime
 from typing import List, Optional
 
@@ -522,22 +523,28 @@ async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
 
 # ─── Externer Kalender (ICS-URL read-only einblenden — „andere Richtung") ───
 class ExtIn(BaseModel):
-    url: str = ""
+    url: Optional[str] = None      # None = unverändert lassen (partielles Update)
+    color: Optional[str] = None    # "" = zurücksetzen, None = unverändert
 
 
 @router.get("/external")
 async def get_external(user: User = Depends(require_module)):
-    return {"url": user.external_ics_url or ""}
+    return {"url": user.external_ics_url or "", "color": user.external_ics_color or ""}
 
 
 @router.put("/external")
 async def set_external(body: ExtIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    url = (body.url or "").strip()
-    if url and not (url.startswith("http://") or url.startswith("https://") or url.startswith("webcal://")):
-        raise HTTPException(400, "URL muss mit http(s):// oder webcal:// beginnen")
-    user.external_ics_url = url.replace("webcal://", "https://", 1) if url else None
+    if body.url is not None:
+        url = body.url.strip()
+        if url and not (url.startswith("http://") or url.startswith("https://") or url.startswith("webcal://")):
+            raise HTTPException(400, "URL muss mit http(s):// oder webcal:// beginnen")
+        user.external_ics_url = url.replace("webcal://", "https://", 1) if url else None
+    if body.color is not None:
+        c = body.color.strip()
+        # Nur einfache Hex-Farbe zulassen (#rgb / #rrggbb), sonst leeren.
+        user.external_ics_color = c if re.fullmatch(r"#[0-9a-fA-F]{3,8}", c) else ""
     await db.commit()
-    return {"url": user.external_ics_url or ""}
+    return {"url": user.external_ics_url or "", "color": user.external_ics_color or ""}
 
 
 def _parse_ics(text: str):

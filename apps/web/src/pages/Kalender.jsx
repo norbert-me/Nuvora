@@ -62,8 +62,8 @@ export default function Kalender() {
   const [showExt, setShowExt] = useState(() => { try { return localStorage.getItem("kal_ext") !== "0"; } catch { return true; } });
   const toggleExt = () => setShowExt((v) => { const n = !v; try { localStorage.setItem("kal_ext", n ? "1" : "0"); } catch { /* egal */ } return n; });
   // Eigene Farbe für abonnierte (externe) Termine — reine Anzeige-Präferenz.
-  const [extColor, setExtColor] = useState(() => { try { return localStorage.getItem("kal_ext_color") || ""; } catch { return ""; } });
-  const saveExtColor = (c) => { setExtColor(c); try { localStorage.setItem("kal_ext_color", c || ""); } catch { /* egal */ } };
+  const [extColor, setExtColor] = useState(""); // Farbe externer Termine — am Konto gespeichert (geräteübergreifend)
+  const saveExtColor = (c) => { setExtColor(c || ""); fetch(`${API}/external`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color: c || "" }) }).catch(() => {}); };
   const [extUrl, setExtUrl] = useState("");   // externer ICS-Feed (read-only Anzeige)
   const [extEvents, setExtEvents] = useState([]); // [{date:'YYYY-MM-DD', title}]
   const openAbo = async () => {
@@ -75,7 +75,7 @@ export default function Kalender() {
     await fetch(`${API}/external`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) }).catch(() => {});
     setExtUrl(url); loadExt();
   };
-  useEffect(() => { fetch(`${API}/external`).then((r) => (r.ok ? r.json() : { url: "" })).then((d) => { setExtUrl(d.url || ""); if (d.url) loadExt(); }).catch(() => {}); }, []);
+  useEffect(() => { fetch(`${API}/external`).then((r) => (r.ok ? r.json() : { url: "" })).then((d) => { setExtUrl(d.url || ""); setExtColor(d.color || ""); if (d.url) loadExt(); }).catch(() => {}); }, []);
   const extByDay = (d) => extEvents.filter((e) => e.date === ymd(d));
   const [entries, setEntries] = useState([]);
   const [classes, setClasses] = useState([]);

@@ -42,6 +42,8 @@ class User(Base):
     # Externer Kalender (ICS-URL, z.B. Google/Apple), den Nuvora read-only
     # einblendet — die „andere Richtung". Leer = aus. Isoliert/leicht entfernbar.
     external_ics_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Eigene Anzeigefarbe für abonnierte (externe) Termine (Hex, "" = Standard).
+    external_ics_color: Mapped[str] = mapped_column(String(9), default="", server_default="")
     # Einstiege-Startsammlung einmalig angelegt? Danach nicht erneut seeden,
     # auch wenn die Lehrkraft alle Einstiege loescht (sonst tauchen sie wieder auf).
     methoden_seeded: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
