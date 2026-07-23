@@ -17,13 +17,14 @@ const newId = () => "t" + Date.now().toString(36) + Math.random().toString(36).s
 // Eine Zeile „je Aufgabe/Teilaufgabe": Label, Ø-Punkte, farbige %-Zahl, Balken
 // auf eigener Zeile und (optional) Trennschärfe + 95%-KI darunter. Gemeinsam für
 // „je Aufgabe" und „je Teilaufgabe", damit beide gleich aussehen.
-function StatRow({ row, t }) {
+function StatRow({ row, t, expandable, open, onToggle, small }) {
   const col = row.pct < 50 ? C.danger : row.pct < 75 ? C.warning : C.success;
   const dc = row.disc == null ? "var(--text3)" : row.disc >= 0.4 ? C.success : row.disc >= 0.2 ? C.warning : C.danger;
   return (
-    <div style={{ padding: "8px 10px", borderRadius: 8, background: "var(--bg2)", marginBottom: 5 }}>
+    <div onClick={expandable ? onToggle : undefined} style={{ padding: small ? "6px 9px" : "8px 10px", borderRadius: 8, background: small ? "var(--bg3)" : "var(--bg2)", marginBottom: 5, cursor: expandable ? "pointer" : "default" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={{ flex: 1, fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.label}</span>
+        {expandable && <span style={{ display: "inline-flex", color: "var(--text3)", transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}><Icon d={ICONS.open} size={12} /></span>}
+        <span style={{ flex: 1, fontSize: small ? 12.5 : 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: small ? "var(--text2)" : "var(--text)" }}>{small ? `${t("klassenarbeit.part")} ${row.label}` : row.label}</span>
         <span style={{ fontSize: 11.5, color: "var(--text3)", whiteSpace: "nowrap" }}>⌀ {String(row.avgP).replace(".", ",")}/{row.max}</span>
         <span style={{ fontSize: 13, fontWeight: 800, color: col, minWidth: 40, textAlign: "right" }}>{row.pct}%</span>
       </div>
@@ -51,6 +52,7 @@ export default function Klassenarbeit() {
   useEffect(() => { try { const u = JSON.parse(localStorage.getItem("user")); if (u?.grade_scale) setScale(u.grade_scale); } catch { /* Default */ } }, []);
   const [hideIndividual, setHideIndividual] = useState(false); // #55: SuS-Ansicht — einzelne Leistungen + Noten aus
   const [scaleOpen, setScaleOpen] = useState(false); // Notenschlüssel-Editor auf/zu
+  const [expandedTasks, setExpandedTasks] = useState(() => new Set()); // aufgeklappte Teilaufgaben-Auswertung
   const [distMode, setDistMode] = useState("bar");   // Notenverteilung: "bar" | "box"
   const [barMode, setBarMode] = useState("whole");   // Balken: "whole" (1..6) | "fine" (Teilnoten)
   const [boxMode, setBoxMode] = useState("pct");     // Boxplot: "pct" (%) | "note" (Noten)
@@ -253,7 +255,7 @@ export default function Klassenarbeit() {
           ciLow = Math.max(0, Math.round(mean(pcts) - half));
           ciHigh = Math.min(100, Math.round(mean(pcts) + half));
         }
-        perUnit.push({ id: u.id, label: `${tk.label || (i + 1)} ${u.label}`, avgP: Math.round(avgP * 10) / 10, max: umx, pct: umx ? Math.round((avgP / umx) * 100) : 0, disc, ciLow, ciHigh });
+        perUnit.push({ id: u.id, taskId: tk.id, label: u.label || "", avgP: Math.round(avgP * 10) / 10, max: umx, pct: umx ? Math.round((avgP / umx) * 100) : 0, disc, ciLow, ciHigh });
       });
     });
 
@@ -491,16 +493,25 @@ export default function Klassenarbeit() {
                 ))}
               </>)}
 
-              {/* je Aufgabe: Ø, Trefferquote + Trennschärfe/95%-KI */}
+              {/* je Aufgabe: Ø, Trefferquote + Trennschärfe/95%-KI. Hat eine Aufgabe
+                  Teilaufgaben, lässt sich deren Auswertung darunter ausklappen. */}
               {analyse.perTask.length > 0 && (<>
                 <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.byTask")}</div>
-                {analyse.perTask.map((tk) => <StatRow key={tk.id} row={tk} t={t} />)}
-              </>)}
-
-              {/* je Teilaufgabe (nur wo Aufgaben Teile haben) — inkl. Trennschärfe/KI */}
-              {analyse.perUnit.length > 0 && (<>
-                <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.byPart")}</div>
-                {analyse.perUnit.map((u) => <StatRow key={u.id} row={u} t={t} />)}
+                {analyse.perTask.map((tk) => {
+                  const parts = analyse.perUnit.filter((u) => u.taskId === tk.id);
+                  const open = expandedTasks.has(tk.id);
+                  const toggle = () => setExpandedTasks((prev) => { const n = new Set(prev); n.has(tk.id) ? n.delete(tk.id) : n.add(tk.id); return n; });
+                  return (
+                    <div key={tk.id}>
+                      <StatRow row={tk} t={t} expandable={parts.length > 0} open={open} onToggle={toggle} />
+                      {open && parts.length > 0 && (
+                        <div style={{ marginLeft: 18, marginBottom: 5 }}>
+                          {parts.map((u) => <StatRow key={u.id} row={u} t={t} small />)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </>)}
 
               {/* Noten-Auswertung im CardVote-Design: Kennzahl-Kacheln + Panel mit

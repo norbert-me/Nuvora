@@ -1022,6 +1022,7 @@ export default {
   "klassenarbeit.addPartHint": "Split into sub-tasks (a, b, c …) with own points",
   "klassenarbeit.partLabel": "Part",
   "klassenarbeit.byPart": "⌀ per sub-task",
+  "klassenarbeit.part": "Part",
   "klassenarbeit.stdev": "Std. dev",
   "klassenarbeit.min": "Min",
   "klassenarbeit.median": "Median",

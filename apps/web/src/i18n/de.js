@@ -1022,6 +1022,7 @@ export default {
   "klassenarbeit.addPartHint": "In Teilaufgaben (a, b, c …) mit eigenen Punkten aufteilen",
   "klassenarbeit.partLabel": "Teil",
   "klassenarbeit.byPart": "⌀ je Teilaufgabe",
+  "klassenarbeit.part": "Teil",
   "klassenarbeit.stdev": "Streuung",
   "klassenarbeit.min": "Min",
   "klassenarbeit.median": "Median",

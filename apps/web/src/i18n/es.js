@@ -1022,6 +1022,7 @@ export default {
   "klassenarbeit.addPartHint": "Dividir en subtareas (a, b, c …) con puntos propios",
   "klassenarbeit.partLabel": "Parte",
   "klassenarbeit.byPart": "⌀ por subtarea",
+  "klassenarbeit.part": "Parte",
   "klassenarbeit.stdev": "Desviación",
   "klassenarbeit.min": "Mín",
   "klassenarbeit.median": "Mediana",
