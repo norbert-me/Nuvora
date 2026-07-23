@@ -802,6 +802,7 @@ export default {
   "kalender.showHide": "Show / hide",
   "kalender.extEvents": "External events",
   "kalender.toggleAllDay": "Toggle all-day events",
+  "kalender.timeInvalid": "The end time must be after the start time.",
   "kalender.entryTime": "Time (optional)",
   "kalender.entryTitle": "Title",
   "kalender.entryTitlePlaceholder": "e.g. Intro to fractions",

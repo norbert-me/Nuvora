@@ -802,6 +802,7 @@ export default {
   "kalender.showHide": "Ein-/Ausblenden",
   "kalender.extEvents": "Externe Termine",
   "kalender.toggleAllDay": "Ganztägige ein-/ausblenden",
+  "kalender.timeInvalid": "Die Endzeit muss nach der Startzeit liegen.",
   "kalender.entryTime": "Uhrzeit (optional)",
   "kalender.entryTitle": "Titel",
   "kalender.entryTitlePlaceholder": "z. B. Einführung Bruchrechnung",

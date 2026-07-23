@@ -1102,6 +1102,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   const [deckId, setDeckId] = useState(entry.karten_deck_id || "");
   const [startTime, setStartTime] = useState(entry.start_time || "");
   const [endTime, setEndTime] = useState(entry.end_time || "");
+  const timeInvalid = !!(startTime && endTime && endTime <= startTime); // Ende vor/gleich Start
   const [dateVal, setDateVal] = useState(entry.date ? ymd(new Date(entry.date)) : ymd(new Date()));
   const [decks, setDecks] = useState([]); // Karten-Decks der gewaehlten Klasse
   // Decks haengen an der Klasse: neu laden, wenn Klasse wechselt und Modul aktiv.
@@ -1207,6 +1208,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
             <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={{ ...fld, width: "auto" }} title={t("kalender.end")} />
             {(startTime || endTime) && <button onClick={() => { setStartTime(""); setEndTime(""); }} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.delete")}><Icon d={ICONS.close} size={15} /></button>}
           </div>
+          {timeInvalid && <div style={{ fontSize: 12, color: C.danger, marginTop: 5 }}>{t("kalender.timeInvalid")}</div>}
         </>)}
         <div style={lbl}>{t("nav.classes")}</div>
         <KursKlasseSelect value={classId === "" ? "" : Number(classId)} allowNone noneLabel={`– ${t("kalender.noClass")} –`}
@@ -1297,7 +1299,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         <div style={lbl}>{t("kalender.notes")}</div>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...fld, resize: "vertical" }} />
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
-          <button onClick={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, title, notes, start_time: startTime || "", end_time: endTime || "", class_id: classId ? Number(classId) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })} style={btnPrimary}>{t("common.save")}</button>
+          <button onClick={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, title, notes, start_time: startTime || "", end_time: endTime || "", class_id: classId ? Number(classId) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })} disabled={timeInvalid} style={{ ...btnPrimary, opacity: timeInvalid ? 0.5 : 1 }}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
           {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
         </div>

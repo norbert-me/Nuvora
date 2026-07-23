@@ -802,6 +802,7 @@ export default {
   "kalender.showHide": "Mostrar / ocultar",
   "kalender.extEvents": "Eventos externos",
   "kalender.toggleAllDay": "Mostrar/ocultar eventos de todo el día",
+  "kalender.timeInvalid": "La hora de fin debe ser posterior a la de inicio.",
   "kalender.entryTime": "Hora (opcional)",
   "kalender.entryTitle": "Título",
   "kalender.entryTitlePlaceholder": "p. ej. Introducción a fracciones",

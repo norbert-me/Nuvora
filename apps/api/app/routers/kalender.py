@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -63,6 +63,13 @@ class EntryIn(BaseModel):
     period: Optional[int] = None
     start_time: str = ""   # optionale freie Uhrzeit "HH:MM"
     end_time: str = ""
+
+    @model_validator(mode="after")
+    def _times_ok(self):
+        # Endzeit (falls beide gesetzt) muss nach der Startzeit liegen.
+        if self.start_time and self.end_time and self.end_time <= self.start_time:
+            raise ValueError("Die Endzeit muss nach der Startzeit liegen")
+        return self
     cardvote_set_id: Optional[int] = None
     karten_deck_id: Optional[int] = None
     lernpfad_ladder_id: Optional[int] = None
@@ -421,7 +428,10 @@ async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
         return None
 
     now = datetime.now().strftime("%Y%m%dT%H%M%SZ")
-    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Nuvora//Kalender//DE", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:Nuvora"]
+    # REFRESH-INTERVAL / X-PUBLISHED-TTL bitten den Client (Apple/Google), das Abo
+    # häufiger neu zu laden — sonst hängt eine Änderung an Apples Standard-Takt.
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Nuvora//Kalender//DE", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+             "X-WR-CALNAME:Nuvora", "REFRESH-INTERVAL;VALUE=DURATION:PT1H", "X-PUBLISHED-TTL:PT1H"]
     for e in entries:
         day = e.date.date() if hasattr(e.date, "date") else e.date
         title = e.title or (classes.get(e.class_id) or "Termin")
@@ -518,7 +528,8 @@ async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
                               f"SUMMARY:{_ics_escape(title)}", "END:VEVENT"]
 
     lines.append("END:VCALENDAR")
-    return _Plain("\r\n".join(lines), media_type="text/calendar; charset=utf-8")
+    return _Plain("\r\n".join(lines), media_type="text/calendar; charset=utf-8",
+                  headers={"Cache-Control": "no-cache, max-age=0"})
 
 
 # ─── Externer Kalender (ICS-URL read-only einblenden — „andere Richtung") ───
