@@ -1,0 +1,44 @@
+name: CI
+
+# Läuft bei jedem Push und PR: API-Tests + Web-Build. Fängt Regressionen ab,
+# bevor ein Tag ein Release schneidet (release.yml macht nur das Release).
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  api-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Abhängigkeiten
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+      - name: pytest
+        run: pytest -q
+
+  web-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Installieren
+        run: npm ci
+      - name: Build
+        run: npm run build
