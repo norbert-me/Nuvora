@@ -86,7 +86,6 @@ export default function Methoden() {
                 <span style={{ flex: 1 }} />
                 <button onClick={() => setPublishing(m)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("methoden.publish")}><Icon d={ICONS.share} size={17} color="var(--accent)" /></button>
                 <button onClick={() => setEdit(m)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>
-                <button onClick={() => remove(m.id)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
               </div>
               {m.description && <div style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{m.description}</div>}
               {m.ablauf && (<>
@@ -102,14 +101,14 @@ export default function Methoden() {
         </div>
       )}
 
-      {edit && <MethodModal m={edit} topics={topics} onSave={save} onClose={() => setEdit(null)} t={t} />}
+      {edit && <MethodModal m={edit} topics={topics} onSave={save} onDelete={(id) => { remove(id); setEdit(null); }} onClose={() => setEdit(null)} t={t} />}
       {publishing && <PublishModal name={publishing.title} onClose={() => setPublishing(null)}
         onPublish={(description) => fetch(`/api/marketplace/publish/method`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method_id: publishing.id, description }) }).catch(() => null)} />}
     </div>
   );
 }
 
-function MethodModal({ m, topics = [], onSave, onClose, t }) {
+function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
   const [title, setTitle] = useState(m.title || "");
   const [dauer, setDauer] = useState(m.dauer ?? "");
   const [description, setDescription] = useState(m.description || "");
@@ -148,9 +147,10 @@ function MethodModal({ m, topics = [], onSave, onClose, t }) {
             </select>
           </>
         )}
-        <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+        <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
           <button onClick={() => onSave({ id: m.id, title, description, ablauf, material, dauer, topic_id: topicId === "" ? null : Number(topicId) })} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
+          {m.id && <button onClick={() => onDelete(m.id)} style={{ ...btnSecondary, marginLeft: "auto", color: C.danger, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.trash} size={15} color={C.danger} /> {t("common.delete")}</button>}
         </div>
       </div>
     </div>

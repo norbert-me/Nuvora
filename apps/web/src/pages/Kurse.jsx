@@ -97,7 +97,6 @@ export default function Kurse() {
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
               <strong style={{ fontSize: 15, flex: 1 }}>{k.name}</strong>
               <button onClick={() => openEdit(k)} className="icon-btn" style={iconBtn} title={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
-              <button onClick={() => delKurs(k)} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
             </div>
             {/* Zugeordnete Klasse wird NICHT mehr unter dem Kurs angezeigt —
                 sie ist nicht nötig; Verwaltung läuft übers Bearbeiten. */}
@@ -148,6 +147,11 @@ export default function Kurse() {
                     {k.niveau_aktiv && <NiveauPanel kursId={k.id} t={t} />}
                   </div>
                 )}
+                <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+                  <button onClick={() => delKurs(k)} style={{ ...btnSecondary, color: C.danger, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <Icon d={ICONS.trash} size={15} color={C.danger} /> {t("kurse.deleteKurs") !== "kurse.deleteKurs" ? t("kurse.deleteKurs") : t("common.delete")}
+                  </button>
+                </div>
               </div>
             )}
           </div>
