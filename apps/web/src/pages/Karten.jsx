@@ -1,6 +1,6 @@
 // Modul Karten (Lehrer): Stapel & Karten verwalten, QR-Tokens drucken,
 // Fortschritt sehen. Schüler lernen kontenlos über den Token (siehe Lernen.jsx).
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, selectStyle, modalOverlay, modalPanel, Empty, Skeleton } from "../components/Icons.jsx";
