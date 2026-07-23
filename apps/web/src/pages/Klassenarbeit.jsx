@@ -62,6 +62,8 @@ export default function Klassenarbeit() {
   useEffect(() => { try { const u = JSON.parse(localStorage.getItem("user")); if (u && u.grade_tendency === false) setGradeMode("wert"); } catch { /* Default */ } }, []);
   const [classId, setClassId] = useState(null);
   const [kursId, setKursId] = useState(null);
+  const [subsetKurs, setSubsetKurs] = useState(null); // gewählter Teilkurs (Kurs aus Teilen von Klassen) oder null
+  const [subsetKurse, setSubsetKurse] = useState([]); // Kurse mit einzeln hinzugefügten SuS
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
   const [topics, setTopics] = useState([]);
@@ -72,6 +74,8 @@ export default function Klassenarbeit() {
   const saveTimer = useRef(null);
 
   useEffect(() => { fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
+  // Teilkurse (Kurse aus Teilen von Klassen = einzeln hinzugefügte SuS) laden.
+  useEffect(() => { fetch("/api/kurse").then((r) => (r.ok ? r.json() : [])).then((d) => setSubsetKurse((Array.isArray(d) ? d : []).filter((k) => k.member_count > 0))).catch(() => {}); }, []);
   // Beim ersten Besuch gleich eine Klasse wählen (zuletzt genutzte, sonst erste),
   // damit die Arbeitsauswahl nicht ausgeblendet bleibt, bis man von Hand klickt.
   useEffect(() => {
@@ -80,12 +84,24 @@ export default function Klassenarbeit() {
       if (classId == null && l.length) { const w = lastClass(); setClassId(l.some((c) => c.id === w) ? w : l[0].id); }
     }).catch(() => {});
   }, []); // eslint-disable-line
+  const repClass = useRef(null); // Referenz-Klasse eines Teilkurses (für work.class_id, FK)
   useEffect(() => {
+    // Teilkurs (Kurs aus Teilen von Klassen): Roster + Arbeiten über den Kurs.
+    if (subsetKurs) {
+      fetch(`${API}/kurse/${subsetKurs}/students`).then((r) => (r.ok ? r.json() : [])).then((list) => {
+        const studs = Array.isArray(list) ? list : []; setStudents(studs);
+        const rep = studs[0]?.class_id || null; repClass.current = rep;
+        if (rep) fetch(`${API}/classes/${rep}/works?kurs_id=${subsetKurs}`).then((r) => (r.ok ? r.json() : [])).then((d) => { const l = Array.isArray(d) ? d : []; setWorks(l); setWork(l[0] || null); }).catch(() => {});
+        else { setWorks([]); setWork(null); }
+      }).catch(() => { setStudents([]); setWorks([]); setWork(null); });
+      return;
+    }
+    repClass.current = null;
     if (classId) rememberClass(classId);
     if (!classId) { setStudents([]); setWorks([]); setWork(null); return; }
     fetch(`${API}/classes/${classId}/students`).then((r) => (r.ok ? r.json() : [])).then((d) => setStudents(Array.isArray(d) ? d : [])).catch(() => {});
     fetch(`${API}/classes/${classId}/works${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => { const l = Array.isArray(d) ? d : []; setWorks(l); setWork(l[0] || null); }).catch(() => {});
-  }, [classId, kursId]);
+  }, [classId, kursId, subsetKurs]);
 
   const topicLabel = (id) => { const tp = topics.find((x) => x.id === id); if (!tp) return ""; const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
 
@@ -101,7 +117,11 @@ export default function Klassenarbeit() {
   };
 
   const neueArbeit = async () => {
-    const res = await fetch(`${API}/works`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ class_id: classId, kurs_id: kursId, name: t("klassenarbeit.newName") }) }).catch(() => null);
+    // Teilkurs: class_id = Referenz-Klasse (FK), kurs_id = Teilkurs (Roster kommt daraus).
+    const cid = subsetKurs ? repClass.current : classId;
+    const kid = subsetKurs || kursId;
+    if (!cid) return;
+    const res = await fetch(`${API}/works`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ class_id: cid, kurs_id: kid, name: t("klassenarbeit.newName") }) }).catch(() => null);
     if (res && res.ok) { const w = await res.json(); setWorks((p) => [w, ...p]); setWork(w); }
   };
   const loeschen = async () => {
@@ -294,15 +314,22 @@ export default function Klassenarbeit() {
   const th = { padding: "6px 8px", borderBottom: "2px solid var(--border)", fontSize: 11.5, color: "var(--text2)", fontWeight: 600 };
   const td = { padding: 0, borderBottom: "1px solid var(--border)", textAlign: "center" };
 
+  const hasRoster = classId != null || subsetKurs != null;
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
         <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("klassenarbeit.title")}</h1>
-        <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
+        <KursKlasseSelect value={subsetKurs ? "" : classId} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} />
+        {subsetKurse.length > 0 && (
+          <select value={subsetKurs || ""} onChange={(e) => setSubsetKurs(e.target.value ? Number(e.target.value) : null)} style={{ ...selectStyle, fontSize: 13 }} title={t("klassenarbeit.subsetHint")}>
+            <option value="">{t("klassenarbeit.subsetPick")}</option>
+            {subsetKurse.map((k) => <option key={k.id} value={k.id}>{k.name} ({k.member_count})</option>)}
+          </select>
+        )}
       </div>
       <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 16px" }}>{t("klassenarbeit.hint")}</p>
 
-      {!classId ? null : (
+      {!hasRoster ? null : (
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
           <select value={work?.id || ""} onChange={(e) => setWork(works.find((w) => String(w.id) === e.target.value) || null)} style={{ ...selectStyle, minWidth: 180 }}>
             {works.length === 0 && <option value="">{t("klassenarbeit.none")}</option>}
@@ -313,7 +340,7 @@ export default function Klassenarbeit() {
         </div>
       )}
 
-      {classId && work && students.length > 0 && (
+      {hasRoster && work && students.length > 0 && (
         <>
           {/* SuS-Ansicht (Präsentation): alles über der Auswertung ausblenden —
               Aufgaben-Editor, Punkte-Raster, Aktionen. Nur die Auswertung bleibt. */}
@@ -467,7 +494,7 @@ export default function Klassenarbeit() {
               </div>
             </div>
           )}
-          {notenModal && <NotenUebernahme t={t} classId={classId} kursId={kursId} students={students} work={work} scale={effScale} onClose={() => setNotenModal(false)} />}
+          {notenModal && <NotenUebernahme t={t} classId={subsetKurs ? repClass.current : classId} kursId={subsetKurs || kursId} students={students} work={work} scale={effScale} onClose={() => setNotenModal(false)} />}
           </>)}
 
           {analyse && (analyse.topics.length > 0 || analyse.students.length > 0 || analyse.perUnit.length > 0 || analyse.noten.n > 0) && (
@@ -614,8 +641,8 @@ export default function Klassenarbeit() {
           )}
         </>
       )}
-      {classId && !work && <Empty title={t("klassenarbeit.empty")} hint={t("klassenarbeit.emptyHint")} action={t("klassenarbeit.new")} onAction={neueArbeit} />}
-      {classId && work && students.length === 0 && <Empty title={t("klassenarbeit.noStudents")} />}
+      {hasRoster && !work && <Empty title={t("klassenarbeit.empty")} hint={t("klassenarbeit.emptyHint")} action={t("klassenarbeit.new")} onAction={neueArbeit} />}
+      {hasRoster && work && students.length === 0 && <Empty title={t("klassenarbeit.noStudents")} />}
     </div>
   );
 }

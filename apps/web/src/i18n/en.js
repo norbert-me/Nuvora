@@ -979,6 +979,8 @@ export default {
   "klassenarbeit.toNoten": "Add to gradebook",
   "klassenarbeit.toNotenHint": "Each student's hit rate becomes a grade (via your scale) in a new column ({{n}} students). Editable — remove absentees afterwards.",
   "klassenarbeit.hint": "Add tasks with a topic and tick right or wrong per student. The evaluation then shows who needs to catch up on which topic.",
+  "klassenarbeit.subsetPick": "— Sub-course —",
+  "klassenarbeit.subsetHint": "Course from parts of classes (individually chosen students)",
   "klassenarbeit.none": "— no test —",
   "klassenarbeit.new": "New test",
   "klassenarbeit.newName": "Class test",

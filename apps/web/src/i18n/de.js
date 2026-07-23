@@ -979,6 +979,8 @@ export default {
   "klassenarbeit.toNoten": "In Noten übernehmen",
   "klassenarbeit.toNotenHint": "Aus der Trefferquote wird je Schüler eine Note (über deine Notenskala) und als neue Spalte angelegt ({{n}} SuS). Frei editierbar — Abwesende danach entfernen.",
   "klassenarbeit.hint": "Aufgaben mit Thema anlegen und je Schüler richtig oder falsch ankreuzen. Die Auswertung zeigt dann, wer bei welchem Thema Nachholbedarf hat.",
+  "klassenarbeit.subsetPick": "— Teilkurs —",
+  "klassenarbeit.subsetHint": "Kurs aus Teilen von Klassen (einzeln gewählte SuS)",
   "klassenarbeit.none": "— keine Arbeit —",
   "klassenarbeit.new": "Neue Arbeit",
   "klassenarbeit.newName": "Klassenarbeit",

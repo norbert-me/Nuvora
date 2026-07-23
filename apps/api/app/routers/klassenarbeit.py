@@ -107,7 +107,7 @@ async def roster_kurs(kurs_id: int, user: User = Depends(require_module), db: As
     canon = {}
     for s in studs:
         canon.setdefault(s.name.strip(), s)
-    return [{"id": s.id, "name": s.name} for s in sorted(canon.values(), key=lambda s: (s.card_id, s.id))]
+    return [{"id": s.id, "name": s.name, "class_id": s.class_id} for s in sorted(canon.values(), key=lambda s: (s.card_id, s.id))]
 
 
 @router.get("/classes/{class_id}/works", response_model=List[WorkOut])
