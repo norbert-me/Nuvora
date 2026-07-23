@@ -58,6 +58,7 @@ class EntryIn(BaseModel):
     title: str = ""
     notes: str = ""
     class_id: Optional[int] = None
+    kurs_id: Optional[int] = None   # gewaehlter Kurs (Fach) — Anzeige beim Bearbeiten
     topic_id: Optional[int] = None
     method_id: Optional[int] = None
     period: Optional[int] = None
@@ -98,6 +99,7 @@ async def list_entries(frm: Optional[datetime] = None, to: Optional[datetime] = 
 async def create_entry(body: EntryIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("kalender_entry", f"u{user.id}", 300, 60, "Zu viele Eintraege. Bitte kurz warten.")
     await _check_class(db, user, body.class_id)
+    await _check_kurs(db, user, body.kurs_id)
     await _check_topic(db, user, body.topic_id)
     e = CalendarEntry(owner_id=user.id, **body.model_dump())
     db.add(e)
@@ -113,6 +115,7 @@ async def update_entry(entry_id: int, body: EntryIn, user: User = Depends(requir
     if not e or e.owner_id != user.id:
         raise HTTPException(404, "Eintrag nicht gefunden")
     await _check_class(db, user, body.class_id)
+    await _check_kurs(db, user, body.kurs_id)
     await _check_topic(db, user, body.topic_id)
     for k, v in body.model_dump().items():
         setattr(e, k, v)

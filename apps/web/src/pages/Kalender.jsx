@@ -269,7 +269,7 @@ export default function Kalender() {
   }, [view, cursor]); // eslint-disable-line
 
   const save = async (e) => {
-    const body = { date: isoDay(e.date), title: e.title || "", notes: e.notes || "", class_id: e.class_id || null, topic_id: e.topic_id || null, method_id: e.method_id || null, period: e.period ?? null, start_time: e.start_time || "", end_time: e.end_time || "", cardvote_set_id: e.cardvote_set_id || null, karten_deck_id: e.karten_deck_id || null, lernpfad_ladder_id: e.lernpfad_ladder_id || null, codedetektiv_puzzle: e.codedetektiv_puzzle || null };
+    const body = { date: isoDay(e.date), title: e.title || "", notes: e.notes || "", class_id: e.class_id || null, kurs_id: e.kurs_id ?? null, topic_id: e.topic_id || null, method_id: e.method_id || null, period: e.period ?? null, start_time: e.start_time || "", end_time: e.end_time || "", cardvote_set_id: e.cardvote_set_id || null, karten_deck_id: e.karten_deck_id || null, lernpfad_ladder_id: e.lernpfad_ladder_id || null, codedetektiv_puzzle: e.codedetektiv_puzzle || null };
     const res = await fetch(e.id ? `${API}/entries/${e.id}` : `${API}/entries`, {
       method: e.id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     }).catch(() => null);
@@ -312,7 +312,7 @@ export default function Kalender() {
     // bearbeitet den vorhandenen Eintrag statt einen neuen anzulegen.
     const vorhanden = entries.find((e) => ymd(new Date(e.date)) === ymd(day) && e.period != null && e.period === s.period);
     if (vorhanden) setEditing({ ...vorhanden, date: new Date(vorhanden.date) });
-    else setEditing({ date: startOfDay(day), period: s.period, title: s.title || "", class_id: s.class_id || null, topic_id: s.topic_id || null });
+    else setEditing({ date: startOfDay(day), period: s.period, title: s.title || "", class_id: s.class_id || null, kurs_id: s.kurs_id ?? null, topic_id: s.topic_id || null });
   };
 
   // Farbe aus dem Stundenplan setzen: am FACH (Fach-Klasse), damit verschiedene
@@ -594,12 +594,16 @@ function ExtChips({ list, onOpen, extColor }) {
 function EntryChips({ list, className, topicName, onOpen, classColor }) {
   return list.map((e) => {
     const col = e.class_id && classColor ? classColor(e.class_id) : null;
-    const label = (e.start_time ? e.start_time + " " : "") + (e.title || topicName(e.topic_id) || (className && className(e.class_id)) || "—");
+    // Zweizeilig: Titel oben, darunter Uhrzeit + Klasse gedaempft. Der Titel darf
+    // bis zu zwei Zeilen umbrechen, die Meta-Zeile bleibt einzeilig.
+    const titel = e.title || topicName(e.topic_id) || (className && className(e.class_id)) || "—";
+    const meta = [e.start_time || null, className ? className(e.class_id) : null].filter(Boolean).join(" · ");
     return (
       <button key={e.id} onClick={(ev) => { ev.stopPropagation(); onOpen({ ...e, date: new Date(e.date) }); }}
-        style={{ ...chip, marginTop: 3, width: "100%", ...(col ? { background: col + "22", color: "var(--text)", borderLeft: `3px solid ${col}` } : {}) }}
-        title={label}>
-        {label}
+        style={{ ...chip, whiteSpace: "normal", marginTop: 3, width: "100%", lineHeight: 1.25, ...(col ? { background: col + "22", color: "var(--text)", borderLeft: `3px solid ${col}` } : {}) }}
+        title={[titel, meta].filter(Boolean).join(" — ")}>
+        <span style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", fontWeight: 600 }}>{titel}</span>
+        {meta && <span style={{ display: "block", fontSize: 10.5, opacity: 0.72, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{meta}</span>}
       </button>
     );
   });
@@ -1190,6 +1194,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   const [title, setTitle] = useState(entry.title || "");
   const [notes, setNotes] = useState(entry.notes || "");
   const [classId, setClassId] = useState(entry.class_id || "");
+  const [kursId, setKursId] = useState(entry.kurs_id ?? null); // gewaehlter Kurs — richtige Auflösung beim Bearbeiten
   const [topicId, setTopicId] = useState(entry.topic_id || "");
   const [methodId, setMethodId] = useState(entry.method_id || "");
   const [quizId, setQuizId] = useState(entry.cardvote_set_id || "");
@@ -1325,8 +1330,8 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
           {timeInvalid && <div style={{ fontSize: 12, color: C.danger, marginTop: 5 }}>{t("kalender.timeInvalid")}</div>}
         </>)}
         <div style={lbl}>{t("nav.classes")}</div>
-        <KursKlasseSelect value={classId === "" ? "" : Number(classId)} allowNone noneLabel={`– ${t("kalender.noClass")} –`}
-          onChange={(id) => setClassId(id === "" ? "" : String(id))} style={sfld} />
+        <KursKlasseSelect value={classId === "" ? "" : Number(classId)} kursValue={kursId} allowNone noneLabel={`– ${t("kalender.noClass")} –`}
+          onChange={(id, kid) => { setClassId(id === "" ? "" : String(id)); setKursId(id === "" ? null : (kid ?? null)); }} onKurs={setKursId} style={sfld} />
         <div style={lbl}>{t("kalender.topic")}</div>
         <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={sfld}>
           <option value="">– {t("kalender.noTopic")} –</option>
@@ -1413,7 +1418,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         <div style={lbl}>{t("kalender.notes")}</div>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...fld, resize: "vertical" }} />
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
-          <button onClick={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, title, notes, start_time: startTime || "", end_time: endTime || "", class_id: classId ? Number(classId) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })} disabled={timeInvalid} style={{ ...btnPrimary, opacity: timeInvalid ? 0.5 : 1 }}>{t("common.save")}</button>
+          <button onClick={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, title, notes, start_time: startTime || "", end_time: endTime || "", class_id: classId ? Number(classId) : null, kurs_id: classId ? (kursId ?? null) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })} disabled={timeInvalid} style={{ ...btnPrimary, opacity: timeInvalid ? 0.5 : 1 }}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
           {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
         </div>

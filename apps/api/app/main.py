@@ -216,6 +216,7 @@ def _ensure_columns(sync_conn):
         ("grade_categories", "topic_id", "INTEGER"),
         ("attendance", "period", "INTEGER"),
         ("calendar_entries", "method_id", "INTEGER"),
+        ("calendar_entries", "kurs_id", "INTEGER"),
         ("calendar_entries", "period", "INTEGER"),
         ("calendar_entries", "cardvote_set_id", "INTEGER"),
         ("calendar_entries", "karten_deck_id", "INTEGER"),

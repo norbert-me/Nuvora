@@ -567,6 +567,9 @@ class CalendarEntry(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     class_id: Mapped[Optional[int]] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), nullable=True, index=True)
+    # Gewaehlter Kurs (Fach) — dieselbe Fach-Klasse kann in mehreren Kursen liegen;
+    # ohne diesen Hinweis riete die Auswahl beim Bearbeiten den falschen Kurs.
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     title: Mapped[str] = mapped_column(String(200), default="", server_default="")
     notes: Mapped[str] = mapped_column(Text, default="", server_default="")
