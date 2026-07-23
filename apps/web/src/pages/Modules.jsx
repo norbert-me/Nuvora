@@ -173,14 +173,21 @@ export default function Modules() {
 
       {helpMod && (
         <div onClick={() => setHelpMod(null)} style={modalOverlay}>
-          <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 460 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 520, maxHeight: "86vh", overflowY: "auto" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
               <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, flex: 1 }}>{dispName(helpMod)}</h3>
               <StageBadge stage={helpMod.stage} title={helpMod.stage === "beta" ? t("stage.betaHint") : t("stage.alphaHint")} />
               <button onClick={() => setHelpMod(null)} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
             </div>
-            <p style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.65, margin: "0 0 8px", whiteSpace: "pre-wrap" }}>{helpOf(helpMod)}</p>
-            {imgOf(helpMod) && (
+            <p style={{ fontSize: 14.5, color: "var(--text)", lineHeight: 1.7, margin: "0 0 4px", whiteSpace: "pre-wrap" }}>{helpOf(helpMod)}</p>
+            <ModuleIllos mkey={helpMod.key} t={t} />
+            {t(`mod.${helpMod.key}.sr`) !== `mod.${helpMod.key}.sr` && (
+              <Collapsible title={t("karten.srTitle")}>
+                <p style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.7, margin: "0 0 10px", whiteSpace: "pre-wrap" }}>{t(`mod.${helpMod.key}.sr`)}</p>
+                <SpacingIllo caption={t(`mod.${helpMod.key}.ill3`)} />
+              </Collapsible>
+            )}
+            {!hasIllos(helpMod.key) && imgOf(helpMod) && (
               <div style={{ marginTop: 12, border: "1px dashed var(--border2)", borderRadius: 10, padding: "18px 16px", background: "var(--bg3)", textAlign: "center" }}>
                 <div style={{ fontSize: 22, marginBottom: 6, opacity: 0.5 }}>🖼️</div>
                 <div style={{ fontSize: 12.5, color: "var(--text3)", lineHeight: 1.5 }}>{imgOf(helpMod)}</div>
@@ -192,6 +199,95 @@ export default function Modules() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Module mit eigenen (SVG-)Illustrationen im Erklär-Popup. Für andere bleibt der
+// Text-Platzhalter (imgOf) erhalten.
+function hasIllos(key) { return key === "karten"; }
+
+function ModuleIllos({ mkey, t }) {
+  if (mkey !== "karten") return null;
+  return (
+    <div style={{ display: "flex", gap: 12, flexWrap: "wrap", margin: "16px 0 2px" }}>
+      <IlloFrame caption={t("mod.karten.ill1")}><CardIllo /></IlloFrame>
+      <IlloFrame caption={t("mod.karten.ill2")}><QrIllo /></IlloFrame>
+    </div>
+  );
+}
+
+function IlloFrame({ children, caption }) {
+  return (
+    <figure style={{ margin: 0, flex: "1 1 200px", minWidth: 180, background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 14px 10px", textAlign: "center" }}>
+      {children}
+      <figcaption style={{ fontSize: 12, color: "var(--text3)", lineHeight: 1.45, marginTop: 8 }}>{caption}</figcaption>
+    </figure>
+  );
+}
+
+// Vorder-/Rückseite: Frage links, Antwort rechts, dazwischen der „Umdrehen"-Pfeil.
+function CardIllo() {
+  return (
+    <svg viewBox="0 0 168 92" width="100%" height="84" style={{ display: "block" }} aria-hidden="true">
+      <rect x="6" y="14" width="64" height="64" rx="10" fill="var(--card)" stroke="var(--accent)" strokeWidth="2" />
+      <text x="38" y="44" textAnchor="middle" fontSize="17" fontWeight="700" fill="var(--text)">7·8</text>
+      <text x="38" y="64" textAnchor="middle" fontSize="15" fill="var(--text3)">?</text>
+      <path d="M78 40a8 8 0 0116 0M78 52a8 8 0 0016 0" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" />
+      <path d="M92 36l2 6-6 1M80 56l-2-6 6-1" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="98" y="14" width="64" height="64" rx="10" fill="var(--card)" stroke="var(--border2)" strokeWidth="2" />
+      <text x="130" y="52" textAnchor="middle" fontSize="20" fontWeight="700" fill="var(--accent)">56</text>
+    </svg>
+  );
+}
+
+// Üben ohne Konto: QR-Code, Pfeil, Gerät mit Häkchen.
+function QrIllo() {
+  return (
+    <svg viewBox="0 0 168 92" width="100%" height="84" style={{ display: "block" }} aria-hidden="true">
+      <rect x="8" y="18" width="56" height="56" rx="8" fill="var(--card)" stroke="var(--border2)" strokeWidth="2" />
+      <rect x="16" y="26" width="14" height="14" rx="3" fill="none" stroke="var(--text2)" strokeWidth="2.5" />
+      <rect x="42" y="26" width="14" height="14" rx="3" fill="none" stroke="var(--text2)" strokeWidth="2.5" />
+      <rect x="16" y="52" width="14" height="14" rx="3" fill="none" stroke="var(--text2)" strokeWidth="2.5" />
+      <rect x="44" y="52" width="4" height="4" fill="var(--text2)" />
+      <rect x="52" y="52" width="4" height="4" fill="var(--text2)" />
+      <rect x="44" y="60" width="4" height="4" fill="var(--text2)" />
+      <path d="M74 46h18m0 0l-5-5m5 5l-5 5" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="104" y="12" width="42" height="68" rx="9" fill="var(--card)" stroke="var(--border2)" strokeWidth="2" />
+      <path d="M113 46l7 7 13-15" fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// Wachsende Wiederholungs-Abstände auf einer Zeitachse.
+function SpacingIllo({ caption }) {
+  const xs = [14, 40, 84, 152, 232];
+  const labels = ["heute", "1 T", "3 T", "1 Wo", "3 Wo"];
+  return (
+    <figure style={{ margin: 0, background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 14px 10px", textAlign: "center" }}>
+      <svg viewBox="0 0 248 60" width="100%" height="56" style={{ display: "block" }} aria-hidden="true">
+        <line x1="10" y1="30" x2="240" y2="30" stroke="var(--border2)" strokeWidth="2" />
+        {xs.map((x, i) => (
+          <g key={x}>
+            <circle cx={x} cy="30" r={i === 0 ? 4 : 5} fill={i === 0 ? "var(--text3)" : "var(--accent)"} />
+            <text x={x} y="50" textAnchor="middle" fontSize="10" fill="var(--text3)">{labels[i]}</text>
+          </g>
+        ))}
+      </svg>
+      <figcaption style={{ fontSize: 12, color: "var(--text3)", lineHeight: 1.45, marginTop: 4 }}>{caption}</figcaption>
+    </figure>
+  );
+}
+
+function Collapsible({ title, children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ marginTop: 14, border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+      <button onClick={() => setOpen((o) => !o)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "12px 14px", background: "var(--bg3)", border: "none", cursor: "pointer", font: "inherit", fontSize: 14.5, fontWeight: 600, color: "var(--text)", textAlign: "left" }}>
+        <span>{title}</span>
+        <span style={{ color: "var(--text3)", display: "inline-block", transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▸</span>
+      </button>
+      {open && <div style={{ padding: "12px 14px 14px" }}>{children}</div>}
     </div>
   );
 }
