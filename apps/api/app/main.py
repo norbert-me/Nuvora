@@ -97,7 +97,16 @@ class ETagMiddleware(BaseHTTPMiddleware):
         return _Response(content=body, status_code=200, headers=headers, media_type=response.media_type)
 
 
-app = FastAPI(title="Nuvora API")
+# Interaktive API-Doku (/docs, /redoc, /openapi.json) nur einschalten, wenn
+# NUVORA_DOCS=1 gesetzt ist. In Produktion aus, damit die komplette API-Oberflaeche
+# nicht ohne Not offengelegt wird (defensive Härtung).
+_docs_on = os.environ.get("NUVORA_DOCS") == "1"
+app = FastAPI(
+    title="Nuvora API",
+    docs_url="/docs" if _docs_on else None,
+    redoc_url="/redoc" if _docs_on else None,
+    openapi_url="/openapi.json" if _docs_on else None,
+)
 
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(ETagMiddleware)
