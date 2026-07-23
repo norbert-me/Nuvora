@@ -752,7 +752,7 @@ export default {
   "onboard.tour": "Rundgang starten",
   "onboard.help": "Zur Hilfe",
   "onboard.later": "Später",
-  "onboard.note": "Du findest beides jederzeit über die Fußzeile wieder.",
+  "onboard.note": "Du findest beides jederzeit über dein Profil wieder.",
   "plan.title": "Wochenplanung",
   "plan.intro": "Plane den Unterricht in Wochen: je ein bis drei Themenblöcke, am Ende ein Test über die Themen der Woche.",
   "plan.needClass": "Noch keine Klasse. Lege sie unter {{link}} an.",

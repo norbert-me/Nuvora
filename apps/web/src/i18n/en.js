@@ -726,7 +726,7 @@ export default {
   "onboard.tour": "Start the tour",
   "onboard.help": "Go to help",
   "onboard.later": "Later",
-  "onboard.note": "You can reach both any time via the footer.",
+  "onboard.note": "You can reach both any time from your profile.",
   "plan.title": "Weekly plan",
   "plan.intro": "Plan lessons in weeks: one to three topic blocks each, a test at the end over the week's topics.",
   "plan.needClass": "No class yet. Create one under {{link}}.",

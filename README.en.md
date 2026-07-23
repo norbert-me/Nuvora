@@ -8,11 +8,13 @@ Source: [github.com/norbert-me/Nuvora](https://github.com/norbert-me/Nuvora)
 
 Open source and non-commercial ([CC BY-NC 4.0](LICENSE)) — the source is open, commercial use is excluded. This is deliberately *not* an OSI open-source license.
 
+> **Built 100 % with AI.** Code, design and copy were developed entirely with an AI assistant (Claude) — a demonstration of how far AI-assisted software development reaches today.
+
 Learners need no devices and no accounts — they only appear as records the teacher manages.
 
 Nuvora is the base: account, classes, courses, students and topics live here. Modules are switched on and work on this data — they do not own it.
 
-> **Status: 2.0 — stable, still growing.** The frame stands — sign-in, home page, module management, classes, courses and topics are Nuvora. Nine modules sit on the core; none has its own accounts or database. The shared **topic taxonomy** connects them: a topic students struggled with in CardVote or Code-Detektiv spawns a Karten practice deck or a Lernpfad revision task at the press of a button, test results become a grade column, and the topic view shows everything attached to a topic across the modules — including stored material.
+> **Status: 2.0 — stable, still growing.** The frame stands — sign-in, home page, module management, classes, courses and topics are Nuvora. Ten modules sit on the core (Orga bundles further tools); none has its own accounts or database. The shared **topic taxonomy** connects them: a topic students struggled with in CardVote or Code-Detektiv spawns a Karten practice deck or a Lernpfad revision task at the press of a button, test results become a grade column, and the topic view shows everything attached to a topic across the modules — including stored material.
 
 ## Core
 
@@ -51,6 +53,10 @@ Vanilla JS, mounted in-page
 Gradebook: columns from your assessment scheme with weights, grades and observations per person. Works like an empty spreadsheet.
 
 Computes the weighted average and shows how much of the scheme is covered — the report-card grade stays your decision, observations never count. A **per-student trend** (▲/▼) shows whether performance rises or falls over the term. Importable as a grade column: **CardVote** hit rate, **Karten** mastery and **Code-Detektiv** sessions (each via your grade scale).
+
+### Klassenarbeit (class tests)
+
+Create tasks with a topic and tick right/wrong (or partial points) per student. The evaluation shows points, a grade distribution with an adjustable key, boxplots and per-task discrimination — and **who needs to catch up on which topic**. From there you can trigger targeted revision (Karten deck / Lernpfad). Absent students are excluded from the stats without losing their grades; results are importable as a grade column.
 
 ### Karten (cards)
 

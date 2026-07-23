@@ -726,7 +726,7 @@ export default {
   "onboard.tour": "Empezar el recorrido",
   "onboard.help": "Ir a la ayuda",
   "onboard.later": "Más tarde",
-  "onboard.note": "Puedes volver a ambos desde el pie de página.",
+  "onboard.note": "Puedes volver a ambos desde tu perfil.",
   "plan.title": "Plan semanal",
   "plan.intro": "Planifica en semanas: de uno a tres bloques temáticos, con una prueba al final sobre los temas de la semana.",
   "plan.needClass": "Aún no hay clase. Créala en {{link}}.",

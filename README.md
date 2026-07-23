@@ -8,11 +8,13 @@ Quellcode: [github.com/norbert-me/Nuvora](https://github.com/norbert-me/Nuvora)
 
 Quelloffen und nicht kommerziell nutzbar ([CC BY-NC 4.0](LICENSE)) — der Quellcode liegt offen, kommerzielle Nutzung ist ausgeschlossen. Das ist bewusst *keine* OSI-Open-Source-Lizenz.
 
+> **100 % mit KI gebaut.** Code, Design und Texte sind vollständig mit einem KI-Assistenten (Claude) entwickelt — als Beleg, wie weit KI-gestützte Softwareentwicklung heute trägt.
+
 Lernende brauchen keine Geräte und keine Konten — sie tauchen nur als Datensätze auf, die die Lehrkraft verwaltet.
 
 Nuvora ist die Basis: Konto, Klassen, Kurse, Schüler und Themen liegen hier. Module werden dazugeschaltet und arbeiten auf diesen Daten — sie besitzen sie nicht.
 
-> **Status: 2.0 — stabil, wächst weiter.** Der Rahmen steht — Anmeldung, Startseite, Modulverwaltung, Klassen, Kurse und Themen sind Nuvora. Neun Module sitzen auf dem Kern; keins hat eigene Konten oder eine eigene Datenbank. Die geteilte **Themen-Taxonomie** verbindet sie: ein in CardVote oder Code-Detektiv schwaches Thema erzeugt auf Knopfdruck ein Karten-Übungsdeck oder eine Lernpfad-Wiederholung, Test-Ergebnisse werden zu einer Notenspalte, und die Themen-Ansicht zeigt zu einem Thema alles quer über die Module — samt hinterlegtem Material.
+> **Status: 2.0 — stabil, wächst weiter.** Der Rahmen steht — Anmeldung, Startseite, Modulverwaltung, Klassen, Kurse und Themen sind Nuvora. Zehn Module sitzen auf dem Kern (Orga bündelt weitere Werkzeuge); keins hat eigene Konten oder eine eigene Datenbank. Die geteilte **Themen-Taxonomie** verbindet sie: ein in CardVote oder Code-Detektiv schwaches Thema erzeugt auf Knopfdruck ein Karten-Übungsdeck oder eine Lernpfad-Wiederholung, Test-Ergebnisse werden zu einer Notenspalte, und die Themen-Ansicht zeigt zu einem Thema alles quer über die Module — samt hinterlegtem Material.
 
 ## Kern
 
@@ -51,6 +53,10 @@ Vanilla JS, in-page gemountet
 Notenbuch: Spalten aus deinem Leistungskonzept mit Gewichten, Noten und Beobachtungen je Person. Bedient sich wie eine leere Tabelle.
 
 Rechnet den gewichteten Schnitt und zeigt, wie viel des Konzepts belegt ist — die Zeugnisnote bleibt deine Entscheidung, Beobachtungen zählen nie mit. Ein **Trend je Schüler** (▲/▼) zeigt, ob die Leistung übers Halbjahr steigt oder fällt. Als Notenspalte übernehmbar: **CardVote**-Trefferquote, **Karten**-Meisterung und **Code-Detektiv**-Sessions (jeweils über deine Notenskala).
+
+### Klassenarbeit
+
+Aufgaben mit Thema anlegen und je Schüler richtig/falsch (oder Teilpunkte) ankreuzen. Die Auswertung zeigt Punkte, Notenverteilung mit anpassbarem Schlüssel, Boxplots und Trennschärfe je Aufgabe — und **wer bei welchem Thema Nachholbedarf hat**. Daraus lässt sich gezielte Wiederholung (Karten-Deck / Lernpfad) anstoßen. Abwesende werden herausgerechnet, ohne ihre Noten zu verlieren; Ergebnisse sind als Notenspalte übernehmbar.
 
 ### Karten
 
