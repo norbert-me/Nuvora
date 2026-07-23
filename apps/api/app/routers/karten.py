@@ -83,10 +83,23 @@ async def _owned_deck(db, user, deck_id) -> CardDeck:
     return d
 
 
-async def _kurs_roster(db, user, class_id):
+async def _kurs_roster(db, user, class_id, subset_kurs=None):
     """SuS DIESER Fach-Klasse. Karten sind pro Fach getrennt: jede Fach-Klasse
     hat eigene Stapel und eigenen Fortschritt (SuS werden im Kern geteilt, der
-    Karten-Fortschritt aber je Fach gefuehrt)."""
+    Karten-Fortschritt aber je Fach gefuehrt).
+
+    Mit subset_kurs: der Roster eines Teilkurses (Kurse aus Teilen von Klassen) —
+    die einzeln hinzugefügten SuS, auch aus fremden Klassen (dedupliziert)."""
+    if subset_kurs is not None:
+        from .kurse import member_student_ids
+        sids = list(await member_student_ids(db, subset_kurs))
+        if not sids:
+            return []
+        studs = (await db.execute(select(Student).where(Student.id.in_(sids)).order_by(Student.card_id, Student.id))).scalars().all()
+        canon = {}
+        for s in studs:
+            canon.setdefault(s.name.strip(), s)
+        return sorted(canon.values(), key=lambda s: (s.card_id, s.id))
     return (await db.execute(select(Student).where(Student.class_id == class_id).order_by(Student.card_id, Student.id))).scalars().all()
 
 
@@ -100,9 +113,10 @@ async def _kurs_decks_where(cls, kurs_id=None):
 
 async def _student_deck_where(db, st):
     """Deck-Filter fuer einen Schueler (oeffentliches Lernen): alle Stapel der
-    Kurse (Fächer), in denen seine Klasse liegt — plus Klassen-Fallback."""
-    from .kurse import class_kurs_ids
-    kurse = list(await class_kurs_ids(db, st.class_id))
+    Kurse (Fächer), in denen seine Klasse liegt, PLUS die Teilkurse, in denen er
+    einzeln Mitglied ist (Kurse aus Teilen von Klassen) — plus Klassen-Fallback."""
+    from .kurse import class_kurs_ids, student_kurs_ids
+    kurse = list(set(await class_kurs_ids(db, st.class_id)) | await student_kurs_ids(db, st.id))
     if kurse:
         return or_(CardDeck.kurs_id.in_(kurse), and_(CardDeck.class_id == st.class_id, CardDeck.kurs_id.is_(None)))
     return and_(CardDeck.class_id == st.class_id, CardDeck.kurs_id.is_(None))
@@ -324,10 +338,13 @@ class StudentTokenOut(BaseModel):
 
 
 @router.post("/classes/{class_id}/tokens", response_model=List[StudentTokenOut])
-async def ensure_tokens(class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def ensure_tokens(class_id: int, subset_kurs: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Erzeugt fehlende Schueler-Tokens fuer den Kurs (idempotent, je Person einer)."""
     await _owned_class(db, user, class_id)
-    students = await _kurs_roster(db, user, class_id)
+    if subset_kurs is not None:
+        from .kurse import _owned_kurs
+        await _owned_kurs(db, user, subset_kurs)
+    students = await _kurs_roster(db, user, class_id, subset_kurs)
     out = []
     changed = False
     for st in students:
@@ -353,9 +370,12 @@ class StudentProgress(BaseModel):
 
 
 @router.get("/classes/{class_id}/progress", response_model=List[StudentProgress])
-async def progress(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def progress(class_id: int, kurs_id: Optional[int] = None, subset_kurs: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     cls = await _owned_class(db, user, class_id)
-    students = await _kurs_roster(db, user, class_id)
+    if subset_kurs is not None:
+        from .kurse import _owned_kurs
+        await _owned_kurs(db, user, subset_kurs)
+    students = await _kurs_roster(db, user, class_id, subset_kurs)
     now = _now()
     # Nur ausgerollte Stapel zaehlen — Entwuerfe verzerren den Fortschritt nicht.
     deck_ids = (await db.execute(select(CardDeck.id).where(
@@ -403,11 +423,18 @@ class CardStat(BaseModel):
 
 
 @router.get("/classes/{class_id}/students/{student_id}/cards", response_model=List[CardStat])
-async def student_cards(class_id: int, student_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def student_cards(class_id: int, student_id: int, kurs_id: Optional[int] = None, subset_kurs: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Detailstatistik je Karte fuer einen Schueler — nur ausgerollte Stapel."""
     cls = await _owned_class(db, user, class_id)
     st = await db.get(Student, student_id)
-    if not st or st.class_id != class_id:
+    if not st:
+        raise HTTPException(404, "Schüler nicht gefunden")
+    if subset_kurs is not None:
+        from .kurse import member_student_ids, _owned_kurs
+        await _owned_kurs(db, user, subset_kurs)
+        if student_id not in await member_student_ids(db, subset_kurs):
+            raise HTTPException(404, "Schüler nicht in diesem Teilkurs")
+    elif st.class_id != class_id:
         raise HTTPException(404, "Schüler nicht in dieser Klasse")
     now = _now()
     decks = {d.id: d.name for d in (await db.execute(select(CardDeck).where(

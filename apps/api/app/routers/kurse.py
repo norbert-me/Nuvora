@@ -97,6 +97,16 @@ async def class_kurs_ids(db, class_id, only_active=True) -> set:
     return ids
 
 
+async def student_kurs_ids(db, student_id, only_active=True) -> set:
+    """Teilkurse (kurs_students), in denen dieser SuS EINZELN Mitglied ist —
+    Kurse aus Teilen von Klassen, unabhängig von der Klassen-Zugehörigkeit."""
+    ids = set((await db.execute(select(KursStudent.kurs_id).where(KursStudent.student_id == student_id))).scalars().all())
+    if only_active and ids:
+        alive = set((await db.execute(select(Kurs.id).where(Kurs.id.in_(list(ids)), Kurs.deleted_at.is_(None)))).scalars().all())
+        return ids & alive
+    return ids
+
+
 async def sibling_class_ids(db, class_id) -> set:
     """Alle Klassen, die mit dieser einen Kurs teilen (inkl. sich selbst)."""
     kurse = await class_kurs_ids(db, class_id)

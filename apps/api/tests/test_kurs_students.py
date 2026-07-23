@@ -96,3 +96,33 @@ async def test_noten_teilkurs_roster_und_speichern(s):
     await N.create_entry(body, user=u, db=s)
     ents = await N.list_entries(a.id, kurs_id=kurs.id, user=u, db=s)
     assert any(e.student_id == b1.id and e.value == 2.0 for e in ents)
+
+
+@pytest.mark.asyncio
+async def test_karten_teilkurs_roster_und_deck_sichtbar(s):
+    """Karten voll integriert: Teilkurs-Roster (Progress) enthält Einzel-SuS
+    fremder Klassen, und ihr öffentliches Lernen sieht das Teilkurs-Deck."""
+    from datetime import datetime, timezone
+    from app.models import UserModule, CardDeck
+    from app.routers import karten as KT
+    from sqlalchemy import select as _sel
+    u = User(email="g@h.de", password_hash="x", name="L"); s.add(u); await s.flush()
+    s.add(UserModule(user_id=u.id, module_key="karten"))
+    a = SchoolClass(name="7a", owner_id=u.id); b = SchoolClass(name="7b", owner_id=u.id); s.add(a); s.add(b); await s.flush()
+    a1 = Student(card_id=1, name="Ann", class_id=a.id); b1 = Student(card_id=2, name="Bo", class_id=b.id)
+    s.add(a1); s.add(b1)
+    kurs = Kurs(owner_id=u.id, name="Förder"); s.add(kurs); await s.commit()
+    await K.add_student_member(kurs.id, a1.id, user=u, db=s)
+    await K.add_student_member(kurs.id, b1.id, user=u, db=s)
+
+    # Progress-Roster des Teilkurses enthält beide SuS (repClass 7a).
+    prog = await KT.progress(a.id, kurs_id=kurs.id, subset_kurs=kurs.id, user=u, db=s)
+    assert {p.name for p in prog} == {"Ann", "Bo"}
+
+    # Deck am Teilkurs, ausgerollt. Bo (fremde Klasse 7b) muss es sehen.
+    deck = CardDeck(name="Vokabeln", class_id=a.id, kurs_id=kurs.id,
+                    released_at=datetime(2020, 1, 1, tzinfo=timezone.utc), owner_id=u.id)
+    s.add(deck); await s.commit()
+    where = await KT._student_deck_where(s, b1)
+    ids = (await s.execute(_sel(CardDeck.id).where(where))).scalars().all()
+    assert deck.id in ids   # Teilkurs-SuS aus fremder Klasse sieht das Deck

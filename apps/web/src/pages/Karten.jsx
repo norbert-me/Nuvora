@@ -28,6 +28,10 @@ export default function Karten() {
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
   const [kursId, setKursId] = useState(null); // Karten hängen am Kurs (Fach)
+  // Teilkurs (Kurse aus Teilen von Klassen): Roster/Progress/Tokens des Kurses,
+  // classId = Repräsentant-Klasse für die FK, kursId = Teilkurs (für die Decks).
+  const [subsetKurs, setSubsetKurs] = useState(null);
+  const [subsetKurse, setSubsetKurse] = useState([]);
   const [decks, setDecks] = useState([]);
   const [progress, setProgress] = useState([]);
   const [tokens, setTokens] = useState(null);
@@ -76,6 +80,7 @@ export default function Karten() {
   const [deckTrash, setDeckTrash] = useState([]);
   const [showTrash, setShowTrash] = useState(false);
   const kq = kursId != null ? `?kurs_id=${kursId}` : "";
+  const sq = subsetKurs ? `&subset_kurs=${subsetKurs}` : ""; // Teilkurs-Roster
   const [loadingDecks, setLoadingDecks] = useState(true);
   const decksLoadedOnce = useRef(false); // Skeleton nur beim ersten Laden, nicht bei Klassen-/Kurswechsel
   const loadDecks = (id) => { if (!id) return; setLoadingDecks(true); return fetch(`${API}/classes/${id}/decks${kq}`).then((r) => (r.ok ? r.json() : [])).then(setDecks).catch(() => {}).finally(() => { setLoadingDecks(false); decksLoadedOnce.current = true; }); };
@@ -97,18 +102,25 @@ export default function Karten() {
     return true;
   };
 
-  const loadProgress = () => fetch(`${API}/classes/${classId}/progress${kq}`).then((r) => (r.ok ? r.json() : [])).then(setProgress).catch(() => {});
+  const loadProgress = () => fetch(`${API}/classes/${classId}/progress${kq}${sq}`).then((r) => (r.ok ? r.json() : [])).then(setProgress).catch(() => {});
   const openDetail = async (p) => {
-    const cards = await fetch(`${API}/classes/${classId}/students/${p.student_id}/cards${kq}`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+    const cards = await fetch(`${API}/classes/${classId}/students/${p.student_id}/cards${kq}${sq}`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
     setDetail({ student: p, cards });
   };
-  const loadTokens = () => fetch(`${API}/classes/${classId}/tokens`, { method: "POST" }).then((r) => (r.ok ? r.json() : [])).then(setTokens).catch(() => {});
+  const loadTokens = () => fetch(`${API}/classes/${classId}/tokens${subsetKurs ? `?subset_kurs=${subsetKurs}` : ""}`, { method: "POST" }).then((r) => (r.ok ? r.json() : [])).then(setTokens).catch(() => {});
   // Daten laden, wenn der Tab (aus der Navbar) oder die Klasse wechselt.
   useEffect(() => {
     if (!classId) return;
     if (view === "progress") loadProgress(); // eslint-disable-line
     if (view === "qr") loadTokens();
-  }, [view, classId, kursId]);
+  }, [view, classId, kursId, subsetKurs]);
+
+  // Teilkurse (nur solche mit einzeln hinzugefügten SuS).
+  useEffect(() => {
+    fetch(`${API}/kurse`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+      setSubsetKurse((Array.isArray(d) ? d : []).filter((k) => (k.member_count || 0) > 0));
+    }).catch(() => {});
+  }, []);
 
   if (classes.length === 0) {
     return (
@@ -125,7 +137,25 @@ export default function Karten() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
         <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("karten.title")}</h1>
-        <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); setTokens(null); }} onKurs={setKursId} />
+        <KursKlasseSelect value={subsetKurs ? null : classId} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); setTokens(null); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} />
+        {subsetKurse.length > 0 && (
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
+            {t("noten.teilkurs")}
+            <select value={subsetKurs || ""} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)" }}
+              onChange={async (e) => {
+                const kid = e.target.value ? Number(e.target.value) : null;
+                setTokens(null);
+                if (!kid) { setSubsetKurs(null); return; }
+                const list = await fetch(`${API}/kurse/${kid}/members`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+                const rep = Array.isArray(list) && list.length ? list[0].class_id : null;
+                if (!rep) return;
+                setSubsetKurs(kid); setClassId(rep); setKursId(kid);
+              }}>
+              <option value="">{t("noten.teilkursNone")}</option>
+              {subsetKurse.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
+            </select>
+          </label>
+        )}
       </div>
 
       {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 10 }}>{error}</p>}
