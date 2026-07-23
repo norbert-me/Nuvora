@@ -462,6 +462,7 @@ export default {
   "modules.activate": "Activar",
   "modules.deactivate": "Desactivar",
   "modules.error": "No se pudo cambiar el módulo",
+  "modules.deactivateConfirm": "¿Desactivar el módulo «{{name}}»? El contenido se conserva y vuelve al reactivarlo.",
   "topics.title": "Temas",
   "topics.collapse": "Ocultar subtemas",
   "topics.expand": "Mostrar subtemas",

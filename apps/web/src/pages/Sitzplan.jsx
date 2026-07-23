@@ -364,7 +364,7 @@ export default function Sitzplan() {
                 display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
                 fontSize: 11.5, letterSpacing: "0.1em", color: "var(--text2)", textTransform: "uppercase", fontWeight: 700,
                 border: "2px solid var(--text3)", borderRadius: 6, background: "var(--bg2)",
-                cursor: "grab", userSelect: "none", boxShadow: "0 1px 3px rgba(0,0,0,0.12)" }}
+                cursor: "grab", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: "none", boxShadow: "0 1px 3px rgba(0,0,0,0.12)" }}
               title={t("sitzplan.board")}>{t("sitzplan.board")}
               {(
                 <span onPointerDown={onTafelRotDown} title={t("sitzplan.rotate")}
@@ -384,7 +384,7 @@ export default function Sitzplan() {
                     display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
                     padding: "6px 22px 6px 8px", borderRadius: 8, border: "1px solid var(--border2)",
                     background: abs ? "var(--bg2)" : "var(--bg)", color: "var(--text)", fontSize: 12.5, fontWeight: 600,
-                    cursor: "grab", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", userSelect: "none",
+                    cursor: "grab", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: "none",
                     opacity: abs ? 0.5 : 1, textDecoration: abs ? "line-through" : "none" }}>
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
                   {abs && <span style={{ position: "absolute", top: 3, right: 24, width: 8, height: 8, borderRadius: 4, background: ABS_COL[abs] }} title={t(`anwesenheit.${abs}`)} />}

@@ -462,6 +462,7 @@ export default {
   "modules.activate": "Aktivieren",
   "modules.deactivate": "Abschalten",
   "modules.error": "Modul konnte nicht geändert werden",
+  "modules.deactivateConfirm": "Modul „{{name}}“ deaktivieren? Der Inhalt bleibt erhalten und ist nach dem Wiedereinschalten wieder da.",
   "topics.title": "Themen",
   "topics.collapse": "Unterthemen ausblenden",
   "topics.expand": "Unterthemen anzeigen",

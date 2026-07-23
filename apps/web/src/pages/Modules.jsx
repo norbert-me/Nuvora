@@ -5,6 +5,7 @@ import { useModules } from "../core/modules.js";
 import { StageBadge, Tabs, inputStyle, btnSecondary, COLORS as C } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { pageTitle } from "../components/Icons.jsx";
+import { askConfirm } from "../core/dialog.jsx";
 
 export default function Modules() {
   const { t } = useLanguage();
@@ -37,6 +38,8 @@ export default function Modules() {
   });
 
   const handle = async (m) => {
+    // Beim Deaktivieren beruhigen: der Inhalt bleibt erhalten, nur der Zugang geht.
+    if (m.active && !(await askConfirm(t("modules.deactivateConfirm", { name: dispName(m) })))) return;
     setBusy(m.key);
     setError("");
     try {

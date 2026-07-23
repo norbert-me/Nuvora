@@ -462,6 +462,7 @@ export default {
   "modules.activate": "Activate",
   "modules.deactivate": "Deactivate",
   "modules.error": "Could not change the module",
+  "modules.deactivateConfirm": "Deactivate module “{{name}}”? Its content is kept and comes back when you reactivate.",
   "topics.title": "Topics",
   "topics.collapse": "Hide subtopics",
   "topics.expand": "Show subtopics",
