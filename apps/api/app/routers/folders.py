@@ -214,7 +214,10 @@ async def delete_question_set(set_id: int, user: User = Depends(get_current_user
     if not qs:
         raise HTTPException(404)
     await ensure_set_access(db, qs, user.id)
-    await db.delete(qs)
+    # Core-DELETE: die DB kaskadiert die Set-Einträge (question_set_items) und
+    # NULLt die Verknüpfungen in Kalender-Einträgen (cardvote_set_id ON DELETE
+    # SET NULL). ORM-Objekt-Delete müsste die items erst laden (async Lazy-Load).
+    await db.execute(sql_delete(QuestionSet).where(QuestionSet.id == set_id))
     await db.commit()
 
 

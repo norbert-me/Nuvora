@@ -1176,7 +1176,7 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onClo
   );
 }
 
-function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders = [], puzzles = [], aktiv = {}, onSave, onDelete, onClose, t }) {
+function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders = [], puzzles = [], aktiv = {}, topicName = () => "", onSave, onDelete, onClose, t }) {
   const navigate = useNavigate();
   // "Ergebnis als Note": die gelaufene Session zum verknüpften Quiz suchen und
   // deren Auswertung mit direkt geöffnetem Noten-Import ansteuern.

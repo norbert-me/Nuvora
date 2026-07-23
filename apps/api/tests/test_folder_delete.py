@@ -42,3 +42,20 @@ async def test_delete_folder_structure(s):
     sets = (await s.execute(select(QuestionSet))).scalars().all()
     assert folders == []
     assert sets == []
+
+
+@pytest.mark.asyncio
+async def test_delete_set_nulls_calendar_link(s):
+    """Wird ein Frageset gelöscht, muss die Verknüpfung im Kalender-Eintrag
+    verschwinden (cardvote_set_id ON DELETE SET NULL)."""
+    from datetime import datetime, timezone
+    from app.models import QuestionSet, CalendarEntry
+    u = User(email="c@d.de", password_hash="x", name="L"); s.add(u); await s.flush()
+    qs = QuestionSet(name="Quiz", owner_id=u.id); s.add(qs); await s.flush()
+    e = CalendarEntry(owner_id=u.id, date=datetime(2026, 9, 3, 12, tzinfo=timezone.utc), cardvote_set_id=qs.id)
+    s.add(e); await s.commit()
+
+    await F.delete_question_set(qs.id, user=u, db=s)
+
+    await s.refresh(e)
+    assert e.cardvote_set_id is None
