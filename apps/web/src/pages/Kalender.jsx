@@ -896,8 +896,6 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
 
   return (
     <div>
-      <button onClick={() => onAdd(day)} style={{ ...btnPrimary, marginBottom: 14 }}>{t("kalender.add")}</button>
-
       {hasBanner && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ ...sectionLabel, marginBottom: 6 }}>{t("kalender.allDay")}</div>

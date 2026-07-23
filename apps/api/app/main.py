@@ -681,12 +681,13 @@ GITHUB_VERSION_URL = os.environ.get(
 GITHUB_RELEASE_URL = os.environ.get(
     "GITHUB_RELEASE_URL", "https://api.github.com/repos/norbert-me/Nuvora/releases/latest"
 )
-# Beta liest die VERSION-Datei ueber die Contents-API (frischer als der Raw-CDN).
-GITHUB_CONTENTS_URL = os.environ.get(
-    "GITHUB_CONTENTS_URL", "https://api.github.com/repos/norbert-me/Nuvora/contents/apps/api/VERSION?ref=main"
+# Beta = neuestes Release inkl. Prerelease. GitHubs /releases ist nach Erstellzeit
+# absteigend sortiert; das erste nicht-Entwurf-Release ist das aktuellste (Pre-)Release.
+GITHUB_RELEASES_URL = os.environ.get(
+    "GITHUB_RELEASES_URL", "https://api.github.com/repos/norbert-me/Nuvora/releases?per_page=20"
 )
-# Kanal je Instanz. "stable" = nur bei Major-Releases; "beta" = jeder Commit
-# (rohe VERSION von main). Steht in app_settings, hier nur der Fallback.
+# Kanal je Instanz. "stable" = nur letztes echtes Release (kein Prerelease);
+# "beta" = neuestes Release inkl. Prerelease. Steht in app_settings, hier nur der Fallback.
 DEFAULT_CHANNEL = os.environ.get("UPDATE_CHANNEL", "stable")
 CHANNELS = ("stable", "beta")
 # Cache je Kanal, damit ein Umschalten nicht am alten Wert haengt.
@@ -707,15 +708,19 @@ from pydantic import BaseModel as _BaseModel
 
 
 def _fetch_latest_beta() -> str:
-    # Ueber die GitHub-Contents-API statt raw.githubusercontent: der Raw-CDN
-    # cacht die Datei mehrere Minuten, sodass frische Commits verspaetet
-    # erschienen. Die API ist deutlich aktueller.
-    import urllib.request, json as _json, base64 as _b64
-    req = urllib.request.Request(GITHUB_CONTENTS_URL, headers={"User-Agent": "Nuvora", "Accept": "application/vnd.github+json"})
+    """Tag des neuesten Releases inkl. Prerelease (Beta-Kanal). Die Liste kommt
+    nach Erstellzeit absteigend; das erste veroeffentlichte (kein Entwurf)
+    Release ist das aktuellste — egal ob Prerelease oder Vollrelease, damit Beta
+    auch ein neueres Stable nicht verpasst. Leer, wenn es noch keins gibt."""
+    import urllib.request, json as _json
+    req = urllib.request.Request(GITHUB_RELEASES_URL, headers={"User-Agent": "Nuvora", "Accept": "application/vnd.github+json"})
     with urllib.request.urlopen(req, timeout=5) as r:
         data = _json.loads(r.read().decode("utf-8", "ignore"))
-    raw = _b64.b64decode(data.get("content", "")).decode("utf-8", "ignore")
-    return raw.strip().split("\n")[0].strip()
+    for rel in (data if isinstance(data, list) else []):
+        if rel.get("draft"):
+            continue
+        return (rel.get("tag_name") or "").strip()
+    return ""
 
 
 def _fetch_latest_stable() -> str:
