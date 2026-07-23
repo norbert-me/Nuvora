@@ -602,7 +602,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           <select value={deck.topic_id ?? ""} onChange={(e) => setTopic(e.target.value)} title={t("karten.topicHint")}
             style={{ ...selectStyle, fontSize: 12, padding: "4px 28px 4px 9px", maxWidth: 180 }}>
             <option value="">– {t("karten.freeCards")} –</option>
-            {[...topics].sort((a, b) => topicLabel(b).localeCompare(topicLabel(a), "de", { numeric: true })).map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
+            {[...topics].sort((a, b) => topicLabel(a).localeCompare(topicLabel(b), "de", { numeric: true })).map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
           </select>
         )}
         {/* Niveau-Stapel: "E"/"G" wird automatisch nur an Schueler des jeweiligen

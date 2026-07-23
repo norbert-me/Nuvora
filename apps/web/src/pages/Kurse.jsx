@@ -148,8 +148,8 @@ export default function Kurse() {
                   </div>
                 )}
                 <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
-                  <button onClick={() => delKurs(k)} style={{ ...btnSecondary, color: C.danger, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                    <Icon d={ICONS.trash} size={15} color={C.danger} /> {t("kurse.deleteKurs") !== "kurse.deleteKurs" ? t("kurse.deleteKurs") : t("common.delete")}
+                  <button onClick={() => delKurs(k)} className="icon-btn" style={{ ...iconBtn }} title={t("kurse.deleteKurs") !== "kurse.deleteKurs" ? t("kurse.deleteKurs") : t("common.delete")}>
+                    <Icon d={ICONS.trash} size={16} color={C.danger} />
                   </button>
                 </div>
               </div>

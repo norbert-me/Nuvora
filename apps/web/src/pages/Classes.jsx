@@ -335,7 +335,7 @@ export default function Classes() {
           <button onClick={addRow} disabled={students.length >= MAX_CARDS} style={{ ...btnSecondary, opacity: students.length >= MAX_CARDS ? 0.4 : 1 }}>{t("classes.addRow")}</button>
           <button onClick={save} disabled={!name.trim()} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={() => setEditing(null)} style={btnSecondary}>{t("common.cancel")}</button>
-          {editing.id && <button onClick={() => { remove(editing.id); setEditing(null); }} style={{ ...btnSecondary, marginLeft: "auto", color: C.danger, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.trash} size={15} color={C.danger} /> {t("classes.delete") !== "classes.delete" ? t("classes.delete") : t("common.delete")}</button>}
+          {editing.id && <button onClick={() => { remove(editing.id); setEditing(null); }} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("classes.delete") !== "classes.delete" ? t("classes.delete") : t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>}
         </div>
         {cardvote && (
           <p style={{ fontSize: 12, color: students.length >= MAX_CARDS ? C.danger : "var(--text3)", margin: 0 }}>

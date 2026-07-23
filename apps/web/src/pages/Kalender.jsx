@@ -29,8 +29,8 @@ const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0
 // zeigt einen Tag zu früh (z.B. 3.9 als 2.9 im Apple-Kalender).
 const isoDay = (d) => { const x = new Date(d); return new Date(x.getFullYear(), x.getMonth(), x.getDate(), 12, 0, 0).toISOString(); };
 const hmToMin = (hhmm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || ""); return m ? (+m[1]) * 60 + (+m[2]) : null; };
-// Auswahl-Dropdowns alphabetisch absteigend (Z→A, zahlenbewusst) sortieren.
-const byLabelDesc = (label) => (a, b) => String(label(b)).localeCompare(String(label(a)), "de", { numeric: true });
+// Auswahl-Dropdowns alphabetisch aufsteigend (A→Z / 1→2→3, zahlenbewusst) sortieren.
+const byLabel = (label) => (a, b) => String(label(a)).localeCompare(String(label(b)), "de", { numeric: true });
 // Ein Eintrag ist ganztägig, wenn er weder an einer Stunde noch an einer freien Uhrzeit hängt.
 const isAllDayEntry = (e) => e.period == null && hmToMin(e.start_time) == null;
 // Schmaler Viewport (Handy hochkant): kompaktere Darstellung (Monat mit Punkten).
@@ -1233,6 +1233,9 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   const sfld = { ...selectStyle, width: "100%", fontSize: 14, padding: "10px 34px 10px 12px" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
   const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
+  // Code-Detektiv ist ein Informatik-Werkzeug: die Rätsel-Auswahl nur zeigen, wenn
+  // die gewählte Klasse eine Informatik-Stunde ist (bestehende Verknüpfung bleibt).
+  const istInformatik = /informatik/i.test((classId && (classes.find((c) => c.id === Number(classId)) || {}).name) || "");
   // Bestehender Eintrag oeffnet zuerst als Ansicht; neuer direkt im Bearbeiten.
   const [edit, setEdit] = useState(!entry.id);
   const clsName = classId && (classes.find((c) => c.id === Number(classId)) || {}).name;
@@ -1335,14 +1338,14 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         <div style={lbl}>{t("kalender.topic")}</div>
         <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={sfld}>
           <option value="">– {t("kalender.noTopic")} –</option>
-          {[...topics].sort(byLabelDesc(topicLabel)).map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
+          {[...topics].sort(byLabel(topicLabel)).map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
         </select>
         {methods.length > 0 && (
           <>
             <div style={lbl}>{t("kalender.method")}</div>
             <select value={methodId} onChange={(e) => setMethodId(e.target.value)} style={sfld}>
               <option value="">– {t("kalender.noMethod")} –</option>
-              {[...methods].sort(byLabelDesc((m) => m.title)).map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
+              {[...methods].sort(byLabel((m) => m.title)).map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
             </select>
           </>
         )}
@@ -1357,7 +1360,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
             <div style={lbl}>{t("kalender.planCardvote")}</div>
             <select value={quizId} onChange={(e) => setQuizId(e.target.value)} style={sfld}>
               <option value="">– {t("kalender.none")} –</option>
-              {[...quizze].sort(byLabelDesc((q) => q.folder ? `${q.folder} / ${q.name}` : q.name)).map((q) => <option key={q.id} value={q.id}>{q.folder ? `${q.folder} / ${q.name}` : q.name}</option>)}
+              {[...quizze].sort(byLabel((q) => q.folder ? `${q.folder} / ${q.name}` : q.name)).map((q) => <option key={q.id} value={q.id}>{q.folder ? `${q.folder} / ${q.name}` : q.name}</option>)}
             </select>
           </>
         )}
@@ -1366,7 +1369,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
             <div style={lbl}>{t("kalender.planKarten")}</div>
             <select value={deckId} onChange={(e) => setDeckId(e.target.value)} style={sfld} disabled={!classId} title={!classId ? t("kalender.pickClassFirst") : undefined}>
               <option value="">– {t("kalender.none")} –</option>
-              {[...decks].sort(byLabelDesc((d) => d.name)).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              {[...decks].sort(byLabel((d) => d.name)).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
             {deckId && <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 4 }}>{t("kalender.deckReleaseHint")}</div>}
           </>
@@ -1376,16 +1379,16 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
             <div style={lbl}>{t("kalender.planLernleiter")}</div>
             <select value={ladderId} onChange={(e) => setLadderId(e.target.value)} style={sfld}>
               <option value="">– {t("kalender.none")} –</option>
-              {[...ladders].sort(byLabelDesc((l) => topicName(l.topic_id) || l.path || "")).map((l) => <option key={l.id} value={l.id}>{(topicName(l.topic_id) || l.path || t("kalender.planLernleiter"))}</option>)}
+              {[...ladders].sort(byLabel((l) => topicName(l.topic_id) || l.path || "")).map((l) => <option key={l.id} value={l.id}>{(topicName(l.topic_id) || l.path || t("kalender.planLernleiter"))}</option>)}
             </select>
           </>
         )}
-        {aktiv["code-detektiv"] && (
+        {aktiv["code-detektiv"] && (istInformatik || puzzleId) && (
           <>
             <div style={lbl}>{t("kalender.planDetektiv")}</div>
             <select value={puzzleId} onChange={(e) => setPuzzleId(e.target.value)} style={sfld}>
               <option value="">– {t("kalender.none")} –</option>
-              {[...puzzles].sort(byLabelDesc((p) => p.title || p.client_id)).map((p) => <option key={p.client_id} value={p.client_id}>{p.title || p.client_id}</option>)}
+              {[...puzzles].sort(byLabel((p) => p.title || p.client_id)).map((p) => <option key={p.client_id} value={p.client_id}>{p.title || p.client_id}</option>)}
             </select>
           </>
         )}

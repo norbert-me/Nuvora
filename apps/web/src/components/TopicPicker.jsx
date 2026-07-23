@@ -32,12 +32,12 @@ export default function TopicPicker({ value, onChange, style }) {
   const byId = new Map(topics.map((t) => [t.id, t]));
   const label = (t) => (t.parent_id ? `${byId.get(t.parent_id)?.name ?? "?"} / ${t.name}` : t.name);
 
-  // Oberthemen mit ihren Unterthemen direkt darunter — alphabetisch absteigend.
-  const nameDesc = (a, b) => (b.name || "").localeCompare(a.name || "", "de", { numeric: true });
+  // Oberthemen mit ihren Unterthemen direkt darunter — alphabetisch aufsteigend.
+  const nameAsc = (a, b) => (a.name || "").localeCompare(b.name || "", "de", { numeric: true });
   const ordered = [];
-  topics.filter((t) => !t.parent_id).sort(nameDesc).forEach((root) => {
+  topics.filter((t) => !t.parent_id).sort(nameAsc).forEach((root) => {
     ordered.push(root);
-    topics.filter((c) => c.parent_id === root.id).sort(nameDesc).forEach((c) => ordered.push(c));
+    topics.filter((c) => c.parent_id === root.id).sort(nameAsc).forEach((c) => ordered.push(c));
   });
 
   return (
