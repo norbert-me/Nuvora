@@ -53,6 +53,7 @@ export default function Klassenarbeit() {
   const [hideIndividual, setHideIndividual] = useState(false); // #55: SuS-Ansicht — einzelne Leistungen + Noten aus
   const [scaleOpen, setScaleOpen] = useState(false); // Notenschlüssel-Editor auf/zu
   const [expandedTasks, setExpandedTasks] = useState(() => new Set()); // aufgeklappte Teilaufgaben-Auswertung
+  const [infoOpen, setInfoOpen] = useState(false); // „Auswertung verstehen"
   const [distMode, setDistMode] = useState("bar");   // Notenverteilung: "bar" | "box"
   const [barMode, setBarMode] = useState("whole");   // Balken: "whole" (1..6) | "fine" (Teilnoten)
   const [boxMode, setBoxMode] = useState("pct");     // Boxplot: "pct" (%) | "note" (Noten)
@@ -527,6 +528,46 @@ export default function Klassenarbeit() {
                   {analyse.noten.sdPct != null && <StatCard label={t("klassenarbeit.stdev")} value={`${String(analyse.noten.sdPct).replace(".", ",")}%`} />}
                   {analyse.noten.ciLow != null && <StatCard label={t("klassenarbeit.ci")} value={`${analyse.noten.ciLow}–${analyse.noten.ciHigh}%`} />}
                 </div>
+                {/* „Auswertung verstehen": Kennzahlen erklärt + konkrete Handlungshinweise. */}
+                <button onClick={() => setInfoOpen((v) => !v)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12.5, marginBottom: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ display: "inline-flex", transform: infoOpen ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}><Icon d={ICONS.open} size={12} /></span>
+                  {t("klassenarbeit.explain")}
+                </button>
+                {infoOpen && (() => {
+                  const sd = analyse.noten.sdPct;
+                  const sdLevel = sd == null ? null : sd < 10 ? "low" : sd <= 25 ? "mid" : "high";
+                  const weak = analyse.topics.filter((tp) => tp.pct < 50).map((tp) => tp.label);
+                  const lowDisc = analyse.perTask.filter((tk) => tk.disc != null && tk.disc < 0.2);
+                  const Item = ({ term, children }) => (
+                    <li style={{ marginBottom: 7 }}><b style={{ color: "var(--text)" }}>{term}:</b> <span style={{ color: "var(--text2)" }}>{children}</span></li>
+                  );
+                  return (
+                    <div style={{ padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 12, fontSize: 13, lineHeight: 1.55 }}>
+                      <ul style={{ margin: 0, paddingLeft: 18 }}>
+                        <Item term={t("klassenarbeit.avgGrade") + " / " + t("klassenarbeit.median")}>{t("klassenarbeit.explainAvg")}</Item>
+                        {sd != null && (
+                          <Item term={`${t("klassenarbeit.stdev")} (${String(sd).replace(".", ",")}%)`}>
+                            {t("klassenarbeit.explainSd")} {" "}
+                            <b style={{ color: sdLevel === "low" ? C.warning : sdLevel === "mid" ? C.success : C.danger }}>
+                              {t(`klassenarbeit.explainSd_${sdLevel}`)}
+                            </b>
+                          </Item>
+                        )}
+                        {analyse.noten.ciLow != null && <Item term={t("klassenarbeit.ci")}>{t("klassenarbeit.explainCi")}</Item>}
+                        <Item term={t("klassenarbeit.disc")}>{t("klassenarbeit.explainDisc")}</Item>
+                      </ul>
+                      {(weak.length > 0 || lowDisc.length > 0) && (
+                        <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+                          <div style={{ fontWeight: 700, marginBottom: 5 }}>{t("klassenarbeit.explainActions")}</div>
+                          <ul style={{ margin: 0, paddingLeft: 18 }}>
+                            {weak.length > 0 && <li style={{ marginBottom: 5, color: "var(--text2)" }}>{t("klassenarbeit.explainWeak", { topics: weak.join(", ") })}</li>}
+                            {lowDisc.length > 0 && <li style={{ color: "var(--text2)" }}>{t("klassenarbeit.explainLowDisc", { n: lowDisc.length })}</li>}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 {/* Verteilung / Boxplot — Panel + Pillen-Umschalter wie CardVote. */}
                 <div style={{ padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
