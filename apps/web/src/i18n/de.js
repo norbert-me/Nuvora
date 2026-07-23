@@ -957,6 +957,7 @@ export default {
   "karten.newFolder": "Name des neuen Ordners",
   "karten.renameFolder": "Ordner umbenennen",
   "karten.delFolderConfirm": "Ordner löschen? Unterordner werden mitgelöscht; die Stapel darin wandern in die Ebene darüber.",
+  "karten.move": "Verschieben",
   "karten.moveToFolder": "In Ordner verschieben",
   "karten.rootFolder": "kein Ordner",
   "karten.newDeckItem": "Neuer Stapel",

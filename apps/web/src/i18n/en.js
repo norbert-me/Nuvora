@@ -931,6 +931,7 @@ export default {
   "karten.newFolder": "Name of the new folder",
   "karten.renameFolder": "Rename folder",
   "karten.delFolderConfirm": "Delete folder? Subfolders are deleted too; the decks inside move up one level.",
+  "karten.move": "Move",
   "karten.moveToFolder": "Move to folder",
   "karten.rootFolder": "no folder",
   "karten.newDeckItem": "New deck",

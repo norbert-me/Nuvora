@@ -481,6 +481,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   const [collapsed, setCollapsed] = useState(true);
   const [renaming, setRenaming] = useState(false);
   const [nameVal, setNameVal] = useState(deck.name || "");
+  const [moveOpen, setMoveOpen] = useState(false); // „Verschieben"-Popover (Ziel-Ordner)
   // LaTeX-Editor: Formel ins zuletzt fokussierte Feld (Vorder-/Rückseite) einfügen.
   const frontRef = useRef(null);
   const backRef = useRef(null);
@@ -566,11 +567,25 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         </select>
         )}
         {!collapsed && onMove && folders.length > 0 && (
-          <select value={deck.folder_id ?? ""} onChange={(e) => onMove(deck, e.target.value ? Number(e.target.value) : null)} title={t("karten.moveToFolder")}
-            style={{ ...selectStyle, fontSize: 12, padding: "4px 28px 4px 9px", maxWidth: 160 }}>
-            <option value="">– {t("karten.rootFolder")} –</option>
-            {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-          </select>
+          <div style={{ position: "relative" }}>
+            <button onClick={() => setMoveOpen((v) => !v)} style={{ ...btnSecondary, fontSize: 12, padding: "5px 11px", display: "inline-flex", alignItems: "center", gap: 6 }} title={t("karten.moveToFolder")}>
+              <Icon d={ICONS.move || ICONS.export} size={14} /> {t("karten.move")}
+            </button>
+            {moveOpen && (<>
+              <div onClick={() => setMoveOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+              <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50, minWidth: 180, maxHeight: 260, overflow: "auto", background: "var(--card)", border: "1px solid var(--border2)", borderRadius: 12, boxShadow: "0 8px 30px rgba(0,0,0,0.18)", padding: 6 }}>
+                {[{ id: null, name: `– ${t("karten.rootFolder")} –` }, ...folders].map((f) => {
+                  const active = (deck.folder_id ?? null) === f.id;
+                  return (
+                    <button key={f.id ?? "root"} onClick={() => { setMoveOpen(false); if (!active) onMove(deck, f.id); }}
+                      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "8px 12px", background: active ? "var(--bg2)" : "none", border: "none", borderRadius: 8, color: active ? "var(--text3)" : "var(--text)", fontSize: 13, fontWeight: active ? 700 : 500, cursor: active ? "default" : "pointer", textAlign: "left" }}>
+                      {f.name}{active ? " ✓" : ""}
+                    </button>
+                  );
+                })}
+              </div>
+            </>)}
+          </div>
         )}
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{deck.cards.length} {t("karten.cards")}</span>

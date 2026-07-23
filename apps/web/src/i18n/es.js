@@ -931,6 +931,7 @@ export default {
   "karten.newFolder": "Nombre de la nueva carpeta",
   "karten.renameFolder": "Renombrar carpeta",
   "karten.delFolderConfirm": "¿Eliminar la carpeta? Las subcarpetas también; los mazos suben un nivel.",
+  "karten.move": "Mover",
   "karten.moveToFolder": "Mover a carpeta",
   "karten.rootFolder": "sin carpeta",
   "karten.newDeckItem": "Nuevo mazo",
