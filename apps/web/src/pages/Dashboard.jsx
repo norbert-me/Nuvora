@@ -415,6 +415,7 @@ export default function Dashboard() {
             templateItems={[
               { label: t("classes.templateExcel"), href: `${API}/import/questions-template.xlsx` },
               { label: t("dash.jsonExample"), href: "/beispiel-frageset.json" },
+              { label: t("dash.jsonFolderExample"), href: "/beispiel-ordner.json" },
             ]}
           />
         </div>

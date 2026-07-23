@@ -349,6 +349,7 @@ export default {
   "dash.setName": "Nombre del banco de preguntas",
   "dash.setNamePrompt": "Nombre del banco de preguntas:",
   "dash.importJsonItem": "Importar carpeta/banco (JSON)",
+  "dash.jsonFolderExample": "Ejemplo: carpeta (JSON)",
   "dash.jsonExample": "Ejemplo JSON",
   "dash.deleteFolderConfirm": "¿Eliminar la carpeta y todo su contenido?",
   "dash.deleteSetConfirm": "¿Eliminar el banco de preguntas?",

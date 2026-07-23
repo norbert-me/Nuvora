@@ -1,0 +1,56 @@
+{
+  "type": "cardvote_folder",
+  "version": 1,
+  "name": "Mathematik (Beispiel-Ordner)",
+  "question_sets": [
+    {
+      "name": "Kopfrechnen",
+      "shuffle_questions": false,
+      "shuffle_answers": true,
+      "questions": [
+        {
+          "text": "Was ist 7 · 8?",
+          "choices": { "A": "54", "B": "56", "C": "48", "D": "64" },
+          "correct_answer": "B",
+          "image_url": null,
+          "image_layout": "above",
+          "num_choices": 4,
+          "choice_images": null
+        },
+        {
+          "text": "Was ist 144 : 12?",
+          "choices": { "A": "11", "B": "13", "C": "12" },
+          "correct_answer": "C",
+          "image_url": null,
+          "image_layout": "above",
+          "num_choices": 3,
+          "choice_images": null
+        }
+      ]
+    }
+  ],
+  "children": [
+    {
+      "name": "Bruchrechnung",
+      "question_sets": [
+        {
+          "name": "Brüche kürzen",
+          "shuffle_questions": false,
+          "shuffle_answers": true,
+          "questions": [
+            {
+              "text": "Kürze $\\frac{6}{8}$ vollständig.",
+              "choices": { "A": "$\\frac{3}{4}$", "B": "$\\frac{2}{3}$", "C": "$\\frac{6}{8}$", "D": "$\\frac{4}{6}$" },
+              "correct_answer": "A",
+              "image_url": null,
+              "image_layout": "above",
+              "num_choices": 4,
+              "choice_images": null
+            }
+          ]
+        }
+      ],
+      "children": []
+    }
+  ]
+}

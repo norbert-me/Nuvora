@@ -349,6 +349,7 @@ export default {
   "dash.setName": "Question set name",
   "dash.setNamePrompt": "Question set name:",
   "dash.importJsonItem": "Import folder/set (JSON)",
+  "dash.jsonFolderExample": "Example: folder (JSON)",
   "dash.jsonExample": "JSON example",
   "dash.deleteFolderConfirm": "Delete folder and all contents?",
   "dash.deleteSetConfirm": "Delete question set?",
