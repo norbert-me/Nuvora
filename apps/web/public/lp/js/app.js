@@ -822,7 +822,7 @@
         const ober = topics.find(t => !t.parent_id && t.name === thema);
         const kernKinder = ober ? topics.filter(t => t.parent_id === ober.id).map(t => t.name) : [];
         const matching = [...new Set([...aufgaben.filter(a => a.thema === thema).map(a => a.unterthema).filter(Boolean), ...kernKinder])].sort();
-        dl.innerHTML = matching.map(t => `<option value="${esc(t)}">`).join('');
+        dl.innerHTML = matching.map(t => `<option value="${escAttr(t)}">`).join('');
     }
 
     // ─── Bild-Upload ───
@@ -860,14 +860,14 @@
 
     function renderBildPreview() {
         if (currentBild) {
-            bildPreview.innerHTML = `<img src="${currentBild}"><span class="bild-remove" id="bild-remove">entfernen</span>`;
+            bildPreview.innerHTML = `<img src="${safeImgSrc(currentBild)}"><span class="bild-remove" id="bild-remove">entfernen</span>`;
             document.getElementById('bild-remove').addEventListener('click', () => { currentBild = null; bildInput.value = ''; bildPreview.innerHTML = ''; });
         } else { bildPreview.innerHTML = ''; }
     }
 
     function renderLoesungBildPreview() {
         if (currentLoesungBild) {
-            loesungBildPreview.innerHTML = `<img src="${currentLoesungBild}"><span class="bild-remove" id="loesungbild-remove">entfernen</span>`;
+            loesungBildPreview.innerHTML = `<img src="${safeImgSrc(currentLoesungBild)}"><span class="bild-remove" id="loesungbild-remove">entfernen</span>`;
             document.getElementById('loesungbild-remove').addEventListener('click', () => { currentLoesungBild = null; loesungBildInput.value = ''; loesungBildPreview.innerHTML = ''; });
         } else { loesungBildPreview.innerHTML = ''; }
     }
@@ -989,7 +989,7 @@
         renderBildPreview();
         currentLoesungBild = a.loesungBild || null;
         if (currentLoesungBild) {
-            loesungBildPreview.innerHTML = '<img src="' + currentLoesungBild + '" style="max-width:200px">';
+            loesungBildPreview.innerHTML = '<img src="' + safeImgSrc(currentLoesungBild) + '" style="max-width:200px">';
         } else {
             loesungBildPreview.innerHTML = '';
         }
@@ -1215,7 +1215,7 @@
         const themen = [...new Set([...aufgaben.map(a => a.thema).filter(Boolean), ...kernOber])].sort();
         const sel = document.getElementById('filter-thema');
         const cur = sel.value;
-        sel.innerHTML = '<option value="">Alle Themen</option>' + themen.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+        sel.innerHTML = '<option value="">Alle Themen</option>' + themen.map(t => `<option value="${escAttr(t)}">${esc(t)}</option>`).join('');
         sel.value = cur;
 
         const selectedThema = document.getElementById('filter-thema').value;
@@ -1227,16 +1227,16 @@
         )].sort();
         const selU = document.getElementById('filter-unterthema');
         const curU = selU.value;
-        selU.innerHTML = '<option value="">Alle Unterthemen</option>' + unterthemen.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+        selU.innerHTML = '<option value="">Alle Unterthemen</option>' + unterthemen.map(t => `<option value="${escAttr(t)}">${esc(t)}</option>`).join('');
         selU.value = curU;
 
         const dl = document.getElementById('themen-list');
-        dl.innerHTML = themen.map(t => `<option value="${esc(t)}">`).join('');
+        dl.innerHTML = themen.map(t => `<option value="${escAttr(t)}">`).join('');
 
         const kernUnter = topics.filter(t => t.parent_id).map(t => t.name);
         const allUnterthemen = [...new Set([...aufgaben.map(a => a.unterthema).filter(Boolean), ...kernUnter])].sort();
         const dlU = document.getElementById('unterthemen-list');
-        dlU.innerHTML = allUnterthemen.map(t => `<option value="${esc(t)}">`).join('');
+        dlU.innerHTML = allUnterthemen.map(t => `<option value="${escAttr(t)}">`).join('');
     }
 
     document.getElementById('filter-thema').addEventListener('change', () => {
@@ -1418,9 +1418,9 @@
     function renderKlassen() {
         const container = document.getElementById('klassen-chips');
         container.innerHTML = klassen.map(k => `
-            <span class="chip klasse-chip" data-klasse="${esc(k)}">
+            <span class="chip klasse-chip" data-klasse="${escAttr(k)}">
                 ${esc(k)}
-                <button type="button" class="chip-delete" data-klasse="${esc(k)}">&times;</button>
+                <button type="button" class="chip-delete" data-klasse="${escAttr(k)}">&times;</button>
             </span>
         `).join('');
 
@@ -1502,7 +1502,7 @@
 
         const schuelerSel = document.getElementById('schueler-klasse');
         const cur = schuelerSel.value;
-        schuelerSel.innerHTML = '<option value="">– wählen –</option>' + sorted.map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join('');
+        schuelerSel.innerHTML = '<option value="">– wählen –</option>' + sorted.map(k => `<option value="${escAttr(k)}">${esc(k)}</option>`).join('');
         schuelerSel.value = cur;
     }
 
@@ -1681,12 +1681,12 @@
         }
 
         const selT = document.getElementById('gen-thema');
-        if (selT) selT.innerHTML = '<option value="">– Thema wählen –</option>' + themen.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+        if (selT) selT.innerHTML = '<option value="">– Thema wählen –</option>' + themen.map(t => `<option value="${escAttr(t)}">${esc(t)}</option>`).join('');
 
         const selK = document.getElementById('gen-klasse');
         if (selK) {
             const cur = selK.value;   // Auswahl erhalten, wenn nur neu befuellt wird
-            selK.innerHTML = '<option value="">– Kurs wählen –</option>' + kurseNamen.map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join('');
+            selK.innerHTML = '<option value="">– Kurs wählen –</option>' + kurseNamen.map(k => `<option value="${escAttr(k)}">${esc(k)}</option>`).join('');
             if (cur && kurseNamen.includes(cur)) selK.value = cur;
         }
         if (!kurseNamen.length) console.warn('[Generator] Kurs-Selektor bleibt leer: klassen=%d, schueler=%d, classes/kurse direkt auch leer — hat das Konto im Kern Klassen?', klassen.length, schueler.length);
@@ -1712,7 +1712,7 @@
                 <span id="gen-ut-summary">Alle Unterthemen</span><span style="color:var(--text-muted)">▾</span>
               </summary>
               <div style="position:absolute;z-index:30;top:calc(100% + 4px);left:0;min-width:100%;max-height:260px;overflow:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.18);padding:4px">
-                ${unterthemen.map(u => `<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;border-radius:6px"><input type="checkbox" class="gen-ut-cb" value="${esc(u)}"> ${esc(u)}</label>`).join('')}
+                ${unterthemen.map(u => `<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;border-radius:6px"><input type="checkbox" class="gen-ut-cb" value="${escAttr(u)}"> ${esc(u)}</label>`).join('')}
               </div>
             </details>`;
         const summary = () => {
@@ -2746,8 +2746,8 @@
             ${tags ? sec('Tags', `<div style="color:#555">${tags}</div>`) : ''}
             ${a.aufgabentext ? sec('Aufgabentext', `<div style="white-space:pre-wrap;line-height:1.5">${esc(a.aufgabentext)}</div>`) : ''}
             ${a.loesung ? sec('Lösung', `<div style="white-space:pre-wrap;line-height:1.5">${esc(a.loesung)}</div>`) : ''}
-            ${a.bild ? sec('Bild', `<img src="${a.bild}" style="max-width:100%;border-radius:8px;display:block">`) : ''}
-            ${a.loesungBild ? sec('Lösungsbild', `<img src="${a.loesungBild}" style="max-width:100%;border-radius:8px;display:block">`) : ''}
+            ${a.bild ? sec('Bild', `<img src="${safeImgSrc(a.bild)}" style="max-width:100%;border-radius:8px;display:block">`) : ''}
+            ${a.loesungBild ? sec('Lösungsbild', `<img src="${safeImgSrc(a.loesungBild)}" style="max-width:100%;border-radius:8px;display:block">`) : ''}
         `;
         // Eingebettet: Nuvora rendert das Overlay ueber der ganzen Seite —
         // zentriert und ohne sichtbare iframe-Grenze. Sonst lokales Modal.
@@ -3160,6 +3160,21 @@
         const d = document.createElement('div');
         d.textContent = str;
         return d.innerHTML;
+    }
+
+    // esc() escaped nur < > & — in einem doppelt-gequoteten Attribut bricht ein "
+    // trotzdem aus (…onerror=…). Fuer Attributwerte zusaetzlich " und ' escapen.
+    function escAttr(str) {
+        return esc(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // Bildquellen aus Import/Marktplatz sind nicht vertrauenswuerdig: nur data:-Bilder,
+    // blob: und relative/eigene URLs zulassen — javascript:/andere Schemata raus.
+    function safeImgSrc(src) {
+        const s = String(src || '').trim();
+        if (/^data:image\//i.test(s) || /^blob:/i.test(s)) return escAttr(s);
+        if (/^\//.test(s) || /^https?:\/\//i.test(s)) return escAttr(s);
+        return '';
     }
 
     // Inline-SVG-Icons (keine Emoji). currentColor erbt Button-Textfarbe.
