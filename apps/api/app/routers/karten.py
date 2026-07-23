@@ -18,12 +18,12 @@ import qrcode
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
-from sqlalchemy import select, func as sa_func, and_, or_
+from sqlalchemy import select, func as sa_func, and_, or_, delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from sqlalchemy.orm import selectinload
-from ..models import Card, CardDeck, CardReview, SchoolClass, Student, User, Session, Scan, QuestionSetItem
+from ..models import Card, CardDeck, CardFolder, CardReview, SchoolClass, Student, User, Session, Scan, QuestionSetItem
 from .auth import get_current_user, rate_limit
 from .modules import is_active
 
@@ -138,6 +138,7 @@ class DeckIn(BaseModel):
     name: str = ""
     topic_id: Optional[int] = None
     niveau: str = ""  # "" = alle, "E"/"G" = nur dieses Niveau
+    folder_id: Optional[int] = None  # Ordner (wie CardVote); NULL = Wurzel
 
 
 class CardOut(BaseModel):
@@ -154,9 +155,75 @@ class DeckOut(BaseModel):
     name: str
     topic_id: Optional[int] = None
     niveau: str = ""
+    folder_id: Optional[int] = None
     released_at: Optional[datetime] = None
     cards: List[CardOut] = []
     model_config = {"from_attributes": True}
+
+
+# ─── Ordner (wie CardVote) zum Gruppieren der Stapel ───
+
+class CardFolderIn(BaseModel):
+    name: str = ""
+    parent_id: Optional[int] = None
+
+
+class CardFolderOut(BaseModel):
+    id: int
+    name: str
+    parent_id: Optional[int] = None
+    model_config = {"from_attributes": True}
+
+
+async def _owned_card_folder(db, user, folder_id):
+    f = await db.get(CardFolder, folder_id)
+    if not f or f.owner_id != user.id:
+        raise HTTPException(404, "Ordner nicht gefunden")
+    return f
+
+
+def _folder_scope(class_id, kurs_id):
+    """Ordner hängen wie die Stapel am KURS (alle Fach-Klassen); ohne Kurs an der
+    Klasse. So passen Ordner und Decks zusammen."""
+    if kurs_id is not None:
+        return [CardFolder.kurs_id == kurs_id]
+    return [CardFolder.class_id == class_id, CardFolder.kurs_id.is_(None)]
+
+
+@router.get("/classes/{class_id}/card-folders", response_model=List[CardFolderOut])
+async def list_card_folders(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    await _owned_class(db, user, class_id)
+    rows = (await db.execute(select(CardFolder).where(CardFolder.owner_id == user.id, *_folder_scope(class_id, kurs_id)).order_by(CardFolder.name))).scalars().all()
+    return rows
+
+
+@router.post("/classes/{class_id}/card-folders", response_model=CardFolderOut, status_code=201)
+async def create_card_folder(class_id: int, body: CardFolderIn, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    await _owned_class(db, user, class_id)
+    f = CardFolder(owner_id=user.id, class_id=class_id, kurs_id=kurs_id, name=body.name.strip(), parent_id=body.parent_id)
+    db.add(f)
+    await db.commit()
+    await db.refresh(f)
+    return f
+
+
+@router.put("/card-folders/{folder_id}", response_model=CardFolderOut)
+async def update_card_folder(folder_id: int, body: CardFolderIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    f = await _owned_card_folder(db, user, folder_id)
+    f.name = body.name.strip()
+    f.parent_id = body.parent_id
+    await db.commit()
+    await db.refresh(f)
+    return f
+
+
+@router.delete("/card-folders/{folder_id}", status_code=204)
+async def delete_card_folder(folder_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Ordner löschen: DB kaskadiert Unterordner (parent_id CASCADE); die Stapel
+    darin wandern in die Wurzel (deck.folder_id SET NULL). Stapel bleiben also."""
+    await _owned_card_folder(db, user, folder_id)
+    await db.execute(sql_delete(CardFolder).where(CardFolder.id == folder_id))
+    await db.commit()
 
 
 @router.get("/classes/{class_id}/decks", response_model=List[DeckOut])
@@ -187,7 +254,8 @@ async def create_deck(class_id: int, body: DeckIn, kurs_id: Optional[int] = None
     rate_limit("karten_deck", f"u{user.id}", 100, 60, "Zu viele Stapel. Bitte kurz warten.")
     cls = await _owned_class(db, user, class_id)
     deck = CardDeck(class_id=class_id, kurs_id=kurs_id, owner_id=user.id, name=body.name.strip(),
-                    topic_id=body.topic_id, niveau=body.niveau if body.niveau in ("E", "G") else "")
+                    topic_id=body.topic_id, niveau=body.niveau if body.niveau in ("E", "G") else "",
+                    folder_id=body.folder_id)
     db.add(deck)
     await db.commit()
     await db.refresh(deck, ["cards"])
@@ -201,6 +269,7 @@ async def update_deck(deck_id: int, body: DeckIn, user: User = Depends(require_m
     deck.name = body.name.strip()
     deck.topic_id = body.topic_id
     deck.niveau = body.niveau if body.niveau in ("E", "G") else ""
+    deck.folder_id = body.folder_id
     await db.commit()
     await db.refresh(deck, ["cards"])
     return deck

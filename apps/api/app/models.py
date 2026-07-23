@@ -867,6 +867,8 @@ class CardDeck(Base):
     # Optionale Bindung an ein Kern-Thema (oder NULL = freie Karten). Kalender-
     # Eintraege mit demselben Thema rollen den Stapel automatisch aus.
     topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Optionaler Ordner (wie bei CardVote) zum Gruppieren der Stapel. NULL = Wurzel.
+    folder_id: Mapped[Optional[int]] = mapped_column(ForeignKey("card_folders.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Papierkorb: gesetzt = gelöscht, 30 Tage wiederherstellbar (Karten-Fortschritt bleibt).
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
@@ -875,6 +877,20 @@ class CardDeck(Base):
     released_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     cards: Mapped[list["Card"]] = relationship(back_populates="deck", cascade="all, delete-orphan", order_by="Card.position")
+
+
+class CardFolder(Base):
+    """Ordner zum Gruppieren von Kartenstapeln (wie CardVote-Ordner), pro
+    Klasse/Kurs. Verschachtelt über parent_id. Löschen eines Ordners kaskadiert
+    zu Unterordnern; die Stapel darin wandern in die Wurzel (deck.folder_id SET NULL)."""
+    __tablename__ = "card_folders"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
+    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("card_folders.id", ondelete="CASCADE"), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(120), default="", server_default="")
 
 
 class Card(Base):

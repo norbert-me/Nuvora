@@ -85,7 +85,17 @@ export default function Karten() {
   const decksLoadedOnce = useRef(false); // Skeleton nur beim ersten Laden, nicht bei Klassen-/Kurswechsel
   const loadDecks = (id) => { if (!id) return; setLoadingDecks(true); return fetch(`${API}/classes/${id}/decks${kq}`).then((r) => (r.ok ? r.json() : [])).then(setDecks).catch(() => {}).finally(() => { setLoadingDecks(false); decksLoadedOnce.current = true; }); };
   const loadTrash = (id) => id && fetch(`${API}/classes/${id}/decks/trash${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => setDeckTrash(Array.isArray(d) ? d : [])).catch(() => {});
-  useEffect(() => { loadDecks(classId); loadTrash(classId); }, [classId, kursId]);
+  // Ordner (wie CardVote) zum Gruppieren der Stapel — pro Klasse/Kurs.
+  const [cardFolders, setCardFolders] = useState([]);
+  const [currentCardFolder, setCurrentCardFolder] = useState(null); // null = Wurzel
+  const loadFolders = (id) => id && fetch(`${API}/classes/${id}/card-folders${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => setCardFolders(Array.isArray(d) ? d : [])).catch(() => {});
+  useEffect(() => { loadDecks(classId); loadTrash(classId); loadFolders(classId); setCurrentCardFolder(null); }, [classId, kursId]);
+  const folderName = (fid) => (cardFolders.find((f) => f.id === fid) || {}).name || "";
+  const folderPath = (fid) => { const byId = Object.fromEntries(cardFolders.map((f) => [f.id, f])); const path = []; let cur = fid; while (cur != null && byId[cur]) { path.unshift(byId[cur]); cur = byId[cur].parent_id ?? null; } return path; };
+  const createFolder = async (name) => { if (!name || !name.trim() || !classId) return; await fetch(`${API}/classes/${classId}/card-folders${kq}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), parent_id: currentCardFolder }) }).catch(() => {}); loadFolders(classId); };
+  const renameFolder = async (f) => { const n = await askPrompt(t("karten.renameFolder"), f.name); if (n == null) return; await fetch(`${API}/card-folders/${f.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n.trim(), parent_id: f.parent_id ?? null }) }).catch(() => {}); loadFolders(classId); };
+  const deleteFolder = async (f) => { if (!await askConfirm(t("karten.delFolderConfirm"))) return; await fetch(`${API}/card-folders/${f.id}`, { method: "DELETE" }).catch(() => {}); if (currentCardFolder === f.id) setCurrentCardFolder(f.parent_id ?? null); loadFolders(classId); loadDecks(classId); };
+  const moveDeck = async (deck, folderId) => { await fetch(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", folder_id: folderId }) }).catch(() => {}); loadDecks(classId); };
   const restoreDeck = async (id) => { await fetch(`${API}/decks/${id}/restore`, { method: "POST" }).catch(() => {}); loadDecks(classId); loadTrash(classId); };
   const purgeDeck = async (id) => {
     if (!await askConfirm(t("karten.purgeConfirm"))) return;
@@ -166,15 +176,45 @@ export default function Karten() {
             <summary style={{ cursor: "pointer", fontSize: 13.5, fontWeight: 600, color: "var(--text2)" }}>{t("karten.srTitle")}</summary>
             <p style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.6, margin: "8px 0 0" }}>{t("karten.srInfo")}</p>
           </details>
-          <form data-tour="karten-new" onSubmit={async (e) => { e.preventDefault(); if (addingDeck || !newDeck.trim()) return; setAddingDeck(true); try { if (await call(() => fetch(`${API}/classes/${classId}/decks${kq}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newDeck.trim() }) }))) setNewDeck(""); } finally { setAddingDeck(false); } }}
-            style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-            <input value={newDeck} onChange={(e) => setNewDeck(e.target.value)} placeholder={t("karten.newDeck")}
-              style={{ flex: 1, maxWidth: 320, padding: "8px 12px", border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)" }} />
-            <AddButton type="submit" disabled={addingDeck || !newDeck.trim()} title={t("common.add")} style={{ opacity: (!addingDeck && newDeck.trim()) ? 1 : 0.4 }} />
-          </form>
+          {/* Breadcrumb: Wurzel › Ordner › Unterordner */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 12, fontSize: 13.5 }}>
+            <button onClick={() => setCurrentCardFolder(null)} style={{ background: "none", border: "none", cursor: "pointer", color: currentCardFolder == null ? "var(--text)" : "var(--accent)", fontWeight: 600, padding: 0 }}>{t("karten.allDecks")}</button>
+            {folderPath(currentCardFolder).map((f, i, arr) => (
+              <span key={f.id} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <span style={{ color: "var(--text3)" }}>›</span>
+                <button onClick={() => setCurrentCardFolder(f.id)} style={{ background: "none", border: "none", cursor: "pointer", color: i === arr.length - 1 ? "var(--text)" : "var(--accent)", fontWeight: 600, padding: 0 }}>{f.name}</button>
+              </span>
+            ))}
+          </div>
+
+          {/* Neuer Stapel (im aktuellen Ordner) + neuer Ordner */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+            <form data-tour="karten-new" onSubmit={async (e) => { e.preventDefault(); if (addingDeck || !newDeck.trim()) return; setAddingDeck(true); try { if (await call(() => fetch(`${API}/classes/${classId}/decks${kq}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newDeck.trim(), folder_id: currentCardFolder }) }))) setNewDeck(""); } finally { setAddingDeck(false); } }}
+              style={{ display: "flex", gap: 8, flex: 1, minWidth: 240 }}>
+              <input value={newDeck} onChange={(e) => setNewDeck(e.target.value)} placeholder={t("karten.newDeck")}
+                style={{ flex: 1, maxWidth: 320, padding: "8px 12px", border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)" }} />
+              <AddButton type="submit" disabled={addingDeck || !newDeck.trim()} title={t("common.add")} style={{ opacity: (!addingDeck && newDeck.trim()) ? 1 : 0.4 }} />
+            </form>
+            <button onClick={async () => { const n = await askPrompt(t("karten.newFolder")); if (n) createFolder(n); }} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <Icon d={ICONS.plus} size={15} /> {t("karten.folder")}
+            </button>
+          </div>
+
+          {/* Unterordner des aktuellen Ordners */}
+          {cardFolders.filter((f) => (f.parent_id ?? null) === currentCardFolder).map((f) => (
+            <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", marginBottom: 8, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
+              <button onClick={() => setCurrentCardFolder(f.id)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", textAlign: "left", minWidth: 0, color: "var(--text)" }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                <strong style={{ fontSize: 15 }}>{f.name}</strong>
+              </button>
+              <button onClick={() => renameFolder(f)} className="icon-btn" style={iconBtn} title={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
+              <button onClick={() => deleteFolder(f)} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
+            </div>
+          ))}
+
           {loadingDecks && !decksLoadedOnce.current ? <Skeleton rows={3} height={60} />
-            : decks.length === 0 ? <Empty title={t("karten.noDecks")} hint={t("karten.noDecksHint")} /> : null}
-          {decks.map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} />)}
+            : (decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).length === 0 && cardFolders.filter((f) => (f.parent_id ?? null) === currentCardFolder).length === 0) ? <Empty title={t("karten.noDecks")} hint={t("karten.noDecksHint")} /> : null}
+          {decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} />)}
           {deckTrash.length > 0 && (
             <div style={{ marginTop: 8 }}>
               <button onClick={() => setShowTrash((v) => !v)} style={{ ...btnSecondary, fontSize: 13 }}>{t("karten.trash")} ({deckTrash.length})</button>
@@ -371,14 +411,16 @@ function StudentDetail({ detail, t, onClose }) {
   );
 }
 
-function Deck({ deck, t, call, topics = [], showTopic = false }) {
+function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onMove }) {
   const [front, setFront] = useState("");
   const [back, setBack] = useState("");
   const [planDate, setPlanDate] = useState("");
   const [busy, setBusy] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [importing, setImporting] = useState(false);
-  const saveDeck = (patch) => call(() => fetch(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", ...patch }) }));
+  // folder_id IMMER mitschicken, sonst nullt ein Speichern (Name/Thema/Niveau)
+  // die Ordner-Zuordnung.
+  const saveDeck = (patch) => call(() => fetch(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", folder_id: deck.folder_id ?? null, ...patch }) }));
   const setTopic = (tid) => saveDeck({ topic_id: tid ? Number(tid) : null });
   const setNiveau = (n) => saveDeck({ niveau: n });
   const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
@@ -419,6 +461,13 @@ function Deck({ deck, t, call, topics = [], showTopic = false }) {
           <option value="E">{t("karten.niveauE")}</option>
           <option value="G">{t("karten.niveauG")}</option>
         </select>
+        {onMove && folders.length > 0 && (
+          <select value={deck.folder_id ?? ""} onChange={(e) => onMove(deck, e.target.value ? Number(e.target.value) : null)} title={t("karten.moveToFolder")}
+            style={{ ...selectStyle, fontSize: 12, padding: "4px 28px 4px 9px", maxWidth: 160 }}>
+            <option value="">– {t("karten.rootFolder")} –</option>
+            {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+        )}
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{deck.cards.length} {t("karten.cards")}</span>
         {deck.cards.length > 0 && (
