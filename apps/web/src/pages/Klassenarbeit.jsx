@@ -329,10 +329,11 @@ export default function Klassenarbeit() {
       </div>
       <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 16px" }}>{t("klassenarbeit.hint")}</p>
 
-      {!hasRoster ? null : (
+      {/* Auswahlzeile nur, wenn es schon Arbeiten gibt — sonst führt allein die
+          Leerzustand-Karte zum Anlegen (kein doppeltes „keine Arbeit"). */}
+      {hasRoster && works.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
           <select value={work?.id || ""} onChange={(e) => setWork(works.find((w) => String(w.id) === e.target.value) || null)} style={{ ...selectStyle, minWidth: 180 }}>
-            {works.length === 0 && <option value="">{t("klassenarbeit.none")}</option>}
             {works.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
           <button onClick={neueArbeit} style={btnSecondary}>{t("klassenarbeit.new")}</button>
@@ -641,7 +642,7 @@ export default function Klassenarbeit() {
           )}
         </>
       )}
-      {hasRoster && !work && <Empty title={t("klassenarbeit.empty")} hint={t("klassenarbeit.emptyHint")} action={t("klassenarbeit.new")} onAction={neueArbeit} />}
+      {hasRoster && works.length === 0 && <Empty title={t("klassenarbeit.empty")} hint={t("klassenarbeit.emptyHint")} action={t("klassenarbeit.new")} onAction={neueArbeit} />}
       {hasRoster && work && students.length === 0 && <Empty title={t("klassenarbeit.noStudents")} />}
     </div>
   );
