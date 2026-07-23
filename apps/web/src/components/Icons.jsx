@@ -40,6 +40,7 @@ export const ICONS = {
   grip: ["M7 5.5h.01M7 10h.01M7 14.5h.01M13 5.5h.01M13 10h.01M13 14.5h.01"],
   close: ["M5 5l10 10M15 5L5 15"],
   plus: ["M10 4v12M4 10h12"],
+  refresh: ["M15.5 6.5A6 6 0 105 5.2", "M15.5 3v3.5H12"],
   minus: ["M4 10h12"],
   more: ["M5 10h.01M10 10h.01M15 10h.01"],
   // Info: Kreis mit „i" (Erklär-Popup der Modulauswahl).

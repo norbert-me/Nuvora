@@ -658,15 +658,16 @@ _EXT_TTL = 600  # 10 Minuten
 
 
 @router.get("/external-events")
-async def external_events(user: User = Depends(require_module)):
+async def external_events(refresh: bool = False, user: User = Depends(require_module)):
     """Holt den externen ICS-Feed (falls gesetzt) und liefert Events als
-    {date: YYYY-MM-DD, title}. Read-only, nur zur Anzeige. 10-Min-Cache."""
+    {date: YYYY-MM-DD, title}. Read-only, nur zur Anzeige. 10-Min-Cache;
+    refresh=1 umgeht ihn (frisch ziehen, damit Löschungen sofort erscheinen)."""
     if not user.external_ics_url:
         _EXT_CACHE.pop(user.id, None)
         return []
     import time
     hit = _EXT_CACHE.get(user.id)
-    if hit and hit[0] == user.external_ics_url and hit[1] > time.time():
+    if not refresh and hit and hit[0] == user.external_ics_url and hit[1] > time.time():
         return hit[2]
     import asyncio, urllib.request, urllib.parse, socket, ipaddress
     def _fetch():

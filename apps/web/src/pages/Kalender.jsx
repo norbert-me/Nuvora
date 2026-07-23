@@ -82,7 +82,8 @@ export default function Kalender() {
     const r = await fetch(`${API}/subscribe`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
     if (r) { const ex = await fetch(`${API}/external`).then((x) => (x.ok ? x.json() : { url: "" })).catch(() => ({ url: "" })); setAbo({ ...r, ext: ex.url || "" }); }
   };
-  const loadExt = () => fetch(`${API}/external-events`).then((r) => (r.ok ? r.json() : [])).then((d) => setExtEvents(Array.isArray(d) ? d : [])).catch(() => {});
+  const [extBusy, setExtBusy] = useState(false);
+  const loadExt = (force = false) => { if (force) setExtBusy(true); return fetch(`${API}/external-events${force ? "?refresh=1" : ""}`).then((r) => (r.ok ? r.json() : [])).then((d) => setExtEvents(Array.isArray(d) ? d : [])).catch(() => {}).finally(() => force && setExtBusy(false)); };
   const saveExt = async (url) => {
     await fetch(`${API}/external`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) }).catch(() => {});
     setExtUrl(url); loadExt();
@@ -394,6 +395,14 @@ export default function Kalender() {
                     <input type="color" value={extColor || "#8e8e93"} onChange={(e) => saveExtColor(e.target.value)} style={{ marginLeft: "auto", width: 28, height: 22, padding: 0, border: "none", background: "none", cursor: "pointer" }} />
                     {extColor && <button onClick={() => saveExtColor("")} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.close} size={13} /></button>}
                   </label>
+                )}
+                {extUrl && (
+                  <button onClick={() => loadExt(true)} disabled={extBusy}
+                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", boxSizing: "border-box", padding: "8px 12px", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: extBusy ? "default" : "pointer", borderRadius: 8, background: "none", border: "none", textAlign: "left", opacity: extBusy ? 0.6 : 1 }}
+                    title={t("kalender.extRefreshHint")}>
+                    <Icon d={ICONS.refresh} size={15} color="var(--text2)" />
+                    {extBusy ? t("kalender.extRefreshing") : t("kalender.extRefresh")}
+                  </button>
                 )}
               </div>
             </>)}
