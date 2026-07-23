@@ -989,6 +989,7 @@ export default {
   "nav.cards2": "Cards",
   "mod.karten.name": "Cards",
   "mod.karten.desc": "Flashcards with spaced repetition. Learners practice without an account via QR code; you see their progress in the module.",
+  "mod.karten.help": "Flashcards with spaced repetition. Learners practice without an account via QR code; you see their progress in the module.\n\nWhat is spaced repetition? After each card learners rate how well they knew it. Well-known cards return after ever longer intervals (days, then weeks), weak ones come back soon. This focuses review on what is still shaky — proven more efficient than plain repetition. Nuvora uses the SM-2 algorithm.",
   "karten.publish": "Publish to marketplace",
   "karten.publishPrompt": "Short description (optional):",
   "karten.published": "Published to the marketplace.",

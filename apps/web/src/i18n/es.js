@@ -989,6 +989,7 @@ export default {
   "nav.cards2": "Tarjetas",
   "mod.karten.name": "Tarjetas",
   "mod.karten.desc": "Tarjetas con repetición espaciada. El alumnado practica sin cuenta mediante QR; ves su progreso en el módulo.",
+  "mod.karten.help": "Tarjetas con repetición espaciada. El alumnado practica sin cuenta mediante QR; ves su progreso en el módulo.\n\n¿Qué es la repetición espaciada? Tras cada tarjeta el alumno valora cómo la sabía. Las bien sabidas vuelven tras intervalos cada vez más largos (días, luego semanas); las flojas, pronto. Así se repasa lo que aún falla, más eficiente que repetir sin más. Nuvora usa el algoritmo SM-2.",
   "karten.publish": "Publicar en el mercado",
   "karten.publishPrompt": "Descripción breve (opcional):",
   "karten.published": "Publicado en el mercado.",

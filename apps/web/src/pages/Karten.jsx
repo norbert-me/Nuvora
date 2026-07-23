@@ -209,10 +209,6 @@ export default function Karten() {
 
       {view === "cards" && (
         <>
-          <details style={{ marginBottom: 16, border: "1px solid var(--border)", borderRadius: 12, background: "var(--bg3)", padding: "10px 14px" }}>
-            <summary style={{ cursor: "pointer", fontSize: 13.5, fontWeight: 600, color: "var(--text2)" }}>{t("karten.srTitle")}</summary>
-            <p style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.6, margin: "8px 0 0" }}>{t("karten.srInfo")}</p>
-          </details>
           {/* Breadcrumb: Wurzel › Ordner › Unterordner */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 12, fontSize: 13.5 }}>
             <button onClick={() => setCurrentCardFolder(null)} style={{ background: "none", border: "none", cursor: "pointer", color: currentCardFolder == null ? "var(--text)" : "var(--accent)", fontWeight: 600, padding: 0 }}>{t("karten.allDecks")}</button>
