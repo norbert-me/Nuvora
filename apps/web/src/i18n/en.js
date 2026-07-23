@@ -477,6 +477,7 @@ export default {
   "topics.subCount": "{{n}} subtopics",
   "topics.intro": "The shared vocabulary of your modules. Questions and exercises point at the same topics — so you can later see where a class needs practice.",
   "topics.loadError": "Could not load topics",
+  "topics.addTopic": "New topic",
   "topics.newPlaceholder": "New topic, e.g. Fractions",
   "topics.subPlaceholder": "Subtopic, e.g. Multiplying and dividing",
   "topics.empty": "No topics yet. Create one — subtopics go underneath.",

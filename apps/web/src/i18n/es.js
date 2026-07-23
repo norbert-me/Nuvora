@@ -477,6 +477,7 @@ export default {
   "topics.subCount": "{{n}} subtemas",
   "topics.intro": "El vocabulario común de tus módulos. Preguntas y ejercicios apuntan a los mismos temas, para ver dónde una clase necesita práctica.",
   "topics.loadError": "No se pudieron cargar los temas",
+  "topics.addTopic": "Nuevo tema",
   "topics.newPlaceholder": "Nuevo tema, p. ej. Fracciones",
   "topics.subPlaceholder": "Subtema, p. ej. Multiplicar y dividir",
   "topics.empty": "Aún no hay temas. Crea uno; los subtemas van debajo.",

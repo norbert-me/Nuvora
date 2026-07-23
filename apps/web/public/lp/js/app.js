@@ -2990,6 +2990,17 @@
         maxInput.addEventListener('input', checkMax);
         pflichtInput.addEventListener('input', checkMax);
         checkMax();
+
+        // Die Slider sind eben mit Default-Werten neu aufgebaut worden. Jetzt die
+        // gemerkten Präferenzen wieder setzen (außer beim Bearbeiten einer
+        // bestehenden Lernleiter — die setzt ihre eigene Konfig danach selbst).
+        setzGeneratorPrefs();
+        // Jede Änderung an den Reglern sofort merken, damit sie den Reload
+        // überlebt — nicht erst beim Generieren.
+        ['cfg-max', 'cfg-pflicht', 'cfg-g-basis', 'cfg-g-g', 'cfg-e-basis', 'cfg-e-g', 'cfg-e-e', 'cfg-erkl'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('input', () => saveGenPrefs());
+        });
     }
 
     function getGenConfig() {
@@ -3268,7 +3279,6 @@
                             <button class="btn small" data-action="export-vorlage" data-id="${p._id}" title="Ohne Schülerdaten (teilbar)">${ICON.download} Vorlage</button>
                         </div>
                     </details>
-                    <button class="btn icon" data-action="edit" data-id="${p._id}" title="Bearbeiten">${ICON.edit}</button>
                     <button class="btn icon danger" data-action="delete" data-id="${p._id}" title="Löschen">${ICON.delete}</button>
                 </div>
             </div>
@@ -3296,8 +3306,7 @@
             btn.addEventListener('click', e => {
                 e.stopPropagation();
                 const act = btn.dataset.action;
-                if (act === 'edit') openPfad(btn.dataset.id);
-                else if (act === 'export-full') exportPfad(lernpfade.find(p => p._id === btn.dataset.id), true);
+                if (act === 'export-full') exportPfad(lernpfade.find(p => p._id === btn.dataset.id), true);
                 else if (act === 'export-vorlage') exportPfad(lernpfade.find(p => p._id === btn.dataset.id), false);
                 else if (act === 'delete') deletePfad(btn.dataset.id);
                 btn.closest('details')?.removeAttribute('open');   // Export-Menü nach Wahl schliessen

@@ -477,6 +477,7 @@ export default {
   "topics.subCount": "{{n}} Unterthemen",
   "topics.intro": "Der gemeinsame Wortschatz deiner Module. Fragen und Aufgaben zeigen auf dieselben Themen — so lässt sich später erkennen, wo eine Klasse Übung braucht.",
   "topics.loadError": "Themen konnten nicht geladen werden",
+  "topics.addTopic": "Neues Thema",
   "topics.newPlaceholder": "Neues Thema, z. B. Bruchrechnung",
   "topics.subPlaceholder": "Unterthema, z. B. Vervielfachen und Teilen",
   "topics.empty": "Noch keine Themen. Lege eins an — Unterthemen kommen darunter.",

@@ -232,7 +232,7 @@ export default function Topics() {
 
       {!showRootForm ? (
         <button onClick={() => setShowRootForm(true)} style={{ ...btnSecondary, marginBottom: 22, display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <Icon d={ICONS.plus} size={15} /> {t("topics.newPlaceholder")}
+          <Icon d={ICONS.plus} size={15} /> {t("topics.addTopic")}
         </button>
       ) : (
         <form onSubmit={submitRoot} style={{ display: "flex", gap: 8, marginBottom: 22 }}>
