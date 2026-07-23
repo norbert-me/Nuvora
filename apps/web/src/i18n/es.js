@@ -954,6 +954,8 @@ export default {
   "karten.importing": "Importando …",
   "karten.topicHint": "Asignar un tema — al planificarlo en el calendario, la baraja se distribuye automáticamente",
   "karten.cards": "tarjetas",
+  "karten.latexHint": "LaTeX en $…$ (p. ej. $a^2+b^2$)",
+  "karten.jsonTemplate": "JSON de ejemplo",
   "karten.front": "Anverso",
   "karten.back": "Reverso",
   "karten.delDeck": "¿Eliminar el mazo «{{name}}»? Sus tarjetas se eliminan también.",

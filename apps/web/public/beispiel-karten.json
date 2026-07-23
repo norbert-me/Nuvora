@@ -1,0 +1,11 @@
+{
+  "type": "nuvora_karten_deck",
+  "version": 1,
+  "name": "Mathe-Formeln (Beispiel)",
+  "cards": [
+    { "front": "Fläche eines Kreises", "back": "$A = \\pi r^2$" },
+    { "front": "Satz des Pythagoras", "back": "$a^2 + b^2 = c^2$" },
+    { "front": "Was ist $\\frac{3}{4} + \\frac{1}{4}$?", "back": "$1$" },
+    { "front": "Hauptstadt von Frankreich", "back": "Paris" }
+  ]
+}

@@ -954,6 +954,8 @@ export default {
   "karten.importing": "Importing …",
   "karten.topicHint": "Assign a topic — when planned in the calendar, the deck is released automatically",
   "karten.cards": "cards",
+  "karten.latexHint": "LaTeX in $…$ (e.g. $a^2+b^2$)",
+  "karten.jsonTemplate": "Example JSON",
   "karten.front": "Front",
   "karten.back": "Back",
   "karten.delDeck": "Delete deck “{{name}}”? All its cards go with it.",

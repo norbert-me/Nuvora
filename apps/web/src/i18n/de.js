@@ -980,6 +980,8 @@ export default {
   "karten.importing": "Importiere …",
   "karten.topicHint": "Thema zuordnen — geplant im Kalender, wird der Stapel automatisch freigeschaltet",
   "karten.cards": "Karten",
+  "karten.latexHint": "LaTeX in $…$ (z. B. $a^2+b^2$)",
+  "karten.jsonTemplate": "Beispiel-JSON",
   "karten.front": "Vorderseite",
   "karten.back": "Rückseite",
   "karten.delDeck": "Stapel „{{name}}“ löschen? Alle Karten darin verschwinden mit.",

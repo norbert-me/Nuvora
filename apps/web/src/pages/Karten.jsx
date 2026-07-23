@@ -9,7 +9,22 @@ import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import PublishModal from "../components/PublishModal.jsx";
+import Latex from "../components/Latex.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
+
+// LaTeX-Schnelltasten (wie im CardVote-Editor): fügt Formeln ins fokussierte Feld.
+const LATEX_BUTTONS = [
+  { label: "a/b", tex: "\\frac{}{}", cursor: -3 },
+  { label: "x²", tex: "^{}", cursor: -1 },
+  { label: "x₂", tex: "_{}", cursor: -1 },
+  { label: "√", tex: "\\sqrt{}", cursor: -1 },
+  { label: "±", tex: "\\pm " },
+  { label: "·", tex: "\\cdot " },
+  { label: "≠", tex: "\\neq " },
+  { label: "≤", tex: "\\leq " },
+  { label: "≥", tex: "\\geq " },
+  { label: "π", tex: "\\pi " },
+];
 
 // Meisterung aus dem Reifegrad: gewichteter Anteil reifer Karten. Neu zählt
 // nicht, langfristig voll. Ergibt 0–100 %, das die Notenskala in eine Note übersetzt.
@@ -418,6 +433,26 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   const [busy, setBusy] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [importing, setImporting] = useState(false);
+  // LaTeX-Editor: Formel ins zuletzt fokussierte Feld (Vorder-/Rückseite) einfügen.
+  const frontRef = useRef(null);
+  const backRef = useRef(null);
+  const activeField = useRef("front");
+  const insertLatex = (tex, offset) => {
+    const isBack = activeField.current === "back";
+    const input = isBack ? backRef.current : frontRef.current;
+    const val = isBack ? back : front;
+    const setter = isBack ? setBack : setFront;
+    if (!input) return;
+    const start = input.selectionStart || 0, end = input.selectionEnd || 0;
+    const sel = val.slice(start, end);
+    let insert = tex; if (sel && tex.includes("{}")) insert = tex.replace("{}", `{${sel}}`);
+    const before = val.slice(0, start);
+    const needsDollar = !before.includes("$") || before.split("$").length % 2 === 1;
+    const wrapped = needsDollar ? `$${insert}$` : insert;
+    const next = before + wrapped + val.slice(end);
+    setter(next);
+    setTimeout(() => { const pos = start + wrapped.length + (offset || 0); input.focus(); input.setSelectionRange(pos, pos); }, 0);
+  };
   // folder_id IMMER mitschicken, sonst nullt ein Speichern (Name/Thema/Niveau)
   // die Ordner-Zuordnung.
   const saveDeck = (patch) => call(() => fetch(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", folder_id: deck.folder_id ?? null, ...patch }) }));
@@ -496,25 +531,38 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
       )}
       {deck.cards.map((c) => (
         <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 13.5 }}>
-          <span style={{ flex: 1, minWidth: 0 }}><strong>{c.front}</strong> <span style={{ color: "var(--text3)" }}>→ {c.back}</span></span>
+          <span style={{ flex: 1, minWidth: 0 }}><strong><Latex>{c.front}</Latex></strong> <span style={{ color: "var(--text3)" }}>→ <Latex>{c.back}</Latex></span></span>
           <button onClick={() => call(() => fetch(`${API}/cards/${c.id}`, { method: "DELETE" }))} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
         </div>
       ))}
-      <form onSubmit={add} style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-        <input value={front} onChange={(e) => setFront(e.target.value)} placeholder={t("karten.front")} style={{ flex: 1, minWidth: 120, ...inp }} />
-        <input value={back} onChange={(e) => setBack(e.target.value)} placeholder={t("karten.back")} style={{ flex: 1, minWidth: 120, ...inp }} />
-        <button type="submit" disabled={busy || !front.trim() || !back.trim()} style={{ ...btnPrimary, padding: "6px 14px", opacity: (!busy && front.trim() && back.trim()) ? 1 : 0.4 }}>{t("common.add")}</button>
-        <button type="button" onClick={() => setImporting(true)} style={{ ...btnSecondary, padding: "6px 14px" }}>{t("karten.import")}</button>
-        {deck.cards.length > 0 && (
-          <button type="button" onClick={() => {
-            // Export als CSV (Vorderseite,Rückseite) — Trenner Semikolon, damit
-            // Kommas im Text nicht stören; Anführungszeichen escaped.
-            const esc = (v) => `"${String(v).replace(/"/g, '""')}"`;
-            const csv = deck.cards.map((c) => `${esc(c.front)};${esc(c.back)}`).join("\n");
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-            a.download = `${(deck.name || "stapel").replace(/[^\w-]+/g, "_")}.csv`; a.click(); URL.revokeObjectURL(a.href);
-          }} style={{ ...btnSecondary, padding: "6px 14px" }}>{t("karten.export")}</button>
+      <form onSubmit={add} style={{ marginTop: 10 }}>
+        {/* LaTeX-Schnelltasten: fügen die Formel ins zuletzt fokussierte Feld. */}
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>
+          {LATEX_BUTTONS.map((b) => (
+            <button key={b.label} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insertLatex(b.tex, b.cursor)}
+              style={{ padding: "3px 8px", fontSize: 13, border: "1px solid var(--border2)", borderRadius: 6, background: "var(--card)", cursor: "pointer", fontFamily: "serif", color: "var(--text)" }}>{b.label}</button>
+          ))}
+          <span style={{ fontSize: 11, color: "var(--text3)", marginLeft: 4 }}>{t("karten.latexHint")}</span>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input ref={frontRef} onFocus={() => (activeField.current = "front")} value={front} onChange={(e) => setFront(e.target.value)} placeholder={t("karten.front")} style={{ flex: 1, minWidth: 120, ...inp }} />
+          <input ref={backRef} onFocus={() => (activeField.current = "back")} value={back} onChange={(e) => setBack(e.target.value)} placeholder={t("karten.back")} style={{ flex: 1, minWidth: 120, ...inp }} />
+          <button type="submit" disabled={busy || !front.trim() || !back.trim()} style={{ ...btnPrimary, padding: "6px 14px", opacity: (!busy && front.trim() && back.trim()) ? 1 : 0.4 }}>{t("common.add")}</button>
+          <button type="button" onClick={() => setImporting(true)} style={{ ...btnSecondary, padding: "6px 14px" }}>{t("karten.import")}</button>
+          {deck.cards.length > 0 && (
+            <button type="button" onClick={() => {
+              // JSON-Export (mit Formeln unverändert). Import versteht dieses Format.
+              const data = { type: "nuvora_karten_deck", version: 1, name: deck.name || "", cards: deck.cards.map((c) => ({ front: c.front, back: c.back })) };
+              const a = document.createElement("a");
+              a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+              a.download = `${(deck.name || "stapel").replace(/[^\w-]+/g, "_")}.json`; a.click(); URL.revokeObjectURL(a.href);
+            }} style={{ ...btnSecondary, padding: "6px 14px" }}>{t("karten.export")}</button>
+          )}
+        </div>
+        {(front.includes("$") || back.includes("$")) && (
+          <div style={{ marginTop: 8, padding: "8px 12px", background: "var(--bg2)", borderRadius: 8, fontSize: 14 }}>
+            <Latex>{front}</Latex> <span style={{ color: "var(--text3)" }}>→ <Latex>{back}</Latex></span>
+          </div>
         )}
       </form>
       {importing && <ImportModal deckName={deck.name || t("karten.deck")} t={t}
@@ -527,6 +575,16 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
 // CSV/TSV/Text in {front, back}-Paare. Trenner automatisch erkannt (Tab,
 // Semikolon, Komma). Kopfzeilen (mit '#') werden uebersprungen.
 function parseCards(text) {
+  // JSON zuerst: { "cards": [{front, back}] } oder direktes Array [{front, back}].
+  const trimmed = (text || "").trim();
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try {
+      const data = JSON.parse(trimmed);
+      const arr = Array.isArray(data) ? data : (Array.isArray(data.cards) ? data.cards : []);
+      return arr.map((c) => ({ front: String(c.front ?? "").trim(), back: String(c.back ?? "").trim() }))
+        .filter((c) => c.front || c.back);
+    } catch { /* kein gültiges JSON — als CSV/Text weiter */ }
+  }
   const lines = text.split(/\r?\n/).filter((l) => l.trim() && !l.trim().startsWith("#"));
   if (!lines.length) return [];
   // Trenner an der ersten Datenzeile bestimmen: Tab > Semikolon > Komma.
@@ -571,8 +629,11 @@ function ImportModal({ deckName, onClose, onImport, t }) {
       <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 560 }}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>{t("karten.importTitle", { name: deckName })}</h3>
         <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 12px" }}>{t("karten.importHint")}</p>
-        <input type="file" accept=".csv,.tsv,.txt" onChange={onFile} style={{ fontSize: 13, marginBottom: 10 }} />
-        <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={"Frage,Antwort\nHauptstadt Frankreich,Paris"} rows={8}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
+          <input type="file" accept=".csv,.tsv,.txt,.json" onChange={onFile} style={{ fontSize: 13 }} />
+          <a href="/beispiel-karten.json" download style={{ fontSize: 12.5, color: "var(--accent)" }}>{t("karten.jsonTemplate")}</a>
+        </div>
+        <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={"Vorderseite;Rückseite  (CSV)\noder JSON: { \"cards\": [{ \"front\": \"…\", \"back\": \"$a^2$\" }] }"} rows={8}
           style={{ ...inp, width: "100%", boxSizing: "border-box", fontFamily: "monospace", fontSize: 13, resize: "vertical" }} />
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14 }}>
           <button onClick={doImport} disabled={!parsed.length || busy} style={{ ...btnPrimary, opacity: (parsed.length && !busy) ? 1 : 0.4 }}>
