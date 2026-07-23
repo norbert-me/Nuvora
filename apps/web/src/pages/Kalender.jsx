@@ -1244,6 +1244,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
     deckId && (() => { const d = decks.find((x) => x.id === Number(deckId)); return d && { to: `/karten?class=${classId}`, label: d.name, kind: t("kalender.planKarten") }; })(),
     ladderId && (() => { const l = ladders.find((x) => x.id === Number(ladderId)); return l && { to: "/lernpfad", label: (topicName(l.topic_id) || l.path || t("kalender.planLernleiter")), kind: t("kalender.planLernleiter") }; })(),
     puzzleId && (() => { const p = puzzles.find((x) => x.client_id === puzzleId); return { to: `/code-detektiv/puzzle/${puzzleId}?mode=solo`, label: (p && p.title) || puzzleId, kind: t("kalender.planDetektiv") }; })(),
+    methodId && methName && { to: "/methoden", label: methName, kind: t("kalender.method") },
   ].filter(Boolean);
   const zeile = (k, v) => v ? <div style={{ display: "flex", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--border)", fontSize: 13.5 }}><span style={{ color: "var(--text3)", minWidth: 92 }}>{k}</span><span style={{ fontWeight: 500 }}>{v}</span></div> : null;
   return (
@@ -1251,7 +1252,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
       <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 460, padding: 0 }}>
         <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "flex-start", gap: 12 }}>
           <div style={{ flex: 1 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 5 }}>{!edit ? (title || t("kalender.entry")) : ((entry.id || entry.period != null) ? t("kalender.editEntry") : t("kalender.newEntry"))}</h3>
+            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 5 }}>{!edit ? (title || clsName || t("kalender.entry")) : ((entry.id || entry.period != null) ? t("kalender.editEntry") : t("kalender.newEntry"))}</h3>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               {entry.period != null && <span style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 9px", borderRadius: 980, background: "var(--accent)", color: "#fff" }}>{entry.period}. {t("kalender.period")}</span>}
               <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{new Date(entry.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>
@@ -1262,7 +1263,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         <div style={{ padding: "6px 24px 22px" }}>
         {!edit && (
           <div>
-            {(clsName || topName || methName) && (
+            {(clsName || topName || startTime || endTime) && (
               <div style={{ marginTop: 4 }}>
                 {clsName && (
                   <div style={{ display: "flex", gap: 8, fontSize: 13.5, padding: "3px 0" }}>
@@ -1272,7 +1273,8 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
                   </div>
                 )}
                 {zeile(t("kalender.topic"), topName)}
-                {zeile(t("kalender.method"), methName)}
+                {/* Einstieg (Methode) steht jetzt als anklickbarer Link unter „Öffnen". */}
+                {zeile(t("kalender.time"), (startTime || endTime) ? `${startTime || "?"}–${endTime || "?"}` : null)}
               </div>
             )}
             {aktiv.orga && classId && (

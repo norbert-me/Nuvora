@@ -896,6 +896,7 @@ export default {
   "kalender.notes": "Notizen",
   "kalender.mon": "Mo", "kalender.tue": "Di", "kalender.wed": "Mi", "kalender.thu": "Do", "kalender.fri": "Fr", "kalender.sat": "Sa", "kalender.sun": "So",
   "kalender.method": "Einstieg",
+  "kalender.time": "Uhrzeit",
   "kalender.noMethod": "keine",
   "kalender.none": "keine",
   "kalender.planCardvote": "CardVote-Quiz",
