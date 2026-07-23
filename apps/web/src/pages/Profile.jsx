@@ -45,6 +45,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   const [profileMsg, setProfileMsg] = useState("");
   const DEFAULT_SCALE = { 1: 87, 2: 73, 3: 59, 4: 45, 5: 20, 6: 0 };
   const [gradeScale, setGradeScale] = useState(user.grade_scale || DEFAULT_SCALE);
+  const [gradeTendency, setGradeTendency] = useState(user.grade_tendency !== false); // Default: mit Tendenz (2+)
   const [showUsername, setShowUsername] = useState(false);
   const [showScale, setShowScale] = useState(false);
   const [showPw, setShowPw] = useState(false);
@@ -88,7 +89,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     const res = await fetch(`${API}/auth/profile`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ name, salutation, grade_scale: gradeScale, marketplace_name: marketplaceName }),
+      body: JSON.stringify({ name, salutation, grade_scale: gradeScale, grade_tendency: gradeTendency, marketplace_name: marketplaceName }),
     });
     if (res.ok) {
       const data = await res.json();
@@ -214,6 +215,18 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             ))}
           </div>
           )}
+
+          {/* Noten-Anzeige: mit Tendenz (2+/2-) oder ganze Noten — Module übernehmen das. */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 14, color: "var(--text)" }}>{t("profile.gradeTendency")}</span>
+            <InfoDot text={t("profile.gradeTendencyHint")} />
+            <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden", marginLeft: "auto" }}>
+              {[[true, t("profile.gradeTendencyOn")], [false, t("profile.gradeTendencyOff")]].map(([v, lbl]) => (
+                <button key={String(v)} type="button" onClick={() => setGradeTendency(v)}
+                  style={{ border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, padding: "5px 12px", background: gradeTendency === v ? "var(--accent)" : "transparent", color: gradeTendency === v ? "#fff" : "var(--text2)" }}>{lbl}</button>
+              ))}
+            </div>
+          </div>
 
           {profileMsg && <div style={{ fontSize: 13, color: profileMsg === "Gespeichert" ? C.success : C.danger, marginTop: 12, marginBottom: 8 }}>{profileMsg}</div>}
           <button type="submit" style={{ ...btnPrimary, marginTop: 16 }}>{t("common.save")}</button>

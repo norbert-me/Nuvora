@@ -27,6 +27,9 @@ class User(Base):
     salutation: Mapped[str] = mapped_column(String(10), default="Hr.")
     marketplace_name: Mapped[str] = mapped_column(String(100), default="", server_default="")
     grade_scale: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    # Noten mit Tendenz (2+/2-) statt ganzer Note (2). Default an — Module (Klassen-
+    # arbeit, CardVote) übernehmen das als Voreinstellung.
+    grade_tendency: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     pending_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

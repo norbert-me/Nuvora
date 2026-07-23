@@ -68,7 +68,8 @@ export default function Evaluation() {
   // Kachel.
   const [showCiTop, setShowCiTop] = useState(false);
   const [gradeView, setGradeView] = useState("bar");
-  const [gradeMode, setGradeMode] = useState("whole"); // "whole" | "tendency"
+  // Voreinstellung aus dem Profil (grade_tendency): mit Tendenz (2+) oder ganz.
+  const [gradeMode, setGradeMode] = useState(() => { try { const u = JSON.parse(localStorage.getItem("user")); return u && u.grade_tendency === false ? "whole" : "tendency"; } catch { return "whole"; } }); // "whole" | "tendency"
   const { modules } = useModules();
   const notenAktiv = modules.find((m) => m.key === "noten")?.active ?? false;
   const kartenAktiv = modules.find((m) => m.key === "karten")?.active ?? false;

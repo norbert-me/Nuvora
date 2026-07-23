@@ -300,6 +300,7 @@ class UpdateProfileBody(BaseModel):
     name: str
     salutation: str
     grade_scale: Optional[dict] = None
+    grade_tendency: Optional[bool] = None
     marketplace_name: Optional[str] = None
 
     @field_validator("name")
@@ -321,7 +322,7 @@ def _user_dict(user):
     display = f"{user.salutation} {user.name}".strip() if user.salutation else user.name
     return {
         "id": user.id, "email": user.email, "name": user.name, "salutation": user.salutation,
-        "display_name": display or user.email, "grade_scale": user.grade_scale,
+        "display_name": display or user.email, "grade_scale": user.grade_scale, "grade_tendency": user.grade_tendency,
         "marketplace_name": getattr(user, "marketplace_name", "") or "",
         "pending_email": getattr(user, "pending_email", None),
     }
@@ -562,6 +563,8 @@ async def update_profile(body: UpdateProfileBody, user: User = Depends(get_curre
     user.salutation = body.salutation
     if body.grade_scale is not None:
         user.grade_scale = body.grade_scale
+    if body.grade_tendency is not None:
+        user.grade_tendency = bool(body.grade_tendency)
     if body.marketplace_name is not None:
         user.marketplace_name = body.marketplace_name.strip()[:100]
     await db.commit()

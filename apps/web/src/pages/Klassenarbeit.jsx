@@ -54,7 +54,9 @@ export default function Klassenarbeit() {
   const [distMode, setDistMode] = useState("bar");   // Notenverteilung: "bar" | "box"
   const [barMode, setBarMode] = useState("whole");   // Balken: "whole" (1..6) | "fine" (Teilnoten)
   const [boxMode, setBoxMode] = useState("pct");     // Boxplot: "pct" (%) | "note" (Noten)
-  const [gradeMode, setGradeMode] = useState("note"); // Note zeigen als "note" (2+) | "wert" (2,3)
+  // Note-Anzeige aus der Profil-Präferenz vorbelegen (Tendenz 2+ vs. Notenwert).
+  const [gradeMode, setGradeMode] = useState("note"); // "note" (2+) | "wert" (2,3)
+  useEffect(() => { try { const u = JSON.parse(localStorage.getItem("user")); if (u && u.grade_tendency === false) setGradeMode("wert"); } catch { /* Default */ } }, []);
   const [classId, setClassId] = useState(null);
   const [kursId, setKursId] = useState(null);
   const [classes, setClasses] = useState([]);

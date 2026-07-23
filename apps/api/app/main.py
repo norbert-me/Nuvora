@@ -156,6 +156,7 @@ def _ensure_columns(sync_conn):
     # (Tabelle, Spalte, DDL-Typ inkl. Default)
     wanted = [
         ("users", "marketplace_name", "VARCHAR(100) DEFAULT '' NOT NULL"),
+        ("users", "grade_tendency", "BOOLEAN DEFAULT true NOT NULL"),
         ("users", "email_verified", "BOOLEAN DEFAULT false NOT NULL"),
         ("users", "pending_email", "VARCHAR(255)"),
         ("questions", "owner_id", "INTEGER"),
