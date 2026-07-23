@@ -1700,12 +1700,28 @@
         if (!thema) { container.innerHTML = '<span style="color:var(--text-muted);font-size:0.85rem">Erst Thema wählen</span>'; return; }
         const unterthemen = [...new Set(aufgaben.filter(a => a.thema === thema).map(a => a.unterthema).filter(Boolean))].sort();
         if (!unterthemen.length) { container.innerHTML = '<span style="color:var(--text-muted);font-size:0.85rem">Keine Unterthemen</span>'; return; }
-        container.innerHTML = unterthemen.map(u =>
-            `<label class="chip"><input type="checkbox" class="gen-ut-cb" value="${esc(u)}"> ${esc(u)}</label>`
-        ).join('');
+        // Als Dropdown (aufklappbar) statt langer Chip-Reihe — Mehrfachauswahl
+        // bleibt über dieselben .gen-ut-cb-Checkboxen erhalten.
+        container.innerHTML = `
+            <details class="gen-ut-dd" style="position:relative;display:inline-block;min-width:220px">
+              <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card)">
+                <span id="gen-ut-summary">Alle Unterthemen</span><span style="color:var(--text-muted)">▾</span>
+              </summary>
+              <div style="position:absolute;z-index:30;top:calc(100% + 4px);left:0;min-width:100%;max-height:260px;overflow:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.18);padding:4px">
+                ${unterthemen.map(u => `<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;border-radius:6px"><input type="checkbox" class="gen-ut-cb" value="${esc(u)}"> ${esc(u)}</label>`).join('')}
+              </div>
+            </details>`;
+        const summary = () => {
+            const n = container.querySelectorAll('.gen-ut-cb:checked').length;
+            const el = document.getElementById('gen-ut-summary');
+            if (el) el.textContent = n === 0 ? 'Alle Unterthemen' : (n === 1
+                ? container.querySelector('.gen-ut-cb:checked').value
+                : `${n} Unterthemen`);
+        };
         container.querySelectorAll('.gen-ut-cb').forEach(cb => {
-            cb.addEventListener('change', updateGenConfig);
+            cb.addEventListener('change', () => { summary(); updateGenConfig(); });
         });
+        summary();
     }
 
     // Zweiter Ausloeser im Konfig-Panel — teilt sich die Logik mit btn-generate.
@@ -1731,11 +1747,19 @@
         if (!themaAufgaben.length) { toast('Keine Aufgaben für ' + (unterthema || 'dieses Thema')); return; }
         if (!klasseSchueler.length) { toast('Keine Schüler in dieser Klasse'); return; }
 
-        // Ab der 2. Lernleiter im Pfad kommt vorne eine kleine Wiederholung der
-        // Unterthemen davor dazu (max. 2 Aufgaben, auf dem Niveau des Schuelers).
+        // Ab der 2. Lernleiter im Pfad kommt vorne eine kleine Wiederholung dazu —
+        // aber NUR aus der unmittelbar davor liegenden Lernleiter, nicht aus allen
+        // (#5). Die erste Lernleiter bekommt keine Wiederholung: beim Bearbeiten
+        // der ersten (editIdx 0) bzw. ohne Vorgänger ist vorherigeLl leer (#6).
         const pfadId = document.getElementById('gen-pfad').value;
         const pfad = pfadId ? lernpfade.find(p => p._id === pfadId) : null;
-        const vorherigeLl = (pfad && pfad.lernleitern) || [];
+        let vorherigeLl = [];
+        if (pfad && pfad.lernleitern && pfad.lernleitern.length) {
+            const idx = editingLlId
+                ? pfad.lernleitern.findIndex(x => x._id === editingLlId)
+                : pfad.lernleitern.length;          // neue Lernleiter kommt ans Ende
+            if (idx > 0) vorherigeLl = [pfad.lernleitern[idx - 1]];
+        }
 
         const basisAufgaben = themaAufgaben.filter(a => getKategorie(a) === 'Basis');
         const gAufgaben = themaAufgaben.filter(a => getKategorie(a) === 'G-Niveau');
@@ -3569,6 +3593,9 @@
             if (themaSel) { themaSel.disabled = false; themaSel.value = ll.thema || ''; }
             refreshGenUnterthemen();
             document.querySelectorAll('.gen-ut-cb').forEach(cb => { cb.checked = uts.includes(cb.value); });
+            // Dropdown-Beschriftung nachziehen (programmatisches Setzen feuert kein change).
+            const anyCb = document.querySelector('.gen-ut-cb');
+            if (anyCb) anyCb.dispatchEvent(new Event('change'));
             const klasseSel = document.getElementById('gen-klasse');
             if (klasseSel) klasseSel.value = ll.klasse || '';
             updateGenConfig();
