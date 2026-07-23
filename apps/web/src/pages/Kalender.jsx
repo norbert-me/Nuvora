@@ -31,6 +31,16 @@ const isoDay = (d) => { const x = new Date(d); return new Date(x.getFullYear(), 
 const hmToMin = (hhmm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || ""); return m ? (+m[1]) * 60 + (+m[2]) : null; };
 // Ein Eintrag ist ganztägig, wenn er weder an einer Stunde noch an einer freien Uhrzeit hängt.
 const isAllDayEntry = (e) => e.period == null && hmToMin(e.start_time) == null;
+// Schmaler Viewport (Handy hochkant): kompaktere Darstellung (Monat mit Punkten).
+function useNarrow(bp = 640) {
+  const [n, setN] = useState(() => typeof window !== "undefined" && window.innerWidth < bp);
+  useEffect(() => {
+    const on = () => setN(window.innerWidth < bp);
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, [bp]);
+  return n;
+}
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 const mondayOf = (d) => { const x = startOfDay(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
@@ -665,6 +675,13 @@ function MonthGrid({ extColor, range, cursor, byDay, extByDay, slotsFor, onSlot,
   for (let d = new Date(range[0]); d <= range[1]; d = addDays(d, 1)) days.push(new Date(d));
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
   const heute = ymd(new Date());
+  const narrow = useNarrow();
+  // Handy hochkant: nur Punkte je Tag (voll wird die Woche/der Tag angetippt).
+  const dotsFor = (d) => {
+    const own = byDay(d).map((e) => (e.class_id ? classColor(e.class_id) : "var(--accent)"));
+    const ext = (extByDay ? extByDay(d) : []).map(() => extColor || "var(--text3)");
+    return [...own, ...ext];
+  };
   return (
     <div>
       <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
@@ -687,7 +704,20 @@ function MonthGrid({ extColor, range, cursor, byDay, extByDay, slotsFor, onSlot,
                 const f = frei && frei(d);
                 return (
                   <td key={ymd(d)} onClick={(e) => { if (!e.target.closest("button")) onDayView(d); }} title={t("kalender.toDay")}
-                    style={{ ...cell, cursor: "pointer", opacity: other ? 0.5 : 1, background: f ? "rgba(184,134,11,0.09)" : undefined, outline: ymd(d) === heute ? "2px solid var(--accent)" : "none", outlineOffset: -2 }}>
+                    style={{ ...cell, cursor: "pointer", opacity: other ? 0.5 : 1, verticalAlign: "top",
+                      padding: narrow ? "3px 2px" : cell.padding, minHeight: narrow ? 46 : cell.minHeight, height: narrow ? 46 : undefined,
+                      background: f ? "rgba(184,134,11,0.09)" : undefined, outline: ymd(d) === heute ? "2px solid var(--accent)" : "none", outlineOffset: -2 }}>
+                    {narrow ? (
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                        <span style={{ fontSize: 12, fontWeight: ymd(d) === heute ? 700 : 500, color: "var(--text2)" }}>{d.getDate()}</span>
+                        {f ? <span style={{ width: 5, height: 5, borderRadius: 5, background: "rgba(184,134,11,0.7)" }} /> : (
+                          <div style={{ display: "flex", gap: 2, flexWrap: "wrap", justifyContent: "center", maxWidth: "100%" }}>
+                            {dotsFor(d).slice(0, 4).map((c, i) => <span key={i} style={{ width: 5, height: 5, borderRadius: 5, background: c }} />)}
+                            {dotsFor(d).length > 4 && <span style={{ fontSize: 8, color: "var(--text3)", lineHeight: "5px" }}>+{dotsFor(d).length - 4}</span>}
+                          </div>
+                        )}
+                      </div>
+                    ) : (<>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <button onClick={() => onDayView(d)} title={t("kalender.toDay")} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--text2)", padding: 0 }}>{d.getDate()}</button>
                       {!f && <button onClick={(e) => { e.stopPropagation(); onAdd(d); }} className="icon-btn" style={{ ...iconBtn, padding: 0 }} title={t("kalender.add")}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>}
@@ -696,6 +726,7 @@ function MonthGrid({ extColor, range, cursor, byDay, extByDay, slotsFor, onSlot,
                       <EntryChips list={byDay(d)} className={className} topicName={topicName} onOpen={onOpen} classColor={classColor} />
                       <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} extColor={extColor} />
                       {slotsFor && <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} slotName={slotName} topicName={topicName} onSlot={onSlot} day={d} t={t} />}
+                    </>)}
                     </>)}
                   </td>
                 );
