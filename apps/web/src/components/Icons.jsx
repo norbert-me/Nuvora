@@ -264,17 +264,22 @@ export function Boxplot({ values, max = 100, label, unit = "", compact = false }
         ))}
       </div>
       {(() => {
-        const MINGAP = 14; const last = [-Infinity, -Infinity];
+        // Beschriftungen kollisionsfrei: jede in die erste Zeile, in der sie
+        // MINGAP hinter der letzten liegt — sonst neue Zeile. So überlagert nichts,
+        // auch auf schmalen Handy-Displays (dort werden einfach mehr Zeilen genutzt).
+        const MINGAP = 18; const rows = [];
         const items = [["Min", sorted[0]], ["Q1", q1], ["Median", med], ["Q3", q3], ["Max", sorted[sorted.length - 1]]].map(([lbl, v]) => {
           const x = pct(v);
-          const row = x - last[0] >= MINGAP ? 0 : x - last[1] >= MINGAP ? 1 : (last[0] <= last[1] ? 0 : 1);
-          last[row] = x;
+          let row = rows.findIndex((lastX) => x - lastX >= MINGAP);
+          if (row === -1) row = rows.length;
+          rows[row] = x;
           return { lbl, v, x, row };
         });
+        const nRows = Math.max(1, rows.length);
         return (
-          <div style={{ position: "relative", height: 28, margin: "4px 20px 0", fontSize: 11, color: "var(--text3)" }}>
+          <div style={{ position: "relative", height: nRows * 14 + 2, margin: "4px 20px 0", fontSize: 10.5, color: "var(--text3)" }}>
             {items.map((it, i) => (
-              <span key={i} style={{ position: "absolute", top: it.row * 13, left: `${it.x}%`, transform: "translateX(-50%)", whiteSpace: "nowrap" }}>{it.lbl}: {fmt(it.v)}{unit}</span>
+              <span key={i} style={{ position: "absolute", top: it.row * 14, left: `${it.x}%`, transform: "translateX(-50%)", whiteSpace: "nowrap" }}>{it.lbl}: {fmt(it.v)}{unit}</span>
             ))}
           </div>
         );
