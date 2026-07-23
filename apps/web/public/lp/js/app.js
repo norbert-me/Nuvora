@@ -3702,7 +3702,7 @@
         // Bilanz-Diagnose: gespeichert -> aufgeloest -> gezeigt. Zeigt eindeutig,
         // ob (a) nichts gespeichert wurde, (b) IDs nicht auf Aufgaben mappen
         // (geloescht/neu?), oder (c) der Thema-Filter alles entfernt.
-        let dSaved = 0, dResolved = 0, dShown = 0; const sampleUnresolved = []; const themenGezeigt = new Set();
+        let dSaved = 0, dResolved = 0, dShown = 0; const sampleUnresolved = []; const themenGezeigt = new Set(); const themenAufgeloest = new Set();
         previewData = (ll.schueler || []).map(sch => {
             const student = schueler.find(s => s.id === (sch.id || parseInt(sch._id)))
                 || { _id: String(sch._id), id: sch.id, name: sch.name, niveau: '', foerder: [] };
@@ -3714,8 +3714,13 @@
                 return a;
             }).filter(Boolean);
             dResolved += resolved.length;
-            const tasks = resolved
-                .filter(a => !istErste || !eigen || a.thema === eigen)   // erste: keine Wiederholung
+            resolved.forEach(a => themenAufgeloest.add(a.thema || '∅'));
+            let gefiltert = resolved.filter(a => !istErste || !eigen || a.thema === eigen);   // erste: keine Wiederholung
+            // Würde der Thema-Filter der ERSTEN Lernleiter alles entfernen, lieber die
+            // gespeicherten Aufgaben ungefiltert zeigen — die Zuweisung IST die
+            // Lernleiter; nichts anzuzeigen ist schlechter als eine evtl. Wiederholung.
+            if (istErste && eigen && gefiltert.length === 0 && resolved.length) gefiltert = resolved;
+            const tasks = gefiltert
                 .map(a => { themenGezeigt.add(a.thema || '∅'); return { ...a, section: sektVon(a), selected: true }; });
             dShown += tasks.length;
             // NICHT neu sortieren: die gespeicherte Reihenfolge (aufgabenIds) IST
@@ -3733,8 +3738,8 @@
         });
         // Nur bei einem Problem loggen (nichts gezeigt oder ungeloeste IDs).
         if (dShown === 0 || sampleUnresolved.length) {
-            console.warn('openLernleiter Bilanz: gespeichert=%d, aufgeloest=%d, gezeigt=%d, aufgaben-Pool=%d, gezeigte Themen=%o, unaufgeloeste IDs (Beispiele)=%o',
-                dSaved, dResolved, dShown, aufgaben.length, [...themenGezeigt], sampleUnresolved);
+            console.warn('openLernleiter Bilanz: gespeichert=%d, aufgeloest=%d, gezeigt=%d, aufgaben-Pool=%d, eigen-Thema=%o, aufgeloeste Themen=%o, gezeigte Themen=%o, unaufgeloeste IDs (Beispiele)=%o',
+                dSaved, dResolved, dShown, aufgaben.length, eigen, [...themenAufgeloest], [...themenGezeigt], sampleUnresolved);
         }
         if (previewData.some(e => e.tasks.length)) {
             renderPreview();
