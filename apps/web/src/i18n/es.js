@@ -1131,6 +1131,7 @@ export default {
   "orga.tabsSettings": "Mostrar/ocultar pestañas",
   "sitzplan.hint": "Arrastra un alumno del grupo a un sitio. Arrástralo de vuelta al grupo para quitarlo. Se guarda automáticamente.",
   "sitzplan.cols": "Columnas",
+  "sitzplan.redo": "Rehacer",
   "sitzplan.undo": "Deshacer",
   "sitzplan.addEmpty": "Añadir sitio vacío",
   "sitzplan.emptySeat": "Sitio vacío",

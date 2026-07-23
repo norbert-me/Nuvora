@@ -36,6 +36,8 @@ export default function Sitzplan() {
   // Leeren, leerer Platz) den Stand sichern; Undo stellt ihn wieder her.
   const undoStack = useRef([]);
   const [undoLen, setUndoLen] = useState(0);
+  const redoStack = useRef([]);
+  const [redoLen, setRedoLen] = useState(0);
   const [tafel, setTafel] = useState({ x: 200, y: 8 }); // bewegliche Tafel
   const tafelRef = useRef(null);
   const [zoom, setZoom] = useState(1); // Anzeige-Zoom (Positionen bleiben unskaliert gespeichert)
@@ -130,9 +132,11 @@ export default function Sitzplan() {
     setSeats(next);
     if (classId) fetch(`${API}/${classId}${kursQ}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seats: next, tafel: tf }) }).catch(() => {});
   };
-  // Vor einer Änderung den aktuellen Stand auf den Undo-Stapel legen.
-  const snapshot = () => { undoStack.current.push({ seats, tafel }); if (undoStack.current.length > 40) undoStack.current.shift(); setUndoLen(undoStack.current.length); };
-  const undo = () => { const p = undoStack.current.pop(); setUndoLen(undoStack.current.length); if (!p) return; setTafel(p.tafel); persist(p.seats, p.tafel); };
+  // Vor einer Änderung den aktuellen Stand auf den Undo-Stapel legen. Eine neue
+  // Aktion macht Redo ungültig (klassisches Undo/Redo).
+  const snapshot = () => { undoStack.current.push({ seats, tafel }); if (undoStack.current.length > 40) undoStack.current.shift(); setUndoLen(undoStack.current.length); redoStack.current = []; setRedoLen(0); };
+  const undo = () => { const p = undoStack.current.pop(); setUndoLen(undoStack.current.length); if (!p) return; redoStack.current.push({ seats, tafel }); setRedoLen(redoStack.current.length); setTafel(p.tafel); persist(p.seats, p.tafel); };
+  const redo = () => { const p = redoStack.current.pop(); setRedoLen(redoStack.current.length); if (!p) return; undoStack.current.push({ seats, tafel }); setUndoLen(undoStack.current.length); setTafel(p.tafel); persist(p.seats, p.tafel); };
   // Leerer Platz (kein Schüler): eigener String-sid + empty-Flag, versetzt abgelegt.
   const addEmpty = () => { snapshot(); const n = seats.filter((s) => s.empty).length; persist([...seats, { sid: "e" + Date.now(), x: 40 + (n % 8) * 18, y: 60 + (n % 8) * 18, rot: 0, empty: true }]); };
 
@@ -340,6 +344,7 @@ export default function Sitzplan() {
         <ImportButton label={t("sitzplan.import")} onFile={doImport} style={{ padding: "6px 12px", fontSize: 13 }} />
         <button onClick={addEmpty} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("sitzplan.addEmpty")}><Icon d={ICONS.plus} size={15} /> {t("sitzplan.emptySeat")}</button>
         <button onClick={undo} disabled={undoLen === 0} className="icon-btn" style={{ ...iconBtn, opacity: undoLen === 0 ? 0.4 : 1 }} title={t("sitzplan.undo")}><Icon d={ICONS.undo || ICONS.restore} size={18} /></button>
+        <button onClick={redo} disabled={redoLen === 0} className="icon-btn" style={{ ...iconBtn, opacity: redoLen === 0 ? 0.4 : 1 }} title={t("sitzplan.redo")}><span style={{ display: "inline-flex", transform: "scaleX(-1)" }}><Icon d={ICONS.undo || ICONS.restore} size={18} /></span></button>
         <button onClick={leeren} className="icon-btn" style={iconBtn} title={t("sitzplan.clear")}><Icon d={ICONS.trash} color={C.danger} /></button>
       </div>
       {showHint && <p style={{ fontSize: 13, color: "var(--text3)", margin: "8px 0 14px" }}>{t("sitzplan.hintFree")}</p>}

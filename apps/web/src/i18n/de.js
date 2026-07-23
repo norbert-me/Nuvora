@@ -1156,6 +1156,7 @@ export default {
   "sitzplan.title": "Sitzplan",
   "sitzplan.hint": "Schüler aus dem Pool auf einen Platz ziehen. Zum Entfernen zurück in den Pool ziehen. Wird automatisch gespeichert.",
   "sitzplan.cols": "Spalten",
+  "sitzplan.redo": "Wiederholen",
   "sitzplan.undo": "Rückgängig",
   "sitzplan.addEmpty": "Leeren Platz hinzufügen",
   "sitzplan.emptySeat": "Leerer Platz",

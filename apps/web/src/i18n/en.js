@@ -1131,6 +1131,7 @@ export default {
   "orga.tabsSettings": "Show/hide tabs",
   "sitzplan.hint": "Drag a student from the pool onto a seat. Drag back to the pool to remove. Saved automatically.",
   "sitzplan.cols": "Columns",
+  "sitzplan.redo": "Redo",
   "sitzplan.undo": "Undo",
   "sitzplan.addEmpty": "Add empty seat",
   "sitzplan.emptySeat": "Empty seat",
