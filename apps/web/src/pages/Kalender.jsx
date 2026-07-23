@@ -28,6 +28,9 @@ const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0
 // lokale Mitternacht in +TZ zum UTC-Vortag und der ICS-Export (server .date())
 // zeigt einen Tag zu früh (z.B. 3.9 als 2.9 im Apple-Kalender).
 const isoDay = (d) => { const x = new Date(d); return new Date(x.getFullYear(), x.getMonth(), x.getDate(), 12, 0, 0).toISOString(); };
+const hmToMin = (hhmm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || ""); return m ? (+m[1]) * 60 + (+m[2]) : null; };
+// Ein Eintrag ist ganztägig, wenn er weder an einer Stunde noch an einer freien Uhrzeit hängt.
+const isAllDayEntry = (e) => e.period == null && hmToMin(e.start_time) == null;
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 const mondayOf = (d) => { const x = startOfDay(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
@@ -53,6 +56,8 @@ export default function Kalender() {
   const [cursor, setCursor] = useState(() => startOfDay(new Date()));
   const [abo, setAbo] = useState(null); // Abo-URLs { url, webcal }
   const [moreOpen, setMoreOpen] = useState(false); // „⋯"-Menü (Teilen/Abonnieren)
+  const [showAllDay, setShowAllDay] = useState(() => { try { return localStorage.getItem("kal_allday") !== "0"; } catch { return true; } });
+  const toggleAllDay = () => setShowAllDay((v) => { const n = !v; try { localStorage.setItem("kal_allday", n ? "1" : "0"); } catch { /* egal */ } return n; });
   const [extUrl, setExtUrl] = useState("");   // externer ICS-Feed (read-only Anzeige)
   const [extEvents, setExtEvents] = useState([]); // [{date:'YYYY-MM-DD', title}]
   const openAbo = async () => {
@@ -197,6 +202,10 @@ export default function Kalender() {
     return p ? `${p.name} / ${tp.name}` : tp.name;
   };
   const byDay = (d) => entries.filter((e) => ymd(new Date(e.date)) === ymd(d));
+  // Ganztägig ein/ausblenden: filtert ganztägige Einträge bzw. externe Termine
+  // ohne Uhrzeit aus den Kalenderansichten (Stundenplan-Slots bleiben).
+  const byDayV = (d) => showAllDay ? byDay(d) : byDay(d).filter((e) => !isAllDayEntry(e));
+  const extByDayV = (d) => showAllDay ? extByDay(d) : extByDay(d).filter((ev) => hmToMin(ev.time) != null);
 
   const move = (dir) => {
     if (view === "day") setCursor(addDays(cursor, dir));
@@ -312,7 +321,18 @@ export default function Kalender() {
             options={[["today", t("kalender.todayView")], ["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")]]} />
         )}
         {view !== "timetable" && view !== "breaks" && (
-          <div style={{ position: "relative", marginLeft: "auto" }}>
+          <button onClick={() => setEditing({ date: startOfDay(new Date()) })} style={{ ...btnPrimary, marginLeft: "auto", padding: "6px 14px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("kalender.newEntry")}>
+            <Icon d={ICONS.plus} size={16} /> {t("kalender.newEntry")}
+          </button>
+        )}
+        {view !== "timetable" && view !== "breaks" && (
+          <button onClick={toggleAllDay} className="icon-btn" style={{ ...iconBtn, width: 34, height: 34, opacity: showAllDay ? 1 : 0.45 }}
+            title={t("kalender.toggleAllDay")}>
+            <Icon d={showAllDay ? ICONS.eye : (ICONS.eyeOff || ICONS.eye)} size={18} />
+          </button>
+        )}
+        {view !== "timetable" && view !== "breaks" && (
+          <div style={{ position: "relative" }}>
             <button onClick={() => setMoreOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn, width: 34, height: 34 }} title={t("common.more") !== "common.more" ? t("common.more") : "Mehr"}>
               <Icon d={ICONS.more} size={18} />
             </button>
@@ -387,7 +407,7 @@ export default function Kalender() {
           heuteAbsent={heuteAbsent} orgaAktiv={!!aktiv.orga} onOpen={setEditing} onSlot={fromSlot} />
       )}
 
-      {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} slotName={slotName} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
+      {view === "month" && <MonthGrid range={range} cursor={cursor} byDay={byDayV} extByDay={extByDayV} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} slotName={slotName} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
       {view === "week" && wdhVorschlag.length > 0 && (
         <div style={{ marginBottom: 12, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)" }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t("kalender.wdhTitle")}</div>
@@ -403,8 +423,8 @@ export default function Kalender() {
           </div>
         </div>
       )}
-      {view === "week" && <WeekView range={range} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} frei={frei} className={className} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
-      {view === "day" && <DayView day={cursor} tt={tt} byDay={byDay} extByDay={extByDay} slotsFor={slotsFor} frei={frei} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
+      {view === "week" && <WeekView range={range} byDay={byDayV} extByDay={extByDayV} slotsFor={slotsFor} frei={frei} className={className} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
+      {view === "day" && <DayView day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} slotsFor={slotsFor} frei={frei} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
       {view === "timetable" && <TimetableView tt={tt} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
@@ -775,7 +795,17 @@ function DayView({ day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFo
       {/* Zeitleiste 0–24 Uhr: scrollbar, Start bei 6 Uhr (Ref setzt scrollTop). */}
       {timed.length > 0 && (
         <div ref={scrollRef} style={{ maxHeight: "62vh", overflowY: "auto", border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)" }}>
-        <div style={{ position: "relative", height: 24 * HOUR }}>
+        <div style={{ position: "relative", height: 24 * HOUR }}
+          onClick={(ev) => {
+            // Klick auf freie Fläche der Zeitleiste öffnet direkt den Editor mit
+            // vorbelegter Uhrzeit (auf 5 Min gerundet). Klicks auf Termine nicht.
+            if (ev.target.closest("button")) return;
+            const y = ev.clientY - ev.currentTarget.getBoundingClientRect().top;
+            let m = Math.round(((y / HOUR) * 60) / 5) * 5;
+            m = Math.max(0, Math.min(23 * 60 + 55, m));
+            const hhmm = String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+            onOpen({ date: day, start_time: hhmm });
+          }}>
           {Array.from({ length: 25 }, (_, h) => (
             <div key={h} style={{ position: "absolute", top: yOf(h * 60), left: 46, right: 0, borderTop: h === 0 || h === 24 ? "none" : "1px solid var(--border)" }}>
               {h < 24 && <span style={{ position: "absolute", top: -1, left: -44, fontSize: 10.5, color: "var(--text3)" }}>{String(h).padStart(2, "0")}:00</span>}
@@ -1036,6 +1066,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   const [deckId, setDeckId] = useState(entry.karten_deck_id || "");
   const [startTime, setStartTime] = useState(entry.start_time || "");
   const [endTime, setEndTime] = useState(entry.end_time || "");
+  const [dateVal, setDateVal] = useState(entry.date ? ymd(new Date(entry.date)) : ymd(new Date()));
   const [decks, setDecks] = useState([]); // Karten-Decks der gewaehlten Klasse
   // Decks haengen an der Klasse: neu laden, wenn Klasse wechselt und Modul aktiv.
   useEffect(() => {
@@ -1126,6 +1157,10 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
           </div>
         )}
         {edit && (<>
+        {entry.period == null && (<>
+          <div style={lbl}>{t("kalender.extDate")}</div>
+          <input type="date" value={dateVal} onChange={(e) => e.target.value && setDateVal(e.target.value)} style={fld} />
+        </>)}
         <div style={lbl}>{t("kalender.entryTitle")}</div>
         <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus placeholder={t("kalender.entryTitlePlaceholder")} style={fld} />
         {entry.period == null && (<>
@@ -1226,7 +1261,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         <div style={lbl}>{t("kalender.notes")}</div>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...fld, resize: "vertical" }} />
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
-          <button onClick={() => onSave({ ...entry, title, notes, start_time: startTime || "", end_time: endTime || "", class_id: classId ? Number(classId) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })} style={btnPrimary}>{t("common.save")}</button>
+          <button onClick={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, title, notes, start_time: startTime || "", end_time: endTime || "", class_id: classId ? Number(classId) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
           {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
         </div>

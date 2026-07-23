@@ -795,6 +795,7 @@ export default {
   "kalender.empty": "Kein Eintrag an diesem Tag.",
   "kalender.newEntry": "Neuer Eintrag",
   "kalender.editEntry": "Eintrag bearbeiten",
+  "kalender.toggleAllDay": "Ganztägige ein-/ausblenden",
   "kalender.entryTime": "Uhrzeit (optional)",
   "kalender.entryTitle": "Titel",
   "kalender.entryTitlePlaceholder": "z. B. Einführung Bruchrechnung",

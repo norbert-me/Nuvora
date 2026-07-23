@@ -795,6 +795,7 @@ export default {
   "kalender.empty": "No entry on this day.",
   "kalender.newEntry": "New entry",
   "kalender.editEntry": "Edit entry",
+  "kalender.toggleAllDay": "Toggle all-day events",
   "kalender.entryTime": "Time (optional)",
   "kalender.entryTitle": "Title",
   "kalender.entryTitlePlaceholder": "e.g. Intro to fractions",
