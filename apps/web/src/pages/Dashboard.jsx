@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import Latex from "../components/Latex.jsx";
 import PublishModal from "../components/PublishModal.jsx";
@@ -110,6 +111,32 @@ export default function Dashboard() {
     }
     return null;
   };
+
+  // Deep-Link ?set=<id> (z. B. aus dem Kalender): das Fragenset in seinem Ordner
+  // öffnen. Einmalig, sobald die Ordner/Sets geladen sind.
+  const [params, setParams] = useSearchParams();
+  const [openedSet, setOpenedSet] = useState(false);
+  useEffect(() => {
+    if (openedSet) return;
+    const sid = Number(params.get("set"));
+    if (!sid) return;
+    const clear = () => { setOpenedSet(true); params.delete("set"); setParams(params, { replace: true }); };
+    const top = rootSets.find((s) => s.id === sid);
+    if (top) { setPath([]); setCurrentFolder(null); setEditingSet(top); clear(); return; }
+    const walk = (nodes, trail) => {
+      for (const n of nodes) {
+        const s = (n.question_sets || []).find((x) => x.id === sid);
+        const here = [...trail, { id: n.id, name: n.name }];
+        if (s) return { set: s, trail: here, folderId: n.id };
+        const deeper = walk(n.children || [], here);
+        if (deeper) return deeper;
+      }
+      return null;
+    };
+    const r = walk(folders, []);
+    if (r) { setPath(r.trail); setCurrentFolder(r.folderId); setEditingSet(r.set); clear(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [folders, rootSets]);
 
   const getAllFolderIds = (node) => {
     let ids = [node.id];

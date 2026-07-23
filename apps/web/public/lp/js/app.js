@@ -675,6 +675,18 @@
     window.addEventListener('message', (e) => {
         if (e.origin !== window.location.origin) return;
         if (e.data && e.data.type === 'nuvora:lernpfad-tab' && e.data.tab) switchTab(e.data.tab);
+        // Deep-Link aus dem Kalender: eine bestimmte Lernleiter (Server-id) öffnen.
+        // Zum „lernpfade"-Tab wechseln, frisch laden, dann den Pfad öffnen, der die
+        // Lernleiter enthält.
+        if (e.data && e.data.type === 'nuvora:open-lernleiter' && e.data.id != null) {
+            (async () => {
+                switchTab('lernpfade');
+                await loadLernpfade();
+                const ziel = String(e.data.id);
+                const pfad = lernpfade.find(p => (p.lernleitern || []).some(ll => String(ll.id) === ziel));
+                if (pfad) openPfad(pfad._id);
+            })();
+        }
     });
 
     // Mobiles Navigations-Menü aufklappen

@@ -110,6 +110,15 @@ export default function Karten() {
   const [addName, setAddName] = useState("");
   const loadFolders = (id) => id && fetch(`${API}/classes/${id}/card-folders${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => setCardFolders(Array.isArray(d) ? d : [])).catch(() => {});
   useEffect(() => { loadDecks(classId); loadTrash(classId); loadFolders(classId); setCurrentCardFolder(null); }, [classId, kursId]);
+  // Deep-Link ?deck=<id> (aus dem Kalender): in den Ordner des Stapels springen,
+  // der Stapel klappt sich per autoOpen einmalig auf und scrollt hin.
+  const [autoDeck, setAutoDeck] = useState(Number(params.get("deck")) || null);
+  useEffect(() => {
+    if (!autoDeck || !decks.length) return;
+    const d = decks.find((x) => x.id === autoDeck);
+    if (d) setCurrentCardFolder(d.folder_id ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [decks]);
   const folderName = (fid) => (cardFolders.find((f) => f.id === fid) || {}).name || "";
   // Drag&Drop: Ordner in einen anderen Ordner (oder über den Breadcrumb nach oben)
   // ziehen. Das Ziel wird beim Ziehen hervorgehoben (Vorschau, wohin es landet).
@@ -312,7 +321,7 @@ export default function Karten() {
 
           {loadingDecks && !decksLoadedOnce.current ? <Skeleton rows={3} height={60} />
             : (decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).length === 0 && cardFolders.filter((f) => (f.parent_id ?? null) === currentCardFolder).length === 0) ? <Empty title={t("karten.noDecks")} hint={t("karten.noDecksHint")} /> : null}
-          {decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} onDragStartDeck={() => setDragDeckId(d.id)} onDragEndDeck={endDrag} dragging={dragDeckId === d.id} />)}
+          {decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} onDragStartDeck={() => setDragDeckId(d.id)} onDragEndDeck={endDrag} dragging={dragDeckId === d.id} autoOpen={autoDeck === d.id} onAutoOpened={() => setAutoDeck(null)} />)}
           {deckTrash.length > 0 && (
             <div style={{ marginTop: 8 }}>
               <button onClick={() => setShowTrash((v) => !v)} style={{ ...btnSecondary, fontSize: 13 }}>{t("karten.trash")} ({deckTrash.length})</button>
@@ -509,7 +518,7 @@ function StudentDetail({ detail, t, onClose }) {
   );
 }
 
-function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onMove, onDragStartDeck, onDragEndDeck, dragging = false }) {
+function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onMove, onDragStartDeck, onDragEndDeck, dragging = false, autoOpen = false, onAutoOpened }) {
   const [front, setFront] = useState("");
   const [back, setBack] = useState("");
   const [planDate, setPlanDate] = useState("");
@@ -519,6 +528,15 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   // Standard eingeklappt: nur Kopf zeigen; ausgeklappt kommen Einstellungen,
   // Karten und Eingabe dazu. Umbenennen per Stift am Namen.
   const [collapsed, setCollapsed] = useState(true);
+  const rootRef = useRef(null);
+  // Deep-Link (?deck=<id> aus dem Kalender): einmalig aufklappen + hinscrollen.
+  useEffect(() => {
+    if (!autoOpen) return;
+    setCollapsed(false);
+    rootRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    onAutoOpened && onAutoOpened();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpen]);
   const [renaming, setRenaming] = useState(false);
   const [nameVal, setNameVal] = useState(deck.name || "");
   const [moveOpen, setMoveOpen] = useState(false); // „Verschieben"-Popover (Ziel-Ordner)
@@ -573,7 +591,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
     : { text: t("karten.draft"), bg: "var(--bg3)", col: "var(--text3)" };
 
   return (
-    <div style={{ marginBottom: 14, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, opacity: dragging ? 0.4 : 1 }}>
+    <div ref={rootRef} style={{ marginBottom: 14, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, opacity: dragging ? 0.4 : 1 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: collapsed ? 0 : 10, flexWrap: "wrap" }}>
         {onDragStartDeck && (
           <span draggable onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; onDragStartDeck(); }} onDragEnd={onDragEndDeck}

@@ -2,6 +2,7 @@
 // Je Einstieg: Idee (Text), Ablauf mit Material, Materialliste, ca. Dauer.
 // Wiederverwendbar; im Kalender einer Stunde zuweisbar.
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, modalOverlay, modalPanel, inputStyle, ExportButton, ImportButton } from "../components/Icons.jsx";
@@ -29,6 +30,21 @@ export default function Methoden() {
   const loadFolders = () => fetch(`${API}/folders`).then((r) => (r.ok ? r.json() : [])).then((d) => setFolders(Array.isArray(d) ? d : [])).catch(() => {});
   useEffect(() => { load(); loadFolders(); }, []);
   useEffect(() => { fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
+
+  // Deep-Link ?open=<id> (z. B. aus dem Kalender): den Einstieg direkt öffnen und
+  // in seinen Ordner springen. Einmalig, sobald die Einträge geladen sind.
+  const [params, setParams] = useSearchParams();
+  const [opened, setOpened] = useState(false);
+  useEffect(() => {
+    if (opened) return;
+    const id = Number(params.get("open"));
+    if (!id || !items.length) return;
+    const m = items.find((x) => x.id === id);
+    if (m) { setCurrent(m.folder_id ?? null); setEdit(m); }
+    setOpened(true);
+    params.delete("open"); setParams(params, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
 
   const folderById = (id) => folders.find((f) => f.id === id) || null;
   const childFolders = (pid) => folders.filter((f) => (f.parent_id ?? null) === pid).sort((a, b) => a.name.localeCompare(b.name, "de", { numeric: true }));

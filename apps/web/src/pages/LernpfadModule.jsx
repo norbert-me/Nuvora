@@ -68,7 +68,13 @@ export default function LernpfadModule() {
     const onMessage = (e) => {
       if (e.origin !== ORIGIN) return;
       const d = e.data || {};
-      if (d.type === "lernpfad:ready") { sendeTheme(); sendeTab(); }
+      if (d.type === "lernpfad:ready") {
+        sendeTheme(); sendeTab();
+        // Deep-Link ?ll=<id> (aus dem Kalender): die App die passende Lernleiter
+        // öffnen lassen, sobald sie bereit ist. Param danach entfernen (einmalig).
+        const ll = params.get("ll");
+        if (ll) { post({ type: "nuvora:open-lernleiter", id: ll }); params.delete("ll"); setParams(params, { replace: true }); }
+      }
       if (d.type === "lernpfad:tab" && d.tab && d.tab !== tabRef.current) setParams({ tab: d.tab }, { replace: true });
       if (d.type === "lernpfad:modal" && typeof d.html === "string") setModal({ title: d.title || "", html: d.html });
       if (d.type === "lernpfad:toast" && d.msg) { setToast(String(d.msg)); clearTimeout(window.__lpToast); window.__lpToast = setTimeout(() => setToast(""), 2500); }
