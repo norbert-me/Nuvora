@@ -660,7 +660,7 @@
         btn.classList.add('active');
         const content = document.getElementById('tab-' + tab);
         if (content) content.classList.add('active');
-        if (tab === 'generator') refreshGeneratorDropdowns();
+        if (tab === 'generator') { refreshGeneratorDropdowns(); setzGeneratorPrefs(); }
         if (tab === 'aufgaben') setNextId();
         if (tab === 'lernpfade') loadLernpfade();
         const nav = document.getElementById('nav-links');
@@ -1752,6 +1752,7 @@
         `;
 
         const config = getGenConfig();
+        saveGenPrefs(config);  // Aufgabenauswahl-Präferenzen merken (nächstes Mal vorbelegt)
         const erklPool = aufgaben.filter(a => a.thema === thema && getKategorie(a) === 'Erklärung' && (!selectedUt.length || selectedUt.includes(a.unterthema)));
 
         const utList = selectedUt.length ? selectedUt.slice().sort() : [''];
@@ -3006,6 +3007,24 @@
         };
     }
 
+    // Aufgabenauswahl-Präferenzen (Regler im Generator) am Gerät merken, damit
+    // sie beim nächsten Mal vorbelegt sind. Beim Bearbeiten einer bestehenden
+    // Lernleiter hat deren gespeicherte Konfig Vorrang (siehe setzGeneratorPrefs).
+    const GEN_PREFS_KEY = 'lp_gen_prefs';
+    function saveGenPrefs(cfg) {
+        try { localStorage.setItem(GEN_PREFS_KEY, JSON.stringify(cfg || getGenConfig())); } catch (e) { /* egal */ }
+    }
+    function loadGenPrefs() {
+        try { return JSON.parse(localStorage.getItem(GEN_PREFS_KEY) || 'null'); } catch (e) { return null; }
+    }
+    // Beim Öffnen des Generators die gemerkten Präferenzen setzen — aber nur, wenn
+    // gerade KEINE bestehende Lernleiter bearbeitet wird (die bringt ihre eigene mit).
+    function setzGeneratorPrefs() {
+        if (editingLlId) return;
+        const p = loadGenPrefs();
+        if (p) setGenConfig(p);
+    }
+
     // Regler auf eine gespeicherte Konfig setzen (openLernleiter). cfg-max zuerst,
     // weil es das Maximum von cfg-pflicht bestimmt. 'input' feuern, damit die
     // Ausgaben/abhängigen Anzeigen mitgehen.
@@ -3362,10 +3381,15 @@
     });
 
     function editPfad(pfad) {
+        if (!pfad) { toast('Lernpfad nicht gefunden'); return; }
         currentPfad = pfad;
-        document.getElementById('pfad-edit-panel').style.display = '';
+        const panel = document.getElementById('pfad-edit-panel');
+        panel.style.display = '';
         document.getElementById('pfad-edit-title').textContent = 'Lernpfad: ' + esc(pfad.name);
         renderPfadLernleitern();
+        // Ans Panel scrollen — es öffnet unter der Liste; sonst wirkt der
+        // Bearbeiten-Klick, als passiere nichts (langer Bildschirm).
+        try { panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { /* egal */ }
     }
 
     function renderPfadLernleitern() {
