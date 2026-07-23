@@ -32,7 +32,13 @@ export default function Modules() {
 
   const dispName = (m) => (t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name);
   const descOf = (m) => (t(`mod.${m.key}.desc`) !== `mod.${m.key}.desc` ? t(`mod.${m.key}.desc`) : m.description) || "";
-  const helpOf = (m) => { const k = HELP_KEY[m.key]; const h = k && t(k) !== k ? t(k) : ""; return h || descOf(m); };
+  const helpOf = (m) => {
+    const hk = `mod.${m.key}.help`;
+    if (t(hk) !== hk) return t(hk);
+    const k = HELP_KEY[m.key]; const h = k && t(k) !== k ? t(k) : "";
+    return h || descOf(m);
+  };
+  const imgOf = (m) => { const ik = `mod.${m.key}.img`; return t(ik) !== ik ? t(ik) : ""; };
   // Neuer Nutzer ohne aktives Modul: nach Beliebtheit vorsortieren, damit der
   // Einstieg nicht bei einer alphabetischen Wand aus 12 Namen beginnt.
   const noneActive = modules.every((m) => !m.active);
@@ -131,12 +137,13 @@ export default function Modules() {
                 )}
               </div>
               <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.6 }}>
-                {t(`mod.${m.key}.desc`) !== `mod.${m.key}.desc` ? t(`mod.${m.key}.desc`) : m.description}
+                {descOf(m)}
+                {" "}
+                <button onClick={() => setHelpMod(m)} style={{ border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--accent)", fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap" }}>
+                  {t("modules.more")} ›
+                </button>
               </div>
             </div>
-            <button onClick={() => setHelpMod(m)} className="icon-btn" style={{ ...iconBtn, flexShrink: 0 }} title={t("modules.explain")}>
-              <Icon d={ICONS.info || ICONS.help} size={18} />
-            </button>
             <button
               onClick={() => handle(m)}
               disabled={busy === m.key || !m.available}
@@ -173,6 +180,12 @@ export default function Modules() {
               <button onClick={() => setHelpMod(null)} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
             </div>
             <p style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.65, margin: "0 0 8px", whiteSpace: "pre-wrap" }}>{helpOf(helpMod)}</p>
+            {imgOf(helpMod) && (
+              <div style={{ marginTop: 12, border: "1px dashed var(--border2)", borderRadius: 10, padding: "18px 16px", background: "var(--bg3)", textAlign: "center" }}>
+                <div style={{ fontSize: 22, marginBottom: 6, opacity: 0.5 }}>🖼️</div>
+                <div style={{ fontSize: 12.5, color: "var(--text3)", lineHeight: 1.5 }}>{imgOf(helpMod)}</div>
+              </div>
+            )}
             <div style={{ marginTop: 16, textAlign: "right" }}>
               <button onClick={() => setHelpMod(null)} style={btnSecondary}>{t("common.close")}</button>
             </div>
