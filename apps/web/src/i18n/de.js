@@ -928,6 +928,7 @@ export default {
   "kalender.noBreaks": "Noch keine freien Tage eingetragen.",
   "methoden.title": "Einstiege",
   "methoden.intro": "Ideen für den Unterrichtseinstieg: eine kurze Idee, der Ablauf mit Material, eine Materialliste und die ungefähre Dauer.",
+  "methoden.jsonTemplate": "Vorlage",
   "methoden.new": "Neu",
   "methoden.edit": "Bearbeiten",
   "methoden.empty": "Noch keine Einstiege.",

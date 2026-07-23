@@ -898,6 +898,7 @@ export default {
   "kalender.noBreaks": "Aún no hay días sin clase.",
   "methoden.title": "Inicios",
   "methoden.intro": "Ideas para el inicio de la clase: una idea breve, el desarrollo con material, una lista de material y la duración aproximada.",
+  "methoden.jsonTemplate": "Plantilla",
   "methoden.new": "Nuevo",
   "methoden.edit": "Editar",
   "methoden.empty": "Aún no hay inicios.",

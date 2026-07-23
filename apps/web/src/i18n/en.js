@@ -898,6 +898,7 @@ export default {
   "kalender.noBreaks": "No days off yet.",
   "methoden.title": "Starters",
   "methoden.intro": "Ideas for lesson starters: a short idea, the procedure with materials, a materials list and an approximate duration.",
+  "methoden.jsonTemplate": "Template",
   "methoden.new": "New",
   "methoden.edit": "Edit",
   "methoden.empty": "No starters yet.",

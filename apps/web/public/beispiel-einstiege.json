@@ -1,0 +1,26 @@
+{
+  "type": "nuvora_einstiege",
+  "items": [
+    {
+      "title": "Blitzlicht",
+      "description": "Kurzer Stimmungs- und Wissensfang zu Stundenbeginn: jede/r sagt in einem Satz, was von der letzten Stunde hängen geblieben ist.",
+      "ablauf": "1. Frage an die Klasse stellen (\"Ein Satz: Was weißt du noch über …?\").\n2. Reihum ein Satz pro Person, ohne Kommentar.\n3. Auffällige Lücken notieren und in der Stunde aufgreifen.",
+      "material": "Keins",
+      "dauer": 5
+    },
+    {
+      "title": "Fehler des Tages",
+      "description": "Ein typischer Rechen- oder Denkfehler steht an der Tafel — die Klasse findet und erklärt ihn.",
+      "ablauf": "1. Vorbereiteten Fehler zeigen (z. B. falsch gekürzter Bruch).\n2. Partnerarbeit: Wo steckt der Fehler, warum passiert er?\n3. Auflösung im Plenum, richtige Lösung festhalten.",
+      "material": "Tafel / Folie mit dem Fehlerbeispiel",
+      "dauer": 10
+    },
+    {
+      "title": "Placemat",
+      "description": "Aktivierung des Vorwissens in Vierergruppen vor einem neuen Thema.",
+      "ablauf": "1. Blatt in vier Außenfelder + Mitte teilen.\n2. Jede/r schreibt still ins eigene Feld, was sie/er zum Thema weiß.\n3. Gruppe einigt sich auf gemeinsame Punkte in der Mitte.\n4. Kurze Vorstellung im Plenum.",
+      "material": "Ein DIN-A3-Blatt pro Gruppe, Stifte",
+      "dauer": 15
+    }
+  ]
+}

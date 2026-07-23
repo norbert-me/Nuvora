@@ -67,8 +67,9 @@ export default function Methoden() {
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
         <h1 style={pageTitle}>{t("methoden.title")}</h1>
         <span style={{ flex: 1 }} />
-        <ExportButton label={t("common.export")} onClick={doExport} />
-        <ImportButton label={t("common.import")} onFile={doImport} />
+        <a href="/beispiel-einstiege.json" download style={{ fontSize: 12.5, color: "var(--accent)", textDecoration: "none", whiteSpace: "nowrap" }}>{t("methoden.jsonTemplate")}</a>
+        <ExportButton label="" title={t("common.export")} onClick={doExport} />
+        <ImportButton label="" title={t("common.import")} onFile={doImport} />
         <AddButton onClick={() => setEdit({})} title={t("methoden.new")} />
       </div>
 
@@ -115,9 +116,16 @@ function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
   const [ablauf, setAblauf] = useState(m.ablauf || "");
   const [material, setMaterial] = useState(m.material || "");
   const [topicId, setTopicId] = useState(m.topic_id ?? "");
+  const [titleErr, setTitleErr] = useState(false);
   const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
   const fld = { ...inputStyle, width: "100%" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
+  const submit = () => {
+    // Fehlender Titel wird direkt in der Maske gemeldet, nicht als Seitenfehler
+    // hinter dem Modal.
+    if (!title.trim()) { setTitleErr(true); return; }
+    onSave({ id: m.id, title, description, ablauf, material, dauer, topic_id: topicId === "" ? null : Number(topicId) });
+  };
   return (
     <div onClick={onClose} style={modalOverlay}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 480 }}>
@@ -125,7 +133,8 @@ function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ flex: 1 }}>
             <div style={{ ...lbl, marginTop: 0 }}>{t("methoden.titleField")}</div>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus style={fld} />
+            <input value={title} onChange={(e) => { setTitle(e.target.value); if (titleErr) setTitleErr(false); }} autoFocus style={{ ...fld, ...(titleErr ? { borderColor: C.danger } : {}) }} />
+            {titleErr && <div style={{ color: C.danger, fontSize: 12, marginTop: 4 }}>{t("methoden.titleRequired")}</div>}
           </div>
           <div style={{ width: 120 }}>
             <div style={{ ...lbl, marginTop: 0 }}>{t("methoden.dauer")}</div>
@@ -148,7 +157,7 @@ function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
           </>
         )}
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
-          <button onClick={() => onSave({ id: m.id, title, description, ablauf, material, dauer, topic_id: topicId === "" ? null : Number(topicId) })} style={btnPrimary}>{t("common.save")}</button>
+          <button onClick={submit} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
           {m.id && <button onClick={() => onDelete(m.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>}
         </div>
