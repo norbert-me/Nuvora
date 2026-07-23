@@ -330,7 +330,9 @@ export default function Dashboard() {
         {currentChildren.map((f) => (
           <div key={f.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", marginBottom: 8, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 14, cursor: "pointer" }}>
             <span onClick={() => renamingFolder !== f.id && openFolder(f)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              {/* Ordner-Icon nur in der Ansicht — beim Umbenennen weg, sonst
+                  überlappt es das Eingabefeld. */}
+              {renamingFolder !== f.id && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>}
               {renamingFolder === f.id ? (
                 <input
                   autoFocus
@@ -339,7 +341,7 @@ export default function Dashboard() {
                   onBlur={commitRenameFolder}
                   onKeyDown={(e) => { if (e.key === "Enter") commitRenameFolder(); if (e.key === "Escape") setRenamingFolder(null); }}
                   onClick={(e) => e.stopPropagation()}
-                  style={{ fontWeight: 700, fontSize: 15, padding: "4px 10px", border: "2px solid var(--accent)", borderRadius: 8, background: "var(--input-bg)", color: "var(--text)", outline: "none", flex: 1 }}
+                  style={{ fontWeight: 700, fontSize: 15, padding: "4px 10px", border: "2px solid var(--accent)", borderRadius: 8, background: "var(--input-bg)", color: "var(--text)", outline: "none", flex: 1, minWidth: 0, boxSizing: "border-box" }}
                 />
               ) : (
                 <>
