@@ -815,6 +815,7 @@ export default {
   "kalender.free": "no lessons",
   "kalender.bundesland": "State",
   "kalender.ferienImport": "Import holidays",
+  "kalender.feiertagImport": "Import public holidays",
   "kalender.ferienImporting": "Importing …",
   "kalender.ferienHint": "School holidays for two school years. Only missing periods are added.",
   "kalender.ferienNothing": "All holidays for this state are already entered.",

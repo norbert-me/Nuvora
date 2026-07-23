@@ -815,6 +815,7 @@ export default {
   "kalender.free": "unterrichtsfrei",
   "kalender.bundesland": "Bundesland",
   "kalender.ferienImport": "Ferien importieren",
+  "kalender.feiertagImport": "Feiertage importieren",
   "kalender.ferienImporting": "Importiere …",
   "kalender.ferienHint": "Schulferien für zwei Schuljahre. Nur fehlende Zeiträume werden ergänzt.",
   "kalender.ferienNothing": "Alle Ferien dieses Bundeslands sind bereits eingetragen.",

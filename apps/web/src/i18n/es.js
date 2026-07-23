@@ -815,6 +815,7 @@ export default {
   "kalender.free": "sin clases",
   "kalender.bundesland": "Estado federado",
   "kalender.ferienImport": "Importar vacaciones",
+  "kalender.feiertagImport": "Importar festivos",
   "kalender.ferienImporting": "Importando …",
   "kalender.ferienHint": "Vacaciones escolares de dos cursos. Solo se añaden los periodos que faltan.",
   "kalender.ferienNothing": "Todas las vacaciones de este estado ya están registradas.",

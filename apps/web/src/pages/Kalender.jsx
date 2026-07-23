@@ -10,6 +10,7 @@ import { swr, put } from "../core/cache.js";
 import { undoDelete } from "../core/undo.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
 import ferienDE from "../data/ferien-de.json";
+import { feiertage } from "../data/feiertage.js";
 
 // Bundeslaender fuer den Ferien-Import (Kuerzel muss zu ferien-de.json passen).
 const BUNDESLAENDER = [
@@ -888,6 +889,18 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
     }
     setImporting(false);
   };
+  const feiertagImport = async () => {
+    const jahr = new Date().getFullYear();
+    const liste = [...feiertage(jahr, land), ...feiertage(jahr + 1, land)];
+    const vorhanden = new Set(breaks.map((b) => `${ymd(new Date(b.start_date))}|${(b.label || "").trim()}`));
+    const neu = liste.filter((f) => !vorhanden.has(`${f.start}|${f.label.trim()}`));
+    if (neu.length === 0) { showAlert(t("kalender.ferienNothing")); return; }
+    setImporting(true);
+    for (const f of neu) {
+      await onAdd({ start_date: new Date(f.start + "T00:00:00").toISOString(), end_date: new Date(f.end + "T00:00:00").toISOString(), label: f.label });
+    }
+    setImporting(false);
+  };
   return (
     <div style={standalone ? {} : { marginTop: 26, borderTop: "1px solid var(--border)", paddingTop: 18 }}>
       <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{t("kalender.breaksTitle")}</h3>
@@ -898,6 +911,7 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
             {BUNDESLAENDER.map(([k, n]) => <option key={k} value={k}>{n}</option>)}
           </select></label>
         <button onClick={ferienImport} disabled={importing} style={{ ...btnSecondary, opacity: importing ? 0.6 : 1 }}>{importing ? t("kalender.ferienImporting") : t("kalender.ferienImport")}</button>
+        <button onClick={feiertagImport} disabled={importing} style={{ ...btnSecondary, opacity: importing ? 0.6 : 1 }}>{t("kalender.feiertagImport")}</button>
         <span style={{ fontSize: 11.5, color: "var(--text3)", flex: 1, minWidth: 160 }}>{t("kalender.ferienHint")}</span>
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
