@@ -217,7 +217,7 @@ export default function Kalender() {
   }, [view, cursor]); // eslint-disable-line
 
   const save = async (e) => {
-    const body = { date: isoDay(e.date), title: e.title || "", notes: e.notes || "", class_id: e.class_id || null, topic_id: e.topic_id || null, method_id: e.method_id || null, period: e.period ?? null, cardvote_set_id: e.cardvote_set_id || null, karten_deck_id: e.karten_deck_id || null, lernpfad_ladder_id: e.lernpfad_ladder_id || null, codedetektiv_puzzle: e.codedetektiv_puzzle || null };
+    const body = { date: isoDay(e.date), title: e.title || "", notes: e.notes || "", class_id: e.class_id || null, topic_id: e.topic_id || null, method_id: e.method_id || null, period: e.period ?? null, start_time: e.start_time || "", end_time: e.end_time || "", cardvote_set_id: e.cardvote_set_id || null, karten_deck_id: e.karten_deck_id || null, lernpfad_ladder_id: e.lernpfad_ladder_id || null, codedetektiv_puzzle: e.codedetektiv_puzzle || null };
     const res = await fetch(e.id ? `${API}/entries/${e.id}` : `${API}/entries`, {
       method: e.id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     }).catch(() => null);
@@ -506,7 +506,7 @@ function ExtChips({ list, onOpen }) {
 function EntryChips({ list, className, topicName, onOpen, classColor }) {
   return list.map((e) => {
     const col = e.class_id && classColor ? classColor(e.class_id) : null;
-    const label = e.title || topicName(e.topic_id) || (className && className(e.class_id)) || "—";
+    const label = (e.start_time ? e.start_time + " " : "") + (e.title || topicName(e.topic_id) || (className && className(e.class_id)) || "—");
     return (
       <button key={e.id} onClick={(ev) => { ev.stopPropagation(); onOpen({ ...e, date: new Date(e.date) }); }}
         style={{ ...chip, marginTop: 3, width: "100%", ...(col ? { background: col + "22", color: "var(--text)", borderLeft: `3px solid ${col}` } : {}) }}
@@ -711,7 +711,8 @@ function DayView({ day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFo
   if (f) return <p style={{ fontSize: 14, color: "var(--text3)", fontStyle: "italic" }}>{f.label ? `${f.label} — ${t("kalender.free")}` : t("kalender.free")}</p>;
 
   // Ganztägig / ohne verortbare Uhrzeit -> Banner oben (auch externe Termine).
-  const ganztags = list.filter((e) => e.period == null);
+  // Einträge mit freier Uhrzeit gehören in die Zeitspur, nicht ins Banner.
+  const ganztags = list.filter((e) => e.period == null && toMin(e.start_time) == null);
   const belegte = new Set(slots.map((s) => s.period));
 
   const yOf = (min) => (min / 60) * HOUR;
@@ -730,6 +731,13 @@ function DayView({ day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFo
     const { s: sm, e: em } = pTime(e.period);
     if (sm == null) { ganztags.push(e); return; }   // keine Uhrzeit hinterlegt -> ganztägig
     timed.push({ key: "e" + e.id, start: sm, end: em != null ? em : sm + 45, col: "var(--accent)",
+      label: e.title || topicName(e.topic_id) || t("kalender.planned"), sub: "", onClick: () => onOpen({ ...e, date: new Date(e.date) }) });
+  });
+  // Einträge mit freier Uhrzeit (kein Stundenplan-Slot) in die Zeitspur.
+  list.filter((e) => e.period == null && toMin(e.start_time) != null).forEach((e) => {
+    const sm = toMin(e.start_time);
+    const emv = toMin(e.end_time);
+    timed.push({ key: "t" + e.id, start: sm, end: emv != null && emv > sm ? emv : sm + 45, col: e.class_id ? classColor(e.class_id) : "var(--accent)",
       label: e.title || topicName(e.topic_id) || t("kalender.planned"), sub: "", onClick: () => onOpen({ ...e, date: new Date(e.date) }) });
   });
   const extAllDay = ext.filter((ev) => toMin(ev.time) == null);
@@ -1026,6 +1034,8 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   const [ladderId, setLadderId] = useState(entry.lernpfad_ladder_id || "");
   const [puzzleId, setPuzzleId] = useState(entry.codedetektiv_puzzle || "");
   const [deckId, setDeckId] = useState(entry.karten_deck_id || "");
+  const [startTime, setStartTime] = useState(entry.start_time || "");
+  const [endTime, setEndTime] = useState(entry.end_time || "");
   const [decks, setDecks] = useState([]); // Karten-Decks der gewaehlten Klasse
   // Decks haengen an der Klasse: neu laden, wenn Klasse wechselt und Modul aktiv.
   useEffect(() => {
@@ -1118,6 +1128,15 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         {edit && (<>
         <div style={lbl}>{t("kalender.entryTitle")}</div>
         <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus placeholder={t("kalender.entryTitlePlaceholder")} style={fld} />
+        {entry.period == null && (<>
+          <div style={lbl}>{t("kalender.entryTime")}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={{ ...fld, width: "auto" }} title={t("kalender.start")} />
+            <span style={{ color: "var(--text3)" }}>–</span>
+            <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={{ ...fld, width: "auto" }} title={t("kalender.end")} />
+            {(startTime || endTime) && <button onClick={() => { setStartTime(""); setEndTime(""); }} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.delete")}><Icon d={ICONS.close} size={15} /></button>}
+          </div>
+        </>)}
         <div style={lbl}>{t("nav.classes")}</div>
         <KursKlasseSelect value={classId === "" ? "" : Number(classId)} allowNone noneLabel={`– ${t("kalender.noClass")} –`}
           onChange={(id) => setClassId(id === "" ? "" : String(id))} style={sfld} />
@@ -1207,7 +1226,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         <div style={lbl}>{t("kalender.notes")}</div>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...fld, resize: "vertical" }} />
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
-          <button onClick={() => onSave({ ...entry, title, notes, class_id: classId ? Number(classId) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })} style={btnPrimary}>{t("common.save")}</button>
+          <button onClick={() => onSave({ ...entry, title, notes, start_time: startTime || "", end_time: endTime || "", class_id: classId ? Number(classId) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
           {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
         </div>

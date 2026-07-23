@@ -573,6 +573,10 @@ class CalendarEntry(Base):
     # Tag+Stunde eindeutig, damit ein erneuter Klick auf dieselbe Stunde den
     # vorhandenen Eintrag bearbeitet statt einen zweiten anzulegen.
     period: Mapped[Optional[int]] = mapped_column(nullable=True)
+    # Optionale freie Uhrzeit ("HH:MM"), unabhaengig vom Stundenplan. Gesetzt =
+    # getakteter Termin (hat Vorrang vor der period-Uhrzeit im ICS/Tagesplan).
+    start_time: Mapped[str] = mapped_column(String(5), default="", server_default="")
+    end_time: Mapped[str] = mapped_column(String(5), default="", server_default="")
     # Verknuepfte Modul-Objekte (Regel 3: alle optional, ON DELETE SET NULL —
     # der Eintrag bleibt ohne das jeweilige Modul voll nutzbar). CardVote-Quiz,
     # Karten-Deck (wird am Kalendertag freigeschaltet), Lernpfad-Lernleiter.

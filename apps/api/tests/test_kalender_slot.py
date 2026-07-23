@@ -47,3 +47,21 @@ async def test_slot_behaelt_kurs(s):
     fremd = Kurs(owner_id=v.id, name="fremd"); s.add(fremd); await s.commit()
     with pytest.raises(Exception):
         await KAL.upsert_slot(KAL.SlotIn(weekday=1, period=1, class_id=cls.id, kurs_id=fremd.id), user=u, db=s)
+
+
+@pytest.mark.asyncio
+async def test_ics_freie_uhrzeit(s):
+    """Eintrag mit freier Uhrzeit wird als getakteter VEVENT exportiert
+    (DTSTART/DTEND mit Zeit), nicht als Ganztags-Termin."""
+    from datetime import datetime, timezone
+    from app.models import CalendarEntry
+    u = User(email="c@d.de", password_hash="x", name="L", calendar_token="tok123"); s.add(u); await s.flush()
+    # 12:00-verankertes Datum (wie das Frontend jetzt sendet).
+    s.add(CalendarEntry(owner_id=u.id, date=datetime(2025, 9, 3, 10, 0, tzinfo=timezone.utc),
+                        title="Konferenz", start_time="07:55", end_time="12:40"))
+    await s.commit()
+    resp = await KAL.ics_feed("tok123", db=s)
+    body = resp.body.decode() if hasattr(resp.body, "decode") else resp.body
+    assert "DTSTART:20250903T075500" in body
+    assert "DTEND:20250903T124000" in body
+    assert "SUMMARY:Konferenz" in body

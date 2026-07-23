@@ -795,6 +795,7 @@ export default {
   "kalender.empty": "Sin entrada este día.",
   "kalender.newEntry": "Nueva entrada",
   "kalender.editEntry": "Editar entrada",
+  "kalender.entryTime": "Hora (opcional)",
   "kalender.entryTitle": "Título",
   "kalender.entryTitlePlaceholder": "p. ej. Introducción a fracciones",
   "kalender.noClass": "sin clase",

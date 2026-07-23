@@ -60,6 +60,8 @@ class EntryIn(BaseModel):
     topic_id: Optional[int] = None
     method_id: Optional[int] = None
     period: Optional[int] = None
+    start_time: str = ""   # optionale freie Uhrzeit "HH:MM"
+    end_time: str = ""
     cardvote_set_id: Optional[int] = None
     karten_deck_id: Optional[int] = None
     lernpfad_ladder_id: Optional[int] = None
@@ -424,9 +426,14 @@ async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
         title = e.title or (classes.get(e.class_id) or "Termin")
         # Hat der Eintrag eine Stunde und gibt es dafür Uhrzeiten im Stundenplan,
         # als getakteten Termin ausgeben (sonst als Ganztags-Termin).
-        tm = ttimes[e.period - 1] if (e.period and isinstance(ttimes, list) and 0 < e.period <= len(ttimes)) else None
-        a = _hm(tm.get("start")) if isinstance(tm, dict) else None
-        b2 = _hm(tm.get("end")) if isinstance(tm, dict) else None
+        # Freie Uhrzeit am Eintrag hat Vorrang; sonst die Uhrzeit der Stunde.
+        if getattr(e, "start_time", "") and getattr(e, "end_time", ""):
+            a = _hm(e.start_time)
+            b2 = _hm(e.end_time)
+        else:
+            tm = ttimes[e.period - 1] if (e.period and isinstance(ttimes, list) and 0 < e.period <= len(ttimes)) else None
+            a = _hm(tm.get("start")) if isinstance(tm, dict) else None
+            b2 = _hm(tm.get("end")) if isinstance(tm, dict) else None
         if a and b2:
             dtstart = f"DTSTART:{d8(day)}T{a}"
             dtend = f"DTEND:{d8(day)}T{b2}"
