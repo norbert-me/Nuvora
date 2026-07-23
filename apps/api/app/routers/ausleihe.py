@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
-from ..models import MaterialItem, MaterialLoan, Student, User
+from ..models import MaterialItem, MaterialLoan, SchoolClass, Student, User
 from .auth import get_current_user, rate_limit
 from .modules import is_active
 
@@ -105,11 +105,17 @@ async def create_loan(body: LoanIn, user: User = Depends(require_module), db: As
     borrower = (body.borrower or "").strip()
     sid = None
     if body.student_id:
+        # Schüler muss der Lehrkraft gehören (über die Klasse). Ohne diese Prüfung
+        # ließe sich per fremder student_id der Name eines fremden Schülers abgreifen.
         st = await db.get(Student, body.student_id)
-        if st:
-            sid = st.id
-            if not borrower:
-                borrower = st.name
+        owner = (await db.execute(
+            select(SchoolClass.owner_id).where(SchoolClass.id == st.class_id)
+        )).scalar_one_or_none() if st else None
+        if not st or owner != user.id:
+            raise HTTPException(404, "Schüler nicht gefunden")
+        sid = st.id
+        if not borrower:
+            borrower = st.name
     if not borrower:
         raise HTTPException(400, "Ausleiher fehlt")
     loan = MaterialLoan(owner_id=user.id, item_id=it.id, student_id=sid, borrower=borrower[:160])

@@ -681,10 +681,22 @@ async def external_events(refresh: bool = False, user: User = Depends(require_mo
         parsed = urllib.parse.urlparse(url)
         if parsed.scheme not in ("http", "https") or not parsed.hostname:
             return ""
-        for res in socket.getaddrinfo(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80)):
+        host = parsed.hostname
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        infos = socket.getaddrinfo(host, port)
+        for res in infos:
             ip = ipaddress.ip_address(res[4][0])
             if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
                 raise ValueError("Ziel-IP nicht erlaubt")
+        # DNS-Rebinding sperren: urllib würde den Host beim Verbinden ERNEUT auflösen —
+        # ein bösartiger DNS könnte dann eine geprüfte öffentliche IP durch eine interne
+        # ersetzen (TOCTOU). Darum getaddrinfo für genau diesen Host auf das bereits
+        # geprüfte Ergebnis pinnen; Hostname bleibt für SNI/Cert-Prüfung erhalten.
+        _real_gai = socket.getaddrinfo
+        def _pinned_gai(h, p, *a, **k):
+            if h == host and p == port:
+                return infos
+            return _real_gai(h, p, *a, **k)
         # Redirects sperren: ein Redirect koennte nach dem IP-Check auf eine
         # private IP umleiten (SSRF). Feeds (Google/iCloud) liefern direkt.
         class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -692,8 +704,12 @@ async def external_events(refresh: bool = False, user: User = Depends(require_mo
                 return None
         opener = urllib.request.build_opener(_NoRedirect)
         req = urllib.request.Request(url, headers={"User-Agent": "Nuvora"})
-        with opener.open(req, timeout=6) as r:
-            return r.read(2_000_000).decode("utf-8", "replace")  # max 2 MB
+        socket.getaddrinfo = _pinned_gai
+        try:
+            with opener.open(req, timeout=6) as r:
+                return r.read(2_000_000).decode("utf-8", "replace")  # max 2 MB
+        finally:
+            socket.getaddrinfo = _real_gai
     try:
         text = await asyncio.get_event_loop().run_in_executor(None, _fetch)
     except Exception:
