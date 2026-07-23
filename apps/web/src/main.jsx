@@ -211,17 +211,19 @@ const getModuleNavItems = (t, location) => {
   if (area === "orga") {
     const tab = params.get("tab");
     const items = [
-      { key: "checklisten", to: `${ORG}?tab=checklisten`, label: t("orga.tabChecklists"), active: !["anwesenheit", "ausleihe", "sitzplan"].includes(tab) },
+      { key: "checklisten", to: `${ORG}?tab=checklisten`, label: t("orga.tabChecklists"), active: !["anwesenheit", "ausleihe", "sitzplan", "optionen"].includes(tab) },
       { key: "anwesenheit", to: `${ORG}?tab=anwesenheit`, label: t("anwesenheit.title"), active: tab === "anwesenheit" },
       { key: "ausleihe", to: `${ORG}?tab=ausleihe`, label: t("ausleihe.title"), active: tab === "ausleihe" },
       { key: "sitzplan", to: `${ORG}?tab=sitzplan`, label: t("sitzplan.title"), active: tab === "sitzplan" },
     ];
-    // Vom Modul-Zahnrad (Orga-Seite) ausgeblendete Reiter raus — aber den aktiven
+    // Vom Modul-Zahnrad (Orga-Optionen) ausgeblendete Reiter raus — aber den aktiven
     // nie verstecken, und nie eine leere Leiste erzeugen (Fallback Checklisten).
     let hidden = [];
     try { hidden = JSON.parse(localStorage.getItem("orga_hidden_tabs") || "[]"); } catch { /* egal */ }
     const vis = items.filter((i) => !hidden.includes(i.key) || i.active);
-    return vis.length ? vis : [items[0]];
+    const list = vis.length ? vis : [items[0]];
+    // „Optionen" immer ganz rechts, nie ausblendbar (dort schaltet man die Reiter).
+    return [...list, { key: "optionen", to: `${ORG}?tab=optionen`, label: t("orga.tabOptions"), active: tab === "optionen" }];
   }
   if (area === "code-detektiv") {
     // Nativ eingebunden: die Nuvora-Navbar steuert die Bereiche der App direkt.

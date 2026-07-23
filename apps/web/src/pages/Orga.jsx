@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
-import { AddButton, pageTitle, btnPrimary, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C, th as thBase, td } from "../components/Icons.jsx";
+import { AddButton, pageTitle, btnPrimary, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C, th as thBase, td, Toggle, cardStyle } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import ViewMenu from "../components/ViewMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -28,7 +28,7 @@ export default function Orga() {
   // per ?tab=anwesenheit direkt in die Anwesenheit springen.
   const [tab, setTab] = useState(["anwesenheit", "ausleihe", "sitzplan"].includes(params.get("tab")) ? params.get("tab") : "checklisten");
   // Auf ?tab-Wechsel aus der Navbar reagieren (nicht nur beim ersten Laden).
-  useEffect(() => { setTab(["anwesenheit", "ausleihe", "sitzplan"].includes(params.get("tab")) ? params.get("tab") : "checklisten"); }, [params]);
+  useEffect(() => { setTab(["anwesenheit", "ausleihe", "sitzplan", "optionen"].includes(params.get("tab")) ? params.get("tab") : "checklisten"); }, [params]);
 
   // Modul-Zahnrad: welche Orga-Reiter in der Navbar erscheinen. Ausgeblendete
   // stehen in localStorage; die Navbar (main.jsx) liest das und re-rendert auf
@@ -89,14 +89,22 @@ export default function Orga() {
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
-      {/* Modul-Zahnrad: Reiter ein-/ausblenden (immer sichtbar, über allen Werkzeugen). */}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
-        <ViewMenu title={t("orga.tabsSettings")} items={ORGA_TABS.map((k) => ({ key: k, label: tabLabel[k], value: !hidden.includes(k), onChange: (v) => toggleTab(k, v) }))} />
-      </div>
-      {/* Kein eigenes Tab-Band mehr: zwischen den vier Werkzeugen wird über die
-          Navbar gewechselt (?tab=…), siehe main.jsx. Der Titel steht nur beim
-          Checklisten-Tab; die eingebetteten Werkzeuge bringen ihren eigenen mit. */}
-      {tab === "anwesenheit" ? <Anwesenheit /> : tab === "ausleihe" ? <Ausleihe /> : tab === "sitzplan" ? <Sitzplan /> : (<>
+      {/* Zwischen den Werkzeugen wird über die Navbar gewechselt (?tab=…). Der
+          Reiter „Optionen" blendet Reiter ein/aus (Modul-Zahnrad als Seite). */}
+      {tab === "optionen" ? (
+        <div style={{ maxWidth: 560 }}>
+          <h1 style={{ ...pageTitle, marginBottom: 6 }}>{t("orga.optionsTitle")}</h1>
+          <p style={{ color: "var(--text2)", fontSize: 14, marginBottom: 20 }}>{t("orga.optionsIntro")}</p>
+          <div style={{ ...cardStyle, display: "flex", flexDirection: "column", gap: 4 }}>
+            {ORGA_TABS.map((k) => (
+              <div key={k} style={{ display: "flex", alignItems: "center", padding: "10px 4px", borderBottom: "1px solid var(--border)" }}>
+                <span style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>{tabLabel[k]}</span>
+                <Toggle checked={!hidden.includes(k)} onChange={(v) => toggleTab(k, v)} />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : tab === "anwesenheit" ? <Anwesenheit /> : tab === "ausleihe" ? <Ausleihe /> : tab === "sitzplan" ? <Sitzplan /> : (<>
       <h1 style={{ ...pageTitle, marginBottom: 14 }}>{t("orga.moduleTitle")}</h1>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
         <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
