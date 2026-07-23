@@ -23,6 +23,11 @@ const BUNDESLAENDER = [
 const API = "/api/kalender";
 
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+// Kalenderdatum als ISO auf 12:00 Uhr LOKAL verankert: so verschiebt die
+// UTC-Umrechnung (toISOString) das Datum nie über die Tagesgrenze. Sonst wird
+// lokale Mitternacht in +TZ zum UTC-Vortag und der ICS-Export (server .date())
+// zeigt einen Tag zu früh (z.B. 3.9 als 2.9 im Apple-Kalender).
+const isoDay = (d) => { const x = new Date(d); return new Date(x.getFullYear(), x.getMonth(), x.getDate(), 12, 0, 0).toISOString(); };
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 const mondayOf = (d) => { const x = startOfDay(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
@@ -212,7 +217,7 @@ export default function Kalender() {
   }, [view, cursor]); // eslint-disable-line
 
   const save = async (e) => {
-    const body = { date: new Date(e.date).toISOString(), title: e.title || "", notes: e.notes || "", class_id: e.class_id || null, topic_id: e.topic_id || null, method_id: e.method_id || null, period: e.period ?? null, cardvote_set_id: e.cardvote_set_id || null, karten_deck_id: e.karten_deck_id || null, lernpfad_ladder_id: e.lernpfad_ladder_id || null, codedetektiv_puzzle: e.codedetektiv_puzzle || null };
+    const body = { date: isoDay(e.date), title: e.title || "", notes: e.notes || "", class_id: e.class_id || null, topic_id: e.topic_id || null, method_id: e.method_id || null, period: e.period ?? null, cardvote_set_id: e.cardvote_set_id || null, karten_deck_id: e.karten_deck_id || null, lernpfad_ladder_id: e.lernpfad_ladder_id || null, codedetektiv_puzzle: e.codedetektiv_puzzle || null };
     const res = await fetch(e.id ? `${API}/entries/${e.id}` : `${API}/entries`, {
       method: e.id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     }).catch(() => null);
@@ -457,7 +462,7 @@ function ExtInfoModal({ ev, onClose, t }) {
         </div>
         <p style={{ fontSize: 12, color: "var(--text3)", margin: "0 0 12px" }}>{t("kalender.extEventNote")}</p>
         <Zeile label={t("kalender.extDate")}>{zeitraum}</Zeile>
-        {ev.time && <Zeile label={t("kalender.extTime")}>{ev.time}</Zeile>}
+        {ev.time && <Zeile label={t("kalender.extTime")}>{ev.endtime && ev.endtime !== ev.time ? `${ev.time} – ${ev.endtime}` : ev.time}</Zeile>}
         {ev.location && <Zeile label={t("kalender.extLocation")}>{ev.location}</Zeile>}
         {ev.description && <Zeile label={t("kalender.extDesc")}>{ev.description}</Zeile>}
         <div style={{ marginTop: 16, textAlign: "right" }}>
@@ -730,7 +735,8 @@ function DayView({ day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFo
   const extAllDay = ext.filter((ev) => toMin(ev.time) == null);
   ext.filter((ev) => toMin(ev.time) != null).forEach((ev, i) => {
     const sm = toMin(ev.time);
-    timed.push({ key: "x" + i, start: sm, end: sm + 60, col: "var(--text3)", dashed: true,
+    const emx = toMin(ev.endtime); // echte Endzeit aus dem Feed, sonst 60min-Fallback
+    timed.push({ key: "x" + i, start: sm, end: emx != null && emx > sm ? emx : sm + 60, col: "var(--text3)", dashed: true,
       label: "🔗 " + (ev.title || "—"), sub: ev.location || "", onClick: () => onExt(ev) });
   });
 
@@ -886,7 +892,7 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
   const speichern = () => {
     if (!von) return;
     const ende = bis || von;
-    onAdd({ start_date: new Date(von + "T00:00:00").toISOString(), end_date: new Date(ende + "T00:00:00").toISOString(), label: label.trim() });
+    onAdd({ start_date: new Date(von + "T12:00:00").toISOString(), end_date: new Date(ende + "T12:00:00").toISOString(), label: label.trim() });
     setVon(""); setBis(""); setLabel("");
   };
   const fmt = (s) => new Date(s).toLocaleDateString();
@@ -901,7 +907,7 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
     if (neu.length === 0) { showAlert(t("kalender.ferienNothing")); return; }
     setImporting(true);
     for (const f of neu) {
-      await onAdd({ start_date: new Date(f.start + "T00:00:00").toISOString(), end_date: new Date(f.end + "T00:00:00").toISOString(), label: f.label });
+      await onAdd({ start_date: new Date(f.start + "T12:00:00").toISOString(), end_date: new Date(f.end + "T12:00:00").toISOString(), label: f.label });
     }
     setImporting(false);
   };
@@ -913,7 +919,7 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
     if (neu.length === 0) { showAlert(t("kalender.ferienNothing")); return; }
     setImporting(true);
     for (const f of neu) {
-      await onAdd({ start_date: new Date(f.start + "T00:00:00").toISOString(), end_date: new Date(f.end + "T00:00:00").toISOString(), label: f.label });
+      await onAdd({ start_date: new Date(f.start + "T12:00:00").toISOString(), end_date: new Date(f.end + "T12:00:00").toISOString(), label: f.label });
     }
     setImporting(false);
   };

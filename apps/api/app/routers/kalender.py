@@ -558,6 +558,8 @@ def _parse_ics(text: str):
                     cur["time"] = raw[9:11] + ":" + raw[11:13]
             elif k == "DTEND":
                 cur["end"] = raw[:8]
+                if "T" in raw and len(raw) >= 13:   # Endzeit HH:MM (für getaktete Events)
+                    cur["endtime"] = raw[9:11] + ":" + raw[11:13]
             elif k == "SUMMARY":
                 cur["title"] = raw.replace("\\,", ",").replace(r"\;", ";").replace("\\n", " ")
             elif k == "LOCATION":
@@ -624,7 +626,8 @@ async def external_events(user: User = Depends(require_module)):
         # Info-Felder je Event (fuer das Detail-Popup); read-only.
         multi = bool(d1 and d1 > d0)
         last = (d1 - timedelta(days=1)) if multi else d0
-        info = {"title": title, "time": e.get("time"), "location": e.get("location", ""),
+        info = {"title": title, "time": e.get("time"), "endtime": e.get("endtime"),
+                "location": e.get("location", ""),
                 "description": e.get("description", ""), "start": d0.isoformat(), "end": last.isoformat()}
         # Mehrtägige (Ganztags-)Events über alle Tage anzeigen; DTEND ist bei
         # Ganztags exklusiv. Ohne/gleiches Ende: nur der eine Tag. Max 60 Tage.
