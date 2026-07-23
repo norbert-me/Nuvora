@@ -116,15 +116,15 @@ export default function Topics() {
     if (await add(childName.trim(), parentId)) { setChildName(""); setAddingUnder(null); }
   };
 
-  // Drei Ebenen: Fach (0) > Thema (1) > Unterthema (2). depth steuert Einzug,
-  // ob noch Unterpunkte erlaubt sind (nur bis Ebene 2) und ob gezogen wird
-  // (Reihenfolge per Drag nur auf der obersten Ebene).
-  const MAX_DEPTH = 2;
+  // Zwei Ebenen: Thema (0) > Unterthema (1). Neue Unterpunkte nur unter Themen
+  // (Ebene 0). Bestehende tiefere Einträge werden weiter angezeigt, nur nicht mehr
+  // erweitert. Drag (Reihenfolge) nur auf der obersten Ebene.
+  const MAX_DEPTH = 1;
   const row = (tp, depth) => {
     const isChild = depth > 0;
     const isRoot = depth === 0;
-    const canHaveKids = depth < MAX_DEPTH;
-    const subCount = canHaveKids ? childrenOf(tp.id).length : 0;
+    const canHaveKids = depth < MAX_DEPTH;                 // neues Unterthema erlauben?
+    const subCount = childrenOf(tp.id).length;             // vorhandene Kinder immer zeigen
     const over = isRoot && dragId && dragOver && dragOver.id === tp.id;
     return (
     <div
@@ -149,7 +149,11 @@ export default function Topics() {
       {canHaveKids ? (
         <button onClick={() => toggleExpand(tp.id)} className="icon-btn" style={{ ...iconBtn, padding: 1, visibility: subCount ? "visible" : "hidden" }}
           title={expanded.has(tp.id) ? t("topics.collapse") : t("topics.expand")}>
-          <Icon d={expanded.has(tp.id) ? ICONS.minus : ICONS.plus} size={15} />
+          {/* Pfeil (rotiert) zum Auf-/Zuklappen — klar anders als das +-Icon zum
+              Unterthema-Anlegen. */}
+          <span style={{ display: "inline-flex", transform: expanded.has(tp.id) ? "rotate(90deg)" : "none", transition: "transform 0.15s", color: "var(--text3)" }}>
+            <Icon d={ICONS.open} size={13} />
+          </span>
         </button>
       ) : null}
       {editing === tp.id ? (
