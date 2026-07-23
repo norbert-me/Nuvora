@@ -1722,6 +1722,16 @@
             cb.addEventListener('change', () => { summary(); updateGenConfig(); });
         });
         summary();
+        // Klick außerhalb schließt das offene Dropdown (native <details> tut das
+        // nicht von allein). Einmalig am Dokument, unabhängig vom Neuaufbau.
+        if (!window.__genUtOutside) {
+            window.__genUtOutside = true;
+            document.addEventListener('click', (e) => {
+                document.querySelectorAll('details.gen-ut-dd[open]').forEach(d => {
+                    if (!d.contains(e.target)) d.removeAttribute('open');
+                });
+            });
+        }
     }
 
     // Zweiter Ausloeser im Konfig-Panel — teilt sich die Logik mit btn-generate.
