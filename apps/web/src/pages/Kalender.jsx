@@ -1206,6 +1206,24 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
     if (!aktiv.karten || !classId) { setDecks([]); return; }
     fetch(`/api/karten/classes/${classId}/all-decks`).then((r) => (r.ok ? r.json() : [])).then((d) => setDecks(Array.isArray(d) ? d : [])).catch(() => {});
   }, [aktiv.karten, classId]);
+  // Sofort beim Thema-Wählen das passende Deck + die passende Lernleiter
+  // vorschlagen — nicht erst beim Speichern. Nur, wenn das Feld leer ist oder
+  // noch den vorigen Auto-Wert traegt (manuelle Wahl bleibt unangetastet).
+  const autoDeck = useRef(null);
+  const autoLadder = useRef(null);
+  useEffect(() => {
+    if (!topicId) return;
+    const tid = Number(topicId);
+    if (aktiv.karten) {
+      const m = decks.find((d) => Number(d.topic_id) === tid);
+      if (m && (!deckId || Number(deckId) === autoDeck.current)) { setDeckId(m.id); autoDeck.current = m.id; }
+    }
+    if (aktiv.lernpfad) {
+      const m = ladders.find((l) => Number(l.topic_id) === tid);
+      if (m && (!ladderId || Number(ladderId) === autoLadder.current)) { setLadderId(m.id); autoLadder.current = m.id; }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topicId, decks, ladders, aktiv.karten, aktiv.lernpfad]);
   const fld = { ...inputStyle, width: "100%" };
   const sfld = { ...selectStyle, width: "100%", fontSize: 14, padding: "10px 34px 10px 12px" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };

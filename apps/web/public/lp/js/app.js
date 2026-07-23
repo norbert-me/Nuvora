@@ -1698,7 +1698,11 @@
         const thema = document.getElementById('gen-thema').value;
         const container = document.getElementById('gen-unterthema-container');
         if (!thema) { container.innerHTML = '<span style="color:var(--text-muted);font-size:0.85rem">Erst Thema wählen</span>'; return; }
-        const unterthemen = [...new Set(aufgaben.filter(a => a.thema === thema).map(a => a.unterthema).filter(Boolean))].sort();
+        // Unterthemen aus Aufgaben UND aus den Kind-Themen des Kern-Themas —
+        // sonst fehlen sie bei frischen Themen ohne Aufgaben (wie im Aufgabe-Formular).
+        const ober = topics.find(t => !t.parent_id && t.name === thema);
+        const kernKinder = ober ? topics.filter(t => t.parent_id === ober.id).map(t => t.name) : [];
+        const unterthemen = [...new Set([...aufgaben.filter(a => a.thema === thema).map(a => a.unterthema).filter(Boolean), ...kernKinder])].sort();
         if (!unterthemen.length) { container.innerHTML = '<span style="color:var(--text-muted);font-size:0.85rem">Keine Unterthemen</span>'; return; }
         // Als Dropdown (aufklappbar) statt langer Chip-Reihe — Mehrfachauswahl
         // bleibt über dieselben .gen-ut-cb-Checkboxen erhalten.
