@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -138,7 +138,11 @@ async def delete_folder(folder_id: int, user: User = Depends(get_current_user), 
         raise HTTPException(404)
     if f.owner_id and f.owner_id != user.id:
         raise HTTPException(403, "Keine Berechtigung")
-    await db.delete(f)
+    # Ganze Struktur löschen: Core-DELETE statt ORM-Objekt-Delete. Die DB kaskadiert
+    # über parent_id (Unterordner, rekursiv) und folder_id (Fragensets) selbst —
+    # der ORM-Cascade müsste die Kinder erst laden (in async = Lazy-Load-Fehler bei
+    # Ordnern MIT Inhalt), darum bewusst über die DB-Fremdschlüssel.
+    await db.execute(sql_delete(Folder).where(Folder.id == folder_id))
     await db.commit()
 
 
