@@ -417,13 +417,9 @@ function Nav({ user, onLogout }) {
     return () => window.removeEventListener("nuvora:settings", h);
   }, []);
 
-  // Geführte Kern-Tour: einmal beim ersten Einloggen automatisch, jederzeit über
-  // ein Event neu startbar (Profil/Tutorial dispatchen "nuvora:start-tour").
+  // Geführte Kern-Tour: über ein Event startbar (das Onboarding-Modal beim ersten
+  // Login und der Button auf der Tutorial-Seite dispatchen "nuvora:start-tour").
   const [showTour, setShowTour] = useState(false);
-  useEffect(() => {
-    if (!user) return;
-    try { if (!localStorage.getItem("nuvora_kerntour_done")) { const id = setTimeout(() => setShowTour(true), 700); return () => clearTimeout(id); } } catch { /* egal */ }
-  }, [user]);
   useEffect(() => {
     const h = () => setShowTour(true);
     window.addEventListener("nuvora:start-tour", h);
@@ -694,7 +690,9 @@ function FirstRun({ user }) {
   if (!show) return null;
 
   const hasCardvote = active.some((m) => m.key === "cardvote");
-  const tourZiel = "/tutorial";
+  // „Tour" startet die geführte Kern-Tour direkt hier (Spotlight über die Navbar),
+  // statt auf die Tutorial-Seite zu springen.
+  const startGuided = () => { done(); setTimeout(() => window.dispatchEvent(new Event("nuvora:start-tour")), 60); };
 
   return (
     <div onClick={() => done()} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 300 }}>
@@ -702,7 +700,7 @@ function FirstRun({ user }) {
         <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>{t("onboard.title")}</h2>
         <p style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.6, marginBottom: 20 }}>{t("onboard.text")}</p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button onClick={() => done(tourZiel)} style={btnPrimary}>{t("onboard.tour")}</button>
+          <button onClick={startGuided} style={btnPrimary}>{t("onboard.tour")}</button>
           <button onClick={() => done("/help")} style={btnSecondary}>{t("onboard.help")}</button>
           <button onClick={() => done()} style={{ ...btnSecondary, marginLeft: "auto" }}>{t("onboard.later")}</button>
         </div>
