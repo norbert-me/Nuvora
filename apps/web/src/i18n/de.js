@@ -968,6 +968,7 @@ export default {
   "karten.trashHint": "Gelöschte Stapel — 30 Tage wiederherstellbar, Karten-Fortschritt bleibt.",
   "karten.cardCount": "{{n}} Karten",
   "karten.purgeConfirm": "Stapel endgültig löschen? Alle Karten und der Lern-Fortschritt gehen verloren.",
+  "karten.renameDeck": "Stapel umbenennen",
   "karten.deck": "Stapel",
   "karten.freeCards": "freie Karten",
   "karten.niveauHint": "Niveau-Stapel: wird automatisch nur an Schüler dieses Niveaus (E/G) verteilt",

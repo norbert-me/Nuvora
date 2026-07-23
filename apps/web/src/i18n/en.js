@@ -942,6 +942,7 @@ export default {
   "karten.trashHint": "Deleted decks — restorable for 30 days, progress kept.",
   "karten.cardCount": "{{n}} cards",
   "karten.purgeConfirm": "Delete deck permanently? All cards and progress are lost.",
+  "karten.renameDeck": "Rename deck",
   "karten.deck": "Deck",
   "karten.freeCards": "free cards",
   "karten.niveauHint": "Level deck: automatically given only to students of this level (E/G)",

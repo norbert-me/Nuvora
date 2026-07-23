@@ -476,6 +476,11 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   const [busy, setBusy] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [importing, setImporting] = useState(false);
+  // Standard eingeklappt: nur Kopf zeigen; ausgeklappt kommen Einstellungen,
+  // Karten und Eingabe dazu. Umbenennen per Stift am Namen.
+  const [collapsed, setCollapsed] = useState(true);
+  const [renaming, setRenaming] = useState(false);
+  const [nameVal, setNameVal] = useState(deck.name || "");
   // LaTeX-Editor: Formel ins zuletzt fokussierte Feld (Vorder-/Rückseite) einfügen.
   const frontRef = useRef(null);
   const backRef = useRef(null);
@@ -507,6 +512,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
     a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
     a.download = `${(deck.name || "stapel").replace(/[^\w-]+/g, "_")}.json`; a.click(); URL.revokeObjectURL(a.href);
   };
+  const doRename = async () => { const n = nameVal.trim(); setRenaming(false); if (n && n !== deck.name) await saveDeck({ name: n }); };
   const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
   const add = async (e) => {
     e.preventDefault();
@@ -527,10 +533,22 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
 
   return (
     <div style={{ marginBottom: 14, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-        <strong style={{ fontSize: 16 }}>{deck.name || t("karten.deck")}</strong>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: collapsed ? 0 : 10, flexWrap: "wrap" }}>
+        <button onClick={() => setCollapsed((v) => !v)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title={collapsed ? t("topics.expand") : t("topics.collapse")}>
+          <span style={{ display: "inline-flex", transform: collapsed ? "none" : "rotate(90deg)", transition: "transform 0.15s", color: "var(--text3)" }}><Icon d={ICONS.open} size={16} /></span>
+        </button>
+        {renaming ? (
+          <input value={nameVal} onChange={(e) => setNameVal(e.target.value)} autoFocus onBlur={doRename}
+            onKeyDown={(e) => { if (e.key === "Enter") doRename(); if (e.key === "Escape") { setNameVal(deck.name || ""); setRenaming(false); } }}
+            style={{ fontSize: 16, fontWeight: 700, padding: "3px 8px", border: "1px solid var(--border2)", borderRadius: 8, background: "var(--bg)", color: "var(--text)" }} />
+        ) : (
+          <>
+            <strong onClick={() => setCollapsed((v) => !v)} style={{ fontSize: 16, cursor: "pointer" }}>{deck.name || t("karten.deck")}</strong>
+            <button onClick={() => { setNameVal(deck.name || ""); setRenaming(true); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("karten.renameDeck")}><Icon d={ICONS.edit} size={14} /></button>
+          </>
+        )}
         <span style={{ fontSize: 11.5, fontWeight: 600, padding: "2px 8px", borderRadius: 980, background: badge.bg, color: badge.col }}>{badge.text}</span>
-        {showTopic && (
+        {!collapsed && showTopic && (
           <select value={deck.topic_id ?? ""} onChange={(e) => setTopic(e.target.value)} title={t("karten.topicHint")}
             style={{ ...selectStyle, fontSize: 12, padding: "4px 28px 4px 9px", maxWidth: 180 }}>
             <option value="">– {t("karten.freeCards")} –</option>
@@ -539,13 +557,15 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         )}
         {/* Niveau-Stapel: "E"/"G" wird automatisch nur an Schueler des jeweiligen
             Niveaus verteilt, "" an alle. Kein manuelles Zuweisen noetig. */}
+        {!collapsed && (
         <select value={deck.niveau || ""} onChange={(e) => setNiveau(e.target.value)} title={t("karten.niveauHint")}
           style={{ ...selectStyle, fontSize: 12, padding: "4px 28px 4px 9px", maxWidth: 150 }}>
           <option value="">{t("karten.niveauAll")}</option>
           <option value="E">{t("karten.niveauE")}</option>
           <option value="G">{t("karten.niveauG")}</option>
         </select>
-        {onMove && folders.length > 0 && (
+        )}
+        {!collapsed && onMove && folders.length > 0 && (
           <select value={deck.folder_id ?? ""} onChange={(e) => onMove(deck, e.target.value ? Number(e.target.value) : null)} title={t("karten.moveToFolder")}
             style={{ ...selectStyle, fontSize: 12, padding: "4px 28px 4px 9px", maxWidth: 160 }}>
             <option value="">– {t("karten.rootFolder")} –</option>
@@ -554,19 +574,22 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         )}
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{deck.cards.length} {t("karten.cards")}</span>
-        {deck.cards.length > 0 && (
-          <button onClick={exportDeck} className="icon-btn" style={iconBtn} title={t("karten.export")}><Icon d={ICONS.export} size={18} /></button>
-        )}
-        <button onClick={() => setImporting(true)} className="icon-btn" style={iconBtn} title={t("karten.import")}><Icon d={ICONS.import} size={18} /></button>
-        {deck.cards.length > 0 && (
-          <button onClick={() => setPublishing(true)} className="icon-btn" style={iconBtn} title={t("karten.publish")}><Icon d={ICONS.share} size={18} color="var(--accent)" /></button>
-        )}
+        {!collapsed && (<>
+          {deck.cards.length > 0 && (
+            <button onClick={exportDeck} className="icon-btn" style={iconBtn} title={t("karten.export")}><Icon d={ICONS.export} size={18} /></button>
+          )}
+          <button onClick={() => setImporting(true)} className="icon-btn" style={iconBtn} title={t("karten.import")}><Icon d={ICONS.import} size={18} /></button>
+          {deck.cards.length > 0 && (
+            <button onClick={() => setPublishing(true)} className="icon-btn" style={iconBtn} title={t("karten.publish")}><Icon d={ICONS.share} size={18} color="var(--accent)" /></button>
+          )}
+        </>)}
         {publishing && <PublishModal name={deck.name || t("karten.deck")} onClose={() => setPublishing(false)}
           onPublish={(description) => fetch(`/api/marketplace/publish/deck`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deck_id: deck.id, description }) }).catch(() => null)} />}
         <button onClick={async () => { if (await askConfirm(t("karten.delDeck", { name: deck.name }))) call(() => fetch(`${API}/decks/${deck.id}`, { method: "DELETE" })); }}
           className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
       </div>
 
+      {!collapsed && (<>
       {/* Ausrollen: sofort, geplant oder zurueckziehen. Ohne Karten sinnlos. */}
       {deck.cards.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap", fontSize: 13 }}>
@@ -608,6 +631,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           </div>
         )}
       </form>
+      </>)}
       {importing && <ImportModal deckName={deck.name || t("karten.deck")} t={t}
         onClose={() => setImporting(false)}
         onImport={async (cards) => call(() => fetch(`${API}/decks/${deck.id}/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cards }) }))} />}

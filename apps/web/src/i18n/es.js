@@ -942,6 +942,7 @@ export default {
   "karten.trashHint": "Mazos eliminados: recuperables 30 días, se conserva el progreso.",
   "karten.cardCount": "{{n}} tarjetas",
   "karten.purgeConfirm": "¿Eliminar el mazo definitivamente? Se pierden las tarjetas y el progreso.",
+  "karten.renameDeck": "Renombrar mazo",
   "karten.deck": "Mazo",
   "karten.freeCards": "tarjetas libres",
   "karten.niveauHint": "Baraja por nivel: se reparte automáticamente solo al alumnado de ese nivel (E/G)",
