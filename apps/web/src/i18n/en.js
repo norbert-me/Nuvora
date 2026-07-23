@@ -460,6 +460,7 @@ export default {
   "home.noModuleText": "Activate a module to get started. You can switch it off again at any time — your data stays.",
   "home.chooseModules": "Choose modules",
   "home.manageModules": "Manage modules",
+  "modules.explain": "Explanation",
   "modules.title": "Modules",
   "modules.groupUnterricht": "Teaching",
   "modules.groupOrganisation": "Organisation",

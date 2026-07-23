@@ -460,6 +460,7 @@ export default {
   "home.noModuleText": "Schalte ein Modul frei, um loszulegen. Du kannst es jederzeit wieder abschalten — deine Daten bleiben erhalten.",
   "home.chooseModules": "Module auswählen",
   "home.manageModules": "Module verwalten",
+  "modules.explain": "Erklärung",
   "modules.title": "Module",
   "modules.groupUnterricht": "Unterricht",
   "modules.groupOrganisation": "Organisation",

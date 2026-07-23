@@ -2,9 +2,19 @@
 // des Moduls bleiben im Kern liegen und sind nach dem Wiedereinschalten da.
 import { useState } from "react";
 import { useModules } from "../core/modules.js";
-import { StageBadge, Tabs, inputStyle, btnSecondary, COLORS as C } from "../components/Icons.jsx";
+import { StageBadge, Tabs, inputStyle, btnSecondary, COLORS as C, Icon, ICONS, iconBtn, modalOverlay, modalPanel } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { pageTitle } from "../components/Icons.jsx";
+
+// Ausführlichere Erklärung je Modul für das Info-Popup in der Auswahl. Nutzt
+// die bereits vorhandenen Seiten-Intros wieder (die dort nicht mehr angezeigt
+// werden), sonst die Kurzbeschreibung.
+const HELP_KEY = {
+  klassenarbeit: "klassenarbeit.hint",
+  methoden: "methoden.intro",
+  orga: "orga.hint",
+  ausleihe: "ausleihe.hint",
+};
 import { askConfirm } from "../core/dialog.jsx";
 
 export default function Modules() {
@@ -16,10 +26,13 @@ export default function Modules() {
   const [dir, setDir] = useState("asc");           // asc | desc
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState({});    // je Kategorie ausgeklappt?
+  const [helpMod, setHelpMod] = useState(null);    // Modul für das Erklär-Popup
 
   if (loading) return null;
 
   const dispName = (m) => (t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name);
+  const descOf = (m) => (t(`mod.${m.key}.desc`) !== `mod.${m.key}.desc` ? t(`mod.${m.key}.desc`) : m.description) || "";
+  const helpOf = (m) => { const k = HELP_KEY[m.key]; const h = k && t(k) !== k ? t(k) : ""; return h || descOf(m); };
   // Neuer Nutzer ohne aktives Modul: nach Beliebtheit vorsortieren, damit der
   // Einstieg nicht bei einer alphabetischen Wand aus 12 Namen beginnt.
   const noneActive = modules.every((m) => !m.active);
@@ -121,6 +134,9 @@ export default function Modules() {
                 {t(`mod.${m.key}.desc`) !== `mod.${m.key}.desc` ? t(`mod.${m.key}.desc`) : m.description}
               </div>
             </div>
+            <button onClick={() => setHelpMod(m)} className="icon-btn" style={{ ...iconBtn, flexShrink: 0 }} title={t("modules.explain")}>
+              <Icon d={ICONS.info || ICONS.help} size={18} />
+            </button>
             <button
               onClick={() => handle(m)}
               disabled={busy === m.key || !m.available}
@@ -147,6 +163,22 @@ export default function Modules() {
         </div>
         );
       })}
+
+      {helpMod && (
+        <div onClick={() => setHelpMod(null)} style={modalOverlay}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 460 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, flex: 1 }}>{dispName(helpMod)}</h3>
+              <StageBadge stage={helpMod.stage} title={helpMod.stage === "beta" ? t("stage.betaHint") : t("stage.alphaHint")} />
+              <button onClick={() => setHelpMod(null)} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
+            </div>
+            <p style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.65, margin: "0 0 8px", whiteSpace: "pre-wrap" }}>{helpOf(helpMod)}</p>
+            <div style={{ marginTop: 16, textAlign: "right" }}>
+              <button onClick={() => setHelpMod(null)} style={btnSecondary}>{t("common.close")}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

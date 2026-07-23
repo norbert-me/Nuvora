@@ -327,7 +327,6 @@ export default function Klassenarbeit() {
           </select>
         )}
       </div>
-      <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 16px" }}>{t("klassenarbeit.hint")}</p>
 
       {/* Auswahlzeile nur, wenn es schon Arbeiten gibt — sonst führt allein die
           Leerzustand-Karte zum Anlegen (kein doppeltes „keine Arbeit"). */}

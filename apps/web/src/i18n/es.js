@@ -460,6 +460,7 @@ export default {
   "home.noModuleText": "Activa un módulo para empezar. Puedes desactivarlo cuando quieras: tus datos se conservan.",
   "home.chooseModules": "Elegir módulos",
   "home.manageModules": "Gestionar módulos",
+  "modules.explain": "Explicación",
   "modules.title": "Módulos",
   "modules.groupUnterricht": "Docencia",
   "modules.groupOrganisation": "Organización",

@@ -42,6 +42,8 @@ export const ICONS = {
   plus: ["M10 4v12M4 10h12"],
   minus: ["M4 10h12"],
   more: ["M5 10h.01M10 10h.01M15 10h.01"],
+  // Info: Kreis mit „i" (Erklär-Popup der Modulauswahl).
+  info: ["M10 3a7 7 0 100 14 7 7 0 000-14z", "M10 9v4.5", "M10 6.6v.01"],
   // Teilen: drei verbundene Knoten. EINHEITLICH fuer „Teilen/Veroeffentlichen".
   share: ["M14.5 3a2 2 0 100 4 2 2 0 100-4z", "M5.5 8a2 2 0 100 4 2 2 0 100-4z", "M14.5 13a2 2 0 100 4 2 2 0 100-4z", "M7.3 9.1l5.9 3.3M13.2 6.6L7.3 9.9"],
   calendar: ["M4 5h12v11H4z", "M4 8h12M7 3v4M13 3v4"],

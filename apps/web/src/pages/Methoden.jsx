@@ -71,7 +71,6 @@ export default function Methoden() {
         <ImportButton label={t("common.import")} onFile={doImport} />
         <button onClick={() => setEdit({})} style={btnPrimary}>{t("methoden.new")}</button>
       </div>
-      <p style={{ fontSize: 13.5, color: "var(--text2)", margin: "0 0 18px", maxWidth: 640 }}>{t("methoden.intro")}</p>
 
       {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 10 }}>{error}</p>}
 

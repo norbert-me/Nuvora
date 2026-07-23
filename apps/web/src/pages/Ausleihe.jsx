@@ -71,7 +71,6 @@ export default function Ausleihe() {
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
       <h1 style={pageTitle}>{t("ausleihe.title")}</h1>
-      <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 16px" }}>{t("ausleihe.hint")}</p>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <input value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()} placeholder={t("ausleihe.newPlaceholder")} style={{ ...fld, flex: 1, minWidth: 200 }} />
