@@ -114,12 +114,24 @@ export default function Karten() {
   // Drag&Drop: Ordner in einen anderen Ordner (oder über den Breadcrumb nach oben)
   // ziehen. Das Ziel wird beim Ziehen hervorgehoben (Vorschau, wohin es landet).
   const [dragFolder, setDragFolder] = useState(null);
+  const [dragDeckId, setDragDeckId] = useState(null); // Stapel-Drag (in Ordner verschieben)
   const [dropTarget, setDropTarget] = useState(undefined); // undefined = keins, null = Wurzel, id = Ordner
   const folderById = () => Object.fromEntries(cardFolders.map((f) => [f.id, f]));
   const isAncestor = (aId, bId) => { const m = folderById(); let cur = m[bId]?.parent_id ?? null; while (cur != null) { if (cur === aId) return true; cur = m[cur]?.parent_id ?? null; } return false; };
   const canDropInto = (dragId, targetId) => dragId != null && targetId !== dragId && !isAncestor(dragId, targetId) && ((folderById()[dragId]?.parent_id ?? null) !== (targetId ?? null));
   const moveFolderTo = async (fId, parentId) => { const f = folderById()[fId]; if (!f) return; await fetch(`${API}/card-folders/${fId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: f.name, parent_id: parentId }) }).catch(() => {}); loadFolders(classId); };
-  const endDrag = () => { setDragFolder(null); setDropTarget(undefined); };
+  // Generisch: gilt ein Ablegen auf targetId (Ordner oder Wurzel)? Für Ordner mit
+  // Zyklus-Schutz, für Stapel wenn er nicht schon dort liegt.
+  const canDrop = (targetId) => {
+    if (dragFolder != null) return canDropInto(dragFolder, targetId);
+    if (dragDeckId != null) { const d = decks.find((x) => x.id === dragDeckId); return d && (d.folder_id ?? null) !== (targetId ?? null); }
+    return false;
+  };
+  const doDrop = (targetId) => {
+    if (dragFolder != null) moveFolderTo(dragFolder, targetId);
+    else if (dragDeckId != null) { const d = decks.find((x) => x.id === dragDeckId); if (d) moveDeck(d, targetId); }
+  };
+  const endDrag = () => { setDragFolder(null); setDragDeckId(null); setDropTarget(undefined); };
   const folderPath = (fid) => { const byId = Object.fromEntries(cardFolders.map((f) => [f.id, f])); const path = []; let cur = fid; while (cur != null && byId[cur]) { path.unshift(byId[cur]); cur = byId[cur].parent_id ?? null; } return path; };
   const createFolder = async (name) => { if (!name || !name.trim() || !classId) return; await fetch(`${API}/classes/${classId}/card-folders${kq}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), parent_id: currentCardFolder }) }).catch(() => {}); loadFolders(classId); };
   const renameFolder = async (f) => { const n = await askPrompt(t("karten.renameFolder"), f.name); if (n == null) return; await fetch(`${API}/card-folders/${f.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n.trim(), parent_id: f.parent_id ?? null }) }).catch(() => {}); loadFolders(classId); };
@@ -232,18 +244,18 @@ export default function Karten() {
           {/* Breadcrumb: Wurzel › Ordner › Unterordner */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 12, fontSize: 13.5 }}>
             <button onClick={() => setCurrentCardFolder(null)}
-              onDragOver={(e) => { if (canDropInto(dragFolder, null)) { e.preventDefault(); if (dropTarget !== null) setDropTarget(null); } }}
+              onDragOver={(e) => { if (canDrop(null)) { e.preventDefault(); if (dropTarget !== null) setDropTarget(null); } }}
               onDragLeave={() => setDropTarget((cur) => (cur === null ? undefined : cur))}
-              onDrop={(e) => { e.preventDefault(); if (canDropInto(dragFolder, null)) moveFolderTo(dragFolder, null); endDrag(); }}
-              style={{ background: dropTarget === null && canDropInto(dragFolder, null) ? "var(--accent-bg, rgba(10,132,255,0.12))" : "none", border: dropTarget === null && canDropInto(dragFolder, null) ? "1px solid var(--accent)" : "1px solid transparent", borderRadius: 8, cursor: "pointer", color: currentCardFolder == null ? "var(--text)" : "var(--accent)", fontWeight: 600, padding: "2px 6px" }}>{t("karten.allDecks")}</button>
+              onDrop={(e) => { e.preventDefault(); if (canDrop(null)) doDrop(null); endDrag(); }}
+              style={{ background: dropTarget === null && canDrop(null) ? "var(--accent-bg, rgba(10,132,255,0.12))" : "none", border: dropTarget === null && canDrop(null) ? "1px solid var(--accent)" : "1px solid transparent", borderRadius: 8, cursor: "pointer", color: currentCardFolder == null ? "var(--text)" : "var(--accent)", fontWeight: 600, padding: "2px 6px" }}>{t("karten.allDecks")}</button>
             {folderPath(currentCardFolder).map((f, i, arr) => (
               <span key={f.id} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                 <span style={{ color: "var(--text3)" }}>›</span>
                 <button onClick={() => setCurrentCardFolder(f.id)}
-                  onDragOver={(e) => { if (canDropInto(dragFolder, f.id)) { e.preventDefault(); if (dropTarget !== f.id) setDropTarget(f.id); } }}
+                  onDragOver={(e) => { if (canDrop(f.id)) { e.preventDefault(); if (dropTarget !== f.id) setDropTarget(f.id); } }}
                   onDragLeave={() => setDropTarget((cur) => (cur === f.id ? undefined : cur))}
-                  onDrop={(e) => { e.preventDefault(); if (canDropInto(dragFolder, f.id)) moveFolderTo(dragFolder, f.id); endDrag(); }}
-                  style={{ background: dropTarget === f.id && canDropInto(dragFolder, f.id) ? "var(--accent-bg, rgba(10,132,255,0.12))" : "none", border: dropTarget === f.id && canDropInto(dragFolder, f.id) ? "1px solid var(--accent)" : "1px solid transparent", borderRadius: 8, cursor: "pointer", color: i === arr.length - 1 ? "var(--text)" : "var(--accent)", fontWeight: 600, padding: "2px 6px" }}>{f.name}</button>
+                  onDrop={(e) => { e.preventDefault(); if (canDrop(f.id)) doDrop(f.id); endDrag(); }}
+                  style={{ background: dropTarget === f.id && canDrop(f.id) ? "var(--accent-bg, rgba(10,132,255,0.12))" : "none", border: dropTarget === f.id && canDrop(f.id) ? "1px solid var(--accent)" : "1px solid transparent", borderRadius: 8, cursor: "pointer", color: i === arr.length - 1 ? "var(--text)" : "var(--accent)", fontWeight: 600, padding: "2px 6px" }}>{f.name}</button>
               </span>
             ))}
           </div>
@@ -278,14 +290,14 @@ export default function Karten() {
           {/* Unterordner des aktuellen Ordners — per Drag&Drop verschiebbar. */}
           {cardFolders.filter((f) => (f.parent_id ?? null) === currentCardFolder).map((f) => {
             const isDrag = dragFolder === f.id;
-            const isTarget = dropTarget === f.id && canDropInto(dragFolder, f.id);
+            const isTarget = dropTarget === f.id && canDrop(f.id);
             return (
             <div key={f.id} draggable
               onDragStart={(e) => { setDragFolder(f.id); e.dataTransfer.effectAllowed = "move"; }}
               onDragEnd={endDrag}
-              onDragOver={(e) => { if (canDropInto(dragFolder, f.id)) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dropTarget !== f.id) setDropTarget(f.id); } }}
+              onDragOver={(e) => { if (canDrop(f.id)) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dropTarget !== f.id) setDropTarget(f.id); } }}
               onDragLeave={() => setDropTarget((cur) => (cur === f.id ? undefined : cur))}
-              onDrop={(e) => { e.preventDefault(); if (canDropInto(dragFolder, f.id)) moveFolderTo(dragFolder, f.id); endDrag(); }}
+              onDrop={(e) => { e.preventDefault(); if (canDrop(f.id)) doDrop(f.id); endDrag(); }}
               style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", marginBottom: 8, borderRadius: 14, background: isTarget ? "var(--accent-bg, rgba(10,132,255,0.10))" : "var(--card)", opacity: isDrag ? 0.4 : 1, cursor: "grab", border: isTarget ? "2px solid var(--accent)" : "1px solid var(--border)" }}>
               <span className="drag-handle" style={{ color: "var(--text3)", cursor: "grab", fontSize: 15, flexShrink: 0 }}>⠿</span>
               <button onClick={() => setCurrentCardFolder(f.id)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", textAlign: "left", minWidth: 0, color: "var(--text)" }}>
@@ -300,7 +312,7 @@ export default function Karten() {
 
           {loadingDecks && !decksLoadedOnce.current ? <Skeleton rows={3} height={60} />
             : (decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).length === 0 && cardFolders.filter((f) => (f.parent_id ?? null) === currentCardFolder).length === 0) ? <Empty title={t("karten.noDecks")} hint={t("karten.noDecksHint")} /> : null}
-          {decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} />)}
+          {decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} onDragStartDeck={() => setDragDeckId(d.id)} onDragEndDeck={endDrag} dragging={dragDeckId === d.id} />)}
           {deckTrash.length > 0 && (
             <div style={{ marginTop: 8 }}>
               <button onClick={() => setShowTrash((v) => !v)} style={{ ...btnSecondary, fontSize: 13 }}>{t("karten.trash")} ({deckTrash.length})</button>
@@ -497,7 +509,7 @@ function StudentDetail({ detail, t, onClose }) {
   );
 }
 
-function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onMove }) {
+function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onMove, onDragStartDeck, onDragEndDeck, dragging = false }) {
   const [front, setFront] = useState("");
   const [back, setBack] = useState("");
   const [planDate, setPlanDate] = useState("");
@@ -561,8 +573,12 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
     : { text: t("karten.draft"), bg: "var(--bg3)", col: "var(--text3)" };
 
   return (
-    <div style={{ marginBottom: 14, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16 }}>
+    <div style={{ marginBottom: 14, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, opacity: dragging ? 0.4 : 1 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: collapsed ? 0 : 10, flexWrap: "wrap" }}>
+        {onDragStartDeck && (
+          <span draggable onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; onDragStartDeck(); }} onDragEnd={onDragEndDeck}
+            className="drag-handle" title={t("karten.moveToFolder")} style={{ color: "var(--text3)", cursor: "grab", fontSize: 15, flexShrink: 0, userSelect: "none" }}>⠿</span>
+        )}
         <button onClick={() => setCollapsed((v) => !v)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title={collapsed ? t("topics.expand") : t("topics.collapse")}>
           <span style={{ display: "inline-flex", transform: collapsed ? "none" : "rotate(90deg)", transition: "transform 0.15s", color: "var(--text3)" }}><Icon d={ICONS.open} size={16} /></span>
         </button>
