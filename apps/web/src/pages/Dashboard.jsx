@@ -268,7 +268,7 @@ export default function Dashboard() {
   };
 
   if (editingSet) {
-    return <QuestionSetEditor questionSet={editingSet} allQuestions={allQuestions} onBack={() => { setEditingSet(null); load(); }} onQuestionsChange={load} />;
+    return <QuestionSetEditor questionSet={editingSet} allQuestions={allQuestions} onBack={() => { setEditingSet(null); load(); }} onDelete={() => deleteSet(editingSet.id)} onQuestionsChange={load} />;
   }
 
   // Collect all valid move targets (excluding the folder being moved and its descendants)
@@ -340,13 +340,16 @@ export default function Dashboard() {
                 </>
               )}
             </span>
-            {/* Beim Umbenennen die Aktions-Buttons ausblenden — sonst liegen sie
-                auf schmalen Displays (iPhone) über dem Eingabefeld. */}
-            {renamingFolder !== f.id && (
+            {/* Löschen steckt im Bearbeiten-Modus (Umbenennen), nicht als
+                dauersichtbarer Papierkorb in der Zeile. */}
+            {renamingFolder !== f.id ? (
             <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
               <button onClick={(e) => { e.stopPropagation(); exportFolder(f.id, f.name); }} className="icon-btn" style={iconBtn} title={t("classes.export")}><Icon d={ICONS.export} size={18} /></button>
               <button onClick={(e) => { e.stopPropagation(); setMovingFolder(f.id); }} className="icon-btn" style={iconBtn} title={t("dash.move")}><Icon d={ICONS.move} size={18} /></button>
               <button onClick={(e) => { e.stopPropagation(); startRenameFolder(f.id, f.name); }} className="icon-btn" style={iconBtn} title={t("dash.rename")}><Icon d={ICONS.edit} size={18} /></button>
+            </div>
+            ) : (
+            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
               <button onClick={(e) => { e.stopPropagation(); deleteFolder(f.id); }} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
             </div>
             )}
@@ -369,7 +372,6 @@ export default function Dashboard() {
                 </button>
                 <button onClick={(e) => { e.stopPropagation(); duplicateSet(qs.id); }} className="icon-btn" style={iconBtn} title={t("dash.duplicate")}><Icon d={ICONS.duplicate} size={18} /></button>
                 <button onClick={async (e) => { e.stopPropagation(); const r = await fetch(`${API}/export/question-set/${qs.id}`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${qs.name}.json`; a.click(); URL.revokeObjectURL(a.href); }} className="icon-btn" style={iconBtn} title={t("classes.export")}><Icon d={ICONS.export} size={18} /></button>
-                <button onClick={(e) => { e.stopPropagation(); deleteSet(qs.id); }} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
               </div>
             </div>
           ))}
@@ -468,7 +470,7 @@ function NewSetButton({ onCreate }) {
 }
 
 
-function QuestionSetEditor({ questionSet, allQuestions, onBack, onQuestionsChange }) {
+function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQuestionsChange }) {
   const [qSearch, setQSearch] = useState("");
   // Touch-Geraet? Dort funktioniert HTML5-Drag nicht (iOS Safari) — deshalb
   // dort Pfeile statt Ziehen. Desktop behaelt das Ziehen.
@@ -592,6 +594,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onQuestionsChang
         <input value={name} onChange={(e) => setName(e.target.value)} onBlur={saveName} onKeyDown={(e) => e.key === "Enter" && saveName()}
           style={{ padding: "10px 14px", fontSize: 20, fontWeight: 700, border: "1px solid var(--border2)", borderRadius: 10, flex: 1, maxWidth: 500, color: "var(--text)" }} />
         {saving && <span style={{ color: "var(--text3)", fontSize: 13 }}>{t("dash.saving")}</span>}
+        {onDelete && <button onClick={onDelete} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
       </div>
 
       <div style={{ display: "flex", gap: 24, marginBottom: 20, flexWrap: "wrap" }}>
