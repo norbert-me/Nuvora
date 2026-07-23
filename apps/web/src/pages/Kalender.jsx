@@ -47,6 +47,7 @@ export default function Kalender() {
   const setView = (v) => setParams((p) => { const n = new URLSearchParams(p); if (v === "month") n.delete("view"); else n.set("view", v); return n; }, { replace: true });
   const [cursor, setCursor] = useState(() => startOfDay(new Date()));
   const [abo, setAbo] = useState(null); // Abo-URLs { url, webcal }
+  const [moreOpen, setMoreOpen] = useState(false); // „⋯"-Menü (Teilen/Abonnieren)
   const [extUrl, setExtUrl] = useState("");   // externer ICS-Feed (read-only Anzeige)
   const [extEvents, setExtEvents] = useState([]); // [{date:'YYYY-MM-DD', title}]
   const openAbo = async () => {
@@ -305,7 +306,22 @@ export default function Kalender() {
           <Tabs value={view} onChange={setView}
             options={[["today", t("kalender.todayView")], ["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")]]} />
         )}
-        {view !== "timetable" && view !== "breaks" && <button onClick={openAbo} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13, marginLeft: "auto" }} title={t("kalender.subscribeHint")}>{t("kalender.subscribe")}</button>}
+        {view !== "timetable" && view !== "breaks" && (
+          <div style={{ position: "relative", marginLeft: "auto" }}>
+            <button onClick={() => setMoreOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn, width: 34, height: 34 }} title={t("common.more") !== "common.more" ? t("common.more") : "Mehr"}>
+              <Icon d={ICONS.more} size={18} />
+            </button>
+            {moreOpen && (<>
+              <div onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+              <div style={{ ...popoverPanel, position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 50, minWidth: 200, padding: 6 }}>
+                <button onClick={() => { setMoreOpen(false); openAbo(); }} title={t("kalender.subscribeHint")}
+                  style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "8px 12px", background: "none", border: "none", borderRadius: 8, color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: "pointer", textAlign: "left" }}>
+                  <Icon d={ICONS.share} size={15} /> {t("kalender.subscribe")}
+                </button>
+              </div>
+            </>)}
+          </div>
+        )}
       </div>
       {view === "timetable" && (
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
