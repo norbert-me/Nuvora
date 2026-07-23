@@ -679,18 +679,30 @@
         // Zum „lernpfade"-Tab wechseln, frisch laden, dann den Pfad öffnen, der die
         // Lernleiter enthält.
         if (e.data && e.data.type === 'nuvora:open-lernleiter' && e.data.id != null) {
+            // openPfad/editPfad sind lokal in renderLernpfade — hier nicht sichtbar.
+            // Deshalb über das DOM: erst die Pfad-Zeile klicken (öffnet den Pfad),
+            // dann die konkrete Lernleiter darin.
+            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
             (async () => {
                 const ziel = String(e.data.id);
                 switchTab('lernpfade');
-                // Bis zu ~2s auf die Pfad-Daten warten (frischer Mount lädt Themen,
-                // Schüler, Pfade noch), dann den Pfad mit der Lernleiter öffnen.
-                for (let i = 0; i < 10; i++) {
+                // Bis zu ~3s auf die Pfad-Daten warten (frischer Mount lädt noch).
+                let pfad = null;
+                for (let i = 0; i < 15; i++) {
                     await loadLernpfade();
-                    const pfad = lernpfade.find(p => (p.lernleitern || []).some(ll => String(ll.id) === ziel));
-                    if (pfad) { openPfad(pfad._id); return; }
-                    await new Promise(r => setTimeout(r, 200));
+                    pfad = lernpfade.find(p => (p.lernleitern || []).some(ll => String(ll.id) === ziel));
+                    if (pfad) break;
+                    await sleep(200);
                 }
-                console.warn('[Lernpfad] open-lernleiter: Lernleiter', ziel, 'in keinem Pfad gefunden');
+                if (!pfad) { console.warn('[Lernpfad] open-lernleiter: Lernleiter', ziel, 'in keinem Pfad gefunden'); return; }
+                const row = document.querySelector('#pfade-list .list-row[data-id="' + pfad._id + '"]');
+                if (row) row.click();   // öffnet den Pfad (editPfad rendert die Lernleitern)
+                // Danach die konkrete Lernleiter im Pfad öffnen.
+                for (let i = 0; i < 15; i++) {
+                    const el = document.querySelector('[data-ll-id="' + ziel + '"][data-action="open"]');
+                    if (el) { el.click(); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+                    await sleep(150);
+                }
             })();
         }
     });
