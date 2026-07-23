@@ -115,6 +115,18 @@ async def list_folders(user: User = Depends(get_current_user), db: AsyncSession 
     return roots
 
 
+@router.get("/root-question-sets")
+async def list_root_question_sets(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Fragensets OHNE Ordner (Top-Level) des Nutzers — analog zu den Sets in
+    einem Ordner, nur eben ordnerlos."""
+    rows = (await db.execute(
+        select(QuestionSet)
+        .options(selectinload(QuestionSet.items).selectinload(QuestionSetItem.question))
+        .where(QuestionSet.folder_id.is_(None), QuestionSet.owner_id == user.id)
+    )).scalars().all()
+    return [_set_to_dict(qs) for qs in rows]
+
+
 @router.put("/folders/{folder_id}", response_model=FolderOut)
 async def update_folder(folder_id: int, body: FolderCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     f = await db.get(Folder, folder_id)
@@ -152,7 +164,7 @@ async def delete_folder(folder_id: int, user: User = Depends(get_current_user), 
 async def create_question_set(body: QuestionSetCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("set_create", f"u{user.id}", 60, 60, "Zu viele Fragesets in kurzer Zeit. Bitte kurz warten.")
     qs = QuestionSet(
-        name=body.name, folder_id=body.folder_id,
+        name=body.name, folder_id=body.folder_id, owner_id=user.id,
         shuffle_questions=body.shuffle_questions, shuffle_answers=body.shuffle_answers,
     )
     db.add(qs)
@@ -209,11 +221,16 @@ async def delete_question_set(set_id: int, user: User = Depends(get_current_user
 # --- Helpers ---
 
 async def ensure_set_access(db: AsyncSession, qs: QuestionSet, user_id: int):
-    """403, wenn das Frageset einem fremden Ordner gehoert. Ordnerlose Sets sind zugelassen."""
-    if qs is not None and qs.folder_id is not None:
+    """403, wenn das Frageset einem fremden Ordner ODER (ordnerlos) einem fremden
+    Besitzer gehoert. Ordnerlose Sets ohne owner_id (Altbestand) bleiben zugelassen."""
+    if qs is None:
+        return
+    if qs.folder_id is not None:
         folder = await db.get(Folder, qs.folder_id)
         if folder and folder.owner_id and folder.owner_id != user_id:
             raise HTTPException(403, "Kein Zugriff auf dieses Frageset")
+    elif qs.owner_id is not None and qs.owner_id != user_id:
+        raise HTTPException(403, "Kein Zugriff auf dieses Frageset")
 
 
 def _set_to_dict(qs: QuestionSet) -> dict:

@@ -13,6 +13,7 @@ const API = "/api";
 export default function Dashboard() {
   const { t } = useLanguage();
   const [folders, setFolders] = useState([]);
+  const [rootSets, setRootSets] = useState([]); // Fragensets ohne Ordner (Top-Level)
   const [allQuestions, setAllQuestions] = useState([]);
   const [path, setPath] = useState([]);
   const [currentFolder, setCurrentFolder] = useState(null);
@@ -72,6 +73,8 @@ export default function Dashboard() {
       const [f, q] = await Promise.all([fr.json(), qr.json()]);
       setFolders(Array.isArray(f) ? f : []);
       setAllQuestions(Array.isArray(q) ? q : []);
+      // Top-Level-Fragensets (ohne Ordner) — werden am Wurzel-Level angezeigt.
+      fetch(`${API}/root-question-sets`).then((r) => (r.ok ? r.json() : [])).then((d) => setRootSets(Array.isArray(d) ? d : [])).catch(() => {});
       setLoadError(false);
     } catch { setLoadError(true); }
   };
@@ -115,7 +118,7 @@ export default function Dashboard() {
   };
 
   const currentChildren = currentFolder ? (findNode(folders, currentFolder)?.children || []) : folders;
-  const currentSets = currentFolder ? (findNode(folders, currentFolder)?.question_sets || []) : [];
+  const currentSets = currentFolder ? (findNode(folders, currentFolder)?.question_sets || []) : rootSets;
 
   const openFolder = (folder) => {
     setPath([...path, { id: folder.id, name: folder.name }]);
@@ -362,10 +365,10 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {currentFolder && (
+      {(currentFolder || currentSets.length > 0) && (
         <div style={{ marginBottom: 20 }}>
           <h3 style={{ marginBottom: 8, fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("dash.setsHeading")}</h3>
-          {currentSets.length === 0 && <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("dash.emptySets")}</p>}
+          {currentFolder && currentSets.length === 0 && <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("dash.emptySets")}</p>}
           {currentSets.map((qs) => (
             <div key={qs.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", marginBottom: 8, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 14, cursor: "pointer" }}>
               <span onClick={() => setEditingSet(qs)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
@@ -398,7 +401,7 @@ export default function Dashboard() {
               <div onClick={() => setAddMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
               <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50, minWidth: 180, background: "var(--card)", border: "1px solid var(--border2)", borderRadius: 12, boxShadow: "0 8px 30px rgba(0,0,0,0.18)", padding: 6 }}>
                 <button onClick={() => { setAddMenuOpen(false); setAddMode("folder"); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "9px 12px", background: "none", border: "none", borderRadius: 8, color: "var(--text)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", textAlign: "left" }}><Icon d={ICONS.plus} size={15} /> {t("dash.newFolder")}</button>
-                {currentFolder && <button onClick={() => { setAddMenuOpen(false); setAddMode("set"); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "9px 12px", background: "none", border: "none", borderRadius: 8, color: "var(--text)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", textAlign: "left" }}><Icon d={ICONS.plus} size={15} /> {t("dash.newSet")}</button>}
+                <button onClick={() => { setAddMenuOpen(false); setAddMode("set"); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "9px 12px", background: "none", border: "none", borderRadius: 8, color: "var(--text)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", textAlign: "left" }}><Icon d={ICONS.plus} size={15} /> {t("dash.newSet")}</button>
               </div>
             </>)}
           </div>
