@@ -9,6 +9,7 @@ import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import PublishModal from "../components/PublishModal.jsx";
+import ImportMenu from "../components/ImportMenu.jsx";
 import Latex from "../components/Latex.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
 
@@ -111,6 +112,27 @@ export default function Karten() {
   const renameFolder = async (f) => { const n = await askPrompt(t("karten.renameFolder"), f.name); if (n == null) return; await fetch(`${API}/card-folders/${f.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n.trim(), parent_id: f.parent_id ?? null }) }).catch(() => {}); loadFolders(classId); };
   const deleteFolder = async (f) => { if (!await askConfirm(t("karten.delFolderConfirm"))) return; await fetch(`${API}/card-folders/${f.id}`, { method: "DELETE" }).catch(() => {}); if (currentCardFolder === f.id) setCurrentCardFolder(f.parent_id ?? null); loadFolders(classId); loadDecks(classId); };
   const moveDeck = async (deck, folderId) => { await fetch(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", folder_id: folderId }) }).catch(() => {}); loadDecks(classId); };
+  // Seitenweiter Import: eine JSON/CSV-Datei wird zu einem NEUEN Stapel im
+  // aktuellen Ordner (wie CardVote-Import). Name aus JSON, sonst Dateiname.
+  const importDeck = () => {
+    if (!classId) return;
+    const input = document.createElement("input");
+    input.type = "file"; input.accept = ".json,.csv,.tsv,.txt";
+    input.onchange = async (e) => {
+      const f = e.target.files?.[0]; if (!f) return;
+      const text = await f.text();
+      let name = f.name.replace(/\.[^.]+$/, "");
+      try { const j = JSON.parse(text); if (j && j.name) name = String(j.name); } catch { /* CSV */ }
+      const cards = parseCards(text);
+      if (!cards.length) { showAlert(t("karten.importEmpty")); return; }
+      const r = await fetch(`${API}/classes/${classId}/decks${kq}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, folder_id: currentCardFolder }) }).catch(() => null);
+      if (!r || !r.ok) return;
+      const deck = await r.json();
+      await fetch(`${API}/decks/${deck.id}/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cards }) }).catch(() => {});
+      loadDecks(classId);
+    };
+    input.click();
+  };
   const restoreDeck = async (id) => { await fetch(`${API}/decks/${id}/restore`, { method: "POST" }).catch(() => {}); loadDecks(classId); loadTrash(classId); };
   const purgeDeck = async (id) => {
     if (!await askConfirm(t("karten.purgeConfirm"))) return;
@@ -213,6 +235,8 @@ export default function Karten() {
             <button onClick={async () => { const n = await askPrompt(t("karten.newFolder")); if (n) createFolder(n); }} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}>
               <Icon d={ICONS.plus} size={15} /> {t("karten.folder")}
             </button>
+            <ImportMenu importItems={[{ label: t("karten.importDeck"), onClick: importDeck }]}
+              templateItems={[{ label: t("karten.jsonTemplate"), href: "/beispiel-karten.json" }]} />
           </div>
 
           {/* Unterordner des aktuellen Ordners */}
@@ -458,6 +482,12 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   const saveDeck = (patch) => call(() => fetch(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", folder_id: deck.folder_id ?? null, ...patch }) }));
   const setTopic = (tid) => saveDeck({ topic_id: tid ? Number(tid) : null });
   const setNiveau = (n) => saveDeck({ niveau: n });
+  const exportDeck = () => {
+    const data = { type: "nuvora_karten_deck", version: 1, name: deck.name || "", cards: deck.cards.map((c) => ({ front: c.front, back: c.back })) };
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+    a.download = `${(deck.name || "stapel").replace(/[^\w-]+/g, "_")}.json`; a.click(); URL.revokeObjectURL(a.href);
+  };
   const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
   const add = async (e) => {
     e.preventDefault();
@@ -506,6 +536,10 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{deck.cards.length} {t("karten.cards")}</span>
         {deck.cards.length > 0 && (
+          <button onClick={exportDeck} className="icon-btn" style={iconBtn} title={t("karten.export")}><Icon d={ICONS.export} size={18} /></button>
+        )}
+        <button onClick={() => setImporting(true)} className="icon-btn" style={iconBtn} title={t("karten.import")}><Icon d={ICONS.import} size={18} /></button>
+        {deck.cards.length > 0 && (
           <button onClick={() => setPublishing(true)} className="icon-btn" style={iconBtn} title={t("karten.publish")}><Icon d={ICONS.share} size={18} color="var(--accent)" /></button>
         )}
         {publishing && <PublishModal name={deck.name || t("karten.deck")} onClose={() => setPublishing(false)}
@@ -548,16 +582,6 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           <input ref={frontRef} onFocus={() => (activeField.current = "front")} value={front} onChange={(e) => setFront(e.target.value)} placeholder={t("karten.front")} style={{ flex: 1, minWidth: 120, ...inp }} />
           <input ref={backRef} onFocus={() => (activeField.current = "back")} value={back} onChange={(e) => setBack(e.target.value)} placeholder={t("karten.back")} style={{ flex: 1, minWidth: 120, ...inp }} />
           <button type="submit" disabled={busy || !front.trim() || !back.trim()} style={{ ...btnPrimary, padding: "6px 14px", opacity: (!busy && front.trim() && back.trim()) ? 1 : 0.4 }}>{t("common.add")}</button>
-          <button type="button" onClick={() => setImporting(true)} style={{ ...btnSecondary, padding: "6px 14px" }}>{t("karten.import")}</button>
-          {deck.cards.length > 0 && (
-            <button type="button" onClick={() => {
-              // JSON-Export (mit Formeln unverändert). Import versteht dieses Format.
-              const data = { type: "nuvora_karten_deck", version: 1, name: deck.name || "", cards: deck.cards.map((c) => ({ front: c.front, back: c.back })) };
-              const a = document.createElement("a");
-              a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
-              a.download = `${(deck.name || "stapel").replace(/[^\w-]+/g, "_")}.json`; a.click(); URL.revokeObjectURL(a.href);
-            }} style={{ ...btnSecondary, padding: "6px 14px" }}>{t("karten.export")}</button>
-          )}
         </div>
         {(front.includes("$") || back.includes("$")) && (
           <div style={{ marginTop: 8, padding: "8px 12px", background: "var(--bg2)", borderRadius: 8, fontSize: 14 }}>

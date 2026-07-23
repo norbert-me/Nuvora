@@ -947,6 +947,8 @@ export default {
   "karten.niveauE": "E only",
   "karten.niveauG": "G only",
   "karten.export": "Export",
+  "karten.importDeck": "Import deck from file",
+  "karten.importEmpty": "Import empty — no cards found.",
   "karten.import": "Import",
   "karten.importTitle": "Import cards — {{name}}",
   "karten.importHint": "CSV, TSV or tab-separated text export. First column = front, second = back. Delimiter (tab/semicolon/comma) is detected, #-lines skipped.",
