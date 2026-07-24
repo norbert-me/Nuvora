@@ -274,6 +274,16 @@ function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
   const [topicId, setTopicId] = useState(m.topic_id ?? "");
   const [titleErr, setTitleErr] = useState(false);
   const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
+  // Oberthemen aufsteigend (1→2→3…), jedes mit seinen Unterthemen direkt darunter.
+  const nameAsc = (a, b) => (a.name || "").localeCompare(b.name || "", "de", { numeric: true });
+  const topicsSorted = (() => {
+    const out = [];
+    topics.filter((tp) => !tp.parent_id).sort(nameAsc).forEach((root) => {
+      out.push(root);
+      topics.filter((c) => c.parent_id === root.id).sort(nameAsc).forEach((c) => out.push(c));
+    });
+    return out;
+  })();
   const fld = { ...inputStyle, width: "100%" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
   const submit = () => {
@@ -308,7 +318,7 @@ function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
             <div style={lbl}>{t("methoden.topic")}</div>
             <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={fld}>
               <option value="">{t("methoden.topicNone")}</option>
-              {topics.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
+              {topicsSorted.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
             </select>
           </>
         )}
