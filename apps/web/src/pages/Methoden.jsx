@@ -25,6 +25,8 @@ export default function Methoden() {
   const fileRef = useRef(null);
   const [newFolder, setNewFolder] = useState(false); // Ordner-Anlege-Eingabe offen?
   const [folderName, setFolderName] = useState("");
+  const [renamingFolder, setRenamingFolder] = useState(null); // Ordner-id im Inline-Umbenennen
+  const [renameVal, setRenameVal] = useState("");
   const [drag, setDrag] = useState(null);       // { kind: "folder"|"method", id }
   const [dropTarget, setDropTarget] = useState(undefined); // Ziel-Ordner-id | null (Wurzel) | undefined
 
@@ -85,11 +87,13 @@ export default function Methoden() {
     await fetch(`${API}/folders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, parent_id: current }) }).catch(() => {});
     setFolderName(""); setNewFolder(false); loadFolders();
   };
-  const renameFolder = async (f) => {
-    const name = await askPrompt(t("methoden.folderRename"), f.name);
-    if (name == null || !name.trim()) return;
-    await fetch(`${API}/folders/${f.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), parent_id: f.parent_id ?? null }) }).catch(() => {});
-    loadFolders();
+  // Inline-Umbenennen (kein Popup): die Ordnerkarte wird zum Eingabefeld.
+  const startRename = (f) => { setRenamingFolder(f.id); setRenameVal(f.name); };
+  const commitRename = async (f) => {
+    const name = renameVal.trim();
+    if (!name || name === f.name) { setRenamingFolder(null); return; }
+    await fetch(`${API}/folders/${f.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, parent_id: f.parent_id ?? null }) }).catch(() => {});
+    setRenamingFolder(null); loadFolders();
   };
   const deleteFolder = async (f) => {
     if (!(await askConfirm(t("methoden.folderDeleteConfirm", { name: f.name })))) return;
@@ -209,16 +213,28 @@ export default function Methoden() {
           {subfolders.map((f) => {
             const count = items.filter((m) => m.folder_id === f.id).length + childFolders(f.id).length;
             const over = dropTarget === f.id && canDrop(f.id);
+            const renaming = renamingFolder === f.id;
             return (
-              <div key={f.id} draggable onDragStart={() => setDrag({ kind: "folder", id: f.id })} onDragEnd={endDrag} {...dropProps(f.id)}
-                onClick={() => setCurrent(f.id)}
-                style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 14px", border: `1px solid ${over ? "var(--accent)" : "var(--border)"}`, borderRadius: 12, background: over ? "var(--accent-bg, rgba(10,132,255,0.10))" : "var(--card)", cursor: "pointer" }}>
-                <span style={{ color: "var(--text3)", cursor: "grab", fontSize: 13 }} title={t("methoden.dragHint")}>⠿</span>
-                <Icon d={ICONS.folder} size={18} color="var(--accent)" />
-                <span style={{ fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
-                <span style={{ fontSize: 12, color: "var(--text3)" }}>{count}</span>
-                <button onClick={(e) => { e.stopPropagation(); renameFolder(f); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.rename")}><Icon d={ICONS.edit} size={13} /></button>
-                <button onClick={(e) => { e.stopPropagation(); deleteFolder(f); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}><Icon d={ICONS.trash} size={13} color={C.danger} /></button>
+              <div key={f.id} draggable={!renaming} onDragStart={() => setDrag({ kind: "folder", id: f.id })} onDragEnd={endDrag} {...dropProps(f.id)}
+                onClick={renaming ? undefined : () => setCurrent(f.id)}
+                style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 14px", border: `1px solid ${over ? "var(--accent)" : "var(--border)"}`, borderRadius: 12, background: over ? "var(--accent-bg, rgba(10,132,255,0.10))" : "var(--card)", cursor: renaming ? "default" : "pointer" }}>
+                {renaming ? (
+                  <>
+                    <input value={renameVal} autoFocus onClick={(e) => e.stopPropagation()} onChange={(e) => setRenameVal(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") commitRename(f); if (e.key === "Escape") setRenamingFolder(null); }}
+                      onBlur={() => commitRename(f)}
+                      style={{ ...inputStyle, flex: 1, minWidth: 0, padding: "6px 8px" }} />
+                    <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); deleteFolder(f); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ color: "var(--text3)", cursor: "grab", fontSize: 13 }} title={t("methoden.dragHint")}>⠿</span>
+                    <Icon d={ICONS.folder} size={18} color="var(--accent)" />
+                    <span style={{ fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
+                    <span style={{ fontSize: 12, color: "var(--text3)" }}>{count}</span>
+                    <button onClick={(e) => { e.stopPropagation(); startRename(f); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.rename")}><Icon d={ICONS.edit} size={13} /></button>
+                  </>
+                )}
               </div>
             );
           })}
