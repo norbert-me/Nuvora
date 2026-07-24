@@ -222,12 +222,13 @@ export default function Topics() {
       {row(tp, depth)}
       {notesOpen === tp.id && (
         <div style={{ marginLeft: (depth + 1) * 28, marginBottom: 8 }}>
-          <textarea value={notesVal} onChange={(e) => setNotesVal(e.target.value)} autoFocus rows={4}
+          <textarea value={notesVal} onChange={(e) => setNotesVal(e.target.value.slice(0, 500))} autoFocus rows={4} maxLength={500}
             placeholder={t("topics.notesPlaceholder")}
             style={{ width: "100%", boxSizing: "border-box", padding: 10, border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)", fontSize: 14, lineHeight: 1.5, resize: "vertical" }} />
-          <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+          <div style={{ display: "flex", gap: 8, marginTop: 6, alignItems: "center" }}>
             <button onClick={() => saveNotes(tp, notesVal)} style={btnPrimary}>{t("common.save")}</button>
             <button onClick={() => setNotesOpen(null)} style={btnSecondary}>{t("common.abort")}</button>
+            <span style={{ marginLeft: "auto", fontSize: 12, color: notesVal.length >= 500 ? C.danger : "var(--text3)" }}>{notesVal.length}/500</span>
           </div>
         </div>
       )}

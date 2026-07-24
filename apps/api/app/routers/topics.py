@@ -37,6 +37,13 @@ class TopicIn(BaseModel):
             raise ValueError("Name ist zu lang (max. 120 Zeichen)")
         return v
 
+    @field_validator("notes")
+    @classmethod
+    def notes_max(cls, v: str) -> str:
+        if v and len(v) > 500:
+            raise ValueError("Notiz ist zu lang (max. 500 Zeichen)")
+        return v
+
 
 class TopicOut(BaseModel):
     id: int
