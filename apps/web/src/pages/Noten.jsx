@@ -174,7 +174,7 @@ export default function Noten() {
 
   // Teilkurse (nur solche mit einzeln hinzugefügten SuS) für die Auswahl.
   useEffect(() => {
-    fetch(`${API}/kurse`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+    fetch("/api/kurse").then((r) => (r.ok ? r.json() : [])).then((d) => {
       setSubsetKurse((Array.isArray(d) ? d : []).filter((k) => (k.member_count || 0) > 0));
     }).catch(() => {});
   }, []);
