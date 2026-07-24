@@ -283,8 +283,11 @@ function MethodView({ m, t, onEdit, onPublish, onClose }) {
       <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{val}</div>
     </div>
   ) : null;
+  const downOnOverlay = useRef(false);
   return (
-    <div onClick={onClose} style={modalOverlay}>
+    <div style={modalOverlay}
+      onMouseDown={(e) => { downOnOverlay.current = e.target === e.currentTarget; }}
+      onClick={(e) => { if (e.target === e.currentTarget && downOnOverlay.current) onClose(); }}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 520, maxHeight: "86vh", overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
           <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, flex: 1 }}>{m.title}</h3>
@@ -331,8 +334,14 @@ function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
     if (!title.trim()) { setTitleErr(true); return; }
     onSave({ id: m.id, title, description, ablauf, material, dauer, topic_id: topicId === "" ? null : Number(topicId), folder_id: m.folder_id ?? null });
   };
+  // Nur schließen, wenn Klick WIRKLICH auf dem Overlay begann und endete. Sonst
+  // schloss eine Textauswahl, die im Feld startet und außerhalb endet, das Modal
+  // (Datenverlust). e.currentTarget ist das Overlay.
+  const downOnOverlay = useRef(false);
   return (
-    <div onClick={onClose} style={modalOverlay}>
+    <div style={modalOverlay}
+      onMouseDown={(e) => { downOnOverlay.current = e.target === e.currentTarget; }}
+      onClick={(e) => { if (e.target === e.currentTarget && downOnOverlay.current) onClose(); }}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 480, maxHeight: "90vh", overflowY: "auto" }}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{m.id ? t("methoden.edit") : t("methoden.new")}</h3>
         <div style={{ display: "flex", gap: 10 }}>
