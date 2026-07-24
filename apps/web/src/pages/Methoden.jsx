@@ -19,6 +19,7 @@ export default function Methoden() {
   const [current, setCurrent] = useState(null); // aktueller Ordner (id) oder null = Wurzel
   const [edit, setEdit] = useState(null); // { id?, title, ... } | null
   const [publishing, setPublishing] = useState(null);
+  const [viewing, setViewing] = useState(null); // Einstieg im Detail-Popup
   const [error, setError] = useState("");
   const [topics, setTopics] = useState([]);
   const [addOpen, setAddOpen] = useState(false);
@@ -245,32 +246,23 @@ export default function Methoden() {
       {visible.length === 0 && subfolders.length === 0 ? (
         <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("methoden.empty")}</p>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
           {visible.map((m) => (
             <div key={m.id} draggable onDragStart={() => setDrag({ kind: "method", id: m.id })} onDragEnd={endDrag}
-              style={{ padding: 16, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", opacity: drag && drag.kind === "method" && drag.id === m.id ? 0.5 : 1 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <span style={{ color: "var(--text3)", cursor: "grab", fontSize: 13 }} title={t("methoden.dragHint")}>⠿</span>
-                <div style={{ fontSize: 15, fontWeight: 700 }}>{m.title}</div>
-                {m.dauer != null && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 980, background: "rgba(37,99,235,0.12)", color: C.info }}>{t("methoden.dauerBadge", { n: m.dauer })}</span>}
-                <span style={{ flex: 1 }} />
-                <button onClick={() => setPublishing(m)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("methoden.publish")}><Icon d={ICONS.share} size={17} color="var(--accent)" /></button>
-                <button onClick={() => setEdit(m)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>
-              </div>
-              {m.description && <div style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{m.description}</div>}
-              {m.ablauf && (<>
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", margin: "10px 0 3px" }}>{t("methoden.ablauf")}</div>
-                <div style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{m.ablauf}</div>
-              </>)}
-              {m.material && (<>
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", margin: "10px 0 3px" }}>{t("methoden.material")}</div>
-                <div style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{m.material}</div>
-              </>)}
+              onClick={() => setViewing(m)}
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", cursor: "pointer", opacity: drag && drag.kind === "method" && drag.id === m.id ? 0.5 : 1 }}>
+              <span style={{ color: "var(--text3)", cursor: "grab", fontSize: 13 }} title={t("methoden.dragHint")}>⠿</span>
+              <span style={{ fontWeight: 600, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.title}</span>
+              {m.dauer != null && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 980, background: "rgba(37,99,235,0.12)", color: C.info, flexShrink: 0 }}>{t("methoden.dauerBadge", { n: m.dauer })}</span>}
             </div>
           ))}
         </div>
       )}
 
+      {viewing && <MethodView m={viewing} t={t}
+        onEdit={() => { setEdit(viewing); setViewing(null); }}
+        onPublish={() => { setPublishing(viewing); setViewing(null); }}
+        onClose={() => setViewing(null)} />}
       {edit && <MethodModal m={edit} topics={topics} onSave={save} onDelete={(id) => { remove(id); setEdit(null); }} onClose={() => setEdit(null)} t={t} />}
       {publishing && <PublishModal name={publishing.title} onClose={() => setPublishing(null)}
         onPublish={(description) => fetch(`/api/marketplace/publish/method`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method_id: publishing.id, description }) }).catch(() => null)} />}
@@ -281,6 +273,37 @@ export default function Methoden() {
 const menuItem = { display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", background: "none", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 13.5, color: "var(--text)", textAlign: "left" };
 const crumbBtn = { background: "none", border: "1px solid transparent", borderRadius: 7, padding: "3px 8px", cursor: "pointer", color: "var(--text)", fontSize: 13 };
 const crumbDrop = { borderColor: "var(--accent)", background: "var(--accent-bg, rgba(10,132,255,0.10))" };
+
+// Detail-Ansicht (Klick auf einen Einstieg): zeigt die Erklärung, mit Buttons
+// zum Bearbeiten und Teilen.
+function MethodView({ m, t, onEdit, onPublish, onClose }) {
+  const sec = (label, val) => val ? (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{val}</div>
+    </div>
+  ) : null;
+  return (
+    <div onClick={onClose} style={modalOverlay}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 520, maxHeight: "86vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+          <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, flex: 1 }}>{m.title}</h3>
+          {m.dauer != null && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 9px", borderRadius: 980, background: "rgba(37,99,235,0.12)", color: C.info }}>{t("methoden.dauerBadge", { n: m.dauer })}</span>}
+          <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
+        </div>
+        {sec(t("methoden.idee"), m.description)}
+        {sec(t("methoden.ablauf"), m.ablauf)}
+        {sec(t("methoden.material"), m.material)}
+        {m.id && <div style={{ marginTop: 14 }}><MaterialPanel methodId={m.id} /></div>}
+        <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
+          <button onClick={onEdit} style={btnPrimary}>{t("common.edit")}</button>
+          <button onClick={onPublish} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.share} size={15} color="var(--accent)" /> {t("methoden.publish")}</button>
+          <button onClick={onClose} style={{ ...btnSecondary, marginLeft: "auto" }}>{t("common.close")}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
   const [title, setTitle] = useState(m.title || "");
