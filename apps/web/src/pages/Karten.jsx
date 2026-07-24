@@ -144,7 +144,33 @@ export default function Karten() {
     if (dragFolder != null) moveFolderTo(dragFolder, targetId);
     else if (dragDeckId != null) { const d = decks.find((x) => x.id === dragDeckId); if (d) moveDeck(d, targetId); }
   };
-  const endDrag = () => { setDragFolder(null); setDragDeckId(null); setDropTarget(undefined); };
+  const endDrag = () => { setDragFolder(null); setDragDeckId(null); setDropTarget(undefined); setDeckDrop(null); };
+  // Stapel-Reorder INNERHALB des Ordners: einen Stapel auf einen anderen ziehen.
+  const [deckDrop, setDeckDrop] = useState(null); // { id, side: "above"|"below" }
+  const onDeckDragOver = (e, id) => {
+    if (dragDeckId == null || id === dragDeckId) return;
+    // Nur reorder, wenn beide Stapel im selben Ordner liegen.
+    const src = decks.find((x) => x.id === dragDeckId), tgt = decks.find((x) => x.id === id);
+    if (!src || !tgt || (src.folder_id ?? null) !== (tgt.folder_id ?? null)) return;
+    e.preventDefault();
+    const r = e.currentTarget.getBoundingClientRect();
+    const side = e.clientY < r.top + r.height / 2 ? "above" : "below";
+    setDeckDrop((p) => (p && p.id === id && p.side === side ? p : { id, side }));
+  };
+  const dropDeck = async (targetId) => {
+    const von = dragDeckId, ov = deckDrop;
+    endDrag();
+    if (von == null || von === targetId) return;
+    const inFolder = decks.filter((d) => (d.folder_id ?? null) === currentCardFolder);
+    const ids = inFolder.map((d) => d.id);
+    const from = ids.indexOf(von); let to = ids.indexOf(targetId);
+    if (from < 0 || to < 0) return;
+    if (ov && ov.id === targetId && ov.side === "below") to += 1;
+    if (from < to) to -= 1;
+    const neu = [...ids]; neu.splice(to, 0, neu.splice(from, 1)[0]);
+    await fetch(`${API}/classes/${classId}/decks/reorder${kq}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: neu }) }).catch(() => {});
+    loadDecks(classId);
+  };
   const folderPath = (fid) => { const byId = Object.fromEntries(cardFolders.map((f) => [f.id, f])); const path = []; let cur = fid; while (cur != null && byId[cur]) { path.unshift(byId[cur]); cur = byId[cur].parent_id ?? null; } return path; };
   const createFolder = async (name) => { if (!name || !name.trim() || !classId) return; await fetch(`${API}/classes/${classId}/card-folders${kq}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), parent_id: currentCardFolder }) }).catch(() => {}); loadFolders(classId); };
   const renameFolder = async (f) => { const n = await askPrompt(t("karten.renameFolder"), f.name); if (n == null) return; await fetch(`${API}/card-folders/${f.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n.trim(), parent_id: f.parent_id ?? null }) }).catch(() => {}); loadFolders(classId); };
@@ -325,7 +351,7 @@ export default function Karten() {
 
           {loadingDecks && !decksLoadedOnce.current ? <Skeleton rows={3} height={60} />
             : (decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).length === 0 && cardFolders.filter((f) => (f.parent_id ?? null) === currentCardFolder).length === 0) ? <Empty title={t("karten.noDecks")} hint={t("karten.noDecksHint")} /> : null}
-          {decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} onDragStartDeck={() => setDragDeckId(d.id)} onDragEndDeck={endDrag} dragging={dragDeckId === d.id} autoOpen={autoDeck === d.id} onAutoOpened={() => setAutoDeck(null)} />)}
+          {decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} onDragStartDeck={() => setDragDeckId(d.id)} onDragEndDeck={endDrag} dragging={dragDeckId === d.id} autoOpen={autoDeck === d.id} onAutoOpened={() => setAutoDeck(null)} onReorderOver={(e) => onDeckDragOver(e, d.id)} onReorderDrop={() => dropDeck(d.id)} dropSide={deckDrop && deckDrop.id === d.id ? deckDrop.side : null} />)}
           {deckTrash.length > 0 && (
             <div style={{ marginTop: 8 }}>
               <button onClick={() => setShowTrash((v) => !v)} style={{ ...btnSecondary, fontSize: 13 }}>{t("karten.trash")} ({deckTrash.length})</button>
@@ -522,7 +548,7 @@ function StudentDetail({ detail, t, onClose }) {
   );
 }
 
-function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onMove, onDragStartDeck, onDragEndDeck, dragging = false, autoOpen = false, onAutoOpened }) {
+function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onMove, onDragStartDeck, onDragEndDeck, dragging = false, autoOpen = false, onAutoOpened, onReorderOver, onReorderDrop, dropSide = null }) {
   const [front, setFront] = useState("");
   const [back, setBack] = useState("");
   const [planDate, setPlanDate] = useState("");
@@ -642,7 +668,9 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
     <div ref={rootRef} draggable={!!onDragStartDeck}
       onDragStart={onDragStartDeck ? (e) => { if (!dragFromHandle.current) { e.preventDefault(); return; } e.dataTransfer.effectAllowed = "move"; onDragStartDeck(); } : undefined}
       onDragEnd={onDragStartDeck ? () => { dragFromHandle.current = false; onDragEndDeck && onDragEndDeck(); } : undefined}
-      style={{ marginBottom: 14, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, opacity: dragging ? 0.4 : 1 }}>
+      onDragOver={onReorderOver} onDrop={onReorderDrop}
+      style={{ marginBottom: 14, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, opacity: dragging ? 0.4 : 1,
+        boxShadow: dropSide === "above" ? "inset 0 3px 0 var(--accent)" : dropSide === "below" ? "inset 0 -3px 0 var(--accent)" : undefined }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: collapsed ? 0 : 10, flexWrap: "wrap" }}>
         {onDragStartDeck && (
           <span onMouseDown={() => { dragFromHandle.current = true; }}

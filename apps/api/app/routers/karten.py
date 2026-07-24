@@ -246,7 +246,7 @@ async def list_decks(class_id: int, kurs_id: Optional[int] = None, user: User = 
     from sqlalchemy.orm import selectinload
     r = await db.execute(
         select(CardDeck).where(CardDeck.owner_id == user.id, await _kurs_decks_where(cls, kurs_id), CardDeck.deleted_at.is_(None))
-        .options(selectinload(CardDeck.cards)).order_by(CardDeck.id)
+        .options(selectinload(CardDeck.cards)).order_by(CardDeck.position, CardDeck.id)
     )
     return r.scalars().all()
 
@@ -259,7 +259,7 @@ async def list_all_decks(class_id: int, user: User = Depends(require_module), db
     from sqlalchemy.orm import selectinload
     r = await db.execute(
         select(CardDeck).where(CardDeck.owner_id == user.id, await _class_all_decks_where(db, class_id), CardDeck.deleted_at.is_(None))
-        .options(selectinload(CardDeck.cards)).order_by(CardDeck.id)
+        .options(selectinload(CardDeck.cards)).order_by(CardDeck.position, CardDeck.id)
     )
     return r.scalars().all()
 
@@ -308,14 +308,34 @@ async def _schedule_deck_from_calendar(db: AsyncSession, user: User, deck: CardD
 async def create_deck(class_id: int, body: DeckIn, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("karten_deck", f"u{user.id}", 100, 60, "Zu viele Stapel. Bitte kurz warten.")
     cls = await _owned_class(db, user, class_id)
+    last = (await db.execute(select(CardDeck.position).where(CardDeck.class_id == class_id).order_by(CardDeck.position.desc()))).scalars().first()
     deck = CardDeck(class_id=class_id, kurs_id=kurs_id, owner_id=user.id, name=body.name.strip(),
                     topic_id=body.topic_id, niveau=body.niveau if body.niveau in ("E", "G") else "",
-                    folder_id=body.folder_id)
+                    folder_id=body.folder_id, position=(last if last is not None else -1) + 1)
     db.add(deck)
     await db.commit()
     await db.refresh(deck, ["cards"])
     await _schedule_deck_from_calendar(db, user, deck)
     return deck
+
+
+class DeckReorderIn(BaseModel):
+    ids: List[int]
+
+
+@router.put("/classes/{class_id}/decks/reorder", status_code=204)
+async def reorder_decks(class_id: int, body: DeckReorderIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Reihenfolge der Stapel der Klasse anhand der ID-Liste setzen (nur eigene)."""
+    await _owned_class(db, user, class_id)
+    rows = (await db.execute(select(CardDeck).where(CardDeck.class_id == class_id, CardDeck.owner_id == user.id))).scalars().all()
+    by_id = {d.id: d for d in rows}
+    pos = 0
+    for did in body.ids:
+        d = by_id.get(did)
+        if d is not None:
+            d.position = pos
+            pos += 1
+    await db.commit()
 
 
 @router.put("/decks/{deck_id}", response_model=DeckOut)

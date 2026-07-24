@@ -889,6 +889,8 @@ class CardDeck(Base):
     topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
     # Optionaler Ordner (wie bei CardVote) zum Gruppieren der Stapel. NULL = Wurzel.
     folder_id: Mapped[Optional[int]] = mapped_column(ForeignKey("card_folders.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Reihenfolge innerhalb der Klasse/des Ordners (Drag & Drop sortierbar).
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Papierkorb: gesetzt = gelöscht, 30 Tage wiederherstellbar (Karten-Fortschritt bleibt).
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
