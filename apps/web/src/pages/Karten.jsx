@@ -544,6 +544,10 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   const [renaming, setRenaming] = useState(false);
   const [nameVal, setNameVal] = useState(deck.name || "");
   const [moveOpen, setMoveOpen] = useState(false); // „Verschieben"-Popover (Ziel-Ordner)
+  // Deck als Ganzes ziehbar, aber nur wenn der Zug am Griff (⠿) beginnt — sonst
+  // bliebe Text-/Button-Interaktion im Deck kaputt. Der Griff setzt das Flag per
+  // mousedown; das Wurzel-draggable prüft es beim dragstart.
+  const dragFromHandle = useRef(false);
   // LaTeX-Editor: Formel ins zuletzt fokussierte Feld (Vorder-/Rückseite) einfügen.
   const frontRef = useRef(null);
   const backRef = useRef(null);
@@ -585,6 +589,12 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   useEffect(() => { setCards(deck.cards); }, [deck.cards]);
   const [dragCard, setDragCard] = useState(null);
   const [cardDrop, setCardDrop] = useState(null); // { id, side: "above"|"below" }
+  // Karte bearbeiten (Text + Bilder) — Bild-Upload sitzt im Edit-Bereich.
+  const [editCard, setEditCard] = useState(null); // Karten-id im Edit
+  const [ecFront, setEcFront] = useState("");
+  const [ecBack, setEcBack] = useState("");
+  const startEditCard = (c) => { setEditCard(c.id); setEcFront(c.front || ""); setEcBack(c.back || ""); };
+  const saveEditCard = (c) => call(() => fetch(`${API}/cards/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ front: ecFront, back: ecBack }) })).then(() => setEditCard(null));
   const onCardDragOver = (e, id) => {
     e.preventDefault();
     if (dragCard == null || id === dragCard) { setCardDrop(null); return; }
@@ -631,10 +641,13 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
     : { text: t("karten.draft"), bg: "var(--bg3)", col: "var(--text3)" };
 
   return (
-    <div ref={rootRef} style={{ marginBottom: 14, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, opacity: dragging ? 0.4 : 1 }}>
+    <div ref={rootRef} draggable={!!onDragStartDeck}
+      onDragStart={onDragStartDeck ? (e) => { if (!dragFromHandle.current) { e.preventDefault(); return; } e.dataTransfer.effectAllowed = "move"; onDragStartDeck(); } : undefined}
+      onDragEnd={onDragStartDeck ? () => { dragFromHandle.current = false; onDragEndDeck && onDragEndDeck(); } : undefined}
+      style={{ marginBottom: 14, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, opacity: dragging ? 0.4 : 1 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: collapsed ? 0 : 10, flexWrap: "wrap" }}>
         {onDragStartDeck && (
-          <span draggable onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; onDragStartDeck(); }} onDragEnd={onDragEndDeck}
+          <span onMouseDown={() => { dragFromHandle.current = true; }}
             className="drag-handle" title={t("karten.moveToFolder")} style={{ color: "var(--text3)", cursor: "grab", fontSize: 15, flexShrink: 0, userSelect: "none" }}>⠿</span>
         )}
         <button onClick={() => setCollapsed((v) => !v)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title={collapsed ? t("topics.expand") : t("topics.collapse")}>
@@ -727,17 +740,39 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
       )}
       {cards.map((c) => {
         const over = dragCard != null && cardDrop && cardDrop.id === c.id;
+        const editing = editCard === c.id;
         return (
         <div key={c.id} onDragOver={(e) => onCardDragOver(e, c.id)} onDrop={() => dropCard(c.id)}
-          style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 13.5,
+          style={{ display: "flex", alignItems: editing ? "flex-start" : "center", gap: 8, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 13.5,
             opacity: dragCard === c.id ? 0.4 : 1,
             boxShadow: over && cardDrop.side === "above" ? "inset 0 2px 0 var(--accent)" : over && cardDrop.side === "below" ? "inset 0 -2px 0 var(--accent)" : undefined }}>
-          <span draggable onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; setDragCard(c.id); }} onDragEnd={() => { setDragCard(null); setCardDrop(null); }}
-            className="drag-handle" title={t("karten.reorderHint")} style={{ color: "var(--text3)", cursor: "grab", fontSize: 14, flexShrink: 0, userSelect: "none" }}>⠿</span>
-          <CardImgCtl cardId={c.id} side="front" has={c.has_front_image} imgVer={imgVer} onUpload={uploadCardImg} onRemove={removeCardImg} t={t} />
-          <span style={{ flex: 1, minWidth: 0 }}><strong><Latex>{c.front}</Latex></strong> <span style={{ color: "var(--text3)" }}>→ <Latex>{c.back}</Latex></span></span>
-          <CardImgCtl cardId={c.id} side="back" has={c.has_back_image} imgVer={imgVer} onUpload={uploadCardImg} onRemove={removeCardImg} t={t} />
-          <button onClick={() => call(() => fetch(`${API}/cards/${c.id}`, { method: "DELETE" }))} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
+          <span draggable onDragStart={(e) => { e.stopPropagation(); e.dataTransfer.effectAllowed = "move"; setDragCard(c.id); }} onDragEnd={() => { setDragCard(null); setCardDrop(null); }}
+            className="drag-handle" title={t("karten.reorderHint")} style={{ color: "var(--text3)", cursor: "grab", fontSize: 14, flexShrink: 0, userSelect: "none", marginTop: editing ? 4 : 0 }}>⠿</span>
+          {editing ? (
+            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <input value={ecFront} onChange={(e) => setEcFront(e.target.value)} placeholder={t("karten.front")} style={{ flex: 1, minWidth: 120, ...inp }} />
+                <input value={ecBack} onChange={(e) => setEcBack(e.target.value)} placeholder={t("karten.back")} style={{ flex: 1, minWidth: 120, ...inp }} />
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("karten.imgFront")}</span>
+                <CardImgCtl cardId={c.id} side="front" has={c.has_front_image} imgVer={imgVer} onUpload={uploadCardImg} onRemove={removeCardImg} t={t} />
+                <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("karten.imgBack")}</span>
+                <CardImgCtl cardId={c.id} side="back" has={c.has_back_image} imgVer={imgVer} onUpload={uploadCardImg} onRemove={removeCardImg} t={t} />
+                <span style={{ flex: 1 }} />
+                <button onClick={() => saveEditCard(c)} style={{ ...btnPrimary, padding: "5px 12px" }}>{t("common.save")}</button>
+                <button onClick={() => setEditCard(null)} style={{ ...btnSecondary, padding: "5px 12px" }}>{t("common.abort")}</button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {c.has_front_image && <AuthImage src={`${API}/cards/${c.id}/image/front`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: 5, border: "1px solid var(--border2)", flexShrink: 0 }} />}
+              <span style={{ flex: 1, minWidth: 0 }}><strong><Latex>{c.front}</Latex></strong> <span style={{ color: "var(--text3)" }}>→ <Latex>{c.back}</Latex></span></span>
+              {c.has_back_image && <AuthImage src={`${API}/cards/${c.id}/image/back`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: 5, border: "1px solid var(--border2)", flexShrink: 0 }} />}
+              <button onClick={() => startEditCard(c)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>
+              <button onClick={() => call(() => fetch(`${API}/cards/${c.id}`, { method: "DELETE" }))} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
+            </>
+          )}
         </div>
         );
       })}
