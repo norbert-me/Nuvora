@@ -590,12 +590,9 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   useEffect(() => { setCards(deck.cards); }, [deck.cards]);
   const [dragCard, setDragCard] = useState(null);
   const [cardDrop, setCardDrop] = useState(null); // { id, side: "above"|"below" }
-  // Karte bearbeiten (Text + Bilder) — Bild-Upload sitzt im Edit-Bereich.
+  // Karte bearbeiten (Text + Bilder) — in einem Popup.
   const [editCard, setEditCard] = useState(null); // Karten-id im Edit
-  const [ecFront, setEcFront] = useState("");
-  const [ecBack, setEcBack] = useState("");
-  const startEditCard = (c) => { setEditCard(c.id); setEcFront(c.front || ""); setEcBack(c.back || ""); };
-  const saveEditCard = (c) => call(() => fetch(`${API}/cards/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ front: ecFront, back: ecBack }) })).then(() => setEditCard(null));
+  const saveEditCard = (id, front, back) => call(() => fetch(`${API}/cards/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ front, back }) })).then(() => setEditCard(null));
   const onCardDragOver = (e, id) => {
     e.preventDefault();
     if (dragCard == null || id === dragCard) { setCardDrop(null); return; }
@@ -755,42 +752,25 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
       )}
       {cards.map((c) => {
         const over = dragCard != null && cardDrop && cardDrop.id === c.id;
-        const editing = editCard === c.id;
         return (
         <div key={c.id} onDragOver={(e) => onCardDragOver(e, c.id)} onDrop={() => dropCard(c.id)}
-          style={{ display: "flex", alignItems: editing ? "flex-start" : "center", gap: 8, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 13.5,
+          style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 13.5,
             opacity: dragCard === c.id ? 0.4 : 1,
             boxShadow: over && cardDrop.side === "above" ? "inset 0 2px 0 var(--accent)" : over && cardDrop.side === "below" ? "inset 0 -2px 0 var(--accent)" : undefined }}>
           <span draggable onDragStart={(e) => { e.stopPropagation(); e.dataTransfer.effectAllowed = "move"; setDragCard(c.id); }} onDragEnd={() => { setDragCard(null); setCardDrop(null); }}
-            className="drag-handle" title={t("karten.reorderHint")} style={{ color: "var(--text3)", cursor: "grab", fontSize: 14, flexShrink: 0, userSelect: "none", marginTop: editing ? 4 : 0 }}>⠿</span>
-          {editing ? (
-            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <input value={ecFront} onChange={(e) => setEcFront(e.target.value)} placeholder={t("karten.front")} style={{ flex: 1, minWidth: 120, ...inp }} />
-                <input value={ecBack} onChange={(e) => setEcBack(e.target.value)} placeholder={t("karten.back")} style={{ flex: 1, minWidth: 120, ...inp }} />
-              </div>
-              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("karten.imgFront")}</span>
-                <CardImgCtl cardId={c.id} side="front" has={c.has_front_image} imgVer={imgVer} onUpload={uploadCardImg} onRemove={removeCardImg} t={t} />
-                <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("karten.imgBack")}</span>
-                <CardImgCtl cardId={c.id} side="back" has={c.has_back_image} imgVer={imgVer} onUpload={uploadCardImg} onRemove={removeCardImg} t={t} />
-                <span style={{ flex: 1 }} />
-                <button onClick={() => saveEditCard(c)} style={{ ...btnPrimary, padding: "5px 12px" }}>{t("common.save")}</button>
-                <button onClick={() => setEditCard(null)} style={{ ...btnSecondary, padding: "5px 12px" }}>{t("common.abort")}</button>
-              </div>
-            </div>
-          ) : (
-            <>
-              {c.has_front_image && <AuthImage src={`${API}/cards/${c.id}/image/front`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: 5, border: "1px solid var(--border2)", flexShrink: 0 }} />}
-              <span style={{ flex: 1, minWidth: 0 }}><strong><Latex>{c.front}</Latex></strong> <span style={{ color: "var(--text3)" }}>→ <Latex>{c.back}</Latex></span></span>
-              {c.has_back_image && <AuthImage src={`${API}/cards/${c.id}/image/back`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: 5, border: "1px solid var(--border2)", flexShrink: 0 }} />}
-              <button onClick={() => startEditCard(c)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>
-              <button onClick={() => call(() => fetch(`${API}/cards/${c.id}`, { method: "DELETE" }))} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
-            </>
-          )}
+            className="drag-handle" title={t("karten.reorderHint")} style={{ color: "var(--text3)", cursor: "grab", fontSize: 14, flexShrink: 0, userSelect: "none" }}>⠿</span>
+          {c.has_front_image && <AuthImage src={`${API}/cards/${c.id}/image/front`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: 5, border: "1px solid var(--border2)", flexShrink: 0 }} />}
+          <span style={{ flex: 1, minWidth: 0 }}><strong><Latex>{c.front}</Latex></strong> <span style={{ color: "var(--text3)" }}>→ <Latex>{c.back}</Latex></span></span>
+          {c.has_back_image && <AuthImage src={`${API}/cards/${c.id}/image/back`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: 5, border: "1px solid var(--border2)", flexShrink: 0 }} />}
+          <button onClick={() => setEditCard(c.id)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>
+          <button onClick={() => call(() => fetch(`${API}/cards/${c.id}`, { method: "DELETE" }))} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
         </div>
         );
       })}
+      {editCard != null && cards.find((c) => c.id === editCard) && (
+        <CardEditModal card={cards.find((c) => c.id === editCard)} imgVer={imgVer} onUpload={uploadCardImg} onRemove={removeCardImg}
+          onSave={saveEditCard} onClose={() => setEditCard(null)} t={t} />
+      )}
       <form onSubmit={add} style={{ marginTop: 10 }}>
         {/* LaTeX-Schnelltasten: fügen die Formel ins zuletzt fokussierte Feld. */}
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>
@@ -820,6 +800,53 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
 }
 
 const menuRow = { display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "8px 10px", background: "none", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 13.5, color: "var(--text)", textAlign: "left" };
+
+// Karte bearbeiten im Popup: Vorder-/Rückseite als Text + Bild-Upload je Seite.
+function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t }) {
+  const [front, setFront] = useState(card.front || "");
+  const [back, setBack] = useState(card.back || "");
+  const inpS = { padding: "8px 10px", border: "1px solid var(--border2)", borderRadius: 8, background: "var(--bg)", color: "var(--text)", fontSize: 14, width: "100%", boxSizing: "border-box", resize: "vertical" };
+  const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
+  // Nur schließen, wenn Klick wirklich auf dem Overlay begann und endete (Textauswahl-Schutz).
+  const downOnOverlay = useRef(false);
+  return (
+    <div style={modalOverlay}
+      onMouseDown={(e) => { downOnOverlay.current = e.target === e.currentTarget; }}
+      onClick={(e) => { if (e.target === e.currentTarget && downOnOverlay.current) onClose(); }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 480, maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, flex: 1 }}>{t("karten.editCard")}</h3>
+          <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
+        </div>
+
+        <div style={lbl}>{t("karten.front")}</div>
+        <textarea value={front} onChange={(e) => setFront(e.target.value)} rows={2} style={inpS} />
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+          <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("karten.imgFront")}</span>
+          <CardImgCtl cardId={card.id} side="front" has={card.has_front_image} imgVer={imgVer} onUpload={onUpload} onRemove={onRemove} t={t} />
+        </div>
+
+        <div style={lbl}>{t("karten.back")}</div>
+        <textarea value={back} onChange={(e) => setBack(e.target.value)} rows={2} style={inpS} />
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+          <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("karten.imgBack")}</span>
+          <CardImgCtl cardId={card.id} side="back" has={card.has_back_image} imgVer={imgVer} onUpload={onUpload} onRemove={onRemove} t={t} />
+        </div>
+
+        {(front.includes("$") || back.includes("$")) && (
+          <div style={{ marginTop: 12, padding: "8px 12px", background: "var(--bg2)", borderRadius: 8, fontSize: 14 }}>
+            <Latex>{front}</Latex> <span style={{ color: "var(--text3)" }}>→ <Latex>{back}</Latex></span>
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
+          <button onClick={() => onSave(card.id, front.trim(), back.trim())} style={btnPrimary}>{t("common.save")}</button>
+          <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // Bild-Steuerung je Kartenseite: Thumbnail + Entfernen, sonst Upload-Knopf.
 function CardImgCtl({ cardId, side, has, imgVer, onUpload, onRemove, t }) {

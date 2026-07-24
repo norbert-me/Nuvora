@@ -1020,6 +1020,7 @@ export default {
   "karten.rollout": "Ausrollen",
   "karten.planTime": "Freischaltung um 7:00 Uhr morgens",
   "karten.planLabel": "Für später planen",
+  "karten.editCard": "Karte bearbeiten",
   "karten.imgAdd": "Bild hinzufügen",
   "karten.imgRemove": "Bild entfernen",
   "karten.front": "Vorderseite",
