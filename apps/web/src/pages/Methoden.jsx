@@ -334,7 +334,7 @@ function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
   };
   return (
     <div onClick={onClose} style={modalOverlay}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 480 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 480, maxHeight: "90vh", overflowY: "auto" }}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{m.id ? t("methoden.edit") : t("methoden.new")}</h3>
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ flex: 1 }}>
@@ -348,11 +348,11 @@ function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
           </div>
         </div>
         <div style={lbl}>{t("methoden.idee")}</div>
-        <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder={t("methoden.ideePlaceholder")} style={{ ...fld, resize: "vertical" }} />
+        <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={6} placeholder={t("methoden.ideePlaceholder")} style={{ ...fld, resize: "vertical" }} />
         <div style={lbl}>{t("methoden.ablauf")}</div>
-        <textarea value={ablauf} onChange={(e) => setAblauf(e.target.value)} rows={4} placeholder={t("methoden.ablaufPlaceholder")} style={{ ...fld, resize: "vertical" }} />
+        <textarea value={ablauf} onChange={(e) => setAblauf(e.target.value)} rows={8} placeholder={t("methoden.ablaufPlaceholder")} style={{ ...fld, resize: "vertical" }} />
         <div style={lbl}>{t("methoden.material")}</div>
-        <textarea value={material} onChange={(e) => setMaterial(e.target.value)} rows={2} placeholder={t("methoden.materialPlaceholder")} style={{ ...fld, resize: "vertical" }} />
+        <textarea value={material} onChange={(e) => setMaterial(e.target.value)} rows={4} placeholder={t("methoden.materialPlaceholder")} style={{ ...fld, resize: "vertical" }} />
         {topics.length > 0 && (
           <>
             <div style={lbl}>{t("methoden.topic")}</div>
