@@ -905,6 +905,7 @@ export default {
   "methoden.folderRename": "Rename folder",
   "methoden.folderDeleteConfirm": "Delete folder “{{name}}”? Its starters move up one level.",
   "methoden.dragHint": "Drag to move into a folder",
+  "methoden.importFile": "Import file",
   "methoden.jsonTemplate": "Template",
   "methoden.new": "New",
   "methoden.edit": "Edit",

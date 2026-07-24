@@ -935,6 +935,7 @@ export default {
   "methoden.folderRename": "Ordner umbenennen",
   "methoden.folderDeleteConfirm": "Ordner „{{name}}“ löschen? Die Einstiege darin wandern in die Ebene darüber.",
   "methoden.dragHint": "Ziehen zum Verschieben in einen Ordner",
+  "methoden.importFile": "Datei importieren",
   "methoden.jsonTemplate": "Vorlage",
   "methoden.new": "Neu",
   "methoden.edit": "Bearbeiten",

@@ -905,6 +905,7 @@ export default {
   "methoden.folderRename": "Renombrar carpeta",
   "methoden.folderDeleteConfirm": "¿Borrar la carpeta “{{name}}”? Sus inicios suben un nivel.",
   "methoden.dragHint": "Arrastra para mover a una carpeta",
+  "methoden.importFile": "Importar archivo",
   "methoden.jsonTemplate": "Plantilla",
   "methoden.new": "Nuevo",
   "methoden.edit": "Editar",
