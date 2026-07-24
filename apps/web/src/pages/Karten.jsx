@@ -544,6 +544,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   const [renaming, setRenaming] = useState(false);
   const [nameVal, setNameVal] = useState(deck.name || "");
   const [moveOpen, setMoveOpen] = useState(false); // „Verschieben"-Popover (Ziel-Ordner)
+  const [rollOpen, setRollOpen] = useState(false);  // Ausrollen-Untermenü
   // Deck als Ganzes ziehbar, aber nur wenn der Zug am Griff (⠿) beginnt — sonst
   // bliebe Text-/Button-Interaktion im Deck kaputt. Der Griff setzt das Flag per
   // mousedown; das Wurzel-draggable prüft es beim dragstart.
@@ -723,19 +724,31 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
       </div>
 
       {!collapsed && (<>
-      {/* Ausrollen: sofort, geplant oder zurueckziehen. Ohne Karten sinnlos. */}
+      {/* Ausrollen gebündelt in einem Untermenü: sofort, geplant, zurückziehen. */}
       {deck.cards.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap", fontSize: 13 }}>
-          {status !== "aus" && <button onClick={() => release({ now: true })} style={{ ...btnPrimary, padding: "5px 12px" }}>{t("karten.rollOutNow")}</button>}
-          {status !== "aus" && (
+        <div style={{ position: "relative", display: "inline-block", marginBottom: 12 }}>
+          <button onClick={() => setRollOpen((v) => !v)} style={{ ...btnSecondary, padding: "5px 12px", display: "inline-flex", alignItems: "center", gap: 6 }}>
+            {t("karten.rollout")} <span style={{ color: "var(--text3)" }}>▾</span>
+          </button>
+          {rollOpen && (
             <>
-              <input type="datetime-local" value={planDate} onChange={(e) => setPlanDate(e.target.value)}
-                style={{ ...inp, padding: "5px 8px" }} />
-              <button disabled={!planDate} onClick={() => release({ released_at: new Date(planDate).toISOString() })}
-                style={{ ...btnSecondary, padding: "5px 12px", opacity: planDate ? 1 : 0.4 }}>{t("karten.plan")}</button>
+              <div onClick={() => setRollOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 30 }} />
+              <div style={{ position: "absolute", left: 0, top: "calc(100% + 4px)", zIndex: 31, background: "var(--card)", border: "1px solid var(--border2)", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.18)", padding: 8, minWidth: 240 }}>
+                {status !== "aus" && <button onClick={() => { setRollOpen(false); release({ now: true }); }} style={{ ...menuRow }}><Icon d={ICONS.upload} size={15} color="var(--accent)" /> {t("karten.rollOutNow")}</button>}
+                {status !== "aus" && (
+                  <div style={{ padding: "8px 10px" }}>
+                    <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 4 }}>{t("karten.planLabel")}</div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <input type="datetime-local" value={planDate} onChange={(e) => setPlanDate(e.target.value)} style={{ ...inp, padding: "5px 8px", flex: 1, minWidth: 150 }} />
+                      <button disabled={!planDate} onClick={() => { if (planDate) { setRollOpen(false); release({ released_at: new Date(planDate).toISOString() }); } }}
+                        style={{ ...btnPrimary, padding: "5px 12px", opacity: planDate ? 1 : 0.4 }}>{t("karten.plan")}</button>
+                    </div>
+                  </div>
+                )}
+                {status !== "entwurf" && <button onClick={() => { setRollOpen(false); release({}); }} style={{ ...menuRow, color: C.danger }}><Icon d={ICONS.ban} size={15} color={C.danger} /> {t("karten.withdraw")}</button>}
+              </div>
             </>
           )}
-          {status !== "entwurf" && <button onClick={() => release({})} style={{ ...btnSecondary, padding: "5px 12px" }}>{t("karten.withdraw")}</button>}
         </div>
       )}
       {cards.map((c) => {
@@ -803,6 +816,8 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
     </div>
   );
 }
+
+const menuRow = { display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "8px 10px", background: "none", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 13.5, color: "var(--text)", textAlign: "left" };
 
 // Bild-Steuerung je Kartenseite: Thumbnail + Entfernen, sonst Upload-Knopf.
 function CardImgCtl({ cardId, side, has, imgVer, onUpload, onRemove, t }) {

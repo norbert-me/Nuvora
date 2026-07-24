@@ -1017,6 +1017,8 @@ export default {
   "karten.reorderHint": "Ziehen zum Sortieren",
   "karten.imgFront": "Bild Vorderseite:",
   "karten.imgBack": "Bild Rückseite:",
+  "karten.rollout": "Ausrollen",
+  "karten.planLabel": "Für später planen",
   "karten.imgAdd": "Bild hinzufügen",
   "karten.imgRemove": "Bild entfernen",
   "karten.front": "Vorderseite",

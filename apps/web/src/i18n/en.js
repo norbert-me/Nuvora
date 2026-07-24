@@ -987,6 +987,8 @@ export default {
   "karten.reorderHint": "Drag to reorder",
   "karten.imgFront": "Front image:",
   "karten.imgBack": "Back image:",
+  "karten.rollout": "Roll out",
+  "karten.planLabel": "Schedule for later",
   "karten.imgAdd": "Add image",
   "karten.imgRemove": "Remove image",
   "karten.front": "Front",

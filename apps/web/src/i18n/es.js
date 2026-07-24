@@ -987,6 +987,8 @@ export default {
   "karten.reorderHint": "Arrastra para ordenar",
   "karten.imgFront": "Imagen anverso:",
   "karten.imgBack": "Imagen reverso:",
+  "karten.rollout": "Desplegar",
+  "karten.planLabel": "Programar para más tarde",
   "karten.imgAdd": "Añadir imagen",
   "karten.imgRemove": "Quitar imagen",
   "karten.front": "Anverso",
