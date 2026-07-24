@@ -144,7 +144,9 @@ export default function Kurse() {
                   <div>
                     <div style={editLabel}>{t("kurse.editLevels")}</div>
                     <Toggle checked={!!k.niveau_aktiv} onChange={(v) => setNiveauAktiv(k, v)} label={t("kurse.niveauToggle")} />
-                    {k.niveau_aktiv && <NiveauPanel kursId={k.id} t={t} />}
+                    {/* Teilnehmerliste immer sichtbar; der E/G-Selektor je Person nur,
+                        wenn der E/G-Regler an ist. */}
+                    <NiveauPanel kursId={k.id} niveauAktiv={!!k.niveau_aktiv} t={t} />
                   </div>
                 )}
                 <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
@@ -204,7 +206,7 @@ function StudentMembers({ kursId, allClasses, t }) {
 
 // E/G je Person im Kurs. Setzt das Niveau kursweit (alle Fach-Klassen-Zeilen der
 // Person), damit z.B. die Karteikarten-Niveaustapel überall greifen.
-function NiveauPanel({ kursId, t }) {
+function NiveauPanel({ kursId, niveauAktiv = false, t }) {
   const [studs, setStuds] = useState(null);
   useEffect(() => {
     fetch(`${API}/kurse/${kursId}/students`).then((r) => (r.ok ? r.json() : [])).then((d) => setStuds(Array.isArray(d) ? d : [])).catch(() => setStuds([]));
@@ -220,12 +222,15 @@ function NiveauPanel({ kursId, t }) {
       {studs.map((s) => (
         <div key={s.name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
           <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
-          <select value={s.niveau || ""} onChange={(e) => setNiveau(s.name, e.target.value)}
-            style={{ ...selectStyle, fontSize: 12.5, padding: "4px 24px 4px 8px" }}>
-            <option value="">–</option>
-            <option value="E">{t("classes.eCourse")}</option>
-            <option value="G">{t("classes.gCourse")}</option>
-          </select>
+          {/* E/G-Selektor nur bei aktivem Regler; sonst nur der Name (Teilnehmer sichtbar). */}
+          {niveauAktiv && (
+            <select value={s.niveau || ""} onChange={(e) => setNiveau(s.name, e.target.value)}
+              style={{ ...selectStyle, fontSize: 12.5, padding: "4px 24px 4px 8px" }}>
+              <option value="">–</option>
+              <option value="E">{t("classes.eCourse")}</option>
+              <option value="G">{t("classes.gCourse")}</option>
+            </select>
+          )}
         </div>
       ))}
     </div>
