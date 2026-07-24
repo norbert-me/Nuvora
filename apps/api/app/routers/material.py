@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Material, Topic, CalendarEntry, User
+from ..models import Material, Topic, CalendarEntry, Method, User
 from sqlalchemy import func
 
 from .auth import get_current_user, rate_limit
@@ -29,6 +29,7 @@ class MaterialOut(BaseModel):
     id: int
     topic_id: Optional[int] = None
     entry_id: Optional[int] = None
+    method_id: Optional[int] = None
     filename: str
     mime: str
     size: int
@@ -53,28 +54,40 @@ async def _check_entry(db: AsyncSession, user_id: int, entry_id: Optional[int]) 
     return entry_id
 
 
+async def _check_method(db: AsyncSession, user_id: int, method_id: Optional[int]) -> Optional[int]:
+    if method_id is None:
+        return None
+    ok = (await db.execute(select(Method.id).where(Method.id == method_id, Method.owner_id == user_id))).scalar_one_or_none()
+    if not ok:
+        raise HTTPException(404, "Einstieg nicht gefunden")
+    return method_id
+
+
 @router.get("", response_model=List[MaterialOut])
-async def list_material(topic_id: Optional[int] = None, entry_id: Optional[int] = None,
+async def list_material(topic_id: Optional[int] = None, entry_id: Optional[int] = None, method_id: Optional[int] = None,
                         user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Material der Lehrkraft, gefiltert nach Thema und/oder Stunde."""
+    """Material der Lehrkraft, gefiltert nach Thema, Stunde und/oder Einstieg."""
     q = select(Material).where(Material.owner_id == user.id)
     if topic_id is not None:
         q = q.where(Material.topic_id == topic_id)
     if entry_id is not None:
         q = q.where(Material.entry_id == entry_id)
+    if method_id is not None:
+        q = q.where(Material.method_id == method_id)
     rows = (await db.execute(q.order_by(Material.created_at.desc()))).scalars().all()
     return rows
 
 
 @router.post("", response_model=MaterialOut, status_code=201)
 async def upload_material(file: UploadFile = File(...), topic_id: Optional[int] = Form(None),
-                          entry_id: Optional[int] = Form(None),
+                          entry_id: Optional[int] = Form(None), method_id: Optional[int] = Form(None),
                           user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("material_up", f"u{user.id}", 60, 60, "Zu viele Uploads. Bitte kurz warten.")
-    if topic_id is None and entry_id is None:
-        raise HTTPException(400, "Material braucht ein Thema oder eine Stunde")
+    if topic_id is None and entry_id is None and method_id is None:
+        raise HTTPException(400, "Material braucht ein Thema, eine Stunde oder einen Einstieg")
     topic_id = await _check_topic(db, user.id, topic_id)
     entry_id = await _check_entry(db, user.id, entry_id)
+    method_id = await _check_method(db, user.id, method_id)
     data = await file.read()
     if not data:
         raise HTTPException(400, "Datei ist leer")
@@ -83,7 +96,7 @@ async def upload_material(file: UploadFile = File(...), topic_id: Optional[int] 
     used = (await db.execute(select(func.coalesce(func.sum(Material.size), 0)).where(Material.owner_id == user.id))).scalar_one()
     if used + len(data) > QUOTA_BYTES:
         raise HTTPException(413, "Speicher voll (max. 200 MB je Konto). Bitte alte Dateien löschen.")
-    m = Material(owner_id=user.id, topic_id=topic_id, entry_id=entry_id,
+    m = Material(owner_id=user.id, topic_id=topic_id, entry_id=entry_id, method_id=method_id,
                  filename=(file.filename or "datei")[:255], mime=(file.content_type or "")[:120],
                  size=len(data), data=data)
     db.add(m)

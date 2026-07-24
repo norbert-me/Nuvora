@@ -43,7 +43,7 @@ async def _setup(s):
 @pytest.mark.asyncio
 async def test_upload_und_liste(s):
     u, tp = await _setup(s)
-    out = await M.upload_material(file=_upload("blatt.pdf", b"%PDF-1.4 data"), topic_id=tp.id, entry_id=None, user=u, db=s)
+    out = await M.upload_material(file=_upload("blatt.pdf", b"%PDF-1.4 data"), topic_id=tp.id, entry_id=None, method_id=None, user=u, db=s)
     assert out.filename == "blatt.pdf" and out.size == len(b"%PDF-1.4 data")
     lst = await M.list_material(topic_id=tp.id, user=u, db=s)
     assert len(lst) == 1 and lst[0].topic_id == tp.id
@@ -53,14 +53,14 @@ async def test_upload_und_liste(s):
 async def test_ohne_thema_und_stunde_verboten(s):
     u, tp = await _setup(s)
     with pytest.raises(HTTPException) as ei:
-        await M.upload_material(file=_upload("x.txt", b"x"), topic_id=None, entry_id=None, user=u, db=s)
+        await M.upload_material(file=_upload("x.txt", b"x"), topic_id=None, entry_id=None, method_id=None, user=u, db=s)
     assert ei.value.status_code == 400
 
 
 @pytest.mark.asyncio
 async def test_fremdes_material_unsichtbar(s):
     u, tp = await _setup(s)
-    await M.upload_material(file=_upload("geheim.pdf", b"data"), topic_id=tp.id, entry_id=None, user=u, db=s)
+    await M.upload_material(file=_upload("geheim.pdf", b"data"), topic_id=tp.id, entry_id=None, method_id=None, user=u, db=s)
     mid = (await s.execute(select(Material.id))).scalar_one()
 
     v = User(email="v@b.de", password_hash="x", name="V"); s.add(v); await s.commit()
@@ -75,3 +75,21 @@ async def test_fremdes_material_unsichtbar(s):
     # Eigentuemer kann herunterladen
     resp = await M.download_material(mid, user=u, db=s)
     assert resp.body == b"data"
+
+
+@pytest.mark.asyncio
+async def test_material_am_einstieg(s):
+    """Datei an einen Einstieg (Methode) haengen, per method_id auflisten; das
+    Loeschen des Einstiegs nullt nur die Zuordnung (Material bleibt)."""
+    from sqlalchemy import delete as sql_delete
+    from app.models import Method
+    u, _ = await _setup(s)
+    m = Method(owner_id=u.id, title="Blitzlicht"); s.add(m); await s.commit()
+    out = await M.upload_material(file=_upload("ab.pdf", b"data"), topic_id=None, entry_id=None, method_id=m.id, user=u, db=s)
+    assert out.method_id == m.id
+    liste = await M.list_material(method_id=m.id, user=u, db=s)
+    assert [x.filename for x in liste] == ["ab.pdf"]
+    # Einstieg loeschen -> Material bleibt, method_id genullt (ON DELETE SET NULL).
+    await s.execute(sql_delete(Method).where(Method.id == m.id)); await s.commit()
+    mid = (await s.execute(select(Material.method_id).where(Material.id == out.id))).scalar_one()
+    assert mid is None

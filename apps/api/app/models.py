@@ -1000,6 +1000,8 @@ class Material(Base):
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
     entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("calendar_entries.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Auch an einen Einstieg (Methode) haengbar — optional, ON DELETE SET NULL.
+    method_id: Mapped[Optional[int]] = mapped_column(ForeignKey("methods.id", ondelete="SET NULL"), nullable=True, index=True)
     filename: Mapped[str] = mapped_column(String(255))
     mime: Mapped[str] = mapped_column(String(120), default="", server_default="")
     size: Mapped[int] = mapped_column(Integer, default=0, server_default="0")

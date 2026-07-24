@@ -16,15 +16,15 @@ function fmtSize(n) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default function MaterialPanel({ topicId = null, entryId = null }) {
+export default function MaterialPanel({ topicId = null, entryId = null, methodId = null }) {
   const { t } = useLanguage();
   const [items, setItems] = useState([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  const q = topicId != null ? `?topic_id=${topicId}` : `?entry_id=${entryId}`;
+  const q = topicId != null ? `?topic_id=${topicId}` : methodId != null ? `?method_id=${methodId}` : `?entry_id=${entryId}`;
   const load = () => fetch(`${API}${q}`).then((r) => (r.ok ? r.json() : [])).then((d) => setItems(Array.isArray(d) ? d : [])).catch(() => {});
-  useEffect(() => { load(); }, [topicId, entryId]);
+  useEffect(() => { load(); }, [topicId, entryId, methodId]);
 
   const upload = async (file) => {
     if (!file) return;
@@ -33,6 +33,7 @@ export default function MaterialPanel({ topicId = null, entryId = null }) {
     fd.append("file", file);
     if (topicId != null) fd.append("topic_id", String(topicId));
     if (entryId != null) fd.append("entry_id", String(entryId));
+    if (methodId != null) fd.append("method_id", String(methodId));
     const res = await fetch(API, { method: "POST", body: fd }).catch(() => null);
     setBusy(false);
     if (res && res.ok) load();

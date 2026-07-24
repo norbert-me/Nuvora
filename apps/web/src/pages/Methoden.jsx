@@ -7,6 +7,7 @@ import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, modalOverlay, modalPanel, inputStyle, ExportButton, ImportButton } from "../components/Icons.jsx";
 import PublishModal from "../components/PublishModal.jsx";
+import MaterialPanel from "../components/MaterialPanel.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api/methoden";
@@ -338,6 +339,8 @@ function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
             </select>
           </>
         )}
+        {/* Datei-Upload nur beim gespeicherten Einstieg (braucht die id). */}
+        {m.id && <div style={{ marginTop: 14 }}><MaterialPanel methodId={m.id} /></div>}
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
           <button onClick={submit} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
