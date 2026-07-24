@@ -119,3 +119,25 @@ async def test_release_deck_via_kurs(s):
     await s.refresh(deck); await s.refresh(e)
     assert deck.released_at is not None       # über den Kurs verbunden + freigeschaltet
     assert e.karten_deck_id == deck.id        # automatisch am Eintrag verknüpft
+
+
+@pytest.mark.asyncio
+async def test_deck_created_after_entry_schedules(s):
+    """Wird das Deck NACH dem Kalender-Eintrag angelegt, plant die Deck-Seite die
+    Freischaltung zum Eintragsdatum und verlinkt den Eintrag (Gegenstück zur
+    Kalender-Seite)."""
+    from datetime import datetime, timezone
+    from app.models import Topic, CalendarEntry, UserModule
+    from app.routers import karten as KR
+    u = User(email="d@e.de", password_hash="x", name="L"); s.add(u); await s.flush()
+    s.add(UserModule(user_id=u.id, module_key="karten"))
+    s.add(UserModule(user_id=u.id, module_key="kalender"))
+    a = SchoolClass(name="7a", owner_id=u.id); s.add(a); await s.flush()
+    topic = Topic(name="Winkel", owner_id=u.id); s.add(topic); await s.flush()
+    e = CalendarEntry(owner_id=u.id, date=datetime(2026, 9, 14, 7, tzinfo=timezone.utc), class_id=a.id, topic_id=topic.id)
+    s.add(e); await s.commit()
+
+    deck = await KR.create_deck(a.id, KR.DeckIn(name="D", topic_id=topic.id), kurs_id=None, user=u, db=s)
+    await s.refresh(deck); await s.refresh(e)
+    assert deck.released_at == e.date          # zum Termin geplant
+    assert e.karten_deck_id == deck.id         # Eintrag verlinkt

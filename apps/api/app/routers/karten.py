@@ -276,6 +276,34 @@ async def list_deck_trash(class_id: int, kurs_id: Optional[int] = None, user: Us
     return r.scalars().all()
 
 
+async def _schedule_deck_from_calendar(db: AsyncSession, user: User, deck: CardDeck) -> None:
+    """Gegenstück zu _release_matching_decks (kalender.py): plant/verknüpft ein
+    neu angelegtes oder frisch mit Thema versehenes Deck mit einem bereits
+    vorhandenen Kalender-Eintrag desselben Themas. Ohne das blieb ein Deck, das
+    NACH dem Eintrag angelegt wird, unausgerollt (der Eintrag hat es nie gesehen).
+    Nur Entwürfe (released_at NULL), nur bei aktivem Kalender-Modul (Regel 3)."""
+    if deck.topic_id is None or deck.released_at is not None:
+        return
+    if not await is_active(db, user.id, "kalender"):
+        return
+    from ..models import CalendarEntry
+    from .kurse import class_kurs_ids
+    entries = (await db.execute(
+        select(CalendarEntry).where(CalendarEntry.owner_id == user.id, CalendarEntry.topic_id == deck.topic_id)
+        .order_by(CalendarEntry.date)
+    )).scalars().all()
+    for e in entries:
+        if e.class_id is None:
+            continue
+        kurse = await class_kurs_ids(db, e.class_id)
+        if e.class_id == deck.class_id or (deck.kurs_id is not None and deck.kurs_id in kurse):
+            deck.released_at = e.date           # zum Termin freischalten (frühester Eintrag)
+            if not e.karten_deck_id:
+                e.karten_deck_id = deck.id       # Eintrag auf dieses Deck verlinken
+            await db.commit()
+            return
+
+
 @router.post("/classes/{class_id}/decks", response_model=DeckOut, status_code=201)
 async def create_deck(class_id: int, body: DeckIn, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("karten_deck", f"u{user.id}", 100, 60, "Zu viele Stapel. Bitte kurz warten.")
@@ -286,6 +314,7 @@ async def create_deck(class_id: int, body: DeckIn, kurs_id: Optional[int] = None
     db.add(deck)
     await db.commit()
     await db.refresh(deck, ["cards"])
+    await _schedule_deck_from_calendar(db, user, deck)
     return deck
 
 
@@ -299,6 +328,7 @@ async def update_deck(deck_id: int, body: DeckIn, user: User = Depends(require_m
     deck.folder_id = body.folder_id
     await db.commit()
     await db.refresh(deck, ["cards"])
+    await _schedule_deck_from_calendar(db, user, deck)
     return deck
 
 
