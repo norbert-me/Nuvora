@@ -315,7 +315,7 @@ function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
           <button onClick={submit} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
-          {m.id && <button onClick={() => onDelete(m.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>}
+          {m.id && <button onClick={() => onDelete(m.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto", padding: 6 }} title={t("common.delete")}><Icon d={ICONS.trash} size={20} color={C.danger} /></button>}
         </div>
       </div>
     </div>
