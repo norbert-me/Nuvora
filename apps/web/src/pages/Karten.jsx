@@ -578,6 +578,33 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
     call(() => fetch(`${API}/cards/${cardId}/image/${side}`, { method: "POST", body: fd })).then(() => setImgVer((v) => v + 1));
   };
   const removeCardImg = (cardId, side) => call(() => fetch(`${API}/cards/${cardId}/image/${side}`, { method: "DELETE" })).then(() => setImgVer((v) => v + 1));
+
+  // Karten innerhalb des Stapels per Drag & Drop sortieren — mit Vorschau, wo
+  // die Karte landet (Linie ober-/unterhalb der Zielzeile).
+  const [cards, setCards] = useState(deck.cards);
+  useEffect(() => { setCards(deck.cards); }, [deck.cards]);
+  const [dragCard, setDragCard] = useState(null);
+  const [cardDrop, setCardDrop] = useState(null); // { id, side: "above"|"below" }
+  const onCardDragOver = (e, id) => {
+    e.preventDefault();
+    if (dragCard == null || id === dragCard) { setCardDrop(null); return; }
+    const r = e.currentTarget.getBoundingClientRect();
+    const side = e.clientY < r.top + r.height / 2 ? "above" : "below";
+    setCardDrop((p) => (p && p.id === id && p.side === side ? p : { id, side }));
+  };
+  const dropCard = async (targetId) => {
+    const von = dragCard, ov = cardDrop;
+    setDragCard(null); setCardDrop(null);
+    if (von == null || von === targetId) return;
+    const ids = cards.map((c) => c.id);
+    const from = ids.indexOf(von); let to = ids.indexOf(targetId);
+    if (from < 0 || to < 0) return;
+    if (ov && ov.id === targetId && ov.side === "below") to += 1;
+    if (from < to) to -= 1;
+    const neu = [...ids]; neu.splice(to, 0, neu.splice(from, 1)[0]);
+    setCards(neu.map((id) => cards.find((c) => c.id === id))); // sofortige Vorschau
+    call(() => fetch(`${API}/decks/${deck.id}/cards/reorder`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: neu }) }));
+  };
   const exportDeck = () => {
     const data = { type: "nuvora_karten_deck", version: 1, name: deck.name || "", cards: deck.cards.map((c) => ({ front: c.front, back: c.back })) };
     const a = document.createElement("a");
@@ -698,14 +725,22 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           {status !== "entwurf" && <button onClick={() => release({})} style={{ ...btnSecondary, padding: "5px 12px" }}>{t("karten.withdraw")}</button>}
         </div>
       )}
-      {deck.cards.map((c) => (
-        <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 13.5 }}>
+      {cards.map((c) => {
+        const over = dragCard != null && cardDrop && cardDrop.id === c.id;
+        return (
+        <div key={c.id} onDragOver={(e) => onCardDragOver(e, c.id)} onDrop={() => dropCard(c.id)}
+          style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 13.5,
+            opacity: dragCard === c.id ? 0.4 : 1,
+            boxShadow: over && cardDrop.side === "above" ? "inset 0 2px 0 var(--accent)" : over && cardDrop.side === "below" ? "inset 0 -2px 0 var(--accent)" : undefined }}>
+          <span draggable onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; setDragCard(c.id); }} onDragEnd={() => { setDragCard(null); setCardDrop(null); }}
+            className="drag-handle" title={t("karten.reorderHint")} style={{ color: "var(--text3)", cursor: "grab", fontSize: 14, flexShrink: 0, userSelect: "none" }}>⠿</span>
           <CardImgCtl cardId={c.id} side="front" has={c.has_front_image} imgVer={imgVer} onUpload={uploadCardImg} onRemove={removeCardImg} t={t} />
           <span style={{ flex: 1, minWidth: 0 }}><strong><Latex>{c.front}</Latex></strong> <span style={{ color: "var(--text3)" }}>→ <Latex>{c.back}</Latex></span></span>
           <CardImgCtl cardId={c.id} side="back" has={c.has_back_image} imgVer={imgVer} onUpload={uploadCardImg} onRemove={removeCardImg} t={t} />
           <button onClick={() => call(() => fetch(`${API}/cards/${c.id}`, { method: "DELETE" }))} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
         </div>
-      ))}
+        );
+      })}
       <form onSubmit={add} style={{ marginTop: 10 }}>
         {/* LaTeX-Schnelltasten: fügen die Formel ins zuletzt fokussierte Feld. */}
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>

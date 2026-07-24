@@ -984,6 +984,7 @@ export default {
   "karten.cards": "cards",
   "karten.latexHint": "LaTeX in $…$ (e.g. $a^2+b^2$)",
   "karten.jsonTemplate": "Example JSON",
+  "karten.reorderHint": "Drag to reorder",
   "karten.imgAdd": "Add image",
   "karten.imgRemove": "Remove image",
   "karten.front": "Front",

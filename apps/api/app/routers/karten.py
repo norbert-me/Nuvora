@@ -377,6 +377,25 @@ async def add_card(deck_id: int, body: CardIn, user: User = Depends(require_modu
     return card
 
 
+class CardReorderIn(BaseModel):
+    ids: List[int]
+
+
+@router.put("/decks/{deck_id}/cards/reorder", status_code=204)
+async def reorder_cards(deck_id: int, body: CardReorderIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Setzt die Reihenfolge der Karten im Stapel anhand der ID-Liste."""
+    await _owned_deck(db, user, deck_id)
+    rows = (await db.execute(select(Card).where(Card.deck_id == deck_id))).scalars().all()
+    by_id = {c.id: c for c in rows}
+    pos = 0
+    for cid in body.ids:
+        c = by_id.get(cid)
+        if c is not None:
+            c.position = pos
+            pos += 1
+    await db.commit()
+
+
 class ImportIn(BaseModel):
     # Karten aus CSV/TSV oder Anki-Text-Export. Client parst, schickt Paare.
     cards: List[CardIn]
