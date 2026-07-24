@@ -484,6 +484,8 @@ export default {
   "topics.subPlaceholder": "Subtema, p. ej. Multiplicar y dividir",
   "topics.empty": "Aún no hay temas. Crea uno; los subtemas van debajo.",
   "topics.emptyHint": "Crea una asignatura (p.ej. Mates), luego temas y subtemas.",
+  "topics.notes": "Nota / objetivos",
+  "topics.notesPlaceholder": "¿Qué debe aprender el alumnado en este tema? (para planificar clases)",
   "topics.addSub": "+ Subtema",
   "topics.questionCount": "{{n}} pregunta(s)",
   "topics.delConfirm": "¿Eliminar «{{name}}»?",

@@ -334,6 +334,9 @@ class Topic(Base):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Freie Notiz je Thema/Unterthema: Lernziele/Inhalt ("Was sollen die SuS hier
+    # lernen?") zur Unterrichtsplanung. Rein für die Lehrkraft, kein Modul hängt daran.
+    notes: Mapped[str] = mapped_column(Text, default="", server_default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     children: Mapped[list["Topic"]] = relationship(

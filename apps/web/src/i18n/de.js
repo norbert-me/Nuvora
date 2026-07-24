@@ -484,6 +484,8 @@ export default {
   "topics.subPlaceholder": "Unterthema, z. B. Vervielfachen und Teilen",
   "topics.empty": "Noch keine Themen. Lege eins an — Unterthemen kommen darunter.",
   "topics.emptyHint": "Lege ein Fach an (z.B. Mathe), darunter Themen und Unterthemen.",
+  "topics.notes": "Notiz / Lernziele",
+  "topics.notesPlaceholder": "Was sollen die SuS in diesem Thema lernen? (für die Unterrichtsplanung)",
   "topics.addSub": "+ Unterthema",
   "topics.questionCount": "{{n}} Frage(n)",
   "topics.delConfirm": "„{{name}}“ löschen?",

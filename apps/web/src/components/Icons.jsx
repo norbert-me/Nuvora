@@ -42,6 +42,7 @@ export const ICONS = {
   plus: ["M10 4v12M4 10h12"],
   refresh: ["M15.5 6.5A6 6 0 105 5.2", "M15.5 3v3.5H12"],
   folder: ["M3 5.5A1.5 1.5 0 014.5 4h3l1.5 2h6.5A1.5 1.5 0 0117 7.5v7A1.5 1.5 0 0115.5 16h-11A1.5 1.5 0 013 14.5z"],
+  note: ["M6 3h5l3 3v10a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z", "M11 3v3h3", "M7.5 10h5M7.5 13h4"],
   minus: ["M4 10h12"],
   more: ["M5 10h.01M10 10h.01M15 10h.01"],
   // Info: Kreis mit „i" (Erklär-Popup der Modulauswahl).

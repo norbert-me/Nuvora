@@ -25,6 +25,7 @@ router = APIRouter(prefix="/api/topics", tags=["topics"])
 class TopicIn(BaseModel):
     name: str
     parent_id: Optional[int] = None
+    notes: str = ""
 
     @field_validator("name")
     @classmethod
@@ -42,6 +43,7 @@ class TopicOut(BaseModel):
     name: str
     parent_id: Optional[int]
     position: int
+    notes: str = ""
     # Wie viele CardVote-Fragen haengen an diesem Thema? Macht sichtbar, was
     # ein Loeschen kostet.
     question_count: int = 0
@@ -96,7 +98,7 @@ async def list_topics(
     return [
         TopicOut(
             id=t.id, name=t.name, parent_id=t.parent_id, position=t.position,
-            question_count=counts.get(t.id, 0),
+            notes=t.notes or "", question_count=counts.get(t.id, 0),
         )
         for t in result.scalars().all()
     ]
@@ -130,12 +132,12 @@ async def create_topic(
     )
     topic = Topic(
         name=data.name, parent_id=data.parent_id, owner_id=user.id,
-        position=(last.scalar_one_or_none() or 0) + 1,
+        position=(last.scalar_one_or_none() or 0) + 1, notes=data.notes or "",
     )
     db.add(topic)
     await db.commit()
     await db.refresh(topic)
-    return TopicOut(id=topic.id, name=topic.name, parent_id=topic.parent_id, position=topic.position)
+    return TopicOut(id=topic.id, name=topic.name, parent_id=topic.parent_id, position=topic.position, notes=topic.notes or "")
 
 
 class ReorderIn(BaseModel):
@@ -209,9 +211,10 @@ async def update_topic(
 
     topic.name = data.name
     topic.parent_id = data.parent_id
+    topic.notes = data.notes or ""
     await db.commit()
     await db.refresh(topic)
-    return TopicOut(id=topic.id, name=topic.name, parent_id=topic.parent_id, position=topic.position)
+    return TopicOut(id=topic.id, name=topic.name, parent_id=topic.parent_id, position=topic.position, notes=topic.notes or "")
 
 
 @router.delete("/{topic_id}", status_code=204)

@@ -22,6 +22,8 @@ export default function Topics() {
   const [childName, setChildName] = useState("");
   const [editing, setEditing] = useState(null);
   const [editName, setEditName] = useState("");
+  const [notesOpen, setNotesOpen] = useState(null); // Thema-id, dessen Notiz offen ist
+  const [notesVal, setNotesVal] = useState("");
   const [expanded, setExpanded] = useState(() => new Set());
   const [dragId, setDragId] = useState(null);
   const [dragOver, setDragOver] = useState(null); // { id, side: "above"|"below" }
@@ -89,8 +91,17 @@ export default function Topics() {
     call(() => fetch(`${API}/topics/${t.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, parent_id: t.parent_id }),
+      body: JSON.stringify({ name, parent_id: t.parent_id, notes: t.notes || "" }),
     }));
+
+  // Notiz (Lernziele/Inhalt) speichern — Name/Parent unverändert mitschicken.
+  const saveNotes = async (tp, notes) => {
+    if (await call(() => fetch(`${API}/topics/${tp.id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: tp.name, parent_id: tp.parent_id, notes }),
+    }))) setNotesOpen(null);
+  };
+  const openNotes = (tp) => { setNotesOpen(tp.id); setNotesVal(tp.notes || ""); };
 
   const remove = async (tp) => {
     const kids = topics.filter((x) => x.parent_id === tp.id);
@@ -186,6 +197,9 @@ export default function Topics() {
               <Icon d={ICONS.plus} size={16} color="var(--accent)" />
             </button>
           )}
+          <button onClick={() => (notesOpen === tp.id ? setNotesOpen(null) : openNotes(tp))} className="icon-btn" style={iconBtn} title={t("topics.notes")}>
+            <Icon d={ICONS.note} size={16} color={tp.notes ? "var(--accent)" : "var(--text3)"} />
+          </button>
           <Link to={`/thema/${tp.id}`} className="icon-btn" style={{ ...iconBtn, display: "inline-flex", color: "var(--accent)" }} title={t("thema.view")}>
             <Icon d={ICONS.chart} size={16} color="var(--accent)" />
           </Link>
@@ -206,6 +220,17 @@ export default function Topics() {
   const renderNode = (tp, depth) => (
     <div key={tp.id} style={depth === 0 ? { marginBottom: 10 } : undefined}>
       {row(tp, depth)}
+      {notesOpen === tp.id && (
+        <div style={{ marginLeft: (depth + 1) * 28, marginBottom: 8 }}>
+          <textarea value={notesVal} onChange={(e) => setNotesVal(e.target.value)} autoFocus rows={4}
+            placeholder={t("topics.notesPlaceholder")}
+            style={{ width: "100%", boxSizing: "border-box", padding: 10, border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)", fontSize: 14, lineHeight: 1.5, resize: "vertical" }} />
+          <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+            <button onClick={() => saveNotes(tp, notesVal)} style={btnPrimary}>{t("common.save")}</button>
+            <button onClick={() => setNotesOpen(null)} style={btnSecondary}>{t("common.abort")}</button>
+          </div>
+        </div>
+      )}
       {expanded.has(tp.id) && depth < MAX_DEPTH && childrenOf(tp.id).map((c) => renderNode(c, depth + 1))}
       {addingUnder === tp.id && depth < MAX_DEPTH && (
         <form onSubmit={(e) => submitChild(e, tp.id)} style={{ display: "flex", gap: 8, marginLeft: (depth + 1) * 28, marginBottom: 6 }}>

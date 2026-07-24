@@ -484,6 +484,8 @@ export default {
   "topics.subPlaceholder": "Subtopic, e.g. Multiplying and dividing",
   "topics.empty": "No topics yet. Create one — subtopics go underneath.",
   "topics.emptyHint": "Create a subject (e.g. Maths), then topics and subtopics.",
+  "topics.notes": "Note / goals",
+  "topics.notesPlaceholder": "What should students learn in this topic? (for lesson planning)",
   "topics.addSub": "+ Subtopic",
   "topics.questionCount": "{{n}} question(s)",
   "topics.delConfirm": "Delete “{{name}}”?",
