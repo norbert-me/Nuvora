@@ -988,6 +988,7 @@ export default {
   "karten.imgFront": "Front image:",
   "karten.imgBack": "Back image:",
   "karten.rollout": "Roll out",
+  "karten.planTime": "Unlocks at 7:00 in the morning",
   "karten.planLabel": "Schedule for later",
   "karten.imgAdd": "Add image",
   "karten.imgRemove": "Remove image",

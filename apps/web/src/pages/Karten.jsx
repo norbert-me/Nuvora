@@ -739,10 +739,12 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
                   <div style={{ padding: "8px 10px" }}>
                     <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 4 }}>{t("karten.planLabel")}</div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      <input type="datetime-local" value={planDate} onChange={(e) => setPlanDate(e.target.value)} style={{ ...inp, padding: "5px 8px", flex: 1, minWidth: 150 }} />
-                      <button disabled={!planDate} onClick={() => { if (planDate) { setRollOpen(false); release({ released_at: new Date(planDate).toISOString() }); } }}
+                      {/* Nur Datum wählen — freigeschaltet wird immer 07:00 morgens des Tages. */}
+                      <input type="date" value={planDate} onChange={(e) => setPlanDate(e.target.value)} style={{ ...inp, padding: "5px 8px", flex: 1, minWidth: 150 }} />
+                      <button disabled={!planDate} onClick={() => { if (planDate) { const [y, mo, d] = planDate.split("-").map(Number); setRollOpen(false); release({ released_at: new Date(y, mo - 1, d, 7, 0, 0).toISOString() }); } }}
                         style={{ ...btnPrimary, padding: "5px 12px", opacity: planDate ? 1 : 0.4 }}>{t("karten.plan")}</button>
                     </div>
+                    <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 4 }}>{t("karten.planTime")}</div>
                   </div>
                 )}
                 {status !== "entwurf" && <button onClick={() => { setRollOpen(false); release({}); }} style={{ ...menuRow, color: C.danger }}><Icon d={ICONS.ban} size={15} color={C.danger} /> {t("karten.withdraw")}</button>}

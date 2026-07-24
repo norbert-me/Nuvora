@@ -988,6 +988,7 @@ export default {
   "karten.imgFront": "Imagen anverso:",
   "karten.imgBack": "Imagen reverso:",
   "karten.rollout": "Desplegar",
+  "karten.planTime": "Se activa a las 7:00 de la mañana",
   "karten.planLabel": "Programar para más tarde",
   "karten.imgAdd": "Añadir imagen",
   "karten.imgRemove": "Quitar imagen",
