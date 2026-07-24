@@ -197,9 +197,6 @@ export default function Topics() {
               <Icon d={ICONS.plus} size={16} color="var(--accent)" />
             </button>
           )}
-          <button onClick={() => openPopup(tp)} className="icon-btn" style={iconBtn} title={t("topics.notes")}>
-            <Icon d={ICONS.note} size={16} color={tp.notes ? "var(--accent)" : "var(--text3)"} />
-          </button>
           <button onClick={() => { setEditing(tp.id); setEditName(tp.name); }} className="icon-btn" style={iconBtn} title={t("common.rename")}>
             <Icon d={ICONS.edit} />
           </button>

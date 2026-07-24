@@ -250,9 +250,9 @@ export default function Methoden() {
           {visible.map((m) => (
             <div key={m.id} draggable onDragStart={() => setDrag({ kind: "method", id: m.id })} onDragEnd={endDrag}
               onClick={() => setViewing(m)}
-              style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", cursor: "pointer", opacity: drag && drag.kind === "method" && drag.id === m.id ? 0.5 : 1 }}>
-              <span style={{ color: "var(--text3)", cursor: "grab", fontSize: 13 }} title={t("methoden.dragHint")}>⠿</span>
-              <span style={{ fontWeight: 600, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.title}</span>
+              style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "12px 14px", minHeight: 58, border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", cursor: "pointer", opacity: drag && drag.kind === "method" && drag.id === m.id ? 0.5 : 1 }}>
+              <span style={{ color: "var(--text3)", cursor: "grab", fontSize: 13, lineHeight: "1.4" }} title={t("methoden.dragHint")}>⠿</span>
+              <span style={{ fontWeight: 600, flex: 1, minWidth: 0, lineHeight: 1.35, wordBreak: "break-word" }}>{m.title}</span>
               {m.dauer != null && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 980, background: "rgba(37,99,235,0.12)", color: C.info, flexShrink: 0 }}>{t("methoden.dauerBadge", { n: m.dauer })}</span>}
             </div>
           ))}
