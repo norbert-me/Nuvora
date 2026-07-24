@@ -296,9 +296,8 @@ function MethodView({ m, t, onEdit, onPublish, onClose }) {
         {sec(t("methoden.material"), m.material)}
         {m.id && <div style={{ marginTop: 14 }}><MaterialPanel methodId={m.id} /></div>}
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
-          <button onClick={onEdit} style={btnPrimary}>{t("common.edit")}</button>
-          <button onClick={onPublish} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.share} size={15} color="var(--accent)" /> {t("methoden.publish")}</button>
-          <button onClick={onClose} style={{ ...btnSecondary, marginLeft: "auto" }}>{t("common.close")}</button>
+          <button onClick={onEdit} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.edit")}><Icon d={ICONS.edit} size={18} /></button>
+          <button onClick={onPublish} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("methoden.publish")}><Icon d={ICONS.share} size={18} color="var(--accent)" /></button>
         </div>
       </div>
     </div>
