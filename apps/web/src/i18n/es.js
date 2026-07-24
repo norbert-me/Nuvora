@@ -978,6 +978,8 @@ export default {
   "karten.cards": "tarjetas",
   "karten.latexHint": "LaTeX en $…$ (p. ej. $a^2+b^2$)",
   "karten.jsonTemplate": "JSON de ejemplo",
+  "karten.imgAdd": "Añadir imagen",
+  "karten.imgRemove": "Quitar imagen",
   "karten.front": "Anverso",
   "karten.back": "Reverso",
   "karten.delDeck": "¿Eliminar el mazo «{{name}}»? Sus tarjetas se eliminan también.",

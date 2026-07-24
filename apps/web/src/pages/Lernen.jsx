@@ -1,6 +1,7 @@
 // Kartenlernen für Schüler — KEIN Login, Zugriff über den Token in der URL.
 // Öffentliche Route: läuft ohne Nuvora-Konto. Der Token ist die Identität.
 import { useState, useEffect, useCallback } from "react";
+import CardFace from "../components/CardFace.jsx";
 import { COLORS as C } from "../components/Icons.jsx";
 import { useParams } from "react-router-dom";
 
@@ -110,16 +111,12 @@ export default function Lernen() {
         <div style={{ fontSize: 13, color: "var(--text3)", textAlign: "center", marginBottom: 12 }}>
           {data.name} · Karte {i + 1} von {data.cards.length}
         </div>
-        <div
-          onClick={() => !flipped && setFlipped(true)}
-          style={{
-            minHeight: 200, display: "flex", alignItems: "center", justifyContent: "center",
-            textAlign: "center", padding: 28, fontSize: 20, lineHeight: 1.5,
-            border: "1px solid var(--border)", borderRadius: 18, background: "var(--card)",
-            cursor: flipped ? "default" : "pointer", whiteSpace: "pre-wrap",
-          }}
-        >
-          {flipped ? card.back : card.front}
+        <div onClick={() => !flipped && setFlipped(true)} style={{ cursor: flipped ? "default" : "pointer" }}>
+          <CardFace
+            text={flipped ? card.back : card.front}
+            imageUrl={(flipped ? card.has_back_image : card.has_front_image)
+              ? `${API}/lernen/${token}/image/${card.card_id}/${flipped ? "back" : "front"}` : null}
+          />
         </div>
 
         {!flipped ? (

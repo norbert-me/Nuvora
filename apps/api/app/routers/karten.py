@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 import qrcode
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select, func as sa_func, and_, or_, delete as sql_delete
@@ -157,6 +157,8 @@ class CardOut(BaseModel):
     front: str
     back: str
     position: int
+    has_front_image: bool = False
+    has_back_image: bool = False
     model_config = {"from_attributes": True}
 
 
@@ -422,6 +424,93 @@ async def delete_card(card_id: int, user: User = Depends(require_module), db: As
     await db.commit()
 
 
+# ─── Karten-Bilder (je Seite oben-zentral). Blob deferred; Ausspielung eigener Endpoint. ───
+_CARD_IMG_MAX = 5 * 1024 * 1024  # 5 MB je Bild
+
+
+def _side_cols(side: str):
+    if side == "front":
+        return Card.front_image, Card.front_image_mime
+    if side == "back":
+        return Card.back_image, Card.back_image_mime
+    raise HTTPException(400, "Seite muss front oder back sein")
+
+
+async def _serve_card_image(db: AsyncSession, card_id: int, side: str) -> Response:
+    blob_col, mime_col = _side_cols(side)
+    row = (await db.execute(select(blob_col, mime_col).where(Card.id == card_id))).first()
+    if not row or not row[0]:
+        raise HTTPException(404, "Kein Bild")
+    # Privat, aber cachebar im Browser (unveraenderlich pro Karte/Seite bis Neu-Upload).
+    return Response(content=row[0], media_type=row[1] or "image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
+
+
+@router.post("/cards/{card_id}/image/{side}", response_model=CardOut)
+async def upload_card_image(card_id: int, side: str, file: UploadFile = File(...),
+                            user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    rate_limit("karten_img", f"u{user.id}", 120, 60, "Zu viele Uploads. Bitte kurz warten.")
+    _side_cols(side)  # validiert die Seite
+    card = await db.get(Card, card_id)
+    if not card:
+        raise HTTPException(404, "Karte nicht gefunden")
+    await _owned_deck(db, user, card.deck_id)
+    mime = (file.content_type or "").lower()
+    if not mime.startswith("image/"):
+        raise HTTPException(400, "Nur Bilddateien erlaubt")
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "Datei ist leer")
+    if len(data) > _CARD_IMG_MAX:
+        raise HTTPException(413, "Bild zu groß (max. 5 MB)")
+    setattr(card, f"{side}_image", data)
+    setattr(card, f"{side}_image_mime", mime[:120])
+    await db.commit()
+    await db.refresh(card)
+    return card
+
+
+@router.delete("/cards/{card_id}/image/{side}", response_model=CardOut)
+async def delete_card_image(card_id: int, side: str, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    _side_cols(side)
+    card = await db.get(Card, card_id)
+    if not card:
+        raise HTTPException(404, "Karte nicht gefunden")
+    await _owned_deck(db, user, card.deck_id)
+    setattr(card, f"{side}_image", None)
+    setattr(card, f"{side}_image_mime", "")
+    await db.commit()
+    await db.refresh(card)
+    return card
+
+
+@router.get("/cards/{card_id}/image/{side}")
+async def get_card_image(card_id: int, side: str, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Bild einer eigenen Karte (Lehrkraft, mit Login)."""
+    card = await db.get(Card, card_id)
+    if not card:
+        raise HTTPException(404, "Karte nicht gefunden")
+    await _owned_deck(db, user, card.deck_id)
+    return await _serve_card_image(db, card_id, side)
+
+
+@router.get("/lernen/{token}/image/{card_id}/{side}")
+async def student_card_image(token: str, card_id: int, side: str, db: AsyncSession = Depends(get_db)):
+    """Bild einer Karte für die/den Lernende(n) — Token statt Login. Nur Karten
+    aus ausgerollten Stapeln, die dieser Token sehen darf."""
+    st = await _student_by_token(db, token)
+    now = _now()
+    dw = await _student_deck_where(db, st)
+    ok = (await db.execute(
+        select(Card.id).join(CardDeck, Card.deck_id == CardDeck.id).where(
+            Card.id == card_id, dw, _niveau_where(st),
+            CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None), CardDeck.released_at <= now,
+        )
+    )).scalar_one_or_none()
+    if not ok:
+        raise HTTPException(404, "Karte nicht gefunden")
+    return await _serve_card_image(db, card_id, side)
+
+
 # ─── Tokens & QR ───
 
 class StudentTokenOut(BaseModel):
@@ -666,7 +755,8 @@ async def student_session(token: str, all: bool = False, db: AsyncSession = Depe
         if is_due:
             due_count += 1
         if all or is_due:
-            faellig.append({"card_id": c.id, "front": c.front, "back": c.back})
+            faellig.append({"card_id": c.id, "front": c.front, "back": c.back,
+                            "has_front_image": c.has_front_image, "has_back_image": c.has_back_image})
         if rev is not None and rev.due > now and (next_due is None or rev.due < next_due):
             next_due = rev.due
     # Auch geplante Stapel zaehlen: rollt einer frueher aus als die naechste

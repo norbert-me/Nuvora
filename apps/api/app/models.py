@@ -920,10 +920,26 @@ class Card(Base):
     deck_id: Mapped[int] = mapped_column(ForeignKey("card_decks.id", ondelete="CASCADE"), index=True)
     front: Mapped[str] = mapped_column(Text, default="", server_default="")
     back: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # Optionales Bild je Seite (oben-zentral über dem Text). Der Blob ist deferred,
+    # damit Listen-Queries ihn nicht mitladen; die kleine mime-Spalte ist immer da
+    # und signalisiert, OB ein Bild existiert (has_*_image). Ausgeliefert wird der
+    # Blob nur über einen eigenen Endpoint (Lehrkraft mit Login, SuS per Token).
+    front_image: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True, deferred=True)
+    front_image_mime: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    back_image: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True, deferred=True)
+    back_image_mime: Mapped[str] = mapped_column(String(120), default="", server_default="")
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     deck: Mapped[CardDeck] = relationship(back_populates="cards")
+
+    @property
+    def has_front_image(self) -> bool:
+        return bool(self.front_image_mime)
+
+    @property
+    def has_back_image(self) -> bool:
+        return bool(self.back_image_mime)
 
 
 class CardReview(Base):

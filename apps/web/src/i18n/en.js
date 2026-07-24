@@ -978,6 +978,8 @@ export default {
   "karten.cards": "cards",
   "karten.latexHint": "LaTeX in $…$ (e.g. $a^2+b^2$)",
   "karten.jsonTemplate": "Example JSON",
+  "karten.imgAdd": "Add image",
+  "karten.imgRemove": "Remove image",
   "karten.front": "Front",
   "karten.back": "Back",
   "karten.delDeck": "Delete deck “{{name}}”? All its cards go with it.",

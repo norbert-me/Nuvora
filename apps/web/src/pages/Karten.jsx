@@ -5,6 +5,7 @@ import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
 import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, selectStyle, modalOverlay, modalPanel, Empty, Skeleton } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
+import AuthImage from "../components/AuthImage.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
@@ -568,6 +569,15 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   const saveDeck = (patch) => call(() => fetch(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", folder_id: deck.folder_id ?? null, ...patch }) }));
   const setTopic = (tid) => saveDeck({ topic_id: tid ? Number(tid) : null });
   const setNiveau = (n) => saveDeck({ niveau: n });
+  // Karten-Bilder je Seite (oben-zentral). imgVer erzwingt ein Neu-Laden der
+  // Vorschau nach Upload/Löschen (gleiche URL, neuer Inhalt).
+  const [imgVer, setImgVer] = useState(0);
+  const uploadCardImg = (cardId, side, file) => {
+    if (!file) return;
+    const fd = new FormData(); fd.append("file", file);
+    call(() => fetch(`${API}/cards/${cardId}/image/${side}`, { method: "POST", body: fd })).then(() => setImgVer((v) => v + 1));
+  };
+  const removeCardImg = (cardId, side) => call(() => fetch(`${API}/cards/${cardId}/image/${side}`, { method: "DELETE" })).then(() => setImgVer((v) => v + 1));
   const exportDeck = () => {
     const data = { type: "nuvora_karten_deck", version: 1, name: deck.name || "", cards: deck.cards.map((c) => ({ front: c.front, back: c.back })) };
     const a = document.createElement("a");
@@ -689,8 +699,10 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         </div>
       )}
       {deck.cards.map((c) => (
-        <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 13.5 }}>
+        <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 13.5 }}>
+          <CardImgCtl cardId={c.id} side="front" has={c.has_front_image} imgVer={imgVer} onUpload={uploadCardImg} onRemove={removeCardImg} t={t} />
           <span style={{ flex: 1, minWidth: 0 }}><strong><Latex>{c.front}</Latex></strong> <span style={{ color: "var(--text3)" }}>→ <Latex>{c.back}</Latex></span></span>
+          <CardImgCtl cardId={c.id} side="back" has={c.has_back_image} imgVer={imgVer} onUpload={uploadCardImg} onRemove={removeCardImg} t={t} />
           <button onClick={() => call(() => fetch(`${API}/cards/${c.id}`, { method: "DELETE" }))} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
         </div>
       ))}
@@ -719,6 +731,25 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         onClose={() => setImporting(false)}
         onImport={async (cards) => call(() => fetch(`${API}/decks/${deck.id}/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cards }) }))} />}
     </div>
+  );
+}
+
+// Bild-Steuerung je Kartenseite: Thumbnail + Entfernen, sonst Upload-Knopf.
+function CardImgCtl({ cardId, side, has, imgVer, onUpload, onRemove, t }) {
+  if (has) {
+    return (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
+        <AuthImage src={`${API}/cards/${cardId}/image/${side}`} reloadKey={imgVer}
+          style={{ height: 32, width: 32, objectFit: "cover", borderRadius: 6, border: "1px solid var(--border2)" }} />
+        <button onClick={() => onRemove(cardId, side)} className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={t("karten.imgRemove")}><Icon d={ICONS.close} size={12} color={C.danger} /></button>
+      </span>
+    );
+  }
+  return (
+    <label className="icon-btn" style={{ ...iconBtn, padding: 3, cursor: "pointer", flexShrink: 0 }} title={`${t("karten.imgAdd")} (${side === "front" ? t("karten.front") : t("karten.back")})`}>
+      <Icon d={ICONS.upload} size={14} color="var(--text3)" />
+      <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files[0]; e.target.value = ""; onUpload(cardId, side, f); }} />
+    </label>
   );
 }
 
