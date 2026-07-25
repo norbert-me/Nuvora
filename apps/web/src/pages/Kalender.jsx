@@ -270,7 +270,7 @@ export default function Kalender() {
   }, [view, cursor]); // eslint-disable-line
 
   const save = async (e) => {
-    const body = { date: isoDay(e.date), title: e.title || "", notes: e.notes || "", class_id: e.class_id || null, kurs_id: e.kurs_id ?? null, topic_id: e.topic_id || null, method_id: e.method_id || null, period: e.period ?? null, start_time: e.start_time || "", end_time: e.end_time || "", cardvote_set_id: e.cardvote_set_id || null, karten_deck_id: e.karten_deck_id || null, lernpfad_ladder_id: e.lernpfad_ladder_id || null, codedetektiv_puzzle: e.codedetektiv_puzzle || null };
+    const body = { date: isoDay(e.date), title: e.title || "", notes: e.notes || "", verlaufsplan: Array.isArray(e.verlaufsplan) ? e.verlaufsplan : [], class_id: e.class_id || null, kurs_id: e.kurs_id ?? null, topic_id: e.topic_id || null, method_id: e.method_id || null, period: e.period ?? null, start_time: e.start_time || "", end_time: e.end_time || "", cardvote_set_id: e.cardvote_set_id || null, karten_deck_id: e.karten_deck_id || null, lernpfad_ladder_id: e.lernpfad_ladder_id || null, codedetektiv_puzzle: e.codedetektiv_puzzle || null };
     const res = await fetch(e.id ? `${API}/entries/${e.id}` : `${API}/entries`, {
       method: e.id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     }).catch(() => null);
@@ -1200,6 +1200,11 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   };
   const [title, setTitle] = useState(entry.title || "");
   const [notes, setNotes] = useState(entry.notes || "");
+  const [verlauf, setVerlauf] = useState(Array.isArray(entry.verlaufsplan) ? entry.verlaufsplan : []);
+  const addPhase = () => setVerlauf((v) => [...v, { phase: "", dauer: "", text: "" }]);
+  const setPhase = (i, k, val) => setVerlauf((v) => v.map((p, j) => (j === i ? { ...p, [k]: val } : p)));
+  const delPhase = (i) => setVerlauf((v) => v.filter((_, j) => j !== i));
+  const movePhase = (i, dir) => setVerlauf((v) => { const j = i + dir; if (j < 0 || j >= v.length) return v; const n = [...v]; [n[i], n[j]] = [n[j], n[i]]; return n; });
   const [classId, setClassId] = useState(entry.class_id || "");
   const [kursId, setKursId] = useState(entry.kurs_id ?? null); // gewaehlter Kurs — richtige Auflösung beim Bearbeiten
   const [topicId, setTopicId] = useState(entry.topic_id || "");
@@ -1320,7 +1325,21 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
               </div>
             )}
             {notes && <div style={{ marginTop: 14, fontSize: 13.5, whiteSpace: "pre-wrap", color: "var(--text2)" }}>{notes}</div>}
-            {!clsName && !topName && !methName && !linkList.length && !notes && <p style={{ fontSize: 13.5, color: "var(--text3)", marginTop: 8 }}>{t("kalender.emptyEntry")}</p>}
+            {verlauf.length > 0 && (
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>{t("kalender.verlauf")}</div>
+                {verlauf.map((p, i) => (
+                  <div key={i} style={{ display: "flex", gap: 10, padding: "6px 0", borderTop: i ? "1px solid var(--border)" : "none" }}>
+                    <div style={{ minWidth: 96, flexShrink: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 600 }}>{p.phase || "—"}</div>
+                      {p.dauer && <div style={{ fontSize: 12, color: "var(--text3)" }}>{p.dauer}</div>}
+                    </div>
+                    <div style={{ flex: 1, fontSize: 13.5, color: "var(--text2)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{p.text}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {!clsName && !topName && !methName && !linkList.length && !notes && !verlauf.length && <p style={{ fontSize: 13.5, color: "var(--text3)", marginTop: 8 }}>{t("kalender.emptyEntry")}</p>}
             {/* Material an dieser Stunde — nur beim gespeicherten Eintrag. */}
             {entry.id && <div style={{ marginTop: 14 }}><MaterialPanel entryId={entry.id} /></div>}
             <div style={{ display: "flex", gap: 8, marginTop: 20, alignItems: "center" }}>
@@ -1435,8 +1454,28 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         })()}
         <div style={lbl}>{t("kalender.notes")}</div>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...fld, resize: "vertical" }} />
+
+        {/* Verlaufsplan: einfache Phasenliste (Phase + Dauer + Freitext). */}
+        <div style={{ ...lbl, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ flex: 1 }}>{t("kalender.verlauf")}</span>
+          <button onClick={addPhase} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("kalender.verlaufAdd")}><Icon d={ICONS.plus} size={15} color="var(--accent)" /></button>
+        </div>
+        {verlauf.length === 0 && <div style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 4 }}>{t("kalender.verlaufEmpty")}</div>}
+        {verlauf.map((p, i) => (
+          <div key={i} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 8, marginBottom: 6, background: "var(--bg)" }}>
+            <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
+              <input value={p.phase} onChange={(e) => setPhase(i, "phase", e.target.value)} placeholder={t("kalender.verlaufPhase")} style={{ ...fld, flex: 1, padding: "6px 8px" }} />
+              <input value={p.dauer} onChange={(e) => setPhase(i, "dauer", e.target.value)} placeholder={t("kalender.verlaufDauer")} style={{ ...fld, width: 70, padding: "6px 8px" }} />
+              <button onClick={() => movePhase(i, -1)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title="↑" disabled={i === 0}><span style={{ color: i === 0 ? "var(--text3)" : "var(--text2)" }}>↑</span></button>
+              <button onClick={() => movePhase(i, 1)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title="↓" disabled={i === verlauf.length - 1}><span style={{ color: i === verlauf.length - 1 ? "var(--text3)" : "var(--text2)" }}>↓</span></button>
+              <button onClick={() => delPhase(i)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title={t("common.delete")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button>
+            </div>
+            <textarea value={p.text} onChange={(e) => setPhase(i, "text", e.target.value)} rows={2} placeholder={t("kalender.verlaufText")} style={{ ...fld, resize: "vertical", padding: "6px 8px" }} />
+          </div>
+        ))}
+
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
-          <button onClick={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, title, notes, start_time: startTime || "", end_time: endTime || "", class_id: classId ? Number(classId) : null, kurs_id: classId ? (kursId ?? null) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })} disabled={timeInvalid} style={{ ...btnPrimary, opacity: timeInvalid ? 0.5 : 1 }}>{t("common.save")}</button>
+          <button onClick={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, title, notes, start_time: startTime || "", end_time: endTime || "", verlaufsplan: verlauf.filter((p) => (p.phase || p.text || p.dauer)).map((p) => ({ phase: p.phase || "", dauer: p.dauer || "", text: p.text || "" })), class_id: classId ? Number(classId) : null, kurs_id: classId ? (kursId ?? null) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })} disabled={timeInvalid} style={{ ...btnPrimary, opacity: timeInvalid ? 0.5 : 1 }}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
           {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
         </div>

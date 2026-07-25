@@ -588,6 +588,8 @@ class CalendarEntry(Base):
     # getakteter Termin (hat Vorrang vor der period-Uhrzeit im ICS/Tagesplan).
     start_time: Mapped[str] = mapped_column(String(5), default="", server_default="")
     end_time: Mapped[str] = mapped_column(String(5), default="", server_default="")
+    # Verlaufsplan: einfache Phasenliste [{phase, dauer, text}] für die Stunde.
+    verlaufsplan: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     # Verknuepfte Modul-Objekte (Regel 3: alle optional, ON DELETE SET NULL —
     # der Eintrag bleibt ohne das jeweilige Modul voll nutzbar). CardVote-Quiz,
     # Karten-Deck (wird am Kalendertag freigeschaltet), Lernpfad-Lernleiter.

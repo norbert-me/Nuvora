@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, field_validator
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -53,10 +53,17 @@ async def _check_kurs(db: AsyncSession, user: User, kurs_id: Optional[int]) -> N
         raise HTTPException(404, "Kurs nicht gefunden")
 
 
+class PhaseItem(BaseModel):
+    phase: str = ""
+    dauer: str = ""
+    text: str = ""
+
+
 class EntryIn(BaseModel):
     date: datetime
     title: str = ""
     notes: str = ""
+    verlaufsplan: List[PhaseItem] = []
     class_id: Optional[int] = None
     kurs_id: Optional[int] = None   # gewaehlter Kurs (Fach) — Anzeige beim Bearbeiten
     topic_id: Optional[int] = None
@@ -80,6 +87,11 @@ class EntryIn(BaseModel):
 class EntryOut(EntryIn):
     id: int
     model_config = {"from_attributes": True}
+
+    @field_validator("verlaufsplan", mode="before")
+    @classmethod
+    def _vp_none(cls, v):
+        return v or []
 
 
 @router.get("/entries", response_model=List[EntryOut])
