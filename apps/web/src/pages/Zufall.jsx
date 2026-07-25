@@ -2,7 +2,7 @@
 // Klasse. Reiner Client: liest nur die Kern-Klassen, speichert nichts.
 // "Ohne Wiederholung" merkt sich die schon Gezogenen, bis die Klasse durch ist.
 import { useState, useEffect, useMemo } from "react";
-import { pageTitle, btnPrimary, btnSecondary, selectStyle, Toggle } from "../components/Icons.jsx";
+import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Toggle, Tabs } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
@@ -27,6 +27,10 @@ export default function Zufall() {
   const [absent, setAbsent] = useState(new Set()); // heute abwesende IDs
   const [aktuell, setAktuell] = useState(null);
   const [rollt, setRollt] = useState(false);
+  const [tab, setTab] = useState("ziehen");        // ziehen | gruppen
+  const [groupMode, setGroupMode] = useState("count"); // count = Anzahl Gruppen | size = SuS je Gruppe
+  const [groupN, setGroupN] = useState(4);
+  const [groups, setGroups] = useState([]);
 
   useEffect(() => {
     return swr("classes", "/api/classes", (d) => {
@@ -115,21 +119,64 @@ export default function Zufall() {
   // Gedächtnis für die Fairness bleibt bewusst erhalten.
   const reset = () => { setGezogen([]); setAktuell(null); };
 
+  // Zufallsgruppen: anwesende SuS mischen und gleichmäßig (Round-Robin) verteilen.
+  const makeGroups = () => {
+    const pool = [...(anwesend.length ? anwesend : students)];
+    for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+    if (!pool.length) { setGroups([]); return; }
+    const k = groupMode === "count"
+      ? Math.max(1, Math.min(Math.round(groupN) || 1, pool.length))
+      : Math.max(1, Math.ceil(pool.length / Math.max(1, Math.round(groupN) || 1)));
+    const gs = Array.from({ length: k }, () => []);
+    pool.forEach((s, i) => gs[i % k].push(s));
+    setGroups(gs);
+  };
+
   return (
     <div style={{ maxWidth: 640, margin: "0 auto" }}>
       <h1 style={pageTitle}>{t("zufall.title")}</h1>
 
+      <div style={{ marginBottom: 16 }}>
+        <Tabs value={tab} onChange={setTab} options={[["ziehen", t("zufall.tabDraw")], ["gruppen", t("zufall.tabGroups")]]} />
+      </div>
+
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
         <KursKlasseSelect value={classId} onChange={setClassId} />
-        <Toggle checked={ohneWdh} onChange={setOhneWdh} label={t("zufall.noRepeat")} />
-        <Toggle checked={gewichtet} onChange={setGewichtet} label={t("zufall.weighted")} />
+        {tab === "ziehen" && <Toggle checked={ohneWdh} onChange={setOhneWdh} label={t("zufall.noRepeat")} />}
+        {tab === "ziehen" && <Toggle checked={gewichtet} onChange={setGewichtet} label={t("zufall.weighted")} />}
         {anwesenheitAktiv && <Toggle checked={skipAbs} onChange={setSkipAbs} label={t("zufall.skipAbsent")} />}
       </div>
+
+      {tab === "gruppen" && (
+        students.length === 0 ? <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("zufall.noStudents")}</p> : (
+        <>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
+            <select value={groupMode} onChange={(e) => setGroupMode(e.target.value)} style={{ ...selectStyle }}>
+              <option value="count">{t("zufall.byCount")}</option>
+              <option value="size">{t("zufall.bySize")}</option>
+            </select>
+            <input type="number" min="1" max="30" value={groupN} onChange={(e) => setGroupN(e.target.value)} style={{ ...inputStyle, width: 80, padding: "8px 10px" }} />
+            <button onClick={makeGroups} style={btnPrimary}>{groups.length ? t("zufall.reroll") : t("zufall.makeGroups")}</button>
+          </div>
+          {groups.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+              {groups.map((g, i) => (
+                <div key={i} style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 14 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--accent)", marginBottom: 8 }}>{t("zufall.group", { n: i + 1 })} <span style={{ color: "var(--text3)", fontWeight: 400 }}>· {g.length}</span></div>
+                  {g.map((s) => <div key={s.id} style={{ fontSize: 14, padding: "3px 0" }}>{s.name}</div>)}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+        )
+      )}
+
       {skipAbs && anwesenheitAktiv && absent.size > 0 && (
         <p style={{ fontSize: 12.5, color: "var(--text3)", marginTop: -8, marginBottom: 16 }}>{t("zufall.absentSkipped", { n: absent.size })}</p>
       )}
 
-      {students.length === 0 ? (
+      {tab === "ziehen" && (students.length === 0 ? (
         <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("zufall.noStudents")}</p>
       ) : (
         <>
@@ -151,7 +198,7 @@ export default function Zufall() {
             )}
           </div>
         </>
-      )}
+      ))}
     </div>
   );
 }
