@@ -105,6 +105,7 @@ export default function Kalender() {
   const [examOverview, setExamOverview] = useState([]); // Klassenarbeiten-Übersicht (kommend + Reststunden)
   const loadExams = () => fetch(`${API}/klassenarbeiten/uebersicht`).then((r) => (r.ok ? r.json() : [])).then((d) => setExamOverview(Array.isArray(d) ? d : [])).catch(() => {});
   const addExam = async (body) => { await fetch(`${API}/klassenarbeiten`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {}); loadExams(); };
+  const updExam = async (id, body) => { await fetch(`${API}/klassenarbeiten/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {}); loadExams(); };
   const delExam = async (id) => { await fetch(`${API}/klassenarbeiten/${id}`, { method: "DELETE" }).catch(() => {}); loadExams(); };
   useEffect(() => { if (view === "klassenarbeit") loadExams(); /* eslint-disable-next-line */ }, [view]);
   const [wdhVorschlag, setWdhVorschlag] = useState([]); // schwache Themen der Vorwoche
@@ -482,7 +483,7 @@ export default function Kalender() {
         </div>
       )}
       {view === "breaks" && <BreaksPanel breaks={breaks} onAdd={addBreak} onDel={delBreak} t={t} standalone />}
-      {view === "klassenarbeit" && <ExamPanel overview={examOverview} onAdd={addExam} onDel={delExam} t={t} />}
+      {view === "klassenarbeit" && <ExamPanel overview={examOverview} onAdd={addExam} onUpd={updExam} onDel={delExam} t={t} />}
 
       {view === "today" && (
         <HeuteView t={t} tt={tt} weekdayOf={weekdayOf} byDay={byDay}
@@ -1073,11 +1074,21 @@ function TimetableView({ tt, className, slotName, slotColor, classColor, topicNa
 // blendet der Kalender Vorlagen und Eintraege aus. Eigener Tab (standalone).
 // Klassenarbeiten planen + Übersicht: je kommender Klassenarbeit die bis dahin
 // verbleibenden Stundenplan-Stunden (freie Tage/Ausfälle bereits abgezogen).
-function ExamPanel({ overview, onAdd, onDel, t }) {
+function ExamPanel({ overview, onAdd, onUpd, onDel, t }) {
   const [classId, setClassId] = useState("");
   const [kursId, setKursId] = useState(null);
   const [date, setDate] = useState("");
   const [title, setTitle] = useState("");
+  const [editId, setEditId] = useState(null);
+  const [eDate, setEDate] = useState("");
+  const [eTitle, setETitle] = useState("");
+  const startEdit = (e) => { setEditId(e.id); setEDate(ymd(new Date(e.date))); setETitle(e.title || ""); };
+  const saveEdit = (e) => {
+    if (!eDate) return;
+    const [y, m, d] = eDate.split("-").map(Number);
+    onUpd(e.id, { class_id: e.class_id ?? null, kurs_id: e.kurs_id ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: eTitle.trim() });
+    setEditId(null);
+  };
   const save = () => {
     if (!classId || !date) return;
     const [y, m, d] = date.split("-").map(Number);
@@ -1104,15 +1115,30 @@ function ExamPanel({ overview, onAdd, onDel, t }) {
         <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("kalender.examsEmpty")}</p>
       ) : overview.map((e) => (
         <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", marginBottom: 8 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 700, fontSize: 15 }}>{e.kurs || e.klasse || "—"}{e.title ? ` · ${e.title}` : ""}</div>
-            <div style={{ fontSize: 12.5, color: "var(--text3)" }}>{new Date(e.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
-          </div>
-          <div style={{ textAlign: "right", flexShrink: 0 }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: "var(--accent)" }}>{e.stunden}</div>
-            <div style={{ fontSize: 11, color: "var(--text3)" }}>{t("kalender.examStunden")}</div>
-          </div>
-          <button onClick={() => onDel(e.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>
+          {editId === e.id ? (
+            <>
+              <div style={{ flex: 1, minWidth: 0, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <span style={{ fontWeight: 700, fontSize: 14 }}>{e.kurs || e.klasse || "—"}</span>
+                <input type="date" value={eDate} onChange={(ev) => setEDate(ev.target.value)} style={{ ...inputStyle, padding: "6px 8px" }} />
+                <input value={eTitle} onChange={(ev) => setETitle(ev.target.value)} placeholder={t("kalender.examTitle")} style={{ ...inputStyle, flex: 1, minWidth: 120, padding: "6px 8px" }} />
+              </div>
+              <button onClick={() => saveEdit(e)} style={{ ...btnPrimary, padding: "5px 12px" }}>{t("common.save")}</button>
+              <button onClick={() => setEditId(null)} style={{ ...btnSecondary, padding: "5px 12px" }}>{t("common.abort")}</button>
+            </>
+          ) : (
+            <>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>{e.kurs || e.klasse || "—"}{e.title ? ` · ${e.title}` : ""}</div>
+                <div style={{ fontSize: 12.5, color: "var(--text3)" }}>{new Date(e.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontSize: 20, fontWeight: 800, color: "var(--accent)" }}>{e.stunden}</div>
+                <div style={{ fontSize: 11, color: "var(--text3)" }}>{t("kalender.examStunden")}</div>
+              </div>
+              <button onClick={() => startEdit(e)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
+              <button onClick={() => onDel(e.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>
+            </>
+          )}
         </div>
       ))}
     </div>
