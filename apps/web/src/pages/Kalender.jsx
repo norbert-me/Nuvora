@@ -493,7 +493,7 @@ export default function Kalender() {
           heuteAbsent={heuteAbsent} orgaAktiv={!!aktiv.orga} onOpen={setEditing} onSlot={fromSlot} />
       )}
 
-      {view === "month" && <MonthGrid extColor={extColor} range={range} cursor={cursor} byDay={byDayV} extByDay={extByDayV} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} slotName={slotName} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
+      {view === "month" && <MonthGrid extColor={extColor} range={range} cursor={cursor} byDay={byDayV} extByDay={extByDayV} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} kursName={kursName} slotName={slotName} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
       {view === "week" && wdhVorschlag.length > 0 && (
         <div style={{ marginBottom: 12, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)" }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t("kalender.wdhTitle")}</div>
@@ -509,7 +509,7 @@ export default function Kalender() {
           </div>
         </div>
       )}
-      {view === "week" && <WeekView extColor={extColor} range={range} byDay={byDayV} extByDay={extByDayV} slotsFor={slotsFor} frei={frei} className={className} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
+      {view === "week" && <WeekView extColor={extColor} range={range} byDay={byDayV} extByDay={extByDayV} slotsFor={slotsFor} frei={frei} className={className} kursName={kursName} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
       {view === "day" && <DayView extColor={extColor} day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} slotsFor={slotsFor} cancelledFor={cancelledFor} onCancelSlot={cancelSlot} onRestoreSlot={restoreSlot} frei={frei} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
       {view === "timetable" && <TimetableView tt={tt} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
@@ -609,13 +609,15 @@ function ExtChips({ list, onOpen, extColor }) {
   ));
 }
 
-function EntryChips({ list, className, topicName, onOpen, classColor }) {
+function EntryChips({ list, className, kursName = () => "", topicName, onOpen, classColor }) {
+  // Anzeige denkt in Kursen: liegt ein Kurs am Eintrag, dessen Namen (Fach) zeigen,
+  // sonst die Fach-Klasse.
+  const nameOf = (e) => (e.kurs_id && kursName(e.kurs_id)) || (className && className(e.class_id)) || "";
   return list.map((e) => {
     const col = e.class_id && classColor ? classColor(e.class_id) : null;
-    // Zweizeilig: Titel oben, darunter Uhrzeit + Klasse gedaempft. Der Titel darf
-    // bis zu zwei Zeilen umbrechen, die Meta-Zeile bleibt einzeilig.
-    const titel = e.title || topicName(e.topic_id) || (className && className(e.class_id)) || "—";
-    const meta = [e.start_time || null, className ? className(e.class_id) : null].filter(Boolean).join(" · ");
+    // Zweizeilig: Titel oben, darunter Uhrzeit + Kurs/Klasse gedaempft.
+    const titel = e.title || topicName(e.topic_id) || nameOf(e) || "—";
+    const meta = [e.start_time || null, nameOf(e) || null].filter(Boolean).join(" · ");
     return (
       <button key={e.id} onClick={(ev) => { ev.stopPropagation(); onOpen({ ...e, date: new Date(e.date) }); }}
         style={{ ...chip, whiteSpace: "normal", marginTop: 3, width: "100%", lineHeight: 1.25, ...(col ? { background: col + "22", color: "var(--text)", borderLeft: `3px solid ${col}` } : {}) }}
@@ -715,7 +717,7 @@ function HeuteView({ t, tt, weekdayOf, byDay, className, slotName, slotColor, cl
   );
 }
 
-function MonthGrid({ extColor, range, cursor, byDay, extByDay, slotsFor, onSlot, frei, className, slotName, topicName, classColor, onAdd, onOpen, onExt, onDayView, onWeekView, t }) {
+function MonthGrid({ extColor, range, cursor, byDay, extByDay, slotsFor, onSlot, frei, className, kursName, slotName, topicName, classColor, onAdd, onOpen, onExt, onDayView, onWeekView, t }) {
   const days = [];
   for (let d = new Date(range[0]); d <= range[1]; d = addDays(d, 1)) days.push(new Date(d));
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
@@ -768,7 +770,7 @@ function MonthGrid({ extColor, range, cursor, byDay, extByDay, slotsFor, onSlot,
                       {!f && <button onClick={(e) => { e.stopPropagation(); onAdd(d); }} className="icon-btn" style={{ ...iconBtn, padding: 0 }} title={t("kalender.add")}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>}
                     </div>
                     {f ? <FreiMarker label={f.label} t={t} /> : (<>
-                      <EntryChips list={byDay(d)} className={className} topicName={topicName} onOpen={onOpen} classColor={classColor} />
+                      <EntryChips list={byDay(d)} className={className} kursName={kursName} topicName={topicName} onOpen={onOpen} classColor={classColor} />
                       <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} extColor={extColor} />
                       {slotsFor && <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} slotName={slotName} topicName={topicName} onSlot={onSlot} day={d} t={t} />}
                     </>)}
@@ -785,7 +787,7 @@ function MonthGrid({ extColor, range, cursor, byDay, extByDay, slotsFor, onSlot,
   );
 }
 
-function WeekView({ extColor, range, byDay, extByDay, slotsFor, frei, className, slotName, classColor, topicName, onAdd, onOpen, onExt, onSlot, onDayView, t }) {
+function WeekView({ extColor, range, byDay, extByDay, slotsFor, frei, className, kursName, slotName, classColor, topicName, onAdd, onOpen, onExt, onSlot, onDayView, t }) {
   const days = [];
   for (let d = new Date(range[0]); d <= range[1]; d = addDays(d, 1)) days.push(new Date(d));
   return (
@@ -801,7 +803,7 @@ function WeekView({ extColor, range, byDay, extByDay, slotsFor, frei, className,
           </div>
           {f ? <FreiMarker label={f.label} t={t} /> : (<>
             <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} slotName={slotName} topicName={topicName} onSlot={onSlot} day={d} t={t} />
-            <EntryChips list={byDay(d)} className={className} topicName={topicName} onOpen={onOpen} classColor={classColor} />
+            <EntryChips list={byDay(d)} className={className} kursName={kursName} topicName={topicName} onOpen={onOpen} classColor={classColor} />
             <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} extColor={extColor} />
           </>)}
         </div>
