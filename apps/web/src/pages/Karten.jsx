@@ -629,6 +629,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   // Karten-Papierkorb je Stapel (Soft-Delete): auflisten, wiederherstellen, endgültig löschen.
   const [cardTrashOpen, setCardTrashOpen] = useState(false);
   const [cardTrash, setCardTrash] = useState([]);
+  const [studying, setStudying] = useState(false); // Lernmodus (Karten durchgehen)
   const loadCardTrash = () => fetch(`${API}/decks/${deck.id}/cards/trash`).then((r) => (r.ok ? r.json() : [])).then((d) => setCardTrash(Array.isArray(d) ? d : [])).catch(() => {});
   const toggleCardTrash = () => { const n = !cardTrashOpen; setCardTrashOpen(n); if (n) loadCardTrash(); };
   const restoreCard = (id) => call(() => fetch(`${API}/cards/${id}/restore`, { method: "POST" })).then(loadCardTrash);
@@ -750,6 +751,9 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{deck.cards.length} {t("karten.cards")}</span>
         {!collapsed && (<>
+          {cards.length > 0 && (
+            <button onClick={() => setStudying(true)} className="icon-btn" style={iconBtn} title={t("karten.study")}><Icon d={ICONS.eye} size={18} color="var(--accent)" /></button>
+          )}
           {deck.cards.length > 0 && (
             <button onClick={exportDeck} className="icon-btn" style={iconBtn} title={t("karten.export")}><Icon d={ICONS.export} size={18} /></button>
           )}
@@ -837,6 +841,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         <CardEditModal card={{ id: null, front: "", back: "", has_front_image: false, has_back_image: false }} imgVer={imgVer}
           onSave={(_id, f, b) => createCard(f, b)} onClose={() => setNewOpen(false)} t={t} />
       )}
+      {studying && <StudyModal cards={cards} deckName={deck.name || t("karten.deck")} t={t} onClose={() => setStudying(false)} />}
       {importing && <ImportModal deckName={deck.name || t("karten.deck")} t={t}
         onClose={() => setImporting(false)}
         onImport={async (cards) => call(() => fetch(`${API}/decks/${deck.id}/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cards }) }))} />}
@@ -845,6 +850,67 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
 }
 
 const menuRow = { display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "8px 10px", background: "none", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 13.5, color: "var(--text)", textAlign: "left" };
+
+// Lernmodus: Karten des Stapels durchgehen. Vorderseite → tippen/Leertaste
+// deckt die Rückseite auf → weiter. Nur zum Anschauen, speichert nichts.
+function StudyModal({ cards, deckName, t, onClose }) {
+  const shuffle = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const [order, setOrder] = useState(() => cards.map((_, i) => i));
+  const [pos, setPos] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const c = cards[order[pos]];
+  const go = (d) => { setFlipped(false); setPos((p) => Math.min(cards.length - 1, Math.max(0, p + d))); };
+  const flip = () => setFlipped((f) => !f);
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") { onClose(); }
+      else if (e.key === " " || e.key === "Enter") { e.preventDefault(); flipped ? go(1) : setFlipped(true); }
+      else if (e.key === "ArrowRight") go(1);
+      else if (e.key === "ArrowLeft") go(-1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [flipped]);
+  if (!c) return null;
+  const img = flipped ? (c.has_back_image ? "back" : null) : (c.has_front_image ? "front" : null);
+  const txt = flipped ? c.back : c.front;
+  const done = pos + 1;
+  return (
+    <div style={{ ...modalOverlay, background: "rgba(0,0,0,0.72)" }} {...overlayGuard(onClose)}>
+      <div style={{ width: "100%", maxWidth: 640, display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#fff" }}>
+          <strong style={{ fontSize: 15 }}>{deckName}</strong>
+          <span style={{ fontSize: 13, opacity: 0.7 }}>{done} / {cards.length}</span>
+          <span style={{ flex: 1 }} />
+          <button onClick={() => { setOrder(shuffle(cards.map((_, i) => i))); setPos(0); setFlipped(false); }} className="icon-btn" style={{ ...iconBtn, color: "#fff" }} title={t("zufall.reroll")}><Icon d={ICONS.shuffle} size={18} color="#fff" /></button>
+          <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, color: "#fff" }} title={t("common.close")}><Icon d={ICONS.close} size={18} color="#fff" /></button>
+        </div>
+        {/* Fortschrittsbalken */}
+        <div style={{ height: 4, borderRadius: 3, background: "rgba(255,255,255,0.18)", overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${(done / cards.length) * 100}%`, background: "var(--accent)", transition: "width .2s" }} />
+        </div>
+        {/* Karte: klick dreht */}
+        <div onClick={flip}
+          style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 18, minHeight: 300, padding: "40px 28px",
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18, cursor: "pointer", textAlign: "center" }}>
+          <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: flipped ? "var(--accent)" : "var(--text3)" }}>
+            {flipped ? t("karten.back") : t("karten.front")}
+          </span>
+          {img && <AuthImage src={`${API}/cards/${c.id}/image/${img}`} style={{ maxHeight: 200, maxWidth: "100%", objectFit: "contain", borderRadius: 10 }} />}
+          <div style={{ fontSize: 24, fontWeight: 600, lineHeight: 1.4 }}><Latex>{txt}</Latex></div>
+          {!flipped && <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("karten.tapToFlip")}</span>}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button onClick={() => go(-1)} disabled={pos === 0} style={{ ...btnSecondary, opacity: pos === 0 ? 0.4 : 1 }}>← {t("karten.prev")}</button>
+          <button onClick={flip} style={{ ...btnSecondary, flex: 1 }}>{flipped ? t("karten.showFront") : t("karten.reveal")}</button>
+          {pos + 1 < cards.length
+            ? <button onClick={() => go(1)} style={{ ...btnPrimary }}>{t("karten.next")} →</button>
+            : <button onClick={onClose} style={{ ...btnPrimary }}>{t("karten.finish")}</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // Karte bearbeiten im Popup: Vorder-/Rückseite als Text + Bild-Upload je Seite.
 function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t }) {
