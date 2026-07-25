@@ -619,6 +619,13 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   // Karte bearbeiten (Text + Bilder) — in einem Popup.
   const [editCard, setEditCard] = useState(null); // Karten-id im Edit
   const saveEditCard = (id, front, back) => call(() => fetch(`${API}/cards/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ front, back }) })).then(() => setEditCard(null));
+  // Neue Karte per Popup (wie Bearbeiten) statt Inline-Formular.
+  const [newOpen, setNewOpen] = useState(false);
+  const createCard = async (frontV, backV) => {
+    if (!frontV.trim() && !backV.trim()) return;
+    await call(() => fetch(`${API}/decks/${deck.id}/cards`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ front: frontV.trim(), back: backV.trim() }) }));
+    setNewOpen(false);
+  };
   const onCardDragOver = (e, id) => {
     e.preventDefault();
     if (dragCard == null || id === dragCard) { setCardDrop(null); return; }
@@ -799,27 +806,14 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         <CardEditModal card={cards.find((c) => c.id === editCard)} imgVer={imgVer} onUpload={uploadCardImg} onRemove={removeCardImg}
           onSave={saveEditCard} onClose={() => setEditCard(null)} t={t} />
       )}
-      <form onSubmit={add} style={{ marginTop: 10 }}>
-        {/* LaTeX-Schnelltasten: fügen die Formel ins zuletzt fokussierte Feld. */}
-        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>
-          {LATEX_BUTTONS.map((b) => (
-            <button key={b.label} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insertLatex(b.tex, b.cursor)}
-              style={{ padding: "3px 8px", fontSize: 13, border: "1px solid var(--border2)", borderRadius: 6, background: "var(--card)", cursor: "pointer", fontFamily: "serif", color: "var(--text)" }}>{b.label}</button>
-          ))}
-          <span style={{ fontSize: 11, color: "var(--text3)", marginLeft: 4 }}>{t("karten.latexHint")}</span>
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <input ref={frontRef} onFocus={() => (activeField.current = "front")} value={front} onChange={(e) => setFront(e.target.value)} placeholder={t("karten.front")} style={{ flex: 1, minWidth: 120, ...inp }} />
-          <input ref={backRef} onFocus={() => (activeField.current = "back")} value={back} onChange={(e) => setBack(e.target.value)} placeholder={t("karten.back")} style={{ flex: 1, minWidth: 120, ...inp }} />
-          <button type="submit" disabled={busy || !front.trim() || !back.trim()} style={{ ...btnPrimary, padding: "6px 14px", opacity: (!busy && front.trim() && back.trim()) ? 1 : 0.4 }}>{t("common.add")}</button>
-        </div>
-        {(front.includes("$") || back.includes("$")) && (
-          <div style={{ marginTop: 8, padding: "8px 12px", background: "var(--bg2)", borderRadius: 8, fontSize: 14 }}>
-            <Latex>{front}</Latex> <span style={{ color: "var(--text3)" }}>→ <Latex>{back}</Latex></span>
-          </div>
-        )}
-      </form>
+      <div style={{ marginTop: 10 }}>
+        <button onClick={() => setNewOpen(true)} style={{ ...btnPrimary, padding: "8px 16px", display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} color="#fff" /> {t("karten.newCard")}</button>
+      </div>
       </>)}
+      {newOpen && (
+        <CardEditModal card={{ id: null, front: "", back: "", has_front_image: false, has_back_image: false }} imgVer={imgVer}
+          onSave={(_id, f, b) => createCard(f, b)} onClose={() => setNewOpen(false)} t={t} />
+      )}
       {importing && <ImportModal deckName={deck.name || t("karten.deck")} t={t}
         onClose={() => setImporting(false)}
         onImport={async (cards) => call(() => fetch(`${API}/decks/${deck.id}/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cards }) }))} />}
@@ -860,7 +854,7 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t })
       onClick={(e) => { if (e.target === e.currentTarget && downOnOverlay.current) onClose(); }}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 480, maxHeight: "90vh", overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-          <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, flex: 1 }}>{t("karten.editCard")}</h3>
+          <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, flex: 1 }}>{card.id ? t("karten.editCard") : t("karten.newCard")}</h3>
           <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
         </div>
 
@@ -875,17 +869,23 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t })
 
         <div style={lbl}>{t("karten.front")}</div>
         <textarea ref={frontRef} onFocus={() => (activeField.current = "front")} value={front} onChange={(e) => setFront(e.target.value)} rows={2} style={inpS} />
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
-          <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("karten.imgFront")}</span>
-          <CardImgCtl cardId={card.id} side="front" has={card.has_front_image} imgVer={imgVer} onUpload={onUpload} onRemove={onRemove} t={t} />
-        </div>
+        {card.id && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("karten.imgFront")}</span>
+            <CardImgCtl cardId={card.id} side="front" has={card.has_front_image} imgVer={imgVer} onUpload={onUpload} onRemove={onRemove} t={t} />
+          </div>
+        )}
 
         <div style={lbl}>{t("karten.back")}</div>
         <textarea ref={backRef} onFocus={() => (activeField.current = "back")} value={back} onChange={(e) => setBack(e.target.value)} rows={2} style={inpS} />
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
-          <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("karten.imgBack")}</span>
-          <CardImgCtl cardId={card.id} side="back" has={card.has_back_image} imgVer={imgVer} onUpload={onUpload} onRemove={onRemove} t={t} />
-        </div>
+        {card.id ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("karten.imgBack")}</span>
+            <CardImgCtl cardId={card.id} side="back" has={card.has_back_image} imgVer={imgVer} onUpload={onUpload} onRemove={onRemove} t={t} />
+          </div>
+        ) : (
+          <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 6 }}>{t("karten.imgAfterSave")}</div>
+        )}
 
         {(front.includes("$") || back.includes("$")) && (
           <div style={{ marginTop: 12, padding: "8px 12px", background: "var(--bg2)", borderRadius: 8, fontSize: 14 }}>

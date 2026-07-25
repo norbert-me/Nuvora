@@ -1037,6 +1037,8 @@ export default {
   "karten.rollout": "Ausrollen",
   "karten.planTime": "Freischaltung um 7:00 Uhr morgens",
   "karten.planLabel": "Für später planen",
+  "karten.newCard": "Neue Karte",
+  "karten.imgAfterSave": "Bild lässt sich nach dem Speichern hinzufügen.",
   "karten.editCard": "Karte bearbeiten",
   "karten.imgAdd": "Bild hinzufügen",
   "karten.imgRemove": "Bild entfernen",
