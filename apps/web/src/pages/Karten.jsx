@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, selectStyle, modalOverlay, modalPanel, Empty, Skeleton } from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, selectStyle, overlayGuard, modalOverlay, modalPanel, Empty, Skeleton } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import AuthImage from "../components/AuthImage.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -485,7 +485,7 @@ function NotenBrueckeModal({ t, classId, kursId, progress, scale, onClose }) {
   };
 
   return (
-    <div onClick={onClose} style={modalOverlay}>
+    <div {...overlayGuard(onClose)} style={modalOverlay}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 440 }}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t("karten.toNoten")}</h3>
         <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 14px" }}>{t("karten.masteryHint", { n: grades.length })}</p>
@@ -525,7 +525,7 @@ function StudentDetail({ detail, t, onClose }) {
   }
   const rows = Object.entries(sets);
   return (
-    <div onClick={onClose} style={modalOverlay}>
+    <div {...overlayGuard(onClose)} style={modalOverlay}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 520 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
           <h3 style={{ fontSize: 17, fontWeight: 700, flex: 1 }}>{student.name}</h3>
@@ -948,7 +948,7 @@ function ImportModal({ deckName, onClose, onImport, t }) {
     if (ok) onClose();
   };
   return (
-    <div onClick={onClose} style={modalOverlay}>
+    <div {...overlayGuard(onClose)} style={modalOverlay}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 560 }}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>{t("karten.importTitle", { name: deckName })}</h3>
         <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 12px" }}>{t("karten.importHint")}</p>

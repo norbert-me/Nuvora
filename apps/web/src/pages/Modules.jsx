@@ -2,7 +2,7 @@
 // des Moduls bleiben im Kern liegen und sind nach dem Wiedereinschalten da.
 import { useState } from "react";
 import { useModules } from "../core/modules.js";
-import { StageBadge, Tabs, inputStyle, btnSecondary, COLORS as C, Icon, ICONS, iconBtn, modalOverlay, modalPanel } from "../components/Icons.jsx";
+import { StageBadge, Tabs, inputStyle, btnSecondary, COLORS as C, Icon, ICONS, iconBtn, overlayGuard, modalOverlay, modalPanel } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { pageTitle } from "../components/Icons.jsx";
 
@@ -172,7 +172,7 @@ export default function Modules() {
       })}
 
       {helpMod && (
-        <div onClick={() => setHelpMod(null)} style={modalOverlay}>
+        <div {...overlayGuard(() => setHelpMod(null))} style={modalOverlay}>
           <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 520, maxHeight: "86vh", overflowY: "auto" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
               <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, flex: 1 }}>{dispName(helpMod)}</h3>

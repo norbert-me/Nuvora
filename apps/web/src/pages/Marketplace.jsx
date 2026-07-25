@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { Icon, ICONS, modalOverlay, modalPanel, COLORS as C } from "../components/Icons.jsx";
+import { Icon, ICONS, overlayGuard, modalOverlay, modalPanel, COLORS as C } from "../components/Icons.jsx";
 
 const API = "/api";
 
@@ -216,7 +216,7 @@ export default function Marketplace({ fixedKind }) {
       )}
 
       {preview && (
-        <div onClick={() => setPreview(null)} style={modalOverlay}>
+        <div {...overlayGuard(() => setPreview(null))} style={modalOverlay}>
           <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 560 }}>
             {preview.loading ? (
               <p style={{ color: "var(--text3)", fontSize: 14, margin: 0 }}>{t("common.loading")}</p>
@@ -301,7 +301,7 @@ export default function Marketplace({ fixedKind }) {
       )}
 
       {copyDeckFor && (
-        <div onClick={() => setCopyDeckFor(null)} style={modalOverlay}>
+        <div {...overlayGuard(() => setCopyDeckFor(null))} style={modalOverlay}>
           <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 400 }}>
             <h3 style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 700, color: "var(--text)" }}>{t("market.chooseClass")}</h3>
             <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 14px" }}>{t("market.chooseClassHint", { title: copyDeckFor.title })}</p>

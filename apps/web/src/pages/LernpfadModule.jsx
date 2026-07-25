@@ -1,4 +1,4 @@
-import { modalOverlay, modalPanel } from "../components/Icons.jsx";
+import { overlayGuard, modalOverlay, modalPanel } from "../components/Icons.jsx";
 // Modul Lernpfad — nativ in die Shell eingebaut (kein eigener Container mehr).
 //
 // Die erprobte Vanilla-JS-App wurde ins Web-Projekt uebernommen: ihre Statik
@@ -98,7 +98,7 @@ export default function LernpfadModule() {
   return (
     <>
       {modal && (
-        <div onClick={() => setModal(null)} style={modalOverlay}>
+        <div {...overlayGuard(() => setModal(null))} style={modalOverlay}>
           <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 560 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
               <h3 style={{ fontSize: 17, fontWeight: 700, flex: 1, margin: 0 }}>{modal.title}</h3>

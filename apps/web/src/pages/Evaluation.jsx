@@ -3,7 +3,7 @@ import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
-import { DownloadLink, Icon, ICONS, btnPrimary, btnSecondary, modalOverlay, modalPanel, inputStyle, COLORS as C, Boxplot } from "../components/Icons.jsx";
+import { DownloadLink, Icon, ICONS, btnPrimary, btnSecondary, overlayGuard, modalOverlay, modalPanel, inputStyle, COLORS as C, Boxplot } from "../components/Icons.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
 
 const API = "/api";
@@ -980,7 +980,7 @@ function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
   };
 
   return (
-    <div onClick={onClose} style={modalOverlay}>
+    <div {...overlayGuard(onClose)} style={modalOverlay}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 460 }}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t("notenimp.title")}</h3>
         <p style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 16 }}>

@@ -12,7 +12,7 @@ import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, modalOverlay, modalPanel, popoverPanel, Empty, Skeleton, ExportButton, ImportButton } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, overlayGuard, modalOverlay, modalPanel, popoverPanel, Empty, Skeleton, ExportButton, ImportButton } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
@@ -782,7 +782,7 @@ function NotenStatistik({ noten, t }) {
 // Einfaches modales Popup fuer die Anlage-Formulare (Abschnitt/Spalte).
 function Modal({ title, onClose, children }) {
   return (
-    <div onClick={onClose} style={modalOverlay}>
+    <div {...overlayGuard(onClose)} style={modalOverlay}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 400 }}>
         {title && <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>{title}</h3>}
         {children}

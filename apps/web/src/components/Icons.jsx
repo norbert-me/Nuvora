@@ -212,6 +212,18 @@ export const modalPanel = {
   padding: 22, border: "1px solid var(--border)", boxShadow: "0 20px 50px rgba(0,0,0,0.3)",
   maxHeight: "88vh", overflow: "auto", boxSizing: "border-box",
 };
+// Overlay-Klick soll NUR schließen, wenn Maus-Down UND -Up wirklich auf dem
+// Overlay liegen. Eine Textauswahl, die im Panel startet und außerhalb endet,
+// darf das Modal nicht schließen (sonst Datenverlust). Ein Modul-Flag reicht,
+// da immer nur EINE Maus-Interaktion gleichzeitig läuft.
+// Nutzung: <div {...overlayGuard(onClose)} style={modalOverlay}>…</div>
+let _ovDown = false;
+export function overlayGuard(onClose) {
+  return {
+    onMouseDown: (e) => { _ovDown = e.target === e.currentTarget; },
+    onClick: (e) => { if (e.target === e.currentTarget && _ovDown) onClose(); },
+  };
+}
 // Schwebendes Panel (Dropdown, Menü, Tooltip, Sprung-Popover). NUR die Oberfläche —
 // Position/zIndex/minWidth je Aufrufer per Spread ergänzen:
 // { ...popoverPanel, position:"absolute", top:.., right:.., zIndex:.. }.
@@ -313,7 +325,7 @@ export function Modal({ children, onClose, width = 480, style }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   return (
-    <div onClick={onClose} style={modalOverlay}>
+    <div {...overlayGuard(onClose)} style={modalOverlay}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: width, ...style }}>
         {children}
       </div>
