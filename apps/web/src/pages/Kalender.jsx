@@ -104,9 +104,11 @@ export default function Kalender() {
   const [breaks, setBreaks] = useState([]); // unterrichtsfreie Zeitraeume (Ferien/Feiertage)
   const [examOverview, setExamOverview] = useState([]); // Klassenarbeiten-Übersicht (kommend + Reststunden)
   const loadExams = () => fetch(`${API}/klassenarbeiten/uebersicht`).then((r) => (r.ok ? r.json() : [])).then((d) => setExamOverview(Array.isArray(d) ? d : [])).catch(() => {});
-  const addExam = async (body) => { await fetch(`${API}/klassenarbeiten`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {}); loadExams(); };
-  const updExam = async (id, body) => { await fetch(`${API}/klassenarbeiten/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {}); loadExams(); };
-  const delExam = async (id) => { await fetch(`${API}/klassenarbeiten/${id}`, { method: "DELETE" }).catch(() => {}); loadExams(); };
+  // Nach jeder Änderung auch die Kalender-Einträge neu laden — die Klassenarbeit
+  // erzeugt/ändert/löscht serverseitig einen ganztägigen Eintrag.
+  const addExam = async (body) => { await fetch(`${API}/klassenarbeiten`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {}); loadExams(); load(); };
+  const updExam = async (id, body) => { await fetch(`${API}/klassenarbeiten/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {}); loadExams(); load(); };
+  const delExam = async (id) => { await fetch(`${API}/klassenarbeiten/${id}`, { method: "DELETE" }).catch(() => {}); loadExams(); load(); };
   useEffect(() => { if (view === "klassenarbeit") loadExams(); /* eslint-disable-next-line */ }, [view]);
   const [wdhVorschlag, setWdhVorschlag] = useState([]); // schwache Themen der Vorwoche
   const [slotEdit, setSlotEdit] = useState(null); // { weekday, period, ...slot } oder null
