@@ -93,11 +93,11 @@ export default function Topics() {
       body: JSON.stringify({ name, parent_id: t.parent_id, notes: t.notes || "" }),
     }));
 
-  // Notiz (Lernziele/Inhalt) speichern — Name/Parent unverändert mitschicken.
-  const saveNotes = (tp, notes) =>
+  // Titel + Notiz speichern (aus dem Detail-Popup). Leerer Titel behält den alten.
+  const saveTopic = (tp, name, notes) =>
     call(() => fetch(`${API}/topics/${tp.id}`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: tp.name, parent_id: tp.parent_id, notes }),
+      body: JSON.stringify({ name: (name || "").trim() || tp.name, parent_id: tp.parent_id, notes }),
     }));
 
   const remove = async (tp) => {
@@ -197,9 +197,12 @@ export default function Topics() {
               <Icon d={ICONS.plus} size={16} color="var(--accent)" />
             </button>
           )}
-          <button onClick={() => { setEditing(tp.id); setEditName(tp.name); }} className="icon-btn" style={iconBtn} title={t("common.rename")}>
-            <Icon d={ICONS.edit} />
-          </button>
+          {/* Unterthemen: kein Umbenennen-Icon in der Zeile — läuft übers Detail-Popup. */}
+          {isRoot && (
+            <button onClick={() => { setEditing(tp.id); setEditName(tp.name); }} className="icon-btn" style={iconBtn} title={t("common.rename")}>
+              <Icon d={ICONS.edit} />
+            </button>
+          )}
           <button onClick={() => remove(tp)} className="icon-btn" style={iconBtn} title={t("common.delete")}>
             <Icon d={ICONS.trash} color={C.danger} />
           </button>
@@ -261,17 +264,19 @@ export default function Topics() {
 
       {roots.map((tp) => renderNode(tp, 0))}
 
-      {popup && <TopicPopup tp={popup} t={t} onSaveNotes={saveNotes} onClose={() => setPopup(null)} />}
+      {popup && <TopicPopup tp={popup} t={t} onSaveTopic={saveTopic} onClose={() => setPopup(null)} />}
     </div>
   );
 }
 
 // Detail-Popup eines Themas/Unterthemas: Notiz (inline editierbar) und — hinter
 // einem Ausklapp-Icon — welche Klassen und welche Modul-Inhalte am Thema hängen.
-function TopicPopup({ tp, t, onSaveNotes, onClose }) {
+function TopicPopup({ tp, t, onSaveTopic, onClose }) {
   const [editNote, setEditNote] = useState(false);
   const [noteVal, setNoteVal] = useState(tp.notes || "");
   const [notes, setNotes] = useState(tp.notes || "");
+  const [name, setName] = useState(tp.name);      // Anzeige-Titel (nach Umbenennen)
+  const [titleVal, setTitleVal] = useState(tp.name); // Titel im Edit
   const [open, setOpen] = useState(false); // Inhalte-Bereich ausgeklappt?
   const [usage, setUsage] = useState(null);
   const [classes, setClasses] = useState({}); // id -> name
@@ -282,12 +287,13 @@ function TopicPopup({ tp, t, onSaveNotes, onClose }) {
     fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).then((d) => setClasses(Object.fromEntries((Array.isArray(d) ? d : []).map((c) => [c.id, c.name])))).catch(() => {});
   }, [open]);
 
-  const saveNote = async () => { await onSaveNotes(tp, noteVal); setNotes(noteVal); setEditNote(false); };
+  const saveEdit = async () => { await onSaveTopic(tp, titleVal, noteVal); setNotes(noteVal); setName(titleVal.trim() || name); setEditNote(false); };
 
   // Klassen, die über Inhalte (Decks/Kalender) an diesem Thema hängen.
   const klassenNamen = usage ? [...new Set([
     ...(usage.karten || []).map((d) => d.class_id),
     ...(usage.kalender || []).map((e) => e.class_id),
+    ...(usage.lernpfad || []).map((l) => l.class_id),
   ].filter(Boolean))].map((id) => classes[id]).filter(Boolean) : [];
 
   const secTitle = { fontSize: 11.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", margin: "12px 0 4px" };
@@ -297,29 +303,31 @@ function TopicPopup({ tp, t, onSaveNotes, onClose }) {
     <div onClick={onClose} style={modalOverlay}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 520, maxHeight: "86vh", overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-          <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, flex: 1 }}>{tp.parent_name ? `${tp.parent_name} / ${tp.name}` : tp.name}</h3>
+          <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, flex: 1 }}>{tp.parent_name ? `${tp.parent_name} / ${name}` : name}</h3>
+          {/* Ein Edit-Icon für Titel UND Notiz. */}
+          {!editNote && <button onClick={() => { setTitleVal(name); setNoteVal(notes); setEditNote(true); }} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.edit")}><Icon d={ICONS.edit} size={16} /></button>}
           <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
         </div>
 
-        {/* Notiz mit Edit im Popup. */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, ...secTitle, marginTop: 4 }}>
-          <span style={{ flex: 1 }}>{t("topics.notes")}</span>
-          {!editNote && <button onClick={() => { setNoteVal(notes); setEditNote(true); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>}
-        </div>
         {editNote ? (
           <div>
-            <textarea value={noteVal} onChange={(e) => setNoteVal(e.target.value.slice(0, 500))} autoFocus rows={4} maxLength={500}
+            <div style={secTitle}>{t("common.rename")}</div>
+            <input value={titleVal} onChange={(e) => setTitleVal(e.target.value)} autoFocus maxLength={120}
+              style={{ width: "100%", boxSizing: "border-box", padding: 10, border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)", fontSize: 15, fontWeight: 600 }} />
+            <div style={secTitle}>{t("topics.notes")}</div>
+            <textarea value={noteVal} onChange={(e) => setNoteVal(e.target.value.slice(0, 500))} rows={4} maxLength={500}
               placeholder={t("topics.notesPlaceholder")}
               style={{ width: "100%", boxSizing: "border-box", padding: 10, border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)", fontSize: 14, lineHeight: 1.5, resize: "vertical" }} />
             <div style={{ display: "flex", gap: 8, marginTop: 6, alignItems: "center" }}>
-              <button onClick={saveNote} style={btnPrimary}>{t("common.save")}</button>
+              <button onClick={saveEdit} style={btnPrimary}>{t("common.save")}</button>
               <button onClick={() => setEditNote(false)} style={btnSecondary}>{t("common.abort")}</button>
               <span style={{ marginLeft: "auto", fontSize: 12, color: noteVal.length >= 500 ? C.danger : "var(--text3)" }}>{noteVal.length}/500</span>
             </div>
           </div>
-        ) : (
+        ) : (<>
+          <div style={secTitle}>{t("topics.notes")}</div>
           <div style={{ fontSize: 14, color: notes ? "var(--text2)" : "var(--text3)", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{notes || t("topics.notesEmpty")}</div>
-        )}
+        </>)}
 
         {/* Ausklappbar: Klassen + Inhalte zum Thema. */}
         <button onClick={() => setOpen((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginTop: 16, padding: "10px 12px", background: "var(--bg3, var(--bg))", border: "1px solid var(--border)", borderRadius: 10, cursor: "pointer", color: "var(--text)", fontSize: 14, fontWeight: 600, textAlign: "left" }}>
@@ -335,7 +343,7 @@ function TopicPopup({ tp, t, onSaveNotes, onClose }) {
 
                 {(usage.cardvote?.length > 0) && (<><div style={secTitle}>CardVote</div>{usage.cardvote.map((q) => <div key={q.id} style={line}>{q.text || `#${q.id}`}</div>)}</>)}
                 {(usage.karten?.length > 0) && (<><div style={secTitle}>{t("nav.cards2")}</div>{usage.karten.map((d) => <div key={d.id} style={line}>{d.name}{classes[d.class_id] ? ` · ${classes[d.class_id]}` : ""}{d.released ? "" : ` · ${t("topics.draft")}`}</div>)}</>)}
-                {(usage.lernpfad?.length > 0) && (<><div style={secTitle}>Lernpfad</div>{usage.lernpfad.map((e) => <div key={e.id} style={line}>{e.code ? `${e.code} · ` : ""}{e.text || e.kategorie}</div>)}</>)}
+                {(usage.lernpfad?.length > 0) && (<><div style={secTitle}>Lernpfad</div>{usage.lernpfad.map((l) => <div key={l.id} style={line}>{l.path || "—"}{classes[l.class_id] ? ` · ${classes[l.class_id]}` : ""}</div>)}</>)}
                 {(usage.kalender?.length > 0) && (<><div style={secTitle}>Kalender</div>{usage.kalender.map((e) => <div key={e.id} style={line}>{e.date ? `${new Date(e.date).toLocaleDateString()} · ` : ""}{e.title || "—"}{classes[e.class_id] ? ` · ${classes[e.class_id]}` : ""}</div>)}</>)}
                 {(usage.codedetektiv?.length > 0) && (<><div style={secTitle}>Code-Detektiv</div>{usage.codedetektiv.map((p) => <div key={p.id} style={line}>{p.title || p.client_id}</div>)}</>)}
 

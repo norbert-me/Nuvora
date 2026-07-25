@@ -15,7 +15,7 @@ from sqlalchemy import select, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Question, Topic, User, CardDeck, Exercise, CalendarEntry, CodePuzzle
+from ..models import Question, Topic, User, CardDeck, Exercise, CalendarEntry, CodePuzzle, LearningLadder, LearningPath
 from .auth import get_current_user, rate_limit
 from .modules import is_active
 
@@ -178,8 +178,15 @@ async def topic_usage(topic_id: int, user: User = Depends(get_current_user), db:
         rows = (await db.execute(select(CardDeck).where(CardDeck.owner_id == user.id, CardDeck.topic_id == topic_id, CardDeck.deleted_at.is_(None)).limit(50))).scalars().all()
         out["karten"] = [{"id": d.id, "name": d.name, "class_id": d.class_id, "released": d.released_at is not None} for d in rows]
     if await on("lernpfad"):
-        rows = (await db.execute(select(Exercise).where(Exercise.owner_id == user.id, Exercise.topic_id == topic_id).limit(50))).scalars().all()
-        out["lernpfad"] = [{"id": e.id, "code": e.code, "text": (e.aufgabentext or "")[:120], "kategorie": e.kategorie} for e in rows]
+        # Lernleitern (Stufen von Lernpfaden) mit diesem Thema — NICHT die einzelnen
+        # Aufgaben. Der Pfadname macht sie in der Übersicht wiedererkennbar.
+        rows = (await db.execute(
+            select(LearningLadder, LearningPath.name)
+            .join(LearningPath, LearningLadder.path_id == LearningPath.id)
+            .where(LearningPath.owner_id == user.id, LearningLadder.topic_id == topic_id, LearningPath.deleted_at.is_(None))
+            .order_by(LearningPath.name, LearningLadder.position).limit(50)
+        )).all()
+        out["lernpfad"] = [{"id": lad.id, "path": pname, "class_id": lad.class_id} for (lad, pname) in rows]
     if await on("kalender"):
         rows = (await db.execute(select(CalendarEntry).where(CalendarEntry.owner_id == user.id, CalendarEntry.topic_id == topic_id).order_by(CalendarEntry.date.desc()).limit(50))).scalars().all()
         out["kalender"] = [{"id": e.id, "date": e.date.isoformat() if e.date else None, "title": e.title, "class_id": e.class_id} for e in rows]
