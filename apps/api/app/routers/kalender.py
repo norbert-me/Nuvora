@@ -415,19 +415,27 @@ async def exam_overview(user: User = Depends(require_module), db: AsyncSession =
     cancel_set = {(_d(c.date), c.period) for c in cancels}
     today = datetime.now(_tz.utc).date()
 
+    # Bei mehreren Klassenarbeiten desselben Kurses zählen die Stunden ZWISCHEN
+    # den Terminen: Startpunkt ist die vorige Klassenarbeit der Gruppe (frühestens
+    # heute — Vergangenes ist schon gelaufen), nicht immer heute.
     out = []
-    for ex in exams:
+    prev = {}  # gruppen-key -> Datum der vorigen Klassenarbeit
+    for ex in exams:  # nach Datum sortiert
         exd = _d(ex.date)
+        key = ex.kurs_id if ex.kurs_id is not None else ("c", ex.class_id)
+        frm = prev.get(key)
+        prev[key] = exd  # für die nächste Klassenarbeit dieser Gruppe
         if exd < today:
-            continue  # nur kommende
+            continue  # vergangene: nicht anzeigen, aber als „vorige" gemerkt
+        start = frm if (frm is not None and frm > today) else today
         # Slots des Kurses/der Klasse: bei Kurs per kurs_id, sonst per class_id (ohne Kurs).
         my_slots = [s for s in slots if (ex.kurs_id is not None and s.kurs_id == ex.kurs_id) or (ex.kurs_id is None and ex.class_id is not None and s.class_id == ex.class_id)]
         by_wd = {}
         for s in my_slots:
             by_wd.setdefault(s.weekday, []).append(s.period)
-        # Von heute bis zum Tag VOR der Klassenarbeit (die KA-Stunde selbst zählt nicht).
+        # Vom Startpunkt bis zum Tag VOR der Klassenarbeit (die KA-Stunde selbst zählt nicht).
         stunden = 0
-        d = today
+        d = start
         while d < exd:
             if d not in breaks_days:
                 for p in by_wd.get(d.weekday(), []):
