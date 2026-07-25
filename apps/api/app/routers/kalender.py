@@ -437,22 +437,40 @@ async def exam_overview(user: User = Depends(require_module), db: AsyncSession =
         if exd < today:
             continue  # vergangene: nicht anzeigen, aber als „vorige" gemerkt
         start = frm if (frm is not None and frm > today) else today
-        # Gehört ein Slot/Eintrag zu diesem Termin? Kurs ODER Klasse trifft (großzügig,
-        # damit ein Kurs-Termin auch klassenweise geplante Stunden erwischt).
+        # Gehört ein Slot/Eintrag zu diesem Termin?
+        # - Kurs-Termin: nur der SELBE Kurs zählt; kurslose (nur Klasse geplante)
+        #   Stunden derselben Klasse zählen zusätzlich. Ein ANDERER Kurs derselben
+        #   Klasse zählt NICHT (sonst zählte Physik für die Mathe-Arbeit mit).
+        # - Klassen-Termin ohne Kurs: alles dieser Klasse.
         def _match(kurs_id, class_id):
-            return (ex.kurs_id is not None and kurs_id == ex.kurs_id) or (ex.class_id is not None and class_id == ex.class_id)
+            if ex.kurs_id is not None:
+                return kurs_id == ex.kurs_id or (
+                    kurs_id is None and ex.class_id is not None and class_id == ex.class_id
+                )
+            return ex.class_id is not None and class_id == ex.class_id
         by_wd = {}
         for s in slots:
             if _match(s.kurs_id, s.class_id):
                 by_wd.setdefault(s.weekday, []).append(s.period)
-        # (Tag, Stunde)-Menge = wiederkehrende Slots UND geplante Einträge (dedupliziert,
-        # damit geplante Stunden nicht doppelt zählen). Vom Start bis zum Tag VOR der KA.
+        # Ein konkreter Eintrag mit Stundennummer ERSETZT an dem Tag den
+        # wiederkehrenden Slot dieser Stunde (so zeigt es auch der Kalender: genau
+        # eine Zeile je Stunde). Darum je (Tag, Stunde) merken, welche vom Kalender
+        # überschrieben sind — egal für welchen Kurs — damit der alte Slot dort
+        # nicht mehr mitzählt, wenn der Eintrag den Kurs geändert hat.
+        overridden = set()
+        for e in planned:
+            ed = _d(e.date)
+            if start <= ed < exd:
+                overridden.add((ed, e.period))
+        # Stunden bis zum Tag VOR der KA, genau wie der Kalender sie zeigt:
+        # wiederkehrende Slots (frei/Ausfall/überschrieben abgezogen) plus die
+        # konkret geplanten Einträge des Kurses.
         occ = set()
         d = start
         while d < exd:
             if d not in breaks_days:
                 for p in by_wd.get(d.weekday(), []):
-                    if (d, p) not in cancel_set:
+                    if (d, p) not in cancel_set and (d, p) not in overridden:
                         occ.add((d, p))
             d = d + timedelta(days=1)
         for e in planned:

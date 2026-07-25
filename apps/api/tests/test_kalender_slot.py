@@ -168,3 +168,42 @@ async def test_exam_crud_and_overview(s):
     await K.delete_exam(ex.id, user=u, db=s)
     assert await K.list_exams(user=u, db=s) == []
     assert await s.get(CalendarEntry, ex.entry_id) is None  # Eintrag mitgelöscht
+
+
+@pytest.mark.asyncio
+async def test_exam_overview_calendar_overrides(s):
+    """Stundenzählung folgt dem Kalender: ein konkreter Eintrag ERSETZT den
+    wiederkehrenden Slot dieser Stunde. Wird der Kurs im Eintrag geändert, zählt
+    die Stunde nicht mehr für den alten Kurs (kein Doppel-/Fehlzählen). Zusätzlich
+    hinzugefügte Stunden zählen mit."""
+    from datetime import datetime, timezone, timedelta
+    from app.models import UserModule, TimetableSlot, CalendarEntry
+    from app.routers import kalender as K
+    u = User(email="ov@d.de", password_hash="x", name="L"); s.add(u); await s.flush()
+    s.add(UserModule(user_id=u.id, module_key="kalender"))
+    a = SchoolClass(name="7a", owner_id=u.id); s.add(a); await s.flush()
+    kA = Kurs(name="Mathe 7a", owner_id=u.id)
+    kB = Kurs(name="Physik 7a", owner_id=u.id)
+    s.add_all([kA, kB]); await s.commit()
+
+    # Termin für Kurs A an einem Montag, gut in der Zukunft.
+    base = datetime.now(timezone.utc) + timedelta(days=30)
+    while base.weekday() != 0:  # nächster Montag
+        base += timedelta(days=1)
+    exd = base + timedelta(days=14)  # KA zwei Wochen später, ebenfalls Montag
+    ex = await K.create_exam(K.ExamIn(date=exd, title="Arbeit", class_id=a.id, kurs_id=kA.id), user=u, db=s)
+
+    # Wiederkehrender Montags-Slot Stunde 1 für Kurs A -> zwei Montage vor der KA.
+    s.add(TimetableSlot(owner_id=u.id, weekday=0, period=1, class_id=a.id, kurs_id=kA.id)); await s.commit()
+    base_cnt = (await K.exam_overview(user=u, db=s))[0]["stunden"]
+    assert base_cnt >= 2  # mehrere Montage bis zur KA
+
+    # Ersten (base-)Montag umwidmen: Eintrag Stunde 1 = Kurs B. Kalender zeigt dort
+    # B, also darf Kurs A diese Stunde NICHT mehr zählen -> genau eine weniger.
+    s.add(CalendarEntry(owner_id=u.id, date=base, period=1, class_id=a.id, kurs_id=kB.id, title="Physik")); await s.commit()
+    assert (await K.exam_overview(user=u, db=s))[0]["stunden"] == base_cnt - 1
+
+    # Zusätzliche Stunde für Kurs A am Dienstag drauf (nicht im Raster) zählt mit.
+    s.add(CalendarEntry(owner_id=u.id, date=base + timedelta(days=1), period=3, class_id=a.id, kurs_id=kA.id, title="Extra")); await s.commit()
+    assert (await K.exam_overview(user=u, db=s))[0]["stunden"] == base_cnt
+    await K.delete_exam(ex.id, user=u, db=s)
