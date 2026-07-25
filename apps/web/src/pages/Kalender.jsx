@@ -1144,7 +1144,7 @@ function ExamPanel({ overview, onAdd, onUpd, onDel, t }) {
               </div>
               {/* Auto-verknüpfte Auswertung im Modul „Klassenarbeit" öffnen. */}
               {e.work_id && e.class_id && (
-                <Link to={`/klassenarbeit?class=${e.class_id}&work=${e.work_id}`} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("kalender.openExamWork")}>
+                <Link to={`/klassenarbeit?class=${e.class_id}${e.kurs_id ? `&kurs=${e.kurs_id}` : ""}&work=${e.work_id}`} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("kalender.openExamWork")}>
                   <Icon d={ICONS.chart} size={16} color="var(--accent)" />
                 </Link>
               )}

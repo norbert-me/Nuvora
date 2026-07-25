@@ -66,7 +66,10 @@ export default function Klassenarbeit() {
   const [params] = useSearchParams();
   const wantWork = useRef(Number(params.get("work")) || null);
   const [classId, setClassId] = useState(Number(params.get("class")) || null);
-  const [kursId, setKursId] = useState(null);
+  // Kurs aus dem Deep-Link: eine Klasse kann in mehreren Kursen liegen — ohne
+  // diesen Hinweis riete die Auswahl den ersten Kurs (Bug: „7.5" gewählt, Arbeit
+  // landet unter „7.5 LZ"). Als kursValue an KursKlasseSelect weitergereicht.
+  const [kursId, setKursId] = useState(Number(params.get("kurs")) || null);
   const [subsetKurs, setSubsetKurs] = useState(null); // gewählter Teilkurs (Kurs aus Teilen von Klassen) oder null
   const [subsetKurse, setSubsetKurse] = useState([]); // Kurse mit einzeln hinzugefügten SuS
   const [classes, setClasses] = useState([]);
@@ -331,7 +334,7 @@ export default function Klassenarbeit() {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
         <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("klassenarbeit.title")}</h1>
-        <span data-tour="ka-class" style={{ display: "inline-flex" }}><KursKlasseSelect value={subsetKurs ? "" : classId} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} /></span>
+        <span data-tour="ka-class" style={{ display: "inline-flex" }}><KursKlasseSelect value={subsetKurs ? "" : classId} kursValue={subsetKurs ? null : kursId} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} /></span>
         {subsetKurse.length > 0 && (
           <select value={subsetKurs || ""} onChange={(e) => setSubsetKurs(e.target.value ? Number(e.target.value) : null)} style={{ ...selectStyle, fontSize: 13 }} title={t("klassenarbeit.subsetHint")}>
             <option value="">{t("klassenarbeit.subsetPick")}</option>
