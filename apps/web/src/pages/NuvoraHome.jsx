@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
-import { StageBadge, Icon, ICONS, iconBtn, btnSecondary, selectStyle, COLORS as C } from "../components/Icons.jsx";
+import { StageBadge, Icon, ICONS, MODULE_ICONS, iconBtn, btnSecondary, selectStyle, COLORS as C } from "../components/Icons.jsx";
 import { pageTitle } from "../components/Icons.jsx";
 
 const card = {
@@ -278,6 +278,12 @@ export default function NuvoraHome({ user }) {
               const inner = (<>
                 <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
                   {edit && <span style={{ color: "var(--text3)", display: "inline-flex" }}><Icon d={ICONS.grip} size={16} /></span>}
+                  {MODULE_ICONS[m.key] && (
+                    <span style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      background: "var(--accent-bg, rgba(10,132,255,0.12))", color: "var(--accent)" }}>
+                      <Icon d={MODULE_ICONS[m.key]} size={18} color="currentColor" />
+                    </span>
+                  )}
                   <span>{name(m)}</span> <StageBadge stage={m.stage} />
                 </div>
                 <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.6 }}>{desc(m)}</div>
