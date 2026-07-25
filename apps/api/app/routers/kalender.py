@@ -408,6 +408,9 @@ async def exam_overview(user: User = Depends(require_module), db: AsyncSession =
     slots = (await db.execute(select(TimetableSlot).where(TimetableSlot.owner_id == user.id))).scalars().all()
     breaks = (await db.execute(select(CalendarBreak).where(CalendarBreak.owner_id == user.id))).scalars().all()
     cancels = (await db.execute(select(SlotCancellation).where(SlotCancellation.owner_id == user.id))).scalars().all()
+    # Bereits GEPLANTE Stunden (konkrete Einträge mit Stundennummer) zählen mit —
+    # auch zusätzliche/verschobene, die nicht im wiederkehrenden Raster stehen.
+    planned = (await db.execute(select(CalendarEntry).where(CalendarEntry.owner_id == user.id, CalendarEntry.period.is_not(None)))).scalars().all()
     id2cls, _ = await _class_maps(db, user)
     kurse = {k.id: k.name for k in (await db.execute(select(Kurs).where(Kurs.owner_id == user.id))).scalars().all()}
 
@@ -434,20 +437,29 @@ async def exam_overview(user: User = Depends(require_module), db: AsyncSession =
         if exd < today:
             continue  # vergangene: nicht anzeigen, aber als „vorige" gemerkt
         start = frm if (frm is not None and frm > today) else today
-        # Slots des Kurses/der Klasse: bei Kurs per kurs_id, sonst per class_id (ohne Kurs).
-        my_slots = [s for s in slots if (ex.kurs_id is not None and s.kurs_id == ex.kurs_id) or (ex.kurs_id is None and ex.class_id is not None and s.class_id == ex.class_id)]
+        # Gehört ein Slot/Eintrag zu diesem Termin? Kurs ODER Klasse trifft (großzügig,
+        # damit ein Kurs-Termin auch klassenweise geplante Stunden erwischt).
+        def _match(kurs_id, class_id):
+            return (ex.kurs_id is not None and kurs_id == ex.kurs_id) or (ex.class_id is not None and class_id == ex.class_id)
         by_wd = {}
-        for s in my_slots:
-            by_wd.setdefault(s.weekday, []).append(s.period)
-        # Vom Startpunkt bis zum Tag VOR der Klassenarbeit (die KA-Stunde selbst zählt nicht).
-        stunden = 0
+        for s in slots:
+            if _match(s.kurs_id, s.class_id):
+                by_wd.setdefault(s.weekday, []).append(s.period)
+        # (Tag, Stunde)-Menge = wiederkehrende Slots UND geplante Einträge (dedupliziert,
+        # damit geplante Stunden nicht doppelt zählen). Vom Start bis zum Tag VOR der KA.
+        occ = set()
         d = start
         while d < exd:
             if d not in breaks_days:
                 for p in by_wd.get(d.weekday(), []):
                     if (d, p) not in cancel_set:
-                        stunden += 1
+                        occ.add((d, p))
             d = d + timedelta(days=1)
+        for e in planned:
+            ed = _d(e.date)
+            if start <= ed < exd and ed not in breaks_days and _match(e.kurs_id, e.class_id):
+                occ.add((ed, e.period))
+        stunden = len(occ)
         out.append({
             "id": ex.id, "date": ex.date.isoformat(), "title": ex.title,
             "kurs_id": ex.kurs_id, "class_id": ex.class_id,
