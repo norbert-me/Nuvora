@@ -735,6 +735,20 @@ class MaterialLoan(Base):
     item: Mapped[MaterialItem] = relationship(back_populates="loans")
 
 
+class ExamDate(Base):
+    """Geplante Klassenarbeit (Kalender-Modul): ein Datum + Titel je Kurs/Klasse.
+    Die Übersicht zählt daraus die bis dahin verbleibenden Stundenplan-Stunden
+    (abzüglich freier Tage). Reine Planung, hängt an keinem anderen Modul."""
+    __tablename__ = "exam_dates"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    class_id: Mapped[Optional[int]] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), nullable=True, index=True)
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
+    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    title: Mapped[str] = mapped_column(String(200), default="", server_default="")
+
+
 class CalendarBreak(Base):
     """Unterrichtsfreier Zeitraum (Ferien, beweglicher Feiertag). An Tagen
     innerhalb des Zeitraums zeigt der Kalender weder Stundenplan-Vorlagen noch

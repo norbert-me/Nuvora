@@ -141,3 +141,24 @@ async def test_deck_created_after_entry_schedules(s):
     await s.refresh(deck); await s.refresh(e)
     assert deck.released_at == e.date          # zum Termin geplant
     assert e.karten_deck_id == deck.id         # Eintrag verlinkt
+
+
+@pytest.mark.asyncio
+async def test_exam_crud_and_overview(s):
+    """Klassenarbeit anlegen/listen/löschen; Übersicht zählt Stundenplan-Stunden
+    bis zum Termin (>=1 bei passendem Slot)."""
+    from datetime import datetime, timezone, timedelta
+    from app.models import UserModule, TimetableSlot
+    from app.routers import kalender as K
+    u = User(email="ex@d.de", password_hash="x", name="L"); s.add(u); await s.flush()
+    s.add(UserModule(user_id=u.id, module_key="kalender"))
+    a = SchoolClass(name="7a", owner_id=u.id); s.add(a); await s.commit()
+    d = datetime.now(timezone.utc) + timedelta(days=20)
+    ex = await K.create_exam(K.ExamIn(date=d, title="Vokabeltest", class_id=a.id), user=u, db=s)
+    assert len(await K.list_exams(user=u, db=s)) == 1
+    # Stunde am Wochentag des Termins -> in 20 Tagen mehrfach, mind. eine vor dem Termin.
+    s.add(TimetableSlot(owner_id=u.id, weekday=d.weekday(), period=1, class_id=a.id)); await s.commit()
+    ov = await K.exam_overview(user=u, db=s)
+    assert len(ov) == 1 and isinstance(ov[0]["stunden"], int) and ov[0]["stunden"] >= 1
+    await K.delete_exam(ex.id, user=u, db=s)
+    assert await K.list_exams(user=u, db=s) == []

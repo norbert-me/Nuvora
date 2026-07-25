@@ -15,7 +15,7 @@ from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import CalendarBreak, CalendarEntry, CardDeck, Kurs, SchoolClass, TimetableSlot, SlotCancellation, Topic, User, Session as TestSession
+from ..models import CalendarBreak, CalendarEntry, CardDeck, ExamDate, Kurs, SchoolClass, TimetableSlot, SlotCancellation, Topic, User, Session as TestSession
 from .auth import get_current_user, rate_limit
 from .modules import is_active
 
@@ -314,6 +314,111 @@ async def delete_entry(entry_id: int, user: User = Depends(require_module), db: 
         raise HTTPException(404, "Eintrag nicht gefunden")
     await db.delete(e)
     await db.commit()
+
+
+# ─── Klassenarbeiten: Termine planen + Übersicht (verbleibende Stundenplan-Stunden) ───
+
+class ExamIn(BaseModel):
+    date: datetime
+    title: str = ""
+    class_id: Optional[int] = None
+    kurs_id: Optional[int] = None
+
+
+class ExamOut(ExamIn):
+    id: int
+    model_config = {"from_attributes": True}
+
+
+@router.get("/klassenarbeiten", response_model=List[ExamOut])
+async def list_exams(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    rows = (await db.execute(select(ExamDate).where(ExamDate.owner_id == user.id).order_by(ExamDate.date))).scalars().all()
+    return rows
+
+
+@router.post("/klassenarbeiten", response_model=ExamOut, status_code=201)
+async def create_exam(body: ExamIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    await _check_class(db, user, body.class_id)
+    await _check_kurs(db, user, body.kurs_id)
+    e = ExamDate(owner_id=user.id, **body.model_dump())
+    db.add(e)
+    await db.commit()
+    await db.refresh(e)
+    return e
+
+
+@router.put("/klassenarbeiten/{exam_id}", response_model=ExamOut)
+async def update_exam(exam_id: int, body: ExamIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    e = await db.get(ExamDate, exam_id)
+    if not e or e.owner_id != user.id:
+        raise HTTPException(404, "Klassenarbeit nicht gefunden")
+    await _check_class(db, user, body.class_id)
+    await _check_kurs(db, user, body.kurs_id)
+    for k, v in body.model_dump().items():
+        setattr(e, k, v)
+    await db.commit()
+    await db.refresh(e)
+    return e
+
+
+@router.delete("/klassenarbeiten/{exam_id}", status_code=204)
+async def delete_exam(exam_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    e = await db.get(ExamDate, exam_id)
+    if not e or e.owner_id != user.id:
+        raise HTTPException(404, "Klassenarbeit nicht gefunden")
+    await db.delete(e)
+    await db.commit()
+
+
+@router.get("/klassenarbeiten/uebersicht")
+async def exam_overview(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Kommende Klassenarbeiten mit den bis dahin verbleibenden Stundenplan-
+    Stunden des Kurses (freie Tage/Ferien und Stundenausfälle abgezogen)."""
+    from datetime import timedelta, timezone as _tz
+    exams = (await db.execute(select(ExamDate).where(ExamDate.owner_id == user.id).order_by(ExamDate.date))).scalars().all()
+    slots = (await db.execute(select(TimetableSlot).where(TimetableSlot.owner_id == user.id))).scalars().all()
+    breaks = (await db.execute(select(CalendarBreak).where(CalendarBreak.owner_id == user.id))).scalars().all()
+    cancels = (await db.execute(select(SlotCancellation).where(SlotCancellation.owner_id == user.id))).scalars().all()
+    id2cls, _ = await _class_maps(db, user)
+    kurse = {k.id: k.name for k in (await db.execute(select(Kurs).where(Kurs.owner_id == user.id))).scalars().all()}
+
+    def _d(x):  # auf reines Datum reduzieren
+        return x.date() if hasattr(x, "date") else x
+    breaks_days = set()
+    for b in breaks:
+        d = _d(b.start_date); end = _d(b.end_date)
+        while d <= end:
+            breaks_days.add(d); d = d + timedelta(days=1)
+    cancel_set = {(_d(c.date), c.period) for c in cancels}
+    today = datetime.now(_tz.utc).date()
+
+    out = []
+    for ex in exams:
+        exd = _d(ex.date)
+        if exd < today:
+            continue  # nur kommende
+        # Slots des Kurses/der Klasse: bei Kurs per kurs_id, sonst per class_id (ohne Kurs).
+        my_slots = [s for s in slots if (ex.kurs_id is not None and s.kurs_id == ex.kurs_id) or (ex.kurs_id is None and ex.class_id is not None and s.class_id == ex.class_id)]
+        by_wd = {}
+        for s in my_slots:
+            by_wd.setdefault(s.weekday, []).append(s.period)
+        # Von heute bis zum Tag VOR der Klassenarbeit (die KA-Stunde selbst zählt nicht).
+        stunden = 0
+        d = today
+        while d < exd:
+            if d not in breaks_days:
+                for p in by_wd.get(d.weekday(), []):
+                    if (d, p) not in cancel_set:
+                        stunden += 1
+            d = d + timedelta(days=1)
+        out.append({
+            "id": ex.id, "date": ex.date.isoformat(), "title": ex.title,
+            "kurs_id": ex.kurs_id, "class_id": ex.class_id,
+            "kurs": kurse.get(ex.kurs_id) if ex.kurs_id else None,
+            "klasse": id2cls.get(ex.class_id) if ex.class_id else None,
+            "stunden": stunden,
+        })
+    return out
 
 
 # ─── Stundenplan (wiederkehrendes Wochenraster, Vorlage fuer Termine) ───

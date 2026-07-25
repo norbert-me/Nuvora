@@ -102,6 +102,11 @@ export default function Kalender() {
   const [editing, setEditing] = useState(null); // { date, ...entry } oder null
   const [tt, setTt] = useState({ periods: 6, slots: [] }); // Stundenplan
   const [breaks, setBreaks] = useState([]); // unterrichtsfreie Zeitraeume (Ferien/Feiertage)
+  const [examOverview, setExamOverview] = useState([]); // Klassenarbeiten-Übersicht (kommend + Reststunden)
+  const loadExams = () => fetch(`${API}/klassenarbeiten/uebersicht`).then((r) => (r.ok ? r.json() : [])).then((d) => setExamOverview(Array.isArray(d) ? d : [])).catch(() => {});
+  const addExam = async (body) => { await fetch(`${API}/klassenarbeiten`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {}); loadExams(); };
+  const delExam = async (id) => { await fetch(`${API}/klassenarbeiten/${id}`, { method: "DELETE" }).catch(() => {}); loadExams(); };
+  useEffect(() => { if (view === "klassenarbeit") loadExams(); /* eslint-disable-next-line */ }, [view]);
   const [wdhVorschlag, setWdhVorschlag] = useState([]); // schwache Themen der Vorwoche
   const [slotEdit, setSlotEdit] = useState(null); // { weekday, period, ...slot } oder null
   const [heuteAbsent, setHeuteAbsent] = useState({}); // class_id -> Anzahl Fehlende heute
@@ -259,7 +264,7 @@ export default function Kalender() {
   // Pfeiltasten ←/→ blättern (nur in Monat/Woche/Tag, nicht beim Tippen).
   useEffect(() => {
     const onKey = (e) => {
-      if (["timetable", "breaks", "today"].includes(view)) return;
+      if (["timetable", "breaks", "klassenarbeit", "today"].includes(view)) return;
       const el = document.activeElement;
       if (el && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) return;
       if (e.key === "ArrowLeft") move(-1);
@@ -360,16 +365,16 @@ export default function Kalender() {
         {/* Stundenplan UND Freie Tage sind in die Navbar ausgelagert (?view=…) —
             beides Konfiguration. Der Ansicht-Umschalter erscheint darum nur in den
             eigentlichen Kalenderansichten, nicht in Stundenplan/Freie Tage. */}
-        {view !== "timetable" && view !== "breaks" && (
+        {view !== "timetable" && view !== "breaks" && view !== "klassenarbeit" && (
           <span data-tour="kal-views" style={{ display: "inline-flex" }}>
             <Tabs value={view} onChange={setView}
               options={[["today", t("kalender.todayView")], ["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")]]} />
           </span>
         )}
-        {view !== "timetable" && view !== "breaks" && (
+        {view !== "timetable" && view !== "breaks" && view !== "klassenarbeit" && (
           <AddButton data-tour="kal-new" onClick={() => setEditing({ date: startOfDay(new Date()) })} title={t("kalender.newEntry")} style={{ marginLeft: "auto" }} />
         )}
-        {view !== "timetable" && view !== "breaks" && (
+        {view !== "timetable" && view !== "breaks" && view !== "klassenarbeit" && (
           <div style={{ position: "relative" }}>
             {/* Auge = „was anzeigen?": Ganztägige/Externe ein-/ausblenden + Farbe. */}
             <button data-tour="kal-view-menu" onClick={() => setViewMenuOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn, width: 34, height: 34, opacity: (showAllDay && showExt) ? 1 : 0.55 }} title={t("kalender.viewMenu")}>
@@ -408,7 +413,7 @@ export default function Kalender() {
             </>)}
           </div>
         )}
-        {view !== "timetable" && view !== "breaks" && (
+        {view !== "timetable" && view !== "breaks" && view !== "klassenarbeit" && (
           <div style={{ position: "relative" }}>
             <button onClick={() => setMoreOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn, width: 34, height: 34 }} title={t("common.more") !== "common.more" ? t("common.more") : "Mehr"}>
               <Icon d={ICONS.more} size={18} />
@@ -435,7 +440,7 @@ export default function Kalender() {
       )}
       {/* Datums-Navigator: Pfeile flankieren das Datum; Klick aufs Datum springt
           direkt (nativer Picker), „Heute" integriert. Kein Selektor mehr oben rechts. */}
-      {view !== "timetable" && view !== "breaks" && view !== "today" && (
+      {view !== "timetable" && view !== "breaks" && view !== "klassenarbeit" && view !== "today" && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 14, position: "relative" }}>
           <button onClick={() => move(-1)} title="◀" style={{ ...btnSecondary, padding: "4px 13px", fontSize: 17, lineHeight: 1 }}>‹</button>
           <button onClick={() => setCursor(startOfDay(new Date()))} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>{t("kalender.today")}</button>
@@ -477,6 +482,7 @@ export default function Kalender() {
         </div>
       )}
       {view === "breaks" && <BreaksPanel breaks={breaks} onAdd={addBreak} onDel={delBreak} t={t} standalone />}
+      {view === "klassenarbeit" && <ExamPanel overview={examOverview} onAdd={addExam} onDel={delExam} t={t} />}
 
       {view === "today" && (
         <HeuteView t={t} tt={tt} weekdayOf={weekdayOf} byDay={byDay}
@@ -1065,6 +1071,54 @@ function TimetableView({ tt, className, slotName, slotColor, classColor, topicNa
 
 // Unterrichtsfreie Zeitraeume (Ferien, bewegliche Feiertage). An diesen Tagen
 // blendet der Kalender Vorlagen und Eintraege aus. Eigener Tab (standalone).
+// Klassenarbeiten planen + Übersicht: je kommender Klassenarbeit die bis dahin
+// verbleibenden Stundenplan-Stunden (freie Tage/Ausfälle bereits abgezogen).
+function ExamPanel({ overview, onAdd, onDel, t }) {
+  const [classId, setClassId] = useState("");
+  const [kursId, setKursId] = useState(null);
+  const [date, setDate] = useState("");
+  const [title, setTitle] = useState("");
+  const save = () => {
+    if (!classId || !date) return;
+    const [y, m, d] = date.split("-").map(Number);
+    onAdd({ class_id: Number(classId), kurs_id: kursId ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: title.trim() });
+    setDate(""); setTitle("");
+  };
+  const sfld = { ...inputStyle };
+  return (
+    <div style={{ maxWidth: 640 }}>
+      <h2 style={pageTitle}>{t("kalender.examsTab")}</h2>
+      <p style={{ fontSize: 13.5, color: "var(--text2)", margin: "0 0 16px" }}>{t("kalender.examsIntro")}</p>
+
+      <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, marginBottom: 18 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <KursKlasseSelect value={classId === "" ? "" : Number(classId)} kursValue={kursId}
+            onChange={(id, kid) => { setClassId(id === "" ? "" : String(id)); setKursId(id === "" ? null : (kid ?? null)); }} onKurs={setKursId} />
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ ...sfld, padding: "8px 10px" }} />
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("kalender.examTitle")} style={{ ...sfld, flex: 1, minWidth: 140, padding: "8px 10px" }} />
+          <button onClick={save} disabled={!classId || !date} style={{ ...btnPrimary, opacity: (classId && date) ? 1 : 0.5 }}>{t("common.add")}</button>
+        </div>
+      </div>
+
+      {overview.length === 0 ? (
+        <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("kalender.examsEmpty")}</p>
+      ) : overview.map((e) => (
+        <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", marginBottom: 8 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>{e.kurs || e.klasse || "—"}{e.title ? ` · ${e.title}` : ""}</div>
+            <div style={{ fontSize: 12.5, color: "var(--text3)" }}>{new Date(e.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
+          </div>
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "var(--accent)" }}>{e.stunden}</div>
+            <div style={{ fontSize: 11, color: "var(--text3)" }}>{t("kalender.examStunden")}</div>
+          </div>
+          <button onClick={() => onDel(e.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
   const [von, setVon] = useState("");
   const [bis, setBis] = useState("");
