@@ -69,7 +69,11 @@ export default function KursKlasseSelect({ value, kursValue = null, onChange, on
   const curKurs = cur && cur.id !== "none" ? Number(cur.id) : null;
   // Auch ohne Klick den aktuellen Kurs melden (Erstladen), damit z.B. der
   // Sitzplan gleich den kursweiten Datensatz lädt, nicht den Klassen-Fallback.
-  useEffect(() => { if (onKurs) onKurs(curKurs); }, [curKurs]); // eslint-disable-line
+  // ERST nach dem Laden der Gruppen melden: sonst käme beim Mounten ein onKurs(null),
+  // das einen von außen gesetzten kursValue (z.B. Edit einer Klassenarbeit) nullt,
+  // bevor die Ableitung ihn überhaupt anwenden konnte — danach riete sie den ersten
+  // Kurs (Bug: hinterlegter Kurs „7.5" sprang auf „7.5 LZ").
+  useEffect(() => { if (onKurs && groups.length) onKurs(curKurs); }, [curKurs, groups.length]); // eslint-disable-line
 
   if (!groups.length && !allowNone) return null;
 

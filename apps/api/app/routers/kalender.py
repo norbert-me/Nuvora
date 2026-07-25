@@ -347,14 +347,22 @@ def _work_name(title: str) -> str:
 
 
 async def _ensure_work(db: AsyncSession, user: User, e: ExamDate) -> None:
-    """Bei aktivem Modul „Klassenarbeit auswerten" zum Termin eine leere Auswertung
-    anlegen (nur mit Klasse; die braucht das Raster). Vorhandene wird nur umbenannt,
-    nie neu erzeugt — Ergebnisse dürfen nicht verloren gehen (Regel: Live-Daten)."""
+    """Bei aktivem Modul „Klassenarbeit auswerten" zum Termin eine Auswertung halten.
+    Vorhandene: Namen mitziehen; solange sie noch LEER ist (Auto-Datensatz, keine
+    Aufgaben/Ergebnisse), auch Klasse/Kurs nachziehen — sonst bliebe sie im alten
+    Kurs, wenn der Termin umgetragen wird. Befüllte Auswertungen bleiben unangetastet
+    (Regel: Live-Daten). Zeigt work_id ins Leere (Auswertung gelöscht), wird die
+    Verknüpfung gelöst und ggf. neu angelegt."""
     if e.work_id:
         w = await db.get(WorkAnalysis, e.work_id)
         if w and w.owner_id == user.id:
             w.name = _work_name(e.title)
-        return
+            if not (w.tasks or w.results):
+                if e.class_id is not None:
+                    w.class_id = e.class_id
+                w.kurs_id = e.kurs_id
+            return
+        e.work_id = None  # verwaiste Verknüpfung lösen, unten neu anlegen
     if e.class_id is None:
         return
     if not await is_active(db, user.id, "klassenarbeit"):

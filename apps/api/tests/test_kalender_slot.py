@@ -207,6 +207,39 @@ async def test_exam_auto_creates_work_when_module_active(s):
 
 
 @pytest.mark.asyncio
+async def test_exam_edit_syncs_and_recreates_work(s):
+    """Edit des Termins: der leere Auto-Datensatz zieht Kurs mit; zeigt work_id ins
+    Leere (Auswertung geloescht), wird beim Speichern neu angelegt."""
+    from datetime import datetime, timezone, timedelta
+    from app.models import UserModule, WorkAnalysis, Kurs
+    from app.routers import kalender as K
+    u = User(email="s2@d.de", password_hash="x", name="L"); s.add(u); await s.flush()
+    s.add_all([UserModule(user_id=u.id, module_key="kalender"), UserModule(user_id=u.id, module_key="klassenarbeit")])
+    a = SchoolClass(name="7.5 LZ", owner_id=u.id); s.add(a); await s.flush()
+    k1 = Kurs(name="7.5 LZ", owner_id=u.id); k2 = Kurs(name="7.5", owner_id=u.id)
+    s.add_all([k1, k2]); await s.commit()
+    d = datetime.now(timezone.utc) + timedelta(days=10)
+
+    # Anlegen mit falschem Kurs, dann per Edit auf den richtigen umtragen.
+    ex = await K.create_exam(K.ExamIn(date=d, title="A", class_id=a.id, kurs_id=k1.id), user=u, db=s)
+    w = await s.get(WorkAnalysis, ex.work_id)
+    assert w.kurs_id == k1.id
+    await K.update_exam(ex.id, K.ExamIn(date=d, title="A", class_id=a.id, kurs_id=k2.id), user=u, db=s)
+    w = await s.get(WorkAnalysis, ex.work_id)
+    assert w.kurs_id == k2.id  # leerer Auto-Datensatz zog den Kurs mit
+
+    # Auswertung löschen (Verknüpfung ins Leere), dann Edit -> neue Auswertung.
+    old = ex.work_id
+    await s.delete(w); await s.commit()
+    ex = await s.get(K.ExamDate, ex.id); ex.work_id = old  # verwaiste Verknüpfung simulieren
+    await s.commit()
+    r = await K.update_exam(ex.id, K.ExamIn(date=d, title="A", class_id=a.id, kurs_id=k2.id), user=u, db=s)
+    assert r.work_id is not None
+    nw = await s.get(WorkAnalysis, r.work_id)
+    assert nw is not None and nw.kurs_id == k2.id and (nw.tasks or []) == []  # frisch angelegt
+
+
+@pytest.mark.asyncio
 async def test_exam_overview_calendar_overrides(s):
     """Stundenzählung folgt dem Kalender: ein konkreter Eintrag ERSETZT den
     wiederkehrenden Slot dieser Stunde. Wird der Kurs im Eintrag geändert, zählt
