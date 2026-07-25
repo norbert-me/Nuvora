@@ -1082,11 +1082,13 @@ function ExamPanel({ overview, onAdd, onUpd, onDel, t }) {
   const [editId, setEditId] = useState(null);
   const [eDate, setEDate] = useState("");
   const [eTitle, setETitle] = useState("");
-  const startEdit = (e) => { setEditId(e.id); setEDate(ymd(new Date(e.date))); setETitle(e.title || ""); };
+  const [eClassId, setEClassId] = useState("");
+  const [eKursId, setEKursId] = useState(null);
+  const startEdit = (e) => { setEditId(e.id); setEDate(ymd(new Date(e.date))); setETitle(e.title || ""); setEClassId(e.class_id ? String(e.class_id) : ""); setEKursId(e.kurs_id ?? null); };
   const saveEdit = (e) => {
-    if (!eDate) return;
+    if (!eDate || !eClassId) return;
     const [y, m, d] = eDate.split("-").map(Number);
-    onUpd(e.id, { class_id: e.class_id ?? null, kurs_id: e.kurs_id ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: eTitle.trim() });
+    onUpd(e.id, { class_id: Number(eClassId), kurs_id: eKursId ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: eTitle.trim() });
     setEditId(null);
   };
   const save = () => {
@@ -1118,7 +1120,8 @@ function ExamPanel({ overview, onAdd, onUpd, onDel, t }) {
           {editId === e.id ? (
             <>
               <div style={{ flex: 1, minWidth: 0, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <span style={{ fontWeight: 700, fontSize: 14 }}>{e.kurs || e.klasse || "—"}</span>
+                <KursKlasseSelect value={eClassId === "" ? "" : Number(eClassId)} kursValue={eKursId}
+                  onChange={(id, kid) => { setEClassId(id === "" ? "" : String(id)); setEKursId(id === "" ? null : (kid ?? null)); }} onKurs={setEKursId} />
                 <input type="date" value={eDate} onChange={(ev) => setEDate(ev.target.value)} style={{ ...inputStyle, padding: "6px 8px" }} />
                 <input value={eTitle} onChange={(ev) => setETitle(ev.target.value)} placeholder={t("kalender.examTitle")} style={{ ...inputStyle, flex: 1, minWidth: 120, padding: "6px 8px" }} />
               </div>
