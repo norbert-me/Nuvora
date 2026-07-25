@@ -364,7 +364,12 @@ export default function Kalender() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
-        <h1 style={pageTitle}>{t("kalender.title")}</h1>
+        {/* Kein „Kalender"-Titel auf jeder Seite — die Navbar zeigt den Bereich
+            schon. Die Konfig-Unterseiten tragen ihren eigenen Abschnittstitel;
+            die eigentlichen Kalenderansichten kommen ganz ohne Titel aus. */}
+        {(view === "timetable" || view === "breaks" || view === "klassenarbeit") && (
+          <h1 style={pageTitle}>{view === "timetable" ? t("kalender.timetable") : view === "breaks" ? t("kalender.breaksTab") : t("kalender.examsTab")}</h1>
+        )}
         {/* Stundenplan UND Freie Tage sind in die Navbar ausgelagert (?view=…) —
             beides Konfiguration. Der Ansicht-Umschalter erscheint darum nur in den
             eigentlichen Kalenderansichten, nicht in Stundenplan/Freie Tage. */}
@@ -1104,7 +1109,6 @@ function ExamPanel({ overview, onAdd, onUpd, onDel, t }) {
   const sfld = { ...inputStyle };
   return (
     <div style={{ maxWidth: 640 }}>
-      <h2 style={pageTitle}>{t("kalender.examsTab")}</h2>
       <p style={{ fontSize: 13.5, color: "var(--text2)", margin: "0 0 16px" }}>{t("kalender.examsIntro")}</p>
 
       <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, marginBottom: 18 }}>
@@ -1199,7 +1203,9 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
   };
   return (
     <div style={standalone ? {} : { marginTop: 26, borderTop: "1px solid var(--border)", paddingTop: 18 }}>
-      <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{t("kalender.breaksTitle")}</h3>
+      {/* Titel nur im eingebetteten Fall (im Stundenplan) — als eigene Seite trägt
+          ihn schon der Abschnitts-h1 oben. */}
+      {!standalone && <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{t("kalender.breaksTitle")}</h3>}
       <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 12px", maxWidth: 620 }}>{t("kalender.breaksHint")}</p>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)" }}>
         <label style={{ fontSize: 12, color: "var(--text2)", display: "flex", flexDirection: "column", gap: 3 }}>{t("kalender.bundesland")}

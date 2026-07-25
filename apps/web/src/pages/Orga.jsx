@@ -105,7 +105,7 @@ export default function Orga() {
           </div>
         </div>
       ) : tab === "anwesenheit" ? <Anwesenheit /> : tab === "ausleihe" ? <Ausleihe /> : tab === "sitzplan" ? <Sitzplan /> : (<>
-      <h1 style={{ ...pageTitle, marginBottom: 14 }}>{t("orga.moduleTitle")}</h1>
+      <h1 style={{ ...pageTitle, marginBottom: 14 }}>{t("orga.tabChecklists")}</h1>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
         <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
       </div>

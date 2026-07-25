@@ -254,7 +254,9 @@ export default function Karten() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
-        <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("karten.title")}</h1>
+        {/* Abschnittstitel statt immer „Karten" — die Navbar zeigt das Modul schon;
+            auf Fortschritt/QR wäre „Karten" nur doppelt. */}
+        <h1 style={{ ...pageTitle, marginBottom: 0 }}>{view === "progress" ? t("karten.tabProgress") : view === "qr" ? t("karten.tabQr") : t("karten.title")}</h1>
         <span data-tour="karten-class" style={{ display: "inline-flex" }}><KursKlasseSelect value={subsetKurs ? null : classId} kursValue={wantKurs} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); setTokens(null); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} /></span>
         {subsetKurse.length > 0 && (
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
