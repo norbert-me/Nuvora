@@ -275,19 +275,21 @@ export default function NuvoraHome({ user }) {
           {!edit && isOn("cardvote") && <SchwacheWoche t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} methodenAktiv={isOn("methoden")} />}
           <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
             {(edit ? displayList : shown).map((m) => {
-              const inner = (<>
-                <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
+              // Dashboard braucht keine Erklärung (die steht unter „Module") —
+              // nur großes Icon + Name. Höhe bleibt wie zuvor (tileStyle).
+              const inner = (
+                <div style={{ fontSize: 17, fontWeight: 700, display: "flex", alignItems: "center", gap: 14 }}>
                   {edit && <span style={{ color: "var(--text3)", display: "inline-flex" }}><Icon d={ICONS.grip} size={16} /></span>}
                   {MODULE_ICONS[m.key] && (
-                    <span style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    <span style={{ flexShrink: 0, width: 52, height: 52, borderRadius: 12, display: "inline-flex", alignItems: "center", justifyContent: "center",
                       background: "var(--bg2, var(--bg))", color: "var(--text)" }}>
-                      <Icon d={MODULE_ICONS[m.key]} size={18} color="currentColor" />
+                      <Icon d={MODULE_ICONS[m.key]} size={32} color="currentColor" />
                     </span>
                   )}
                   <span>{name(m)}</span> <StageBadge stage={m.stage} />
                 </div>
-                <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.6 }}>{desc(m)}</div>
-              </>);
+              );
+              const tileStyle = { ...card, minHeight: 100, boxSizing: "border-box", display: "flex", alignItems: "center" };
               if (edit) {
                 // Bearbeiten: Karten sind ziehbar. Die gezogene Kachel wird zum
                 // gestrichelten Platzhalter, die restlichen weichen live aus —
@@ -309,7 +311,7 @@ export default function NuvoraHome({ user }) {
                     }}
                     onDrop={commit}
                     onDragEnd={() => { setDragKey(null); setOverKey(null); }}
-                    style={{ ...card, cursor: "grab", borderStyle: "dashed",
+                    style={{ ...tileStyle, cursor: "grab", borderStyle: "dashed",
                       ...(isDragged ? { opacity: 0.35, borderColor: "var(--accent)", background: "var(--bg2)" } : {}) }}>
                     {inner}
                   </div>
@@ -317,8 +319,8 @@ export default function NuvoraHome({ user }) {
               }
               // Externe Module leben ausserhalb der React-App — echter Seitenwechsel.
               return m.external
-                ? <a key={m.key} href={m.path} style={card}>{inner}</a>
-                : <Link key={m.key} to={m.path} style={card}>{inner}</Link>;
+                ? <a key={m.key} href={m.path} style={tileStyle}>{inner}</a>
+                : <Link key={m.key} to={m.path} style={tileStyle}>{inner}</Link>;
             })}
           </div>
         </>
