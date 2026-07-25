@@ -132,14 +132,27 @@ export const btnSmall = { padding: "5px 12px", fontSize: 13 };
 
 // Einheitliche Export-/Import-Knoepfe (Icon + Label) — moduluebergreifend
 // dasselbe Aussehen und Verhalten. Nie je Seite nachbauen.
-export function ExportButton({ label, onClick, style, ...props }) {
+export function ExportButton({ label, onClick, style, iconOnly, ...props }) {
+  if (iconOnly)
+    return (
+      <button onClick={onClick} className="icon-btn" style={{ ...iconBtn, ...style }} {...props}>
+        <Icon d={ICONS.export} size={18} />
+      </button>
+    );
   return (
     <button onClick={onClick} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6, ...style }} {...props}>
       <Icon d={ICONS.export} size={15} /> {label}
     </button>
   );
 }
-export function ImportButton({ label, onFile, accept = ".json,application/json", style, ...props }) {
+export function ImportButton({ label, onFile, accept = ".json,application/json", style, iconOnly, ...props }) {
+  if (iconOnly)
+    return (
+      <label className="icon-btn" style={{ ...iconBtn, cursor: "pointer", ...style }} {...props}>
+        <Icon d={ICONS.import} size={18} />
+        <input type="file" accept={accept} style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) onFile(e.target.files[0]); e.target.value = ""; }} />
+      </label>
+    );
   return (
     <label style={{ ...btnSecondary, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, ...style }} {...props}>
       <Icon d={ICONS.import} size={15} /> {label}

@@ -380,15 +380,13 @@ export default function Noten() {
             </select>
           </label>
         )}
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
-          {t("noten.term")}
-          <select value={term} onChange={(e) => setTerm(e.target.value)}
-            style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)" }}>
-            <option value="1">{t("noten.term1")}</option>
-            <option value="2">{t("noten.term2")}</option>
-            <option value="year">{t("noten.year")}</option>
-          </select>
-        </label>
+        <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden" }} title={t("noten.term")}>
+          {[["1", t("noten.term1")], ["2", t("noten.term2")], ["year", t("noten.year")]].map(([v, label]) => (
+            <button key={v} onClick={() => setTerm(v)}
+              style={{ padding: "6px 14px", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
+                background: term === v ? "var(--accent)" : "transparent", color: term === v ? "#fff" : "var(--text2)" }}>{label}</button>
+          ))}
+        </div>
         <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden" }} title={t("noten.aggHint")}>
           {[["mean", t("noten.aggMean")], ["median", t("noten.aggMedian")]].map(([m, label]) => (
             <button key={m} onClick={() => setAggPersist(m)}
@@ -398,9 +396,9 @@ export default function Noten() {
         </div>
         {term !== "year" && classId && (
           <div style={{ display: "flex", gap: 8, marginLeft: "auto", alignItems: "center" }}>
-            <ExportButton label={t("noten.export")} onClick={doExport} />
+            <ExportButton iconOnly title={t("noten.export")} onClick={doExport} />
             <button onClick={doZeugnis} style={btnSecondary} title={t("noten.zeugnisHint")}>{t("noten.zeugnis")}</button>
-            <ImportButton label={t("noten.import")} onFile={doImport} />
+            <ImportButton iconOnly title={t("noten.import")} onFile={doImport} />
             {cdAktiv && sections.length > 0 && <button onClick={() => setCdDialog(true)} style={btnSecondary} title={t("noten.fromCdHint")}>{t("noten.fromCd")}</button>}
             <button data-tour="noten-add" onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}
               className="icon-btn"

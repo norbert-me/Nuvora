@@ -157,7 +157,7 @@ export default function Methoden() {
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
         <h1 style={pageTitle}>{t("methoden.title")}</h1>
         <span style={{ flex: 1 }} />
-        <ExportButton label="" title={t("common.export")} onClick={doExport} />
+        <ExportButton iconOnly title={t("common.export")} onClick={doExport} />
         <div style={{ position: "relative" }}>
           <button onClick={() => setImpOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn }} title={t("common.import")}><Icon d={ICONS.import} size={18} /></button>
           {impOpen && (
