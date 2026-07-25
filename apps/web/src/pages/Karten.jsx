@@ -626,6 +626,13 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
     await call(() => fetch(`${API}/decks/${deck.id}/cards`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ front: frontV.trim(), back: backV.trim() }) }));
     setNewOpen(false);
   };
+  // Karten-Papierkorb je Stapel (Soft-Delete): auflisten, wiederherstellen, endgültig löschen.
+  const [cardTrashOpen, setCardTrashOpen] = useState(false);
+  const [cardTrash, setCardTrash] = useState([]);
+  const loadCardTrash = () => fetch(`${API}/decks/${deck.id}/cards/trash`).then((r) => (r.ok ? r.json() : [])).then((d) => setCardTrash(Array.isArray(d) ? d : [])).catch(() => {});
+  const toggleCardTrash = () => { const n = !cardTrashOpen; setCardTrashOpen(n); if (n) loadCardTrash(); };
+  const restoreCard = (id) => call(() => fetch(`${API}/cards/${id}/restore`, { method: "POST" })).then(loadCardTrash);
+  const purgeCard = async (id) => { if (!await askConfirm(t("karten.cardPurgeConfirm"))) return; await fetch(`${API}/cards/${id}/purge`, { method: "DELETE" }).catch(() => {}); loadCardTrash(); };
   const onCardDragOver = (e, id) => {
     e.preventDefault();
     if (dragCard == null || id === dragCard) { setCardDrop(null); return; }
@@ -806,9 +813,25 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         <CardEditModal card={cards.find((c) => c.id === editCard)} imgVer={imgVer} onUpload={uploadCardImg} onRemove={removeCardImg}
           onSave={saveEditCard} onClose={() => setEditCard(null)} t={t} />
       )}
-      <div style={{ marginTop: 10 }}>
+      <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <button onClick={() => setNewOpen(true)} style={{ ...btnPrimary, padding: "8px 16px", display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} color="#fff" /> {t("karten.newCard")}</button>
+        <button onClick={toggleCardTrash} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 12.5, display: "inline-flex", alignItems: "center", gap: 5 }}>
+          <Icon d={ICONS.trash} size={14} color="var(--text3)" /> {t("karten.cardTrash")} {cardTrashOpen ? "▲" : "▾"}
+        </button>
       </div>
+      {cardTrashOpen && (
+        <div style={{ marginTop: 8, border: "1px dashed var(--border2)", borderRadius: 10, padding: 10 }}>
+          {cardTrash.length === 0 ? (
+            <p style={{ fontSize: 12.5, color: "var(--text3)", margin: 0 }}>{t("karten.cardTrashEmpty")}</p>
+          ) : cardTrash.map((c) => (
+            <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", fontSize: 13 }}>
+              <span style={{ flex: 1, minWidth: 0, color: "var(--text3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><Latex>{c.front}</Latex> → <Latex>{c.back}</Latex></span>
+              <button onClick={() => restoreCard(c.id)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("karten.restore")}><Icon d={ICONS.restore || ICONS.refresh} size={15} color="var(--accent)" /></button>
+              <button onClick={() => purgeCard(c.id)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("karten.purge")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button>
+            </div>
+          ))}
+        </div>
+      )}
       </>)}
       {newOpen && (
         <CardEditModal card={{ id: null, front: "", back: "", has_front_image: false, has_back_image: false }} imgVer={imgVer}

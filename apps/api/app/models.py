@@ -958,6 +958,8 @@ class Card(Base):
     back_image_mime: Mapped[str] = mapped_column(String(120), default="", server_default="")
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Papierkorb je Karte: gesetzt = gelöscht (wiederherstellbar), sonst aktiv.
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
     deck: Mapped[CardDeck] = relationship(back_populates="cards")
 

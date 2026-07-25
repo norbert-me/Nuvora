@@ -175,6 +175,17 @@ class DeckOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+def _deck_out(deck) -> "DeckOut":
+    """DeckOut mit gefilterten Karten: gelöschte (deleted_at) bleiben draußen. Das
+    Relationship trägt delete-orphan — hier NICHT anfassen, nur beim Ausgeben filtern."""
+    return DeckOut(
+        id=deck.id, class_id=deck.class_id, kurs_id=deck.kurs_id, name=deck.name,
+        topic_id=deck.topic_id, niveau=deck.niveau, folder_id=deck.folder_id,
+        released_at=deck.released_at,
+        cards=[CardOut.model_validate(c) for c in deck.cards if c.deleted_at is None],
+    )
+
+
 # ─── Ordner (wie CardVote) zum Gruppieren der Stapel ───
 
 class CardFolderIn(BaseModel):
@@ -248,7 +259,7 @@ async def list_decks(class_id: int, kurs_id: Optional[int] = None, user: User = 
         select(CardDeck).where(CardDeck.owner_id == user.id, await _kurs_decks_where(cls, kurs_id), CardDeck.deleted_at.is_(None))
         .options(selectinload(CardDeck.cards)).order_by(CardDeck.position, CardDeck.id)
     )
-    return r.scalars().all()
+    return [_deck_out(d) for d in r.scalars().all()]
 
 
 @router.get("/classes/{class_id}/all-decks", response_model=List[DeckOut])
@@ -261,7 +272,7 @@ async def list_all_decks(class_id: int, user: User = Depends(require_module), db
         select(CardDeck).where(CardDeck.owner_id == user.id, await _class_all_decks_where(db, class_id), CardDeck.deleted_at.is_(None))
         .options(selectinload(CardDeck.cards)).order_by(CardDeck.position, CardDeck.id)
     )
-    return r.scalars().all()
+    return [_deck_out(d) for d in r.scalars().all()]
 
 
 @router.get("/classes/{class_id}/decks/trash", response_model=List[DeckOut])
@@ -273,7 +284,7 @@ async def list_deck_trash(class_id: int, kurs_id: Optional[int] = None, user: Us
         select(CardDeck).where(CardDeck.owner_id == user.id, await _kurs_decks_where(cls, kurs_id), CardDeck.deleted_at.is_not(None))
         .options(selectinload(CardDeck.cards)).order_by(CardDeck.deleted_at.desc())
     )
-    return r.scalars().all()
+    return [_deck_out(d) for d in r.scalars().all()]
 
 
 async def _schedule_deck_from_calendar(db: AsyncSession, user: User, deck: CardDeck) -> None:
@@ -485,6 +496,38 @@ async def update_card(card_id: int, body: CardIn, user: User = Depends(require_m
 
 @router.delete("/cards/{card_id}", status_code=204)
 async def delete_card(card_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Soft-Delete: die Karte wandert in den Papierkorb des Stapels."""
+    card = await db.get(Card, card_id)
+    if not card:
+        raise HTTPException(404, "Karte nicht gefunden")
+    await _owned_deck(db, user, card.deck_id)
+    card.deleted_at = _now()
+    await db.commit()
+
+
+@router.get("/decks/{deck_id}/cards/trash", response_model=List[CardOut])
+async def list_card_trash(deck_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Gelöschte Karten des Stapels (wiederherstellbar)."""
+    await _owned_deck(db, user, deck_id)
+    rows = (await db.execute(select(Card).where(Card.deck_id == deck_id, Card.deleted_at.is_not(None)).order_by(Card.deleted_at.desc()))).scalars().all()
+    return rows
+
+
+@router.post("/cards/{card_id}/restore", response_model=CardOut)
+async def restore_card(card_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    card = await db.get(Card, card_id)
+    if not card:
+        raise HTTPException(404, "Karte nicht gefunden")
+    await _owned_deck(db, user, card.deck_id)
+    card.deleted_at = None
+    await db.commit()
+    await db.refresh(card)
+    return card
+
+
+@router.delete("/cards/{card_id}/purge", status_code=204)
+async def purge_card(card_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Endgültig löschen (aus dem Papierkorb)."""
     card = await db.get(Card, card_id)
     if not card:
         raise HTTPException(404, "Karte nicht gefunden")
@@ -694,7 +737,7 @@ async def student_cards(class_id: int, student_id: int, kurs_id: Optional[int] =
     ))).scalars().all()}
     if not decks:
         return []
-    cards = (await db.execute(select(Card).where(Card.deck_id.in_(decks.keys())).order_by(Card.deck_id, Card.position))).scalars().all()
+    cards = (await db.execute(select(Card).where(Card.deck_id.in_(decks.keys()), Card.deleted_at.is_(None)).order_by(Card.deck_id, Card.position))).scalars().all()
     reviews = {r.card_id: r for r in (await db.execute(select(CardReview).where(CardReview.student_id == student_id))).scalars().all()}
     out = []
     for c in cards:
@@ -808,7 +851,7 @@ async def student_session(token: str, all: bool = False, db: AsyncSession = Depe
     ))).scalars().all()
     if not decks:
         return {"name": st.name, "cards": [], "total": 0, "due": 0, "learned": 0, "hist": _empty_hist()}
-    cards = (await db.execute(select(Card).where(Card.deck_id.in_(decks)).order_by(Card.position))).scalars().all()
+    cards = (await db.execute(select(Card).where(Card.deck_id.in_(decks), Card.deleted_at.is_(None)).order_by(Card.position))).scalars().all()
     reviews = {r.card_id: r for r in (await db.execute(select(CardReview).where(CardReview.student_id == st.id))).scalars().all()}
     faellig = []
     hist = _empty_hist()
