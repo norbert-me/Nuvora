@@ -513,7 +513,7 @@ export default function Kalender() {
       {view === "day" && <DayView extColor={extColor} day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} slotsFor={slotsFor} cancelledFor={cancelledFor} onCancelSlot={cancelSlot} onRestoreSlot={restoreSlot} frei={frei} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
       {view === "timetable" && <TimetableView tt={tt} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
-      {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
+      {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} kursName={kursName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
       {abo && (
         <div {...overlayGuard(() => setAbo(null))} style={modalOverlay}>
           <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 500 }}>
@@ -1274,7 +1274,7 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onClo
   );
 }
 
-function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders = [], puzzles = [], aktiv = {}, topicName = () => "", onSave, onDelete, onClose, t }) {
+function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders = [], puzzles = [], aktiv = {}, topicName = () => "", kursName = () => "", onSave, onDelete, onClose, t }) {
   const navigate = useNavigate();
   // "Ergebnis als Note": die gelaufene Session zum verknüpften Quiz suchen und
   // deren Auswertung mit direkt geöffnetem Noten-Import ansteuern.
@@ -1341,7 +1341,9 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   const istInformatik = /informatik/i.test((classId && (classes.find((c) => c.id === Number(classId)) || {}).name) || "");
   // Bestehender Eintrag oeffnet zuerst als Ansicht; neuer direkt im Bearbeiten.
   const [edit, setEdit] = useState(!entry.id);
-  const clsName = classId && (classes.find((c) => c.id === Number(classId)) || {}).name;
+  // Anzeige denkt in Kursen: liegt ein Kurs am Eintrag, zeigen wir dessen Namen
+  // (Fach), sonst die Fach-Klasse. So trägt auch der Klassenarbeit-Eintrag den Kurs.
+  const clsName = (kursId && kursName(kursId)) || (classId && (classes.find((c) => c.id === Number(classId)) || {}).name);
   const topName = topicId && (() => { const tp = topics.find((x) => x.id === Number(topicId)); return tp ? topicLabel(tp) : ""; })();
   const methName = methodId && (methods.find((m) => m.id === Number(methodId)) || {}).title;
   const linkList = [

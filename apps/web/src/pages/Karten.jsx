@@ -835,6 +835,23 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t })
   const [back, setBack] = useState(card.back || "");
   const inpS = { padding: "8px 10px", border: "1px solid var(--border2)", borderRadius: 8, background: "var(--bg)", color: "var(--text)", fontSize: 14, width: "100%", boxSizing: "border-box", resize: "vertical" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
+  // LaTeX-Schnelltasten fügen in das zuletzt fokussierte Feld ein (wie in der Anlege-Maske).
+  const frontRef = useRef(null), backRef = useRef(null), activeField = useRef("front");
+  const insertLatex = (tex, offset) => {
+    const isBack = activeField.current === "back";
+    const input = isBack ? backRef.current : frontRef.current;
+    const val = isBack ? back : front;
+    const setter = isBack ? setBack : setFront;
+    if (!input) return;
+    const start = input.selectionStart || 0, end = input.selectionEnd || 0;
+    const sel = val.slice(start, end);
+    let insert = tex; if (sel && tex.includes("{}")) insert = tex.replace("{}", `{${sel}}`);
+    const before = val.slice(0, start);
+    const needsDollar = !before.includes("$") || before.split("$").length % 2 === 1;
+    const wrapped = needsDollar ? `$${insert}$` : insert;
+    setter(before + wrapped + val.slice(end));
+    setTimeout(() => { const pos = start + wrapped.length + (offset || 0); input.focus(); input.setSelectionRange(pos, pos); }, 0);
+  };
   // Nur schließen, wenn Klick wirklich auf dem Overlay begann und endete (Textauswahl-Schutz).
   const downOnOverlay = useRef(false);
   return (
@@ -847,15 +864,24 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t })
           <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
         </div>
 
+        {/* LaTeX-Schnelltasten (fügen ins zuletzt fokussierte Feld). */}
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", margin: "4px 0 6px" }}>
+          {LATEX_BUTTONS.map((b) => (
+            <button key={b.label} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insertLatex(b.tex, b.cursor)}
+              style={{ padding: "3px 8px", fontSize: 13, border: "1px solid var(--border2)", borderRadius: 6, background: "var(--card)", cursor: "pointer", fontFamily: "serif", color: "var(--text)" }}>{b.label}</button>
+          ))}
+          <span style={{ fontSize: 11, color: "var(--text3)", marginLeft: 4 }}>{t("karten.latexHint")}</span>
+        </div>
+
         <div style={lbl}>{t("karten.front")}</div>
-        <textarea value={front} onChange={(e) => setFront(e.target.value)} rows={2} style={inpS} />
+        <textarea ref={frontRef} onFocus={() => (activeField.current = "front")} value={front} onChange={(e) => setFront(e.target.value)} rows={2} style={inpS} />
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
           <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("karten.imgFront")}</span>
           <CardImgCtl cardId={card.id} side="front" has={card.has_front_image} imgVer={imgVer} onUpload={onUpload} onRemove={onRemove} t={t} />
         </div>
 
         <div style={lbl}>{t("karten.back")}</div>
-        <textarea value={back} onChange={(e) => setBack(e.target.value)} rows={2} style={inpS} />
+        <textarea ref={backRef} onFocus={() => (activeField.current = "back")} value={back} onChange={(e) => setBack(e.target.value)} rows={2} style={inpS} />
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
           <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("karten.imgBack")}</span>
           <CardImgCtl cardId={card.id} side="back" has={card.has_back_image} imgVer={imgVer} onUpload={onUpload} onRemove={onRemove} t={t} />
