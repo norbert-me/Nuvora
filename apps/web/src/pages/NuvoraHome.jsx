@@ -280,7 +280,7 @@ export default function NuvoraHome({ user }) {
                   {edit && <span style={{ color: "var(--text3)", display: "inline-flex" }}><Icon d={ICONS.grip} size={16} /></span>}
                   {MODULE_ICONS[m.key] && (
                     <span style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center",
-                      background: "var(--accent-bg, rgba(10,132,255,0.12))", color: "var(--accent)" }}>
+                      background: "var(--bg2, var(--bg))", color: "var(--text)" }}>
                       <Icon d={MODULE_ICONS[m.key]} size={18} color="currentColor" />
                     </span>
                   )}

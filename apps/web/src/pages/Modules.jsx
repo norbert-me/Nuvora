@@ -124,7 +124,7 @@ export default function Modules() {
           >
             {MODULE_ICONS[m.key] && (
               <div style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center",
-                background: m.active ? "var(--accent-bg, rgba(10,132,255,0.12))" : "var(--bg2, var(--bg))", color: m.active ? "var(--accent)" : "var(--text3)" }}>
+                background: "var(--bg2, var(--bg))", color: m.active ? "var(--text)" : "var(--text3)" }}>
                 <Icon d={MODULE_ICONS[m.key]} size={22} color="currentColor" />
               </div>
             )}
