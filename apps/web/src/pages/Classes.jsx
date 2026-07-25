@@ -14,6 +14,7 @@ import { undoDelete } from "../core/undo.jsx";
 import { useSearchParams, Link } from "react-router-dom";
 import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
+import AuthImage from "../components/AuthImage.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
 import { peek, put } from "../core/cache.js";
@@ -192,6 +193,21 @@ export default function Classes() {
     setStudentField(idx, "foerder", cur.includes(wert) ? cur.filter((f) => f !== wert) : [...cur, wert]);
   };
 
+  // Foto je SuS (personenbezogen, eigener Endpoint). photoVer erzwingt Neu-Laden
+  // der Vorschau nach Upload/Löschen.
+  const [photoVer, setPhotoVer] = useState(0);
+  const uploadPhoto = async (idx, sid, file) => {
+    if (!file || !sid) return;
+    const fd = new FormData(); fd.append("file", file);
+    const r = await fetch(`/api/classes/students/${sid}/photo`, { method: "POST", body: fd }).catch(() => null);
+    if (r && r.ok) { setStudentField(idx, "has_photo", true); setPhotoVer((v) => v + 1); }
+  };
+  const removePhoto = async (idx, sid) => {
+    if (!sid) return;
+    await fetch(`/api/classes/students/${sid}/photo`, { method: "DELETE" }).catch(() => {});
+    setStudentField(idx, "has_photo", false); setPhotoVer((v) => v + 1);
+  };
+
   const removeStudent = async (idx) => {
     if (!await askConfirm(t("classes.removeCardConfirm"))) return;
     const updated = students.filter((_, i) => i !== idx);
@@ -264,6 +280,20 @@ export default function Classes() {
 
             {detailsFor === idx && (
               <div style={{ margin: "0 0 12px 52px", padding: 16, border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)" }}>
+                {/* Foto der Person (personenbezogen; nie im Export). */}
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>{t("classes.photo")}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                  {s.id && s.has_photo && <AuthImage src={`/api/classes/students/${s.id}/photo`} reloadKey={photoVer} style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 10, border: "1px solid var(--border2)" }} />}
+                  {s.id ? (
+                    <>
+                      <label style={{ ...btnSecondary, cursor: "pointer", padding: "6px 12px", fontSize: 13 }}>
+                        {s.has_photo ? t("classes.photoChange") : t("classes.photoAdd")}
+                        <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files[0]; e.target.value = ""; uploadPhoto(idx, s.id, f); }} />
+                      </label>
+                      {s.has_photo && <button type="button" onClick={() => removePhoto(idx, s.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>}
+                    </>
+                  ) : <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("classes.photoSaveFirst")}</span>}
+                </div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>{t("classes.classTeacher")}</div>
                 <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
                   <input

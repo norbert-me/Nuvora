@@ -1,6 +1,7 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -77,6 +78,7 @@ class StudentOut(BaseModel):
     foerder: Optional[List[str]] = None
     notizen: str = ""
     klassenlehrer: str = ""
+    has_photo: bool = False
     model_config = {"from_attributes": True}
 
 
@@ -311,3 +313,56 @@ async def _load_class(db: AsyncSession, class_id: int) -> Optional[SchoolClass]:
         select(SchoolClass).options(selectinload(SchoolClass.students)).where(SchoolClass.id == class_id)
     )
     return result.scalar_one_or_none()
+
+
+# ─── SuS-Foto (personenbezogen; NIE in Export/Marktplatz) ───
+_PHOTO_MAX = 5 * 1024 * 1024  # 5 MB
+
+
+async def _owned_student(db: AsyncSession, user: User, student_id: int) -> Student:
+    st = await db.get(Student, student_id)
+    if not st:
+        raise HTTPException(404, "Schüler nicht gefunden")
+    cls = await db.get(SchoolClass, st.class_id)
+    if not cls or cls.owner_id != user.id:
+        raise HTTPException(404, "Schüler nicht gefunden")
+    return st
+
+
+@router.post("/students/{student_id}/photo", response_model=StudentOut)
+async def upload_student_photo(student_id: int, file: UploadFile = File(...),
+                               user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    rate_limit("student_photo", f"u{user.id}", 120, 60, "Zu viele Uploads. Bitte kurz warten.")
+    st = await _owned_student(db, user, student_id)
+    mime = (file.content_type or "").lower()
+    if not mime.startswith("image/"):
+        raise HTTPException(400, "Nur Bilddateien erlaubt")
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "Datei ist leer")
+    if len(data) > _PHOTO_MAX:
+        raise HTTPException(413, "Bild zu groß (max. 5 MB)")
+    st.photo = data
+    st.photo_mime = mime[:120]
+    await db.commit()
+    await db.refresh(st)
+    return st
+
+
+@router.delete("/students/{student_id}/photo", response_model=StudentOut)
+async def delete_student_photo(student_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    st = await _owned_student(db, user, student_id)
+    st.photo = None
+    st.photo_mime = ""
+    await db.commit()
+    await db.refresh(st)
+    return st
+
+
+@router.get("/students/{student_id}/photo")
+async def get_student_photo(student_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await _owned_student(db, user, student_id)
+    row = (await db.execute(select(Student.photo, Student.photo_mime).where(Student.id == student_id))).first()
+    if not row or not row[0]:
+        raise HTTPException(404, "Kein Foto")
+    return Response(content=row[0], media_type=row[1] or "image/jpeg", headers={"Cache-Control": "private, max-age=3600"})

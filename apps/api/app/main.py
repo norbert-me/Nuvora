@@ -230,6 +230,8 @@ def _ensure_columns(sync_conn):
         ("calendar_entries", "kurs_id", "INTEGER"),
         ("calendar_entries", "verlaufsplan", "JSON"),
         ("topics", "notes", "TEXT DEFAULT '' NOT NULL"),
+        ("students", "photo", "BYTEA"),
+        ("students", "photo_mime", "VARCHAR(120) DEFAULT '' NOT NULL"),
         ("materials", "method_id", "INTEGER"),
         ("cards", "front_image", "BYTEA"),
         ("cards", "front_image_mime", "VARCHAR(120) DEFAULT '' NOT NULL"),

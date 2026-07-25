@@ -263,8 +263,16 @@ class Student(Base):
     # wie "Mathe 7.5" mischt Kinder aus mehreren Klassen mit je eigener
     # Klassenleitung. Freitext, weil Lehrkraefte keine Nuvora-Konten sind.
     klassenlehrer: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    # Optionales Foto der Person — personenbezogen, NIE in Export/Marktplatz. Blob
+    # deferred (Listen laden es nicht); die mime-Spalte signalisiert, OB eins da ist.
+    photo: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True, deferred=True)
+    photo_mime: Mapped[str] = mapped_column(String(120), default="", server_default="")
 
     school_class: Mapped[SchoolClass] = relationship(back_populates="students")
+
+    @property
+    def has_photo(self) -> bool:
+        return bool(self.photo_mime)
 
 
 class MarketplaceQuiz(Base):
