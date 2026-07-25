@@ -1139,7 +1139,7 @@ function ExamPanel({ overview, onAdd, onUpd, onDel, t }) {
                 <div style={{ fontSize: 12.5, color: "var(--text3)" }}>{new Date(e.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontSize: 20, fontWeight: 800, color: "var(--accent)" }}>{e.stunden}</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: "var(--text)" }}>{e.stunden}</div>
                 <div style={{ fontSize: 11, color: "var(--text3)" }}>{t("kalender.examStunden")}</div>
               </div>
               <button onClick={() => startEdit(e)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
