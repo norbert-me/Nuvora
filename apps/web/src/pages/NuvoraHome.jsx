@@ -297,14 +297,15 @@ export default function NuvoraHome({ user }) {
                   <div key={m.key} draggable
                     onDragStart={() => setDragKey(m.key)}
                     onDragOver={(e) => e.preventDefault()}
-                    // Beim Betreten einer ANDEREN Kachel dorthin einsortieren; beim
-                    // Zurückkommen auf die eigene (Ursprungs-)Kachel die Vorschau
-                    // auf die Ausgangsreihenfolge zurücksetzen (sonst zeigt der
-                    // Originalplatz noch die letzte Nachbar-Vorschau).
+                    // Beim Betreten einer ANDEREN Kachel dorthin einsortieren. Den
+                    // gestrichelten Platzhalter (eigene Kachel) bewusst ignorieren:
+                    // Nach dem Umsortieren liegt er unter dem Cursor; würde man ihn
+                    // auf die Ausgangsreihenfolge zurücksetzen, spränge die Vorschau
+                    // sofort zurück und der Cursor stünde wieder überm Nachbarn —
+                    // das erzeugte das Flackern.
                     onDragEnter={() => {
-                      if (!dragKey) return;
-                      if (m.key !== dragKey) { if (overKey !== m.key) setOverKey(m.key); }
-                      else if (overKey !== dragKey) setOverKey(dragKey);
+                      if (!dragKey || m.key === dragKey) return;
+                      if (overKey !== m.key) setOverKey(m.key);
                     }}
                     onDrop={commit}
                     onDragEnd={() => { setDragKey(null); setOverKey(null); }}
