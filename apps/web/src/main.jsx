@@ -201,7 +201,11 @@ const getModuleNavItems = (t, location) => {
     ];
   }
   if (area === "zufall") {
-    return [{ to: ZUF, label: t("zufall.title") }];
+    const cur = params.get("tab");
+    return [
+      { to: ZUF, label: t("zufall.navDraw"), active: cur !== "gruppen" },
+      { to: `${ZUF}?tab=gruppen`, label: t("zufall.navGroups"), active: cur === "gruppen" },
+    ];
   }
   if (area === "klassenarbeit") {
     return [

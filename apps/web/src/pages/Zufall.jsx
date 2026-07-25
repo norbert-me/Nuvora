@@ -2,7 +2,8 @@
 // Klasse. Reiner Client: liest nur die Kern-Klassen, speichert nichts.
 // "Ohne Wiederholung" merkt sich die schon Gezogenen, bis die Klasse durch ist.
 import { useState, useEffect, useMemo } from "react";
-import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Toggle, Tabs } from "../components/Icons.jsx";
+import { useSearchParams } from "react-router-dom";
+import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Toggle } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
@@ -27,7 +28,10 @@ export default function Zufall() {
   const [absent, setAbsent] = useState(new Set()); // heute abwesende IDs
   const [aktuell, setAktuell] = useState(null);
   const [rollt, setRollt] = useState(false);
-  const [tab, setTab] = useState("ziehen");        // ziehen | gruppen
+  // Unterseite kommt aus der Navbar (?tab=gruppen), damit Ziehen und Gruppen
+  // eigene Menuepunkte sind statt interner Reiter.
+  const [params] = useSearchParams();
+  const tab = params.get("tab") === "gruppen" ? "gruppen" : "ziehen";
   const [groupMode, setGroupMode] = useState("count"); // count = Anzahl Gruppen | size = SuS je Gruppe
   const [groupN, setGroupN] = useState(4);
   const [groups, setGroups] = useState([]);
@@ -134,11 +138,7 @@ export default function Zufall() {
 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto" }}>
-      <h1 style={pageTitle}>{t("zufall.title")}</h1>
-
-      <div style={{ marginBottom: 16 }}>
-        <Tabs value={tab} onChange={setTab} options={[["ziehen", t("zufall.tabDraw")], ["gruppen", t("zufall.tabGroups")]]} />
-      </div>
+      <h1 style={pageTitle}>{tab === "gruppen" ? t("zufall.navGroups") : t("zufall.navDraw")}</h1>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
         <KursKlasseSelect value={classId} onChange={setClassId} />

@@ -137,11 +137,11 @@ REGISTRY: List[ModuleDef] = [
     ModuleDef(
         key="zufall",
         group="werkzeug",
-        name="Zufallsschüler",
+        name="Zufall",
         description=(
-            "Zieht per Knopfdruck eine zufällige Person aus einer Klasse — fair "
-            "gewichtet nach der Zeit seit dem letzten Ziehen, nicht zweimal am "
-            "Stück."
+            "Zwei Werkzeuge: Zufallsschüler zieht per Knopfdruck eine faire "
+            "Person aus der Klasse (gewichtet nach Zeit seit dem letzten Ziehen), "
+            "Zufallsgruppe teilt die Klasse in Gruppen — nach Anzahl oder Größe."
         ),
         path="/zufall",
         stage="stable",
