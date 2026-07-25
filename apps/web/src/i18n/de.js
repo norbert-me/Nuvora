@@ -753,7 +753,7 @@ export default {
   "noten.supportNeeds": "Förderschwerpunkte",
   "noten.classTeacher": "Klassenleitung",
   "noten.notes": "Notizen",
-  "noten.verlauf": "Notenverlauf",
+  "noten.verlauf": "Verlauf der Gesamtnote",
   "noten.verlaufAxis": "älteste → neueste",
   "noten.gradesBySection": "Noten nach Abschnitt",
   "noten.noGrades": "Noch keine Noten.",

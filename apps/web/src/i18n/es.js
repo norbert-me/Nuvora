@@ -723,7 +723,7 @@ export default {
   "noten.supportNeeds": "Necesidades",
   "noten.classTeacher": "Tutor/a",
   "noten.notes": "Notas",
-  "noten.verlauf": "Evolución de notas",
+  "noten.verlauf": "Evolución de la nota global",
   "noten.verlaufAxis": "más antigua → más reciente",
   "noten.gradesBySection": "Notas por sección",
   "noten.noGrades": "Aún no hay notas.",

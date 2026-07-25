@@ -1087,7 +1087,7 @@ function GradeChart({ series, t }) {
         {pts.map((p, i) => (
           <g key={i}>
             <circle cx={p.cx} cy={p.cy} r="4" fill="var(--accent)" stroke="var(--card)" strokeWidth="1.5" />
-            <title>{`${p.s.cat.name}: ${de(p.s.value)}`}</title>
+            <title>{`${p.s.cat.name}: ${de(Math.round(p.s.value * 10) / 10)}`}</title>
           </g>
         ))}
       </svg>
@@ -1098,12 +1098,32 @@ function GradeChart({ series, t }) {
 
 function StudentInfo({ t, student, summary, sections, entries = [], className, onZeugnis, onClose }) {
   if (!student) return null;
-  // Serie: je Kategorie (Zeitreihenfolge) die letzte Note der Person.
-  const cats = sections.flatMap((s) => s.categories || []);
-  const series = cats.map((c) => {
-    const es = entries.filter((e) => e.student_id === student.id && e.category_id === c.id && e.kind === "grade" && e.value != null);
-    return es.length ? { cat: c, value: es[es.length - 1].value } : null;
-  }).filter(Boolean);
+  // Verlauf der GESAMTNOTE (gewichtet) über die Zeit: nach jeder neuen Note die
+  // gewichtete Gesamtnote aus allen bis dahin vorhandenen Noten. Kategorien in
+  // Zeitreihenfolge (created_at, sonst Reihenfolge Abschnitt/Kategorie).
+  const cats = sections.flatMap((s, si) => (s.categories || []).map((c, ci) => ({ ...c, secId: s.id, ord: si * 1000 + ci })));
+  cats.sort((a, b) => (a.created_at && b.created_at ? String(a.created_at).localeCompare(String(b.created_at)) : a.ord - b.ord));
+  const gradeOf = (cid) => {
+    const es = entries.filter((e) => e.student_id === student.id && e.category_id === cid && e.kind === "grade" && e.value != null);
+    return es.length ? es[es.length - 1].value : null;
+  };
+  const overallUpTo = (prefixIds) => {
+    const secAvgs = [];
+    sections.forEach((sec) => {
+      const vals = (sec.categories || []).filter((c) => prefixIds.has(c.id)).map((c) => gradeOf(c.id)).filter((v) => v != null);
+      if (vals.length) secAvgs.push({ avg: vals.reduce((a, b) => a + b, 0) / vals.length, w: sec.weight || 0 });
+    });
+    if (!secAvgs.length) return null;
+    const tw = secAvgs.reduce((a, s) => a + s.w, 0);
+    return tw > 0 ? secAvgs.reduce((a, s) => a + s.avg * s.w, 0) / tw : secAvgs.reduce((a, s) => a + s.avg, 0) / secAvgs.length;
+  };
+  const prefix = new Set();
+  const series = [];
+  cats.forEach((c) => {
+    prefix.add(c.id);
+    const v = overallUpTo(prefix);
+    if (v != null) series.push({ cat: c, value: v });
+  });
   return (
     <div onClick={onClose} style={overlay}>
       <div onClick={(e) => e.stopPropagation()} style={modal}>
