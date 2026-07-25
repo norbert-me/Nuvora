@@ -891,6 +891,7 @@ export default {
   "kalender.examTitle": "Title (optional)",
   "kalender.examsEmpty": "No upcoming class tests yet.",
   "kalender.examStunden": "lessons until then",
+  "kalender.openExamWork": "Open analysis",
   "kalender.notes": "Notes",
   "kalender.mon": "Mon", "kalender.tue": "Tue", "kalender.wed": "Wed", "kalender.thu": "Thu", "kalender.fri": "Fri", "kalender.sat": "Sat", "kalender.sun": "Sun",
   "kalender.method": "Starter",

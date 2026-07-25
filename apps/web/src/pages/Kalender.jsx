@@ -1142,6 +1142,12 @@ function ExamPanel({ overview, onAdd, onUpd, onDel, t }) {
                 <div style={{ fontSize: 20, fontWeight: 800, color: "var(--text)" }}>{e.stunden}</div>
                 <div style={{ fontSize: 11, color: "var(--text3)" }}>{t("kalender.examStunden")}</div>
               </div>
+              {/* Auto-verknüpfte Auswertung im Modul „Klassenarbeit" öffnen. */}
+              {e.work_id && e.class_id && (
+                <Link to={`/klassenarbeit?class=${e.class_id}&work=${e.work_id}`} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("kalender.openExamWork")}>
+                  <Icon d={ICONS.chart} size={16} color="var(--accent)" />
+                </Link>
+              )}
               <button onClick={() => startEdit(e)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
               <button onClick={() => onDel(e.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>
             </>

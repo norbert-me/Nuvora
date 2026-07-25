@@ -15,7 +15,7 @@ from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import CalendarBreak, CalendarEntry, CardDeck, ExamDate, Kurs, SchoolClass, TimetableSlot, SlotCancellation, Topic, User, Session as TestSession
+from ..models import CalendarBreak, CalendarEntry, CardDeck, ExamDate, Kurs, SchoolClass, TimetableSlot, SlotCancellation, Topic, User, WorkAnalysis, Session as TestSession
 from .auth import get_current_user, rate_limit
 from .modules import is_active
 
@@ -327,6 +327,7 @@ class ExamIn(BaseModel):
 
 class ExamOut(ExamIn):
     id: int
+    work_id: Optional[int] = None   # verknüpfte Auswertung im Modul „Klassenarbeit"
     model_config = {"from_attributes": True}
 
 
@@ -339,6 +340,30 @@ async def list_exams(user: User = Depends(require_module), db: AsyncSession = De
 def _exam_title(title: str) -> str:
     t = (title or "").strip()
     return f"Klassenarbeit: {t}" if t else "Klassenarbeit"
+
+
+def _work_name(title: str) -> str:
+    return (title or "").strip()[:200] or "Klassenarbeit"
+
+
+async def _ensure_work(db: AsyncSession, user: User, e: ExamDate) -> None:
+    """Bei aktivem Modul „Klassenarbeit auswerten" zum Termin eine leere Auswertung
+    anlegen (nur mit Klasse; die braucht das Raster). Vorhandene wird nur umbenannt,
+    nie neu erzeugt — Ergebnisse dürfen nicht verloren gehen (Regel: Live-Daten)."""
+    if e.work_id:
+        w = await db.get(WorkAnalysis, e.work_id)
+        if w and w.owner_id == user.id:
+            w.name = _work_name(e.title)
+        return
+    if e.class_id is None:
+        return
+    if not await is_active(db, user.id, "klassenarbeit"):
+        return
+    w = WorkAnalysis(owner_id=user.id, class_id=e.class_id, kurs_id=e.kurs_id,
+                     name=_work_name(e.title), tasks=[], results={})
+    db.add(w)
+    await db.flush()
+    e.work_id = w.id
 
 
 @router.post("/klassenarbeiten", response_model=ExamOut, status_code=201)
@@ -354,6 +379,7 @@ async def create_exam(body: ExamIn, user: User = Depends(require_module), db: As
     db.add(entry)
     await db.flush()
     e.entry_id = entry.id
+    await _ensure_work(db, user, e)
     await db.commit()
     await db.refresh(e)
     return e
@@ -380,6 +406,8 @@ async def update_exam(exam_id: int, body: ExamIn, user: User = Depends(require_m
         db.add(entry)
         await db.flush()
         e.entry_id = entry.id
+    # Auswertung anlegen (falls Modul inzwischen aktiv) bzw. Namen mitziehen.
+    await _ensure_work(db, user, e)
     await db.commit()
     await db.refresh(e)
     return e
@@ -395,6 +423,12 @@ async def delete_exam(exam_id: int, user: User = Depends(require_module), db: As
         entry = await db.get(CalendarEntry, e.entry_id)
         if entry and entry.owner_id == user.id:
             await db.delete(entry)
+    # Verknüpfte Auswertung nur löschen, wenn sie noch leer ist (nie befüllte
+    # Ergebnisse mitreißen — Regel: Live-Daten schützen).
+    if e.work_id:
+        w = await db.get(WorkAnalysis, e.work_id)
+        if w and w.owner_id == user.id and not (w.tasks or w.results):
+            await db.delete(w)
     await db.delete(e)
     await db.commit()
 
@@ -480,7 +514,7 @@ async def exam_overview(user: User = Depends(require_module), db: AsyncSession =
         stunden = len(occ)
         out.append({
             "id": ex.id, "date": ex.date.isoformat(), "title": ex.title,
-            "kurs_id": ex.kurs_id, "class_id": ex.class_id,
+            "kurs_id": ex.kurs_id, "class_id": ex.class_id, "work_id": ex.work_id,
             "kurs": kurse.get(ex.kurs_id) if ex.kurs_id else None,
             "klasse": id2cls.get(ex.class_id) if ex.class_id else None,
             "stunden": stunden,

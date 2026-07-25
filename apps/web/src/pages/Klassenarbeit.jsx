@@ -3,6 +3,7 @@
 // Daraus LIVE je SuS ein Fehlerprofil nach Thema, eine Note (Punkte/Max → Skala)
 // und gezielte Wiederholung (Karten des schwachen Themas wieder fällig).
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, overlayGuard, modalOverlay, modalPanel, Boxplot, StatCard } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -60,7 +61,11 @@ export default function Klassenarbeit() {
   // Note-Anzeige NUR aus der Profil-Präferenz (eine Person, eine Präferenz —
   // kein Umschalter je Seite mehr). "note" = Symbol 2+, "wert" = Dezimal 2,3.
   const gradeMode = (() => { try { const u = JSON.parse(localStorage.getItem("user")); return u && u.grade_tendency === false ? "wert" : "note"; } catch { return "note"; } })();
-  const [classId, setClassId] = useState(null);
+  // Deep-Link aus dem Kalender: ?class=…&work=… öffnet direkt die verknüpfte
+  // Auswertung. Klasse als Startwert, gewünschte Auswertung merken bis geladen.
+  const [params] = useSearchParams();
+  const wantWork = useRef(Number(params.get("work")) || null);
+  const [classId, setClassId] = useState(Number(params.get("class")) || null);
   const [kursId, setKursId] = useState(null);
   const [subsetKurs, setSubsetKurs] = useState(null); // gewählter Teilkurs (Kurs aus Teilen von Klassen) oder null
   const [subsetKurse, setSubsetKurse] = useState([]); // Kurse mit einzeln hinzugefügten SuS
@@ -100,7 +105,14 @@ export default function Klassenarbeit() {
     if (classId) rememberClass(classId);
     if (!classId) { setStudents([]); setWorks([]); setWork(null); return; }
     fetch(`${API}/classes/${classId}/students`).then((r) => (r.ok ? r.json() : [])).then((d) => setStudents(Array.isArray(d) ? d : [])).catch(() => {});
-    fetch(`${API}/classes/${classId}/works${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => { const l = Array.isArray(d) ? d : []; setWorks(l); setWork(l[0] || null); }).catch(() => {});
+    fetch(`${API}/classes/${classId}/works${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+      const l = Array.isArray(d) ? d : [];
+      setWorks(l);
+      // Deep-Link: gewünschte Auswertung wählen, sonst die neueste.
+      const target = wantWork.current ? l.find((x) => x.id === wantWork.current) : null;
+      if (target) wantWork.current = null;
+      setWork(target || l[0] || null);
+    }).catch(() => {});
   }, [classId, kursId, subsetKurs]);
 
   const topicLabel = (id) => { const tp = topics.find((x) => x.id === id); if (!tp) return ""; const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };

@@ -891,6 +891,7 @@ export default {
   "kalender.examTitle": "Título (opcional)",
   "kalender.examsEmpty": "Aún no hay exámenes próximos.",
   "kalender.examStunden": "horas hasta entonces",
+  "kalender.openExamWork": "Abrir análisis",
   "kalender.notes": "Notas",
   "kalender.mon": "Lun", "kalender.tue": "Mar", "kalender.wed": "Mié", "kalender.thu": "Jue", "kalender.fri": "Vie", "kalender.sat": "Sáb", "kalender.sun": "Dom",
   "kalender.method": "Inicio",

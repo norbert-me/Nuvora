@@ -171,6 +171,42 @@ async def test_exam_crud_and_overview(s):
 
 
 @pytest.mark.asyncio
+async def test_exam_auto_creates_work_when_module_active(s):
+    """Bei aktivem Modul „Klassenarbeit" entsteht zum Termin automatisch eine leere
+    Auswertung; ohne das Modul nicht. Eine leere wird beim Löschen mitgenommen,
+    eine befüllte bleibt (Live-Daten)."""
+    from datetime import datetime, timezone, timedelta
+    from app.models import UserModule, WorkAnalysis
+    from app.routers import kalender as K
+    u = User(email="w@d.de", password_hash="x", name="L"); s.add(u); await s.flush()
+    s.add(UserModule(user_id=u.id, module_key="kalender"))
+    a = SchoolClass(name="7a", owner_id=u.id); s.add(a); await s.commit()
+    d = datetime.now(timezone.utc) + timedelta(days=10)
+
+    # Modul NICHT aktiv -> keine Auswertung.
+    ex1 = await K.create_exam(K.ExamIn(date=d, title="Ohne", class_id=a.id), user=u, db=s)
+    assert ex1.work_id is None
+
+    # Modul aktiv -> Auswertung automatisch, leer, gleicher Name.
+    s.add(UserModule(user_id=u.id, module_key="klassenarbeit")); await s.commit()
+    ex2 = await K.create_exam(K.ExamIn(date=d, title="Bruchrechnung", class_id=a.id), user=u, db=s)
+    assert ex2.work_id is not None
+    w = await s.get(WorkAnalysis, ex2.work_id)
+    assert w is not None and w.name == "Bruchrechnung" and (w.tasks or []) == []
+
+    # Leere Auswertung wird beim Löschen des Termins mitgenommen.
+    await K.delete_exam(ex2.id, user=u, db=s)
+    assert await s.get(WorkAnalysis, w.id) is None
+
+    # Befüllte Auswertung bleibt.
+    ex3 = await K.create_exam(K.ExamIn(date=d, title="Terme", class_id=a.id), user=u, db=s)
+    w3 = await s.get(WorkAnalysis, ex3.work_id)
+    w3.tasks = [{"id": "t1", "label": "x", "topic_id": None}]; await s.commit()
+    await K.delete_exam(ex3.id, user=u, db=s)
+    assert await s.get(WorkAnalysis, w3.id) is not None
+
+
+@pytest.mark.asyncio
 async def test_exam_overview_calendar_overrides(s):
     """Stundenzählung folgt dem Kalender: ein konkreter Eintrag ERSETZT den
     wiederkehrenden Slot dieser Stunde. Wird der Kurs im Eintrag geändert, zählt
