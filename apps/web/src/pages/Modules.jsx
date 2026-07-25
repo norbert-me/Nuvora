@@ -15,6 +15,24 @@ const HELP_KEY = {
   orga: "orga.hint",
   ausleihe: "ausleihe.hint",
 };
+
+// Ein SVG je Modul (20×20, im Stil von Icons.jsx — stroke, currentColor). Macht
+// die Modulauswahl auf einen Blick erkennbar.
+const MODULE_ICONS = {
+  cardvote: ["M3 5h14v10H3z", "M6.5 10l2 2 3.5-4"],
+  karten: ["M7 6h8a1 1 0 011 1v7a1 1 0 01-1 1H7a1 1 0 01-1-1V7a1 1 0 011-1z", "M4 5v8a1 1 0 001 1"],
+  lernpfad: ["M6 3v14", "M14 3v14", "M6 6h8", "M6 10h8", "M6 14h8"],
+  noten: ["M3 16h14", "M5 16V9", "M10 16V4", "M15 16v-5"],
+  "code-detektiv": ["M9 3a5.5 5.5 0 100 11 5.5 5.5 0 000-11z", "M13.5 13l3 3", "M7.3 7.5L6 8.8l1.3 1.3", "M10.7 7.5L12 8.8l-1.3 1.3"],
+  kalender: ["M4 5h12v11H4z", "M4 8h12", "M7 3v3", "M13 3v3"],
+  orga: ["M7 4h6v2H7z", "M6 5H5a1 1 0 00-1 1v10a1 1 0 001 1h10a1 1 0 001-1V6a1 1 0 00-1-1h-1", "M7 10h6", "M7 13h4"],
+  zufall: ["M4 6h3l7 8h3", "M4 14h3l2-2.5", "M12 8l2-2.5", "M14 4l2.5 2-2.5 2", "M14 12l2.5 2-2.5 2"],
+  klassenarbeit: ["M6 3h6l3 3v11H6z", "M12 3v3h3", "M8 11h5", "M8 14h3"],
+  methoden: ["M10 3a5 5 0 00-3 9v2h6v-2a5 5 0 00-3-9z", "M8.5 17h3"],
+  sitzplan: ["M4 5h5v4H4z", "M11 5h5v4h-5z", "M4 11h5v4H4z", "M11 11h5v4h-5z"],
+  ausleihe: ["M4 7l6-3 6 3v6l-6 3-6-3z", "M4 7l6 3 6-3", "M10 10v6"],
+  material: ["M4 6a1 1 0 011-1h3l1.5 2H15a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1z"],
+};
 import { askConfirm } from "../core/dialog.jsx";
 
 export default function Modules() {
@@ -121,6 +139,12 @@ export default function Modules() {
               gap: 16,
             }}
           >
+            {MODULE_ICONS[m.key] && (
+              <div style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center",
+                background: m.active ? "var(--accent-bg, rgba(10,132,255,0.12))" : "var(--bg2, var(--bg))", color: m.active ? "var(--accent)" : "var(--text3)" }}>
+                <Icon d={MODULE_ICONS[m.key]} size={22} color="currentColor" />
+              </div>
+            )}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
                 {t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name}
