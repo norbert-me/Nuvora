@@ -336,12 +336,24 @@ async def list_exams(user: User = Depends(require_module), db: AsyncSession = De
     return rows
 
 
+def _exam_title(title: str) -> str:
+    t = (title or "").strip()
+    return f"Klassenarbeit: {t}" if t else "Klassenarbeit"
+
+
 @router.post("/klassenarbeiten", response_model=ExamOut, status_code=201)
 async def create_exam(body: ExamIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _check_class(db, user, body.class_id)
     await _check_kurs(db, user, body.kurs_id)
     e = ExamDate(owner_id=user.id, **body.model_dump())
     db.add(e)
+    await db.flush()
+    # Ganztägiger Kalendereintrag (period None, keine Uhrzeit) zum Termin.
+    entry = CalendarEntry(owner_id=user.id, date=e.date, title=_exam_title(e.title),
+                          class_id=e.class_id, kurs_id=e.kurs_id)
+    db.add(entry)
+    await db.flush()
+    e.entry_id = entry.id
     await db.commit()
     await db.refresh(e)
     return e
@@ -356,6 +368,12 @@ async def update_exam(exam_id: int, body: ExamIn, user: User = Depends(require_m
     await _check_kurs(db, user, body.kurs_id)
     for k, v in body.model_dump().items():
         setattr(e, k, v)
+    # Verknüpften Kalendereintrag mitziehen (Datum/Titel/Klasse/Kurs).
+    if e.entry_id:
+        entry = await db.get(CalendarEntry, e.entry_id)
+        if entry and entry.owner_id == user.id:
+            entry.date = e.date; entry.title = _exam_title(e.title)
+            entry.class_id = e.class_id; entry.kurs_id = e.kurs_id
     await db.commit()
     await db.refresh(e)
     return e
@@ -366,6 +384,11 @@ async def delete_exam(exam_id: int, user: User = Depends(require_module), db: As
     e = await db.get(ExamDate, exam_id)
     if not e or e.owner_id != user.id:
         raise HTTPException(404, "Klassenarbeit nicht gefunden")
+    # Auch den automatisch erzeugten Kalendereintrag entfernen.
+    if e.entry_id:
+        entry = await db.get(CalendarEntry, e.entry_id)
+        if entry and entry.owner_id == user.id:
+            await db.delete(entry)
     await db.delete(e)
     await db.commit()
 

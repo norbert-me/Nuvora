@@ -156,9 +156,15 @@ async def test_exam_crud_and_overview(s):
     d = datetime.now(timezone.utc) + timedelta(days=20)
     ex = await K.create_exam(K.ExamIn(date=d, title="Vokabeltest", class_id=a.id), user=u, db=s)
     assert len(await K.list_exams(user=u, db=s)) == 1
+    # Automatisch erzeugter ganztägiger Kalendereintrag.
+    from app.models import CalendarEntry
+    assert ex.entry_id is not None
+    entry = await s.get(CalendarEntry, ex.entry_id)
+    assert entry is not None and entry.period is None and "Klassenarbeit" in entry.title
     # Stunde am Wochentag des Termins -> in 20 Tagen mehrfach, mind. eine vor dem Termin.
     s.add(TimetableSlot(owner_id=u.id, weekday=d.weekday(), period=1, class_id=a.id)); await s.commit()
     ov = await K.exam_overview(user=u, db=s)
     assert len(ov) == 1 and isinstance(ov[0]["stunden"], int) and ov[0]["stunden"] >= 1
     await K.delete_exam(ex.id, user=u, db=s)
     assert await K.list_exams(user=u, db=s) == []
+    assert await s.get(CalendarEntry, ex.entry_id) is None  # Eintrag mitgelöscht

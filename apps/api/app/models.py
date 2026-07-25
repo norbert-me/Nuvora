@@ -755,6 +755,8 @@ class ExamDate(Base):
     kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     title: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    # Automatisch erzeugter (ganztägiger) Kalendereintrag zu diesem Termin.
+    entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("calendar_entries.id", ondelete="SET NULL"), nullable=True, index=True)
 
 
 class CalendarBreak(Base):
