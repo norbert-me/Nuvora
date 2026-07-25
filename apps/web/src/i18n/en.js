@@ -723,6 +723,8 @@ export default {
   "noten.supportNeeds": "Support needs",
   "noten.classTeacher": "Class teacher",
   "noten.notes": "Notes",
+  "noten.verlauf": "Grade trend",
+  "noten.verlaufAxis": "oldest → newest",
   "noten.gradesBySection": "Grades by section",
   "noten.noGrades": "No grades yet.",
   "noten.clickStudent": "Click a name to see the E/G course and support needs.",

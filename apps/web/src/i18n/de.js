@@ -753,6 +753,8 @@ export default {
   "noten.supportNeeds": "Förderschwerpunkte",
   "noten.classTeacher": "Klassenleitung",
   "noten.notes": "Notizen",
+  "noten.verlauf": "Notenverlauf",
+  "noten.verlaufAxis": "älteste → neueste",
   "noten.gradesBySection": "Noten nach Abschnitt",
   "noten.noGrades": "Noch keine Noten.",
   "noten.clickStudent": "Klick auf einen Namen zeigt E-/G-Kurs und Förderbedarf.",

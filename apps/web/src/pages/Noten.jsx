@@ -693,7 +693,7 @@ export default function Noten() {
       )}
 
       {infoFuer && (
-        <StudentInfo t={t} student={students.find((st) => st.id === infoFuer)} summary={sumOf(infoFuer)} sections={sections} className={cls?.name} onZeugnis={() => doZeugnisStudent(infoFuer)} onClose={() => setInfoFuer(null)} />
+        <StudentInfo t={t} student={students.find((st) => st.id === infoFuer)} summary={sumOf(infoFuer)} sections={sections} entries={entries} className={cls?.name} onZeugnis={() => doZeugnisStudent(infoFuer)} onClose={() => setInfoFuer(null)} />
       )}
     </div>
   );
@@ -1063,8 +1063,47 @@ function CompareModal({ t, cat, onClose }) {
   );
 }
 
-function StudentInfo({ t, student, summary, sections, className, onZeugnis, onClose }) {
+// Notenverlauf: eine Linie über die Kategorien in Zeitreihenfolge. Deutsche Noten
+// 1 (oben, best) bis 6 (unten). Einzelne Serie -> keine Legende, Titel benennt sie.
+function GradeChart({ series, t }) {
+  if (series.length < 2) return null;
+  const W = 340, H = 170, padL = 26, padR = 12, padT = 12, padB = 20;
+  const n = series.length;
+  const x = (i) => padL + (n === 1 ? 0 : (i * (W - padL - padR)) / (n - 1));
+  const y = (v) => padT + ((v - 1) / 5) * (H - padT - padB); // 1 oben, 6 unten
+  const pts = series.map((s, i) => ({ cx: x(i), cy: y(s.value), s }));
+  const line = pts.map((p, i) => `${i ? "L" : "M"}${p.cx.toFixed(1)},${p.cy.toFixed(1)}`).join(" ");
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>{t("noten.verlauf")}</div>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }} role="img" aria-label={t("noten.verlauf")}>
+        {[1, 2, 3, 4, 5, 6].map((g) => (
+          <g key={g}>
+            <line x1={padL} y1={y(g)} x2={W - padR} y2={y(g)} stroke="var(--border)" strokeWidth="1" />
+            <text x={padL - 6} y={y(g) + 3.5} textAnchor="end" fontSize="10" fill="var(--text3)">{g}</text>
+          </g>
+        ))}
+        <path d={line} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        {pts.map((p, i) => (
+          <g key={i}>
+            <circle cx={p.cx} cy={p.cy} r="4" fill="var(--accent)" stroke="var(--card)" strokeWidth="1.5" />
+            <title>{`${p.s.cat.name}: ${de(p.s.value)}`}</title>
+          </g>
+        ))}
+      </svg>
+      <div style={{ fontSize: 11, color: "var(--text3)", textAlign: "right", marginTop: 2 }}>{t("noten.verlaufAxis")}</div>
+    </div>
+  );
+}
+
+function StudentInfo({ t, student, summary, sections, entries = [], className, onZeugnis, onClose }) {
   if (!student) return null;
+  // Serie: je Kategorie (Zeitreihenfolge) die letzte Note der Person.
+  const cats = sections.flatMap((s) => s.categories || []);
+  const series = cats.map((c) => {
+    const es = entries.filter((e) => e.student_id === student.id && e.category_id === c.id && e.kind === "grade" && e.value != null);
+    return es.length ? { cat: c, value: es[es.length - 1].value } : null;
+  }).filter(Boolean);
   return (
     <div onClick={onClose} style={overlay}>
       <div onClick={(e) => e.stopPropagation()} style={modal}>
@@ -1084,6 +1123,8 @@ function StudentInfo({ t, student, summary, sections, className, onZeugnis, onCl
           {student.klassenlehrer && (<><dt style={dtS}>{t("noten.classTeacher")}</dt><dd style={ddS}>{student.klassenlehrer}</dd></>)}
           {student.notizen && (<><dt style={dtS}>{t("noten.notes")}</dt><dd style={ddS}>{student.notizen}</dd></>)}
         </dl>
+
+        <GradeChart series={series} t={t} />
 
         <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t("noten.gradesBySection")}</div>
         {sections.length === 0 || !summary ? (
