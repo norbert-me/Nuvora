@@ -796,8 +796,11 @@ async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
                     continue
                 title = classes.get(s.class_id) or s.title or "Unterricht"
                 tr = times[s.period - 1] if 0 <= s.period - 1 < len(times) else None
-                a = hms(tr.get("from")) if isinstance(tr, dict) else None
-                b2 = hms(tr.get("to")) if isinstance(tr, dict) else None
+                # Uhrzeiten liegen als {"start","end"} vor (wie im Rest der App) —
+                # nicht "from"/"to". Mit den falschen Keys war die Zeit immer None,
+                # darum landeten die Stunden im Abo als ganztägige Ereignisse.
+                a = hms(tr.get("start")) if isinstance(tr, dict) else None
+                b2 = hms(tr.get("end")) if isinstance(tr, dict) else None
                 uid = f"UID:nuvora-slot-{s.id}-{d8(day)}@nuvora"
                 if a and b2:
                     lines += ["BEGIN:VEVENT", uid, f"DTSTAMP:{now}",
