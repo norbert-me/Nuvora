@@ -11,6 +11,7 @@ Der Schnitt wird ueber die Abschnitte gewichtet; innerhalb eines Abschnitts
 zaehlen die Spalten gleich. Beobachtungen zaehlen NIE — 'Anstrengungsbereitschaft'
 ist kein Messwert.
 """
+import re
 from datetime import datetime
 from typing import List, Optional
 
@@ -1183,15 +1184,10 @@ async def import_noten(class_id: int, body: dict, term: str = "1", kurs_id: Opti
 
 # ─── Zeugnis-/Eltern-Export: ein gebuendeltes PDF je Schueler ───
 
-@router.get("/classes/{class_id}/zeugnis.pdf")
-async def zeugnis_export(class_id: int, term: str = "1", agg: str = "mean", kurs_id: Optional[int] = None,
-                         student_id: Optional[int] = None,
-                         user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    """Gebuendelter Eltern-/Zeugnis-Export: je Schueler eine Seite mit Noten
-    (gewichteter Schnitt + Abschnitte), Fehlzeiten und Karten-Fortschritt.
-    Fehlzeiten/Karten nur, wenn die Module aktiv sind (Regel 3 — Noten laeuft
-    ohne sie voll). Besonders schuetzenswerte Daten (foerder/notizen) sind
-    bewusst NICHT enthalten."""
+async def _zeugnis_pdf(class_id: int, term: str, agg: str, kurs_id: Optional[int],
+                       student_id: Optional[int], user: User, db: AsyncSession):
+    """Baut das Zeugnis-PDF und gibt (bytes, dateiname) zurueck. Genutzt vom
+    PDF-Endpoint und vom gebuendelten ZIP-Export."""
     sc = await _owned_class(db, user, class_id)
     sections, summaries = await _summarize(db, user, class_id, term, agg="median" if agg == "median" else "mean", kurs_id=kurs_id)
     sum_by_id = {s.student_id: s for s in summaries}
@@ -1291,7 +1287,42 @@ async def zeugnis_export(class_id: int, term: str = "1", agg: str = "mean", kurs
         c.save()
 
     import io
+    buf = io.BytesIO(); build(buf)
+    safe = re.sub(r"[^\w-]+", "_", sc.name) or "klasse"
+    return buf.getvalue(), f"Zeugnis_{safe}_{halb.replace('. ', '')}.pdf"
+
+
+@router.get("/classes/{class_id}/zeugnis.pdf")
+async def zeugnis_export(class_id: int, term: str = "1", agg: str = "mean", kurs_id: Optional[int] = None,
+                         student_id: Optional[int] = None,
+                         user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Gebuendelter Eltern-/Zeugnis-Export: je Schueler eine Seite mit Noten
+    (gewichteter Schnitt + Abschnitte), Fehlzeiten und Karten-Fortschritt.
+    Fehlzeiten/Karten nur, wenn die Module aktiv sind (Regel 3 — Noten laeuft
+    ohne sie voll). Besonders schuetzenswerte Daten (foerder/notizen) sind
+    bewusst NICHT enthalten."""
+    import io
     from fastapi.responses import StreamingResponse
-    buf = io.BytesIO(); build(buf); buf.seek(0)
-    return StreamingResponse(buf, media_type="application/pdf",
-                             headers={"Content-Disposition": f'attachment; filename="Zeugnis_{sc.name}_{halb}.pdf"'})
+    pdf, name = await _zeugnis_pdf(class_id, term, agg, kurs_id, student_id, user, db)
+    return StreamingResponse(io.BytesIO(pdf), media_type="application/pdf",
+                             headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+@router.get("/classes/{class_id}/export.zip")
+async def export_bundle(class_id: int, term: str = "1", agg: str = "mean", kurs_id: Optional[int] = None,
+                        user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Gebuendelter Noten-Export: die Daten (JSON, re-importierbar) UND das
+    Zeugnis-PDF in einer ZIP. foerder/notizen bleiben aussen vor (wie im JSON/PDF)."""
+    import io, json, zipfile
+    from fastapi.responses import StreamingResponse
+    sc = await _owned_class(db, user, class_id)
+    data = await export_noten(class_id, term, kurs_id, user, db)
+    pdf, pdf_name = await _zeugnis_pdf(class_id, term, agg, kurs_id, None, user, db)
+    safe = re.sub(r"[^\w-]+", "_", sc.name) or "klasse"
+    zbuf = io.BytesIO()
+    with zipfile.ZipFile(zbuf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr(f"noten-{safe}-hj{term}.json", json.dumps(data, ensure_ascii=False, indent=2))
+        z.writestr(pdf_name, pdf)
+    zbuf.seek(0)
+    return StreamingResponse(zbuf, media_type="application/zip",
+                             headers={"Content-Disposition": f'attachment; filename="noten-{safe}-hj{term}.zip"'})

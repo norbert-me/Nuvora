@@ -214,11 +214,12 @@ export default function Noten() {
 
   const doExport = async () => {
     if (!classId) return;
-    const r = await fetch(`${API}/classes/${classId}/export?term=${term}${kp}`).catch(() => null);
+    // Export als ZIP: Daten (JSON, re-importierbar) + Zeugnis-PDF gebündelt.
+    const r = await fetch(`${API}/classes/${classId}/export.zip?term=${term}&agg=${agg}${kp}`).catch(() => null);
     if (!r || !r.ok) return;
     const blob = await r.blob(); const cls = classes.find((c) => c.id === classId);
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-    a.download = `noten-${(cls?.name || "klasse")}-hj${term}.json`; a.click(); URL.revokeObjectURL(a.href);
+    a.download = `noten-${(cls?.name || "klasse")}-hj${term}.zip`; a.click(); URL.revokeObjectURL(a.href);
   };
   const doZeugnis = async () => {
     if (!classId) return;
