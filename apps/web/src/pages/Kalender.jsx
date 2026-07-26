@@ -83,14 +83,16 @@ export default function Kalender() {
   const toggleAllDay = () => setShowAllDay((v) => { const n = !v; try { localStorage.setItem("kal_allday", n ? "1" : "0"); } catch { /* egal */ } return n; });
   const [showExt, setShowExt] = useState(() => { try { return localStorage.getItem("kal_ext") !== "0"; } catch { return true; } });
   const toggleExt = () => setShowExt((v) => { const n = !v; try { localStorage.setItem("kal_ext", n ? "1" : "0"); } catch { /* egal */ } return n; });
-  // Eigene Farbe für abonnierte (externe) Termine — reine Anzeige-Präferenz.
-  const [extColor, setExtColor] = useState(""); // Farbe externer Termine — am Konto gespeichert (geräteübergreifend)
-  const saveExtColor = (c) => { setExtColor(c || ""); fetch(`${API}/external`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color: c || "" }) }).catch(() => {}); };
-  const [extUrl, setExtUrl] = useState("");   // externer ICS-Feed (read-only Anzeige)
-  const [extEvents, setExtEvents] = useState([]); // [{date:'YYYY-MM-DD', title}]
+  // Mehrere externe Kalender (read-only): je Kalender URL + Farbe. Einzelne
+  // Ereignisse lassen sich ausblenden (external_hidden, Schlüssel uid|Datum).
+  const [extCals, setExtCals] = useState([]); // [{url,color,name}]
+  const [extHidden, setExtHidden] = useState([]);
+  const [extEvents, setExtEvents] = useState([]); // [{date,title,color,key,…}]
+  // Fallback-Farbe (Kalender ohne eigene Farbe): erste gesetzte Kalenderfarbe.
+  const extColor = extCals.find((c) => c.color)?.color || "";
   const openAbo = async () => {
     const r = await fetch(`${API}/subscribe`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
-    if (r) { const ex = await fetch(`${API}/external`).then((x) => (x.ok ? x.json() : { url: "" })).catch(() => ({ url: "" })); setAbo({ ...r, ext: ex.url || "" }); }
+    if (r) { const ex = await fetch(`${API}/external`).then((x) => (x.ok ? x.json() : {})).catch(() => ({})); setAbo({ ...r, cals: (ex.calendars || []) }); }
   };
   // Force-Resync: neues Abo-Token holen. Die alte URL wird sofort ungueltig —
   // damit behandelt Apple/Google das Abo als neu und laedt alles einmal frisch.
@@ -105,11 +107,25 @@ export default function Kalender() {
   };
   const [extBusy, setExtBusy] = useState(false);
   const loadExt = (force = false) => { if (force) setExtBusy(true); return fetch(`${API}/external-events${force ? "?refresh=1" : ""}`).then((r) => (r.ok ? r.json() : [])).then((d) => setExtEvents(Array.isArray(d) ? d : [])).catch(() => {}).finally(() => force && setExtBusy(false)); };
-  const saveExt = async (url) => {
-    await fetch(`${API}/external`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) }).catch(() => {});
-    setExtUrl(url); loadExt();
+  // Kalenderliste speichern (URL/Farbe je Kalender) und Events neu ziehen.
+  const saveCals = async (cals) => {
+    const clean = cals.filter((c) => (c.url || "").trim());
+    await fetch(`${API}/external`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ calendars: clean }) }).catch(() => {});
+    setExtCals(clean); loadExt(true);
   };
-  useEffect(() => { fetch(`${API}/external`).then((r) => (r.ok ? r.json() : { url: "" })).then((d) => { setExtUrl(d.url || ""); setExtColor(d.color || ""); if (d.url) loadExt(); }).catch(() => {}); }, []);
+  // Ein externes Ereignis aus-/wieder einblenden (Schlüssel uid|Datum).
+  const hideExtEvent = async (key) => {
+    if (!key) return;
+    setExtHidden((h) => [...h, key]);
+    setExtEvents((evs) => evs.filter((e) => e.key !== key));  // sofort raus
+    await fetch(`${API}/external/hide`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key }) }).catch(() => {});
+  };
+  const unhideExtEvent = async (key) => {
+    setExtHidden((h) => h.filter((k) => k !== key));
+    await fetch(`${API}/external/unhide`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key }) }).catch(() => {});
+    loadExt(true);
+  };
+  useEffect(() => { fetch(`${API}/external`).then((r) => (r.ok ? r.json() : {})).then((d) => { setExtCals(d.calendars || []); setExtHidden(d.hidden || []); if ((d.calendars || []).length) loadExt(); }).catch(() => {}); }, []);
   const extByDay = (d) => extEvents.filter((e) => e.date === ymd(d));
   const [entries, setEntries] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -423,19 +439,20 @@ export default function Kalender() {
                     {t("kalender.extEvents")}
                   </label>
                 )}
-                {extEvents.length > 0 && showExt && (
-                  <label style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", boxSizing: "border-box", padding: "8px 12px", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: "pointer", borderRadius: 8 }}>
-                    {t("kalender.extColor")}
-                    <input type="color" value={extColor || "#8e8e93"} onChange={(e) => saveExtColor(e.target.value)} style={{ marginLeft: "auto", width: 28, height: 22, padding: 0, border: "none", background: "none", cursor: "pointer" }} />
-                    {extColor && <button onClick={() => saveExtColor("")} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.close} size={13} /></button>}
-                  </label>
-                )}
-                {extUrl && (
+                {extCals.length > 0 && (
                   <button onClick={() => loadExt(true)} disabled={extBusy}
                     style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", boxSizing: "border-box", padding: "8px 12px", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: extBusy ? "default" : "pointer", borderRadius: 8, background: "none", border: "none", textAlign: "left", opacity: extBusy ? 0.6 : 1 }}
                     title={t("kalender.extRefreshHint")}>
                     <Icon d={ICONS.refresh} size={15} color="var(--text2)" />
                     {extBusy ? t("kalender.extRefreshing") : t("kalender.extRefresh")}
+                  </button>
+                )}
+                {extHidden.length > 0 && (
+                  <button onClick={() => { extHidden.forEach((k) => unhideExtEvent(k)); setViewMenuOpen(false); }}
+                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", boxSizing: "border-box", padding: "8px 12px", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: "pointer", borderRadius: 8, background: "none", border: "none", textAlign: "left" }}
+                    title={t("kalender.extUnhideAllHint")}>
+                    <Icon d={ICONS.eye} size={15} color="var(--text2)" />
+                    {t("kalender.extUnhideAll", { n: extHidden.length })}
                   </button>
                 )}
               </div>
@@ -561,14 +578,11 @@ export default function Kalender() {
               <span style={{ fontSize: 11.5, color: "var(--text3)", flex: 1, minWidth: 180 }}>{t("kalender.resyncHint")}</span>
             </div>
 
-            {/* Andere Richtung: externen Kalender (ICS-URL) read-only einblenden. */}
+            {/* Andere Richtung: MEHRERE externe Kalender (ICS-URL) read-only einblenden. */}
             <div style={{ borderTop: "1px solid var(--border)", marginTop: 18, paddingTop: 14 }}>
               <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 4 }}>{t("kalender.extTitle")}</div>
-              <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8 }}>{t("kalender.extText")}</div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input defaultValue={abo.ext || ""} placeholder="https://…/basic.ics" id="lp-ext-url" style={{ ...inputStyle, flex: 1, fontSize: 12 }} />
-                <button onClick={() => { const v = document.getElementById("lp-ext-url").value.trim(); saveExt(v); setAbo((a) => ({ ...a, ext: v })); }} style={btnPrimary}>{t("common.save")}</button>
-              </div>
+              <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 10 }}>{t("kalender.extText")}</div>
+              <ExtCalEditor cals={abo.cals || []} onChange={(cals) => setAbo((a) => ({ ...a, cals }))} onSave={(cals) => { saveCals(cals); setAbo((a) => ({ ...a, cals })); }} t={t} />
             </div>
 
             <div style={{ marginTop: 16, textAlign: "right" }}>
@@ -578,14 +592,14 @@ export default function Kalender() {
         </div>
       )}
       {slotEdit && <SlotModal slot={slotEdit} classes={classes} kurse={kurse} topics={topics} onSave={saveSlot} onDelete={removeSlot} onColor={setSlotColor} onClose={() => setSlotEdit(null)} t={t} />}
-      {extInfo && <ExtInfoModal ev={extInfo} onClose={() => setExtInfo(null)} t={t} />}
+      {extInfo && <ExtInfoModal ev={extInfo} onClose={() => setExtInfo(null)} onHide={(k) => { hideExtEvent(k); setExtInfo(null); }} t={t} />}
     </div>
   );
 }
 
 // Read-only-Info zu einem angeklickten externen (abonnierten) Termin. Nicht
 // editierbar — fremder Kalender; nur Anzeige der ICS-Felder.
-function ExtInfoModal({ ev, onClose, t }) {
+function ExtInfoModal({ ev, onClose, onHide, t }) {
   const fmt = (iso) => { try { return new Date(iso + "T00:00:00").toLocaleDateString(); } catch { return iso; } };
   const zeitraum = ev.end && ev.end !== ev.start ? `${fmt(ev.start)} – ${fmt(ev.end)}` : fmt(ev.start || ev.date);
   const Zeile = ({ label, children }) => (
@@ -606,9 +620,48 @@ function ExtInfoModal({ ev, onClose, t }) {
         {ev.time && <Zeile label={t("kalender.extTime")}>{ev.endtime && ev.endtime !== ev.time ? `${ev.time} – ${ev.endtime}` : ev.time}</Zeile>}
         {ev.location && <Zeile label={t("kalender.extLocation")}>{ev.location}</Zeile>}
         {ev.description && <Zeile label={t("kalender.extDesc")}>{ev.description}</Zeile>}
-        <div style={{ marginTop: 16, textAlign: "right" }}>
+        <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 8 }}>
+          {onHide && ev.key && (
+            <button onClick={() => onHide(ev.key)} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("kalender.extHideHint")}>
+              <Icon d={ICONS.eye} size={15} /> {t("kalender.extHide")}
+            </button>
+          )}
+          <span style={{ flex: 1 }} />
           <button onClick={onClose} style={btnSecondary}>{t("common.close") !== "common.close" ? t("common.close") : "Schließen"}</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Editor für mehrere externe Kalender: je Zeile URL + Farbe + Löschen. „Speichern"
+// schreibt die ganze Liste (leere URLs fallen weg).
+function ExtCalEditor({ cals, onChange, onSave, t }) {
+  const rows = cals.length ? cals : [{ url: "", color: "", name: "" }];
+  const setRow = (i, patch) => { const next = rows.map((r, j) => (j === i ? { ...r, ...patch } : r)); onChange(next); };
+  const addRow = () => onChange([...rows, { url: "", color: "", name: "" }]);
+  const delRow = (i) => { const next = rows.filter((_, j) => j !== i); onChange(next.length ? next : [{ url: "", color: "", name: "" }]); };
+  return (
+    <div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {rows.map((c, i) => (
+          <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <input type="color" value={c.color || "#8e8e93"} onChange={(e) => setRow(i, { color: e.target.value })}
+              title={t("kalender.extColor")} style={{ width: 26, height: 26, padding: 0, border: "none", background: "none", cursor: "pointer", flexShrink: 0 }} />
+            <input value={c.url || ""} onChange={(e) => setRow(i, { url: e.target.value })} placeholder="https://…/basic.ics"
+              style={{ ...inputStyle, flex: 1, fontSize: 12, minWidth: 0 }} />
+            <button onClick={() => delRow(i)} className="icon-btn" style={{ ...iconBtn, padding: 4, flexShrink: 0 }} title={t("common.delete")}>
+              <Icon d={ICONS.trash} size={15} color={C.danger} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center" }}>
+        <button onClick={addRow} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <Icon d={ICONS.plus} size={14} /> {t("kalender.extAdd")}
+        </button>
+        <span style={{ flex: 1 }} />
+        <button onClick={() => onSave(rows)} style={btnPrimary}>{t("common.save")}</button>
       </div>
     </div>
   );
@@ -637,10 +690,11 @@ function SlotGhosts({ list, entries, className, slotName, topicName, onSlot, day
 // Kalenderraster (war Doppelung und Unruhe).
 // Externe (abonnierte) Termine — read-only, grau, nicht klickbar.
 function ExtChips({ list, onOpen, extColor }) {
+  const colOf = (ev) => ev.color || extColor;
   if (!list || !list.length) return null;
   return list.map((ev, i) => (
     <button key={`ext-${i}`} onClick={onOpen ? (e) => { e.stopPropagation(); onOpen(ev); } : undefined} title={ev.title}
-      style={{ display: "block", width: "100%", textAlign: "left", fontSize: 11, color: extColor || "var(--text3)", background: extColor ? extColor + "1e" : "var(--bg2)", border: `1px dashed ${extColor || "var(--border2)"}`, borderRadius: 6, padding: "1px 5px", margin: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: onOpen ? "pointer" : "default" }}>{(ev.time ? ev.time + " " : "")}🔗 {ev.title || "—"}</button>
+      style={{ display: "block", width: "100%", textAlign: "left", fontSize: 11, color: colOf(ev) || "var(--text3)", background: colOf(ev) ? colOf(ev) + "1e" : "var(--bg2)", border: `1px dashed ${colOf(ev) || "var(--border2)"}`, borderRadius: 6, padding: "1px 5px", margin: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: onOpen ? "pointer" : "default" }}>{(ev.time ? ev.time + " " : "")}🔗 {ev.title || "—"}</button>
   ));
 }
 
@@ -761,7 +815,7 @@ function MonthGrid({ extColor, range, cursor, byDay, extByDay, slotsFor, onSlot,
   // Handy hochkant: nur Punkte je Tag (voll wird die Woche/der Tag angetippt).
   const dotsFor = (d) => {
     const own = byDay(d).map((e) => (e.class_id ? classColor(e.class_id) : "var(--accent)"));
-    const ext = (extByDay ? extByDay(d) : []).map(() => extColor || "var(--text3)");
+    const ext = (extByDay ? extByDay(d) : []).map((ev) => ev.color || extColor || "var(--text3)");
     return [...own, ...ext];
   };
   return (
@@ -914,7 +968,7 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
   ext.filter((ev) => toMin(ev.time) != null).forEach((ev, i) => {
     const sm = toMin(ev.time);
     const emx = toMin(ev.endtime); // echte Endzeit aus dem Feed, sonst 60min-Fallback
-    timed.push({ key: "x" + i, start: sm, end: emx != null && emx > sm ? emx : sm + 60, col: extColor || "var(--text3)", dashed: true,
+    timed.push({ key: "x" + i, start: sm, end: emx != null && emx > sm ? emx : sm + 60, col: ev.color || extColor || "var(--text3)", dashed: true,
       label: "🔗 " + (ev.title || "—"), sub: ev.location || "", onClick: () => onExt(ev) });
   });
 
@@ -940,14 +994,17 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
   }
 
   const hasBanner = ganztags.length > 0 || extAllDay.length > 0;
-  const bannerBtn = (key, title, sub, onClick, extern) => (
+  const bannerBtn = (key, title, sub, onClick, extern, col) => {
+    const c = col || extColor;
+    return (
     <button key={key} onClick={onClick}
       style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 14px", borderRadius: 10, cursor: "pointer",
-        border: extern ? `1px dashed ${extColor || "var(--border2)"}` : "1px solid var(--accent)", background: extern ? (extColor ? extColor + "1e" : "var(--bg2)") : "var(--accent-bg, rgba(10,132,255,0.10))", color: "var(--text)" }}>
+        border: extern ? `1px dashed ${c || "var(--border2)"}` : "1px solid var(--accent)", background: extern ? (c ? c + "1e" : "var(--bg2)") : "var(--accent-bg, rgba(10,132,255,0.10))", color: "var(--text)" }}>
       <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
       {sub && <span style={{ display: "block", fontSize: 12.5, color: "var(--text3)", marginTop: 2 }}>{sub}</span>}
     </button>
-  );
+    );
+  };
 
   return (
     <div>
@@ -956,7 +1013,7 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
           <div style={{ ...sectionLabel, marginBottom: 6 }}>{t("kalender.allDay")}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {ganztags.map((e) => bannerBtn("g" + e.id, `${e.title || topicName(e.topic_id) || "—"}${linked(e) ? " ↗" : ""}`, e.notes || "", () => onOpen({ ...e, date: new Date(e.date) }), false))}
-            {extAllDay.map((ev, i) => bannerBtn("xa" + i, `🔗 ${ev.title || "—"}`, ev.location || "", () => onExt(ev), true))}
+            {extAllDay.map((ev, i) => bannerBtn("xa" + i, `🔗 ${ev.title || "—"}`, ev.location || "", () => onExt(ev), true, ev.color))}
           </div>
         </div>
       )}

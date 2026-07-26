@@ -131,18 +131,36 @@ async def test_ics_freie_uhrzeit(s):
 
 
 @pytest.mark.asyncio
-async def test_external_color_partial_update(s):
-    """Farbe extern speichern darf die abonnierte URL nicht löschen (partiell)."""
+async def test_external_calendars_and_hide(s):
+    """Mehrere externe Kalender speichern (webcal→https, Hex-Farbe validiert),
+    Altbestand migriert, und einzelne Ereignisse aus-/wieder einblenden."""
     u = User(email="x@y.de", password_hash="p", name="L"); s.add(u); await s.flush()
-    u.external_ics_url = "https://example.com/f.ics"; await s.commit()
-    # Nur Farbe setzen -> URL bleibt.
-    out = await KAL.set_external(KAL.ExtIn(color="#ff8800"), user=u, db=s)
-    assert out["url"] == "https://example.com/f.ics"
-    assert out["color"] == "#ff8800"
-    # Ungültige Farbe -> leer.
-    out = await KAL.set_external(KAL.ExtIn(color="rot"), user=u, db=s)
-    assert out["color"] == ""
-    assert out["url"] == "https://example.com/f.ics"
+    # Altbestand (Einzel-URL) wird als erster Kalender migriert.
+    u.external_ics_url = "https://old.example.com/f.ics"; u.external_ics_color = "#123456"; await s.commit()
+    got = await KAL.get_external(user=u)
+    assert got["calendars"] == [{"url": "https://old.example.com/f.ics", "color": "#123456", "name": ""}]
+
+    # Zwei Kalender setzen: webcal→https, ungültige Farbe wird geleert.
+    body = KAL.ExtCalsIn(calendars=[
+        KAL.ExtCalIn(url="webcal://a.example.com/x.ics", color="#ff8800", name="A"),
+        KAL.ExtCalIn(url="https://b.example.com/y.ics", color="rot"),
+        KAL.ExtCalIn(url="  ", color=""),  # leer -> raus
+    ])
+    out = await KAL.set_external(body, user=u, db=s)
+    assert [c["url"] for c in out["calendars"]] == ["https://a.example.com/x.ics", "https://b.example.com/y.ics"]
+    assert out["calendars"][0]["color"] == "#ff8800" and out["calendars"][1]["color"] == ""
+    assert u.external_ics_url == "https://a.example.com/x.ics"  # Altfeld mitgezogen
+
+    # Ungültige URL -> Fehler.
+    with pytest.raises(Exception):
+        await KAL.set_external(KAL.ExtCalsIn(calendars=[KAL.ExtCalIn(url="ftp://nope")]), user=u, db=s)
+
+    # Ereignis aus-/wieder einblenden.
+    await KAL.hide_external_event(KAL.ExtHideIn(key="uid-1|2026-09-18"), user=u, db=s)
+    await KAL.hide_external_event(KAL.ExtHideIn(key="uid-1|2026-09-18"), user=u, db=s)  # idempotent
+    assert (await KAL.get_external(user=u))["hidden"] == ["uid-1|2026-09-18"]
+    await KAL.unhide_external_event(KAL.ExtHideIn(key="uid-1|2026-09-18"), user=u, db=s)
+    assert (await KAL.get_external(user=u))["hidden"] == []
 
 
 @pytest.mark.asyncio

@@ -876,30 +876,74 @@ async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
                   headers={"Cache-Control": "no-cache, max-age=0"})
 
 
-# ─── Externer Kalender (ICS-URL read-only einblenden — „andere Richtung") ───
-class ExtIn(BaseModel):
-    url: Optional[str] = None      # None = unverändert lassen (partielles Update)
-    color: Optional[str] = None    # "" = zurücksetzen, None = unverändert
+# ─── Externe Kalender (mehrere ICS-URLs read-only einblenden — „andere Richtung") ───
+class ExtCalIn(BaseModel):
+    url: str = ""
+    color: Optional[str] = ""
+    name: Optional[str] = ""
+
+
+class ExtCalsIn(BaseModel):
+    calendars: List[ExtCalIn] = []
+
+
+class ExtHideIn(BaseModel):
+    key: str  # "uid|YYYY-MM-DD"
+
+
+def _ext_calendars(user: User) -> list:
+    """Die externen Kalender des Nutzers, immer als Liste. Altbestand
+    (external_ics_url/_color) wird als erster Eintrag mitgeführt, bis er einmal
+    über die neue Liste überschrieben wird."""
+    cals = user.external_calendars
+    if isinstance(cals, list) and cals:
+        return [c for c in cals if isinstance(c, dict) and c.get("url")]
+    if user.external_ics_url:
+        return [{"url": user.external_ics_url, "color": user.external_ics_color or "", "name": ""}]
+    return []
 
 
 @router.get("/external")
 async def get_external(user: User = Depends(require_module)):
-    return {"url": user.external_ics_url or "", "color": user.external_ics_color or ""}
+    return {"calendars": _ext_calendars(user), "hidden": user.external_hidden or []}
 
 
 @router.put("/external")
-async def set_external(body: ExtIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    if body.url is not None:
-        url = body.url.strip()
-        if url and not (url.startswith("http://") or url.startswith("https://") or url.startswith("webcal://")):
+async def set_external(body: ExtCalsIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    out = []
+    for c in body.calendars:
+        url = (c.url or "").strip()
+        if not url:
+            continue
+        if not (url.startswith("http://") or url.startswith("https://") or url.startswith("webcal://")):
             raise HTTPException(400, "URL muss mit http(s):// oder webcal:// beginnen")
-        user.external_ics_url = url.replace("webcal://", "https://", 1) if url else None
-    if body.color is not None:
-        c = body.color.strip()
-        # Nur einfache Hex-Farbe zulassen (#rgb / #rrggbb), sonst leeren.
-        user.external_ics_color = c if re.fullmatch(r"#[0-9a-fA-F]{3,8}", c) else ""
+        url = url.replace("webcal://", "https://", 1)
+        col = (c.color or "").strip()
+        col = col if re.fullmatch(r"#[0-9a-fA-F]{3,8}", col) else ""
+        out.append({"url": url, "color": col, "name": (c.name or "").strip()[:60]})
+    user.external_calendars = out
+    # Altfelder mitziehen (erster Kalender), damit nichts Altes wiederauflebt.
+    user.external_ics_url = out[0]["url"] if out else None
+    user.external_ics_color = out[0]["color"] if out else ""
     await db.commit()
-    return {"url": user.external_ics_url or "", "color": user.external_ics_color or ""}
+    return {"calendars": out, "hidden": user.external_hidden or []}
+
+
+@router.post("/external/hide", status_code=204)
+async def hide_external_event(body: ExtHideIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Ein einzelnes externes Ereignis ausblenden (Schlüssel uid|Datum)."""
+    hid = list(user.external_hidden or [])
+    if body.key and body.key not in hid:
+        hid.append(body.key)
+        user.external_hidden = hid[:2000]
+        await db.commit()
+
+
+@router.post("/external/unhide", status_code=204)
+async def unhide_external_event(body: ExtHideIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    hid = [k for k in (user.external_hidden or []) if k != body.key]
+    user.external_hidden = hid
+    await db.commit()
 
 
 _RRULE_WD = {"MO": 0, "TU": 1, "WE": 2, "TH": 3, "FR": 4, "SA": 5, "SU": 6}
@@ -1018,6 +1062,8 @@ def _parse_ics(text: str):
                 cur["description"] = raw.replace("\\,", ",").replace(r"\;", ";").replace("\\n", "\n").replace("\\N", "\n")[:1000]
             elif k == "STATUS":
                 cur["status"] = raw.upper()
+            elif k == "UID":
+                cur["uid"] = raw[:200]
             elif k == "RRULE":
                 cur["rrule"] = raw  # Wiederholregel (FREQ/INTERVAL/UNTIL/COUNT/BYDAY)
             elif k == "EXDATE":
@@ -1034,98 +1080,108 @@ _EXT_CACHE: dict[int, tuple[str, float, list]] = {}
 _EXT_TTL = 600  # 10 Minuten
 
 
+def _fetch_ics(url: str) -> str:
+    """Einen externen ICS-Feed holen — mit SSRF-Schutz (keine privaten IPs),
+    DNS-Rebinding-Pin und ohne Redirects. Gibt den Text zurück (max 2 MB)."""
+    import urllib.request, urllib.parse, socket, ipaddress
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        return ""
+    host = parsed.hostname
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    infos = socket.getaddrinfo(host, port)
+    for res in infos:
+        ip = ipaddress.ip_address(res[4][0])
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+            raise ValueError("Ziel-IP nicht erlaubt")
+    _real_gai = socket.getaddrinfo
+    def _pinned_gai(h, p, *a, **k):
+        if h == host and p == port:
+            return infos
+        return _real_gai(h, p, *a, **k)
+    class _NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *a, **k):
+            return None
+    opener = urllib.request.build_opener(_NoRedirect)
+    req = urllib.request.Request(url, headers={"User-Agent": "Nuvora"})
+    socket.getaddrinfo = _pinned_gai
+    try:
+        with opener.open(req, timeout=6) as r:
+            return r.read(2_000_000).decode("utf-8", "replace")
+    finally:
+        socket.getaddrinfo = _real_gai
+
+
 @router.get("/external-events")
 async def external_events(refresh: bool = False, user: User = Depends(require_module)):
-    """Holt den externen ICS-Feed (falls gesetzt) und liefert Events als
-    {date: YYYY-MM-DD, title}. Read-only, nur zur Anzeige. 10-Min-Cache;
-    refresh=1 umgeht ihn (frisch ziehen, damit Löschungen sofort erscheinen)."""
-    if not user.external_ics_url:
+    """Holt ALLE externen ICS-Feeds und liefert Events als {date, title, color,
+    key, …}. Read-only. 10-Min-Cache; refresh=1 umgeht ihn. Ausgeblendete
+    Ereignisse (external_hidden, Schlüssel uid|Datum) werden weggelassen."""
+    import time
+    cals = _ext_calendars(user)
+    hidden = set(user.external_hidden or [])
+    # Cache-Signatur: URLs + Farben + ausgeblendete Schlüssel.
+    sig = "|".join(f"{c['url']}~{c.get('color','')}" for c in cals) + "##" + ",".join(sorted(hidden))
+    if not cals:
         _EXT_CACHE.pop(user.id, None)
         return []
-    import time
     hit = _EXT_CACHE.get(user.id)
-    if not refresh and hit and hit[0] == user.external_ics_url and hit[1] > time.time():
+    if not refresh and hit and hit[0] == sig and hit[1] > time.time():
         return hit[2]
-    import asyncio, urllib.request, urllib.parse, socket, ipaddress
-    def _fetch():
-        url = user.external_ics_url
-        # SSRF-Schutz: Ziel-Host darf nicht auf eine private/lokale IP zeigen
-        # (kein Zugriff auf interne Dienste/Metadaten). Nur http(s).
-        parsed = urllib.parse.urlparse(url)
-        if parsed.scheme not in ("http", "https") or not parsed.hostname:
-            return ""
-        host = parsed.hostname
-        port = parsed.port or (443 if parsed.scheme == "https" else 80)
-        infos = socket.getaddrinfo(host, port)
-        for res in infos:
-            ip = ipaddress.ip_address(res[4][0])
-            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
-                raise ValueError("Ziel-IP nicht erlaubt")
-        # DNS-Rebinding sperren: urllib würde den Host beim Verbinden ERNEUT auflösen —
-        # ein bösartiger DNS könnte dann eine geprüfte öffentliche IP durch eine interne
-        # ersetzen (TOCTOU). Darum getaddrinfo für genau diesen Host auf das bereits
-        # geprüfte Ergebnis pinnen; Hostname bleibt für SNI/Cert-Prüfung erhalten.
-        _real_gai = socket.getaddrinfo
-        def _pinned_gai(h, p, *a, **k):
-            if h == host and p == port:
-                return infos
-            return _real_gai(h, p, *a, **k)
-        # Redirects sperren: ein Redirect koennte nach dem IP-Check auf eine
-        # private IP umleiten (SSRF). Feeds (Google/iCloud) liefern direkt.
-        class _NoRedirect(urllib.request.HTTPRedirectHandler):
-            def redirect_request(self, *a, **k):
-                return None
-        opener = urllib.request.build_opener(_NoRedirect)
-        req = urllib.request.Request(url, headers={"User-Agent": "Nuvora"})
-        socket.getaddrinfo = _pinned_gai
-        try:
-            with opener.open(req, timeout=6) as r:
-                return r.read(2_000_000).decode("utf-8", "replace")  # max 2 MB
-        finally:
-            socket.getaddrinfo = _real_gai
-    try:
-        text = await asyncio.get_event_loop().run_in_executor(None, _fetch)
-    except Exception:
-        return []
+    import asyncio, hashlib
     from datetime import date, timedelta
     def _d(v):
         return date(int(v[0:4]), int(v[4:6]), int(v[6:8])) if v and len(v) >= 8 and v[:8].isdigit() else None
-    # Anzeigefenster für wiederkehrende Termine (sonst würden Serien endlos wachsen).
     today = date.today()
     win_start = today - timedelta(days=60)
     win_end = today + timedelta(days=180)
+
+    async def _load(url):
+        try:
+            return await asyncio.get_event_loop().run_in_executor(None, _fetch_ics, url)
+        except Exception:
+            return ""
+    texts = await asyncio.gather(*[_load(c["url"]) for c in cals])
+
     out = []
-    for e in _parse_ics(text):
-        d0 = _d(e.get("start"))
-        if not d0:
-            continue
-        title = e.get("title", "")[:200]
-        d1 = _d(e.get("end"))
-        # Info-Felder je Event (fuer das Detail-Popup); read-only.
-        multi = bool(d1 and d1 > d0)
-        last = (d1 - timedelta(days=1)) if multi else d0
-        info = {"title": title, "time": e.get("time"), "endtime": e.get("endtime"),
-                "location": e.get("location", ""),
-                "description": e.get("description", ""), "start": d0.isoformat(), "end": last.isoformat()}
-        if e.get("rrule"):
-            # Wiederkehrender Termin: jede Instanz im Fenster als eigener Tag.
-            for occ in _expand_rrule(d0, e["rrule"], e.get("exdate"), win_start, win_end):
-                out.append({**info, "date": occ.isoformat(), "start": occ.isoformat(), "end": occ.isoformat()})
-        elif multi:
-            # Mehrtägige (Ganztags-)Events über alle Tage anzeigen; DTEND ist bei
-            # Ganztags exklusiv. Ohne/gleiches Ende: nur der eine Tag. Max 60 Tage.
-            cur = d0
-            n = 0
-            while cur < d1 and n < 60:
-                out.append({**info, "date": cur.isoformat()})
-                cur += timedelta(days=1); n += 1
-        else:
-            out.append({**info, "date": d0.isoformat()})
-    # Höheres Limit: bei vielen wiederkehrenden Serien im Fenster (heute -60..+180)
-    # kamen mit 2000 späte Events GAR NICHT mehr durch — ganze Termine fehlten an
-    # einzelnen Tagen. Nach Datum sortieren, damit ein etwaiger Schnitt am Rand des
-    # Fensters greift und nicht mitten im sichtbaren Bereich.
+    for cal, text in zip(cals, texts):
+        color = cal.get("color") or ""
+        for e in _parse_ics(text):
+            d0 = _d(e.get("start"))
+            if not d0:
+                continue
+            title = e.get("title", "")[:200]
+            d1 = _d(e.get("end"))
+            # Stabiler Ereignis-Schlüssel zum Ausblenden: UID, sonst Titel+Start-Hash.
+            uid = e.get("uid") or "h" + hashlib.md5(f"{title}|{e.get('start')}".encode()).hexdigest()[:16]
+            multi = bool(d1 and d1 > d0)
+            last = (d1 - timedelta(days=1)) if multi else d0
+            info = {"title": title, "time": e.get("time"), "endtime": e.get("endtime"),
+                    "location": e.get("location", ""), "color": color, "uid": uid,
+                    "description": e.get("description", ""), "start": d0.isoformat(), "end": last.isoformat()}
+
+            def _emit(iso_date, ov=None):
+                key = f"{uid}|{iso_date}"
+                if key in hidden:
+                    return
+                row = {**info, "date": iso_date, "key": key}
+                if ov:
+                    row.update(ov)
+                out.append(row)
+
+            if e.get("rrule"):
+                for occ in _expand_rrule(d0, e["rrule"], e.get("exdate"), win_start, win_end):
+                    iso = occ.isoformat()
+                    _emit(iso, {"start": iso, "end": iso})
+            elif multi:
+                cur = d0
+                n = 0
+                while cur < d1 and n < 60:
+                    _emit(cur.isoformat())
+                    cur += timedelta(days=1); n += 1
+            else:
+                _emit(d0.isoformat())
     out.sort(key=lambda x: (x["date"], x.get("time") or ""))
     result = out[:20000]
-    _EXT_CACHE[user.id] = (user.external_ics_url, time.time() + _EXT_TTL, result)
+    _EXT_CACHE[user.id] = (sig, time.time() + _EXT_TTL, result)
     return result

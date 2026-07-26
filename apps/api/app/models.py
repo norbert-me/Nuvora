@@ -44,6 +44,11 @@ class User(Base):
     external_ics_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # Eigene Anzeigefarbe für abonnierte (externe) Termine (Hex, "" = Standard).
     external_ics_color: Mapped[str] = mapped_column(String(9), default="", server_default="")
+    # Mehrere externe Kalender: Liste [{url, color, name}]. Löst external_ics_url/
+    # _color ab (die bleiben als Altbestand und werden beim ersten Lesen migriert).
+    external_calendars: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # Ausgeblendete externe Einzel-Ereignisse: Liste von Schlüsseln "uid|YYYY-MM-DD".
+    external_hidden: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     # Einstiege-Startsammlung einmalig angelegt? Danach nicht erneut seeden,
     # auch wenn die Lehrkraft alle Einstiege loescht (sonst tauchen sie wieder auf).
     methoden_seeded: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
