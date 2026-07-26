@@ -70,6 +70,7 @@ const weekValToDate = (s) => { const [y, w] = s.split("-W").map(Number); return 
 
 export default function Kalender() {
   const { t } = useLanguage();
+  const nav = useNavigate();
   // Ansicht in der URL (?view=), damit der Stundenplan aus dem Navbar-Menü
   // ansteuerbar ist. Ohne Parameter = Monat. Andere Query-Params bleiben.
   const [params, setParams] = useSearchParams();
@@ -88,6 +89,7 @@ export default function Kalender() {
   const [extCals, setExtCals] = useState([]); // [{url,color,name}]
   const [extHidden, setExtHidden] = useState([]);
   const [extEvents, setExtEvents] = useState([]); // [{date,title,color,key,…}]
+  const [todoEvents, setTodoEvents] = useState([]); // datierte To-dos [{id,date,time,text,done}]
   // Fallback-Farbe (Kalender ohne eigene Farbe): erste gesetzte Kalenderfarbe.
   const extColor = extCals.find((c) => c.color)?.color || "";
   const openAbo = async () => {
@@ -277,8 +279,14 @@ export default function Kalender() {
     const [a, b] = range;
     fetch(`${API}/entries?frm=${a.toISOString()}&to=${addDays(b, 1).toISOString()}`)
       .then((r) => (r.ok ? r.json() : [])).then((d) => setEntries(Array.isArray(d) ? d : [])).catch(() => {});
-  }, [view, cursor]); // eslint-disable-line
+    // Datierte To-dos (nur bei aktivem Modul) mit anzeigen — Regel-3-Zusatz.
+    if (aktiv.todo) {
+      fetch(`/api/todo/calendar?frm=${ymd(a)}&to=${ymd(b)}`)
+        .then((r) => (r.ok ? r.json() : [])).then((d) => setTodoEvents(Array.isArray(d) ? d : [])).catch(() => {});
+    } else setTodoEvents([]);
+  }, [view, cursor, aktiv.todo]); // eslint-disable-line
   useEffect(() => { load(); }, [load]);
+  const todoByDay = (d) => todoEvents.filter((e) => e.date === ymd(d));
 
   const topicName = (id) => {
     const tp = topics.find((x) => x.id === id);
@@ -535,7 +543,7 @@ export default function Kalender() {
           heuteAbsent={heuteAbsent} orgaAktiv={!!aktiv.orga} onOpen={setEditing} onSlot={fromSlot} />
       )}
 
-      {view === "month" && <MonthGrid extColor={extColor} range={range} cursor={cursor} byDay={byDayV} extByDay={extByDayV} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} kursName={kursName} slotName={slotName} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
+      {view === "month" && <MonthGrid extColor={extColor} range={range} cursor={cursor} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/todo")} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} kursName={kursName} slotName={slotName} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
       {view === "week" && wdhVorschlag.length > 0 && (
         <div style={{ marginBottom: 12, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)" }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t("kalender.wdhTitle")}</div>
@@ -551,8 +559,8 @@ export default function Kalender() {
           </div>
         </div>
       )}
-      {view === "week" && <WeekView extColor={extColor} range={range} byDay={byDayV} extByDay={extByDayV} slotsFor={slotsFor} frei={frei} className={className} kursName={kursName} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
-      {view === "day" && <DayView extColor={extColor} day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} slotsFor={slotsFor} cancelledFor={cancelledFor} onCancelSlot={cancelSlot} onRestoreSlot={restoreSlot} frei={frei} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
+      {view === "week" && <WeekView extColor={extColor} range={range} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/todo")} slotsFor={slotsFor} frei={frei} className={className} kursName={kursName} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
+      {view === "day" && <DayView extColor={extColor} day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/todo")} slotsFor={slotsFor} cancelledFor={cancelledFor} onCancelSlot={cancelSlot} onRestoreSlot={restoreSlot} frei={frei} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
       {view === "timetable" && <TimetableView tt={tt} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} kursName={kursName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
@@ -697,6 +705,18 @@ function ExtChips({ list, onOpen, extColor }) {
   ));
 }
 
+// Datierte To-dos als Chip (Modul To-do). Erledigte durchgestrichen. Klick führt
+// in die To-do-Liste (Link kommt vom Aufrufer via onOpen).
+function TodoChips({ list, onOpen }) {
+  if (!list || !list.length) return null;
+  return list.map((td) => (
+    <button key={`todo-${td.id}`} onClick={onOpen ? (e) => { e.stopPropagation(); onOpen(); } : undefined} title={td.text}
+      style={{ display: "block", width: "100%", textAlign: "left", fontSize: 11, color: "var(--text)", background: "rgba(52,199,89,0.12)", border: "1px solid rgba(52,199,89,0.5)", borderRadius: 6, padding: "1px 5px", margin: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: onOpen ? "pointer" : "default", textDecoration: td.done ? "line-through" : "none", opacity: td.done ? 0.6 : 1 }}>
+      {(td.time ? td.time + " " : "")}✓ {td.text}
+    </button>
+  ));
+}
+
 function EntryChips({ list, className, kursName = () => "", topicName, onOpen, classColor }) {
   // Anzeige denkt in Kursen: liegt ein Kurs am Eintrag, dessen Namen (Fach) zeigen,
   // sonst die Fach-Klasse.
@@ -805,7 +825,7 @@ function HeuteView({ t, tt, weekdayOf, byDay, className, slotName, slotColor, cl
   );
 }
 
-function MonthGrid({ extColor, range, cursor, byDay, extByDay, slotsFor, onSlot, frei, className, kursName, slotName, topicName, classColor, onAdd, onOpen, onExt, onDayView, onWeekView, t }) {
+function MonthGrid({ extColor, range, cursor, byDay, extByDay, todoByDay, onTodo, slotsFor, onSlot, frei, className, kursName, slotName, topicName, classColor, onAdd, onOpen, onExt, onDayView, onWeekView, t }) {
   const days = [];
   for (let d = new Date(range[0]); d <= range[1]; d = addDays(d, 1)) days.push(new Date(d));
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
@@ -860,6 +880,7 @@ function MonthGrid({ extColor, range, cursor, byDay, extByDay, slotsFor, onSlot,
                     {f ? <FreiMarker label={f.label} t={t} /> : (<>
                       <EntryChips list={byDay(d)} className={className} kursName={kursName} topicName={topicName} onOpen={onOpen} classColor={classColor} />
                       <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} extColor={extColor} />
+                      <TodoChips list={todoByDay && todoByDay(d)} onOpen={onTodo} />
                       {slotsFor && <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} slotName={slotName} topicName={topicName} onSlot={onSlot} day={d} t={t} />}
                     </>)}
                     </>)}
@@ -875,7 +896,7 @@ function MonthGrid({ extColor, range, cursor, byDay, extByDay, slotsFor, onSlot,
   );
 }
 
-function WeekView({ extColor, range, byDay, extByDay, slotsFor, frei, className, kursName, slotName, classColor, topicName, onAdd, onOpen, onExt, onSlot, onDayView, t }) {
+function WeekView({ extColor, range, byDay, extByDay, todoByDay, onTodo, slotsFor, frei, className, kursName, slotName, classColor, topicName, onAdd, onOpen, onExt, onSlot, onDayView, t }) {
   const days = [];
   for (let d = new Date(range[0]); d <= range[1]; d = addDays(d, 1)) days.push(new Date(d));
   return (
@@ -893,6 +914,7 @@ function WeekView({ extColor, range, byDay, extByDay, slotsFor, frei, className,
             <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} slotName={slotName} topicName={topicName} onSlot={onSlot} day={d} t={t} />
             <EntryChips list={byDay(d)} className={className} kursName={kursName} topicName={topicName} onOpen={onOpen} classColor={classColor} />
             <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} extColor={extColor} />
+            <TodoChips list={todoByDay && todoByDay(d)} onOpen={onTodo} />
           </>)}
         </div>
         );
@@ -915,7 +937,7 @@ function FreiMarker({ label, t }) {
   );
 }
 
-function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDay, slotsFor, cancelledFor, onCancelSlot, onRestoreSlot, frei, className, slotName, slotColor, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
+function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDay, todoByDay, onTodo, slotsFor, cancelledFor, onCancelSlot, onRestoreSlot, frei, className, slotName, slotColor, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
   const list = byDay(day);
   const slots = slotsFor(day);
   const ext = extByDay ? extByDay(day) : [];
@@ -1027,6 +1049,14 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
               {s.period}. {t("kalender.period")} {slotName(s) || s.title || ""} <span style={{ textDecoration: "none", fontWeight: 700, color: "var(--accent)" }}>↺</span>
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Datierte To-dos dieses Tages (Modul To-do). */}
+      {todoByDay && todoByDay(day).length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ ...sectionLabel, marginBottom: 6 }}>{t("todo.title")}</div>
+          <TodoChips list={todoByDay(day)} onOpen={onTodo} />
         </div>
       )}
 
@@ -1267,11 +1297,23 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
   const [importing, setImporting] = useState(false);
   const ferienImport = async () => {
     const liste = ferienDE[land] || [];
-    const vorhanden = new Set(breaks.map((b) => `${ymd(new Date(b.start_date))}|${(b.label || "").trim()}`));
-    const neu = liste.filter((f) => !vorhanden.has(`${f.start}|${f.label.trim()}`));
-    if (neu.length === 0) { showAlert(t("kalender.ferienNothing")); return; }
+    // Bestehende nach Start|Label. Stimmt der Eintrag, aber das ENDE weicht ab
+    // (z.B. alter Import vor einer Datensatz-Korrektur), wird er ersetzt — sonst
+    // bliebe ein zu kurzes Ferienende stehen (Idempotenz nur über Start+Label).
+    const byKey = new Map(breaks.map((b) => [`${ymd(new Date(b.start_date))}|${(b.label || "").trim()}`, b]));
+    const toAdd = [];
+    const toFix = [];
+    for (const f of liste) {
+      const ex = byKey.get(`${f.start}|${f.label.trim()}`);
+      if (!ex) toAdd.push(f);
+      else if (ymd(new Date(ex.end_date)) !== f.end) toFix.push({ old: ex, f });
+    }
+    if (toAdd.length === 0 && toFix.length === 0) { showAlert(t("kalender.ferienNothing")); return; }
     setImporting(true);
-    for (const f of neu) {
+    for (const { old } of toFix) {
+      await fetch(`${API}/breaks/${old.id}`, { method: "DELETE" }).catch(() => {});
+    }
+    for (const f of [...toFix.map((x) => x.f), ...toAdd]) {
       await onAdd({ start_date: new Date(f.start + "T12:00:00").toISOString(), end_date: new Date(f.end + "T12:00:00").toISOString(), label: f.label });
     }
     setImporting(false);
