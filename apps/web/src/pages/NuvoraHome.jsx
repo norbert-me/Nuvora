@@ -150,7 +150,7 @@ function HeutePanel({ t, orgaAktiv }) {
 
   if (!data) return null;
   // Nur heute gültige Stundenplan-Versionen (valid_from/valid_to grenzen ein).
-  const heuteYmd = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
+  // heuteYmd ist oben schon definiert (YYYY-MM-DD).
   const activeToday = (s) => (!s.valid_from || heuteYmd >= s.valid_from) && (!s.valid_to || heuteYmd <= s.valid_to);
   const slots = data.slots.filter((s) => s.weekday === wochentag() && activeToday(s)).sort((a, b) => a.period - b.period);
   const extras = data.entries.filter((e) => e.period == null || !slots.some((s) => s.period === e.period));
