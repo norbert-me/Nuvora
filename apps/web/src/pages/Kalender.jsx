@@ -484,47 +484,46 @@ export default function Kalender() {
           </label>
         </div>
       )}
-      {/* Datums-Navigator: Pfeile flankieren das Datum; Klick aufs Datum springt
-          direkt (nativer Picker), „Heute" integriert. Kein Selektor mehr oben rechts. */}
+      {/* Datums-Navigator, einheitlich mit der Anwesenheit: ‹ [Auswahl] › Heute.
+          Tagesansicht = nativer Datums-Picker inline (wie Anwesenheit); Monat/Woche
+          behalten den Selektor im Popover, da ein Tag-Picker dort nicht passt. */}
       {view !== "timetable" && view !== "breaks" && view !== "klassenarbeit" && view !== "today" && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 14, position: "relative" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 14, position: "relative", flexWrap: "wrap" }}>
           <button onClick={() => move(-1)} title="◀" style={{ ...btnSecondary, padding: "4px 13px", fontSize: 17, lineHeight: 1 }}>‹</button>
-          <button onClick={() => setCursor(startOfDay(new Date()))} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>{t("kalender.today")}</button>
-          {/* Direktsprung als eigenes Popover (keine nativen showPicker/Overlay-
-              Tricks — die öffneten in Safari nichts). Klick aufs Datum klappt
-              Auswahl-Dropdowns auf; Auswahl springt und schließt. */}
-          <div style={{ position: "relative" }}>
-            <button onClick={() => setJumpOpen((v) => !v)} title={t("kalender.jumpToDay")}
-              style={{ border: "none", background: "none", fontSize: 15, fontWeight: 700, color: "var(--text)", minWidth: 170, textAlign: "center", cursor: "pointer", padding: "4px 8px", borderRadius: 8, borderBottom: "1px dotted var(--border2)" }}>{title} ▾</button>
-            {jumpOpen && (<>
-              <div onClick={() => setJumpOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-              <div style={{ ...popoverPanel, position: "absolute", top: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)", zIndex: 50, padding: 8, display: "flex", gap: 6, alignItems: "center" }}>
-                {view === "month" && (
-                  <select value={cursor.getMonth()} onChange={(e) => { setCursor(startOfDay(new Date(cursor.getFullYear(), Number(e.target.value), 1))); setJumpOpen(false); }} style={{ ...selectStyle, padding: "6px 24px 6px 8px", fontSize: 13 }}>
-                    {Array.from({ length: 12 }, (_, m) => <option key={m} value={m}>{new Date(2000, m, 1).toLocaleDateString(undefined, { month: "long" })}</option>)}
-                  </select>
-                )}
-                {view === "week" && (
-                  <select value={isoWeek(cursor).week} onChange={(e) => { setCursor(weekValToDate(`${isoWeek(cursor).year}-W${String(e.target.value).padStart(2, "0")}`)); setJumpOpen(false); }} style={{ ...selectStyle, padding: "6px 24px 6px 8px", fontSize: 13 }}>
-                    {Array.from({ length: 53 }, (_, i) => i + 1).map((w) => <option key={w} value={w}>{t("kalender.kw")} {w}</option>)}
-                  </select>
-                )}
-                {view === "day" && (
-                  <input type="date" value={ymd(cursor)} onChange={(e) => { if (e.target.value) { setCursor(startOfDay(new Date(e.target.value + "T00:00:00"))); setJumpOpen(false); } }} style={{ ...inputStyle, padding: "6px 8px", fontSize: 13 }} />
-                )}
-                {(view === "month" || view === "week") && (() => {
-                  const y0 = new Date().getFullYear();
-                  const cy = view === "week" ? isoWeek(cursor).week : cursor.getMonth();
-                  return (
-                    <select value={cursor.getFullYear()} onChange={(e) => { const y = Number(e.target.value); setCursor(view === "week" ? weekValToDate(`${y}-W${String(cy).padStart(2, "0")}`) : startOfDay(new Date(y, cy, 1))); setJumpOpen(false); }} style={{ ...selectStyle, padding: "6px 24px 6px 8px", fontSize: 13 }}>
-                      {Array.from({ length: 7 }, (_, i) => y0 - 3 + i).map((y) => <option key={y} value={y}>{y}</option>)}
+          {view === "day" ? (
+            <input type="date" value={ymd(cursor)} onChange={(e) => { if (e.target.value) setCursor(startOfDay(new Date(e.target.value + "T00:00:00"))); }} style={inputStyle} />
+          ) : (
+            <div style={{ position: "relative" }}>
+              <button onClick={() => setJumpOpen((v) => !v)} title={t("kalender.jumpToDay")}
+                style={{ border: "none", background: "none", fontSize: 15, fontWeight: 700, color: "var(--text)", minWidth: 170, textAlign: "center", cursor: "pointer", padding: "4px 8px", borderRadius: 8, borderBottom: "1px dotted var(--border2)" }}>{title} ▾</button>
+              {jumpOpen && (<>
+                <div onClick={() => setJumpOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+                <div style={{ ...popoverPanel, position: "absolute", top: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)", zIndex: 50, padding: 8, display: "flex", gap: 6, alignItems: "center" }}>
+                  {view === "month" && (
+                    <select value={cursor.getMonth()} onChange={(e) => { setCursor(startOfDay(new Date(cursor.getFullYear(), Number(e.target.value), 1))); setJumpOpen(false); }} style={{ ...selectStyle, padding: "6px 24px 6px 8px", fontSize: 13 }}>
+                      {Array.from({ length: 12 }, (_, m) => <option key={m} value={m}>{new Date(2000, m, 1).toLocaleDateString(undefined, { month: "long" })}</option>)}
                     </select>
-                  );
-                })()}
-              </div>
-            </>)}
-          </div>
+                  )}
+                  {view === "week" && (
+                    <select value={isoWeek(cursor).week} onChange={(e) => { setCursor(weekValToDate(`${isoWeek(cursor).year}-W${String(e.target.value).padStart(2, "0")}`)); setJumpOpen(false); }} style={{ ...selectStyle, padding: "6px 24px 6px 8px", fontSize: 13 }}>
+                      {Array.from({ length: 53 }, (_, i) => i + 1).map((w) => <option key={w} value={w}>{t("kalender.kw")} {w}</option>)}
+                    </select>
+                  )}
+                  {(() => {
+                    const y0 = new Date().getFullYear();
+                    const cy = view === "week" ? isoWeek(cursor).week : cursor.getMonth();
+                    return (
+                      <select value={cursor.getFullYear()} onChange={(e) => { const y = Number(e.target.value); setCursor(view === "week" ? weekValToDate(`${y}-W${String(cy).padStart(2, "0")}`) : startOfDay(new Date(y, cy, 1))); setJumpOpen(false); }} style={{ ...selectStyle, padding: "6px 24px 6px 8px", fontSize: 13 }}>
+                        {Array.from({ length: 7 }, (_, i) => y0 - 3 + i).map((y) => <option key={y} value={y}>{y}</option>)}
+                      </select>
+                    );
+                  })()}
+                </div>
+              </>)}
+            </div>
+          )}
           <button onClick={() => move(1)} title="▶" style={{ ...btnSecondary, padding: "4px 13px", fontSize: 17, lineHeight: 1 }}>›</button>
+          <button onClick={() => setCursor(startOfDay(new Date()))} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>{t("kalender.today")}</button>
         </div>
       )}
       {view === "breaks" && <BreaksPanel breaks={breaks} onAdd={addBreak} onDel={delBreak} t={t} standalone />}
