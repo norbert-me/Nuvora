@@ -165,7 +165,7 @@ function HeutePanel({ t, orgaAktiv }) {
     <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 18, marginBottom: 24 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
         <div style={{ fontSize: 15, fontWeight: 700, textTransform: "capitalize" }}>{dateStr}</div>
-        <Link to="/kalender" style={{ fontSize: 12.5, color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>{t("home.toCalendar")} ↗</Link>
+        <Link to="/kalender?view=day" style={{ fontSize: 12.5, color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>{t("home.toCalendar")} ↗</Link>
       </div>
       {data.frei && (
         <div style={{ padding: "8px 12px", borderRadius: 10, background: "rgba(184,134,11,0.12)", color: "#8a6d00", fontSize: 13, fontWeight: 600 }}>
@@ -177,7 +177,7 @@ function HeutePanel({ t, orgaAktiv }) {
           {slots.map((s) => {
             const e = eintrag(s.period);
             // 1-Klick: mit Klasse + aktivem Orga direkt in die Anwesenheit heute.
-            const to = orgaAktiv && s.class_id ? `/orga?tab=anwesenheit&class=${s.class_id}&date=${heuteYmd}` : "/kalender";
+            const to = orgaAktiv && s.class_id ? `/orga?tab=anwesenheit&class=${s.class_id}&date=${heuteYmd}` : "/kalender?view=day";
             return (
               <Link key={s.id} to={to} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px solid var(--border)", borderLeft: `4px solid ${s.class_id ? ccolor(s.class_id) : "var(--border2)"}`, borderRadius: 10, textDecoration: "none", color: "var(--text)" }}>
                 <div style={{ minWidth: 42, textAlign: "center" }}>
@@ -192,7 +192,7 @@ function HeutePanel({ t, orgaAktiv }) {
             );
           })}
           {extras.map((e) => (
-            <Link key={e.id} to="/kalender" style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px dashed var(--border2)", borderRadius: 10, textDecoration: "none", color: "var(--text)" }}>
+            <Link key={e.id} to="/kalender?view=day" style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px dashed var(--border2)", borderRadius: 10, textDecoration: "none", color: "var(--text)" }}>
               <div style={{ minWidth: 42, textAlign: "center", color: "var(--text3)", fontSize: 12 }}>—</div>
               <div style={{ fontSize: 14, fontWeight: 600 }}>{e.title || (e.class_id && cname(e.class_id)) || t("kalender.planned")}</div>
             </Link>
