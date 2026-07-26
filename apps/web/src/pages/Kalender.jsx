@@ -887,9 +887,10 @@ function MonthGrid({ extColor, range, cursor, byDay, extByDay, todoByDay, onTodo
                     {f ? <FreiMarker label={f.label} t={t} /> : (<>
                       <EntryChips list={byDay(d)} className={className} kursName={kursName} topicName={topicName} onOpen={onOpen} classColor={classColor} />
                       <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} extColor={extColor} />
-                      <TodoChips list={todoByDay && todoByDay(d)} onOpen={onTodo} />
                       {slotsFor && <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} slotName={slotName} topicName={topicName} onSlot={onSlot} day={d} t={t} />}
                     </>)}
+                    {/* To-dos zeigen auch an freien Tagen (Ferien/Feiertag). */}
+                    <TodoChips list={todoByDay && todoByDay(d)} onOpen={onTodo} />
                     </>)}
                   </td>
                 );
@@ -921,8 +922,9 @@ function WeekView({ extColor, range, byDay, extByDay, todoByDay, onTodo, slotsFo
             <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} slotName={slotName} topicName={topicName} onSlot={onSlot} day={d} t={t} />
             <EntryChips list={byDay(d)} className={className} kursName={kursName} topicName={topicName} onOpen={onOpen} classColor={classColor} />
             <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} extColor={extColor} />
-            <TodoChips list={todoByDay && todoByDay(d)} onOpen={onTodo} />
           </>)}
+          {/* To-dos auch an freien Tagen. */}
+          <TodoChips list={todoByDay && todoByDay(d)} onOpen={onTodo} />
         </div>
         );
       })}
@@ -958,7 +960,17 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
   const scrollRef = useRef(null);
   const dayKey = ymd(day);
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 6 * HOUR; }, [dayKey]);
-  if (f) return <p style={{ fontSize: 14, color: "var(--text3)", fontStyle: "italic" }}>{f.label ? `${f.label} — ${t("kalender.free")}` : t("kalender.free")}</p>;
+  if (f) return (
+    <div>
+      <p style={{ fontSize: 14, color: "var(--text3)", fontStyle: "italic" }}>{f.label ? `${f.label} — ${t("kalender.free")}` : t("kalender.free")}</p>
+      {todoByDay && todoByDay(day).length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ ...sectionLabel, marginBottom: 6 }}>{t("todo.title")}</div>
+          <TodoChips list={todoByDay(day)} onOpen={onTodo} />
+        </div>
+      )}
+    </div>
+  );
 
   // Ganztägig / ohne verortbare Uhrzeit -> Banner oben (auch externe Termine).
   // Einträge mit freier Uhrzeit gehören in die Zeitspur, nicht ins Banner.
