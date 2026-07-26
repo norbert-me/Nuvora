@@ -118,6 +118,7 @@ import Methoden from "./pages/Methoden.jsx";
 import Zufall from "./pages/Zufall.jsx";
 import Orga from "./pages/Orga.jsx";
 import Klassenarbeit, { KlassenarbeitVergleich } from "./pages/Klassenarbeit.jsx";
+import Todo from "./pages/Todo.jsx";
 import { useModules } from "./core/modules.js";
 import { DialogHost } from "./core/dialog.jsx";
 import { UndoHost } from "./core/undo.jsx";
@@ -145,6 +146,7 @@ const ZUF = "/zufall";
 const ORG = "/orga";
 const AUS = "/ausleihe";
 const KLA = "/klassenarbeit";
+const TODO = "/todo";
 
 // Menue passend zum Bereich. Man soll im Modul-Menue bleiben, auch auf
 // modulneutralen Seiten (Hilfe, Impressum), solange man aus einem Modul kam —
@@ -160,6 +162,7 @@ const getModuleNavItems = (t, location) => {
     : pathname.startsWith(MET) ? "methoden"
     : pathname.startsWith(ZUF) ? "zufall"
     : pathname.startsWith(ORG) ? "orga"
+    : pathname.startsWith(TODO) ? "todo"
     : pathname.startsWith(KLA) ? "klassenarbeit"
     : pathname.startsWith(KA) ? "karten"
     : params.get("area"); // Hilfe u.ae.: Bereich aus der Query
@@ -206,6 +209,9 @@ const getModuleNavItems = (t, location) => {
       { to: ZUF, label: t("zufall.navDraw"), active: cur !== "gruppen" },
       { to: `${ZUF}?tab=gruppen`, label: t("zufall.navGroups"), active: cur === "gruppen" },
     ];
+  }
+  if (area === "todo") {
+    return [{ to: TODO, label: t("todo.title") }];
   }
   if (area === "klassenarbeit") {
     return [
@@ -768,6 +774,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={KAL} element={user ? <ModuleGate moduleKey="kalender"><Kalender /></ModuleGate> : <Landing />} />
           <Route path={MET} element={user ? <ModuleGate moduleKey="methoden"><Methoden /></ModuleGate> : <Landing />} />
           <Route path={ZUF} element={user ? <ModuleGate moduleKey="zufall"><Zufall /></ModuleGate> : <Landing />} />
+          <Route path={TODO} element={user ? <ModuleGate moduleKey="todo"><Todo /></ModuleGate> : <Landing />} />
           <Route path={KLA} element={user ? <ModuleGate moduleKey="klassenarbeit"><Klassenarbeit /></ModuleGate> : <Landing />} />
           <Route path={`${KLA}/vergleich`} element={user ? <ModuleGate moduleKey="klassenarbeit"><KlassenarbeitVergleich /></ModuleGate> : <Landing />} />
           <Route path={ORG} element={user ? <ModuleGate moduleKey="orga"><Orga /></ModuleGate> : <Landing />} />

@@ -32,6 +32,7 @@ export const MODULE_ICONS = {
   sitzplan: ["M4 5h5v4H4z", "M11 5h5v4h-5z", "M4 11h5v4H4z", "M11 11h5v4h-5z"],
   ausleihe: ["M4 7l6-3 6 3v6l-6 3-6-3z", "M4 7l6 3 6-3", "M10 10v6"],
   material: ["M4 6a1 1 0 011-1h3l1.5 2H15a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1z"],
+  todo: ["M4 6h9", "M4 10h9", "M4 14h6", "M15.5 12.5l1.5 1.5 2.5-3"],
 };
 
 export const ICONS = {

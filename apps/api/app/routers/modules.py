@@ -171,6 +171,18 @@ REGISTRY: List[ModuleDef] = [
         path="/methoden",
         stage="stable",
     ),
+    ModuleDef(
+        key="todo",
+        group="organisation",
+        name="To-do",
+        description=(
+            "Einfache Aufgabenliste. Ein Eintrag kann ein Datum und eine Uhrzeit "
+            "bekommen — dann steht er auch im Kalender. Ohne Datum bleibt es eine "
+            "reine Merkliste."
+        ),
+        path="/todo",
+        stage="stable",
+    ),
 ]
 
 _BY_KEY = {m.key: m for m in REGISTRY}

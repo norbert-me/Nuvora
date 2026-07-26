@@ -1068,3 +1068,21 @@ class Material(Base):
     size: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     data: Mapped[bytes] = mapped_column(LargeBinary)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Todo(Base):
+    """Modul To-do: einfache Aufgabenliste der Lehrkraft. Eigenstaendig (Regel 3).
+    Optional mit Datum (und Uhrzeit) — dann erscheint der Eintrag auch im Kalender,
+    sofern das Kalender-Modul aktiv ist (reine Zusatz-Bruecke, keine Abhaengigkeit).
+    """
+    __tablename__ = "todos"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    text: Mapped[str] = mapped_column(String(500), default="", server_default="")
+    done: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Optional: Faelligkeitsdatum + Uhrzeit ("HH:MM", "" = ganztaegig/ohne Zeit).
+    due_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, index=True)
+    due_time: Mapped[str] = mapped_column(String(5), default="", server_default="")
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
