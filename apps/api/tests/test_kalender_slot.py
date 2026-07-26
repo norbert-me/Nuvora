@@ -27,6 +27,21 @@ async def s():
     await e.dispose()
 
 
+def test_expand_rrule_common_cases():
+    """Wiederkehrende externe Termine (RRULE) werden im Fenster expandiert:
+    WEEKLY/BYDAY mit UNTIL + EXDATE, DAILY/INTERVAL/COUNT, MONTHLY/COUNT."""
+    from datetime import date
+    from app.routers.kalender import _expand_rrule
+    ws, we = date(2026, 5, 1), date(2026, 9, 1)
+    wk = _expand_rrule(date(2026, 6, 1), "FREQ=WEEKLY;BYDAY=MO,WE;UNTIL=20260701T000000Z", {"20260610"}, ws, we)
+    assert len(wk) == 9 and wk[0] == date(2026, 6, 1) and wk[-1] == date(2026, 7, 1)
+    assert date(2026, 6, 10) not in wk           # EXDATE ausgenommen
+    dl = _expand_rrule(date(2026, 6, 1), "FREQ=DAILY;INTERVAL=3;COUNT=4", None, ws, we)
+    assert [x.day for x in dl] == [1, 4, 7, 10]
+    mo = _expand_rrule(date(2026, 6, 15), "FREQ=MONTHLY;COUNT=3", None, ws, we)
+    assert [x.month for x in mo] == [6, 7, 8]
+
+
 @pytest.mark.asyncio
 async def test_slot_behaelt_kurs(s):
     u = User(email="a@b.de", password_hash="x", name="L"); s.add(u); await s.flush()

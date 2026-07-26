@@ -902,6 +902,85 @@ async def set_external(body: ExtIn, user: User = Depends(require_module), db: As
     return {"url": user.external_ics_url or "", "color": user.external_ics_color or ""}
 
 
+_RRULE_WD = {"MO": 0, "TU": 1, "WE": 2, "TH": 3, "FR": 4, "SA": 5, "SU": 6}
+
+
+def _expand_rrule(d0, rule, exdate, win_start, win_end):
+    """Wiederkehr-Termine (RRULE) im Fenster [win_start, win_end] aufzählen. Deckt
+    die gängigen Fälle ab: DAILY/WEEKLY/MONTHLY/YEARLY mit INTERVAL/COUNT/UNTIL/
+    BYDAY. exdate = Menge/Liste ausgenommener Tage als 'YYYYMMDD'."""
+    from datetime import date as _date, timedelta as _td
+    parts = {}
+    for kv in (rule or "").split(";"):
+        if "=" in kv:
+            k, v = kv.split("=", 1); parts[k.upper()] = v
+    freq = (parts.get("FREQ") or "").upper()
+    try:
+        interval = max(1, int(parts.get("INTERVAL", "1")))
+    except ValueError:
+        interval = 1
+    count = int(parts["COUNT"]) if parts.get("COUNT", "").isdigit() else None
+    u = parts.get("UNTIL", "")[:8]
+    until = _date(int(u[0:4]), int(u[4:6]), int(u[6:8])) if len(u) == 8 and u.isdigit() else None
+    ex = set(exdate or [])
+    days = []
+    emitted = 0
+
+    def add(occ):
+        nonlocal emitted
+        if occ.strftime("%Y%m%d") in ex:
+            return True
+        emitted += 1
+        if occ >= d0 and win_start <= occ <= win_end:
+            days.append(occ)
+        return count is None or emitted < count
+
+    if freq == "DAILY":
+        occ = d0
+        while occ <= win_end and (until is None or occ <= until):
+            if not add(occ):
+                break
+            occ += _td(days=interval)
+    elif freq == "WEEKLY":
+        wanted = sorted({_RRULE_WD[x] for x in parts.get("BYDAY", "").split(",") if x in _RRULE_WD}) or [d0.weekday()]
+        week = d0 - _td(days=d0.weekday())
+        guard = 0
+        stop = False
+        while week <= win_end and (until is None or week <= until) and not stop and guard < 600:
+            for wd in wanted:
+                occ = week + _td(days=wd)
+                if occ < d0 or (until and occ > until):
+                    continue
+                if occ > win_end:
+                    stop = True; break
+                if not add(occ):
+                    stop = True; break
+            week += _td(weeks=interval); guard += 1
+    elif freq in ("MONTHLY", "YEARLY"):
+        y, m = d0.year, d0.month
+        guard = 0
+        while guard < 800:
+            try:
+                occ = _date(y, m, d0.day)
+            except ValueError:
+                occ = None
+            if occ is not None:
+                if occ > win_end or (until and occ > until):
+                    break
+                if not add(occ):
+                    break
+            if freq == "MONTHLY":
+                m += interval
+                while m > 12:
+                    m -= 12; y += 1
+            else:
+                y += interval
+            guard += 1
+    else:
+        days = [d0] if win_start <= d0 <= win_end else []
+    return days
+
+
 def _parse_ics(text: str):
     """Sehr einfacher ICS-Parser: VEVENTs mit DTSTART/DTEND/SUMMARY."""
     import re
@@ -939,6 +1018,11 @@ def _parse_ics(text: str):
                 cur["description"] = raw.replace("\\,", ",").replace(r"\;", ";").replace("\\n", "\n").replace("\\N", "\n")[:1000]
             elif k == "STATUS":
                 cur["status"] = raw.upper()
+            elif k == "RRULE":
+                cur["rrule"] = raw  # Wiederholregel (FREQ/INTERVAL/UNTIL/COUNT/BYDAY)
+            elif k == "EXDATE":
+                # Ausgenommene Termine (gelöschte Einzeltage einer Serie).
+                cur.setdefault("exdate", []).extend(p.strip()[:8] for p in raw.split(",") if p.strip()[:8].isdigit())
     return events
 
 
@@ -1006,6 +1090,10 @@ async def external_events(refresh: bool = False, user: User = Depends(require_mo
     from datetime import date, timedelta
     def _d(v):
         return date(int(v[0:4]), int(v[4:6]), int(v[6:8])) if v and len(v) >= 8 and v[:8].isdigit() else None
+    # Anzeigefenster für wiederkehrende Termine (sonst würden Serien endlos wachsen).
+    today = date.today()
+    win_start = today - timedelta(days=60)
+    win_end = today + timedelta(days=180)
     out = []
     for e in _parse_ics(text):
         d0 = _d(e.get("start"))
@@ -1019,9 +1107,13 @@ async def external_events(refresh: bool = False, user: User = Depends(require_mo
         info = {"title": title, "time": e.get("time"), "endtime": e.get("endtime"),
                 "location": e.get("location", ""),
                 "description": e.get("description", ""), "start": d0.isoformat(), "end": last.isoformat()}
-        # Mehrtägige (Ganztags-)Events über alle Tage anzeigen; DTEND ist bei
-        # Ganztags exklusiv. Ohne/gleiches Ende: nur der eine Tag. Max 60 Tage.
-        if multi:
+        if e.get("rrule"):
+            # Wiederkehrender Termin: jede Instanz im Fenster als eigener Tag.
+            for occ in _expand_rrule(d0, e["rrule"], e.get("exdate"), win_start, win_end):
+                out.append({**info, "date": occ.isoformat(), "start": occ.isoformat(), "end": occ.isoformat()})
+        elif multi:
+            # Mehrtägige (Ganztags-)Events über alle Tage anzeigen; DTEND ist bei
+            # Ganztags exklusiv. Ohne/gleiches Ende: nur der eine Tag. Max 60 Tage.
             cur = d0
             n = 0
             while cur < d1 and n < 60:
