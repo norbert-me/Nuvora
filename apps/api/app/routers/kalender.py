@@ -946,7 +946,7 @@ def _expand_rrule(d0, rule, exdate, win_start, win_end):
         week = d0 - _td(days=d0.weekday())
         guard = 0
         stop = False
-        while week <= win_end and (until is None or week <= until) and not stop and guard < 600:
+        while week <= win_end and (until is None or week <= until) and not stop and guard < 8000:
             for wd in wanted:
                 occ = week + _td(days=wd)
                 if occ < d0 or (until and occ > until):
@@ -959,7 +959,7 @@ def _expand_rrule(d0, rule, exdate, win_start, win_end):
     elif freq in ("MONTHLY", "YEARLY"):
         y, m = d0.year, d0.month
         guard = 0
-        while guard < 800:
+        while guard < 8000:
             try:
                 occ = _date(y, m, d0.day)
             except ValueError:
@@ -1121,6 +1121,11 @@ async def external_events(refresh: bool = False, user: User = Depends(require_mo
                 cur += timedelta(days=1); n += 1
         else:
             out.append({**info, "date": d0.isoformat()})
-    result = out[:2000]
+    # Höheres Limit: bei vielen wiederkehrenden Serien im Fenster (heute -60..+180)
+    # kamen mit 2000 späte Events GAR NICHT mehr durch — ganze Termine fehlten an
+    # einzelnen Tagen. Nach Datum sortieren, damit ein etwaiger Schnitt am Rand des
+    # Fensters greift und nicht mitten im sichtbaren Bereich.
+    out.sort(key=lambda x: (x["date"], x.get("time") or ""))
+    result = out[:20000]
     _EXT_CACHE[user.id] = (user.external_ics_url, time.time() + _EXT_TTL, result)
     return result
