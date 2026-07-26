@@ -217,8 +217,16 @@ async def method_calendar(method_id: int, user: User = Depends(require_module), 
     m = await db.get(Method, method_id)
     if not m or m.owner_id != user.id:
         raise HTTPException(404, "Eintrag nicht gefunden")
+    # Stunden dieses Einstiegs: ausdrücklich verknüpft (method_id) ODER — falls der
+    # Einstieg ein Thema hat — über das GLEICHE Thema automatisch zugeordnet. So
+    # erscheint die Stunde auch, wenn der Eintrag nur das Thema trägt (die Auto-
+    # Zuordnung im Kalender speichert method_id erst beim Bearbeiten).
+    from sqlalchemy import or_
+    cond = CalendarEntry.method_id == method_id
+    if m.topic_id is not None:
+        cond = or_(cond, CalendarEntry.topic_id == m.topic_id)
     rows = (await db.execute(select(CalendarEntry).where(
-        CalendarEntry.owner_id == user.id, CalendarEntry.method_id == method_id
+        CalendarEntry.owner_id == user.id, cond
     ).order_by(CalendarEntry.date))).scalars().all()
     kurse = {k.id: k.name for k in (await db.execute(select(Kurs).where(Kurs.owner_id == user.id))).scalars().all()}
     classes = {c.id: c.name for c in (await db.execute(select(SchoolClass).where(SchoolClass.owner_id == user.id))).scalars().all()}
