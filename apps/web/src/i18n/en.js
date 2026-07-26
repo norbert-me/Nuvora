@@ -1092,6 +1092,8 @@ export default {
   "noten.zeugnis": "Report PDF",
   "noten.zeugnisHint": "Bundled parent/report PDF per student: grades, absences, card progress (no support data)",
   "noten.export": "Export",
+  "noten.exportBundle": "Data + report (ZIP)",
+  "noten.exportData": "Data only (JSON)",
   "noten.import": "Import",
   "noten.importError": "Import failed.",
   "modules.sortBy": "Sort:",

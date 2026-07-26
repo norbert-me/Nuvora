@@ -19,6 +19,9 @@ import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api/noten";
 
+// Zeile im Export-Dropdown (Icon + Text, linksbündig).
+const expRow = { display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "8px 10px", background: "none", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 13.5, color: "var(--text)", textAlign: "left" };
+
 function parseNote(text) {
   const n = parseFloat(String(text).replace(",", "."));
   if (Number.isNaN(n) || n < 1 || n > 6) return null;
@@ -57,6 +60,7 @@ export default function Noten() {
   const cdAktiv = modules.find((m) => m.key === "codedetektiv")?.active ?? false;
   const kartenAktiv = modules.find((m) => m.key === "karten")?.active ?? false;
   const [cdDialog, setCdDialog] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false); // Export-Dropdown
   const [topics, setTopics] = useState([]); // Kern-Themen: Spalte einem Thema zuordnen (Nachholbedarf)
   useEffect(() => { fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
   // Wie mehrere Einzelnoten zusammengefasst werden: Mittel oder Median. Merkt
@@ -220,6 +224,14 @@ export default function Noten() {
     const blob = await r.blob(); const cls = classes.find((c) => c.id === classId);
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
     a.download = `noten-${(cls?.name || "klasse")}-hj${term}.zip`; a.click(); URL.revokeObjectURL(a.href);
+  };
+  const doExportJson = async () => {
+    if (!classId) return;
+    const r = await fetch(`${API}/classes/${classId}/export?term=${term}${kp}`).catch(() => null);
+    if (!r || !r.ok) return;
+    const blob = await r.blob(); const cls = classes.find((c) => c.id === classId);
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `noten-${(cls?.name || "klasse")}-hj${term}.json`; a.click(); URL.revokeObjectURL(a.href);
   };
   const doZeugnis = async () => {
     if (!classId) return;
@@ -397,8 +409,19 @@ export default function Noten() {
         </div>
         {term !== "year" && classId && (
           <div style={{ display: "flex", gap: 8, marginLeft: "auto", alignItems: "center" }}>
-            <ExportButton iconOnly title={t("noten.export")} onClick={doExport} />
-            <button onClick={doZeugnis} style={btnSecondary} title={t("noten.zeugnisHint")}>{t("noten.zeugnis")}</button>
+            <div style={{ position: "relative" }}>
+              <button onClick={() => setExportOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn, display: "inline-flex", alignItems: "center", gap: 2 }} title={t("noten.export")} aria-label={t("noten.export")}>
+                <Icon d={ICONS.export} size={18} /><span style={{ fontSize: 10, color: "var(--text3)" }}>▾</span>
+              </button>
+              {exportOpen && (<>
+                <div onClick={() => setExportOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+                <div style={{ ...popoverPanel, position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 50, minWidth: 220, padding: 6 }}>
+                  <button onClick={() => { setExportOpen(false); doExport(); }} style={expRow}><Icon d={ICONS.export} size={15} /> {t("noten.exportBundle")}</button>
+                  <button onClick={() => { setExportOpen(false); doExportJson(); }} style={expRow}><Icon d={ICONS.export} size={15} /> {t("noten.exportData")}</button>
+                  <button onClick={() => { setExportOpen(false); doZeugnis(); }} style={expRow}><Icon d={ICONS.pdf || ICONS.export} size={15} /> {t("noten.zeugnis")}</button>
+                </div>
+              </>)}
+            </div>
             <ImportButton iconOnly title={t("noten.import")} onFile={doImport} />
             {cdAktiv && sections.length > 0 && <button onClick={() => setCdDialog(true)} style={btnSecondary} title={t("noten.fromCdHint")}>{t("noten.fromCd")}</button>}
             <button data-tour="noten-add" onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}

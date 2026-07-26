@@ -1092,6 +1092,8 @@ export default {
   "noten.zeugnis": "PDF de boletín",
   "noten.zeugnisHint": "PDF de boletín agrupado por alumno: notas, faltas, progreso de tarjetas (sin datos de apoyo)",
   "noten.export": "Exportar",
+  "noten.exportBundle": "Datos + boletín (ZIP)",
+  "noten.exportData": "Solo datos (JSON)",
   "noten.import": "Importar",
   "noten.importError": "Error al importar.",
   "modules.sortBy": "Ordenar:",

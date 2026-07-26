@@ -1117,6 +1117,8 @@ export default {
   "noten.zeugnis": "Zeugnis-PDF",
   "noten.zeugnisHint": "Gebündeltes Eltern-/Zeugnis-PDF je Schüler: Noten, Fehlzeiten, Karten-Fortschritt (ohne Förderdaten)",
   "noten.export": "Exportieren",
+  "noten.exportBundle": "Daten + Zeugnis (ZIP)",
+  "noten.exportData": "Nur Daten (JSON)",
   "noten.import": "Importieren",
   "noten.importError": "Import fehlgeschlagen.",
   "modules.sortBy": "Sortieren:",
