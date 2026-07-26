@@ -595,24 +595,18 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
   };
 
   const dragIdx = useRef(null);
+  const dragWork = useRef(null); // Arbeits-Reihenfolge während des Ziehens (stabil, kein State-Lag)
   const [previewQuestions, setPreviewQuestions] = useState(null);
 
+  // Vorschau inkrementell: das gezogene Element in der ARBEITS-Liste von seiner
+  // aktuellen Position auf die überfahrene schieben — nicht immer aus dem Original
+  // (das verlor bei Mehrschritt-Drags die Identität; Ablegen speicherte falsch).
   const reorderPreview = (from, to) => {
-    if (from === to || from == null) return;
-    const arr = [...questions];
+    if (from == null || from === to || !dragWork.current) return;
+    const arr = dragWork.current;
     const [moved] = arr.splice(from, 1);
     arr.splice(to, 0, moved);
-    setPreviewQuestions(arr);
-  };
-
-  const reorderQuestion = async (from, to) => {
-    if (from === to || from == null) return;
-    const arr = [...questions];
-    const [moved] = arr.splice(from, 1);
-    arr.splice(to, 0, moved);
-    setQuestions(arr);
-    setPreviewQuestions(null);
-    await saveSet(name, arr);
+    setPreviewQuestions([...arr]);
   };
 
   const uploadImage = async (setter) => {
@@ -677,10 +671,10 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
         <div
           key={q.id}
           draggable={!searching && !isTouch}
-          onDragStart={(e) => { if (searching) return; e.dataTransfer.effectAllowed = "move"; dragIdx.current = idx; }}
-          onDragOver={(e) => { if (searching) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; reorderPreview(dragIdx.current, idx); dragIdx.current = idx; }}
-          onDrop={(e) => { if (searching) return; e.preventDefault(); const arr = previewQuestions || questions; setQuestions(arr); setPreviewQuestions(null); saveSet(name, arr); dragIdx.current = null; }}
-          onDragEnd={() => { setPreviewQuestions(null); dragIdx.current = null; }}
+          onDragStart={(e) => { if (searching) return; e.dataTransfer.effectAllowed = "move"; dragWork.current = [...base]; dragIdx.current = idx; }}
+          onDragOver={(e) => { if (searching || dragIdx.current == null) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (idx !== dragIdx.current) { reorderPreview(dragIdx.current, idx); dragIdx.current = idx; } }}
+          onDrop={(e) => { if (searching) return; e.preventDefault(); const arr = dragWork.current || previewQuestions || questions; setQuestions(arr); setPreviewQuestions(null); saveSet(name, arr); dragIdx.current = null; dragWork.current = null; }}
+          onDragEnd={() => { setPreviewQuestions(null); dragIdx.current = null; dragWork.current = null; }}
           style={{
             display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", marginBottom: 6,
             border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)",
