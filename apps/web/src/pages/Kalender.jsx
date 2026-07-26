@@ -82,6 +82,17 @@ export default function Kalender() {
     const r = await fetch(`${API}/subscribe`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
     if (r) { const ex = await fetch(`${API}/external`).then((x) => (x.ok ? x.json() : { url: "" })).catch(() => ({ url: "" })); setAbo({ ...r, ext: ex.url || "" }); }
   };
+  // Force-Resync: neues Abo-Token holen. Die alte URL wird sofort ungueltig —
+  // damit behandelt Apple/Google das Abo als neu und laedt alles einmal frisch.
+  // Danach muss der alte Kalender entfernt und die neue URL abonniert werden.
+  const [resyncing, setResyncing] = useState(false);
+  const resyncAbo = async () => {
+    if (!(await askConfirm(t("kalender.resyncConfirm")))) return;
+    setResyncing(true);
+    const r = await fetch(`${API}/subscribe/resync`, { method: "POST" }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+    setResyncing(false);
+    if (r) { setAbo((a) => ({ ...a, url: r.url, webcal: r.webcal })); showAlert(t("kalender.resyncDone")); }
+  };
   const [extBusy, setExtBusy] = useState(false);
   const loadExt = (force = false) => { if (force) setExtBusy(true); return fetch(`${API}/external-events${force ? "?refresh=1" : ""}`).then((r) => (r.ok ? r.json() : [])).then((d) => setExtEvents(Array.isArray(d) ? d : [])).catch(() => {}).finally(() => force && setExtBusy(false)); };
   const saveExt = async (url) => {
@@ -529,6 +540,15 @@ export default function Kalender() {
             <div style={{ display: "flex", gap: 8 }}>
               <input readOnly value={abo.url} onFocus={(e) => e.target.select()} style={{ ...inputStyle, flex: 1, fontSize: 12 }} />
               <button onClick={() => { navigator.clipboard?.writeText(abo.url); }} style={btnSecondary}>{t("common.copy") !== "common.copy" ? t("common.copy") : "Kopieren"}</button>
+            </div>
+
+            {/* Force-Resync: bricht die alte Verbindung ab und erzeugt eine neue URL,
+                damit ein haengendes Abo einmal komplett neu laedt. */}
+            <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <button onClick={resyncAbo} disabled={resyncing} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6, opacity: resyncing ? 0.6 : 1 }}>
+                <Icon d={ICONS.refresh} size={15} /> {resyncing ? t("kalender.resyncing") : t("kalender.resync")}
+              </button>
+              <span style={{ fontSize: 11.5, color: "var(--text3)", flex: 1, minWidth: 180 }}>{t("kalender.resyncHint")}</span>
             </div>
 
             {/* Andere Richtung: externen Kalender (ICS-URL) read-only einblenden. */}

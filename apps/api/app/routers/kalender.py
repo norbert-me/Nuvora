@@ -676,6 +676,19 @@ async def revoke_subscribe(user: User = Depends(require_module), db: AsyncSessio
     await db.commit()
 
 
+@router.post("/subscribe/resync")
+async def resync_subscribe(request: _Request, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Force-Resync: ein FRISCHES Token erzeugen. Die alte Abo-URL wird sofort
+    ungueltig (404), sodass der abonnierende Kalender die Verbindung als neu
+    behandelt und alles einmal komplett neu laedt — statt an Apples zaehem
+    Cache-Takt zu haengen. Gibt die neue URL zum erneuten Abonnieren zurueck."""
+    user.calendar_token = _secrets.token_urlsafe(24)
+    await db.commit()
+    base = str(request.base_url).rstrip("/")
+    path = f"/api/kalender/feed/{user.calendar_token}.ics"
+    return {"url": base + path, "webcal": ("webcal://" + base.split("://", 1)[-1] + path) if "://" in base else base + path}
+
+
 def _ics_escape(s: str) -> str:
     return (s or "").replace("\\", "\\\\").replace(";", r"\;").replace(",", r"\,").replace("\n", r"\n")
 
