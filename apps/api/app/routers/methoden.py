@@ -12,7 +12,7 @@ from sqlalchemy import select, delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Method, MethodFolder, Topic, User
+from ..models import CalendarEntry, Kurs, Method, MethodFolder, SchoolClass, Topic, User
 from .auth import get_current_user, rate_limit
 from .modules import is_active
 
@@ -208,3 +208,21 @@ async def delete_method(method_id: int, user: User = Depends(require_module), db
         raise HTTPException(404, "Eintrag nicht gefunden")
     await db.delete(m)
     await db.commit()
+
+
+@router.get("/{method_id}/kalender")
+async def method_calendar(method_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Kalendereinträge (Stunden), an die dieser Einstieg gehängt ist — die
+    Rückrichtung zu CalendarEntry.method_id. Read-only, mit Kurs/Klassen-Name."""
+    m = await db.get(Method, method_id)
+    if not m or m.owner_id != user.id:
+        raise HTTPException(404, "Eintrag nicht gefunden")
+    rows = (await db.execute(select(CalendarEntry).where(
+        CalendarEntry.owner_id == user.id, CalendarEntry.method_id == method_id
+    ).order_by(CalendarEntry.date))).scalars().all()
+    kurse = {k.id: k.name for k in (await db.execute(select(Kurs).where(Kurs.owner_id == user.id))).scalars().all()}
+    classes = {c.id: c.name for c in (await db.execute(select(SchoolClass).where(SchoolClass.owner_id == user.id))).scalars().all()}
+    return [{"id": e.id, "date": e.date.isoformat(), "period": e.period,
+             "class_id": e.class_id, "kurs_id": e.kurs_id,
+             "label": (kurse.get(e.kurs_id) if e.kurs_id else None) or (classes.get(e.class_id) if e.class_id else None) or (e.title or "")}
+            for e in rows]

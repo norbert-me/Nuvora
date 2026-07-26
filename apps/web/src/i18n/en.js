@@ -935,6 +935,7 @@ export default {
   "kalender.addBreak": "Add",
   "kalender.noBreaks": "No days off yet.",
   "methoden.title": "Starters",
+  "methoden.linkedLessons": "Linked lessons",
   "methoden.intro": "Ideas for lesson starters: a short idea, the procedure with materials, a materials list and an approximate duration.",
   "methoden.newFolder": "Folder",
   "methoden.newFolderShort": "Folder",

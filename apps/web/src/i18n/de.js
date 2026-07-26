@@ -965,6 +965,7 @@ export default {
   "kalender.addBreak": "Hinzufügen",
   "kalender.noBreaks": "Noch keine freien Tage eingetragen.",
   "methoden.title": "Einstiege",
+  "methoden.linkedLessons": "Verknüpfte Stunden",
   "methoden.intro": "Ideen für den Unterrichtseinstieg: eine kurze Idee, der Ablauf mit Material, eine Materialliste und die ungefähre Dauer.",
   "methoden.newFolder": "Ordner",
   "methoden.newFolderShort": "Ordner",

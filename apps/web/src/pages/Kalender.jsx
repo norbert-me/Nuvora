@@ -76,7 +76,8 @@ export default function Kalender() {
   const [params, setParams] = useSearchParams();
   const view = params.get("view") || "month";
   const setView = (v) => setParams((p) => { const n = new URLSearchParams(p); if (v === "month") n.delete("view"); else n.set("view", v); return n; }, { replace: true });
-  const [cursor, setCursor] = useState(() => startOfDay(new Date()));
+  // Startdatum optional per ?date=YYYY-MM-DD (Deep-Link, z.B. aus den Einstiegen).
+  const [cursor, setCursor] = useState(() => { const p = params.get("date"); return p && /^\d{4}-\d{2}-\d{2}$/.test(p) ? startOfDay(new Date(p + "T00:00:00")) : startOfDay(new Date()); });
   const [abo, setAbo] = useState(null); // Abo-URLs { url, webcal }
   const [moreOpen, setMoreOpen] = useState(false); // „⋯"-Menü (Teilen/Abonnieren)
   const [viewMenuOpen, setViewMenuOpen] = useState(false); // „Auge"-Menü (was ein-/ausblenden)

@@ -2,7 +2,7 @@
 // Je Einstieg: Idee (Text), Ablauf mit Material, Materialliste, ca. Dauer.
 // Wiederverwendbar; im Kalender einer Stunde zuweisbar.
 import { useState, useEffect, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, modalOverlay, modalPanel, inputStyle, ExportButton, ImportButton } from "../components/Icons.jsx";
@@ -276,6 +276,12 @@ const crumbDrop = { borderColor: "var(--accent)", background: "var(--accent-bg, 
 // Detail-Ansicht (Klick auf einen Einstieg): zeigt die Erklärung, mit Buttons
 // zum Bearbeiten und Teilen.
 function MethodView({ m, t, onEdit, onPublish, onClose }) {
+  // Rückrichtung: an welche Stunden (Kalendereinträge) ist dieser Einstieg gehängt?
+  const [linked, setLinked] = useState([]);
+  useEffect(() => {
+    if (!m.id) { setLinked([]); return; }
+    fetch(`${API}/${m.id}/kalender`).then((r) => (r.ok ? r.json() : [])).then((d) => setLinked(Array.isArray(d) ? d : [])).catch(() => {});
+  }, [m.id]);
   const sec = (label, val) => val ? (
     <div style={{ marginTop: 12 }}>
       <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3 }}>{label}</div>
@@ -297,6 +303,22 @@ function MethodView({ m, t, onEdit, onPublish, onClose }) {
         {sec(t("methoden.ablauf"), m.ablauf)}
         {sec(t("methoden.material"), m.material)}
         {m.id && <div style={{ marginTop: 14 }}><MaterialPanel methodId={m.id} /></div>}
+        {linked.length > 0 && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 5 }}>{t("methoden.linkedLessons")}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {linked.map((e) => (
+                <Link key={e.id} to={`/kalender?view=day&date=${e.date.slice(0, 10)}`} onClick={onClose}
+                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", textDecoration: "none", color: "var(--accent)", fontSize: 13.5 }}>
+                  <Icon d={ICONS.calendar || ICONS.open} size={15} color="var(--accent)" />
+                  <span style={{ fontWeight: 600 }}>{new Date(e.date).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</span>
+                  {e.period ? <span style={{ color: "var(--text3)" }}>· {e.period}. {t("kalender.period")}</span> : null}
+                  {e.label ? <span style={{ color: "var(--text3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>· {e.label}</span> : null}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
           <button onClick={onEdit} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.edit")}><Icon d={ICONS.edit} size={18} /></button>
           <button onClick={onPublish} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("methoden.publish")}><Icon d={ICONS.share} size={18} color="var(--accent)" /></button>
