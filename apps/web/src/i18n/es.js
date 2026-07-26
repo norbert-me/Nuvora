@@ -899,6 +899,8 @@ export default {
   "kalender.examsTab": "Exámenes",
   "kalender.examsIntro": "Programa exámenes — el resumen muestra cuántas horas del horario quedan hasta entonces (restados días libres y cancelaciones).",
   "kalender.examTitle": "Título (opcional)",
+  "kalender.examAllDay": "Todo el día",
+  "kalender.examPeriodHint": "Opcional: vincular a una hora del día.",
   "kalender.examsEmpty": "Aún no hay exámenes próximos.",
   "kalender.examStunden": "horas hasta entonces",
   "kalender.openExamWork": "Abrir análisis",

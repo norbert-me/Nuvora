@@ -323,6 +323,7 @@ class ExamIn(BaseModel):
     title: str = ""
     class_id: Optional[int] = None
     kurs_id: Optional[int] = None
+    period: Optional[int] = None   # an eine Stunde binden; None = ganztägig
 
 
 class ExamOut(ExamIn):
@@ -381,9 +382,9 @@ async def create_exam(body: ExamIn, user: User = Depends(require_module), db: As
     e = ExamDate(owner_id=user.id, **body.model_dump())
     db.add(e)
     await db.flush()
-    # Ganztägiger Kalendereintrag (period None, keine Uhrzeit) zum Termin.
+    # Kalendereintrag zum Termin: an eine Stunde (period) gebunden oder ganztägig.
     entry = CalendarEntry(owner_id=user.id, date=e.date, title=_exam_title(e.title),
-                          class_id=e.class_id, kurs_id=e.kurs_id)
+                          class_id=e.class_id, kurs_id=e.kurs_id, period=e.period)
     db.add(entry)
     await db.flush()
     e.entry_id = entry.id
@@ -407,10 +408,10 @@ async def update_exam(exam_id: int, body: ExamIn, user: User = Depends(require_m
     entry = await db.get(CalendarEntry, e.entry_id) if e.entry_id else None
     if entry and entry.owner_id == user.id:
         entry.date = e.date; entry.title = _exam_title(e.title)
-        entry.class_id = e.class_id; entry.kurs_id = e.kurs_id
+        entry.class_id = e.class_id; entry.kurs_id = e.kurs_id; entry.period = e.period
     else:
         entry = CalendarEntry(owner_id=user.id, date=e.date, title=_exam_title(e.title),
-                              class_id=e.class_id, kurs_id=e.kurs_id)
+                              class_id=e.class_id, kurs_id=e.kurs_id, period=e.period)
         db.add(entry)
         await db.flush()
         e.entry_id = entry.id
@@ -537,7 +538,7 @@ async def exam_overview(user: User = Depends(require_module), db: AsyncSession =
         stunden = len(occ)
         out.append({
             "id": ex.id, "date": ex.date.isoformat(), "title": ex.title,
-            "kurs_id": ex.kurs_id, "class_id": ex.class_id, "work_id": ex.work_id,
+            "kurs_id": ex.kurs_id, "class_id": ex.class_id, "work_id": ex.work_id, "period": ex.period,
             "kurs": kurse.get(ex.kurs_id) if ex.kurs_id else None,
             "klasse": id2cls.get(ex.class_id) if ex.class_id else None,
             "stunden": stunden,

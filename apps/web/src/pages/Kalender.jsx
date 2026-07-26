@@ -535,7 +535,7 @@ export default function Kalender() {
         </div>
       )}
       {view === "breaks" && <BreaksPanel breaks={breaks} onAdd={addBreak} onDel={delBreak} t={t} standalone />}
-      {view === "klassenarbeit" && <ExamPanel overview={examOverview} onAdd={addExam} onUpd={updExam} onDel={delExam} t={t} />}
+      {view === "klassenarbeit" && <ExamPanel overview={examOverview} periods={tt.periods} onAdd={addExam} onUpd={updExam} onDel={delExam} t={t} />}
 
       {view === "today" && (
         <HeuteView t={t} tt={tt} weekdayOf={weekdayOf} byDay={byDay}
@@ -1200,30 +1200,34 @@ function TimetableView({ tt, className, slotName, slotColor, classColor, topicNa
 // blendet der Kalender Vorlagen und Eintraege aus. Eigener Tab (standalone).
 // Klassenarbeiten planen + Übersicht: je kommender Klassenarbeit die bis dahin
 // verbleibenden Stundenplan-Stunden (freie Tage/Ausfälle bereits abgezogen).
-function ExamPanel({ overview, onAdd, onUpd, onDel, t }) {
+function ExamPanel({ overview, periods = 6, onAdd, onUpd, onDel, t }) {
   const [classId, setClassId] = useState("");
   const [kursId, setKursId] = useState(null);
   const [date, setDate] = useState("");
   const [title, setTitle] = useState("");
+  const [period, setPeriod] = useState("");   // "" = ganztägig, sonst Stundennummer
   const [editId, setEditId] = useState(null);
   const [eDate, setEDate] = useState("");
   const [eTitle, setETitle] = useState("");
   const [eClassId, setEClassId] = useState("");
   const [eKursId, setEKursId] = useState(null);
-  const startEdit = (e) => { setEditId(e.id); setEDate(ymd(new Date(e.date))); setETitle(e.title || ""); setEClassId(e.class_id ? String(e.class_id) : ""); setEKursId(e.kurs_id ?? null); };
+  const [ePeriod, setEPeriod] = useState("");
+  const pOpts = Array.from({ length: Math.max(1, periods) }, (_, i) => i + 1);
+  const startEdit = (e) => { setEditId(e.id); setEDate(ymd(new Date(e.date))); setETitle(e.title || ""); setEClassId(e.class_id ? String(e.class_id) : ""); setEKursId(e.kurs_id ?? null); setEPeriod(e.period ? String(e.period) : ""); };
   const saveEdit = (e) => {
     if (!eDate || !eClassId) return;
     const [y, m, d] = eDate.split("-").map(Number);
-    onUpd(e.id, { class_id: Number(eClassId), kurs_id: eKursId ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: eTitle.trim() });
+    onUpd(e.id, { class_id: Number(eClassId), kurs_id: eKursId ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: eTitle.trim(), period: ePeriod ? Number(ePeriod) : null });
     setEditId(null);
   };
   const save = () => {
     if (!classId || !date) return;
     const [y, m, d] = date.split("-").map(Number);
-    onAdd({ class_id: Number(classId), kurs_id: kursId ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: title.trim() });
-    setDate(""); setTitle("");
+    onAdd({ class_id: Number(classId), kurs_id: kursId ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: title.trim(), period: period ? Number(period) : null });
+    setDate(""); setTitle(""); setPeriod("");
   };
   const sfld = { ...inputStyle };
+  const pSel = { ...selectStyle, padding: "8px 26px 8px 10px", fontSize: 13 };
   return (
     <div style={{ maxWidth: 640 }}>
       <p style={{ fontSize: 13.5, color: "var(--text2)", margin: "0 0 16px" }}>{t("kalender.examsIntro")}</p>
@@ -1233,6 +1237,10 @@ function ExamPanel({ overview, onAdd, onUpd, onDel, t }) {
           <KursKlasseSelect value={classId === "" ? "" : Number(classId)} kursValue={kursId}
             onChange={(id, kid) => { setClassId(id === "" ? "" : String(id)); setKursId(id === "" ? null : (kid ?? null)); }} onKurs={setKursId} />
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ ...sfld, padding: "8px 10px" }} />
+          <select value={period} onChange={(e) => setPeriod(e.target.value)} title={t("kalender.examPeriodHint")} style={pSel}>
+            <option value="">{t("kalender.examAllDay")}</option>
+            {pOpts.map((p) => <option key={p} value={p}>{p}. {t("kalender.period")}</option>)}
+          </select>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("kalender.examTitle")} style={{ ...sfld, flex: 1, minWidth: 140, padding: "8px 10px" }} />
           <button onClick={save} disabled={!classId || !date} style={{ ...btnPrimary, opacity: (classId && date) ? 1 : 0.5 }}>{t("common.add")}</button>
         </div>
@@ -1248,6 +1256,10 @@ function ExamPanel({ overview, onAdd, onUpd, onDel, t }) {
                 <KursKlasseSelect value={eClassId === "" ? "" : Number(eClassId)} kursValue={eKursId}
                   onChange={(id, kid) => { setEClassId(id === "" ? "" : String(id)); setEKursId(id === "" ? null : (kid ?? null)); }} onKurs={setEKursId} />
                 <input type="date" value={eDate} onChange={(ev) => setEDate(ev.target.value)} style={{ ...inputStyle, padding: "6px 8px" }} />
+                <select value={ePeriod} onChange={(ev) => setEPeriod(ev.target.value)} title={t("kalender.examPeriodHint")} style={{ ...pSel, padding: "6px 24px 6px 8px" }}>
+                  <option value="">{t("kalender.examAllDay")}</option>
+                  {pOpts.map((p) => <option key={p} value={p}>{p}. {t("kalender.period")}</option>)}
+                </select>
                 <input value={eTitle} onChange={(ev) => setETitle(ev.target.value)} placeholder={t("kalender.examTitle")} style={{ ...inputStyle, flex: 1, minWidth: 120, padding: "6px 8px" }} />
               </div>
               <button onClick={() => saveEdit(e)} style={{ ...btnPrimary, padding: "5px 12px" }}>{t("common.save")}</button>
@@ -1257,7 +1269,7 @@ function ExamPanel({ overview, onAdd, onUpd, onDel, t }) {
             <>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 15 }}>{e.kurs || e.klasse || "—"}{e.title ? ` · ${e.title}` : ""}</div>
-                <div style={{ fontSize: 12.5, color: "var(--text3)" }}>{new Date(e.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</div>
+                <div style={{ fontSize: 12.5, color: "var(--text3)" }}>{new Date(e.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}{e.period ? ` · ${e.period}. ${t("kalender.period")}` : ""}</div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
                 <div style={{ fontSize: 20, fontWeight: 800, color: "var(--text)" }}>{e.stunden}</div>

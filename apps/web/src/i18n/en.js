@@ -899,6 +899,8 @@ export default {
   "kalender.examsTab": "Class tests",
   "kalender.examsIntro": "Schedule tests — the overview shows how many timetable lessons remain until then (free days and cancellations deducted).",
   "kalender.examTitle": "Title (optional)",
+  "kalender.examAllDay": "All day",
+  "kalender.examPeriodHint": "Optionally bind to a lesson of the day.",
   "kalender.examsEmpty": "No upcoming class tests yet.",
   "kalender.examStunden": "lessons until then",
   "kalender.openExamWork": "Open analysis",

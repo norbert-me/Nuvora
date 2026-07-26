@@ -760,7 +760,9 @@ class ExamDate(Base):
     kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     title: Mapped[str] = mapped_column(String(200), default="", server_default="")
-    # Automatisch erzeugter (ganztägiger) Kalendereintrag zu diesem Termin.
+    # Optional an eine Stunde des Tages gebunden (Stundennummer). NULL = ganztägig.
+    period: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Automatisch erzeugter Kalendereintrag zu diesem Termin (ganztägig oder an period).
     entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("calendar_entries.id", ondelete="SET NULL"), nullable=True, index=True)
     # Optionale Brücke zum Modul „Klassenarbeit auswerten": bei aktivem Modul wird
     # zum Termin automatisch eine (leere) Auswertung angelegt. SET NULL, damit das

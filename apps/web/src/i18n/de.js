@@ -929,6 +929,8 @@ export default {
   "kalender.examsTab": "Klassenarbeiten",
   "kalender.examsIntro": "Termine planen — die Übersicht zeigt, wie viele Stundenplan-Stunden bis dahin bleiben (freie Tage und Ausfälle abgezogen).",
   "kalender.examTitle": "Titel (optional)",
+  "kalender.examAllDay": "Ganztägig",
+  "kalender.examPeriodHint": "Optional an eine Stunde des Tages binden.",
   "kalender.examsEmpty": "Noch keine kommenden Klassenarbeiten.",
   "kalender.examStunden": "Stunden bis dahin",
   "kalender.openExamWork": "Auswertung öffnen",
