@@ -6,7 +6,7 @@ Thema ist ON DELETE SET NULL, damit das Loeschen eines Themas keinen Eintrag
 mitreisst.
 """
 import re
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -441,6 +441,18 @@ async def delete_exam(exam_id: int, user: User = Depends(require_module), db: As
     await db.commit()
 
 
+def _slot_active_on(s: TimetableSlot, d: date) -> bool:
+    """Gilt die (versionierte) Stundenplan-Stunde am Tag d? valid_from/valid_to
+    grenzen sie ein; NULL heißt offen (seit jeher bzw. noch aktiv)."""
+    vf = s.valid_from.date() if isinstance(s.valid_from, datetime) else s.valid_from
+    vt = s.valid_to.date() if isinstance(s.valid_to, datetime) else s.valid_to
+    if vf is not None and d < vf:
+        return False
+    if vt is not None and d > vt:
+        return False
+    return True
+
+
 @router.get("/klassenarbeiten/uebersicht")
 async def exam_overview(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Kommende Klassenarbeiten mit den bis dahin verbleibenden Stundenplan-
@@ -493,7 +505,7 @@ async def exam_overview(user: User = Depends(require_module), db: AsyncSession =
         by_wd = {}
         for s in slots:
             if _match(s.kurs_id, s.class_id):
-                by_wd.setdefault(s.weekday, []).append(s.period)
+                by_wd.setdefault(s.weekday, []).append(s)  # ganze Slots (für Gültigkeit)
         # Ein konkreter Eintrag mit Stundennummer ERSETZT an dem Tag den
         # wiederkehrenden Slot dieser Stunde (so zeigt es auch der Kalender: genau
         # eine Zeile je Stunde). Darum je (Tag, Stunde) merken, welche vom Kalender
@@ -511,7 +523,10 @@ async def exam_overview(user: User = Depends(require_module), db: AsyncSession =
         d = start
         while d < exd:
             if d not in breaks_days:
-                for p in by_wd.get(d.weekday(), []):
+                for s in by_wd.get(d.weekday(), []):
+                    if not _slot_active_on(s, d):
+                        continue
+                    p = s.period
                     if (d, p) not in cancel_set and (d, p) not in overridden:
                         occ.add((d, p))
             d = d + timedelta(days=1)
@@ -543,6 +558,8 @@ class SlotIn(BaseModel):
 
 class SlotOut(SlotIn):
     id: int
+    valid_from: Optional[date] = None  # None = seit jeher gültig
+    valid_to: Optional[date] = None    # None = noch aktiv; sonst letzter gültiger Tag
     model_config = {"from_attributes": True}
 
 
@@ -626,17 +643,35 @@ async def upsert_slot(body: SlotIn, user: User = Depends(require_module), db: As
     await _check_class(db, user, body.class_id)
     await _check_kurs(db, user, body.kurs_id)
     await _check_topic(db, user, body.topic_id)
-    s = (await db.execute(select(TimetableSlot).where(
+    today = date.today()
+    # Die AKTUELL gültige Version an (weekday, period) — nur die hat valid_to NULL.
+    active = (await db.execute(select(TimetableSlot).where(
         TimetableSlot.owner_id == user.id,
         TimetableSlot.weekday == body.weekday,
         TimetableSlot.period == body.period,
-    ))).scalar_one_or_none()
-    if s is None:
-        s = TimetableSlot(owner_id=user.id, **body.model_dump())
+        TimetableSlot.valid_to.is_(None),
+    ).order_by(TimetableSlot.id.desc()))).scalars().first()
+    same = active is not None and (
+        active.class_id == body.class_id and active.kurs_id == body.kurs_id
+        and (active.title or "") == (body.title or "") and active.topic_id == body.topic_id
+    )
+    if active is None:
+        # Neue Stunde: gilt ab HEUTE (nicht rückwirkend — die Vergangenheit war leer).
+        s = TimetableSlot(owner_id=user.id, valid_from=today, valid_to=None, **body.model_dump())
         db.add(s)
-    else:
+    elif same:
+        s = active
+    elif (active.valid_from.date() if isinstance(active.valid_from, datetime) else active.valid_from) == today:
+        # Heute schon begonnen → direkt ändern, keine zusätzliche Version.
         for k, v in body.model_dump().items():
-            setattr(s, k, v)
+            setattr(active, k, v)
+        s = active
+    else:
+        # Änderung wirkt ab HEUTE: alte Version bis GESTERN einfrieren (Vergangenheit
+        # bleibt unverändert), neue Version ab heute anlegen.
+        active.valid_to = today - timedelta(days=1)
+        s = TimetableSlot(owner_id=user.id, valid_from=today, valid_to=None, **body.model_dump())
+        db.add(s)
     await db.commit()
     await db.refresh(s)
     return s
@@ -647,7 +682,14 @@ async def delete_slot(slot_id: int, user: User = Depends(require_module), db: As
     s = await db.get(TimetableSlot, slot_id)
     if not s or s.owner_id != user.id:
         raise HTTPException(404, "Stunde nicht gefunden")
-    await db.delete(s)
+    today = date.today()
+    vf = s.valid_from.date() if isinstance(s.valid_from, datetime) else s.valid_from
+    if vf is not None and vf >= today:
+        # War nie in der Vergangenheit aktiv → ganz entfernen.
+        await db.delete(s)
+    else:
+        # Ab HEUTE entfallen, Vergangenheit behält die Stunde.
+        s.valid_to = today - timedelta(days=1)
     await db.commit()
 
 
@@ -806,6 +848,8 @@ async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
                 continue
             for s in by_wd.get(day.weekday(), []):
                 if (day, s.period) in belegt:
+                    continue
+                if not _slot_active_on(s, day):
                     continue
                 title = classes.get(s.class_id) or s.title or "Unterricht"
                 tr = times[s.period - 1] if 0 <= s.period - 1 < len(times) else None

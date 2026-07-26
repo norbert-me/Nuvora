@@ -187,6 +187,8 @@ def _ensure_columns(sync_conn):
         ("grade_sections", "kurs_id", "INTEGER"),
         ("grade_overrides", "kurs_id", "INTEGER"),
         ("timetable_slots", "kurs_id", "INTEGER"),
+        ("timetable_slots", "valid_from", "DATE"),
+        ("timetable_slots", "valid_to", "DATE"),
         ("work_analyses", "scale", "JSON"),
         ("work_analyses", "absent", "JSON"),
         ("questions", "topic_id", "INTEGER"),

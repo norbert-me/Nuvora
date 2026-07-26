@@ -50,6 +50,54 @@ async def test_slot_behaelt_kurs(s):
 
 
 @pytest.mark.asyncio
+async def test_slot_edit_versioned_from_today(s):
+    """Stundenplan-Änderung wirkt ab HEUTE: die alte Version wird bis gestern
+    eingefroren, eine neue ab heute angelegt — vergangene Tage bleiben unverändert.
+    Löschen entfernt ab heute, behält aber die Vergangenheit."""
+    from datetime import date, timedelta
+    from app.models import TimetableSlot
+    from sqlalchemy import select
+    u = User(email="tt@d.de", password_hash="x", name="L"); s.add(u); await s.flush()
+    c1 = SchoolClass(name="7a", owner_id=u.id); c2 = SchoolClass(name="7b", owner_id=u.id)
+    s.add_all([c1, c2]); await s.commit()
+    today = date.today()
+
+    # Neue Stunde: gilt ab heute.
+    out = await KAL.upsert_slot(KAL.SlotIn(weekday=0, period=1, class_id=c1.id), user=u, db=s)
+    assert out.valid_from == today and out.valid_to is None
+
+    # Für einen früheren Zustand tun, als hätte die Stunde schon länger gegolten.
+    out.valid_from = today - timedelta(days=30); await s.commit()
+
+    # Ändern (andere Klasse): alte Version endet gestern, neue ab heute.
+    await KAL.upsert_slot(KAL.SlotIn(weekday=0, period=1, class_id=c2.id), user=u, db=s)
+    rows = (await s.execute(select(TimetableSlot).where(TimetableSlot.owner_id == u.id).order_by(TimetableSlot.id))).scalars().all()
+    assert len(rows) == 2
+    alt = next(r for r in rows if r.class_id == c1.id)
+    neu = next(r for r in rows if r.class_id == c2.id)
+    assert alt.valid_to == today - timedelta(days=1)   # Vergangenheit eingefroren
+    assert neu.valid_from == today and neu.valid_to is None
+
+    # Materialisierung: gestern noch c1, heute c2.
+    assert KAL._slot_active_on(alt, today - timedelta(days=1)) and not KAL._slot_active_on(alt, today)
+    assert KAL._slot_active_on(neu, today) and not KAL._slot_active_on(neu, today - timedelta(days=1))
+
+    # Löschen der heute begonnenen Version: sie hatte keine Vergangenheit -> ganz
+    # weg; die eingefrorene alte Version (c1) bleibt für frühere Tage erhalten.
+    await KAL.delete_slot(neu.id, user=u, db=s)
+    rows = (await s.execute(select(TimetableSlot).where(TimetableSlot.owner_id == u.id))).scalars().all()
+    assert len(rows) == 1 and rows[0].class_id == c1.id
+    assert await s.get(TimetableSlot, neu.id) is None
+
+    # Eine Version MIT Vergangenheit wird beim Löschen nur bis gestern begrenzt.
+    alt2 = await s.get(TimetableSlot, alt.id)
+    alt2.valid_to = None; await s.commit()   # tun, als wäre sie wieder aktiv
+    await KAL.delete_slot(alt2.id, user=u, db=s)
+    alt3 = await s.get(TimetableSlot, alt.id)
+    assert alt3 is not None and alt3.valid_to == today - timedelta(days=1)
+
+
+@pytest.mark.asyncio
 async def test_ics_freie_uhrzeit(s):
     """Eintrag mit freier Uhrzeit wird als getakteter VEVENT exportiert
     (DTSTART/DTEND mit Zeit), nicht als Ganztags-Termin."""

@@ -23,6 +23,16 @@ const BUNDESLAENDER = [
 const API = "/api/kalender";
 
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+// Gilt die (versionierte) Stundenplan-Stunde am Tag d? valid_from/valid_to sind
+// "YYYY-MM-DD" oder null (offen). Änderungen am Plan wirken ab heute, ältere Tage
+// zeigen weiter die damalige Stunde.
+const slotActiveOn = (s, d) => {
+  const dd = ymd(d);
+  if (s.valid_from && dd < s.valid_from) return false;
+  if (s.valid_to && dd > s.valid_to) return false;
+  return true;
+};
 // Kalenderdatum als ISO auf 12:00 Uhr LOKAL verankert: so verschiebt die
 // UTC-Umrechnung (toISOString) das Datum nie über die Tagesgrenze. Sonst wird
 // lokale Mitternacht in +TZ zum UTC-Vortag und der ICS-Export (server .date())
@@ -185,7 +195,7 @@ export default function Kalender() {
     loadCancels();
   };
   // Ausgefallene Stunden eines Tages (für die „entfällt"-Chips mit Wiederherstellen).
-  const cancelledFor = (d) => tt.slots.filter((s) => s.weekday === weekdayOf(d) && isCancelled(d, s.period)).sort((a, b) => a.period - b.period);
+  const cancelledFor = (d) => tt.slots.filter((s) => s.weekday === weekdayOf(d) && slotActiveOn(s, d) && isCancelled(d, s.period)).sort((a, b) => a.period - b.period);
 
   // Wochenansicht: schwache Themen der Vorwoche als Wiederholungs-Vorschlag.
   useEffect(() => {
@@ -203,7 +213,7 @@ export default function Kalender() {
   useEffect(() => {
     if (view !== "today" || !aktiv.orga) { setHeuteAbsent({}); return; }
     const heute = startOfDay(new Date());
-    const cids = [...new Set(tt.slots.filter((s) => s.weekday === weekdayOf(heute) && s.class_id).map((s) => s.class_id))];
+    const cids = [...new Set(tt.slots.filter((s) => s.weekday === weekdayOf(heute) && slotActiveOn(s, heute) && s.class_id).map((s) => s.class_id))];
     if (!cids.length) { setHeuteAbsent({}); return; }
     const iso = new Date(ymd(heute) + "T00:00:00").toISOString();
     Promise.all(cids.map((cid) => fetch(`/api/anwesenheit/${cid}?date=${iso}`).then((r) => (r.ok ? r.json() : {})).then((d) => {
@@ -324,7 +334,7 @@ export default function Kalender() {
   const kursColor = (id) => (kurse.find((k) => k.id === id) || {}).color || "";
   const slotColor = (s) => (s && s.kurs_id && kursColor(s.kurs_id)) || (s && s.class_id ? classColor(s.class_id) : C.info);
   const weekdayOf = (d) => (new Date(d).getDay() + 6) % 7; // 0 = Montag
-  const slotsFor = (d) => tt.slots.filter((s) => s.weekday === weekdayOf(d) && !isCancelled(d, s.period)).sort((a, b) => a.period - b.period);
+  const slotsFor = (d) => tt.slots.filter((s) => s.weekday === weekdayOf(d) && slotActiveOn(s, d) && !isCancelled(d, s.period)).sort((a, b) => a.period - b.period);
   // Klick auf eine Stundenplan-Vorlage: gibt es an dem Tag schon einen Eintrag
   // dieser Klasse, wird der bearbeitet; sonst ein neuer aus der Vorlage.
   const fromSlot = (day, s) => {
@@ -659,7 +669,7 @@ function EntryChips({ list, className, kursName = () => "", topicName, onOpen, c
 function HeuteView({ t, tt, weekdayOf, byDay, className, slotName, slotColor, classColor, topicName, frei, heuteAbsent, orgaAktiv, onOpen, onSlot }) {
   const heute = startOfDay(new Date());
   const istFrei = frei(heute);
-  const slots = (tt.slots || []).filter((s) => s.weekday === weekdayOf(heute)).sort((a, b) => a.period - b.period);
+  const slots = (tt.slots || []).filter((s) => s.weekday === weekdayOf(heute) && slotActiveOn(s, heute)).sort((a, b) => a.period - b.period);
   const eintraege = byDay(heute);
   const zeit = (period) => { const w = (tt.times || [])[period - 1]; return w && (w.start || w.end) ? `${w.start || ""}–${w.end || ""}` : ""; };
   // Zeilen: pro Stundenplan-Slot; Ganztägige (ohne Stunde) als Banner oben,
@@ -1013,7 +1023,8 @@ function TimetableView({ tt, className, slotName, slotColor, classColor, topicNa
   const [showTimes, setShowTimes] = useState(false);
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri")];
   const periods = Array.from({ length: tt.periods }, (_, i) => i + 1);
-  const slot = (wd, p) => tt.slots.find((s) => s.weekday === wd && s.period === p);
+  // Editor zeigt/bearbeitet nur die AKTUELL gültige Version (valid_to == null).
+  const slot = (wd, p) => tt.slots.find((s) => s.weekday === wd && s.period === p && !s.valid_to);
   // Uhrzeiten je Stunde: onBlur speichern (wenige Felder, kein Debounce noetig).
   const timeVal = (i, f) => (tt.times && tt.times[i] && tt.times[i][f]) || "";
   const commitTime = (i, f, val) => {

@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
 
-from sqlalchemy import ForeignKey, String, Text, DateTime, Integer, JSON, Boolean, LargeBinary, UniqueConstraint, func
+from sqlalchemy import ForeignKey, String, Text, DateTime, Date, Integer, JSON, Boolean, LargeBinary, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -830,6 +830,12 @@ class TimetableSlot(Base):
     kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(200), default="", server_default="")
     topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Gültigkeitszeitraum: Änderungen am Stundenplan wirken ab HEUTE, die
+    # Vergangenheit bleibt unverändert. Beim Ändern wird die alte Version bis
+    # gestern begrenzt (valid_to) und eine neue ab heute angelegt (valid_from).
+    # NULL = offen (valid_from: seit jeher, valid_to: noch aktiv).
+    valid_from: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    valid_to: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
 
 
 class SlotCancellation(Base):
