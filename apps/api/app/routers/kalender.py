@@ -858,7 +858,10 @@ async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
                 # darum landeten die Stunden im Abo als ganztägige Ereignisse.
                 a = hms(tr.get("start")) if isinstance(tr, dict) else None
                 b2 = hms(tr.get("end")) if isinstance(tr, dict) else None
-                uid = f"UID:nuvora-slot-{s.id}-{d8(day)}@nuvora"
+                # UID mit Zeit-Marker (-t): erzwingt bei Apple/Google, dass die
+                # frueher faelschlich ganztaegigen Slot-Events durch die getakteten
+                # ERSETZT werden — sonst behaelt Apple pro UID stur den Ganztags-Typ.
+                uid = f"UID:nuvora-slot-{s.id}-{d8(day)}-t@nuvora"
                 if a and b2:
                     lines += ["BEGIN:VEVENT", uid, f"DTSTAMP:{now}",
                               f"DTSTART:{d8(day)}T{a}", f"DTEND:{d8(day)}T{b2}",
