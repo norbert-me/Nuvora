@@ -143,20 +143,48 @@ IMAGE_MAGIC = {
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 
+def _sanitize_svg(text: str) -> str:
+    """SVG von aktiven Inhalten befreien, bevor es (same-origin) ausgeliefert wird.
+    Entfernt Skripte, Event-Handler, foreignObject, DOCTYPE/Entities und aktive
+    URLs. Reine Vektorgrafik bleibt. Kein perfekter Parser, aber schließt die
+    bekannten XSS-Vektoren beim Rendern als Dokument."""
+    import re
+    # DOCTYPE inkl. internem Subset ([ … ]) und Entities (XXE / Billion Laughs) raus.
+    text = re.sub(r"<!DOCTYPE[^\[>]*(\[[^\]]*\])?\s*>", "", text, flags=re.I | re.S)
+    text = re.sub(r"<!ENTITY[^>]*>", "", text, flags=re.I | re.S)
+    # <script> und <foreignObject> samt Inhalt raus.
+    text = re.sub(r"<script\b.*?</script\s*>", "", text, flags=re.I | re.S)
+    text = re.sub(r"<script\b[^>]*/>", "", text, flags=re.I)
+    text = re.sub(r"<foreignObject\b.*?</foreignObject\s*>", "", text, flags=re.I | re.S)
+    # Event-Handler-Attribute (on…="…") entfernen.
+    text = re.sub(r"\son[a-zA-Z]+\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)", "", text)
+    # Aktive URLs in href/xlink:href/src unschaedlich machen.
+    text = re.sub(r"(href|xlink:href|src)\s*=\s*([\"'])\s*(javascript:|data:text/html)[^\"']*\2",
+                  r'\1=\2#\2', text, flags=re.I)
+    return text
+
+
 @router.post("/upload-image")
 async def upload_image(file: UploadFile = File(...), user: User = Depends(get_current_user)):
-    header = await file.read(16)
-    if not any(header.startswith(magic) for magic in IMAGE_MAGIC):
-        raise HTTPException(400, "Keine gültige Bilddatei")
-    rest = await file.read(MAX_UPLOAD_BYTES - 16 + 1)
-    content = header + rest
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(400, "Bild zu gross (max 10 MB)")
+    low = content[:4096].lstrip().lower()
+    is_svg = (low.startswith(b"<?xml") or low.startswith(b"<svg") or low.startswith(b"<!doctype svg")) and b"<svg" in content[:8192].lower()
+    if is_svg:
+        # SVG: sanitisieren und als .svg ablegen (per <img> gerendert; das Dokument
+        # selbst ist nach dem Strippen ohne aktive Inhalte).
+        clean = _sanitize_svg(content.decode("utf-8", "replace"))
+        name = f"{uuid.uuid4().hex}.svg"
+        with open(os.path.join(UPLOAD_DIR, name), "w", encoding="utf-8") as f:
+            f.write(clean)
+        return {"url": f"/api/uploads/{name}"}
+    if not any(content[:16].startswith(magic) for magic in IMAGE_MAGIC):
+        raise HTTPException(400, "Keine gültige Bilddatei")
     ext = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "jpg"
     if ext not in ("jpg", "jpeg", "png", "gif", "webp"):
         ext = "jpg"
     name = f"{uuid.uuid4().hex}.{ext}"
-    path = os.path.join(UPLOAD_DIR, name)
-    with open(path, "wb") as f:
+    with open(os.path.join(UPLOAD_DIR, name), "wb") as f:
         f.write(content)
     return {"url": f"/api/uploads/{name}"}
