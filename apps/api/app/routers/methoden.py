@@ -217,6 +217,9 @@ async def method_calendar(method_id: int, user: User = Depends(require_module), 
     m = await db.get(Method, method_id)
     if not m or m.owner_id != user.id:
         raise HTTPException(404, "Eintrag nicht gefunden")
+    # Verknüpfung nur, wenn BEIDE Module aktiv sind — ohne Kalender keine Stunden.
+    if not await is_active(db, user.id, "kalender"):
+        return []
     # Stunden dieses Einstiegs: ausdrücklich verknüpft (method_id) ODER — falls der
     # Einstieg ein Thema hat — über das GLEICHE Thema automatisch zugeordnet. So
     # erscheint die Stunde auch, wenn der Eintrag nur das Thema trägt (die Auto-

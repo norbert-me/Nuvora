@@ -539,7 +539,7 @@ export default function Kalender() {
       {view === "klassenarbeit" && <ExamPanel overview={examOverview} periods={tt.periods} onAdd={addExam} onUpd={updExam} onDel={delExam} t={t} />}
 
       {view === "today" && (
-        <HeuteView t={t} tt={tt} weekdayOf={weekdayOf} byDay={byDay}
+        <HeuteView t={t} tt={tt} weekdayOf={weekdayOf} byDay={byDay} todoByDay={todoByDay} onTodo={() => nav("/todo")}
           className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} frei={frei}
           heuteAbsent={heuteAbsent} orgaAktiv={!!aktiv.orga} onOpen={setEditing} onSlot={fromSlot} />
       )}
@@ -740,7 +740,7 @@ function EntryChips({ list, className, kursName = () => "", topicName, onOpen, c
 
 // „Heute" — der Tag über alle Module gebündelt: Stunde, Uhrzeit, Klasse, das
 // geplante Objekt (Deck/Quiz/Lernleiter/Einstieg) und wie viele heute fehlen.
-function HeuteView({ t, tt, weekdayOf, byDay, className, slotName, slotColor, classColor, topicName, frei, heuteAbsent, orgaAktiv, onOpen, onSlot }) {
+function HeuteView({ t, tt, weekdayOf, byDay, todoByDay, onTodo, className, slotName, slotColor, classColor, topicName, frei, heuteAbsent, orgaAktiv, onOpen, onSlot }) {
   const heute = startOfDay(new Date());
   const istFrei = frei(heute);
   const slots = (tt.slots || []).filter((s) => s.weekday === weekdayOf(heute) && slotActiveOn(s, heute)).sort((a, b) => a.period - b.period);
@@ -758,6 +758,12 @@ function HeuteView({ t, tt, weekdayOf, byDay, className, slotName, slotColor, cl
   return (
     <div>
       <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 14, textTransform: "capitalize" }}>{dateStr}</div>
+      {todoByDay && todoByDay(heute).length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ ...sectionLabel, marginBottom: 6 }}>{t("todo.title")}</div>
+          <TodoChips list={todoByDay(heute)} onOpen={onTodo} />
+        </div>
+      )}
       {istFrei && (
         <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(184,134,11,0.12)", color: "#8a6d00", fontSize: 13.5, fontWeight: 600, marginBottom: 14 }}>
           {t("kalender.freeDay")}: {istFrei.label || ""}
