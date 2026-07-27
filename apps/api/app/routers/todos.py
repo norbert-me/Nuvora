@@ -101,6 +101,23 @@ async def create_todo(body: TodoIn, user: User = Depends(require_module), db: As
     return _out(t)
 
 
+class ReorderIn(BaseModel):
+    ids: List[int]  # neue Reihenfolge (nur offene To-dos)
+
+
+@router.put("/reorder", status_code=204)
+async def reorder_todos(body: ReorderIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Reihenfolge setzen (position nach Listenindex). Vor /{todo_id} definiert,
+    damit „reorder" nicht als todo_id interpretiert wird."""
+    rows = (await db.execute(select(Todo).where(Todo.owner_id == user.id, Todo.id.in_(body.ids)))).scalars().all()
+    by_id = {t.id: t for t in rows}
+    for i, tid in enumerate(body.ids):
+        t = by_id.get(tid)
+        if t is not None:
+            t.position = i
+    await db.commit()
+
+
 @router.put("/{todo_id}", response_model=TodoOut)
 async def update_todo(todo_id: int, body: TodoPatch, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     t = await db.get(Todo, todo_id)

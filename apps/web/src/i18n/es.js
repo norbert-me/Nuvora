@@ -1144,6 +1144,7 @@ export default {
   "zufall.group": "Grupo {{n}}",
   "zufall.title": "Azar",
   "todo.title": "Tareas",
+  "todo.reorderHint": "Arrastra para reordenar",
   "todo.placeholder": "Nueva tarea …",
   "todo.done": "Hechas",
   "todo.empty": "Aún no hay tareas",

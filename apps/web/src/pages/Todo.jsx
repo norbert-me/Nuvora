@@ -1,7 +1,7 @@
 // Modul To-do — einfache Aufgabenliste. Ein Eintrag kann Datum + Uhrzeit tragen;
 // datierte Einträge erscheinen zusätzlich im Kalender (Regel 3: reine Zusatz-
 // Brücke, die Liste läuft eigenständig).
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { pageTitle, btnPrimary, btnSecondary, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -40,7 +40,36 @@ export default function Todo() {
   const offen = items.filter((i) => !i.done);
   const erledigt = items.filter((i) => i.done);
 
-  const Row = (it) => {
+  // Drag&Drop der offenen To-dos mit Live-Vorschau (stabile Arbeits-Liste im Ref,
+  // damit das Ablegen genau die vorgeschaute Reihenfolge speichert).
+  const dragIdx = useRef(null);
+  const dragWork = useRef(null);
+  const [previewOpen, setPreviewOpen] = useState(null);
+  const reorderPreview = (from, to) => {
+    if (from == null || from === to || !dragWork.current) return;
+    const a = dragWork.current;
+    const [m] = a.splice(from, 1);
+    a.splice(to, 0, m);
+    setPreviewOpen([...a]);
+  };
+  const commitOrder = async () => {
+    const arr = dragWork.current;
+    if (!arr) return;
+    setItems((prev) => [...arr, ...prev.filter((x) => x.done)]);  // offen neu, erledigt hinten
+    setPreviewOpen(null);
+    const ids = arr.map((x) => x.id);
+    dragIdx.current = null; dragWork.current = null;
+    await fetch(`${API}/reorder`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) }).catch(() => {});
+  };
+  const dndFor = (idx) => ({
+    draggable: editId == null,
+    onDragStart: () => { dragWork.current = [...(previewOpen || offen)]; dragIdx.current = idx; },
+    onDragOver: (e) => { if (dragIdx.current == null) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (idx !== dragIdx.current) { reorderPreview(dragIdx.current, idx); dragIdx.current = idx; } },
+    onDrop: (e) => { e.preventDefault(); commitOrder(); },
+    onDragEnd: () => { setPreviewOpen(null); dragIdx.current = null; dragWork.current = null; },
+  });
+
+  const Row = (it, dnd) => {
     if (editId === it.id) {
       return (
         <div key={it.id} style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", border: "1px solid var(--accent)", borderRadius: 10, marginBottom: 6 }}>
@@ -53,7 +82,8 @@ export default function Todo() {
       );
     }
     return (
-      <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)", marginBottom: 6 }}>
+      <div key={it.id} {...(dnd || {})} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)", marginBottom: 6, cursor: dnd ? "grab" : "default" }}>
+        {dnd && <span className="drag-handle" title={t("todo.reorderHint")} style={{ color: "var(--text3)", flexShrink: 0, display: "inline-flex", cursor: "grab" }}><Icon d={ICONS.grip} size={15} /></span>}
         <input type="checkbox" checked={it.done} onChange={() => toggle(it)} style={{ width: 18, height: 18, cursor: "pointer", flexShrink: 0 }} />
         <span style={{ flex: 1, minWidth: 0, fontSize: 14, textDecoration: it.done ? "line-through" : "none", color: it.done ? "var(--text3)" : "var(--text)" }}>{it.text}</span>
         {it.due_date && (
@@ -83,11 +113,11 @@ export default function Todo() {
         <Empty title={t("todo.empty")} hint={t("todo.emptyHint")} />
       ) : (
         <>
-          {offen.map(Row)}
+          {(previewOpen || offen).map((it, idx) => Row(it, dndFor(idx)))}
           {erledigt.length > 0 && (
             <>
               <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: 0.4, margin: "18px 0 8px" }}>{t("todo.done")} ({erledigt.length})</div>
-              {erledigt.map(Row)}
+              {erledigt.map((it) => Row(it, null))}
             </>
           )}
         </>

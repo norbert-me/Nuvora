@@ -1144,6 +1144,7 @@ export default {
   "zufall.group": "Group {{n}}",
   "zufall.title": "Random",
   "todo.title": "To-do",
+  "todo.reorderHint": "Drag to reorder",
   "todo.placeholder": "New task …",
   "todo.done": "Done",
   "todo.empty": "No tasks yet",

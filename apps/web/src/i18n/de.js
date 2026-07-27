@@ -1169,6 +1169,7 @@ export default {
   "zufall.group": "Gruppe {{n}}",
   "zufall.title": "Zufall",
   "todo.title": "To-do",
+  "todo.reorderHint": "Ziehen zum Umsortieren",
   "todo.placeholder": "Neue Aufgabe …",
   "todo.done": "Erledigt",
   "todo.empty": "Noch keine Aufgaben",
