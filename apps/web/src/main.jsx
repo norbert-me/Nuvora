@@ -119,6 +119,11 @@ import Zufall from "./pages/Zufall.jsx";
 import Orga from "./pages/Orga.jsx";
 import Klassenarbeit, { KlassenarbeitVergleich } from "./pages/Klassenarbeit.jsx";
 import Todo from "./pages/Todo.jsx";
+import Timer from "./pages/Timer.jsx";
+import Notizen from "./pages/Notizen.jsx";
+import Elternlog from "./pages/Elternlog.jsx";
+import Stoffplan from "./pages/Stoffplan.jsx";
+import Mathefussball from "./pages/Mathefussball.jsx";
 import { useModules } from "./core/modules.js";
 import { DialogHost } from "./core/dialog.jsx";
 import { UndoHost } from "./core/undo.jsx";
@@ -147,6 +152,11 @@ const ORG = "/orga";
 const AUS = "/ausleihe";
 const KLA = "/klassenarbeit";
 const TODO = "/todo";
+const TIMER = "/timer";
+const NOTIZEN = "/notizen";
+const ELTERN = "/elternlog";
+const STOFF = "/stoffplan";
+const MATHEF = "/mathefussball";
 
 // Menue passend zum Bereich. Man soll im Modul-Menue bleiben, auch auf
 // modulneutralen Seiten (Hilfe, Impressum), solange man aus einem Modul kam —
@@ -163,6 +173,11 @@ const getModuleNavItems = (t, location) => {
     : pathname.startsWith(ZUF) ? "zufall"
     : pathname.startsWith(ORG) ? "orga"
     : pathname.startsWith(TODO) ? "todo"
+    : pathname.startsWith(TIMER) ? "timer"
+    : pathname.startsWith(NOTIZEN) ? "notizen"
+    : pathname.startsWith(ELTERN) ? "elternlog"
+    : pathname.startsWith(STOFF) ? "stoffplan"
+    : pathname.startsWith(MATHEF) ? "mathefussball"
     : pathname.startsWith(KLA) ? "klassenarbeit"
     : pathname.startsWith(KA) ? "karten"
     : params.get("area"); // Hilfe u.ae.: Bereich aus der Query
@@ -213,6 +228,11 @@ const getModuleNavItems = (t, location) => {
   if (area === "todo") {
     return [{ to: TODO, label: t("todo.title") }];
   }
+  if (area === "timer") return [{ to: TIMER, label: t("timer.title") }];
+  if (area === "notizen") return [{ to: NOTIZEN, label: t("notizen.title") }];
+  if (area === "elternlog") return [{ to: ELTERN, label: t("elternlog.title") }];
+  if (area === "stoffplan") return [{ to: STOFF, label: t("stoffplan.title") }];
+  if (area === "mathefussball") return [{ to: MATHEF, label: t("mathefussball.title") }];
   if (area === "klassenarbeit") {
     return [
       { to: KLA, label: t("klassenarbeit.navWorks"), active: pathname === KLA },
@@ -775,6 +795,11 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={MET} element={user ? <ModuleGate moduleKey="methoden"><Methoden /></ModuleGate> : <Landing />} />
           <Route path={ZUF} element={user ? <ModuleGate moduleKey="zufall"><Zufall /></ModuleGate> : <Landing />} />
           <Route path={TODO} element={user ? <ModuleGate moduleKey="todo"><Todo /></ModuleGate> : <Landing />} />
+          <Route path={TIMER} element={user ? <ModuleGate moduleKey="timer"><Timer /></ModuleGate> : <Landing />} />
+          <Route path={NOTIZEN} element={user ? <ModuleGate moduleKey="notizen"><Notizen /></ModuleGate> : <Landing />} />
+          <Route path={ELTERN} element={user ? <ModuleGate moduleKey="elternlog"><Elternlog /></ModuleGate> : <Landing />} />
+          <Route path={STOFF} element={user ? <ModuleGate moduleKey="stoffplan"><Stoffplan /></ModuleGate> : <Landing />} />
+          <Route path={MATHEF} element={user ? <ModuleGate moduleKey="mathefussball"><Mathefussball /></ModuleGate> : <Landing />} />
           <Route path={KLA} element={user ? <ModuleGate moduleKey="klassenarbeit"><Klassenarbeit /></ModuleGate> : <Landing />} />
           <Route path={`${KLA}/vergleich`} element={user ? <ModuleGate moduleKey="klassenarbeit"><KlassenarbeitVergleich /></ModuleGate> : <Landing />} />
           <Route path={ORG} element={user ? <ModuleGate moduleKey="orga"><Orga /></ModuleGate> : <Landing />} />

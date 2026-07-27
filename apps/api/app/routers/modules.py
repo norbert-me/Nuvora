@@ -91,7 +91,7 @@ REGISTRY: List[ModuleDef] = [
             "einer Klassen-Session (Beitritt per Code, ohne Login). Themen-getaggt."
         ),
         path="/code-detektiv",
-        stage="stable",
+        stage="beta",
     ),
     ModuleDef(
         key="karten",
@@ -182,6 +182,64 @@ REGISTRY: List[ModuleDef] = [
         ),
         path="/todo",
         stage="stable",
+    ),
+    ModuleDef(
+        key="timer",
+        group="werkzeug",
+        name="Timer",
+        description=(
+            "Countdown und Stoppuhr für den Unterricht — groß für den Beamer, mit "
+            "Voreinstellungen und Signalton am Ende. Reines Werkzeug, ohne Daten."
+        ),
+        path="/timer",
+        stage="beta",
+    ),
+    ModuleDef(
+        key="notizen",
+        group="werkzeug",
+        name="Beobachtungen",
+        description=(
+            "Formative Notizen je Schüler mit Datum (Anstrengung, Sozialverhalten, "
+            "Fortschritt) — bewusst getrennt von der Note. Was das Notenbuch nicht "
+            "misst, hat hier seinen Platz."
+        ),
+        path="/notizen",
+        stage="beta",
+    ),
+    ModuleDef(
+        key="elternlog",
+        group="organisation",
+        name="Elternkontakte",
+        description=(
+            "Dokumentation von Elternkontakten je Schüler: Datum, Kanal (Telefon/"
+            "Mail/Gespräch) und Notiz. Erfüllt die Dokumentationspflicht ohne Zettel."
+        ),
+        path="/elternlog",
+        stage="beta",
+    ),
+    ModuleDef(
+        key="stoffplan",
+        group="organisation",
+        name="Stoffverteilung",
+        description=(
+            "Langfristplanung: Themen übers Schuljahr in eine Reihenfolge bringen "
+            "(grobe Kalenderwoche, Stundenumfang, Notiz) und abhaken. Ergänzt den "
+            "datumsgenauen Kalender um die Jahressicht."
+        ),
+        path="/stoffplan",
+        stage="beta",
+    ),
+    ModuleDef(
+        key="mathefussball",
+        group="unterricht",
+        name="Mathefußball",
+        description=(
+            "Kopfrechen-Spiel für zwei Teams am Beamer: richtige Antwort schiebt den "
+            "Ball Richtung Tor. Zahlenraum und Rechenarten einstellbar. Reines Spiel, "
+            "ohne Daten."
+        ),
+        path="/mathefussball",
+        stage="beta",
     ),
 ]
 

@@ -1,4 +1,8 @@
 from datetime import datetime, date
+# Alias: eine Spalte, die selbst "date" heißt, würde den Typ `date` im
+# Klassenkörper verdecken (Name wird vor der Annotation gebunden). Für solche
+# Spalten den Alias verwenden.
+PyDate = date
 from typing import Optional
 
 from sqlalchemy import ForeignKey, String, Text, DateTime, Date, Integer, JSON, Boolean, LargeBinary, UniqueConstraint, func
@@ -1086,5 +1090,54 @@ class Todo(Base):
     # Optional: Faelligkeitsdatum + Uhrzeit ("HH:MM", "" = ganztaegig/ohne Zeit).
     due_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, index=True)
     due_time: Mapped[str] = mapped_column(String(5), default="", server_default="")
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Observation(Base):
+    """Modul Beobachtungen: formative Notiz je Schueler (Datum + Kategorie + Text).
+    Bewusst getrennt von der Note (Regel: Beobachtungen zaehlen nie als Messwert).
+    DSGVO Art. 9-nah — steht in keinem Export/Marktplatz."""
+    __tablename__ = "observations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), index=True)
+    date: Mapped[Optional[PyDate]] = mapped_column(Date, nullable=True)
+    category: Mapped[str] = mapped_column(String(60), default="", server_default="")
+    text: Mapped[str] = mapped_column(Text, default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ParentContact(Base):
+    """Modul Elternkontakte: dokumentierter Kontakt je Schueler (Datum, Kanal, Notiz).
+    Dokumentationspflicht; nicht im Export/Marktplatz."""
+    __tablename__ = "parent_contacts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), index=True)
+    date: Mapped[Optional[PyDate]] = mapped_column(Date, nullable=True)
+    channel: Mapped[str] = mapped_column(String(30), default="", server_default="")  # telefon|mail|gespraech|brief
+    text: Mapped[str] = mapped_column(Text, default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CurriculumItem(Base):
+    """Modul Stoffverteilung: ein Thema in der Jahresplanung eines Kurses/einer
+    Klasse. Grobe Kalenderwoche (kw, frei), Stundenumfang, Notiz, erledigt.
+    Reihenfolge ueber position. Optionaler Kern-Themenbezug (topic_id SET NULL)."""
+    __tablename__ = "curriculum_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="CASCADE"), nullable=True, index=True)
+    class_id: Mapped[Optional[int]] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), nullable=True, index=True)
+    topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
+    title: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    kw: Mapped[str] = mapped_column(String(20), default="", server_default="")     # z.B. "40" oder "40-42"
+    hours: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    notes: Mapped[str] = mapped_column(Text, default="", server_default="")
+    done: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
