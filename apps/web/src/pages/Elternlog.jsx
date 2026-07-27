@@ -2,7 +2,9 @@
 import { useState, useEffect } from "react";
 import { pageTitle, btnPrimary, btnSecondary, inputStyle, selectStyle, Icon, ICONS, iconBtn, COLORS as C, Empty } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
+import { Link } from "react-router-dom";
 import { useLanguage } from "../i18n/index.jsx";
+import { useModules } from "../core/modules.js";
 import { swr, lastClass, rememberClass } from "../core/cache.js";
 
 const API = "/api/elternlog";
@@ -11,6 +13,9 @@ const CHANNELS = [["telefon", "Telefon"], ["mail", "Mail"], ["gespraech", "Gespr
 
 export default function Elternlog() {
   const { t } = useLanguage();
+  const { modules } = useModules();
+  const notenAktiv = modules.find((m) => m.key === "noten")?.active ?? false;
+  const [grades, setGrades] = useState({}); // student_id -> Gesamtnote (nur bei aktivem Noten-Modul)
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
   const [counts, setCounts] = useState({});
@@ -31,7 +36,15 @@ export default function Elternlog() {
   const chLabel = (v) => (CHANNELS.find((c) => c[0] === v) || [, ""])[1];
 
   const loadCounts = () => { if (classId) fetch(`${API}/counts?class_id=${classId}`).then((r) => (r.ok ? r.json() : {})).then((d) => setCounts(d || {})).catch(() => {}); };
-  useEffect(() => { setSel(null); loadCounts(); }, [classId]);
+  // Gesamtnoten der Klasse laden — nur wenn das Noten-Modul aktiv ist (Regel 3).
+  const loadGrades = () => {
+    if (!classId || !notenAktiv) { setGrades({}); return; }
+    fetch(`/api/noten/classes/${classId}/summary?term=1&agg=mean`).then((r) => (r.ok ? r.json() : [])).then((rows) => {
+      const g = {}; (Array.isArray(rows) ? rows : []).forEach((s) => { const v = s.total_override ?? s.weighted; if (v != null) g[String(s.student_id)] = v; }); setGrades(g);
+    }).catch(() => {});
+  };
+  useEffect(() => { setSel(null); loadCounts(); loadGrades(); /* eslint-disable-next-line */ }, [classId, notenAktiv]);
+  const noteStr = (sid) => { const v = grades[String(sid)]; return v == null ? null : String(v).replace(".", ","); };
 
   const loadList = (sid) => fetch(`${API}?student_id=${sid}`).then((r) => (r.ok ? r.json() : [])).then((d) => setList(Array.isArray(d) ? d : [])).catch(() => {});
   const open = (s) => { setSel(s); setText(""); setChannel("telefon"); setDate(ymd(new Date())); loadList(s.id); };
@@ -64,9 +77,14 @@ export default function Elternlog() {
         )
       ) : (
         <>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
             <button onClick={() => setSel(null)} style={{ ...btnSecondary, padding: "6px 12px" }}>← {t("common.back")}</button>
             <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{sel.name}</h2>
+            {notenAktiv && noteStr(sel.id) && (
+              <Link to="/noten" title={t("elternlog.toGrades")} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, padding: "4px 12px", borderRadius: 980, background: "var(--accent-bg, rgba(10,132,255,0.12))", color: "var(--accent)", textDecoration: "none" }}>
+                {t("elternlog.grade")}: {noteStr(sel.id)} ↗
+              </Link>
+            )}
           </div>
 
           <div style={{ border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", padding: 14, marginBottom: 16 }}>
