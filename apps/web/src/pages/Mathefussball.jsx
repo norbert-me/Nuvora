@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
-const STEPS = 6; // Felder je Seite bis zum Tor
+const STEPS = 2; // Felder je Seite (2 links, Mitte, 2 rechts); Tor beim Überschreiten des Rands
 
 function gen(max, ops) {
   const op = ops[Math.floor(Math.random() * ops.length)];
@@ -44,8 +44,8 @@ export default function Mathefussball() {
     if (busy) return;
     const dir = team === 0 ? 1 : -1;
     let np = pos + dir; let goal = "";
-    if (np >= STEPS) { setScore((s) => [s[0] + 1, s[1]]); np = 0; goal = `⚽ ${names[0]}!`; }
-    else if (np <= -STEPS) { setScore((s) => [s[0], s[1] + 1]); np = 0; goal = `⚽ ${names[1]}!`; }
+    if (np > STEPS) { setScore((s) => [s[0] + 1, s[1]]); np = 0; goal = `⚽ ${names[0]}!`; }
+    else if (np < -STEPS) { setScore((s) => [s[0], s[1] + 1]); np = 0; goal = `⚽ ${names[1]}!`; }
     setPos(np); setReveal(true); setBusy(true); setFlash(goal);
     timer.current = setTimeout(() => { setFlash(""); setBusy(false); nextTask(); }, 2000);
   };
