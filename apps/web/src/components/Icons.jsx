@@ -38,6 +38,7 @@ export const MODULE_ICONS = {
   elternlog: ["M7 4a2.5 2.5 0 100 5 2.5 2.5 0 000-5z", "M3 16c0-2.5 1.8-4 4-4s4 1.5 4 4", "M13 9h4", "M13 12h4", "M12 6h5a1 1 0 011 1v3"],
   stoffplan: ["M4 5h12", "M4 9h12", "M4 13h8", "M4 17h8", "M14.5 14.5l1.5 1.5 2.5-3"],
   mathefussball: ["M10 3a7 7 0 100 14 7 7 0 000-14z", "M10 6.5l2.5 1.8-1 3h-3l-1-3z"],
+  notizblock: ["M5 3h7l3 3v11a1 1 0 01-1 1H5a1 1 0 01-1-1V4a1 1 0 011-1z", "M12 3v3h3", "M7 10h6", "M7 13h4"],
 };
 
 export const ICONS = {

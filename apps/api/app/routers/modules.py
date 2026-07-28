@@ -230,6 +230,18 @@ REGISTRY: List[ModuleDef] = [
         stage="beta",
     ),
     ModuleDef(
+        key="notizblock",
+        group="werkzeug",
+        name="Notizblock",
+        description=(
+            "Freie Notizzettel für alles, was zwischendurch anfällt — Titel und "
+            "Text, mehrere Zettel, per Drag & Drop sortierbar. Nicht an Schüler "
+            "gebunden (das sind die Beobachtungen)."
+        ),
+        path="/notizblock",
+        stage="beta",
+    ),
+    ModuleDef(
         key="mathefussball",
         group="unterricht",
         name="Mathefußball",
