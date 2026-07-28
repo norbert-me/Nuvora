@@ -3663,8 +3663,24 @@
         document.querySelector('.tab[data-tab="generator"]').click();
 
         // Unterthemen der Lernleiter (für Anzeige + Wiederholungs-Erkennung).
-        const uts = (ll.unterthema || '').split(',').map(s => s.trim()).filter(Boolean);
+        const utsRoh = (ll.unterthema || '').split(',').map(s => s.trim()).filter(Boolean);
         if (!ll.config) console.warn('openLernleiter: keine gespeicherte Konfig (vor v2.7.54?) — Regler/Zusatz bleiben Default; einmal neu speichern.');
+
+        // Thema/Unterthemen aus den TATSAECHLICHEN Aufgaben dieser Leiter ableiten:
+        // ll.thema/ll.unterthema koennen veraltet sein (Thema umbenannt, Aufgaben
+        // verschoben). Ein veraltetes Unterthema waehlte beim Oeffnen einen Filter
+        // vor, fuer den es keine Aufgaben gibt → „Vorschau generieren" fand nichts
+        // (falscher Fehler) und die Wiederholungs-Markierung kippte. Darum: Thema =
+        // haeufigstes Thema der Leiter-Aufgaben (falls ll.thema keine Aufgaben hat),
+        // und nur solche Unterthemen vorwaehlen, die auch wirklich vorkommen.
+        const llAufg = (ll.schueler || []).flatMap(sch => (sch.aufgabenIds || [])
+            .map(id => aufgaben.find(x => String(x.id) === String(id) || String(x._id) === String(id)))).filter(Boolean);
+        const themaCount = {};
+        llAufg.forEach(a => { if (a.thema) themaCount[a.thema] = (themaCount[a.thema] || 0) + 1; });
+        const themaHaeufig = Object.keys(themaCount).sort((x, y) => themaCount[y] - themaCount[x])[0] || '';
+        const eigThema = aufgaben.some(a => a.thema === ll.thema) ? (ll.thema || themaHaeufig) : (themaHaeufig || ll.thema || '');
+        const taskUts = new Set(llAufg.filter(a => a.thema === eigThema).map(a => a.unterthema).filter(Boolean));
+        const uts = utsRoh.filter(u => taskUts.size === 0 || taskUts.has(u));
 
         // Thema/Unterthema/Klasse/Regler setzen. Der Tab-Klick oben stösst ein
         // ASYNCHRONES refreshGeneratorDropdowns an, das die Dropdowns kurz danach
@@ -3675,7 +3691,7 @@
             const pfadSel = document.getElementById('gen-pfad');
             if (pfadSel) pfadSel.value = pfad._id;
             const themaSel = document.getElementById('gen-thema');
-            if (themaSel) { themaSel.disabled = false; themaSel.value = ll.thema || ''; }
+            if (themaSel) { themaSel.disabled = false; themaSel.value = eigThema || ll.thema || ''; }
             refreshGenUnterthemen();
             document.querySelectorAll('.gen-ut-cb').forEach(cb => { cb.checked = uts.includes(cb.value); });
             // Dropdown-Beschriftung nachziehen (programmatisches Setzen feuert kein change).
@@ -3695,7 +3711,7 @@
         // nicht gewaehlten Unterthema sind Wiederholung (sonst wuerde die
         // Hervorhebung fehlen, weil die Sektion nicht mitgespeichert ist, #54).
         const eigeneUt = new Set(uts);
-        const eigenThema = ll.thema || eigenesThema(ll);
+        const eigenThema = eigThema || ll.thema || eigenesThema(ll);
         const istWdh = a => {
             if (getKategorie(a) === 'Erklärung') return false;
             if (eigenThema && a.thema && a.thema !== eigenThema) return true;
