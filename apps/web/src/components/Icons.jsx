@@ -39,6 +39,7 @@ export const MODULE_ICONS = {
   stoffplan: ["M4 5h12", "M4 9h12", "M4 13h8", "M4 17h8", "M14.5 14.5l1.5 1.5 2.5-3"],
   mathefussball: ["M10 3a7 7 0 100 14 7 7 0 000-14z", "M10 6.5l2.5 1.8-1 3h-3l-1-3z"],
   notizblock: ["M5 3h7l3 3v11a1 1 0 01-1 1H5a1 1 0 01-1-1V4a1 1 0 011-1z", "M12 3v3h3", "M7 10h6", "M7 13h4"],
+  tafel: ["M3 4h14v10H3z", "M7 8h6", "M7 11h4", "M8 17l2-3 2 3"],
 };
 
 export const ICONS = {

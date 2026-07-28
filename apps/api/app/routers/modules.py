@@ -230,6 +230,18 @@ REGISTRY: List[ModuleDef] = [
         stage="beta",
     ),
     ModuleDef(
+        key="tafel",
+        group="werkzeug",
+        name="Tafel",
+        description=(
+            "Classroom-Screen für den Beamer: frei platzierbare Textfelder, in "
+            "Größe und Schriftgröße anpassbar. Für Arbeitsaufträge, Hinweise und "
+            "alles, was gerade an die Tafel soll. Reines Werkzeug, ohne Daten."
+        ),
+        path="/tafel",
+        stage="beta",
+    ),
+    ModuleDef(
         key="notizblock",
         group="werkzeug",
         name="Notizblock",
