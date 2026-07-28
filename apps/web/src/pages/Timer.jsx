@@ -1,7 +1,7 @@
 // Modul Timer — Countdown & Stoppuhr für den Unterricht. Reiner Client, keine
 // Daten. Groß für den Beamer; Signalton am Ende des Countdowns.
 import { useState, useEffect, useRef } from "react";
-import { pageTitle, btnPrimary, btnSecondary, Icon, ICONS } from "../components/Icons.jsx";
+import { pageTitle, btnPrimary, btnSecondary, inputStyle, Icon, ICONS } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const PRESETS = [1, 2, 3, 5, 10, 15, 20]; // Minuten
@@ -47,6 +47,13 @@ export default function Timer() {
   }, [running, mode]);
 
   const setMinutes = (m) => { setTotal(m * 60); setRemaining(m * 60); setRunning(false); };
+  const [cm, setCm] = useState("");   // individuelle Minuten
+  const [cs, setCs] = useState("");   // individuelle Sekunden
+  const applyCustom = () => {
+    const secs = (Number(cm) || 0) * 60 + (Number(cs) || 0);
+    if (secs <= 0) return;
+    setTotal(secs); setRemaining(secs); setRunning(false);
+  };
   const reset = () => { setRunning(false); if (mode === "countdown") setRemaining(total); else setElapsed(0); };
   const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
   const value = mode === "countdown" ? remaining : elapsed;
@@ -64,13 +71,21 @@ export default function Timer() {
         ))}
       </div>
 
-      {mode === "countdown" && (
-        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 20 }}>
+      {mode === "countdown" && (<>
+        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 12 }}>
           {PRESETS.map((m) => (
             <button key={m} onClick={() => setMinutes(m)} style={{ ...btnSecondary, padding: "6px 14px" }}>{m} min</button>
           ))}
         </div>
-      )}
+        {/* Individuelle Zeit: Minuten + Sekunden frei eingeben. */}
+        <div style={{ display: "flex", gap: 6, justifyContent: "center", alignItems: "center", flexWrap: "wrap", marginBottom: 20 }}>
+          <input type="number" min="0" max="999" value={cm} onChange={(e) => setCm(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") applyCustom(); }} placeholder="0" style={{ ...inputStyle, width: 64, textAlign: "center", padding: "8px 8px" }} />
+          <span style={{ color: "var(--text3)", fontSize: 13 }}>{t("timer.min")}</span>
+          <input type="number" min="0" max="59" value={cs} onChange={(e) => setCs(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") applyCustom(); }} placeholder="00" style={{ ...inputStyle, width: 64, textAlign: "center", padding: "8px 8px" }} />
+          <span style={{ color: "var(--text3)", fontSize: 13 }}>{t("timer.sec")}</span>
+          <button onClick={applyCustom} style={{ ...btnSecondary, padding: "8px 14px" }}>{t("timer.setTime")}</button>
+        </div>
+      </>)}
 
       <div style={{ position: "relative", padding: "36px 16px", borderRadius: 24, border: "1px solid var(--border)", background: done ? "rgba(255,59,48,0.10)" : "var(--card)", marginBottom: 24, overflow: "hidden" }}>
         {mode === "countdown" && (
