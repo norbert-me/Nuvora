@@ -134,6 +134,7 @@
             unteraufgaben: ex.unteraufgaben || 1,
             kompetenz: ex.kompetenz || '',
             methode: ex.methode || '',
+            sozialform: ex.sozialform || '',
             lrs: ex.lrs ? 1 : 0,
             lrsText: ex.lrs_text || '',
             loesung: ex.loesung || '',
@@ -154,6 +155,7 @@
             operator: a.operator || '',
             kompetenz: a.kompetenz || '',
             methode: a.methode || '',
+            sozialform: a.sozialform || '',
             unteraufgaben: parseInt(a.unteraufgaben) || 1,
             quelle_typ: a.quelleTyp || '',
             quelle_detail: a.quelleDetail || '',
@@ -185,7 +187,7 @@
     let syncSigs = {};
     function aufgabeSig(a) {
         return JSON.stringify([a.thema, a.unterthema, a.kategorie, a.aufgabentext, a.loesung,
-            a.operator, a.kompetenz, a.methode, a.unteraufgaben, a.quelleTyp, a.quelleDetail,
+            a.operator, a.kompetenz, a.methode, a.sozialform, a.unteraufgaben, a.quelleTyp, a.quelleDetail,
             a.lrs ? 1 : 0, a.lrsText, a.foerderschwerpunkte || [], a.latex, a.code]);
     }
 
@@ -952,6 +954,7 @@
             operator: document.getElementById('aufgabe-operator').value.trim(),
             kompetenz: editId ? (aufgaben.find(x => x._id === editId)?.kompetenz || '') : '',
             methode: document.getElementById('aufgabe-methode').value.trim(),
+            sozialform: document.getElementById('aufgabe-sozialform').value.trim(),
             lrs: lrsCheckbox.checked,
             lrsText: document.getElementById('aufgabe-lrs-text').value.trim(),
             foerderschwerpunkte: [...document.querySelectorAll('.aufgabe-foerder:checked')].map(cb => cb.value),
@@ -1019,6 +1022,7 @@
         document.getElementById('aufgabe-operator').value = a.operator || '';
         document.getElementById('aufgabe-unteraufgaben').value = a.unteraufgaben || 1;
         document.getElementById('aufgabe-methode').value = a.methode || '';
+        document.getElementById('aufgabe-sozialform').value = a.sozialform || '';
         document.getElementById('aufgabe-lrs').checked = a.lrs;
         lrsAltGroup.style.display = a.lrs ? '' : 'none';
         document.getElementById('aufgabe-lrs-text').value = a.lrsText || '';
@@ -1092,6 +1096,7 @@
         if (a.operator) html += `<span class="badge badge-operator">${esc(a.operator)}</span> `;
         if (a.kompetenz) html += `<span class="badge badge-kompetenz">${esc(a.kompetenz)}</span> `;
         if (a.methode) html += `<span class="badge badge-methode">${esc(a.methode)}</span> `;
+        if (a.sozialform) html += `<span class="badge badge-sozialform">${esc(a.sozialform)}</span> `;
         if (a.foerderschwerpunkte && a.foerderschwerpunkte.length) {
             a.foerderschwerpunkte.forEach(f => {
                 html += `<span class="badge badge-lrs">${esc(f)}</span> `;
@@ -1322,6 +1327,7 @@
                         unteraufgaben: parseInt(item.unteraufgaben) || 1,
                         kompetenz: item.kompetenz || '',
                         methode: item.methode || '',
+                        sozialform: item.sozialform || '',
                         lrs: !!item.lrs,
                         lrsText: item.lrsText || '',
                         foerderschwerpunkte: Array.isArray(item.foerderschwerpunkte) ? item.foerderschwerpunkte : [],
@@ -2079,6 +2085,7 @@
                 if (task.operator) tags.push(`<span class="badge badge-operator">${esc(task.operator)}</span>`);
                 if (task.kompetenz) tags.push(`<span class="badge badge-kompetenz">${esc(task.kompetenz)}</span>`);
                 if (task.methode) tags.push(`<span class="badge badge-methode">${esc(task.methode)}</span>`);
+                if (task.sozialform) tags.push(`<span class="badge badge-sozialform">${esc(task.sozialform)}</span>`);
 
                 const hasLRS = s.foerder.includes('LRS');
 

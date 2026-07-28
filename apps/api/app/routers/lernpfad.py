@@ -68,6 +68,7 @@ class ExerciseIn(BaseModel):
     operator: str = ""
     kompetenz: str = ""
     methode: str = ""
+    sozialform: str = ""
     unteraufgaben: int = 1
     quelle_typ: str = ""
     quelle_detail: str = ""

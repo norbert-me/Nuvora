@@ -391,6 +391,8 @@ class Exercise(Base):
     operator: Mapped[str] = mapped_column(String(100), default="", server_default="")
     kompetenz: Mapped[str] = mapped_column(String(100), default="", server_default="")
     methode: Mapped[str] = mapped_column(String(100), default="", server_default="")
+    # Sozialform der Aufgabe (Einzel-/Partner-/Gruppenarbeit …). Freitext/kurz.
+    sozialform: Mapped[str] = mapped_column(String(50), default="", server_default="")
     unteraufgaben: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
 
     quelle_typ: Mapped[str] = mapped_column(String(50), default="", server_default="")

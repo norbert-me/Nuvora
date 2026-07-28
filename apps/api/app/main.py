@@ -257,6 +257,7 @@ def _ensure_columns(sync_conn):
         ("calendar_entries", "start_time", "VARCHAR(5) DEFAULT '' NOT NULL"),
         ("calendar_entries", "end_time", "VARCHAR(5) DEFAULT '' NOT NULL"),
         ("exercises", "code", "VARCHAR(20) DEFAULT '' NOT NULL"),
+        ("exercises", "sozialform", "VARCHAR(50) DEFAULT '' NOT NULL"),
         ("users", "timetable_periods", "INTEGER DEFAULT 6 NOT NULL"),
         ("users", "timetable_times", "JSON"),
     ]
