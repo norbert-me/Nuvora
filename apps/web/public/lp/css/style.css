@@ -480,6 +480,8 @@ tr:hover td { background: #f9fafb; }
 .badge-kompetenz { background: #fef3c7; color: #78350f; }
 .badge-methode { background: #e0f2fe; color: #075985; }
 .badge-sozialform { background: #d1fae5; color: #065f46; }
+/* Chips in der Aufgaben-/Leiterzeile kürzen, Hover (title) zeigt die volle Länge. */
+.step-tags .badge { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
 
 .hint {
     font-size: 0.85rem;

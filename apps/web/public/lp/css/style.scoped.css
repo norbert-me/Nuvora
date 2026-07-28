@@ -480,6 +480,7 @@
 #lp-app .badge-kompetenz { background: #fef3c7; color: #78350f; }
 #lp-app .badge-methode { background: #e0f2fe; color: #075985; }
 #lp-app .badge-sozialform { background: #d1fae5; color: #065f46; }
+#lp-app .step-tags .badge { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
 
 #lp-app .hint {
     font-size: 0.85rem;

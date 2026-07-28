@@ -144,6 +144,19 @@
         };
     }
 
+    // Sozialform als Chip mit Icon (Einzel/Partner/Gruppe) + Hover für die volle
+    // Bezeichnung. Unbekannte Werte: nur Text (gekürzt via CSS, Hover zeigt alles).
+    function sozialformBadge(v) {
+        const val = v || ''; const t = val.toLowerCase();
+        const svg = (paths) => `<svg viewBox="0 0 18 16" width="12" height="11" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px">${paths}</svg>`;
+        let icon = '', label = val;
+        if (t.includes('einzel')) { icon = svg('<circle cx="9" cy="5" r="2.4"/><path d="M4.5 14c0-2.6 2-4.2 4.5-4.2s4.5 1.6 4.5 4.2"/>'); label = 'Einzel'; }
+        else if (t.includes('partner')) { icon = svg('<circle cx="6" cy="5" r="2"/><circle cx="12" cy="5" r="2"/><path d="M2.5 14c0-2.3 1.6-3.6 3.5-3.6M11.5 14c0-2.3 1.6-3.6 3.5-3.6"/>'); label = 'Partner'; }
+        else if (t.includes('gruppe')) { icon = svg('<circle cx="5" cy="5" r="1.8"/><circle cx="13" cy="5" r="1.8"/><circle cx="9" cy="4" r="1.8"/><path d="M2 14c0-2 1.3-3.2 3-3.2M13 14c0-2 1.3-3.2 3-3.2M6 14c0-2.3 1.4-3.6 3-3.6s3 1.3 3 3.6"/>'); label = 'Gruppe'; }
+        else if (t.includes('plenum')) { icon = svg('<circle cx="9" cy="8" r="5"/><circle cx="9" cy="8" r="1.6"/>'); label = 'Plenum'; }
+        return `<span class="badge badge-sozialform" title="${escAttr(val)}">${icon}${icon ? ' ' : ''}${esc(label)}</span>`;
+    }
+
     // Oberflaechen-Form -> Kern-Aufgabe.
     async function zuKern(a) {
         return {
@@ -1093,10 +1106,10 @@
 
     function renderTags(a) {
         let html = '';
-        if (a.operator) html += `<span class="badge badge-operator">${esc(a.operator)}</span> `;
-        if (a.kompetenz) html += `<span class="badge badge-kompetenz">${esc(a.kompetenz)}</span> `;
-        if (a.methode) html += `<span class="badge badge-methode">${esc(a.methode)}</span> `;
-        if (a.sozialform) html += `<span class="badge badge-sozialform">${esc(a.sozialform)}</span> `;
+        if (a.operator) html += `<span class="badge badge-operator" title="${escAttr(a.operator)}">${esc(a.operator)}</span> `;
+        if (a.kompetenz) html += `<span class="badge badge-kompetenz" title="${escAttr(a.kompetenz)}">${esc(a.kompetenz)}</span> `;
+        if (a.methode) html += `<span class="badge badge-methode" title="${escAttr(a.methode)}">${esc(a.methode)}</span> `;
+        if (a.sozialform) html += sozialformBadge(a.sozialform) + ' ';
         if (a.foerderschwerpunkte && a.foerderschwerpunkte.length) {
             a.foerderschwerpunkte.forEach(f => {
                 html += `<span class="badge badge-lrs">${esc(f)}</span> `;
@@ -2082,10 +2095,10 @@
                 if (!task.selected) step.classList.add('deselected');
 
                 const tags = [];
-                if (task.operator) tags.push(`<span class="badge badge-operator">${esc(task.operator)}</span>`);
-                if (task.kompetenz) tags.push(`<span class="badge badge-kompetenz">${esc(task.kompetenz)}</span>`);
-                if (task.methode) tags.push(`<span class="badge badge-methode">${esc(task.methode)}</span>`);
-                if (task.sozialform) tags.push(`<span class="badge badge-sozialform">${esc(task.sozialform)}</span>`);
+                if (task.operator) tags.push(`<span class="badge badge-operator" title="${escAttr(task.operator)}">${esc(task.operator)}</span>`);
+                if (task.kompetenz) tags.push(`<span class="badge badge-kompetenz" title="${escAttr(task.kompetenz)}">${esc(task.kompetenz)}</span>`);
+                if (task.methode) tags.push(`<span class="badge badge-methode" title="${escAttr(task.methode)}">${esc(task.methode)}</span>`);
+                if (task.sozialform) tags.push(sozialformBadge(task.sozialform));
 
                 const hasLRS = s.foerder.includes('LRS');
 
@@ -2603,6 +2616,14 @@
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(10);
         doc.text('Datum: _______________', dateRight, y, { align: 'right' });
+        // Niveau + ALLE Förderbedarfe des Schülers (nicht nur LRS) unter den Namen.
+        const meta = [s.niveau ? s.niveau + '-Kurs' : '', ...(s.foerder || [])].filter(Boolean).join(' · ');
+        if (meta) {
+            y += 5;
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(110);
+            doc.text(meta, marginL, y);
+            doc.setTextColor(0);
+        }
         y += 3;
         doc.setLineWidth(0.6);
         doc.line(marginL, y, marginL + contentW, y);
