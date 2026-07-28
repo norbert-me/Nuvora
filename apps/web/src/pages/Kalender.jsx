@@ -328,7 +328,13 @@ export default function Kalender() {
     const res = await fetch(e.id ? `${API}/entries/${e.id}` : `${API}/entries`, {
       method: e.id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     }).catch(() => null);
-    if (res && res.ok) { setEditing(null); load(); }
+    if (res && res.ok) {
+      // Nach dem Speichern den Eintrag ANZEIGEN (nicht schließen). _justSaved lässt
+      // das Modal in die Ansicht wechseln; date wieder als Date, id vom Server.
+      let saved = null; try { saved = await res.json(); } catch { /* egal */ }
+      load();
+      setEditing({ ...e, ...(saved || {}), date: saved && saved.date ? new Date(saved.date) : e.date, _justSaved: Date.now() });
+    }
   };
   const remove = (id) => {
     setEditing(null);
@@ -1515,6 +1521,9 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   const istInformatik = /informatik/i.test((classId && (classes.find((c) => c.id === Number(classId)) || {}).name) || "");
   // Bestehender Eintrag oeffnet zuerst als Ansicht; neuer direkt im Bearbeiten.
   const [edit, setEdit] = useState(!entry.id);
+  // Nach dem Speichern (Parent setzt _justSaved) in die Ansicht wechseln, statt zu
+  // schließen — so sieht man den gespeicherten Eintrag sofort.
+  useEffect(() => { if (entry._justSaved) setEdit(false); }, [entry._justSaved]);
   // Anzeige denkt in Kursen: liegt ein Kurs am Eintrag, zeigen wir dessen Namen
   // (Fach), sonst die Fach-Klasse. So trägt auch der Klassenarbeit-Eintrag den Kurs.
   const clsName = (kursId && kursName(kursId)) || (classId && (classes.find((c) => c.id === Number(classId)) || {}).name);
@@ -1591,9 +1600,9 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
                 <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>{t("kalender.verlauf")}</div>
                 {verlauf.map((p, i) => (
                   <div key={i} style={{ display: "flex", gap: 10, padding: "6px 0", borderTop: i ? "1px solid var(--border)" : "none" }}>
-                    <div style={{ minWidth: 96, flexShrink: 0 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 600 }}>{p.phase || "—"}</div>
-                      {p.dauer && <div style={{ fontSize: 12, color: "var(--text3)" }}>{p.dauer}</div>}
+                    <div style={{ minWidth: 120, flexShrink: 0, display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 600 }}>{p.phase || "—"}</span>
+                      {p.dauer && <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap" }}>{p.dauer} min</span>}
                     </div>
                     <div style={{ flex: 1, fontSize: 13.5, color: "var(--text2)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{p.text}</div>
                   </div>
@@ -1726,7 +1735,8 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
           <div key={i} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 8, marginBottom: 6, background: "var(--bg)" }}>
             <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
               <input value={p.phase} onChange={(e) => setPhase(i, "phase", e.target.value)} placeholder={t("kalender.verlaufPhase")} style={{ ...fld, flex: 1, padding: "6px 8px" }} />
-              <input value={p.dauer} onChange={(e) => setPhase(i, "dauer", e.target.value)} placeholder={t("kalender.verlaufDauer")} style={{ ...fld, width: 70, padding: "6px 8px" }} />
+              <input type="number" min="0" value={p.dauer} onChange={(e) => setPhase(i, "dauer", e.target.value)} placeholder={t("kalender.verlaufDauer")} style={{ ...fld, width: 56, padding: "6px 8px" }} />
+              <span style={{ fontSize: 12, color: "var(--text3)", flexShrink: 0 }}>min</span>
               <button onClick={() => movePhase(i, -1)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title="↑" disabled={i === 0}><span style={{ color: i === 0 ? "var(--text3)" : "var(--text2)" }}>↑</span></button>
               <button onClick={() => movePhase(i, 1)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title="↓" disabled={i === verlauf.length - 1}><span style={{ color: i === verlauf.length - 1 ? "var(--text3)" : "var(--text2)" }}>↓</span></button>
               <button onClick={() => delPhase(i)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title={t("common.delete")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button>
