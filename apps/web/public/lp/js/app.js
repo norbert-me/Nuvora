@@ -2616,14 +2616,8 @@
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(10);
         doc.text('Datum: _______________', dateRight, y, { align: 'right' });
-        // Niveau + ALLE Förderbedarfe des Schülers (nicht nur LRS) unter den Namen.
-        const meta = [s.niveau ? s.niveau + '-Kurs' : '', ...(s.foerder || [])].filter(Boolean).join(' · ');
-        if (meta) {
-            y += 5;
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(110);
-            doc.text(meta, marginL, y);
-            doc.setTextColor(0);
-        }
+        // WICHTIG: KEINE Förderbedarfe/Niveau auf dem Schülerblatt (DSGVO Art. 9).
+        // Die stehen nur in der Planungsansicht für die Lehrkraft, nie im PDF.
         y += 3;
         doc.setLineWidth(0.6);
         doc.line(marginL, y, marginL + contentW, y);
@@ -3824,7 +3818,12 @@
         // (geloescht/neu?), oder (c) der Thema-Filter alles entfernt.
         let dSaved = 0, dResolved = 0, dShown = 0; const sampleUnresolved = []; const themenGezeigt = new Set(); const themenAufgeloest = new Set();
         previewData = (ll.schueler || []).map(sch => {
-            const student = schueler.find(s => s.id === (sch.id || parseInt(sch._id)))
+            // Schüler zuerst über die id auflösen; klappt das nicht (id-Shift nach
+            // Sync), über den Namen — sonst ginge in der Planung das Niveau und ALLE
+            // Förderbedarfe verloren (leerer Fallback). Nur wenn beides scheitert,
+            // ein Minimal-Objekt.
+            const student = schueler.find(s => String(s.id) === String(sch.id) || String(s._id) === String(sch._id))
+                || (sch.name && schueler.find(s => s.name === sch.name))
                 || { _id: String(sch._id), id: sch.id, name: sch.name, niveau: '', foerder: [] };
             const ids = sch.aufgabenIds || [];
             dSaved += ids.length;
