@@ -37,8 +37,8 @@ export default function Methoden() {
   useEffect(() => { load(); loadFolders(); }, []);
   useEffect(() => { fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
 
-  // Deep-Link ?open=<id> (z. B. aus dem Kalender): den Einstieg direkt öffnen und
-  // in seinen Ordner springen. Einmalig, sobald die Einträge geladen sind.
+  // Deep-Link ?open=<id> (z. B. aus dem Kalender): den Einstieg in der ANSICHT
+  // (Detail) öffnen — nicht direkt im Bearbeiten. Von dort geht Bearbeiten weiter.
   const [params, setParams] = useSearchParams();
   const [opened, setOpened] = useState(false);
   useEffect(() => {
@@ -46,7 +46,7 @@ export default function Methoden() {
     const id = Number(params.get("open"));
     if (!id || !items.length) return;
     const m = items.find((x) => x.id === id);
-    if (m) { setCurrent(m.folder_id ?? null); setEdit(m); }
+    if (m) { setCurrent(m.folder_id ?? null); setViewing(m); }
     setOpened(true);
     params.delete("open"); setParams(params, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
