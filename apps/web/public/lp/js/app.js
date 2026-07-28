@@ -2520,6 +2520,44 @@
     }
 
 
+    // Kleines Smiley zum Ankreisen (Selbsteinschaetzung je Pflichtaufgabe).
+    // good=true -> laechelnd, sonst neutral. Vektor, da Helvetica keine Emoji hat.
+    function drawSmiley(doc, cx, cy, r, good) {
+        doc.setDrawColor(80); doc.setLineWidth(0.3);
+        doc.circle(cx, cy, r, 'S');
+        doc.setFillColor(80);
+        doc.circle(cx - r * 0.38, cy - r * 0.28, 0.35, 'F');
+        doc.circle(cx + r * 0.38, cy - r * 0.28, 0.35, 'F');
+        if (good) {
+            // Laechel-Bogen (kubische Bezier) unten.
+            doc.lines([[r * 0.33, r * 0.55, r * 0.67, r * 0.55, r, 0]], cx - r * 0.5, cy + r * 0.12, [1, 1], 'S');
+        } else {
+            doc.line(cx - r * 0.45, cy + r * 0.35, cx + r * 0.45, cy + r * 0.35);
+        }
+        doc.setDrawColor(0); doc.setLineWidth(0.4);
+    }
+
+    // Hinweis-Kasten mit Titel + Fliesstext (mehrzeilig) auf dem Blatt.
+    function pdfHinweis(doc, marginL, contentW, y, titel, zeilen) {
+        const padX = 4, padY = 3.5;
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+        const titelLines = doc.splitTextToSize(titel, contentW - 2 * padX);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+        const bodyLines = [];
+        zeilen.forEach(z => doc.splitTextToSize(z, contentW - 2 * padX).forEach(l => bodyLines.push(l)));
+        const boxH = padY * 2 + titelLines.length * 4.6 + bodyLines.length * 4.2 + 1;
+        doc.setDrawColor(180); doc.setLineWidth(0.3); doc.setFillColor(245, 247, 250);
+        doc.roundedRect(marginL, y, contentW, boxH, 2, 2, 'FD');
+        doc.setDrawColor(0);
+        let ty = y + padY + 3.5;
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(30);
+        titelLines.forEach(l => { doc.text(l, marginL + padX, ty); ty += 4.6; });
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60);
+        bodyLines.forEach(l => { doc.text(l, marginL + padX, ty); ty += 4.2; });
+        doc.setTextColor(0);
+        return y + boxH + 5;
+    }
+
     function renderStudentPage(doc, entry, marginL, contentW, lineH, checkboxSize, withQR) {
         const s = entry.student;
         const selectedTasks = entry.tasks.filter(t => t.selected);
@@ -2548,6 +2586,7 @@
         // Die beiden Ankreuzspalten ruecken dafuer an den rechten Rand.
         const korrX = marginL + contentW - 24;
         const pruefX = korrX - 32;
+        const smileyX = pruefX - 18;   // Spalte für die Selbsteinschätzung (Smileys)
         const rowH = 12;
 
         const pdfTitle = entry.unterthema ? entry.thema + ' – ' + entry.unterthema : entry.thema;
@@ -2573,6 +2612,7 @@
         doc.setFontSize(7);
         doc.setTextColor(120);
         doc.text('erledigt', cbX, y);
+        doc.text('wie lief\'s?', smileyX, y);
         doc.text('Lösung geprüft', pruefX, y);
         doc.text('korrigiert', korrX, y);
         doc.setTextColor(0);
@@ -2583,20 +2623,41 @@
         doc.setDrawColor(0);
         y += 5;
 
-        let zusatzHeadingDone = false;
+        let zusatzHeadingDone = false, wdhHeadingDone = false;
+        const regSekPage = ['Basis', 'G-Niveau', 'E-Niveau'];
         selectedTasks.forEach((task, idx) => {
             if (y > 272) { doc.addPage(); y = 15; }
 
-            // Zwischenüberschrift vor der ersten Zusatzaufgabe
+            // Hinweis über dem Wiederholungsteil.
+            if (task.section === 'Wiederholung' && !wdhHeadingDone) {
+                wdhHeadingDone = true;
+                y = pdfHinweis(doc, marginL, contentW, y, 'Du bist nicht fertig geworden?',
+                    ['Kein Problem – das ist eingeplant. In der naechsten Stunde arbeitest du im Wiederholungsteil an deinen offenen Aufgaben weiter. Nimm die Leiter mit.']);
+            }
+
+            // „Wie geht es weiter?" + Smiley-Regeln, dann die Zusatzaufgaben-Überschrift.
             if (task.zusatz && !zusatzHeadingDone) {
                 zusatzHeadingDone = true;
-                y += 2;
-                doc.setFont('helvetica', 'bold');
-                doc.setFontSize(11);
+                if (y > 250) { doc.addPage(); y = 15; }
+                // Kasten mit Titel und zwei Regeln, je mit gezeichnetem Smiley davor.
+                doc.setDrawColor(180); doc.setLineWidth(0.3); doc.setFillColor(245, 247, 250);
+                doc.roundedRect(marginL, y, contentW, 22, 2, 2, 'FD'); doc.setDrawColor(0);
+                let ty = y + 5;
+                doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(30);
+                doc.text('Wie geht es weiter? Schau auf deine Smileys bei den Pflichtaufgaben.', marginL + 4, ty);
+                ty += 5.5;
+                doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60);
+                drawSmiley(doc, marginL + 6, ty - 1, 2, true);
+                doc.text('Hoechstens einmal kein guter Smiley: Du darfst frei waehlen – Zusatz- oder Knobelaufgaben.', marginL + 11, ty);
+                ty += 5;
+                drawSmiley(doc, marginL + 6, ty - 1, 2, false);
+                doc.text('Zweimal oder oefter kein guter Smiley: Mach die Zusatzaufgaben – sie ueben, was noch wackelt.', marginL + 11, ty);
+                doc.setTextColor(0);
+                y += 27;
+                doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
                 doc.text('Zusatzaufgaben', marginL, y);
                 y += 3;
-                doc.setDrawColor(200);
-                doc.setLineWidth(0.2);
+                doc.setDrawColor(200); doc.setLineWidth(0.2);
                 doc.line(marginL, y, marginL + contentW, y);
                 doc.setDrawColor(0);
                 y += 6;
@@ -2611,6 +2672,13 @@
             doc.setTextColor(100);
             doc.text(String(idx + 1), numX, y + 1.5);
             doc.setTextColor(0);
+
+            // Selbsteinschätzung: zwei Smileys zum Ankreisen — nur bei PFLICHT-
+            // Aufgaben (regulaer, kein Zusatz), nicht bei Wiederholung/Erklaerung.
+            if (regSekPage.includes(task.section) && !task.zusatz) {
+                drawSmiley(doc, smileyX + 2.5, y, 2.2, true);
+                drawSmiley(doc, smileyX + 9, y, 2.2, false);
+            }
 
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(11);
