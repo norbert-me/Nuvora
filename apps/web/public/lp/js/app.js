@@ -3121,6 +3121,13 @@
     // Ausgaben/abhängigen Anzeigen mitgehen.
     function setGenConfig(cfg) {
         if (!cfg) return;
+        // Das max-Attribut des Aufgaben-Reglers haengt am aktuell gefilterten Pool
+        // (basis + max(g,e)). Eine gespeicherte Lernleiter kann aber MEHR Aufgaben
+        // haben (Wiederholung, mehrere Unterthemen). Sonst klemmt der Browser den
+        // Wert nach unten — die Config zeigte "1 Aufgabe", obwohl die Leiter 6 hat.
+        // Darum das Maximum notfalls auf die gespeicherte Anzahl anheben.
+        const maxEl = document.getElementById('cfg-max');
+        if (maxEl && cfg.max != null) maxEl.max = String(Math.max(Number(maxEl.max) || 1, Number(cfg.max) || 0));
         const set = (id, v) => {
             const el = document.getElementById(id);
             if (el && v != null && v !== '') { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); }
