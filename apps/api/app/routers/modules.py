@@ -184,17 +184,6 @@ REGISTRY: List[ModuleDef] = [
         stage="stable",
     ),
     ModuleDef(
-        key="timer",
-        group="werkzeug",
-        name="Timer",
-        description=(
-            "Countdown und Stoppuhr für den Unterricht — groß für den Beamer, mit "
-            "Voreinstellungen und Signalton am Ende. Reines Werkzeug, ohne Daten."
-        ),
-        path="/timer",
-        stage="beta",
-    ),
-    ModuleDef(
         key="notizen",
         group="werkzeug",
         name="Beobachtungen",

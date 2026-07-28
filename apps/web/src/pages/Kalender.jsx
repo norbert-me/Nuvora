@@ -1512,6 +1512,20 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topicId, decks, ladders, methods, aktiv.karten, aktiv.lernpfad, aktiv.methoden]);
+  // Dauer des verknüpften Einstiegs einmalig in den Verlaufsplan übernehmen.
+  // Nur, wenn noch keine Einstieg-Phase existiert (überschreibt nichts Eigenes).
+  const autoEinstieg = useRef(null);
+  useEffect(() => {
+    if (!methodId) return;
+    const m = methods.find((x) => x.id === Number(methodId));
+    if (!m || !m.dauer) return;
+    if (autoEinstieg.current === m.id) return;
+    autoEinstieg.current = m.id;
+    setVerlauf((v) => (v.some((p) => (p.phase || "").trim().toLowerCase() === "einstieg")
+      ? v
+      : [{ phase: "Einstieg", dauer: String(m.dauer), text: m.title || "" }, ...v]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [methodId, methods]);
   const fld = { ...inputStyle, width: "100%" };
   const sfld = { ...selectStyle, width: "100%", fontSize: 14, padding: "10px 34px 10px 12px" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
