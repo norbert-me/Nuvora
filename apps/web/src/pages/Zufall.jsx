@@ -26,6 +26,7 @@ export default function Zufall() {
   const [lastDrawn, setLastDrawn] = useState({}); // student_id -> letztes Zieh-Datum (ISO), serverseitig
   const [lastId, setLastId] = useState(null);     // zuletzt gezogen (nicht zweimal am Stück)
   const [absent, setAbsent] = useState(new Set()); // heute abwesende IDs
+  const [niveau, setNiveau] = useState(""); // "" = alle, "E" oder "G" (Kurs-Niveau)
   const [aktuell, setAktuell] = useState(null);
   const [rollt, setRollt] = useState(false);
   // Unterseite kommt aus der Navbar (?tab=gruppen), damit Ziehen und Gruppen
@@ -69,10 +70,12 @@ export default function Zufall() {
       setCounts(c); setLastDrawn(ld); setLastId(d.last_student_id ?? null);
     }).catch(() => {});
   }, [classId]);
-  useEffect(() => { setGezogen([]); setAktuell(null); }, [ohneWdh]);
+  useEffect(() => { setGezogen([]); setAktuell(null); }, [ohneWdh, niveau]);
 
-  const anwesend = students.filter((s) => !absent.has(s.id));
-  const basis = anwesend.length ? anwesend : students; // alle abwesend -> nicht blockieren
+  // Optional nur E- oder G-Niveau ziehen (Kurs-Niveau am Schüler).
+  const nivPool = niveau ? students.filter((s) => (s.niveau || "") === niveau) : students;
+  const anwesend = nivPool.filter((s) => !absent.has(s.id));
+  const basis = anwesend.length ? anwesend : nivPool; // alle abwesend -> nicht blockieren
   const pool = ohneWdh ? basis.filter((s) => !gezogen.includes(s.id)) : basis;
 
   // Tage seit letztem Ziehen (nie gezogen = groß, damit sofort bevorzugt).
@@ -142,6 +145,13 @@ export default function Zufall() {
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
         <KursKlasseSelect value={classId} onChange={setClassId} />
+        {tab === "ziehen" && (
+          <select value={niveau} onChange={(e) => setNiveau(e.target.value)} title={t("zufall.niveauHint")} style={{ ...selectStyle, fontSize: 13, padding: "8px 26px 8px 10px" }}>
+            <option value="">{t("zufall.niveauAll")}</option>
+            <option value="G">{t("zufall.niveauG")}</option>
+            <option value="E">{t("zufall.niveauE")}</option>
+          </select>
+        )}
         {tab === "ziehen" && <Toggle checked={ohneWdh} onChange={setOhneWdh} label={t("zufall.noRepeat")} />}
         {tab === "ziehen" && <Toggle checked={gewichtet} onChange={setGewichtet} label={t("zufall.weighted")} />}
         {anwesenheitAktiv && <Toggle checked={skipAbs} onChange={setSkipAbs} label={t("zufall.skipAbsent")} />}
