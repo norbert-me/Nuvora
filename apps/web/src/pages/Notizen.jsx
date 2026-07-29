@@ -46,8 +46,7 @@ export default function Notizen() {
 
   return (
     <div style={{ maxWidth: 760, margin: "0 auto" }}>
-      <h1 style={pageTitle}>{t("notizen.title")}</h1>
-      <p style={{ fontSize: 12.5, color: "var(--text3)", marginTop: -8, marginBottom: 16 }}>{t("notizen.intro")}</p>
+      <p style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 16 }}>{t("notizen.intro")}</p>
 
       <div style={{ marginBottom: 16 }}><KursKlasseSelect value={classId} onChange={setClassId} /></div>
 

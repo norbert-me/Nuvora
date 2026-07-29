@@ -416,12 +416,7 @@ export default function Kalender() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
-        {/* Kein „Kalender"-Titel auf jeder Seite — die Navbar zeigt den Bereich
-            schon. Die Konfig-Unterseiten tragen ihren eigenen Abschnittstitel;
-            die eigentlichen Kalenderansichten kommen ganz ohne Titel aus. */}
-        {(view === "timetable" || view === "breaks" || view === "klassenarbeit") && (
-          <h1 style={pageTitle}>{view === "timetable" ? t("kalender.timetable") : view === "breaks" ? t("kalender.breaksTab") : t("kalender.examsTab")}</h1>
-        )}
+        {/* Kein Titel — die Navbar zeigt den Bereich (auch die Konfig-Reiter). */}
         {/* Stundenplan UND Freie Tage sind in die Navbar ausgelagert (?view=…) —
             beides Konfiguration. Der Ansicht-Umschalter erscheint darum nur in den
             eigentlichen Kalenderansichten, nicht in Stundenplan/Freie Tage. */}

@@ -141,8 +141,6 @@ export default function Zufall() {
 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto" }}>
-      <h1 style={pageTitle}>{tab === "gruppen" ? t("zufall.navGroups") : t("zufall.navDraw")}</h1>
-
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
         <KursKlasseSelect value={classId} onChange={setClassId} />
         {tab === "ziehen" && (

@@ -773,8 +773,7 @@ export function KlassenarbeitVergleich() {
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 16px 40px" }}>
-      <h1 style={pageTitle}>{t("klassenarbeit.compareTitle")}</h1>
-      <p style={{ fontSize: 13, color: "var(--text3)", marginTop: -4, marginBottom: 16 }}>{t("klassenarbeit.compareHint")}</p>
+      <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 16 }}>{t("klassenarbeit.compareHint")}</p>
       <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
 
       {classId && rows.length === 0 && <div style={{ marginTop: 24 }}><Empty title={t("klassenarbeit.compareEmpty")} /></div>}
