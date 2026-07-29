@@ -20,7 +20,7 @@ const load = () => {
       ...it, _ref: true,
       x: (it.x || 0) * 1.6, y: (it.y || 0) * 1.6,
       w: (it.w || 240) * 1.6, h: (it.h || 90) * 1.6,
-      fontSize: (it.fontSize || 28) * 1.6,
+      fontSize: Math.round((it.fontSize || 28) * 1.6),
     }));
   } catch { return []; }
 };
@@ -58,8 +58,8 @@ export default function Tafel() {
     setItems((p) => [...p, it]); setSel(it.id);
   };
   const addTimer = () => {
-    const w = 440, h = 260;
-    const it = { id: uid(), type: "timer", x: (REF_W - w) / 2, y: 160, w, h, minutes: 5, _ref: true };
+    const w = 460, h = 340;
+    const it = { id: uid(), type: "timer", x: (REF_W - w) / 2, y: 140, w, h, minutes: 5, _ref: true };
     setItems((p) => [...p, it]); setSel(it.id);
   };
   const patch = (id, o) => setItems((p) => p.map((i) => (i.id === id ? { ...i, ...o } : i)));
@@ -86,7 +86,11 @@ export default function Tafel() {
   const onUp = () => { drag.current = null; window.removeEventListener("pointermove", onMove); };
 
   const selItem = items.find((i) => i.id === sel);
-  const bumpFont = (delta) => { if (selItem) patch(selItem.id, { fontSize: Math.max(16, Math.min(280, (selItem.fontSize || 48) + delta)) }); };
+  const [fontPop, setFontPop] = useState(false);
+  const setFont = (v) => { if (selItem) patch(selItem.id, { fontSize: Math.max(16, Math.min(280, Math.round(v))) }); };
+  const bumpFont = (delta) => { if (selItem) setFont((selItem.fontSize || 48) + delta); };
+  // Popup schließen, wenn nichts (Text) mehr gewählt ist.
+  useEffect(() => { if (!selItem || selItem.type === "timer") setFontPop(false); }, [selItem]);
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
@@ -103,15 +107,27 @@ export default function Tafel() {
       <div style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 38, marginBottom: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)", flexWrap: "wrap" }}>
         {!selItem && <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("tafel.selectHint")}</span>}
         {selItem && selItem.type !== "timer" && (<>
-          <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("tafel.textSize")}</span>
-          <button onClick={() => bumpFont(-4)} style={{ ...btnSecondary, padding: "4px 12px", fontWeight: 700 }}>A−</button>
-          <span style={{ fontSize: 13, minWidth: 34, textAlign: "center" }}>{selItem.fontSize}</span>
-          <button onClick={() => bumpFont(4)} style={{ ...btnSecondary, padding: "4px 12px", fontWeight: 700 }}>A+</button>
-          <span style={{ width: 1, height: 20, background: "var(--border)", margin: "0 4px" }} />
           {COLORS.map((c) => (
             <button key={c} onClick={() => patch(selItem.id, { color: c })} title={t("tafel.color")}
               style={{ width: 22, height: 22, borderRadius: 6, background: c, border: selItem.color === c ? "2px solid var(--accent)" : "1px solid var(--border2)", cursor: "pointer" }} />
           ))}
+          <span style={{ width: 1, height: 20, background: "var(--border)", margin: "0 4px" }} />
+          <div style={{ position: "relative", display: "inline-flex" }}>
+            <button onClick={() => setFontPop((v) => !v)} className="icon-btn" style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8 }} title={t("tafel.textSize")}>
+              <Icon d={ICONS.edit} size={16} color="var(--text2)" />
+            </button>
+            {fontPop && (
+              <div onPointerDown={(e) => e.stopPropagation()} style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 20, minWidth: 220, padding: 12, border: "1px solid var(--border2)", borderRadius: 12, background: "var(--card)", boxShadow: "0 8px 28px rgba(0,0,0,0.18)" }}>
+                <div style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 8 }}>{t("tafel.textSize")}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <button onClick={() => bumpFont(-2)} style={{ ...btnSecondary, padding: "4px 12px", fontWeight: 700 }}>A−</button>
+                  <span style={{ fontSize: 14, minWidth: 40, textAlign: "center", fontWeight: 600 }}>{selItem.fontSize}</span>
+                  <button onClick={() => bumpFont(2)} style={{ ...btnSecondary, padding: "4px 12px", fontWeight: 700 }}>A+</button>
+                </div>
+                <input type="range" min="16" max="280" step="1" value={selItem.fontSize} onChange={(e) => setFont(Number(e.target.value))} style={{ width: "100%" }} />
+              </div>
+            )}
+          </div>
         </>)}
         {selItem && selItem.type === "timer" && (
           <button onClick={() => patch(selItem.id, { muted: !selItem.muted })} style={{ ...btnSecondary, padding: "4px 12px", display: "inline-flex", alignItems: "center", gap: 6 }}>
@@ -195,14 +211,14 @@ function TafelTimer({ item, onPatch, t }) {
   const bump = (d) => onPatch({ minutes: Math.max(1, Math.min(180, (item.minutes || 5) + d)) });
   const bh = item.h || 150;
   return (
-    <div onPointerDown={stop} className={flash ? "tafel-flash" : ""} style={{ width: "100%", height: "100%", boxSizing: "border-box", borderRadius: 8, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, padding: "14px 8px 8px" }}>
+    <div onPointerDown={stop} className={flash ? "tafel-flash" : ""} style={{ width: "100%", height: "100%", boxSizing: "border-box", borderRadius: 8, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, padding: "22px 12px 16px" }}>
       <div style={{ fontSize: Math.max(28, Math.min(bh * 0.42, item.w * 0.32)), fontWeight: 800, lineHeight: 1, fontVariantNumeric: "tabular-nums", color: done ? "#dc2626" : "var(--text)" }}>{fmt(remaining)}</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", justifyContent: "center" }}>
         <button onClick={() => bump(-1)} style={{ ...miniBtn }}>−</button>
-        <span style={{ fontSize: 12, color: "var(--text3)", minWidth: 40, textAlign: "center" }}>{item.minutes || 5} {t("tafel.min")}</span>
+        <span style={{ fontSize: 30, color: "var(--text2)", minWidth: 120, textAlign: "center", fontWeight: 600 }}>{item.minutes || 5} {t("tafel.min")}</span>
         <button onClick={() => bump(1)} style={{ ...miniBtn }}>＋</button>
       </div>
-      <div style={{ display: "flex", gap: 6 }}>
+      <div style={{ display: "flex", gap: 14 }}>
         {!running
           ? <button onClick={() => { if (!done) setRunning(true); }} disabled={done} style={{ ...miniBtn, opacity: done ? 0.5 : 1 }}>▶</button>
           : <button onClick={() => setRunning(false)} style={{ ...miniBtn }}>❚❚</button>}
@@ -212,4 +228,4 @@ function TafelTimer({ item, onPatch, t }) {
   );
 }
 
-const miniBtn = { padding: "3px 10px", fontSize: 14, fontWeight: 700, border: "1px solid var(--border2)", borderRadius: 8, background: "var(--bg)", color: "var(--text)", cursor: "pointer" };
+const miniBtn = { padding: "8px 22px", fontSize: 32, fontWeight: 700, lineHeight: 1, border: "2px solid var(--border2)", borderRadius: 12, background: "var(--bg)", color: "var(--text)", cursor: "pointer" };
