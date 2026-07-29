@@ -112,22 +112,15 @@ export default function Tafel() {
               style={{ width: 22, height: 22, borderRadius: 6, background: c, border: selItem.color === c ? "2px solid var(--accent)" : "1px solid var(--border2)", cursor: "pointer" }} />
           ))}
           <span style={{ width: 1, height: 20, background: "var(--border)", margin: "0 4px" }} />
-          <div style={{ position: "relative", display: "inline-flex" }}>
-            <button onClick={() => setFontPop((v) => !v)} className="icon-btn" style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8 }} title={t("tafel.textSize")}>
-              <Icon d={ICONS.edit} size={16} color="var(--text2)" />
-            </button>
-            {fontPop && (
-              <div onPointerDown={(e) => e.stopPropagation()} style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 20, minWidth: 220, padding: 12, border: "1px solid var(--border2)", borderRadius: 12, background: "var(--card)", boxShadow: "0 8px 28px rgba(0,0,0,0.18)" }}>
-                <div style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 8 }}>{t("tafel.textSize")}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <button onClick={() => bumpFont(-2)} style={{ ...btnSecondary, padding: "4px 12px", fontWeight: 700 }}>A−</button>
-                  <span style={{ fontSize: 14, minWidth: 40, textAlign: "center", fontWeight: 600 }}>{selItem.fontSize}</span>
-                  <button onClick={() => bumpFont(2)} style={{ ...btnSecondary, padding: "4px 12px", fontWeight: 700 }}>A+</button>
-                </div>
-                <input type="range" min="16" max="280" step="1" value={selItem.fontSize} onChange={(e) => setFont(Number(e.target.value))} style={{ width: "100%" }} />
-              </div>
-            )}
-          </div>
+          <button onClick={() => setFontPop((v) => !v)} className="icon-btn" style={{ ...iconBtn, border: fontPop ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 8 }} title={t("tafel.textSize")}>
+            <Icon d={ICONS.edit} size={16} color={fontPop ? "var(--accent)" : "var(--text2)"} />
+          </button>
+          {fontPop && (<>
+            <button onClick={() => bumpFont(-2)} style={{ ...btnSecondary, padding: "4px 12px", fontWeight: 700 }}>A−</button>
+            <span style={{ fontSize: 13, minWidth: 40, textAlign: "center", fontWeight: 600 }}>{selItem.fontSize}</span>
+            <button onClick={() => bumpFont(2)} style={{ ...btnSecondary, padding: "4px 12px", fontWeight: 700 }}>A+</button>
+            <input type="range" min="16" max="280" step="1" value={selItem.fontSize} onChange={(e) => setFont(Number(e.target.value))} style={{ width: 140 }} />
+          </>)}
         </>)}
         {selItem && selItem.type === "timer" && (
           <button onClick={() => patch(selItem.id, { muted: !selItem.muted })} style={{ ...btnSecondary, padding: "4px 12px", display: "inline-flex", alignItems: "center", gap: 6 }}>
