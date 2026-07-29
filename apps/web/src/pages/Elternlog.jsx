@@ -80,7 +80,7 @@ export default function Elternlog() {
             <button onClick={() => setSel(null)} style={{ ...btnSecondary, padding: "6px 12px" }}>← {t("common.back")}</button>
             <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{sel.name}</h2>
             {notenAktiv && noteStr(sel.id) && (
-              <Link to="/noten" title={t("elternlog.toGrades")} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, padding: "4px 12px", borderRadius: 980, background: "var(--accent-bg, rgba(10,132,255,0.12))", color: "var(--accent)", textDecoration: "none" }}>
+              <Link to="/auswertung?tab=noten" title={t("elternlog.toGrades")} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, padding: "4px 12px", borderRadius: 980, background: "var(--accent-bg, rgba(10,132,255,0.12))", color: "var(--accent)", textDecoration: "none" }}>
                 {t("elternlog.grade")}: {noteStr(sel.id)} ↗
               </Link>
             )}

@@ -20,7 +20,7 @@ from .auth import get_current_user, rate_limit
 from .modules import is_active
 
 router = APIRouter(prefix="/api/klassenarbeit", tags=["klassenarbeit"])
-MODULE_KEY = "klassenarbeit"
+MODULE_KEY = "auswertung"
 
 
 async def require_module(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> User:

@@ -269,7 +269,7 @@ async def test_exam_auto_creates_work_when_module_active(s):
     assert ex1.work_id is None
 
     # Modul aktiv -> Auswertung automatisch, leer, gleicher Name.
-    s.add(UserModule(user_id=u.id, module_key="klassenarbeit")); await s.commit()
+    s.add(UserModule(user_id=u.id, module_key="auswertung")); await s.commit()
     ex2 = await K.create_exam(K.ExamIn(date=d, title="Bruchrechnung", class_id=a.id), user=u, db=s)
     assert ex2.work_id is not None
     w = await s.get(WorkAnalysis, ex2.work_id)
@@ -295,7 +295,7 @@ async def test_exam_edit_syncs_and_recreates_work(s):
     from app.models import UserModule, WorkAnalysis, Kurs
     from app.routers import kalender as K
     u = User(email="s2@d.de", password_hash="x", name="L"); s.add(u); await s.flush()
-    s.add_all([UserModule(user_id=u.id, module_key="kalender"), UserModule(user_id=u.id, module_key="klassenarbeit")])
+    s.add_all([UserModule(user_id=u.id, module_key="kalender"), UserModule(user_id=u.id, module_key="auswertung")])
     a = SchoolClass(name="7.5 LZ", owner_id=u.id); s.add(a); await s.flush()
     k1 = Kurs(name="7.5 LZ", owner_id=u.id); k2 = Kurs(name="7.5", owner_id=u.id)
     s.add_all([k1, k2]); await s.commit()

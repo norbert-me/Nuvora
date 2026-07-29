@@ -110,14 +110,14 @@ import PublicCd from "./codedetektiv/PublicCd.jsx";
 import Cards from "./pages/Cards.jsx";
 import Tutorial from "./pages/Tutorial.jsx";
 import GuidedTour, { PATH_TOUR, tourFor } from "./components/GuidedTour.jsx";
-import NotenModul from "./pages/Noten.jsx";
+import Auswertung from "./pages/Auswertung.jsx";
 import Lernen from "./pages/Lernen.jsx";
 import Karten from "./pages/Karten.jsx";
 import Kalender from "./pages/Kalender.jsx";
 import Unterrichtsplanung from "./pages/Unterrichtsplanung.jsx";
 import Zufall from "./pages/Zufall.jsx";
 import Orga from "./pages/Orga.jsx";
-import Klassenarbeit, { KlassenarbeitVergleich } from "./pages/Klassenarbeit.jsx";
+import { KlassenarbeitVergleich } from "./pages/Klassenarbeit.jsx";
 import Notizbrett from "./pages/Notizbrett.jsx";
 import Notizen from "./pages/Notizen.jsx";
 import Elternlog from "./pages/Elternlog.jsx";
@@ -136,12 +136,12 @@ const CV = "/cardvote";
 function helpArea(pathname) {
   if (pathname.startsWith("/cardvote")) return "cardvote";
   if (pathname.startsWith("/lernpfad")) return "lernpfad";
-  if (pathname.startsWith("/noten")) return "noten";
+  if (pathname.startsWith("/auswertung")) return "noten";
   if (pathname.startsWith("/karten")) return "karten";
   return "core";
 }
 const LP = "/lernpfad";
-const NO = "/noten";
+const AUSW = "/auswertung";
 const CD = "/code-detektiv";
 const KA = "/karten";
 const KAL = "/kalender";
@@ -149,7 +149,6 @@ const UPLAN = "/unterrichtsplanung";
 const ZUF = "/zufall";
 const ORG = "/orga";
 const AUS = "/ausleihe";
-const KLA = "/klassenarbeit";
 const NOTIZBRETT = "/notizbrett";
 const NOTIZEN = "/notizen";
 const KLASSENLEITUNG = "/klassenleitung";
@@ -164,7 +163,7 @@ const getModuleNavItems = (t, location) => {
   const params = new URLSearchParams(search);
   const area = pathname.startsWith(CV) ? "cardvote"
     : pathname.startsWith(LP) ? "lernpfad"
-    : pathname.startsWith(NO) ? "noten"
+    : pathname.startsWith(AUSW) ? "auswertung"
     : pathname.startsWith(CD) ? "code-detektiv"
     : pathname.startsWith(KAL) ? "kalender"
     : pathname.startsWith(UPLAN) ? "unterrichtsplanung"
@@ -175,7 +174,6 @@ const getModuleNavItems = (t, location) => {
     : pathname.startsWith(KLASSENLEITUNG) ? "klassenleitung"
     : pathname.startsWith(MATHEF) ? "mathespiele"
     : pathname.startsWith(TAFEL) ? "tafel"
-    : pathname.startsWith(KLA) ? "klassenarbeit"
     : pathname.startsWith(KA) ? "karten"
     // Bereich aus der Query (Hilfe, Marktplatz). Der Einstiege-Marktplatz nutzt
     // weiterhin area=methoden — auf die Navbar von „Unterrichtsplanung" mappen.
@@ -199,8 +197,14 @@ const getModuleNavItems = (t, location) => {
       { to: `${LP}?tab=lernpfade`, label: "Lernpfade", active: cur === "lernpfade" },
     ];
   }
-  if (area === "noten") {
-    return [{ to: NO, label: t("nav.grades") }];
+  if (area === "auswertung") {
+    const cur = params.get("tab");
+    const verg = pathname.startsWith(`${AUSW}/vergleich`);
+    return [
+      { to: `${AUSW}?tab=noten`, label: t("auswertung.tabGrades"), active: !verg && cur !== "klassenarbeit" },
+      { to: `${AUSW}?tab=klassenarbeit`, label: t("auswertung.tabWorks"), active: !verg && cur === "klassenarbeit" },
+      { to: `${AUSW}/vergleich`, label: t("klassenarbeit.navCompare"), active: verg },
+    ];
   }
   if (area === "kalender") {
     const cur = params.get("view");
@@ -238,12 +242,6 @@ const getModuleNavItems = (t, location) => {
   if (area === "klassenleitung") return [{ to: KLASSENLEITUNG, label: t("klassenleitung.title") }];
   if (area === "mathespiele") return [{ to: MATHEF, label: t("mathespiele.title") }];
   if (area === "tafel") return [{ to: TAFEL, label: t("tafel.title") }];
-  if (area === "klassenarbeit") {
-    return [
-      { to: KLA, label: t("klassenarbeit.navWorks"), active: pathname === KLA },
-      { to: `${KLA}/vergleich`, label: t("klassenarbeit.navCompare"), active: pathname.startsWith(`${KLA}/vergleich`) },
-    ];
-  }
   if (area === "orga") {
     const tab = params.get("tab");
     const items = [
@@ -792,7 +790,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path="/help" element={<Help />} />
 
           {/* ─── Modul Noten ─── */}
-          <Route path={NO} element={user ? <ModuleGate moduleKey="noten"><NotenModul /></ModuleGate> : <Landing />} />
+          <Route path={AUSW} element={user ? <ModuleGate moduleKey="auswertung"><Auswertung /></ModuleGate> : <Landing />} />
 
           {/* ─── Modul Karten ─── */}
           <Route path={KA} element={user ? <ModuleGate moduleKey="karten"><Karten /></ModuleGate> : <Landing />} />
@@ -804,8 +802,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={KLASSENLEITUNG} element={user ? <ModuleGate moduleKey="klassenleitung"><Elternlog /></ModuleGate> : <Landing />} />
           <Route path={MATHEF} element={user ? <ModuleGate moduleKey="mathespiele"><Mathefussball /></ModuleGate> : <Landing />} />
           <Route path={TAFEL} element={user ? <ModuleGate moduleKey="tafel"><Tafel /></ModuleGate> : <Landing />} />
-          <Route path={KLA} element={user ? <ModuleGate moduleKey="klassenarbeit"><Klassenarbeit /></ModuleGate> : <Landing />} />
-          <Route path={`${KLA}/vergleich`} element={user ? <ModuleGate moduleKey="klassenarbeit"><KlassenarbeitVergleich /></ModuleGate> : <Landing />} />
+          <Route path={`${AUSW}/vergleich`} element={user ? <ModuleGate moduleKey="auswertung"><KlassenarbeitVergleich /></ModuleGate> : <Landing />} />
           <Route path={ORG} element={user ? <ModuleGate moduleKey="orga"><Orga /></ModuleGate> : <Landing />} />
 
           {/* ─── Modul Code-Detektiv ─── */}

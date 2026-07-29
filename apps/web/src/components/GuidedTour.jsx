@@ -126,8 +126,7 @@ export const MODULE_TOURS = {
 // Route-Präfix → Tour-Id (für Auto-Start beim ersten Besuch der Modulseite).
 export const PATH_TOUR = [
   ["/kalender", "kalender"],
-  ["/noten", "noten"],
-  ["/klassenarbeit", "klassenarbeit"],
+  ["/auswertung", "noten"],
   ["/karten", "karten"],
 ];
 

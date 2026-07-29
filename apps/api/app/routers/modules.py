@@ -68,17 +68,18 @@ REGISTRY: List[ModuleDef] = [
         stage="stable",
     ),
     ModuleDef(
-        key="noten",
+        key="auswertung",
         group="werkzeug",
-        name="Noten",
+        name="Auswertung",
         description=(
-            "Notenbuch: eigene Spalten mit Gewichten, Noten und Beobachtungen je "
-            "Person. Rechnet den gewichteten Schnitt und zeigt einen Trend je "
-            "Schüler — die Zeugnisnote bleibt deine Entscheidung, Beobachtungen "
-            "zählen nie mit. CardVote-, Karten- und Code-Detektiv-Ergebnisse als "
-            "Spalte übernehmbar."
+            "Leistung auswerten an einem Ort — zwei Reiter: Notenbuch (eigene "
+            "Spalten mit Gewichten, gewichteter Schnitt und Trend je Schüler; die "
+            "Zeugnisnote bleibt deine Entscheidung, Beobachtungen zählen nie mit; "
+            "CardVote-/Karten-/Code-Detektiv-Ergebnisse als Spalte übernehmbar) und "
+            "Klassenarbeit (je Aufgabe ein Thema, richtig/falsch je Schüler → "
+            "Fehlerprofil und gezielte Wiederholung)."
         ),
-        path="/noten",
+        path="/auswertung",
         stage="stable",
     ),
     ModuleDef(
@@ -144,19 +145,6 @@ REGISTRY: List[ModuleDef] = [
             "Zufallsgruppe teilt die Klasse in Gruppen — nach Anzahl oder Größe."
         ),
         path="/zufall",
-        stage="stable",
-    ),
-    ModuleDef(
-        key="klassenarbeit",
-        group="werkzeug",
-        name="Klassenarbeit",
-        description=(
-            "Klassenarbeit auswerten: je Aufgabe ein Thema, je Schüler richtig/"
-            "falsch. Daraus ein Fehlerprofil pro Person nach Thema — und auf "
-            "Knopfdruck gezielte Wiederholung (Karten des schwachen Themas wieder "
-            "fällig)."
-        ),
-        path="/klassenarbeit",
         stage="stable",
     ),
     ModuleDef(

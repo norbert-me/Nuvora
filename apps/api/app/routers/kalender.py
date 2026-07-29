@@ -366,7 +366,7 @@ async def _ensure_work(db: AsyncSession, user: User, e: ExamDate) -> None:
         e.work_id = None  # verwaiste Verknüpfung lösen, unten neu anlegen
     if e.class_id is None:
         return
-    if not await is_active(db, user.id, "klassenarbeit"):
+    if not await is_active(db, user.id, "auswertung"):
         return
     w = WorkAnalysis(owner_id=user.id, class_id=e.class_id, kurs_id=e.kurs_id,
                      name=_work_name(e.title), tasks=[], results={})

@@ -31,7 +31,7 @@ from .modules import is_active
 
 router = APIRouter(prefix="/api/noten", tags=["noten"])
 
-MODULE_KEY = "noten"
+MODULE_KEY = "auswertung"
 
 
 async def require_module(
