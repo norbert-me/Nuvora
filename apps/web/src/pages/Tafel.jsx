@@ -102,37 +102,9 @@ export default function Tafel() {
         <button onClick={() => outerRef.current?.requestFullscreen?.()} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("tafel.fullscreen")}><Icon d={ICONS.fit} size={16} /> {t("tafel.fullscreen")}</button>
       </div>
 
-      {/* Werkzeugleiste: immer sichtbar mit fester Höhe, damit die Tafel beim
-          Aus-/Abwählen nicht springt und Felder stabil platzierbar bleiben. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 38, marginBottom: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)", flexWrap: "wrap" }}>
-        {!selItem && <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("tafel.selectHint")}</span>}
-        {selItem && selItem.type !== "timer" && (<>
-          {COLORS.map((c) => (
-            <button key={c} onClick={() => patch(selItem.id, { color: c })} title={t("tafel.color")}
-              style={{ width: 22, height: 22, borderRadius: 6, background: c, border: selItem.color === c ? "2px solid var(--accent)" : "1px solid var(--border2)", cursor: "pointer" }} />
-          ))}
-          <span style={{ width: 1, height: 20, background: "var(--border)", margin: "0 4px" }} />
-          <button onClick={() => setFontPop((v) => !v)} className="icon-btn" style={{ ...iconBtn, border: fontPop ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 8 }} title={t("tafel.textSize")}>
-            <Icon d={ICONS.edit} size={16} color={fontPop ? "var(--accent)" : "var(--text2)"} />
-          </button>
-          {fontPop && (<>
-            <button onClick={() => bumpFont(-2)} style={{ ...btnSecondary, padding: "4px 12px", fontWeight: 700 }}>A−</button>
-            <span style={{ fontSize: 13, minWidth: 40, textAlign: "center", fontWeight: 600 }}>{selItem.fontSize}</span>
-            <button onClick={() => bumpFont(2)} style={{ ...btnSecondary, padding: "4px 12px", fontWeight: 700 }}>A+</button>
-            <input type="range" min="16" max="280" step="1" value={selItem.fontSize} onChange={(e) => setFont(Number(e.target.value))} style={{ width: 140 }} />
-          </>)}
-        </>)}
-        {selItem && selItem.type === "timer" && (
-          <button onClick={() => patch(selItem.id, { muted: !selItem.muted })} style={{ ...btnSecondary, padding: "4px 12px", display: "inline-flex", alignItems: "center", gap: 6 }}>
-            {selItem.muted ? "🔇" : "🔊"} {selItem.muted ? t("tafel.soundOff") : t("tafel.soundOn")}
-          </button>
-        )}
-        {selItem && <><span style={{ flex: 1 }} />
-          <button onClick={() => del(selItem.id)} className="icon-btn" style={{ ...iconBtn }} title={t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button></>}
-      </div>
-
       {/* Tafel-Fläche: äußerer Rahmen misst die Breite, das innere Board hat feste
-          Referenzgröße und wird per transform:scale eingepasst. */}
+          Referenzgröße und wird per transform:scale eingepasst. Die Steuerleiste
+          schwebt am gewählten Element (kein fester Balken oben). */}
       <div ref={outerRef} onPointerDown={() => setSel(null)}
         style={{ position: "relative", width: "100%", height: scale * REF_H, border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: 0, left: 0, width: REF_W, height: REF_H, transform: `scale(${scale})`, transformOrigin: "top left" }}>
@@ -163,6 +135,41 @@ export default function Tafel() {
             </div>
           ))}
         </div>
+
+        {/* Steuerleiste schwebt direkt am gewählten Element (in Bildschirm-Pixeln,
+            darum außerhalb der skalierten Fläche gerendert). */}
+        {selItem && (() => {
+          const ex = selItem.x * scale, ey = selItem.y * scale, eh = selItem.h * scale;
+          const top = ey - 52 >= 4 ? ey - 52 : ey + eh + 8; // sonst unter das Element
+          return (
+            <div onPointerDown={(e) => e.stopPropagation()}
+              style={{ position: "absolute", left: Math.max(4, ex), top, zIndex: 10, display: "flex", alignItems: "center", gap: 6, padding: "6px 8px", border: "1px solid var(--border2)", borderRadius: 10, background: "var(--card)", boxShadow: "0 6px 20px rgba(0,0,0,0.16)", flexWrap: "wrap", maxWidth: "94%" }}>
+              {selItem.type !== "timer" && (<>
+                {COLORS.map((c) => (
+                  <button key={c} onClick={() => patch(selItem.id, { color: c })} title={t("tafel.color")}
+                    style={{ width: 22, height: 22, borderRadius: 6, background: c, border: selItem.color === c ? "2px solid var(--accent)" : "1px solid var(--border2)", cursor: "pointer" }} />
+                ))}
+                <span style={{ width: 1, height: 20, background: "var(--border)", margin: "0 4px" }} />
+                <button onClick={() => setFontPop((v) => !v)} className="icon-btn" style={{ ...iconBtn, border: fontPop ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 8 }} title={t("tafel.textSize")}>
+                  <Icon d={ICONS.edit} size={16} color={fontPop ? "var(--accent)" : "var(--text2)"} />
+                </button>
+                {fontPop && (<>
+                  <button onClick={() => bumpFont(-2)} style={{ ...btnSecondary, padding: "4px 12px", fontWeight: 700 }}>A−</button>
+                  <span style={{ fontSize: 13, minWidth: 40, textAlign: "center", fontWeight: 600 }}>{selItem.fontSize}</span>
+                  <button onClick={() => bumpFont(2)} style={{ ...btnSecondary, padding: "4px 12px", fontWeight: 700 }}>A+</button>
+                  <input type="range" min="16" max="280" step="1" value={selItem.fontSize} onChange={(e) => setFont(Number(e.target.value))} style={{ width: 130 }} />
+                </>)}
+              </>)}
+              {selItem.type === "timer" && (
+                <button onClick={() => patch(selItem.id, { muted: !selItem.muted })} style={{ ...btnSecondary, padding: "4px 12px", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  {selItem.muted ? "🔇" : "🔊"} {selItem.muted ? t("tafel.soundOff") : t("tafel.soundOn")}
+                </button>
+              )}
+              <span style={{ width: 1, height: 20, background: "var(--border)", margin: "0 2px" }} />
+              <button onClick={() => del(selItem.id)} className="icon-btn" style={{ ...iconBtn }} title={t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>
+            </div>
+          );
+        })()}
       </div>
       <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 10 }}>{t("tafel.hint")}</p>
     </div>
