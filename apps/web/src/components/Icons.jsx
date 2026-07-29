@@ -45,6 +45,8 @@ export const ICONS = {
   download: ["M10 3v10M6 9l4 4 4-4", "M3 15v1a2 2 0 002 2h10a2 2 0 002-2v-1"],
   edit: ["M13.5 3.5l3 3L7 16H4v-3L13.5 3.5z"],
   move: ["M5 10h10M12 6l4 4-4 4", "M3 4v12"],
+  // Verschieben in alle Richtungen: Kreuz mit vier Pfeilspitzen.
+  moveAll: ["M10 3v14", "M3 10h14", "M7 6l3-3 3 3", "M7 14l3 3 3-3", "M6 7l-3 3 3 3", "M14 7l3 3-3 3"],
   shuffle: ["M3 6h2l4 8h2l4-8h2M3 14h2l2-3M13 6h2l-2 3"],
   open: ["M10 3L17 10L10 17", "M17 10H3"],
   pdf: ["M5 2h7l4 4v11a2 2 0 01-2 2H5a2 2 0 01-2-2V4a2 2 0 012-2z", "M12 2v4h4"],

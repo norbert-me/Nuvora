@@ -119,7 +119,7 @@ export default function Tafel() {
               {/* Zieh-Griff oben */}
               <div onPointerDown={(e) => onDown(e, it.id, "move")}
                 style={{ position: "absolute", top: -4, left: 0, right: 0, height: 30, cursor: "grab", display: sel === it.id ? "flex" : "none", alignItems: "center", justifyContent: "center", color: "var(--text3)" }}>
-                <Icon d={ICONS.move || ICONS.grip} size={22} />
+                <Icon d={ICONS.moveAll} size={24} />
               </div>
               {it.type === "timer" ? (
                 <TafelTimer item={it} onPatch={(o) => patch(it.id, o)} t={t} />
