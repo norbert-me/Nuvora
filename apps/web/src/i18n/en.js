@@ -1195,6 +1195,7 @@ export default {
   "stoffplan.empty": "No topics planned yet",
   "stoffplan.emptyHint": "Pick a class/course and add topics.",
   "stoffplan.h": "h",
+  "mathespiele.title": "Math games",
   "mathefussball.title": "Math football",
   "notizblock.title": "Notepad",
   "tafel.title": "Board",

@@ -332,7 +332,6 @@ export default function Sitzplan() {
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
-        <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("sitzplan.title")}</h1>
         <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
         <ViewMenu title={t("sitzplan.view")} items={[
           ...(anwesenheitAktiv ? [{ key: "aufruf", label: t("sitzplan.rollcall"), value: aufruf, onChange: (v) => { setAufruf(v); saveView({ aufruf: v }); } }] : []),

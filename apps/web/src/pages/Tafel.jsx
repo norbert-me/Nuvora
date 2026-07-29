@@ -55,7 +55,7 @@ export default function Tafel() {
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
       <style>{`@keyframes tafelFlash{0%,100%{background:transparent}50%{background:rgba(220,38,38,0.55)}}.tafel-flash{animation:tafelFlash .5s steps(1) 6}`}</style>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
-        <h1 style={{ ...pageTitle, marginBottom: 0, flex: 1 }}>{t("tafel.title")}</h1>
+        <span style={{ flex: 1 }} />
         <button onClick={add} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} color="#fff" /> {t("tafel.add")}</button>
         <button onClick={addTimer} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} /> {t("tafel.addTimer")}</button>
         <button onClick={() => boardRef.current?.requestFullscreen?.()} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("tafel.fullscreen")}><Icon d={ICONS.fit} size={16} /> {t("tafel.fullscreen")}</button>

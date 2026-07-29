@@ -1195,6 +1195,7 @@ export default {
   "stoffplan.empty": "Aún no hay temas",
   "stoffplan.emptyHint": "Elige clase/curso y añade temas.",
   "stoffplan.h": "h",
+  "mathespiele.title": "Juegos de matemáticas",
   "mathefussball.title": "Fútbol matemático",
   "notizblock.title": "Bloc de notas",
   "tafel.title": "Pizarra",

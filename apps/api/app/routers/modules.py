@@ -222,15 +222,16 @@ REGISTRY: List[ModuleDef] = [
         stage="beta",
     ),
     ModuleDef(
-        key="mathefussball",
+        key="mathespiele",
         group="unterricht",
-        name="Mathefußball",
+        name="Mathespiele",
         description=(
-            "Kopfrechen-Spiel für zwei Teams am Beamer: richtige Antwort schiebt den "
+            "Sammlung von Mathe-Spielen für den Unterricht. Aktuell Mathefußball: "
+            "Kopfrechen-Spiel für zwei Teams am Beamer — richtige Antwort schiebt den "
             "Ball Richtung Tor. Zahlenraum und Rechenarten einstellbar. Reines Spiel, "
             "ohne Daten."
         ),
-        path="/mathefussball",
+        path="/mathespiele",
         stage="beta",
     ),
 ]

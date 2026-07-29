@@ -355,7 +355,6 @@ export default function Noten() {
   if (classes.length === 0) {
     return (
       <div style={{ maxWidth: 700 }}>
-        <h1 style={pageTitle}>{t("noten.title")}</h1>
         <p style={{ color: "var(--text2)", fontSize: 14 }}>
           {t("noten.needClass").split("{{link}}")[0]}
           <Link to="/classes" style={{ color: "var(--accent)" }}>{t("nav.classes")}</Link>
@@ -370,7 +369,6 @@ export default function Noten() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
-        <h1 style={pageTitle}>{t("noten.title")}</h1>
         <label data-tour="noten-class" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
           {t("nav.classes")}
           <KursKlasseSelect value={subsetKurs ? null : classId} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} />

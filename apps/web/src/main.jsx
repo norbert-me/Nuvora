@@ -153,7 +153,7 @@ const KLA = "/klassenarbeit";
 const NOTIZBRETT = "/notizbrett";
 const NOTIZEN = "/notizen";
 const KLASSENLEITUNG = "/klassenleitung";
-const MATHEF = "/mathefussball";
+const MATHEF = "/mathespiele";
 const TAFEL = "/tafel";
 
 // Menue passend zum Bereich. Man soll im Modul-Menue bleiben, auch auf
@@ -173,7 +173,7 @@ const getModuleNavItems = (t, location) => {
     : pathname.startsWith(NOTIZBRETT) ? "notizbrett"
     : pathname.startsWith(NOTIZEN) ? "notizen"
     : pathname.startsWith(KLASSENLEITUNG) ? "klassenleitung"
-    : pathname.startsWith(MATHEF) ? "mathefussball"
+    : pathname.startsWith(MATHEF) ? "mathespiele"
     : pathname.startsWith(TAFEL) ? "tafel"
     : pathname.startsWith(KLA) ? "klassenarbeit"
     : pathname.startsWith(KA) ? "karten"
@@ -210,9 +210,12 @@ const getModuleNavItems = (t, location) => {
     ];
   }
   if (area === "unterrichtsplanung") {
+    const markt = pathname.startsWith("/marktplatz");
+    const cur = markt ? null : (params.get("open") || params.get("tab") === "einstiege" ? "einstiege" : "stoff");
     return [
-      { to: UPLAN, label: t("unterrichtsplanung.title") },
-      { to: "/marktplatz?area=methoden&kind=method", label: t("nav.marketplace") },
+      { to: `${UPLAN}?tab=stoff`, label: t("unterrichtsplanung.tabStoff"), active: cur === "stoff" },
+      { to: `${UPLAN}?tab=einstiege`, label: t("unterrichtsplanung.tabEinstiege"), active: cur === "einstiege" },
+      { to: "/marktplatz?area=methoden&kind=method", label: t("nav.marketplace"), active: markt },
     ];
   }
   if (area === "zufall") {
@@ -231,7 +234,7 @@ const getModuleNavItems = (t, location) => {
   }
   if (area === "notizen") return [{ to: NOTIZEN, label: t("notizen.title") }];
   if (area === "klassenleitung") return [{ to: KLASSENLEITUNG, label: t("klassenleitung.title") }];
-  if (area === "mathefussball") return [{ to: MATHEF, label: t("mathefussball.title") }];
+  if (area === "mathespiele") return [{ to: MATHEF, label: t("mathespiele.title") }];
   if (area === "tafel") return [{ to: TAFEL, label: t("tafel.title") }];
   if (area === "klassenarbeit") {
     return [
@@ -797,7 +800,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={NOTIZBRETT} element={user ? <ModuleGate moduleKey="notizbrett"><Notizbrett /></ModuleGate> : <Landing />} />
           <Route path={NOTIZEN} element={user ? <ModuleGate moduleKey="notizen"><Notizen /></ModuleGate> : <Landing />} />
           <Route path={KLASSENLEITUNG} element={user ? <ModuleGate moduleKey="klassenleitung"><Elternlog /></ModuleGate> : <Landing />} />
-          <Route path={MATHEF} element={user ? <ModuleGate moduleKey="mathefussball"><Mathefussball /></ModuleGate> : <Landing />} />
+          <Route path={MATHEF} element={user ? <ModuleGate moduleKey="mathespiele"><Mathefussball /></ModuleGate> : <Landing />} />
           <Route path={TAFEL} element={user ? <ModuleGate moduleKey="tafel"><Tafel /></ModuleGate> : <Landing />} />
           <Route path={KLA} element={user ? <ModuleGate moduleKey="klassenarbeit"><Klassenarbeit /></ModuleGate> : <Landing />} />
           <Route path={`${KLA}/vergleich`} element={user ? <ModuleGate moduleKey="klassenarbeit"><KlassenarbeitVergleich /></ModuleGate> : <Landing />} />

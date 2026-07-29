@@ -1220,6 +1220,7 @@ export default {
   "stoffplan.empty": "Noch keine Themen geplant",
   "stoffplan.emptyHint": "Klasse/Kurs wählen und Themen hinzufügen.",
   "stoffplan.h": "Std",
+  "mathespiele.title": "Mathespiele",
   "mathefussball.title": "Mathefußball",
   "notizblock.title": "Notizblock",
   "tafel.title": "Tafel",

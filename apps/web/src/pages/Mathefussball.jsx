@@ -56,8 +56,6 @@ export default function Mathefussball() {
 
   return (
     <div style={{ maxWidth: 820, margin: "0 auto" }}>
-      <h1 style={pageTitle}>{t("mathefussball.title")}</h1>
-
       {/* Einstellungen */}
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 18 }}>
         <label style={{ fontSize: 13, color: "var(--text2)", display: "inline-flex", alignItems: "center", gap: 6 }}>

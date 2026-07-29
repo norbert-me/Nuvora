@@ -93,7 +93,6 @@ export default function Orga() {
           Reiter „Optionen" blendet Reiter ein/aus (Modul-Zahnrad als Seite). */}
       {tab === "optionen" ? (
         <div style={{ maxWidth: 560 }}>
-          <h1 style={{ ...pageTitle, marginBottom: 6 }}>{t("orga.optionsTitle")}</h1>
           <p style={{ color: "var(--text2)", fontSize: 14, marginBottom: 20 }}>{t("orga.optionsIntro")}</p>
           <div style={{ ...cardStyle, display: "flex", flexDirection: "column", gap: 4 }}>
             {ORGA_TABS.map((k) => (
@@ -105,7 +104,6 @@ export default function Orga() {
           </div>
         </div>
       ) : tab === "anwesenheit" ? <Anwesenheit /> : tab === "ausleihe" ? <Ausleihe /> : tab === "sitzplan" ? <Sitzplan /> : (<>
-      <h1 style={{ ...pageTitle, marginBottom: 14 }}>{t("orga.tabChecklists")}</h1>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
         <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
       </div>

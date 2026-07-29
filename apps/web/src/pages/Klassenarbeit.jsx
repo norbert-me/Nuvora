@@ -333,7 +333,6 @@ export default function Klassenarbeit() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
-        <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("klassenarbeit.title")}</h1>
         <span data-tour="ka-class" style={{ display: "inline-flex" }}><KursKlasseSelect value={subsetKurs ? "" : classId} kursValue={subsetKurs ? null : kursId} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} /></span>
         {subsetKurse.length > 0 && (
           <select value={subsetKurs || ""} onChange={(e) => setSubsetKurs(e.target.value ? Number(e.target.value) : null)} style={{ ...selectStyle, fontSize: 13 }} title={t("klassenarbeit.subsetHint")}>
