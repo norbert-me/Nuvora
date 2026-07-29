@@ -172,16 +172,17 @@ REGISTRY: List[ModuleDef] = [
         stage="stable",
     ),
     ModuleDef(
-        key="todo",
+        key="notizbrett",
         group="organisation",
-        name="To-do",
+        name="Notizbrett",
         description=(
-            "Einfache Aufgabenliste. Ein Eintrag kann ein Datum und eine Uhrzeit "
-            "bekommen — dann steht er auch im Kalender. Ohne Datum bleibt es eine "
-            "reine Merkliste."
+            "Notizen und Aufgaben an einem Ort — zwei Reiter: freie Notizzettel "
+            "(Titel + Text, sortierbar) und eine To-do-Liste. Datierte Aufgaben "
+            "erscheinen zusätzlich im Kalender. Nicht an Schüler gebunden (das "
+            "sind die Beobachtungen)."
         ),
-        path="/todo",
-        stage="stable",
+        path="/notizbrett",
+        stage="beta",
     ),
     ModuleDef(
         key="notizen",
@@ -228,18 +229,6 @@ REGISTRY: List[ModuleDef] = [
             "alles, was gerade an die Tafel soll. Reines Werkzeug, ohne Daten."
         ),
         path="/tafel",
-        stage="beta",
-    ),
-    ModuleDef(
-        key="notizblock",
-        group="werkzeug",
-        name="Notizblock",
-        description=(
-            "Freie Notizzettel für alles, was zwischendurch anfällt — Titel und "
-            "Text, mehrere Zettel, per Drag & Drop sortierbar. Nicht an Schüler "
-            "gebunden (das sind die Beobachtungen)."
-        ),
-        path="/notizblock",
         stage="beta",
     ),
     ModuleDef(

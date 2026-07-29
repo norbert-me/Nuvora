@@ -20,7 +20,7 @@ from .auth import get_current_user
 from .modules import is_active
 
 router = APIRouter(prefix="/api/todo", tags=["todo"])
-MODULE_KEY = "todo"
+MODULE_KEY = "notizbrett"
 
 
 async def require_module(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> User:

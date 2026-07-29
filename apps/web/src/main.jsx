@@ -118,12 +118,11 @@ import Methoden from "./pages/Methoden.jsx";
 import Zufall from "./pages/Zufall.jsx";
 import Orga from "./pages/Orga.jsx";
 import Klassenarbeit, { KlassenarbeitVergleich } from "./pages/Klassenarbeit.jsx";
-import Todo from "./pages/Todo.jsx";
+import Notizbrett from "./pages/Notizbrett.jsx";
 import Notizen from "./pages/Notizen.jsx";
 import Elternlog from "./pages/Elternlog.jsx";
 import Stoffplan from "./pages/Stoffplan.jsx";
 import Mathefussball from "./pages/Mathefussball.jsx";
-import Notizblock from "./pages/Notizblock.jsx";
 import Tafel from "./pages/Tafel.jsx";
 import { useModules } from "./core/modules.js";
 import { DialogHost } from "./core/dialog.jsx";
@@ -152,12 +151,11 @@ const ZUF = "/zufall";
 const ORG = "/orga";
 const AUS = "/ausleihe";
 const KLA = "/klassenarbeit";
-const TODO = "/todo";
+const NOTIZBRETT = "/notizbrett";
 const NOTIZEN = "/notizen";
 const ELTERN = "/elternlog";
 const STOFF = "/stoffplan";
 const MATHEF = "/mathefussball";
-const NOTIZBLOCK = "/notizblock";
 const TAFEL = "/tafel";
 
 // Menue passend zum Bereich. Man soll im Modul-Menue bleiben, auch auf
@@ -174,12 +172,11 @@ const getModuleNavItems = (t, location) => {
     : pathname.startsWith(MET) ? "methoden"
     : pathname.startsWith(ZUF) ? "zufall"
     : pathname.startsWith(ORG) ? "orga"
-    : pathname.startsWith(TODO) ? "todo"
+    : pathname.startsWith(NOTIZBRETT) ? "notizbrett"
     : pathname.startsWith(NOTIZEN) ? "notizen"
     : pathname.startsWith(ELTERN) ? "elternlog"
     : pathname.startsWith(STOFF) ? "stoffplan"
     : pathname.startsWith(MATHEF) ? "mathefussball"
-    : pathname.startsWith(NOTIZBLOCK) ? "notizblock"
     : pathname.startsWith(TAFEL) ? "tafel"
     : pathname.startsWith(KLA) ? "klassenarbeit"
     : pathname.startsWith(KA) ? "karten"
@@ -228,14 +225,13 @@ const getModuleNavItems = (t, location) => {
       { to: `${ZUF}?tab=gruppen`, label: t("zufall.navGroups"), active: cur === "gruppen" },
     ];
   }
-  if (area === "todo") {
-    return [{ to: TODO, label: t("todo.title") }];
+  if (area === "notizbrett") {
+    return [{ to: NOTIZBRETT, label: t("notizbrett.title") }];
   }
   if (area === "notizen") return [{ to: NOTIZEN, label: t("notizen.title") }];
   if (area === "elternlog") return [{ to: ELTERN, label: t("elternlog.title") }];
   if (area === "stoffplan") return [{ to: STOFF, label: t("stoffplan.title") }];
   if (area === "mathefussball") return [{ to: MATHEF, label: t("mathefussball.title") }];
-  if (area === "notizblock") return [{ to: NOTIZBLOCK, label: t("notizblock.title") }];
   if (area === "tafel") return [{ to: TAFEL, label: t("tafel.title") }];
   if (area === "klassenarbeit") {
     return [
@@ -798,12 +794,11 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={KAL} element={user ? <ModuleGate moduleKey="kalender"><Kalender /></ModuleGate> : <Landing />} />
           <Route path={MET} element={user ? <ModuleGate moduleKey="methoden"><Methoden /></ModuleGate> : <Landing />} />
           <Route path={ZUF} element={user ? <ModuleGate moduleKey="zufall"><Zufall /></ModuleGate> : <Landing />} />
-          <Route path={TODO} element={user ? <ModuleGate moduleKey="todo"><Todo /></ModuleGate> : <Landing />} />
+          <Route path={NOTIZBRETT} element={user ? <ModuleGate moduleKey="notizbrett"><Notizbrett /></ModuleGate> : <Landing />} />
           <Route path={NOTIZEN} element={user ? <ModuleGate moduleKey="notizen"><Notizen /></ModuleGate> : <Landing />} />
           <Route path={ELTERN} element={user ? <ModuleGate moduleKey="elternlog"><Elternlog /></ModuleGate> : <Landing />} />
           <Route path={STOFF} element={user ? <ModuleGate moduleKey="stoffplan"><Stoffplan /></ModuleGate> : <Landing />} />
           <Route path={MATHEF} element={user ? <ModuleGate moduleKey="mathefussball"><Mathefussball /></ModuleGate> : <Landing />} />
-          <Route path={NOTIZBLOCK} element={user ? <ModuleGate moduleKey="notizblock"><Notizblock /></ModuleGate> : <Landing />} />
           <Route path={TAFEL} element={user ? <ModuleGate moduleKey="tafel"><Tafel /></ModuleGate> : <Landing />} />
           <Route path={KLA} element={user ? <ModuleGate moduleKey="klassenarbeit"><Klassenarbeit /></ModuleGate> : <Landing />} />
           <Route path={`${KLA}/vergleich`} element={user ? <ModuleGate moduleKey="klassenarbeit"><KlassenarbeitVergleich /></ModuleGate> : <Landing />} />

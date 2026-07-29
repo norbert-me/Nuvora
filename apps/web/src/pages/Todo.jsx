@@ -7,7 +7,7 @@ import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api/todo";
 
-export default function Todo() {
+export default function Todo({ embedded } = {}) {
   const { t } = useLanguage();
   const [items, setItems] = useState([]);
   const [text, setText] = useState("");
@@ -98,8 +98,8 @@ export default function Todo() {
   };
 
   return (
-    <div style={{ maxWidth: 640, margin: "0 auto" }}>
-      <h1 style={pageTitle}>{t("todo.title")}</h1>
+    <div style={{ maxWidth: 640, margin: embedded ? 0 : "0 auto" }}>
+      {!embedded && <h1 style={pageTitle}>{t("todo.title")}</h1>}
 
       <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginBottom: 18 }}>
         <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder={t("todo.placeholder")} style={{ ...inputStyle, flex: 1, minWidth: 160 }} />

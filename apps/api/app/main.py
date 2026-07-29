@@ -405,6 +405,15 @@ async def startup():
             ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
         """))
         await db.execute(text("DELETE FROM user_modules WHERE module_key = 'sitzplan'"))
+        # Todo + Notizblock sind ins Modul „Notizbrett" (2 Reiter) aufgegangen.
+        # Wer eins von beiden aktiv hatte, bekommt notizbrett; die Daten (todos,
+        # notepad_notes) bleiben unverändert. Idempotent.
+        await db.execute(text("""
+            INSERT INTO user_modules (user_id, module_key)
+            SELECT DISTINCT user_id, 'notizbrett' FROM user_modules WHERE module_key IN ('todo', 'notizblock')
+            ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
+        """))
+        await db.execute(text("DELETE FROM user_modules WHERE module_key IN ('todo', 'notizblock')"))
         await db.commit()
 
     # Anwesenheit ist jetzt pro Stunde (student, date, period) statt pro Tag.

@@ -281,11 +281,11 @@ export default function Kalender() {
     fetch(`${API}/entries?frm=${a.toISOString()}&to=${addDays(b, 1).toISOString()}`)
       .then((r) => (r.ok ? r.json() : [])).then((d) => setEntries(Array.isArray(d) ? d : [])).catch(() => {});
     // Datierte To-dos (nur bei aktivem Modul) mit anzeigen — Regel-3-Zusatz.
-    if (aktiv.todo) {
+    if (aktiv.notizbrett) {
       fetch(`/api/todo/calendar?frm=${ymd(a)}&to=${ymd(b)}`)
         .then((r) => (r.ok ? r.json() : [])).then((d) => setTodoEvents(Array.isArray(d) ? d : [])).catch(() => {});
     } else setTodoEvents([]);
-  }, [view, cursor, aktiv.todo]); // eslint-disable-line
+  }, [view, cursor, aktiv.notizbrett]); // eslint-disable-line
   useEffect(() => { load(); }, [load]);
   const todoByDay = (d) => todoEvents.filter((e) => e.date === ymd(d));
 
@@ -545,12 +545,12 @@ export default function Kalender() {
       {view === "klassenarbeit" && <ExamPanel overview={examOverview} periods={tt.periods} onAdd={addExam} onUpd={updExam} onDel={delExam} t={t} />}
 
       {view === "today" && (
-        <HeuteView t={t} tt={tt} weekdayOf={weekdayOf} byDay={byDay} todoByDay={todoByDay} onTodo={() => nav("/todo")}
+        <HeuteView t={t} tt={tt} weekdayOf={weekdayOf} byDay={byDay} todoByDay={todoByDay} onTodo={() => nav("/notizbrett")}
           className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} frei={frei}
           heuteAbsent={heuteAbsent} orgaAktiv={!!aktiv.orga} onOpen={setEditing} onSlot={fromSlot} />
       )}
 
-      {view === "month" && <MonthGrid extColor={extColor} range={range} cursor={cursor} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/todo")} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} kursName={kursName} slotName={slotName} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
+      {view === "month" && <MonthGrid extColor={extColor} range={range} cursor={cursor} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/notizbrett")} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} kursName={kursName} slotName={slotName} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
       {view === "week" && wdhVorschlag.length > 0 && (
         <div style={{ marginBottom: 12, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)" }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t("kalender.wdhTitle")}</div>
@@ -566,8 +566,8 @@ export default function Kalender() {
           </div>
         </div>
       )}
-      {view === "week" && <WeekView extColor={extColor} range={range} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/todo")} slotsFor={slotsFor} frei={frei} className={className} kursName={kursName} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
-      {view === "day" && <DayView extColor={extColor} day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/todo")} slotsFor={slotsFor} cancelledFor={cancelledFor} onCancelSlot={cancelSlot} onRestoreSlot={restoreSlot} frei={frei} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
+      {view === "week" && <WeekView extColor={extColor} range={range} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/notizbrett")} slotsFor={slotsFor} frei={frei} className={className} kursName={kursName} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
+      {view === "day" && <DayView extColor={extColor} day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/notizbrett")} slotsFor={slotsFor} cancelledFor={cancelledFor} onCancelSlot={cancelSlot} onRestoreSlot={restoreSlot} frei={frei} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
       {view === "timetable" && <TimetableView tt={tt} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} kursName={kursName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}

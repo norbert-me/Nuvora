@@ -6,7 +6,7 @@ import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api/notizblock";
 
-export default function Notizblock() {
+export default function Notizblock({ embedded } = {}) {
   const { t } = useLanguage();
   const [notes, setNotes] = useState([]);
   const saveTimers = useRef({});
@@ -42,9 +42,9 @@ export default function Notizblock() {
 
   const view = preview || notes;
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto" }}>
+    <div style={{ maxWidth: embedded ? "none" : 900, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-        <h1 style={{ ...pageTitle, marginBottom: 0, flex: 1 }}>{t("notizblock.title")}</h1>
+        {embedded ? <span style={{ flex: 1 }} /> : <h1 style={{ ...pageTitle, marginBottom: 0, flex: 1 }}>{t("notizblock.title")}</h1>}
         <button onClick={add} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} color="#fff" /> {t("notizblock.new")}</button>
       </div>
 
