@@ -7,27 +7,59 @@ import { useLanguage } from "../i18n/index.jsx";
 
 const KEY = "nuvora_tafel_v1";
 const COLORS = ["#111827", "#2563eb", "#dc2626", "#16a34a", "#d97706", "#7c3aed"];
+// Feste Referenzfläche (16:9). Alle Element-Koordinaten liegen in diesem Raum;
+// die Anzeige skaliert per transform an die tatsächliche Breite.
+const REF_W = 1600, REF_H = 900;
 
-const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } };
+// Alt-Stände lagen in ungefähren Pixeln eines ~1000px breiten Boards. Einmalig
+// in den REF-Raum hochskalieren (Faktor ~1.6), danach _ref markiert.
+const load = () => {
+  try {
+    const arr = JSON.parse(localStorage.getItem(KEY)) || [];
+    return arr.map((it) => (it._ref ? it : {
+      ...it, _ref: true,
+      x: (it.x || 0) * 1.6, y: (it.y || 0) * 1.6,
+      w: (it.w || 240) * 1.6, h: (it.h || 90) * 1.6,
+      fontSize: (it.fontSize || 28) * 1.6,
+    }));
+  } catch { return []; }
+};
 
 export default function Tafel() {
   const { t } = useLanguage();
   const [items, setItems] = useState(load);
   const [sel, setSel] = useState(null);
-  const boardRef = useRef(null);
+  const outerRef = useRef(null);   // misst die verfügbare Breite, Ziel für Vollbild
+  const [scale, setScale] = useState(1); // REF-Koordinaten -> Bildschirm
+  const scaleRef = useRef(1);
   const drag = useRef(null); // { id, mode, sx, sy, ox, oy, ow, oh }
 
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(items)); } catch { /* voll — egal */ } }, [items]);
 
+  // Board hat eine feste Referenzgröße (REF_W×REF_H); die Anzeige wird über
+  // transform:scale an die Breite angepasst. So bleiben alle Elemente relativ zur
+  // Fläche stehen und verschwinden nie unten/rechts, egal wie breit der Bildschirm.
+  useEffect(() => {
+    const el = outerRef.current; if (!el) return;
+    const measure = () => { const w = el.clientWidth || REF_W; const s = w / REF_W; scaleRef.current = s; setScale(s); };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    document.addEventListener("fullscreenchange", measure);
+    return () => { ro.disconnect(); document.removeEventListener("fullscreenchange", measure); };
+  }, []);
+
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const clampX = (x, w) => Math.max(0, Math.min(REF_W - w, x));
+  const clampY = (y, h) => Math.max(0, Math.min(REF_H - h, y));
   const add = () => {
-    const b = boardRef.current?.getBoundingClientRect();
-    const it = { id: uid(), type: "text", x: b ? b.width / 2 - 120 : 60, y: 60, w: 240, h: 90, text: "", fontSize: 28, color: "#111827" };
+    const w = 460, h = 150;
+    const it = { id: uid(), type: "text", x: (REF_W - w) / 2, y: 120, w, h, text: "", fontSize: 48, color: "#111827", _ref: true };
     setItems((p) => [...p, it]); setSel(it.id);
   };
   const addTimer = () => {
-    const b = boardRef.current?.getBoundingClientRect();
-    const it = { id: uid(), type: "timer", x: b ? b.width / 2 - 130 : 80, y: 90, w: 260, h: 150, minutes: 5 };
+    const w = 440, h = 260;
+    const it = { id: uid(), type: "timer", x: (REF_W - w) / 2, y: 160, w, h, minutes: 5, _ref: true };
     setItems((p) => [...p, it]); setSel(it.id);
   };
   const patch = (id, o) => setItems((p) => p.map((i) => (i.id === id ? { ...i, ...o } : i)));
@@ -42,14 +74,19 @@ export default function Tafel() {
   };
   const onMove = (e) => {
     const d = drag.current; if (!d) return;
-    const dx = e.clientX - d.sx, dy = e.clientY - d.sy;
-    if (d.mode === "move") patch(d.id, { x: Math.max(0, d.ox + dx), y: Math.max(0, d.oy + dy) });
-    else patch(d.id, { w: Math.max(80, d.ow + dx), h: Math.max(50, d.oh + dy) });
+    const s = scaleRef.current || 1;
+    const dx = (e.clientX - d.sx) / s, dy = (e.clientY - d.sy) / s; // Bildschirm -> REF
+    if (d.mode === "move") patch(d.id, { x: clampX(d.ox + dx, d.ow), y: clampY(d.oy + dy, d.oh) });
+    else {
+      const w = Math.max(140, Math.min(REF_W - d.ox, d.ow + dx));
+      const h = Math.max(90, Math.min(REF_H - d.oy, d.oh + dy));
+      patch(d.id, { w, h });
+    }
   };
   const onUp = () => { drag.current = null; window.removeEventListener("pointermove", onMove); };
 
   const selItem = items.find((i) => i.id === sel);
-  const bumpFont = (delta) => { if (selItem) patch(selItem.id, { fontSize: Math.max(10, Math.min(160, (selItem.fontSize || 28) + delta)) }); };
+  const bumpFont = (delta) => { if (selItem) patch(selItem.id, { fontSize: Math.max(16, Math.min(280, (selItem.fontSize || 48) + delta)) }); };
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
@@ -58,7 +95,7 @@ export default function Tafel() {
         <span style={{ flex: 1 }} />
         <button onClick={add} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} color="#fff" /> {t("tafel.add")}</button>
         <button onClick={addTimer} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} /> {t("tafel.addTimer")}</button>
-        <button onClick={() => boardRef.current?.requestFullscreen?.()} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("tafel.fullscreen")}><Icon d={ICONS.fit} size={16} /> {t("tafel.fullscreen")}</button>
+        <button onClick={() => outerRef.current?.requestFullscreen?.()} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("tafel.fullscreen")}><Icon d={ICONS.fit} size={16} /> {t("tafel.fullscreen")}</button>
       </div>
 
       {/* Werkzeugleiste: immer sichtbar mit fester Höhe, damit die Tafel beim
@@ -85,35 +122,38 @@ export default function Tafel() {
           <button onClick={() => del(selItem.id)} className="icon-btn" style={{ ...iconBtn }} title={t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button></>}
       </div>
 
-      {/* Tafel-Fläche */}
-      <div ref={boardRef} onPointerDown={() => setSel(null)}
-        style={{ position: "relative", width: "100%", minHeight: "70vh", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", overflow: "hidden" }}>
-        {items.length === 0 && (
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text3)", fontSize: 14, pointerEvents: "none" }}>{t("tafel.empty")}</div>
-        )}
-        {items.map((it) => (
-          <div key={it.id} onPointerDown={(e) => { e.stopPropagation(); setSel(it.id); }}
-            style={{ position: "absolute", left: it.x, top: it.y, width: it.w, height: it.h,
-              border: sel === it.id ? "2px solid var(--accent)" : "1px dashed transparent",
-              borderRadius: 8, boxSizing: "border-box", background: sel === it.id ? "rgba(10,132,255,0.04)" : "transparent" }}>
-            {/* Zieh-Griff oben */}
-            <div onPointerDown={(e) => onDown(e, it.id, "move")}
-              style={{ position: "absolute", top: -2, left: 0, right: 0, height: 16, cursor: "grab", display: sel === it.id ? "flex" : "none", alignItems: "center", justifyContent: "center", color: "var(--text3)" }}>
-              <Icon d={ICONS.move || ICONS.grip} size={13} />
+      {/* Tafel-Fläche: äußerer Rahmen misst die Breite, das innere Board hat feste
+          Referenzgröße und wird per transform:scale eingepasst. */}
+      <div ref={outerRef} onPointerDown={() => setSel(null)}
+        style={{ position: "relative", width: "100%", height: scale * REF_H, border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, width: REF_W, height: REF_H, transform: `scale(${scale})`, transformOrigin: "top left" }}>
+          {items.length === 0 && (
+            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text3)", fontSize: 28, pointerEvents: "none" }}>{t("tafel.empty")}</div>
+          )}
+          {items.map((it) => (
+            <div key={it.id} onPointerDown={(e) => { e.stopPropagation(); setSel(it.id); }}
+              style={{ position: "absolute", left: it.x, top: it.y, width: it.w, height: it.h,
+                border: sel === it.id ? "3px solid var(--accent)" : "2px dashed transparent",
+                borderRadius: 10, boxSizing: "border-box", background: sel === it.id ? "rgba(10,132,255,0.04)" : "transparent" }}>
+              {/* Zieh-Griff oben */}
+              <div onPointerDown={(e) => onDown(e, it.id, "move")}
+                style={{ position: "absolute", top: -4, left: 0, right: 0, height: 30, cursor: "grab", display: sel === it.id ? "flex" : "none", alignItems: "center", justifyContent: "center", color: "var(--text3)" }}>
+                <Icon d={ICONS.move || ICONS.grip} size={22} />
+              </div>
+              {it.type === "timer" ? (
+                <TafelTimer item={it} onPatch={(o) => patch(it.id, o)} t={t} />
+              ) : (
+                <textarea value={it.text} onChange={(e) => patch(it.id, { text: e.target.value })} placeholder={t("tafel.placeholder")}
+                  style={{ width: "100%", height: "100%", boxSizing: "border-box", border: "none", outline: "none", resize: "none", background: "transparent",
+                    color: it.color, fontSize: it.fontSize, fontWeight: 700, lineHeight: 1.15, padding: "18px 16px 12px", overflow: "hidden", fontFamily: "inherit" }} />
+              )}
+              {/* Größen-Griff unten rechts */}
+              <div onPointerDown={(e) => onDown(e, it.id, "resize")}
+                style={{ position: "absolute", right: -2, bottom: -2, width: 28, height: 28, cursor: "nwse-resize", display: sel === it.id ? "block" : "none",
+                  borderRight: "5px solid var(--accent)", borderBottom: "5px solid var(--accent)", borderBottomRightRadius: 8 }} />
             </div>
-            {it.type === "timer" ? (
-              <TafelTimer item={it} onPatch={(o) => patch(it.id, o)} t={t} />
-            ) : (
-              <textarea value={it.text} onChange={(e) => patch(it.id, { text: e.target.value })} placeholder={t("tafel.placeholder")}
-                style={{ width: "100%", height: "100%", boxSizing: "border-box", border: "none", outline: "none", resize: "none", background: "transparent",
-                  color: it.color, fontSize: it.fontSize, fontWeight: 700, lineHeight: 1.15, padding: "12px 10px 8px", overflow: "hidden", fontFamily: "inherit" }} />
-            )}
-            {/* Größen-Griff unten rechts */}
-            <div onPointerDown={(e) => onDown(e, it.id, "resize")}
-              style={{ position: "absolute", right: -1, bottom: -1, width: 16, height: 16, cursor: "nwse-resize", display: sel === it.id ? "block" : "none",
-                borderRight: "3px solid var(--accent)", borderBottom: "3px solid var(--accent)", borderBottomRightRadius: 6 }} />
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
       <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 10 }}>{t("tafel.hint")}</p>
     </div>

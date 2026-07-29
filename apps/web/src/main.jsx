@@ -177,7 +177,9 @@ const getModuleNavItems = (t, location) => {
     : pathname.startsWith(TAFEL) ? "tafel"
     : pathname.startsWith(KLA) ? "klassenarbeit"
     : pathname.startsWith(KA) ? "karten"
-    : params.get("area"); // Hilfe u.ae.: Bereich aus der Query
+    // Bereich aus der Query (Hilfe, Marktplatz). Der Einstiege-Marktplatz nutzt
+    // weiterhin area=methoden — auf die Navbar von „Unterrichtsplanung" mappen.
+    : (params.get("area") === "methoden" ? "unterrichtsplanung" : params.get("area"));
 
   if (area === "cardvote") {
     return [
