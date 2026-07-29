@@ -207,11 +207,10 @@ function TafelTimer({ item, onPatch, t }) {
   }, [running]);
   const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
   const done = remaining === 0;
-  const stop = (e) => e.stopPropagation();
   const bump = (d) => onPatch({ minutes: Math.max(1, Math.min(180, (item.minutes || 5) + d)) });
   const bh = item.h || 150;
   return (
-    <div onPointerDown={stop} className={flash ? "tafel-flash" : ""} style={{ width: "100%", height: "100%", boxSizing: "border-box", borderRadius: 8, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, padding: "22px 12px 16px" }}>
+    <div className={flash ? "tafel-flash" : ""} style={{ width: "100%", height: "100%", boxSizing: "border-box", borderRadius: 8, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, padding: "22px 12px 16px" }}>
       <div style={{ fontSize: Math.max(28, Math.min(bh * 0.42, item.w * 0.32)), fontWeight: 800, lineHeight: 1, fontVariantNumeric: "tabular-nums", color: done ? "#dc2626" : "var(--text)" }}>{fmt(remaining)}</div>
       <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", justifyContent: "center" }}>
         <button onClick={() => bump(-1)} style={{ ...miniBtn }}>−</button>
