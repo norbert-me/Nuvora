@@ -12,7 +12,7 @@ import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api/methoden";
 
-export default function Methoden() {
+export default function Methoden({ embedded } = {}) {
   const { t } = useLanguage();
   const [items, setItems] = useState([]);
   const [folders, setFolders] = useState([]);
@@ -155,7 +155,7 @@ export default function Methoden() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-        <h1 style={pageTitle}>{t("methoden.title")}</h1>
+        {!embedded && <h1 style={pageTitle}>{t("methoden.title")}</h1>}
         <span style={{ flex: 1 }} />
         <ExportButton iconOnly title={t("common.export")} onClick={doExport} />
         <div style={{ position: "relative" }}>

@@ -114,14 +114,13 @@ import NotenModul from "./pages/Noten.jsx";
 import Lernen from "./pages/Lernen.jsx";
 import Karten from "./pages/Karten.jsx";
 import Kalender from "./pages/Kalender.jsx";
-import Methoden from "./pages/Methoden.jsx";
+import Unterrichtsplanung from "./pages/Unterrichtsplanung.jsx";
 import Zufall from "./pages/Zufall.jsx";
 import Orga from "./pages/Orga.jsx";
 import Klassenarbeit, { KlassenarbeitVergleich } from "./pages/Klassenarbeit.jsx";
 import Notizbrett from "./pages/Notizbrett.jsx";
 import Notizen from "./pages/Notizen.jsx";
 import Elternlog from "./pages/Elternlog.jsx";
-import Stoffplan from "./pages/Stoffplan.jsx";
 import Mathefussball from "./pages/Mathefussball.jsx";
 import Tafel from "./pages/Tafel.jsx";
 import { useModules } from "./core/modules.js";
@@ -146,15 +145,14 @@ const NO = "/noten";
 const CD = "/code-detektiv";
 const KA = "/karten";
 const KAL = "/kalender";
-const MET = "/methoden";
+const UPLAN = "/unterrichtsplanung";
 const ZUF = "/zufall";
 const ORG = "/orga";
 const AUS = "/ausleihe";
 const KLA = "/klassenarbeit";
 const NOTIZBRETT = "/notizbrett";
 const NOTIZEN = "/notizen";
-const ELTERN = "/elternlog";
-const STOFF = "/stoffplan";
+const KLASSENLEITUNG = "/klassenleitung";
 const MATHEF = "/mathefussball";
 const TAFEL = "/tafel";
 
@@ -169,13 +167,12 @@ const getModuleNavItems = (t, location) => {
     : pathname.startsWith(NO) ? "noten"
     : pathname.startsWith(CD) ? "code-detektiv"
     : pathname.startsWith(KAL) ? "kalender"
-    : pathname.startsWith(MET) ? "methoden"
+    : pathname.startsWith(UPLAN) ? "unterrichtsplanung"
     : pathname.startsWith(ZUF) ? "zufall"
     : pathname.startsWith(ORG) ? "orga"
     : pathname.startsWith(NOTIZBRETT) ? "notizbrett"
     : pathname.startsWith(NOTIZEN) ? "notizen"
-    : pathname.startsWith(ELTERN) ? "elternlog"
-    : pathname.startsWith(STOFF) ? "stoffplan"
+    : pathname.startsWith(KLASSENLEITUNG) ? "klassenleitung"
     : pathname.startsWith(MATHEF) ? "mathefussball"
     : pathname.startsWith(TAFEL) ? "tafel"
     : pathname.startsWith(KLA) ? "klassenarbeit"
@@ -212,9 +209,9 @@ const getModuleNavItems = (t, location) => {
       { to: `${KAL}?view=klassenarbeit`, label: t("kalender.examsTab"), active: cur === "klassenarbeit" },
     ];
   }
-  if (area === "methoden") {
+  if (area === "unterrichtsplanung") {
     return [
-      { to: MET, label: t("methoden.title") },
+      { to: UPLAN, label: t("unterrichtsplanung.title") },
       { to: "/marktplatz?area=methoden&kind=method", label: t("nav.marketplace") },
     ];
   }
@@ -229,8 +226,7 @@ const getModuleNavItems = (t, location) => {
     return [{ to: NOTIZBRETT, label: t("notizbrett.title") }];
   }
   if (area === "notizen") return [{ to: NOTIZEN, label: t("notizen.title") }];
-  if (area === "elternlog") return [{ to: ELTERN, label: t("elternlog.title") }];
-  if (area === "stoffplan") return [{ to: STOFF, label: t("stoffplan.title") }];
+  if (area === "klassenleitung") return [{ to: KLASSENLEITUNG, label: t("klassenleitung.title") }];
   if (area === "mathefussball") return [{ to: MATHEF, label: t("mathefussball.title") }];
   if (area === "tafel") return [{ to: TAFEL, label: t("tafel.title") }];
   if (area === "klassenarbeit") {
@@ -792,12 +788,11 @@ function AppRoutes({ user, setUser, logout }) {
           {/* ─── Modul Karten ─── */}
           <Route path={KA} element={user ? <ModuleGate moduleKey="karten"><Karten /></ModuleGate> : <Landing />} />
           <Route path={KAL} element={user ? <ModuleGate moduleKey="kalender"><Kalender /></ModuleGate> : <Landing />} />
-          <Route path={MET} element={user ? <ModuleGate moduleKey="methoden"><Methoden /></ModuleGate> : <Landing />} />
+          <Route path={UPLAN} element={user ? <ModuleGate moduleKey="unterrichtsplanung"><Unterrichtsplanung /></ModuleGate> : <Landing />} />
           <Route path={ZUF} element={user ? <ModuleGate moduleKey="zufall"><Zufall /></ModuleGate> : <Landing />} />
           <Route path={NOTIZBRETT} element={user ? <ModuleGate moduleKey="notizbrett"><Notizbrett /></ModuleGate> : <Landing />} />
           <Route path={NOTIZEN} element={user ? <ModuleGate moduleKey="notizen"><Notizen /></ModuleGate> : <Landing />} />
-          <Route path={ELTERN} element={user ? <ModuleGate moduleKey="elternlog"><Elternlog /></ModuleGate> : <Landing />} />
-          <Route path={STOFF} element={user ? <ModuleGate moduleKey="stoffplan"><Stoffplan /></ModuleGate> : <Landing />} />
+          <Route path={KLASSENLEITUNG} element={user ? <ModuleGate moduleKey="klassenleitung"><Elternlog /></ModuleGate> : <Landing />} />
           <Route path={MATHEF} element={user ? <ModuleGate moduleKey="mathefussball"><Mathefussball /></ModuleGate> : <Landing />} />
           <Route path={TAFEL} element={user ? <ModuleGate moduleKey="tafel"><Tafel /></ModuleGate> : <Landing />} />
           <Route path={KLA} element={user ? <ModuleGate moduleKey="klassenarbeit"><Klassenarbeit /></ModuleGate> : <Landing />} />

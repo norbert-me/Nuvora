@@ -160,16 +160,17 @@ REGISTRY: List[ModuleDef] = [
         stage="stable",
     ),
     ModuleDef(
-        key="methoden",
+        key="unterrichtsplanung",
         group="unterricht",
-        name="Einstiege",
+        name="Unterrichtsplanung",
         description=(
-            "Sammlung von Ideen für den Unterrichtseinstieg — Idee, Ablauf, "
-            "Material und ungefähre Dauer. Wiederverwendbar, an Kalender-Stunden "
-            "zuweisbar und themen-getaggt: zu einem schwachen Thema vorschlagbar."
+            "Vorbereitung an einem Ort — zwei Reiter: Stoffverteilung (Themen übers "
+            "Schuljahr in eine Reihenfolge bringen und abhaken) und Einstiege "
+            "(Ideen für den Unterrichtseinstieg: Idee, Ablauf, Material, Dauer; "
+            "an Kalender-Stunden zuweisbar und themen-getaggt)."
         ),
-        path="/methoden",
-        stage="stable",
+        path="/unterrichtsplanung",
+        stage="beta",
     ),
     ModuleDef(
         key="notizbrett",
@@ -197,26 +198,15 @@ REGISTRY: List[ModuleDef] = [
         stage="beta",
     ),
     ModuleDef(
-        key="elternlog",
+        key="klassenleitung",
         group="organisation",
-        name="Elternkontakte",
+        name="Klassenleitung",
         description=(
-            "Dokumentation von Elternkontakten je Schüler: Datum, Kanal (Telefon/"
-            "Mail/Gespräch) und Notiz. Erfüllt die Dokumentationspflicht ohne Zettel."
+            "Aufgaben der Klassenleitung — derzeit die Elternkontakte je Schüler: "
+            "Datum, Kanal (Telefon/Mail/Gespräch) und Notiz. Erfüllt die "
+            "Dokumentationspflicht ohne Zettel."
         ),
-        path="/elternlog",
-        stage="beta",
-    ),
-    ModuleDef(
-        key="stoffplan",
-        group="organisation",
-        name="Stoffverteilung",
-        description=(
-            "Langfristplanung: Themen übers Schuljahr in eine Reihenfolge bringen "
-            "(grobe Kalenderwoche, Stundenumfang, Notiz) und abhaken. Ergänzt den "
-            "datumsgenauen Kalender um die Jahressicht."
-        ),
-        path="/stoffplan",
+        path="/klassenleitung",
         stage="beta",
     ),
     ModuleDef(

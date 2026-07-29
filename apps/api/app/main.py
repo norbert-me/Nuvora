@@ -414,6 +414,22 @@ async def startup():
             ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
         """))
         await db.execute(text("DELETE FROM user_modules WHERE module_key IN ('todo', 'notizblock')"))
+        # Elternkontakte sind ins Modul „Klassenleitung" umgezogen (gleiche Daten,
+        # parent_contacts). Idempotent.
+        await db.execute(text("""
+            INSERT INTO user_modules (user_id, module_key)
+            SELECT DISTINCT user_id, 'klassenleitung' FROM user_modules WHERE module_key = 'elternlog'
+            ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
+        """))
+        await db.execute(text("DELETE FROM user_modules WHERE module_key = 'elternlog'"))
+        # Stoffverteilung + Einstiege sind ins Modul „Unterrichtsplanung" (2 Reiter)
+        # aufgegangen. Daten (curriculum_items, methods) bleiben. Idempotent.
+        await db.execute(text("""
+            INSERT INTO user_modules (user_id, module_key)
+            SELECT DISTINCT user_id, 'unterrichtsplanung' FROM user_modules WHERE module_key IN ('stoffplan', 'methoden')
+            ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
+        """))
+        await db.execute(text("DELETE FROM user_modules WHERE module_key IN ('stoffplan', 'methoden')"))
         await db.commit()
 
     # Anwesenheit ist jetzt pro Stunde (student, date, period) statt pro Tag.

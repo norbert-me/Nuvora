@@ -17,7 +17,7 @@ from .auth import get_current_user
 from .modules import is_active
 
 router = APIRouter(prefix="/api/stoffplan", tags=["stoffplan"])
-MODULE_KEY = "stoffplan"
+MODULE_KEY = "unterrichtsplanung"
 
 
 async def require_module(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> User:

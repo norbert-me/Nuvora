@@ -17,7 +17,7 @@ from .auth import get_current_user, rate_limit
 from .modules import is_active
 
 router = APIRouter(prefix="/api/methoden", tags=["methoden"])
-MODULE_KEY = "methoden"
+MODULE_KEY = "unterrichtsplanung"
 
 
 async def _check_topic(db: AsyncSession, user_id: int, topic_id: Optional[int]) -> Optional[int]:

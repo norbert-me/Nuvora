@@ -1506,12 +1506,12 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
       const m = ladders.find((l) => Number(l.topic_id) === tid);
       if (m && (!ladderId || Number(ladderId) === autoLadder.current)) { setLadderId(m.id); autoLadder.current = m.id; }
     }
-    if (aktiv.methoden) {
+    if (aktiv.unterrichtsplanung) {
       const m = methods.find((x) => Number(x.topic_id) === tid);
       if (m && (!methodId || Number(methodId) === autoMethod.current)) { setMethodId(m.id); autoMethod.current = m.id; }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topicId, decks, ladders, methods, aktiv.karten, aktiv.lernpfad, aktiv.methoden]);
+  }, [topicId, decks, ladders, methods, aktiv.karten, aktiv.lernpfad, aktiv.unterrichtsplanung]);
   // Dauer des verknüpften Einstiegs einmalig in den Verlaufsplan übernehmen.
   // Nur, wenn noch keine Einstieg-Phase existiert (überschreibt nichts Eigenes).
   const autoEinstieg = useRef(null);
@@ -1548,7 +1548,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
     deckId && (() => { const d = decks.find((x) => x.id === Number(deckId)); return d && { to: `/karten?class=${d.class_id}${d.kurs_id ? `&kurs=${d.kurs_id}` : ""}&deck=${deckId}`, label: d.name, kind: t("kalender.planKarten"), hideName: true }; })(),
     ladderId && (() => { const l = ladders.find((x) => x.id === Number(ladderId)); return l && { to: `/lernpfad?ll=${ladderId}`, label: (topicName(l.topic_id) || l.path || t("kalender.planLernleiter")), kind: t("kalender.planLernleiter"), hideName: true }; })(),
     puzzleId && (() => { const p = puzzles.find((x) => x.client_id === puzzleId); return { to: `/code-detektiv/puzzle/${puzzleId}?mode=solo`, label: (p && p.title) || puzzleId, kind: t("kalender.planDetektiv") }; })(),
-    methodId && methName && { to: `/methoden?open=${methodId}`, label: methName, kind: t("kalender.method"), hideName: true },
+    methodId && methName && { to: `/unterrichtsplanung?tab=einstiege&open=${methodId}`, label: methName, kind: t("kalender.method"), hideName: true },
   ].filter(Boolean);
   const zeile = (k, v) => v ? <div style={{ display: "flex", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--border)", fontSize: 13.5 }}><span style={{ color: "var(--text3)", minWidth: 92 }}>{k}</span><span style={{ fontWeight: 500 }}>{v}</span></div> : null;
   return (
@@ -1658,7 +1658,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
           <option value="">– {t("kalender.noTopic")} –</option>
           {[...topics].sort(byLabel(topicLabel)).map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
         </select>
-        {aktiv.methoden && (
+        {aktiv.unterrichtsplanung && (
           <>
             <div style={lbl}>{t("kalender.method")}</div>
             <select value={methodId} onChange={(e) => setMethodId(e.target.value)} style={sfld}>

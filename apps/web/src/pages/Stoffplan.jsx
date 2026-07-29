@@ -9,7 +9,7 @@ import { swr, lastClass, rememberClass } from "../core/cache.js";
 
 const API = "/api/stoffplan";
 
-export default function Stoffplan() {
+export default function Stoffplan({ embedded } = {}) {
   const { t } = useLanguage();
   const [classId, setClassId] = useState(() => lastClass() || null);
   const [kursId, setKursId] = useState(null);
@@ -58,8 +58,8 @@ export default function Stoffplan() {
 
   const view = preview || items;
   return (
-    <div style={{ maxWidth: 780, margin: "0 auto" }}>
-      <h1 style={pageTitle}>{t("stoffplan.title")}</h1>
+    <div style={{ maxWidth: embedded ? "none" : 780, margin: embedded ? 0 : "0 auto" }}>
+      {!embedded && <h1 style={pageTitle}>{t("stoffplan.title")}</h1>}
       <p style={{ fontSize: 12.5, color: "var(--text3)", marginTop: -8, marginBottom: 16 }}>{t("stoffplan.intro")}</p>
 
       <div style={{ marginBottom: 14 }}>

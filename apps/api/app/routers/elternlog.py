@@ -18,7 +18,7 @@ from .auth import get_current_user
 from .modules import is_active
 
 router = APIRouter(prefix="/api/elternlog", tags=["elternlog"])
-MODULE_KEY = "elternlog"
+MODULE_KEY = "klassenleitung"
 _CHANNELS = {"telefon", "mail", "gespraech", "brief", "sonstiges"}
 
 
