@@ -223,7 +223,11 @@ const getModuleNavItems = (t, location) => {
     ];
   }
   if (area === "notizbrett") {
-    return [{ to: NOTIZBRETT, label: t("notizbrett.title") }];
+    const cur = params.get("tab");
+    return [
+      { to: `${NOTIZBRETT}?tab=notizen`, label: t("notizbrett.tabNotes"), active: cur !== "aufgaben" },
+      { to: `${NOTIZBRETT}?tab=aufgaben`, label: t("notizbrett.tabTodos"), active: cur === "aufgaben" },
+    ];
   }
   if (area === "notizen") return [{ to: NOTIZEN, label: t("notizen.title") }];
   if (area === "klassenleitung") return [{ to: KLASSENLEITUNG, label: t("klassenleitung.title") }];
