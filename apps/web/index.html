@@ -53,6 +53,12 @@
         line-height: 1.5;
       }
       input, select, button, textarea { font-family: inherit; }
+      /* iOS zoomt beim Fokus in Felder mit Schrift < 16px hinein. Auf schmalen
+         Bildschirmen darum überall mind. 16px erzwingen — verhindert das
+         störende Rein-/Rauszoomen (z.B. beim Schreiben von Notizen). */
+      @media (max-width: 640px) {
+        input:not(.keep-fontsize), select, textarea:not(.keep-fontsize) { font-size: 16px !important; }
+      }
       input, select, textarea { background: var(--input-bg); color: var(--text); border-color: var(--border2); }
       input:focus, select:focus, textarea:focus {
         outline: none; border-color: var(--accent) !important;

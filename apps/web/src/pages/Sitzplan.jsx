@@ -339,8 +339,8 @@ export default function Sitzplan() {
         ]} />
         <button onClick={() => setShowHint((v) => !v)} className="icon-btn" title={t("sitzplan.hintFree")}
           style={{ ...iconBtn, border: showHint ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 999, width: 30, height: 30, fontWeight: 700, color: showHint ? "var(--accent)" : "var(--text3)" }}>i</button>
-        <ExportButton label={t("sitzplan.export")} onClick={doExport} style={{ padding: "6px 12px", fontSize: 13, marginLeft: anwesenheitAktiv ? 0 : "auto" }} />
-        <ImportButton label={t("sitzplan.import")} onFile={doImport} style={{ padding: "6px 12px", fontSize: 13 }} />
+        <ExportButton iconOnly title={t("sitzplan.export")} onClick={doExport} style={{ marginLeft: anwesenheitAktiv ? 0 : "auto" }} />
+        <ImportButton iconOnly title={t("sitzplan.import")} onFile={doImport} />
         <button onClick={addEmpty} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("sitzplan.addEmpty")}><Icon d={ICONS.plus} size={15} /> {t("sitzplan.emptySeat")}</button>
         <button onClick={undo} disabled={undoLen === 0} className="icon-btn" style={{ ...iconBtn, opacity: undoLen === 0 ? 0.4 : 1 }} title={t("sitzplan.undo")}><Icon d={ICONS.undo || ICONS.restore} size={18} /></button>
         <button onClick={redo} disabled={redoLen === 0} className="icon-btn" style={{ ...iconBtn, opacity: redoLen === 0 ? 0.4 : 1 }} title={t("sitzplan.redo")}><span style={{ display: "inline-flex", transform: "scaleX(-1)" }}><Icon d={ICONS.undo || ICONS.restore} size={18} /></span></button>
@@ -431,7 +431,7 @@ export default function Sitzplan() {
                         style={{ position: "absolute", right: -9, top: -9, width: 18, height: 18, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center",
                           background: "var(--card)", border: "1px solid var(--border2)", color: "var(--text2)", fontSize: 12, lineHeight: 1, cursor: "grab", touchAction: "none", boxShadow: "0 1px 2px rgba(0,0,0,0.15)" }}>↻</span>
                       <button onPointerDown={(e) => e.stopPropagation()} onClick={() => entfernen(seat.sid)} title={t("sitzplan.removeSeat")}
-                        style={{ position: "absolute", right: 2, top: 2, width: 16, height: 16, border: "none", background: "transparent", cursor: "pointer", color: C.danger, fontSize: 12, padding: 0, lineHeight: 1 }}>×</button>
+                        style={{ position: "absolute", right: -9, bottom: -9, width: 20, height: 20, borderRadius: 10, border: "1px solid var(--border2)", background: "var(--card)", cursor: "pointer", color: C.danger, fontSize: 13, fontWeight: 700, padding: 0, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
                     </>
                   )}
                 </div>

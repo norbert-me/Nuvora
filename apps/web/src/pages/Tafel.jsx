@@ -87,10 +87,17 @@ export default function Tafel() {
 
   const selItem = items.find((i) => i.id === sel);
   const [fontPop, setFontPop] = useState(false);
+  const [fs, setFs] = useState(false); // Pseudo-Vollbild (iOS kennt kein requestFullscreen für divs)
   const setFont = (v) => { if (selItem) patch(selItem.id, { fontSize: Math.max(16, Math.min(280, Math.round(v))) }); };
   const bumpFont = (delta) => { if (selItem) setFont((selItem.fontSize || 48) + delta); };
-  // Popup schließen, wenn nichts (Text) mehr gewählt ist.
-  useEffect(() => { if (!selItem || selItem.type === "timer") setFontPop(false); }, [selItem]);
+  // Wählt ein Element und holt es nach vorn — so lässt sich bei Überlappung das
+  // obere greifen und wegziehen, um das untere freizulegen.
+  const select = (id) => {
+    setSel(id);
+    setItems((p) => { const i = p.findIndex((x) => x.id === id); if (i < 0 || i === p.length - 1) return p; const n = [...p]; const [it] = n.splice(i, 1); n.push(it); return n; });
+  };
+  // Beim Auswählen die Farb-/Größen-Optik eingeklappt lassen (erst Stift zeigen).
+  useEffect(() => { setFontPop(false); }, [sel]);
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
@@ -99,39 +106,40 @@ export default function Tafel() {
         <span style={{ flex: 1 }} />
         <button onClick={add} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} color="#fff" /> {t("tafel.add")}</button>
         <button onClick={addTimer} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} /> {t("tafel.addTimer")}</button>
-        <button onClick={() => outerRef.current?.requestFullscreen?.()} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("tafel.fullscreen")}><Icon d={ICONS.fit} size={16} /> {t("tafel.fullscreen")}</button>
+        <button onClick={() => setFs((v) => !v)} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("tafel.fullscreen")}><Icon d={fs ? ICONS.close : ICONS.fit} size={16} /> {fs ? t("common.close") : t("tafel.fullscreen")}</button>
       </div>
 
       {/* Tafel-Fläche: äußerer Rahmen misst die Breite, das innere Board hat feste
           Referenzgröße und wird per transform:scale eingepasst. Die Steuerleiste
           schwebt am gewählten Element (kein fester Balken oben). */}
       <div ref={outerRef} onPointerDown={() => setSel(null)}
-        style={{ position: "relative", width: "100%", height: scale * REF_H, border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", overflow: "hidden" }}>
+        style={{ position: "relative", width: "100%", height: scale * REF_H, border: "1px solid var(--border)", borderRadius: fs ? 0 : 12, background: "var(--card)", overflow: "hidden",
+          ...(fs ? { position: "fixed", inset: 0, width: "100vw", height: "100vh", zIndex: 9999 } : {}) }}>
+        {fs && (
+          <button onClick={() => setFs(false)} style={{ position: "absolute", top: 10, right: 10, zIndex: 20, ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <Icon d={ICONS.close} size={16} /> {t("common.close")}
+          </button>
+        )}
         <div style={{ position: "absolute", top: 0, left: 0, width: REF_W, height: REF_H, transform: `scale(${scale})`, transformOrigin: "top left" }}>
           {items.length === 0 && (
             <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text3)", fontSize: 28, pointerEvents: "none" }}>{t("tafel.empty")}</div>
           )}
           {items.map((it) => (
-            <div key={it.id} onPointerDown={(e) => { e.stopPropagation(); setSel(it.id); }}
+            <div key={it.id} onPointerDown={(e) => { e.stopPropagation(); select(it.id); }}
               style={{ position: "absolute", left: it.x, top: it.y, width: it.w, height: it.h,
                 border: sel === it.id ? "3px solid var(--accent)" : "2px dashed transparent",
                 borderRadius: 10, boxSizing: "border-box", background: sel === it.id ? "rgba(10,132,255,0.04)" : "transparent" }}>
-              {/* Zieh-Griff oben */}
-              <div onPointerDown={(e) => onDown(e, it.id, "move")}
-                style={{ position: "absolute", top: -4, left: 0, right: 0, height: 30, cursor: "grab", display: sel === it.id ? "flex" : "none", alignItems: "center", justifyContent: "center", color: "var(--text3)" }}>
-                <Icon d={ICONS.moveAll} size={28} />
-              </div>
               {it.type === "timer" ? (
                 <TafelTimer item={it} onPatch={(o) => patch(it.id, o)} t={t} />
               ) : (
-                <textarea value={it.text} onChange={(e) => patch(it.id, { text: e.target.value })} placeholder={t("tafel.placeholder")}
+                <textarea value={it.text} onChange={(e) => patch(it.id, { text: e.target.value })} placeholder={t("tafel.placeholder")} className="keep-fontsize"
                   style={{ width: "100%", height: "100%", boxSizing: "border-box", border: "none", outline: "none", resize: "none", background: "transparent",
                     color: it.color, fontSize: it.fontSize, fontWeight: 700, lineHeight: 1.15, padding: "18px 16px 12px", overflow: "hidden", fontFamily: "inherit" }} />
               )}
-              {/* Größen-Griff unten rechts */}
+              {/* Größen-Griff unten rechts (groß genug fürs Handy) */}
               <div onPointerDown={(e) => onDown(e, it.id, "resize")}
-                style={{ position: "absolute", right: -2, bottom: -2, width: 28, height: 28, cursor: "nwse-resize", display: sel === it.id ? "block" : "none",
-                  borderRight: "5px solid var(--accent)", borderBottom: "5px solid var(--accent)", borderBottomRightRadius: 8 }} />
+                style={{ position: "absolute", right: -3, bottom: -3, width: 44, height: 44, cursor: "nwse-resize", display: sel === it.id ? "block" : "none",
+                  borderRight: "7px solid var(--accent)", borderBottom: "7px solid var(--accent)", borderBottomRightRadius: 10 }} />
             </div>
           ))}
         </div>
@@ -144,20 +152,22 @@ export default function Tafel() {
           return (
             <div onPointerDown={(e) => e.stopPropagation()}
               style={{ position: "absolute", left: Math.max(4, ex), top, zIndex: 10, display: "flex", alignItems: "center", gap: 6, padding: "6px 8px", border: "1px solid var(--border2)", borderRadius: 10, background: "var(--card)", boxShadow: "0 6px 20px rgba(0,0,0,0.16)", flexWrap: "wrap", maxWidth: "94%" }}>
+              {/* Verschieben-Griff (in Bildschirmpixeln — auf dem Handy gut greifbar) */}
+              <button onPointerDown={(e) => onDown(e, selItem.id, "move")} className="icon-btn" style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8, cursor: "grab", touchAction: "none" }} title={t("tafel.move") || ""}>
+                <Icon d={ICONS.moveAll} size={18} color="var(--text2)" />
+              </button>
               {selItem.type !== "timer" && (<>
-                {COLORS.map((c) => (
-                  <button key={c} onClick={() => patch(selItem.id, { color: c })} title={t("tafel.color")}
-                    style={{ width: 22, height: 22, borderRadius: 6, background: c, border: selItem.color === c ? "2px solid var(--accent)" : "1px solid var(--border2)", cursor: "pointer" }} />
-                ))}
-                <span style={{ width: 1, height: 20, background: "var(--border)", margin: "0 4px" }} />
                 <button onClick={() => setFontPop((v) => !v)} className="icon-btn" style={{ ...iconBtn, border: fontPop ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 8 }} title={t("tafel.textSize")}>
                   <Icon d={ICONS.edit} size={16} color={fontPop ? "var(--accent)" : "var(--text2)"} />
                 </button>
                 {fontPop && (<>
+                  {COLORS.map((c) => (
+                    <button key={c} onClick={() => patch(selItem.id, { color: c })} title={t("tafel.color")}
+                      style={{ width: 22, height: 22, borderRadius: 6, background: c, border: selItem.color === c ? "2px solid var(--accent)" : "1px solid var(--border2)", cursor: "pointer" }} />
+                  ))}
                   <button onClick={() => bumpFont(-2)} style={{ ...btnSecondary, padding: "4px 12px", fontWeight: 700 }}>A−</button>
                   <span style={{ fontSize: 13, minWidth: 40, textAlign: "center", fontWeight: 600 }}>{selItem.fontSize}</span>
                   <button onClick={() => bumpFont(2)} style={{ ...btnSecondary, padding: "4px 12px", fontWeight: 700 }}>A+</button>
-                  <input type="range" min="16" max="280" step="1" value={selItem.fontSize} onChange={(e) => setFont(Number(e.target.value))} style={{ width: 130 }} />
                 </>)}
               </>)}
               {selItem.type === "timer" && (

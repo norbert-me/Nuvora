@@ -3,7 +3,7 @@
 // und wird nicht gespeichert. Übersicht zeigt Fehlzeiten und lässt nachtragen.
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { pageTitle, btnSecondary, selectStyle, Toggle, Tabs, inputStyle, COLORS as C } from "../components/Icons.jsx";
+import { pageTitle, btnSecondary, selectStyle, Toggle, Tabs, inputStyle, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
@@ -20,6 +20,7 @@ export default function Anwesenheit() {
   const kalenderAktiv = modules.find((m) => m.key === "kalender")?.active ?? false;
   const [params] = useSearchParams();
   const [classes, setClasses] = useState([]);
+  const [showLegend, setShowLegend] = useState(false); // Legende (Anwesend/Fehlt…) einklappbar
   // Vorauswahl per ?class= / ?date= (z. B. aus dem Kalender).
   const [classId, setClassId] = useState(() => Number(params.get("class")) || null);
   const [datum, setDatum] = useState(params.get("date") || ymd(new Date()));
@@ -122,7 +123,7 @@ export default function Anwesenheit() {
     loadSumme();
   };
 
-  const legende = (
+  const legende = showLegend && (
     <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>
       {STATI.map((st) => (
         <span key={st} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
@@ -148,7 +149,11 @@ export default function Anwesenheit() {
         ) : (
           <KursKlasseSelect value={classId} onChange={setClassId} />
         )}
-        <Tabs value={view} onChange={setView} style={{ marginLeft: "auto" }}
+        <button onClick={() => setShowLegend((v) => !v)} className="icon-btn" title={t("anwesenheit.legend")}
+          style={{ ...iconBtn, marginLeft: "auto", border: showLegend ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 8 }}>
+          <Icon d={ICONS.info} size={16} color={showLegend ? "var(--accent)" : "var(--text2)"} />
+        </button>
+        <Tabs value={view} onChange={setView}
           options={[["tag", t("anwesenheit.day")], ["uebersicht", t("anwesenheit.overview")]]} />
       </div>
 

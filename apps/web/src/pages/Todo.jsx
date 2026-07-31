@@ -18,6 +18,8 @@ export default function Todo({ embedded } = {}) {
   const [eDate, setEDate] = useState("");
   const [eTime, setETime] = useState("");
 
+  const heuteYmd = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const naechsteStunde = () => { const d = new Date(); d.setMinutes(0, 0, 0); d.setHours(d.getHours() + 1); return `${String(d.getHours()).padStart(2, "0")}:00`; };
   const load = () => fetch(API).then((r) => (r.ok ? r.json() : [])).then((d) => setItems(Array.isArray(d) ? d : [])).catch(() => {});
   useEffect(() => { load(); }, []);
 
@@ -103,8 +105,25 @@ export default function Todo({ embedded } = {}) {
 
       <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginBottom: 18 }}>
         <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder={t("todo.placeholder")} style={{ ...inputStyle, flex: 1, minWidth: 160 }} />
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} title={t("todo.dateHint")} style={{ ...inputStyle, padding: "9px 8px" }} />
-        {date && <input type="time" value={time} onChange={(e) => setTime(e.target.value)} title={t("todo.timeHint")} style={{ ...inputStyle, padding: "9px 8px" }} />}
+        {/* Datum/Uhrzeit erst per Icon dazuschalten (Default heute bzw. nächste
+            volle Stunde) — kein leeres Feld, das nach nichts aussieht. */}
+        {!date ? (
+          <button onClick={() => setDate(heuteYmd())} className="icon-btn" title={t("todo.addDate")} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8 }}>
+            <Icon d={ICONS.calendar} size={18} color="var(--text2)" />
+          </button>
+        ) : (<>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} title={t("todo.dateHint")} style={{ ...inputStyle, padding: "9px 8px" }} />
+          {!time ? (
+            <button onClick={() => setTime(naechsteStunde())} className="icon-btn" title={t("todo.addTime")} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8 }}>
+              <Icon d={ICONS.clock} size={18} color="var(--text2)" />
+            </button>
+          ) : (
+            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} title={t("todo.timeHint")} style={{ ...inputStyle, padding: "9px 8px" }} />
+          )}
+          <button onClick={() => { setDate(""); setTime(""); }} className="icon-btn" title={t("common.remove") || t("common.delete")} style={{ ...iconBtn }}>
+            <Icon d={ICONS.close} size={15} color="var(--text3)" />
+          </button>
+        </>)}
         <button onClick={add} disabled={!text.trim()} style={{ ...btnPrimary, opacity: text.trim() ? 1 : 0.5 }}>{t("common.add")}</button>
       </div>
       <p style={{ fontSize: 12.5, color: "var(--text3)", marginTop: -10, marginBottom: 16 }}>{t("todo.calHint")}</p>

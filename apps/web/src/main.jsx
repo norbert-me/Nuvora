@@ -680,15 +680,6 @@ function Home() {
         </div>
       </div>
 
-      <div style={{ textAlign: "center" }}>
-        <div style={{ display: "inline-block", padding: "18px 28px", background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)", maxWidth: 480 }}>
-          <p style={{ fontSize: 14, color: "var(--text2)", margin: 0, lineHeight: 1.6 }}>
-            {contribBefore}
-            <Link to="/contact" style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>{t("footer.contact")}</Link>
-            {contribAfter}
-          </p>
-        </div>
-      </div>
     </div>
   );
 }

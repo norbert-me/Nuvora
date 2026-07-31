@@ -75,6 +75,7 @@ export const ICONS = {
   // Teilen: drei verbundene Knoten. EINHEITLICH fuer „Teilen/Veroeffentlichen".
   share: ["M14.5 3a2 2 0 100 4 2 2 0 100-4z", "M5.5 8a2 2 0 100 4 2 2 0 100-4z", "M14.5 13a2 2 0 100 4 2 2 0 100-4z", "M7.3 9.1l5.9 3.3M13.2 6.6L7.3 9.9"],
   calendar: ["M4 5h12v11H4z", "M4 8h12M7 3v4M13 3v4"],
+  clock: ["M10 4a6 6 0 100 12 6 6 0 000-12z", "M10 7v3.2l2.2 1.3"],
   // Auge (Ansicht/Präsentation), Kreis (anwesend) + durchgestrichener Kreis (abwesend).
   eye: ["M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z", "M10 7.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"],
   circle: ["M10 3.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13z"],
