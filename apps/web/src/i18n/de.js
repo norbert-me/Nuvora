@@ -936,7 +936,7 @@ export default {
   "kalender.examAllDay": "Ganztägig",
   "kalender.examPeriodHint": "Optional an eine Stunde des Tages binden.",
   "kalender.examsEmpty": "Noch keine kommenden Klassenarbeiten.",
-  "kalender.examStunden": "Stunden bis dahin",
+  "kalender.examStunden": "Std. bis dahin",
   "kalender.openExamWork": "Auswertung öffnen",
   "kalender.notes": "Notizen",
   "kalender.mon": "Mo", "kalender.tue": "Di", "kalender.wed": "Mi", "kalender.thu": "Do", "kalender.fri": "Fr", "kalender.sat": "Sa", "kalender.sun": "So",

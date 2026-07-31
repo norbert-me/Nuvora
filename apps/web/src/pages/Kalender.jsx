@@ -1157,7 +1157,7 @@ function TimetableView({ tt, className, slotName, slotColor, classColor, topicNa
       <div>
         <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
           <thead><tr>
-            <th style={{ width: 96, padding: 6, fontSize: 12, color: "var(--text3)" }}></th>
+            <th style={{ width: showTimes ? 96 : 26, padding: 6, fontSize: 12, color: "var(--text3)" }}></th>
             {wdays.map((w) => <th key={w} style={{ padding: 6, fontSize: 12, color: "var(--text3)" }}>{w}</th>)}
           </tr></thead>
           <tbody>
@@ -1167,7 +1167,7 @@ function TimetableView({ tt, className, slotName, slotColor, classColor, topicNa
               return (
                 <Fragment key={p}>
                   <tr>
-                    <td style={{ ...tdBase, textAlign: "center", padding: 4, background: "transparent", border: "none", width: 96 }}>
+                    <td style={{ ...tdBase, textAlign: "center", padding: showTimes ? 4 : "4px 2px", background: "transparent", border: "none", width: showTimes ? 96 : 26 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>{p}.</div>
                       {showTimes && (<>
                         <input type="time" defaultValue={timeVal(p - 1, "start")} onBlur={(e) => commitTime(p - 1, "start", e.target.value)} style={timeInput} title={t("kalender.start")} />

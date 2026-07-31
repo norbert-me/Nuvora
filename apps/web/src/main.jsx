@@ -512,7 +512,7 @@ function Nav({ user, onLogout }) {
         height: 52,
         gap: 4,
       }}>
-        <NavLink to="/" data-tour="home" style={{ textDecoration: "none", flexShrink: 0 }}>
+        <NavLink to="/" data-tour="home" onClick={() => setMenuOpen(false)} style={{ textDecoration: "none", flexShrink: 0 }}>
           <div style={{
             fontWeight: 700,
             fontSize: 20,

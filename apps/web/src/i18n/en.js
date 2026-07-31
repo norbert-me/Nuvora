@@ -906,7 +906,7 @@ export default {
   "kalender.examAllDay": "All day",
   "kalender.examPeriodHint": "Optionally bind to a lesson of the day.",
   "kalender.examsEmpty": "No upcoming class tests yet.",
-  "kalender.examStunden": "lessons until then",
+  "kalender.examStunden": "lessons left",
   "kalender.openExamWork": "Open analysis",
   "kalender.notes": "Notes",
   "kalender.mon": "Mon", "kalender.tue": "Tue", "kalender.wed": "Wed", "kalender.thu": "Thu", "kalender.fri": "Fri", "kalender.sat": "Sat", "kalender.sun": "Sun",

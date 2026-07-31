@@ -906,7 +906,7 @@ export default {
   "kalender.examAllDay": "Todo el día",
   "kalender.examPeriodHint": "Opcional: vincular a una hora del día.",
   "kalender.examsEmpty": "Aún no hay exámenes próximos.",
-  "kalender.examStunden": "horas hasta entonces",
+  "kalender.examStunden": "horas restantes",
   "kalender.openExamWork": "Abrir análisis",
   "kalender.notes": "Notas",
   "kalender.mon": "Lun", "kalender.tue": "Mar", "kalender.wed": "Mié", "kalender.thu": "Jue", "kalender.fri": "Vie", "kalender.sat": "Sáb", "kalender.sun": "Dom",
