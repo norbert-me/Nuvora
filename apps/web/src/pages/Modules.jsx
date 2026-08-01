@@ -111,7 +111,7 @@ export default function Modules() {
         const mods = open ? all : all.slice(0, 2);
         return (
         <div key={g} style={{ marginBottom: 26 }}>
-          <h2 style={{ fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", color: "var(--text3)", margin: "0 0 10px" }}>{label}</h2>
+          <h2 style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", color: "var(--text3)", margin: "0 0 10px" }}>{label}</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {mods.map((m) => (
           <div

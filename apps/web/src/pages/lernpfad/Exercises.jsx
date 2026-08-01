@@ -5,7 +5,7 @@
 // findet ein schwach ausgefallenes Testthema seine Uebungsaufgaben.
 import { useState, useEffect } from "react";
 import { askConfirm } from "../../core/dialog.jsx";
-import { Icon, ICONS, iconBtn, COLORS as C } from "../../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, btnPrimary, btnSecondary, COLORS as C, inputStyle} from "../../components/Icons.jsx";
 import TopicPicker from "../../components/TopicPicker.jsx";
 
 const API = "/api/lernpfad";
@@ -208,6 +208,4 @@ function Select({ value, onChange, options, allowEmpty }) {
   );
 }
 
-const inp = { width: "100%", padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box", resize: "vertical" };
-const btnSecondary = { padding: "9px 18px", cursor: "pointer", fontSize: 14, border: "1px solid var(--border2)", borderRadius: 980, background: "var(--card)", color: "var(--text)", fontWeight: 500 };
-const btnPrimary = { padding: "9px 18px", cursor: "pointer", fontSize: 14, border: "none", borderRadius: 980, background: "var(--text)", color: "var(--bg)", fontWeight: 600 };
+const inp = { ...inputStyle, width: "100%", resize: "vertical" };

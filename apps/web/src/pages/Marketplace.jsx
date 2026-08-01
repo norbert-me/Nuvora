@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { Icon, ICONS, overlayGuard, modalOverlay, modalPanel, COLORS as C } from "../components/Icons.jsx";
+import { Icon, ICONS, overlayGuard, modalOverlay, modalPanel, btnPrimary, btnSecondary, COLORS as C, pageApp} from "../components/Icons.jsx";
 
 const API = "/api";
 
@@ -131,7 +131,7 @@ export default function Marketplace({ fixedKind }) {
   };
 
   return (
-    <div>
+    <div style={{ ...pageApp }}>
       <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 20px" }}>
         {hintBefore}<a href="/questions" style={{ color: "var(--accent)", textDecoration: "none" }}>{t("market.publishHintLink")}</a>{hintAfter}
       </p>
@@ -197,8 +197,8 @@ export default function Marketplace({ fixedKind }) {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                <button onClick={() => openPreview(q.id)} style={{ padding: "7px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer", background: "var(--card)", color: "var(--text)", border: "1px solid var(--border2)", borderRadius: 980, whiteSpace: "nowrap" }}>{t("market.preview")}</button>
-                <button onClick={() => copy(q)} style={{ padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 980, whiteSpace: "nowrap" }}>{t("market.adopt")}</button>
+                <button onClick={() => openPreview(q.id)} style={{ ...btnSecondary, padding: "7px 16px", fontSize: 13, whiteSpace: "nowrap" }}>{t("market.preview")}</button>
+                <button onClick={() => copy(q)} style={{ ...btnPrimary, padding: "7px 16px", fontSize: 13, whiteSpace: "nowrap" }}>{t("market.adopt")}</button>
                 {(user && (user.id === q.author_id || user.id === 1)) && (
                   <button onClick={() => remove(q.id)} title={t("market.removeTitle")} style={{ padding: 7, background: "none", border: "1px solid var(--border2)", borderRadius: 980, cursor: "pointer", color: C.danger, display: "flex", alignItems: "center" }}>
                     <Icon d={ICONS.trash} size={15} color={C.danger} />
@@ -291,8 +291,8 @@ export default function Marketplace({ fixedKind }) {
                   </div>
                 ))}
                 <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
-                  <button onClick={() => { const p = preview; setPreview(null); copy(p); }} style={{ padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 980 }}>{t("market.adopt")}</button>
-                  <button onClick={() => setPreview(null)} style={{ padding: "10px 20px", fontSize: 14, fontWeight: 500, cursor: "pointer", background: "var(--card)", color: "var(--text)", border: "1px solid var(--border2)", borderRadius: 980 }}>{t("common.close")}</button>
+                  <button onClick={() => { const p = preview; setPreview(null); copy(p); }} style={{ ...btnPrimary, padding: "10px 20px" }}>{t("market.adopt")}</button>
+                  <button onClick={() => setPreview(null)} style={{ ...btnSecondary, padding: "10px 20px" }}>{t("common.close")}</button>
                 </div>
               </>
             )}
@@ -311,7 +311,7 @@ export default function Marketplace({ fixedKind }) {
                   style={{ textAlign: "left", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>{c.name}</button>
               ))}
             </div>
-            <button onClick={() => setCopyDeckFor(null)} style={{ marginTop: 14, padding: "8px 16px", fontSize: 13.5, cursor: "pointer", background: "var(--card)", color: "var(--text)", border: "1px solid var(--border2)", borderRadius: 980 }}>{t("common.abort")}</button>
+            <button onClick={() => setCopyDeckFor(null)} style={{ ...btnSecondary, marginTop: 14, padding: "8px 16px", fontSize: 13.5 }}>{t("common.abort")}</button>
           </div>
         </div>
       )}

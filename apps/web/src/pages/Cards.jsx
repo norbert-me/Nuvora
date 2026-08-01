@@ -75,7 +75,7 @@ export default function Cards() {
         if (rest.length) groups.push({ name: null, list: rest });
         return groups.map((g, gi) => (
           <div key={gi}>
-            {g.name && g.list.length > 1 && <div style={{ fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text3)", margin: "6px 0 6px" }}>{g.name}</div>}
+            {g.name && g.list.length > 1 && <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text3)", margin: "6px 0 6px" }}>{g.name}</div>}
             {g.list.map(row)}
           </div>
         ));

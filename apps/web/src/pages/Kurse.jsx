@@ -9,7 +9,7 @@ import { undoDelete } from "../core/undo.jsx";
 import { AddButton, pageTitle, pageIntro, btnPrimary, btnSecondary, selectStyle, chipStyle, Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, Toggle, Empty, pageApp} from "../components/Icons.jsx";
 
 const API = "/api";
-const editLabel = { fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text3)", marginBottom: 6 };
+const editLabel = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text3)", marginBottom: 6 };
 
 export default function Kurse() {
   const { t } = useLanguage();

@@ -12,7 +12,7 @@ import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, overlayGuard, modalOverlay, modalPanel, popoverPanel, Empty, Skeleton, ExportButton, ImportButton } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, overlayGuard, modalOverlay, modalPanel, popoverPanel, Empty, Skeleton, ExportButton, ImportButton, inputStyle} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
@@ -1309,7 +1309,7 @@ function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo }
   );
 }
 
-const inp = { width: "100%", padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" };
+const inp = { ...inputStyle, width: "100%" };
 const th = { padding: "8px 6px", borderBottom: "2px solid var(--border3)", fontWeight: 600, fontSize: 12, color: "var(--text2)", textAlign: "center", whiteSpace: "nowrap", position: "relative" };
 const td = { padding: "4px 6px", borderBottom: "1px solid var(--border)", textAlign: "center", color: "var(--text)" };
 const stickyL = { position: "sticky", left: 0, background: "var(--card)", zIndex: 1 };

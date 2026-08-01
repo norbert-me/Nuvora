@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { COLORS as C, pageApp} from "../components/Icons.jsx";
+import { COLORS as C, btnPrimary, pageApp} from "../components/Icons.jsx";
 import { useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -360,10 +360,7 @@ export default function Scanner() {
         <div style={{ padding: 20, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 12, textAlign: "center" }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>{t("scanner.finishedTitle")}</div>
           <p style={{ fontSize: 14, color: "var(--text3)", margin: "0 0 14px" }}>{t("scanner.finishedHint")}</p>
-          <button onClick={() => { setSessionFinished(false); setLastCards([]); }} style={{
-            padding: "10px 24px", fontSize: 14, fontWeight: 600, cursor: "pointer",
-            background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 980,
-          }}>
+          <button onClick={() => { setSessionFinished(false); setLastCards([]); }} style={{ ...btnPrimary, padding: "10px 24px" }}>
             {t("scanner.newSession")}
           </button>
         </div>
@@ -391,12 +388,8 @@ export default function Scanner() {
           <button
             onClick={toggleScanning}
             disabled={sessionId.length < 4}
-            style={{
-              marginTop: 22, width: "100%", maxWidth: 240, padding: "13px 24px", fontSize: 15, fontWeight: 600,
-              cursor: sessionId.length >= 4 ? "pointer" : "default",
-              background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 980,
-              opacity: sessionId.length >= 4 ? 1 : 0.35,
-            }}
+            style={{ ...btnPrimary, marginTop: 22, width: "100%", maxWidth: 240, padding: "13px 24px", fontSize: 15,
+              cursor: sessionId.length >= 4 ? "pointer" : "default", opacity: sessionId.length >= 4 ? 1 : 0.35 }}
           >
             {t("scanner.join")}
           </button>
