@@ -240,7 +240,7 @@ const getModuleNavItems = (t, location) => {
   }
   if (area === "notizen") return [{ to: NOTIZEN, label: t("notizen.title") }];
   if (area === "klassenleitung") return [{ to: KLASSENLEITUNG, label: t("klassenleitung.title") }];
-  if (area === "mathespiele") return [{ to: MATHEF, label: t("mathespiele.title") }];
+  if (area === "mathespiele") return [{ to: MATHEF, label: t("mathefussball.title") }];
   if (area === "tafel") return [{ to: TAFEL, label: t("tafel.title") }];
   if (area === "orga") {
     const tab = params.get("tab");
