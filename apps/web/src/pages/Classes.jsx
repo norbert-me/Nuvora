@@ -236,10 +236,9 @@ export default function Classes() {
       <div>
         <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{editing.id ? t("classes.editTitle") : t("classes.newTitle")}</h2>
         <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}>
+          {/* Klassen tragen keine Farbe — die Farbe hängt am Kurs (Fach). */}
           <input placeholder={t("classes.namePlaceholder")} value={name} onChange={(e) => setName(e.target.value)}
             autoComplete="off" style={{ padding: "10px 14px", fontSize: 18, width: 300, border: "1px solid var(--border2)", borderRadius: 10 }} autoFocus />
-          <input type="color" value={color} onChange={(e) => setColor(e.target.value)} title={t("classes.color")}
-            style={{ width: 40, height: 40, padding: 0, border: "1px solid var(--border2)", borderRadius: 8, background: "none", cursor: "pointer" }} />
         </div>
         {!editing.id && (
           <p style={{ color: "var(--text3)", fontSize: 12.5, marginBottom: 16, maxWidth: 460 }}>{t("classes.subjectHint")}</p>
