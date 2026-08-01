@@ -52,7 +52,7 @@ export default function Cards() {
 
       {(() => {
         const row = (cls) => (
-          <div key={cls.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", marginBottom: 10, border: "1px solid var(--border)", borderRadius: 16, background: "var(--card)" }}>
+          <div key={cls.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", marginBottom: 10, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <strong style={{ fontSize: 16, color: "var(--text)" }}>{cls.name}</strong>
               <span style={{ color: "var(--text3)", fontSize: 13 }}>{cls.students.length} {t("classes.learners")}</span>

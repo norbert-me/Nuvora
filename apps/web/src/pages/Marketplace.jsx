@@ -179,7 +179,7 @@ export default function Marketplace({ fixedKind }) {
         <p style={{ color: "var(--text3)", fontSize: 14 }}>{authorFilter ? t("market.emptyFiltered") : search ? t("market.emptySearch") : t("market.emptyNone")}</p>
       ) : (
         quizzes.map((q) => (
-          <div key={q.id} style={{ padding: "16px 18px", marginBottom: 10, border: "1px solid var(--border)", borderRadius: 16, background: "var(--card)" }}>
+          <div key={q.id} style={{ padding: "16px 18px", marginBottom: 10, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 6 }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{q.title}</div>

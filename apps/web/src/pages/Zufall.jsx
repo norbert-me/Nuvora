@@ -188,7 +188,7 @@ export default function Zufall() {
         <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("zufall.noStudents")}</p>
       ) : (
         <>
-          <div style={{ border: "1px solid var(--border)", borderRadius: 18, background: "var(--card)", padding: "48px 24px", textAlign: "center", marginBottom: 18 }}>
+          <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: "48px 24px", textAlign: "center", marginBottom: 18 }}>
             <div style={{ fontSize: aktuell ? 34 : 18, fontWeight: 800, color: aktuell ? "var(--text)" : "var(--text3)", opacity: rollt ? 0.6 : 1, transition: "opacity .1s", minHeight: 44 }}>
               {aktuell ? aktuell.name : t("zufall.hint")}
             </div>

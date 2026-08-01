@@ -87,7 +87,7 @@ export default function Ausleihe() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {(nurOffene ? items.filter((it) => it.open > 0) : items).map((it) => (
-            <div key={it.id} style={{ border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)" }}>
+            <div key={it.id} style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px" }}>
                 <button onClick={() => oeffnen(it.id)} style={{ flex: 1, textAlign: "left", background: "none", border: "none", cursor: "pointer", color: "var(--text)", fontSize: 15, fontWeight: 600, display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ color: "var(--text3)", fontSize: 12 }}>{offen === it.id ? "▾" : "▸"}</span>

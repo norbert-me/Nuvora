@@ -278,7 +278,7 @@ export default function Classes() {
             </div>
 
             {detailsFor === idx && (
-              <div style={{ margin: "0 0 12px 52px", padding: 16, border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)" }}>
+              <div style={{ margin: "0 0 12px 52px", padding: 16, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
                 {/* Foto der Person (personenbezogen; nie im Export). */}
                 <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>{t("classes.photo")}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
@@ -418,7 +418,7 @@ export default function Classes() {
       {loaded && !loadError && classes.length === 0 && <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("classes.empty")}</p>}
 
       {classes.map((cls) => (
-        <div key={cls.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", marginBottom: 10, border: "1px solid var(--border)", borderRadius: 16, background: "var(--card)" }}>
+        <div key={cls.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", marginBottom: 10, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
           <button onClick={() => startEdit(cls)} title={t("classes.open")}
             style={{ display: "flex", alignItems: "center", gap: 10, border: "none", background: "none", cursor: "pointer", padding: 0, textAlign: "left", flex: 1, minWidth: 0 }}>
             <strong style={{ fontSize: 16, color: "var(--text)" }}>{cls.name}</strong>

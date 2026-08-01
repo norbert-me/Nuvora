@@ -54,7 +54,7 @@ export default function Notizblock({ embedded } = {}) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
           {view.map((n, idx) => (
             <div key={n.id} draggable {...dnd(idx)}
-              style={{ display: "flex", flexDirection: "column", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", padding: 12, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+              style={{ display: "flex", flexDirection: "column", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 12, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
                 <span className="drag-handle" title={t("notizblock.reorderHint")} style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex", flexShrink: 0 }}><Icon d={ICONS.grip} size={15} /></span>
                 <input value={n.title} onChange={(e) => patch(n.id, "title", e.target.value)} placeholder={t("notizblock.titlePlaceholder")}

@@ -778,7 +778,7 @@ export function KlassenarbeitVergleich() {
 
       {classId && rows.length === 0 && <div style={{ marginTop: 24 }}><Empty title={t("klassenarbeit.compareEmpty")} /></div>}
       {rows.length > 0 && (
-        <div style={{ marginTop: 20, border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", overflow: "hidden" }}>
+        <div style={{ marginTop: 20, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 14px", fontSize: 11, color: "var(--text3)", borderBottom: "1px solid var(--border)" }}>
             <span style={{ width: 150, flexShrink: 0 }}>{t("klassenarbeit.compareWork")}</span>
             <span style={{ flex: 1, minWidth: 200 }}>0 % – 100 %</span>

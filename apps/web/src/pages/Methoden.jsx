@@ -250,7 +250,7 @@ export default function Methoden({ embedded } = {}) {
           {visible.map((m) => (
             <div key={m.id} draggable onDragStart={() => setDrag({ kind: "method", id: m.id })} onDragEnd={endDrag}
               onClick={() => setViewing(m)}
-              style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "12px 14px", minHeight: 58, border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", cursor: "pointer", opacity: drag && drag.kind === "method" && drag.id === m.id ? 0.5 : 1 }}>
+              style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "12px 14px", minHeight: 58, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", cursor: "pointer", opacity: drag && drag.kind === "method" && drag.id === m.id ? 0.5 : 1 }}>
               <span style={{ color: "var(--text3)", cursor: "grab", fontSize: 13, lineHeight: "1.4" }} title={t("methoden.dragHint")}>⠿</span>
               <span style={{ fontWeight: 600, flex: 1, minWidth: 0, lineHeight: 1.35, wordBreak: "break-word" }}>{m.title}</span>
             </div>

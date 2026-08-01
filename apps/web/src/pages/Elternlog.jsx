@@ -67,7 +67,7 @@ export default function Elternlog() {
         students.length === 0 ? <Empty title={t("elternlog.noStudents")} /> : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
             {students.map((s) => (
-              <button key={s.id} onClick={() => open(s)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)", cursor: "pointer", textAlign: "left", color: "var(--text)" }}>
+              <button key={s.id} onClick={() => open(s)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", cursor: "pointer", textAlign: "left", color: "var(--text)" }}>
                 <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
                 {counts[String(s.id)] > 0 && <span style={{ fontSize: 12, fontWeight: 700, padding: "1px 8px", borderRadius: 980, background: "var(--accent-bg, rgba(10,132,255,0.12))", color: "var(--accent)" }}>{counts[String(s.id)]}</span>}
               </button>
@@ -86,7 +86,7 @@ export default function Elternlog() {
             )}
           </div>
 
-          <div style={{ border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", padding: 14, marginBottom: 16 }}>
+          <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 14, marginBottom: 16 }}>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
               <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ ...inputStyle, padding: "8px 8px" }} />
               <select value={channel} onChange={(e) => setChannel(e.target.value)} style={{ ...selectStyle, padding: "8px 26px 8px 10px", fontSize: 13 }}>
@@ -102,7 +102,7 @@ export default function Elternlog() {
           {list.length === 0 ? (
             <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("elternlog.empty")}</p>
           ) : list.map((c) => (
-            <div key={c.id} style={{ display: "flex", gap: 10, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)", marginBottom: 6 }}>
+            <div key={c.id} style={{ display: "flex", gap: 10, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", marginBottom: 6 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 2 }}>
                   {c.date ? fmt(c.date) : ""}{c.channel ? ` · ${chLabel(c.channel)}` : ""}

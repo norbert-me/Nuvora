@@ -150,7 +150,7 @@ function MeinFortschritt({ data }) {
   if (!total) return null;
   const learned = data?.learned || 0;
   return (
-    <div style={{ padding: 16, border: "1px solid var(--border)", borderRadius: 16, background: "var(--card)", textAlign: "left" }}>
+    <div style={{ padding: 16, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", textAlign: "left" }}>
       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Dein Fortschritt</div>
       <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 12 }}>{learned} von {total} Karten gelernt</div>
       <div style={{ display: "flex", height: 12, borderRadius: 6, overflow: "hidden", marginBottom: 10 }}>

@@ -374,7 +374,7 @@ export default function Sitzplan() {
             <button onClick={fitView} className="icon-btn" style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8, width: 28, height: 28 }} title={t("sitzplan.fitHint")} aria-label={t("sitzplan.fit")}><Icon d={ICONS.fit} size={16} /></button>
             <button onClick={anordnen} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 12 }} title={t("sitzplan.arrangeHint")}>{t("sitzplan.arrange")}</button>
           </div>
-          <div ref={scrollRef} style={{ height: 520, overflow: "auto", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", marginBottom: 18 }}>
+          <div ref={scrollRef} style={{ height: 520, overflow: "auto", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", marginBottom: 18 }}>
           <div ref={canvasRef} onPointerDown={onCanvasDown} onDragOver={(e) => e.preventDefault()} onDrop={onCanvasDrop}
             style={{ position: "relative", height: 760, width: "calc(100% - 40px)", minWidth: 720, margin: "0 20px", transform: `scale(${zoom})`, transformOrigin: "0 0",
               cursor: "grab",

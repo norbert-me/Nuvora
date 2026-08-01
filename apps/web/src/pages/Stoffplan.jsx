@@ -82,7 +82,7 @@ export default function Stoffplan({ embedded } = {}) {
       {view.length === 0 ? (
         <Empty title={t("stoffplan.empty")} hint={t("stoffplan.emptyHint")} />
       ) : view.map((it, idx) => (
-        <div key={it.id} {...dnd(idx)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)", marginBottom: 6, cursor: "grab", opacity: it.done ? 0.6 : 1 }}>
+        <div key={it.id} {...dnd(idx)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", marginBottom: 6, cursor: "grab", opacity: it.done ? 0.6 : 1 }}>
           <span className="drag-handle" style={{ color: "var(--text3)", display: "inline-flex", flexShrink: 0 }}><Icon d={ICONS.grip} size={15} /></span>
           <input type="checkbox" checked={it.done} onChange={() => patch(it.id, { done: !it.done })} style={{ width: 18, height: 18, cursor: "pointer", flexShrink: 0 }} />
           <span style={{ flex: 1, minWidth: 0, fontSize: 14, textDecoration: it.done ? "line-through" : "none" }}>{it.title}</span>

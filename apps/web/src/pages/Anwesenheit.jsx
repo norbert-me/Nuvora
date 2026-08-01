@@ -180,7 +180,7 @@ export default function Anwesenheit() {
             {students.map((s, i) => {
               const cur = statusOf(s.id);
               return (
-                <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)" }}>
+                <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
                   <span style={{ color: "var(--text3)", fontSize: 12, minWidth: 22 }}>{i + 1}.</span>
                   <span style={{ flex: 1, fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
                   <div style={{ display: "inline-flex", gap: 4 }}>
@@ -213,7 +213,7 @@ export default function Anwesenheit() {
               const leer = !a.fehlt && !a.spaet && !a.entsch;
               const auf = offen === s.id;
               return (
-                <div key={s.id} style={{ border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)" }}>
+                <div key={s.id} style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
                   <button onClick={() => oeffnen(s.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", width: "100%", background: "none", border: "none", cursor: "pointer", textAlign: "left", color: "var(--text)" }}>
                     <span style={{ color: "var(--text3)", fontSize: 12, minWidth: 22 }}>{i + 1}.</span>
                     <span style={{ flex: 1, fontWeight: 500 }}>{s.name}</span>

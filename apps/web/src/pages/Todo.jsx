@@ -84,7 +84,7 @@ export default function Todo({ embedded } = {}) {
       );
     }
     return (
-      <div key={it.id} {...(dnd || {})} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)", marginBottom: 6, cursor: dnd ? "grab" : "default" }}>
+      <div key={it.id} {...(dnd || {})} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", marginBottom: 6, cursor: dnd ? "grab" : "default" }}>
         {dnd && <span className="drag-handle" title={t("todo.reorderHint")} style={{ color: "var(--text3)", flexShrink: 0, display: "inline-flex", cursor: "grab" }}><Icon d={ICONS.grip} size={15} /></span>}
         <input type="checkbox" checked={it.done} onChange={() => toggle(it)} style={{ width: 18, height: 18, cursor: "pointer", flexShrink: 0 }} />
         <span style={{ flex: 1, minWidth: 0, fontSize: 14, textDecoration: it.done ? "line-through" : "none", color: it.done ? "var(--text3)" : "var(--text)" }}>{it.text}</span>

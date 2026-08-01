@@ -550,7 +550,7 @@ export default function Kalender() {
 
       {view === "month" && <MonthGrid extColor={extColor} range={range} cursor={cursor} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/notizbrett")} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} kursName={kursName} slotName={slotName} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
       {view === "week" && wdhVorschlag.length > 0 && (
-        <div style={{ marginBottom: 12, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)" }}>
+        <div style={{ marginBottom: 12, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t("kalender.wdhTitle")}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {wdhVorschlag.map((tp) => (
@@ -1085,7 +1085,7 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
 
       {/* Zeitleiste 0–24 Uhr: scrollbar, Start bei 6 Uhr (Ref setzt scrollTop). */}
       {timed.length > 0 && (
-        <div ref={scrollRef} style={{ maxHeight: "62vh", overflowY: "auto", border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)" }}>
+        <div ref={scrollRef} style={{ maxHeight: "62vh", overflowY: "auto", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
         <div style={{ position: "relative", height: 24 * HOUR }}
           onClick={(ev) => {
             // Klick auf freie Fläche der Zeitleiste öffnet direkt den Editor mit
@@ -1268,7 +1268,7 @@ function ExamPanel({ overview, periods = 6, onAdd, onUpd, onDel, t }) {
       {overview.length === 0 ? (
         <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("kalender.examsEmpty")}</p>
       ) : overview.map((e) => (
-        <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", marginBottom: 8 }}>
+        <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", marginBottom: 8 }}>
           {editId === e.id ? (
             <>
               <div style={{ flex: 1, minWidth: 0, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -1367,7 +1367,7 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
           ihn schon der Abschnitts-h1 oben. */}
       {!standalone && <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{t("kalender.breaksTitle")}</h3>}
       <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 12px", maxWidth: 620 }}>{t("kalender.breaksHint")}</p>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)" }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
         <label style={{ fontSize: 12, color: "var(--text2)", display: "flex", flexDirection: "column", gap: 3 }}>{t("kalender.bundesland")}
           <select value={land} onChange={(e) => { setLand(e.target.value); localStorage.setItem("nuvora_bundesland", e.target.value); }} style={{ ...selectStyle, fontSize: 14, padding: "9px 30px 9px 12px" }}>
             {BUNDESLAENDER.map(([k, n]) => <option key={k} value={k}>{n}</option>)}

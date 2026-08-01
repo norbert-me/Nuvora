@@ -677,7 +677,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
           onDragEnd={() => { setPreviewQuestions(null); dragIdx.current = null; dragWork.current = null; }}
           style={{
             display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", marginBottom: 6,
-            border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)",
+            border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)",
             cursor: searching ? "default" : "grab", transition: "transform 0.15s ease",
           }}
         >
