@@ -289,7 +289,12 @@ export default function NuvoraHome({ user }) {
                       <Icon d={MODULE_ICONS[m.key]} size={32} color="currentColor" />
                     </span>
                   )}
-                  <span>{name(m)}</span> <StageBadge stage={m.stage} />
+                  {/* Beta-Badge ÜBER den Namen (nicht dahinter) — läuft sonst bei
+                      langen Namen aus der Karte. */}
+                  <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, minWidth: 0 }}>
+                    <StageBadge stage={m.stage} />
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{name(m)}</span>
+                  </span>
                 </div>
               );
               const tileStyle = { ...card, minHeight: 100, boxSizing: "border-box", display: "flex", alignItems: "center" };
