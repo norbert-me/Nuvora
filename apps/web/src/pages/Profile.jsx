@@ -48,6 +48,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   const [gradeTendency, setGradeTendency] = useState(user.grade_tendency !== false); // Default: mit Tendenz (2+)
   const [showUsername, setShowUsername] = useState(false);
   const [showScale, setShowScale] = useState(false);
+  const [showTendency, setShowTendency] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminMsg, setAdminMsg] = useState("");
@@ -216,17 +217,23 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
           </div>
           )}
 
-          {/* Noten-Anzeige: mit Tendenz (2+/2-) oder ganze Noten — Module übernehmen das. */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 14, color: "var(--text)" }}>{t("profile.gradeTendency")}</span>
+          {/* Noten-Anzeige: mit Tendenz (2+/2-) oder ganze Noten — einklappbar wie
+              die Abschnitte darüber. */}
+          <button type="button" onClick={() => setShowTendency((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: 20, marginBottom: showTendency ? 10 : 0 }}>
+            <span style={{ fontSize: 20, color: "var(--text3)", lineHeight: 1 }}>{showTendency ? "−" : "+"}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{t("profile.gradeTendency")}</span>
             <InfoDot text={t("profile.gradeTendencyHint")} />
-            <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden", marginLeft: "auto" }}>
-              {[[true, t("profile.gradeTendencyOn")], [false, t("profile.gradeTendencyOff")]].map(([v, lbl]) => (
-                <button key={String(v)} type="button" onClick={() => setGradeTendency(v)}
-                  style={{ border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, padding: "5px 12px", background: gradeTendency === v ? "var(--accent)" : "transparent", color: gradeTendency === v ? "#fff" : "var(--text2)" }}>{lbl}</button>
-              ))}
+          </button>
+          {showTendency && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4, flexWrap: "wrap" }}>
+              <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden" }}>
+                {[[true, t("profile.gradeTendencyOn")], [false, t("profile.gradeTendencyOff")]].map(([v, lbl]) => (
+                  <button key={String(v)} type="button" onClick={() => setGradeTendency(v)}
+                    style={{ border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, padding: "5px 12px", background: gradeTendency === v ? "var(--accent)" : "transparent", color: gradeTendency === v ? "#fff" : "var(--text2)" }}>{lbl}</button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {profileMsg && <div style={{ fontSize: 13, color: profileMsg === "Gespeichert" ? C.success : C.danger, marginTop: 12, marginBottom: 8 }}>{profileMsg}</div>}
           <button type="submit" style={{ ...btnPrimary, marginTop: 16 }}>{t("common.save")}</button>
