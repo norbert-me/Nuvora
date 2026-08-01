@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, overlayGuard, modalOverlay, modalPanel, popoverPanel } from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, overlayGuard, modalOverlay, modalPanel, popoverPanel, ExportButton, ImportButton } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, put } from "../core/cache.js";
@@ -141,6 +141,7 @@ export default function Kalender() {
   const [aktiv, setAktiv] = useState({}); // { cardvote, karten, lernpfad } aktiv?
   const [editing, setEditing] = useState(null); // { date, ...entry } oder null
   const [tt, setTt] = useState({ periods: 6, slots: [] }); // Stundenplan
+  const [showTimes, setShowTimes] = useState(false); // Uhrzeiten-Spalte im Stundenplan
   const [breaks, setBreaks] = useState([]); // unterrichtsfreie Zeitraeume (Ferien/Feiertage)
   const [examOverview, setExamOverview] = useState([]); // Klassenarbeiten-Übersicht (kommend + Reststunden)
   const loadExams = () => fetch(`${API}/klassenarbeiten/uebersicht`).then((r) => (r.ok ? r.json() : [])).then((d) => setExamOverview(Array.isArray(d) ? d : [])).catch(() => {});
@@ -487,11 +488,13 @@ export default function Kalender() {
         )}
       </div>
       {view === "timetable" && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          <button onClick={exportKal} style={btnSecondary}>{t("kalender.export")}</button>
-          <label style={{ ...btnSecondary, cursor: "pointer" }}>{t("kalender.import")}
-            <input type="file" accept=".json,application/json" style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) importKal(e.target.files[0]); e.target.value = ""; }} />
-          </label>
+        <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
+          <ExportButton iconOnly title={t("kalender.export")} onClick={exportKal} />
+          <ImportButton iconOnly title={t("kalender.import")} onFile={importKal} />
+          <button onClick={() => setShowTimes((v) => !v)} className="icon-btn" title={t("kalender.timesShow")}
+            style={{ ...iconBtn, border: showTimes ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 8 }}>
+            <Icon d={ICONS.clock} size={18} color={showTimes ? "var(--accent)" : "var(--text2)"} />
+          </button>
         </div>
       )}
       {/* Datums-Navigator, einheitlich mit der Anwesenheit: ‹ [Auswahl] › Heute.
@@ -563,7 +566,7 @@ export default function Kalender() {
       )}
       {view === "week" && <WeekView extColor={extColor} range={range} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/notizbrett")} slotsFor={slotsFor} frei={frei} className={className} kursName={kursName} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
       {view === "day" && <DayView extColor={extColor} day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/notizbrett")} slotsFor={slotsFor} cancelledFor={cancelledFor} onCancelSlot={cancelSlot} onRestoreSlot={restoreSlot} frei={frei} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
-      {view === "timetable" && <TimetableView tt={tt} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
+      {view === "timetable" && <TimetableView tt={tt} showTimes={showTimes} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} kursName={kursName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
       {abo && (
@@ -1124,9 +1127,8 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
   );
 }
 
-function TimetableView({ tt, className, slotName, slotColor, classColor, topicName, onEdit, onPeriods, onTimes, breaks = [], onAddBreak, onDelBreak, t }) {
-  // Uhrzeiten sind nur fürs Einstellen wichtig — standardmäßig ausgeblendet.
-  const [showTimes, setShowTimes] = useState(false);
+function TimetableView({ tt, showTimes = false, className, slotName, slotColor, classColor, topicName, onEdit, onPeriods, onTimes, breaks = [], onAddBreak, onDelBreak, t }) {
+  // Uhrzeiten-Umschalter liegt jetzt oben neben Export/Import (Prop showTimes).
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri")];
   const periods = Array.from({ length: tt.periods }, (_, i) => i + 1);
   // Editor zeigt/bearbeitet nur die AKTUELL gültige Version (valid_to == null).
@@ -1148,11 +1150,8 @@ function TimetableView({ tt, className, slotName, slotColor, classColor, topicNa
   const gapH = (p) => { const a = toMin(timeVal(p - 1, "end")), b = toMin(timeVal(p, "start")); return a != null && b != null && b > a ? (b - a) * PXMIN : 0; };
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "0 0 12px", flexWrap: "wrap" }}>
-        <p style={{ fontSize: 13, color: "var(--text3)", margin: 0, maxWidth: 620, flex: 1 }}>{t("kalender.timetableHint")}</p>
-        <button onClick={() => setShowTimes((v) => !v)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>
-          {showTimes ? t("kalender.timesHide") : t("kalender.timesShow")}
-        </button>
+      <div style={{ margin: "0 0 12px" }}>
+        <p style={{ fontSize: 13, color: "var(--text3)", margin: 0, maxWidth: 620 }}>{t("kalender.timetableHint")}</p>
       </div>
       <div>
         <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
@@ -1249,7 +1248,7 @@ function ExamPanel({ overview, periods = 6, onAdd, onUpd, onDel, t }) {
   const sfld = { ...inputStyle };
   const pSel = { ...selectStyle, padding: "8px 26px 8px 10px", fontSize: 13 };
   return (
-    <div style={{ maxWidth: 640 }}>
+    <div>
       <p style={{ fontSize: 13.5, color: "var(--text2)", margin: "0 0 16px" }}>{t("kalender.examsIntro")}</p>
 
       <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, marginBottom: 18 }}>
