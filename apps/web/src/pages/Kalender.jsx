@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, overlayGuard, modalOverlay, modalPanel, popoverPanel, ExportButton, ImportButton } from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, overlayGuard, modalOverlay, modalPanel, popoverPanel, ExportButton, ImportButton, pageApp} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, put } from "../core/cache.js";
@@ -415,7 +415,7 @@ export default function Kalender() {
     : cursor.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
-    <div>
+    <div style={{ ...pageApp }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
         {/* Kein Titel — die Navbar zeigt den Bereich (auch die Konfig-Reiter). */}
         {/* Stundenplan UND Freie Tage sind in die Navbar ausgelagert (?view=…) —

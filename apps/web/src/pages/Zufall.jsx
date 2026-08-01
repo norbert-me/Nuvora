@@ -3,7 +3,7 @@
 // "Ohne Wiederholung" merkt sich die schon Gezogenen, bis die Klasse durch ist.
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Toggle } from "../components/Icons.jsx";
+import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Toggle, pageApp} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
@@ -140,7 +140,7 @@ export default function Zufall() {
   };
 
   return (
-    <div style={{ maxWidth: 640, margin: "0 auto" }}>
+    <div style={{ ...pageApp }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
         <KursKlasseSelect value={classId} onChange={setClassId} />
         {tab === "ziehen" && (

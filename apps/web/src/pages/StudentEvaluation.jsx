@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { DownloadLink, COLORS as C } from "../components/Icons.jsx";
+import { DownloadLink, COLORS as C, pageApp} from "../components/Icons.jsx";
 
 const API = "/api";
 
@@ -41,7 +41,7 @@ export default function StudentEvaluation() {
   const worst = pcts.length > 0 ? pcts[0] : null;
 
   return (
-    <div style={{ maxWidth: 700 }}>
+    <div style={{ ...pageApp }}>
       <Link to={`/cardvote/class-evaluation/${classId}`} style={{ color: "var(--text3)", textDecoration: "none", fontSize: 13, fontWeight: 500 }}>
         ← {class_name}
       </Link>

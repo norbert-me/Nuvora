@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { COLORS as C } from "../components/Icons.jsx";
+import { COLORS as C, pageApp} from "../components/Icons.jsx";
 import { useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -352,7 +352,7 @@ export default function Scanner() {
   const scannedStudents = classStudents.filter((s) => scannedIds.has(s.card_id));
 
   return (
-    <div style={{ maxWidth: 600, margin: "0 auto" }}>
+    <div style={{ ...pageApp }}>
       <style>{`@keyframes scanFlash { 0% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 0.6; } }`}</style>
 
       {/* Testende-Hinweis */}

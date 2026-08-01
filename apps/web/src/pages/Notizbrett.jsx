@@ -4,6 +4,7 @@
 // weiter eigenständig gegen ihre APIs (/api/notizblock, /api/todo); hier nur die
 // gemeinsame Hülle. Nicht an Schüler gebunden (Regel 3).
 import { useSearchParams } from "react-router-dom";
+import { pageApp } from "../components/Icons.jsx";
 import Notizblock from "./Notizblock.jsx";
 import Todo from "./Todo.jsx";
 
@@ -11,7 +12,7 @@ export default function Notizbrett() {
   const [params] = useSearchParams();
   const tab = params.get("tab") === "aufgaben" ? "aufgaben" : "notizen";
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
+    <div style={{ ...pageApp }}>
       {tab === "aufgaben" ? <Todo embedded /> : <Notizblock embedded />}
     </div>
   );

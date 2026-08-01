@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
-import { AddButton, pageTitle, btnPrimary, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C, th as thBase, td, Toggle, cardStyle } from "../components/Icons.jsx";
+import { AddButton, pageTitle, btnPrimary, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C, th as thBase, td, Toggle, cardStyle, pageApp} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import ViewMenu from "../components/ViewMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -88,7 +88,7 @@ export default function Orga() {
   const th = { ...thBase, verticalAlign: "bottom" };
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto" }}>
+    <div style={{ ...pageApp }}>
       {/* Zwischen den Werkzeugen wird über die Navbar gewechselt (?tab=…). Der
           Reiter „Optionen" blendet Reiter ein/aus (Modul-Zahnrad als Seite). */}
       {tab === "optionen" ? (

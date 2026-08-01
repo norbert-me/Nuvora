@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import { useLanguage } from "../i18n/index.jsx";
 import { askPrompt, askConfirm } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
-import { AddButton, pageTitle, pageIntro, btnPrimary, btnSecondary, selectStyle, chipStyle, Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, Toggle, Empty } from "../components/Icons.jsx";
+import { AddButton, pageTitle, pageIntro, btnPrimary, btnSecondary, selectStyle, chipStyle, Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, Toggle, Empty, pageApp} from "../components/Icons.jsx";
 
 const API = "/api";
 const editLabel = { fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text3)", marginBottom: 6 };
@@ -64,7 +64,7 @@ export default function Kurse() {
   const frei = (k) => { const drin = new Set(k.classes.map((c) => c.id)); return allClasses.filter((c) => !drin.has(c.id)); };
 
   return (
-    <div style={{ maxWidth: 720, margin: "0 auto" }}>
+    <div style={{ ...pageApp }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <h1 style={{ ...pageTitle, marginBottom: 0, flex: 1 }}>{t("kurse.title")}</h1>
         {trash.length > 0 && <button onClick={() => setShowTrash((v) => !v)} style={btnSecondary}>{t("classes.trash")} ({trash.length})</button>}

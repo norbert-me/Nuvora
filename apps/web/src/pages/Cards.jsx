@@ -6,7 +6,7 @@
 // Kern-Klassenseite; damit trug der Kern Modulwissen (Regel 3 in CLAUDE.md).
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Icon, ICONS, iconBtn, pageTitle } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, pageTitle, pageApp} from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api";
@@ -38,7 +38,7 @@ export default function Cards() {
   };
 
   return (
-    <div>
+    <div style={{ ...pageApp }}>
       <p style={{ color: "var(--text2)", marginBottom: 20, fontSize: 14 }}>
         {t("cards.intro").split("{{link}}")[0]}<Link to="/classes" style={{ color: "var(--accent)" }}>{t("nav.classes")}</Link>{t("cards.intro").split("{{link}}")[1]}
       </p>

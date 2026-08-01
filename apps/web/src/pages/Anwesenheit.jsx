@@ -135,7 +135,7 @@ export default function Anwesenheit() {
   );
 
   return (
-    <div style={{ maxWidth: 720, margin: "0 auto" }}>
+    <div style={{ maxWidth: "none" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
         {stundenWahl ? (
           <select value={`${stunde}:${classId}`} onChange={(e) => { const [p, c] = e.target.value.split(":").map(Number); setStunde(p); setClassId(c); }}

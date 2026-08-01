@@ -4,7 +4,7 @@
 // und gezielte Wiederholung (Karten des schwachen Themas wieder fällig).
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, overlayGuard, modalOverlay, modalPanel, Boxplot, StatCard } from "../components/Icons.jsx";
+import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, overlayGuard, modalOverlay, modalPanel, Boxplot, StatCard, pageApp} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
@@ -772,7 +772,7 @@ export function KlassenarbeitVergleich() {
   const nt = (x) => x == null ? "–" : String(Math.round(x * 10) / 10).replace(".", ",");
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 16px 40px" }}>
+    <div style={{ ...pageApp, padding: "0 16px 40px" }}>
       <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 16 }}>{t("klassenarbeit.compareHint")}</p>
       <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
 

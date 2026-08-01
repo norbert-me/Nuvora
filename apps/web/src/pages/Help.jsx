@@ -172,7 +172,7 @@ export default function Help() {
   };
 
   return (
-    <div style={{ maxWidth: 700 }}>
+    <div style={{ ...pageApp }}>
       <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", marginBottom: 16 }}>{t("help.title")}</h2>
 
       <p style={{ marginBottom: 20, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 12, background: "var(--card)", fontSize: 14 }}>

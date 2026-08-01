@@ -330,7 +330,7 @@ export default function Sitzplan() {
   };
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto" }}>
+    <div style={{ maxWidth: "none" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
         <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
         <ViewMenu title={t("sitzplan.view")} items={[

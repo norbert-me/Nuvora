@@ -2,7 +2,7 @@
 // des Moduls bleiben im Kern liegen und sind nach dem Wiedereinschalten da.
 import { useState } from "react";
 import { useModules } from "../core/modules.js";
-import { StageBadge, Tabs, inputStyle, btnSecondary, COLORS as C, Icon, ICONS, MODULE_ICONS, iconBtn, overlayGuard, modalOverlay, modalPanel } from "../components/Icons.jsx";
+import { StageBadge, Tabs, inputStyle, btnSecondary, COLORS as C, Icon, ICONS, MODULE_ICONS, iconBtn, overlayGuard, modalOverlay, modalPanel, pageApp} from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { pageTitle } from "../components/Icons.jsx";
 
@@ -72,7 +72,7 @@ export default function Modules() {
   };
 
   return (
-    <div style={{ maxWidth: 720, margin: "0 auto" }}>
+    <div style={{ ...pageApp }}>
       <h1 style={pageTitle}>{t("modules.title")}</h1>
       <p style={{ color: "var(--text2)", marginBottom: 24, fontSize: 14 }}>
         Aktiviere, was du brauchst. Abschalten entfernt keine Daten — sie sind

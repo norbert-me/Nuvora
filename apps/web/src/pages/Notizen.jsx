@@ -1,7 +1,7 @@
 // Modul Beobachtungen — formative Notizen je Schüler. Bewusst getrennt von der
 // Note. Klasse wählen → Schüler → Notizen (Datum, Kategorie, Text).
 import { useState, useEffect } from "react";
-import { pageTitle, btnPrimary, btnSecondary, inputStyle, selectStyle, Icon, ICONS, iconBtn, COLORS as C, Empty } from "../components/Icons.jsx";
+import { pageTitle, btnPrimary, btnSecondary, inputStyle, selectStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, pageApp} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, lastClass, rememberClass } from "../core/cache.js";
@@ -45,7 +45,7 @@ export default function Notizen() {
   const fmt = (iso) => { try { return new Date(iso + "T00:00:00").toLocaleDateString(); } catch { return iso; } };
 
   return (
-    <div style={{ maxWidth: 760, margin: "0 auto" }}>
+    <div style={{ ...pageApp }}>
       <p style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 16 }}>{t("notizen.intro")}</p>
 
       <div style={{ marginBottom: 16 }}><KursKlasseSelect value={classId} onChange={setClassId} /></div>

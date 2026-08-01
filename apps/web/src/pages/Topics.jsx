@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { Link } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, Empty, Skeleton, overlayGuard, modalOverlay, modalPanel, inputStyle } from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, Empty, Skeleton, overlayGuard, modalOverlay, modalPanel, inputStyle, pageApp} from "../components/Icons.jsx";
 import { peek, put } from "../core/cache.js";
 
 const API = "/api";
@@ -233,7 +233,7 @@ export default function Topics() {
   );
 
   return (
-    <div>
+    <div style={{ ...pageApp }}>
       <h1 style={pageTitle}>{t("topics.title")}</h1>
       <p style={{ color: "var(--text2)", marginBottom: 22, fontSize: 14 }}>
         {t("topics.intro")}

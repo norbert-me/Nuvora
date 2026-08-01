@@ -5,11 +5,12 @@
 // APIs (/api/noten, /api/klassenarbeit). Trennung Note/Beobachtung bleibt: die
 // Beobachtungen sitzen in der Klassenleitung, nicht hier.
 import { useSearchParams } from "react-router-dom";
+import { pageApp } from "../components/Icons.jsx";
 import Noten from "./Noten.jsx";
 import Klassenarbeit from "./Klassenarbeit.jsx";
 
 export default function Auswertung() {
   const [params] = useSearchParams();
   const tab = params.get("tab") === "klassenarbeit" ? "klassenarbeit" : "noten";
-  return tab === "klassenarbeit" ? <Klassenarbeit /> : <Noten />;
+  return <div style={{ ...pageApp }}>{tab === "klassenarbeit" ? <Klassenarbeit /> : <Noten />}</div>;
 }

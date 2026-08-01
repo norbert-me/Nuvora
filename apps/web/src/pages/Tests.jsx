@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link } from "react-router-dom";
-import { Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, pageApp} from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api";
@@ -57,7 +57,7 @@ export default function Tests() {
   if (error && sessions.length === 0) return <p style={{ color: C.danger }}>{t("common.connectionError")}</p>;
 
   return (
-    <div>
+    <div style={{ ...pageApp }}>
       {/* Oben: je Klasse die Gesamtauswertung. Darunter die einzelnen Quiz. */}
       {classes.length > 0 && (
         <div style={{ marginBottom: 28 }}>

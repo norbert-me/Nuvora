@@ -4,7 +4,7 @@
 // Kern; die Module arbeiten darauf.
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { pageTitle } from "../components/Icons.jsx";
+import { pageTitle, pageApp} from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
 
@@ -38,7 +38,7 @@ export default function ThemaAnsicht() {
   const a = data.active || {};
 
   return (
-    <div style={{ maxWidth: 780, margin: "0 auto" }}>
+    <div style={{ ...pageApp }}>
       <Link to="/topics" style={{ color: "var(--text3)", textDecoration: "none", fontSize: 13, fontWeight: 500 }}>← {t("nav.topics")}</Link>
       <h1 style={{ ...pageTitle, marginTop: 8 }}>{data.name}</h1>
       <p style={{ fontSize: 13.5, color: "var(--text2)", marginBottom: 20 }}>{t("thema.hint")}</p>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, selectStyle, overlayGuard, modalOverlay, modalPanel, Empty, Skeleton } from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, selectStyle, overlayGuard, modalOverlay, modalPanel, Empty, Skeleton, pageApp} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import AuthImage from "../components/AuthImage.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -251,7 +251,7 @@ export default function Karten() {
   }
 
   return (
-    <div>
+    <div style={{ ...pageApp }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
         <span data-tour="karten-class" style={{ display: "inline-flex" }}><KursKlasseSelect value={subsetKurs ? null : classId} kursValue={wantKurs} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); setTokens(null); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} /></span>
         {subsetKurse.length > 0 && (

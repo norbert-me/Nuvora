@@ -85,6 +85,17 @@ export const ICONS = {
     "M10 2v2.2M10 15.8V18M2 10h2.2M15.8 10H18M4.4 4.4l1.6 1.6M14 14l1.6 1.6M15.6 4.4L14 6M6 14l-1.6 1.6"],
 };
 
+// ─── Seiten-Shells ───
+// Genau DREI Seitenbreiten für die ganze App, alle zentriert. Jede Seite nutzt
+// eine davon per Spread am Wurzel-Container — keine Seite definiert mehr eine
+// eigene Breite. So springt beim Wechsel nichts mehr.
+//   pageApp  — jede eingeloggte Modul-/Kernseite (Standard).
+//   pageForm — Formular-/Auth-/Bestätigungsseiten (Login, Kontakt, Profil …).
+//   pageFull — Vollbild-Flächen (Tafel, Sitzplan-Canvas, Live-Session/Beamer).
+export const pageApp = { maxWidth: 960, margin: "0 auto", width: "100%", boxSizing: "border-box" };
+export const pageForm = { maxWidth: 480, margin: "0 auto", width: "100%", boxSizing: "border-box" };
+export const pageFull = { maxWidth: "100%", margin: "0 auto", width: "100%", boxSizing: "border-box" };
+
 export const iconBtn = { cursor: "pointer", padding: "6px", border: "none", background: "transparent", borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s" };
 
 // EINHEITLICHER Hinzufügen-Knopf: quadratisch, nur ein „+" (Akzentfarbe), das

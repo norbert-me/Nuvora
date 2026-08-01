@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
-import { StageBadge, Icon, ICONS, MODULE_ICONS, iconBtn, btnSecondary, selectStyle, COLORS as C } from "../components/Icons.jsx";
+import { StageBadge, Icon, ICONS, MODULE_ICONS, iconBtn, btnSecondary, selectStyle, COLORS as C, pageApp} from "../components/Icons.jsx";
 import { pageTitle } from "../components/Icons.jsx";
 
 const card = {
@@ -238,7 +238,7 @@ export default function NuvoraHome({ user }) {
   const commit = () => { persist(previewKeys()); setDragKey(null); setOverKey(null); };
 
   return (
-    <div style={{ maxWidth: 820, margin: "0 auto" }}>
+    <div style={{ ...pageApp }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <h1 style={{ ...pageTitle, marginBottom: 0, flex: 1 }}>
           {firstName ? t("home.welcome", { name: firstName }) : t("home.welcomePlain")}

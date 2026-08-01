@@ -69,7 +69,7 @@ export default function Ausleihe() {
   const zurueckLoans = loans.filter((l) => l.returned_at);
 
   return (
-    <div style={{ maxWidth: 720, margin: "0 auto" }}>
+    <div style={{ maxWidth: "none" }}>
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <input value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()} placeholder={t("ausleihe.newPlaceholder")} style={{ ...fld, flex: 1, minWidth: 200 }} />
         <AddButton onClick={anlegen} title={t("ausleihe.add")} />

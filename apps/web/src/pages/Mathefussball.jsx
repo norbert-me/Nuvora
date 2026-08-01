@@ -2,7 +2,7 @@
 // keine Daten. Richtige Antwort schiebt den Ball Richtung gegnerisches Tor;
 // erreicht er das Tor, gibt es ein Tor und der Ball geht zurück in die Mitte.
 import { useState, useRef, useEffect } from "react";
-import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS } from "../components/Icons.jsx";
+import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, pageApp} from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const STEPS = 2; // Felder je Seite (2 links, Mitte, 2 rechts); Tor beim Überschreiten des Rands
@@ -55,7 +55,7 @@ export default function Mathefussball() {
   const cells = Array.from({ length: STEPS * 2 + 1 }, (_, i) => i - STEPS); // -STEPS..STEPS
 
   return (
-    <div style={{ maxWidth: 820, margin: "0 auto" }}>
+    <div style={{ ...pageApp }}>
       {/* Einstellungen */}
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 18 }}>
         <label style={{ fontSize: 13, color: "var(--text2)", display: "inline-flex", alignItems: "center", gap: 6 }}>
