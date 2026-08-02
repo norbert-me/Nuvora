@@ -120,6 +120,7 @@ rsync -rlz -c --inplace --delete \
   --exclude='*.db' \
   --exclude='.DS_Store' \
   --exclude='.claude/' \
+  --exclude='.nfs*' \
   "$DIR/" "$SERVER:$REMOTE_DIR/"
 
 echo "→ Pflicht-Secrets auf dem Server prüfen..."
