@@ -75,14 +75,18 @@ function LernpfadHilfe({ t }) {
   );
 }
 
-function NotenHilfe({ t }) {
+// Modul Auswertung: zwei Reiter — Notenbuch und Klassenarbeiten.
+function AuswertungHilfe({ t }) {
   return (
     <>
+      <Section title={t("help.au.tabsT")}>{t("help.au.tabs")}</Section>
       <Section title={t("help.nt.howT")}>{t("help.nt.how")}</Section>
       <Section title={t("help.nt.avgT")}>{t("help.nt.avg")}</Section>
       <Section title={t("help.nt.trendT")}>{t("help.nt.trend")}</Section>
       <Section title={t("help.nt.obsT")}>{t("help.nt.obs")}</Section>
       <Section title={t("help.nt.impT")}>{t("help.nt.imp")} {t("help.nt.imp2")}</Section>
+      <Section title={t("help.kla.whatT")}>{t("help.kla.what")}</Section>
+      <Section title={t("help.kla.evalT")}>{t("help.kla.eval")}</Section>
     </>
   );
 }
@@ -111,9 +115,12 @@ function KalenderHilfe({ t }) {
   );
 }
 
-function EinstiegeHilfe({ t }) {
+// Modul Unterrichtsplanung: zwei Reiter — Stoffverteilung und Einstiege.
+function UnterrichtsplanungHilfe({ t }) {
   return (
     <>
+      <Section title={t("help.up.tabsT")}>{t("help.up.tabs")}</Section>
+      <Section title={t("help.stoff.whatT")}>{t("help.stoff.what")}</Section>
       <Section title={t("help.ein.whatT")}>{t("help.ein.what")}</Section>
       <Section title={t("help.ein.useT")}>{t("help.ein.use")}</Section>
     </>
@@ -144,12 +151,64 @@ function OrgaHilfe({ t }) {
 }
 
 function ZufallHilfe({ t }) {
-  return <Section title={t("help.zu.whatT")}>{t("help.zu.what")}</Section>;
+  return (
+    <>
+      <Section title={t("help.zu.whatT")}>{t("help.zu.what")}</Section>
+      <Section title={t("help.zu.groupsT")}>{t("help.zu.groups")}</Section>
+    </>
+  );
+}
+
+// Modul Notizbrett: zwei Reiter — Notizen und Aufgaben (To-do).
+function NotizbrettHilfe({ t }) {
+  return (
+    <>
+      <Section title={t("help.nb.whatT")}>{t("help.nb.what")}</Section>
+      <Section title={t("help.nb.todoT")}>{t("help.nb.todo")}</Section>
+    </>
+  );
+}
+
+function KlassenleitungHilfe({ t }) {
+  return (
+    <>
+      <Section title={t("help.kl.whatT")}>{t("help.kl.what")}</Section>
+      <Section title={t("help.kl.privT")}>{t("help.kl.priv")}</Section>
+    </>
+  );
+}
+
+function BeobachtungenHilfe({ t }) {
+  return (
+    <>
+      <Section title={t("help.beo.whatT")}>{t("help.beo.what")}</Section>
+      <Section title={t("help.beo.sepT")}>{t("help.beo.sep")}</Section>
+    </>
+  );
+}
+
+function TafelHilfe({ t }) {
+  return (
+    <>
+      <Section title={t("help.tf.whatT")}>{t("help.tf.what")}</Section>
+      <Section title={t("help.tf.useT")}>{t("help.tf.use")}</Section>
+    </>
+  );
+}
+
+function MathespieleHilfe({ t }) {
+  return <Section title={t("help.ms.whatT")}>{t("help.ms.what")}</Section>;
 }
 
 // Bereiche mit eigener, ausführlicher Hilfe. Module ohne Eintrag fallen auf ihre
 // Modul-Beschreibung zurück (unten) — so hat JEDES aktive Modul eine Erklärung.
-const AREA_COMP = { core: KernHilfe, cardvote: CardVoteHilfe, lernpfad: LernpfadHilfe, karten: KartenHilfe, auswertung: NotenHilfe, kalender: KalenderHilfe, unterrichtsplanung: EinstiegeHilfe, "code-detektiv": DetektivHilfe, orga: OrgaHilfe, zufall: ZufallHilfe };
+const AREA_COMP = {
+  core: KernHilfe, cardvote: CardVoteHilfe, lernpfad: LernpfadHilfe, karten: KartenHilfe,
+  auswertung: AuswertungHilfe, kalender: KalenderHilfe, unterrichtsplanung: UnterrichtsplanungHilfe,
+  "code-detektiv": DetektivHilfe, orga: OrgaHilfe, zufall: ZufallHilfe,
+  notizbrett: NotizbrettHilfe, klassenleitung: KlassenleitungHilfe, notizen: BeobachtungenHilfe,
+  tafel: TafelHilfe, mathespiele: MathespieleHilfe,
+};
 
 export default function Help() {
   const [params, setParams] = useSearchParams();
