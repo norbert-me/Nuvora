@@ -14,7 +14,7 @@ Learners need no devices and no accounts — they only appear as records the tea
 
 Nuvora is the base: account, classes, courses, students and topics live here. Modules are switched on and work on this data — they do not own it.
 
-> **Status: 2.0 — stable, still growing.** The frame stands — sign-in, home page, module management, classes, courses and topics are Nuvora. Ten modules sit on the core (Orga bundles further tools); none has its own accounts or database. The shared **topic taxonomy** connects them: a topic students struggled with in CardVote or Code-Detektiv spawns a Karten practice deck or a Lernpfad revision task at the press of a button, test results become a grade column, and the topic view shows everything attached to a topic across the modules — including stored material.
+> **Status: stable, still growing.** The frame stands — sign-in, home page, module management, classes, courses and topics are Nuvora. Fourteen modules sit on the core; none has its own accounts or database. Related tools are bundled under one module with **tabs** (e.g. Auswertung = gradebook + class tests, Unterrichtsplanung = curriculum plan + lesson starters, Notizbrett = notes + to-do, Orga = checklists + attendance + lending + seating plan). The shared **topic taxonomy** connects them: a topic students struggled with in CardVote or Code-Detektiv spawns a Karten practice deck or a Lernpfad revision task at the press of a button, test results become a grade column, and the topic view shows everything attached to a topic across the modules — including stored material.
 
 ## Core
 
@@ -48,15 +48,13 @@ The proven interface stayed — it is **built into the web project** (`apps/web/
 
 Vanilla JS, mounted in-page
 
-### Noten (grades)
+### Auswertung — gradebook + class tests
 
-Gradebook: columns from your assessment scheme with weights, grades and observations per person. Works like an empty spreadsheet.
+Assessment in one place, in two tabs.
 
-Computes the weighted average and shows how much of the scheme is covered — the report-card grade stays your decision, observations never count. A **per-student trend** (▲/▼) shows whether performance rises or falls over the term. Importable as a grade column: **CardVote** hit rate, **Karten** mastery and **Code-Detektiv** sessions (each via your grade scale).
+**Gradebook** — columns from your assessment scheme with weights; works like an empty spreadsheet. Computes the weighted average and shows how much of the scheme is covered — the report-card grade stays your decision, observations never count. A **per-student trend** (▲/▼) shows whether performance rises or falls over the term. Importable as a grade column: **CardVote** hit rate, **Karten** mastery and **Code-Detektiv** sessions (each via your grade scale).
 
-### Klassenarbeit (class tests)
-
-Create tasks with a topic and tick right/wrong (or partial points) per student. The evaluation shows points, a grade distribution with an adjustable key, boxplots and per-task discrimination — and **who needs to catch up on which topic**. From there you can trigger targeted revision (Karten deck / Lernpfad). Absent students are excluded from the stats without losing their grades; results are importable as a grade column.
+**Class tests** — create tasks with a topic and tick right/wrong (or partial points) per student. The evaluation shows points, a grade distribution with an adjustable key, boxplots and per-task discrimination — and **who needs to catch up on which topic**. From there you can trigger targeted revision (Karten deck / Lernpfad). Absent students are excluded from the stats without losing their grades.
 
 ### Karten (cards)
 
@@ -66,9 +64,13 @@ Flashcards with spaced repetition (SM-2). A deck belongs to a course; learners p
 
 Lesson planning: day, week and month views plus a recurring **timetable** (class per period, colours, times). A CardVote quiz, a Karten deck or a learning ladder can be planned onto an entry; **days off** (holidays) hide lessons. **Calendar sync** both ways: your own ICS feed to subscribe to (Apple/Google) and an external calendar shown read-only (SSRF-hardened).
 
-### Einstiege (lesson starters)
+### Unterrichtsplanung — curriculum plan + lesson starters
 
-Ideas for opening a lesson — the idea, the procedure with materials, a materials list and an approximate duration. Reusable, assignable to calendar periods and topic-tagged: for a weak topic the home page suggests a matching starter.
+Lesson prep in one place, in two tabs.
+
+**Curriculum plan** — put topics across the school year into an order (rough calendar week, lesson count, note) and tick them off. The year view to the date-precise calendar.
+
+**Lesson starters** — ideas for opening a lesson: the idea, the procedure with materials, a materials list and an approximate duration. Reusable, assignable to calendar periods and topic-tagged: for a weak topic the home page suggests a matching starter.
 
 ### Code-Detektiv
 
@@ -85,7 +87,27 @@ Class-management tools, in tabs:
 
 ### Zufallsschüler (random student)
 
-Draws a random person from a class at the press of a button — fairly weighted by the time since the last draw, never twice in a row.
+Draws a random person from a class at the press of a button — fairly weighted by the time since the last draw, never twice in a row. Optionally restricted to E/G level; also a random-groups generator.
+
+### Notizbrett (notice board)
+
+Two tabs: **Notes** (free jottings, sortable) and **Tasks** (a to-do list). Dated tasks also appear in the calendar. Not tied to students.
+
+### Klassenleitung (class leadership)
+
+Class-leadership duties — currently the **parent contacts** per student: date, channel (phone/mail/meeting) and note. Meets the documentation duty without paper.
+
+### Beobachtungen (observations)
+
+Formative notes per student with a date (effort, social behaviour, progress) — **deliberately separate from the grade**. What the gradebook does not measure has its place here.
+
+### Tafel (board)
+
+Freely placeable text fields and a countdown timer for the projector. Move, resize and colour fields; fullscreen. A pure tool, no data.
+
+### Mathespiele (math games)
+
+A collection of math games. Currently **math football**: a mental-arithmetic duel for two teams on the projector — a correct answer pushes the ball towards the opponent's goal. Number range and operations configurable.
 
 > CardVote was developed standalone up to v1.4.4 ([archive](https://github.com/norbert-me/CardVote)). Further development happens only here. The marketplace now also shares Karten decks, lesson starters and learning ladders.
 
@@ -102,15 +124,20 @@ Nuvora core (apps/api, apps/web)
 ├── accounts · classes · courses · students · topics · material   belong to the core
 ├── module registry                                               who has activated what
 └── modules
-    ├── CardVote      /cardvote/*     voting, evaluation, marketplace
-    ├── Lernpfad      /lernpfad       exercises & ladders (native in-page)
-    ├── Noten         /noten          gradebook, trend, result import
-    ├── Karten        /karten         flashcards, spaced repetition
-    ├── Kalender      /kalender        planning, timetable, ICS sync
-    ├── Einstiege     /methoden       lesson starters (topic-tagged)
-    ├── Code-Detektiv /code-detektiv  programming puzzles (native)
-    ├── Orga          /orga           checklists · attendance · lending · seating plan
-    └── Zufallsschüler /zufall        draw a random student
+    ├── CardVote           /cardvote/*         voting, evaluation, marketplace
+    ├── Lernpfad           /lernpfad           exercises & ladders (native in-page)
+    ├── Karten             /karten             flashcards, spaced repetition
+    ├── Kalender           /kalender           planning, timetable, ICS sync
+    ├── Auswertung         /auswertung         gradebook + class tests
+    ├── Unterrichtsplanung /unterrichtsplanung curriculum plan + lesson starters
+    ├── Code-Detektiv      /code-detektiv      programming puzzles (native)
+    ├── Orga               /orga               checklists · attendance · lending · seating plan
+    ├── Zufallsschüler     /zufall             draw a random student / groups
+    ├── Notizbrett         /notizbrett         notes + to-do
+    ├── Klassenleitung     /klassenleitung     parent contacts
+    ├── Beobachtungen      /notizen            formative notes per student
+    ├── Tafel              /tafel              projector text fields + timer
+    └── Mathespiele        /mathespiele        math games (projector)
 ```
 
 What connects them is an add-on, never a prerequisite: the shared **topic taxonomy** carries the bridges.
@@ -164,8 +191,8 @@ Then on <http://localhost:8080>:
 | `/`          | Nuvora — home, modules, classes, courses, topics  |
 | `/cardvote/` | CardVote module                                   |
 | `/lernpfad`  | Lernpfad module                                   |
-| `/noten`     | Noten module                                      |
-| others       | `/karten` · `/kalender` · `/methoden` · `/code-detektiv` · `/orga` · `/zufall` |
+| `/auswertung`| Auswertung module (gradebook + class tests)       |
+| others       | `/karten` · `/kalender` · `/unterrichtsplanung` · `/code-detektiv` · `/orga` · `/zufall` · `/notizbrett` · `/klassenleitung` · `/notizen` · `/tafel` · `/mathespiele` |
 
 Without `POSTGRES_PASSWORD` and `TOKEN_SECRET` the stack deliberately won't start — default passwords must not accidentally end up in production. Generate a random value with `openssl rand -hex 32`.
 

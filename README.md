@@ -14,7 +14,7 @@ Lernende brauchen keine Geräte und keine Konten — sie tauchen nur als Datens�
 
 Nuvora ist die Basis: Konto, Klassen, Kurse, Schüler und Themen liegen hier. Module werden dazugeschaltet und arbeiten auf diesen Daten — sie besitzen sie nicht.
 
-> **Status: 2.0 — stabil, wächst weiter.** Der Rahmen steht — Anmeldung, Startseite, Modulverwaltung, Klassen, Kurse und Themen sind Nuvora. Zehn Module sitzen auf dem Kern (Orga bündelt weitere Werkzeuge); keins hat eigene Konten oder eine eigene Datenbank. Die geteilte **Themen-Taxonomie** verbindet sie: ein in CardVote oder Code-Detektiv schwaches Thema erzeugt auf Knopfdruck ein Karten-Übungsdeck oder eine Lernpfad-Wiederholung, Test-Ergebnisse werden zu einer Notenspalte, und die Themen-Ansicht zeigt zu einem Thema alles quer über die Module — samt hinterlegtem Material.
+> **Status: stabil, wächst weiter.** Der Rahmen steht — Anmeldung, Startseite, Modulverwaltung, Klassen, Kurse und Themen sind Nuvora. Vierzehn Module sitzen auf dem Kern; keins hat eigene Konten oder eine eigene Datenbank. Verwandte Werkzeuge sind unter einem Modul mit **Reitern** gebündelt (z. B. Auswertung = Notenbuch + Klassenarbeiten, Unterrichtsplanung = Stoffverteilung + Einstiege, Notizbrett = Notizen + To-do, Orga = Checklisten + Anwesenheit + Ausleihe + Sitzplan). Die geteilte **Themen-Taxonomie** verbindet sie: ein in CardVote oder Code-Detektiv schwaches Thema erzeugt auf Knopfdruck ein Karten-Übungsdeck oder eine Lernpfad-Wiederholung, Test-Ergebnisse werden zu einer Notenspalte, und die Themen-Ansicht zeigt zu einem Thema alles quer über die Module — samt hinterlegtem Material.
 
 ## Kern
 
@@ -48,15 +48,13 @@ Die bewährte Oberfläche blieb — sie ist **ins Web-Projekt eingebaut** (`apps
 
 Vanilla JS, in-page gemountet
 
-### Noten
+### Auswertung — Notenbuch + Klassenarbeiten
 
-Notenbuch: Spalten aus deinem Leistungskonzept mit Gewichten, Noten und Beobachtungen je Person. Bedient sich wie eine leere Tabelle.
+Leistung auswerten an einem Ort, in zwei Reitern.
 
-Rechnet den gewichteten Schnitt und zeigt, wie viel des Konzepts belegt ist — die Zeugnisnote bleibt deine Entscheidung, Beobachtungen zählen nie mit. Ein **Trend je Schüler** (▲/▼) zeigt, ob die Leistung übers Halbjahr steigt oder fällt. Als Notenspalte übernehmbar: **CardVote**-Trefferquote, **Karten**-Meisterung und **Code-Detektiv**-Sessions (jeweils über deine Notenskala).
+**Notenbuch** — Spalten aus deinem Leistungskonzept mit Gewichten; bedient sich wie eine leere Tabelle. Rechnet den gewichteten Schnitt und zeigt, wie viel des Konzepts belegt ist — die Zeugnisnote bleibt deine Entscheidung, Beobachtungen zählen nie mit. Ein **Trend je Schüler** (▲/▼) zeigt, ob die Leistung übers Halbjahr steigt oder fällt. Als Notenspalte übernehmbar: **CardVote**-Trefferquote, **Karten**-Meisterung und **Code-Detektiv**-Sessions (jeweils über deine Notenskala).
 
-### Klassenarbeit
-
-Aufgaben mit Thema anlegen und je Schüler richtig/falsch (oder Teilpunkte) ankreuzen. Die Auswertung zeigt Punkte, Notenverteilung mit anpassbarem Schlüssel, Boxplots und Trennschärfe je Aufgabe — und **wer bei welchem Thema Nachholbedarf hat**. Daraus lässt sich gezielte Wiederholung (Karten-Deck / Lernpfad) anstoßen. Abwesende werden herausgerechnet, ohne ihre Noten zu verlieren; Ergebnisse sind als Notenspalte übernehmbar.
+**Klassenarbeiten** — Aufgaben mit Thema anlegen und je Schüler richtig/falsch (oder Teilpunkte) ankreuzen. Die Auswertung zeigt Punkte, Notenverteilung mit anpassbarem Schlüssel, Boxplots und Trennschärfe je Aufgabe — und **wer bei welchem Thema Nachholbedarf hat**. Daraus lässt sich gezielte Wiederholung (Karten-Deck / Lernpfad) anstoßen. Abwesende werden herausgerechnet, ohne ihre Noten zu verlieren.
 
 ### Karten
 
@@ -66,9 +64,13 @@ Karteikarten mit Spaced Repetition (SM-2). Ein Stapel gehört einem Kurs; die Le
 
 Unterrichtsplanung: Tag-, Wochen-, Monatsansicht und ein wiederkehrender **Stundenplan** (Klasse je Stunde, Farben, Uhrzeiten). An einen Eintrag lässt sich ein CardVote-Quiz, ein Karten-Deck oder eine Lernleiter planen; **freie Tage** (Ferien/Feiertage) blenden Stunden aus. **Kalender-Sync** in beide Richtungen: eigener ICS-Feed zum Abonnieren (Apple/Google) und ein externer Kalender read-only eingeblendet (SSRF-gehärtet).
 
-### Einstiege
+### Unterrichtsplanung — Stoffverteilung + Einstiege
 
-Ideen für den Unterrichtseinstieg — Idee, Ablauf mit Material, Materialliste und ungefähre Dauer. Wiederverwendbar, an Kalender-Stunden zuweisbar und themen-getaggt: zu einem schwachen Thema schlägt die Startseite einen passenden Einstieg vor.
+Vorbereitung an einem Ort, in zwei Reitern.
+
+**Stoffverteilung** — Themen übers Schuljahr in eine Reihenfolge bringen (grobe Kalenderwoche, Stundenumfang, Notiz) und abhaken. Die Jahressicht zum datumsgenauen Kalender.
+
+**Einstiege** — Ideen für den Unterrichtseinstieg: Idee, Ablauf mit Material, Materialliste, ungefähre Dauer. Wiederverwendbar, an Kalender-Stunden zuweisbar und themen-getaggt: zu einem schwachen Thema schlägt die Startseite einen passenden Einstieg vor.
 
 ### Code-Detektiv
 
@@ -85,7 +87,27 @@ Werkzeuge zur Klassenführung, in Reitern:
 
 ### Zufallsschüler
 
-Zieht per Knopfdruck eine zufällige Person aus einer Klasse — fair gewichtet nach der Zeit seit dem letzten Ziehen, nicht zweimal am Stück.
+Zieht per Knopfdruck eine zufällige Person aus einer Klasse — fair gewichtet nach der Zeit seit dem letzten Ziehen, nicht zweimal am Stück. Optional auf E-/G-Niveau eingeschränkt; auch als Zufallsgruppen-Generator.
+
+### Notizbrett
+
+Zwei Reiter: **Notizen** (freie Zettel, sortierbar) und **Aufgaben** (To-do-Liste). Datierte Aufgaben erscheinen zusätzlich im Kalender. Nicht an Schüler gebunden.
+
+### Klassenleitung
+
+Aufgaben der Klassenleitung — derzeit die **Elternkontakte** je Schüler: Datum, Kanal (Telefon/Mail/Gespräch) und Notiz. Erfüllt die Dokumentationspflicht ohne Zettel.
+
+### Beobachtungen
+
+Formative Notizen je Schüler mit Datum (Anstrengung, Sozialverhalten, Fortschritt) — **bewusst getrennt von der Note**. Was das Notenbuch nicht misst, hat hier seinen Platz.
+
+### Tafel
+
+Frei platzierbare Textfelder und ein Countdown-Timer für den Beamer. Felder verschieben, skalieren, einfärben; Vollbild. Reines Werkzeug, ohne Daten.
+
+### Mathespiele
+
+Sammlung von Mathe-Spielen. Aktuell **Mathefußball**: Kopfrechen-Duell für zwei Teams am Beamer — die richtige Antwort schiebt den Ball Richtung gegnerisches Tor. Zahlenraum und Rechenarten einstellbar.
 
 ## Architektur
 
@@ -100,15 +122,20 @@ Nuvora-Kern (apps/api, apps/web)
 ├── Konten · Klassen · Kurse · Schüler · Themen · Material   gehören dem Kern
 ├── Modulregister                                            wer hat was aktiviert
 └── Module
-    ├── CardVote      /cardvote/*     Abstimmung, Auswertung, Marktplatz
-    ├── Lernpfad      /lernpfad       Aufgaben & Lernleitern (nativ in-page)
-    ├── Noten         /noten          Notenbuch, Trend, Ergebnis-Übernahme
-    ├── Karten        /karten         Karteikarten, Spaced Repetition
-    ├── Kalender      /kalender        Planung, Stundenplan, ICS-Sync
-    ├── Einstiege     /methoden       Unterrichtseinstiege (themen-getaggt)
-    ├── Code-Detektiv /code-detektiv  Programmier-Rätsel (nativ)
-    ├── Orga          /orga           Checklisten · Anwesenheit · Ausleihe · Sitzplan
-    └── Zufallsschüler /zufall        zufällige Person ziehen
+    ├── CardVote           /cardvote/*         Abstimmung, Auswertung, Marktplatz
+    ├── Lernpfad           /lernpfad           Aufgaben & Lernleitern (nativ in-page)
+    ├── Karten             /karten             Karteikarten, Spaced Repetition
+    ├── Kalender           /kalender           Planung, Stundenplan, ICS-Sync
+    ├── Auswertung         /auswertung         Notenbuch + Klassenarbeiten
+    ├── Unterrichtsplanung /unterrichtsplanung Stoffverteilung + Einstiege
+    ├── Code-Detektiv      /code-detektiv      Programmier-Rätsel (nativ)
+    ├── Orga               /orga               Checklisten · Anwesenheit · Ausleihe · Sitzplan
+    ├── Zufallsschüler     /zufall             zufällige Person / Gruppen
+    ├── Notizbrett         /notizbrett         Notizen + To-do
+    ├── Klassenleitung     /klassenleitung     Elternkontakte
+    ├── Beobachtungen      /notizen            formative Notizen je Schüler
+    ├── Tafel              /tafel              Beamer-Textfelder + Timer
+    └── Mathespiele        /mathespiele        Mathe-Spiele (Beamer)
 ```
 
 Verbindendes ist Zusatz, nie Voraussetzung: die geteilte **Themen-Taxonomie** trägt die Brücken.
@@ -162,8 +189,8 @@ Dann auf <http://localhost:8080>:
 | `/`          | Nuvora — Startseite, Module, Klassen, Kurse, Themen |
 | `/cardvote/` | Modul CardVote                                     |
 | `/lernpfad`  | Modul Lernpfad                                      |
-| `/noten`     | Modul Noten                                         |
-| weitere      | `/karten` · `/kalender` · `/methoden` · `/code-detektiv` · `/orga` · `/zufall` |
+| `/auswertung`| Modul Auswertung (Notenbuch + Klassenarbeiten)     |
+| weitere      | `/karten` · `/kalender` · `/unterrichtsplanung` · `/code-detektiv` · `/orga` · `/zufall` · `/notizbrett` · `/klassenleitung` · `/notizen` · `/tafel` · `/mathespiele` |
 
 Ohne `POSTGRES_PASSWORD` und `TOKEN_SECRET` startet der Stack absichtlich nicht — Standardpasswörter sollen nicht versehentlich in Produktion landen. Zufallswert erzeugen mit `openssl rand -hex 32`.
 
