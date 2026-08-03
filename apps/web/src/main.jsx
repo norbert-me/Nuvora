@@ -136,8 +136,18 @@ const CV = "/cardvote";
 function helpArea(pathname) {
   if (pathname.startsWith("/cardvote")) return "cardvote";
   if (pathname.startsWith("/lernpfad")) return "lernpfad";
-  if (pathname.startsWith("/auswertung")) return "noten";
+  if (pathname.startsWith("/auswertung")) return "auswertung";
+  if (pathname.startsWith("/unterrichtsplanung")) return "unterrichtsplanung";
   if (pathname.startsWith("/karten")) return "karten";
+  if (pathname.startsWith("/kalender")) return "kalender";
+  if (pathname.startsWith("/code-detektiv")) return "code-detektiv";
+  if (pathname.startsWith("/orga")) return "orga";
+  if (pathname.startsWith("/zufall")) return "zufall";
+  if (pathname.startsWith("/notizbrett")) return "notizbrett";
+  if (pathname.startsWith("/klassenleitung")) return "klassenleitung";
+  if (pathname.startsWith("/notizen")) return "notizen";
+  if (pathname.startsWith("/tafel")) return "tafel";
+  if (pathname.startsWith("/mathespiele")) return "mathespiele";
   return "core";
 }
 const LP = "/lernpfad";

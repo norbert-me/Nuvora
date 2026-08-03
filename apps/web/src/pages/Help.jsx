@@ -147,29 +147,25 @@ function ZufallHilfe({ t }) {
   return <Section title={t("help.zu.whatT")}>{t("help.zu.what")}</Section>;
 }
 
-const AREA_COMP = { core: KernHilfe, cardvote: CardVoteHilfe, lernpfad: LernpfadHilfe, karten: KartenHilfe, noten: NotenHilfe, kalender: KalenderHilfe, methoden: EinstiegeHilfe, "code-detektiv": DetektivHilfe, orga: OrgaHilfe, zufall: ZufallHilfe };
-// Reiter-Beschriftung: Modulnamen aus den jeweiligen i18n-Titeln.
-const AREA_TITLE = { cardvote: "CardVote", lernpfad: "Lernpfad", "code-detektiv": "Code-Detektiv", karten: "karten.title", noten: "noten.title", kalender: "kalender.title", methoden: "methoden.title", orga: "orga.title", zufall: "zufall.title" };
-const MODULE_KEYS = ["cardvote", "lernpfad", "karten", "noten", "kalender", "methoden", "code-detektiv", "orga", "zufall"];
+// Bereiche mit eigener, ausführlicher Hilfe. Module ohne Eintrag fallen auf ihre
+// Modul-Beschreibung zurück (unten) — so hat JEDES aktive Modul eine Erklärung.
+const AREA_COMP = { core: KernHilfe, cardvote: CardVoteHilfe, lernpfad: LernpfadHilfe, karten: KartenHilfe, auswertung: NotenHilfe, kalender: KalenderHilfe, unterrichtsplanung: EinstiegeHilfe, "code-detektiv": DetektivHilfe, orga: OrgaHilfe, zufall: ZufallHilfe };
 
 export default function Help() {
   const [params, setParams] = useSearchParams();
   const { modules } = useModules();
   const { t } = useLanguage();
-  const aktiv = new Set(modules.filter((m) => m.active).map((m) => m.key));
 
-  // Kern immer, Module nur wenn aktiv.
-  const sichtbar = ["core", ...MODULE_KEYS.filter((k) => aktiv.has(k))];
+  // Kern immer, dann jedes aktive Modul (in Registry-Reihenfolge).
+  const aktiveModule = modules.filter((m) => m.active);
+  const sichtbar = ["core", ...aktiveModule.map((m) => m.key)];
   const gewuenscht = params.get("area");
   const area = sichtbar.includes(gewuenscht) ? gewuenscht : sichtbar[0];
   const Comp = AREA_COMP[area];
+  const modInfo = modules.find((m) => m.key === area);
 
-  // core-Reiter zeigt "Kern"; Modulnamen aus i18n-Titel (Eigennamen bleiben so).
-  const label = (k) => {
-    if (k === "core") return t("help.coreLabel");
-    const key = AREA_TITLE[k];
-    return key && key.includes(".") ? t(key) : key;
-  };
+  // core-Reiter zeigt "Kern"; Modulnamen kommen aus dem Register (Eigennamen).
+  const label = (k) => (k === "core" ? t("help.coreLabel") : (modules.find((m) => m.key === k)?.name || k));
 
   return (
     <div style={{ ...pageApp }}>
@@ -198,7 +194,9 @@ export default function Help() {
         </div>
       )}
 
-      <Comp t={t} />
+      {Comp ? <Comp t={t} /> : modInfo ? (
+        <Section title={modInfo.name}>{modInfo.description}</Section>
+      ) : null}
 
       <p style={{ fontSize: 13, color: "var(--text3)", marginTop: 24 }}>
         {withLink(t("help.contact"), "/contact", t("footer.contact"))}
