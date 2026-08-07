@@ -1227,13 +1227,15 @@ function ExamMassnahmen({ classId, kursId = null, t }) {
   // Wie viele Ausgleiche es insgesamt gäbe (alle Fächer) — nur so lässt sich
   // sagen, ob wirklich nichts hinterlegt ist oder nur nichts für DIESEN Kurs.
   const [gesamt, setGesamt] = useState(0);
+  const [fehler, setFehler] = useState(false);
   const [offen, setOffen] = useState(false);
   useEffect(() => {
     let alive = true;
+    setFehler(false);
     fetch(`${API}/classes/${classId}/massnahmen?arbeit=true${kursId ? `&kurs_id=${kursId}` : ""}`)
-      .then((r) => (r.ok ? r.json() : []))
+      .then((r) => { if (!r.ok) { if (alive) setFehler(true); return []; } return r.json(); })
       .then((d) => { if (alive) setRows(Array.isArray(d) ? d : []); })
-      .catch(() => {});
+      .catch(() => { if (alive) setFehler(true); });
     fetch(`${API}/classes/${classId}/massnahmen?arbeit=true`)
       .then((r) => (r.ok ? r.json() : []))
       .then((d) => { if (alive) setGesamt(Array.isArray(d) ? d.length : 0); })
@@ -1242,6 +1244,15 @@ function ExamMassnahmen({ classId, kursId = null, t }) {
   }, [classId, kursId]);
   // Auch ohne Eintrag sichtbar: „nichts hinterlegt" ist eine Aussage. Sonst
   // bliebe unklar, ob es keine Ausgleiche gibt oder die Anzeige fehlt.
+  // Ein Serverfehler darf nicht wie „nichts hinterlegt" aussehen — sonst sucht
+  // man den Fehler in den Daten, während der Endpunkt gar nicht antwortet.
+  if (fehler) {
+    return (
+      <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8, fontSize: 12.5, color: C.warning }}>
+        {t("kalender.examMeasuresError")}
+      </div>
+    );
+  }
   if (!rows.length) {
     return (
       <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8, fontSize: 12.5, color: "var(--text3)" }}>

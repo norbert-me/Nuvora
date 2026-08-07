@@ -954,6 +954,7 @@ export default {
   "kalender.examsEmpty": "No upcoming class tests yet.",
   "kalender.examStunden": "lessons left",
   "kalender.examMeasures": "Adjustments for {{n}} students",
+  "kalender.examMeasuresError": "Could not load adjustments (server did not answer).",
   "kalender.examMeasuresNone": "No adjustments recorded for this exam.",
   "kalender.examMeasuresAdd": "Add them in the course",
   "kalender.examMeasuresOtherCourse": "Nothing recorded for this subject — {{n}} adjustment(s) apply in another course.",

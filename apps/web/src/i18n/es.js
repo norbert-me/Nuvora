@@ -954,6 +954,7 @@ export default {
   "kalender.examsEmpty": "Aún no hay exámenes próximos.",
   "kalender.examStunden": "horas restantes",
   "kalender.examMeasures": "Adaptaciones para {{n}} alumnos",
+  "kalender.examMeasuresError": "No se pudieron cargar las adaptaciones (el servidor no responde).",
   "kalender.examMeasuresNone": "Sin adaptaciones registradas para este examen.",
   "kalender.examMeasuresAdd": "Añadirlas en el curso",
   "kalender.examMeasuresOtherCourse": "Nada registrado para esta asignatura — {{n}} adaptación(es) valen en otro curso.",

@@ -984,6 +984,7 @@ export default {
   "kalender.examsEmpty": "Noch keine kommenden Klassenarbeiten.",
   "kalender.examStunden": "Std. bis dahin",
   "kalender.examMeasures": "Abweichungen für {{n}} Schüler",
+  "kalender.examMeasuresError": "Nachteilsausgleiche konnten nicht geladen werden (Server antwortet nicht).",
   "kalender.examMeasuresNone": "Keine Nachteilsausgleiche für diese Arbeit hinterlegt.",
   "kalender.examMeasuresAdd": "Im Kurs eintragen",
   "kalender.examMeasuresOtherCourse": "Für dieses Fach nichts hinterlegt — {{n}} Ausgleich(e) gelten in einem anderen Kurs.",
