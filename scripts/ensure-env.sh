@@ -10,6 +10,14 @@
 
 changed=''
 
+# Vor jeder Aenderung eine Kopie: die .env traegt Secrets, die nur hier
+# existieren. Sieben Kopien reichen, um einen Fehlgriff zu bemerken.
+if [ -f .env ]; then
+  cp -p .env ".env.bak-$(date +%Y%m%d-%H%M%S)" 2>/dev/null || true
+  chmod 600 .env.bak-* 2>/dev/null || true
+  ls -1t .env.bak-* 2>/dev/null | tail -n +8 | xargs -r rm -f
+fi
+
 if [ ! -f .env ]; then
   # Platzhalter aus dem Beispiel NICHT uebernehmen: eine .env mit
   # ADMIN_EMAIL=admin@example.com sieht ausgefuellt aus, verschickt

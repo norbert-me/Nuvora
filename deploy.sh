@@ -106,6 +106,7 @@ echo "→ Nur geänderte Dateien hochladen..."
 rsync -rlz -c --inplace --delete \
   --exclude='.git/' \
   --exclude='.env' \
+  --exclude='.env.bak-*' \
   --exclude='.deploy.env' \
   --exclude='node_modules/' \
   --exclude='venv/' \
