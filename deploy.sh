@@ -159,6 +159,29 @@ else
   echo "  ✓ .env vollständig, unverändert."
 fi
 
+# Mailversand und Kontaktadresse sind kein Pflichtwert (der Stack laeuft ohne),
+# aber ihr Fehlen faellt im Betrieb erst auf, wenn eine Registrierung haengt
+# oder eine Kontaktanfrage ins Leere geht. Darum hier laut sagen.
+MAIL_WARN=$(ssh "$SERVER" "cd '$REMOTE_DIR' 2>/dev/null || exit 0
+  host=\$(sed -n 's|^SMTP_HOST=\([^#]*\).*|\1|p' .env | tr -d ' \t' | head -1)
+  from=\$(sed -n 's|^SMTP_FROM=\([^#]*\).*|\1|p' .env | tr -d ' \t' | head -1)
+  mail=\$(sed -n 's|^ADMIN_EMAIL=\([^#]*\).*|\1|p' .env | tr -d ' \t' | head -1)
+  [ -z \"\$host\" ] && echo 'SMTP_HOST fehlt'
+  [ -z \"\$from\" ] && echo 'SMTP_FROM fehlt'
+  case \"\$mail\" in
+    ''|*example.com|admin) echo 'ADMIN_EMAIL ist keine echte Adresse' ;;
+  esac
+")
+if [ -n "$MAIL_WARN" ]; then
+  echo ""
+  echo "  ⚠ Mailversand unvollständig:"
+  printf '      %s\n' $MAIL_WARN
+  echo "      Ohne diese Werte gehen Bestätigungs-, Reset- und Kontaktmails nicht raus."
+  echo "      ssh $SERVER"
+  echo "      cd $REMOTE_DIR && nano .env   # danach: ./deploy.sh api"
+  echo ""
+fi
+
 # Der Port-Konflikt zeigt sich sonst erst, wenn alle Images gebaut sind und
 # der Proxy als letzter Container startet — also nach mehreren Minuten.
 echo "→ Port prüfen..."
