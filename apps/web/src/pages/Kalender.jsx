@@ -1480,7 +1480,7 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onClo
       <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 440 }}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 2 }}>{t("kalender.timetable")}</h3>
         <div style={{ fontSize: 12.5, color: "var(--text3)" }}>{wdays[slot.weekday]} · {slot.period}. {t("kalender.period")}</div>
-        <div style={lbl}>{t("nav.classes")}</div>
+        <div style={lbl}>{t("kalender.kursOrClass")}</div>
         <KursKlasseSelect value={classId === "" ? "" : Number(classId)} kursValue={slot.kurs_id ?? null} allowNone noneLabel={`– ${t("kalender.noClass")} –`} autoFocus
           onChange={(id, kid) => { setClassId(id === "" ? "" : String(id)); setKursId(id === "" ? null : (kid ?? null)); }}
           onKurs={setKursId} style={sfld} />
@@ -1627,9 +1627,11 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
               <div style={{ marginTop: 4 }}>
                 {clsName && (
                   <div style={{ display: "flex", gap: 8, fontSize: 13.5, padding: "3px 0" }}>
-                    <span style={{ color: "var(--text3)", minWidth: 90 }}>{t("nav.classes")}</span>
-                    {/* Kurs anklickbar: öffnet die Klasse/den Kurs im Kern. */}
-                    <Link to={`/classes?open=${classId}`} onClick={onClose} style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>{clsName} ↗</Link>
+                    {/* Steht dort ein Kurs (Fach), heißt die Zeile auch so — und
+                        der Link führt in den Kurs, nicht in die Klasse. */}
+                    <span style={{ color: "var(--text3)", minWidth: 90 }}>{kursId ? t("kurse.one") : t("nav.classes")}</span>
+                    <Link to={kursId ? "/kurse" : `/classes?open=${classId}`} onClick={onClose}
+                      style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>{clsName} ↗</Link>
                   </div>
                 )}
                 {zeile(t("kalender.topic"), topName)}
@@ -1718,7 +1720,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
           </div>
           {timeInvalid && <div style={{ fontSize: 12, color: C.danger, marginTop: 5 }}>{t("kalender.timeInvalid")}</div>}
         </>)}
-        <div style={lbl}>{t("nav.classes")}</div>
+        <div style={lbl}>{t("kalender.kursOrClass")}</div>
         <KursKlasseSelect value={classId === "" ? "" : Number(classId)} kursValue={kursId} allowNone noneLabel={`– ${t("kalender.noClass")} –`}
           onChange={(id, kid) => { setClassId(id === "" ? "" : String(id)); setKursId(id === "" ? null : (kid ?? null)); }} onKurs={setKursId} style={sfld} />
         <div style={lbl}>{t("kalender.topic")}</div>

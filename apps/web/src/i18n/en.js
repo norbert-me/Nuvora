@@ -157,6 +157,8 @@ export default {
   "classes.trash": "Trash",
   "kurse.emptyTitle": "No course yet",
   "kurse.emptyHint": "A course is a subject of a class (e.g. Maths 7.5). Enter a name above to create one.",
+  "kurse.one": "Course",
+  "kalender.kursOrClass": "Course / class",
   "kurse.title": "Courses",
   "kurse.intro": "Bundle subject-classes of the same group into a course (e.g. Math 7.5 and Study 7.5). Classes in the same course share the student list and attendance; cards and grades stay per subject-class. A class may be in several courses.",
   "kurse.newPlaceholder": "New course, e.g. 7.5",

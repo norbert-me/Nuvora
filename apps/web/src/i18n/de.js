@@ -157,6 +157,8 @@ export default {
   "classes.trash": "Papierkorb",
   "kurse.emptyTitle": "Noch kein Kurs",
   "kurse.emptyHint": "Ein Kurs ist ein Fach einer Klasse (z.B. Mathe 7.5). Oben Namen eingeben und anlegen.",
+  "kurse.one": "Kurs",
+  "kalender.kursOrClass": "Kurs / Klasse",
   "kurse.title": "Kurse",
   "kurse.intro": "Fach-Klassen derselben Lerngruppe zu einem Kurs bündeln (z.B. Mathe 7.5 und Lernzeit 7.5). Klassen im selben Kurs teilen sich Schülerliste und Anwesenheit; Karten und Noten bleiben pro Fach-Klasse. Eine Klasse darf in mehreren Kursen sein.",
   "kurse.newPlaceholder": "Neuer Kurs, z.B. 7.5",

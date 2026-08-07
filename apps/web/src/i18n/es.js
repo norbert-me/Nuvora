@@ -157,6 +157,8 @@ export default {
   "classes.trash": "Papelera",
   "kurse.emptyTitle": "Aún no hay curso",
   "kurse.emptyHint": "Un curso es una asignatura de una clase (p.ej. Mates 7.5). Escribe un nombre arriba para crear uno.",
+  "kurse.one": "Curso",
+  "kalender.kursOrClass": "Curso / clase",
   "kurse.title": "Cursos",
   "kurse.intro": "Agrupa clases de la misma cohorte en un curso (p. ej. Mates 7.5 y Estudio 7.5). Las clases del mismo curso comparten la lista de alumnos y la asistencia; las tarjetas y notas siguen por clase. Una clase puede estar en varios cursos.",
   "kurse.newPlaceholder": "Nuevo curso, p. ej. 7.5",

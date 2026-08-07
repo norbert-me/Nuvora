@@ -347,11 +347,24 @@ async def set_kurs_massnahmen(kurs_id: int, body: MassnahmenIn, user: User = Dep
             raise HTTPException(400, "Beschreibung zu lang (max. 300 Zeichen)")
         neu.append({"art": art, "detail": detail, "arbeit": bool(m.get("arbeit")), "kurs_id": kurs_id})
 
-    members = list(await member_class_ids(db, [kurs_id]))
-    if not members:
+    # Dieselbe Menge wie beim Lesen: SuS der Mitgliedsklassen UND einzeln
+    # hinzugefügte. Über member_class_ids allein blieb ein Kurs aus Teilen von
+    # Klassen ohne Treffer — gespeichert wurde dann nichts.
+    sids = list(await member_student_ids(db, kurs_id))
+    if not sids:
         return
-    studs = (await db.execute(select(Student).where(Student.class_id.in_(members)))).scalars().all()
-    for s in studs:
+    studs = (await db.execute(select(Student).where(Student.id.in_(sids)))).scalars().all()
+    # Auf alle Fach-Klassen-Zeilen der Person schreiben (gleicher Name), damit
+    # jede Ansicht dieselben Daten sieht — auch die des Kalenders, der über die
+    # Geschwisterklassen der Termin-Klasse sucht.
+    klassen = {s.class_id for s in studs if s.name.strip() == name}
+    zwillinge = []
+    if klassen:
+        alle = set()
+        for cid in klassen:
+            alle |= await sibling_class_ids(db, cid)
+        zwillinge = (await db.execute(select(Student).where(Student.class_id.in_(list(alle))))).scalars().all()
+    for s in {x.id: x for x in list(studs) + list(zwillinge)}.values():
         if s.name.strip() != name:
             continue
         fremd = [m for m in (s.massnahmen or []) if m.get("kurs_id") not in (None, kurs_id)]
