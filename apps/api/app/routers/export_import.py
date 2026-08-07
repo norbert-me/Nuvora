@@ -373,8 +373,13 @@ async def _export_folder_recursive(folder_id: int, db: AsyncSession) -> dict:
             "name": qs.name,
             "shuffle_questions": qs.shuffle_questions,
             "shuffle_answers": qs.shuffle_answers,
+            # E/G-Differenzierung gehoert zum Quiz — ohne sie waere die
+            # zurueckgespielte Fassung anders bewertet als das Original.
+            "niveau_aktiv": bool(qs.niveau_aktiv),
+            "minuspunkte": bool(qs.minuspunkte),
             "questions": [
                 {
+                    "niveau": item.niveau or "",
                     "text": item.question.text,
                     "choices": item.question.choices,
                     "correct_answer": item.question.correct_answer,
@@ -421,6 +426,8 @@ async def _import_folder_recursive(data: dict, parent_id, owner_id, db: AsyncSes
             folder_id=folder.id,
             shuffle_questions=qs_data.get("shuffle_questions", False),
             shuffle_answers=qs_data.get("shuffle_answers", False),
+            niveau_aktiv=bool(qs_data.get("niveau_aktiv", False)),
+            minuspunkte=bool(qs_data.get("minuspunkte", False)),
         )
         db.add(qs)
         await db.flush()
@@ -437,7 +444,8 @@ async def _import_folder_recursive(data: dict, parent_id, owner_id, db: AsyncSes
             )
             db.add(q)
             await db.flush()
-            db.add(QuestionSetItem(question_set_id=qs.id, question_id=q.id, position=pos))
+            db.add(QuestionSetItem(question_set_id=qs.id, question_id=q.id, position=pos,
+                                   niveau="E" if qdata.get("niveau") == "E" else ""))
     for child_data in data.get("children", []):
         await _import_folder_recursive(child_data, folder.id, owner_id, db)
     return folder
