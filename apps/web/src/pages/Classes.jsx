@@ -14,7 +14,6 @@ import { undoDelete } from "../core/undo.jsx";
 import { useSearchParams, Link } from "react-router-dom";
 import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, selectStyle, pageApp} from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
-import KlassenLinks from "../components/KlassenLinks.jsx";
 import AuthImage from "../components/AuthImage.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
@@ -268,9 +267,6 @@ export default function Classes() {
         {!editing.id && (
           <p style={{ color: "var(--text3)", fontSize: 12.5, marginBottom: 16, maxWidth: 460 }}>{t("classes.subjectHint")}</p>
         )}
-        {/* Zweiter Weg durch Nuvora: von der Klasse aus in die Module, statt
-            erst das Modul zu wählen und dort die Klasse zu suchen. */}
-        {editing.id && <KlassenLinks classId={editing.id} kursId={editing.kurs_id ?? null} />}
         <p style={{ color: "var(--text3)", marginBottom: 8, fontSize: 14 }}>
           {t("classes.fillHint", { filled, total: students.length })}
         </p>

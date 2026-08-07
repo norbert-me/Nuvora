@@ -1233,7 +1233,16 @@ function ExamMassnahmen({ classId, t }) {
       .catch(() => {});
     return () => { alive = false; };
   }, [classId]);
-  if (!rows.length) return null;
+  // Auch ohne Eintrag sichtbar: „nichts hinterlegt" ist eine Aussage. Sonst
+  // bliebe unklar, ob es keine Ausgleiche gibt oder die Anzeige fehlt.
+  if (!rows.length) {
+    return (
+      <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8, fontSize: 12.5, color: "var(--text3)" }}>
+        {t("kalender.examMeasuresNone")}{" "}
+        <Link to={`/classes?open=${classId}`} style={{ color: "var(--accent)" }}>{t("kalender.examMeasuresAdd")}</Link>
+      </div>
+    );
+  }
   return (
     <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
       <button onClick={() => setOffen((v) => !v)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--accent)", fontSize: 12.5, fontWeight: 600 }}>
