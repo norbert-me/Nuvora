@@ -8,6 +8,7 @@ import ViewMenu from "../components/ViewMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
+import { useUrlClass } from "../core/klassenwahl.js";
 
 const API = "/api/sitzplan";
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -31,6 +32,8 @@ export default function Sitzplan() {
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
   const [kursId, setKursId] = useState(null); // Sitzplan hängt am Kurs (Fach)
+  // Aus dem Kurs verlinkt (?class=&kurs=): dann diesen Inhalt zeigen.
+  useUrlClass(setClassId, setKursId);
   const [seats, setSeats] = useState([]); // [{sid,x,y,rot}] — sid=String mit empty:true = leerer Platz
   // Rückgängig: vor jeder Geste (Ziehen, Drehen, Löschen, Anordnen, Import,
   // Leeren, leerer Platz) den Stand sichern; Undo stellt ihn wieder her.

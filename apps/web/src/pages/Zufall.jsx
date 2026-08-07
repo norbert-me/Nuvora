@@ -8,6 +8,7 @@ import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
+import { useUrlClass } from "../core/klassenwahl.js";
 
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -18,6 +19,8 @@ export default function Zufall() {
   const anwesenheitAktiv = modules.find((m) => m.key === "orga")?.active ?? false;
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
+  // Aus dem Kurs verlinkt (?class=&kurs=): dann diesen Inhalt zeigen.
+  useUrlClass(setClassId);
   const [ohneWdh, setOhneWdh] = useState(true);
   const [skipAbs, setSkipAbs] = useState(true);    // Abwesende überspringen
   const [gewichtet, setGewichtet] = useState(false); // am seltensten dran bevorzugen

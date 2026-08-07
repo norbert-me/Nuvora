@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
 import { swr, lastClass, rememberClass } from "../core/cache.js";
+import { useUrlClass } from "../core/klassenwahl.js";
 
 const API = "/api/elternlog";
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -18,6 +19,8 @@ export default function Elternlog() {
   const [grades, setGrades] = useState({}); // student_id -> Gesamtnote (nur bei aktivem Noten-Modul)
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
+  // Aus dem Kurs verlinkt (?class=&kurs=): dann diesen Inhalt zeigen.
+  useUrlClass(setClassId);
   const [counts, setCounts] = useState({});
   const [sel, setSel] = useState(null);
   const [list, setList] = useState([]);

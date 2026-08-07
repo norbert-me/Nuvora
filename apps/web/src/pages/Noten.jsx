@@ -16,6 +16,7 @@ import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle,
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
+import { useUrlClass } from "../core/klassenwahl.js";
 
 const API = "/api/noten";
 
@@ -34,6 +35,8 @@ export default function Noten() {
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
   const [kursId, setKursId] = useState(null); // Noten hängen am Kurs (Fach)
+  // Aus dem Kurs verlinkt (?class=&kurs=): dann diesen Inhalt zeigen.
+  useUrlClass(setClassId, setKursId);
   const kp = kursId != null ? `&kurs_id=${kursId}` : "";
   // Teilkurs (Kurse aus Teilen von Klassen): Noten-Zeilen = die Einzel-SuS des
   // Kurses. classId zeigt dann auf die Repräsentant-Klasse (erster SuS) für die

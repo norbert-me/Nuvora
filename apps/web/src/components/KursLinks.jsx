@@ -41,18 +41,20 @@ export default function KursLinks({ kurs }) {
   const orgaAn = (tab) => an("orga") && !versteckt.includes(tab);
   if (!classId) return null;
 
-  const kq = kurs?.id ? `&kurs=${kurs.id}` : "";
+  // Klasse und Kurs stehen an JEDEM Link: die Zielseite soll den Inhalt dieses
+  // Kurses zeigen, nicht die zuletzt irgendwo gewählte Klasse.
+  const q = `class=${classId}${kurs?.id ? `&kurs=${kurs.id}` : ""}`;
   const ziele = [
-    an("auswertung") && { to: "/auswertung?tab=noten", icon: ICONS.chart, label: t("kursLinks.noten") },
-    an("auswertung") && { to: "/auswertung?tab=klassenarbeit", icon: ICONS.chart, label: t("kursLinks.klassenarbeit") },
-    an("karten") && { to: `/karten?tab=cards&class=${classId}${kq}`, icon: ICONS.duplicate, label: t("kursLinks.karten") },
+    an("auswertung") && { to: `/auswertung?tab=noten&${q}`, icon: ICONS.chart, label: t("kursLinks.noten") },
+    an("auswertung") && { to: `/auswertung?tab=klassenarbeit&${q}`, icon: ICONS.chart, label: t("kursLinks.klassenarbeit") },
+    an("karten") && { to: `/karten?tab=cards&${q}`, icon: ICONS.duplicate, label: t("kursLinks.karten") },
     an("cardvote") && { to: `/cardvote/class-evaluation/${classId}`, icon: ICONS.chart, label: t("kursLinks.cardvote") },
-    an("lernpfad") && { to: "/lernpfad", icon: ICONS.open, label: t("kursLinks.lernpfad") },
-    orgaAn("sitzplan") && { to: "/orga?tab=sitzplan", icon: ICONS.grip, label: t("sitzplan.title") },
-    orgaAn("anwesenheit") && { to: "/orga?tab=anwesenheit", icon: ICONS.circle, label: t("anwesenheit.title") },
-    orgaAn("ausleihe") && { to: "/orga?tab=ausleihe", icon: ICONS.archive, label: t("ausleihe.title") },
-    an("klassenleitung") && { to: "/klassenleitung", icon: ICONS.note, label: t("kursLinks.klassenleitung") },
-    an("zufall") && { to: "/zufall", icon: ICONS.shuffle, label: t("kursLinks.zufall") },
+    an("lernpfad") && { to: `/lernpfad?${q}`, icon: ICONS.open, label: t("kursLinks.lernpfad") },
+    orgaAn("sitzplan") && { to: `/orga?tab=sitzplan&${q}`, icon: ICONS.grip, label: t("sitzplan.title") },
+    orgaAn("anwesenheit") && { to: `/orga?tab=anwesenheit&${q}`, icon: ICONS.circle, label: t("anwesenheit.title") },
+    orgaAn("ausleihe") && { to: `/orga?tab=ausleihe&${q}`, icon: ICONS.archive, label: t("ausleihe.title") },
+    an("klassenleitung") && { to: `/klassenleitung?${q}`, icon: ICONS.note, label: t("kursLinks.klassenleitung") },
+    an("zufall") && { to: `/zufall?${q}`, icon: ICONS.shuffle, label: t("kursLinks.zufall") },
   ].filter(Boolean);
 
   if (ziele.length === 0) return null;

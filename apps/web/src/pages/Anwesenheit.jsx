@@ -8,6 +8,7 @@ import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
+import { useUrlClass } from "../core/klassenwahl.js";
 
 const API = "/api/anwesenheit";
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -23,6 +24,8 @@ export default function Anwesenheit() {
   const [showLegend, setShowLegend] = useState(false); // Legende (Anwesend/Fehlt…) einklappbar
   // Vorauswahl per ?class= / ?date= (z. B. aus dem Kalender).
   const [classId, setClassId] = useState(() => Number(params.get("class")) || null);
+  // Aus dem Kurs verlinkt (?class=&kurs=): dann diesen Inhalt zeigen.
+  useUrlClass(setClassId);
   const [datum, setDatum] = useState(params.get("date") || ymd(new Date()));
   const [tag, setTag] = useState({});      // { student_id: {status,note} }
   const [summe, setSumme] = useState({});   // { student_id: {fehlt,spaet,entsch} }

@@ -11,6 +11,7 @@ import { useModules } from "../core/modules.js";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { lastClass, rememberClass } from "../core/cache.js";
 import { gradeFromPct, gradeDetailed, quantile, stdev, DEFAULT_SCALE } from "../core/grades.js";
+import { useUrlClass } from "../core/klassenwahl.js";
 
 const API = "/api/klassenarbeit";
 const newId = () => "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -70,6 +71,8 @@ export default function Klassenarbeit() {
   // diesen Hinweis riete die Auswahl den ersten Kurs (Bug: „7.5" gewählt, Arbeit
   // landet unter „7.5 LZ"). Als kursValue an KursKlasseSelect weitergereicht.
   const [kursId, setKursId] = useState(Number(params.get("kurs")) || null);
+  // Aus dem Kurs verlinkt (?class=&kurs=): dann diesen Inhalt zeigen.
+  useUrlClass(setClassId, setKursId);
   const [subsetKurs, setSubsetKurs] = useState(null); // gewählter Teilkurs (Kurs aus Teilen von Klassen) oder null
   const [subsetKurse, setSubsetKurse] = useState([]); // Kurse mit einzeln hinzugefügten SuS
   const [classes, setClasses] = useState([]);
