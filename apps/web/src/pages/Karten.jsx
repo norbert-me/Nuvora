@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, selectStyle, overlayGuard, modalOverlay, modalPanel, Empty, Skeleton, pageApp, inputStyle} from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, selectStyle, overlayGuard, modalOverlay, modalPanel, Empty, Skeleton, pageApp, inputStyle, Popover} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import AuthImage from "../components/AuthImage.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -305,10 +305,10 @@ export default function Karten() {
                 <AddButton onClick={() => setAddMenuOpen((v) => !v)} title={t("common.add")} />
                 {addMenuOpen && (<>
                   <div onClick={() => setAddMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-                  <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50, minWidth: 190, background: "var(--card)", border: "1px solid var(--border2)", borderRadius: 12, boxShadow: "0 8px 30px rgba(0,0,0,0.18)", padding: 6 }}>
+                  <Popover style={{ minWidth: 190, padding: 6 }}>
                     <button onClick={() => { setAddMenuOpen(false); setAddMode("deck"); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "9px 12px", background: "none", border: "none", borderRadius: 8, color: "var(--text)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", textAlign: "left" }}><Icon d={ICONS.plus} size={15} /> {t("karten.newDeckItem")}</button>
                     <button onClick={() => { setAddMenuOpen(false); setAddMode("folder"); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "9px 12px", background: "none", border: "none", borderRadius: 8, color: "var(--text)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", textAlign: "left" }}><Icon d={ICONS.plus} size={15} /> {t("karten.newFolderItem")}</button>
-                  </div>
+                  </Popover>
                 </>)}
               </div>
             )}
@@ -701,7 +701,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
             </button>
             {moveOpen && (<>
               <div onClick={() => setMoveOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-              <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50, minWidth: 180, maxHeight: 260, overflow: "auto", background: "var(--card)", border: "1px solid var(--border2)", borderRadius: 12, boxShadow: "0 8px 30px rgba(0,0,0,0.18)", padding: 6 }}>
+              <Popover style={{ minWidth: 180, maxHeight: 260, overflow: "auto", padding: 6 }}>
                 {[{ id: null, name: `– ${t("karten.rootFolder")} –` }, ...folders].map((f) => {
                   const active = (deck.folder_id ?? null) === f.id;
                   return (
@@ -711,7 +711,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
                     </button>
                   );
                 })}
-              </div>
+              </Popover>
             </>)}
           </div>
         )}
@@ -743,7 +743,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           {rollOpen && (
             <>
               <div onClick={() => setRollOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 30 }} />
-              <div style={{ position: "absolute", left: 0, top: "calc(100% + 4px)", zIndex: 31, background: "var(--card)", border: "1px solid var(--border2)", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.18)", padding: 8, minWidth: 240 }}>
+              <Popover style={{ zIndex: 31, padding: 8, minWidth: 240 }}>
                 {status !== "aus" && <button onClick={() => { setRollOpen(false); release({ now: true }); }} style={{ ...menuRow }}><Icon d={ICONS.upload} size={15} color="var(--accent)" /> {t("karten.rollOutNow")}</button>}
                 {status !== "aus" && (
                   <div style={{ padding: "8px 10px" }}>
@@ -758,7 +758,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
                   </div>
                 )}
                 {status !== "entwurf" && <button onClick={() => { setRollOpen(false); release({}); }} style={{ ...menuRow, color: C.danger }}><Icon d={ICONS.ban} size={15} color={C.danger} /> {t("karten.withdraw")}</button>}
-              </div>
+              </Popover>
             </>
           )}
         </div>

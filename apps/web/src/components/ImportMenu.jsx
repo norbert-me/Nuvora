@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useLanguage } from "../i18n/index.jsx";
-import { Icon, ICONS, popoverPanel } from "./Icons.jsx";
+import { Icon, ICONS, popoverPanel , Popover} from "./Icons.jsx";
 
 // item: { label, onClick } für Importieren, oder { label, href } für Vorlagen-Downloads
 function MenuRow({ item, onClose }) {
@@ -65,16 +65,13 @@ export default function ImportMenu({ importItems = [], templateItems = [] }) {
       </button>
 
       {open && (
-        <div style={{
-          ...popoverPanel, position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50,
-          minWidth: 230, padding: 6,
-        }}>
+        <Popover style={{ minWidth: 230, padding: 6 }}>
           {importItems.map((item, i) => <MenuRow key={`i${i}`} item={item} onClose={() => setOpen(false)} />)}
           {importItems.length > 0 && templateItems.length > 0 && (
             <div style={{ height: 1, background: "var(--border3)", margin: "6px 4px" }} />
           )}
           {templateItems.map((item, i) => <MenuRow key={`t${i}`} item={item} onClose={() => setOpen(false)} />)}
-        </div>
+        </Popover>
       )}
     </div>
   );

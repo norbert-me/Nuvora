@@ -12,7 +12,7 @@ import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, overlayGuard, modalOverlay, modalPanel, popoverPanel, Empty, Skeleton, ExportButton, ImportButton, inputStyle} from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, overlayGuard, modalOverlay, modalPanel, popoverPanel, Empty, Skeleton, ExportButton, ImportButton, inputStyle, Popover} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
@@ -413,11 +413,11 @@ export default function Noten() {
               </button>
               {exportOpen && (<>
                 <div onClick={() => setExportOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-                <div style={{ ...popoverPanel, position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 50, minWidth: 220, padding: 6 }}>
+                <Popover align="right" style={{ minWidth: 220, padding: 6 }}>
                   <button onClick={() => { setExportOpen(false); doExport(); }} style={expRow}><Icon d={ICONS.export} size={15} /> {t("noten.exportBundle")}</button>
                   <button onClick={() => { setExportOpen(false); doExportJson(); }} style={expRow}><Icon d={ICONS.export} size={15} /> {t("noten.exportData")}</button>
                   <button onClick={() => { setExportOpen(false); doZeugnis(); }} style={expRow}><Icon d={ICONS.pdf || ICONS.export} size={15} /> {t("noten.zeugnis")}</button>
-                </div>
+                </Popover>
               </>)}
             </div>
             <ImportButton iconOnly title={t("noten.import")} onFile={doImport} />
@@ -918,11 +918,11 @@ function SectionMenu({ t, sec, onEdit, onDelete, onAddCol }) {
       {open && (
         <>
           <span onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 9 }} />
-          <div style={{ ...popoverPanel, position: "absolute", zIndex: 10, top: 24, right: 0, minWidth: 168, padding: 4 }}>
+          <Popover align="right" style={{ zIndex: 10, top: 24, minWidth: 168, padding: 4 }}>
             <button style={item} onClick={() => { setOpen(false); onAddCol(); }}><Icon d={ICONS.plus} size={14} color="var(--accent)" /> {t("noten.addColumn")}</button>
             <button style={item} onClick={() => { setOpen(false); setEdit(true); }}><Icon d={ICONS.edit} size={14} /> {t("common.edit")}</button>
             <button style={{ ...item, color: C.danger }} onClick={() => { setOpen(false); onDelete(); }}><Icon d={ICONS.trash} size={14} color={C.danger} /> {t("common.delete")}</button>
-          </div>
+          </Popover>
         </>
       )}
     </span>
@@ -940,7 +940,7 @@ function ColMenu({ t, cat, stats, onStats, onRename, onDelete, onClose, dividerO
   return (
     <>
       <span onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 9 }} />
-      <div onClick={(e) => e.stopPropagation()} style={{ ...popoverPanel, position: "absolute", zIndex: 10, top: 26, left: "50%", transform: "translateX(-50%)", minWidth: 210, padding: 12, textAlign: "left", fontWeight: 400 }}>
+      <Popover align="center" onClick={(e) => e.stopPropagation()} style={{ zIndex: 10, top: 26, minWidth: 210, padding: 12, textAlign: "left", fontWeight: 400 }}>
         <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 8 }}>{t("noten.colCreated")}: {datum}</div>
         {/* Auswertung: schlichter Details-Knopf, öffnet das zentrale Modal. */}
         <button onClick={() => { onStats(); onClose(); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 10, padding: "7px 9px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer" }}>
@@ -996,7 +996,7 @@ function ColMenu({ t, cat, stats, onStats, onRename, onDelete, onClose, dividerO
           <button onClick={save} style={{ ...btnPrimary, padding: "5px 12px", fontSize: 12 }}>{t("common.save")}</button>
           <button onClick={onDelete} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
         </div>
-      </div>
+      </Popover>
     </>
   );
 }

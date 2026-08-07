@@ -43,7 +43,7 @@ export function UndoHost() {
   return (
     <div style={{ position: "fixed", left: "50%", bottom: 24, transform: "translateX(-50%)", zIndex: 3200, display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
       {items.map((it) => (
-        <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 16, background: "#1e293b", color: "#fff", padding: "10px 12px 10px 16px", borderRadius: 10, fontSize: 14, boxShadow: "0 6px 20px rgba(0,0,0,0.3)", minWidth: 260 }}>
+        <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 16, background: "#1e293b", color: "#fff", padding: "10px 12px 10px 16px", borderRadius: 10, fontSize: 14, boxShadow: "0 6px 20px rgba(0,0,0,0.3)", minWidth: 260, maxWidth: "calc(100vw - 24px)", boxSizing: "border-box" }}>
           <span style={{ flex: 1 }}>{it.message}</span>
           <button onClick={() => finish(it.id, true)}
             style={{ background: "none", border: "none", color: "#7dd3fc", fontWeight: 700, fontSize: 14, cursor: "pointer", padding: "2px 6px" }}>

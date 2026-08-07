@@ -55,10 +55,12 @@ export default function GuidedTour({ steps, onDone, t }) {
   if (rect) {
     const below = rect.top + rect.height + pad + 12 + 180 < vh;
     const top = below ? rect.top + rect.height + pad + 12 : Math.max(12, rect.top - pad - 12 - 180);
-    let left = Math.min(Math.max(12, rect.left), vw - 332);
-    tip = { position: "fixed", top, left, width: 320 };
+    // Auf schmalen Geraeten passt die feste Breite nicht — dann den Rand nutzen.
+    const breite = Math.min(320, vw - 24);
+    let left = Math.min(Math.max(12, rect.left), Math.max(12, vw - breite - 12));
+    tip = { position: "fixed", top, left, width: breite };
   } else {
-    tip = { position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 340 };
+    tip = { position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: Math.min(340, vw - 24) };
   }
 
   return (

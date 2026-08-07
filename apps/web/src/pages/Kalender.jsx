@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, overlayGuard, modalOverlay, modalPanel, popoverPanel, ExportButton, ImportButton, pageApp} from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, overlayGuard, modalOverlay, modalPanel, popoverPanel, ExportButton, ImportButton, pageApp, Popover} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, put } from "../core/cache.js";
@@ -440,7 +440,7 @@ export default function Kalender() {
               <div onClick={() => setViewMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
               {/* Am Knopf ausgerichtet (links), nicht am rechten Rand — der Knopf
                   steht links, das Menü lief sonst aus dem Bild. */}
-              <div style={{ ...popoverPanel, position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50, minWidth: 220, padding: 6 }}>
+              <Popover style={{ minWidth: 220, padding: 6 }}>
                 <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", padding: "6px 12px 4px", textTransform: "uppercase", letterSpacing: 0.4 }}>{t("kalender.showHide")}</div>
                 <label style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", boxSizing: "border-box", padding: "8px 12px", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: "pointer", borderRadius: 8 }}>
                   <input type="checkbox" checked={showAllDay} onChange={toggleAllDay} />
@@ -468,7 +468,7 @@ export default function Kalender() {
                     {t("kalender.extUnhideAll", { n: extHidden.length })}
                   </button>
                 )}
-              </div>
+              </Popover>
             </>)}
           </div>
         )}
@@ -479,12 +479,12 @@ export default function Kalender() {
             </button>
             {moreOpen && (<>
               <div onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-              <div style={{ ...popoverPanel, position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50, minWidth: 200, padding: 6 }}>
+              <Popover style={{ minWidth: 200, padding: 6 }}>
                 <button onClick={() => { setMoreOpen(false); openAbo(); }} title={t("kalender.subscribeHint")}
                   style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "8px 12px", background: "none", border: "none", borderRadius: 8, color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: "pointer", textAlign: "left" }}>
                   <Icon d={ICONS.share} size={15} /> {t("kalender.subscribe")}
                 </button>
-              </div>
+              </Popover>
             </>)}
           </div>
         )}
@@ -513,7 +513,7 @@ export default function Kalender() {
                 style={{ border: "none", background: "none", fontSize: 15, fontWeight: 700, color: "var(--text)", minWidth: 170, textAlign: "center", cursor: "pointer", padding: "4px 8px", borderRadius: 8, borderBottom: "1px dotted var(--border2)" }}>{title} ▾</button>
               {jumpOpen && (<>
                 <div onClick={() => setJumpOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-                <div style={{ ...popoverPanel, position: "absolute", top: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)", zIndex: 50, padding: 8, display: "flex", gap: 6, alignItems: "center" }}>
+                <Popover align="center" style={{ padding: 8, display: "flex", gap: 6, alignItems: "center" }}>
                   {view === "month" && (
                     <select value={cursor.getMonth()} onChange={(e) => { setCursor(startOfDay(new Date(cursor.getFullYear(), Number(e.target.value), 1))); setJumpOpen(false); }} style={{ ...selectStyle, padding: "6px 24px 6px 8px", fontSize: 13 }}>
                       {Array.from({ length: 12 }, (_, m) => <option key={m} value={m}>{new Date(2000, m, 1).toLocaleDateString(undefined, { month: "long" })}</option>)}
@@ -533,7 +533,7 @@ export default function Kalender() {
                       </select>
                     );
                   })()}
-                </div>
+                </Popover>
               </>)}
             </div>
           )}

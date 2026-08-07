@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
-import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, modalOverlay, modalPanel, inputStyle, ExportButton, ImportButton } from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, modalOverlay, modalPanel, inputStyle, ExportButton, ImportButton, Popover} from "../components/Icons.jsx";
 import PublishModal from "../components/PublishModal.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -163,10 +163,10 @@ export default function Methoden({ embedded } = {}) {
           {impOpen && (
             <>
               <div onClick={() => setImpOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
-              <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", zIndex: 21, background: "var(--card)", border: "1px solid var(--border2)", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.18)", padding: 4, minWidth: 180 }}>
+              <Popover align="right" style={{ zIndex: 21, padding: 4, minWidth: 180 }}>
                 <button onClick={() => { setImpOpen(false); fileRef.current?.click(); }} style={menuItem}><Icon d={ICONS.import} size={14} /> {t("methoden.importFile")}</button>
                 <a href="/beispiel-einstiege.json" download onClick={() => setImpOpen(false)} style={{ ...menuItem, textDecoration: "none" }}><Icon d={ICONS.download} size={14} /> {t("methoden.jsonTemplate")}</a>
-              </div>
+              </Popover>
             </>
           )}
           <input ref={fileRef} type="file" accept=".json,application/json" style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) doImport(e.target.files[0]); e.target.value = ""; }} />
@@ -176,10 +176,10 @@ export default function Methoden({ embedded } = {}) {
           {addOpen && (
             <>
               <div onClick={() => setAddOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
-              <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", zIndex: 21, background: "var(--card)", border: "1px solid var(--border2)", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.18)", padding: 4, minWidth: 150 }}>
+              <Popover align="right" style={{ zIndex: 21, padding: 4, minWidth: 150 }}>
                 <button onClick={() => { setAddOpen(false); setEdit({}); }} style={menuItem}><Icon d={ICONS.plus} size={14} /> {t("methoden.new")}</button>
                 <button onClick={() => { setAddOpen(false); setNewFolder(true); setFolderName(""); }} style={menuItem}><Icon d={ICONS.folder} size={14} /> {t("methoden.newFolder")}</button>
-              </div>
+              </Popover>
             </>
           )}
         </div>

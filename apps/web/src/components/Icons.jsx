@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 const iconSvg = { fill: "none", stroke: "var(--text3)", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" };
 
@@ -284,6 +284,37 @@ export const popoverPanel = {
   // Rand hinaus und war halb unsichtbar.
   maxWidth: "calc(100vw - 24px)",
 };
+
+// Aufklappmenü an einem Knopf. Die Ausrichtung (links/rechts/mittig) ist nur
+// der Wunsch — nach dem Öffnen schiebt sich das Panel in den sichtbaren
+// Bereich zurück. Auf dem Handy hing ein Menü sonst halb außerhalb, je nachdem
+// wo sein Knopf stand. Der Elternknoten braucht position: relative.
+export function Popover({ align = "left", style, children, ...rest }) {
+  const ref = useRef(null);
+  const basis = align === "center" ? "translateX(-50%)" : "";
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const schieben = () => {
+      el.style.transform = basis;
+      const r = el.getBoundingClientRect();
+      const rand = 12;
+      let dx = 0;
+      if (r.right > window.innerWidth - rand) dx = window.innerWidth - rand - r.right;
+      if (r.left + dx < rand) dx = rand - r.left;
+      el.style.transform = dx ? `${basis} translateX(${dx}px)`.trim() : basis;
+    };
+    schieben();
+    window.addEventListener("resize", schieben);
+    return () => window.removeEventListener("resize", schieben);
+  });
+  const pos = align === "center" ? { left: "50%", transform: basis } : { [align]: 0 };
+  return (
+    <div ref={ref} style={{ ...popoverPanel, position: "absolute", top: "calc(100% + 6px)", zIndex: 50, ...pos, ...style }} {...rest}>
+      {children}
+    </div>
+  );
+}
 // Statistik-Kachel (Auswertungen): großer Wert + Label. EINE Quelle, damit die
 // Auswertungen (CardVote, Klassenarbeit) gleich aussehen.
 export function StatCard({ label, value, color, sub }) {
