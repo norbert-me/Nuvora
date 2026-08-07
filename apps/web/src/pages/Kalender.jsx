@@ -1224,12 +1224,19 @@ function TimetableView({ tt, showTimes = false, className, slotName, slotColor, 
 // Kalender zeigt sie nur an — gepflegt werden sie unter /classes.
 function ExamMassnahmen({ classId, kursId = null, t }) {
   const [rows, setRows] = useState([]);
+  // Wie viele Ausgleiche es insgesamt gäbe (alle Fächer) — nur so lässt sich
+  // sagen, ob wirklich nichts hinterlegt ist oder nur nichts für DIESEN Kurs.
+  const [gesamt, setGesamt] = useState(0);
   const [offen, setOffen] = useState(false);
   useEffect(() => {
     let alive = true;
     fetch(`${API}/classes/${classId}/massnahmen?arbeit=true${kursId ? `&kurs_id=${kursId}` : ""}`)
       .then((r) => (r.ok ? r.json() : []))
       .then((d) => { if (alive) setRows(Array.isArray(d) ? d : []); })
+      .catch(() => {});
+    fetch(`${API}/classes/${classId}/massnahmen?arbeit=true`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => { if (alive) setGesamt(Array.isArray(d) ? d.length : 0); })
       .catch(() => {});
     return () => { alive = false; };
   }, [classId, kursId]);
@@ -1238,8 +1245,8 @@ function ExamMassnahmen({ classId, kursId = null, t }) {
   if (!rows.length) {
     return (
       <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8, fontSize: 12.5, color: "var(--text3)" }}>
-        {t("kalender.examMeasuresNone")}{" "}
-        <Link to={`/classes?open=${classId}`} style={{ color: "var(--accent)" }}>{t("kalender.examMeasuresAdd")}</Link>
+        {gesamt > 0 ? t("kalender.examMeasuresOtherCourse", { n: gesamt }) : t("kalender.examMeasuresNone")}{" "}
+        <Link to="/kurse" style={{ color: "var(--accent)" }}>{t("kalender.examMeasuresAdd")}</Link>
       </div>
     );
   }
@@ -1260,7 +1267,7 @@ function ExamMassnahmen({ classId, kursId = null, t }) {
               ))}
             </div>
           ))}
-          <Link to={`/classes?open=${classId}`} style={{ fontSize: 12, color: "var(--text3)" }}>{t("kalender.examMeasuresEdit")}</Link>
+          <Link to="/kurse" style={{ fontSize: 12, color: "var(--text3)" }}>{t("kalender.examMeasuresEdit")}</Link>
         </div>
       )}
     </div>
