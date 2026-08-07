@@ -136,10 +136,16 @@ export default function Classes() {
         klassenlehrer: s.klassenlehrer || "",
       })),
     };
-    if (editing.id) {
-      await fetch(`${API}/classes/${editing.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    } else {
-      await fetch(`${API}/classes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const res = editing.id
+      ? await fetch(`${API}/classes/${editing.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      : await fetch(`${API}/classes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    // Fehler nicht verschlucken: sonst schließt sich der Editor und die
+    // Eingaben (Förderdaten!) sind still verloren.
+    if (res && !res.ok) {
+      let detail = "";
+      try { const b = await res.json(); detail = typeof b.detail === "string" ? b.detail : JSON.stringify(b.detail); } catch { /* egal */ }
+      showAlert(detail || t("common.notWork"));
+      return;
     }
     setEditing(null);
     load();

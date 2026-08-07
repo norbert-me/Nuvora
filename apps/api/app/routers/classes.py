@@ -239,14 +239,25 @@ async def list_massnahmen(
     sc = await db.get(SchoolClass, class_id)
     if not sc or sc.owner_id != user.id:
         raise HTTPException(404, "Klasse nicht gefunden")
+    # Kursweit suchen: dieselben Kinder stehen in den Geschwister-Fach-Klassen
+    # (Mathe 7.5, Lernzeit 7.5) noch einmal. Gepflegt wird eine Maßnahme meist
+    # nur an einer davon — sonst meldet der Kalender „nichts hinterlegt",
+    # obwohl es sie gibt. Gleicher Name = dieselbe Person (wie im Roster).
+    from .kurse import sibling_class_ids
+    sib = await sibling_class_ids(db, class_id)
     rows = (await db.execute(
-        select(Student).where(Student.class_id == class_id).order_by(Student.card_id)
+        select(Student).where(Student.class_id.in_(sib or [class_id])).order_by(Student.card_id)
     )).scalars().all()
+    gesehen = set()
     out = []
     for s in rows:
+        name = s.name.strip()
+        if name in gesehen:
+            continue
         ms = [m for m in (s.massnahmen or []) if not arbeit or m.get("arbeit")]
         if not ms:
-            continue
+            continue   # ohne Eintrag weiterschauen: die Zwillingszeile kann welche haben
+        gesehen.add(name)
         out.append(MassnahmenStudentOut(
             student_id=s.id, card_id=s.card_id, name=s.name,
             foerder=list(s.foerder or []), massnahmen=[MassnahmeIn(**m) for m in ms],
