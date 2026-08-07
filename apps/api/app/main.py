@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .database import engine
 from .models import Base
-from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, planung, karten, kalender, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizen, elternlog, stoffplan, notizblock
+from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, planung, karten, kalender, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizen, elternlog, stoffplan, notizblock, trash
 from . import websocket as ws
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -155,6 +155,7 @@ app.include_router(notizen.router)
 app.include_router(elternlog.router)
 app.include_router(stoffplan.router)
 app.include_router(notizblock.router)
+app.include_router(trash.router)
 app.include_router(marketplace.router)
 
 UPLOAD_DIR = "/app/uploads"
@@ -566,10 +567,14 @@ async def startup():
         except Exception:
             pass
 
-    # Papierkorb leeren: Klassen, die länger als 30 Tage gelöscht sind, endgültig
-    # entfernen (jetzt greift die Kaskade auf Noten/Karten/…). Läuft bei jedem Start.
+    # Papierkorb leeren: was länger als 30 Tage gelöscht ist, endgültig entfernen
+    # (jetzt greift die Kaskade auf Noten/Karten/…). Läuft bei jedem Start und
+    # deckt alle Arten des gemeinsamen Papierkorbs ab (routers/trash.py). Kinder
+    # (Karten, Lernleitern) zuerst, damit die Zählung stimmt.
     async with async_session() as db:
-        for tbl, wort in (("school_classes", "Klasse(n)"), ("card_decks", "Deck(s)"), ("learning_paths", "Lernpfad(e)"), ("kurse", "Kurs(e)")):
+        for tbl, wort in (("cards", "Karte(n)"), ("learning_ladders", "Lernleiter(n)"),
+                          ("school_classes", "Klasse(n)"), ("card_decks", "Deck(s)"),
+                          ("learning_paths", "Lernpfad(e)"), ("kurse", "Kurs(e)")):
             try:
                 res = await db.execute(text(
                     f"DELETE FROM {tbl} WHERE deleted_at IS NOT NULL AND deleted_at < now() - interval '30 days'"

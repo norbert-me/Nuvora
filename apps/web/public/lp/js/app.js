@@ -3504,68 +3504,10 @@
                 btn.closest('details')?.removeAttribute('open');   // Export-Menü nach Wahl schliessen
             });
         });
-        renderPfadTrash(list);
     }
 
-    // Papierkorb: gelöschte Lernpfade UND einzelne gelöschte Lernleitern, mit
-    // Wiederherstellen / endgültig löschen. Wird unter die Liste gehängt.
-    async function renderPfadTrash(list) {
-        let pTrash = [], lTrash = [];
-        try { pTrash = await api(`${LP}/paths/trash`).then(r => r.ok ? r.json() : []); } catch (e) { pTrash = []; }
-        try { lTrash = await api(`${LP}/ladders/trash`).then(r => r.ok ? r.json() : []); } catch (e) { lTrash = []; }
-        const old = document.getElementById('pfade-trash');
-        if (old) old.remove();
-        if (!pTrash.length && !lTrash.length) return;
-        const box = document.createElement('div');
-        box.id = 'pfade-trash';
-        box.style.marginTop = '12px';
-        const pfadRows = pTrash.map(p => `
-            <div class="list-row" style="opacity:.85">
-                <div style="flex:1;min-width:0"><strong>${esc(p.name)}</strong> <span style="color:var(--text-muted)">– Lernpfad · ${(p.lernleitern || []).length} Lernleitern</span></div>
-                <div class="btn-group" style="flex-shrink:0;flex-wrap:nowrap">
-                    <button class="btn" data-restore-path="${p.id}">Wiederherstellen</button>
-                    <button class="btn icon danger" data-purge-path="${p.id}" title="Endgültig löschen">${ICON.delete}</button>
-                </div>
-            </div>`).join('');
-        const ladderRows = lTrash.map(l => {
-            const tp = topicPfad(l.topic_id);
-            const name = [tp.thema, tp.unterthema].filter(Boolean).join(' / ') || 'Lernleiter';
-            const n = (l.assignments || []).length;
-            return `
-            <div class="list-row" style="opacity:.85">
-                <div style="flex:1;min-width:0"><strong>${esc(name)}</strong> <span style="color:var(--text-muted)">– Lernleiter aus „${esc(l.path_name)}"${n ? ` · ${n} Schüler` : ''}</span></div>
-                <div class="btn-group" style="flex-shrink:0;flex-wrap:nowrap">
-                    <button class="btn" data-restore-ladder="${l.id}">Wiederherstellen</button>
-                    <button class="btn icon danger" data-purge-ladder="${l.id}" title="Endgültig löschen">${ICON.delete}</button>
-                </div>
-            </div>`;
-        }).join('');
-        box.innerHTML = `
-            <details>
-                <summary style="cursor:pointer;color:var(--text-muted);font-size:13px">Papierkorb (${pTrash.length + lTrash.length})</summary>
-                <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">${pfadRows}${ladderRows}</div>
-            </details>`;
-        list.parentNode.insertBefore(box, list.nextSibling);
-        box.querySelectorAll('[data-restore-path]').forEach(b => b.addEventListener('click', async () => {
-            await api(`${LP}/paths/${b.dataset.restorePath}/restore`, { method: 'POST' }).catch(() => {});
-            loadLernpfade();
-        }));
-        box.querySelectorAll('[data-purge-path]').forEach(b => b.addEventListener('click', async () => {
-            if (!await confirmDlg('Lernpfad endgültig löschen? Die Lernleitern gehen verloren.', { ok: 'Endgültig löschen' })) return;
-            await api(`${LP}/paths/${b.dataset.purgePath}/purge`, { method: 'DELETE' }).catch(() => {});
-            renderPfadTrash(list);
-        }));
-        box.querySelectorAll('[data-restore-ladder]').forEach(b => b.addEventListener('click', async () => {
-            const r = await api(`${LP}/ladders/${b.dataset.restoreLadder}/restore`, { method: 'POST' }).catch(() => null);
-            if (r && !r.ok) { const e = await r.json().catch(() => ({})); toast(e.detail || 'Wiederherstellen fehlgeschlagen'); return; }
-            loadLernpfade();
-        }));
-        box.querySelectorAll('[data-purge-ladder]').forEach(b => b.addEventListener('click', async () => {
-            if (!await confirmDlg('Lernleiter endgültig löschen?', { ok: 'Endgültig löschen' })) return;
-            await api(`${LP}/ladders/${b.dataset.purgeLadder}/purge`, { method: 'DELETE' }).catch(() => {});
-            renderPfadTrash(list);
-        }));
-    }
+    // Papierkorb: Gelöschte Lernpfade und Lernleitern liegen im gemeinsamen
+    // Papierkorb des Kerns (/papierkorb) — hier wird nur noch gelöscht.
 
     document.getElementById('pfad-create-btn').addEventListener('click', async () => {
         const name = document.getElementById('pfad-name').value.trim();

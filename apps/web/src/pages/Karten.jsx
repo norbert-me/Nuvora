@@ -94,14 +94,13 @@ export default function Karten() {
 
   useEffect(() => { if (classId) rememberClass(classId); }, [classId]);
 
-  const [deckTrash, setDeckTrash] = useState([]);
-  const [showTrash, setShowTrash] = useState(false);
+  // Gelöschte Stapel und Karten liegen im gemeinsamen Papierkorb des Kerns
+  // (/papierkorb) — das Modul löscht nur noch.
   const kq = kursId != null ? `?kurs_id=${kursId}` : "";
   const sq = subsetKurs ? `&subset_kurs=${subsetKurs}` : ""; // Teilkurs-Roster
   const [loadingDecks, setLoadingDecks] = useState(true);
   const decksLoadedOnce = useRef(false); // Skeleton nur beim ersten Laden, nicht bei Klassen-/Kurswechsel
   const loadDecks = (id) => { if (!id) return; setLoadingDecks(true); return fetch(`${API}/classes/${id}/decks${kq}`).then((r) => (r.ok ? r.json() : [])).then(setDecks).catch(() => {}).finally(() => { setLoadingDecks(false); decksLoadedOnce.current = true; }); };
-  const loadTrash = (id) => id && fetch(`${API}/classes/${id}/decks/trash${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => setDeckTrash(Array.isArray(d) ? d : [])).catch(() => {});
   // Ordner (wie CardVote) zum Gruppieren der Stapel — pro Klasse/Kurs.
   const [cardFolders, setCardFolders] = useState([]);
   const [currentCardFolder, setCurrentCardFolder] = useState(null); // null = Wurzel
@@ -110,7 +109,7 @@ export default function Karten() {
   const [addMode, setAddMode] = useState(null); // null | "deck" | "folder"
   const [addName, setAddName] = useState("");
   const loadFolders = (id) => id && fetch(`${API}/classes/${id}/card-folders${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => setCardFolders(Array.isArray(d) ? d : [])).catch(() => {});
-  useEffect(() => { loadDecks(classId); loadTrash(classId); loadFolders(classId); setCurrentCardFolder(null); }, [classId, kursId]);
+  useEffect(() => { loadDecks(classId); loadFolders(classId); setCurrentCardFolder(null); }, [classId, kursId]);
   // Deep-Link ?deck=<id> (aus dem Kalender): in den Ordner des Stapels springen,
   // der Stapel klappt sich per autoOpen einmalig auf und scrollt hin.
   const [autoDeck, setAutoDeck] = useState(Number(params.get("deck")) || null);
@@ -204,19 +203,12 @@ export default function Karten() {
     };
     input.click();
   };
-  const restoreDeck = async (id) => { await fetch(`${API}/decks/${id}/restore`, { method: "POST" }).catch(() => {}); loadDecks(classId); loadTrash(classId); };
-  const purgeDeck = async (id) => {
-    if (!await askConfirm(t("karten.purgeConfirm"))) return;
-    await fetch(`${API}/decks/${id}/purge`, { method: "DELETE" }).catch(() => {});
-    loadTrash(classId);
-  };
 
   const call = async (fn) => {
     setError("");
     const res = await fn();
     if (!res.ok) { const b = await res.json().catch(() => ({})); setError(typeof b.detail === "string" ? b.detail : t("common.notWork")); return false; }
     await loadDecks(classId);
-    loadTrash(classId);
     return true;
   };
 
@@ -350,23 +342,6 @@ export default function Karten() {
           {loadingDecks && !decksLoadedOnce.current ? <Skeleton rows={3} height={60} />
             : (decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).length === 0 && cardFolders.filter((f) => (f.parent_id ?? null) === currentCardFolder).length === 0) ? <Empty title={t("karten.noDecks")} hint={t("karten.noDecksHint")} /> : null}
           {decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} onDragStartDeck={() => setDragDeckId(d.id)} onDragEndDeck={endDrag} dragging={dragDeckId === d.id} autoOpen={autoDeck === d.id} onAutoOpened={() => setAutoDeck(null)} onReorderOver={(e) => onDeckDragOver(e, d.id)} onReorderDrop={() => dropDeck(d.id)} dropSide={deckDrop && deckDrop.id === d.id ? deckDrop.side : null} />)}
-          {deckTrash.length > 0 && (
-            <div style={{ marginTop: 8 }}>
-              <button onClick={() => setShowTrash((v) => !v)} style={{ ...btnSecondary, fontSize: 13 }}>{t("karten.trash")} ({deckTrash.length})</button>
-              {showTrash && (
-                <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 12, marginTop: 8, background: "var(--bg3)" }}>
-                  <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 8px" }}>{t("karten.trashHint")}</p>
-                  {deckTrash.map((d) => (
-                    <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: "1px solid var(--border)" }}>
-                      <span style={{ flex: 1, fontWeight: 500 }}>{d.name} <span style={{ fontSize: 12, color: "var(--text3)" }}>· {t("karten.cardCount", { n: d.cards?.length || 0 })}</span></span>
-                      <button onClick={() => restoreDeck(d.id)} style={{ ...btnSecondary, padding: "4px 11px", fontSize: 12.5 }}>{t("classes.restore")}</button>
-                      <button onClick={() => purgeDeck(d.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("classes.purge")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
         </>
       )}
 
@@ -624,14 +599,8 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
     await call(() => fetch(`${API}/decks/${deck.id}/cards`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ front: frontV.trim(), back: backV.trim() }) }));
     setNewOpen(false);
   };
-  // Karten-Papierkorb je Stapel (Soft-Delete): auflisten, wiederherstellen, endgültig löschen.
-  const [cardTrashOpen, setCardTrashOpen] = useState(false);
-  const [cardTrash, setCardTrash] = useState([]);
+  // Gelöschte Karten liegen im gemeinsamen Papierkorb des Kerns (/papierkorb).
   const [studying, setStudying] = useState(false); // Lernmodus (Karten durchgehen)
-  const loadCardTrash = () => fetch(`${API}/decks/${deck.id}/cards/trash`).then((r) => (r.ok ? r.json() : [])).then((d) => setCardTrash(Array.isArray(d) ? d : [])).catch(() => {});
-  const toggleCardTrash = () => { const n = !cardTrashOpen; setCardTrashOpen(n); if (n) loadCardTrash(); };
-  const restoreCard = (id) => call(() => fetch(`${API}/cards/${id}/restore`, { method: "POST" })).then(loadCardTrash);
-  const purgeCard = async (id) => { if (!await askConfirm(t("karten.cardPurgeConfirm"))) return; await fetch(`${API}/cards/${id}/purge`, { method: "DELETE" }).catch(() => {}); loadCardTrash(); };
   const onCardDragOver = (e, id) => {
     e.preventDefault();
     if (dragCard == null || id === dragCard) { setCardDrop(null); return; }
@@ -817,23 +786,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
       )}
       <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <button onClick={() => setNewOpen(true)} style={{ ...btnPrimary, padding: "8px 16px", display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} color="#fff" /> {t("karten.newCard")}</button>
-        <button onClick={toggleCardTrash} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 12.5, display: "inline-flex", alignItems: "center", gap: 5 }}>
-          <Icon d={ICONS.trash} size={14} color="var(--text3)" /> {t("karten.cardTrash")} {cardTrashOpen ? "▲" : "▾"}
-        </button>
       </div>
-      {cardTrashOpen && (
-        <div style={{ marginTop: 8, border: "1px dashed var(--border2)", borderRadius: 10, padding: 10 }}>
-          {cardTrash.length === 0 ? (
-            <p style={{ fontSize: 12.5, color: "var(--text3)", margin: 0 }}>{t("karten.cardTrashEmpty")}</p>
-          ) : cardTrash.map((c) => (
-            <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", fontSize: 13 }}>
-              <span style={{ flex: 1, minWidth: 0, color: "var(--text3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><Latex>{c.front}</Latex> → <Latex>{c.back}</Latex></span>
-              <button onClick={() => restoreCard(c.id)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("karten.restore")}><Icon d={ICONS.restore || ICONS.refresh} size={15} color="var(--accent)" /></button>
-              <button onClick={() => purgeCard(c.id)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("karten.purge")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button>
-            </div>
-          ))}
-        </div>
-      )}
       </>)}
       {newOpen && (
         <CardEditModal card={{ id: null, front: "", back: "", has_front_image: false, has_back_image: false }} imgVer={imgVer}

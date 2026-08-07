@@ -14,17 +14,15 @@ const editLabel = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", l
 export default function Kurse() {
   const { t } = useLanguage();
   const [kurse, setKurse] = useState([]);
-  const [trash, setTrash] = useState([]);
   const [allClasses, setAllClasses] = useState([]);
-  const [showTrash, setShowTrash] = useState(false);
+  // Gelöschte Kurse liegen im gemeinsamen Papierkorb des Kerns (/papierkorb).
   const [neu, setNeu] = useState("");
   const [editKurs, setEditKurs] = useState(null); // aufgeklappter Bearbeiten-Bereich (Name, E/G)
   const [editName, setEditName] = useState("");
 
   const load = () => fetch(`${API}/kurse`).then((r) => (r.ok ? r.json() : [])).then((d) => setKurse(Array.isArray(d) ? d : [])).catch(() => {});
-  const loadTrash = () => fetch(`${API}/kurse/trash`).then((r) => (r.ok ? r.json() : [])).then((d) => setTrash(Array.isArray(d) ? d : [])).catch(() => {});
   const loadClasses = () => fetch(`${API}/classes`).then((r) => (r.ok ? r.json() : [])).then((d) => setAllClasses(Array.isArray(d) ? d : [])).catch(() => {});
-  useEffect(() => { load(); loadTrash(); loadClasses(); }, []);
+  useEffect(() => { load(); loadClasses(); }, []);
 
   const anlegen = async () => {
     const name = neu.trim(); if (!name) return;
@@ -50,14 +48,8 @@ export default function Kurse() {
     undoDelete({
       message: t("undo.deleted", { name: k.name }),
       undo: () => load(),
-      commit: async () => { await fetch(`${API}/kurse/${k.id}`, { method: "DELETE" }).catch(() => {}); loadTrash(); },
+      commit: async () => { await fetch(`${API}/kurse/${k.id}`, { method: "DELETE" }).catch(() => {}); },
     });
-  };
-  const restore = async (id) => { await fetch(`${API}/kurse/${id}/restore`, { method: "POST" }).catch(() => {}); load(); loadTrash(); };
-  const purge = async (id) => {
-    if (!await askConfirm(t("kurse.purgeConfirm"))) return;
-    await fetch(`${API}/kurse/${id}/purge`, { method: "DELETE" }).catch(() => {});
-    loadTrash();
   };
 
   // Klassen, die (noch) nicht in diesem Kurs sind — zum Hinzufügen.
@@ -67,7 +59,6 @@ export default function Kurse() {
     <div style={{ ...pageApp }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <h1 style={{ ...pageTitle, marginBottom: 0, flex: 1 }}>{t("kurse.title")}</h1>
-        {trash.length > 0 && <button onClick={() => setShowTrash((v) => !v)} style={btnSecondary}>{t("classes.trash")} ({trash.length})</button>}
       </div>
       <p style={pageIntro}>{t("kurse.intro")}</p>
 
@@ -76,19 +67,6 @@ export default function Kurse() {
           placeholder={t("kurse.newPlaceholder")} style={{ ...inputStyle, flex: 1, minWidth: 200 }} />
         <AddButton onClick={anlegen} title={t("kurse.add")} />
       </div>
-
-      {showTrash && trash.length > 0 && (
-        <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 12, marginBottom: 18, background: "var(--bg3)" }}>
-          <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 8px" }}>{t("kurse.trashHint")}</p>
-          {trash.map((k) => (
-            <div key={k.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: "1px solid var(--border)" }}>
-              <span style={{ flex: 1, fontWeight: 500 }}>{k.name}</span>
-              <button onClick={() => restore(k.id)} style={{ ...btnSecondary, padding: "4px 11px", fontSize: 12.5 }}>{t("classes.restore")}</button>
-              <button onClick={() => purge(k.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("classes.purge")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button>
-            </div>
-          ))}
-        </div>
-      )}
 
       {kurse.length === 0 && <Empty title={t("kurse.emptyTitle")} hint={t("kurse.emptyHint")} />}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
