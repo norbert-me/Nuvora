@@ -280,6 +280,9 @@ export function overlayGuard(onClose) {
 export const popoverPanel = {
   background: "var(--card)", color: "var(--text)", border: "1px solid var(--border)",
   borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+  // Nie breiter als der Bildschirm: auf dem Handy ragte ein Menü sonst über den
+  // Rand hinaus und war halb unsichtbar.
+  maxWidth: "calc(100vw - 24px)",
 };
 // Statistik-Kachel (Auswertungen): großer Wert + Label. EINE Quelle, damit die
 // Auswertungen (CardVote, Klassenarbeit) gleich aussehen.

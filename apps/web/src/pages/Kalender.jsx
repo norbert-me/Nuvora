@@ -438,7 +438,9 @@ export default function Kalender() {
             </button>
             {viewMenuOpen && (<>
               <div onClick={() => setViewMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-              <div style={{ ...popoverPanel, position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 50, minWidth: 220, padding: 6 }}>
+              {/* Am Knopf ausgerichtet (links), nicht am rechten Rand — der Knopf
+                  steht links, das Menü lief sonst aus dem Bild. */}
+              <div style={{ ...popoverPanel, position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50, minWidth: 220, padding: 6 }}>
                 <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", padding: "6px 12px 4px", textTransform: "uppercase", letterSpacing: 0.4 }}>{t("kalender.showHide")}</div>
                 <label style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", boxSizing: "border-box", padding: "8px 12px", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: "pointer", borderRadius: 8 }}>
                   <input type="checkbox" checked={showAllDay} onChange={toggleAllDay} />
@@ -477,7 +479,7 @@ export default function Kalender() {
             </button>
             {moreOpen && (<>
               <div onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-              <div style={{ ...popoverPanel, position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 50, minWidth: 200, padding: 6 }}>
+              <div style={{ ...popoverPanel, position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 50, minWidth: 200, padding: 6 }}>
                 <button onClick={() => { setMoreOpen(false); openAbo(); }} title={t("kalender.subscribeHint")}
                   style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "8px 12px", background: "none", border: "none", borderRadius: 8, color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: "pointer", textAlign: "left" }}>
                   <Icon d={ICONS.share} size={15} /> {t("kalender.subscribe")}

@@ -383,9 +383,18 @@ export default function Session() {
   const studentList = kursRoster(selectedClass);
   const studentMap = Object.fromEntries(studentList.map((s) => [s.card_id, s.name]));
 
+  const niveauMap = Object.fromEntries(studentList.map((s) => [s.card_id, s.niveau || ""]));
   const leaderboard = Object.entries(scores)
-    .map(([cid, pts]) => ({ id: Number(cid), name: studentMap[cid] || `#${cid}`, points: pts, streak: streaks[cid] || 0 }))
+    .map(([cid, pts]) => ({ id: Number(cid), name: studentMap[cid] || `#${cid}`, niveau: niveauMap[cid] || "", points: pts, streak: streaks[cid] || 0 }))
     .sort((a, b) => b.points - a.points);
+
+  // Differenziertes Quiz: keine gemeinsame Rangliste über beide Kursniveaus —
+  // die Aufgaben sind für E und G nicht dieselbe Anforderung.
+  const getrennteListen = !!selectedSet?.niveau_aktiv && leaderboard.some((p) => p.niveau);
+  const boards = getrennteListen
+    ? [["E", leaderboard.filter((p) => p.niveau === "E")], ["G", leaderboard.filter((p) => p.niveau !== "E")]]
+        .filter(([, list]) => list.length > 0)
+    : [["", leaderboard]];
 
   // Step 1: Choose class + question set + options
   if (!sessionId) {
@@ -589,6 +598,33 @@ export default function Session() {
   if (finished) {
     // Game mode: podium
     if (gameMode && leaderboard.length > 0) {
+      // Bei E/G kein gemeinsames Podium — stattdessen je Kursniveau eine Liste.
+      if (getrennteListen) {
+        return (
+          <div style={{ textAlign: "center", paddingTop: 20 }}>
+            <h2 style={{ fontSize: 28, fontWeight: 800, color: "var(--text)", marginBottom: 8 }}><SvgTrophy size={26} /> {t("session.finalResult")}</h2>
+            <p style={{ color: "var(--text3)", marginBottom: 24, fontSize: 15 }}>{selectedClass?.name} — {selectedSet?.name}</p>
+            <div style={{ display: "flex", gap: 20, justifyContent: "center", flexWrap: "wrap" }}>
+              {boards.map(([niv, list]) => (
+                <div key={niv} style={{ minWidth: 260, maxWidth: 360, textAlign: "left" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text3)", marginBottom: 8, textAlign: "center" }}>{niv}-Kurs</div>
+                  {list.map((p, i) => (
+                    <div key={p.id} style={{ display: "flex", justifyContent: "space-between", padding: "10px 16px", background: i < 3 ? `${PODIUM_COLORS[i]}22` : "var(--bg2)", borderRadius: 10, marginBottom: 6 }}>
+                      <span style={{ color: "var(--text3)", fontWeight: 600, width: 26 }}>{i + 1}.</span>
+                      <span style={{ flex: 1, marginLeft: 8, color: "var(--text)" }}>{p.name}</span>
+                      <span style={{ fontWeight: 700, color: "var(--text)" }}>{p.points}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 32 }}>
+              <button onClick={() => navigate(`/cardvote/evaluation/${sessionId}`)} style={{ ...btnPrimary, padding: "10px 20px" }}>{t("session.detailEval")}</button>
+              <button onClick={() => navigate("/cardvote/tests")} style={{ ...btnSecondary, padding: "10px 20px" }}>{t("session.allTests")}</button>
+            </div>
+          </div>
+        );
+      }
       const top = leaderboard.slice(0, 3);
       const rest = leaderboard.slice(3);
       return (
@@ -910,7 +946,10 @@ export default function Session() {
                 <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", marginBottom: 10, textAlign: "center" }}>
                   <SvgTrophy size={16} /> {t("session.leaderboard")}
                 </div>
-                {leaderboard.slice(0, 8).map((p, i) => (
+                {boards.map(([niv, list]) => (
+                  <div key={niv || "alle"} style={{ marginBottom: boards.length > 1 ? 10 : 0 }}>
+                    {niv && <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", marginBottom: 4, textAlign: "center" }}>{niv}-Kurs</div>}
+                    {list.slice(0, 8).map((p, i) => (
                   <div key={p.id} style={{
                     display: "flex", alignItems: "center", gap: 8, padding: "6px 10px",
                     borderRadius: 8, marginBottom: 4,
@@ -924,6 +963,8 @@ export default function Session() {
                     </span>
                     <span style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>{p.points}</span>
                     {p.streak >= 2 && <span style={{ fontSize: 11, color: "#ff9500" }}><SvgFlame size={11} />{p.streak}</span>}
+                  </div>
+                    ))}
                   </div>
                 ))}
               </div>
