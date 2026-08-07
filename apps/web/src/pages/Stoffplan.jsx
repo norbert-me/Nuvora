@@ -14,6 +14,8 @@ export default function Stoffplan({ embedded } = {}) {
   const [classId, setClassId] = useState(() => lastClass() || null);
   const [kursId, setKursId] = useState(null);
   const [items, setItems] = useState([]);
+  const [exams, setExams] = useState([]);   // Klassenarbeitstermine (Kalender)
+  const [offen, setOffen] = useState(null); // aufgeklappter Eintrag (E/G-Ziele)
   const [topics, setTopics] = useState([]);
   const [title, setTitle] = useState("");
   const [topicId, setTopicId] = useState("");
@@ -24,7 +26,14 @@ export default function Stoffplan({ embedded } = {}) {
   const topicName = (id) => { const tp = topics.find((x) => x.id === id); return tp ? topicLabel(tp) : ""; };
 
   const scopeQ = () => (kursId != null ? `kurs_id=${kursId}` : (classId != null ? `class_id=${classId}` : ""));
-  const load = () => { const q = scopeQ(); if (!q) { setItems([]); return; } fetch(`${API}?${q}`).then((r) => (r.ok ? r.json() : [])).then((d) => setItems(Array.isArray(d) ? d : [])).catch(() => {}); };
+  const load = () => {
+    const q = scopeQ();
+    if (!q) { setItems([]); setExams([]); return; }
+    fetch(`${API}?${q}`).then((r) => (r.ok ? r.json() : [])).then((d) => setItems(Array.isArray(d) ? d : [])).catch(() => {});
+    // Klassenarbeiten kommen aus dem Kalender — hier nur gelesen, damit sie
+    // nicht ein zweites Mal als Thema gepflegt werden. Ohne Modul: leere Liste.
+    fetch(`${API}/klassenarbeiten?${q}`).then((r) => (r.ok ? r.json() : [])).then((d) => setExams(Array.isArray(d) ? d : [])).catch(() => {});
+  };
   useEffect(() => { if (classId) rememberClass(classId); load(); /* eslint-disable-next-line */ }, [classId, kursId]);
 
   const add = async () => {
@@ -57,6 +66,33 @@ export default function Stoffplan({ embedded } = {}) {
   });
 
   const view = preview || items;
+  // Klassenarbeiten stehen zwischen den Themen ihrer Kalenderwoche — geplant
+  // werden sie im Kalender, hier sind sie nur sichtbar (sonst pflegt man sie
+  // zweimal). Ohne KW am Thema hängen sie hinten an.
+  const kwVon = (it) => { const n = parseInt(String(it.kw || "").match(/\d+/)?.[0] ?? "", 10); return Number.isFinite(n) ? n : null; };
+  const nachThema = new Map();   // Index des letzten Themas einer KW -> Termine
+  const ohnePlatz = [];
+  for (const e of exams) {
+    let idx = -1;
+    if (e.kw != null) view.forEach((it, i) => { const k = kwVon(it); if (k != null && k <= e.kw) idx = i; });
+    if (idx >= 0) nachThema.set(idx, [...(nachThema.get(idx) || []), e]);
+    else ohnePlatz.push(e);
+  }
+  const ExamZeile = ({ e }) => (
+    <div key={`exam-${e.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", border: "1px solid var(--accent)", borderRadius: 14, background: "var(--accent-bg)", marginBottom: 6 }}>
+      <Icon d={ICONS.chart} size={15} color="var(--accent)" />
+      <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, color: "var(--accent)" }}>
+        {e.title || t("stoffplan.exam")}
+      </span>
+      <span style={{ fontSize: 12, color: "var(--text2)", flexShrink: 0 }}>
+        {e.date ? new Date(e.date).toLocaleDateString() : ""}
+      </span>
+      {e.kw != null && <span style={{ fontSize: 12, fontWeight: 600, padding: "2px 8px", borderRadius: 980, background: "var(--bg)", color: "var(--text2)", flexShrink: 0 }}>KW {e.kw}</span>}
+      <Link to="/kalender?view=klassenarbeit" className="icon-btn" style={{ ...iconBtn, padding: 4, flexShrink: 0 }} title={t("stoffplan.examEdit")}>
+        <Icon d={ICONS.open} size={15} color="var(--accent)" />
+      </Link>
+    </div>
+  );
   return (
     <div style={{ maxWidth: embedded ? "none" : 780, margin: embedded ? 0 : "0 auto" }}>
       {!embedded && <h1 style={pageTitle}>{t("stoffplan.title")}</h1>}
@@ -82,7 +118,8 @@ export default function Stoffplan({ embedded } = {}) {
       {view.length === 0 ? (
         <Empty title={t("stoffplan.empty")} hint={t("stoffplan.emptyHint")} />
       ) : view.map((it, idx) => (
-        <div key={it.id} {...dnd(idx)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", marginBottom: 6, cursor: "grab", opacity: it.done ? 0.6 : 1 }}>
+        <div key={it.id}>
+        <div {...dnd(idx)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", marginBottom: 6, cursor: "grab", opacity: it.done ? 0.6 : 1 }}>
           <span className="drag-handle" style={{ color: "var(--text3)", display: "inline-flex", flexShrink: 0 }}><Icon d={ICONS.grip} size={15} /></span>
           <input type="checkbox" checked={it.done} onChange={() => patch(it.id, { done: !it.done })} style={{ width: 18, height: 18, cursor: "pointer", flexShrink: 0 }} />
           <span style={{ flex: 1, minWidth: 0, fontSize: 14, textDecoration: it.done ? "line-through" : "none" }}>{it.title}</span>
@@ -93,9 +130,39 @@ export default function Stoffplan({ embedded } = {}) {
           )}
           {it.kw && <span style={{ fontSize: 12, fontWeight: 600, padding: "2px 8px", borderRadius: 980, background: "var(--bg2, var(--bg))", color: "var(--text2)", flexShrink: 0 }}>KW {it.kw}</span>}
           {it.hours != null && <span style={{ fontSize: 12, color: "var(--text3)", flexShrink: 0 }}>{it.hours} {t("stoffplan.h")}</span>}
+          {/* Was auf G und was auf E verlangt wird — dieselbe Stunde, zwei Ansprüche. */}
+          <button onClick={() => setOffen(offen === it.id ? null : it.id)}
+            title={t("stoffplan.zieleHint")}
+            style={{
+              flexShrink: 0, padding: "2px 9px", borderRadius: 980, fontSize: 11.5, fontWeight: 700, cursor: "pointer",
+              border: (it.ziel_g || it.ziel_e) ? "1px solid var(--accent)" : "1px solid var(--border2)",
+              background: (it.ziel_g || it.ziel_e) ? "var(--accent-bg)" : "var(--bg)",
+              color: (it.ziel_g || it.ziel_e) ? "var(--accent)" : "var(--text3)",
+            }}>
+            E/G
+          </button>
           <button onClick={() => del(it.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
         </div>
+        {offen === it.id && (
+          <div style={{ margin: "-2px 0 8px", padding: "10px 12px", border: "1px solid var(--border)", borderTop: "none", borderRadius: "0 0 14px 14px", background: "var(--bg3)" }}>
+            {[["ziel_g", t("stoffplan.zielG"), t("stoffplan.zielGHint")], ["ziel_e", t("stoffplan.zielE"), t("stoffplan.zielEHint")]].map(([feld, label, hint]) => (
+              <div key={feld} style={{ marginBottom: feld === "ziel_g" ? 8 : 0 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", marginBottom: 3 }}>{label}</div>
+                <textarea
+                  defaultValue={it[feld] || ""}
+                  onBlur={(e) => { if (e.target.value !== (it[feld] || "")) patch(it.id, { [feld]: e.target.value }); }}
+                  rows={2} placeholder={hint} maxLength={2000}
+                  style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box", padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 13, background: "var(--bg)", color: "var(--text)", resize: "vertical", overflowWrap: "anywhere" }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+        {(nachThema.get(idx) || []).map((e) => <ExamZeile key={`exam-${e.id}`} e={e} />)}
+        </div>
       ))}
+      {/* Termine, die vor dem ersten Thema liegen oder ohne KW-Bezug sind. */}
+      {ohnePlatz.map((e) => <ExamZeile key={`exam-${e.id}`} e={e} />)}
     </div>
   );
 }

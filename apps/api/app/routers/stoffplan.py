@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import CurriculumItem, Kurs, SchoolClass, User
+from ..models import CurriculumItem, ExamDate, Kurs, SchoolClass, User
 from .auth import get_current_user
 from .modules import is_active
 
@@ -50,6 +50,9 @@ class ItemIn(BaseModel):
     kw: Optional[str] = ""
     hours: Optional[int] = None
     notes: Optional[str] = ""
+    # Was auf welchem Niveau verlangt wird (E/G-Kurs). Freitext.
+    ziel_g: Optional[str] = ""
+    ziel_e: Optional[str] = ""
 
 
 class ItemPatch(BaseModel):
@@ -57,6 +60,8 @@ class ItemPatch(BaseModel):
     kw: Optional[str] = None
     hours: Optional[int] = None
     notes: Optional[str] = None
+    ziel_g: Optional[str] = None
+    ziel_e: Optional[str] = None
     done: Optional[bool] = None
     topic_id: Optional[int] = None
 
@@ -68,7 +73,8 @@ class ReorderIn(BaseModel):
 def _out(i: CurriculumItem) -> dict:
     return {"id": i.id, "kurs_id": i.kurs_id, "class_id": i.class_id, "topic_id": i.topic_id,
             "title": i.title or "", "kw": i.kw or "", "hours": i.hours,
-            "notes": i.notes or "", "done": i.done, "position": i.position}
+            "notes": i.notes or "", "ziel_g": i.ziel_g or "", "ziel_e": i.ziel_e or "",
+            "done": i.done, "position": i.position}
 
 
 @router.get("")
@@ -81,6 +87,37 @@ async def list_items(kurs_id: Optional[int] = None, class_id: Optional[int] = No
         q = q.where(CurriculumItem.class_id == class_id, CurriculumItem.kurs_id.is_(None))
     rows = (await db.execute(q.order_by(CurriculumItem.position, CurriculumItem.id))).scalars().all()
     return [_out(i) for i in rows]
+
+
+@router.get("/klassenarbeiten")
+async def list_exams(kurs_id: Optional[int] = None, class_id: Optional[int] = None,
+                     user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Klassenarbeitstermine dieses Kurses — damit sie in der Jahresplanung
+    stehen, ohne dort ein zweites Mal gepflegt zu werden.
+
+    Regel 3: der Stoffplan liest nur. Ohne Modul Kalender gibt es schlicht keine
+    Termine (leere Liste), und die Jahresplanung funktioniert unverändert.
+    """
+    if not await is_active(db, user.id, "kalender"):
+        return []
+    q = select(ExamDate).where(ExamDate.owner_id == user.id)
+    if kurs_id is not None:
+        q = q.where(ExamDate.kurs_id == kurs_id)
+    elif class_id is not None:
+        q = q.where(ExamDate.class_id == class_id)
+    else:
+        return []
+    rows = (await db.execute(q.order_by(ExamDate.date))).scalars().all()
+    return [{
+        "id": e.id,
+        "date": e.date.isoformat() if e.date else None,
+        # Kalenderwoche, damit die Arbeit zwischen den Themen derselben Woche steht.
+        "kw": e.date.isocalendar()[1] if e.date else None,
+        "title": e.title or "",
+        "class_id": e.class_id,
+        "kurs_id": e.kurs_id,
+        "work_id": e.work_id,
+    } for e in rows]
 
 
 @router.post("", status_code=201)
@@ -101,7 +138,8 @@ async def create_item(body: ItemIn, user: User = Depends(require_module), db: As
     pos = (mx + 1) if mx is not None else 0
     i = CurriculumItem(owner_id=user.id, kurs_id=body.kurs_id, class_id=body.class_id, topic_id=body.topic_id,
                        title=title, kw=(body.kw or "").strip()[:20], hours=body.hours,
-                       notes=(body.notes or "").strip(), position=pos)
+                       notes=(body.notes or "").strip(), ziel_g=(body.ziel_g or "").strip(),
+                       ziel_e=(body.ziel_e or "").strip(), position=pos)
     db.add(i)
     await db.commit()
     await db.refresh(i)
@@ -133,6 +171,10 @@ async def update_item(item_id: int, body: ItemPatch, user: User = Depends(requir
         i.hours = body.hours
     if body.notes is not None:
         i.notes = body.notes.strip()
+    if body.ziel_g is not None:
+        i.ziel_g = body.ziel_g.strip()[:2000]
+    if body.ziel_e is not None:
+        i.ziel_e = body.ziel_e.strip()[:2000]
     if body.done is not None:
         i.done = body.done
     if body.topic_id is not None:
