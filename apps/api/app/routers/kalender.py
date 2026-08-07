@@ -86,6 +86,11 @@ class EntryIn(BaseModel):
 
 class EntryOut(EntryIn):
     id: int
+    # Gehoert der Eintrag zu einem Klassenarbeitstermin? Dann kann die Ansicht
+    # die Nachteilsausgleiche und (bei aktivem Modul) die Auswertung anbieten,
+    # ohne die Klassenarbeitsliste nachzuladen.
+    exam_id: Optional[int] = None
+    work_id: Optional[int] = None
     model_config = {"from_attributes": True}
 
     @field_validator("verlaufsplan", mode="before")
@@ -104,7 +109,19 @@ async def list_entries(frm: Optional[datetime] = None, to: Optional[datetime] = 
     if to is not None:
         q = q.where(CalendarEntry.date <= to)
     rows = (await db.execute(q.order_by(CalendarEntry.date))).scalars().all()
-    return rows
+    # Klassenarbeitstermine an ihre Eintraege haengen (ein Aufruf statt N).
+    exams = (await db.execute(select(ExamDate).where(
+        ExamDate.owner_id == user.id, ExamDate.entry_id.is_not(None)))).scalars().all()
+    by_entry = {e.entry_id: e for e in exams}
+    out = []
+    for r in rows:
+        item = EntryOut.model_validate(r)
+        ex = by_entry.get(r.id)
+        if ex:
+            item.exam_id = ex.id
+            item.work_id = ex.work_id
+        out.append(item)
+    return out
 
 
 @router.post("/entries", response_model=EntryOut, status_code=201)

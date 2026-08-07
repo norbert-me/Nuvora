@@ -1628,6 +1628,18 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
                 {t("kalender.toAttendance")}
               </Link>
             )}
+            {/* Klassenarbeitstermin: die Auswertung dazu ist ein Klick entfernt
+                (nur bei aktivem Modul — Regel 3). */}
+            {aktiv.auswertung && entry.work_id && classId && (
+              <Link to={`/auswertung?tab=klassenarbeit&class=${classId}${kursId ? `&kurs=${kursId}` : ""}&work=${entry.work_id}`} onClick={onClose}
+                style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", textDecoration: "none", color: "var(--accent)", fontSize: 13.5, fontWeight: 600 }}>
+                <Icon d={ICONS.chart} size={15} color="var(--accent)" />
+                {t("kalender.openExamWork")}
+              </Link>
+            )}
+            {/* Was für einzelne Kinder in Arbeiten abweicht (Zeitzuschlag,
+                abweichende Lernziele …) — beim Aufschlagen des Termins sichtbar. */}
+            {entry.exam_id && classId && <ExamMassnahmen classId={Number(classId)} t={t} />}
             {aktiv.cardvote && aktiv.auswertung && entry.cardvote_set_id && classId && (
               <button onClick={alsNote}
                 style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", cursor: "pointer", color: "var(--accent)", fontSize: 13.5, fontWeight: 600, width: "100%" }}>
