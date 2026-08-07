@@ -265,6 +265,12 @@ class Student(Base):
     # prueft zuerst jeden Export- und Veroeffentlichungspfad.
     niveau: Mapped[str] = mapped_column(String(1), default="", server_default="")  # "E" | "G" | ""
     foerder: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # Foerdermassnahmen zu den Schwerpunkten: was fuer dieses Kind konkret gilt
+    # (abweichende Lernziele, laengere Bearbeitungszeit, Vorlesen, …).
+    # [{"art": "Zeitzuschlag", "detail": "+25 %", "arbeit": true}, …]
+    # arbeit=true heisst: gilt in Klassenarbeiten — genau diese zeigt der
+    # Kalender am Klassenarbeitstermin. Ebenfalls DSGVO Art. 9, siehe oben.
+    massnahmen: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     notizen: Mapped[str] = mapped_column(Text, default="", server_default="")
     # Einzigartiger Token fuer den kontenlosen Karten-Zugang (Bearer-Secret).
     karten_token: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, unique=True, index=True)

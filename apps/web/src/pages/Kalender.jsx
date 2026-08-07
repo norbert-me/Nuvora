@@ -1217,6 +1217,45 @@ function TimetableView({ tt, showTimes = false, className, slotName, slotColor, 
 
 // Unterrichtsfreie Zeitraeume (Ferien, bewegliche Feiertage). An diesen Tagen
 // blendet der Kalender Vorlagen und Eintraege aus. Eigener Tab (standalone).
+// Nachteilsausgleiche zur Klassenarbeit: die Fördermaßnahmen der Klasse, die in
+// Klassenarbeiten gelten (Kern: students.massnahmen mit arbeit=true). Der
+// Kalender zeigt sie nur an — gepflegt werden sie unter /classes.
+function ExamMassnahmen({ classId, t }) {
+  const [rows, setRows] = useState([]);
+  const [offen, setOffen] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    fetch(`${API}/classes/${classId}/massnahmen?arbeit=true`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => { if (alive) setRows(Array.isArray(d) ? d : []); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [classId]);
+  if (!rows.length) return null;
+  return (
+    <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
+      <button onClick={() => setOffen((v) => !v)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--accent)", fontSize: 12.5, fontWeight: 600 }}>
+        {t("kalender.examMeasures", { n: rows.length })} {offen ? "▲" : "▾"}
+      </button>
+      {offen && (
+        <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 5 }}>
+          {rows.map((s) => (
+            <div key={s.student_id} style={{ fontSize: 12.5, color: "var(--text2)" }}>
+              <strong style={{ color: "var(--text)" }}>{s.name}</strong>{" "}
+              {s.massnahmen.map((m, i) => (
+                <span key={i} style={{ marginRight: 6 }}>
+                  {m.art}{m.detail ? ` (${m.detail})` : ""}{i < s.massnahmen.length - 1 ? "," : ""}
+                </span>
+              ))}
+            </div>
+          ))}
+          <Link to={`/classes?open=${classId}`} style={{ fontSize: 12, color: "var(--text3)" }}>{t("kalender.examMeasuresEdit")}</Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Klassenarbeiten planen + Übersicht: je kommender Klassenarbeit die bis dahin
 // verbleibenden Stundenplan-Stunden (freie Tage/Ausfälle bereits abgezogen).
 function ExamPanel({ overview, periods = 6, onAdd, onUpd, onDel, t }) {
@@ -1268,7 +1307,8 @@ function ExamPanel({ overview, periods = 6, onAdd, onUpd, onDel, t }) {
       {overview.length === 0 ? (
         <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("kalender.examsEmpty")}</p>
       ) : overview.map((e) => (
-        <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", marginBottom: 8 }}>
+        <div key={e.id} style={{ padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", marginBottom: 8 }}>
+         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {editId === e.id ? (
             <>
               <div style={{ flex: 1, minWidth: 0, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -1304,6 +1344,10 @@ function ExamPanel({ overview, periods = 6, onAdd, onUpd, onDel, t }) {
               <button onClick={() => onDel(e.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>
             </>
           )}
+         </div>
+         {/* Was fuer einzelne Kinder abweicht (Zeitzuschlag, abweichende
+             Lernziele …) — beim Vorbereiten der Arbeit muss es sichtbar sein. */}
+         {e.class_id && <ExamMassnahmen classId={e.class_id} t={t} />}
         </div>
       ))}
     </div>

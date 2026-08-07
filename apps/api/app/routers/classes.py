@@ -26,6 +26,40 @@ FOERDER_VALUES = {
     "Sprache",
 }
 
+# Foerdermassnahmen: was zum Schwerpunkt konkret vereinbart ist. Feste Auswahl
+# aus einem Grund — die Massnahme mit „arbeit" steuert, was der Kalender am
+# Klassenarbeitstermin anzeigt; Freitext waere dort nicht wiederfindbar. Das
+# Konkrete steht im Detail-Feld ("+25 %", "nur Aufgaben 1-4").
+MASSNAHMEN_VALUES = {
+    "Zeitzuschlag", "Abweichende Lernziele", "Weniger Aufgaben", "Vorlesen",
+    "Größere Schrift", "Hilfsmittel", "Eigener Raum", "Zusätzliche Pausen",
+    "Assistenz", "Rechtschreibung nicht bewertet", "Mündlich statt schriftlich",
+    "Sonstiges",
+}
+
+
+class MassnahmeIn(BaseModel):
+    art: str
+    detail: str = ""
+    # Gilt in Klassenarbeiten? Genau diese zeigt der Kalender am Termin.
+    arbeit: bool = False
+
+    @field_validator("art")
+    @classmethod
+    def valid_art(cls, v: str) -> str:
+        v = (v or "").strip()
+        if v not in MASSNAHMEN_VALUES:
+            raise ValueError(f"Unbekannte Fördermaßnahme: {v}")
+        return v
+
+    @field_validator("detail")
+    @classmethod
+    def detail_len(cls, v: str) -> str:
+        v = (v or "").strip()
+        if len(v) > 300:
+            raise ValueError("Beschreibung zu lang (max. 300 Zeichen)")
+        return v
+
 
 class StudentIn(BaseModel):
     card_id: int
@@ -34,8 +68,16 @@ class StudentIn(BaseModel):
     # besonders schuetzenswert (DSGVO Art. 9) — nie veroeffentlichen.
     niveau: str = ""
     foerder: Optional[List[str]] = None
+    massnahmen: Optional[List[MassnahmeIn]] = None
     notizen: str = ""
     klassenlehrer: str = ""
+
+    @field_validator("massnahmen")
+    @classmethod
+    def massnahmen_anzahl(cls, v):
+        if v is not None and len(v) > 20:
+            raise ValueError("Zu viele Fördermaßnahmen (max. 20)")
+        return v
 
     @field_validator("klassenlehrer")
     @classmethod
@@ -70,12 +112,20 @@ class StudentIn(BaseModel):
         return v
 
 
+def _massnahmen(s: "StudentIn"):
+    """Pydantic-Objekte in die JSON-Spalte schreiben — dicts, keine Modelle."""
+    if s.massnahmen is None:
+        return None
+    return [m.model_dump() for m in s.massnahmen]
+
+
 class StudentOut(BaseModel):
     id: int
     card_id: int
     name: str
     niveau: str = ""
     foerder: Optional[List[str]] = None
+    massnahmen: Optional[List[MassnahmeIn]] = None
     notizen: str = ""
     klassenlehrer: str = ""
     has_photo: bool = False
@@ -133,7 +183,7 @@ async def create_class(body: ClassCreate, user: User = Depends(get_current_user)
     db.add(KursTag(kurs_id=kurs.id, class_id=sc.id))  # Mitgliedschaft (many-to-many)
     for s in body.students:
         db.add(Student(card_id=s.card_id, name=s.name, class_id=sc.id, kurs_id=kurs.id,
-                       niveau=s.niveau, foerder=s.foerder, notizen=s.notizen,
+                       niveau=s.niveau, foerder=s.foerder, massnahmen=_massnahmen(s), notizen=s.notizen,
                        klassenlehrer=s.klassenlehrer))
     await db.commit()
     return await _load_class(db, sc.id)
@@ -162,6 +212,46 @@ async def list_trash(user: User = Depends(get_current_user), db: AsyncSession = 
         .order_by(SchoolClass.deleted_at.desc())
     )
     return result.scalars().all()
+
+
+class MassnahmenStudentOut(BaseModel):
+    """Ein Kind mit dem, was für es vereinbart ist — für Ansichten, die die
+    Abweichungen brauchen (z.B. der Kalender am Klassenarbeitstermin)."""
+    student_id: int
+    card_id: int
+    name: str
+    foerder: List[str] = []
+    massnahmen: List[MassnahmeIn] = []
+
+
+@router.get("/{class_id}/massnahmen", response_model=List[MassnahmenStudentOut])
+async def list_massnahmen(
+    class_id: int,
+    arbeit: bool = False,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Fördermaßnahmen der Klasse, nur Kinder, für die etwas hinterlegt ist.
+    arbeit=true filtert auf das, was in Klassenarbeiten gilt (Zeitzuschlag,
+    abweichende Lernziele …) — genau das zeigt der Kalender am Termin.
+
+    Besonders schützenswert (DSGVO Art. 9): nur der Besitzer der Klasse."""
+    sc = await db.get(SchoolClass, class_id)
+    if not sc or sc.owner_id != user.id:
+        raise HTTPException(404, "Klasse nicht gefunden")
+    rows = (await db.execute(
+        select(Student).where(Student.class_id == class_id).order_by(Student.card_id)
+    )).scalars().all()
+    out = []
+    for s in rows:
+        ms = [m for m in (s.massnahmen or []) if not arbeit or m.get("arbeit")]
+        if not ms:
+            continue
+        out.append(MassnahmenStudentOut(
+            student_id=s.id, card_id=s.card_id, name=s.name,
+            foerder=list(s.foerder or []), massnahmen=[MassnahmeIn(**m) for m in ms],
+        ))
+    return out
 
 
 @router.get("/{class_id}", response_model=ClassOut)
@@ -201,11 +291,12 @@ async def update_class(class_id: int, body: ClassCreate, user: User = Depends(ge
             cur.name = s.name
             cur.niveau = s.niveau
             cur.foerder = s.foerder
+            cur.massnahmen = _massnahmen(s)
             cur.notizen = s.notizen
             cur.klassenlehrer = s.klassenlehrer
         else:
             db.add(Student(card_id=s.card_id, name=s.name, class_id=class_id, kurs_id=sc.kurs_id,
-                           niveau=s.niveau, foerder=s.foerder, notizen=s.notizen,
+                           niveau=s.niveau, foerder=s.foerder, massnahmen=_massnahmen(s), notizen=s.notizen,
                            klassenlehrer=s.klassenlehrer))
     # Nur wirklich entfernte Karten loeschen (deren Daten sollen dann auch weg).
     for card_id, s in by_card.items():
@@ -244,11 +335,13 @@ async def _sync_siblings(db: AsyncSession, sc: SchoolClass):
             if twin:  # Felder angleichen (Name-Identität bleibt)
                 twin.niveau = m.niveau
                 twin.foerder = m.foerder
+                twin.massnahmen = m.massnahmen
                 twin.notizen = m.notizen
                 twin.klassenlehrer = m.klassenlehrer
             else:  # neuer Schüler -> in die Geschwister-Klasse übernehmen
                 db.add(Student(card_id=next_card, name=m.name, class_id=g.id, kurs_id=sc.kurs_id,
-                               niveau=m.niveau, foerder=m.foerder, notizen=m.notizen, klassenlehrer=m.klassenlehrer))
+                               niveau=m.niveau, foerder=m.foerder, massnahmen=m.massnahmen,
+                               notizen=m.notizen, klassenlehrer=m.klassenlehrer))
                 next_card += 1
 
 
