@@ -90,14 +90,14 @@ export default function Topics() {
     call(() => fetch(`${API}/topics/${t.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, parent_id: t.parent_id, notes: t.notes || "" }),
+      body: JSON.stringify({ name, parent_id: t.parent_id, notes: t.notes || "", ziel_g: t.ziel_g || "", ziel_e: t.ziel_e || "" }),
     }));
 
   // Titel + Notiz speichern (aus dem Detail-Popup). Leerer Titel behält den alten.
-  const saveTopic = (tp, name, notes) =>
+  const saveTopic = (tp, name, notes, zielG, zielE) =>
     call(() => fetch(`${API}/topics/${tp.id}`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: (name || "").trim() || tp.name, parent_id: tp.parent_id, notes }),
+      body: JSON.stringify({ name: (name || "").trim() || tp.name, parent_id: tp.parent_id, notes, ziel_g: zielG || "", ziel_e: zielE || "" }),
     }));
 
   const remove = async (tp) => {
@@ -275,6 +275,11 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
   const [editNote, setEditNote] = useState(false);
   const [noteVal, setNoteVal] = useState(tp.notes || "");
   const [notes, setNotes] = useState(tp.notes || "");
+  // Anforderungen je Niveau — am Thema, weil der Inhalt zum Thema gehört.
+  const [zielG, setZielG] = useState(tp.ziel_g || "");
+  const [zielE, setZielE] = useState(tp.ziel_e || "");
+  const [zielGVal, setZielGVal] = useState(tp.ziel_g || "");
+  const [zielEVal, setZielEVal] = useState(tp.ziel_e || "");
   const [name, setName] = useState(tp.name);      // Anzeige-Titel (nach Umbenennen)
   const [titleVal, setTitleVal] = useState(tp.name); // Titel im Edit
   const [open, setOpen] = useState(false); // Inhalte-Bereich ausgeklappt?
@@ -287,7 +292,11 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
     fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).then((d) => setClasses(Object.fromEntries((Array.isArray(d) ? d : []).map((c) => [c.id, c.name])))).catch(() => {});
   }, [open]);
 
-  const saveEdit = async () => { await onSaveTopic(tp, titleVal, noteVal); setNotes(noteVal); setName(titleVal.trim() || name); setEditNote(false); };
+  const saveEdit = async () => {
+    await onSaveTopic(tp, titleVal, noteVal, zielGVal, zielEVal);
+    setNotes(noteVal); setZielG(zielGVal); setZielE(zielEVal);
+    setName(titleVal.trim() || name); setEditNote(false);
+  };
 
   // Klassen, die über Inhalte (Decks/Kalender) an diesem Thema hängen.
   const klassenNamen = usage ? [...new Set([
@@ -305,7 +314,7 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
           <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, flex: 1 }}>{tp.parent_name ? `${tp.parent_name} / ${name}` : name}</h3>
           {/* Ein Edit-Icon für Titel UND Notiz. */}
-          {!editNote && <button onClick={() => { setTitleVal(name); setNoteVal(notes); setEditNote(true); }} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.edit")}><Icon d={ICONS.edit} size={16} /></button>}
+          {!editNote && <button onClick={() => { setTitleVal(name); setNoteVal(notes); setZielGVal(zielG); setZielEVal(zielE); setEditNote(true); }} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.edit")}><Icon d={ICONS.edit} size={16} /></button>}
           <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
         </div>
 
@@ -318,6 +327,14 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
             <textarea value={noteVal} onChange={(e) => setNoteVal(e.target.value.slice(0, 500))} rows={4} maxLength={500}
               placeholder={t("topics.notesPlaceholder")}
               style={{ width: "100%", boxSizing: "border-box", padding: 10, border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)", fontSize: 14, lineHeight: 1.5, resize: "vertical" }} />
+            {[["g", t("topics.zielG"), t("topics.zielGPlaceholder"), zielGVal, setZielGVal],
+              ["e", t("topics.zielE"), t("topics.zielEPlaceholder"), zielEVal, setZielEVal]].map(([k, label, ph, wert, setzen]) => (
+              <div key={k}>
+                <div style={secTitle}>{label}</div>
+                <textarea value={wert} onChange={(e) => setzen(e.target.value.slice(0, 500))} rows={2} maxLength={500} placeholder={ph}
+                  style={{ width: "100%", boxSizing: "border-box", padding: 10, border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)", fontSize: 14, lineHeight: 1.5, resize: "vertical" }} />
+              </div>
+            ))}
             <div style={{ display: "flex", gap: 8, marginTop: 6, alignItems: "center" }}>
               <button onClick={saveEdit} style={btnPrimary}>{t("common.save")}</button>
               <button onClick={() => setEditNote(false)} style={btnSecondary}>{t("common.abort")}</button>
@@ -327,6 +344,16 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
         ) : (<>
           <div style={secTitle}>{t("topics.notes")}</div>
           <div style={{ fontSize: 14, color: notes ? "var(--text2)" : "var(--text3)", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{notes || t("topics.notesEmpty")}</div>
+          {(zielG || zielE) && (
+            <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+              {[[t("topics.zielG"), zielG], [t("topics.zielE"), zielE]].filter(([, v]) => v).map(([label, v]) => (
+                <div key={label} style={{ flex: "1 1 200px", minWidth: 180, padding: "8px 10px", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 }}>{label}</div>
+                  <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{v}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </>)}
 
         {/* Ausklappbar: Klassen + Inhalte zum Thema. */}

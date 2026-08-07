@@ -371,6 +371,12 @@ class Topic(Base):
     # Freie Notiz je Thema/Unterthema: Lernziele/Inhalt ("Was sollen die SuS hier
     # lernen?") zur Unterrichtsplanung. Rein für die Lehrkraft, kein Modul hängt daran.
     notes: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # Dasselbe, nach Anspruch getrennt: was alle können müssen (G) und was im
+    # E-Kurs dazukommt (z.B. Stufenwinkel erkennen vs. damit begründen). Am
+    # THEMA und nicht in der Jahresplanung — der Inhalt gehört zum Thema, die
+    # Planung ordnet ihn nur zeitlich ein.
+    ziel_g: Mapped[str] = mapped_column(Text, default="", server_default="")
+    ziel_e: Mapped[str] = mapped_column(Text, default="", server_default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     children: Mapped[list["Topic"]] = relationship(
@@ -1157,11 +1163,6 @@ class CurriculumItem(Base):
     kw: Mapped[str] = mapped_column(String(20), default="", server_default="")     # z.B. "40" oder "40-42"
     hours: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     notes: Mapped[str] = mapped_column(Text, default="", server_default="")
-    # Was auf welchem Niveau verlangt wird — dieselbe Stunde, zwei Ansprüche
-    # (z.B. Stufenwinkel erkennen vs. begründen). Freitext, weil das die
-    # Fachkonferenz formuliert und kein Vokabular vorgeben kann.
-    ziel_g: Mapped[str] = mapped_column(Text, default="", server_default="")
-    ziel_e: Mapped[str] = mapped_column(Text, default="", server_default="")
     done: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

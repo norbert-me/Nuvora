@@ -50,9 +50,6 @@ class ItemIn(BaseModel):
     kw: Optional[str] = ""
     hours: Optional[int] = None
     notes: Optional[str] = ""
-    # Was auf welchem Niveau verlangt wird (E/G-Kurs). Freitext.
-    ziel_g: Optional[str] = ""
-    ziel_e: Optional[str] = ""
 
 
 class ItemPatch(BaseModel):
@@ -60,8 +57,6 @@ class ItemPatch(BaseModel):
     kw: Optional[str] = None
     hours: Optional[int] = None
     notes: Optional[str] = None
-    ziel_g: Optional[str] = None
-    ziel_e: Optional[str] = None
     done: Optional[bool] = None
     topic_id: Optional[int] = None
 
@@ -73,8 +68,7 @@ class ReorderIn(BaseModel):
 def _out(i: CurriculumItem) -> dict:
     return {"id": i.id, "kurs_id": i.kurs_id, "class_id": i.class_id, "topic_id": i.topic_id,
             "title": i.title or "", "kw": i.kw or "", "hours": i.hours,
-            "notes": i.notes or "", "ziel_g": i.ziel_g or "", "ziel_e": i.ziel_e or "",
-            "done": i.done, "position": i.position}
+            "notes": i.notes or "", "done": i.done, "position": i.position}
 
 
 @router.get("")
@@ -138,8 +132,7 @@ async def create_item(body: ItemIn, user: User = Depends(require_module), db: As
     pos = (mx + 1) if mx is not None else 0
     i = CurriculumItem(owner_id=user.id, kurs_id=body.kurs_id, class_id=body.class_id, topic_id=body.topic_id,
                        title=title, kw=(body.kw or "").strip()[:20], hours=body.hours,
-                       notes=(body.notes or "").strip(), ziel_g=(body.ziel_g or "").strip(),
-                       ziel_e=(body.ziel_e or "").strip(), position=pos)
+                       notes=(body.notes or "").strip(), position=pos)
     db.add(i)
     await db.commit()
     await db.refresh(i)
@@ -171,10 +164,6 @@ async def update_item(item_id: int, body: ItemPatch, user: User = Depends(requir
         i.hours = body.hours
     if body.notes is not None:
         i.notes = body.notes.strip()
-    if body.ziel_g is not None:
-        i.ziel_g = body.ziel_g.strip()[:2000]
-    if body.ziel_e is not None:
-        i.ziel_e = body.ziel_e.strip()[:2000]
     if body.done is not None:
         i.done = body.done
     if body.topic_id is not None:

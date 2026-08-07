@@ -15,7 +15,7 @@ export default function Stoffplan({ embedded } = {}) {
   const [kursId, setKursId] = useState(null);
   const [items, setItems] = useState([]);
   const [exams, setExams] = useState([]);   // Klassenarbeitstermine (Kalender)
-  const [offen, setOffen] = useState(null); // aufgeklappter Eintrag (E/G-Ziele)
+
   const [topics, setTopics] = useState([]);
   const [title, setTitle] = useState("");
   const [topicId, setTopicId] = useState("");
@@ -24,6 +24,12 @@ export default function Stoffplan({ embedded } = {}) {
   useEffect(() => swr("topics", "/api/topics", (d) => setTopics(Array.isArray(d) ? d : [])), []);
   const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
   const topicName = (id) => { const tp = topics.find((x) => x.id === id); return tp ? topicLabel(tp) : ""; };
+  // E/G-Anforderungen des verknüpften Themas, kurz für die Zeile.
+  const ziele = (id) => {
+    const tp = topics.find((x) => x.id === id);
+    if (!tp || (!tp.ziel_g && !tp.ziel_e)) return "";
+    return [tp.ziel_g ? `G: ${tp.ziel_g}` : "", tp.ziel_e ? `E: ${tp.ziel_e}` : ""].filter(Boolean).join("  ·  ");
+  };
 
   const scopeQ = () => (kursId != null ? `kurs_id=${kursId}` : (classId != null ? `class_id=${classId}` : ""));
   const load = () => {
@@ -79,9 +85,11 @@ export default function Stoffplan({ embedded } = {}) {
     else ohnePlatz.push(e);
   }
   const ExamZeile = ({ e }) => (
-    <div key={`exam-${e.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", border: "1px solid var(--accent)", borderRadius: 14, background: "var(--accent-bg)", marginBottom: 6 }}>
-      <Icon d={ICONS.chart} size={15} color="var(--accent)" />
-      <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, color: "var(--accent)" }}>
+    // Dezent, nicht blau: die Arbeit ist ein Merkposten in der Planung, kein
+    // Aufruf zum Klicken.
+    <div key={`exam-${e.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", border: "1px solid var(--border2)", borderLeft: "3px solid var(--text3)", borderRadius: 14, background: "var(--bg3)", marginBottom: 6 }}>
+      <Icon d={ICONS.chart} size={15} color="var(--text3)" />
+      <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, color: "var(--text)" }}>
         {e.title || t("stoffplan.exam")}
       </span>
       <span style={{ fontSize: 12, color: "var(--text2)", flexShrink: 0 }}>
@@ -89,7 +97,7 @@ export default function Stoffplan({ embedded } = {}) {
       </span>
       {e.kw != null && <span style={{ fontSize: 12, fontWeight: 600, padding: "2px 8px", borderRadius: 980, background: "var(--bg)", color: "var(--text2)", flexShrink: 0 }}>KW {e.kw}</span>}
       <Link to="/kalender?view=klassenarbeit" className="icon-btn" style={{ ...iconBtn, padding: 4, flexShrink: 0 }} title={t("stoffplan.examEdit")}>
-        <Icon d={ICONS.open} size={15} color="var(--accent)" />
+        <Icon d={ICONS.open} size={15} color="var(--text3)" />
       </Link>
     </div>
   );
@@ -125,9 +133,11 @@ export default function Stoffplan({ embedded } = {}) {
           <span style={{ flex: 1, minWidth: 0 }}>
             <span style={{ fontSize: 14, textDecoration: it.done ? "line-through" : "none" }}>{it.title}</span>
             {/* Anforderungen direkt lesbar — dafür sind sie da. */}
-            {(it.ziel_g || it.ziel_e) && (
+            {/* Die Anforderungen stehen am Thema (Kern) — hier nur gespiegelt,
+                damit man sie in der Jahresplanung sieht, ohne sie doppelt zu pflegen. */}
+            {ziele(it.topic_id) && (
               <span style={{ display: "block", fontSize: 12, color: "var(--text3)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {it.ziel_g ? `G: ${it.ziel_g}` : ""}{it.ziel_g && it.ziel_e ? "  ·  " : ""}{it.ziel_e ? `E: ${it.ziel_e}` : ""}
+                {ziele(it.topic_id)}
               </span>
             )}
           </span>
@@ -138,34 +148,8 @@ export default function Stoffplan({ embedded } = {}) {
           )}
           {it.kw && <span style={{ fontSize: 12, fontWeight: 600, padding: "2px 8px", borderRadius: 980, background: "var(--bg2, var(--bg))", color: "var(--text2)", flexShrink: 0 }}>KW {it.kw}</span>}
           {it.hours != null && <span style={{ fontSize: 12, color: "var(--text3)", flexShrink: 0 }}>{it.hours} {t("stoffplan.h")}</span>}
-          {/* Was auf G und was auf E verlangt wird — dieselbe Stunde, zwei Ansprüche. */}
-          <button onClick={() => setOffen(offen === it.id ? null : it.id)}
-            title={t("stoffplan.zieleHint")}
-            style={{
-              flexShrink: 0, padding: "2px 9px", borderRadius: 980, fontSize: 11.5, fontWeight: 700, cursor: "pointer",
-              border: (it.ziel_g || it.ziel_e) ? "1px solid var(--accent)" : "1px solid var(--border2)",
-              background: (it.ziel_g || it.ziel_e) ? "var(--accent-bg)" : "var(--bg)",
-              color: (it.ziel_g || it.ziel_e) ? "var(--accent)" : "var(--text3)",
-            }}>
-            E/G
-          </button>
           <button onClick={() => del(it.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
         </div>
-        {offen === it.id && (
-          <div style={{ margin: "-2px 0 8px", padding: "10px 12px", border: "1px solid var(--border)", borderTop: "none", borderRadius: "0 0 14px 14px", background: "var(--bg3)" }}>
-            {[["ziel_g", t("stoffplan.zielG"), t("stoffplan.zielGHint")], ["ziel_e", t("stoffplan.zielE"), t("stoffplan.zielEHint")]].map(([feld, label, hint]) => (
-              <div key={feld} style={{ marginBottom: feld === "ziel_g" ? 8 : 0 }}>
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", marginBottom: 3 }}>{label}</div>
-                <textarea
-                  defaultValue={it[feld] || ""}
-                  onBlur={(e) => { if (e.target.value !== (it[feld] || "")) patch(it.id, { [feld]: e.target.value }); }}
-                  rows={2} placeholder={hint} maxLength={2000}
-                  style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box", padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 13, background: "var(--bg)", color: "var(--text)", resize: "vertical", overflowWrap: "anywhere" }}
-                />
-              </div>
-            ))}
-          </div>
-        )}
         {(nachThema.get(idx) || []).map((e) => <ExamZeile key={`exam-${e.id}`} e={e} />)}
         </div>
       ))}
