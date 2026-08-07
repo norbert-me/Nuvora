@@ -13,7 +13,7 @@
 // sich die zuletzt gewählte (core/cache.js). Der Sprung setzt sie vorher,
 // statt jede Seite um einen eigenen Parameter zu erweitern. Hat ein Kurs
 // mehrere Fach-Klassen, wählt man oben, für welche der Sprung gilt.
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Icon, ICONS, COLORS as C } from "./Icons.jsx";
 import { rememberClass } from "../core/cache.js";
@@ -26,6 +26,19 @@ export default function KursLinks({ kurs }) {
   const klassen = kurs?.classes || [];
   const [classId, setClassId] = useState(klassen[0]?.id ?? null);
   const an = (key) => modules.find((m) => m.key === key)?.active ?? false;
+  // Orga bündelt mehrere Reiter; was im Modul-Zahnrad ausgeblendet ist, gehört
+  // auch hier nicht hin — sonst führt der Kurs in etwas, das die Lehrkraft
+  // abgeschaltet hat (z.B. Ausleihe).
+  const lesen = () => { try { return JSON.parse(localStorage.getItem("orga_hidden_tabs") || "[]"); } catch { return []; } };
+  const [versteckt, setVersteckt] = useState(lesen);
+  useEffect(() => {
+    // Das Modul-Zahnrad meldet Änderungen — sonst stimmte die Leiste erst nach
+    // einem Neuladen wieder.
+    const h = () => setVersteckt(lesen());
+    window.addEventListener("nuvora:settings", h);
+    return () => window.removeEventListener("nuvora:settings", h);
+  }, []);
+  const orgaAn = (tab) => an("orga") && !versteckt.includes(tab);
   if (!classId) return null;
 
   const kq = kurs?.id ? `&kurs=${kurs.id}` : "";
@@ -35,9 +48,9 @@ export default function KursLinks({ kurs }) {
     an("karten") && { to: `/karten?tab=cards&class=${classId}${kq}`, icon: ICONS.duplicate, label: t("kursLinks.karten") },
     an("cardvote") && { to: `/cardvote/class-evaluation/${classId}`, icon: ICONS.chart, label: t("kursLinks.cardvote") },
     an("lernpfad") && { to: "/lernpfad", icon: ICONS.open, label: t("kursLinks.lernpfad") },
-    an("orga") && { to: "/orga?tab=sitzplan", icon: ICONS.grip, label: t("sitzplan.title") },
-    an("orga") && { to: "/orga?tab=anwesenheit", icon: ICONS.circle, label: t("anwesenheit.title") },
-    an("orga") && { to: "/orga?tab=ausleihe", icon: ICONS.archive, label: t("ausleihe.title") },
+    orgaAn("sitzplan") && { to: "/orga?tab=sitzplan", icon: ICONS.grip, label: t("sitzplan.title") },
+    orgaAn("anwesenheit") && { to: "/orga?tab=anwesenheit", icon: ICONS.circle, label: t("anwesenheit.title") },
+    orgaAn("ausleihe") && { to: "/orga?tab=ausleihe", icon: ICONS.archive, label: t("ausleihe.title") },
     an("klassenleitung") && { to: "/klassenleitung", icon: ICONS.note, label: t("kursLinks.klassenleitung") },
     an("zufall") && { to: "/zufall", icon: ICONS.shuffle, label: t("kursLinks.zufall") },
   ].filter(Boolean);
