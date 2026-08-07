@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "../i18n/index.jsx";
 import { askPrompt, askConfirm } from "../core/dialog.jsx";
+import KlassenLinks from "../components/KlassenLinks.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { AddButton, pageTitle, pageIntro, btnPrimary, btnSecondary, selectStyle, chipStyle, Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, Toggle, Empty, pageApp} from "../components/Icons.jsx";
 
@@ -76,8 +77,12 @@ export default function Kurse() {
               <strong style={{ fontSize: 15, flex: 1 }}>{k.name}</strong>
               <button onClick={() => openEdit(k)} className="icon-btn" style={iconBtn} title={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
             </div>
-            {/* Zugeordnete Klasse wird NICHT mehr unter dem Kurs angezeigt —
-                sie ist nicht nötig; Verwaltung läuft übers Bearbeiten. */}
+            {/* Zweiter Weg durch Nuvora: vom Kurs aus in die Module. Bei einer
+                Fach-Klasse direkt; hat der Kurs mehrere, je Klasse eine Zeile. */}
+            {k.classes.length === 1 && <KlassenLinks classId={k.classes[0].id} kursId={k.id} />}
+            {k.classes.length > 1 && k.classes.map((c) => (
+              <KlassenLinks key={c.id} classId={c.id} kursId={k.id} title={c.name} />
+            ))}
 
             {/* Bearbeiten-Bereich (hinter dem Stift): klar gegliedert in Name,
                 Klassen (hinzufügen/entfernen) und E/G. */}
