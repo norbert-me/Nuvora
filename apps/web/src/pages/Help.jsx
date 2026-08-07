@@ -115,12 +115,11 @@ function KalenderHilfe({ t }) {
   );
 }
 
-// Modul Unterrichtsplanung: zwei Reiter — Stoffverteilung und Einstiege.
+// Modul Unterrichtsplanung: die Einstiege. Die Jahresplanung liegt bei den
+// Themen im Kern, nicht hier.
 function UnterrichtsplanungHilfe({ t }) {
   return (
     <>
-      <Section title={t("help.up.tabsT")}>{t("help.up.tabs")}</Section>
-      <Section title={t("help.stoff.whatT")}>{t("help.stoff.what")}</Section>
       <Section title={t("help.ein.whatT")}>{t("help.ein.what")}</Section>
       <Section title={t("help.ein.useT")}>{t("help.ein.use")}</Section>
     </>

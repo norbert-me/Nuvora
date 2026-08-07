@@ -228,10 +228,8 @@ const getModuleNavItems = (t, location) => {
   }
   if (area === "unterrichtsplanung") {
     const markt = pathname.startsWith("/marktplatz");
-    const cur = markt ? null : (params.get("open") || params.get("tab") === "einstiege" ? "einstiege" : "stoff");
     return [
-      { to: `${UPLAN}?tab=stoff`, label: t("unterrichtsplanung.tabStoff"), active: cur === "stoff" },
-      { to: `${UPLAN}?tab=einstiege`, label: t("unterrichtsplanung.tabEinstiege"), active: cur === "einstiege" },
+      { to: UPLAN, label: t("unterrichtsplanung.tabEinstiege"), active: !markt },
       { to: "/marktplatz?area=methoden&kind=method", label: t("nav.marketplace"), active: markt },
     ];
   }

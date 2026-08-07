@@ -152,10 +152,10 @@ REGISTRY: List[ModuleDef] = [
         group="unterricht",
         name="Unterrichtsplanung",
         description=(
-            "Vorbereitung an einem Ort — zwei Reiter: Stoffverteilung (Themen übers "
-            "Schuljahr in eine Reihenfolge bringen und abhaken) und Einstiege "
-            "(Ideen für den Unterrichtseinstieg: Idee, Ablauf, Material, Dauer; "
-            "an Kalender-Stunden zuweisbar und themen-getaggt)."
+            "Ideen für den Unterrichtseinstieg sammeln: Idee, Ablauf, Material, "
+            "Dauer — an Kalender-Stunden zuweisbar und themen-getaggt. Die "
+            "Jahresplanung liegt bei den Themen im Kern (Reihenfolge, Lernziele, "
+            "E/G-Anforderungen), nicht hier."
         ),
         path="/unterrichtsplanung",
         stage="beta",

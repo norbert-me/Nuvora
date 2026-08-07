@@ -14,7 +14,7 @@ Lernende brauchen keine Geräte und keine Konten — sie tauchen nur als Datens�
 
 Nuvora ist die Basis: Konto, Klassen, Kurse, Schüler und Themen liegen hier. Module werden dazugeschaltet und arbeiten auf diesen Daten — sie besitzen sie nicht.
 
-> **Status: stabil, wächst weiter.** Der Rahmen steht — Anmeldung, Startseite, Modulverwaltung, Klassen, Kurse und Themen sind Nuvora. Vierzehn Module sitzen auf dem Kern; keins hat eigene Konten oder eine eigene Datenbank. Verwandte Werkzeuge sind unter einem Modul mit **Reitern** gebündelt (z. B. Auswertung = Notenbuch + Klassenarbeiten, Unterrichtsplanung = Stoffverteilung + Einstiege, Notizbrett = Notizen + To-do, Orga = Checklisten + Anwesenheit + Ausleihe + Sitzplan). Die geteilte **Themen-Taxonomie** verbindet sie: ein in CardVote oder Code-Detektiv schwaches Thema erzeugt auf Knopfdruck ein Karten-Übungsdeck oder eine Lernpfad-Wiederholung, Test-Ergebnisse werden zu einer Notenspalte, und die Themen-Ansicht zeigt zu einem Thema alles quer über die Module — samt hinterlegtem Material.
+> **Status: stabil, wächst weiter.** Der Rahmen steht — Anmeldung, Startseite, Modulverwaltung, Klassen, Kurse und Themen sind Nuvora. Vierzehn Module sitzen auf dem Kern; keins hat eigene Konten oder eine eigene Datenbank. Verwandte Werkzeuge sind unter einem Modul mit **Reitern** gebündelt (z. B. Auswertung = Notenbuch + Klassenarbeiten, Notizbrett = Notizen + To-do, Orga = Checklisten + Anwesenheit + Ausleihe + Sitzplan). Die geteilte **Themen-Taxonomie** verbindet sie: ein in CardVote oder Code-Detektiv schwaches Thema erzeugt auf Knopfdruck ein Karten-Übungsdeck oder eine Lernpfad-Wiederholung, Test-Ergebnisse werden zu einer Notenspalte, und die Themen-Ansicht zeigt zu einem Thema alles quer über die Module — samt hinterlegtem Material.
 
 ## Kern
 
@@ -64,11 +64,7 @@ Karteikarten mit Spaced Repetition (SM-2). Ein Stapel gehört einem Kurs; die Le
 
 Unterrichtsplanung: Tag-, Wochen-, Monatsansicht und ein wiederkehrender **Stundenplan** (Klasse je Stunde, Farben, Uhrzeiten). An einen Eintrag lässt sich ein CardVote-Quiz, ein Karten-Deck oder eine Lernleiter planen; **freie Tage** (Ferien/Feiertage) blenden Stunden aus. **Kalender-Sync** in beide Richtungen: eigener ICS-Feed zum Abonnieren (Apple/Google) und ein externer Kalender read-only eingeblendet (SSRF-gehärtet).
 
-### Unterrichtsplanung — Stoffverteilung + Einstiege
-
-Vorbereitung an einem Ort, in zwei Reitern.
-
-**Stoffverteilung** — Themen übers Schuljahr in eine Reihenfolge bringen (grobe Kalenderwoche, Stundenumfang, Notiz) und abhaken. Die Jahressicht zum datumsgenauen Kalender.
+### Unterrichtsplanung — Einstiege
 
 **Einstiege** — Ideen für den Unterrichtseinstieg: Idee, Ablauf mit Material, Materialliste, ungefähre Dauer. Wiederverwendbar, an Kalender-Stunden zuweisbar und themen-getaggt: zu einem schwachen Thema schlägt die Startseite einen passenden Einstieg vor.
 
@@ -127,7 +123,7 @@ Nuvora-Kern (apps/api, apps/web)
     ├── Karten             /karten             Karteikarten, Spaced Repetition
     ├── Kalender           /kalender           Planung, Stundenplan, ICS-Sync
     ├── Auswertung         /auswertung         Notenbuch + Klassenarbeiten
-    ├── Unterrichtsplanung /unterrichtsplanung Stoffverteilung + Einstiege
+    ├── Unterrichtsplanung /unterrichtsplanung Einstiege
     ├── Code-Detektiv      /code-detektiv      Programmier-Rätsel (nativ)
     ├── Orga               /orga               Checklisten · Anwesenheit · Ausleihe · Sitzplan
     ├── Zufallsschüler     /zufall             zufällige Person / Gruppen

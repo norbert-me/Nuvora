@@ -1148,26 +1148,6 @@ class ParentContact(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class CurriculumItem(Base):
-    """Modul Stoffverteilung: ein Thema in der Jahresplanung eines Kurses/einer
-    Klasse. Grobe Kalenderwoche (kw, frei), Stundenumfang, Notiz, erledigt.
-    Reihenfolge ueber position. Optionaler Kern-Themenbezug (topic_id SET NULL)."""
-    __tablename__ = "curriculum_items"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="CASCADE"), nullable=True, index=True)
-    class_id: Mapped[Optional[int]] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), nullable=True, index=True)
-    topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
-    title: Mapped[str] = mapped_column(String(200), default="", server_default="")
-    kw: Mapped[str] = mapped_column(String(20), default="", server_default="")     # z.B. "40" oder "40-42"
-    hours: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    notes: Mapped[str] = mapped_column(Text, default="", server_default="")
-    done: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
-    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-
 class NotepadNote(Base):
     """Modul Notizblock: freie Notizzettel der Lehrkraft (Titel + Text). Nicht an
     Schüler oder Klasse gebunden (das ist Beobachtungen), reine private Ablage —
