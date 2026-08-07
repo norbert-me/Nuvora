@@ -196,6 +196,30 @@ if [ -n "$MAIL_WARN" ]; then
   echo ""
 fi
 
+# Eine einzige umgebrochene Zeile (nano ohne -w) macht die .env fuer docker
+# compose unlesbar — und dann scheitert jeder compose-Aufruf mit einer Meldung,
+# die nach etwas ganz anderem aussieht (z.B. "Port belegt", weil der eigene
+# Container nicht mehr erkannt wird). Darum hier zuerst pruefen.
+echo "→ .env-Syntax prüfen..."
+ENV_BAD=$(ssh "$SERVER" "cd '$REMOTE_DIR' 2>/dev/null || exit 0
+  awk '!/^[A-Z_]+=/ && !/^#/ && NF { print \"    Zeile \" NR \": kein SCHLUESSEL= am Anfang (umgebrochener Wert?)\" }' .env
+")
+if [ -n "$ENV_BAD" ]; then
+  echo ""
+  echo "  ⚠ Die .env auf dem Server ist beschädigt:"
+  echo "$ENV_BAD"
+  echo ""
+  echo "    Das passiert, wenn ein langer Wert beim Bearbeiten umgebrochen wurde."
+  echo "    Reparieren (klebt Fortsetzungszeilen zurück, sichert vorher):"
+  echo "      ssh $SERVER"
+  echo "      cd $REMOTE_DIR && cp -p .env .env.bak-manuell && \\"
+  echo "        awk '/^[A-Z_]+=/ || /^#/ || /^\$/ { if (NR>1) print p; p=\$0; next } { p = p \$0 } END { print p }' .env > .env.fix && mv .env.fix .env && chmod 600 .env"
+  echo ""
+  echo "    Beim Bearbeiten 'nano -w .env' nehmen — ohne -w bricht nano wieder um."
+  echo "  Deploy abgebrochen."
+  exit 4
+fi
+
 # Der Port-Konflikt zeigt sich sonst erst, wenn alle Images gebaut sind und
 # der Proxy als letzter Container startet — also nach mehreren Minuten.
 echo "→ Port prüfen..."
