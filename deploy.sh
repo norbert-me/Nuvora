@@ -107,6 +107,7 @@ rsync -rlz -c --inplace --delete \
   --exclude='.git/' \
   --exclude='.env' \
   --exclude='.env.bak-*' \
+  --exclude='.env-eingerichtet' \
   --exclude='.deploy.env' \
   --exclude='node_modules/' \
   --exclude='venv/' \
@@ -135,6 +136,7 @@ echo "→ Pflicht-Secrets auf dem Server prüfen..."
 GEN_TOKEN=$(openssl rand -hex 32)
 GEN_PGPW=$(openssl rand -hex 24)
 
+set +e
 BOOTSTRAP=$(ssh "$SERVER" sh -s <<REMOTE
 cd '$REMOTE_DIR' || exit 1
 t='$GEN_TOKEN'
@@ -144,6 +146,17 @@ site='$SITE_URL'
 $(cat "$DIR/scripts/ensure-env.sh")
 REMOTE
 )
+BOOT_RC=$?
+set -e
+# Exitcode 3: die .env fehlt, obwohl die Installation schon eingerichtet war.
+# Weiterbauen wuerde mit frischen Zufallswerten starten — also hier stoppen.
+if [ "$BOOT_RC" = "3" ]; then
+  echo ""
+  echo "$BOOTSTRAP"
+  echo ""
+  echo "  Deploy abgebrochen. Nichts wurde gebaut oder neu gestartet."
+  exit 3
+fi
 
 unset GEN_TOKEN GEN_PGPW
 

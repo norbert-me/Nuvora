@@ -18,6 +18,17 @@ if [ -f .env ]; then
   ls -1t .env.bak-* 2>/dev/null | tail -n +8 | xargs -r rm -f
 fi
 
+# Einmal eingerichtet, nie wieder stillschweigend neu: fehlt die .env, obwohl
+# hier schon einmal eine stand, ist etwas faul (NAS nicht gemountet, Datei
+# geloescht). Dann lieber abbrechen als eine leere Installation hochziehen —
+# sonst laufen Mailversand und Admin-Adresse wieder auf Anfang.
+if [ ! -f .env ] && [ -f .env-eingerichtet ]; then
+  echo 'ABBRUCH: .env fehlt, obwohl diese Installation schon eingerichtet war.'
+  echo 'Kein Neuanlegen — sonst waeren SMTP- und Admin-Angaben wieder weg.'
+  echo 'Pruefen: ist das Verzeichnis (NAS) gemountet? Sicherung: .env.bak-*'
+  exit 3
+fi
+
 if [ ! -f .env ]; then
   # Platzhalter aus dem Beispiel NICHT uebernehmen: eine .env mit
   # ADMIN_EMAIL=admin@example.com sieht ausgefuellt aus, verschickt
@@ -73,5 +84,8 @@ set_always() {
 
 set_always PORT "$port"
 set_always SITE_URL "$site"
+
+# Marker: ab jetzt gilt diese Installation als eingerichtet (siehe oben).
+[ -f .env-eingerichtet ] || : > .env-eingerichtet
 
 printf '%s' "$changed"
