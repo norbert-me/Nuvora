@@ -1232,11 +1232,13 @@ function ExamMassnahmen({ classId, kursId = null, t }) {
   useEffect(() => {
     let alive = true;
     setFehler(false);
-    fetch(`${API}/classes/${classId}/massnahmen?arbeit=true${kursId ? `&kurs_id=${kursId}` : ""}`)
+    // Absoluter Pfad: API zeigt hier auf /api/kalender, die Maßnahmen liegen
+    // aber im Kern unter /api/classes.
+    fetch(`/api/classes/${classId}/massnahmen?arbeit=true${kursId ? `&kurs_id=${kursId}` : ""}`)
       .then((r) => { if (!r.ok) { if (alive) setFehler(true); return []; } return r.json(); })
       .then((d) => { if (alive) setRows(Array.isArray(d) ? d : []); })
       .catch(() => { if (alive) setFehler(true); });
-    fetch(`${API}/classes/${classId}/massnahmen?arbeit=true`)
+    fetch(`/api/classes/${classId}/massnahmen?arbeit=true`)
       .then((r) => (r.ok ? r.json() : []))
       .then((d) => { if (alive) setGesamt(Array.isArray(d) ? d.length : 0); })
       .catch(() => {});
