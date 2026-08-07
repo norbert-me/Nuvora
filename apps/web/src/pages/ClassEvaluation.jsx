@@ -66,7 +66,13 @@ export default function ClassEvaluation() {
     };
   });
 
-  const sorted = [...studentRows].sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1));
+  // Kein gemeinsames Ranking über beide Kursniveaus — die Maßstäbe sind
+  // verschieden. Gibt es Niveaus, wird zuerst nach Niveau gruppiert.
+  const hatNiveaus = students.some((s) => s.niveau);
+  const sorted = [...studentRows].sort((a, b) => {
+    if (hatNiveaus && (a.niveau || "") !== (b.niveau || "")) return (a.niveau || "").localeCompare(b.niveau || "");
+    return (b.pct ?? -1) - (a.pct ?? -1);
+  });
 
   const testAverages = tests.map((test, ti) => {
     let sum = 0;
@@ -175,6 +181,12 @@ export default function ClassEvaluation() {
                       {student.name}
                     </Link>
                   ) : student.name}
+                  {/* Kursniveau steht immer neben dem Ergebnis. */}
+                  {student.niveau && (
+                    <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, padding: "1px 6px", borderRadius: 8, background: "var(--bg2)", color: "var(--text3)" }}>
+                      {student.niveau}
+                    </span>
+                  )}
                 </td>
                 {student.perTest.map((pt, i) => (
                   <td

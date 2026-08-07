@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
-import { useLanguage } from "../i18n/index.jsx";
-import { btnPrimary, btnSecondary, COLORS as C, pageForm} from "../components/Icons.jsx";
+import { useLanguage, LANGUAGES } from "../i18n/index.jsx";
+import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm} from "../components/Icons.jsx";
 
 const API = "/api";
 
@@ -34,7 +34,7 @@ const TrashIcon = ({ size = 16 }) => (
 );
 
 export default function Profile({ user, onLogout, onUserUpdate }) {
-  const { t } = useLanguage();
+  const { t, lang, setLang } = useLanguage();
   const [oldPw, setOldPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [msg, setMsg] = useState("");
@@ -156,6 +156,19 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
 
   return (
     <div style={{ ...pageForm }}>
+
+      {/* Sprache steht im Profil, nicht mehr in der Navbar — sie wird einmal
+          gesetzt, nicht im Betrieb gewechselt. */}
+      <div style={{ padding: 24, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 24, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 160 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{t("nav.language")}</div>
+        </div>
+        <select value={lang} onChange={(e) => setLang(e.target.value)} style={{ ...selectStyle, minWidth: 160 }}>
+          {Object.entries(LANGUAGES).map(([code, label]) => (
+            <option key={code} value={code}>{label}</option>
+          ))}
+        </select>
+      </div>
 
       <div style={{ padding: 24, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 24 }}>
         <div style={{ fontSize: 15, color: "var(--text3)", marginBottom: 4 }}>{t("profile.email")}</div>

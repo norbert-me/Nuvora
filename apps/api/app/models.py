@@ -112,6 +112,13 @@ class QuestionSet(Base):
     owner_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     shuffle_questions: Mapped[bool] = mapped_column(Boolean, default=False)
     shuffle_answers: Mapped[bool] = mapped_column(Boolean, default=False)
+    # E/G-Differenzierung: alle SuS sehen dieselben Fragen, unterschieden wird
+    # erst in der Auswertung (G zaehlt nur G-Fragen als 100 %, E-Fragen geben
+    # Bonus). Aus = ein Quiz wie bisher.
+    niveau_aktiv: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Minuspunkte: falsche Antwort = -1 (Gesamtpunktzahl nie unter 0). Wer die
+    # Karte unten laesst, antwortet nicht: 0 Punkte, kein Abzug.
+    minuspunkte: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     folder: Mapped[Optional[Folder]] = relationship(back_populates="question_sets")
     items: Mapped[list["QuestionSetItem"]] = relationship(back_populates="question_set", order_by="QuestionSetItem.position", cascade="all, delete-orphan")
@@ -124,6 +131,10 @@ class QuestionSetItem(Base):
     question_set_id: Mapped[int] = mapped_column(ForeignKey("question_sets.id", ondelete="CASCADE"))
     question_id: Mapped[int] = mapped_column(ForeignKey("questions.id", ondelete="CASCADE"))
     position: Mapped[int] = mapped_column(Integer)
+    # Niveau der Frage IN DIESEM Quiz ("E" oder "" = G). Bewusst am Set-Eintrag
+    # und nicht an der Frage: dieselbe Frage kann in einem Quiz Anforderung und
+    # in einem anderen Zusatz sein. Ohne niveau_aktiv am Set ohne Wirkung.
+    niveau: Mapped[str] = mapped_column(String(1), default="", server_default="")
     question_set: Mapped[QuestionSet] = relationship(back_populates="items")
     question: Mapped[Question] = relationship()
 

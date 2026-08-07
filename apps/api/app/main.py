@@ -203,6 +203,9 @@ def _ensure_columns(sync_conn):
         ("students", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
         ("students", "foerder", "JSON"),
         ("students", "massnahmen", "JSON"),
+        ("question_sets", "niveau_aktiv", "BOOLEAN DEFAULT FALSE NOT NULL"),
+        ("question_sets", "minuspunkte", "BOOLEAN DEFAULT FALSE NOT NULL"),
+        ("question_set_items", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
         ("students", "notizen", "TEXT DEFAULT '' NOT NULL"),
         ("students", "klassenlehrer", "VARCHAR(120) DEFAULT '' NOT NULL"),
         # learning_ladders wurde in einem frueheren Deploy ohne diese Spalten

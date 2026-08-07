@@ -6,7 +6,7 @@ import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
 import "@fontsource/inter/700.css";
 import "@fontsource/inter/800.css";
-import { LanguageProvider, useLanguage, LANGUAGES } from "./i18n/index.jsx";
+import { LanguageProvider, useLanguage } from "./i18n/index.jsx";
 import { enqueue, classify, newTmp, flush as flushOutbox } from "./core/outbox.js";
 
 // Global fetch interceptor: add auth token to all /api/ requests
@@ -435,25 +435,6 @@ function DarkModeToggle() {
   );
 }
 
-function LanguageSwitcher() {
-  const { lang, setLang, t } = useLanguage();
-  return (
-    <select
-      value={lang}
-      onChange={(e) => setLang(e.target.value)}
-      title={t("nav.language")}
-      style={{
-        background: "none", border: "none", cursor: "pointer", padding: "6px 2px",
-        fontSize: 13, fontWeight: 600, color: "var(--text2)", flexShrink: 0,
-      }}
-    >
-      {Object.entries(LANGUAGES).map(([code, label]) => (
-        <option key={code} value={code}>{code.toUpperCase()}</option>
-      ))}
-    </select>
-  );
-}
-
 function Nav({ user, onLogout }) {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -590,7 +571,6 @@ function Nav({ user, onLogout }) {
           })}
         </div>
 
-        <LanguageSwitcher />
         <DarkModeToggle />
         <NavLink to={user ? "/profile" : "/login"} data-tour="profile" onClick={() => { setMenuOpen(false); if (!user) window.dispatchEvent(new Event("cardvote:reset-login-mode")); }} style={{
           padding: 6,

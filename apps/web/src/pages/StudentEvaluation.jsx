@@ -27,7 +27,9 @@ export default function StudentEvaluation() {
       present: s?.present || false,
       score: s?.score || 0,
       total: s?.total || test.max_score,
-      pct: s?.present && s.total > 0 ? Math.round((s.score / s.total) * 100) : null,
+      // pct kommt aus der Wertung am Server (E/G-Bonus, Minuspunkte); Fallback
+      // für alte Datensätze: Punkte durch erreichbare Punkte.
+      pct: s?.present ? (s.pct ?? (s.total > 0 ? Math.round((s.score / s.total) * 100) : null)) : null,
     };
   });
 
@@ -48,6 +50,9 @@ export default function StudentEvaluation() {
       <h2 style={{ marginTop: 12, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{student.name}</h2>
       <p style={{ color: "var(--text3)", marginBottom: 20, fontSize: 14 }}>
         Karte #{student.card_id} · {class_name}
+        {/* Kursniveau gehört zur Ergebnisanzeige — die Prozentwerte einer
+            G-Wertung sind ohne diesen Hinweis nicht einzuordnen. */}
+        {student.niveau ? ` · ${student.niveau}-Kurs` : ""}
       </p>
 
       <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>

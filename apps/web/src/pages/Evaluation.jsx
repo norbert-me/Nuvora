@@ -5,6 +5,7 @@ import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
 import { DownloadLink, Icon, ICONS, btnPrimary, btnSecondary, overlayGuard, modalOverlay, modalPanel, inputStyle, COLORS as C, Boxplot } from "../components/Icons.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
+import { bewerte, statusOf } from "../core/scoring.js";
 
 const API = "/api";
 const COLORS = { A: "#0066cc", B: "#5856d6", C: C.warning, D: C.danger };
@@ -84,6 +85,11 @@ export default function Evaluation() {
   const [avgMode, setAvgMode] = useState("pts");
   const [medMode, setMedMode] = useState("pts");
   const [sdMode, setSdMode] = useState("pts");
+  // Wer krank war (aus der Wertung) bzw. trotz fehlender Abgabe gewertet wird.
+  const [krankListe, setKrankListe] = useState([]);
+  const [anwesendListe, setAnwesendListe] = useState([]);
+  // Lehrer-Übersicht nach Kursniveau filtern ("" = alle).
+  const [niveauFilter, setNiveauFilter] = useState("");
   const [configDirty, setConfigDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(false);
@@ -98,6 +104,8 @@ export default function Evaluation() {
       clearTimeout(timer);
       if (evalData && evalData.questions && evalData.students) setData({ ...evalData, _evalConfig: config || {} });
       if (config && config.weights) setWeights(config.weights);
+      if (config && Array.isArray(config.krank)) setKrankListe(config.krank);
+      if (config && Array.isArray(config.anwesend)) setAnwesendListe(config.anwesend);
       if (config && config.grade_scale) setGradeScale(config.grade_scale);
       else {
         try {
@@ -108,7 +116,7 @@ export default function Evaluation() {
     });
   }, [id]);
 
-  const saveConfig = (newWeights, newScale) => {
+  const saveConfig = (newWeights, newScale, patch = {}) => {
     clearTimeout(saveTimer.current);
     setConfigDirty(true);
     saveTimer.current = setTimeout(() => {
@@ -116,9 +124,22 @@ export default function Evaluation() {
       fetch(`${API}/sessions/${id}/eval-config`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ weights: newWeights, grade_scale: newScale }),
+        // krank/anwesend immer mitschicken — die Konfiguration wird als Ganzes
+        // ersetzt, ein Weglassen würde die Einstufung stillschweigend löschen.
+        body: JSON.stringify({ weights: newWeights, grade_scale: newScale, krank: krankListe, anwesend: anwesendListe, ...patch }),
       }).then(() => { setSaving(false); setConfigDirty(false); });
     }, 800);
+  };
+
+  // Kind zwischen „krank" (aus der Wertung) und „anwesend" (0 zählt mit) schalten.
+  const setStatus = (cardId, neu) => {
+    const key = String(cardId);
+    const krank = krankListe.map(String).filter((x) => x !== key);
+    const anwesend = anwesendListe.map(String).filter((x) => x !== key);
+    if (neu === "krank") krank.push(key); else anwesend.push(key);
+    setKrankListe(krank);
+    setAnwesendListe(anwesend);
+    saveConfig(weights, gradeScale, { krank, anwesend });
   };
 
   const updateWeight = (qId, val) => {
@@ -160,24 +181,36 @@ export default function Evaluation() {
   const getWeight = (qId) => weights[qId] ?? 1;
   const maxScore = questions.reduce((sum, q) => sum + (q.correct_answer ? getWeight(q.id) : 0), 0);
 
-  const presentStudents = students.filter((s) => s.present).map((s) => {
-    const score = s.answers.reduce((sum, a, i) => {
-      if (a.is_correct) return sum + getWeight(questions[i].id);
-      return sum;
-    }, 0);
-    return { ...s, weightedScore: score };
+  // E/G und Minuspunkte kommen vom Quiz; die Wertung selbst steht in
+  // core/scoring.js (gleiche Regeln wie am Server).
+  const niveauAktiv = !!data.niveau_aktiv;
+  const minuspunkte = !!data.minuspunkte;
+  const werte = (s) => bewerte(
+    questions.map((q) => ({ id: q.id, correct_answer: q.correct_answer, niveau: q.niveau || "" })),
+    Object.fromEntries(s.answers.map((a) => [a.question_id, a.answer])),
+    { niveau: s.niveau || "", niveauAktiv, minuspunkte, weights, scale: gradeScale },
+  );
+
+  // „krank" bleibt aus jeder Wertung. Wer anwesend war und nichts abgegeben
+  // hat, zählt mit 0 mit — umschaltbar je Kind (setStatus).
+  const status = (s) => statusOf(s.card_id, s.present, { krank: krankListe, anwesend: anwesendListe });
+  const presentStudents = students.filter((s) => status(s) === "anwesend").map((s) => {
+    const w = werte(s);
+    return { ...s, weightedScore: w.score, ownMax: w.maxScore, pct: w.pct, basePct: w.basePct, bonusPct: w.bonusPct, eCorrect: w.eCorrect, eTotal: w.eTotal };
   });
 
-  const absentStudents = students.filter((s) => !s.present);
+  const absentStudents = students.filter((s) => status(s) === "krank");
 
   const scores = presentStudents.map((s) => s.weightedScore);
-  const pcts = scores.map((s) => maxScore > 0 ? (s / maxScore) * 100 : 0);
+  const pcts = presentStudents.map((s) => s.pct);
   const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
-  const avgPct = maxScore > 0 ? Math.round((avgScore / maxScore) * 100) : 0;
+  // Prozentwerte kommen aus der Wertung je Kind (bei E/G hat nicht jedes
+  // dieselbe erreichbare Punktzahl) — nicht mehr aus einem gemeinsamen Maximum.
+  const avgPct = pcts.length > 0 ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : 0;
   const medianScore = median(scores);
-  const medianPct = maxScore > 0 ? Math.round((medianScore / maxScore) * 100) : 0;
+  const medianPct = pcts.length > 0 ? Math.round(median(pcts)) : 0;
   const sd = stddev(scores);
-  const sdPct = maxScore > 0 ? stddev(pcts) : 0;
+  const sdPct = pcts.length > 0 ? stddev(pcts) : 0;
 
 const gradeDistribution = (() => {
     if (gradeMode === "tendency") {
@@ -424,8 +457,8 @@ const gradeDistribution = (() => {
             grades={presentStudents.map((st) => ({
               card_id: st.card_id, name: st.name,
               value: gradeMode === "tendency"
-                ? tendencyGrade(maxScore > 0 ? (st.weightedScore / maxScore) * 100 : 0, gradeScale)
-                : Math.round(gradeFromPct(maxScore > 0 ? (st.weightedScore / maxScore) * 100 : 0, gradeScale) * 10) / 10,
+                ? tendencyGrade(st.pct, gradeScale)
+                : Math.round(gradeFromPct(st.pct, gradeScale) * 10) / 10,
             }))}
             onClose={() => setNotenDialog(false)}
           />
@@ -572,7 +605,9 @@ const gradeDistribution = (() => {
           </div>
         ) : (
           scores.length >= 3
-            ? <Boxplot values={scores} max={maxScore} />
+            // Bei E/G ist die erreichbare Punktzahl je Kind verschieden — dann
+            // ist Prozent die einzige gemeinsame Achse.
+            ? (niveauAktiv ? <Boxplot values={pcts} max={100} /> : <Boxplot values={scores} max={maxScore} />)
             : <p style={{ fontSize: 13, color: "var(--text3)" }}>Mindestens 3 Ergebnisse nötig.</p>
         )}
       </div>
@@ -654,6 +689,25 @@ const gradeDistribution = (() => {
 
       <TopicAnalysis questions={questions} presentStudents={presentStudents} />
 
+      {/* Filter nach Kursniveau. Bewusst kein gemeinsames Ranking über beide
+          Niveaus — die Maßstäbe sind verschieden. */}
+      {niveauAktiv && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("eval.niveauFilter")}</span>
+          {[["", t("eval.niveauAll")], ["E", "E"], ["G", "G"]].map(([wert, label]) => (
+            <button key={wert || "alle"} onClick={() => setNiveauFilter(wert)}
+              style={{
+                padding: "4px 12px", borderRadius: 980, fontSize: 12.5, cursor: "pointer",
+                border: niveauFilter === wert ? "1px solid var(--accent)" : "1px solid var(--border2)",
+                background: niveauFilter === wert ? "var(--accent-bg)" : "var(--bg)",
+                color: niveauFilter === wert ? "var(--accent)" : "var(--text2)",
+              }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div style={{ overflowX: "auto" }}>
         <table style={{ borderCollapse: "collapse", fontSize: 14, whiteSpace: "nowrap" }}>
           <thead>
@@ -664,7 +718,7 @@ const gradeDistribution = (() => {
                   onClick={() => setSelectedQ(i)}
                   style={{ ...th, writingMode: "vertical-lr", textAlign: "left", maxWidth: 30, height: 120, fontSize: 12, padding: "4px 2px", cursor: "pointer", color: "var(--accent)" }}
                   title={`${q.text} — Klicken für Details`}>
-                  F{i + 1}{getWeight(q.id) !== 1 ? ` (×${getWeight(q.id)})` : ""}
+                  F{i + 1}{getWeight(q.id) !== 1 ? ` (×${getWeight(q.id)})` : ""}{niveauAktiv && (q.niveau || "") === "E" ? " · E" : ""}
                 </th>
               ))}
               <th style={{ ...th, background: "var(--bg2)" }}>Punkte</th>
@@ -684,8 +738,10 @@ const gradeDistribution = (() => {
             </tr>
           </thead>
           <tbody>
-            {presentStudents.map((student) => {
-              const pct = maxScore > 0 ? Math.round((student.weightedScore / maxScore) * 100) : 0;
+            {presentStudents
+              .filter((s) => !niveauFilter || (s.niveau || "G") === niveauFilter)
+              .map((student) => {
+              const pct = Math.round(student.pct);
               const grade = gradeFromPct(pct, gradeScale);
               return (
                 <tr key={student.card_id}>
@@ -699,6 +755,21 @@ const gradeDistribution = (() => {
                       {student.name}{" "}
                       <Icon d={ICONS.download} size={15} color="var(--text3)" />
                     </a>
+                    {/* Kursniveau steht immer neben dem Ergebnis, nicht nur bei
+                        differenzierten Quizzen — die Note ist ohne es nicht lesbar. */}
+                    {student.niveau && (
+                      <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, padding: "1px 6px", borderRadius: 8, background: "var(--bg2)", color: "var(--text3)" }}
+                        title={t("eval.niveauBadgeHint")}>
+                        {student.niveau}
+                      </span>
+                    )}
+                    {!student.present && (
+                      <button onClick={() => setStatus(student.card_id, "krank")}
+                        title={t("eval.markSick")}
+                        style={{ marginLeft: 6, background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 11, fontWeight: 600, padding: 0 }}>
+                        {t("eval.noSubmission")}
+                      </button>
+                    )}
                   </td>
                   {student.answers.map((a, i) => (
                     <td
@@ -721,17 +792,24 @@ const gradeDistribution = (() => {
                     </td>
                   ))}
                   <td style={{ ...td, textAlign: "center", fontWeight: "bold", background: "var(--bg2)" }}>
-                    {fmt(student.weightedScore)} / {maxScore}
+                    {fmt(student.weightedScore)} / {fmt(student.ownMax)}
                   </td>
                   <td style={{
                     ...td, textAlign: "center", fontWeight: "bold",
                     background: pct >= 80 ? "var(--success-bg)" : pct >= 50 ? "var(--warn-bg)" : "var(--danger-bg)",
                     color: pct >= 80 ? C.success : pct >= 50 ? C.warning : C.danger,
                   }}>
-                    {maxScore > 0 ? `${pct}%` : "–"}
+                    {student.ownMax > 0 ? `${pct}%` : "–"}
+                    {/* Bonus aus richtigen E-Fragen — sichtbar, damit die Note nachvollziehbar bleibt. */}
+                    {student.bonusPct > 0 && (
+                      <span style={{ display: "block", fontSize: 10.5, fontWeight: 600, color: "var(--text3)" }}
+                        title={t("eval.bonusHint", { n: student.eCorrect, total: student.eTotal })}>
+                        +{Math.round(student.bonusPct)} E
+                      </span>
+                    )}
                   </td>
                   <td style={{ ...td, textAlign: "center", fontWeight: 700, color: GRADE_COLORS[Math.round(grade)] }}>
-                    {maxScore > 0 ? grade.toFixed(1) : "–"}
+                    {student.ownMax > 0 ? grade.toFixed(1) : "–"}
                   </td>
                 </tr>
               );
@@ -748,6 +826,11 @@ const gradeDistribution = (() => {
               <tr key={student.card_id} style={{ opacity: 0.4 }}>
                 <td style={{ ...td, fontWeight: "bold", position: "sticky", left: 0, background: "var(--card)", zIndex: 1, fontStyle: "italic" }}>
                   {student.name}
+                  {/* Doch anwesend: dann zählt die fehlende Abgabe als 0 mit. */}
+                  <button onClick={() => setStatus(student.card_id, "anwesend")}
+                    style={{ marginLeft: 8, background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: 11, fontWeight: 600, padding: 0, fontStyle: "normal" }}>
+                    {t("eval.markPresent")}
+                  </button>
                 </td>
                 {questions.map((q) => (
                   <td key={q.id} style={{ ...td, textAlign: "center", color: "var(--border2)" }}>–</td>

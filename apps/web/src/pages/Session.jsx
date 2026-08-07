@@ -541,6 +541,13 @@ export default function Session() {
         }}>
           {sessionCode}
         </div>
+        {/* Minuspunkte: die Klasse muss wissen, dass Raten kostet und die
+            Karte unten zu lassen erlaubt ist. */}
+        {selectedSet?.minuspunkte && (
+          <p style={{ color: "var(--text2)", marginBottom: 8, fontSize: 14, maxWidth: 520, marginLeft: "auto", marginRight: "auto" }}>
+            {t("session.minusHint")}
+          </p>
+        )}
         <p style={{ color: "var(--text2)", marginBottom: 8, fontSize: 15 }}>
           {t("session.codeHint")}
         </p>

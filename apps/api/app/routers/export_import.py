@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from ..scoring import bewerte, status_of
 from ..database import get_db
 from ..models import SchoolClass, Student, QuestionSet, QuestionSetItem, Question, Session, Scan, Folder, User
 from .auth import get_current_user, rate_limit
@@ -29,6 +30,16 @@ def strip_latex(text: str) -> str:
     return s.strip()
 
 router = APIRouter(prefix="/api", tags=["export"])
+
+
+async def _quiz_flags(db, session):
+    """E/G-Differenzierung und Minuspunkte des Quiz hinter einer Session."""
+    if not session.question_set_id:
+        return False, False
+    qs = await db.get(QuestionSet, session.question_set_id)
+    if not qs:
+        return False, False
+    return bool(qs.niveau_aktiv), bool(qs.minuspunkte)
 
 
 # --- Export ---
@@ -75,8 +86,11 @@ async def export_question_set(set_id: int, user: User = Depends(get_current_user
         "name": qs.name,
         "shuffle_questions": qs.shuffle_questions,
         "shuffle_answers": qs.shuffle_answers,
+        "niveau_aktiv": bool(qs.niveau_aktiv),
+        "minuspunkte": bool(qs.minuspunkte),
         "questions": [
             {
+                "niveau": item.niveau or "",
                 "text": item.question.text,
                 "choices": item.question.choices,
                 "correct_answer": item.question.correct_answer,
@@ -272,6 +286,10 @@ class ImportQuestionSetBody(BaseModel):
     folder_id: Optional[int] = None
     shuffle_questions: bool = False
     shuffle_answers: bool = False
+    # E/G und Minuspunkte gehoeren zum Quiz — ohne sie waere die importierte
+    # Fassung anders bewertet als das Original.
+    niveau_aktiv: bool = False
+    minuspunkte: bool = False
     questions: list
 
 
@@ -308,6 +326,8 @@ async def import_question_set(body: ImportQuestionSetBody, user: User = Depends(
         folder_id=body.folder_id,
         shuffle_questions=body.shuffle_questions,
         shuffle_answers=body.shuffle_answers,
+        niveau_aktiv=bool(getattr(body, "niveau_aktiv", False)),
+        minuspunkte=bool(getattr(body, "minuspunkte", False)),
     )
     db.add(qs)
     await db.flush()
@@ -324,7 +344,8 @@ async def import_question_set(body: ImportQuestionSetBody, user: User = Depends(
         )
         db.add(q)
         await db.flush()
-        db.add(QuestionSetItem(question_set_id=qs.id, question_id=q.id, position=pos))
+        db.add(QuestionSetItem(question_set_id=qs.id, question_id=q.id, position=pos,
+                               niveau="E" if qdata.get("niveau") == "E" else ""))
     await db.commit()
     return {"id": qs.id, "name": qs.name}
 
@@ -505,6 +526,7 @@ async def evaluation_xlsx(session_id: int, user: User = Depends(get_current_user
         for item in result.scalars().all():
             q = item.question
             q._shuffled_correct = qmap.get(str(q.id), q.correct_answer)
+            q._niveau = item.niveau or ""
             questions.append(q)
 
     result = await db.execute(select(Scan).where(Scan.session_id == session_id))
@@ -529,29 +551,31 @@ async def evaluation_xlsx(session_id: int, user: User = Depends(get_current_user
     for i, q in enumerate(questions):
         ws.cell(row=2, column=i + 2, value=q._shuffled_correct or "–")
 
+    config = session.eval_config or {}
+    niveau_aktiv, minuspunkte = await _quiz_flags(db, session)
+    qdicts = [{"id": q.id, "correct_answer": q._shuffled_correct, "niveau": getattr(q, "_niveau", "")} for q in questions]
     row = 3
     for student in students:
         has_any = any((student.card_id, q.id) in scan_map for q in questions)
-        if not has_any:
+        # Wer als krank gilt, steht nicht in der Liste; eine gewertete 0 schon.
+        if status_of(student.card_id, has_any, config) == "krank":
             continue
         ws.cell(row=row, column=1, value=student.name).font = Font(bold=True)
-        score = 0
-        total_scored = 0
         for i, q in enumerate(questions):
             answer = scan_map.get((student.card_id, q.id))
             cell = ws.cell(row=row, column=i + 2, value=answer or "–")
             correct = q._shuffled_correct
             if answer and correct:
-                total_scored += 1
                 if answer in correct:
-                    score += 1
                     cell.fill = green_fill
                 else:
                     cell.fill = red_fill
             cell.alignment = Alignment(horizontal="center")
-        max_score = len([q for q in questions if q._shuffled_correct])
-        ws.cell(row=row, column=len(questions) + 2, value=f"{score}/{max_score}")
-        ws.cell(row=row, column=len(questions) + 3, value=f"{round(score/max_score*100)}%" if max_score > 0 else "–")
+        eigene = {q.id: scan_map.get((student.card_id, q.id)) for q in questions}
+        w = bewerte(qdicts, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv,
+                    minuspunkte=minuspunkte, weights=config.get("weights"), scale=config.get("grade_scale"))
+        ws.cell(row=row, column=len(questions) + 2, value=f"{w['score']:g}/{w['max_score']:g}")
+        ws.cell(row=row, column=len(questions) + 3, value=f"{round(w['pct'])}%")
         row += 1
 
     ws.column_dimensions["A"].width = 20
@@ -598,6 +622,7 @@ async def evaluation_scsv(session_id: int, user: User = Depends(get_current_user
         for item in result.scalars().all():
             q = item.question
             q._shuffled_correct = qmap.get(str(q.id), q.correct_answer)
+            q._niveau = item.niveau or ""
             questions.append(q)
 
     result = await db.execute(select(Scan).where(Scan.session_id == session_id))
@@ -605,6 +630,7 @@ async def evaluation_scsv(session_id: int, user: User = Depends(get_current_user
     scan_map = {(s.student_id, s.question_id): s.answer for s in all_scans}
 
     config = session.eval_config or {}
+    niveau_aktiv, minuspunkte = await _quiz_flags(db, session)
     weights = config.get("weights", {})
     get_w = lambda qid: weights.get(str(qid), weights.get(qid, 1))
     scale_raw = config.get("grade_scale", {1: 87, 2: 73, 3: 59, 4: 45, 5: 20, 6: 0})
@@ -632,20 +658,15 @@ async def evaluation_scsv(session_id: int, user: User = Depends(get_current_user
 
     scanned_question_ids = set(qid for (_, qid) in scan_map)
 
+    qdicts = [{"id": qn.id, "correct_answer": qn._shuffled_correct, "niveau": getattr(qn, "_niveau", "")}
+              for qn in questions if qn.id in scanned_question_ids]
     for student in students:
         has_any = any((student.card_id, qn.id) in scan_map for qn in questions)
-        if not has_any:
+        if status_of(student.card_id, has_any, config) == "krank":
             continue
-        student_max = sum(
-            get_w(qn.id) for qn in questions
-            if qn._shuffled_correct and qn.id in scanned_question_ids
-        )
-        score = sum(
-            get_w(qn.id) for qn in questions
-            if qn._shuffled_correct and scan_map.get((student.card_id, qn.id))
-            and scan_map[(student.card_id, qn.id)] in qn._shuffled_correct
-        )
-        pct = round(score / student_max * 100) if student_max > 0 else 0
+        eigene = {qn["id"]: scan_map.get((student.card_id, qn["id"])) for qn in qdicts}
+        pct = round(bewerte(qdicts, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv,
+                            minuspunkte=minuspunkte, weights=weights, scale=scale)["pct"])
         grade = _decimal_grade(pct, scale)
         lines.append(",".join([esc(student.name), esc(str(grade)), esc(""), esc("")]))
 
@@ -690,7 +711,7 @@ def _decimal_grade(pct, scale=None):
     return 6.0
 
 
-def _build_student_pdf_single(student, questions, scan_map, session, config):
+def _build_student_pdf_single(student, questions, scan_map, session, config, niveau_aktiv=False, minuspunkte=False):
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
     from reportlab.pdfgen import canvas as pdf_canvas
@@ -709,18 +730,22 @@ def _build_student_pdf_single(student, questions, scan_map, session, config):
     get_w = lambda qid: weights.get(str(qid), weights.get(qid, 1))
     max_score = sum(get_w(q["id"]) for q in questions if q["correct_answer"])
 
-    score = 0
     results = []
+    eigene = {}
     for q in questions:
         ans = scan_map.get((student["card_id"], q["id"]))
+        eigene[q["id"]] = ans
         correct = q["correct_answer"]
         is_correct = ans and correct and ans in correct
         w = get_w(q["id"])
-        if is_correct:
-            score += w
         results.append({"text": q["text"], "answer": ans, "correct": correct, "is_correct": is_correct, "weight": w})
 
-    pct = round(score / max_score * 100) if max_score > 0 else 0
+    # Punkte, Prozent und damit die Note kommen aus der gemeinsamen Wertung
+    # (E/G-Bonus, Minuspunkte) — sonst stuende im PDF etwas anderes als am Schirm.
+    wertung = bewerte(questions, eigene, niveau=student.get("niveau", ""),
+                      niveau_aktiv=niveau_aktiv, minuspunkte=minuspunkte,
+                      weights=weights, scale=scale)
+    score, max_score, pct = wertung["score"], wertung["max_score"], round(wertung["pct"])
     grade = _decimal_grade(pct, scale)
 
     y = ph - 30 * mm
@@ -795,7 +820,7 @@ async def student_evaluation_pdf(session_id: int, card_id: int, user: User = Dep
         )
         s = result.scalar_one_or_none()
         if s:
-            student = {"card_id": s.card_id, "name": s.name}
+            student = {"card_id": s.card_id, "name": s.name, "niveau": s.niveau or ""}
     if not student:
         raise HTTPException(404, "Lernende/r nicht gefunden")
 
@@ -809,14 +834,16 @@ async def student_evaluation_pdf(session_id: int, card_id: int, user: User = Dep
         )
         for item in result.scalars().all():
             q = item.question
-            questions.append({"id": q.id, "text": q.text, "correct_answer": qmap.get(str(q.id), q.correct_answer)})
+            questions.append({"id": q.id, "text": q.text, "correct_answer": qmap.get(str(q.id), q.correct_answer),
+                              "niveau": item.niveau or ""})
 
     result = await db.execute(select(Scan).where(Scan.session_id == session_id))
     scan_map = {(s.student_id, s.question_id): s.answer for s in result.scalars().all()}
 
     config = session.eval_config or {}
     questions = [q for q in questions if (student["card_id"], q["id"]) in scan_map]
-    buf = _build_student_pdf_single(student, questions, scan_map, session, config)
+    niveau_aktiv, minuspunkte = await _quiz_flags(db, session)
+    buf = _build_student_pdf_single(student, questions, scan_map, session, config, niveau_aktiv, minuspunkte)
     filename = f"Auswertung_{student['name']}_{session_id}.pdf"
     return StreamingResponse(buf, media_type="application/pdf",
                              headers={"Content-Disposition": f'attachment; filename="{filename}"'})
@@ -835,7 +862,7 @@ async def all_students_pdf(session_id: int, user: User = Depends(get_current_use
         result = await db.execute(
             select(Student).where(Student.class_id == session.class_id).order_by(Student.name)
         )
-        students = [{"card_id": s.card_id, "name": s.name} for s in result.scalars().all()]
+        students = [{"card_id": s.card_id, "name": s.name, "niveau": s.niveau or ""} for s in result.scalars().all()]
 
     questions = []
     qmap = session.question_map or {}
@@ -847,7 +874,8 @@ async def all_students_pdf(session_id: int, user: User = Depends(get_current_use
         )
         for item in result.scalars().all():
             q = item.question
-            questions.append({"id": q.id, "text": q.text, "correct_answer": qmap.get(str(q.id), q.correct_answer)})
+            questions.append({"id": q.id, "text": q.text, "correct_answer": qmap.get(str(q.id), q.correct_answer),
+                              "niveau": item.niveau or ""})
 
     result = await db.execute(select(Scan).where(Scan.session_id == session_id))
     all_scans = result.scalars().all()
@@ -859,13 +887,16 @@ async def all_students_pdf(session_id: int, user: User = Depends(get_current_use
     from reportlab.lib.colors import HexColor
 
     config = session.eval_config or {}
+    niveau_aktiv, minuspunkte = await _quiz_flags(db, session)
     weights = config.get("weights", {})
     scale_raw = config.get("grade_scale", DEFAULT_SCALE)
     scale = {int(k): v for k, v in scale_raw.items()}
     get_w = lambda qid: weights.get(str(qid), weights.get(qid, 1))
     max_score = sum(get_w(q["id"]) for q in questions if q["correct_answer"])
 
-    present = [s for s in students if any((s["card_id"], q["id"]) in scan_map for q in questions)]
+    # Wer als krank gilt, kommt nicht ins Sammel-PDF; eine gewertete 0 schon.
+    present = [s for s in students
+               if status_of(s["card_id"], any((s["card_id"], q["id"]) in scan_map for q in questions), config) != "krank"]
 
     buf = io.BytesIO()
     c = pdf_canvas.Canvas(buf, pagesize=A4)
@@ -881,19 +912,20 @@ async def all_students_pdf(session_id: int, user: User = Depends(get_current_use
         y -= 10 * mm
 
         student_questions = [q for q in questions if (student["card_id"], q["id"]) in scan_map]
-        score = 0
         results = []
+        eigene = {}
         for q in student_questions:
             ans = scan_map.get((student["card_id"], q["id"]))
+            eigene[q["id"]] = ans
             correct = q["correct_answer"]
             is_correct = ans and correct and ans in correct
             w = get_w(q["id"])
-            if is_correct:
-                score += w
             results.append({"text": q["text"], "answer": ans, "correct": correct, "is_correct": is_correct, "weight": w})
 
-        student_max = sum(get_w(q["id"]) for q in student_questions if q["correct_answer"])
-        pct = round(score / student_max * 100) if student_max > 0 else 0
+        wertung = bewerte(student_questions, eigene, niveau=student.get("niveau", ""),
+                          niveau_aktiv=niveau_aktiv, minuspunkte=minuspunkte,
+                          weights=weights, scale=scale)
+        score, student_max, pct = wertung["score"], wertung["max_score"], round(wertung["pct"])
         grade = _decimal_grade(pct, scale)
 
         c.setFont("Helvetica-Bold", 13)
@@ -999,7 +1031,8 @@ async def class_student_pdf(class_id: int, card_id: int, user: User = Depends(ge
             )
             for item in q_result.scalars().all():
                 q = item.question
-                questions.append({"id": q.id, "correct_answer": qmap.get(str(q.id), q.correct_answer)})
+                questions.append({"id": q.id, "correct_answer": qmap.get(str(q.id), q.correct_answer),
+                                  "niveau": item.niveau or ""})
 
         scan_result = await db.execute(select(Scan).where(Scan.session_id == session.id, Scan.student_id == card_id))
         scans = {s.question_id: s.answer for s in scan_result.scalars().all()}

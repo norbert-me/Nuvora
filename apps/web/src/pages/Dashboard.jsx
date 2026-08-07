@@ -535,21 +535,29 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
   const [questions, setQuestions] = useState(questionSet.questions || []);
   const [shuffleQ, setShuffleQ] = useState(questionSet.shuffle_questions || false);
   const [shuffleA, setShuffleA] = useState(questionSet.shuffle_answers || false);
+  // E/G: alle sehen dieselben Fragen, unterschieden wird erst in der Auswertung.
+  const [niveauAktiv, setNiveauAktiv] = useState(questionSet.niveau_aktiv || false);
+  const [minuspunkte, setMinuspunkte] = useState(questionSet.minuspunkte || false);
+  const [niveaus, setNiveaus] = useState(questionSet.niveaus || {});
   const [showAdd, setShowAdd] = useState(false);
   const [editingQ, setEditingQ] = useState(null);
   const [saving, setSaving] = useState(false);
   const EMPTY_Q = { text: "", choices: { A: "", B: "", C: "", D: "" }, correct_answer: "", num_choices: 4, image_url: null, image_layout: "above", choice_images: null, topic_id: null };
   const [newQ, setNewQ] = useState({ ...EMPTY_Q });
 
-  const saveSet = async (updatedName, updatedQuestions, sQ, sA) => {
+  const saveSet = async (updatedName, updatedQuestions, patch = {}) => {
     setSaving(true);
     await fetch(`${API}/question-sets/${questionSet.id}`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: updatedName, folder_id: questionSet.folder_id,
         question_ids: updatedQuestions.map((q) => q.id),
-        shuffle_questions: sQ !== undefined ? sQ : shuffleQ,
-        shuffle_answers: sA !== undefined ? sA : shuffleA,
+        shuffle_questions: shuffleQ,
+        shuffle_answers: shuffleA,
+        niveau_aktiv: niveauAktiv,
+        minuspunkte,
+        niveaus,
+        ...patch,
       }),
     });
     setSaving(false);
@@ -559,8 +567,16 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
   const saveName = () => saveSet(name, questions);
 
 
-  const toggleShuffleQ = () => { const v = !shuffleQ; setShuffleQ(v); saveSet(name, questions, v, shuffleA); };
-  const toggleShuffleA = () => { const v = !shuffleA; setShuffleA(v); saveSet(name, questions, shuffleQ, v); };
+  const toggleShuffleQ = () => { const v = !shuffleQ; setShuffleQ(v); saveSet(name, questions, { shuffle_questions: v }); };
+  const toggleShuffleA = () => { const v = !shuffleA; setShuffleA(v); saveSet(name, questions, { shuffle_answers: v }); };
+  const toggleNiveau = () => { const v = !niveauAktiv; setNiveauAktiv(v); saveSet(name, questions, { niveau_aktiv: v }); };
+  const toggleMinus = () => { const v = !minuspunkte; setMinuspunkte(v); saveSet(name, questions, { minuspunkte: v }); };
+  // Niveau einer Frage IN DIESEM Quiz umschalten. Ohne Eintrag gilt G.
+  const toggleQNiveau = (qid) => {
+    const next = { ...niveaus, [qid]: (niveaus[qid] === "E" ? "G" : "E") };
+    setNiveaus(next);
+    saveSet(name, questions, { niveaus: next });
+  };
 
   const addNewQuestion = async () => {
     if (!newQ.text.trim()) return;
@@ -638,10 +654,17 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
         {onDelete && <button onClick={onDelete} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
       </div>
 
-      <div style={{ display: "flex", gap: 24, marginBottom: 20, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 24, marginBottom: 8, flexWrap: "wrap" }}>
         <Toggle checked={shuffleQ} onChange={toggleShuffleQ} label={t("dash.shuffleQ")} />
         <Toggle checked={shuffleA} onChange={toggleShuffleA} label={t("dash.shuffleA")} />
+        <Toggle checked={niveauAktiv} onChange={toggleNiveau} label={t("dash.niveauToggle")} />
+        <Toggle checked={minuspunkte} onChange={toggleMinus} label={t("dash.minusToggle")} />
       </div>
+      {(niveauAktiv || minuspunkte) && (
+        <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 20px", lineHeight: 1.5 }}>
+          {niveauAktiv && t("dash.niveauHint")}{niveauAktiv && minuspunkte ? " " : ""}{minuspunkte && t("dash.minusHint")}
+        </p>
+      )}
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
         <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", margin: 0 }}>{t("dash.questionsCount", { count: questions.length })}</h3>
@@ -695,6 +718,20 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
           ) : (
             <span className="drag-handle" style={{ color: "var(--text3)", width: 20, textAlign: "center", fontSize: 18, cursor: "grab", lineHeight: 1, flexShrink: 0 }}>⠿</span>
           ))}
+          {niveauAktiv && (
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleQNiveau(q.id); }}
+              title={t("dash.niveauQHint")}
+              style={{
+                flexShrink: 0, width: 26, height: 26, borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+                border: niveaus[q.id] === "E" ? "1px solid var(--accent)" : "1px solid var(--border2)",
+                background: niveaus[q.id] === "E" ? "var(--accent-bg)" : "var(--bg)",
+                color: niveaus[q.id] === "E" ? "var(--accent)" : "var(--text3)",
+              }}
+            >
+              {niveaus[q.id] === "E" ? "E" : "G"}
+            </button>
+          )}
           <span onClick={() => setEditingQ({ ...q })} style={{ flex: 1, color: "var(--text)", cursor: "pointer" }} title={t("dash.clickEdit")}>
             <Latex>{q.text}</Latex>
             {q.image_url && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 6, verticalAlign: "middle" }}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>}

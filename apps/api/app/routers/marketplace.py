@@ -80,6 +80,10 @@ def _snapshot_from_items(qs: QuestionSet, items: list[QuestionSetItem]) -> dict:
         "name": qs.name,
         "shuffle_questions": qs.shuffle_questions,
         "shuffle_answers": qs.shuffle_answers,
+        # E/G-Differenzierung und Minuspunkte gehoeren zum Quiz — ohne sie waere
+        # die uebernommene Fassung anders bewertet als das Original.
+        "niveau_aktiv": bool(qs.niveau_aktiv),
+        "minuspunkte": bool(qs.minuspunkte),
         "questions": [
             {
                 "text": it.question.text,
@@ -89,6 +93,7 @@ def _snapshot_from_items(qs: QuestionSet, items: list[QuestionSetItem]) -> dict:
                 "image_layout": it.question.image_layout,
                 "num_choices": it.question.num_choices,
                 "choice_images": it.question.choice_images,
+                "niveau": it.niveau or "",
             }
             for it in items
         ],
@@ -143,6 +148,10 @@ async def _quiz_to_dict(quiz: MarketplaceQuiz, user_id: int, current_names: dict
         "avg_rating": avg,
         "rating_count": count,
         "my_rating": my,
+        # Badge in der Uebersicht: differenziert das Quiz nach E/G? Steht im
+        # Schnappschuss, damit die Liste dafuer nichts nachladen muss.
+        "niveau_aktiv": bool((quiz.payload or {}).get("niveau_aktiv", False)),
+        "minuspunkte": bool((quiz.payload or {}).get("minuspunkte", False)),
     }
     # E-Mail nur fuer Admin sichtbar (Moderation), nie oeffentlich
     if is_admin:
@@ -388,6 +397,8 @@ async def copy_quiz(quiz_id: int, body: Optional[CopyBody] = None, user: User = 
         folder_id=mp_folder.id,
         shuffle_questions=data.get("shuffle_questions", False),
         shuffle_answers=data.get("shuffle_answers", False),
+        niveau_aktiv=bool(data.get("niveau_aktiv", False)),
+        minuspunkte=bool(data.get("minuspunkte", False)),
     )
     db.add(qs)
     await db.flush()
@@ -404,7 +415,8 @@ async def copy_quiz(quiz_id: int, body: Optional[CopyBody] = None, user: User = 
         )
         db.add(q)
         await db.flush()
-        db.add(QuestionSetItem(question_set_id=qs.id, question_id=q.id, position=pos))
+        db.add(QuestionSetItem(question_set_id=qs.id, question_id=q.id, position=pos,
+                               niveau="E" if qdata.get("niveau") == "E" else ""))
     await db.commit()
     return {"id": qs.id, "name": qs.name}
 

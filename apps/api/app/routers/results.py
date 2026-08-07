@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 from ..database import get_db
 from ..models import Scan, Session, SchoolClass, Student, QuestionSet, QuestionSetItem, Question, User, Topic
 from .auth import get_current_user
+from ..scoring import bewerte, status_of
 from .. import websocket as ws
 
 router = APIRouter(prefix="/api", tags=["results"])
@@ -186,7 +187,17 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
     if session.class_id:
         # Roster kursweit (gleichnamige Fach-Klassen-SuS = eine Person). Die
         # Kartennummern (card_id) sind bei gleicher Lerngruppe deckungsgleich.
-        students = [{"card_id": s.card_id, "name": s.name} for s in await _kurs_roster(db, session.class_id)]
+        students = [{"card_id": s.card_id, "name": s.name, "niveau": s.niveau or ""}
+                    for s in await _kurs_roster(db, session.class_id)]
+
+    # E/G-Differenzierung und Minuspunkte haengen am Quiz, nicht an der Session.
+    niveau_aktiv = False
+    minuspunkte = False
+    if session.question_set_id:
+        qs = await db.get(QuestionSet, session.question_set_id)
+        if qs:
+            niveau_aktiv = bool(qs.niveau_aktiv)
+            minuspunkte = bool(qs.minuspunkte)
 
     questions = []
     if session.question_set_id:
@@ -207,6 +218,7 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
                 "choices": q.choices,
                 "num_choices": q.num_choices or 4,
                 "topic_id": q.topic_id,  # fuer die Themen-Analyse (Ziel 2)
+                "niveau": item.niveau or "",   # "E" = Zusatz, sonst Anforderung (G)
             })
 
     result = await db.execute(select(Scan).where(Scan.session_id == session_id))
@@ -216,31 +228,43 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
     for scan in all_scans:
         scan_map[(scan.student_id, scan.question_id)] = scan.answer
 
+    config = session.eval_config or {}
     rows = []
     for student in students:
         answers = []
-        score = 0
+        eigene = {}
         has_any_scan = any(
             (student["card_id"], q["id"]) in scan_map for q in questions
         )
         for q in questions:
             answer = scan_map.get((student["card_id"], q["id"]))
+            eigene[q["id"]] = answer
             correct = q["correct_answer"]
             is_correct = answer is not None and correct is not None and answer in correct
-            if is_correct:
-                score += 1
             answers.append({
                 "question_id": q["id"],
                 "answer": answer,
                 "correct_answer": correct,
                 "is_correct": is_correct,
             })
+        wertung = bewerte(
+            questions, eigene, niveau=student["niveau"], niveau_aktiv=niveau_aktiv,
+            minuspunkte=minuspunkte, weights=config.get("weights"), scale=config.get("grade_scale"),
+        )
         rows.append({
             "card_id": student["card_id"],
             "name": student["name"],
+            "niveau": student["niveau"],
             "answers": answers,
-            "score": score,
-            "total": len([q for q in questions if q["correct_answer"]]),
+            "score": wertung["score"],
+            "total": wertung["max_score"],
+            "pct": wertung["pct"],
+            "base_pct": wertung["base_pct"],
+            "bonus_pct": wertung["bonus_pct"],
+            "e_correct": wertung["e_correct"],
+            "e_total": wertung["e_total"],
+            # „krank" bleibt aus jeder Wertung; „anwesend" ohne Abgabe zaehlt mit 0.
+            "status": status_of(student["card_id"], has_any_scan, config),
             "present": has_any_scan,
         })
 
@@ -248,6 +272,8 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
         "session_id": session_id,
         "session_name": session.name,
         "class_id": session.class_id,
+        "niveau_aktiv": niveau_aktiv,
+        "minuspunkte": minuspunkte,
         "questions": questions,
         "students": rows,
     }
@@ -476,7 +502,7 @@ async def get_class_evaluation(class_id: int, user: User = Depends(get_current_u
     result = await db.execute(
         select(Student).where(Student.id.in_([s.id for s in await _kurs_roster(db, class_id)] or [-1])).order_by(Student.name)
     )
-    students = [{"card_id": s.card_id, "name": s.name} for s in result.scalars().all()]
+    students = [{"card_id": s.card_id, "name": s.name, "niveau": s.niveau or ""} for s in result.scalars().all()]
 
     result = await db.execute(
         select(Session).where(Session.class_id == class_id, Session.archived == False).order_by(Session.created_at)
@@ -499,6 +525,7 @@ async def get_class_evaluation(class_id: int, user: User = Depends(get_current_u
                 questions.append({
                     "id": q.id,
                     "correct_answer": qmap.get(str(q.id), q.correct_answer),
+                    "niveau": item.niveau or "",
                 })
 
         scan_result = await db.execute(select(Scan).where(Scan.session_id == session.id))
@@ -509,28 +536,37 @@ async def get_class_evaluation(class_id: int, user: User = Depends(get_current_u
         max_score = len([q for q in questions if q["correct_answer"]])
 
         set_name = None
+        niveau_aktiv = False
+        minuspunkte = False
         if session.question_set_id:
             qs = await db.get(QuestionSet, session.question_set_id)
             if qs:
                 set_name = qs.name
+                niveau_aktiv = bool(qs.niveau_aktiv)
+                minuspunkte = bool(qs.minuspunkte)
 
+        config = session.eval_config or {}
         student_scores = {}
         for student in students:
             has_any = any((student["card_id"], q["id"]) in scan_map for q in questions)
-            if not has_any:
-                student_scores[student["card_id"]] = {"score": None, "total": max_score, "present": False}
+            status = status_of(student["card_id"], has_any, config)
+            if status == "krank":
+                # Krank bleibt aus der Wertung — nicht als 0 verrechnen.
+                student_scores[student["card_id"]] = {"score": None, "total": max_score, "present": False, "status": status}
                 continue
-            score = 0
-            for q in questions:
-                answer = scan_map.get((student["card_id"], q["id"]))
-                if answer and q["correct_answer"] and answer in q["correct_answer"]:
-                    score += 1
-            student_scores[student["card_id"]] = {"score": score, "total": max_score, "present": True}
+            eigene = {q["id"]: scan_map.get((student["card_id"], q["id"])) for q in questions}
+            wertung = bewerte(questions, eigene, niveau=student["niveau"], niveau_aktiv=niveau_aktiv,
+                              minuspunkte=minuspunkte, weights=config.get("weights"), scale=config.get("grade_scale"))
+            student_scores[student["card_id"]] = {
+                "score": wertung["score"], "total": wertung["max_score"], "present": has_any,
+                "status": status, "pct": wertung["pct"], "niveau": student["niveau"],
+            }
 
         tests.append({
             "session_id": session.id,
             "name": session.name,
             "set_name": set_name,
+            "niveau_aktiv": niveau_aktiv,
             "created_at": session.created_at.isoformat() if session.created_at else None,
             "max_score": max_score,
             "student_scores": student_scores,
@@ -588,7 +624,12 @@ async def stats_dashboard(user: User = Depends(get_current_user), db: AsyncSessi
                 qmap = session.question_map or {}
                 for item in q_result.scalars().all():
                     q = item.question
-                    questions.append({"id": q.id, "correct_answer": qmap.get(str(q.id), q.correct_answer)})
+                    questions.append({"id": q.id, "correct_answer": qmap.get(str(q.id), q.correct_answer),
+                                      "niveau": item.niveau or ""})
+
+            qs_flags = await db.get(QuestionSet, session.question_set_id) if session.question_set_id else None
+            niveau_aktiv = bool(qs_flags.niveau_aktiv) if qs_flags else False
+            minuspunkte = bool(qs_flags.minuspunkte) if qs_flags else False
 
             scan_result = await db.execute(select(Scan).where(Scan.session_id == session.id))
             scans_list = scan_result.scalars().all()
@@ -598,12 +639,15 @@ async def stats_dashboard(user: User = Depends(get_current_user), db: AsyncSessi
             if max_score == 0:
                 continue
 
+            config = session.eval_config or {}
             for student in cls.students:
                 has_any = any((student.card_id, q["id"]) in scan_map for q in questions)
-                if not has_any:
-                    continue
-                score = sum(1 for q in questions if scan_map.get((student.card_id, q["id"])) and q["correct_answer"] and scan_map[(student.card_id, q["id"])] in q["correct_answer"])
-                all_pcts.append(round(score / max_score * 100))
+                if status_of(student.card_id, has_any, config) == "krank":
+                    continue   # krank bleibt aus dem Schnitt, eine gewertete 0 nicht
+                eigene = {q["id"]: scan_map.get((student.card_id, q["id"])) for q in questions}
+                w = bewerte(questions, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv,
+                            minuspunkte=minuspunkte, weights=config.get("weights"), scale=config.get("grade_scale"))
+                all_pcts.append(round(w["pct"]))
 
         avg_pct = round(sum(all_pcts) / len(all_pcts)) if all_pcts else None
         class_stats.append({
@@ -663,7 +707,12 @@ async def stats_dashboard(user: User = Depends(get_current_user), db: AsyncSessi
                 qmap = session.question_map or {}
                 for item in q_result.scalars().all():
                     q = item.question
-                    questions.append({"id": q.id, "correct_answer": qmap.get(str(q.id), q.correct_answer)})
+                    questions.append({"id": q.id, "correct_answer": qmap.get(str(q.id), q.correct_answer),
+                                      "niveau": item.niveau or ""})
+
+            qs_flags = await db.get(QuestionSet, session.question_set_id) if session.question_set_id else None
+            niveau_aktiv = bool(qs_flags.niveau_aktiv) if qs_flags else False
+            minuspunkte = bool(qs_flags.minuspunkte) if qs_flags else False
 
             get_w = lambda qid: weights.get(str(qid), weights.get(qid, 1))
             max_score = sum(get_w(q["id"]) for q in questions if q["correct_answer"])
@@ -675,10 +724,11 @@ async def stats_dashboard(user: User = Depends(get_current_user), db: AsyncSessi
 
             for student in cls.students:
                 has_any = any((student.card_id, q["id"]) in scan_map for q in questions)
-                if not has_any:
+                if status_of(student.card_id, has_any, config) == "krank":
                     continue
-                score = sum(get_w(q["id"]) for q in questions if scan_map.get((student.card_id, q["id"])) and q["correct_answer"] and scan_map[(student.card_id, q["id"])] in q["correct_answer"])
-                pct = round(score / max_score * 100)
+                eigene = {q["id"]: scan_map.get((student.card_id, q["id"])) for q in questions}
+                pct = round(bewerte(questions, eigene, niveau=student.niveau or "", niveau_aktiv=niveau_aktiv,
+                                    minuspunkte=minuspunkte, weights=weights, scale=scale)["pct"])
                 for g in range(1, 6):
                     if pct >= scale.get(g, 0):
                         grade_dist[g] += 1

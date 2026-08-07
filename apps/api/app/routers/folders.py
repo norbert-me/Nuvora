@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select, delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -46,6 +46,12 @@ class QuestionSetOut(BaseModel):
     folder_id: Optional[int]
     shuffle_questions: bool = False
     shuffle_answers: bool = False
+    # E/G-Differenzierung und Minuspunkte gelten je Quiz (siehe QuestionSet).
+    niveau_aktiv: bool = False
+    minuspunkte: bool = False
+    # Niveau je Frage IN DIESEM Quiz: {"<question_id>": "E"}. Fehlt ein Eintrag,
+    # gilt G — das ist die Anforderung, die alle erfuellen sollen.
+    niveaus: dict = {}
     questions: List[QuestionInSet] = []
     model_config = {"from_attributes": True}
 
@@ -56,6 +62,17 @@ class QuestionSetCreate(BaseModel):
     question_ids: List[int] = []
     shuffle_questions: bool = False
     shuffle_answers: bool = False
+    niveau_aktiv: bool = False
+    minuspunkte: bool = False
+    niveaus: dict = {}
+
+    @field_validator("niveaus")
+    @classmethod
+    def valid_niveaus(cls, v):
+        for wert in (v or {}).values():
+            if wert not in ("", "E", "G"):
+                raise ValueError("Niveau muss E, G oder leer sein")
+        return v
 
 
 class FolderTree(BaseModel):
@@ -166,11 +183,13 @@ async def create_question_set(body: QuestionSetCreate, user: User = Depends(get_
     qs = QuestionSet(
         name=body.name, folder_id=body.folder_id, owner_id=user.id,
         shuffle_questions=body.shuffle_questions, shuffle_answers=body.shuffle_answers,
+        niveau_aktiv=body.niveau_aktiv, minuspunkte=body.minuspunkte,
     )
     db.add(qs)
     await db.flush()
     for pos, qid in enumerate(body.question_ids):
-        db.add(QuestionSetItem(question_set_id=qs.id, question_id=qid, position=pos))
+        db.add(QuestionSetItem(question_set_id=qs.id, question_id=qid, position=pos,
+                               niveau=_niveau_of(body.niveaus, qid)))
     await db.commit()
     return await _load_set(db, qs.id)
 
@@ -196,13 +215,19 @@ async def update_question_set(set_id: int, body: QuestionSetCreate, user: User =
     qs.folder_id = body.folder_id
     qs.shuffle_questions = body.shuffle_questions
     qs.shuffle_answers = body.shuffle_answers
+    qs.niveau_aktiv = body.niveau_aktiv
+    qs.minuspunkte = body.minuspunkte
 
-    existing = await db.execute(select(QuestionSetItem).where(QuestionSetItem.question_set_id == set_id))
-    for item in existing.scalars().all():
+    # Die alten Niveaus merken: schickt ein alter Client (oder ein Aufruf, der
+    # nur den Namen aendert) keine niveaus mit, duerfen sie nicht verschwinden.
+    existing = (await db.execute(select(QuestionSetItem).where(QuestionSetItem.question_set_id == set_id))).scalars().all()
+    alt = {str(i.question_id): i.niveau or "" for i in existing}
+    for item in existing:
         await db.delete(item)
 
     for pos, qid in enumerate(body.question_ids):
-        db.add(QuestionSetItem(question_set_id=set_id, question_id=qid, position=pos))
+        niv = _niveau_of(body.niveaus, qid) if str(qid) in (body.niveaus or {}) else alt.get(str(qid), "")
+        db.add(QuestionSetItem(question_set_id=set_id, question_id=qid, position=pos, niveau=niv))
 
     await db.commit()
     return await _load_set(db, set_id)
@@ -236,6 +261,12 @@ async def ensure_set_access(db: AsyncSession, qs: QuestionSet, user_id: int):
         raise HTTPException(403, "Kein Zugriff auf dieses Frageset")
 
 
+def _niveau_of(niveaus: dict, qid: int) -> str:
+    """Nur „E" wird gespeichert — G ist der Normalfall und bleibt leer."""
+    wert = (niveaus or {}).get(str(qid), (niveaus or {}).get(qid, ""))
+    return "E" if wert == "E" else ""
+
+
 def _set_to_dict(qs: QuestionSet) -> dict:
     return {
         "id": qs.id,
@@ -243,6 +274,9 @@ def _set_to_dict(qs: QuestionSet) -> dict:
         "folder_id": qs.folder_id,
         "shuffle_questions": qs.shuffle_questions,
         "shuffle_answers": qs.shuffle_answers,
+        "niveau_aktiv": bool(qs.niveau_aktiv),
+        "minuspunkte": bool(qs.minuspunkte),
+        "niveaus": {str(item.question_id): (item.niveau or "G") for item in qs.items},
         "questions": [
             {
                 "id": item.question.id,

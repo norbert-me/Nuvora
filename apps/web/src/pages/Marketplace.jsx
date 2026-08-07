@@ -182,7 +182,20 @@ export default function Marketplace({ fixedKind }) {
           <div key={q.id} style={{ padding: "16px 18px", marginBottom: 10, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 6 }}>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{q.title}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>
+                  {q.title}
+                  {/* Schon in der Übersicht sichtbar: das Quiz differenziert nach E/G. */}
+                  {q.niveau_aktiv && (
+                    <span style={{ marginLeft: 8, padding: "2px 8px", borderRadius: 980, fontSize: 11, fontWeight: 700, background: "var(--accent-bg)", color: "var(--accent)", verticalAlign: "middle" }}>
+                      {t("market.badgeNiveau")}
+                    </span>
+                  )}
+                  {q.minuspunkte && (
+                    <span style={{ marginLeft: 6, padding: "2px 8px", borderRadius: 980, fontSize: 11, fontWeight: 600, background: "var(--bg2)", color: "var(--text3)", verticalAlign: "middle" }}>
+                      {t("market.badgeMinus")}
+                    </span>
+                  )}
+                </div>
                 <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
                   {countLabel(q)}{" "}
                   {q.author_id ? (
