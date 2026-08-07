@@ -1273,6 +1273,8 @@ export default {
   "stoffplan.zielE": "E-Niveau — das kommt dazu",
   "stoffplan.zielGHint": "z. B. Stufenwinkel an einer Skizze erkennen und benennen",
   "stoffplan.zielEHint": "z. B. mit Stufen- und Wechselwinkeln einen Winkel begründen",
+  "stoffplan.examsTitle": "Klassenarbeiten ({{n}})",
+  "stoffplan.examsHint": "Aus dem Kalender — hier nur sichtbar. Themen mit KW versehen, dann stehen die Arbeiten an der passenden Stelle dazwischen.",
   "stoffplan.exam": "Klassenarbeit",
   "stoffplan.examEdit": "Im Kalender bearbeiten",
   "stoffplan.kw": "KW",

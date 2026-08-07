@@ -122,7 +122,15 @@ export default function Stoffplan({ embedded } = {}) {
         <div {...dnd(idx)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", marginBottom: 6, cursor: "grab", opacity: it.done ? 0.6 : 1 }}>
           <span className="drag-handle" style={{ color: "var(--text3)", display: "inline-flex", flexShrink: 0 }}><Icon d={ICONS.grip} size={15} /></span>
           <input type="checkbox" checked={it.done} onChange={() => patch(it.id, { done: !it.done })} style={{ width: 18, height: 18, cursor: "pointer", flexShrink: 0 }} />
-          <span style={{ flex: 1, minWidth: 0, fontSize: 14, textDecoration: it.done ? "line-through" : "none" }}>{it.title}</span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ fontSize: 14, textDecoration: it.done ? "line-through" : "none" }}>{it.title}</span>
+            {/* Anforderungen direkt lesbar — dafür sind sie da. */}
+            {(it.ziel_g || it.ziel_e) && (
+              <span style={{ display: "block", fontSize: 12, color: "var(--text3)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {it.ziel_g ? `G: ${it.ziel_g}` : ""}{it.ziel_g && it.ziel_e ? "  ·  " : ""}{it.ziel_e ? `E: ${it.ziel_e}` : ""}
+              </span>
+            )}
+          </span>
           {it.topic_id && (
             <Link to={`/thema/${it.topic_id}`} className="icon-btn" style={{ ...iconBtn, padding: 4, flexShrink: 0 }} title={`${t("stoffplan.openTopic")}${topicName(it.topic_id) ? ": " + topicName(it.topic_id) : ""}`}>
               <Icon d={ICONS.open} size={15} color="var(--accent)" />
@@ -161,8 +169,17 @@ export default function Stoffplan({ embedded } = {}) {
         {(nachThema.get(idx) || []).map((e) => <ExamZeile key={`exam-${e.id}`} e={e} />)}
         </div>
       ))}
-      {/* Termine, die vor dem ersten Thema liegen oder ohne KW-Bezug sind. */}
-      {ohnePlatz.map((e) => <ExamZeile key={`exam-${e.id}`} e={e} />)}
+      {/* Termine, die sich nicht zwischen die Themen einordnen lassen (Thema
+          ohne KW, oder Arbeit vor dem ersten Thema): chronologisch am Ende. */}
+      {ohnePlatz.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text3)", marginBottom: 6 }}>
+            {t("stoffplan.examsTitle", { n: ohnePlatz.length })}
+          </div>
+          <p style={{ fontSize: 12, color: "var(--text3)", margin: "0 0 8px" }}>{t("stoffplan.examsHint")}</p>
+          {ohnePlatz.map((e) => <ExamZeile key={`exam-${e.id}`} e={e} />)}
+        </div>
+      )}
     </div>
   );
 }

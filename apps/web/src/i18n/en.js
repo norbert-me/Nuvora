@@ -1248,6 +1248,8 @@ export default {
   "stoffplan.zielE": "E level — this comes on top",
   "stoffplan.zielGHint": "e.g. identify and name corresponding angles in a sketch",
   "stoffplan.zielEHint": "e.g. justify an angle using corresponding and alternate angles",
+  "stoffplan.examsTitle": "Exams ({{n}})",
+  "stoffplan.examsHint": "From the calendar — shown here only. Give topics a calendar week and the exams slot in between them.",
   "stoffplan.exam": "Exam",
   "stoffplan.examEdit": "Edit in the calendar",
   "stoffplan.kw": "Wk",

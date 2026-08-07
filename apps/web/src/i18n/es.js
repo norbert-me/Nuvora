@@ -1248,6 +1248,8 @@ export default {
   "stoffplan.zielE": "Nivel E — esto se añade",
   "stoffplan.zielGHint": "p. ej. reconocer y nombrar ángulos correspondientes en un esquema",
   "stoffplan.zielEHint": "p. ej. justificar un ángulo con ángulos correspondientes y alternos",
+  "stoffplan.examsTitle": "Exámenes ({{n}})",
+  "stoffplan.examsHint": "Del calendario — aquí solo visibles. Indica la semana en los temas y los exámenes se intercalan.",
   "stoffplan.exam": "Examen",
   "stoffplan.examEdit": "Editar en el calendario",
   "stoffplan.kw": "Sem",
