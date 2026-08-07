@@ -43,6 +43,10 @@ class MassnahmeIn(BaseModel):
     detail: str = ""
     # Gilt in Klassenarbeiten? Genau diese zeigt der Kalender am Termin.
     arbeit: bool = False
+    # Für welchen Kurs (Fach) gilt sie? Ein Zeitzuschlag in Mathe heißt nicht
+    # dasselbe wie in Sport. Gepflegt wird sie deshalb im Kurs (kurse.py);
+    # NULL = Altbestand, gilt überall.
+    kurs_id: Optional[int] = None
 
     @field_validator("art")
     @classmethod
@@ -228,12 +232,14 @@ class MassnahmenStudentOut(BaseModel):
 async def list_massnahmen(
     class_id: int,
     arbeit: bool = False,
+    kurs_id: Optional[int] = None,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Fördermaßnahmen der Klasse, nur Kinder, für die etwas hinterlegt ist.
     arbeit=true filtert auf das, was in Klassenarbeiten gilt (Zeitzuschlag,
     abweichende Lernziele …) — genau das zeigt der Kalender am Termin.
+    kurs_id grenzt auf das Fach ein (plus Altbestand ohne Kurs).
 
     Besonders schützenswert (DSGVO Art. 9): nur der Besitzer der Klasse."""
     sc = await db.get(SchoolClass, class_id)
@@ -254,7 +260,9 @@ async def list_massnahmen(
         name = s.name.strip()
         if name in gesehen:
             continue
-        ms = [m for m in (s.massnahmen or []) if not arbeit or m.get("arbeit")]
+        ms = [m for m in (s.massnahmen or [])
+              if (not arbeit or m.get("arbeit"))
+              and (kurs_id is None or m.get("kurs_id") in (None, kurs_id))]
         if not ms:
             continue   # ohne Eintrag weiterschauen: die Zwillingszeile kann welche haben
         gesehen.add(name)

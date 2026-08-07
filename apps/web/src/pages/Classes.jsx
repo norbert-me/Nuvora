@@ -43,24 +43,6 @@ const FOERDER = [
   ["Sprache", "Schwierigkeiten beim mündlichen Ausdruck"],
 ];
 
-// Fördermaßnahmen: was zum Schwerpunkt konkret vereinbart ist. Feste Auswahl,
-// wortgleich zum Backend (MASSNAHMEN_VALUES in classes.py) — die mit „gilt in
-// Klassenarbeiten" markierten zeigt der Kalender am Klassenarbeitstermin.
-const MASSNAHMEN = [
-  ["Zeitzuschlag", "Mehr Bearbeitungszeit, z. B. +25 %"],
-  ["Abweichende Lernziele", "Wird an anderen Zielen gemessen als die Klasse"],
-  ["Weniger Aufgaben", "Reduzierter Umfang bei gleicher Anforderung"],
-  ["Vorlesen", "Aufgabenstellungen werden vorgelesen"],
-  ["Größere Schrift", "Arbeitsblatt in größerer Schrift / mehr Kontrast"],
-  ["Hilfsmittel", "Z. B. Taschenrechner, Wörterbuch, Formelsammlung"],
-  ["Eigener Raum", "Arbeitet getrennt oder in einer Kleingruppe"],
-  ["Zusätzliche Pausen", "Darf die Arbeit unterbrechen"],
-  ["Assistenz", "Begleitung durch eine weitere Person"],
-  ["Rechtschreibung nicht bewertet", "Rechtschreibleistung fließt nicht ein"],
-  ["Mündlich statt schriftlich", "Leistung wird mündlich erbracht"],
-  ["Sonstiges", "Freie Beschreibung im Feld daneben"],
-];
-
 const EMPTY_STUDENT = { card_id: 1, name: "", niveau: "", foerder: null, massnahmen: null, notizen: "", klassenlehrer: "" };
 
 export default function Classes() {
@@ -202,20 +184,6 @@ export default function Classes() {
     const updated = [...students];
     updated[idx] = { ...updated[idx], [field]: value };
     setStudents(updated);
-  };
-
-  // Fördermaßnahmen je Kind: hinzufügen, ändern, entfernen.
-  const addMassnahme = (idx) => {
-    const cur = students[idx].massnahmen || [];
-    setStudentField(idx, "massnahmen", [...cur, { art: MASSNAHMEN[0][0], detail: "", arbeit: true }]);
-  };
-  const setMassnahme = (idx, mi, feld, wert) => {
-    const cur = [...(students[idx].massnahmen || [])];
-    cur[mi] = { ...cur[mi], [feld]: wert };
-    setStudentField(idx, "massnahmen", cur);
-  };
-  const delMassnahme = (idx, mi) => {
-    setStudentField(idx, "massnahmen", (students[idx].massnahmen || []).filter((_, i) => i !== mi));
   };
 
   const toggleFoerder = (idx, wert) => {
@@ -376,45 +344,16 @@ export default function Classes() {
                   })}
                 </div>
 
-                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>{t("classes.measures")}</div>
-                <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 9 }}>{t("classes.measuresHint")}</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 7, marginBottom: 16 }}>
-                  {(s.massnahmen || []).map((m, mi) => (
-                    <div key={mi} style={{ display: "flex", gap: 7, alignItems: "center", flexWrap: "wrap" }}>
-                      <select
-                        value={m.art} onChange={(e) => setMassnahme(idx, mi, "art", e.target.value)}
-                        title={(MASSNAHMEN.find(([w]) => w === m.art) || [])[1] || ""}
-                        style={{ ...selectStyle, padding: "7px 26px 7px 9px", fontSize: 13, minWidth: 180 }}
-                      >
-                        {MASSNAHMEN.map(([wert]) => <option key={wert} value={wert}>{wert}</option>)}
-                      </select>
-                      <input
-                        value={m.detail || ""} onChange={(e) => setMassnahme(idx, mi, "detail", e.target.value)}
-                        placeholder={t("classes.measureDetail")} maxLength={300}
-                        style={{ flex: 1, minWidth: 160, padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 13, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }}
-                      />
-                      <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--text2)", cursor: "pointer", userSelect: "none" }}
-                        title={t("classes.measureExamHint")}>
-                        <input type="checkbox" checked={!!m.arbeit} onChange={(e) => setMassnahme(idx, mi, "arbeit", e.target.checked)} style={{ margin: 0, cursor: "pointer" }} />
-                        {t("classes.measureExam")}
-                      </label>
-                      <button type="button" onClick={() => delMassnahme(idx, mi)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}>
-                        <Icon d={ICONS.trash} size={15} color={C.danger} />
-                      </button>
-                    </div>
-                  ))}
-                  <div>
-                    <button type="button" onClick={() => addMassnahme(idx)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12.5 }}>
-                      {t("classes.measureAdd")}
-                    </button>
-                  </div>
-                </div>
-
+                {/* Fördermaßnahmen hängen am KURS (Fach), nicht an der Klasse —
+                    ein Zeitzuschlag in Mathe heißt nicht dasselbe wie in Sport.
+                    Gepflegt werden sie unter /kurse. */}
                 <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>{t("classes.notes")}</div>
                 <textarea
                   value={s.notizen || ""} onChange={(e) => setStudentField(idx, "notizen", e.target.value)}
                   rows={2} placeholder={t("classes.notesPlaceholder")} maxLength={2000}
-                  style={{ width: "100%", padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 13, background: "var(--bg)", color: "var(--text)", resize: "vertical", boxSizing: "border-box" }}
+                  // Breite fest: nur senkrecht ziehbar, lange Wörter brechen um. Ein
+                  // seitlicher Rollbalken hilft bei Notizen niemandem.
+                  style={{ width: "100%", maxWidth: "100%", padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 13, background: "var(--bg)", color: "var(--text)", resize: "vertical", boxSizing: "border-box", overflowX: "hidden", overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}
                 />
                 <p style={{ fontSize: 11.5, color: "var(--text3)", margin: "9px 0 0" }}>
                   {t("classes.staysPrivate")}

@@ -1222,17 +1222,17 @@ function TimetableView({ tt, showTimes = false, className, slotName, slotColor, 
 // Nachteilsausgleiche zur Klassenarbeit: die Fördermaßnahmen der Klasse, die in
 // Klassenarbeiten gelten (Kern: students.massnahmen mit arbeit=true). Der
 // Kalender zeigt sie nur an — gepflegt werden sie unter /classes.
-function ExamMassnahmen({ classId, t }) {
+function ExamMassnahmen({ classId, kursId = null, t }) {
   const [rows, setRows] = useState([]);
   const [offen, setOffen] = useState(false);
   useEffect(() => {
     let alive = true;
-    fetch(`${API}/classes/${classId}/massnahmen?arbeit=true`)
+    fetch(`${API}/classes/${classId}/massnahmen?arbeit=true${kursId ? `&kurs_id=${kursId}` : ""}`)
       .then((r) => (r.ok ? r.json() : []))
       .then((d) => { if (alive) setRows(Array.isArray(d) ? d : []); })
       .catch(() => {});
     return () => { alive = false; };
-  }, [classId]);
+  }, [classId, kursId]);
   // Auch ohne Eintrag sichtbar: „nichts hinterlegt" ist eine Aussage. Sonst
   // bliebe unklar, ob es keine Ausgleiche gibt oder die Anzeige fehlt.
   if (!rows.length) {
@@ -1358,7 +1358,7 @@ function ExamPanel({ overview, periods = 6, onAdd, onUpd, onDel, t }) {
          </div>
          {/* Was fuer einzelne Kinder abweicht (Zeitzuschlag, abweichende
              Lernziele …) — beim Vorbereiten der Arbeit muss es sichtbar sein. */}
-         {e.class_id && <ExamMassnahmen classId={e.class_id} t={t} />}
+         {e.class_id && <ExamMassnahmen classId={e.class_id} kursId={e.kurs_id ?? null} t={t} />}
         </div>
       ))}
     </div>
@@ -1648,7 +1648,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
             )}
             {/* Was für einzelne Kinder in Arbeiten abweicht (Zeitzuschlag,
                 abweichende Lernziele …) — beim Aufschlagen des Termins sichtbar. */}
-            {entry.exam_id && classId && <ExamMassnahmen classId={Number(classId)} t={t} />}
+            {entry.exam_id && classId && <ExamMassnahmen classId={Number(classId)} kursId={kursId ?? null} t={t} />}
             {aktiv.cardvote && aktiv.auswertung && entry.cardvote_set_id && classId && (
               <button onClick={alsNote}
                 style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", cursor: "pointer", color: "var(--accent)", fontSize: 13.5, fontWeight: 600, width: "100%" }}>

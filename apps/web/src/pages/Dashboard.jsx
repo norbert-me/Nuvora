@@ -387,7 +387,11 @@ export default function Dashboard() {
             </div>
             ) : (
             <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-              <button onClick={(e) => { e.stopPropagation(); deleteFolder(f.id); }} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
+              {/* onMouseDown + preventDefault: sonst schließt das Umbenennen-Feld
+                  per onBlur zuerst, der Knopf verschwindet und der Klick geht
+                  ins Leere — das Löschen passierte nie. */}
+              <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); deleteFolder(f.id); }}
+                className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
             </div>
             )}
           </div>

@@ -290,6 +290,75 @@ async def set_niveau(kurs_id: int, body: NiveauIn, user: User = Depends(get_curr
     await db.commit()
 
 
+# ─── Fördermaßnahmen (pro Kurs gepflegt) ───
+# Ein Nachteilsausgleich wirkt fachbezogen: mehr Zeit in Mathe heißt nicht
+# dasselbe wie in Sport. Er hängt deshalb am Kurs, nicht an der Klasse — die
+# Klasse sind die Schüler. Gespeichert wird er weiterhin an der Person
+# (students.massnahmen), jeder Eintrag trägt seine kurs_id.
+
+
+class MassnahmenIn(BaseModel):
+    name: str
+    massnahmen: List[dict] = []
+
+
+@router.get("/{kurs_id}/massnahmen")
+async def kurs_massnahmen(kurs_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """SuS des Kurses (per Name dedupliziert) mit ihren Maßnahmen FÜR DIESEN
+    Kurs. Altbestand ohne kurs_id gilt weiter überall und wird mitgezeigt."""
+    from .classes import MASSNAHMEN_VALUES  # ein Vokabular, eine Quelle
+    await _owned_kurs(db, user, kurs_id)
+    sids = list(await member_student_ids(db, kurs_id))
+    if not sids:
+        return []
+    studs = (await db.execute(select(Student).where(Student.id.in_(sids)).order_by(Student.card_id, Student.id))).scalars().all()
+    out = {}
+    for s in studs:
+        n = s.name.strip()
+        if not n:
+            continue
+        eigene = [m for m in (s.massnahmen or []) if m.get("kurs_id") in (None, kurs_id)]
+        if n not in out:
+            out[n] = {"name": n, "massnahmen": eigene}
+        elif eigene and not out[n]["massnahmen"]:
+            out[n]["massnahmen"] = eigene
+    return list(out.values())
+
+
+@router.put("/{kurs_id}/massnahmen", status_code=204)
+async def set_kurs_massnahmen(kurs_id: int, body: MassnahmenIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Maßnahmen einer Person IN DIESEM Kurs setzen. Einträge anderer Kurse
+    bleiben unberührt; geschrieben wird auf alle Fach-Klassen-Zeilen der Person
+    (gleicher Name), damit jede Ansicht dieselben Daten sieht."""
+    from .classes import MASSNAHMEN_VALUES
+    await _owned_kurs(db, user, kurs_id)
+    name = (body.name or "").strip()
+    if not name:
+        raise HTTPException(400, "Name fehlt")
+    if len(body.massnahmen) > 20:
+        raise HTTPException(400, "Zu viele Fördermaßnahmen (max. 20)")
+    neu = []
+    for m in body.massnahmen:
+        art = (m.get("art") or "").strip()
+        if art not in MASSNAHMEN_VALUES:
+            raise HTTPException(400, f"Unbekannte Fördermaßnahme: {art}")
+        detail = (m.get("detail") or "").strip()
+        if len(detail) > 300:
+            raise HTTPException(400, "Beschreibung zu lang (max. 300 Zeichen)")
+        neu.append({"art": art, "detail": detail, "arbeit": bool(m.get("arbeit")), "kurs_id": kurs_id})
+
+    members = list(await member_class_ids(db, [kurs_id]))
+    if not members:
+        return
+    studs = (await db.execute(select(Student).where(Student.class_id.in_(members)))).scalars().all()
+    for s in studs:
+        if s.name.strip() != name:
+            continue
+        fremd = [m for m in (s.massnahmen or []) if m.get("kurs_id") not in (None, kurs_id)]
+        s.massnahmen = (fremd + neu) or None
+    await db.commit()
+
+
 # ─── Kurs löschen / Papierkorb ───
 
 @router.delete("/{kurs_id}", status_code=204)

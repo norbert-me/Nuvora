@@ -120,6 +120,12 @@ export default function Kurse() {
                   <StudentMembers kursId={k.id} allClasses={allClasses} t={t} />
                 </div>
 
+                <div>
+                  <div style={editLabel}>{t("kurse.editMeasures")}</div>
+                  <p style={{ fontSize: 12, color: "var(--text3)", margin: "0 0 8px" }}>{t("kurse.measuresHint")}</p>
+                  <MassnahmenPanel kursId={k.id} t={t} />
+                </div>
+
                 {k.classes.length > 0 && (
                   <div>
                     <div style={editLabel}>{t("kurse.editLevels")}</div>
@@ -180,6 +186,97 @@ function StudentMembers({ kursId, allClasses, t }) {
         ))}
         {cls && candidates.length === 0 && <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("kurse.allAdded")}</span>}
       </div>
+    </div>
+  );
+}
+
+// Fördermaßnahmen je Person IN DIESEM Kurs — Nachteilsausgleiche wirken
+// fachbezogen (mehr Zeit in Mathe heißt nicht dasselbe wie in Sport). Sie
+// hängen deshalb am Kurs; gespeichert werden sie an der Person, mit kurs_id.
+//
+// Vokabular wortgleich zum Backend (MASSNAHMEN_VALUES in classes.py).
+const MASSNAHMEN = [
+  ["Zeitzuschlag", "Mehr Bearbeitungszeit, z. B. +25 %"],
+  ["Abweichende Lernziele", "Wird an anderen Zielen gemessen als die Klasse"],
+  ["Weniger Aufgaben", "Reduzierter Umfang bei gleicher Anforderung"],
+  ["Vorlesen", "Aufgabenstellungen werden vorgelesen"],
+  ["Größere Schrift", "Arbeitsblatt in größerer Schrift / mehr Kontrast"],
+  ["Hilfsmittel", "Z. B. Taschenrechner, Wörterbuch, Formelsammlung"],
+  ["Eigener Raum", "Arbeitet getrennt oder in einer Kleingruppe"],
+  ["Zusätzliche Pausen", "Darf die Arbeit unterbrechen"],
+  ["Assistenz", "Begleitung durch eine weitere Person"],
+  ["Rechtschreibung nicht bewertet", "Rechtschreibleistung fließt nicht ein"],
+  ["Mündlich statt schriftlich", "Leistung wird mündlich erbracht"],
+  ["Sonstiges", "Freie Beschreibung im Feld daneben"],
+];
+
+function MassnahmenPanel({ kursId, t }) {
+  const [studs, setStuds] = useState(null);
+  const [offen, setOffen] = useState(null); // Name der aufgeklappten Person
+  useEffect(() => {
+    fetch(`${API}/kurse/${kursId}/massnahmen`).then((r) => (r.ok ? r.json() : [])).then((d) => setStuds(Array.isArray(d) ? d : [])).catch(() => setStuds([]));
+  }, [kursId]);
+
+  const speichern = async (name, liste) => {
+    setStuds((prev) => prev.map((s) => (s.name === name ? { ...s, massnahmen: liste } : s)));
+    await fetch(`${API}/kurse/${kursId}/massnahmen`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, massnahmen: liste }),
+    }).catch(() => {});
+  };
+  const setFeld = (s, i, feld, wert) => {
+    const liste = [...(s.massnahmen || [])];
+    liste[i] = { ...liste[i], [feld]: wert };
+    speichern(s.name, liste);
+  };
+  const hinzu = (s) => speichern(s.name, [...(s.massnahmen || []), { art: MASSNAHMEN[0][0], detail: "", arbeit: true }]);
+  const weg = (s, i) => speichern(s.name, (s.massnahmen || []).filter((_, x) => x !== i));
+
+  if (!studs) return null;
+  if (studs.length === 0) return <p style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("kurse.niveauNoStudents")}</p>;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {studs.map((s) => {
+        const n = (s.massnahmen || []).length;
+        const auf = offen === s.name;
+        return (
+          <div key={s.name} style={{ borderTop: "1px solid var(--border)", paddingTop: 6 }}>
+            <button onClick={() => setOffen(auf ? null : s.name)}
+              style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", padding: "2px 0", cursor: "pointer", textAlign: "left", fontSize: 13, color: "var(--text)" }}>
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
+              <span style={{ fontSize: 12, color: n ? "var(--accent)" : "var(--text3)" }}>{n ? t("kurse.measuresCount", { n }) : t("kurse.measuresNone")}</span>
+              <span style={{ color: "var(--text3)", fontSize: 11 }}>{auf ? "▲" : "▾"}</span>
+            </button>
+            {auf && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "6px 0 10px" }}>
+                {(s.massnahmen || []).map((m, i) => (
+                  <div key={i} style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                    <select value={m.art} onChange={(e) => setFeld(s, i, "art", e.target.value)}
+                      title={(MASSNAHMEN.find(([w]) => w === m.art) || [])[1] || ""}
+                      style={{ ...selectStyle, padding: "6px 24px 6px 8px", fontSize: 12.5, minWidth: 170 }}>
+                      {MASSNAHMEN.map(([wert]) => <option key={wert} value={wert}>{wert}</option>)}
+                    </select>
+                    <input value={m.detail || ""} onChange={(e) => setFeld(s, i, "detail", e.target.value)}
+                      placeholder={t("classes.measureDetail")} maxLength={300}
+                      style={{ ...inputStyle, flex: 1, minWidth: 140, padding: "6px 8px", fontSize: 12.5 }} />
+                    <label style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--text2)", cursor: "pointer" }}
+                      title={t("classes.measureExamHint")}>
+                      <input type="checkbox" checked={!!m.arbeit} onChange={(e) => setFeld(s, i, "arbeit", e.target.checked)} style={{ margin: 0 }} />
+                      {t("classes.measureExam")}
+                    </label>
+                    <button onClick={() => weg(s, i)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}>
+                      <Icon d={ICONS.trash} size={14} color={C.danger} />
+                    </button>
+                  </div>
+                ))}
+                <div>
+                  <button onClick={() => hinzu(s)} style={{ ...btnSecondary, padding: "4px 11px", fontSize: 12.5 }}>{t("classes.measureAdd")}</button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
