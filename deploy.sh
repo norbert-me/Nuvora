@@ -30,7 +30,11 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 # Minuten, und der Docker-Build schweigt dazwischen lange. Ohne Anzeige weiss
 # niemand, ob es haengt oder arbeitet. Die Schritte sind fest gezaehlt, weil sie
 # immer dieselben sind — kein Schaetzen, keine Fortschritts-Luege.
-SCHRITTE_GESAMT=9
+#
+# SCHRITTE_GESAMT wird nach dem Auswerten der Argumente endgueltig gesetzt: mit
+# Selbsttest ist eine Etappe mehr zu gehen als ohne. Der Vorbelegungswert hier
+# gilt nur, falls vor dem Parsen schon etwas gemeldet werden muesste.
+SCHRITTE_GESAMT=10
 SCHRITT=0
 BALKEN_BREITE=28
 
@@ -41,16 +45,47 @@ else
   B_GRUEN=""; B_GRAU=""; B_FETT=""; B_AUS=""
 fi
 
+# Ein Zeichen n-mal. Frueher stand hier "printf '█%.0s' $(seq 1 $n)" — und das
+# war der Grund fuer den zerbrochenen Balken: BSD-seq auf macOS zaehlt bei
+# "seq 1 0" RUECKWAERTS und gibt "1 0" aus, also zwei Werte statt keinem. Bei
+# leer=0 (letzter Schritt) druckte printf deshalb zwei Punkte zu viel, und die
+# Zeile war zwei Zeichen breiter als alle anderen. Eine Schleife kennt diese
+# Falle nicht und liefert bei 0 auch wirklich nichts.
+wiederhole() {
+  local zeichen="$1" anzahl="$2" i=0 s=""
+  while [ "$i" -lt "$anzahl" ]; do s="$s$zeichen"; i=$((i + 1)); done
+  printf '%s' "$s"
+}
+
 schritt() {
   SCHRITT=$((SCHRITT + 1))
   local text="$1"
   local voll=$((SCHRITT * BALKEN_BREITE / SCHRITTE_GESAMT))
-  local leer=$((BALKEN_BREITE - voll))
   local prozent=$((SCHRITT * 100 / SCHRITTE_GESAMT))
-  printf '\n%s[%s%s%s%s] %3d%%%s  %s%s/%s%s %s\n' \
-    "$B_GRUEN" "$(printf '█%.0s' $(seq 1 $voll 2>/dev/null))" "$B_GRAU" \
-    "$(printf '·%.0s' $(seq 1 $leer 2>/dev/null))" "$B_GRUEN" "$prozent" "$B_AUS" \
+  # Deckel: laeuft die Zaehlung aus dem Ruder, bleibt wenigstens die Breite
+  # konstant — die Bilanz am Ende meldet den Fehler dann laut.
+  [ "$voll" -gt "$BALKEN_BREITE" ] && voll=$BALKEN_BREITE
+  [ "$voll" -lt 0 ] && voll=0
+  [ "$prozent" -gt 100 ] && prozent=100
+  local leer=$((BALKEN_BREITE - voll))
+  # voll + leer ist per Konstruktion immer BALKEN_BREITE; %3d und %2d/%-2d
+  # halten Prozentzahl, Schrittnummer und Text in festen Spalten.
+  printf '\n%s[%s%s%s%s] %3d%%%s  %s%2d/%-2d%s %s\n' \
+    "$B_GRUEN" "$(wiederhole '█' "$voll")" "$B_GRAU" \
+    "$(wiederhole '·' "$leer")" "$B_GRUEN" "$prozent" "$B_AUS" \
     "$B_GRAU" "$SCHRITT" "$SCHRITTE_GESAMT" "$B_AUS" "$B_FETT$text$B_AUS"
+}
+
+# Sicherung: eine Anzeige, die bei 88 % endet oder ueber 100 % laeuft, ist
+# schlimmer als keine. Am Ende muss die Zahl der gelaufenen Schritte exakt der
+# angekuendigten entsprechen — sonst ist SCHRITTE_GESAMT beim Ergaenzen eines
+# Schrittes vergessen worden, und genau das soll auffallen.
+schritte_bilanz() {
+  [ "$SCHRITT" = "$SCHRITTE_GESAMT" ] && return 0
+  echo ""
+  echo "  ⚠ Fortschrittsanzeige stimmt nicht: $SCHRITT Schritte gelaufen," \
+       "$SCHRITTE_GESAMT angekündigt."
+  echo "    SCHRITTE_GESAMT in deploy.sh an die Zahl der schritt-Aufrufe anpassen."
 }
 
 if [ ! -f "$DIR/.deploy.env" ]; then
@@ -140,6 +175,13 @@ PORT="${PORT:-8080}"
 SITE_URL="${SITE_URL:-http://${SERVER#*@}:$PORT}"
 
 BUILD_SERVICES="${ARGS[*]:-}"
+
+# Jetzt erst steht fest, wie viele Etappen es wirklich sind: neun feste
+# schritt-Aufrufe bis zum Health-Check, plus der Selbsttest, der danach mehrere
+# Minuten laeuft. Der war bisher gar nicht gezaehlt — die Anzeige stand auf
+# 100 %, waehrend der laengste Teil des Deploys noch vor sich ging.
+SCHRITTE_GESAMT=9
+[ "$SELFTEST" = "1" ] && SCHRITTE_GESAMT=10
 
 echo "=== Nuvora Deploy ==="
 echo "Server: $SERVER"
@@ -402,13 +444,19 @@ if [ "$CV" = "200" ] && [ "$LP" = "200" ]; then
   # Health sagt nur "Container laeuft". Der Selbsttest sagt, ob jedes Modul,
   # die Einrichtung und die Seiten wirklich funktionieren.
   if [ "$SELFTEST" = "1" ]; then
-    echo ""
-    echo "→ Selbsttest..."
     SELFTEST_ARGS=()
-    [ "$SELFTEST_VOLL" = "0" ] && SELFTEST_ARGS+=(--schnell)
+    if [ "$SELFTEST_VOLL" = "0" ]; then
+      SELFTEST_ARGS+=(--schnell)
+      schritt "Selbsttest (Schnelltest)"
+    else
+      schritt "Selbsttest (alle Module, dann Browser-Rundgang)"
+    fi
+    schritte_bilanz
     # Kein eigener Schlusssatz: die Zusammenfassung des Selbsttests sagt bereits
     # alles. Der Rueckgabewert traegt das Ergebnis nach aussen.
     "$DIR/selftest.sh" "${SELFTEST_ARGS[@]+"${SELFTEST_ARGS[@]}"}" || exit 1
+  else
+    schritte_bilanz
   fi
 else
   [ "$CV" != "200" ] && echo "  ⚠ Nuvora-Kern nicht gesund (health=$CV)"
