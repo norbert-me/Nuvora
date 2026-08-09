@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { useLanguage, LANGUAGES } from "../i18n/index.jsx";
-import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm} from "../components/Icons.jsx";
+import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 
 const API = "/api";
 
@@ -457,11 +457,11 @@ const linkBtn = {
   background: "none", border: "none", color: "var(--accent)", fontSize: 13, fontWeight: 500, cursor: "pointer", padding: 0,
 };
 
-const thStyle = {
+const thStyle = { ...thBasis,
   textAlign: "left", padding: "6px 8px", borderBottom: "1px solid var(--border2)",
   color: "var(--text3)", fontSize: 12, fontWeight: 600,
 };
 
-const tdStyle = {
+const tdStyle = { ...tdBasis,
   padding: "8px 8px", borderBottom: "1px solid var(--border)", color: "var(--text)",
 };

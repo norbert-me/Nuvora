@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, selectStyle, overlayGuard, modalOverlay, modalPanel, Empty, Skeleton, pageApp, inputStyle, Popover} from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, selectStyle, overlayGuard, modalOverlay, modalPanel, Empty, Skeleton, pageApp, inputStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import AuthImage from "../components/AuthImage.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -1059,5 +1059,6 @@ function ReifeBar({ hist, height = 10 }) {
 }
 
 const inp = { ...inputStyle };
-const th = { padding: "8px 10px", borderBottom: "2px solid var(--border)", fontWeight: 600, fontSize: 12, color: "var(--text2)", textAlign: "center" };
-const td = { padding: "7px 10px", borderBottom: "1px solid var(--border)", textAlign: "center", color: "var(--text)" };
+// Aus dem Kern abgeleitet: nur Innenabstand und Kopflinie weichen ab.
+const th = { ...thBasis, padding: "8px 10px", borderBottom: "2px solid var(--border)" };
+const td = { ...tdBasis, padding: "7px 10px" };

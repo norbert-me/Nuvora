@@ -2,7 +2,7 @@
 // Jedes Feld ist verschiebbar, in der Größe änderbar und hat eine Schriftgröße.
 // Reiner Client; der Stand liegt lokal (localStorage), damit er den Reload übersteht.
 import { useState, useRef, useEffect } from "react";
-import { pageTitle, btnPrimary, btnSecondary, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
+import { pageTitle, btnPrimary, btnSecondary, Icon, ICONS, iconBtn, COLORS as C, pageFull } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const KEY = "nuvora_tafel_v1";
@@ -100,7 +100,7 @@ export default function Tafel() {
   useEffect(() => { setFontPop(false); }, [sel]);
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+    <div style={{ ...pageFull }}>
       <style>{`@keyframes tafelFlash{0%,100%{background:transparent}50%{background:rgba(220,38,38,0.55)}}.tafel-flash{animation:tafelFlash .5s steps(1) 6}`}</style>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
         <span style={{ flex: 1 }} />

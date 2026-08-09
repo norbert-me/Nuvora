@@ -3,7 +3,7 @@ import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
-import { DownloadLink, Icon, ICONS, btnPrimary, btnSecondary, overlayGuard, modalOverlay, modalPanel, inputStyle, COLORS as C, Boxplot } from "../components/Icons.jsx";
+import { DownloadLink, Icon, ICONS, btnPrimary, btnSecondary, overlayGuard, modalOverlay, modalPanel, inputStyle, COLORS as C, Boxplot, pageApp, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
 import { bewerte, statusOf } from "../core/scoring.js";
 
@@ -370,7 +370,7 @@ const gradeDistribution = (() => {
     const allKeys = ["A", "B", "C", "D"];
 
     return (
-      <div>
+      <div style={{ ...pageApp }}>
         <button onClick={() => setSelectedQ(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 13, fontWeight: 500, padding: "4px 0", marginBottom: 16 }}>← Zurück zur Übersicht</button>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>Frage {qi + 1}</h2>
         <div style={{ fontSize: 18, color: "var(--text)", marginBottom: 20, padding: 16, background: "var(--bg2)", borderRadius: 12, lineHeight: 1.5 }}>
@@ -980,8 +980,9 @@ const numInput = { width: 48, padding: "6px 6px", fontSize: 13, border: "1px sol
 // Noten-Nummer schlicht, ohne Kreis/Umrandung.
 const gradeBadge = { flexShrink: 0, minWidth: 14, color: "var(--text)", fontSize: 14, fontWeight: 700, textAlign: "center" };
 
-const th = { padding: "8px 10px", borderBottom: "2px solid var(--border3)", textAlign: "left", fontSize: 13, color: "var(--text)" };
-const td = { padding: "8px 10px", borderBottom: "1px solid var(--border)" };
+// Aus dem Kern abgeleitet: linksbuendig und luftiger, sonst identisch.
+const th = { ...thBasis, padding: "8px 10px", borderBottom: "2px solid var(--border3)", textAlign: "left", fontSize: 13, color: "var(--text)" };
+const td = { ...tdBasis, padding: "8px 10px", textAlign: "left" };
 
 function Stat({ label, value, onClick, clickable, info }) {
   return (

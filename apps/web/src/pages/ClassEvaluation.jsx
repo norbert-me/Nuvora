@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { LoadError, COLORS as C, Boxplot } from "../components/Icons.jsx";
+import { LoadError, COLORS as C, Boxplot, pageApp, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 
 const API = "/api";
 
@@ -32,7 +32,7 @@ export default function ClassEvaluation() {
 
   if (tests.length === 0) {
     return (
-      <div>
+      <div style={{ ...pageApp }}>
         <Link to="/cardvote/tests" style={backLink}>← Alle Tests</Link>
         <h2 style={{ marginTop: 12, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>Klasse {class_name}</h2>
         <p style={{ color: "var(--text3)" }}>Noch keine Tests für diese Klasse.</p>
@@ -251,8 +251,9 @@ function pctStyle(pct) {
 }
 
 const backLink = { color: "var(--text3)", textDecoration: "none", fontSize: 13, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 0", transition: "color 0.15s" };
-const th = { padding: "8px 10px", borderBottom: "2px solid var(--border3)", textAlign: "left", fontSize: 13, color: "var(--text)" };
-const td = { padding: "8px 10px", borderBottom: "1px solid var(--border)" };
+// Aus dem Kern abgeleitet, gleiche Abweichung wie in der Auswertung.
+const th = { ...thBasis, padding: "8px 10px", borderBottom: "2px solid var(--border3)", textAlign: "left", fontSize: 13, color: "var(--text)" };
+const td = { ...tdBasis, padding: "8px 10px", textAlign: "left" };
 
 function Stat({ label, value }) {
   return (

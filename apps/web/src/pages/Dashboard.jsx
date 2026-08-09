@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import Latex from "../components/Latex.jsx";
 import PublishModal from "../components/PublishModal.jsx";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Toggle, modalOverlay as sOverlay, modalPanel as sPanel, Popover} from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Toggle, modalOverlay as sOverlay, modalPanel as sPanel, Popover, pageApp, inputStyle as inputBasis } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import TopicPicker from "../components/TopicPicker.jsx";
@@ -323,7 +323,7 @@ export default function Dashboard() {
   if (loadError && folders.length === 0) return <p style={{ color: C.danger }}>{t("common.connectionError")}</p>;
 
   return (
-    <div>
+    <div style={{ ...pageApp }}>
 
       <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 16, fontSize: 14 }}>
         <span onClick={() => goToPath(-1)} style={{ cursor: "pointer", color: path.length === 0 ? "var(--text)" : "var(--accent)", fontWeight: path.length === 0 ? 600 : 400 }}>
@@ -500,7 +500,8 @@ function ImportProgress({ status }) {
   );
 }
 
-const inputStyle = { padding: "10px 14px", border: "1px solid var(--border2)", borderRadius: 10, fontSize: 14, background: "var(--card)" };
+// Aus dem Kern abgeleitet (etwas groesser, auf Kartenfarbe).
+const inputStyle = { ...inputBasis, padding: "10px 14px", background: "var(--card)" };
 const btnSmall = { background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: "4px 10px", fontWeight: 500, color: "var(--text3)" };
 
 function NewSetButton({ onCreate }) {

@@ -12,7 +12,7 @@ import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, overlayGuard, modalOverlay, modalPanel, popoverPanel, Empty, Skeleton, ExportButton, ImportButton, inputStyle, Popover} from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, overlayGuard, modalOverlay, modalPanel, popoverPanel, Empty, Skeleton, ExportButton, ImportButton, inputStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
@@ -1313,8 +1313,11 @@ function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo }
 }
 
 const inp = { ...inputStyle, width: "100%" };
-const th = { padding: "8px 6px", borderBottom: "2px solid var(--border3)", fontWeight: 600, fontSize: 12, color: "var(--text2)", textAlign: "center", whiteSpace: "nowrap", position: "relative" };
-const td = { padding: "4px 6px", borderBottom: "1px solid var(--border)", textAlign: "center", color: "var(--text)" };
+// Aus dem Kern abgeleitet (Icons.jsx), nicht neu gebaut: die Notentabelle
+// braucht nur eine kraeftigere Kopflinie und relative Zellen fuer die
+// Spalten-Menues.
+const th = { ...thBasis, borderBottom: "2px solid var(--border3)", position: "relative" };
+const td = tdBasis;
 const stickyL = { position: "sticky", left: 0, background: "var(--card)", zIndex: 1 };
 const overlay = modalOverlay;
 const modal = { ...modalPanel, maxWidth: 460 };

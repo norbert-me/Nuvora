@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { DownloadLink, COLORS as C, pageApp} from "../components/Icons.jsx";
+import { DownloadLink, COLORS as C, pageApp, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 
 const API = "/api";
 
@@ -137,5 +137,6 @@ function StatCard({ label, value, color }) {
   );
 }
 
-const th = { padding: "8px 10px", textAlign: "left", fontSize: 13, color: "var(--text3)" };
-const tdStyle = { padding: "10px", color: "var(--text)" };
+// Aus dem Kern abgeleitet.
+const th = { ...thBasis, padding: "8px 10px", textAlign: "left", fontSize: 13, color: "var(--text3)", borderBottom: "none" };
+const tdStyle = { ...tdBasis, padding: 10, textAlign: "left" };
