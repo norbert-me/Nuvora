@@ -32,6 +32,15 @@ fi
 : "${SERVER:?SERVER nicht gesetzt (.deploy.env)}"
 : "${REMOTE_DIR:?REMOTE_DIR nicht gesetzt (.deploy.env)}"
 
+# Anhaengen an eine Datei, die nicht mit einem Zeilenumbruch endet, klebt den
+# neuen Eintrag an den letzten — aus SELFTEST_PASSWORD="…" wurde so
+# SELFTEST_PASSWORD="…"SELFTEST_TOKEN="…" und die Anmeldung schlug fehl.
+# Deshalb vor jedem Anhaengen sicherstellen, dass die Datei sauber endet.
+zeilenende_sichern() {
+  [ -s "$1" ] || return 0
+  [ "$(tail -c 1 "$1" | od -An -c | tr -d ' \n')" = "\\n" ] || printf '\n' >> "$1"
+}
+
 # ─── Argumente: --port N, Rest sind zu bauende Services ───
 CLI_PORT=""
 SELFTEST=1        # Selbsttest nach dem Deploy (./selftest.sh)
@@ -73,6 +82,7 @@ if [ -n "$CLI_PORT" ]; then
     awk -v v="$PORT" 'index($0,"PORT=")==1 { print "PORT=" v; next } { print }' \
       "$DIR/.deploy.env" > "$DIR/.deploy.env.tmp" && mv "$DIR/.deploy.env.tmp" "$DIR/.deploy.env"
   else
+    zeilenende_sichern "$DIR/.deploy.env"
     printf 'PORT=%s\n' "$PORT" >> "$DIR/.deploy.env"
   fi
 
@@ -160,6 +170,7 @@ if [ -z "${SELFTEST_TOKEN:-}" ]; then
     awk -v v="$SELFTEST_TOKEN" 'index($0,"SELFTEST_TOKEN=")==1 { print "SELFTEST_TOKEN=\"" v "\""; next } { print }' \
       "$DIR/.deploy.env" > "$DIR/.deploy.env.tmp" && mv "$DIR/.deploy.env.tmp" "$DIR/.deploy.env"
   else
+    zeilenende_sichern "$DIR/.deploy.env"
     printf 'SELFTEST_TOKEN="%s"\n' "$SELFTEST_TOKEN" >> "$DIR/.deploy.env"
   fi
   echo "  Selbsttest-Token erzeugt und in .deploy.env gemerkt."

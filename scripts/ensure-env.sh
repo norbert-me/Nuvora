@@ -10,6 +10,14 @@
 
 changed=''
 
+# Endet die .env ohne Zeilenumbruch, klebt ein angehaengter Eintrag an den
+# letzten Wert (aus SMTP_FROM_NAME=Nuvora wurde SMTP_FROM_NAME=NuvoraSELFTEST_TOKEN=…).
+# Deshalb vor jedem Anhaengen den Abschluss sicherstellen.
+zeilenende_sichern() {
+  [ -s .env ] || return 0
+  [ "$(tail -c 1 .env | od -An -c | tr -d ' \n')" = "\\n" ] || printf '\n' >> .env
+}
+
 # Vor jeder Aenderung eine Kopie: die .env traegt Secrets, die nur hier
 # existieren. Sieben Kopien reichen, um einen Fehlgriff zu bemerken.
 if [ -f .env ]; then
@@ -53,6 +61,7 @@ set_if_empty() {
       'index($0, k "=") == 1 { print k "=" v; next } { print }' \
       .env > .env.tmp && mv .env.tmp .env
   else
+    zeilenende_sichern
     printf '%s=%s\n' "$key" "$val" >> .env
   fi
   chmod 600 .env
@@ -76,6 +85,7 @@ set_always() {
       'index($0, k "=") == 1 { print k "=" v; next } { print }' \
       .env > .env.tmp && mv .env.tmp .env
   else
+    zeilenende_sichern
     printf '%s=%s\n' "$key" "$val" >> .env
   fi
   chmod 600 .env
