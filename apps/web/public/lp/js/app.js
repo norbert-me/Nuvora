@@ -641,7 +641,13 @@
         else window.location.href = ziel;
     });
 
-    document.addEventListener('DOMContentLoaded', checkAuth);
+    // In-page gemountet laeuft dieses Skript ERST NACH dem Laden der Seite
+    // (die Shell injiziert es) — DOMContentLoaded ist da laengst gefeuert und
+    // checkAuth lief nie. Folge: die App zeigte nur den localStorage-Cache,
+    // holte nie Aufgaben, Klassen und Kurse vom Server. In einem frischen
+    // Browser blieb der Lernpfad damit leer.
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', checkAuth);
+    else checkAuth();
 
     // Migrate old multi-category data to single kategorie
     aufgaben.forEach(a => {

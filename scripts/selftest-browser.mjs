@@ -141,6 +141,16 @@ async function main() {
     }
     await dunkel.close();
 
+    // ── Der Lernpfad muss seine Daten wirklich holen ──
+    // Er ist die einzige Seite, die nicht React ist: eine eingebettete App, die
+    // die Shell nachtraeglich startet. Genau daran ist sie einmal gescheitert —
+    // sie rief nie /exercises auf und zeigte nur den localStorage-Cache, also im
+    // frischen Browser gar nichts. "Rendert" reicht hier als Nachweis nicht.
+    if (module.some((m) => m.key === "lernpfad" && m.available)) {
+      const befund = await ladeLernpfadDaten(kontext);
+      notiere("Seiten", "Lernpfad holt seine Daten", befund.ok, befund.detail);
+    }
+
     // ── Wirklich bedienen, nicht nur ansehen ──
     for (const flow of BEDIENUNG) {
       const befund = await bediene(kontext, flow);
@@ -195,10 +205,20 @@ const MARKE = "ZZ-Selbsttest-UI";
  * startet je nach Konto unterschiedlich.
  */
 async function tourWegklicken(seite) {
-  try {
-    const spaeter = seite.getByRole("button", { name: /später|spaeter|later|más tarde|mas tarde/i }).first();
-    if (await spaeter.isVisible({ timeout: 1500 })) await spaeter.click({ timeout: 3000 });
-  } catch { /* kein Overlay da — der Normalfall */ }
+  // Zwei Sorten: die Willkommens-Tour ("Später") und die Modul-Tour beim
+  // ersten Besuch einer Modulseite ("Überspringen"). Beide legen sich ueber
+  // die Seite und verschlucken jeden Klick — und ohne sie wegzuklicken prueft
+  // der Test nur das Overlay.
+  // Zweimal durch: die Modul-Tour erscheint erst, wenn die Daten da sind.
+  for (const runde of [0, 1]) {
+    for (const name of [/später|spaeter|later|más tarde|mas tarde/i, /überspringen|ueberspringen|skip|saltar|omitir/i]) {
+      try {
+        const knopf = seite.getByRole("button", { name }).first();
+        if (await knopf.isVisible({ timeout: runde ? 500 : 1200 })) await knopf.click({ timeout: 3000 });
+      } catch { /* kein Overlay da — der Normalfall */ }
+    }
+    if (!runde) await seite.waitForTimeout(700);
+  }
 }
 
 /**
@@ -273,6 +293,27 @@ async function aufraeumenBedienung(api) {
       if ((t.name || "").includes(MARKE)) await api(`/api/topics/${t.id}`, "delete");
     }
   } catch { /* siehe oben */ }
+}
+
+/** Holt die eingebettete Lernpfad-App ihre Inhalte vom Server? */
+async function ladeLernpfadDaten(kontext) {
+  const seite = await kontext.newPage();
+  const gesehen = [];
+  seite.on("request", (r) => { if (r.url().includes("/api/lernpfad/")) gesehen.push(new URL(r.url()).pathname); });
+  try {
+    await seite.goto("/lernpfad", { waitUntil: "networkidle", timeout: 30000 });
+    await tourWegklicken(seite);
+    await seite.waitForTimeout(2500);
+    if (!gesehen.some((p) => p.endsWith("/exercises"))) {
+      return { ok: false, detail: "ruft /api/lernpfad/exercises nie auf — zeigt nur den lokalen Cache, "
+                                  + "im frischen Browser also nichts" };
+    }
+    return { ok: true, detail: `holt ${[...new Set(gesehen)].length} Datenquellen vom Server` };
+  } catch (e) {
+    return { ok: false, detail: String(e.message || e).split("\n")[0].slice(0, 140) };
+  } finally {
+    await seite.close();
+  }
 }
 
 /** Eine Seite oeffnen und alles sammeln, was schiefgeht. */
