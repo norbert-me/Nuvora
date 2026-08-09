@@ -37,6 +37,10 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Nuvora}
+      # Damit der Selbsttest nach dem Deploy auch mit seinem eigenen Konto an
+      # die Einrichtungs-Pruefungen kommt (Schema, Konfiguration, E-Mail) —
+      # ohne dafuer das Administrationskonto benutzen zu muessen.
+      SELFTEST_TOKEN: ${SELFTEST_TOKEN:-}
     volumes:
       - uploads:/app/uploads
       # Betreiberdaten: der Setup-Check im Admin-Profil prueft

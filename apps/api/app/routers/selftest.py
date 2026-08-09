@@ -15,9 +15,10 @@ Konfigurationszustand.
 import asyncio
 import os
 import pathlib
+import secrets
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,11 +31,22 @@ from .modules import REGISTRY
 router = APIRouter(prefix="/api/selftest", tags=["selftest"])
 
 
-async def _require_admin(user=Depends(get_current_user)):
-    # Dieselbe Regel wie in main.py (User 1 ist die Administration) — hier
-    # eigenstaendig, damit der Router nicht auf main.py zurueckimportiert.
+async def _require_admin(request: Request, db: AsyncSession = Depends(get_db)):
+    """Administration — oder das Selbsttest-Token.
+
+    Der Selbsttest laeuft nach jedem Deploy mit einem eigenen Konto, und das ist
+    absichtlich nicht die Administration (er schreibt und loescht darin). Ohne
+    zweiten Weg blieben genau die Pruefungen aus, die man am dringendsten
+    braucht: Schema, Konfiguration, E-Mail-Versand. Deshalb zaehlt auch ein
+    Geheimnis aus der Umgebung, gesetzt in der .env des Servers.
+    """
+    token = (os.environ.get("SELFTEST_TOKEN") or "").strip()
+    mitgeschickt = (request.headers.get("X-Selftest-Token") or "").strip()
+    if token and mitgeschickt and secrets.compare_digest(token, mitgeschickt):
+        return None
+    user = await get_current_user(request, Response(), db)
     if user.id != 1:
-        raise HTTPException(403, "Nur für die Administration")
+        raise HTTPException(403, "Nur für die Administration oder mit gültigem SELFTEST_TOKEN")
     return user
 
 

@@ -48,9 +48,11 @@ class ApiFehler(Exception):
 class Api:
     """Duenner HTTP-Client auf urllib — kein requests, keine Installation."""
 
-    def __init__(self, basis, debug=False):
+    def __init__(self, basis, debug=False, selftest_token=""):
         self.basis = basis.rstrip("/")
         self.token = None
+        # Geheimnis fuer die Einrichtungs-Pruefungen (siehe SELFTEST_TOKEN).
+        self.selftest_token = selftest_token
         self.debug = debug
         self.protokoll = []   # (methode, pfad, status, ms) — fuer --debug
 
@@ -63,6 +65,8 @@ class Api:
             req.add_header("Content-Type", "application/json")
         if self.token:
             req.add_header("Authorization", "Bearer " + self.token)
+        if self.selftest_token:
+            req.add_header("X-Selftest-Token", self.selftest_token)
         try:
             with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
                 status, inhalt = r.status, r.read()
@@ -226,8 +230,13 @@ def teste_system(api, b):
 def teste_einrichtung(api, b):
     status, text = api.call("GET", "/api/selftest", roh=True)
     if status == 403:
-        b.add("Einrichtung", "Server-Selbsttest", True, schwere="warnung",
-              detail="uebersprungen — Konto ist nicht die Administration")
+        # Uebersprungen heisst: Schema, Konfiguration und E-Mail-Versand sind
+        # ungeprueft — also genau das, was man nach einem Deploy wissen will.
+        # Als Warnung sichtbar halten, mit dem Weg dahin.
+        b.add("Einrichtung", "Server-Selbsttest", False, schwere="warnung",
+              detail="uebersprungen — Schema, Konfiguration und E-Mail bleiben ungeprueft. "
+                     "SELFTEST_TOKEN in .deploy.env UND in der .env auf dem Server setzen "
+                     "(gleicher Wert), dann laeuft der Teil auch ohne Administrationskonto.")
         return
     if status != 200:
         b.add("Einrichtung", "Server-Selbsttest", False, f"HTTP {status}: {text[:150]}")
@@ -639,12 +648,182 @@ def teste_module(api, b, u):
                 b.add("Module", name, True, "reines Frontend-Modul — Prüfung im Browser-Test")
                 continue
             b.pruefe("Module", name, lambda p=probe: p(api, u))
+
+        # Braucht aktive Module (Karten, Code-Detektiv), also hier drin.
+        teste_schueler_wege(api, b, u)
+        teste_fremdzugriff(api, b, u)
     finally:
         for key in zugeschaltet:
             try:
                 api.call("DELETE", f"/api/modules/{key}/activate", erwartet=(200,))
             except Exception as e:
                 b.reste.append(f"Modul {key} blieb zugeschaltet: {e}")
+
+
+def teste_schueler_wege(api, b, u):
+    """Die einzigen Wege, die Lernende benutzen — ohne Konto, nur mit Token.
+
+    Lernende haben in Nuvora keine Konten. Was sie erreichen, haengt an einem
+    Token in der Adresse. Genau diese Pfade muessen ohne Anmeldung gehen und
+    mit falschem Token dichthalten — beides wird hier durchgespielt.
+    """
+    # Eigener Client OHNE Anmeldung: sonst wuerde der Test sich selbst
+    # bescheinigen, was nur mit Token der Lehrkraft funktioniert.
+    anonym = Api(api.basis, debug=api.debug)
+
+    def karten_lernen():
+        stapel = api.call("POST", f"/api/karten/classes/{u.class_id}/decks",
+                          {"name": f"{PRAEFIX} SuS-Stapel"}, erwartet=(201,))
+        try:
+            karte = api.call("POST", f"/api/karten/decks/{stapel['id']}/cards",
+                             {"front": "3+4", "back": "7"}, erwartet=(201,))
+            # Entwuerfe bleiben fuer Lernende unsichtbar — erst freigeben.
+            api.call("POST", f"/api/karten/decks/{stapel['id']}/release", {"now": True},
+                     erwartet=(200,))
+            zugaenge = api.call("POST", f"/api/karten/classes/{u.class_id}/tokens",
+                                erwartet=(200, 201))
+            if not zugaenge:
+                raise AssertionError("keine Schueler-Zugaenge erzeugt")
+            token = zugaenge[0]["token"]
+
+            sitzung = anonym.call("GET", f"/api/karten/lernen/{token}", erwartet=(200,))
+            karten = sitzung.get("cards", sitzung) if isinstance(sitzung, dict) else sitzung
+            if not karten:
+                raise AssertionError("Lernender sieht keine Karte, obwohl der Stapel frei ist")
+            anonym.call("POST", f"/api/karten/lernen/{token}/review",
+                        {"card_id": karte["id"], "grade": 3}, erwartet=(200,))
+            anonym.call("GET", f"/api/karten/lernen/{token}/results", erwartet=(200,))
+            # Und dicht bei falschem Token.
+            status, _ = anonym.call("GET", "/api/karten/lernen/ZZ-kein-gueltiger-token", roh=True)
+            if status < 400:
+                raise AssertionError(f"falscher Token liefert HTTP {status} statt einer Absage")
+            return "Stapel freigeben, ohne Login lernen, Antwort zaehlt, falscher Token abgewiesen"
+        finally:
+            api.call("DELETE", f"/api/karten/decks/{stapel['id']}", erwartet=(204, 404))
+            api.call("DELETE", f"/api/karten/decks/{stapel['id']}/purge", erwartet=(204, 404))
+
+    def code_detektiv_beitreten():
+        sitzung = api.call("POST", "/api/codedetektiv/sessions",
+                           {"puzzles": [{"id": "zz1", "title": f"{PRAEFIX} Raetsel"}]},
+                           erwartet=(201,))
+        code = sitzung["code"]
+        try:
+            anonym.call("GET", f"/api/codedetektiv/sessions/{code}", erwartet=(200,))
+            anonym.call("POST", f"/api/codedetektiv/sessions/{code}/join",
+                        {"name": f"{PRAEFIX} Kind"}, erwartet=(200, 201))
+            anonym.call("POST", f"/api/codedetektiv/sessions/{code}/result",
+                        {"playerName": f"{PRAEFIX} Kind", "puzzleId": "zz1",
+                         "solved": True, "attempts": 1, "time": 5.0}, erwartet=(200, 201))
+            status, _ = anonym.call("GET", "/api/codedetektiv/sessions/ZZZZZZ", roh=True)
+            if status < 400:
+                raise AssertionError(f"unbekannter Code liefert HTTP {status} statt einer Absage")
+            return "beitreten, Ergebnis melden, unbekannter Code abgewiesen"
+        finally:
+            api.call("DELETE", f"/api/codedetektiv/sessions/{code}", erwartet=(204, 404))
+
+    b.pruefe("Schueler-Wege", "Karten lernen (/lernen/<token>)", karten_lernen)
+    b.pruefe("Schueler-Wege", "Code-Detektiv beitreten (/cd/<code>)", code_detektiv_beitreten)
+
+
+def teste_fremdzugriff(api, b, u):
+    """Mandantentrennung an der laufenden Installation.
+
+    Es gibt Regressionstests dafuer (test_tenant_isolation.py), die pruefen
+    aber die Funktionen. Hier zaehlt, was hinter Proxy und Anmeldung wirklich
+    passiert: fremde IDs anfragen und darauf bestehen, dass nichts durchkommt.
+    """
+    eigene = {k["id"] for k in api.call("GET", "/api/classes", erwartet=(200,))}
+    fremde = [i for i in range(1, 40) if i not in eigene][:3]
+    if not fremde:
+        return b.add("Mandantentrennung", "Fremde Klassen", True,
+                     "keine fremden IDs im Suchbereich")
+
+    def lesen():
+        durchgelassen = []
+        for fid in fremde:
+            for pfad in (f"/api/classes/{fid}",
+                         f"/api/karten/classes/{fid}/decks",
+                         f"/api/noten/classes/{fid}/sections",
+                         f"/api/orga/{fid}",
+                         f"/api/sitzplan/{fid}"):
+                status, _ = api.call("GET", pfad, roh=True)
+                if status == 200:
+                    durchgelassen.append(f"{pfad} -> 200")
+        if durchgelassen:
+            raise AssertionError("fremde Daten lesbar: " + ", ".join(durchgelassen[:5]))
+        return f"{len(fremde) * 5} Anfragen auf fremde IDs, alle abgewiesen"
+
+    def schreiben():
+        # Ein harmloser Schreibversuch: gelingt er, ist die Trennung gebrochen —
+        # dann wird der Eintrag sofort wieder entfernt.
+        for fid in fremde:
+            status, text = api.call("POST", f"/api/orga/{fid}",
+                                    {"name": f"{PRAEFIX} Fremdzugriff"}, roh=True)
+            if status in (200, 201):
+                try:
+                    api.call("DELETE", f"/api/orga/item/{json.loads(text)['id']}",
+                             erwartet=(204, 404))
+                except Exception:
+                    pass
+                raise AssertionError(f"Anlegen in fremder Klasse {fid} war erlaubt (HTTP {status})")
+        return f"Schreibversuche auf {len(fremde)} fremde Klassen abgewiesen"
+
+    b.pruefe("Mandantentrennung", "Fremde Daten lesen", lesen)
+    b.pruefe("Mandantentrennung", "In fremde Klasse schreiben", schreiben)
+
+
+BESTAND_DATEI = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                             ".selftest-bestand.json")
+
+
+def teste_bestand(api, b):
+    """Fruehwarnung: ist ueber Nacht Datenbestand verschwunden?
+
+    Eine Kaskade, die zu viel mitreisst, faellt sonst erst auf, wenn jemand
+    seine Noten sucht. Der Selbsttest merkt sich nach jedem Lauf die Zahlen und
+    vergleicht beim naechsten Mal. Gemessen wird VOR den Testdaten.
+    """
+    quellen = {
+        "Klassen": ("/api/classes", lambda d: len(d)),
+        "Schueler": ("/api/classes", lambda d: sum(len(k.get("students", [])) for k in d)),
+        "Kurse": ("/api/kurse", lambda d: len(d)),
+        "Themen": ("/api/topics", lambda d: len(d)),
+    }
+    jetzt = {}
+    for name, (pfad, zaehl) in quellen.items():
+        try:
+            jetzt[name] = zaehl(api.call("GET", pfad, erwartet=(200,)))
+        except Exception as e:
+            b.add("Bestand", name, False, f"nicht abfragbar: {e}")
+
+    vorher = {}
+    try:
+        with open(BESTAND_DATEI) as f:
+            vorher = json.load(f).get("zahlen", {})
+    except Exception:
+        pass
+
+    if not vorher:
+        b.add("Bestand", "Vergleich", True, schwere="warnung",
+              detail="erster Lauf — Zahlen gemerkt: " +
+                     ", ".join(f"{k} {v}" for k, v in jetzt.items()))
+    else:
+        for name, zahl in jetzt.items():
+            alt = vorher.get(name)
+            if alt is None:
+                b.add("Bestand", name, True, f"{zahl} (neu erfasst)")
+            elif zahl < alt and (alt - zahl) > max(1, alt * 0.1):
+                b.add("Bestand", name, False,
+                      f"{alt} -> {zahl}: {alt - zahl} verschwunden seit dem letzten Lauf. "
+                      "Kein Selbstlaeufer — nachsehen, ob eine Kaskade zu viel mitgerissen hat.")
+            else:
+                b.add("Bestand", name, True, f"{zahl}" + (f" (vorher {alt})" if alt != zahl else ""))
+
+    try:
+        with open(BESTAND_DATEI, "w") as f:
+            json.dump({"zahlen": jetzt}, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        b.reste.append(f"Bestandszahlen nicht gespeichert: {e}")
 
 
 def teste_seiten(api, b):
@@ -678,6 +857,9 @@ def main():
     p.add_argument("--nur-system", action="store_true",
                    help="nur die Checks ohne Login (kein Schreib-Roundtrip)")
     p.add_argument("--json", action="store_true", help="Ergebnis als JSON ausgeben")
+    p.add_argument("--token", default=os.environ.get("SELFTEST_TOKEN"),
+                   help="Geheimnis fuer die Einrichtungs-Pruefungen (sonst nur mit "
+                        "Administrationskonto)")
     p.add_argument("--debug", action="store_true",
                    help="jede Anfrage mitschreiben (Status, Dauer, Fehlertext) — "
                         "zum Suchen, wenn etwas rot ist")
@@ -687,7 +869,7 @@ def main():
         print("Fehler: keine URL. --url oder SELFTEST_URL/SITE_URL setzen.", file=sys.stderr)
         return 2
 
-    api = Api(args.url, debug=args.debug)
+    api = Api(args.url, debug=args.debug, selftest_token=args.token or "")
     b = Bericht()
     if not args.json:
         print(f"Nuvora-Selbsttest gegen {args.url}")
@@ -732,6 +914,8 @@ def main():
         if angemeldet:
             teste_einrichtung(api, b)
             teste_seiten(api, b)
+            # Vor den Testdaten messen, sonst zaehlt der Test seine eigene Klasse mit.
+            teste_bestand(api, b)
             u = Umgebung(api, b)
             if b.pruefe("Kern", "Testdaten anlegen", u.aufbauen):
                 try:

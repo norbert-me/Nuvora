@@ -68,3 +68,6 @@ Thumbs.db
 
 # ─── Persönliche Todo-Liste (nicht committen) ───
 TODO.md
+
+# Zahlen des letzten Selbsttests (Fruehwarnung bei Datenschwund) — lokal.
+.selftest-bestand.json
