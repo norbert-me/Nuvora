@@ -58,6 +58,16 @@ const istEgal = (text) => EGAL.some((r) => r.test(text));
 const ergebnisse = [];
 const notiere = (gruppe, name, ok, detail = "") => ergebnisse.push({ gruppe, name, ok, detail });
 
+// Farbe nur im Terminal (sonst landen Steuerzeichen in Logdateien), NO_COLOR
+// als uebliche Notbremse.
+const FARBE = process.stdout.isTTY && !process.env.NO_COLOR;
+const ROT = FARBE ? "\x1b[31m" : "";
+const GRUEN = FARBE ? "\x1b[32m" : "";
+const FETT = FARBE ? "\x1b[1m" : "";
+const AUS = FARBE ? "\x1b[0m" : "";
+// Ab dieser Laenge wiederholt die Zusammenfassung die Fehler mit Grund.
+const LANG_AB = 25;
+
 async function main() {
   const browser = await chromium.launch();
   const kontext = await browser.newContext({ baseURL: URL_BASIS, viewport: { width: 1280, height: 900 } });
@@ -344,19 +354,30 @@ function drucke() {
   let gruppe = null;
   for (const e of ergebnisse) {
     if (e.gruppe !== gruppe) {
-      console.log(`\n── ${e.gruppe}`);
+      console.log(`\n${FETT}── ${e.gruppe}${AUS}`);
       gruppe = e.gruppe;
     }
-    console.log(`  ${e.ok ? "✓" : "✗"} ${e.name}${e.detail ? `   ${e.detail}` : ""}`);
+    // Nur Fehlerzeilen einfaerben: waere alles bunt, faellt nichts auf.
+    const zeile = `  ${e.ok ? "✓" : "✗"} ${e.name}${e.detail ? `   ${e.detail}` : ""}`;
+    console.log(e.ok ? `  ${GRUEN}✓${AUS}${zeile.slice(3)}` : `${ROT}${zeile}${AUS}`);
   }
   const fehler = ergebnisse.filter((e) => !e.ok);
   console.log("\n" + "=".repeat(40));
-  if (!fehler.length) console.log(`  Browser-Selbsttest gruen — ${ergebnisse.length} Seiten/Checks.`);
-  else {
-    // Nur zaehlen und benennen — der Grund steht schon bei jedem ✗ oben.
-    const namen = fehler.slice(0, 6).map((f) => `${f.gruppe} / ${f.name}`).join(", ");
-    console.log(`  Browser-Selbsttest ROT — ${fehler.length} Fehler.`);
-    console.log(`  Betroffen: ${namen}${fehler.length > 6 ? ` und ${fehler.length - 6} weitere` : ""}`);
+  if (!fehler.length) {
+    console.log(`  ${GRUEN}Browser-Selbsttest gruen${AUS} — ${ergebnisse.length} Seiten/Checks.`);
+  } else {
+    console.log(`  ${ROT}${FETT}Browser-Selbsttest ROT${AUS} — ${fehler.length} Fehler.`);
+    // Kurzer Bericht: Namen reichen. Langer Bericht: der Befund ist laengst aus
+    // dem Bild gescrollt, also hier noch einmal mit Grund.
+    if (ergebnisse.length > LANG_AB) {
+      for (const f of fehler) {
+        console.log(`${ROT}  ✗ ${f.gruppe} / ${f.name}${AUS}`);
+        if (f.detail) console.log(`      ${f.detail}`);
+      }
+    } else {
+      const namen = fehler.slice(0, 6).map((f) => `${f.gruppe} / ${f.name}`).join(", ");
+      console.log(`  Betroffen: ${namen}${fehler.length > 6 ? ` und ${fehler.length - 6} weitere` : ""}`);
+    }
   }
   console.log("=".repeat(40));
 }

@@ -38,6 +38,20 @@ from datetime import datetime, timedelta
 PRAEFIX = "ZZ-Selbsttest"
 TIMEOUT = 30
 
+# Farbe nur, wenn wirklich ein Terminal zuschaut — in eine Datei oder durch eine
+# Pipe gehen sonst Steuerzeichen mit. NO_COLOR ist die uebliche Notbremse.
+_FARBE = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+ROT = "\033[31m" if _FARBE else ""
+GELB = "\033[33m" if _FARBE else ""
+GRUEN = "\033[32m" if _FARBE else ""
+FETT = "\033[1m" if _FARBE else ""
+AUS = "\033[0m" if _FARBE else ""
+
+# Ab dieser Laenge wiederholt die Zusammenfassung die Fehler mitsamt Grund:
+# in einem kurzen Bericht stuende alles doppelt untereinander, in einem langen
+# scrollt der Befund sonst aus dem Bild.
+LANG_AB = 25
+
 
 # ─────────────────────────── HTTP ───────────────────────────
 
@@ -59,7 +73,7 @@ class Api:
         self.protokoll = []   # (methode, pfad, status, ms) — fuer --debug
         self.letzte_kopfe = {}
 
-    def call(self, methode, pfad, body=None, erwartet=None, roh=False):
+    def call(self, methode, pfad, body=None, erwartet=None, roh=False, kopfe=None):
         url = pfad if pfad.startswith("http") else self.basis + pfad
         start = time.monotonic()
         daten = json.dumps(body).encode() if body is not None else None
@@ -70,6 +84,8 @@ class Api:
             req.add_header("Authorization", "Bearer " + self.token)
         if self.selftest_token:
             req.add_header("X-Selftest-Token", self.selftest_token)
+        for k, v in (kopfe or {}).items():
+            req.add_header(k, v)
         try:
             with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
                 status, inhalt, kopfe = r.status, r.read(), dict(r.headers)
@@ -141,31 +157,46 @@ class Bericht:
         gruppe_vorher = None
         for gruppe, name, ok, schwere, detail in self.zeilen:
             if gruppe != gruppe_vorher:
-                print(f"\n── {gruppe}")
+                print(f"\n{FETT}── {gruppe}{AUS}")
                 gruppe_vorher = gruppe
-            zeichen = "✓" if ok else ("!" if schwere == "warnung" else "✗")
-            zeile = f"  {zeichen} {name}"
+            if ok:
+                zeichen, farbe = "✓", GRUEN
+            elif schwere == "warnung":
+                zeichen, farbe = "!", GELB
+            else:
+                zeichen, farbe = "✗", ROT
+            # Nur die Fehlerzeilen einfaerben: waere alles bunt, faellt nichts auf.
+            zeile = f"  {farbe}{zeichen}{AUS} {name}" if ok else f"{farbe}  {zeichen} {name}"
             if detail:
                 zeile += f"   {detail}"
-            print(zeile)
+            print(zeile + (AUS if not ok else ""))
         if self.reste:
-            print("\n── Reste (nicht abgeraeumt — von Hand pruefen)")
+            print(f"\n{FETT}── Reste (nicht abgeraeumt — von Hand pruefen){AUS}")
             for r in self.reste:
-                print(f"  ! {r}")
-        # Die Zusammenfassung zaehlt und benennt, sie wiederholt nicht: der
-        # Grund steht schon bei jedem ✗ weiter oben. Zweimal derselbe Satz macht
-        # den Bericht nur laenger, nicht klarer.
+                print(f"{GELB}  ! {r}{AUS}")
+
         print("\n" + "=" * 40)
         if not self.fehler:
-            print(f"  Selbsttest gruen — {len(self.zeilen)} Checks, "
+            print(f"  {GRUEN}Selbsttest gruen{AUS} — {len(self.zeilen)} Checks, "
                   f"{len(self.warnungen)} Warnung(en).")
         else:
-            namen = ", ".join(f"{g} / {n}" for g, n, _o, _s, _d in self.fehler[:6])
-            if len(self.fehler) > 6:
-                namen += f" und {len(self.fehler) - 6} weitere"
-            print(f"  Selbsttest ROT — {len(self.fehler)} Fehler, "
+            print(f"  {ROT}{FETT}Selbsttest ROT{AUS} — {len(self.fehler)} Fehler, "
                   f"{len(self.warnungen)} Warnung(en).")
-            print(f"  Betroffen: {namen}")
+            # Kurzer Bericht: Namen reichen, der Grund steht zwei Zeilen weiter
+            # oben. Langer Bericht: der Befund ist laengst aus dem Bild
+            # gescrollt, also hier noch einmal vollstaendig.
+            if len(self.zeilen) > LANG_AB:
+                for gruppe, name, _ok, _s, detail in self.fehler:
+                    print(f"{ROT}  ✗ {gruppe} / {name}{AUS}")
+                    if detail:
+                        print(f"      {detail}")
+                for gruppe, name, _ok, _s, detail in self.warnungen:
+                    print(f"{GELB}  ! {gruppe} / {name}{AUS}   {detail}")
+            else:
+                namen = ", ".join(f"{g} / {n}" for g, n, _o, _s, _d in self.fehler[:6])
+                if len(self.fehler) > 6:
+                    namen += f" und {len(self.fehler) - 6} weitere"
+                print(f"  Betroffen: {namen}")
         print("=" * 40)
 
     def als_json(self):
@@ -489,7 +520,9 @@ def teste_web_dateien(api, b):
         treffer = re.search(r'src="(/assets/[^"]+\.js)"', text)
         if not treffer:
             raise AssertionError("kein Anwendungs-Javascript in der Shell gefunden")
-        api.call("GET", treffer.group(1), roh=True)
+        # Mit Accept-Encoding fragen: ohne diese Kopfzeile liefert JEDER Server
+        # unkomprimiert aus — die Pruefung haette sonst immer angeschlagen.
+        api.call("GET", treffer.group(1), roh=True, kopfe={"Accept-Encoding": "gzip, br"})
         kopfe = api.letzte_kopfe
         maengel = []
         if "gzip" not in kopfe.get("content-encoding", "") and "br" not in kopfe.get("content-encoding", ""):
@@ -1080,12 +1113,18 @@ def teste_bestand(api, b):
         except Exception as e:
             b.add("Bestand", name, False, f"nicht abfragbar: {e}")
 
-    vorher = {}
+    # Je Instanz getrennt merken: Test- und Produktivinstanz haben verschiedene
+    # Bestaende, und ein gemeinsamer Stand meldet beim Wechsel sofort "Daten
+    # verschwunden".
+    alle = {}
     try:
         with open(BESTAND_DATEI) as f:
-            vorher = json.load(f).get("zahlen", {})
+            alle = json.load(f)
+        if "zahlen" in alle:   # altes Format ohne Instanz-Trennung
+            alle = {}
     except Exception:
         pass
+    vorher = alle.get(api.basis, {})
 
     if not vorher:
         b.add("Bestand", "Vergleich", True, schwere="warnung",
@@ -1104,8 +1143,9 @@ def teste_bestand(api, b):
                 b.add("Bestand", name, True, f"{zahl}" + (f" (vorher {alt})" if alt != zahl else ""))
 
     try:
+        alle[api.basis] = jetzt
         with open(BESTAND_DATEI, "w") as f:
-            json.dump({"zahlen": jetzt}, f, ensure_ascii=False, indent=2)
+            json.dump(alle, f, ensure_ascii=False, indent=2)
     except Exception as e:
         b.reste.append(f"Bestandszahlen nicht gespeichert: {e}")
 
