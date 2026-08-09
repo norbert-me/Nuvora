@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import Latex from "../components/Latex.jsx";
 import PublishModal from "../components/PublishModal.jsx";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Toggle, modalOverlay as sOverlay, modalPanel as sPanel, Popover, pageApp, inputStyle as inputBasis } from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Toggle, Modal, Popover, pageApp, inputStyle as inputBasis } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import TopicPicker from "../components/TopicPicker.jsx";
@@ -753,8 +753,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
 
       {/* Frage bearbeiten — als zentriertes Popup, damit kein Scrollen nötig ist */}
       {editingQ && (
-        <div onMouseDown={(e) => { if (e.target === e.currentTarget) setEditingQ(null); }} style={modalOverlay}>
-          <div style={modalCard}>
+        <Modal onClose={() => setEditingQ(null)} width={620} label={t("dash.editQ")}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{t("dash.editQ")}</h4>
               <button onClick={() => setEditingQ(null)} title={t("common.close")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", padding: 4, display: "flex" }}>
@@ -767,14 +766,12 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
               <button onClick={() => setEditingQ(null)} style={btnSecondary}>{t("common.cancel")}</button>
             </div>
             <QuestionStats questionId={editingQ.id} />
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* Neue Frage — ebenfalls als Popup */}
       {showAdd && (
-        <div onMouseDown={(e) => { if (e.target === e.currentTarget) setShowAdd(false); }} style={modalOverlay}>
-          <div style={modalCard}>
+        <Modal onClose={() => setShowAdd(false)} width={620} label={t("dash.newQ")}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{t("dash.newQ")}</h4>
               <button onClick={() => setShowAdd(false)} title={t("common.close")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", padding: 4, display: "flex" }}>
@@ -786,15 +783,12 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
               <button onClick={async () => { await addNewQuestion(); setShowAdd(false); }} disabled={!newQ.text.trim()} style={btnPrimary}>{t("dash.add")}</button>
               <button onClick={() => setShowAdd(false)} style={btnSecondary}>{t("common.cancel")}</button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
 }
 
-const modalOverlay = sOverlay;
-const modalCard = { ...sPanel, maxWidth: 620 };
 
 
 const LATEX_BUTTONS = [

@@ -12,7 +12,7 @@ import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, overlayGuard, modalOverlay, modalPanel, popoverPanel, Empty, Skeleton, ExportButton, ImportButton, inputStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, Modal as UiModal, popoverPanel, Empty, Skeleton, ExportButton, ImportButton, inputStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
@@ -804,14 +804,7 @@ function NotenStatistik({ noten, t }) {
 
 // Einfaches modales Popup fuer die Anlage-Formulare (Abschnitt/Spalte).
 function Modal({ title, onClose, children }) {
-  return (
-    <div {...overlayGuard(onClose)} style={modalOverlay}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 400 }}>
-        {title && <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>{title}</h3>}
-        {children}
-      </div>
-    </div>
-  );
+  return <UiModal onClose={onClose} width={400} title={title}>{children}</UiModal>;
 }
 
 function SectionForm({ t, onSave, onCancel, initial }) {
@@ -1044,8 +1037,7 @@ function CompareModal({ t, cat, onClose }) {
   }, [cat.id]);
   const de1 = (n) => (n == null ? "—" : String(Math.round(n * 100) / 100).replace(".", ","));
   return (
-    <div onClick={onClose} style={overlay}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...modal, maxWidth: 520 }}>
+    <UiModal onClose={onClose} width={520} label={`${t("noten.compare")}: ${cat.name}`}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>{t("noten.compare")}: {cat.name}</h3>
         {err ? <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("common.notWork")}</p> : !data ? <p style={{ fontSize: 13, color: "var(--text3)" }}>…</p> : (
           <>
@@ -1081,8 +1073,7 @@ function CompareModal({ t, cat, onClose }) {
           </>
         )}
         <div style={{ marginTop: 16 }}><button onClick={onClose} style={btnSecondary}>{t("common.close")}</button></div>
-      </div>
-    </div>
+    </UiModal>
   );
 }
 
@@ -1148,8 +1139,7 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, o
     if (v != null) series.push({ cat: c, value: v });
   });
   return (
-    <div onClick={onClose} style={overlay}>
-      <div onClick={(e) => e.stopPropagation()} style={modal}>
+    <UiModal onClose={onClose} width={460} label={student.name}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
           <div style={{ flex: 1 }}>
             <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 2 }}>{student.name}</h3>
@@ -1191,8 +1181,7 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, o
         )}
 
         <button onClick={onClose} style={btnSecondary}>{t("noten.close")}</button>
-      </div>
-    </div>
+    </UiModal>
   );
 }
 
@@ -1201,8 +1190,7 @@ function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete })
   const [tendency, setTendency] = useState(1);
   const [note, setNote] = useState("");
   return (
-    <div onClick={onClose} style={overlay}>
-      <div onClick={(e) => e.stopPropagation()} style={modal}>
+    <UiModal onClose={onClose} width={460} label={student?.name}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>{student?.name}</h3>
         <p style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 16 }}>{t("noten.obsSub")}</p>
         {cats.length === 0 ? (
@@ -1235,8 +1223,7 @@ function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete })
           );
         })}
         <button onClick={onClose} style={{ ...btnSecondary, marginTop: 14 }}>{t("noten.close")}</button>
-      </div>
-    </div>
+    </UiModal>
   );
 }
 
@@ -1319,7 +1306,5 @@ const inp = { ...inputStyle, width: "100%" };
 const th = { ...thBasis, borderBottom: "2px solid var(--border3)", position: "relative" };
 const td = tdBasis;
 const stickyL = { position: "sticky", left: 0, background: "var(--card)", zIndex: 1 };
-const overlay = modalOverlay;
-const modal = { ...modalPanel, maxWidth: 460 };
 const dtS = { color: "var(--text3)", fontWeight: 500 };
 const ddS = { margin: 0, color: "var(--text)" };

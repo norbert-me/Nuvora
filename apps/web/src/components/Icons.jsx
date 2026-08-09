@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useId, useLayoutEffect, useRef } from "react";
 
 const iconSvg = { fill: "none", stroke: "var(--text3)", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" };
 
@@ -401,16 +401,114 @@ export function Boxplot({ values, max = 100, label, unit = "", compact = false }
   );
 }
 
-export function Modal({ children, onClose, width = 480, style }) {
-  // Esc schließt — durchgängig für alle Modals, die diese Komponente nutzen.
+// Was innerhalb des Panels per Tab erreichbar ist. Reihenfolge = DOM-Reihenfolge,
+// negative tabIndex und versteckte Elemente fallen raus.
+const FOKUSSIERBAR =
+  'a[href],area[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),' +
+  'button:not([disabled]),iframe,object,embed,summary,[contenteditable="true"],[tabindex]';
+function fokusZiele(wurzel) {
+  if (!wurzel) return [];
+  // Versteckt = irgendein Vorfahre (oder das Element selbst) ist ausgeblendet.
+  // Bewusst über den Elternweg statt offsetParent: das läuft nur beim Tab-Druck
+  // und ist unabhängig vom Layout-Zustand.
+  const sicht = wurzel.ownerDocument.defaultView;
+  const versteckt = (el) => {
+    for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+      const st = sicht?.getComputedStyle(n);
+      if (st && (st.display === "none" || st.visibility === "hidden")) return true;
+      if (n === wurzel) break;
+    }
+    return false;
+  };
+  return Array.from(wurzel.querySelectorAll(FOKUSSIERBAR)).filter(
+    (el) => el.tabIndex >= 0 && !el.hasAttribute("disabled")
+      && el.getAttribute("aria-hidden") !== "true" && !versteckt(el),
+  );
+}
+// Nur der oberste Dialog reagiert auf Escape und fängt den Fokus — sonst würde
+// bei verschachtelten Dialogen der untere mitschließen. Ein Modul-Stapel reicht,
+// da Dialoge immer streng übereinander liegen.
+const _dialogStapel = [];
+// Der Hintergrund darf nicht mitscrollen. Zähler, weil mehrere Dialoge offen
+// sein können und der letzte den Scroll zurückgeben muss.
+let _scrollSperre = 0;
+
+// Zugänglicher Dialog. EINE Quelle für alle Modals: role="dialog", Fokus-Fang,
+// Fokus-Rückgabe auf das auslösende Element, Escape, Klick auf die Fläche.
+// Optik bleibt modalOverlay/modalPanel.
+// title: sichtbare Überschrift (wird zugleich Beschriftung). Wer die Überschrift
+// selbst rendert, gibt stattdessen label (aria-label) oder labelledby an.
+export function Modal({ children, onClose, width = 480, style, title, titleStyle, label, labelledby, overlayStyle }) {
+  const panelRef = useRef(null);
+  const titelId = useId();
+  const beschriftet = labelledby || (title ? titelId : undefined);
+  // onClose ist bei fast jedem Aufrufer eine Inline-Funktion und damit bei jedem
+  // Rendern neu. Läge sie in den Abhängigkeiten, würde der Dialog bei jedem
+  // Rendern der Seite auf- und wieder zugebaut: Fokus spränge zurück und die
+  // Stapel-Reihenfolge (verschachtelte Dialoge) drehte sich um. Deshalb Ref.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  // Das auslösende Element beim ERSTEN Rendern merken: React setzt autoFocus
+  // schon beim Einhängen, im Effekt wäre der Fokus also womöglich längst im
+  // Dialog und die Rückgabe liefe ins Leere.
+  const vorherRef = useRef(undefined);
+  if (vorherRef.current === undefined) vorherRef.current = typeof document !== "undefined" ? document.activeElement : null;
+
   useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    const marke = {};
+    _dialogStapel.push(marke);
+    const oben = () => _dialogStapel[_dialogStapel.length - 1] === marke;
+
+    // Fokus in den Dialog setzen — außer ein Feld hat sich per autoFocus schon
+    // selbst geholt (dann ist das der gewollte Startpunkt).
+    const vorher = vorherRef.current;
+    const panel = panelRef.current;
+    if (!panel?.contains(document.activeElement)) (fokusZiele(panel)[0] || panel)?.focus?.();
+
+    // Hintergrund festhalten.
+    const altOverflow = document.body.style.overflow;
+    if (_scrollSperre++ === 0) document.body.style.overflow = "hidden";
+
+    const onKey = (e) => {
+      if (!oben()) return;
+      // Kein stopPropagation: Felder mit eigenem Escape (Inline-Abbruch) sollen
+      // wie bisher zusätzlich reagieren.
+      if (e.key === "Escape") { closeRef.current?.(); return; }
+      if (e.key !== "Tab") return;
+      const ziele = fokusZiele(panelRef.current);
+      if (!ziele.length) { e.preventDefault(); panelRef.current?.focus(); return; }
+      const ersteZ = ziele[0], letzteZ = ziele[ziele.length - 1];
+      const aktiv = document.activeElement;
+      const drin = panelRef.current?.contains(aktiv);
+      if (e.shiftKey && (aktiv === ersteZ || !drin)) { e.preventDefault(); letzteZ.focus(); }
+      else if (!e.shiftKey && (aktiv === letzteZ || !drin)) { e.preventDefault(); ersteZ.focus(); }
+    };
+    // Capture: der Dialog sieht die Taste vor allen Feld-Handlern der Seite.
+    window.addEventListener("keydown", onKey, true);
+
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      const i = _dialogStapel.indexOf(marke);
+      if (i >= 0) _dialogStapel.splice(i, 1);
+      if (--_scrollSperre <= 0) { _scrollSperre = 0; document.body.style.overflow = altOverflow; }
+      // Fokus zurück auf das auslösende Element, falls es noch im Dokument steht.
+      if (vorher && vorher.isConnected && vorher.focus) vorher.focus();
+    };
+  }, []);
+
   return (
-    <div {...overlayGuard(onClose)} style={modalOverlay}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: width, ...style }}>
+    <div {...overlayGuard(onClose)} style={overlayStyle ? { ...modalOverlay, ...overlayStyle } : modalOverlay}>
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={beschriftet ? undefined : label}
+        aria-labelledby={beschriftet}
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+        style={{ ...modalPanel, maxWidth: width, outline: "none", ...style }}
+      >
+        {title ? <h3 id={titelId} style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, ...titleStyle }}>{title}</h3> : null}
         {children}
       </div>
     </div>

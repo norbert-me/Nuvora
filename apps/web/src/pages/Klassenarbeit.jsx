@@ -4,7 +4,7 @@
 // und gezielte Wiederholung (Karten des schwachen Themas wieder fällig).
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, overlayGuard, modalOverlay, modalPanel, Boxplot, StatCard, pageApp} from "../components/Icons.jsx";
+import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, Modal, Boxplot, StatCard, pageApp} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
@@ -695,8 +695,7 @@ function NotenUebernahme({ t, classId, kursId, students, work, scale = DEFAULT_S
   };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
   return (
-    <div {...overlayGuard(onClose)} style={modalOverlay}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 440 }}>
+    <Modal onClose={onClose} width={440} label={t("klassenarbeit.toNoten")}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t("klassenarbeit.toNoten")}</h3>
         <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 12px" }}>{t("klassenarbeit.toNotenHint", { n: grades.length })}</p>
         {sections && sections.length === 0 ? (
@@ -714,8 +713,7 @@ function NotenUebernahme({ t, classId, kursId, students, work, scale = DEFAULT_S
           <button onClick={submit} disabled={busy || grades.length === 0 || (sections && sections.length === 0)} style={{ ...btnPrimary, opacity: busy ? 0.6 : 1 }}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

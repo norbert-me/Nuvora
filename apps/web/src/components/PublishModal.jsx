@@ -27,7 +27,9 @@ export default function PublishModal({ name, onPublish, onClose }) {
   };
 
   return (
-    <Modal onClose={onClose} width={460}>
+    // Beschriftung fuer Screenreader: der Dialog traegt keine eigene Ueberschrift,
+    // sondern nennt den Namen dessen, was veroeffentlicht wird.
+    <Modal onClose={onClose} width={460} label={name}>
       <h3 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700 }}>{t("publish.title")}</h3>
       <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 16px" }}>{t("publish.text", { name })}</p>
       <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)", display: "block", marginBottom: 4 }}>{t("publish.description")}</label>

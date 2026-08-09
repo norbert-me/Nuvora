@@ -3,7 +3,7 @@ import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
-import { DownloadLink, Icon, ICONS, btnPrimary, btnSecondary, overlayGuard, modalOverlay, modalPanel, inputStyle, COLORS as C, Boxplot, pageApp, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { DownloadLink, Icon, ICONS, btnPrimary, btnSecondary, Modal, inputStyle, COLORS as C, Boxplot, pageApp, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
 import { bewerte, statusOf } from "../core/scoring.js";
 
@@ -1064,8 +1064,7 @@ function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
   };
 
   return (
-    <div {...overlayGuard(onClose)} style={modalOverlay}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 460 }}>
+    <Modal onClose={onClose} width={460} label={t("notenimp.title")}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t("notenimp.title")}</h3>
         <p style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 16 }}>
           {t("notenimp.intro", { test: sessionName ? t("notenimp.testNamed", { name: sessionName }) : t("notenimp.testThis"), n: grades.length })}
@@ -1113,8 +1112,7 @@ function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
             </div>
           </>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }
 

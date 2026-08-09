@@ -2,7 +2,7 @@
 // des Moduls bleiben im Kern liegen und sind nach dem Wiedereinschalten da.
 import { useState } from "react";
 import { useModules } from "../core/modules.js";
-import { StageBadge, Tabs, inputStyle, btnSecondary, COLORS as C, Icon, ICONS, MODULE_ICONS, iconBtn, overlayGuard, modalOverlay, modalPanel, pageApp} from "../components/Icons.jsx";
+import { StageBadge, Tabs, inputStyle, btnSecondary, COLORS as C, Icon, ICONS, MODULE_ICONS, iconBtn, Modal, pageApp} from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { pageTitle } from "../components/Icons.jsx";
 
@@ -179,8 +179,7 @@ export default function Modules() {
       })}
 
       {helpMod && (
-        <div {...overlayGuard(() => setHelpMod(null))} style={modalOverlay}>
-          <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 520, maxHeight: "86vh", overflowY: "auto" }}>
+        <Modal onClose={() => setHelpMod(null)} width={520} style={{ maxHeight: "86vh", overflowY: "auto" }} label={dispName(helpMod)}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
               <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, flex: 1 }}>{dispName(helpMod)}</h3>
               <StageBadge stage={helpMod.stage} title={helpMod.stage === "beta" ? t("stage.betaHint") : t("stage.alphaHint")} />
@@ -203,8 +202,7 @@ export default function Modules() {
             <div style={{ marginTop: 16, textAlign: "right" }}>
               <button onClick={() => setHelpMod(null)} style={btnSecondary}>{t("common.close")}</button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

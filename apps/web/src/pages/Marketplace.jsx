@@ -3,7 +3,7 @@ import { useSearchParams, Link } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
-import { Icon, ICONS, overlayGuard, modalOverlay, modalPanel, btnPrimary, btnSecondary, COLORS as C, pageApp} from "../components/Icons.jsx";
+import { Icon, ICONS, Modal, btnPrimary, btnSecondary, COLORS as C, pageApp} from "../components/Icons.jsx";
 
 const API = "/api";
 
@@ -251,8 +251,7 @@ export default function Marketplace({ fixedKind }) {
       )}
 
       {preview && (
-        <div {...overlayGuard(() => setPreview(null))} style={modalOverlay}>
-          <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 560 }}>
+        <Modal onClose={() => setPreview(null)} width={560} label={preview.title || t("nav.marketplace")}>
             {preview.loading ? (
               <p style={{ color: "var(--text3)", fontSize: 14, margin: 0 }}>{t("common.loading")}</p>
             ) : (
@@ -335,13 +334,11 @@ export default function Marketplace({ fixedKind }) {
                 </div>
               </>
             )}
-          </div>
-        </div>
+        </Modal>
       )}
 
       {copyDeckFor && (
-        <div {...overlayGuard(() => setCopyDeckFor(null))} style={modalOverlay}>
-          <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 400 }}>
+        <Modal onClose={() => setCopyDeckFor(null)} width={400} label={t("market.chooseClass")}>
             <h3 style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 700, color: "var(--text)" }}>{t("market.chooseClass")}</h3>
             <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 14px" }}>{t("market.chooseClassHint", { title: copyDeckFor.title })}</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflow: "auto" }}>
@@ -351,8 +348,7 @@ export default function Marketplace({ fixedKind }) {
               ))}
             </div>
             <button onClick={() => setCopyDeckFor(null)} style={{ ...btnSecondary, marginTop: 14, padding: "8px 16px", fontSize: 13.5 }}>{t("common.abort")}</button>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

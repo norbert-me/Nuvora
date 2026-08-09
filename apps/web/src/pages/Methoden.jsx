@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
-import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, modalOverlay, modalPanel, inputStyle, ExportButton, ImportButton, Popover} from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, Modal, inputStyle, ExportButton, ImportButton, Popover} from "../components/Icons.jsx";
 import PublishModal from "../components/PublishModal.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -288,12 +288,8 @@ function MethodView({ m, t, onEdit, onPublish, onClose }) {
       <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{val}</div>
     </div>
   ) : null;
-  const downOnOverlay = useRef(false);
   return (
-    <div style={modalOverlay}
-      onMouseDown={(e) => { downOnOverlay.current = e.target === e.currentTarget; }}
-      onClick={(e) => { if (e.target === e.currentTarget && downOnOverlay.current) onClose(); }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 520, maxHeight: "86vh", overflowY: "auto" }}>
+    <Modal onClose={onClose} width={520} style={{ maxHeight: "86vh", overflowY: "auto" }} label={m.title}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
           <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, flex: 1 }}>{m.title}</h3>
           {m.dauer != null && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 9px", borderRadius: 980, background: "rgba(37,99,235,0.12)", color: C.info }}>{t("methoden.dauerBadge", { n: m.dauer })}</span>}
@@ -323,8 +319,7 @@ function MethodView({ m, t, onEdit, onPublish, onClose }) {
           <button onClick={onEdit} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={18} /></button>
           <button onClick={onPublish} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("methoden.publish")} aria-label={t("methoden.publish")}><Icon d={ICONS.share} size={18} color="var(--accent)" /></button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -358,12 +353,8 @@ function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
   // Nur schließen, wenn Klick WIRKLICH auf dem Overlay begann und endete. Sonst
   // schloss eine Textauswahl, die im Feld startet und außerhalb endet, das Modal
   // (Datenverlust). e.currentTarget ist das Overlay.
-  const downOnOverlay = useRef(false);
   return (
-    <div style={modalOverlay}
-      onMouseDown={(e) => { downOnOverlay.current = e.target === e.currentTarget; }}
-      onClick={(e) => { if (e.target === e.currentTarget && downOnOverlay.current) onClose(); }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 480, maxHeight: "90vh", overflowY: "auto" }}>
+    <Modal onClose={onClose} width={480} style={{ maxHeight: "90vh", overflowY: "auto" }} label={m.id ? t("methoden.edit") : t("methoden.new")}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{m.id ? t("methoden.edit") : t("methoden.new")}</h3>
         <div style={{ display: "flex", gap: 10 }}>
           <div style={{ flex: 1 }}>
@@ -398,7 +389,6 @@ function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
           {m.id && <button onClick={() => onDelete(m.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto", padding: 6 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={20} color={C.danger} /></button>}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

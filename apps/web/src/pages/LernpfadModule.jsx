@@ -1,4 +1,4 @@
-import { overlayGuard, modalOverlay, modalPanel } from "../components/Icons.jsx";
+import { Modal } from "../components/Icons.jsx";
 // Modul Lernpfad — nativ in die Shell eingebaut (kein eigener Container mehr).
 //
 // Die erprobte Vanilla-JS-App wurde ins Web-Projekt uebernommen: ihre Statik
@@ -98,15 +98,13 @@ export default function LernpfadModule() {
   return (
     <>
       {modal && (
-        <div {...overlayGuard(() => setModal(null))} style={modalOverlay}>
-          <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 560 }}>
+        <Modal onClose={() => setModal(null)} width={560} label={modal.title}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
               <h3 style={{ fontSize: 17, fontWeight: 700, flex: 1, margin: 0 }}>{modal.title}</h3>
               <button onClick={() => setModal(null)} style={{ width: 30, height: 30, borderRadius: 15, border: "none", background: "var(--bg2)", color: "var(--text3)", cursor: "pointer", fontSize: 16 }}>×</button>
             </div>
             <div dangerouslySetInnerHTML={{ __html: modal.html }} />
-          </div>
-        </div>
+        </Modal>
       )}
       {toast && (
         <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 400, background: "#1e293b", color: "#fff", padding: "10px 18px", borderRadius: 10, fontSize: 14, boxShadow: "0 6px 20px rgba(0,0,0,0.3)" }}>{toast}</div>

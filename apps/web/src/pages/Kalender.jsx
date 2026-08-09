@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, overlayGuard, modalOverlay, modalPanel, popoverPanel, ExportButton, ImportButton, pageApp, Popover} from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, Modal, popoverPanel, ExportButton, ImportButton, pageApp, Popover} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, put } from "../core/cache.js";
@@ -572,8 +572,7 @@ export default function Kalender() {
 
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} kursName={kursName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
       {abo && (
-        <div {...overlayGuard(() => setAbo(null))} style={modalOverlay}>
-          <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 500 }}>
+        <Modal onClose={() => setAbo(null)} width={500} label={t("kalender.subscribeTitle")}>
             <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>{t("kalender.subscribeTitle")}</h3>
             <p style={{ fontSize: 13, color: "var(--text2)", marginBottom: 14, lineHeight: 1.5 }}>{t("kalender.subscribeText")}</p>
             <a href={abo.webcal} style={{ ...btnPrimary, display: "inline-block", textDecoration: "none", marginBottom: 14 }}>{t("kalender.subscribeNow")}</a>
@@ -602,8 +601,7 @@ export default function Kalender() {
             <div style={{ marginTop: 16, textAlign: "right" }}>
               <button onClick={() => setAbo(null)} style={btnSecondary}>{t("common.close") !== "common.close" ? t("common.close") : "Schließen"}</button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
       {slotEdit && <SlotModal slot={slotEdit} classes={classes} kurse={kurse} topics={topics} onSave={saveSlot} onDelete={removeSlot} onColor={setSlotColor} onClose={() => setSlotEdit(null)} t={t} />}
       {extInfo && <ExtInfoModal ev={extInfo} onClose={() => setExtInfo(null)} onHide={(k) => { hideExtEvent(k); setExtInfo(null); }} t={t} />}
@@ -623,8 +621,7 @@ function ExtInfoModal({ ev, onClose, onHide, t }) {
     </div>
   );
   return (
-    <div {...overlayGuard(onClose)} style={modalOverlay}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 440 }}>
+    <Modal onClose={onClose} width={440} label={ev.title || t("kalender.entry")}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
           <span>🔗</span>
           <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, flex: 1 }}>{ev.title || "—"}</h3>
@@ -643,8 +640,7 @@ function ExtInfoModal({ ev, onClose, onHide, t }) {
           <span style={{ flex: 1 }} />
           <button onClick={onClose} style={btnSecondary}>{t("common.close") !== "common.close" ? t("common.close") : "Schließen"}</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -1489,8 +1485,7 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onClo
   const sfld = { ...selectStyle, width: "100%", fontSize: 14, padding: "10px 34px 10px 12px" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
   return (
-    <div {...overlayGuard(onClose)} style={modalOverlay}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 440 }}>
+    <Modal onClose={onClose} width={440} label={t("kalender.timetable")}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 2 }}>{t("kalender.timetable")}</h3>
         <div style={{ fontSize: 12.5, color: "var(--text3)" }}>{wdays[slot.weekday]} · {slot.period}. {t("kalender.period")}</div>
         <div style={lbl}>{t("kalender.kursOrClass")}</div>
@@ -1518,8 +1513,7 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onClo
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
           {slot.id && <button onClick={() => onDelete(slot.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -1621,8 +1615,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   ].filter(Boolean);
   const zeile = (k, v) => v ? <div style={{ display: "flex", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--border)", fontSize: 13.5 }}><span style={{ color: "var(--text3)", minWidth: 92 }}>{k}</span><span style={{ fontWeight: 500 }}>{v}</span></div> : null;
   return (
-    <div {...overlayGuard(onClose)} style={modalOverlay}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 460, padding: 0 }}>
+    <Modal onClose={onClose} width={460} style={{ padding: 0 }} label={!edit ? (title || clsName || t("kalender.entry")) : ((entry.id || entry.period != null) ? t("kalender.editEntry") : t("kalender.newEntry"))}>
         <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "flex-start", gap: 12 }}>
           <div style={{ flex: 1 }}>
             <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 5 }}>{!edit ? (title || clsName || t("kalender.entry")) : ((entry.id || entry.period != null) ? t("kalender.editEntry") : t("kalender.newEntry"))}</h3>
@@ -1849,7 +1842,6 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         </div>
         </>)}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

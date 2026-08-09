@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, selectStyle, overlayGuard, modalOverlay, modalPanel, Empty, Skeleton, pageApp, inputStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, selectStyle, Modal as UiModal, overlayGuard, modalOverlay, Empty, Skeleton, pageApp, inputStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import AuthImage from "../components/AuthImage.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -471,8 +471,7 @@ function NotenBrueckeModal({ t, classId, kursId, progress, scale, onClose }) {
   };
 
   return (
-    <div {...overlayGuard(onClose)} style={modalOverlay}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 440 }}>
+    <UiModal onClose={onClose} width={440} label={t("karten.toNoten")}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t("karten.toNoten")}</h3>
         <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 14px" }}>{t("karten.masteryHint", { n: grades.length })}</p>
         {sections && sections.length === 0 ? (
@@ -490,8 +489,7 @@ function NotenBrueckeModal({ t, classId, kursId, progress, scale, onClose }) {
           <button onClick={submit} disabled={busy || grades.length === 0 || (sections && sections.length === 0)} style={{ ...btnPrimary, opacity: busy || grades.length === 0 ? 0.6 : 1 }}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
         </div>
-      </div>
-    </div>
+    </UiModal>
   );
 }
 
@@ -511,8 +509,7 @@ function StudentDetail({ detail, t, onClose }) {
   }
   const rows = Object.entries(sets);
   return (
-    <div {...overlayGuard(onClose)} style={modalOverlay}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 520 }}>
+    <UiModal onClose={onClose} width={520} label={student.name}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
           <h3 style={{ fontSize: 17, fontWeight: 700, flex: 1 }}>{student.name}</h3>
           <button onClick={onClose} className="icon-btn" style={iconBtn} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={16} /></button>
@@ -529,8 +526,7 @@ function StudentDetail({ detail, t, onClose }) {
             <ReifeBar hist={s.hist} height={12} />
           </div>
         ))}
-      </div>
-    </div>
+    </UiModal>
   );
 }
 
@@ -899,13 +895,8 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t })
     setter(before + wrapped + val.slice(end));
     setTimeout(() => { const pos = start + wrapped.length + (offset || 0); input.focus(); input.setSelectionRange(pos, pos); }, 0);
   };
-  // Nur schließen, wenn Klick wirklich auf dem Overlay begann und endete (Textauswahl-Schutz).
-  const downOnOverlay = useRef(false);
   return (
-    <div style={modalOverlay}
-      onMouseDown={(e) => { downOnOverlay.current = e.target === e.currentTarget; }}
-      onClick={(e) => { if (e.target === e.currentTarget && downOnOverlay.current) onClose(); }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 480, maxHeight: "90vh", overflowY: "auto" }}>
+    <UiModal onClose={onClose} width={480} style={{ maxHeight: "90vh", overflowY: "auto" }} label={card.id ? t("karten.editCard") : t("karten.newCard")}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, flex: 1 }}>{card.id ? t("karten.editCard") : t("karten.newCard")}</h3>
           <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
@@ -950,8 +941,7 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t })
           <button onClick={() => onSave(card.id, front.trim(), back.trim())} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
         </div>
-      </div>
-    </div>
+    </UiModal>
   );
 }
 
@@ -1027,8 +1017,7 @@ function ImportModal({ deckName, onClose, onImport, t }) {
     if (ok) onClose();
   };
   return (
-    <div {...overlayGuard(onClose)} style={modalOverlay}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 560 }}>
+    <UiModal onClose={onClose} width={560} label={t("karten.importTitle", { name: deckName })}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>{t("karten.importTitle", { name: deckName })}</h3>
         <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 12px" }}>{t("karten.importHint")}</p>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
@@ -1043,8 +1032,7 @@ function ImportModal({ deckName, onClose, onImport, t }) {
           </button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
         </div>
-      </div>
-    </div>
+    </UiModal>
   );
 }
 

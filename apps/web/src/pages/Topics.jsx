@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { Link } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, Empty, Skeleton, overlayGuard, modalOverlay, modalPanel, inputStyle, pageApp} from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, Empty, Skeleton, Modal, inputStyle, pageApp} from "../components/Icons.jsx";
 import { peek, put } from "../core/cache.js";
 
 const API = "/api";
@@ -309,8 +309,7 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
   const line = { fontSize: 13.5, color: "var(--text2)", padding: "3px 0", lineHeight: 1.4 };
 
   return (
-    <div {...overlayGuard(onClose)} style={modalOverlay}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 520, maxHeight: "86vh", overflowY: "auto" }}>
+    <Modal onClose={onClose} width={520} style={{ maxHeight: "86vh", overflowY: "auto" }} label={tp.parent_name ? `${tp.parent_name} / ${name}` : name}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
           <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, flex: 1 }}>{tp.parent_name ? `${tp.parent_name} / ${name}` : name}</h3>
           {/* Ein Edit-Icon für Titel UND Notiz. */}
@@ -381,8 +380,7 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
             )}
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }
 
