@@ -782,13 +782,41 @@ class Schalter:
         self.module = api.call("GET", "/api/modules", erwartet=(200,))
         self.verfuegbar = [m["key"] for m in self.module if m.get("available")]
         self.anfangs_aktiv = {m["key"] for m in self.module if m.get("active")}
+        # Mitgefuehrter Stand, damit nur noch die Differenz geschickt wird: der
+        # Test schaltet dutzendfach um, und ein Aufruf je Modul und Durchgang
+        # laeuft am echten Server in die nginx-Drosselung (limit_req).
+        self.aktiv_jetzt = set(self.anfangs_aktiv)   # None = Stand unbekannt
+
+    def frisch_lesen(self):
+        """Stand neu vom Server holen — nach einem Fehler ist der mitgefuehrte
+        Zustand nicht mehr vertrauenswuerdig."""
+        module = self.api.call("GET", "/api/modules", erwartet=(200,))
+        self.aktiv_jetzt = {m["key"] for m in module if m.get("active")}
+        return self.aktiv_jetzt
 
     def setze(self, aktiv):
-        """Genau diese Schluessel aktiv, alle anderen aus."""
-        aktiv = set(aktiv)
-        for key in self.verfuegbar:
-            pfad = f"/api/modules/{key}/activate"
-            self.api.call("POST" if key in aktiv else "DELETE", pfad, erwartet=(200,))
+        """Genau diese Schluessel aktiv, alle anderen aus — nur die Differenz."""
+        aktiv = {k for k in aktiv if k in self.verfuegbar}
+        if self.aktiv_jetzt is None:
+            self.frisch_lesen()
+        einschalten = aktiv - self.aktiv_jetzt
+        ausschalten = {k for k in self.verfuegbar if k not in aktiv} & self.aktiv_jetzt
+        for key, methode in ([(k, "POST") for k in sorted(einschalten)] +
+                             [(k, "DELETE") for k in sorted(ausschalten)]):
+            try:
+                self.api.call(methode, f"/api/modules/{key}/activate", erwartet=(200,))
+            except Exception:
+                # Zustand ist jetzt unbekannt — frisch lesen, sonst wuerde der
+                # naechste Aufruf auf einer Luege aufbauen.
+                try:
+                    self.frisch_lesen()
+                except Exception:
+                    self.aktiv_jetzt = None   # beim naechsten Mal frisch holen
+                raise
+            if methode == "POST":
+                self.aktiv_jetzt.add(key)
+            else:
+                self.aktiv_jetzt.discard(key)
 
     def nur(self, key):
         self.setze({key})
@@ -799,8 +827,8 @@ class Schalter:
     def zuruecksetzen(self):
         try:
             self.setze(self.anfangs_aktiv)
-            jetzt = {m["key"] for m in self.api.call("GET", "/api/modules", erwartet=(200,))
-                     if m.get("active")}
+            # Zur Kontrolle wirklich lesen, nicht dem mitgefuehrten Stand glauben.
+            jetzt = self.frisch_lesen()
             if jetzt != self.anfangs_aktiv:
                 self.b.reste.append(
                     f"Modul-Zustand nicht wiederhergestellt: {sorted(jetzt)} "

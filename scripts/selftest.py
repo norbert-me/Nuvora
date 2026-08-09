@@ -38,6 +38,13 @@ from datetime import datetime, timedelta
 PRAEFIX = "ZZ-Selbsttest"
 TIMEOUT = 30
 
+# nginx drosselt /api/ (limit_req, siehe nginx.conf) und antwortet dann mit 429.
+# Das ist kein Anwendungsfehler, sondern der Proxy vor der Anwendung. Wir warten
+# gestaffelt und versuchen es erneut — hoechstens so oft:
+RATELIMIT_VERSUCHE = 4
+RATELIMIT_WARTEN = (1, 2, 4, 8)   # Sekunden zwischen den Versuchen
+RATELIMIT_MAX_WARTEN = 30         # obere Schranke fuer ein Retry-After vom Server
+
 # Farbe nur, wenn wirklich ein Terminal zuschaut — in eine Datei oder durch eine
 # Pipe gehen sonst Steuerzeichen mit. NO_COLOR ist die uebliche Notbremse.
 _FARBE = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
@@ -72,33 +79,62 @@ class Api:
         self.debug = debug
         self.protokoll = []   # (methode, pfad, status, ms) — fuer --debug
         self.letzte_kopfe = {}
+        self.ratelimit_treffer = 0   # wie oft wegen 429 gewartet wurde
+
+    @staticmethod
+    def _wartezeit(versuch, antwortkopfe):
+        """Retry-After beachten, wenn der Server ihn schickt; sonst gestaffelt."""
+        roh = (antwortkopfe.get("retry-after") or "").strip()
+        if roh.isdigit():
+            return min(int(roh), RATELIMIT_MAX_WARTEN)
+        return RATELIMIT_WARTEN[min(versuch, len(RATELIMIT_WARTEN) - 1)]
 
     def call(self, methode, pfad, body=None, erwartet=None, roh=False, kopfe=None):
         url = pfad if pfad.startswith("http") else self.basis + pfad
-        start = time.monotonic()
         daten = json.dumps(body).encode() if body is not None else None
-        req = urllib.request.Request(url, data=daten, method=methode)
-        if daten is not None:
-            req.add_header("Content-Type", "application/json")
-        if self.token:
-            req.add_header("Authorization", "Bearer " + self.token)
-        if self.selftest_token:
-            req.add_header("X-Selftest-Token", self.selftest_token)
-        for k, v in (kopfe or {}).items():
-            req.add_header(k, v)
-        try:
-            with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
-                status, inhalt, kopfe = r.status, r.read(), dict(r.headers)
-        except urllib.error.HTTPError as e:
-            status, inhalt, kopfe = e.code, e.read(), dict(e.headers or {})
-        except Exception as e:  # DNS, TLS, Verbindung
-            self._merke(methode, pfad, 0, start, str(e))
-            raise ApiFehler(methode, pfad, 0, str(e))
-        text = inhalt.decode("utf-8", "replace")
-        # Kopfzeilen der letzten Antwort — die Sicherheits-Pruefungen lesen sie.
-        self.letzte_kopfe = {k.lower(): v for k, v in kopfe.items()}
-        self._merke(methode, pfad, status, start, text)
+
+        # Wiederholung ausschliesslich bei 429. Auch POST/DELETE werden wiederholt,
+        # und das ist hier richtig: ein 429 kommt vom Proxy VOR der Anwendung, die
+        # Anfrage wurde also gar nicht verarbeitet — es gibt nichts, was doppelt
+        # passieren koennte. Fuer jeden anderen Status wird nie wiederholt.
+        for versuch in range(RATELIMIT_VERSUCHE):
+            start = time.monotonic()
+            req = urllib.request.Request(url, data=daten, method=methode)
+            if daten is not None:
+                req.add_header("Content-Type", "application/json")
+            if self.token:
+                req.add_header("Authorization", "Bearer " + self.token)
+            if self.selftest_token:
+                req.add_header("X-Selftest-Token", self.selftest_token)
+            for k, v in (kopfe or {}).items():
+                req.add_header(k, v)
+            try:
+                with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+                    status, inhalt, antwortkopfe = r.status, r.read(), dict(r.headers)
+            except urllib.error.HTTPError as e:
+                status, inhalt, antwortkopfe = e.code, e.read(), dict(e.headers or {})
+            except Exception as e:  # DNS, TLS, Verbindung
+                self._merke(methode, pfad, 0, start, str(e))
+                raise ApiFehler(methode, pfad, 0, str(e))
+            text = inhalt.decode("utf-8", "replace")
+            # Kopfzeilen der letzten Antwort — die Sicherheits-Pruefungen lesen sie.
+            self.letzte_kopfe = {k.lower(): v for k, v in antwortkopfe.items()}
+            self._merke(methode, pfad, status, start, text)
+            if status != 429 or (erwartet and 429 in erwartet):
+                break
+            if versuch == RATELIMIT_VERSUCHE - 1:
+                break
+            self.ratelimit_treffer += 1
+            time.sleep(self._wartezeit(versuch, self.letzte_kopfe))
+
         if erwartet and status not in erwartet:
+            if status == 429:
+                raise ApiFehler(
+                    methode, pfad, status,
+                    f"Ratelimit: nach {RATELIMIT_VERSUCHE} Versuchen immer noch 429. "
+                    "Das ist die Drosselung des nginx-Proxys (limit_req fuer /api/ "
+                    "in nginx.conf), nicht ein Fehler der Anwendung. Der Test feuert "
+                    "zu schnell — Aufrufe sparen oder das Limit anheben.")
             raise ApiFehler(methode, pfad, status, text)
         if roh:
             return status, text
