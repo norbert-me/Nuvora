@@ -770,9 +770,9 @@ async def progress(class_id: int, kurs_id: Optional[int] = None, subset_kurs: Op
             hist[_bucket(rev)] += 1
             if rev is not None and (rev.reps or 0) > 0:
                 reviewed += 1
-            if rev is not None and rev.last_reviewed and (last is None or rev.last_reviewed > last):
-                last = rev.last_reviewed
-            if rev is None or rev.due <= now:
+            if rev is not None and rev.last_reviewed and (last is None or _utc(rev.last_reviewed) > last):
+                last = _utc(rev.last_reviewed)
+            if rev is None or _utc(rev.due) <= now:
                 due += 1
         out.append(StudentProgress(
             student_id=st.id, name=st.name,
@@ -956,21 +956,21 @@ async def student_session(token: str, all: bool = False, db: AsyncSession = Depe
         hist[_bucket(rev)] += 1
         if rev is not None and (rev.reps or 0) > 0:
             learned += 1
-        is_due = rev is None or rev.due <= now
+        is_due = rev is None or _utc(rev.due) <= now
         if is_due:
             due_count += 1
         if all or is_due:
             faellig.append({"card_id": c.id, "front": c.front, "back": c.back,
                             "has_front_image": c.has_front_image, "has_back_image": c.has_back_image})
-        if rev is not None and rev.due > now and (next_due is None or rev.due < next_due):
-            next_due = rev.due
+        if rev is not None and _utc(rev.due) > now and (next_due is None or _utc(rev.due) < next_due):
+            next_due = _utc(rev.due)
     # Auch geplante Stapel zaehlen: rollt einer frueher aus als die naechste
     # Karte faellig ist, zieht das "naechste Lernen" nach vorne.
     future_release = (await db.execute(select(sa_func.min(CardDeck.released_at)).where(
         dw, _niveau_where(st), CardDeck.deleted_at.is_(None), CardDeck.released_at > now,
     ))).scalar()
-    if future_release is not None and (next_due is None or future_release < next_due):
-        next_due = future_release
+    if future_release is not None and (next_due is None or _utc(future_release) < next_due):
+        next_due = _utc(future_release)
     return {"name": st.name, "cards": faellig, "total": len(cards),
             "due": due_count, "learned": learned, "hist": hist,
             "next_due": next_due.isoformat() if next_due else None}

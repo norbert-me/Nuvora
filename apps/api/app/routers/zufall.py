@@ -68,7 +68,11 @@ async def record_draw(class_id: int, body: DrawIn, user: User = Depends(require_
         row.drawn_at = datetime.now(timezone.utc)
         row.class_id = class_id
     else:
-        db.add(ZufallDraw(owner_id=user.id, class_id=class_id, student_id=body.student_id, count=1))
+        # Zeitstempel bewusst hier setzen, nicht per server_default: das Update
+        # oben nimmt die Python-Uhr. Zwei Uhren, und bei zwei Ziehungen in
+        # derselben Sekunde faellt "nicht zweimal am Stueck" auf die falsche.
+        db.add(ZufallDraw(owner_id=user.id, class_id=class_id, student_id=body.student_id,
+                          count=1, drawn_at=datetime.now(timezone.utc)))
     await db.commit()
     return {"ok": True}
 

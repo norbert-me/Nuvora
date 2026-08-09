@@ -274,3 +274,38 @@ async def test_antwort_auf_freigegebenen_stapel_ohne_zeitzone(s):
 
     antwort = await K.submit_review(token, K.ReviewIn(card_id=karte.id, grade=3), db=s)
     assert antwort.get("ok") and not antwort.get("ignoriert"), "die Antwort muss zählen"
+
+
+@pytest.mark.asyncio
+async def test_uebersicht_haelt_gelernte_karten_ohne_zeitzone_aus(s):
+    """Nachdem ein Kind gelernt hat, muss die Lehrkraft den Stand sehen.
+
+    Derselbe Zeitzonen-Bruch wie eine Zeile hoeher, nur auf der anderen Seite:
+    progress() und student_cards() verglichen `rev.due` und `rev.last_reviewed`
+    ungefiltert mit der aktuellen Zeit. Solange niemand gelernt hatte, gab es
+    keine Review-Zeile und nichts zu vergleichen — der Fehler schlug erst zu,
+    wenn die Uebersicht endlich etwas anzuzeigen hatte. Gefunden hat ihn der
+    Systemtest, weil er erst lernt und dann nachsieht.
+    """
+    u = await _lehrkraft(s)
+    kurs, a, _b, ma, _mb = await _kurs_mit_zwei_fachklassen(s, u)
+    deck, karte = await _deck_mit_karte(s, u, a, kurs)
+    deck.released_at = datetime.utcnow() - timedelta(days=1)
+    await s.commit()
+    toks = await K.ensure_tokens(a.id, user=u, db=s)
+    token = next(t.token for t in toks if t.student_id == ma.id)
+    await K.submit_review(token, K.ReviewIn(card_id=karte.id, grade=3), db=s)
+
+    p = (await K.progress(a.id, kurs_id=kurs.id, user=u, db=s))[0]
+    assert p.total == 1 and p.reviewed == 1, "die gelernte Karte muss gezaehlt werden"
+    assert p.due == 0, "sie ist gerade beantwortet, also nicht faellig"
+    assert p.last_reviewed is not None, "der Zeitpunkt gehoert in die Uebersicht"
+
+    detail = await K.student_cards(a.id, ma.id, kurs_id=kurs.id, user=u, db=s)
+    assert [c.card_id for c in detail] == [karte.id]
+
+    # Und der Lernweg des Kindes selbst: naechster Termin statt Absturz.
+    stand = await K.student_session(token, db=s)
+    assert stand["due"] == 0, "gerade beantwortet, also nichts mehr offen"
+    assert stand["learned"] == 1 and stand["total"] == 1
+    assert stand["next_due"] is not None, "der naechste Termin gehoert dazu"

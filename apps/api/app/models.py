@@ -1,4 +1,4 @@
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 # Alias: eine Spalte, die selbst "date" heißt, würde den Typ `date` im
 # Klassenkörper verdecken (Name wird vor der Annotation gebunden). Für solche
 # Spalten den Alias verwenden.
@@ -718,7 +718,8 @@ class ZufallDraw(Base):
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id", ondelete="CASCADE"), index=True)
     count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    drawn_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    drawn_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), server_default=func.now())
 
 
 class SeatingPlan(Base):
