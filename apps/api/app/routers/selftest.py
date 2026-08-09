@@ -12,6 +12,7 @@ der Zugriff auf DB und Dateisystem braucht.
 Nur fuer die Administration (User 1): die Antwort verraet Schema- und
 Konfigurationszustand.
 """
+import asyncio
 import os
 import pathlib
 from typing import List
@@ -142,11 +143,43 @@ def _check_config(out: List[Check]) -> None:
                      schwere="warnung",
                      detail="konfiguriert" if mailer.email_configured() else
                             "unvollstaendig — Registrierung und Passwort-Reset gehen nicht"))
+    if mailer.email_configured():
+        out.append(_check_smtp_erreichbar())
 
     admin_email = (os.environ.get("ADMIN_EMAIL") or "").strip()
     out.append(Check(gruppe="Konfiguration", name="ADMIN_EMAIL", ok="@" in admin_email,
                      schwere="warnung",
                      detail=admin_email or "nicht gesetzt — Kontaktformular hat keinen Empfaenger"))
+
+
+def _check_smtp_erreichbar() -> Check:
+    """Loest der SMTP-Host auf und nimmt er Verbindungen an?
+
+    "Konfiguriert" heisst nicht "erreichbar": ein Tippfehler im Hostnamen sieht
+    in der .env vollstaendig aus, und die Anwendung meldet ihn nie — Mails
+    scheitern still im Hintergrund, die Registrierung bleibt haengen. Genau das
+    ist einmal passiert (SMTP_HOST=Serversmtp-relay.brevo.com). Es wird nur
+    verbunden, keine Mail verschickt.
+    """
+    import socket
+
+    host = (os.environ.get("SMTP_HOST") or "").strip()
+    port = int((os.environ.get("SMTP_PORT") or "465").strip() or 465)
+    try:
+        socket.getaddrinfo(host, port)
+    except Exception:
+        return Check(gruppe="Konfiguration", name="SMTP erreichbar", ok=False,
+                     detail=f"'{host}' laesst sich nicht aufloesen — Tippfehler im Hostnamen? "
+                            "Ohne ihn kommt keine einzige Mail an.")
+    try:
+        with socket.create_connection((host, port), timeout=5):
+            pass
+    except Exception as e:
+        return Check(gruppe="Konfiguration", name="SMTP erreichbar", ok=False,
+                     detail=f"{host}:{port} nimmt keine Verbindung an ({str(e)[:80]}) — "
+                            "Port oder Firewall pruefen.")
+    return Check(gruppe="Konfiguration", name="SMTP erreichbar", ok=True,
+                 detail=f"{host}:{port} antwortet")
 
 
 def _check_site_json(out: List[Check]) -> None:
@@ -217,7 +250,8 @@ async def selftest(request: Request, db: AsyncSession = Depends(get_db),
     checks: List[Check] = []
     if await _check_db(db, checks):
         await _check_schema(db, checks)
-    _check_config(checks)
+    # Der SMTP-Check verbindet sich (bis 5 s) — nicht im Event-Loop blockieren.
+    await asyncio.to_thread(_check_config, checks)
     _check_site_json(checks)
     _check_module(request, checks)
     fehler = sum(1 for c in checks if not c.ok and c.schwere == "fehler")
