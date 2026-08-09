@@ -79,7 +79,15 @@ def _hash_pw(password: str) -> str:
 
 
 def _verify_pw(password: str, stored: str) -> bool:
-    salt, h = stored.split("$", 1)
+    # Ein beschaedigter oder leerer Hash darf nicht in einen Fehler laufen: das
+    # waere HTTP 500 statt "Passwort falsch" — und verriete beim Ausprobieren,
+    # dass mit genau diesem Konto etwas nicht stimmt.
+    try:
+        salt, h = (stored or "").split("$", 1)
+    except ValueError:
+        return False
+    if not salt or not h:
+        return False
     return hmac.compare_digest(
         hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100_000).hex(),
         h,
