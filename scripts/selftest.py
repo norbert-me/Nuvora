@@ -28,8 +28,10 @@ import argparse
 import json
 import os
 import sys
+import re
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta
 
@@ -55,6 +57,7 @@ class Api:
         self.selftest_token = selftest_token
         self.debug = debug
         self.protokoll = []   # (methode, pfad, status, ms) — fuer --debug
+        self.letzte_kopfe = {}
 
     def call(self, methode, pfad, body=None, erwartet=None, roh=False):
         url = pfad if pfad.startswith("http") else self.basis + pfad
@@ -69,13 +72,15 @@ class Api:
             req.add_header("X-Selftest-Token", self.selftest_token)
         try:
             with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
-                status, inhalt = r.status, r.read()
+                status, inhalt, kopfe = r.status, r.read(), dict(r.headers)
         except urllib.error.HTTPError as e:
-            status, inhalt = e.code, e.read()
+            status, inhalt, kopfe = e.code, e.read(), dict(e.headers or {})
         except Exception as e:  # DNS, TLS, Verbindung
             self._merke(methode, pfad, 0, start, str(e))
             raise ApiFehler(methode, pfad, 0, str(e))
         text = inhalt.decode("utf-8", "replace")
+        # Kopfzeilen der letzten Antwort — die Sicherheits-Pruefungen lesen sie.
+        self.letzte_kopfe = {k.lower(): v for k, v in kopfe.items()}
         self._merke(methode, pfad, status, start, text)
         if erwartet and status not in erwartet:
             raise ApiFehler(methode, pfad, status, text)
@@ -108,6 +113,11 @@ class Bericht:
         self.reste = []
 
     def add(self, gruppe, name, ok, detail="", schwere="fehler"):
+        # Einzeilig und gekuerzt: manche Fehlerantwort ist eine ganze HTML-Seite,
+        # und die zerlegt den Bericht.
+        detail = " ".join(str(detail).split())
+        if len(detail) > 300:
+            detail = detail[:297] + "…"
         self.zeilen.append((gruppe, name, ok, schwere, detail))
         return ok
 
@@ -223,6 +233,280 @@ def teste_system(api, b):
     b.pruefe("System", "Lernpfad /lp/js/app.js", statik("/lp/js/app.js", "__nuvoraInPage"))
     b.pruefe("System", "Lernpfad /lp/css/style.scoped.css",
              statik("/lp/css/style.scoped.css", "#lp-app"))
+
+
+# ───────────────── 1b. Erreichbarkeit, Sicherheit, Web-Dateien ─────────────────
+
+def _host_port(url):
+    teile = urllib.parse.urlsplit(url)
+    https = teile.scheme == "https"
+    return teile.hostname or "", teile.port or (443 if https else 80), https
+
+
+def _ist_lokal(host):
+    """Adresse aus dem eigenen Netz? Dort ist fehlendes HTTPS kein Versaeumnis."""
+    import ipaddress
+    if host in ("localhost", "127.0.0.1", "::1"):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_private
+    except ValueError:
+        return False
+
+
+def teste_erreichbarkeit(api, b):
+    """Kommt man ueberhaupt hin — und verschluesselt?
+
+    Alles, was zwischen Browser und Nuvora liegt: Namensaufloesung, Antwortzeit,
+    Zertifikat, Umleitung von http auf https. Faellt hier etwas aus, nuetzt die
+    gesundeste Anwendung nichts.
+    """
+    import socket
+    import ssl
+
+    host, port, https = _host_port(api.basis)
+    lokal = _ist_lokal(host)
+
+    def namen():
+        adressen = {a[4][0] for a in socket.getaddrinfo(host, port)}
+        return f"{host} -> {', '.join(sorted(adressen))}"
+
+    def antwortzeit():
+        start = time.monotonic()
+        api.call("GET", "/api/health", erwartet=(200,))
+        ms = round((time.monotonic() - start) * 1000)
+        if ms > 3000:
+            raise AssertionError(f"{ms} ms bis zur Antwort — das merkt man im Unterricht")
+        return f"{ms} ms"
+
+    def websocket():
+        """Live-Ergebnisse haengen an einem WebSocket — der geht durch andere
+        Teile des Proxys als die normale API und faellt sonst erst im Unterricht
+        auf. Geprueft wird der Handshake (HTTP 101), nichts weiter."""
+        # Session-ID egal: der Endpunkt nimmt die Verbindung an und schliesst
+        # sie mangels Anmeldung wieder — geprueft wird nur der Handshake.
+        pfad = "/ws/session/999999999"
+        anfrage = (
+            f"GET {pfad} HTTP/1.1\r\nHost: {host}\r\nUpgrade: websocket\r\n"
+            "Connection: Upgrade\r\nSec-WebSocket-Key: c2VsYnN0dGVzdDEyMzQ1Ng==\r\n"
+            "Sec-WebSocket-Version: 13\r\n\r\n"
+        ).encode()
+        roh = socket.create_connection((host, port), timeout=10)
+        try:
+            if https:
+                roh = ssl.create_default_context().wrap_socket(roh, server_hostname=host)
+            roh.sendall(anfrage)
+            antwort = roh.recv(200).decode("utf-8", "replace")
+        finally:
+            roh.close()
+        erste = antwort.split("\r\n")[0]
+        if "101" not in erste:
+            raise AssertionError(f"kein Upgrade: '{erste}' — Live-Ergebnisse kaemen nie an")
+        return "Handshake steht (HTTP 101)"
+
+    b.pruefe("Erreichbarkeit", "Namensaufloesung", namen)
+    b.pruefe("Erreichbarkeit", "Antwortzeit", antwortzeit)
+    b.pruefe("Erreichbarkeit", "WebSocket (Live-Ergebnisse)", websocket)
+
+    if not https:
+        b.add("Erreichbarkeit", "HTTPS", lokal, schwere="warnung" if not lokal else "fehler",
+              detail="Adresse im eigenen Netz — ohne Verschluesselung vertretbar" if lokal else
+                     "oeffentlich erreichbar, aber unverschluesselt: Passwoerter und Token gehen "
+                     "im Klartext durchs Netz. Zertifikat einrichten (z.B. Reverse Proxy mit "
+                     "Let's Encrypt).")
+        return
+
+    def zertifikat():
+        ctx = ssl.create_default_context()
+        with socket.create_connection((host, port), timeout=10) as roh:
+            with ctx.wrap_socket(roh, server_hostname=host) as tls:
+                cert = tls.getpeercert()
+                version = tls.version()
+        # Hostname und Kette hat wrap_socket schon geprueft (sonst haette es
+        # geworfen) — bleibt die Restlaufzeit.
+        bis = datetime.strptime(cert["notAfter"], "%b %d %H:%M:%S %Y %Z")
+        tage = (bis - datetime.utcnow()).days
+        aussteller = dict(x[0] for x in cert["issuer"]).get("organizationName", "?")
+        if tage < 0:
+            raise AssertionError(f"Zertifikat ist seit {-tage} Tagen abgelaufen")
+        if tage < 14:
+            raise AssertionError(f"Zertifikat laeuft in {tage} Tagen ab (Aussteller {aussteller}) "
+                                 "— Erneuerung pruefen")
+        if version in ("TLSv1", "TLSv1.1"):
+            raise AssertionError(f"veraltete Verschluesselung ({version})")
+        return f"{version}, gueltig noch {tage} Tage, ausgestellt von {aussteller}"
+
+    def umleitung():
+        # Wer http eintippt, muss auf https landen — sonst hilft das Zertifikat
+        # nur denen, die daran denken. Bewusst mit http.client statt urllib:
+        # urllib folgt Weiterleitungen von selbst und wuerde immer 200 melden,
+        # egal ob umgeleitet wurde oder nicht.
+        import http.client
+        verbindung = http.client.HTTPConnection(host, 80, timeout=10)
+        try:
+            verbindung.request("GET", "/", headers={"Host": host})
+            antwort = verbindung.getresponse()
+            status, ziel = antwort.status, antwort.getheader("Location") or ""
+        finally:
+            verbindung.close()
+        if status in (301, 302, 307, 308) and ziel.startswith("https://"):
+            return f"HTTP {status} nach {ziel[:60]}"
+        raise AssertionError(f"http:// antwortet mit {status} statt einer Umleitung auf https")
+
+    b.pruefe("Erreichbarkeit", "TLS-Zertifikat", zertifikat)
+    b.pruefe("Erreichbarkeit", "Umleitung http -> https", umleitung, schwere="warnung")
+
+
+# Kopfzeilen, die jede Antwort tragen muss, mit dem Grund dahinter.
+SICHERHEITS_KOPFE = [
+    ("x-content-type-options", "nosniff",
+     "ohne ihn raten Browser den Dateityp und fuehren notfalls Hochgeladenes aus"),
+    ("x-frame-options", "", "sonst laesst sich Nuvora in fremde Seiten einbetten (Clickjacking)"),
+    ("referrer-policy", "", "sonst wandern vollstaendige Adressen an fremde Server"),
+    ("content-security-policy", "", "die wichtigste Bremse gegen eingeschleustes Javascript"),
+]
+
+# Pfade, die es im Netz nie geben darf.
+GEHEIM = ["/.env", "/.git/config", "/docker-compose.yml", "/config/site.json",
+          "/apps/api/app/main.py", "/.deploy.env"]
+# Woran man erkennt, dass wirklich die Datei kam (und nicht die Shell als 200).
+VERRAETERISCH = ["POSTGRES_PASSWORD", "TOKEN_SECRET", "SMTP_PASSWORD", "[core]",
+                 "services:", "proxy_pass"]
+
+
+def teste_sicherheit(api, b):
+    """Was ein Fremder von aussen sehen und anfassen kann."""
+    host, _port, https = _host_port(api.basis)
+
+    def kopfe_auf(pfad):
+        def fn():
+            api.call("GET", pfad, roh=True)
+            kopfe = api.letzte_kopfe
+            fehlt = []
+            for name, erwartet, warum in SICHERHEITS_KOPFE:
+                wert = kopfe.get(name, "")
+                if not wert or (erwartet and erwartet not in wert.lower()):
+                    fehlt.append(f"{name} ({warum})")
+            if fehlt:
+                raise AssertionError("fehlt: " + "; ".join(fehlt))
+            return ", ".join(n for n, _e, _w in SICHERHEITS_KOPFE)
+        return fn
+
+    # Auf mehreren Pfaden, nicht nur auf der Startseite: nginx vererbt
+    # add_header NICHT in einen location-Block, der eigene Header setzt — so
+    # verliert ausgerechnet eine Sonderroute ihren Schutz, ohne dass es auffaellt.
+    for pfad, name in (("/", "Startseite"), ("/api/health", "API"),
+                       ("/site.json", "Betreiberdaten"), ("/lp/index.html", "Lernpfad-Statik")):
+        b.pruefe("Sicherheit", f"Schutz-Kopfzeilen: {name}", kopfe_auf(pfad))
+
+    if https:
+        def hsts():
+            api.call("GET", "/", roh=True)
+            wert = api.letzte_kopfe.get("strict-transport-security", "")
+            if not wert:
+                raise AssertionError("kein HSTS — Browser versuchen es weiter unverschluesselt")
+            return wert[:60]
+        b.pruefe("Sicherheit", "HSTS", hsts, schwere="warnung")
+
+    def server_verraet():
+        api.call("GET", "/", roh=True)
+        wert = api.letzte_kopfe.get("server", "")
+        if any(z.isdigit() for z in wert):
+            raise AssertionError(f"Server-Kopfzeile nennt die Version ({wert}) — "
+                                 "erleichtert die Suche nach passenden Luecken")
+        return wert or "keine Server-Kennung"
+
+    def api_ohne_anmeldung():
+        # Ohne Token darf keine einzige Nutzdaten-Route antworten.
+        anonym = Api(api.basis, debug=api.debug)
+        offen = []
+        for pfad in ("/api/classes", "/api/kurse", "/api/topics", "/api/noten/code-sessions",
+                     "/api/karten/classes/1/decks", "/api/trash", "/api/me/export"):
+            status, _ = anonym.call("GET", pfad, roh=True)
+            if status == 200:
+                offen.append(pfad)
+        if offen:
+            raise AssertionError("ohne Anmeldung erreichbar: " + ", ".join(offen))
+        return "7 Datenrouten ohne Token geprueft, alle verschlossen"
+
+    def geheime_dateien():
+        gefunden = []
+        for pfad in GEHEIM:
+            status, text = api.call("GET", pfad, roh=True)
+            if status == 200 and any(m in text for m in VERRAETERISCH):
+                gefunden.append(pfad)
+        if gefunden:
+            raise AssertionError("ausgeliefert: " + ", ".join(gefunden))
+        return f"{len(GEHEIM)} heikle Pfade geprueft, keiner liefert Inhalte"
+
+    def api_doku():
+        for pfad in ("/api/docs", "/docs", "/openapi.json", "/api/openapi.json"):
+            status, text = api.call("GET", pfad, roh=True)
+            if status == 200 and ("swagger" in text.lower() or '"openapi"' in text):
+                raise AssertionError(f"{pfad} ist oeffentlich — zeigt jede Route und jedes Feld")
+        return "nicht oeffentlich"
+
+    b.pruefe("Sicherheit", "Server-Kennung", server_verraet, schwere="warnung")
+    b.pruefe("Sicherheit", "API ohne Anmeldung", api_ohne_anmeldung)
+    b.pruefe("Sicherheit", "Heikle Dateien", geheime_dateien)
+    b.pruefe("Sicherheit", "API-Dokumentation", api_doku, schwere="warnung")
+
+
+def teste_web_dateien(api, b):
+    """Kleinkram, den ein Browser oder eine Suchmaschine erwartet."""
+
+    def robots():
+        status, text = api.call("GET", "/robots.txt", roh=True)
+        if status != 200:
+            raise AssertionError(f"HTTP {status} — ohne robots.txt entscheidet jede Suchmaschine "
+                                 "selbst, was sie von Nuvora indexiert")
+        if "user-agent" not in text.lower():
+            raise AssertionError("Datei ohne User-agent-Zeile — wird ignoriert")
+        gesperrt = [z for z in ("/api/", "/lernen/", "/cd/") if z in text]
+        return f"{len(text)} Zeichen, gesperrt: {', '.join(gesperrt) or 'nichts'}"
+
+    def datei(pfad, was, schwere="fehler"):
+        def fn():
+            status, text = api.call("GET", pfad, roh=True)
+            if status != 200:
+                raise AssertionError(f"HTTP {status} — {was}")
+            return f"{len(text)} Zeichen"
+        return fn
+
+    def unbekannte_seite():
+        # Eine SPA beantwortet unbekannte Adressen mit der Shell — das ist
+        # richtig so (die Route entscheidet der Browser), soll aber wirklich
+        # die Shell sein und keine Fehlerseite des Proxys.
+        status, text = api.call("GET", "/gibt-es-nicht-zz", roh=True)
+        if status != 200 or '<div id="root"' not in text:
+            raise AssertionError(f"HTTP {status} statt der Shell — tote Lesezeichen landen im Nichts")
+        return "unbekannte Adressen bekommen die Shell"
+
+    def auslieferung():
+        # Die Anwendung ist ueber ein Megabyte gross; ohne Kompression und ohne
+        # Cache laedt jede Seite sie neu.
+        status, text = api.call("GET", "/", roh=True)
+        treffer = re.search(r'src="(/assets/[^"]+\.js)"', text)
+        if not treffer:
+            raise AssertionError("kein Anwendungs-Javascript in der Shell gefunden")
+        api.call("GET", treffer.group(1), roh=True)
+        kopfe = api.letzte_kopfe
+        maengel = []
+        if "gzip" not in kopfe.get("content-encoding", "") and "br" not in kopfe.get("content-encoding", ""):
+            maengel.append("keine Kompression (gzip/br)")
+        if "max-age" not in kopfe.get("cache-control", ""):
+            maengel.append("kein Cache-Control")
+        if maengel:
+            raise AssertionError(", ".join(maengel) + f" fuer {treffer.group(1)}")
+        return f"{treffer.group(1).split('/')[-1]}: komprimiert und zwischenspeicherbar"
+
+    b.pruefe("Web-Dateien", "robots.txt", robots)
+    b.pruefe("Web-Dateien", "favicon.svg", datei("/favicon.svg", "Browser zeigt kein Symbol"))
+    b.pruefe("Web-Dateien", "manifest.json", datei("/manifest.json", "kein Zum-Startbildschirm-Hinzufuegen"))
+    b.pruefe("Web-Dateien", "icon-192.png", datei("/icon-192.png", "Symbol fuer den Startbildschirm fehlt"))
+    b.pruefe("Web-Dateien", "sw.js", datei("/sw.js", "Service Worker fehlt"), schwere="warnung")
+    b.pruefe("Web-Dateien", "Unbekannte Adresse", unbekannte_seite)
+    b.pruefe("Web-Dateien", "Auslieferung der Anwendung", auslieferung, schwere="warnung")
 
 
 # ─────────────────────────── 2. Einrichtung (Server) ───────────────────────────
@@ -875,6 +1159,9 @@ def main():
         print(f"Nuvora-Selbsttest gegen {args.url}")
 
     teste_system(api, b)
+    teste_erreichbarkeit(api, b)
+    teste_sicherheit(api, b)
+    teste_web_dateien(api, b)
 
     if args.nur_system or not (args.email and args.passwort):
         if not args.nur_system:

@@ -1,0 +1,21 @@
+# Nuvora — was Suchmaschinen sehen duerfen.
+#
+# Nuvora ist ein Werkzeug fuer Lehrkraefte, keine Inhalts-Website. Oeffentlich
+# interessant sind nur Start-, Rechts- und Hilfeseiten. Alles andere haengt
+# hinter der Anmeldung oder an einem Token und gehoert in keinen Index:
+#
+#   /api/     Schnittstelle (liefert ohne Token ohnehin nichts)
+#   /lernen/  Kartenlernen der Schueler — Adresse enthaelt ihren Zugangstoken
+#   /cd/      Code-Detektiv-Runden mit Beitrittscode
+#
+# Die Token-Adressen stehen hier bewusst NUR als Praefix: sie sind kein
+# Geheimnis-Verzeichnis, das man durch Auflisten schuetzen koennte, aber
+# indexiert gehoeren sie erst recht nicht.
+
+User-agent: *
+Disallow: /api/
+Disallow: /lernen/
+Disallow: /cd/
+Disallow: /profile
+Disallow: /papierkorb
+Allow: /
