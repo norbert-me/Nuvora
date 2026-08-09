@@ -10,7 +10,7 @@ from datetime import datetime, date
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
-from sqlalchemy import select
+from sqlalchemy import inspect as sa_inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import models as m
@@ -29,14 +29,26 @@ def _val(v):
 def _dump(row) -> dict:
     """Alle Spalten einer Zeile als JSON-sicheres dict.
 
-    Ausgenommen: der Passwort-Hash und Dateiinhalte. Bytes lassen sich nicht als
-    JSON schreiben, und eine Auskunft mit eingebetteten Schuelerfotos waere ein
-    unhandliches Monster — statt des Inhalts steht die Groesse da, die Datei
-    selbst laedt die Lehrkraft im Modul herunter.
+    Zwei Ausnahmen:
+
+    - Der Passwort-Hash bleibt draussen.
+    - Dateiinhalte (Schuelerfotos, Kartenbilder, Material) sind Bytes. Sie
+      liessen sich nicht als JSON schreiben, und eine Auskunft mit eingebetteten
+      Fotos waere unhandlich. Statt des Inhalts steht die Groesse da; die Datei
+      selbst laedt die Lehrkraft im Modul herunter.
+
+    Wichtig: die Blob-Spalten sind im Modell als `deferred` markiert — sie
+    werden absichtlich NICHT mitgeladen. Sie hier anzufassen loeste eine
+    Nachladung mitten in der Antwort aus, und die scheitert im asynchronen
+    Kontext (MissingGreenlet). Deshalb werden ungeladene Spalten uebersprungen.
     """
+    ungeladen = sa_inspect(row).unloaded
     out = {}
     for c in row.__table__.columns:
         if c.name in ("password_hash",):
+            continue
+        if c.name in ungeladen:
+            out[c.name] = "(Datei — im Modul herunterladbar)"
             continue
         wert = getattr(row, c.name)
         if isinstance(wert, (bytes, bytearray, memoryview)):
