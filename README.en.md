@@ -111,6 +111,10 @@ A collection of math games. Currently **math football**: a mental-arithmetic due
 
 > CardVote was developed standalone up to v1.4.4 ([archive](https://github.com/norbert-me/CardVote)). Further development happens only here. The marketplace now also shares Karten decks, lesson starters and learning ladders.
 
+### Desktop app (macOS, optional)
+
+`apps/desktop` — a thin Electron shell around the same web interface: its own window, dock icon, no browser chrome. **No own server, no own database**; the app points at your Nuvora server. Reading offline works via Nuvora's service worker, writing offline does not yet. Details in `apps/desktop/README.md`.
+
 ## Architecture
 
 Nuvora is the base, modules are guests. Three rules every change keeps:
@@ -203,9 +207,11 @@ cp .deploy.env.example .deploy.env   # enter server and target path
 ./deploy.sh                          # everything
 ./deploy.sh api                      # rebuild a single service
 ./deploy.sh --port 8090              # different port, remembered in .deploy.env
+./deploy.sh --browser                # self-test also in a real browser
+./deploy.sh --kein-selftest          # deploy without the self-test
 ```
 
-Uploads, builds on the server, checks core and modules, and aborts if something doesn't respond.
+Uploads, builds on the server, checks core and modules, and aborts if something doesn't respond. Then the **self-test** runs (see below) — the exit code turns red if it finds anything.
 
 Services: `api` (core), `web` (shell + module pages incl. Lernpfad static), `db`, `proxy`. There is no separate Lernpfad container anymore.
 
@@ -233,7 +239,7 @@ cp config/site.example.json config/site.json  # legal notice / operator data
 | File               | Contents                                      | In repo? |
 | ------------------ | --------------------------------------------- | -------- |
 | `.env`             | passwords, `TOKEN_SECRET`, SMTP               | no       |
-| `.deploy.env`      | server address, target path                   | no       |
+| `.deploy.env`      | server address, target path, self-test access | no       |
 | `config/site.json` | operator, address, contact (legal notice)     | no       |
 
 `config/site.json` is the single source of operator data: Lernpfad reads it server-side, the legal notice in the shell fetches it via `/site.json` from the proxy.
@@ -241,6 +247,44 @@ cp config/site.example.json config/site.json  # legal notice / operator data
 **Postgres creates the role and database only on the first start.** A `POSTGRES_PASSWORD` changed later does not reach an existing database — then it's an `ALTER ROLE`, not an `.env` edit. `deploy.sh` checks this up front and says what to do.
 
 Databases, backups and uploads contain personal data and are excluded from Git by default.
+
+## Self-test
+
+After every deploy Nuvora checks itself — `./deploy.sh` calls `./selftest.sh` automatically, and it also runs on its own:
+
+```bash
+./selftest.sh              # API, setup, every module
+./selftest.sh --browser    # plus the tour in a real browser
+./selftest.sh --nur-system # no login, no writing
+./selftest.sh --debug      # every request with status and duration
+```
+
+A health check only says a container is running. The self-test says whether the installation *works*:
+
+| Area              | What is checked |
+| ----------------- | --------------- |
+| Reachability      | name resolution, response time, WebSocket handshake (live results), TLS certificate incl. remaining validity, http → https redirect |
+| Security          | protection headers on several paths, server banner without version, API docs not public, data routes closed without a token, sensitive files (`.env`, `.git/config` …) serve nothing |
+| Web files         | `robots.txt`, favicon, manifest, icons, unknown addresses get the shell, app served compressed and cacheable |
+| Setup             | database, **schema against the models** (there is no Alembic — this is where a missing entry in `_ensure_columns` shows up), configuration, operator data, module registry against the mounted routers |
+| E-mail            | host, connection, login, sender acceptance (`MAIL FROM`/`RCPT TO`, **without** sending a mail), SPF and DMARC of the sender domain |
+| Modules           | one real write round-trip per module on a core class and its students: create, read, update, delete |
+| Student paths     | `/lernen/<token>` and `/cd/<code>` without an account — and refusal on a wrong token |
+| Tenant separation | reading and writing foreign IDs must fail |
+| Data volume       | classes, students, courses, topics compared to the previous run — early warning if a cascade takes too much with it |
+| Browser           | every page renders, no console errors, no dead links — on desktop, on a **phone (390 px)** and in **dark mode**; plus real interactions with a reload as proof that it saved |
+
+Test data carries the prefix `ZZ-Selbsttest` and is removed again including the trash; activated modules are reset. You need a dedicated test account (`SELFTEST_EMAIL`/`SELFTEST_PASSWORD` in `.deploy.env`, registered once by hand) — `SELFTEST_TOKEN` is generated by `deploy.sh` on its first run.
+
+The browser part needs Playwright; `selftest.sh --browser` installs it on first use into `scripts/node_modules` (deliberately separate from `apps/web` so it never ends up in the web image).
+
+## Tests
+
+```bash
+cd apps/api && pip install -r requirements-dev.txt && pytest
+```
+
+Regression tests for the places where a bug silently costs data: E/G scoring, class updates without data loss, trash cascades, tenant separation, course logic. They run together with the web build in CI on every push.
 
 ## Schema & migrations
 

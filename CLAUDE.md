@@ -147,6 +147,10 @@ Zwei Dinge tut es bewusst **nicht**, und das darf nicht aufweichen:
 
 Gewichte gibt das Werkzeug keine vor — das Leistungskonzept ist Fachkonferenz-Recht. Es zeigt nur die Summe und markiert, wenn sie nicht 100 % ergibt.
 
+### Desktop-App — `apps/desktop`
+
+Electron-Hülle um dieselbe Weboberfläche (eigenes Fenster, Dock-Icon). **Kein eigener Server, keine eigene Datenbank, kein eigener Code-Pfad** — sie zeigt auf einen laufenden Nuvora-Server. Offline lesen über den Service Worker; offline schreiben ist offen. Sie ist bewusst kein Modul: es gibt nichts im REGISTRY und keinen Selbsttest-Eintrag dafür.
+
 ## Datenübernahme (erledigt)
 
 Die Bestandsdaten aus der alten Lernleiter-SQLite sind in den Kern übernommen; das Skript `scripts/migrate-lernleiter.py` wurde danach entfernt.

@@ -38,6 +38,7 @@ config/site.json
 node_modules/
 __pycache__/
 *.pyc
+.pytest_cache/
 .venv/
 venv/
 
@@ -69,5 +70,7 @@ Thumbs.db
 # ─── Persönliche Todo-Liste (nicht committen) ───
 TODO.md
 
-# Zahlen des letzten Selbsttests (Fruehwarnung bei Datenschwund) — lokal.
+# Zahlen des letzten Selbsttests (Fruehwarnung bei Datenschwund) — lokal, je Instanz.
 .selftest-bestand.json
+# Zwischendatei von deploy.sh, falls ein Lauf abbricht.
+.deploy.env.tmp

@@ -105,6 +105,10 @@ Frei platzierbare Textfelder und ein Countdown-Timer für den Beamer. Felder ver
 
 Sammlung von Mathe-Spielen. Aktuell **Mathefußball**: Kopfrechen-Duell für zwei Teams am Beamer — die richtige Antwort schiebt den Ball Richtung gegnerisches Tor. Zahlenraum und Rechenarten einstellbar.
 
+### Desktop-App (macOS, optional)
+
+`apps/desktop` — eine schlanke Electron-Hülle um dieselbe Weboberfläche: eigenes Fenster, Dock-Icon, kein Browser-Rahmen. **Kein eigener Server, keine eigene Datenbank**; die App zeigt auf deinen Nuvora-Server. Offline *lesen* funktioniert über Nuvoras Service Worker, offline *schreiben* noch nicht. Details in `apps/desktop/README.md`.
+
 ## Architektur
 
 Nuvora ist die Basis, Module sind Gäste. Drei Regeln, die jede Änderung einhält:
@@ -197,9 +201,11 @@ cp .deploy.env.example .deploy.env   # Server und Zielpfad eintragen
 ./deploy.sh                          # alles
 ./deploy.sh api                      # nur einen Service neu bauen
 ./deploy.sh --port 8090              # anderer Port, wird in .deploy.env gemerkt
+./deploy.sh --browser                # Selbsttest zusätzlich im echten Browser
+./deploy.sh --kein-selftest          # ohne Selbsttest ausliefern
 ```
 
-Lädt hoch, baut auf dem Server, prüft Kern und Module und bricht ab, wenn etwas nicht antwortet.
+Lädt hoch, baut auf dem Server, prüft Kern und Module und bricht ab, wenn etwas nicht antwortet. Danach läuft der **Selbsttest** (siehe unten) — der Rückgabewert ist rot, wenn er etwas findet.
 
 Services: `api` (Kern), `web` (Shell + Modul-Seiten inkl. Lernpfad-Statik), `db`, `proxy`. Einen eigenen Lernpfad-Container gibt es nicht mehr.
 
@@ -227,7 +233,7 @@ cp config/site.example.json config/site.json  # Impressum/Betreiberdaten
 | Datei              | Inhalt                                        | Im Repo? |
 | ------------------ | --------------------------------------------- | -------- |
 | `.env`             | Passwörter, `TOKEN_SECRET`, SMTP              | nein     |
-| `.deploy.env`      | Serveradresse, Zielpfad                       | nein     |
+| `.deploy.env`      | Serveradresse, Zielpfad, Zugang für den Selbsttest | nein |
 | `config/site.json` | Betreiber, Anschrift, Kontakt (Impressum)     | nein     |
 
 `config/site.json` ist die einzige Quelle der Betreiberdaten: Lernpfad liest sie serverseitig, das Impressum im Rahmen holt sie über `/site.json` vom Proxy.
@@ -235,6 +241,44 @@ cp config/site.example.json config/site.json  # Impressum/Betreiberdaten
 **Postgres legt Rolle und Datenbank nur beim ersten Start an.** Ein später geändertes `POSTGRES_PASSWORD` erreicht eine bestehende Datenbank nicht — dann ist es ein `ALTER ROLE`, kein `.env`-Edit. `deploy.sh` prüft das vorab und sagt, was zu tun ist.
 
 Datenbanken, Backups und Uploads enthalten personenbezogene Daten und sind grundsätzlich von Git ausgeschlossen.
+
+## Selbsttest
+
+Nach jedem Deploy prüft Nuvora sich selbst — `./deploy.sh` ruft `./selftest.sh` automatisch, einzeln geht es auch:
+
+```bash
+./selftest.sh              # API, Einrichtung, jedes Modul
+./selftest.sh --browser    # zusätzlich der Rundgang im echten Browser
+./selftest.sh --nur-system  # ohne Anmeldung, ohne Schreiben
+./selftest.sh --debug      # jede Anfrage mit Status und Dauer
+```
+
+„Health" sagt nur, dass ein Container läuft. Der Selbsttest sagt, ob die Installation *funktioniert*:
+
+| Bereich          | Was geprüft wird |
+| ---------------- | ---------------- |
+| Erreichbarkeit   | Namensauflösung, Antwortzeit, WebSocket-Handshake (Live-Ergebnisse), TLS-Zertifikat samt Restlaufzeit, Umleitung http → https |
+| Sicherheit       | Schutz-Kopfzeilen auf mehreren Pfaden, Server-Kennung ohne Version, API-Doku nicht öffentlich, Datenrouten ohne Token verschlossen, heikle Dateien (`.env`, `.git/config` …) liefern nichts |
+| Web-Dateien      | `robots.txt`, favicon, Manifest, Icons, unbekannte Adressen bekommen die Shell, Anwendung kommt komprimiert und zwischenspeicherbar |
+| Einrichtung      | Datenbank, **Schema gegen die Modelle** (es gibt kein Alembic — hier fällt auf, was in `_ensure_columns` fehlt), Konfiguration, Betreiberdaten, Modulregister gegen die gemounteten Router |
+| E-Mail           | Host, Verbindung, Anmeldung, Absender-Freigabe (`MAIL FROM`/`RCPT TO`, **ohne** eine Mail zu verschicken), SPF und DMARC der Absender-Domain |
+| Module           | je Modul ein echter Schreib-Roundtrip auf Kern-Klasse und -Schülern: anlegen, lesen, ändern, löschen |
+| Schüler-Wege     | `/lernen/<token>` und `/cd/<code>` ohne Konto — und Absage bei falschem Token |
+| Mandantentrennung | fremde IDs lesen und beschreiben muss scheitern |
+| Bestand          | Klassen, Schüler, Kurse, Themen im Vergleich zum letzten Lauf — Frühwarnung, falls eine Kaskade zu viel mitreißt |
+| Browser          | jede Seite rendert, keine Konsolenfehler, keine toten Links — auf dem Desktop, am **Handy (390 px)** und im **dunklen Design**; dazu echte Handgriffe mit Neuladen als Beweis, dass gespeichert wurde |
+
+Testdaten tragen das Präfix `ZZ-Selbsttest` und werden inklusive Papierkorb wieder abgeräumt; zugeschaltete Module werden zurückgesetzt. Nötig sind ein eigenes Testkonto (`SELFTEST_EMAIL`/`SELFTEST_PASSWORD` in `.deploy.env`, einmalig selbst registrieren) — `SELFTEST_TOKEN` erzeugt `deploy.sh` beim ersten Lauf von allein.
+
+Der Browser-Teil braucht Playwright; `selftest.sh --browser` installiert es beim ersten Mal nach `scripts/node_modules` (bewusst getrennt von `apps/web`, damit es nie ins Web-Image wandert).
+
+## Tests
+
+```bash
+cd apps/api && pip install -r requirements-dev.txt && pytest
+```
+
+Regressionstests für die Stellen, an denen ein Fehler still Daten kostet: E/G-Wertung, Klassen-Update ohne Datenverlust, Papierkorb-Kaskaden, Mandantentrennung, Kurs-Logik. Bei jedem Push laufen sie zusammen mit dem Web-Build in der CI.
 
 ## Schema & Migrationen
 
