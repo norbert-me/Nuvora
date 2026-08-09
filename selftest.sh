@@ -28,24 +28,25 @@ if [ -f "$DIR/.deploy.env" ]; then
   . "$DIR/.deploy.env"
 fi
 
-MIT_BROWSER=0
-ARGS=()
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --browser) MIT_BROWSER=1; shift ;;
-    -h|--help) sed -n '2,22p' "$0" | sed 's|^# \{0,1\}||'; exit 0 ;;
-    *) ARGS+=("$1"); shift ;;
-  esac
-done
-
 # Adresse: --url schlaegt alles, sonst SELFTEST_URL, sonst SITE_URL, sonst der
 # lokale Port. Der Test laeuft von diesem Rechner aus gegen die oeffentliche
 # Adresse — genau der Weg, den auch eine Lehrkraft nimmt.
 URL="${SELFTEST_URL:-${SITE_URL:-http://localhost:${PORT:-8080}}}"
-# Leeres Array + set -u ist in der macOS-Bash (3.2) ein Fehler — deshalb ueberall
-# die Expansion mit Vorgabe.
-for i in "${!ARGS[@]+${!ARGS[@]}}"; do
-  if [ "${ARGS[$i]}" = "--url" ]; then URL="${ARGS[$((i+1))]}"; fi
+
+MIT_BROWSER=0
+ARGS=()
+# --url gleich hier mitnehmen. Ein nachtraeglicher Durchlauf durch ARGS ist in
+# der macOS-Bash (3.2) mit set -u nicht sicher: bei leerem Array liefert die
+# Index-Expansion ein leeres Element und ARGS[""] bricht mit "unbound variable".
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --browser) MIT_BROWSER=1; shift ;;
+    --url) URL="${2:-}"; [ -z "$URL" ] && { echo "Fehler: --url braucht eine Adresse."; exit 1; }
+           ARGS[${#ARGS[@]}]="--url"; ARGS[${#ARGS[@]}]="$URL"; shift 2 ;;
+    --url=*) URL="${1#*=}"; ARGS[${#ARGS[@]}]="--url"; ARGS[${#ARGS[@]}]="$URL"; shift ;;
+    -h|--help) sed -n '2,22p' "$0" | sed 's|^# \{0,1\}||'; exit 0 ;;
+    *) ARGS[${#ARGS[@]}]="$1"; shift ;;
+  esac
 done
 
 export SELFTEST_URL="$URL"
