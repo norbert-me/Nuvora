@@ -1592,6 +1592,13 @@ def main():
         # Fuer den Aufbau muessen alle Module an sein (Klasse anlegen beruehrt
         # nur den Kern, aber das Abraeumen spaeter braucht die Module).
         sch.alle_an()
+        # Reste eines abgebrochenen Laufs zuerst wegraeumen: sonst scheitert
+        # schon der Aufbau am 409 ("Dieses Thema gibt es an dieser Stelle
+        # schon") und der ganze Modulteil faellt aus. Alle Module sind hier
+        # bereits an, die Suche findet also auch die Modul-Reste.
+        from selftest import raeume_reste
+        raeume_reste(api, b)
+        sch.alle_an()   # raeume_reste stellt den Modulstand zurueck
         if not b.pruefe("Kern", "Testdaten anlegen", u.aufbauen):
             b.add("Module", "alle", False, "uebersprungen — ohne Klasse kein Modultest")
             b.drucke()

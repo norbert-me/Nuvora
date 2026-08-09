@@ -1266,6 +1266,47 @@ def teste_seiten(api, b):
 
 # ─────────────────────────── Ablauf ───────────────────────────
 
+def raeume_reste(api, b):
+    """Reste eines abgebrochenen Laufs abraeumen, BEVOR der Test etwas anlegt.
+
+    Ein Lauf, der mittendrin abbricht (Strg-C, Netz weg, Browser tot), laesst
+    seine ZZ-Testdaten stehen. Beim naechsten Mal scheiterte dann schon der
+    Aufbau — `POST /api/topics -> 409: "Dieses Thema gibt es an dieser Stelle
+    schon"` — und danach fiel der ganze Modulteil aus. Ein Test, der sich
+    selbst dauerhaft blockiert, ist wertlos.
+
+    Geloescht wird ausschliesslich, was ein Testpraefix traegt; das Netz dafuer
+    sitzt in scripts/aufraeumen.py (Klasse `Fund`) und nicht hier.
+    """
+    from aufraeumen import Sammler, modulzustand, setze_module
+
+    verfuegbar, vorher = modulzustand(api)
+    # Ohne aktives Modul antwortet dessen API mit 403 — dann faende die Suche
+    # ausgerechnet die Modul-Reste nicht.
+    setze_module(api, b, set(verfuegbar), vorher, verfuegbar)
+    try:
+        funde = Sammler(api, b).alles()
+        loeschbar = [f for f in funde if f.pfade]
+        for f in loeschbar:
+            try:
+                f.loesche(api)
+            except Exception as e:
+                b.reste.append(f"{f.art} '{f.label}' nicht abgeraeumt: {e}")
+        nur_melden = [f for f in funde if not f.pfade]
+        for f in nur_melden:
+            b.reste.append(f"{f.art} '{f.label}' — {f.hinweis or 'nur meldbar'}")
+        if not funde:
+            b.add("Reste", "vom letzten Lauf", True, "nichts liegengeblieben")
+        else:
+            b.add("Reste", "vom letzten Lauf", True, schwere="warnung",
+                  detail=f"{len(loeschbar)} Reste eines abgebrochenen Laufs abgeraeumt"
+                         + (f", {len(nur_melden)} nur gemeldet" if nur_melden else ""))
+    finally:
+        # Ist-Zustand ist jetzt "alle zugeschaltet" — zurueck auf den Stand von
+        # vorher, damit der Selbsttest die Einstellungen nicht veraendert.
+        setze_module(api, b, vorher, set(verfuegbar), verfuegbar)
+
+
 def main():
     p = argparse.ArgumentParser(description="Selbsttest der laufenden Nuvora-Installation")
     p.add_argument("--url", default=os.environ.get("SELFTEST_URL") or os.environ.get("SITE_URL"))
@@ -1334,6 +1375,10 @@ def main():
         if angemeldet:
             teste_einrichtung(api, b)
             teste_seiten(api, b)
+            # Erst aufraeumen, dann zaehlen: Reste eines abgebrochenen Laufs
+            # wuerden sonst als Bestand mitgezaehlt und den naechsten Aufbau
+            # blockieren.
+            raeume_reste(api, b)
             # Vor den Testdaten messen, sonst zaehlt der Test seine eigene Klasse mit.
             teste_bestand(api, b)
             u = Umgebung(api, b)
