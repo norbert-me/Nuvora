@@ -7,11 +7,14 @@
 #          ./deploy.sh web proxy               -> baut mehrere
 #          ./deploy.sh --port 8090              -> anderer Port, wird in .deploy.env gemerkt
 #          ./deploy.sh --port 8090 web           -> beides kombinierbar
-#          ./deploy.sh --browser                 -> Selbsttest zusaetzlich im Browser
+#          ./deploy.sh --schnelltest             -> nur der kurze API-Selbsttest
 #          ./deploy.sh --kein-selftest           -> ohne Selbsttest ausliefern
 #
-# Nach dem Deploy laeuft ./selftest.sh: jedes Modul einmal wirklich benutzt,
-# Einrichtung und Seiten geprueft. Health allein sagt nur "Container laeuft".
+# Nach dem Deploy laeuft ./selftest.sh VOLLSTAENDIG: API und Einrichtung, dann
+# jedes Modul einzeln (nur dieses aktiv, alle anderen muessen abweisen), dann
+# der Rundgang im echten Browser. Das dauert ein paar Minuten und ist Absicht:
+# ein gruener Deploy soll heissen "die Seite laeuft", nicht "der Teil, den wir
+# angeschaut haben, laeuft". Health allein sagt nur "Container laeuft".
 #
 # Secrets (TOKEN_SECRET, POSTGRES_PASSWORD, SMTP_*) leben nur auf dem Server
 # und werden hier nie angefasst. PORT und SITE_URL dagegen gehoeren zum
@@ -72,7 +75,7 @@ zeilenende_sichern() {
 # ─── Argumente: --port N, Rest sind zu bauende Services ───
 CLI_PORT=""
 SELFTEST=1        # Selbsttest nach dem Deploy (./selftest.sh)
-SELFTEST_BROWSER=0
+SELFTEST_VOLL=1   # und zwar vollstaendig: Systemtest + Browser
 ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -80,7 +83,10 @@ while [ $# -gt 0 ]; do
       SELFTEST=0; shift
       ;;
     --browser)
-      SELFTEST_BROWSER=1; shift
+      shift            # Altbestand: der Browser-Rundgang laeuft ohnehin
+      ;;
+    --schnelltest)
+      SELFTEST_VOLL=0; shift
       ;;
     --port|-p)
       CLI_PORT="${2:-}"
@@ -91,7 +97,7 @@ while [ $# -gt 0 ]; do
       CLI_PORT="${1#*=}"; shift
       ;;
     -h|--help)
-      sed -n '2,20p' "$0" | sed 's|^# \{0,1\}||'
+      sed -n '2,23p' "$0" | sed 's|^# \{0,1\}||'
       exit 0
       ;;
     *)
@@ -399,7 +405,7 @@ if [ "$CV" = "200" ] && [ "$LP" = "200" ]; then
     echo ""
     echo "→ Selbsttest..."
     SELFTEST_ARGS=()
-    [ "$SELFTEST_BROWSER" = "1" ] && SELFTEST_ARGS+=(--browser)
+    [ "$SELFTEST_VOLL" = "0" ] && SELFTEST_ARGS+=(--schnell)
     # Kein eigener Schlusssatz: die Zusammenfassung des Selbsttests sagt bereits
     # alles. Der Rueckgabewert traegt das Ergebnis nach aussen.
     "$DIR/selftest.sh" "${SELFTEST_ARGS[@]+"${SELFTEST_ARGS[@]}"}" || exit 1

@@ -835,7 +835,8 @@ def teste_alleinstellung(api, b, u, sch, spuren, nur_modul=None):
         meine = alle_endpunkte[key]
         if not meine and INHALT.get(key) is None:
             b.add(f"Modul {name}", "Backend", True,
-                  "reines Frontend-Modul (kein API-Anteil) — Pruefung im Browser-Test")
+                  "kein API-Anteil — der Nachweis haengt allein am Browser-Test "
+                  "(systemtest-browser.mjs, laeuft im selben Durchlauf mit)")
             continue
 
         sch.nur(key)   # NUR dieses Modul — alles andere aus.
