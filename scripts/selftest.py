@@ -28,6 +28,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta
@@ -47,12 +48,15 @@ class ApiFehler(Exception):
 class Api:
     """Duenner HTTP-Client auf urllib — kein requests, keine Installation."""
 
-    def __init__(self, basis):
+    def __init__(self, basis, debug=False):
         self.basis = basis.rstrip("/")
         self.token = None
+        self.debug = debug
+        self.protokoll = []   # (methode, pfad, status, ms) — fuer --debug
 
     def call(self, methode, pfad, body=None, erwartet=None, roh=False):
         url = pfad if pfad.startswith("http") else self.basis + pfad
+        start = time.monotonic()
         daten = json.dumps(body).encode() if body is not None else None
         req = urllib.request.Request(url, data=daten, method=methode)
         if daten is not None:
@@ -65,8 +69,10 @@ class Api:
         except urllib.error.HTTPError as e:
             status, inhalt = e.code, e.read()
         except Exception as e:  # DNS, TLS, Verbindung
+            self._merke(methode, pfad, 0, start, str(e))
             raise ApiFehler(methode, pfad, 0, str(e))
         text = inhalt.decode("utf-8", "replace")
+        self._merke(methode, pfad, status, start, text)
         if erwartet and status not in erwartet:
             raise ApiFehler(methode, pfad, status, text)
         if roh:
@@ -77,6 +83,17 @@ class Api:
             return json.loads(text)
         except ValueError:
             return text
+
+    def _merke(self, methode, pfad, status, start, text):
+        """Jede Anfrage mitschreiben — mit --debug wird daraus ein Protokoll,
+        das auch beim allgemeinen Suchen hilft (welcher Aufruf ist langsam,
+        welcher antwortet unerwartet)."""
+        ms = round((time.monotonic() - start) * 1000)
+        self.protokoll.append((methode, pfad, status, ms))
+        if self.debug:
+            hinweis = "" if 200 <= status < 400 else f"  {text[:300]}"
+            print(f"    · {methode:6} {pfad:52} {status or 'ERR':>4}  {ms:5} ms{hinweis}",
+                  file=sys.stderr)
 
 
 # ─────────────────────────── Bericht ───────────────────────────
@@ -479,7 +496,7 @@ def probe_orga(api, u):
     heute = datetime.now().replace(microsecond=0).isoformat()
     api.call("PUT", f"/api/anwesenheit/{u.class_id}",
              {"student_id": u.students[0], "date": heute, "status": "da"}, erwartet=(200,))
-    api.call("GET", f"/api/anwesenheit/{u.class_id}", erwartet=(200,))
+    api.call("GET", f"/api/anwesenheit/{u.class_id}?date={heute}", erwartet=(200,))
     api.call("PUT", f"/api/sitzplan/{u.class_id}",
              {"seats": [{"sid": u.students[0], "x": 1, "y": 1}]}, erwartet=(200,))
     api.call("GET", f"/api/sitzplan/{u.class_id}", erwartet=(200,))
@@ -538,7 +555,7 @@ def probe_notizen(api, u):
                            erwartet=(201,))
     api.call("PUT", f"/api/notizen/{beobachtung['id']}",
              {"student_id": u.students[0], "text": f"{PRAEFIX} Beobachtung 2"}, erwartet=(200,))
-    api.call("GET", "/api/notizen/counts", erwartet=(200,))
+    api.call("GET", f"/api/notizen/counts?class_id={u.class_id}", erwartet=(200,))
     api.call("DELETE", f"/api/notizen/{beobachtung['id']}", erwartet=(204,))
     return "Beobachtung anlegen, aendern, loeschen"
 
@@ -549,7 +566,7 @@ def probe_klassenleitung(api, u):
                         "text": f"{PRAEFIX} Gespraech"}, erwartet=(201,))
     api.call("PUT", f"/api/elternlog/{kontakt['id']}",
              {"student_id": u.students[0], "text": f"{PRAEFIX} Gespraech 2"}, erwartet=(200,))
-    api.call("GET", "/api/elternlog/counts", erwartet=(200,))
+    api.call("GET", f"/api/elternlog/counts?class_id={u.class_id}", erwartet=(200,))
     api.call("DELETE", f"/api/elternlog/{kontakt['id']}", erwartet=(204,))
     return "Elternkontakt anlegen, aendern, loeschen"
 
@@ -656,13 +673,16 @@ def main():
     p.add_argument("--nur-system", action="store_true",
                    help="nur die Checks ohne Login (kein Schreib-Roundtrip)")
     p.add_argument("--json", action="store_true", help="Ergebnis als JSON ausgeben")
+    p.add_argument("--debug", action="store_true",
+                   help="jede Anfrage mitschreiben (Status, Dauer, Fehlertext) — "
+                        "zum Suchen, wenn etwas rot ist")
     args = p.parse_args()
 
     if not args.url:
         print("Fehler: keine URL. --url oder SELFTEST_URL/SITE_URL setzen.", file=sys.stderr)
         return 2
 
-    api = Api(args.url)
+    api = Api(args.url, debug=args.debug)
     b = Bericht()
     if not args.json:
         print(f"Nuvora-Selbsttest gegen {args.url}")
@@ -697,6 +717,13 @@ def main():
                     teste_module(api, b, u)
                 finally:
                     u.abbauen()
+            else:
+                # Ohne Klasse und Schueler kann kein Modul geprueft werden. Das
+                # gehoert in den Bericht, sonst liest sich der fehlende
+                # Modul-Block wie "nichts zu beanstanden".
+                b.add("Module", "alle", False,
+                      "uebersprungen — die Testdaten liessen sich nicht anlegen "
+                      "(Fehler oben unter Kern)")
 
     if args.json:
         print(b.als_json())

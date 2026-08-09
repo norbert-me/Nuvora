@@ -49,6 +49,9 @@ const EGAL = [
   // Der Marktplatz und der Update-Check fragen GitHub — offline im Serverraum
   // ist das kein Fehler der Installation.
   /api\.github\.com/i,
+  // /api/version gehoert der Administration; fuer jedes andere Konto ist 403
+  // die richtige Antwort und kein Befund.
+  /\/api\/version/,
 ];
 const istEgal = (text) => EGAL.some((r) => r.test(text));
 
@@ -146,10 +149,16 @@ async function besuche(kontext, pfad, linkSenke) {
     // Landet die Seite auf /modules oder auf der Landing-Seite, greift das Gate
     // oder der Login — beides bedeutet: die Seite ist fuer die Lehrkraft nicht da.
     const jetzt = new URL(seite.url()).pathname;
-    if (jetzt !== pfad && !pfad.startsWith(jetzt)) {
-      if (jetzt === "/modules" && pfad !== "/modules")
-        return { ok: false, detail: `ModuleGate wirft auf /modules zurueck (Modul nicht aktiv?)` };
-      probleme.push(`umgeleitet nach ${jetzt}`);
+    // Umleitungen INNERHALB des Moduls sind erwuenscht (/cardvote →
+    // /cardvote/questions) und kein Befund. Nur der Sprung woanders hin zaehlt.
+    const drin = jetzt === pfad || jetzt.startsWith(pfad) || pfad.startsWith(jetzt);
+    let hinweis = "";
+    if (!drin) {
+      if (jetzt === "/modules") return { ok: false, detail: "ModuleGate wirft auf /modules zurueck (Modul nicht aktiv?)" };
+      if (jetzt === "/") return { ok: false, detail: "landet auf der Startseite — nicht angemeldet?" };
+      // Sonstige Umleitungen sind gewollt (alte CardVote-Adressen zeigen auf
+      // /cardvote/*). Kein Befund — geprueft wird trotzdem, ob das Ziel rendert.
+      hinweis = ` → ${jetzt}`;
     }
     // Gerenderter Inhalt statt leerer Shell.
     const textLaenge = (await seite.locator("body").innerText()).trim().length;
@@ -164,7 +173,7 @@ async function besuche(kontext, pfad, linkSenke) {
     }
     return probleme.length
       ? { ok: false, detail: probleme.slice(0, 3).join(" | ") }
-      : { ok: true, detail: `${textLaenge} Zeichen gerendert` };
+      : { ok: true, detail: `${textLaenge} Zeichen gerendert${hinweis}` };
   } catch (e) {
     return { ok: false, detail: String(e.message || e).split("\n")[0].slice(0, 160) };
   } finally {

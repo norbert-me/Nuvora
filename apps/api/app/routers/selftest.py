@@ -96,13 +96,15 @@ async def _check_schema(db: AsyncSession, out: List[Check]) -> None:
     Modelle auch wirklich in der Datenbank steht: neue Spalten auf bestehenden
     Tabellen kommen nur, wenn jemand sie in die wanted-Liste eingetragen hat.
     """
-    rows = (await db.execute(text(
-        "SELECT table_name, column_name FROM information_schema.columns "
-        "WHERE table_schema = 'public'"
-    ))).all()
-    ist: dict = {}
-    for tabelle, spalte in rows:
-        ist.setdefault(tabelle, set()).add(spalte)
+    def lies(sync_conn):
+        from sqlalchemy import inspect as sa_inspect
+        inspector = sa_inspect(sync_conn)
+        return {t: {c["name"] for c in inspector.get_columns(t)}
+                for t in inspector.get_table_names()}
+
+    # Ueber den Inspector statt information_schema: derselbe Weg, den auch
+    # _ensure_columns beim Start geht, und unabhaengig vom Datenbank-Dialekt.
+    ist = await db.run_sync(lambda s: lies(s.connection()))
 
     fehlende_tabellen = [t for t in Base.metadata.tables if t not in ist]
     out.append(Check(
@@ -173,7 +175,25 @@ def _check_module(request: Request, out: List[Check]) -> None:
     Router niemand gemountet hat, landet die Lehrkraft auf einer Seite, deren
     API 404 liefert.
     """
-    gemountet = {getattr(r, "path", "") for r in request.app.routes}
+    # Je nach FastAPI-Version stehen in app.routes die einzelnen Routen (aeltere
+    # Fassungen flachen include_router aus) oder Platzhalter fuer den
+    # eingehaengten Router (_IncludedRouter, ab 0.14x) — der traegt seine Pfade
+    # erst unter original_router. Deshalb rekursiv durch beides gehen, sonst
+    # meldet der Check auf einer der beiden Versionen alles als fehlend.
+    def sammle(routen, raus, tiefe=0):
+        if tiefe > 5:
+            return raus
+        for r in routen:
+            pfad = getattr(r, "path", "") or getattr(r, "prefix", "")
+            if pfad:
+                raus.add(pfad)
+            unter = getattr(r, "routes", None) or getattr(
+                getattr(r, "original_router", None), "routes", None)
+            if unter:
+                sammle(unter, raus, tiefe + 1)
+        return raus
+
+    gemountet = sammle(request.app.routes, set())
     for mod in REGISTRY:
         prefix = MODUL_PREFIX.get(mod.key, "__unbekannt__")
         if prefix == "__unbekannt__":

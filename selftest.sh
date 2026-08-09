@@ -42,7 +42,9 @@ done
 # lokale Port. Der Test laeuft von diesem Rechner aus gegen die oeffentliche
 # Adresse — genau der Weg, den auch eine Lehrkraft nimmt.
 URL="${SELFTEST_URL:-${SITE_URL:-http://localhost:${PORT:-8080}}}"
-for i in "${!ARGS[@]}"; do
+# Leeres Array + set -u ist in der macOS-Bash (3.2) ein Fehler — deshalb ueberall
+# die Expansion mit Vorgabe.
+for i in "${!ARGS[@]+${!ARGS[@]}}"; do
   if [ "${ARGS[$i]}" = "--url" ]; then URL="${ARGS[$((i+1))]}"; fi
 done
 
@@ -57,7 +59,7 @@ if [ -z "$SELFTEST_EMAIL" ] || [ -z "$SELFTEST_PASSWORD" ]; then
 fi
 
 STATUS=0
-python3 "$DIR/scripts/selftest.py" "${ARGS[@]}" || STATUS=1
+python3 "$DIR/scripts/selftest.py" "${ARGS[@]+"${ARGS[@]}"}" || STATUS=1
 
 if [ "$MIT_BROWSER" = "1" ]; then
   echo ""
