@@ -72,5 +72,8 @@ TODO.md
 
 # Zahlen des letzten Selbsttests (Fruehwarnung bei Datenschwund) — lokal, je Instanz.
 .selftest-bestand.json
+# Modulzustand des Testkontos VOR dem Umschalten — damit scripts/aufraeumen.py
+# ihn nach einem abgebrochenen Lauf wiederherstellen kann. Lokal, je Instanz.
+.selftest-module.json
 # Zwischendatei von deploy.sh, falls ein Lauf abbricht.
 .deploy.env.tmp

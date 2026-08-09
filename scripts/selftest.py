@@ -68,6 +68,35 @@ class ApiFehler(Exception):
         self.status = status
 
 
+def _ratelimit_text(text: str) -> str:
+    """Erklaeren, WER gedrosselt hat — die Antwort weiss es.
+
+    Zwei ganz verschiedene Dinge antworten mit 429, und die Ratschlaege sind
+    gegensaetzlich:
+      * nginx (limit_req fuer /api/, siehe nginx.conf) — der Test feuert zu
+        schnell, Aufrufe sparen oder das Limit anheben.
+      * Nuvora selbst (rate_limit in auth.py, z.B. "Zu viele Anmeldeversuche")
+        — hier ist Warten die einzige richtige Antwort; wer weiter probiert,
+        verlaengert die Sperre nur.
+    Die Anwendung antwortet mit JSON und einem deutschen Satz, nginx mit einer
+    HTML-Seite. Daran laesst sich beides sicher unterscheiden.
+    """
+    grund = ""
+    try:
+        grund = (json.loads(text) or {}).get("detail", "")
+    except Exception:
+        pass
+    if grund:
+        return (f"Ratelimit von Nuvora selbst: „{grund}“ — auch nach "
+                f"{RATELIMIT_VERSUCHE} Versuchen. Das ist eine Schutzsperre der "
+                "Anwendung (rate_limit), kein Fehler. Kurz warten, nicht weiter "
+                "probieren — jeder Versuch verlaengert die Sperre.")
+    return (f"Ratelimit: nach {RATELIMIT_VERSUCHE} Versuchen immer noch 429. "
+            "Das ist die Drosselung des nginx-Proxys (limit_req fuer /api/ in "
+            "nginx.conf), nicht ein Fehler der Anwendung. Der Test feuert zu "
+            "schnell — Aufrufe sparen oder das Limit anheben.")
+
+
 class Api:
     """Duenner HTTP-Client auf urllib — kein requests, keine Installation."""
 
@@ -130,11 +159,7 @@ class Api:
         if erwartet and status not in erwartet:
             if status == 429:
                 raise ApiFehler(
-                    methode, pfad, status,
-                    f"Ratelimit: nach {RATELIMIT_VERSUCHE} Versuchen immer noch 429. "
-                    "Das ist die Drosselung des nginx-Proxys (limit_req fuer /api/ "
-                    "in nginx.conf), nicht ein Fehler der Anwendung. Der Test feuert "
-                    "zu schnell — Aufrufe sparen oder das Limit anheben.")
+                    methode, pfad, status, _ratelimit_text(text))
             raise ApiFehler(methode, pfad, status, text)
         if roh:
             return status, text
@@ -1002,6 +1027,12 @@ def teste_module(api, b, u):
     """
     module = api.call("GET", "/api/modules", erwartet=(200,))
     vorher_aktiv = {m["key"] for m in module if m.get("active")}
+    # Den Ausgangszustand festhalten, BEVOR etwas umgeschaltet wird: bricht der
+    # Lauf ab (Strg-C, Netz weg), kann scripts/aufraeumen.py ihn wiederherstellen.
+    # Import in der Funktion — aufraeumen.py holt Api/Bericht von hier, oben
+    # waere es ein Zirkel.
+    from aufraeumen import merke_module, vergiss_module
+    merke_module(api.basis, vorher_aktiv)
     zugeschaltet = []
     try:
         for m in module:
@@ -1034,6 +1065,9 @@ def teste_module(api, b, u):
                 api.call("DELETE", f"/api/modules/{key}/activate", erwartet=(200,))
             except Exception as e:
                 b.reste.append(f"Modul {key} blieb zugeschaltet: {e}")
+        # Zurueckgestellt — der gemerkte Zustand ist verbraucht. Ohne das wuerde
+        # aufraeumen.py spaeter einen veralteten Stand wiederherstellen.
+        vergiss_module(api.basis)
 
 
 def teste_schueler_wege(api, b, u):

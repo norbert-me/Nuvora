@@ -786,6 +786,11 @@ class Schalter:
         # Test schaltet dutzendfach um, und ein Aufruf je Modul und Durchgang
         # laeuft am echten Server in die nginx-Drosselung (limit_req).
         self.aktiv_jetzt = set(self.anfangs_aktiv)   # None = Stand unbekannt
+        # Ausgangszustand festhalten, bevor irgendetwas umgeschaltet wird: nach
+        # einem Abbruch stellt scripts/aufraeumen.py ihn wieder her. Import in
+        # der Methode — aufraeumen.py holt Api/Bericht aus selftest.py.
+        from aufraeumen import merke_module
+        merke_module(api.basis, self.anfangs_aktiv)
 
     def frisch_lesen(self):
         """Stand neu vom Server holen — nach einem Fehler ist der mitgefuehrte
@@ -834,6 +839,9 @@ class Schalter:
                     f"Modul-Zustand nicht wiederhergestellt: {sorted(jetzt)} "
                     f"statt {sorted(self.anfangs_aktiv)}")
                 return False
+            # Wiederhergestellt — der gemerkte Stand ist verbraucht.
+            from aufraeumen import vergiss_module
+            vergiss_module(self.api.basis)
             return True
         except Exception as e:
             self.b.reste.append(f"Modul-Zustand nicht wiederhergestellt: {e}")
