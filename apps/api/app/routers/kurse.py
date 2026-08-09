@@ -56,22 +56,35 @@ async def _owned_kurs(db, user, kurs_id) -> Kurs:
 
 
 async def _own_class(db, user, class_id) -> SchoolClass:
+    # Besitz strikt wie in classes.py: eine Klasse ohne owner_id gehoert
+    # niemandem und darf nicht in einen fremden Kurs wandern — ueber den Kurs
+    # wuerden sonst Niveau und Massnahmen ihrer SuS geschrieben.
     c = await db.get(SchoolClass, class_id)
-    if not c or (c.owner_id and c.owner_id != user.id):
+    if not c or c.owner_id != user.id:
         raise HTTPException(404, "Klasse nicht gefunden")
     return c
 
 
 # ─── Mitgliedschaft (wird auch von Anwesenheit/Klassen genutzt) ───
 
-async def member_class_ids(db, kurs_ids) -> set:
-    """Klassen-IDs, die Mitglied eines der Kurse sind (kurs_tags ∪ altes kurs_id)."""
+async def member_class_ids(db, kurs_ids, mit_geloeschten=False) -> set:
+    """Klassen-IDs, die Mitglied eines der Kurse sind (kurs_tags ∪ altes kurs_id).
+
+    Klassen im Papierkorb zaehlen nicht mit: ihre SuS standen sonst weiter im
+    Kurs-Roster (E/G-Liste, Massnahmen, Anwesenheit) und Schreibvorgaenge
+    liefen in eine geloeschte Klasse. Die Mitgliedschaft selbst bleibt bestehen
+    — wird die Klasse wiederhergestellt, ist sie wieder dabei."""
     if not kurs_ids:
         return set()
     kurs_ids = list(kurs_ids)
     a = (await db.execute(select(KursTag.class_id).where(KursTag.kurs_id.in_(kurs_ids)))).scalars().all()
     b = (await db.execute(select(SchoolClass.id).where(SchoolClass.kurs_id.in_(kurs_ids)))).scalars().all()
-    return set(a) | set(b)
+    ids = set(a) | set(b)
+    if mit_geloeschten or not ids:
+        return ids
+    lebend = set((await db.execute(select(SchoolClass.id).where(
+        SchoolClass.id.in_(list(ids)), SchoolClass.deleted_at.is_(None)))).scalars().all())
+    return ids & lebend
 
 
 async def member_student_ids(db, kurs_id) -> set:
@@ -81,8 +94,13 @@ async def member_student_ids(db, kurs_id) -> set:
     ids = set()
     if classes:
         ids |= set((await db.execute(select(Student.id).where(Student.class_id.in_(classes)))).scalars().all())
-    ids |= set((await db.execute(select(KursStudent.student_id).where(KursStudent.kurs_id == kurs_id))).scalars().all())
-    return ids
+    einzeln = set((await db.execute(select(KursStudent.student_id).where(KursStudent.kurs_id == kurs_id))).scalars().all())
+    if einzeln:  # nur solche, deren Klasse nicht im Papierkorb liegt
+        einzeln &= set((await db.execute(
+            select(Student.id).join(SchoolClass, Student.class_id == SchoolClass.id)
+            .where(Student.id.in_(list(einzeln)), SchoolClass.deleted_at.is_(None))
+        )).scalars().all())
+    return ids | einzeln
 
 
 async def class_kurs_ids(db, class_id, only_active=True) -> set:
@@ -198,8 +216,16 @@ async def add_member(kurs_id: int, class_id: int, user: User = Depends(get_curre
 @router.delete("/{kurs_id}/classes/{class_id}", status_code=204)
 async def remove_member(kurs_id: int, class_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Klasse aus diesem Kurs entfernen (bleibt in ihren anderen Kursen)."""
+    from sqlalchemy import update
     await _owned_kurs(db, user, kurs_id)
     await db.execute(delete(KursTag).where(KursTag.kurs_id == kurs_id, KursTag.class_id == class_id))
+    # Auch die alte 1:1-Spalte loesen. Jede neue Klasse traegt sie auf ihren
+    # eigenen Kurs; ohne das blieb die Klasse trotz Entfernen Mitglied und
+    # teilte weiter SuS, Anwesenheit und Massnahmen.
+    await db.execute(update(SchoolClass).where(
+        SchoolClass.id == class_id, SchoolClass.kurs_id == kurs_id).values(kurs_id=None))
+    await db.execute(update(Student).where(
+        Student.class_id == class_id, Student.kurs_id == kurs_id).values(kurs_id=None))
     await db.commit()
 
 
@@ -280,11 +306,23 @@ async def set_niveau(kurs_id: int, body: NiveauIn, user: User = Depends(get_curr
     name = (body.name or "").strip()
     if not name:
         raise HTTPException(400, "Name fehlt")
-    members = list(await member_class_ids(db, [kurs_id]))
-    if not members:
+    # Dieselbe Menge wie beim Lesen (kurs_students): SuS der Mitgliedsklassen
+    # UND einzeln hinzugefuegte. Ueber member_class_ids allein blieb ein Kurs
+    # aus Teilen von Klassen ohne Treffer — gespeichert wurde dann nichts.
+    sids = list(await member_student_ids(db, kurs_id))
+    if not sids:
         return
-    studs = (await db.execute(select(Student).where(Student.class_id.in_(members)))).scalars().all()
-    for s in studs:
+    studs = (await db.execute(select(Student).where(Student.id.in_(sids)))).scalars().all()
+    # Auf alle Fach-Klassen-Zeilen der Person schreiben (gleicher Name) — E/G
+    # ist eine Eigenschaft der Person, nicht der einzelnen Fach-Klasse.
+    klassen = {s.class_id for s in studs if s.name.strip() == name}
+    zwillinge = []
+    if klassen:
+        alle = set()
+        for cid in klassen:
+            alle |= await sibling_class_ids(db, cid)
+        zwillinge = (await db.execute(select(Student).where(Student.class_id.in_(list(alle))))).scalars().all()
+    for s in {x.id: x for x in list(studs) + list(zwillinge)}.values():
         if s.name.strip() == name:
             s.niveau = niveau
     await db.commit()
@@ -380,7 +418,9 @@ async def delete_kurs(kurs_id: int, user: User = Depends(get_current_user), db: 
     Klassen bleiben, ggf. in ihren anderen Kursen); Restore stellt sie wieder her."""
     from sqlalchemy import update
     k = await _owned_kurs(db, user, kurs_id)
-    members = list(await member_class_ids(db, [kurs_id]))
+    # Auch Mitglieder im Papierkorb merken: sonst waere ihre Mitgliedschaft
+    # verloren, sobald die Klasse spaeter wiederhergestellt wird.
+    members = list(await member_class_ids(db, [kurs_id], mit_geloeschten=True))
     k.deleted_members = members
     await db.execute(delete(KursTag).where(KursTag.kurs_id == kurs_id))
     await db.execute(update(SchoolClass).where(SchoolClass.kurs_id == kurs_id).values(kurs_id=None))
@@ -393,7 +433,9 @@ async def restore_kurs(kurs_id: int, user: User = Depends(get_current_user), db:
     k = await _owned_kurs(db, user, kurs_id)
     for cid in (k.deleted_members or []):
         c = await db.get(SchoolClass, cid)
-        if c and c.owner_id == user.id and c.deleted_at is None:
+        # Auch Klassen im Papierkorb bekommen ihre Mitgliedschaft zurueck —
+        # sie zaehlt erst wieder, wenn die Klasse selbst zurueckgeholt wird.
+        if c and c.owner_id == user.id:
             exists = (await db.execute(select(KursTag).where(KursTag.kurs_id == kurs_id, KursTag.class_id == cid))).scalar_one_or_none()
             if not exists:
                 db.add(KursTag(kurs_id=kurs_id, class_id=cid))

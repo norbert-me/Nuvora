@@ -64,6 +64,23 @@ Bekanntem verliert:
   kann ihn unter Karten → QR-Codes neu vergeben.
 - **Administration ist Konto 1.** Kein Rollenmodell.
 
+## Releases prüfen
+
+Tags sind mit einem SSH-Schlüssel signiert. Wer Nuvora selbst betreibt, kann
+vor dem Deploy nachsehen, dass der Stand wirklich von hier stammt:
+
+```bash
+git config gpg.ssh.allowedSignersFile .github/allowed_signers
+git verify-tag v4.0.0
+```
+
+Erwartet: `Good "git" signature for norbert@varney.de`. Die zugelassenen
+Schlüssel stehen in [`.github/allowed_signers`](.github/allowed_signers).
+
+Jedes Release trägt außerdem eine Stückliste (CycloneDX) als Anhang — damit
+lässt sich bei einer gemeldeten Lücke prüfen, ob die eigene Installation
+betroffen ist.
+
 ## Was Nuvora bewusst nicht tut
 
 Lernende bekommen keine Konten. Es gibt keine Telemetrie, keine externen

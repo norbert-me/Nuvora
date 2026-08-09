@@ -127,10 +127,14 @@ async def create_session(body: SessionCreate, user: User = Depends(require_modul
     if not body.puzzles:
         raise HTTPException(400, "Mindestens ein Rätsel wählen")
     # Kurzer, gut ablesbarer Code; Kollision extrem unwahrscheinlich, sonst neu.
-    for _ in range(5):
-        code = "".join(secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ23456789") for _ in range(6))
-        if not (await db.execute(select(CodeSession.id).where(CodeSession.code == code))).scalar_one_or_none():
+    code = None
+    for _ in range(8):
+        kandidat = "".join(secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ23456789") for _ in range(6))
+        if not (await db.execute(select(CodeSession.id).where(CodeSession.code == kandidat))).scalar_one_or_none():
+            code = kandidat
             break
+    if code is None:   # sonst lief der letzte (belegte) Code in einen 500er
+        raise HTTPException(503, "Gerade keinen freien Code gefunden. Bitte noch einmal versuchen.")
     s = CodeSession(owner_id=user.id, code=code, puzzles=body.puzzles[:50], players=[], results=[])
     db.add(s)
     await db.commit()
@@ -194,6 +198,17 @@ async def submit_result(code: str, body: ResultIn, request: Request, db: AsyncSe
     pid = (body.puzzleId or "").strip()[:64]
     if not pn or not pid:
         raise HTTPException(400, "Ungültige Angaben")
+    # Nur wer in der Sitzung steht, darf Ergebnisse melden. Wer den Code kennt,
+    # konnte sonst waehrend des laufenden Spiels beliebige Namen in die Liste (und
+    # damit in die Notenspalte) schreiben. Vor dem Start wird ein verlorener
+    # Beitritt still nachgeholt, damit kein Kind sein Ergebnis verliert.
+    players = list(s.players or [])
+    if not any(p.get("name") == pn for p in players):
+        if s.started:
+            raise HTTPException(403, "Nicht in dieser Sitzung angemeldet")
+        players.append({"name": pn, "joinedAt": _now().isoformat()})
+        s.players = players
+        flag_modified(s, "players")
     results = list(s.results or [])
     if any(r.get("playerName") == pn and r.get("puzzleId") == pid for r in results):
         return _session_public(s)
@@ -235,6 +250,7 @@ async def advance_session(code: str, user: User = Depends(require_module), db: A
 async def end_session(code: str, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     s = await _owned_session(db, user, code)
     s.ended = True
+    s.ended_at = _now()
     await db.commit()
     return _session_public(s)
 

@@ -139,6 +139,56 @@ async def test_abwesend_behaelt_punkte(s):
 
 
 @pytest.mark.asyncio
+async def test_punkte_bleiben_zwischen_null_und_maximum(s):
+    """Vertipper (77 statt 7) und negative Punkte werden begrenzt. Sonst ergaebe
+    die Arbeit ueber 100 % — und der Notenwert laege unter 1,0, wo die
+    Uebernahme ins Notenbuch ihn stillschweigend wegwirft."""
+    u, cls, A, B, s1, s2 = await _setup(s)
+    w = await K.create_work(K.WorkIn(class_id=cls.id, name="KA"), user=u, db=s)
+    tasks = [{"id": "t1", "label": "", "topic_id": A.id, "max": 7},
+             {"id": "t2", "label": "", "topic_id": B.id, "max": 2,
+              "parts": [{"id": "p2a", "max": 1}, {"id": "p2b", "max": 1}]}]
+    results = {str(s1.id): {"t1": 77, "p2a": -3, "p2b": 1}, str(s2.id): {"t1": 3.5, "p2a": 1, "p2b": 1}}
+    out = await K.update_work(w.id, K.WorkPut(tasks=tasks, results=results), user=u, db=s)
+    assert out.results[str(s1.id)] == {"t1": 7.0, "p2a": 0.0, "p2b": 1.0}
+    assert out.results[str(s2.id)]["t1"] == 3.5   # Halbpunkte bleiben
+
+    an = await K.analysis(w.id, user=u, db=s)
+    for stat in an["topics"]:
+        assert 0 <= stat["pct"] <= 100
+
+
+@pytest.mark.asyncio
+async def test_alle_abwesend_ergibt_leere_auswertung(s):
+    """Keine Division durch null, wenn niemand mitgeschrieben hat."""
+    u, cls, A, B, s1, s2 = await _setup(s)
+    w = await K.create_work(K.WorkIn(class_id=cls.id, name="KA"), user=u, db=s)
+    tasks = [{"id": "t1", "label": "", "topic_id": A.id, "max": 2}]
+    results = {str(s1.id): {"t1": 2}, str(s2.id): {"t1": 1}}
+    await K.update_work(w.id, K.WorkPut(tasks=tasks, results=results), user=u, db=s)
+    await K.update_work(w.id, K.WorkPut(absent=[str(s1.id), str(s2.id)]), user=u, db=s)
+    an = await K.analysis(w.id, user=u, db=s)
+    assert an["students"] == []
+    assert all(x["pct"] == 0 for x in an["topics"])
+    res = await K.remediate(w.id, K.RemediateIn(threshold=0.5), user=u, db=s)
+    assert res == {"students": 0, "cards_requeued": 0, "exercises_created": 0}
+
+
+@pytest.mark.asyncio
+async def test_aufgabe_ohne_thema_zaehlt_nirgends(s):
+    """Nur Aufgaben MIT Thema bilden das Fehlerprofil — eine Aufgabe ohne Thema
+    darf keine Themenquote verfaelschen."""
+    u, cls, A, B, s1, s2 = await _setup(s)
+    w = await K.create_work(K.WorkIn(class_id=cls.id, name="KA"), user=u, db=s)
+    tasks = [{"id": "t1", "label": "", "topic_id": A.id, "max": 2}, {"id": "t2", "label": "", "max": 10}]
+    results = {str(s1.id): {"t1": 2, "t2": 0}}
+    await K.update_work(w.id, K.WorkPut(tasks=tasks, results=results), user=u, db=s)
+    an = await K.analysis(w.id, user=u, db=s)
+    assert [x["topic_id"] for x in an["topics"]] == [A.id]
+    assert an["topics"][0]["pct"] == 100
+
+
+@pytest.mark.asyncio
 async def test_fremdes_thema_verworfen(s):
     u, cls, A, B, s1, s2 = await _setup(s)
     v = User(email="v@b.de", password_hash="x", name="V"); s.add(v); await s.flush()

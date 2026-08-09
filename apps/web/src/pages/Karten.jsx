@@ -172,7 +172,10 @@ export default function Karten() {
   };
   const folderPath = (fid) => { const byId = Object.fromEntries(cardFolders.map((f) => [f.id, f])); const path = []; let cur = fid; while (cur != null && byId[cur]) { path.unshift(byId[cur]); cur = byId[cur].parent_id ?? null; } return path; };
   const createFolder = async (name) => { if (!name || !name.trim() || !classId) return; await fetch(`${API}/classes/${classId}/card-folders${kq}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), parent_id: currentCardFolder }) }).catch(() => {}); loadFolders(classId); };
-  const renameFolder = async (f) => { const n = await askPrompt(t("karten.renameFolder"), f.name); if (n == null) return; await fetch(`${API}/card-folders/${f.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n.trim(), parent_id: f.parent_id ?? null }) }).catch(() => {}); loadFolders(classId); };
+  // askPrompt nimmt ein Optionen-Objekt, keinen zweiten Text: der bisherige Name
+  // gehoert unter „initial", sonst startet das Feld leer und die Lehrkraft muss
+  // ihn abtippen (oder speichert versehentlich einen leeren Ordnernamen).
+  const renameFolder = async (f) => { const n = await askPrompt(t("karten.renameFolder"), { initial: f.name }); if (n == null || !n.trim()) return; await fetch(`${API}/card-folders/${f.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n.trim(), parent_id: f.parent_id ?? null }) }).catch(() => {}); loadFolders(classId); };
   const deleteFolder = async (f) => { if (!await askConfirm(t("karten.delFolderConfirm"))) return; await fetch(`${API}/card-folders/${f.id}`, { method: "DELETE" }).catch(() => {}); if (currentCardFolder === f.id) setCurrentCardFolder(f.parent_id ?? null); loadFolders(classId); loadDecks(classId); };
   const moveDeck = async (deck, folderId) => { await fetch(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", folder_id: folderId }) }).catch(() => {}); loadDecks(classId); };
   // Aus dem „+"-Menü gewählten Typ anlegen (Stapel im aktuellen Ordner / Ordner).

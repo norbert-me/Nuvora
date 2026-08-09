@@ -205,8 +205,9 @@ async def test_release_deck_via_kurs(s):
 @pytest.mark.asyncio
 async def test_deck_created_after_entry_schedules(s):
     """Wird das Deck NACH dem Kalender-Eintrag angelegt, plant die Deck-Seite die
-    Freischaltung zum Eintragsdatum und verlinkt den Eintrag (Gegenstück zur
-    Kalender-Seite)."""
+    Freischaltung auf den Eintragstag und verlinkt den Eintrag (Gegenstück zur
+    Kalender-Seite). Freigeschaltet wird ab TAGESBEGINN, nicht zur Uhrzeit des
+    Eintrags — sonst sieht die erste Stunde den Stapel noch nicht."""
     from datetime import datetime, timezone
     from app.models import Topic, CalendarEntry, UserModule
     from app.routers import karten as KR
@@ -220,7 +221,8 @@ async def test_deck_created_after_entry_schedules(s):
 
     deck = await KR.create_deck(a.id, KR.DeckIn(name="D", topic_id=topic.id), kurs_id=None, user=u, db=s)
     await s.refresh(deck); await s.refresh(e)
-    assert deck.released_at == e.date          # zum Termin geplant
+    # ab Beginn des Termintags (SQLite gibt den Zeitstempel ohne Zeitzone zurueck)
+    assert deck.released_at.replace(tzinfo=None) == datetime(2026, 9, 14)
     assert e.karten_deck_id == deck.id         # Eintrag verlinkt
 
 

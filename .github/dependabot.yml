@@ -3,6 +3,16 @@
 # Meldungen nicht im Rauschen untergehen.
 version: 2
 updates:
+  # pip liest in /apps/api beide .txt-Dateien: die Bereiche in requirements.txt
+  # und die festen Fassungen samt Hashes in requirements.lock.txt. Genau darum
+  # sieht Dependabot ueberhaupt erst die mitgezogenen Pakete (starlette, cffi,
+  # pillow ...) — an den Bereichen allein sind sie unsichtbar. Dependabot schreibt
+  # Fassung und Hash in der Lock-Datei fort, rechnet den Baum aber NICHT neu (das
+  # kann es nur, wenn die Quelle requirements.in heisst). Nach dem Zusammenfuehren
+  # eines solchen PR also einmal neu erzeugen — Befehl im Kopf von requirements.txt:
+  #   cd apps/api && pip-compile --allow-unsafe --generate-hashes --strip-extras \
+  #     --output-file=requirements.lock.txt requirements.txt
+  # Gruppiert, damit Quelle und Lock in EINEM PR wandern und nicht auseinanderlaufen.
   - package-ecosystem: pip
     directory: /apps/api
     schedule: { interval: weekly }
@@ -29,6 +39,15 @@ updates:
     schedule: { interval: monthly }
   - package-ecosystem: docker
     directory: /apps/web
+    schedule: { interval: monthly }
+
+  # docker-compose.yml wird vom docker-Oekosystem NICHT erfasst (das liest nur
+  # Dockerfiles). Ohne diesen Eintrag veralten die Digests von postgres und dem
+  # Proxy-nginx still. Achtung: nginx steckt an zwei Stellen (hier und in
+  # apps/web/Dockerfile) und kommt in zwei getrennten Vorschlaegen — bis beide
+  # zusammengefuehrt sind, koennen die Fassungen auseinanderlaufen.
+  - package-ecosystem: docker-compose
+    directory: /
     schedule: { interval: monthly }
 
   - package-ecosystem: github-actions

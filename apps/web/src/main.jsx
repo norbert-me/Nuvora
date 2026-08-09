@@ -92,7 +92,7 @@ import { useModules } from "./core/modules.js";
 import { DialogHost } from "./core/dialog.jsx";
 import { UndoHost } from "./core/undo.jsx";
 import { OutboxHost } from "./core/OutboxHost.jsx";
-import { btnPrimary, btnSecondary, btnSmall, Skeleton } from "./components/Icons.jsx";
+import { btnPrimary, btnSecondary, btnSmall, Skeleton, Modal } from "./components/Icons.jsx";
 
 // Alle uebrigen Seiten kommen erst beim Aufruf ueber die Leitung. Vorher lag
 // jedes Modul im selben Bundle: wer nur den Kalender oeffnet, lud auch Scanner,
@@ -141,6 +141,44 @@ const Tafel = React.lazy(() => import("./pages/Tafel.jsx"));
 // Ladezustand fuer nachgeladene Seiten: dieselben pulsierenden Balken wie beim
 // Datenladen — eine Textzeile „laedt…" wuerde die Seite kurz zusammenfallen lassen.
 const PageFallback = () => <Skeleton rows={4} height={56} />;
+
+// Seiten werden erst beim Aufruf nachgeladen. Faellt so ein Nachladen aus —
+// neue Version ist ausgerollt und die alte Datei gibt es nicht mehr, oder das
+// Schul-WLAN hakt kurz —, warf React bisher den ganzen Baum weg: weisse Seite,
+// keine Navigation, nichts anklickbar. Die Lehrkraft haette raten muessen, dass
+// ein Neuladen hilft.
+// Deshalb: einmal automatisch neu laden (danach liegt die neue Datei vor), und
+// falls das auch nicht hilft, wenigstens eine Erklaerung mit Knopf zeigen.
+class LadeFehler extends React.Component {
+  constructor(props) { super(props); this.state = { fehler: null }; }
+  static getDerivedStateFromError(fehler) { return { fehler }; }
+  componentDidCatch(fehler) {
+    // Nur ein fehlgeschlagenes Nachladen rechtfertigt einen Reload — ein echter
+    // Fehler in der Seite wuerde sonst in einer Schleife enden.
+    const nachladefehler = /dynamically imported module|Importing a module script failed|Failed to fetch/i.test(fehler?.message || "");
+    let schonProbiert = true;
+    try { schonProbiert = sessionStorage.getItem("nuvora_chunk_reload") === "1"; } catch { /* egal */ }
+    if (nachladefehler && !schonProbiert) {
+      try { sessionStorage.setItem("nuvora_chunk_reload", "1"); } catch { /* egal */ }
+      window.location.reload();
+    }
+  }
+  componentDidUpdate(prev) {
+    // Andere Seite aufgerufen: nochmal versuchen, statt den Fehler kleben zu lassen.
+    if (prev.pfad !== this.props.pfad && this.state.fehler) this.setState({ fehler: null });
+  }
+  render() {
+    if (!this.state.fehler) return this.props.children;
+    return (
+      <div style={{ padding: "48px 16px", textAlign: "center" }}>
+        <p style={{ fontSize: 15, color: "var(--text2)", marginBottom: 16, lineHeight: 1.6 }}>
+          Diese Seite konnte nicht geladen werden. Meist liegt es an einer neuen Version oder einer kurzen Netzstörung.
+        </p>
+        <button onClick={() => { try { sessionStorage.removeItem("nuvora_chunk_reload"); } catch { /* egal */ } window.location.reload(); }} style={btnPrimary}>Neu laden</button>
+      </div>
+    );
+  }
+}
 // Navigation ist modulbezogen: die Shell zeigt die Punkte des Moduls, in dem
 // man gerade ist. Ausserhalb eines Moduls navigiert Nuvora selbst.
 const CV = "/cardvote";
@@ -320,7 +358,10 @@ const getModuleNavItems = (t, location) => {
 // haben, landet bei der Modulauswahl statt auf einer kaputten Seite.
 function ModuleGate({ moduleKey, children }) {
   const { modules, loading } = useModules();
-  if (loading) return null;
+  // Beim ersten Besuch (noch kein Modul-Cache) und auf langsamer Verbindung
+  // stand hier ein leerer Bereich unter der Navigation. Dieselben Ladebalken wie
+  // beim Nachladen der Seite: die Lehrkraft sieht, dass etwas kommt.
+  if (loading) return <PageFallback />;
   const mod = modules.find((m) => m.key === moduleKey);
   if (!mod?.active) return <Navigate to="/modules" replace />;
   return children;
@@ -736,18 +777,19 @@ function FirstRun({ user }) {
   const startGuided = () => { done(); setTimeout(() => window.dispatchEvent(new Event("nuvora:start-tour")), 60); };
 
   return (
-    <div onClick={() => done()} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 300 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--card)", borderRadius: 20, maxWidth: 440, width: "100%", padding: 28, border: "1px solid var(--border)" }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>{t("onboard.title")}</h2>
-        <p style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.6, marginBottom: 20 }}>{t("onboard.text")}</p>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button onClick={startGuided} style={btnPrimary}>{t("onboard.tour")}</button>
-          <button onClick={() => done("/help")} style={btnSecondary}>{t("onboard.help")}</button>
-          <button onClick={() => done()} style={{ ...btnSecondary, marginLeft: "auto" }}>{t("onboard.later")}</button>
-        </div>
-        <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 14 }}>{t("onboard.note")}</p>
+    // Der allererste Dialog einer neuen Lehrkraft — deshalb ueber dieselbe
+    // Modal-Komponente wie alle anderen: Fokus faengt darin, Escape schliesst,
+    // der Hintergrund scrollt nicht.
+    <Modal onClose={() => done()} width={440} title={t("onboard.title")} titleStyle={{ fontSize: 20, marginBottom: 8 }}
+      style={{ borderRadius: 20, padding: 28 }} overlayStyle={{ zIndex: 300 }}>
+      <p style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.6, marginBottom: 20 }}>{t("onboard.text")}</p>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button onClick={startGuided} style={btnPrimary}>{t("onboard.tour")}</button>
+        <button onClick={() => done("/help")} style={btnSecondary}>{t("onboard.help")}</button>
+        <button onClick={() => done()} style={{ ...btnSecondary, marginLeft: "auto" }}>{t("onboard.later")}</button>
       </div>
-    </div>
+      <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 14 }}>{t("onboard.note")}</p>
+    </Modal>
   );
 }
 
@@ -766,6 +808,7 @@ function AppRoutes({ user, setUser, logout }) {
       <Nav user={user} onLogout={logout} />
       {user && <FirstRun user={user} />}
       <ContentWrapper>
+        <LadeFehler pfad={location.pathname}>
         <React.Suspense fallback={<PageFallback />}>
         <Routes>
           {/* ─── Nuvora-Rahmen ─── */}
@@ -832,6 +875,7 @@ function AppRoutes({ user, setUser, logout }) {
           ))}
         </Routes>
         </React.Suspense>
+        </LadeFehler>
       </ContentWrapper>
       <footer style={{ textAlign: "center", padding: "16px 0 24px", fontSize: 12, color: "var(--text3)" }}>
         {/* Rueckmeldungs-Hinweis: stand frueher nur auf der Landing- und der
@@ -969,15 +1013,17 @@ function App() {
         <UpdateBanner />
         {/* Die beiden oeffentlichen Seiten liegen ausserhalb des Rahmens und
             brauchen deshalb ihre eigene Ladehuelle. */}
-        <React.Suspense fallback={<div style={{ padding: "32px 16px" }}><PageFallback /></div>}>
-          <Routes>
-            {/* Kartenlernen der Schueler: oeffentlich, ohne Login, ueber Token. */}
-            <Route path="/lernen/:token" element={<Lernen />} />
-            {/* Code-Detektiv: öffentliches Beitreten der Schüler ohne Login. */}
-            <Route path="/cd/:code/*" element={<PublicCd />} />
-            <Route path="/*" element={<AppRoutes user={user} setUser={setUser} logout={logout} />} />
-          </Routes>
-        </React.Suspense>
+        <LadeFehler>
+          <React.Suspense fallback={<div style={{ padding: "32px 16px" }}><PageFallback /></div>}>
+            <Routes>
+              {/* Kartenlernen der Schueler: oeffentlich, ohne Login, ueber Token. */}
+              <Route path="/lernen/:token" element={<Lernen />} />
+              {/* Code-Detektiv: öffentliches Beitreten der Schüler ohne Login. */}
+              <Route path="/cd/:code/*" element={<PublicCd />} />
+              <Route path="/*" element={<AppRoutes user={user} setUser={setUser} logout={logout} />} />
+            </Routes>
+          </React.Suspense>
+        </LadeFehler>
       </BrowserRouter>
     </LanguageProvider>
   );

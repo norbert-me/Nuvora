@@ -72,14 +72,26 @@ def test_kaputter_hash_laesst_niemanden_durch():
         assert not A._verify_pw("Geheim!2345", kaputt)
 
 
-def test_hash_traegt_verfahren_und_iterationszahl():
-    """Die Iterationszahl muss im Hash stehen, sonst sperrt jede Erhöhung
-    sämtliche Bestandskonten aus."""
+def test_kaputter_argon2_string_wirft_nicht():
+    """Argon2 wirft bei unlesbarem Hash eine Ausnahme — die darf nicht als
+    HTTP 500 durchschlagen, sonst ist ein defektes Konto von außen erkennbar."""
+    for kaputt in ("$argon2id$", "$argon2id$v=19$m=19456,t=2,p=1$kein-salt",
+                   "$argon2id$v=19$m=19456,t=2,p=1$" + "A" * 22 + "$" + "B" * 43,
+                   "$argon2xy$v=19$m=19456,t=2,p=1$AAAA$BBBB"):
+        assert not A._verify_pw("Geheim!2345", kaputt)
+        assert not A._pw_veraltet(kaputt), "ein unbrauchbarer Hash ist nichts zum Aufrüsten"
+
+
+def test_neue_hashes_sind_argon2id_mit_owasp_parametern():
+    """Argon2id ist das Standardverfahren; die Parameter stehen im Hash, damit
+    sie sich später erhöhen lassen, ohne Bestandskonten auszusperren."""
     h = A._hash_pw("Geheim!2345")
-    algo, iters, salt, digest = h.split("$")
-    assert algo == "pbkdf2_sha256"
-    assert int(iters) == A.PW_ITERATIONS >= 600_000, "OWASP-Empfehlung für PBKDF2-SHA256"
-    assert len(salt) >= 16 and len(digest) == 64
+    assert h.startswith("$argon2id$v=19$")
+    assert f"m={A.ARGON2_MEMORY_COST},t={A.ARGON2_TIME_COST},p={A.ARGON2_PARALLELISM}" in h
+    assert A.ARGON2_MEMORY_COST >= 19_456 and A.ARGON2_TIME_COST >= 2, "OWASP-Mindestwerte"
+    assert A._verify_pw("Geheim!2345", h)
+    assert not A._verify_pw("geheim!2345", h)
+    assert not A._pw_veraltet(h), "frisch erzeugt — nichts zu wandern"
 
 
 def _alter_hash(passwort: str) -> str:
@@ -87,12 +99,25 @@ def _alter_hash(passwort: str) -> str:
     return f"{'ab' * 16}${A._pbkdf2(passwort, 'ab' * 16, A.PW_ITERATIONS_LEGACY)}"
 
 
-def test_bestandskonten_im_alten_format_kommen_weiter_rein():
+def test_pbkdf2_hash_traegt_verfahren_und_iterationszahl():
+    """Das zweite Bestandsformat: die Iterationszahl steht im Hash, sonst sperrt
+    jede Erhöhung sämtliche damit angelegten Konten aus."""
+    h = A._hash_pbkdf2("Geheim!2345")
+    algo, iters, salt, digest = h.split("$")
+    assert algo == "pbkdf2_sha256"
+    assert int(iters) == A.PW_ITERATIONS >= 600_000, "OWASP-Empfehlung für PBKDF2-SHA256"
+    assert len(salt) >= 16 and len(digest) == 64
+
+
+def test_bestandskonten_in_beiden_pbkdf2_formaten_kommen_weiter_rein():
     alt = _alter_hash("Geheim!2345")
     assert alt.count("$") == 1, "das alte Format wird an der Zahl der Dollarzeichen erkannt"
-    assert A._verify_pw("Geheim!2345", alt)
-    assert not A._verify_pw("falsch", alt)
-    assert A._pw_veraltet(alt) and not A._pw_veraltet(A._hash_pw("Geheim!2345"))
+    neu = A._hash_pbkdf2("Geheim!2345")
+    for h in (alt, neu):
+        assert A._verify_pw("Geheim!2345", h)
+        assert not A._verify_pw("falsch", h)
+        assert A._pw_veraltet(h), "PBKDF2 soll beim nächsten Login auf Argon2id wandern"
+    assert not A._pw_veraltet(A._hash_pw("Geheim!2345"))
 
 
 def test_manipulierte_iterationszahl_rechnet_nicht_endlos():
@@ -104,26 +129,28 @@ def test_manipulierte_iterationszahl_rechnet_nicht_endlos():
 
 
 @pytest.mark.asyncio
-async def test_login_hebt_alten_hash_still_an(s):
+@pytest.mark.parametrize("bestand", ["alt", "pbkdf2"])
+async def test_login_hebt_alten_hash_still_auf_argon2id(s, bestand):
     """Nur beim Login liegt der Klartext vor — also wird genau dort aufgerüstet,
-    ohne dass die Lehrkraft etwas merkt."""
+    ohne dass die Lehrkraft etwas merkt. Beide PBKDF2-Formate wandern."""
     u = await _konto(s)
-    u.password_hash = _alter_hash("Geheim!2345")
+    u.password_hash = _alter_hash("Geheim!2345") if bestand == "alt" else A._hash_pbkdf2("Geheim!2345")
     await s.commit()
 
     await A.login(A.LoginBody(email="lehrkraft@schule.de", password="Geheim!2345"), _Anfrage(), s)
 
-    assert u.password_hash.startswith("pbkdf2_sha256$"), "Hash wurde nicht angehoben"
+    assert u.password_hash.startswith("$argon2id$"), "Hash ist nicht auf Argon2id gewandert"
     assert not A._pw_veraltet(u.password_hash)
     assert A._verify_pw("Geheim!2345", u.password_hash), "das Passwort muss dasselbe bleiben"
 
 
 @pytest.mark.asyncio
-async def test_aufruesten_meldet_offene_sitzungen_nicht_ab(s):
+@pytest.mark.parametrize("bestand", ["alt", "pbkdf2"])
+async def test_aufruesten_meldet_offene_sitzungen_nicht_ab(s, bestand):
     """Das Anheben ist eine interne Umformatierung, kein Passwortwechsel — würde
     token_version dabei steigen, flöge man auf allen anderen Geräten raus."""
     u = await _konto(s)
-    u.password_hash = _alter_hash("Geheim!2345")
+    u.password_hash = _alter_hash("Geheim!2345") if bestand == "alt" else A._hash_pbkdf2("Geheim!2345")
     vorher = u.token_version or 0
     await s.commit()
 

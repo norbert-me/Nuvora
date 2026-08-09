@@ -158,12 +158,20 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
     if body.results is not None:
         # {student_id: {task_id: erreichte Punkte}}. Altformat (Liste falscher
         # Aufgaben) wird beim Lesen (_profile) mitübersetzt, hier nur Punkte-Maps.
+        # Punkte bleiben in 0..Maximum der Wertungseinheit: ein Vertipper (77
+        # statt 7) ergäbe sonst über 100 % und damit einen Notenwert unter 1,0 —
+        # den die Übernahme ins Notenbuch stillschweigend wegwirft.
+        umax = {uid: mx for t in (w.tasks or []) for uid, mx in _units(t)}
+        def _punkte(uid, p):
+            if isinstance(p, bool) or not isinstance(p, (int, float)):
+                return 0
+            return max(0.0, min(float(p), umax[uid])) if uid in umax else max(0.0, float(p))
         out = {}
         for k, v in list(body.results.items())[:400]:
             if v == "abwesend":
                 out[str(k)] = "abwesend"                 # abwesend: zählt nicht in die Auswertung
             elif isinstance(v, dict):
-                out[str(k)] = {str(tid)[:40]: (float(p) if isinstance(p, (int, float)) else 0) for tid, p in list(v.items())[:200]}
+                out[str(k)] = {str(tid)[:40]: _punkte(str(tid)[:40], p) for tid, p in list(v.items())[:200]}
             elif isinstance(v, list):
                 out[str(k)] = [str(x)[:40] for x in v]  # Altformat unverändert durchreichen
         w.results = out
@@ -262,13 +270,17 @@ async def analysis(work_id: int, user: User = Depends(require_module), db: Async
         for sid, pr in prof.items():
             e, m = pr.get(tid, [0, 0]); erreicht += e; mx += m
         klass[tid] = {"topic_id": tid, "label": label(tid), "pct": round(erreicht / mx * 100) if mx else 0}
-    # Je SuS schwache Themen (< 50 % der Punkte erreicht)
-    studs = {s.id: s.name for s in (await db.execute(select(Student).where(Student.id.in_([int(x) for x in prof.keys()])))).scalars().all()} if prof else {}
+    # Je SuS schwache Themen (< 50 % der Punkte erreicht). Zeilen ohne saubere
+    # Schueler-ID (Altbestand) werden uebergangen, nicht mit einem Fehler quittiert.
+    ids = {sid: int(sid) for sid in prof if str(sid).lstrip("-").isdigit()}
+    studs = {s.id: s.name for s in (await db.execute(select(Student).where(Student.id.in_(list(ids.values()))))).scalars().all()} if ids else {}
     per_student = []
     for sid, pr in prof.items():
+        if sid not in ids:
+            continue
         schwach = [label(tid) for tid, (e, m) in pr.items() if m and e / m < 0.5]
         if schwach:
-            per_student.append({"student_id": int(sid), "name": studs.get(int(sid), "?"), "weak": sorted(schwach)})
+            per_student.append({"student_id": ids[sid], "name": studs.get(ids[sid], "?"), "weak": sorted(schwach)})
     return {"topics": sorted(klass.values(), key=lambda x: x["pct"]), "students": sorted(per_student, key=lambda x: x["name"])}
 
 
@@ -287,6 +299,8 @@ async def remediate(work_id: int, body: RemediateIn, user: User = Depends(requir
     prof, _ = _profile(w)
     weak_by_student = {}
     for sid, pr in prof.items():
+        if not str(sid).lstrip("-").isdigit():
+            continue
         weak = {tid for tid, (e, m) in pr.items() if m and e / m < body.threshold}
         if weak:
             weak_by_student[int(sid)] = weak

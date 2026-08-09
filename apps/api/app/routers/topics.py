@@ -15,7 +15,10 @@ from sqlalchemy import select, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Question, Topic, User, CardDeck, Exercise, CalendarEntry, CodePuzzle, LearningLadder, LearningPath
+from ..models import (
+    Question, Topic, User, CardDeck, Exercise, CalendarEntry, CodePuzzle,
+    LearningLadder, LearningPath, GradeCategory, Method, TimetableSlot, Material,
+)
 from .auth import get_current_user, rate_limit
 from .modules import is_active
 
@@ -264,9 +267,27 @@ async def delete_topic(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Loescht das Thema samt Unterthemen. Fragen bleiben, verlieren nur ihr
-    Thema (FK ist ON DELETE SET NULL) — Modulinhalte gehen nie verloren, weil
-    im Kern aufgeraeumt wird."""
+    """Loescht das Thema samt Unterthemen. Modulinhalte bleiben, verlieren nur
+    ihr Thema.
+
+    Das ON DELETE SET NULL der Modelle allein reicht dafuer nicht: die meisten
+    topic_id-Spalten sind in gewachsenen Datenbanken per ALTER TABLE
+    nachgezogen (siehe _ensure_columns in main.py) und tragen dort gar keinen
+    Fremdschluessel. Ohne diesen Schritt behielten Fragen, Stapel & Co. die ID
+    eines Themas, das es nicht mehr gibt. Also hier ausdruecklich loesen."""
+    from sqlalchemy import update
+
     topic = await _owned(db, user, topic_id)
+    # Thema samt aller Nachfahren (das Loeschen kaskadiert ueber parent_id).
+    ids = {topic.id}
+    rand = [topic.id]
+    while rand:
+        kinder = (await db.execute(select(Topic.id).where(Topic.parent_id.in_(rand)))).scalars().all()
+        rand = [k for k in kinder if k not in ids]
+        ids.update(rand)
+    ids = list(ids)
+    for modell in (Question, CardDeck, Exercise, CalendarEntry, CodePuzzle,
+                   LearningLadder, GradeCategory, Method, TimetableSlot, Material):
+        await db.execute(update(modell).where(modell.topic_id.in_(ids)).values(topic_id=None))
     await db.delete(topic)
     await db.commit()

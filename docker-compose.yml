@@ -16,9 +16,21 @@ x-logging: &logs
     max-size: "10m"
     max-file: "3"
 
+# Images sind auf ihren Digest festgenagelt: bewegliche Tags wie "postgres:16"
+# zeigen jede Woche woanders hin, damit ergeben zwei Builds vom selben Commit
+# unterschiedliche Container. Der Tag bleibt trotzdem stehen, damit lesbar ist,
+# was gemeint ist — gebunden wird der Digest dahinter.
+#
+# Digest neu holen (Beispiel postgres:16; fuer nginx:alpine beide Stellen —
+# hier und apps/web/Dockerfile — gleich setzen):
+#   N=postgres T=16; TOKEN=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/$N:pull" | python3 -c "import json,sys;print(json.load(sys.stdin)['token'])"); curl -sI -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json" "https://registry-1.docker.io/v2/library/$N/manifests/$T" | grep -i docker-content-digest
+#
+# Wichtig: den Index-Digest nehmen (Accept-Header oben), nicht den einer
+# einzelnen Architektur — der Server laeuft amd64, entwickelt wird auf arm64.
+
 services:
   db:
-    image: postgres:16
+    image: postgres:16@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b
     restart: unless-stopped
     logging: *logs
     environment:
@@ -90,7 +102,9 @@ services:
   # Container mehr. Frueher: eigener Statik-Container hinter /lernpfad-app/.
 
   proxy:
-    image: nginx:alpine
+    # Digest festgenagelt, siehe Kopf der Datei. Gleiche Fassung wie in
+    # apps/web/Dockerfile — beide zusammen aktualisieren.
+    image: nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752
     restart: unless-stopped
     logging: *logs
     ports:

@@ -1,3 +1,8 @@
+# Nur zum Testen — bewusst ohne Lock-Datei und ohne Hashes. Diese Pakete laufen
+# nie im Container und nie in Produktion: sie laden keinen Anwendungscode aus,
+# den ein Nutzer erreicht. Kaeme hier eine unerwartete Fassung, faellt das sofort
+# als roter Testlauf auf, statt still in eine Auslieferung zu rutschen. Was
+# ausgeliefert wird, steht in requirements.lock.txt und ist dort festgenagelt.
 pytest>=8.0,<9.0
 pytest-asyncio>=0.23,<1.0
 aiosqlite>=0.19,<1.0

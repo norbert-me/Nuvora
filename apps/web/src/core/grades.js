@@ -3,8 +3,22 @@
 // pro Lehrkraft (users.grade_scale); ohne sie gilt DEFAULT_SCALE.
 export const DEFAULT_SCALE = { 1: 87, 2: 73, 3: 59, 4: 45, 5: 20, 6: 0 };
 
+// Notenschluessel pruefen: fehlt eine Stufe oder steht Unlesbares darin, gilt
+// der Standard. Sonst rechnete die Seite mit NaN weiter (ein NaN-Vergleich ist
+// immer falsch, die Bereichspruefung greift also nicht) oder gab allen eine 6.
+// Die Python-Seite (noten.py _grade_from_pct) macht genau das schon.
+function skala(scale) {
+  const s = {};
+  for (const stufe of [1, 2, 3, 4, 5, 6]) {
+    const wert = Number(scale?.[stufe]);
+    if (!Number.isFinite(wert)) return DEFAULT_SCALE;
+    s[stufe] = wert;
+  }
+  return s;
+}
+
 export function gradeFromPct(pct, scale) {
-  const s = scale || DEFAULT_SCALE;
+  const s = skala(scale);
   const ranges = [
     [1, s[1], 100],
     [2, s[2], s[1]],
@@ -26,7 +40,7 @@ export function gradeFromPct(pct, scale) {
 // Klassenarbeits-Auswertung. Basis-Note aus der Lehrer-Skala; innerhalb des
 // Bandes oberes Drittel „+", unteres „-". Kein „1-", kein „6+/-".
 export function gradeDetailed(pct, scale) {
-  const s = scale || DEFAULT_SCALE;
+  const s = skala(scale);
   const ranges = [
     [1, s[1], 100], [2, s[2], s[1]], [3, s[3], s[2]],
     [4, s[4], s[3]], [5, s[5], s[4]],
@@ -36,7 +50,11 @@ export function gradeDetailed(pct, scale) {
       const span = upper - lower;
       const pos = span > 0 ? (pct - lower) / span : 1;   // 0 = unten, 1 = oben im Band
       let suffix = pos >= 2 / 3 ? "+" : pos < 1 / 3 ? "-" : "";
-      if (grade === 1 && suffix === "-") suffix = "";     // kein 1-
+      // Im Einserband gibt es weder 1- noch 1+: nach unten waere es eine 2,
+      // nach oben ein Notenwert von 0,7 — den weist die Notenuebernahme als
+      // ausserhalb von 1..6 zurueck, und zwar STILL. Der beste Schueler der
+      // Klasse fiel damit aus der uebernommenen Spalte heraus.
+      if (grade === 1) suffix = "";
       const wert = grade + (suffix === "+" ? -0.3 : suffix === "-" ? 0.3 : 0);
       return { note: grade + suffix, wert: Math.round(wert * 10) / 10, grade };
     }

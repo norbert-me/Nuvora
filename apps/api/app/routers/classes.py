@@ -156,11 +156,20 @@ class ClassCreate(BaseModel):
     def limit_students(cls, v):
         if len(v) > 60:
             raise ValueError("Zu viele Lernende (max. 60 pro Klasse)")
+        # Die card_id ist die Identitaet, ueber die update_class zusammenfuehrt
+        # (siehe dort). Kaeme sie doppelt, wuerde der zweite Schueler den ersten
+        # ueberschreiben und einer verschwaende still — lieber ablehnen.
+        karten = [s.card_id for s in v]
+        if len(set(karten)) != len(karten):
+            raise ValueError("Jede Kartennummer darf nur einmal vorkommen")
         return v
 
     @field_validator("name")
     @classmethod
     def name_len(cls, v):
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("Klassenname darf nicht leer sein")
         if len(v) > 100:
             raise ValueError("Klassenname zu lang")
         return v

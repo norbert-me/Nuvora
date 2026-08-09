@@ -36,8 +36,42 @@ def _now():
     return datetime.now(timezone.utc)
 
 
+def _utc(dt):
+    """Zeitstempel vergleichbar machen.
+
+    Postgres liefert TIMESTAMPTZ mit Zeitzone zurueck, SQLite (Tests, lokale
+    Pruefinstanz) ohne — ein Vergleich mit datetime.now(timezone.utc) wirft dann
+    "can't compare offset-naive and offset-aware datetimes", und zwar erst zur
+    Laufzeit auf dem Geraet eines Kindes.
+    """
+    if dt is not None and dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 def _token():
     return secrets.token_urlsafe(24)  # ~32 Zeichen, unratbar
+
+
+def _tagesbeginn(dt: datetime) -> datetime:
+    """Beginn des Kalendertags (UTC). Kalender-Eintraege sind auf die Tagesmitte
+    verankert; wer daraus direkt ein released_at macht, schaltet den Stapel erst
+    am Nachmittag frei — die Stunde am Vormittag sieht ihn nicht. Freigegeben
+    wird darum AB TAGESBEGINN.
+
+    Bewusst hier dupliziert (gleiche Funktion in kalender.py): kein Modul haengt
+    am anderen (Regel 3)."""
+    d = dt.date() if isinstance(dt, datetime) else dt
+    return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+
+
+# SM-2-Grenzen. Ohne Deckel waechst der Erleichterungsfaktor bei jedem „leicht"
+# weiter und das Intervall vervielfacht sich jedes Mal: nach ein paar Dutzend
+# Klicks (mit all=True kann ein Kind eine Karte beliebig oft ueben) liegt die
+# Faelligkeit jenseits von Jahr 9999 — datetime laeuft ueber (500er Fehler) und
+# die Karte kaeme nie wieder. Ein Jahr ist die Obergrenze fuer die Schule.
+EASE_MIN, EASE_MAX = 130, 300
+INTERVAL_MAX_DAYS = 365
 
 
 # Reifegrad einer Karte fuer das Histogramm. Ohne Review-Datensatz oder mit
@@ -318,7 +352,7 @@ async def _schedule_deck_from_calendar(db: AsyncSession, user: User, deck: CardD
             continue
         kurse = await class_kurs_ids(db, e.class_id)
         if e.class_id == deck.class_id or (deck.kurs_id is not None and deck.kurs_id in kurse):
-            deck.released_at = e.date           # zum Termin freischalten (frühester Eintrag)
+            deck.released_at = _tagesbeginn(e.date)  # ab Beginn des Termintags (frühester Eintrag)
             if not e.karten_deck_id:
                 e.karten_deck_id = deck.id       # Eintrag auf dieses Deck verlinken
             await db.commit()
@@ -623,7 +657,7 @@ async def student_card_image(token: str, card_id: int, side: str, db: AsyncSessi
     dw = await _student_deck_where(db, st)
     ok = (await db.execute(
         select(Card.id).join(CardDeck, Card.deck_id == CardDeck.id).where(
-            Card.id == card_id, dw, _niveau_where(st),
+            Card.id == card_id, dw, _niveau_where(st), Card.deleted_at.is_(None),
             CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None), CardDeck.released_at <= now,
         )
     )).scalar_one_or_none()
@@ -704,17 +738,25 @@ async def progress(class_id: int, kurs_id: Optional[int] = None, subset_kurs: Op
     if subset_kurs is not None:
         from .kurse import _owned_kurs
         await _owned_kurs(db, user, subset_kurs)
+    if kurs_id is not None:
+        from .kurse import _owned_kurs
+        await _owned_kurs(db, user, kurs_id)   # kurs_id kommt aus der URL: erst pruefen, wem er gehoert
     students = await _kurs_roster(db, user, class_id, subset_kurs)
     now = _now()
     # Nur ausgerollte Stapel zaehlen — Entwuerfe verzerren den Fortschritt nicht.
     deck_ids = (await db.execute(select(CardDeck.id).where(
+        CardDeck.owner_id == user.id,
         await _kurs_decks_where(cls, kurs_id),
         CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None),
         CardDeck.released_at <= now,
     ))).scalars().all()
     card_ids = []
     if deck_ids:
-        card_ids = (await db.execute(select(Card.id).where(Card.deck_id.in_(deck_ids)))).scalars().all()
+        # Geloeschte Karten zaehlen nicht mit: sonst sinkt „total" nie wieder, und
+        # weil eine geloeschte Karte nie gelernt wird, blieb sie fuer immer
+        # „faellig" — die Lehrkraft sah dauerhaft offene Karten, die es nicht gibt.
+        card_ids = (await db.execute(select(Card.id).where(
+            Card.deck_id.in_(deck_ids), Card.deleted_at.is_(None)))).scalars().all()
     total = len(card_ids)
     out = []
     for st in students:
@@ -765,8 +807,12 @@ async def student_cards(class_id: int, student_id: int, kurs_id: Optional[int] =
             raise HTTPException(404, "Schüler nicht in diesem Teilkurs")
     elif st.class_id != class_id:
         raise HTTPException(404, "Schüler nicht in dieser Klasse")
+    if kurs_id is not None:
+        from .kurse import _owned_kurs
+        await _owned_kurs(db, user, kurs_id)   # sonst liest ein fremder Kurs Stapelnamen + Kartentexte aus
     now = _now()
     decks = {d.id: d.name for d in (await db.execute(select(CardDeck).where(
+        CardDeck.owner_id == user.id,
         await _kurs_decks_where(cls, kurs_id), CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None), CardDeck.released_at <= now,
     ))).scalars().all()}
     if not decks:
@@ -797,6 +843,12 @@ async def _student_by_token(db: AsyncSession, token: str) -> Student:
     st = r.scalar_one_or_none()
     if not st:
         raise HTTPException(401, "Ungültiger Token")
+    # Klasse im Papierkorb: der Zugang ruht, bis sie wiederhergestellt wird. Sonst
+    # laufen die ausgeteilten Links (und damit der Einblick in Lernstand und
+    # Testergebnisse) weiter, obwohl die Lehrkraft die Klasse geloescht hat.
+    cls = await db.get(SchoolClass, st.class_id)
+    if cls is not None and cls.deleted_at is not None:
+        raise HTTPException(401, "Zugang nicht mehr gültig")
     return st
 
 
@@ -884,7 +936,14 @@ async def student_session(token: str, all: bool = False, db: AsyncSession = Depe
         CardDeck.released_at <= now,
     ))).scalars().all()
     if not decks:
-        return {"name": st.name, "cards": [], "total": 0, "due": 0, "learned": 0, "hist": _empty_hist()}
+        # Auch hier gehoert next_due dazu: wer NUR geplante Stapel hat (typisch am
+        # Tag vor der Stunde), bekam eine leere Seite ohne jeden Hinweis, wann es
+        # weitergeht — das Feld fehlte in dieser Abzweigung schlicht.
+        naechste = (await db.execute(select(sa_func.min(CardDeck.released_at)).where(
+            dw, _niveau_where(st), CardDeck.deleted_at.is_(None), CardDeck.released_at > now,
+        ))).scalar()
+        return {"name": st.name, "cards": [], "total": 0, "due": 0, "learned": 0,
+                "hist": _empty_hist(), "next_due": naechste.isoformat() if naechste else None}
     cards = (await db.execute(select(Card).where(Card.deck_id.in_(decks), Card.deleted_at.is_(None)).order_by(Card.position))).scalars().all()
     reviews = {r.card_id: r for r in (await db.execute(select(CardReview).where(CardReview.student_id == st.id))).scalars().all()}
     faellig = []
@@ -940,10 +999,26 @@ async def submit_review(token: str, body: ReviewIn, db: AsyncSession = Depends(g
     card = await db.get(Card, body.card_id)
     if not card:
         raise HTTPException(404, "Karte nicht gefunden")
-    # Gehoert die Karte zur Klasse des Schuelers?
     deck = await db.get(CardDeck, card.deck_id)
-    if not deck or deck.class_id != st.class_id:
+    if not deck:
+        raise HTTPException(404, "Karte nicht gefunden")
+    # Darf dieses Kind die Karte sehen? GENAU derselbe Massstab wie beim Austeilen
+    # (student_session): Stapel des Kurses ODER der eigenen Klasse, passendes
+    # Niveau. Frueher wurde nur deck.class_id == st.class_id geprueft — ein Stapel
+    # am KURS (also an der Geschwister-Fachklasse) wurde dem Kind angezeigt, jede
+    # Antwort darauf aber mit 403 abgewiesen.
+    now = _now()
+    dw = await _student_deck_where(db, st)
+    sichtbar = (await db.execute(select(CardDeck.id).where(
+        CardDeck.id == deck.id, dw, _niveau_where(st)))).scalar_one_or_none()
+    if not sichtbar:
         raise HTTPException(403, "Karte gehört nicht zu dieser Klasse")
+    # Raeumt die Lehrkraft auf, waehrend ein Kind lernt (Karte/Stapel geloescht,
+    # Freigabe zurueckgezogen), wird der Zug still verworfen: kein Fehler auf dem
+    # Kindergeraet und kein Fortschritt auf etwas, das es nicht mehr gibt.
+    if (card.deleted_at is not None or deck.deleted_at is not None
+            or deck.released_at is None or _utc(deck.released_at) > now):
+        return {"ok": True, "ignoriert": True}
 
     rev = (await db.execute(select(CardReview).where(
         CardReview.student_id == st.id, CardReview.card_id == card.id
@@ -960,23 +1035,23 @@ async def submit_review(token: str, body: ReviewIn, db: AsyncSession = Depends(g
     rev.lapses = 0 if rev.lapses is None else rev.lapses
 
     # SM-2 (vereinfacht): grade 0 zuruecksetzen, sonst Intervall/Ease anpassen.
-    now = _now()
+    # Ease und Intervall sind nach OBEN gedeckelt (EASE_MAX/INTERVAL_MAX_DAYS).
     if body.grade == 0:
         rev.reps = 0
         rev.interval_days = 0
         rev.lapses += 1
-        rev.ease = max(130, rev.ease - 20)
+        rev.ease = max(EASE_MIN, rev.ease - 20)
         rev.due = now + timedelta(minutes=10)
     else:
         q = body.grade + 2  # 1..3 -> SM-2 q 3..5
-        rev.ease = max(130, rev.ease + (q - 3) * 8 - (5 - q) * 2)
+        rev.ease = min(EASE_MAX, max(EASE_MIN, rev.ease + (q - 3) * 8 - (5 - q) * 2))
         rev.reps += 1
         if rev.reps == 1:
             rev.interval_days = 1
         elif rev.reps == 2:
             rev.interval_days = 3
         else:
-            rev.interval_days = max(1, round(rev.interval_days * rev.ease / 100))
+            rev.interval_days = min(INTERVAL_MAX_DAYS, max(1, round(rev.interval_days * rev.ease / 100)))
         rev.due = now + timedelta(days=rev.interval_days)
     rev.last_reviewed = now
     await db.commit()

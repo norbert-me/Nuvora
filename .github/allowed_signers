@@ -1,0 +1,10 @@
+# Wer Tags dieses Repositorys signieren darf (Format: git allowed_signers).
+#
+# Prüfen lässt sich eine Signatur damit so:
+#   git config gpg.ssh.allowedSignersFile .github/allowed_signers
+#   git verify-tag v4.0.0
+#
+# Ein neuer Schlüssel gehört hier hinein UND in die GitHub-Kontoeinstellungen
+# (Settings → SSH and GPG keys → New SSH key → Key type: Signing Key), sonst
+# zeigt GitHub die Signatur nicht als "Verified" an.
+norbert@varney.de ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPj6XuwUimJyp2ekOuyMkfRLpnTMPgG4f9pIrOWcbzK7

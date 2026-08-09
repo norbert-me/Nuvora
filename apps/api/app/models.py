@@ -694,6 +694,11 @@ class CodeSession(Base):
     results: Mapped[list] = mapped_column(JSON, default=list)   # [{playerName,puzzleId,solved,attempts,time}]
     started: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     ended: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # WANN beendet: die Aufraeumung loescht eine beendete Sitzung nach einem Tag.
+    # Ohne diesen Zeitpunkt lief die Frist ab dem Anlegen — eine am Montag
+    # vorbereitete und am Mittwoch gespielte Runde war binnen einer Stunde weg,
+    # bevor die Lehrkraft ihr Ergebnis als Notenspalte uebernehmen konnte.
+    ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     current_index: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

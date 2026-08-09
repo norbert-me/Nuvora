@@ -20,12 +20,29 @@ function _publish(mods) {
   _subscribers.forEach((fn) => fn(mods));
 }
 
-export async function fetchModules() {
-  const res = await fetch("/api/modules");
-  if (!res.ok) return [];
+// Auf einer Modulseite fragen mehrere Stellen gleichzeitig: ModuleGate, die
+// Navigation und jedes useAktiv() der Seite. Das waren bis zu vier identische
+// Anfragen je Seitenaufruf — auf dem Handy vier Roundtrips und unnoetig nah am
+// Rate-Limit. Laeuft schon eine Anfrage, haengen sich die anderen dran.
+let _laufend = null;
+async function _hole() {
+  // Offline/Abbruch darf keine unbehandelte Ablehnung erzeugen — die Shell
+  // arbeitet dann mit dem letzten bekannten Stand weiter.
+  const res = await fetch("/api/modules").catch(() => null);
+  if (!res || !res.ok) return _cache || [];   // Cache behalten statt leeren
   const mods = await res.json();
   _publish(mods);
   return mods;
+}
+export function fetchModules({ frisch = false } = {}) {
+  // frisch: nach einer Aenderung darf keine bereits laufende (noch alte)
+  // Anfrage geteilt werden, sonst zeigt die Oberflaeche den Stand von vorher.
+  if (_laufend && !frisch) return _laufend;
+  const p = _hole();
+  _laufend = p;
+  const frei = () => { if (_laufend === p) _laufend = null; };
+  p.then(frei, frei);
+  return p;
 }
 
 export async function setModuleActive(key, active) {
@@ -33,7 +50,7 @@ export async function setModuleActive(key, active) {
     method: active ? "POST" : "DELETE",
   });
   if (!res.ok) throw new Error("Modul konnte nicht geändert werden");
-  return fetchModules();
+  return fetchModules({ frisch: true });
 }
 
 // Bekannte Modul-Schluessel — muessen wortgleich zur REGISTRY im Backend sein

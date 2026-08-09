@@ -23,9 +23,12 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+      # Aus der Lock-Datei, damit die Tests gegen genau die Fassungen laufen, die
+      # auch im Container landen. Die Testwerkzeuge (requirements-dev.txt) duerfen
+      # frei bleiben: sie werden nie ausgeliefert.
       - name: Abhängigkeiten
         run: |
-          pip install -r requirements.txt
+          pip install --require-hashes -r requirements.lock.txt
           pip install -r requirements-dev.txt
       - name: pytest
         run: pytest -q
@@ -36,7 +39,7 @@ jobs:
         continue-on-error: true
         run: |
           pip install pip-audit
-          pip-audit -r requirements.txt
+          pip-audit --no-deps -r requirements.lock.txt
 
   web-build:
     runs-on: ubuntu-latest
@@ -52,6 +55,11 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
       - name: Installieren
         run: npm ci
+      # Die Logik unter src/core (E/G-Wertung, Notenskala, Modul-Schluessel).
+      # Einmalig, nicht im Watch-Modus — "vitest run" beendet sich selbst.
+      - name: Frontend-Tests
+        run: npm run test
+
       - name: Build
         run: npm run build
 

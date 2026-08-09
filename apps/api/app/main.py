@@ -197,6 +197,7 @@ def _ensure_columns(sync_conn):
         ("timetable_slots", "kurs_id", "INTEGER"),
         ("timetable_slots", "valid_from", "DATE"),
         ("timetable_slots", "valid_to", "DATE"),
+        ("code_sessions", "ended_at", "TIMESTAMPTZ"),
         ("work_analyses", "scale", "JSON"),
         ("work_analyses", "absent", "JSON"),
         ("questions", "topic_id", "INTEGER"),
@@ -690,9 +691,14 @@ async def _codesessions_aufraeumen():
     while True:
         try:
             async with async_session() as db:
+                # Die Frist laeuft ab dem ENDE, nicht ab dem Anlegen: eine
+                # vorbereitete Runde wird oft Tage spaeter gespielt, und ihr
+                # Ergebnis soll bis dahin uebernehmbar bleiben. Beendete
+                # Sitzungen ohne Zeitstempel (Bestand) faellt die Sieben-Tage-
+                # Regel weiter ab.
                 await db.execute(text(
                     "DELETE FROM code_sessions WHERE "
-                    "(ended = true AND created_at < now() - interval '1 day') "
+                    "(ended_at IS NOT NULL AND ended_at < now() - interval '1 day') "
                     "OR created_at < now() - interval '7 days'"
                 ))
                 await db.commit()

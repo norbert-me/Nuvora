@@ -1,3 +1,14 @@
+# HIER wird geschrieben — direkte Abhaengigkeiten mit Bereich.
+# Installiert wird daraus NICHT: Container und CI ziehen requirements.lock.txt
+# (feste Fassungen + Hashes). Nach jeder Aenderung hier die Lock-Datei neu
+# erzeugen, sonst laeuft der Container weiter auf dem alten Stand:
+#
+#   cd apps/api && pip install pip-tools && \
+#     pip-compile --allow-unsafe --generate-hashes --strip-extras \
+#       --output-file=requirements.lock.txt requirements.txt
+#
+# Mit Python 3.12 erzeugen (wie python:3.12-slim im Dockerfile) — pip-compile
+# loest fuer den Interpreter, unter dem es laeuft.
 fastapi>=0.110,<1.0
 uvicorn[standard]>=0.29,<1.0
 sqlalchemy>=2.0,<3.0
@@ -11,4 +22,9 @@ reportlab>=4.0,<5.0
 python-multipart>=0.0.9,<1.0
 openpyxl>=3.1,<4.0
 qrcode>=7.4,<8.0
-Pillow>=10.0,<12.0
+# Pillow 11.x traegt 25 bekannte Luecken (pip-audit gegen die Lock-Datei);
+# behoben sind sie erst in 12.x. Nuvora benutzt Pillow nicht direkt — es
+# kommt ueber qrcode und reportlab herein.
+Pillow>=12.3,<13.0
+argon2-cffi>=23.1,<26.0
+

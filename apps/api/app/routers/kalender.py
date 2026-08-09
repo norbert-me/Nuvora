@@ -6,7 +6,7 @@ Thema ist ON DELETE SET NULL, damit das Loeschen eines Themas keinen Eintrag
 mitreisst.
 """
 import re
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -154,6 +154,15 @@ async def update_entry(entry_id: int, body: EntryIn, user: User = Depends(requir
     return e
 
 
+def _tagesbeginn(dt) -> datetime:
+    """Beginn des Kalendertags (UTC). Eintraege sind auf die Tagesmitte verankert;
+    wer daraus direkt ein released_at macht, schaltet den Stapel erst am Nachmittag
+    frei — die Stunde am Vormittag sieht ihn nicht. Freigegeben wird AB TAGESBEGINN.
+    (Gleiche Funktion in karten.py — kein Modul haengt am anderen, Regel 3.)"""
+    d = dt.date() if isinstance(dt, datetime) else dt
+    return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+
+
 async def _release_matching_decks(db: AsyncSession, user: User, e: CalendarEntry) -> None:
     """Zusatz (Regel 3): plant der Kalender ein Thema, wird ein passender, noch
     nicht ausgerollter Karten-Stapel automatisch zum Termin freigeschaltet.
@@ -167,7 +176,7 @@ async def _release_matching_decks(db: AsyncSession, user: User, e: CalendarEntry
     if e.karten_deck_id:
         deck = await db.get(CardDeck, e.karten_deck_id)
         if deck and deck.owner_id == user.id and deck.released_at is None:
-            deck.released_at = e.date
+            deck.released_at = _tagesbeginn(e.date)
             await db.commit()
     if not e.topic_id:
         return
@@ -188,8 +197,8 @@ async def _release_matching_decks(db: AsyncSession, user: User, e: CalendarEntry
             q = q.where(CardDeck.class_id == e.class_id)
     matched = (await db.execute(q.order_by(CardDeck.id))).scalars().all()
     for deck in matched:
-        if deck.released_at is None:   # Entwürfe zum Termin freischalten
-            deck.released_at = e.date
+        if deck.released_at is None:   # Entwürfe ab Beginn des Termintags freischalten
+            deck.released_at = _tagesbeginn(e.date)
     # Automatisch mit dem Eintrag verknüpfen, wenn dort noch kein Stapel hängt.
     if matched and not e.karten_deck_id:
         e.karten_deck_id = matched[0].id
@@ -199,7 +208,9 @@ async def _release_matching_decks(db: AsyncSession, user: User, e: CalendarEntry
 async def _class_maps(db, user):
     rows = (await db.execute(select(SchoolClass).where((SchoolClass.owner_id == user.id) | (SchoolClass.owner_id.is_(None))))).scalars().all()
     id2name = {c.id: c.name for c in rows}
-    name2id = {c.name: c.id for c in rows}
+    # Zuordnung ueber den Namen NUR auf eigene Klassen: der Import haengte Eintraege
+    # sonst an kontenlose Alt-Klassen, die mehreren Konten gemeinsam sind.
+    name2id = {c.name: c.id for c in rows if c.owner_id == user.id}
     return id2name, name2id
 
 
@@ -329,6 +340,17 @@ async def delete_entry(entry_id: int, user: User = Depends(require_module), db: 
     e = await db.get(CalendarEntry, entry_id)
     if not e or e.owner_id != user.id:
         raise HTTPException(404, "Eintrag nicht gefunden")
+    # Haengt eine Klassenarbeit an diesem Eintrag, geht sie mit: sonst bleibt der
+    # Termin in der Klassenarbeits-Uebersicht (und zaehlt Stunden), obwohl er im
+    # Kalender geloescht wurde. Eine bereits befuellte Auswertung bleibt (Live-Daten).
+    ex = (await db.execute(select(ExamDate).where(
+        ExamDate.owner_id == user.id, ExamDate.entry_id == entry_id))).scalars().first()
+    if ex is not None:
+        if ex.work_id:
+            w = await db.get(WorkAnalysis, ex.work_id)
+            if w and w.owner_id == user.id and not (w.tasks or w.results):
+                await db.delete(w)
+        await db.delete(ex)
     await db.delete(e)
     await db.commit()
 
@@ -750,7 +772,11 @@ async def resync_subscribe(request: _Request, user: User = Depends(require_modul
 
 
 def _ics_escape(s: str) -> str:
-    return (s or "").replace("\\", "\\\\").replace(";", r"\;").replace(",", r"\,").replace("\n", r"\n")
+    """Text fuer eine ICS-Zeile entschaerfen. Auch \\r muss weg: ICS trennt Zeilen
+    mit CRLF — ein Wagenruecklauf aus einer Notiz haette den VEVENT mitten im Feld
+    beendet und den Rest des Feeds fuer den abonnierten Kalender zerlegt."""
+    return ((s or "").replace("\\", "\\\\").replace(";", r"\;").replace(",", r"\,")
+            .replace("\r\n", r"\n").replace("\r", r"\n").replace("\n", r"\n"))
 
 
 @router.get("/feed/{token}.ics")

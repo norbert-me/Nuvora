@@ -20,9 +20,19 @@ Die Regeln:
   der Wertung — die Lehrkraft kann ihn auf „anwesend" stellen, dann zählt seine
   0 überall mit (siehe status_of).
 """
+import math
 from typing import Optional
 
 DEFAULT_SCALE = {1: 87, 2: 73, 3: 59, 4: 45, 5: 20, 6: 0}
+
+
+def kaufmaennisch(x: float, stellen: int) -> float:
+    """Kaufmaennisch runden (die halbe Stelle geht nach oben) — wie Math.round
+    im Frontend. Pythons round() rundet die halbe Stelle zur geraden Zahl
+    ("Bankers Rounding"): 66,25 % wuerde hier 66,2 und dort 66,3 ergeben, und
+    dieselbe Arbeit stuende im PDF anders als auf dem Bildschirm."""
+    f = 10 ** stellen
+    return math.floor(x * f + 0.5) / f
 
 
 def naechste_stufe(pct: float, scale: dict) -> float:
@@ -61,7 +71,17 @@ def bewerte(questions, answers, *, niveau: str = "", niveau_aktiv: bool = False,
     scale = {int(k): v for k, v in (scale or DEFAULT_SCALE).items()}
 
     def gewicht(qid) -> float:
-        return float(w.get(str(qid), w.get(qid, 1)) or 0)
+        """Gewicht einer Frage. Fehlt es (oder ist es null), gilt 1 — wie im
+        Frontend. Unlesbares (Tippfehler in der Konfiguration) gilt als 0 und
+        darf die Wertung nicht mit einem Fehler abbrechen."""
+        v = w.get(str(qid), w.get(qid))
+        if v is None:
+            v = 1
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            return 0.0
+        return 0.0 if math.isnan(v) else v
 
     def beantwortet(q):
         return answers.get(q["id"]) or answers.get(str(q["id"]))
@@ -93,11 +113,11 @@ def bewerte(questions, answers, *, niveau: str = "", niveau_aktiv: bool = False,
         bonus_pct = anteil * naechste_stufe(base_pct, scale)
 
     return {
-        "score": round(score, 2),
-        "max_score": round(base_max, 2),
-        "base_pct": round(base_pct, 1),
-        "bonus_pct": round(bonus_pct, 1),
-        "pct": round(min(100.0, base_pct + bonus_pct), 1),
+        "score": kaufmaennisch(score, 2),
+        "max_score": kaufmaennisch(base_max, 2),
+        "base_pct": kaufmaennisch(base_pct, 1),
+        "bonus_pct": kaufmaennisch(bonus_pct, 1),
+        "pct": kaufmaennisch(min(100.0, base_pct + bonus_pct), 1),
         "e_correct": e_richtig,
         "e_wrong": e_falsch,
         "e_total": len(extra),

@@ -713,10 +713,14 @@ async def _summarize(db, user, class_id, term, agg="mean", kurs_id=None):
             if werte:
                 per_cat[str(c.id)] = _agg(werte, agg)
 
-        # Schnitt je Abschnitt: Mittel/Median aller Noten seiner Spalten
+        # Schnitt je Abschnitt: Mittel/Median ueber die SPALTEN des Abschnitts
+        # (nicht ueber die Eintraege) — innerhalb eines Abschnitts zaehlen die
+        # Spalten gleich. Haette eine Zelle zwei Eintraege (Altbestand,
+        # JSON-Import), zoege sie den Abschnitt sonst doppelt.
         per_sec = {}
         for s in sections:
-            werte = [e.value for e in grades if cat_section.get(e.category_id) == s.id]
+            werte = [per_cat[str(c.id)] for c in cats
+                     if c.section_id == s.id and str(c.id) in per_cat]
             if werte:
                 per_sec[str(s.id)] = _agg(werte, agg)
 
@@ -867,6 +871,15 @@ async def import_session(body: ImportBody, user: User = Depends(require_module),
     if sec.class_id != sess.class_id:
         raise HTTPException(400, "Abschnitt und Session gehören zu verschiedenen Klassen")
 
+    # Zweimal uebernommen stuende derselbe Test als zwei Spalten im Notenbuch
+    # und zaehlte im Abschnitts-Schnitt doppelt. Wer neu uebernehmen will,
+    # loescht die alte Spalte.
+    schon = (await db.execute(select(GradeCategory).where(
+        GradeCategory.owner_id == user.id, GradeCategory.source_session_id == sess.id,
+        GradeCategory.class_id == sec.class_id))).scalars().first()
+    if schon:
+        raise HTTPException(409, f"Dieses Testergebnis wurde bereits übernommen (Spalte „{schon.name}“).")
+
     # Neue Spalte im Abschnitt anlegen (ans Ende).
     pos = len((await db.execute(
         select(GradeCategory).where(GradeCategory.section_id == sec.id)
@@ -888,6 +901,10 @@ async def import_session(body: ImportBody, user: User = Depends(require_module),
             note=f"Aus Test: {sess.name}" if sess.name else "Aus CardVote-Test",
         ))
         angelegt += 1
+    if angelegt == 0:
+        # Keine einzige Zuordnung -> leere Spalte waere nur Ballast.
+        await db.rollback()
+        raise HTTPException(400, "Keine Karte passte zu einem Schüler dieser Klasse")
     await db.commit()
     return {"imported": angelegt}
 
@@ -951,6 +968,10 @@ async def import_grades(body: ImportGradesBody, user: User = Depends(require_mod
             continue
         db.add(GradeEntry(category_id=cat.id, student_id=g.student_id, kind="grade", value=g.value, note=body.note or ""))
         angelegt += 1
+    if angelegt == 0:
+        # Keine einzige Zuordnung -> leere Spalte waere nur Ballast.
+        await db.rollback()
+        raise HTTPException(400, "Kein Schüler der Übernahme gehört zu diesem Kurs")
     await db.commit()
     return {"imported": angelegt}
 
@@ -964,19 +985,24 @@ _DEFAULT_SCALE = {"1": 87, "2": 73, "3": 59, "4": 45, "5": 20, "6": 0}
 
 
 def _grade_from_pct(pct: float, scale: dict) -> float:
-    """Prozent -> Note, identisch zur Frontend-Skala (core/grades.js)."""
+    """Prozent -> Note, identisch zur Frontend-Skala (core/grades.js).
+
+    Gerundet wird kaufmaennisch wie dort (Math.round): Pythons round() rundet
+    die halbe Stelle zur geraden Zahl, 83,5 % ergaebe 2,2 statt 2,3 — dieselbe
+    Leistung stuende dann je nach Weg als andere Note im Notenbuch."""
+    from ..scoring import kaufmaennisch
     try:
-        s = {int(k): v for k, v in (scale or {}).items()}
-        s = {g: s[g] for g in (1, 2, 3, 4, 5, 6)}  # vollstaendig? sonst Default
+        s = {int(k): float(v) for k, v in (scale or {}).items()}
+        s = {g: s[g] for g in (1, 2, 3, 4, 5, 6)}  # vollstaendig+lesbar? sonst Default
     except (ValueError, TypeError, KeyError):
-        s = {int(k): v for k, v in _DEFAULT_SCALE.items()}
+        s = {int(k): float(v) for k, v in _DEFAULT_SCALE.items()}
     ranges = [(1, s[1], 100), (2, s[2], s[1]), (3, s[3], s[2]), (4, s[4], s[3]), (5, s[5], s[4])]
     for grade, lower, upper in ranges:
         if pct >= lower:
             span = upper - lower
             if span <= 0:
                 return float(grade)
-            return round(grade + (upper - pct) / span, 1)
+            return kaufmaennisch(grade + (upper - pct) / span, 1)
     return 6.0
 
 

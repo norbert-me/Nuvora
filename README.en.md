@@ -189,6 +189,8 @@ Two update channels, switchable in the profile: **Stable** only moves on major v
 
 The schema builds itself on start (see below); upgrading needs no migration steps, just `./deploy.sh`.
 
+Tags are signed; `git verify-tag v4.0.0` checks that (see [SECURITY.md](SECURITY.md)). Every release carries a dependency SBOM as an asset.
+
 **Support:** Nuvora is a one-person project with no revenue. Bug reports and ideas are welcome and get read, but there is no promised response time, no support contract, and no guarantee a module stays. Factor that in before relying on it — the source is public, the data is yours.
 
 ## Running
@@ -303,6 +305,21 @@ cd apps/api && pip install -r requirements-dev.txt && pytest
 ```
 
 Regression tests for the places where a bug silently costs data: E/G scoring, class updates without data loss, trash cascades, tenant separation, course logic. They run together with the web build in CI on every push.
+
+## Changing Python dependencies
+
+Two files, one direction: `apps/api/requirements.txt` is the source with ranges, `apps/api/requirements.lock.txt` is **generated** from it — exact versions plus hashes. The container and CI install from the lock file only (`pip install --require-hashes`), so two builds of the same commit produce the same thing and a tampered upstream package fails on its hash. Editing the lock file by hand works against the next `pip-compile`.
+
+```bash
+cd apps/api
+pip install pip-tools            # once
+# 1. edit requirements.txt (add a package, change a range)
+# 2. regenerate the lock — with Python 3.12, same as the container:
+pip-compile --allow-unsafe --generate-hashes --strip-extras \
+  --output-file=requirements.lock.txt requirements.txt
+```
+
+`pip-compile` resolves for the interpreter it runs under, hence Python 3.12. Gotcha: pip-tools 7.6 crashes with pip 26 (`make_requirement_preparer() missing … allow_editables`); if that happens, `pip install "pip<26"` in the same venv. The test tooling (`requirements-dev.txt`) deliberately stays unlocked: it is never shipped, and an unexpected version shows up immediately as a red test run.
 
 ## Schema & migrations
 

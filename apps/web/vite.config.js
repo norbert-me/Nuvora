@@ -15,6 +15,13 @@ export default defineConfig({
       },
     },
   },
+  // Testnetz fuer die Logikdateien unter src/core (Wertung, Notenskala,
+  // Modul-Schluessel). Node reicht: keine der geprueften Stellen braucht ein
+  // DOM — die eine Hook-Pruefung laeuft ueber renderToString.
+  test: {
+    environment: "node",
+    include: ["src/**/*.test.{js,jsx}"],
+  },
   server: {
     port: 3000,
     proxy: {

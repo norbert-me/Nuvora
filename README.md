@@ -187,6 +187,8 @@ Zwei Update-Kanäle, einstellbar im Profil: **Stable** springt nur auf Hauptvers
 
 Das Schema entsteht beim Start von selbst (siehe unten); ein Upgrade braucht keine Migrationsschritte, nur `./deploy.sh`.
 
+Tags sind signiert; `git verify-tag v4.0.0` prüft das (Anleitung in [SECURITY.md](SECURITY.md)). Jedes Release trägt eine Stückliste der Abhängigkeiten als Anhang.
+
 **Support:** Nuvora ist ein Ein-Personen-Projekt ohne Einnahmen. Fehlermeldungen und Ideen sind willkommen und werden gelesen, aber es gibt keine Zusage auf Antwortzeit, keinen Support-Vertrag und keine Zusicherung, dass ein Modul erhalten bleibt. Wer Nuvora produktiv einsetzt, sollte das einkalkulieren — der Quellcode liegt offen, die Daten liegen bei dir.
 
 ## Starten
@@ -301,6 +303,21 @@ cd apps/api && pip install -r requirements-dev.txt && pytest
 ```
 
 Regressionstests für die Stellen, an denen ein Fehler still Daten kostet: E/G-Wertung, Klassen-Update ohne Datenverlust, Papierkorb-Kaskaden, Mandantentrennung, Kurs-Logik. Bei jedem Push laufen sie zusammen mit dem Web-Build in der CI.
+
+## Abhängigkeiten ändern (Python)
+
+Zwei Dateien, eine Richtung: `apps/api/requirements.txt` ist die Quelle mit Bereichen, `apps/api/requirements.lock.txt` ist daraus **erzeugt** — feste Fassungen samt Hashes. Container und CI installieren nur aus der Lock-Datei (`pip install --require-hashes`), damit zwei Builds vom selben Commit dasselbe ergeben und ein umgeschriebenes Upstream-Paket am Hash auffällt. Wer die Lock-Datei von Hand bearbeitet, arbeitet gegen das nächste `pip-compile`.
+
+```bash
+cd apps/api
+pip install pip-tools            # einmalig
+# 1. requirements.txt bearbeiten (Paket hinzu, Bereich ändern)
+# 2. Lock neu erzeugen — mit Python 3.12, wie im Container:
+pip-compile --allow-unsafe --generate-hashes --strip-extras \
+  --output-file=requirements.lock.txt requirements.txt
+```
+
+`pip-compile` löst für den Interpreter, unter dem es läuft — deshalb Python 3.12. Stolperstein: pip-tools 7.6 bricht mit pip 26 ab (`make_requirement_preparer() missing … allow_editables`); dann im selben Venv `pip install "pip<26"`. Die Testwerkzeuge (`requirements-dev.txt`) bleiben bewusst ohne Lock: sie werden nie ausgeliefert, und eine unerwartete Fassung fällt sofort als roter Testlauf auf.
 
 ## Schema & Migrationen
 

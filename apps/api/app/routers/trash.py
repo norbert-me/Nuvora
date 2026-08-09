@@ -135,15 +135,30 @@ def _aktion(kind: str, idx: int):
     return _AKTIONEN[kind][idx]
 
 
+async def _im_papierkorb(kind: str, obj_id: int, user: User, db: AsyncSession) -> None:
+    """Der Papierkorb fasst nur an, was auch wirklich darin liegt — und der
+    Lehrkraft gehört. Nicht jede Modul-Funktion prüft das deleted_at selbst
+    (purge_card tat es nicht): über diesen Router liess sich sonst eine
+    LEBENDE Karte endgültig löschen. Und doppeltes Wiederherstellen soll
+    ehrlich scheitern statt still nichts zu tun."""
+    if kind not in _AKTIONEN:
+        raise HTTPException(404, "Unbekannte Art")
+    items = await list_trash(user, db)
+    if not any(i.kind == kind and i.id == obj_id for i in items):
+        raise HTTPException(404, "Liegt nicht im Papierkorb")
+
+
 @router.post("/{kind}/{obj_id}/restore", status_code=204)
 async def restore_item(kind: str, obj_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Zurückholen. Die Modul-Funktion prüft Besitz und Sonderfälle."""
+    await _im_papierkorb(kind, obj_id, user, db)
     await _aktion(kind, 0)(obj_id, user, db)
 
 
 @router.delete("/{kind}/{obj_id}", status_code=204)
 async def purge_item(kind: str, obj_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Endgültig löschen. Erst hier greifen die Kaskaden."""
+    await _im_papierkorb(kind, obj_id, user, db)
     await _aktion(kind, 1)(obj_id, user, db)
 
 

@@ -11,6 +11,8 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+from argon2 import PasswordHasher
+from argon2.low_level import Type as Argon2Type
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select, delete
@@ -73,34 +75,76 @@ LOGIN_WINDOW = 60
 
 
 # ─────────────────────── Passwort-Hashes ───────────────────────
-# PBKDF2-HMAC-SHA256, aber mit dem Verfahren und der Iterationszahl IM Hash.
-# Grund: die Zahl muss mitwachsen (OWASP empfiehlt fuer PBKDF2-SHA256 inzwischen
-# 600 000). Stuende sie nur im Code, wuerde jede Erhoehung saemtliche
-# Bestandshashes unbrauchbar machen — also alle Konten aussperren.
+# Standard ist Argon2id. Neue und geaenderte Passwoerter werden nur noch damit
+# gehasht; die beiden PBKDF2-Formate bleiben pruefbar, damit sich kein
+# Bestandskonto aussperrt, und wandern beim naechsten erfolgreichen Login still
+# mit (siehe login()) — nur dort liegt der Klartext vor.
 #
-#   neu:  "pbkdf2_sha256$600000$<salt>$<hash>"   → 3 Dollarzeichen
-#   alt:  "<salt>$<hash>", implizit 100 000      → 1 Dollarzeichen
+# Drei Formate, sauber unterscheidbar:
+#   argon2id: "$argon2id$v=19$m=19456,t=2,p=1$<salt>$<hash>"  → beginnt mit "$argon2"
+#   pbkdf2:   "pbkdf2_sha256$600000$<salt>$<hash>"            → 3 Dollarzeichen
+#   ganz alt: "<salt>$<hash>", implizit 100 000 Iterationen   → 1 Dollarzeichen
 #
-# Das alte Format bleibt pruefbar; beim naechsten erfolgreichen Login wird es
-# still angehoben (siehe login()), denn nur dort liegt der Klartext vor.
+# Warum Argon2id statt mehr PBKDF2-Runden: PBKDF2 braucht kaum Speicher und
+# laesst sich deshalb auf GPUs massiv parallel durchprobieren. Argon2id kostet
+# den Angreifer pro Versuch echten RAM — genau das, wovon eine Grafikkarte
+# wenig hat.
+#
+# Parameter nach OWASP (Password Storage Cheat Sheet), zweite der dort als
+# gleichwertig genannten Kombinationen:
+#   time_cost=2, memory_cost=19456 KiB (19 MiB), parallelism=1
+# Die erste Variante (m=46 MiB, t=1) ist gleich sicher, kostet aber 46 MiB je
+# gleichzeitiger Anmeldung. Wir laufen in einem kleinen Container neben
+# Postgres — 19 MiB pro Login ist die Variante, die auch bei mehreren
+# Anmeldungen gleichzeitig nicht den Speicher sprengt (10 parallele Logins
+# = ~190 MiB Spitze, und das nur fuer die Dauer einer Pruefung).
+# parallelism=1, weil der Container wenige Kerne hat und ein zweiter Thread
+# je Anmeldung unter Last nichts bringt, ausser sich selbst im Weg zu stehen.
+# Gemessen: ~14 ms je Pruefung (PBKDF2 mit 600 000 Runden: ~48 ms) — deutlich
+# unter der 100-ms-Grenze, mit Luft fuer eine langsamere Server-CPU.
 PW_ALGO = "pbkdf2_sha256"
 PW_ITERATIONS = 600_000
 PW_ITERATIONS_LEGACY = 100_000
 _PW_ITERATIONS_MAX = 10_000_000  # Notbremse gegen einen manipulierten Hash,
                                  # der den Prozess sonst minutenlang rechnen liesse
 
+ARGON2_TIME_COST = 2
+ARGON2_MEMORY_COST = 19_456  # KiB = 19 MiB je gleichzeitiger Anmeldung
+ARGON2_PARALLELISM = 1
+ARGON2_PREFIX = "$argon2"
+
+_hasher = PasswordHasher(
+    time_cost=ARGON2_TIME_COST,
+    memory_cost=ARGON2_MEMORY_COST,
+    parallelism=ARGON2_PARALLELISM,
+    hash_len=32,
+    salt_len=16,
+    type=Argon2Type.ID,
+)
+
 
 def _pbkdf2(password: str, salt: str, iterations: int) -> str:
     return hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), iterations).hex()
 
 
-def _split_pw(stored: str) -> Optional[tuple[int, str, str]]:
-    """(Iterationen, Salt, Hash) — oder None, wenn der Hash unbrauchbar ist.
+def _ist_argon2(stored: str) -> bool:
+    """Argon2 bringt sein eigenes Format mit ($argon2id$v=19$m=...). Es faengt
+    mit einem Dollarzeichen an, die PBKDF2-Formate nie — daran allein haengt die
+    Unterscheidung, bevor ueberhaupt gesplittet wird."""
+    return (stored or "").startswith(ARGON2_PREFIX)
 
-    Die beiden Formate werden an der Anzahl der Dollarzeichen unterschieden.
+
+def _split_pw(stored: str) -> Optional[tuple[int, str, str]]:
+    """PBKDF2: (Iterationen, Salt, Hash) — oder None, wenn der Hash weder das
+    neue noch das alte PBKDF2-Format ist (Argon2 eingeschlossen: dafuer ist
+    _verify_pw zustaendig).
+
+    Die beiden PBKDF2-Formate werden an der Anzahl der Dollarzeichen unterschieden.
     """
+    if _ist_argon2(stored):
+        return None
     teile = (stored or "").split("$")
-    if len(teile) == 4:  # neues Format
+    if len(teile) == 4:  # neues PBKDF2-Format
         algo, iters, salt, h = teile
         if algo != PW_ALGO or not salt or not h or not iters.isdigit():
             return None
@@ -108,7 +152,7 @@ def _split_pw(stored: str) -> Optional[tuple[int, str, str]]:
         if not 1 <= n <= _PW_ITERATIONS_MAX:
             return None
         return n, salt, h
-    if len(teile) == 2:  # altes Format, feste Iterationszahl
+    if len(teile) == 2:  # ganz altes Format, feste Iterationszahl
         salt, h = teile
         if not salt or not h:
             return None
@@ -116,15 +160,28 @@ def _split_pw(stored: str) -> Optional[tuple[int, str, str]]:
     return None
 
 
-def _hash_pw(password: str, iterations: int = PW_ITERATIONS) -> str:
+def _hash_pbkdf2(password: str, iterations: int = PW_ITERATIONS) -> str:
+    """Nur noch fuer Tests und zum Nachstellen von Bestandshashes — produktiv
+    wird ausschliesslich Argon2id geschrieben."""
     salt = secrets.token_hex(16)
     return f"{PW_ALGO}${iterations}${salt}${_pbkdf2(password, salt, iterations)}"
+
+
+def _hash_pw(password: str) -> str:
+    return _hasher.hash(password)
 
 
 def _verify_pw(password: str, stored: str) -> bool:
     # Ein beschaedigter oder leerer Hash darf nicht in einen Fehler laufen: das
     # waere HTTP 500 statt "Passwort falsch" — und verriete beim Ausprobieren,
-    # dass mit genau diesem Konto etwas nicht stimmt.
+    # dass mit genau diesem Konto etwas nicht stimmt. Argon2 wirft bei kaputtem
+    # String (InvalidHash) genauso wie bei falschem Passwort (VerifyMismatch),
+    # deshalb faengt der Block bewusst alles ab.
+    if _ist_argon2(stored):
+        try:
+            return _hasher.verify(stored, password)
+        except Exception:
+            return False
     zerlegt = _split_pw(stored)
     if not zerlegt:
         return False
@@ -133,9 +190,15 @@ def _verify_pw(password: str, stored: str) -> bool:
 
 
 def _pw_veraltet(stored: str) -> bool:
-    """Wurde der Hash mit zu wenigen Iterationen (oder im alten Format) erzeugt?"""
-    zerlegt = _split_pw(stored)
-    return bool(zerlegt) and zerlegt[0] < PW_ITERATIONS
+    """Muss der Hash beim naechsten Login neu geschrieben werden? Das gilt fuer
+    beide PBKDF2-Formate und fuer Argon2-Hashes mit schwaecheren Parametern als
+    den heutigen (z. B. nach einer spaeteren Erhoehung)."""
+    if _ist_argon2(stored):
+        try:
+            return bool(_hasher.check_needs_rehash(stored))
+        except Exception:
+            return False  # unbrauchbar — _verify_pw laesst hier ohnehin niemanden durch
+    return _split_pw(stored) is not None
 
 
 def _make_token(user_id: int, token_version: int = 0) -> str:
