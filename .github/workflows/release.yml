@@ -51,7 +51,7 @@ jobs:
           upload-release-assets: false
 
       - name: Release anlegen
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: nuvora-sbom.cyclonedx.json
           tag_name: ${{ github.ref_name }}
