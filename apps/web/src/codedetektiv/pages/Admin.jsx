@@ -655,7 +655,7 @@ export default function Admin() {
           <DndContext sensors={sensors} collisionDetection={editorCollision}
             measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
             onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <div style={{ display: 'grid', gridTemplateColumns: toolboxOpen ? '260px 1fr' : '1fr', gap: 16, minHeight: 400 }}>
+            <div className={`cd-editorgrid${toolboxOpen ? '' : ' zu'}`} style={{ display: 'grid', gap: 16, minHeight: 400 }}>
               {toolboxOpen && (
                 <div className="block-toolbox">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -752,7 +752,7 @@ export default function Admin() {
         </div>
 
         {/* Session + Puzzle List */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'start' }}>
+        <div className="cd-zweispaltig" style={{ display: 'grid', gap: 24, alignItems: 'start' }}>
           <div>
             <h2 style={{ marginBottom: 16 }}>Session erstellen</h2>
             <div style={{ background: '#fff', borderRadius: 8, border: '1px solid #e0e0e0', padding: 20 }}>

@@ -422,6 +422,24 @@
   min-height: 500px;
 }
 
+/* Editor-Raster (Werkzeugkasten + Arbeitsflaeche). Lag frueher als
+   Inline-Style im JSX und konnte deshalb nicht auf die Bildschirmbreite
+   reagieren: auf dem Telefon ragte die Seite um ~78px aus dem Bild.
+   minmax(0, 1fr) statt 1fr, damit die Spalte schrumpfen darf — sonst bleibt sie
+   so breit wie ihr laengster Block. */
+.cd-scope .cd-editorgrid { grid-template-columns: 260px minmax(0, 1fr); }
+.cd-scope .cd-editorgrid.zu { grid-template-columns: minmax(0, 1fr); }
+
+/* Zwei gleich breite Spalten (Session anlegen + Raetselliste). minmax(0, …),
+   damit lange Raetselnamen die Spalte nicht aufblasen. */
+.cd-scope .cd-zweispaltig { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+
+@media (max-width: 640px) {
+  .cd-scope .cd-editorgrid { grid-template-columns: minmax(0, 1fr); }
+  .cd-scope .cd-zweispaltig { grid-template-columns: minmax(0, 1fr); }
+  .cd-scope .block-toolbox { max-height: 45vh; }
+}
+
 .cd-scope .block-toolbox {
   background: var(--card);
   border-radius: 8px;

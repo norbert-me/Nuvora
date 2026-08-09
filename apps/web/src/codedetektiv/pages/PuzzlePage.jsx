@@ -740,7 +740,7 @@ export default function PuzzlePage() {
           collisionDetection={isMaze ? mazeCollision : canvasCollision}
           measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
           {...dndHandlers}>
-          <div style={{ display: 'grid', gridTemplateColumns: toolboxOpen ? '260px 1fr' : '1fr', gap: 16 }}>
+          <div className={`cd-editorgrid${toolboxOpen ? '' : ' zu'}`} style={{ display: 'grid', gap: 16 }}>
 
             {toolboxOpen && (
               <div className="block-toolbox">
