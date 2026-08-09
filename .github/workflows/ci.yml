@@ -7,6 +7,10 @@ on:
     branches: ["**"]
   pull_request:
 
+# Lesen reicht: die CI baut und testet nur, sie schreibt nichts ins Repo.
+permissions:
+  contents: read
+
 jobs:
   api-tests:
     runs-on: ubuntu-latest
@@ -26,6 +30,14 @@ jobs:
       - name: pytest
         run: pytest -q
 
+      # Bekannte Luecken in den Python-Abhaengigkeiten. Meldet, blockiert aber
+      # nicht: ein unbehebbares Upstream-CVE soll die CI nicht dauerhaft roetten.
+      - name: pip-audit
+        continue-on-error: true
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt
+
   web-build:
     runs-on: ubuntu-latest
     defaults:
@@ -42,3 +54,7 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
+
+      - name: npm audit
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high

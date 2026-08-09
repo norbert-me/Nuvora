@@ -1,0 +1,33 @@
+name: CodeQL
+
+# Statische Sicherheitsanalyse für beide Sprachen. Läuft bei jedem Push auf main,
+# bei Pull Requests und einmal wöchentlich — Letzteres, weil neue Regeln auch
+# alten Code treffen können, an dem sich nichts geändert hat.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 5 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyse:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        sprache: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.sprache }}
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:${{ matrix.sprache }}

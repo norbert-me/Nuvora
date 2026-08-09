@@ -1,7 +1,10 @@
 FROM node:22-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm install --include=dev
+# npm ci statt install: baut genau die Fassungen aus package-lock.json
+# und schreibt die Lockdatei nicht um — sonst sind zwei Builds vom
+# selben Commit nicht zwingend gleich.
+RUN npm ci --include=dev
 COPY . .
 RUN npx vite build
 

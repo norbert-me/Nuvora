@@ -27,12 +27,22 @@ def _val(v):
 
 
 def _dump(row) -> dict:
-    """Alle Spalten einer Zeile als JSON-sicheres dict (ohne Passwort-Hash)."""
+    """Alle Spalten einer Zeile als JSON-sicheres dict.
+
+    Ausgenommen: der Passwort-Hash und Dateiinhalte. Bytes lassen sich nicht als
+    JSON schreiben, und eine Auskunft mit eingebetteten Schuelerfotos waere ein
+    unhandliches Monster — statt des Inhalts steht die Groesse da, die Datei
+    selbst laedt die Lehrkraft im Modul herunter.
+    """
     out = {}
     for c in row.__table__.columns:
         if c.name in ("password_hash",):
             continue
-        out[c.name] = _val(getattr(row, c.name))
+        wert = getattr(row, c.name)
+        if isinstance(wert, (bytes, bytearray, memoryview)):
+            out[c.name + "_bytes"] = len(wert)
+            continue
+        out[c.name] = _val(wert)
     return out
 
 
@@ -59,6 +69,8 @@ async def export_me(user=Depends(get_current_user), db: AsyncSession = Depends(g
     cat_ids = [c.id for c in (await db.execute(select(m.GradeCategory).where(m.GradeCategory.owner_id == uid))).scalars().all()]
     session_ids = [s.id for s in (await db.execute(select(m.Session).where(m.Session.owner_id == uid))).scalars().all()]
     path_ids = [p.id for p in (await db.execute(select(m.LearningPath).where(m.LearningPath.owner_id == uid))).scalars().all()]
+    kurs_ids = [k.id for k in (await db.execute(select(m.Kurs).where(m.Kurs.owner_id == uid))).scalars().all()]
+    week_ids = [w.id for w in (await db.execute(select(m.PlanWeek).where(m.PlanWeek.owner_id == uid))).scalars().all()]
 
     def in_(model, col, ids):
         return getattr(model, col).in_(ids) if ids else getattr(model, col).in_([-1])
@@ -99,6 +111,32 @@ async def export_me(user=Depends(get_current_user), db: AsyncSession = Depends(g
         "aufgaben": await _rows(db, m.Exercise, m.Exercise.owner_id == uid),
         "code_puzzles": await _rows(db, m.CodePuzzle, m.CodePuzzle.owner_id == uid),
         "marktplatz_veroeffentlichungen": await _rows(db, m.MarketplaceQuiz, m.MarketplaceQuiz.author_id == uid),
+        "marktplatz_bewertungen": await _rows(db, m.MarketplaceRating, m.MarketplaceRating.user_id == uid),
+        # Nachgetragen: diese Tabellen fehlten in der Auskunft, obwohl sie zum Teil
+        # das Persoenlichste enthalten, was Nuvora speichert (Beobachtungen,
+        # Elterngespraeche, Lernfortschritt je Kind). Art. 15 verlangt Vollstaendigkeit
+        # — test_export_vollstaendig.py haelt das ab jetzt nach.
+        "beobachtungen": await _rows(db, m.Observation, m.Observation.owner_id == uid),
+        "elternkontakte": await _rows(db, m.ParentContact, m.ParentContact.owner_id == uid),
+        "notizzettel": await _rows(db, m.NotepadNote, m.NotepadNote.owner_id == uid),
+        "karten_fortschritt": await _rows(db, m.CardReview, in_(m.CardReview, "student_id", student_ids)),
+        "karten_ordner": await _rows(db, m.CardFolder, m.CardFolder.owner_id == uid),
+        "kurse": await _rows(db, m.Kurs, m.Kurs.owner_id == uid),
+        "kurs_klassen": await _rows(db, m.KursTag, in_(m.KursTag, "kurs_id", kurs_ids)),
+        "kurs_mitglieder": await _rows(db, m.KursStudent, in_(m.KursStudent, "kurs_id", kurs_ids)),
+        "klassenarbeiten": await _rows(db, m.WorkAnalysis, m.WorkAnalysis.owner_id == uid),
+        "klassenarbeitstermine": await _rows(db, m.ExamDate, m.ExamDate.owner_id == uid),
+        "segel_stufen": await _rows(db, m.SegelStatus, m.SegelStatus.owner_id == uid),
+        "ausgefallene_stunden": await _rows(db, m.SlotCancellation, m.SlotCancellation.owner_id == uid),
+        "planungs_wochen": await _rows(db, m.PlanWeek, m.PlanWeek.owner_id == uid),
+        "planungs_bloecke": await _rows(db, m.PlanBlock, in_(m.PlanBlock, "week_id", week_ids)),
+        "einstiege_ordner": await _rows(db, m.MethodFolder, m.MethodFolder.owner_id == uid),
+        "todos": await _rows(db, m.Todo, m.Todo.owner_id == uid),
+        "zufall_ziehungen": await _rows(db, m.ZufallDraw, m.ZufallDraw.owner_id == uid),
+        "code_sessions": await _rows(db, m.CodeSession, m.CodeSession.owner_id == uid),
+        # Materialablage: Metadaten (Name, Typ, Groesse, Zuordnung). Die Datei
+        # selbst laedt die Lehrkraft im Modul herunter.
+        "material_dateien": await _rows(db, m.Material, m.Material.owner_id == uid),
     }
     return JSONResponse(
         content=data,

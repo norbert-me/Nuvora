@@ -22,6 +22,7 @@ from sqlalchemy import select, func as sa_func, and_, or_, delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
+from ..uploads import bildtyp
 from sqlalchemy.orm import selectinload
 from ..models import Card, CardDeck, CardFolder, CardReview, SchoolClass, Student, User, Session, Scan, QuestionSetItem
 from .auth import get_current_user, rate_limit
@@ -575,16 +576,15 @@ async def upload_card_image(card_id: int, side: str, file: UploadFile = File(...
     if not card:
         raise HTTPException(404, "Karte nicht gefunden")
     await _owned_deck(db, user, card.deck_id)
-    mime = (file.content_type or "").lower()
-    if not mime.startswith("image/"):
-        raise HTTPException(400, "Nur Bilddateien erlaubt")
     data = await file.read()
     if not data:
         raise HTTPException(400, "Datei ist leer")
     if len(data) > _CARD_IMG_MAX:
         raise HTTPException(413, "Bild zu groß (max. 5 MB)")
+    # Typ am Inhalt bestimmen, nicht am Client glauben: die Kartenbilder liefert
+    # /lernen/<token> OHNE Anmeldung aus (karten.py: _serve_card_image).
     setattr(card, f"{side}_image", data)
-    setattr(card, f"{side}_image_mime", mime[:120])
+    setattr(card, f"{side}_image_mime", bildtyp(data))
     await db.commit()
     await db.refresh(card)
     return card
@@ -671,6 +671,31 @@ class StudentProgress(BaseModel):
     total: int      # Karten in ausgerollten Stapeln
     hist: dict      # Reifegrad-Verteilung (neu/lernen/kurz/mittel/lang)
     last_reviewed: Optional[datetime] = None  # wann zuletzt gelernt
+
+
+@router.post("/classes/{class_id}/tokens/rotate", response_model=List[StudentTokenOut])
+async def rotate_tokens(class_id: int, student_id: Optional[int] = None, subset_kurs: Optional[int] = None,
+                        user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Zugangs-Links neu vergeben — fuer die ganze Klasse oder eine Person.
+
+    Der Link enthaelt den Token; wer ihn weitergibt (Klassenchat, Screenshot),
+    gibt dauerhaft Einblick in Lernstand und Testergebnisse dieses Kindes. Ohne
+    Rotation gaebe es keinen Weg zurueck. Alte Links werden damit sofort
+    ungueltig, QR-Codes muessen neu ausgegeben werden.
+    """
+    rate_limit("karten_tokens", f"u{user.id}", 30, 60, "Zu viele Änderungen. Bitte kurz warten.")
+    await _owned_class(db, user, class_id)
+    students = await _kurs_roster(db, user, class_id, subset_kurs)
+    if student_id is not None:
+        students = [s for s in students if s.id == student_id]
+        if not students:
+            raise HTTPException(404, "Schüler nicht in dieser Klasse")
+    out = []
+    for st in students:
+        st.karten_token = _token()
+        out.append(StudentTokenOut(student_id=st.id, name=st.name, card_id=st.card_id, token=st.karten_token))
+    await db.commit()
+    return out
 
 
 @router.get("/classes/{class_id}/progress", response_model=List[StudentProgress])

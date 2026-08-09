@@ -24,8 +24,11 @@ jobs:
         run: |
           TAG="${GITHUB_REF_NAME}"                 # z.B. v1.5.31
           CUR_MAJOR="$(echo "${TAG#v}" | cut -d. -f1)"
-          # letztes Tag vor diesem (nach Version sortiert)
-          PREV="$(git tag --sort=-v:refname | grep -v "^${TAG}$" | head -1)"
+          # Das zeitlich VORHERIGE Tag, nicht das hoechste: ein nachgereichter
+          # Hotfix auf einem aelteren Stand (v3.12.1 neben v4.1.0) haette sonst
+          # gegen v4 verglichen, einen Major-Wechsel gesehen und sich selbst als
+          # stable veroeffentlicht.
+          PREV="$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || echo "")"
           PREV_MAJOR="$(echo "${PREV#v}" | cut -d. -f1)"
           if [ -n "$PREV_MAJOR" ] && [ "$CUR_MAJOR" != "$PREV_MAJOR" ]; then
             echo "prerelease=false" >> "$GITHUB_OUTPUT"

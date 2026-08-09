@@ -573,23 +573,10 @@ async def startup():
         except Exception:
             pass
 
-    # Papierkorb leeren: was länger als 30 Tage gelöscht ist, endgültig entfernen
-    # (jetzt greift die Kaskade auf Noten/Karten/…). Läuft bei jedem Start und
-    # deckt alle Arten des gemeinsamen Papierkorbs ab (routers/trash.py). Kinder
-    # (Karten, Lernleitern) zuerst, damit die Zählung stimmt.
-    async with async_session() as db:
-        for tbl, wort in (("cards", "Karte(n)"), ("learning_ladders", "Lernleiter(n)"),
-                          ("school_classes", "Klasse(n)"), ("card_decks", "Deck(s)"),
-                          ("learning_paths", "Lernpfad(e)"), ("kurse", "Kurs(e)")):
-            try:
-                res = await db.execute(text(
-                    f"DELETE FROM {tbl} WHERE deleted_at IS NOT NULL AND deleted_at < now() - interval '30 days'"
-                ))
-                if res.rowcount:
-                    print(f"[STARTUP] Papierkorb: {res.rowcount} {wort} endgültig gelöscht (>30 Tage).", flush=True)
-            except Exception:
-                pass
-        await db.commit()
+    # Papierkorb einmal beim Start leeren; danach uebernimmt die Schleife weiter
+    # unten. Nur beim Start reichte nicht: ein Container laeuft monatelang durch,
+    # und dann wurde die zugesagte 30-Tage-Frist nie eingehalten.
+    await _papierkorb_leeren(laut=True)
 
     # Mandantentrennung: owner_id IS NULL galt historisch als „für alle sichtbar"
     # (Einzelmandant nach der Datenübernahme). Bei öffentlichem Betrieb ist das ein
@@ -648,8 +635,70 @@ async def startup():
                 db.add(AppSetting(key="admin_bootstrapped", value="1"))
                 await db.commit()
 
-    # Hintergrund-Task: unbestätigte Konten älter als 14 Tage löschen
-    asyncio.create_task(_cleanup_unverified_loop())
+    # Hintergrund-Tasks: Fristen einhalten, auch ohne Neustart.
+    asyncio.create_task(_cleanup_unverified_loop())   # unbestaetigte Konten, 14 Tage
+    asyncio.create_task(_papierkorb_loop())           # Papierkorb, 30 Tage
+    asyncio.create_task(_codesessions_aufraeumen())   # Code-Detektiv-Sitzungen
+
+
+# Arten des gemeinsamen Papierkorbs (routers/trash.py). Kinder zuerst, damit die
+# Zaehlung stimmt. Neue Art mit deleted_at gehoert HIER dazu — dafuer gibt es den
+# Test test_papierkorb_job.py.
+PAPIERKORB_TABELLEN = (
+    ("cards", "Karte(n)"), ("learning_ladders", "Lernleiter(n)"),
+    ("school_classes", "Klasse(n)"), ("card_decks", "Deck(s)"),
+    ("learning_paths", "Lernpfad(e)"), ("kurse", "Kurs(e)"),
+)
+
+
+async def _papierkorb_leeren(laut: bool = False):
+    """Endgueltig loeschen, was laenger als 30 Tage im Papierkorb liegt."""
+    from sqlalchemy import text
+    from .database import async_session
+    async with async_session() as db:
+        for tbl, wort in PAPIERKORB_TABELLEN:
+            try:
+                res = await db.execute(text(
+                    f"DELETE FROM {tbl} WHERE deleted_at IS NOT NULL "
+                    "AND deleted_at < now() - interval '30 days'"
+                ))
+                if res.rowcount and laut:
+                    print(f"[STARTUP] Papierkorb: {res.rowcount} {wort} endgültig gelöscht (>30 Tage).", flush=True)
+            except Exception:
+                pass
+        await db.commit()
+
+
+async def _papierkorb_loop():
+    """Die 30-Tage-Frist steht in der Datenschutzerklaerung — also muss sie auch
+    laufen, wenn der Container nicht neu startet."""
+    while True:
+        await asyncio.sleep(6 * 3600)
+        await _papierkorb_leeren()
+
+
+async def _codesessions_aufraeumen():
+    """Code-Detektiv-Sitzungen verfallen.
+
+    In einer Sitzung stehen selbst eingegebene Namen und der Loesungsstand aller
+    Mitspielenden — abrufbar fuer jeden mit dem sechsstelligen Code. Ohne Ablauf
+    blieb diese Liste dauerhaft oeffentlich. Beendete Sitzungen gehen nach einem
+    Tag, offen gebliebene nach sieben.
+    """
+    from sqlalchemy import text
+    from .database import async_session
+    while True:
+        try:
+            async with async_session() as db:
+                await db.execute(text(
+                    "DELETE FROM code_sessions WHERE "
+                    "(ended = true AND created_at < now() - interval '1 day') "
+                    "OR created_at < now() - interval '7 days'"
+                ))
+                await db.commit()
+        except Exception:
+            pass
+        await asyncio.sleep(3600)
 
 
 async def _cleanup_unverified_loop():

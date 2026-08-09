@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
+from ..uploads import bildtyp
 from ..models import SchoolClass, Student, User, Kurs, KursTag
 from .auth import get_current_user, rate_limit
 
@@ -446,16 +447,16 @@ async def upload_student_photo(student_id: int, file: UploadFile = File(...),
                                user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("student_photo", f"u{user.id}", 120, 60, "Zu viele Uploads. Bitte kurz warten.")
     st = await _owned_student(db, user, student_id)
-    mime = (file.content_type or "").lower()
-    if not mime.startswith("image/"):
-        raise HTTPException(400, "Nur Bilddateien erlaubt")
     data = await file.read()
     if not data:
         raise HTTPException(400, "Datei ist leer")
     if len(data) > _PHOTO_MAX:
         raise HTTPException(413, "Bild zu groß (max. 5 MB)")
+    # Der vom Browser gemeldete Typ ist eine Behauptung: ein als "image/png"
+    # deklariertes SVG kaeme spaeter mit genau diesem Typ zurueck und liefe im
+    # eigenen Origin. Deshalb entscheiden die ersten Bytes.
     st.photo = data
-    st.photo_mime = mime[:120]
+    st.photo_mime = bildtyp(data)
     await db.commit()
     await db.refresh(st)
     return st

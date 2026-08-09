@@ -1,0 +1,15 @@
+# Nuvora — Meldeweg für Sicherheitslücken (RFC 9116)
+#
+# Nuvora wird selbst gehostet: diese Datei liegt auf der Instanz, die du gerade
+# vor dir hast. Eine Lücke betrifft aber fast immer die Software, nicht nur
+# diese Installation — melde sie deshalb bitte am Projekt, nicht öffentlich als
+# Issue. In den Daten stecken Namen, Noten und Förderbedarfe von Kindern.
+
+Contact: https://github.com/norbert-me/Nuvora/security/advisories/new
+Expires: 2027-08-09T12:00:00.000Z
+Preferred-Languages: de, en
+Policy: https://github.com/norbert-me/Nuvora/blob/main/SECURITY.md
+
+# Betreiberin oder Betreiber dieser Instanz: trage hier zusätzlich deine eigene
+# Adresse ein (Contact: mailto:…) und setze Expires beim Pflegen neu — eine
+# abgelaufene Datei ist schlechter als keine.

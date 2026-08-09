@@ -1,11 +1,26 @@
-# Nuvora — beide Module hinter EINEM Proxy auf EINER Domain.
-#   /          -> CardVote (Kern)
-#   /lernpfad/ -> Lernpfad
-# Die Einzel-Composes in apps/*/ bleiben fuer isoliertes Arbeiten bestehen.
+# Nuvora — Kern und alle Module hinter EINEM Proxy auf EINER Domain.
+#
+#   /         Shell mit allen Modulseiten (web)
+#   /api/     Kern-API (api)
+#   /lp/      Statik der eingebetteten Lernpfad-App, ausgeliefert vom web-Container
+#
+# Vier Dienste: db, api, web, proxy. Es gibt KEINE Einzel-Composes in apps/* —
+# alles wird hier konfiguriert (siehe CLAUDE.md, "Alles wird im Wurzelverzeichnis
+# konfiguriert").
+
+# Logs bleiben sonst unbegrenzt liegen und fuellen irgendwann die Platte des
+# Schulservers. Gilt fuer alle Dienste ueber den YAML-Anker.
+x-logging: &logs
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   db:
     image: postgres:16
     restart: unless-stopped
+    logging: *logs
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-nuvora}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD nicht gesetzt — .env aus .env.example anlegen}
@@ -24,6 +39,7 @@ services:
   api:
     build: ./apps/api
     restart: unless-stopped
+    logging: *logs
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-nuvora}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-nuvora}
       TOKEN_SECRET: ${TOKEN_SECRET:?TOKEN_SECRET nicht gesetzt — .env aus .env.example anlegen}
@@ -60,8 +76,15 @@ services:
   web:
     build: ./apps/web
     restart: unless-stopped
+    logging: *logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
   # Lernpfad ist ins Web-Projekt eingebaut (apps/web/public/lp/) — kein eigener
   # Container mehr. Frueher: eigener Statik-Container hinter /lernpfad-app/.
@@ -69,6 +92,7 @@ services:
   proxy:
     image: nginx:alpine
     restart: unless-stopped
+    logging: *logs
     ports:
       - "${PORT:-8080}:80"
     volumes:
@@ -77,7 +101,8 @@ services:
       # die Lernpfad serverseitig einliest.
       - ./config:/srv/config:ro
     depends_on:
-      - web
+      web:
+        condition: service_healthy
 
 volumes:
   pgdata:

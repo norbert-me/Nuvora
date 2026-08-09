@@ -533,7 +533,33 @@ def teste_web_dateien(api, b):
             raise AssertionError(", ".join(maengel) + f" fuer {treffer.group(1)}")
         return f"{treffer.group(1).split('/')[-1]}: komprimiert und zwischenspeicherbar"
 
+    def security_txt():
+        # RFC 9116: Contact und Expires sind Pflicht, und ein abgelaufenes
+        # Expires ist schlechter als keine Datei — dann glaubt der Finder, es
+        # gaebe einen gepflegten Meldeweg, und schreibt ins Leere.
+        status, text = api.call("GET", "/.well-known/security.txt", roh=True)
+        if status != 200:
+            raise AssertionError(f"HTTP {status} — kein Meldeweg fuer Sicherheitsluecken (RFC 9116)")
+        felder = {z.split(":", 1)[0].strip().lower() for z in text.splitlines()
+                  if ":" in z and not z.strip().startswith("#")}
+        fehlt = [f for f in ("contact", "expires") if f not in felder]
+        if fehlt:
+            raise AssertionError("Pflichtfelder fehlen: " + ", ".join(fehlt))
+        zeile = next((z for z in text.splitlines() if z.lower().startswith("expires:")), "")
+        wert = zeile.split(":", 1)[1].strip()
+        try:
+            bis = datetime.strptime(wert.replace("Z", "").split(".")[0], "%Y-%m-%dT%H:%M:%S")
+        except ValueError:
+            raise AssertionError(f"Expires nicht lesbar: {wert}")
+        tage = (bis - datetime.utcnow()).days
+        if tage < 0:
+            raise AssertionError(f"abgelaufen seit {-tage} Tagen — Expires neu setzen")
+        if tage < 30:
+            raise AssertionError(f"laeuft in {tage} Tagen ab — Expires neu setzen")
+        return f"gueltig noch {tage} Tage"
+
     b.pruefe("Web-Dateien", "robots.txt", robots)
+    b.pruefe("Web-Dateien", "security.txt (RFC 9116)", security_txt)
     b.pruefe("Web-Dateien", "favicon.svg", datei("/favicon.svg", "Browser zeigt kein Symbol"))
     b.pruefe("Web-Dateien", "manifest.json", datei("/manifest.json", "kein Zum-Startbildschirm-Hinzufuegen"))
     b.pruefe("Web-Dateien", "icon-192.png", datei("/icon-192.png", "Symbol fuer den Startbildschirm fehlt"))

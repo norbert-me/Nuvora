@@ -217,6 +217,12 @@ export default function Karten() {
     const cards = await fetch(`${API}/classes/${classId}/students/${p.student_id}/cards${kq}${sq}`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
     setDetail({ student: p, cards });
   };
+  const rotateTokens = async () => {
+    if (!(await askConfirm(t("karten.rotateConfirm")))) return;
+    const r = await fetch(`${API}/classes/${classId}/tokens/rotate${subsetKurs ? `?subset_kurs=${subsetKurs}` : ""}`,
+      { method: "POST" }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+    if (r) setTokens(r);
+  };
   const loadTokens = () => fetch(`${API}/classes/${classId}/tokens${subsetKurs ? `?subset_kurs=${subsetKurs}` : ""}`, { method: "POST" }).then((r) => (r.ok ? r.json() : [])).then(setTokens).catch(() => {});
   // Daten laden, wenn der Tab (aus der Navbar) oder die Klasse wechselt.
   useEffect(() => {
@@ -397,7 +403,14 @@ export default function Karten() {
       {view === "qr" && (
         <div>
           <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 14 }}>{t("karten.qrHint")}</p>
-          <button onClick={() => window.print()} style={{ ...btnSecondary, marginBottom: 16 }}>{t("karten.print")}</button>
+          <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+            <button onClick={() => window.print()} style={btnSecondary}>{t("karten.print")}</button>
+            {/* Ein weitergegebener Link zeigt dauerhaft Lernstand und
+                Testergebnisse eines Kindes. Neu vergeben macht ihn ungueltig. */}
+            <button onClick={rotateTokens} style={btnSecondary} title={t("karten.rotateHint")}>
+              {t("karten.rotate")}
+            </button>
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 14 }}>
             {(tokens || []).map((s) => (
               <div key={s.student_id} style={{ textAlign: "center", border: "1px solid var(--border)", borderRadius: 12, padding: 12, background: "#fff" }}>
