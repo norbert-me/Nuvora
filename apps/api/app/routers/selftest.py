@@ -301,16 +301,34 @@ def _check_absender_dns(absender: str, smtp_host: str, out: List[Check]) -> None
         out.append(Check(gruppe="E-Mail", name="SPF", ok=True, schwere="warnung",
                          detail="nicht pruefbar (kein DNS-Zugriff nach draussen)"))
         return
+    # Freemailer-Adressen als Absender: deren SPF kennt nur die eigenen Server
+    # und wird nie einen Versanddienst nennen. Das ist kein Konfigurationsfehler,
+    # den man beheben koennte — nur eine schlechtere Zustellung. Also Warnung
+    # statt Fehler, damit der Selbsttest nicht dauerhaft rot steht.
+    FREEMAILER = ("t-online.de", "gmail.com", "googlemail.com", "gmx.de", "gmx.net",
+                  "web.de", "outlook.com", "hotmail.com", "yahoo.de", "yahoo.com",
+                  "icloud.com", "posteo.de", "mailbox.org")
+    frei = domain in FREEMAILER
+
     eintrag = next((t for t in spf if t.lower().startswith("v=spf1")), "")
     if not eintrag:
         out.append(Check(gruppe="E-Mail", name="SPF", ok=False,
                          detail=f"{domain} hat keinen SPF-Eintrag — Empfaenger sortieren die "
                                 "Mails als Spam aus oder weisen sie ab."))
     elif gruppe and not any(k in eintrag.lower() for k in gruppe):
-        out.append(Check(gruppe="E-Mail", name="SPF", ok=False,
-                         detail=f"SPF von {domain} gibt {gruppe[0]} nicht frei ({eintrag[:90]}) — "
-                                "genau das meint der Anbieter mit 'authenticate your domain'. "
-                                "Absender freigeben oder den SPF-Eintrag ergaenzen."))
+        if frei:
+            out.append(Check(
+                gruppe="E-Mail", name="SPF", ok=False, schwere="warnung",
+                detail=f"{domain} ist ein Freemailer und gibt {gruppe[0]} nicht frei — das laesst "
+                       "sich nicht aendern. Die Adresse muss beim Versanddienst einzeln "
+                       "freigegeben sein, Mails landen oefter im Spam. Eigene Domain als "
+                       "Absender waere zuverlaessiger."))
+        else:
+            out.append(Check(
+                gruppe="E-Mail", name="SPF", ok=False,
+                detail=f"SPF von {domain} gibt {gruppe[0]} nicht frei ({eintrag[:90]}) — "
+                       "genau das meint der Anbieter mit 'authenticate your domain'. "
+                       "Absender freigeben oder den SPF-Eintrag ergaenzen."))
     else:
         out.append(Check(gruppe="E-Mail", name="SPF", ok=True, detail=eintrag[:90]))
 
