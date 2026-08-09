@@ -138,15 +138,20 @@ class Bericht:
             print("\n── Reste (nicht abgeraeumt — von Hand pruefen)")
             for r in self.reste:
                 print(f"  ! {r}")
+        # Die Zusammenfassung zaehlt und benennt, sie wiederholt nicht: der
+        # Grund steht schon bei jedem ✗ weiter oben. Zweimal derselbe Satz macht
+        # den Bericht nur laenger, nicht klarer.
         print("\n" + "=" * 40)
         if not self.fehler:
             print(f"  Selbsttest gruen — {len(self.zeilen)} Checks, "
                   f"{len(self.warnungen)} Warnung(en).")
         else:
+            namen = ", ".join(f"{g} / {n}" for g, n, _o, _s, _d in self.fehler[:6])
+            if len(self.fehler) > 6:
+                namen += f" und {len(self.fehler) - 6} weitere"
             print(f"  Selbsttest ROT — {len(self.fehler)} Fehler, "
-                  f"{len(self.warnungen)} Warnung(en):")
-            for gruppe, name, _ok, _s, detail in self.fehler:
-                print(f"    ✗ {gruppe} / {name}: {detail}")
+                  f"{len(self.warnungen)} Warnung(en).")
+            print(f"  Betroffen: {namen}")
         print("=" * 40)
 
     def als_json(self):

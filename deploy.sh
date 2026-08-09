@@ -346,8 +346,7 @@ if [ "$CV" = "200" ] && [ "$LP" = "200" ]; then
     [ "$SELFTEST_BROWSER" = "1" ] && SELFTEST_ARGS+=(--browser)
     if ! "$DIR/selftest.sh" "${SELFTEST_ARGS[@]+"${SELFTEST_ARGS[@]}"}"; then
       echo ""
-      echo "  ⚠ Selbsttest gefunden: siehe Fehler oben. Deploy ist ausgeliefert,"
-      echo "    aber etwas funktioniert nicht — nachsehen, bevor Unterricht daran haengt."
+      echo "  Der Stand ist ausgeliefert und laeuft — der Selbsttest hat aber etwas gefunden."
       exit 1
     fi
   fi

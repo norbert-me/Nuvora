@@ -198,8 +198,10 @@ function drucke() {
   console.log("\n" + "=".repeat(40));
   if (!fehler.length) console.log(`  Browser-Selbsttest gruen — ${ergebnisse.length} Seiten/Checks.`);
   else {
-    console.log(`  Browser-Selbsttest ROT — ${fehler.length} Fehler:`);
-    for (const f of fehler) console.log(`    ✗ ${f.gruppe} / ${f.name}: ${f.detail}`);
+    // Nur zaehlen und benennen — der Grund steht schon bei jedem ✗ oben.
+    const namen = fehler.slice(0, 6).map((f) => `${f.gruppe} / ${f.name}`).join(", ");
+    console.log(`  Browser-Selbsttest ROT — ${fehler.length} Fehler.`);
+    console.log(`  Betroffen: ${namen}${fehler.length > 6 ? ` und ${fehler.length - 6} weitere` : ""}`);
   }
   console.log("=".repeat(40));
 }
