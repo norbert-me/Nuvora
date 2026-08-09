@@ -344,11 +344,9 @@ if [ "$CV" = "200" ] && [ "$LP" = "200" ]; then
     echo "→ Selbsttest..."
     SELFTEST_ARGS=()
     [ "$SELFTEST_BROWSER" = "1" ] && SELFTEST_ARGS+=(--browser)
-    if ! "$DIR/selftest.sh" "${SELFTEST_ARGS[@]+"${SELFTEST_ARGS[@]}"}"; then
-      echo ""
-      echo "  Der Stand ist ausgeliefert und laeuft — der Selbsttest hat aber etwas gefunden."
-      exit 1
-    fi
+    # Kein eigener Schlusssatz: die Zusammenfassung des Selbsttests sagt bereits
+    # alles. Der Rueckgabewert traegt das Ergebnis nach aussen.
+    "$DIR/selftest.sh" "${SELFTEST_ARGS[@]+"${SELFTEST_ARGS[@]}"}" || exit 1
   fi
 else
   [ "$CV" != "200" ] && echo "  ⚠ Nuvora-Kern nicht gesund (health=$CV)"
