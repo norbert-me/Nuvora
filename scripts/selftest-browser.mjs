@@ -114,6 +114,29 @@ async function main() {
       const befund = await besuche(kontext, pfad, null);
       notiere("Verlinkung", pfad, befund.ok, befund.detail);
     }
+
+    // ── Handy-Ansicht: Nuvora wird im Unterricht am Telefon bedient ──
+    const handy = await neuerKontext(browser, token, user, { width: 390, height: 844 });
+    for (const { pfad, name } of seiten) {
+      const befund = await besuche(handy, pfad, null, { pruefeUeberlauf: true });
+      notiere("Handy (390px)", name, befund.ok, befund.detail);
+    }
+    await handy.close();
+
+    // ── Dunkles Design: feste Farben fallen erst hier auf ──
+    const dunkel = await neuerKontext(browser, token, user, null, "dark");
+    for (const { pfad, name } of seiten) {
+      const befund = await besuche(dunkel, pfad, null);
+      notiere("Dunkles Design", name, befund.ok, befund.detail);
+    }
+    await dunkel.close();
+
+    // ── Wirklich bedienen, nicht nur ansehen ──
+    for (const flow of BEDIENUNG) {
+      const befund = await bediene(kontext, flow);
+      notiere("Bedienung", flow.name, befund.ok, befund.detail);
+    }
+    await aufraeumenBedienung(api);
   } catch (e) {
     notiere("Ablauf", "Selbsttest", false, String(e.message || e));
   } finally {
@@ -134,8 +157,116 @@ async function main() {
   process.exit(ergebnisse.some((e) => !e.ok) ? 1 : 0);
 }
 
+/** Weiterer Browser-Kontext (Handy, dunkles Design) mit derselben Anmeldung. */
+async function neuerKontext(browser, token, user, viewport, colorScheme) {
+  const k = await browser.newContext({
+    baseURL: URL_BASIS,
+    viewport: viewport || { width: 1280, height: 900 },
+    ...(colorScheme ? { colorScheme } : {}),
+  });
+  await k.addInitScript(([tok, usr]) => {
+    localStorage.setItem("token", tok);
+    localStorage.setItem("user", usr);
+  }, [token, JSON.stringify(user)]);
+  return k;
+}
+
+// Marker, an dem alles Angelegte erkennbar ist — und wieder wegkommt.
+const MARKE = "ZZ-Selbsttest-UI";
+
+/**
+ * Die Einstiegs-Tour wegklicken.
+ *
+ * Ein frisches Konto bekommt ein Overlay ("Tour starten / Später"), das ueber
+ * der Seite liegt und jeden Klick abfaengt. Eine Lehrkraft klickt es weg, also
+ * tut der Test das auch — sonst prueft er nur das Overlay.
+ *
+ * Beschriftungen in allen drei Sprachen (de/en/es), denn die Oberflaeche
+ * startet je nach Konto unterschiedlich.
+ */
+async function tourWegklicken(seite) {
+  try {
+    const spaeter = seite.getByRole("button", { name: /später|spaeter|later|más tarde|mas tarde/i }).first();
+    if (await spaeter.isVisible({ timeout: 1500 })) await spaeter.click({ timeout: 3000 });
+  } catch { /* kein Overlay da — der Normalfall */ }
+}
+
+/**
+ * Handgriffe, die eine Lehrkraft wirklich macht. Jeder legt etwas an, laedt
+ * die Seite neu und besteht darauf, dass es noch da ist — nur so faellt ein
+ * Formular auf, das zwar rendert, aber nichts speichert.
+ *
+ * Bewusst wenige, dafuer haltbare Wege: Beschriftungen aendern sich, IDs gibt
+ * es kaum. Wo ein Bedienelement fehlt, ist genau das der Befund.
+ */
+const BEDIENUNG = [
+  {
+    name: "Notizzettel anlegen und tippen (/notizbrett)",
+    pfad: "/notizbrett",
+    async schritte(seite) {
+      // Beschriftung je nach Sprache des Kontos.
+      const neu = seite.getByRole("button", { name: /neuer? zettel|neu$|new note|new$|nueva? nota/i }).first();
+      await neu.click({ timeout: 8000 });
+      const feld = seite.locator("input[placeholder]").first();
+      await feld.fill(MARKE, { timeout: 8000 });
+      // Der Zettel speichert gebuendelt (600 ms) — abwarten, sonst prueft der
+      // Test das Neuladen gegen einen noch nicht gesendeten Stand.
+      await seite.waitForTimeout(1500);
+    },
+  },
+  {
+    name: "Thema anlegen (/topics)",
+    pfad: "/topics",
+    async schritte(seite) {
+      // Der Knopf traegt nur ein Icon; erkennbar ist er am title-Attribut.
+      await seite.locator("[title='Neues Thema'], [title='New topic'], [title='Nuevo tema']")
+        .first().click({ timeout: 8000 });
+      const feld = seite.locator("input:visible").last();
+      await feld.fill(MARKE, { timeout: 8000 });
+      await feld.press("Enter");
+      await seite.waitForTimeout(1200);
+    },
+  },
+];
+
+/** Einen Handgriff ausfuehren und pruefen, dass er das Neuladen ueberlebt. */
+async function bediene(kontext, flow) {
+  const seite = await kontext.newPage();
+  const probleme = [];
+  seite.on("pageerror", (e) => probleme.push(`Absturz: ${String(e).slice(0, 120)}`));
+  try {
+    await seite.goto(flow.pfad, { waitUntil: "networkidle", timeout: 30000 });
+    await tourWegklicken(seite);
+    await flow.schritte(seite);
+    await seite.reload({ waitUntil: "networkidle" });
+    const text = await seite.locator("body").innerText();
+    const drin = text.includes(MARKE) || (await seite.locator(`input[value='${MARKE}']`).count()) > 0;
+    if (!drin) return { ok: false, detail: "nach dem Neuladen verschwunden — wird nicht gespeichert" };
+    if (probleme.length) return { ok: false, detail: probleme[0] };
+    return { ok: true, detail: "angelegt, ueberlebt das Neuladen" };
+  } catch (e) {
+    return { ok: false, detail: String(e.message || e).split("\n")[0].slice(0, 140) };
+  } finally {
+    await seite.close();
+  }
+}
+
+/** Was die Bedienprobe angelegt hat, wieder entfernen. */
+async function aufraeumenBedienung(api) {
+  try {
+    for (const n of await (await api("/api/notizblock")).json()) {
+      if ((n.title || "").includes(MARKE)) await api(`/api/notizblock/${n.id}`, "delete");
+    }
+  } catch { /* im Bericht steht dann der Rest */ }
+  try {
+    for (const t of await (await api("/api/topics")).json()) {
+      if ((t.name || "").includes(MARKE)) await api(`/api/topics/${t.id}`, "delete");
+    }
+  } catch { /* siehe oben */ }
+}
+
 /** Eine Seite oeffnen und alles sammeln, was schiefgeht. */
-async function besuche(kontext, pfad, linkSenke) {
+async function besuche(kontext, pfad, linkSenke, opts = {}) {
   const seite = await kontext.newPage();
   const probleme = [];
   seite.on("console", (msg) => {
@@ -149,6 +280,7 @@ async function besuche(kontext, pfad, linkSenke) {
   try {
     const antwort = await seite.goto(pfad, { waitUntil: "networkidle", timeout: 30000 });
     if (!antwort || antwort.status() >= 400) return { ok: false, detail: `HTTP ${antwort?.status()}` };
+    await tourWegklicken(seite);
 
     // Landet die Seite auf /modules oder auf der Landing-Seite, greift das Gate
     // oder der Login — beides bedeutet: die Seite ist fuer die Lehrkraft nicht da.
@@ -167,6 +299,29 @@ async function besuche(kontext, pfad, linkSenke) {
     // Gerenderter Inhalt statt leerer Shell.
     const textLaenge = (await seite.locator("body").innerText()).trim().length;
     if (textLaenge < 20) probleme.push("Seite bleibt leer (Render-Fehler?)");
+
+    if (opts.pruefeUeberlauf) {
+      // Waagerechtes Scrollen heisst auf dem Telefon: etwas ragt aus dem Bild,
+      // Knoepfe sind nicht erreichbar. Tabellen duerfen fuer sich scrollen,
+      // die Seite selbst nicht.
+      // Mit dem Schuldigen: "irgendwas ragt raus" hilft niemandem beim Suchen.
+      const { ueber, wer } = await seite.evaluate(() => {
+        const w = window.innerWidth;
+        const ueber = document.documentElement.scrollWidth - w;
+        let schlimmster = null;
+        for (const el of document.querySelectorAll("*")) {
+          const r = el.getBoundingClientRect();
+          if (r.right > w + 2 && r.width > 30 && (!schlimmster || r.right > schlimmster.right)) {
+            schlimmster = { right: r.right, name: el.tagName.toLowerCase() +
+              (el.id ? "#" + el.id : "") +
+              (typeof el.className === "string" && el.className ? "." + el.className.trim().split(/\s+/)[0] : "") };
+          }
+        }
+        return { ueber, wer: schlimmster ? schlimmster.name : "" };
+      });
+      if (ueber > 2)
+        probleme.push(`ragt ${ueber}px aus dem Bild${wer ? ` (${wer})` : ""} — waagerechtes Scrollen`);
+    }
 
     if (linkSenke) {
       for (const href of await seite.locator("a[href^='/']").evaluateAll((as) => as.map((a) => a.getAttribute("href")))) {
