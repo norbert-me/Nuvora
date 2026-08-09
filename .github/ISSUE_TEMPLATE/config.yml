@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Sicherheitslücke melden
+    url: https://github.com/norbert-me/Nuvora/security/advisories/new
+    about: Bitte nicht öffentlich — der private Weg steht in SECURITY.md.

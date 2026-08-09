@@ -1,0 +1,49 @@
+name: Fehler melden
+description: Etwas funktioniert nicht wie beschrieben
+labels: [fehler]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke fürs Melden. **Sicherheitslücken bitte nicht hier**, sondern über
+        [SECURITY.md](https://github.com/norbert-me/Nuvora/blob/main/SECURITY.md)
+        — dort steht der private Weg.
+
+        Und bitte keine echten Schülerdaten in Screenshots oder Logs.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Steht im Profil unter „Über Nuvora" (z. B. 4.0.0).
+      placeholder: "4.0.0"
+    validations:
+      required: true
+  - type: textarea
+    id: was
+    attributes:
+      label: Was ist passiert?
+      description: Was hast du getan, was hast du erwartet, was kam stattdessen?
+    validations:
+      required: true
+  - type: input
+    id: modul
+    attributes:
+      label: Welches Modul oder welche Seite?
+      placeholder: "z. B. Auswertung → Notenbuch, oder /karten"
+  - type: dropdown
+    id: umgebung
+    attributes:
+      label: Wo?
+      options:
+        - Browser am Rechner
+        - Browser am Handy/Tablet
+        - Desktop-App (macOS)
+        - Weiß ich nicht
+  - type: textarea
+    id: logs
+    attributes:
+      label: Ausgabe des Selbsttests (falls vorhanden)
+      description: |
+        `./selftest.sh` sagt oft schon, woran es liegt. Bei einem Serverfehler hilft
+        zusätzlich `docker compose logs --tail=50 api`.
+      render: shell

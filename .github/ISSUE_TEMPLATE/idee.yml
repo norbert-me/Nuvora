@@ -1,0 +1,21 @@
+name: Idee oder Wunsch
+description: Etwas fehlt oder ginge besser
+labels: [idee]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Nuvora ist ein Ein-Personen-Projekt für den eigenen Unterricht. Ideen sind
+        willkommen, aber es gibt keine Zusage, dass etwas umgesetzt wird — und
+        Module, die niemand braucht, kommen nicht dazu.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Welches Problem im Unterricht steckt dahinter?
+      description: Nicht die Lösung — die Situation. Daraus ergibt sich die Lösung oft anders als gedacht.
+    validations:
+      required: true
+  - type: textarea
+    id: idee
+    attributes:
+      label: Wie stellst du es dir vor?
