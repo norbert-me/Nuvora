@@ -22,6 +22,34 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# ─── Fortschrittsbalken ───
+# Ein Deploy dauert je nach Aenderung zwischen zwanzig Sekunden und ein paar
+# Minuten, und der Docker-Build schweigt dazwischen lange. Ohne Anzeige weiss
+# niemand, ob es haengt oder arbeitet. Die Schritte sind fest gezaehlt, weil sie
+# immer dieselben sind — kein Schaetzen, keine Fortschritts-Luege.
+SCHRITTE_GESAMT=9
+SCHRITT=0
+BALKEN_BREITE=28
+
+# Farbe nur im Terminal; in einer Logdatei stoeren Steuerzeichen.
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  B_GRUEN=$'\033[32m'; B_GRAU=$'\033[90m'; B_FETT=$'\033[1m'; B_AUS=$'\033[0m'
+else
+  B_GRUEN=""; B_GRAU=""; B_FETT=""; B_AUS=""
+fi
+
+schritt() {
+  SCHRITT=$((SCHRITT + 1))
+  local text="$1"
+  local voll=$((SCHRITT * BALKEN_BREITE / SCHRITTE_GESAMT))
+  local leer=$((BALKEN_BREITE - voll))
+  local prozent=$((SCHRITT * 100 / SCHRITTE_GESAMT))
+  printf '\n%s[%s%s%s%s] %3d%%%s  %s%s/%s%s %s\n' \
+    "$B_GRUEN" "$(printf '█%.0s' $(seq 1 $voll 2>/dev/null))" "$B_GRAU" \
+    "$(printf '·%.0s' $(seq 1 $leer 2>/dev/null))" "$B_GRUEN" "$prozent" "$B_AUS" \
+    "$B_GRAU" "$SCHRITT" "$SCHRITTE_GESAMT" "$B_AUS" "$B_FETT$text$B_AUS"
+}
+
 if [ ! -f "$DIR/.deploy.env" ]; then
   echo "Fehler: .deploy.env nicht gefunden. Kopiere .deploy.env.example und passe die Werte an."
   exit 1
@@ -114,10 +142,10 @@ echo "Port:   $PORT"
 echo "Build:  ${BUILD_SERVICES:-alle Services}"
 echo ""
 
-echo "→ Prüfe rsync auf dem Server..."
+schritt "Server erreichbar machen (rsync)"
 ssh "$SERVER" "command -v rsync >/dev/null 2>&1 || { echo 'installiere rsync...'; (apt-get update -qq && apt-get install -y -qq rsync) || apk add --no-cache rsync; }"
 
-echo "→ Zielverzeichnis sicherstellen..."
+# (Zielverzeichnis gehoert zum selben Schritt)
 ssh "$SERVER" "mkdir -p '$REMOTE_DIR'"
 
 # --inplace: NAS-sicher (kein Rename über bestehende Datei).
@@ -125,7 +153,7 @@ ssh "$SERVER" "mkdir -p '$REMOTE_DIR'"
 # --delete: entfernt auf dem Server, was hier weg ist — hält den Stand sauber.
 # Ausgeschlossen: alles was Secrets, Laufzeitdaten oder Ballast ist. Die .env
 # und die Daten des Servers gehören dem Server, nicht diesem Rechner.
-echo "→ Nur geänderte Dateien hochladen..."
+schritt "Geänderte Dateien hochladen"
 rsync -rlz -c --inplace --delete \
   --exclude='.git/' \
   --exclude='.env' \
@@ -148,7 +176,7 @@ rsync -rlz -c --inplace --delete \
   --exclude='.nfs*' \
   "$DIR/" "$SERVER:$REMOTE_DIR/"
 
-echo "→ Pflicht-Secrets auf dem Server prüfen..."
+schritt "Pflicht-Secrets prüfen"
 # Nicht nur "gibt es eine .env?", sondern "stehen Werte drin?": eine .env mit
 # leerem TOKEN_SECRET laesst compose genauso scheitern wie gar keine (${VAR:?}
 # greift auch bei leer). Jeder fehlende Pflichtwert wird hier nachgezogen,
@@ -241,7 +269,7 @@ fi
 # compose unlesbar — und dann scheitert jeder compose-Aufruf mit einer Meldung,
 # die nach etwas ganz anderem aussieht (z.B. "Port belegt", weil der eigene
 # Container nicht mehr erkannt wird). Darum hier zuerst pruefen.
-echo "→ .env-Syntax prüfen..."
+schritt ".env-Syntax prüfen"
 ENV_BAD=$(ssh "$SERVER" "cd '$REMOTE_DIR' 2>/dev/null || exit 0
   awk '!/^[A-Z_]+=/ && !/^#/ && NF { print \"    Zeile \" NR \": kein SCHLUESSEL= am Anfang (umgebrochener Wert?)\" }' .env
 ")
@@ -263,7 +291,7 @@ fi
 
 # Der Port-Konflikt zeigt sich sonst erst, wenn alle Images gebaut sind und
 # der Proxy als letzter Container startet — also nach mehreren Minuten.
-echo "→ Port prüfen..."
+schritt "Port prüfen"
 WANT_PORT="$PORT"
 PORT_USER=$(ssh "$SERVER" "
   # Nuvoras eigener Proxy darf den Port halten — der wird beim Deploy ersetzt.
@@ -303,7 +331,7 @@ echo "  ✓ Port $WANT_PORT frei."
 # aendert, aendert damit nicht die Rolle in der bestehenden DB — die api
 # scheitert dann an "password authentication failed", was wie ein Codefehler
 # aussieht, aber Datenstand ist. Hier frueh und eindeutig melden.
-echo "→ Datenbank-Zugang prüfen..."
+schritt "Datenbank-Zugang prüfen"
 DB_CHECK=$(ssh "$SERVER" "
   cd '$REMOTE_DIR' || exit 0
   # Laeuft die DB ueberhaupt schon? Beim allerersten Deploy gibt es nichts zu pruefen.
@@ -337,7 +365,7 @@ if printf '%s' "$DB_CHECK" | grep -qi 'password authentication failed\|role .* d
 fi
 echo "  ✓ Datenbank-Zugang in Ordnung."
 
-echo "→ Container bauen (${BUILD_SERVICES:-alle})..."
+schritt "Container bauen und starten (${BUILD_SERVICES:-alle Dienste})"
 # nginx loest die Upstream-Namen (api, web) EINMAL beim Start auf und
 # merkt sich die IPs. Werden die Container neu erstellt, bekommen sie neue IPs —
 # der unveraenderte Proxy zeigt dann auf tote Adressen und liefert 502, obwohl
@@ -346,13 +374,13 @@ echo "→ Container bauen (${BUILD_SERVICES:-alle})..."
 # shellcheck disable=SC2029
 ssh "$SERVER" "cd '$REMOTE_DIR' && docker compose build $BUILD_SERVICES && docker compose up -d --remove-orphans && docker compose restart proxy"
 
-echo "→ Status & Logs..."
+schritt "Status und Logs"
 sleep 6
 # shellcheck disable=SC2029
 ssh "$SERVER" "cd '$REMOTE_DIR' && docker compose ps; echo '--- api log (letzte 30) ---'; docker compose logs --tail=30 api"
 
 PORT="${PORT:-8080}"
-echo "→ Health-Checks (auf dem Server, Port $PORT)..."
+schritt "Health-Checks (Port $PORT)"
 CV=$(ssh "$SERVER" "curl -s -o /dev/null -w '%{http_code}' http://localhost:$PORT/api/health" || echo "000")
 # Lernpfad ist ins Web eingebaut: seine Statik kommt vom web-Container (/lp/).
 LP=$(ssh "$SERVER" "curl -s -o /dev/null -w '%{http_code}' http://localhost:$PORT/lp/index.html" || echo "000")
