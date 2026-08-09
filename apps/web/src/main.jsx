@@ -81,54 +81,66 @@ window.addEventListener("cardvote:offline", () => { _wasOffline = true; });
 window.addEventListener("cardvote:online", () => { if (_wasOffline) { _wasOffline = false; _flush(); } });
 setTimeout(_flush, 2000);
 import { BrowserRouter, Routes, Route, NavLink, Link, Navigate, useLocation, useNavigate } from "react-router-dom";
-import Dashboard from "./pages/Dashboard.jsx";
-import Session from "./pages/Session.jsx";
-import Scanner from "./pages/Scanner.jsx";
-import Classes from "./pages/Classes.jsx";
-import Kurse from "./pages/Kurse.jsx";
-import Tests from "./pages/Tests.jsx";
-import Evaluation from "./pages/Evaluation.jsx";
-import ClassEvaluation from "./pages/ClassEvaluation.jsx";
-import StudentEvaluation from "./pages/StudentEvaluation.jsx";
+// Statisch bleibt nur, was fuer das erste Bild gebraucht wird: Rahmen, Landing,
+// Login und die Startseite. Alles andere wuerde beim Start einen Ladezustand
+// aufblitzen lassen, ohne dass jemand die Seite ueberhaupt sehen will.
 import Login from "./pages/Login.jsx";
-import Profile from "./pages/Profile.jsx";
-import Legal from "./pages/Legal.jsx";
 import Landing from "./pages/Landing.jsx";
-import Marketplace from "./pages/Marketplace.jsx";
-import ResetPassword from "./pages/ResetPassword.jsx";
-import VerifyEmail from "./pages/VerifyEmail.jsx";
-import ConfirmEmailChange from "./pages/ConfirmEmailChange.jsx";
-import Contact from "./pages/Contact.jsx";
-import Help from "./pages/Help.jsx";
 import NuvoraHome from "./pages/NuvoraHome.jsx";
-import Modules from "./pages/Modules.jsx";
-import Topics from "./pages/Topics.jsx";
-import Papierkorb from "./pages/Papierkorb.jsx";
-import ThemaAnsicht from "./pages/ThemaAnsicht.jsx";
-import LernpfadModule from "./pages/LernpfadModule.jsx";
-import CodeDetektiv from "./codedetektiv/CodeDetektiv.jsx";
-import PublicCd from "./codedetektiv/PublicCd.jsx";
-import Cards from "./pages/Cards.jsx";
-import Tutorial from "./pages/Tutorial.jsx";
 import GuidedTour, { PATH_TOUR, tourFor } from "./components/GuidedTour.jsx";
-import Auswertung from "./pages/Auswertung.jsx";
-import Lernen from "./pages/Lernen.jsx";
-import Karten from "./pages/Karten.jsx";
-import Kalender from "./pages/Kalender.jsx";
-import Unterrichtsplanung from "./pages/Unterrichtsplanung.jsx";
-import Zufall from "./pages/Zufall.jsx";
-import Orga from "./pages/Orga.jsx";
-import { KlassenarbeitVergleich } from "./pages/Klassenarbeit.jsx";
-import Notizbrett from "./pages/Notizbrett.jsx";
-import Notizen from "./pages/Notizen.jsx";
-import Elternlog from "./pages/Elternlog.jsx";
-import Mathefussball from "./pages/Mathefussball.jsx";
-import Tafel from "./pages/Tafel.jsx";
 import { useModules } from "./core/modules.js";
 import { DialogHost } from "./core/dialog.jsx";
 import { UndoHost } from "./core/undo.jsx";
 import { OutboxHost } from "./core/OutboxHost.jsx";
-import { btnPrimary, btnSecondary } from "./components/Icons.jsx";
+import { btnPrimary, btnSecondary, btnSmall, Skeleton } from "./components/Icons.jsx";
+
+// Alle uebrigen Seiten kommen erst beim Aufruf ueber die Leitung. Vorher lag
+// jedes Modul im selben Bundle: wer nur den Kalender oeffnet, lud auch Scanner,
+// Karten und Code-Detektiv (samt @dnd-kit und lzma) mit.
+const Dashboard = React.lazy(() => import("./pages/Dashboard.jsx"));
+const Session = React.lazy(() => import("./pages/Session.jsx"));
+const Scanner = React.lazy(() => import("./pages/Scanner.jsx"));
+const Classes = React.lazy(() => import("./pages/Classes.jsx"));
+const Kurse = React.lazy(() => import("./pages/Kurse.jsx"));
+const Tests = React.lazy(() => import("./pages/Tests.jsx"));
+const Evaluation = React.lazy(() => import("./pages/Evaluation.jsx"));
+const ClassEvaluation = React.lazy(() => import("./pages/ClassEvaluation.jsx"));
+const StudentEvaluation = React.lazy(() => import("./pages/StudentEvaluation.jsx"));
+const Profile = React.lazy(() => import("./pages/Profile.jsx"));
+const Legal = React.lazy(() => import("./pages/Legal.jsx"));
+const Marketplace = React.lazy(() => import("./pages/Marketplace.jsx"));
+const ResetPassword = React.lazy(() => import("./pages/ResetPassword.jsx"));
+const VerifyEmail = React.lazy(() => import("./pages/VerifyEmail.jsx"));
+const ConfirmEmailChange = React.lazy(() => import("./pages/ConfirmEmailChange.jsx"));
+const Contact = React.lazy(() => import("./pages/Contact.jsx"));
+const Help = React.lazy(() => import("./pages/Help.jsx"));
+const Modules = React.lazy(() => import("./pages/Modules.jsx"));
+const Topics = React.lazy(() => import("./pages/Topics.jsx"));
+const Papierkorb = React.lazy(() => import("./pages/Papierkorb.jsx"));
+const ThemaAnsicht = React.lazy(() => import("./pages/ThemaAnsicht.jsx"));
+const LernpfadModule = React.lazy(() => import("./pages/LernpfadModule.jsx"));
+const CodeDetektiv = React.lazy(() => import("./codedetektiv/CodeDetektiv.jsx"));
+const PublicCd = React.lazy(() => import("./codedetektiv/PublicCd.jsx"));
+const Cards = React.lazy(() => import("./pages/Cards.jsx"));
+const Tutorial = React.lazy(() => import("./pages/Tutorial.jsx"));
+const Auswertung = React.lazy(() => import("./pages/Auswertung.jsx"));
+const Lernen = React.lazy(() => import("./pages/Lernen.jsx"));
+const Karten = React.lazy(() => import("./pages/Karten.jsx"));
+const Kalender = React.lazy(() => import("./pages/Kalender.jsx"));
+const Unterrichtsplanung = React.lazy(() => import("./pages/Unterrichtsplanung.jsx"));
+const Zufall = React.lazy(() => import("./pages/Zufall.jsx"));
+const Orga = React.lazy(() => import("./pages/Orga.jsx"));
+// Benannter Export — lazy will ein default, deshalb hier umgehaengt.
+const KlassenarbeitVergleich = React.lazy(() => import("./pages/Klassenarbeit.jsx").then((m) => ({ default: m.KlassenarbeitVergleich })));
+const Notizbrett = React.lazy(() => import("./pages/Notizbrett.jsx"));
+const Notizen = React.lazy(() => import("./pages/Notizen.jsx"));
+const Elternlog = React.lazy(() => import("./pages/Elternlog.jsx"));
+const Mathefussball = React.lazy(() => import("./pages/Mathefussball.jsx"));
+const Tafel = React.lazy(() => import("./pages/Tafel.jsx"));
+
+// Ladezustand fuer nachgeladene Seiten: dieselben pulsierenden Balken wie beim
+// Datenladen — eine Textzeile „laedt…" wuerde die Seite kurz zusammenfallen lassen.
+const PageFallback = () => <Skeleton rows={4} height={56} />;
 // Navigation ist modulbezogen: die Shell zeigt die Punkte des Moduls, in dem
 // man gerade ist. Ausserhalb eines Moduls navigiert Nuvora selbst.
 const CV = "/cardvote";
@@ -754,6 +766,7 @@ function AppRoutes({ user, setUser, logout }) {
       <Nav user={user} onLogout={logout} />
       {user && <FirstRun user={user} />}
       <ContentWrapper>
+        <React.Suspense fallback={<PageFallback />}>
         <Routes>
           {/* ─── Nuvora-Rahmen ─── */}
           <Route path="/" element={user ? <NuvoraHome user={user} /> : <Landing />} />
@@ -818,6 +831,7 @@ function AppRoutes({ user, setUser, logout }) {
             <Route key={p} path={`/${p}/*`} element={<Navigate to={`${CV}/${p}${location.search}`} replace />} />
           ))}
         </Routes>
+        </React.Suspense>
       </ContentWrapper>
       <footer style={{ textAlign: "center", padding: "16px 0 24px", fontSize: 12, color: "var(--text3)" }}>
         {/* Rueckmeldungs-Hinweis: stand frueher nur auf der Landing- und der
@@ -845,6 +859,65 @@ function AppRoutes({ user, setUser, logout }) {
         </span>
       </footer>
     </>
+  );
+}
+
+// Eine neue Fassung liegt fertig im Browser, darf aber erst nach dem Neuladen
+// uebernehmen — sonst risse sie laufende Eingaben raus. Deshalb nur eine
+// schmale Leiste unten statt eines Modals: wer gerade arbeitet, arbeitet weiter.
+function UpdateBanner() {
+  const [ready, setReady] = useState(false);
+  const regRef = useRef(null);
+
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    let alive = true;
+    const offer = (reg) => {
+      // Ohne bisherigen Controller ist es die Erstinstallation, kein Update.
+      if (!navigator.serviceWorker.controller) return;
+      regRef.current = reg;
+      if (alive) setReady(true);
+    };
+    navigator.serviceWorker.ready.then((reg) => {
+      if (!reg) return;
+      if (reg.waiting) offer(reg);
+      reg.addEventListener("updatefound", () => {
+        const sw = reg.installing;
+        if (!sw) return;
+        sw.addEventListener("statechange", () => { if (sw.state === "installed") offer(reg); });
+      });
+    }).catch(() => { /* egal */ });
+    return () => { alive = false; };
+  }, []);
+
+  if (!ready) return null;
+
+  const reload = () => {
+    // Der wartende Worker uebernimmt erst auf Zuruf; sobald er das Ruder hat,
+    // laedt die Seite genau einmal neu (controllerchange).
+    const sw = regRef.current?.waiting;
+    let done = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (!done) { done = true; location.reload(); } });
+    if (sw) sw.postMessage({ type: "SKIP_WAITING" });
+    // Kein wartender Worker (schon aktiv): direkt neu laden.
+    else { done = true; location.reload(); }
+    setTimeout(() => { if (!done) { done = true; location.reload(); } }, 1500);
+  };
+
+  return (
+    <div style={{
+      position: "fixed", left: 16, right: 16, bottom: 16, zIndex: 250,
+      maxWidth: 460, margin: "0 auto",
+      display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+      padding: "10px 14px", borderRadius: 14,
+      background: "var(--card)", border: "1px solid var(--border)",
+      boxShadow: "0 6px 24px rgba(0,0,0,0.14)",
+      fontSize: 13, color: "var(--text2)",
+    }}>
+      <span style={{ flex: 1, minWidth: 160 }}>Eine neue Version steht bereit.</span>
+      <button onClick={reload} style={{ ...btnPrimary, ...btnSmall }}>Neu laden</button>
+      <button onClick={() => setReady(false)} style={{ ...btnSecondary, ...btnSmall }}>Später</button>
+    </div>
   );
 }
 
@@ -893,13 +966,18 @@ function App() {
         <DialogHost />
         <UndoHost />
         <OutboxHost />
-        <Routes>
-          {/* Kartenlernen der Schueler: oeffentlich, ohne Login, ueber Token. */}
-          <Route path="/lernen/:token" element={<Lernen />} />
-          {/* Code-Detektiv: öffentliches Beitreten der Schüler ohne Login. */}
-          <Route path="/cd/:code/*" element={<PublicCd />} />
-          <Route path="/*" element={<AppRoutes user={user} setUser={setUser} logout={logout} />} />
-        </Routes>
+        <UpdateBanner />
+        {/* Die beiden oeffentlichen Seiten liegen ausserhalb des Rahmens und
+            brauchen deshalb ihre eigene Ladehuelle. */}
+        <React.Suspense fallback={<div style={{ padding: "32px 16px" }}><PageFallback /></div>}>
+          <Routes>
+            {/* Kartenlernen der Schueler: oeffentlich, ohne Login, ueber Token. */}
+            <Route path="/lernen/:token" element={<Lernen />} />
+            {/* Code-Detektiv: öffentliches Beitreten der Schüler ohne Login. */}
+            <Route path="/cd/:code/*" element={<PublicCd />} />
+            <Route path="/*" element={<AppRoutes user={user} setUser={setUser} logout={logout} />} />
+          </Routes>
+        </React.Suspense>
       </BrowserRouter>
     </LanguageProvider>
   );
@@ -908,5 +986,11 @@ function App() {
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/sw.js").catch(() => {});
+  navigator.serviceWorker.register("/sw.js").then((reg) => {
+    // Ein Tab bleibt oft tagelang offen. Ohne Nachfrage merkt er von einem
+    // Deploy nichts; beim Zurueckwechseln pruefen wir deshalb einmal nach.
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") reg.update().catch(() => {});
+    });
+  }).catch(() => {});
 }

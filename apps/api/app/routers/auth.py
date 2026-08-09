@@ -72,26 +72,70 @@ MAX_LOGIN_ATTEMPTS = 5
 LOGIN_WINDOW = 60
 
 
-def _hash_pw(password: str) -> str:
+# ─────────────────────── Passwort-Hashes ───────────────────────
+# PBKDF2-HMAC-SHA256, aber mit dem Verfahren und der Iterationszahl IM Hash.
+# Grund: die Zahl muss mitwachsen (OWASP empfiehlt fuer PBKDF2-SHA256 inzwischen
+# 600 000). Stuende sie nur im Code, wuerde jede Erhoehung saemtliche
+# Bestandshashes unbrauchbar machen — also alle Konten aussperren.
+#
+#   neu:  "pbkdf2_sha256$600000$<salt>$<hash>"   → 3 Dollarzeichen
+#   alt:  "<salt>$<hash>", implizit 100 000      → 1 Dollarzeichen
+#
+# Das alte Format bleibt pruefbar; beim naechsten erfolgreichen Login wird es
+# still angehoben (siehe login()), denn nur dort liegt der Klartext vor.
+PW_ALGO = "pbkdf2_sha256"
+PW_ITERATIONS = 600_000
+PW_ITERATIONS_LEGACY = 100_000
+_PW_ITERATIONS_MAX = 10_000_000  # Notbremse gegen einen manipulierten Hash,
+                                 # der den Prozess sonst minutenlang rechnen liesse
+
+
+def _pbkdf2(password: str, salt: str, iterations: int) -> str:
+    return hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), iterations).hex()
+
+
+def _split_pw(stored: str) -> Optional[tuple[int, str, str]]:
+    """(Iterationen, Salt, Hash) — oder None, wenn der Hash unbrauchbar ist.
+
+    Die beiden Formate werden an der Anzahl der Dollarzeichen unterschieden.
+    """
+    teile = (stored or "").split("$")
+    if len(teile) == 4:  # neues Format
+        algo, iters, salt, h = teile
+        if algo != PW_ALGO or not salt or not h or not iters.isdigit():
+            return None
+        n = int(iters)
+        if not 1 <= n <= _PW_ITERATIONS_MAX:
+            return None
+        return n, salt, h
+    if len(teile) == 2:  # altes Format, feste Iterationszahl
+        salt, h = teile
+        if not salt or not h:
+            return None
+        return PW_ITERATIONS_LEGACY, salt, h
+    return None
+
+
+def _hash_pw(password: str, iterations: int = PW_ITERATIONS) -> str:
     salt = secrets.token_hex(16)
-    h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100_000)
-    return f"{salt}${h.hex()}"
+    return f"{PW_ALGO}${iterations}${salt}${_pbkdf2(password, salt, iterations)}"
 
 
 def _verify_pw(password: str, stored: str) -> bool:
     # Ein beschaedigter oder leerer Hash darf nicht in einen Fehler laufen: das
     # waere HTTP 500 statt "Passwort falsch" — und verriete beim Ausprobieren,
     # dass mit genau diesem Konto etwas nicht stimmt.
-    try:
-        salt, h = (stored or "").split("$", 1)
-    except ValueError:
+    zerlegt = _split_pw(stored)
+    if not zerlegt:
         return False
-    if not salt or not h:
-        return False
-    return hmac.compare_digest(
-        hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100_000).hex(),
-        h,
-    )
+    iterations, salt, h = zerlegt
+    return hmac.compare_digest(_pbkdf2(password, salt, iterations), h)
+
+
+def _pw_veraltet(stored: str) -> bool:
+    """Wurde der Hash mit zu wenigen Iterationen (oder im alten Format) erzeugt?"""
+    zerlegt = _split_pw(stored)
+    return bool(zerlegt) and zerlegt[0] < PW_ITERATIONS
 
 
 def _make_token(user_id: int, token_version: int = 0) -> str:
@@ -354,6 +398,12 @@ async def login(body: LoginBody, request: Request, db: AsyncSession = Depends(ge
         raise HTTPException(401, "E-Mail oder Passwort falsch")
     if not user.email_verified:
         raise HTTPException(403, "E-Mail noch nicht bestätigt. Bitte prüfe dein Postfach (auch Spam).")
+    if _pw_veraltet(user.password_hash):
+        # Genau hier — und nur hier — liegt der Klartext vor: still auf das
+        # aktuelle Verfahren heben. token_version bleibt bewusst unveraendert,
+        # sonst wuerde eine Anmeldung alle anderen Sitzungen abmelden.
+        user.password_hash = _hash_pw(body.password)
+        await db.commit()
     return {"token": _make_token(user.id, user.token_version), "user": _user_dict(user)}
 
 

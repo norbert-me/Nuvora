@@ -23,18 +23,54 @@ function apiCacheable(url, method) {
   return true;
 }
 
+// Vite haengt an jeden Chunk einen Inhalts-Hash: "Kalender-a1b2c3.js". Nach
+// einem Deploy heisst dieselbe Seite anders, und die alte Datei blieb bisher
+// fuer immer im Cache liegen — der wuchs mit jedem Deploy um das ganze Bundle.
+// Der Grundname ohne Hash sagt, welche Eintraege dasselbe meinen.
+function assetBase(pathname) {
+  const file = pathname.slice(pathname.lastIndexOf("/") + 1);
+  const dot = file.lastIndexOf(".");
+  if (dot < 0) return file;
+  return file.slice(0, dot).replace(/-[A-Za-z0-9_-]{8,}$/, "") + file.slice(dot);
+}
+
+// Von jedem Grundnamen nur den juengsten Eintrag behalten. cache.keys() liefert
+// die Eintraege in Einfuegereihenfolge, also steht der zuletzt geladene hinten.
+async function pruneOldAssets() {
+  const cache = await caches.open(CACHE_NAME);
+  const keys = await cache.keys();
+  const newest = new Map();
+  for (const req of keys) {
+    const url = new URL(req.url);
+    if (!url.pathname.startsWith("/assets/")) continue; // "/" und index.html nie wegwerfen
+    newest.set(assetBase(url.pathname), req);
+  }
+  const keep = new Set([...newest.values()]);
+  await Promise.all(keys
+    .filter((req) => new URL(req.url).pathname.startsWith("/assets/") && !keep.has(req))
+    .map((req) => cache.delete(req)));
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS)));
-  self.skipWaiting();
+  // Bewusst KEIN skipWaiting: die offene Seite laeuft mit ihren alten, jetzt
+  // vom Server geloeschten Chunk-Dateien weiter. Wuerde der neue Worker sofort
+  // uebernehmen und aufraeumen, liefe ein spaeter nachgeladener Seitenchunk ins
+  // Leere. Der Nutzer entscheidet ueber die Hinweisleiste, wann umgeschaltet wird.
+});
+
+// Zuruf aus der Update-Leiste (main.jsx): jetzt umschalten, die Seite laedt neu.
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME && k !== API_CACHE).map((k) => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter((k) => k !== CACHE_NAME && k !== API_CACHE).map((k) => caches.delete(k)));
+    await pruneOldAssets();
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener("fetch", (event) => {

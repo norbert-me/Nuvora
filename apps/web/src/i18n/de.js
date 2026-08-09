@@ -100,7 +100,6 @@ export default {
 
   // Startseite (nach Login)
   "home.title": "So funktioniert CardVote",
-  "home.intro": "Abstimmungen im Unterricht — Lernende halten Karten hoch, du scannst per Kamera.",
   "home.toCalendar": "Zum Kalender",
   "home.weakPracticed": "geübt",
   "home.weakEinstieg": "Einstieg",
@@ -501,7 +500,6 @@ export default {
   "session.detailEval": "Detailauswertung →",
   "home.welcome": "Willkommen, {{name}}",
   "home.welcomePlain": "Willkommen",
-  "home.intro": "Nuvora ist deine Basis: Konto, Klassen und Schüler liegen hier. Module arbeiten darauf.",
   "home.noModuleTitle": "Noch kein Modul aktiv",
   "home.noModuleText": "Schalte ein Modul frei, um loszulegen. Du kannst es jederzeit wieder abschalten — deine Daten bleiben erhalten.",
   "home.chooseModules": "Module auswählen",
@@ -901,7 +899,7 @@ export default {
   "karten.srInfo": "Die Lernenden bewerten nach jeder Karte selbst, wie gut sie sie konnten. Gut gekonnte Karten kommen erst nach immer längeren Abständen wieder (Tage, dann Wochen), schwache schon bald erneut. So wird gezielt das wiederholt, was noch wackelt — nachweislich effizienter als stures Durchgehen. Nuvora nutzt dafür den SM-2-Algorithmus.",
   "kalender.title": "Kalender",
   "kalender.month": "Monat",
-  "kalender.kw": "KW",
+  "kalender.kw": "KW",   // Spaltenkopf der Monatsansicht — kurz halten
   "kalender.toWeek": "Zur Wochenansicht",
   "kalender.toDay": "Zur Tagesansicht",
   "kalender.allDay": "Ganztägig",
@@ -913,7 +911,6 @@ export default {
   "kalender.end": "Ende",
   "kalender.addPeriod": "Stunde hinzufügen",
   "kalender.removePeriod": "Letzte Stunde entfernen",
-  "kalender.kw": "KW",
   "kalender.jumpToDay": "Zu Tag springen",
   "kalender.subscribe": "Abonnieren",
   "kalender.subscribeHint": "Kalender in Apple/Google abonnieren (dauerhaft)",

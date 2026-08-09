@@ -33,6 +33,15 @@ async def s():
     await engine.dispose()
 
 
+@pytest.fixture(autouse=True)
+def _rate_limit_zuruecksetzen():
+    """Das Anmelde-Limit zählt pro IP und lebt im Modul weiter. Ohne Zurücksetzen
+    reißen sich die Tests gegenseitig in ein 429."""
+    A._login_attempts.clear()
+    yield
+    A._login_attempts.clear()
+
+
 class _Anfrage:
     """Reicht für die Endpunkte: sie lesen nur die Client-Adresse."""
     headers = {"X-Real-IP": "203.0.113.7"}
@@ -61,6 +70,67 @@ def test_passwort_hash_ist_gesalzen_und_prueft_richtig():
 def test_kaputter_hash_laesst_niemanden_durch():
     for kaputt in ("", "kein-dollar-zeichen", "a$b", "$$"):
         assert not A._verify_pw("Geheim!2345", kaputt)
+
+
+def test_hash_traegt_verfahren_und_iterationszahl():
+    """Die Iterationszahl muss im Hash stehen, sonst sperrt jede Erhöhung
+    sämtliche Bestandskonten aus."""
+    h = A._hash_pw("Geheim!2345")
+    algo, iters, salt, digest = h.split("$")
+    assert algo == "pbkdf2_sha256"
+    assert int(iters) == A.PW_ITERATIONS >= 600_000, "OWASP-Empfehlung für PBKDF2-SHA256"
+    assert len(salt) >= 16 and len(digest) == 64
+
+
+def _alter_hash(passwort: str) -> str:
+    """Das Format vor der Umstellung: „salt$hash“ mit fest 100 000 Iterationen."""
+    return f"{'ab' * 16}${A._pbkdf2(passwort, 'ab' * 16, A.PW_ITERATIONS_LEGACY)}"
+
+
+def test_bestandskonten_im_alten_format_kommen_weiter_rein():
+    alt = _alter_hash("Geheim!2345")
+    assert alt.count("$") == 1, "das alte Format wird an der Zahl der Dollarzeichen erkannt"
+    assert A._verify_pw("Geheim!2345", alt)
+    assert not A._verify_pw("falsch", alt)
+    assert A._pw_veraltet(alt) and not A._pw_veraltet(A._hash_pw("Geheim!2345"))
+
+
+def test_manipulierte_iterationszahl_rechnet_nicht_endlos():
+    """Ein Hash mit absurder Iterationszahl würde den Prozess blockieren —
+    er gilt stattdessen als unbrauchbar."""
+    assert not A._verify_pw("Geheim!2345", "pbkdf2_sha256$999999999$salt$" + "0" * 64)
+    assert not A._verify_pw("Geheim!2345", "md5$600000$salt$" + "0" * 64)
+    assert not A._verify_pw("Geheim!2345", "pbkdf2_sha256$viele$salt$" + "0" * 64)
+
+
+@pytest.mark.asyncio
+async def test_login_hebt_alten_hash_still_an(s):
+    """Nur beim Login liegt der Klartext vor — also wird genau dort aufgerüstet,
+    ohne dass die Lehrkraft etwas merkt."""
+    u = await _konto(s)
+    u.password_hash = _alter_hash("Geheim!2345")
+    await s.commit()
+
+    await A.login(A.LoginBody(email="lehrkraft@schule.de", password="Geheim!2345"), _Anfrage(), s)
+
+    assert u.password_hash.startswith("pbkdf2_sha256$"), "Hash wurde nicht angehoben"
+    assert not A._pw_veraltet(u.password_hash)
+    assert A._verify_pw("Geheim!2345", u.password_hash), "das Passwort muss dasselbe bleiben"
+
+
+@pytest.mark.asyncio
+async def test_aufruesten_meldet_offene_sitzungen_nicht_ab(s):
+    """Das Anheben ist eine interne Umformatierung, kein Passwortwechsel — würde
+    token_version dabei steigen, flöge man auf allen anderen Geräten raus."""
+    u = await _konto(s)
+    u.password_hash = _alter_hash("Geheim!2345")
+    vorher = u.token_version or 0
+    await s.commit()
+
+    await A.login(A.LoginBody(email="lehrkraft@schule.de", password="Geheim!2345"), _Anfrage(), s)
+
+    assert (u.token_version or 0) == vorher
+    assert A._verify_token(A._make_token(u.id, vorher)), "altes Token bleibt gültig"
 
 
 # ─────────────────────────── Anmelden ───────────────────────────
