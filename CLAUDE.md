@@ -56,6 +56,8 @@ Bestandskonten werden beim Start einmalig angeschlossen (`users.modules_initiali
 | `scripts/selftest.py` | System und Statik, dann **je Modul ein echter Schreib-Roundtrip** (anlegen, lesen, ändern, löschen) auf Kern-Klasse und -Schülern; schaltet die Module dafür zu und stellt den Zustand danach wieder her |
 | `scripts/selftest-browser.mjs` (`./selftest.sh --browser`) | Rundgang im echten Browser: jede Modul- und Kern-Seite rendert, keine Konsolenfehler, keine toten internen Links. Playwright liegt isoliert in `scripts/`, nie in `apps/web` |
 
+Das Testkonto wird **einmalig von Hand angelegt** (registrieren + E-Mail bestätigen) — der Selbsttest legt es nicht an, weil die Bestätigungspflicht kein Skript ersetzen kann; fehlt es, sagt der Bericht genau das statt nur „401".
+
 Der Roundtrip schreibt in das Konto aus `SELFTEST_EMAIL`/`SELFTEST_PASSWORD` (`.deploy.env`), alles mit Präfix `ZZ-Selbsttest`, und räumt inklusive Papierkorb wieder ab. Was übrig bleibt, steht am Ende unter „Reste" — das ist ein Befund, kein Rauschen.
 
 **Ein neues Modul braucht drei Einträge**, sonst wird der Selbsttest rot: `REGISTRY` (modules.py), `MODUL_PREFIX` (selftest.py) und `PROBEN` (scripts/selftest.py). Genau das ist der Zweck — ein Modul ohne Probe ist ein Modul, von dem niemand weiß, ob es nach dem Deploy noch läuft.

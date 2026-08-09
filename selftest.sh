@@ -57,6 +57,12 @@ if [ -z "$SELFTEST_EMAIL" ] || [ -z "$SELFTEST_PASSWORD" ]; then
   echo "Hinweis: SELFTEST_EMAIL/SELFTEST_PASSWORD fehlen in .deploy.env —"
   echo "         Module und Einrichtung bleiben ungeprueft."
   echo ""
+  echo "         Das Testkonto muss einmalig von Hand angelegt werden:"
+  echo "         unter $URL/login registrieren, E-Mail bestaetigen,"
+  echo "         dann beide Werte in .deploy.env eintragen. (Der Selbsttest"
+  echo "         legt es nicht selbst an — die Bestaetigung kann kein Skript"
+  echo "         ersetzen.)"
+  echo ""
 fi
 
 STATUS=0

@@ -699,8 +699,25 @@ def main():
 
         def login():
             nonlocal angemeldet
-            d = api.call("POST", "/api/auth/login",
-                         {"email": args.email, "password": args.passwort}, erwartet=(200,))
+            status, text = api.call("POST", "/api/auth/login",
+                                    {"email": args.email, "password": args.passwort}, roh=True)
+            # Das Testkonto legt der Selbsttest nicht selbst an: Registrieren
+            # verlangt eine E-Mail-Bestaetigung, die kein Skript ersetzen kann.
+            # Deshalb hier sagen, was zu tun ist, statt nur "401".
+            if status == 401:
+                raise AssertionError(
+                    f"Konto '{args.email}' gibt es nicht (oder das Passwort stimmt nicht). "
+                    f"Einmalig anlegen: unter {args.url}/login registrieren, "
+                    "E-Mail bestaetigen, dann dieselben Zugangsdaten als "
+                    "SELFTEST_EMAIL/SELFTEST_PASSWORD in .deploy.env eintragen.")
+            if status == 403:
+                raise AssertionError(
+                    f"Konto '{args.email}' existiert, aber die E-Mail ist noch nicht "
+                    "bestaetigt. Bestaetigungslink aus der Mail oeffnen (ohne SMTP "
+                    "kommt keine Mail an — dann SMTP_* in der .env auf dem Server setzen).")
+            if status != 200:
+                raise AssertionError(f"HTTP {status}: {text[:150]}")
+            d = json.loads(text)
             api.token = d["token"]
             api.call("GET", "/api/auth/me", erwartet=(200,))
             angemeldet = True

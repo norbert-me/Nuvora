@@ -69,6 +69,10 @@ async function main() {
     const login = await kontext.request.post("/api/auth/login", {
       data: { email: EMAIL, password: PASSWORT },
     });
+    if (login.status() === 401)
+      throw new Error(`Konto '${EMAIL}' gibt es nicht (oder falsches Passwort). Einmalig unter ${URL_BASIS}/login registrieren und E-Mail bestaetigen.`);
+    if (login.status() === 403)
+      throw new Error(`Konto '${EMAIL}' ist noch nicht per E-Mail bestaetigt.`);
     if (!login.ok()) throw new Error(`Login fehlgeschlagen: HTTP ${login.status()}`);
     const { token: t, user } = await login.json();
     token = t;
