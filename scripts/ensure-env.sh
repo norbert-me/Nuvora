@@ -84,6 +84,9 @@ set_always() {
 
 set_always PORT "$port"
 set_always SITE_URL "$site"
+# Gleiches Geheimnis wie in .deploy.env, sonst kommt der Selbsttest nicht an die
+# Einrichtungs-Pruefungen. Erzeugt wird es dort, hier nur nachgezogen.
+[ -n "${selftest:-}" ] && set_always SELFTEST_TOKEN "$selftest"
 
 # Marker: ab jetzt gilt diese Installation als eingerichtet (siehe oben).
 [ -f .env-eingerichtet ] || : > .env-eingerichtet

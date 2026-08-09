@@ -149,6 +149,22 @@ echo "→ Pflicht-Secrets auf dem Server prüfen..."
 GEN_TOKEN=$(openssl rand -hex 32)
 GEN_PGPW=$(openssl rand -hex 24)
 
+# Das Selbsttest-Token muss auf BEIDEN Seiten gleich sein: hier in .deploy.env
+# (damit der Test es mitschickt) und in der .env auf dem Server (damit die API
+# es kennt). Fehlt es, wird es einmalig erzeugt und hier gemerkt — ohne es
+# blieben Schema, Konfiguration und E-Mail-Versand nach jedem Deploy ungeprueft,
+# weil der Selbsttest absichtlich nicht mit dem Administrationskonto laeuft.
+if [ -z "${SELFTEST_TOKEN:-}" ]; then
+  SELFTEST_TOKEN=$(openssl rand -hex 24)
+  if grep -q '^SELFTEST_TOKEN=' "$DIR/.deploy.env"; then
+    awk -v v="$SELFTEST_TOKEN" 'index($0,"SELFTEST_TOKEN=")==1 { print "SELFTEST_TOKEN=\"" v "\""; next } { print }' \
+      "$DIR/.deploy.env" > "$DIR/.deploy.env.tmp" && mv "$DIR/.deploy.env.tmp" "$DIR/.deploy.env"
+  else
+    printf 'SELFTEST_TOKEN="%s"\n' "$SELFTEST_TOKEN" >> "$DIR/.deploy.env"
+  fi
+  echo "  Selbsttest-Token erzeugt und in .deploy.env gemerkt."
+fi
+
 set +e
 BOOTSTRAP=$(ssh "$SERVER" sh -s <<REMOTE
 cd '$REMOTE_DIR' || exit 1
@@ -156,6 +172,7 @@ t='$GEN_TOKEN'
 p='$GEN_PGPW'
 port='$PORT'
 site='$SITE_URL'
+selftest='$SELFTEST_TOKEN'
 $(cat "$DIR/scripts/ensure-env.sh")
 REMOTE
 )

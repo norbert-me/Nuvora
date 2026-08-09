@@ -52,6 +52,9 @@ done
 export SELFTEST_URL="$URL"
 export SELFTEST_EMAIL="${SELFTEST_EMAIL:-}"
 export SELFTEST_PASSWORD="${SELFTEST_PASSWORD:-}"
+# Ohne das Token bleiben Schema, Konfiguration und E-Mail ungeprueft
+# (siehe .deploy.env). ./deploy.sh erzeugt es beim ersten Lauf selbst.
+export SELFTEST_TOKEN="${SELFTEST_TOKEN:-}"
 
 if [ -z "$SELFTEST_EMAIL" ] || [ -z "$SELFTEST_PASSWORD" ]; then
   echo "Hinweis: SELFTEST_EMAIL/SELFTEST_PASSWORD fehlen in .deploy.env —"
