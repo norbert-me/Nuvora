@@ -152,11 +152,15 @@ async function main() {
     }
 
     // ── Wirklich bedienen, nicht nur ansehen ──
+    // Vorher merken, was es gibt: abgeraeumt wird danach genau das Neue. Nach
+    // dem Titel zu suchen reichte nicht — scheitert das Tippen, bleibt ein
+    // leerer Zettel stehen, den niemand zuordnen kann.
+    const vorher = await bestand(api);
     for (const flow of BEDIENUNG) {
       const befund = await bediene(kontext, flow);
       notiere("Bedienung", flow.name, befund.ok, befund.detail);
     }
-    await aufraeumenBedienung(api);
+    await aufraeumenBedienung(api, vorher);
   } catch (e) {
     notiere("Ablauf", "Selbsttest", false, String(e.message || e));
   } finally {
@@ -281,18 +285,23 @@ async function bediene(kontext, flow) {
   }
 }
 
-/** Was die Bedienprobe angelegt hat, wieder entfernen. */
-async function aufraeumenBedienung(api) {
-  try {
-    for (const n of await (await api("/api/notizblock")).json()) {
-      if ((n.title || "").includes(MARKE)) await api(`/api/notizblock/${n.id}`, "delete");
-    }
-  } catch { /* im Bericht steht dann der Rest */ }
-  try {
-    for (const t of await (await api("/api/topics")).json()) {
-      if ((t.name || "").includes(MARKE)) await api(`/api/topics/${t.id}`, "delete");
-    }
-  } catch { /* siehe oben */ }
+/** IDs, die es vor der Bedienprobe schon gab. */
+async function bestand(api) {
+  const ids = async (pfad) => {
+    try { return new Set((await (await api(pfad)).json()).map((x) => x.id)); } catch { return new Set(); }
+  };
+  return { notizblock: await ids("/api/notizblock"), topics: await ids("/api/topics") };
+}
+
+/** Genau das wieder entfernen, was die Bedienprobe angelegt hat. */
+async function aufraeumenBedienung(api, vorher) {
+  for (const [pfad, schluessel] of [["/api/notizblock", "notizblock"], ["/api/topics", "topics"]]) {
+    try {
+      for (const eintrag of await (await api(pfad)).json()) {
+        if (!vorher[schluessel].has(eintrag.id)) await api(`${pfad}/${eintrag.id}`, "delete");
+      }
+    } catch { /* was bleibt, faellt beim naechsten Lauf auf */ }
+  }
 }
 
 /** Holt die eingebettete Lernpfad-App ihre Inhalte vom Server? */
