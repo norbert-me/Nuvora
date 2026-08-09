@@ -137,6 +137,7 @@ const Notizen = React.lazy(() => import("./pages/Notizen.jsx"));
 const Elternlog = React.lazy(() => import("./pages/Elternlog.jsx"));
 const Mathefussball = React.lazy(() => import("./pages/Mathefussball.jsx"));
 const Tafel = React.lazy(() => import("./pages/Tafel.jsx"));
+const NichtGefunden = React.lazy(() => import("./pages/NichtGefunden.jsx"));
 
 // Ladezustand fuer nachgeladene Seiten: dieselben pulsierenden Balken wie beim
 // Datenladen — eine Textzeile „laedt…" wuerde die Seite kurz zusammenfallen lassen.
@@ -873,6 +874,12 @@ function AppRoutes({ user, setUser, logout }) {
           {["questions", "session", "tests", "scan", "marketplace"].map((p) => (
             <Route key={p} path={`/${p}/*`} element={<Navigate to={`${CV}/${p}${location.search}`} replace />} />
           ))}
+
+          {/* Alles, was keine Route oben getroffen hat: eigene 404-Seite statt
+              Navigation ueber einer leeren Flaeche. Steht bewusst ganz unten —
+              die oeffentlichen Wege (/lernen/:token, /cd/:code) liegen ausserhalb
+              dieses Routers und werden davon nicht beruehrt. */}
+          <Route path="*" element={<NichtGefunden user={user} />} />
         </Routes>
         </React.Suspense>
         </LadeFehler>

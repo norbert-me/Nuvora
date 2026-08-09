@@ -1630,4 +1630,13 @@ export default {
   "sitzplan.hintFree": "Drag students from the pool onto the area. Move tables freely, rotate with ↻ (angled tables), remove with × back to the pool. Saved automatically.",
   "sitzplan.rotate": "Rotate",
   "sitzplan.removeSeat": "Remove",
+
+  // Page not found (404)
+  "notfound.title": "This page does not exist",
+  "notfound.intro": "The address leads nowhere — usually a typo, an old bookmark or a link from an earlier version.",
+  "notfound.address": "Requested address",
+  "notfound.home": "Go to start page",
+  "notfound.back": "Back",
+  "notfound.moduleHint": "The address belongs to the module “{{modul}}” — it is currently not enabled for you. You can switch it on under “Modules”.",
+  "notfound.moduleLink": "Manage modules",
 };

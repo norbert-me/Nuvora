@@ -1614,4 +1614,13 @@ export default {
   "sitzplan.hintFree": "Schüler aus dem Pool auf die Fläche ziehen. Tische frei verschieben, mit ↻ drehen (schräge Tische), mit × zurück in den Pool. Wird automatisch gespeichert.",
   "sitzplan.rotate": "Drehen",
   "sitzplan.removeSeat": "Entfernen",
+
+  // Seite nicht gefunden (404)
+  "notfound.title": "Diese Seite gibt es nicht",
+  "notfound.intro": "Die Adresse führt ins Leere — meist ein Tippfehler, ein altes Lesezeichen oder ein Link aus einer früheren Fassung.",
+  "notfound.address": "Aufgerufene Adresse",
+  "notfound.home": "Zur Startseite",
+  "notfound.back": "Zurück",
+  "notfound.moduleHint": "Die Adresse gehört zum Modul „{{modul}}“ — das ist für dich gerade nicht aktiviert. Unter „Module“ lässt es sich einschalten.",
+  "notfound.moduleLink": "Module verwalten",
 };

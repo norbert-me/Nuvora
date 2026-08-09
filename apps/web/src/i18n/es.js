@@ -1630,4 +1630,13 @@ export default {
   "sitzplan.hintFree": "Arrastra alumnos del grupo a la zona. Mueve las mesas libremente, gíralas con ↻ (mesas inclinadas), quítalas con × al grupo. Se guarda automáticamente.",
   "sitzplan.rotate": "Girar",
   "sitzplan.removeSeat": "Quitar",
+
+  // Página no encontrada (404)
+  "notfound.title": "Esta página no existe",
+  "notfound.intro": "La dirección no lleva a ninguna parte: suele ser un error de escritura, un marcador antiguo o un enlace de una versión anterior.",
+  "notfound.address": "Dirección solicitada",
+  "notfound.home": "Ir al inicio",
+  "notfound.back": "Volver",
+  "notfound.moduleHint": "La dirección pertenece al módulo «{{modul}}», que ahora mismo no está activado para ti. Puedes activarlo en «Módulos».",
+  "notfound.moduleLink": "Gestionar módulos",
 };
