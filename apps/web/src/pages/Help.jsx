@@ -3,6 +3,7 @@
 // Bereich aus ?area= (die Navbar haengt ihn beim Klick auf Hilfe an). Oben die
 // anderen Bereiche zum Wechseln; nur Kern plus aktive Module.
 import { Link, useSearchParams } from "react-router-dom";
+import { pageApp } from "../components/Icons.jsx";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 
