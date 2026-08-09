@@ -7,6 +7,11 @@
 #          ./deploy.sh web proxy               -> baut mehrere
 #          ./deploy.sh --port 8090              -> anderer Port, wird in .deploy.env gemerkt
 #          ./deploy.sh --port 8090 web           -> beides kombinierbar
+#          ./deploy.sh --browser                 -> Selbsttest zusaetzlich im Browser
+#          ./deploy.sh --kein-selftest           -> ohne Selbsttest ausliefern
+#
+# Nach dem Deploy laeuft ./selftest.sh: jedes Modul einmal wirklich benutzt,
+# Einrichtung und Seiten geprueft. Health allein sagt nur "Container laeuft".
 #
 # Secrets (TOKEN_SECRET, POSTGRES_PASSWORD, SMTP_*) leben nur auf dem Server
 # und werden hier nie angefasst. PORT und SITE_URL dagegen gehoeren zum
@@ -29,9 +34,17 @@ fi
 
 # ─── Argumente: --port N, Rest sind zu bauende Services ───
 CLI_PORT=""
+SELFTEST=1        # Selbsttest nach dem Deploy (./selftest.sh)
+SELFTEST_BROWSER=0
 ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
+    --kein-selftest)
+      SELFTEST=0; shift
+      ;;
+    --browser)
+      SELFTEST_BROWSER=1; shift
+      ;;
     --port|-p)
       CLI_PORT="${2:-}"
       [ -z "$CLI_PORT" ] && { echo "Fehler: --port braucht eine Nummer, z.B. --port 8090"; exit 1; }
@@ -41,7 +54,7 @@ while [ $# -gt 0 ]; do
       CLI_PORT="${1#*=}"; shift
       ;;
     -h|--help)
-      sed -n '2,15p' "$0" | sed 's|^# \{0,1\}||'
+      sed -n '2,20p' "$0" | sed 's|^# \{0,1\}||'
       exit 0
       ;;
     *)
@@ -324,6 +337,20 @@ if [ "$CV" = "200" ] && [ "$LP" = "200" ]; then
   echo "  Nuvora deployed — beide Module gesund."
   echo "  ${SITE_URL:-http://localhost:$PORT}"
   echo "========================================"
+  # Health sagt nur "Container laeuft". Der Selbsttest sagt, ob jedes Modul,
+  # die Einrichtung und die Seiten wirklich funktionieren.
+  if [ "$SELFTEST" = "1" ]; then
+    echo ""
+    echo "→ Selbsttest..."
+    SELFTEST_ARGS=()
+    [ "$SELFTEST_BROWSER" = "1" ] && SELFTEST_ARGS+=(--browser)
+    if ! "$DIR/selftest.sh" "${SELFTEST_ARGS[@]+"${SELFTEST_ARGS[@]}"}"; then
+      echo ""
+      echo "  ⚠ Selbsttest gefunden: siehe Fehler oben. Deploy ist ausgeliefert,"
+      echo "    aber etwas funktioniert nicht — nachsehen, bevor Unterricht daran haengt."
+      exit 1
+    fi
+  fi
 else
   [ "$CV" != "200" ] && echo "  ⚠ Nuvora-Kern nicht gesund (health=$CV)"
   [ "$LP" != "200" ] && echo "  ⚠ Modul Lernpfad nicht gesund (status=$LP)"

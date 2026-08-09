@@ -1,0 +1,9 @@
+{
+  "name": "nuvora-selftest",
+  "private": true,
+  "type": "module",
+  "description": "Nur fuer den Browser-Selbsttest (scripts/selftest-browser.mjs). Bewusst getrennt von apps/web, damit Playwright nicht ins Web-Image wandert.",
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}

@@ -46,6 +46,20 @@ Im Frontend liest `src/core/modules.js` das aus; `ModuleGate` in `main.jsx` sch�
 
 Bestandskonten werden beim Start einmalig angeschlossen (`users.modules_initialized`), damit niemand nach dem Umbau vor einer leeren Shell steht.
 
+### Selbsttest nach dem Deploy
+
+`./deploy.sh` ruft am Ende `./selftest.sh` — Health sagt nur „Container läuft", der Selbsttest sagt, ob es wirklich funktioniert. Drei Teile:
+
+| Teil | Was es prüft |
+| ---- | ------------ |
+| `apps/api/app/routers/selftest.py` (`GET /api/selftest`, nur Administration) | Datenbank, **Schema gegen die Modelle** (es gibt kein Alembic — hier fällt auf, was in `_ensure_columns` fehlt), Konfiguration, `config/site.json`, REGISTRY gegen die gemounteten Router |
+| `scripts/selftest.py` | System und Statik, dann **je Modul ein echter Schreib-Roundtrip** (anlegen, lesen, ändern, löschen) auf Kern-Klasse und -Schülern; schaltet die Module dafür zu und stellt den Zustand danach wieder her |
+| `scripts/selftest-browser.mjs` (`./selftest.sh --browser`) | Rundgang im echten Browser: jede Modul- und Kern-Seite rendert, keine Konsolenfehler, keine toten internen Links. Playwright liegt isoliert in `scripts/`, nie in `apps/web` |
+
+Der Roundtrip schreibt in das Konto aus `SELFTEST_EMAIL`/`SELFTEST_PASSWORD` (`.deploy.env`), alles mit Präfix `ZZ-Selbsttest`, und räumt inklusive Papierkorb wieder ab. Was übrig bleibt, steht am Ende unter „Reste" — das ist ein Befund, kein Rauschen.
+
+**Ein neues Modul braucht drei Einträge**, sonst wird der Selbsttest rot: `REGISTRY` (modules.py), `MODUL_PREFIX` (selftest.py) und `PROBEN` (scripts/selftest.py). Genau das ist der Zweck — ein Modul ohne Probe ist ein Modul, von dem niemand weiß, ob es nach dem Deploy noch läuft.
+
 
 ### Alles wird im Wurzelverzeichnis konfiguriert
 
