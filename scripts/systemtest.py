@@ -1,0 +1,1592 @@
+#!/usr/bin/env python3
+"""Nuvora — Systemtest: jedes Modul EINZELN durchgespielt, nichts abgehakt.
+
+Der Selbsttest (`scripts/selftest.py`) fragt: laeuft die Installation? Dieser
+Test fragt: stimmt, was sie behauptet? Er beweist statt zu quittieren —
+angelegte Werte werden unabhaengig neu gelesen und verglichen, Zahlen werden im
+Test selbst gerechnet und gegen die des Servers gehalten.
+
+Fuenf Ebenen:
+
+1. **Alleinstellung** — je Modul aus dem REGISTRY: NUR dieses eine aktiv, alle
+   anderen abgeschaltet. Dann muessen die Endpunkte dieses Moduls antworten und
+   die Endpunkte jedes anderen mit 403 abweisen. Das ist die Regel-3-Probe:
+   ohne Aktivierung nichts, und kein Modul haengt an einem anderen.
+2. **Inhalt** — je Modul echte Daten schreiben, danach unabhaengig neu lesen und
+   die WERTE vergleichen (nicht den Statuscode).
+3. **CardVote vollstaendig** — Fragen, Quiz mit E/G, Sitzung, Scans fuer mehrere
+   Kinder und Fragen, Auswertung. Trefferquote je Frage, Prozentwerte,
+   E/G-Bonus und Minuspunkte werden im Test von Hand gerechnet und verglichen
+   (Regeln: apps/api/app/scoring.py).
+4. **Noten** — Ergebnis als Spalte uebernehmen, eine Note aendern, Beobachtung
+   ergaenzen (darf nie zaehlen), Gewichte setzen, gewichteten Schnitt gegen die
+   eigene Rechnung pruefen, Endnote setzen und wieder entfernen.
+5. **Bruecken** — jedes Paar mit Bruecke zweimal: mit beiden Modulen muss sie
+   wirken, ohne das zweite darf sie NICHTS tun (und nichts halb tun); ohne das
+   besitzende Modul 403.
+
+Alles Angelegte traegt PRAEFIX und wird am Ende hart entfernt; der
+Modul-Zustand des Kontos wird wiederhergestellt. Was nicht abgeraeumt werden
+konnte, steht unter "Reste".
+
+Nutzung:
+    scripts/systemtest.py --url http://127.0.0.1:8124 --email … --passwort …
+    scripts/systemtest.py --json
+Rueckgabewert: 0 = gruen, 1 = mindestens ein Fehler.
+"""
+import argparse
+import json
+import os
+import sys
+import time
+from datetime import datetime, timedelta, timezone
+
+# Bausteine kommen aus dem Selbsttest (gleiches Verzeichnis) — nicht kopieren:
+# HTTP-Client, Berichtsform und Farben sollen an EINER Stelle gepflegt werden.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from selftest import Api, ApiFehler, Bericht, FETT, AUS  # noqa: E402
+
+PRAEFIX = "ZZ-Systemtest"
+
+
+class Systembericht(Bericht):
+    """Der Bericht des Selbsttests, nur anders unterschrieben.
+
+    Gruppen, Farben, Zusammenfassung und JSON kommen unveraendert aus
+    `selftest.Bericht` — dupliziert wird nichts, nur das Wort in der Schlusszeile
+    ausgetauscht, damit im Terminal nicht "Selbsttest" ueber einem Systemtest
+    steht.
+    """
+
+    def drucke(self):
+        import io
+        import contextlib
+        puffer = io.StringIO()
+        with contextlib.redirect_stdout(puffer):
+            super().drucke()
+        print(puffer.getvalue().replace("Selbsttest gruen", "Systemtest gruen")
+              .replace("Selbsttest ROT", "Systemtest ROT"), end="")
+
+# Notenschluessel wie DEFAULT_SCALE in apps/api/app/scoring.py: ab wie viel
+# Prozent welche Note. Der Test rechnet damit selbst — waeren die Werte dort
+# andere, faellt genau das hier auf.
+SKALA = {1: 87, 2: 73, 3: 59, 4: 45, 5: 20, 6: 0}
+
+
+def note_aus_prozent(pct):
+    for g in (1, 2, 3, 4, 5, 6):
+        if pct >= SKALA[g]:
+            return g
+    return 6
+
+
+def naechste_stufe(pct):
+    """Prozentpunkte bis zur naechstbesseren Stufe — der Deckel des E-Bonus."""
+    hoeher = sorted(v for v in SKALA.values() if v > pct)
+    return (hoeher[0] - pct) if hoeher else max(0.0, 100.0 - pct)
+
+
+def gleich(a, b, toleranz=0.001):
+    return abs(float(a) - float(b)) <= toleranz
+
+
+# ─────────────────────── Testumgebung im Kern ───────────────────────
+
+class Umgebung:
+    """Klasse mit drei Kindern (E/G/G), Kurs und Thema — der Boden, auf dem
+    jedes Modul arbeitet. Die Niveaus braucht die E/G-Wertung von CardVote."""
+
+    def __init__(self, api, b):
+        self.api, self.b = api, b
+        self.class_id = self.kurs_id = self.topic_id = None
+        self.students = []      # DB-IDs
+        self.karten = [1, 2, 3]  # card_id (die aufgedruckte Nummer)
+        self.namen = [f"{PRAEFIX} Anna", f"{PRAEFIX} Ben", f"{PRAEFIX} Cem"]
+        self.niveaus = ["E", "G", "G"]
+        self.aufraeumen = []
+
+    def spaeter(self, was, fn):
+        self.aufraeumen.append((was, fn))
+
+    def aufbauen(self):
+        kl = self.api.call("POST", "/api/classes", {
+            "name": f"{PRAEFIX} Klasse",
+            "students": [{"card_id": c, "name": n, "niveau": v}
+                         for c, n, v in zip(self.karten, self.namen, self.niveaus)],
+        }, erwartet=(201,))
+        self.class_id = kl["id"]
+        self.kurs_id = kl.get("kurs_id")
+        self.students = [s["id"] for s in kl.get("students", [])]
+        if len(self.students) != 3:
+            raise AssertionError(f"{len(self.students)} Schueler angelegt statt 3")
+        thema = self.api.call("POST", "/api/topics", {"name": f"{PRAEFIX} Thema"}, erwartet=(201,))
+        self.topic_id = thema["id"]
+        # Rueckwaerts abgeraeumt: Thema zuerst, Klasse und Kurs zuletzt.
+        self.spaeter("Thema", lambda: self.api.call(
+            "DELETE", f"/api/topics/{self.topic_id}", erwartet=(204, 404)))
+        self.spaeter("Kurs", lambda: self._weg("/api/kurse", self.kurs_id))
+        self.spaeter("Klasse", lambda: self._weg("/api/classes", self.class_id))
+        return (f"Klasse {self.class_id}, Kurs {self.kurs_id}, Thema {self.topic_id}, "
+                f"Kinder {self.students} (Niveau E/G/G)")
+
+    def _weg(self, prefix, oid):
+        if oid is None:
+            return
+        self.api.call("DELETE", f"{prefix}/{oid}", erwartet=(204, 404))
+        self.api.call("DELETE", f"{prefix}/{oid}/purge", erwartet=(204, 404))
+
+    def abbauen(self):
+        for was, fn in reversed(self.aufraeumen):
+            try:
+                fn()
+            except Exception as e:
+                self.b.reste.append(f"{was}: {e}")
+        try:
+            for eintrag in self.api.call("GET", "/api/trash", erwartet=(200,)) or []:
+                if PRAEFIX in str(eintrag.get("label", "")):
+                    self.api.call("DELETE", f"/api/trash/{eintrag['kind']}/{eintrag['id']}",
+                                  erwartet=(204, 404))
+        except Exception as e:
+            self.b.reste.append(f"Papierkorb: {e}")
+
+
+# ─────────────────────── Was jedes Modul koennen muss ───────────────────────
+
+def endpunkte(u):
+    """Je Modul die Endpunkte, die bei aktivem Modul antworten muessen.
+
+    Bewusst nur lesende Wege: das Schreiben prueft der Inhalts-Roundtrip weiter
+    unten, hier geht es darum, dass die Route ueberhaupt lebt und nicht an einem
+    anderen Modul haengt.
+    """
+    c, k, s, t = u.class_id, u.kurs_id, u.students[0], u.topic_id
+    return {
+        "cardvote": [
+            ("GET", "/api/questions"),
+            ("GET", "/api/folders"),
+            ("GET", "/api/root-question-sets"),
+            ("GET", "/api/sessions/active"),
+            ("GET", "/api/sessions-list"),
+            ("GET", "/api/stats/dashboard"),
+            # Zeitraum ist Pflicht (frm/to) — der Wiederholungs-Vorschlag der Folgewoche.
+            ("GET", f"/api/weak-topics?frm={(datetime.now() - timedelta(days=30)).isoformat()}"
+                    f"&to={datetime.now().isoformat()}"),
+            ("GET", "/api/weak-review"),
+            ("GET", f"/api/classes/{c}/evaluation"),
+        ],
+        "lernpfad": [
+            ("GET", "/api/lernpfad/exercises"),
+            ("GET", "/api/lernpfad/paths"),
+            ("GET", "/api/lernpfad/paths/trash"),
+            ("GET", "/api/lernpfad/ladders/trash"),
+        ],
+        "auswertung": [
+            ("GET", f"/api/noten/classes/{c}/students"),
+            ("GET", f"/api/noten/classes/{c}/sections"),
+            ("GET", f"/api/noten/classes/{c}/entries"),
+            ("GET", f"/api/noten/classes/{c}/summary"),
+            ("GET", f"/api/noten/classes/{c}/year"),
+            ("GET", f"/api/noten/classes/{c}/dividers"),
+            ("GET", f"/api/noten/classes/{c}/export"),
+            ("GET", "/api/noten/code-sessions"),
+            ("GET", f"/api/klassenarbeit/classes/{c}/students"),
+            ("GET", f"/api/klassenarbeit/classes/{c}/works"),
+        ],
+        "karten": [
+            ("GET", f"/api/karten/classes/{c}/decks"),
+            ("GET", f"/api/karten/classes/{c}/all-decks"),
+            ("GET", f"/api/karten/classes/{c}/decks/trash"),
+            ("GET", f"/api/karten/classes/{c}/card-folders"),
+            ("GET", f"/api/karten/classes/{c}/progress"),
+            ("GET", f"/api/karten/classes/{c}/students/{s}/cards"),
+        ],
+        "kalender": [
+            ("GET", "/api/kalender/entries"),
+            ("GET", "/api/kalender/breaks"),
+            ("GET", "/api/kalender/timetable"),
+            ("GET", "/api/kalender/klassenarbeiten"),
+            ("GET", "/api/kalender/klassenarbeiten/uebersicht"),
+            ("GET", "/api/kalender/slot-cancellations"),
+            ("GET", "/api/kalender/export"),
+            ("GET", "/api/kalender/subscribe"),
+            ("GET", "/api/kalender/external"),
+            ("GET", f"/api/kalender/quiz-session?set_id=0&class_id={c}"),
+        ],
+        "orga": [
+            ("GET", f"/api/orga/{c}"),
+            ("GET", f"/api/anwesenheit/{c}?date={datetime.now().date().isoformat()}"),
+            ("GET", f"/api/anwesenheit/{c}/summary"),
+            ("GET", f"/api/anwesenheit/{c}/student/{s}"),
+            ("GET", f"/api/sitzplan/{c}"),
+            ("GET", f"/api/sitzplan/{c}/segel"),
+            ("GET", "/api/ausleihe/items"),
+            ("GET", "/api/ausleihe/loans"),
+        ],
+        "zufall": [
+            ("GET", f"/api/zufall/{c}"),
+        ],
+        "unterrichtsplanung": [
+            ("GET", "/api/methoden/list"),
+            ("GET", "/api/methoden/folders"),
+            ("GET", "/api/methoden/export"),
+        ],
+        "notizbrett": [
+            ("GET", "/api/notizblock"),
+            ("GET", "/api/todo"),
+            ("GET", "/api/todo/calendar"),
+        ],
+        "notizen": [
+            ("GET", f"/api/notizen?student_id={s}"),
+            ("GET", f"/api/notizen/counts?class_id={c}"),
+        ],
+        "klassenleitung": [
+            ("GET", f"/api/elternlog?student_id={s}"),
+            ("GET", f"/api/elternlog/counts?class_id={c}"),
+        ],
+        "code-detektiv": [
+            ("GET", "/api/codedetektiv/puzzles"),
+        ],
+        # Reines Frontend, kein Backend — im Browser-Test geprueft.
+        "tafel": [],
+        "mathespiele": [],
+    }
+
+
+def tore(u):
+    """Je Modul die Endpunkte, die OHNE Aktivierung 403 liefern muessen.
+
+    Kleiner Ausschnitt der Liste oben: es geht nicht um Vollstaendigkeit,
+    sondern darum, dass die Schranke am Router haengt. Wer hier 200 bekommt,
+    liest Moduldaten ohne das Modul.
+    """
+    c, s = u.class_id, u.students[0]
+    return {
+        "cardvote": [("GET", "/api/questions"), ("GET", "/api/sessions-list"),
+                     ("GET", "/api/folders")],
+        "lernpfad": [("GET", "/api/lernpfad/exercises"), ("GET", "/api/lernpfad/paths")],
+        "auswertung": [("GET", f"/api/noten/classes/{c}/sections"),
+                       ("GET", f"/api/klassenarbeit/classes/{c}/works")],
+        "karten": [("GET", f"/api/karten/classes/{c}/decks"),
+                   ("GET", f"/api/karten/classes/{c}/progress")],
+        "kalender": [("GET", "/api/kalender/entries"), ("GET", "/api/kalender/timetable")],
+        "orga": [("GET", f"/api/orga/{c}"), ("GET", "/api/ausleihe/items"),
+                 ("GET", f"/api/sitzplan/{c}")],
+        "zufall": [("GET", f"/api/zufall/{c}")],
+        "unterrichtsplanung": [("GET", "/api/methoden/list"), ("GET", "/api/methoden/folders")],
+        "notizbrett": [("GET", "/api/notizblock"), ("GET", "/api/todo")],
+        "notizen": [("GET", f"/api/notizen?student_id={s}"),
+                    ("GET", f"/api/notizen/counts?class_id={c}")],
+        "klassenleitung": [("GET", f"/api/elternlog?student_id={s}")],
+        "code-detektiv": [("GET", "/api/codedetektiv/puzzles")],
+        "tafel": [],
+        "mathespiele": [],
+    }
+
+
+# ─────────────────────── Inhalt: schreiben und wiederfinden ───────────────────────
+#
+# Jede dieser Proben schreibt echte Daten und liest sie DANACH unabhaengig neu
+# (eigener Aufruf, eigene Liste) und vergleicht die Werte. Ein Statuscode
+# beweist nichts: eine Route kann 201 melden und trotzdem nichts speichern.
+
+def _minuten_bis(iso: str) -> float:
+    """Minuten von jetzt bis zu einem ISO-Zeitpunkt (mit oder ohne Zeitzone)."""
+    z = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    jetzt = datetime.now(timezone.utc) if z.tzinfo else datetime.now()
+    return (z - jetzt).total_seconds() / 60
+
+
+def _finde(liste, **felder):
+    for e in liste or []:
+        if all(e.get(k) == v for k, v in felder.items()):
+            return e
+    return None
+
+
+def inhalt_cardvote(api, u, spuren):
+    frage = api.call("POST", "/api/questions", {
+        "text": f"{PRAEFIX} 7*8?", "question_type": "mc",
+        "choices": {"A": "54", "B": "56", "C": "58", "D": "48"},
+        "correct_answer": "B", "topic_id": u.topic_id,
+    }, erwartet=(201,))
+    spuren.append(("Frage", lambda: api.call("DELETE", f"/api/questions/{frage['id']}",
+                                             erwartet=(204, 404))))
+    gelesen = api.call("GET", f"/api/questions/{frage['id']}", erwartet=(200,))
+    if gelesen["text"] != f"{PRAEFIX} 7*8?" or gelesen["correct_answer"] != "B":
+        raise AssertionError(f"Frage kam anders zurueck: {gelesen}")
+    if gelesen.get("topic_id") != u.topic_id:
+        raise AssertionError("Thema der Frage nicht gespeichert")
+    if (gelesen.get("choices") or {}).get("B") != "56":
+        raise AssertionError(f"Antwortmoeglichkeiten verloren: {gelesen.get('choices')}")
+    api.call("PUT", f"/api/questions/{frage['id']}", {
+        "text": f"{PRAEFIX} 7*8 (neu)", "question_type": "mc",
+        "choices": {"A": "54", "B": "56", "C": "58", "D": "48"},
+        "correct_answer": "B", "topic_id": u.topic_id,
+    }, erwartet=(200,))
+    liste = api.call("GET", "/api/questions", erwartet=(200,))
+    wieder = _finde(liste, id=frage["id"])
+    if not wieder or wieder["text"] != f"{PRAEFIX} 7*8 (neu)":
+        raise AssertionError("geaenderter Text steht nicht in der Liste")
+    return "Frage geschrieben, einzeln und in der Liste mit gleichen Werten wiedergefunden"
+
+
+def inhalt_lernpfad(api, u, spuren):
+    aufgabe = api.call("POST", "/api/lernpfad/exercises", {
+        "topic_id": u.topic_id, "aufgabentext": f"{PRAEFIX} Kuerze 12/18",
+        "kategorie": "Uebung", "loesung": "2/3", "unteraufgaben": 3,
+    }, erwartet=(201,))
+    spuren.append(("Aufgabe", lambda: api.call(
+        "DELETE", f"/api/lernpfad/exercises/{aufgabe['id']}", erwartet=(204, 404))))
+    wieder = _finde(api.call("GET", f"/api/lernpfad/exercises?topic_id={u.topic_id}",
+                             erwartet=(200,)), id=aufgabe["id"])
+    if not wieder:
+        raise AssertionError("Aufgabe nicht ueber ihr Thema auffindbar")
+    for feld, soll in (("aufgabentext", f"{PRAEFIX} Kuerze 12/18"), ("loesung", "2/3"),
+                       ("kategorie", "Uebung"), ("unteraufgaben", 3)):
+        if wieder.get(feld) != soll:
+            raise AssertionError(f"{feld}: {wieder.get(feld)!r} statt {soll!r}")
+
+    pfad = api.call("POST", "/api/lernpfad/paths", {"name": f"{PRAEFIX} Pfad"}, erwartet=(201,))
+    spuren.append(("Lernpfad", lambda: (
+        api.call("DELETE", f"/api/lernpfad/paths/{pfad['id']}", erwartet=(204, 404)),
+        api.call("DELETE", f"/api/lernpfad/paths/{pfad['id']}/purge", erwartet=(204, 404)))))
+    leiter = api.call("POST", f"/api/lernpfad/paths/{pfad['id']}/ladders", {
+        "class_id": u.class_id, "topic_id": u.topic_id, "notizen": "Notiz A",
+        "assignments": [{"student_id": u.students[0], "exercise_ids": [aufgabe["id"]]}],
+    }, erwartet=(201,))
+    # Unabhaengig neu lesen: ueber die Pfadliste, nicht ueber die Antwort von eben.
+    p = _finde(api.call("GET", "/api/lernpfad/paths", erwartet=(200,)), id=pfad["id"])
+    if not p:
+        raise AssertionError("Lernpfad fehlt in der Liste")
+    l = _finde(p.get("ladders"), id=leiter["id"])
+    if not l:
+        raise AssertionError("Lernleiter haengt nicht am Lernpfad")
+    if l.get("notizen") != "Notiz A" or l.get("topic_id") != u.topic_id \
+            or l.get("class_id") != u.class_id:
+        raise AssertionError(f"Lernleiter kam anders zurueck: {l}")
+    zuweisung = (l.get("assignments") or [{}])[0]
+    if zuweisung.get("exercise_ids") != [aufgabe["id"]]:
+        raise AssertionError(f"Zuweisung der Aufgabe verloren: {l.get('assignments')}")
+    return "Aufgabe (5 Felder), Lernpfad mit Lernleiter und Zuweisung wiedergefunden"
+
+
+def inhalt_auswertung(api, u, spuren):
+    block = api.call("POST", f"/api/noten/classes/{u.class_id}/sections",
+                     {"name": f"{PRAEFIX} Block", "weight": 60}, erwartet=(201,))
+    spuren.append(("Notenblock", lambda: api.call(
+        "DELETE", f"/api/noten/sections/{block['id']}", erwartet=(204, 404))))
+    spalte = api.call("POST", "/api/noten/categories",
+                      {"name": f"{PRAEFIX} Spalte", "section_id": block["id"],
+                       "topic_id": u.topic_id}, erwartet=(201,))
+    api.call("POST", "/api/noten/entries", {
+        "category_id": spalte["id"], "student_id": u.students[0], "kind": "grade", "value": 2.3,
+    }, erwartet=(201,))
+    # Unabhaengig lesen: ueber die Eintragsliste der Klasse.
+    eintraege = api.call("GET", f"/api/noten/classes/{u.class_id}/entries", erwartet=(200,))
+    meiner = [e for e in eintraege if e["category_id"] == spalte["id"]]
+    if len(meiner) != 1 or not gleich(meiner[0]["value"], 2.3):
+        raise AssertionError(f"Note nicht wie geschrieben zurueck: {meiner}")
+    # Und ueber die Zusammenfassung — die rechnet, statt nur zu spiegeln.
+    zus = api.call("GET", f"/api/noten/classes/{u.class_id}/summary", erwartet=(200,))
+    zeile = _finde(zus, student_id=u.students[0])
+    if not zeile or not gleich(zeile["per_category"].get(str(spalte["id"])), 2.3):
+        raise AssertionError(f"Schnitt der Spalte falsch: {zeile}")
+
+    arbeit = api.call("POST", "/api/klassenarbeit/works",
+                      {"class_id": u.class_id, "name": f"{PRAEFIX} Arbeit"}, erwartet=(201,))
+    spuren.append(("Klassenarbeit", lambda: api.call(
+        "DELETE", f"/api/klassenarbeit/works/{arbeit['id']}", erwartet=(204, 404))))
+    api.call("PUT", f"/api/klassenarbeit/works/{arbeit['id']}", {
+        "tasks": [{"id": "a1", "label": "Aufgabe 1", "topic_id": u.topic_id, "max": 4}],
+        "results": {str(u.students[0]): {"a1": 1}, str(u.students[1]): {"a1": 4}},
+    }, erwartet=(200,))
+    gelesen = _finde(api.call("GET", f"/api/klassenarbeit/classes/{u.class_id}/works",
+                              erwartet=(200,)), id=arbeit["id"])
+    if not gelesen or (gelesen.get("tasks") or [{}])[0].get("max") != 4:
+        raise AssertionError(f"Aufgabe der Klassenarbeit nicht gespeichert: {gelesen}")
+    # Die Auswertung rechnet: 1 von 4 und 4 von 4 Punkten = 5 von 8 = 63 %.
+    ausw = api.call("GET", f"/api/klassenarbeit/works/{arbeit['id']}/analysis", erwartet=(200,))
+    thema = _finde(ausw.get("topics"), topic_id=u.topic_id)
+    if not thema:
+        raise AssertionError("Thema fehlt in der Auswertung")
+    soll = round(5 / 8 * 100)
+    if thema["pct"] != soll:
+        raise AssertionError(f"Trefferquote {thema['pct']} % statt {soll} % (5 von 8 Punkten)")
+    schwach = _finde(ausw.get("students"), student_id=u.students[0])
+    if not schwach:
+        raise AssertionError("Kind mit 1 von 4 Punkten gilt nicht als schwach")
+    # Sofort wieder abraeumen: der Noten-Teil weiter unten rechnet mit den
+    # Gewichten ALLER Abschnitte — ein liegengebliebener Testabschnitt wuerde
+    # dort eine falsche Erwartung erzeugen. (In `spuren` steht es trotzdem, fuer
+    # den Fall, dass die Probe vorher abbricht.)
+    api.call("DELETE", f"/api/klassenarbeit/works/{arbeit['id']}", erwartet=(204, 404))
+    api.call("DELETE", f"/api/noten/sections/{block['id']}", erwartet=(204, 404))
+    return f"Note 2,3 wiedergefunden; Klassenarbeit rechnet {soll} % und findet das schwache Kind"
+
+
+def inhalt_karten(api, u, spuren):
+    """Der volle Weg: Stapel und zwei Karten anlegen, freigeben, Zugang holen,
+    OHNE Anmeldung lernen, antworten — und danach als Lehrkraft nachsehen, ob
+    der Fortschritt wirklich gestiegen ist."""
+    anonym = Api(api.basis, debug=api.debug)
+    stapel = api.call("POST", f"/api/karten/classes/{u.class_id}/decks",
+                      {"name": f"{PRAEFIX} Stapel", "topic_id": u.topic_id}, erwartet=(201,))
+    spuren.append(("Kartenstapel", lambda: (
+        api.call("DELETE", f"/api/karten/decks/{stapel['id']}", erwartet=(204, 404)),
+        api.call("DELETE", f"/api/karten/decks/{stapel['id']}/purge", erwartet=(204, 404)))))
+    k1 = api.call("POST", f"/api/karten/decks/{stapel['id']}/cards",
+                  {"front": "3+4", "back": "7"}, erwartet=(201,))
+    k2 = api.call("POST", f"/api/karten/decks/{stapel['id']}/cards",
+                  {"front": "5*6", "back": "30"}, erwartet=(201,))
+
+    # Vor der Freigabe darf ein Kind nichts sehen — sonst waeren Entwuerfe oeffentlich.
+    zugaenge = api.call("POST", f"/api/karten/classes/{u.class_id}/tokens", erwartet=(200, 201))
+    token = _finde(zugaenge, student_id=u.students[0])
+    if not token:
+        raise AssertionError("kein Zugang fuer das erste Kind erzeugt")
+    token = token["token"]
+    vorab = anonym.call("GET", f"/api/karten/lernen/{token}", erwartet=(200,))
+    if vorab.get("cards"):
+        raise AssertionError("Entwurf ist fuer Lernende sichtbar — Freigabe wirkt nicht")
+
+    api.call("POST", f"/api/karten/decks/{stapel['id']}/release", {"now": True}, erwartet=(200,))
+    sitzung = anonym.call("GET", f"/api/karten/lernen/{token}", erwartet=(200,))
+    if sitzung.get("total") != 2 or len(sitzung.get("cards") or []) != 2:
+        raise AssertionError(f"Kind sieht {sitzung.get('total')} Karten statt 2")
+    vorderseiten = {c["front"] for c in sitzung["cards"]}
+    if vorderseiten != {"3+4", "5*6"}:
+        raise AssertionError(f"falsche Karten ausgeliefert: {vorderseiten}")
+
+    vorher = _finde(api.call("GET", f"/api/karten/classes/{u.class_id}/progress", erwartet=(200,)),
+                    student_id=u.students[0])
+    anonym.call("POST", f"/api/karten/lernen/{token}/review",
+                {"card_id": k1["id"], "grade": 3}, erwartet=(200,))
+    anonym.call("POST", f"/api/karten/lernen/{token}/review",
+                {"card_id": k2["id"], "grade": 0}, erwartet=(200,))
+    nachher = _finde(api.call("GET", f"/api/karten/classes/{u.class_id}/progress", erwartet=(200,)),
+                     student_id=u.students[0])
+    if nachher["total"] != 2:
+        raise AssertionError(f"Fortschritt zaehlt {nachher['total']} Karten statt 2")
+    if nachher["reviewed"] <= (vorher or {}).get("reviewed", 0):
+        raise AssertionError(f"Fortschritt nicht gestiegen: {vorher} -> {nachher}")
+    if nachher["reviewed"] != 1:
+        # grade 0 setzt zurueck (reps=0) — genau eine Karte gilt als gelernt.
+        raise AssertionError(f"{nachher['reviewed']} gelernte Karten statt 1 "
+                             "(grade 0 darf nicht als gelernt zaehlen)")
+    if nachher["due"] != 0:
+        # Beide Karten sind beantwortet: die gute liegt einen Tag weit weg, die
+        # falsche ("nochmal") zehn Minuten. Faellig ist also gerade keine.
+        raise AssertionError(f"{nachher['due']} faellige Karten statt 0")
+    # Die falsche Karte darf aber nicht verschwinden — sie muss kurz darauf
+    # wiederkommen, sonst waere "nochmal" ein Loeschknopf.
+    stand = anonym.call("GET", f"/api/karten/lernen/{token}", erwartet=(200,))
+    if not stand.get("next_due"):
+        raise AssertionError("keine naechste Faelligkeit — die falsche Karte kommt nie wieder")
+    frist = _minuten_bis(stand["next_due"])
+    if not (0 < frist <= 15):
+        raise AssertionError(f"falsche Karte erst in {frist:.0f} Minuten wieder faellig "
+                             "(erwartet: rund 10)")
+    # Die Detailsicht muss dasselbe sagen wie die Uebersicht.
+    detail = api.call("GET", f"/api/karten/classes/{u.class_id}/students/{u.students[0]}/cards",
+                      erwartet=(200,))
+    eine = _finde(detail, card_id=k1["id"])
+    if not eine or eine["reps"] != 1:
+        raise AssertionError(f"Detailsicht zeigt {eine} statt reps=1")
+    # Fremder Token darf nichts oeffnen.
+    status, _ = anonym.call("GET", "/api/karten/lernen/ZZ-kein-token", roh=True)
+    if status < 400:
+        raise AssertionError(f"falscher Token liefert HTTP {status}")
+    return ("Stapel freigegeben, ohne Anmeldung gelernt, Fortschritt 0 -> 1 von 2 "
+            f"(Detailsicht bestaetigt reps=1), falsche Karte in {frist:.0f} Minuten "
+            "wieder faellig, falscher Token abgewiesen")
+
+
+def inhalt_kalender(api, u, spuren):
+    tag = datetime.now().replace(hour=9, minute=0, second=0, microsecond=0)
+    eintrag = api.call("POST", "/api/kalender/entries", {
+        "date": tag.isoformat(), "title": f"{PRAEFIX} Stunde", "notes": "Merksatz",
+        "class_id": u.class_id, "topic_id": u.topic_id, "period": 2,
+        "start_time": "09:00", "end_time": "09:45",
+        "verlaufsplan": [{"phase": "Einstieg", "dauer": "5", "text": "Blitzlicht"}],
+    }, erwartet=(201,))
+    spuren.append(("Kalendereintrag", lambda: api.call(
+        "DELETE", f"/api/kalender/entries/{eintrag['id']}", erwartet=(204, 404))))
+    frm = (tag - timedelta(days=1)).isoformat()
+    to = (tag + timedelta(days=1)).isoformat()
+    wieder = _finde(api.call("GET", f"/api/kalender/entries?frm={frm}&to={to}", erwartet=(200,)),
+                    id=eintrag["id"])
+    if not wieder:
+        raise AssertionError("Eintrag nicht im abgefragten Zeitraum")
+    for feld, soll in (("title", f"{PRAEFIX} Stunde"), ("notes", "Merksatz"),
+                       ("class_id", u.class_id), ("topic_id", u.topic_id),
+                       ("period", 2), ("start_time", "09:00")):
+        if wieder.get(feld) != soll:
+            raise AssertionError(f"{feld}: {wieder.get(feld)!r} statt {soll!r}")
+    if (wieder.get("verlaufsplan") or [{}])[0].get("text") != "Blitzlicht":
+        raise AssertionError(f"Verlaufsplan verloren: {wieder.get('verlaufsplan')}")
+
+    slot = api.call("PUT", "/api/kalender/timetable/slot", {
+        "weekday": 0, "period": 1, "class_id": u.class_id, "title": f"{PRAEFIX} Slot",
+    }, erwartet=(200,))
+    spuren.append(("Stundenplan-Slot", lambda: api.call(
+        "DELETE", f"/api/kalender/timetable/slot/{slot['id']}", erwartet=(204, 404))))
+    plan = api.call("GET", "/api/kalender/timetable", erwartet=(200,))
+    treffer = _finde(plan.get("slots"), id=slot["id"])
+    if not treffer or treffer.get("weekday") != 0 or treffer.get("class_id") != u.class_id:
+        raise AssertionError(f"Slot nicht im Stundenplan wiedergefunden: {plan.get('slots')}")
+
+    pause = api.call("POST", "/api/kalender/breaks", {
+        "start_date": tag.isoformat(), "end_date": (tag + timedelta(days=2)).isoformat(),
+        "label": f"{PRAEFIX} frei",
+    }, erwartet=(201,))
+    spuren.append(("Freier Zeitraum", lambda: api.call(
+        "DELETE", f"/api/kalender/breaks/{pause['id']}", erwartet=(204, 404))))
+    if not _finde(api.call("GET", "/api/kalender/breaks", erwartet=(200,)), id=pause["id"]):
+        raise AssertionError("freier Zeitraum nicht in der Liste")
+
+    arbeit = api.call("POST", "/api/kalender/klassenarbeiten", {
+        "date": (tag + timedelta(days=7)).isoformat(), "title": f"{PRAEFIX} KA",
+        "class_id": u.class_id,
+    }, erwartet=(201,))
+    spuren.append(("Klassenarbeitstermin", lambda: api.call(
+        "DELETE", f"/api/kalender/klassenarbeiten/{arbeit['id']}", erwartet=(204, 404))))
+    if not _finde(api.call("GET", "/api/kalender/klassenarbeiten", erwartet=(200,)),
+                  id=arbeit["id"]):
+        raise AssertionError("Klassenarbeitstermin nicht in der Liste")
+    return "Eintrag (6 Felder + Verlaufsplan), Slot, freier Zeitraum, Klassenarbeit wiedergefunden"
+
+
+def inhalt_orga(api, u, spuren):
+    posten = api.call("POST", f"/api/orga/{u.class_id}", {"name": f"{PRAEFIX} Zettel"},
+                      erwartet=(201,))
+    spuren.append(("Checklisten-Punkt", lambda: api.call(
+        "DELETE", f"/api/orga/item/{posten['id']}", erwartet=(204, 404))))
+    api.call("PUT", f"/api/orga/item/{posten['id']}/toggle", {"student_id": u.students[0]},
+             erwartet=(200,))
+    wieder = _finde(api.call("GET", f"/api/orga/{u.class_id}", erwartet=(200,)), id=posten["id"])
+    if not wieder or u.students[0] not in (wieder.get("done") or []):
+        raise AssertionError(f"Haken nicht gespeichert: {wieder}")
+
+    heute = datetime.now().replace(hour=8, minute=0, second=0, microsecond=0)
+    api.call("PUT", f"/api/anwesenheit/{u.class_id}",
+             {"student_id": u.students[1], "date": heute.isoformat(), "status": "fehlt",
+              "note": "krank"}, erwartet=(200,))
+    spuren.append(("Anwesenheit", lambda: api.call(
+        "PUT", f"/api/anwesenheit/{u.class_id}",
+        {"student_id": u.students[1], "date": heute.isoformat(), "status": "da"},
+        erwartet=(200, 404))))
+    tag = api.call("GET", f"/api/anwesenheit/{u.class_id}?date={heute.isoformat()}",
+                   erwartet=(200,))
+    eintrag = tag.get(str(u.students[1]))
+    if not eintrag or eintrag.get("status") != "fehlt" or eintrag.get("note") != "krank":
+        raise AssertionError(f"Fehlzeit nicht wie geschrieben: {tag}")
+
+    api.call("PUT", f"/api/sitzplan/{u.class_id}",
+             {"seats": [{"sid": u.students[0], "x": 3, "y": 4, "rot": 90}]}, erwartet=(200,))
+    plan = api.call("GET", f"/api/sitzplan/{u.class_id}", erwartet=(200,))
+    sitz = _finde(plan.get("seats"), sid=u.students[0])
+    if not sitz or not gleich(sitz["x"], 3) or not gleich(sitz["y"], 4) \
+            or not gleich(sitz["rot"], 90):
+        raise AssertionError(f"Sitzplatz nicht wie gesetzt: {plan}")
+
+    gegenstand = api.call("POST", "/api/ausleihe/items", {"name": f"{PRAEFIX} Buch"},
+                          erwartet=(201,))
+    spuren.append(("Ausleih-Gegenstand", lambda: api.call(
+        "DELETE", f"/api/ausleihe/items/{gegenstand['id']}", erwartet=(204, 404))))
+    leihe = api.call("POST", "/api/ausleihe/loans",
+                     {"item_id": gegenstand["id"], "student_id": u.students[2]}, erwartet=(201,))
+    offen = _finde(api.call("GET", "/api/ausleihe/items", erwartet=(200,)), id=gegenstand["id"])
+    if not offen or offen.get("open") != 1:
+        raise AssertionError(f"offene Ausleihe wird nicht gezaehlt: {offen}")
+    if (leihe.get("borrower") or "") != u.namen[2]:
+        raise AssertionError(f"Ausleiher '{leihe.get('borrower')}' statt '{u.namen[2]}'")
+    api.call("PUT", f"/api/ausleihe/loans/{leihe['id']}/return", erwartet=(200,))
+    zurueck = _finde(api.call("GET", "/api/ausleihe/items", erwartet=(200,)), id=gegenstand["id"])
+    if zurueck.get("open") != 0:
+        raise AssertionError("Rueckgabe schliesst die Ausleihe nicht")
+    return "Haken, Fehlzeit mit Notiz, Sitzplatz (x/y/rot), Ausleihe und Rueckgabe belegt"
+
+
+def inhalt_zufall(api, u, spuren):
+    api.call("DELETE", f"/api/zufall/{u.class_id}", erwartet=(204,))
+    api.call("POST", f"/api/zufall/{u.class_id}/draw", {"student_id": u.students[0]},
+             erwartet=(200,))
+    api.call("POST", f"/api/zufall/{u.class_id}/draw", {"student_id": u.students[0]},
+             erwartet=(200,))
+    # Kurz warten: den Zeitstempel eines NEUEN Eintrags setzt die Datenbank
+    # (server_default now()), den eines vorhandenen der Server in Python. Liegen
+    # beide in derselben Sekunde, entscheidet auf sekundengenauen Datenbanken der
+    # Zufall, wer als „zuletzt gezogen" gilt.
+    time.sleep(1.2)
+    api.call("POST", f"/api/zufall/{u.class_id}/draw", {"student_id": u.students[1]},
+             erwartet=(200,))
+    spuren.append(("Zieh-Gedaechtnis", lambda: api.call(
+        "DELETE", f"/api/zufall/{u.class_id}", erwartet=(204, 404))))
+    stand = api.call("GET", f"/api/zufall/{u.class_id}", erwartet=(200,))
+    hist = stand.get("history") or {}
+    if hist.get(str(u.students[0]), {}).get("count") != 2:
+        raise AssertionError(f"zweimal gezogen, gezaehlt: {hist.get(str(u.students[0]))}")
+    if stand.get("last_student_id") != u.students[1]:
+        raise AssertionError(f"zuletzt gezogen ist {stand.get('last_student_id')}, "
+                             f"gezogen wurde {u.students[1]}")
+    return "dreimal gezogen: Zaehler 2 und 1, zuletzt Gezogener stimmt"
+
+
+def inhalt_unterrichtsplanung(api, u, spuren):
+    ordner = api.call("POST", "/api/methoden/folders", {"name": f"{PRAEFIX} Methoden"},
+                      erwartet=(201,))
+    spuren.append(("Methodenordner", lambda: api.call(
+        "DELETE", f"/api/methoden/folders/{ordner['id']}", erwartet=(204, 404))))
+    methode = api.call("POST", "/api/methoden/", {
+        "title": f"{PRAEFIX} Einstieg", "description": "Impulsbild zeigen",
+        "ablauf": "1. Bild\n2. Fragen", "material": "Beamer", "dauer": 10,
+        "folder_id": ordner["id"], "topic_id": u.topic_id,
+    }, erwartet=(201,))
+    spuren.append(("Methode", lambda: api.call(
+        "DELETE", f"/api/methoden/{methode['id']}", erwartet=(204, 404))))
+    wieder = _finde(api.call("GET", "/api/methoden/list", erwartet=(200,)), id=methode["id"])
+    if not wieder:
+        raise AssertionError("Methode nicht in der Sammlung")
+    for feld, soll in (("title", f"{PRAEFIX} Einstieg"), ("description", "Impulsbild zeigen"),
+                       ("material", "Beamer"), ("dauer", 10),
+                       ("folder_id", ordner["id"]), ("topic_id", u.topic_id)):
+        if wieder.get(feld) != soll:
+            raise AssertionError(f"{feld}: {wieder.get(feld)!r} statt {soll!r}")
+    return "Methode mit 6 Feldern im Ordner wiedergefunden"
+
+
+def inhalt_notizbrett(api, u, spuren):
+    notiz = api.call("POST", "/api/notizblock",
+                     {"title": f"{PRAEFIX} Notiz", "content": "Zeile 1\nZeile 2"}, erwartet=(201,))
+    spuren.append(("Notizzettel", lambda: api.call(
+        "DELETE", f"/api/notizblock/{notiz['id']}", erwartet=(204, 404))))
+    wieder = _finde(api.call("GET", "/api/notizblock", erwartet=(200,)), id=notiz["id"])
+    if not wieder or wieder.get("content") != "Zeile 1\nZeile 2":
+        raise AssertionError(f"Notiz kam anders zurueck: {wieder}")
+
+    morgen = (datetime.now() + timedelta(days=1)).date().isoformat()
+    aufgabe = api.call("POST", "/api/todo",
+                       {"text": f"{PRAEFIX} Kopien machen", "due_date": morgen,
+                        "due_time": "07:30"}, erwartet=(201,))
+    spuren.append(("To-do", lambda: api.call(
+        "DELETE", f"/api/todo/{aufgabe['id']}", erwartet=(204, 404))))
+    t = _finde(api.call("GET", "/api/todo", erwartet=(200,)), id=aufgabe["id"])
+    if not t or t.get("due_date") != morgen or t.get("due_time") != "07:30" or t.get("done"):
+        raise AssertionError(f"To-do kam anders zurueck: {t}")
+    api.call("PUT", f"/api/todo/{aufgabe['id']}", {"done": True}, erwartet=(200,))
+    t = _finde(api.call("GET", "/api/todo", erwartet=(200,)), id=aufgabe["id"])
+    if not t.get("done"):
+        raise AssertionError("Erledigt-Haken nicht gespeichert")
+    # Datierte Aufgaben erscheinen im Kalender-Auszug des Moduls.
+    if not _finde(api.call("GET", "/api/todo/calendar", erwartet=(200,)), id=aufgabe["id"]):
+        raise AssertionError("datiertes To-do fehlt im Kalender-Auszug")
+    return "Notiz mit Zeilenumbruch, To-do mit Datum/Uhrzeit, Haken und Kalender-Auszug"
+
+
+def inhalt_notizen(api, u, spuren):
+    heute = datetime.now().date().isoformat()
+    beob = api.call("POST", "/api/notizen",
+                    {"student_id": u.students[0], "text": f"{PRAEFIX} arbeitet konzentriert",
+                     "category": "Arbeitsverhalten", "date": heute}, erwartet=(201,))
+    spuren.append(("Beobachtung", lambda: api.call(
+        "DELETE", f"/api/notizen/{beob['id']}", erwartet=(204, 404))))
+    wieder = _finde(api.call("GET", f"/api/notizen?student_id={u.students[0]}", erwartet=(200,)),
+                    id=beob["id"])
+    if not wieder or wieder.get("category") != "Arbeitsverhalten" or wieder.get("date") != heute:
+        raise AssertionError(f"Beobachtung kam anders zurueck: {wieder}")
+    zahlen = api.call("GET", f"/api/notizen/counts?class_id={u.class_id}", erwartet=(200,))
+    if int((zahlen or {}).get(str(u.students[0]), 0)) < 1:
+        raise AssertionError(f"Zaehler zeigt keine Beobachtung: {zahlen}")
+    return "Beobachtung mit Kategorie und Datum wiedergefunden, Zaehler stimmt"
+
+
+def inhalt_klassenleitung(api, u, spuren):
+    heute = datetime.now().date().isoformat()
+    kontakt = api.call("POST", "/api/elternlog",
+                       {"student_id": u.students[1], "channel": "telefon", "date": heute,
+                        "text": f"{PRAEFIX} Rueckmeldung zu den Hausaufgaben"}, erwartet=(201,))
+    spuren.append(("Elternkontakt", lambda: api.call(
+        "DELETE", f"/api/elternlog/{kontakt['id']}", erwartet=(204, 404))))
+    wieder = _finde(api.call("GET", f"/api/elternlog?student_id={u.students[1]}", erwartet=(200,)),
+                    id=kontakt["id"])
+    if not wieder or wieder.get("channel") != "telefon" or wieder.get("date") != heute:
+        raise AssertionError(f"Elternkontakt kam anders zurueck: {wieder}")
+    zahlen = api.call("GET", f"/api/elternlog/counts?class_id={u.class_id}", erwartet=(200,))
+    if int((zahlen or {}).get(str(u.students[1]), 0)) < 1:
+        raise AssertionError(f"Zaehler zeigt keinen Kontakt: {zahlen}")
+    return "Elternkontakt mit Kanal und Datum wiedergefunden, Zaehler stimmt"
+
+
+def inhalt_code_detektiv(api, u, spuren):
+    kennung = f"{PRAEFIX}-raetsel"
+    nutzlast = {"blocks": [{"id": "b1", "text": "print(x)"}, {"id": "b2", "text": "x = 1"}],
+                "order": ["b2", "b1"]}
+    api.call("PUT", "/api/codedetektiv/puzzles", {
+        "client_id": kennung, "title": f"{PRAEFIX} Raetsel",
+        "topic_id": u.topic_id, "payload": nutzlast,
+    }, erwartet=(200,))
+    spuren.append(("Raetsel", lambda: api.call(
+        "DELETE", f"/api/codedetektiv/puzzles/{kennung}", erwartet=(204, 404))))
+    wieder = _finde(api.call("GET", "/api/codedetektiv/puzzles", erwartet=(200,)),
+                    client_id=kennung)
+    if not wieder or wieder.get("payload") != nutzlast:
+        raise AssertionError(f"Raetsel-Inhalt kam anders zurueck: {wieder}")
+    if wieder.get("topic_id") != u.topic_id:
+        raise AssertionError("Thema des Raetsels nicht gespeichert")
+
+    # Klassen-Session: beitreten und Ergebnis melden geht OHNE Anmeldung.
+    anonym = Api(api.basis, debug=api.debug)
+    sitzung = api.call("POST", "/api/codedetektiv/sessions",
+                       {"puzzles": [{"id": "zz1", "title": f"{PRAEFIX} Raetsel"}]}, erwartet=(201,))
+    code = sitzung["code"]
+    spuren.append(("Code-Detektiv-Session", lambda: api.call(
+        "DELETE", f"/api/codedetektiv/sessions/{code}", erwartet=(204, 404))))
+    anonym.call("POST", f"/api/codedetektiv/sessions/{code}/join",
+                {"name": f"{PRAEFIX} Kind"}, erwartet=(200, 201))
+    anonym.call("POST", f"/api/codedetektiv/sessions/{code}/result",
+                {"playerName": f"{PRAEFIX} Kind", "puzzleId": "zz1", "solved": True,
+                 "attempts": 2, "time": 12.5}, erwartet=(200, 201))
+    stand = anonym.call("GET", f"/api/codedetektiv/sessions/{code}", erwartet=(200,))
+    text = json.dumps(stand, ensure_ascii=False)
+    if f"{PRAEFIX} Kind" not in text:
+        raise AssertionError(f"beigetretenes Kind steht nicht in der Session: {text[:200]}")
+    return "Raetsel samt Bausteinen wiedergefunden; Beitritt und Ergebnis ohne Anmeldung"
+
+
+INHALT = {
+    "cardvote": inhalt_cardvote,
+    "lernpfad": inhalt_lernpfad,
+    "auswertung": inhalt_auswertung,
+    "karten": inhalt_karten,
+    "kalender": inhalt_kalender,
+    "orga": inhalt_orga,
+    "zufall": inhalt_zufall,
+    "unterrichtsplanung": inhalt_unterrichtsplanung,
+    "notizbrett": inhalt_notizbrett,
+    "notizen": inhalt_notizen,
+    "klassenleitung": inhalt_klassenleitung,
+    "code-detektiv": inhalt_code_detektiv,
+    "tafel": None,
+    "mathespiele": None,
+}
+
+
+# ─────────────────────── Modul-Schalter ───────────────────────
+
+class Schalter:
+    """Modul-Aktivierung des Kontos — merkt sich den Anfangszustand und stellt
+    ihn am Ende wieder her. Der Test darf die Einstellungen nicht veraendern."""
+
+    def __init__(self, api, b):
+        self.api, self.b = api, b
+        self.module = api.call("GET", "/api/modules", erwartet=(200,))
+        self.verfuegbar = [m["key"] for m in self.module if m.get("available")]
+        self.anfangs_aktiv = {m["key"] for m in self.module if m.get("active")}
+
+    def setze(self, aktiv):
+        """Genau diese Schluessel aktiv, alle anderen aus."""
+        aktiv = set(aktiv)
+        for key in self.verfuegbar:
+            pfad = f"/api/modules/{key}/activate"
+            self.api.call("POST" if key in aktiv else "DELETE", pfad, erwartet=(200,))
+
+    def nur(self, key):
+        self.setze({key})
+
+    def alle_an(self):
+        self.setze(self.verfuegbar)
+
+    def zuruecksetzen(self):
+        try:
+            self.setze(self.anfangs_aktiv)
+            jetzt = {m["key"] for m in self.api.call("GET", "/api/modules", erwartet=(200,))
+                     if m.get("active")}
+            if jetzt != self.anfangs_aktiv:
+                self.b.reste.append(
+                    f"Modul-Zustand nicht wiederhergestellt: {sorted(jetzt)} "
+                    f"statt {sorted(self.anfangs_aktiv)}")
+                return False
+            return True
+        except Exception as e:
+            self.b.reste.append(f"Modul-Zustand nicht wiederhergestellt: {e}")
+            return False
+
+
+# ─────────────────────── 1./2. Alleinstellung und Inhalt ───────────────────────
+
+def teste_alleinstellung(api, b, u, sch, spuren, nur_modul=None):
+    alle_endpunkte = endpunkte(u)
+    alle_tore = tore(u)
+    unbekannt = [m["key"] for m in sch.module if m["key"] not in alle_endpunkte]
+    if unbekannt:
+        b.add("Register", "REGISTRY gegen Test", False,
+              f"ohne Probe im Systemtest: {', '.join(unbekannt)} — "
+              "neues Modul, aber keine Endpunktliste in scripts/systemtest.py")
+
+    for m in sch.module:
+        key, name = m["key"], m.get("name", m["key"])
+        if nur_modul and key != nur_modul:
+            continue
+        if not m.get("available"):
+            b.add(f"Modul {name}", "verfuegbar", True, "im Register, aber nicht waehlbar")
+            continue
+        if key not in alle_endpunkte:
+            continue
+        meine = alle_endpunkte[key]
+        if not meine and INHALT.get(key) is None:
+            b.add(f"Modul {name}", "Backend", True,
+                  "reines Frontend-Modul (kein API-Anteil) — Pruefung im Browser-Test")
+            continue
+
+        sch.nur(key)   # NUR dieses Modul — alles andere aus.
+
+        def eigene():
+            tot = []
+            for methode, pfad in meine:
+                status, text = api.call(methode, pfad, roh=True)
+                if not (200 <= status < 300):
+                    tot.append(f"{pfad} -> {status} {text[:60]}")
+            if tot:
+                raise AssertionError("antwortet nicht: " + "; ".join(tot))
+            return f"{len(meine)} Endpunkte antworten, ohne dass ein anderes Modul laeuft"
+
+        b.pruefe(f"Modul {name}", "Eigene Endpunkte allein lauffaehig", eigene)
+
+        def fremde():
+            # Regel 3: ohne Aktivierung nichts. Nicht 200 (Daten offen), nicht
+            # 500 (Schranke kracht statt abzuweisen) — genau 403.
+            offen, kaputt = [], []
+            gezaehlt = 0
+            for anderer, wege in alle_tore.items():
+                if anderer == key:
+                    continue
+                for methode, pfad in wege:
+                    gezaehlt += 1
+                    status, _ = api.call(methode, pfad, roh=True)
+                    if status == 403:
+                        continue
+                    (offen if 200 <= status < 300 else kaputt).append(
+                        f"{anderer}: {pfad} -> {status}")
+            probleme = []
+            if offen:
+                probleme.append("ohne Aktivierung erreichbar: " + ", ".join(offen))
+            if kaputt:
+                probleme.append("weder 200 noch 403: " + ", ".join(kaputt))
+            if probleme:
+                raise AssertionError(" | ".join(probleme))
+            return f"{gezaehlt} fremde Endpunkte, alle 403"
+
+        b.pruefe(f"Modul {name}", "Fremde Endpunkte gesperrt (Regel 3)", fremde)
+
+        probe = INHALT.get(key)
+        if probe is not None:
+            b.pruefe(f"Modul {name}", "Inhalt anlegen und wiederfinden",
+                     lambda p=probe: p(api, u, spuren))
+
+
+# ─────────────────────── 3. CardVote vollstaendig ───────────────────────
+
+def teste_cardvote_voll(api, b, u, sch, spuren):
+    """Ein ganzer Test von der Frage bis zur gerechneten Auswertung.
+
+    Vier Fragen, davon zwei als E (Zusatz) markiert. Drei Kinder: eines im
+    E-Kurs (fuer das alles regulaer zaehlt), zwei im G-Kurs (fuer die nur die
+    G-Fragen die 100 % bilden, richtige E-Antworten geben Bonus). Die
+    erwarteten Zahlen rechnet der Test selbst — Regeln siehe
+    apps/api/app/scoring.py.
+    """
+    sch.nur("cardvote")
+    zustand = {}
+
+    def aufbau():
+        ordner = api.call("POST", "/api/folders", {"name": f"{PRAEFIX} Ordner"}, erwartet=(201,))
+        spuren.append(("CardVote-Ordner", lambda: api.call(
+            "DELETE", f"/api/folders/{ordner['id']}", erwartet=(204, 404))))
+        fragen = []
+        for i, richtig in enumerate("ABCD"):
+            q = api.call("POST", "/api/questions", {
+                "text": f"{PRAEFIX} Frage {i + 1}", "question_type": "mc",
+                "choices": {"A": "1", "B": "2", "C": "3", "D": "4"},
+                "correct_answer": richtig, "topic_id": u.topic_id,
+            }, erwartet=(201,))
+            fragen.append(q)
+            spuren.append((f"Frage {i + 1}", lambda qq=q: api.call(
+                "DELETE", f"/api/questions/{qq['id']}", erwartet=(204, 404))))
+        # Fragen 3 und 4 sind E-Anforderung — am Set-Eintrag, nicht an der Frage.
+        satz = api.call("POST", "/api/question-sets", {
+            "name": f"{PRAEFIX} Quiz", "folder_id": ordner["id"],
+            "question_ids": [q["id"] for q in fragen],
+            "niveau_aktiv": True, "minuspunkte": False,
+            "niveaus": {str(fragen[2]["id"]): "E", str(fragen[3]["id"]): "E"},
+        }, erwartet=(201,))
+        spuren.append(("Quiz", lambda: api.call(
+            "DELETE", f"/api/question-sets/{satz['id']}", erwartet=(204, 404))))
+        gelesen = api.call("GET", f"/api/question-sets/{satz['id']}", erwartet=(200,))
+        if not gelesen.get("niveau_aktiv"):
+            raise AssertionError("E/G-Differenzierung am Quiz nicht gespeichert")
+        # Das Niveau haengt am Set-Eintrag (dieselbe Frage kann anderswo
+        # Anforderung sein); ausgeliefert wird es als {frage_id: "E"|"G"}.
+        niveaus = gelesen.get("niveaus") or {}
+        e_fragen = {k for k, v in niveaus.items() if v == "E"}
+        soll = {str(fragen[2]["id"]), str(fragen[3]["id"])}
+        if e_fragen != soll:
+            raise AssertionError(f"E-Markierung am Set-Eintrag verloren: {niveaus} "
+                                 f"— E erwartet fuer {sorted(soll)}")
+        zustand["fragen"] = fragen
+        zustand["satz"] = satz
+        return f"Ordner, 4 Fragen, Quiz mit E/G (Frage 3+4 = E)"
+
+    if not b.pruefe("CardVote", "Fragen und Quiz mit E/G", aufbau):
+        return zustand
+
+    # Antworten je Kind (card_id) und Frage-Position. Richtig ist A,B,C,D.
+    ANTWORTEN = {
+        1: ["A", "B", "C", "A"],   # Anna (E): 3 richtig, Frage 4 falsch
+        2: ["A", "A", "C", "D"],   # Ben  (G): G falsch bei 2, beide E richtig
+        3: ["A", "B", "A", "A"],   # Cem  (G): beide G richtig, beide E falsch
+    }
+
+    def sitzung_und_scans():
+        s = api.call("POST", "/api/sessions", {
+            "name": f"{PRAEFIX} Test", "class_id": u.class_id,
+            "question_set_id": zustand["satz"]["id"], "mode": "test",
+        }, erwartet=(201,))
+        zustand["sitzung"] = s
+        spuren.append(("Sitzung", lambda: api.call(
+            "DELETE", f"/api/sessions/{s['id']}", erwartet=(204, 404))))
+        gezaehlt = 0
+        for pos, frage in enumerate(zustand["fragen"]):
+            api.call("POST", f"/api/sessions/{s['id']}/set-question?question_id={frage['id']}",
+                     erwartet=(200,))
+            for card_id, antworten in ANTWORTEN.items():
+                api.call("POST", "/api/scan", {
+                    "session_id": s["id"], "student_id": card_id, "answer": antworten[pos],
+                }, erwartet=(201,))
+                gezaehlt += 1
+        api.call("POST", f"/api/sessions/{s['id']}/finish", erwartet=(200,))
+        beendet = api.call("GET", f"/api/sessions/{s['id']}", erwartet=(200,))
+        if beendet.get("status") != "finished":
+            raise AssertionError(f"Sitzung steht auf '{beendet.get('status')}' statt 'finished'")
+        return f"{gezaehlt} Scans ueber 4 Fragen und 3 Kinder, Sitzung beendet"
+
+    if not b.pruefe("CardVote", "Sitzung, Scans, Abschluss", sitzung_und_scans):
+        return zustand
+
+    def trefferquoten():
+        """Je Frage: wie viele der drei Kinder haben richtig geantwortet?
+        Gegen die Rohdaten (/results) UND gegen die Auswertung gehalten."""
+        soll = []
+        for pos, richtig in enumerate("ABCD"):
+            soll.append(sum(1 for a in ANTWORTEN.values() if a[pos] == richtig))
+        if soll != [3, 2, 2, 1]:
+            raise AssertionError(f"Testdaten falsch angelegt: {soll}")
+        ausw = api.call("GET", f"/api/sessions/{zustand['sitzung']['id']}/evaluation",
+                        erwartet=(200,))
+        zustand["auswertung"] = ausw
+        ist = []
+        for frage in zustand["fragen"]:
+            treffer = 0
+            for zeile in ausw["students"]:
+                a = _finde(zeile["answers"], question_id=frage["id"])
+                if a and a["is_correct"]:
+                    treffer += 1
+            ist.append(treffer)
+        if ist != soll:
+            raise AssertionError(f"Trefferquote je Frage {ist} statt {soll}")
+        # Zweite Quelle: die rohen Scans zaehlen dasselbe.
+        roh = api.call("GET", f"/api/sessions/{zustand['sitzung']['id']}/results"
+                              f"?question_id={zustand['fragen'][0]['id']}", erwartet=(200,))
+        if roh["counts"]["A"] != 3:
+            raise AssertionError(f"Rohdaten zaehlen {roh['counts']} statt 3x A bei Frage 1")
+        return f"Frage 1–4 richtig von 3: {ist} — Auswertung und Rohdaten stimmen ueberein"
+
+    b.pruefe("CardVote", "Trefferquote je Frage", trefferquoten)
+
+    def eg_wertung():
+        """Die E/G-Regel von Hand nachgerechnet.
+
+        Anna (E-Kurs): differenziert wird nicht, alle 4 Fragen zaehlen.
+        Ben/Cem (G-Kurs): Basis sind die Fragen 1+2, Fragen 3+4 geben Bonus.
+        """
+        ausw = zustand["auswertung"]
+        if not ausw.get("niveau_aktiv"):
+            raise AssertionError("Auswertung meldet niveau_aktiv=false trotz E/G-Quiz")
+
+        # Anna: 3 von 4 richtig = 75,0 %, kein Bonus (E-Kurs kennt keinen).
+        anna = {"base_pct": 75.0, "bonus_pct": 0.0, "pct": 75.0, "score": 3, "total": 4,
+                "e_total": 0}
+        # Ben: Basis 1 von 2 = 50,0 %. Zwei richtige E-Antworten (>= 2, keine
+        # falsche) -> voller Bonus bis zur naechsten Stufe: 59 - 50 = 9,0.
+        ben_basis = 50.0
+        ben_bonus = 1.0 * naechste_stufe(ben_basis)
+        ben = {"base_pct": ben_basis, "bonus_pct": ben_bonus, "pct": ben_basis + ben_bonus,
+               "score": 1, "total": 2, "e_total": 2}
+        # Cem: Basis 2 von 2 = 100 %. Beide E falsch -> kein Bonus (erst ab zwei
+        # richtigen E-Antworten gibt es ueberhaupt welchen).
+        cem = {"base_pct": 100.0, "bonus_pct": 0.0, "pct": 100.0, "score": 2, "total": 2,
+               "e_total": 2}
+
+        abweichung = []
+        for card_id, soll in ((1, anna), (2, ben), (3, cem)):
+            zeile = _finde(ausw["students"], card_id=card_id)
+            if not zeile:
+                raise AssertionError(f"Kind mit Karte {card_id} fehlt in der Auswertung")
+            for feld, wert in soll.items():
+                if not gleich(zeile.get(feld, -999), wert, 0.05):
+                    abweichung.append(f"Karte {card_id} {feld}={zeile.get(feld)} statt {wert}")
+            if zeile.get("status") != "anwesend":
+                abweichung.append(f"Karte {card_id} gilt als {zeile.get('status')}")
+        if abweichung:
+            raise AssertionError("; ".join(abweichung))
+        return (f"E-Kind 75,0 %; G-Kind mit 2 E-Treffern 50,0 + {ben_bonus:.1f} Bonus = "
+                f"{ben['pct']:.1f} %; G-Kind ohne E-Treffer 100,0 % ohne Bonus")
+
+    b.pruefe("CardVote", "E/G-Wertung (Bonus gerechnet)", eg_wertung)
+
+    def notenverteilung():
+        """Aus den Prozentwerten die Noten nach DEFAULT_SCALE — und zaehlen."""
+        ausw = zustand["auswertung"]
+        noten = {}
+        for zeile in ausw["students"]:
+            if zeile["status"] != "anwesend":
+                continue
+            g = note_aus_prozent(zeile["pct"])
+            noten[zeile["card_id"]] = g
+        soll = {1: 2, 2: 3, 3: 1}   # 75 % -> 2, 59 % -> 3, 100 % -> 1
+        if noten != soll:
+            raise AssertionError(f"Noten {noten} statt {soll}")
+        verteilung = {g: sum(1 for x in noten.values() if x == g) for g in sorted(set(noten.values()))}
+        if verteilung != {1: 1, 2: 1, 3: 1}:
+            raise AssertionError(f"Notenverteilung {verteilung} statt je einmal 1, 2, 3")
+        zustand["noten"] = noten
+        return f"Verteilung {verteilung} (je einmal Note 1, 2 und 3)"
+
+    b.pruefe("CardVote", "Notenverteilung", notenverteilung)
+
+    def minuspunkte():
+        """Minuspunkte am Quiz einschalten und dieselbe Sitzung neu bewerten.
+
+        Eine falsche Antwort kostet ihr Gewicht, unter 0 geht es nie. Erwartet:
+        Anna 3 richtig - 1 falsch = 2 von 4 = 50,0 %. Ben 1 richtig - 1 falsch
+        = 0 von 2 = 0,0 %, dazu voller E-Bonus bis zur naechsten Stufe (20).
+        Cem unveraendert 100,0 %.
+        """
+        satz = zustand["satz"]
+        api.call("PUT", f"/api/question-sets/{satz['id']}", {
+            "name": f"{PRAEFIX} Quiz", "folder_id": satz.get("folder_id"),
+            "question_ids": [q["id"] for q in zustand["fragen"]],
+            "niveau_aktiv": True, "minuspunkte": True,
+        }, erwartet=(200,))
+        ausw = api.call("GET", f"/api/sessions/{zustand['sitzung']['id']}/evaluation",
+                        erwartet=(200,))
+        if not ausw.get("minuspunkte"):
+            raise AssertionError("Auswertung meldet minuspunkte=false nach dem Einschalten")
+        ben_bonus = 1.0 * naechste_stufe(0.0)
+        soll = {1: (50.0, 0.0), 2: (0.0, ben_bonus), 3: (100.0, 0.0)}
+        abweichung = []
+        for card_id, (basis, bonus) in soll.items():
+            zeile = _finde(ausw["students"], card_id=card_id)
+            if not gleich(zeile["base_pct"], basis, 0.05):
+                abweichung.append(f"Karte {card_id} base_pct={zeile['base_pct']} statt {basis}")
+            if not gleich(zeile["bonus_pct"], bonus, 0.05):
+                abweichung.append(f"Karte {card_id} bonus_pct={zeile['bonus_pct']} statt {bonus}")
+            if zeile["score"] < 0:
+                abweichung.append(f"Karte {card_id} hat negative Punkte ({zeile['score']})")
+        if abweichung:
+            raise AssertionError("; ".join(abweichung))
+        # Wieder abschalten: die spaeteren Pruefungen rechnen ohne Abzug.
+        api.call("PUT", f"/api/question-sets/{satz['id']}", {
+            "name": f"{PRAEFIX} Quiz", "folder_id": satz.get("folder_id"),
+            "question_ids": [q["id"] for q in zustand["fragen"]],
+            "niveau_aktiv": True, "minuspunkte": False,
+        }, erwartet=(200,))
+        return "Abzug wirkt (50/0/100 %), Punkte bleiben >= 0, E-Bonus bleibt unangetastet"
+
+    b.pruefe("CardVote", "Minuspunkte", minuspunkte)
+
+    def krank():
+        """Wer nichts abgegeben hat, ist krank und bleibt draussen — bis die
+        Lehrkraft ihn auf anwesend stellt. Geprueft am vierten Kind, das es in
+        der Klasse nicht gibt: statt dessen wird Karte 3 auf krank gesetzt."""
+        sid = zustand["sitzung"]["id"]
+        api.call("PUT", f"/api/sessions/{sid}/eval-config", {"krank": [3]}, erwartet=(200,))
+        ausw = api.call("GET", f"/api/sessions/{sid}/evaluation", erwartet=(200,))
+        zeile = _finde(ausw["students"], card_id=3)
+        if zeile["status"] != "krank":
+            raise AssertionError(f"auf krank gesetztes Kind gilt als {zeile['status']}")
+        api.call("PUT", f"/api/sessions/{sid}/eval-config", {}, erwartet=(200,))
+        zurueck = _finde(api.call("GET", f"/api/sessions/{sid}/evaluation",
+                                  erwartet=(200,))["students"], card_id=3)
+        if zurueck["status"] != "anwesend":
+            raise AssertionError("Zuruecksetzen der Krank-Markierung wirkt nicht")
+        return "krank/anwesend schaltet die Wertung wie dokumentiert"
+
+    b.pruefe("CardVote", "Krank bleibt aus der Wertung", krank)
+    return zustand
+
+
+# ─────────────────────── 4. Noten anpassen ───────────────────────
+
+def teste_noten(api, b, u, sch, spuren, cv):
+    """Vom uebernommenen Testergebnis bis zum gewichteten Schnitt.
+
+    Gerechnet wird im Test: zwei Abschnitte mit 60 und 40 Prozent, daraus die
+    Erwartung fuer `weighted`. Beobachtungen duerfen daran nichts aendern.
+    """
+    if "sitzung" not in cv or "noten" not in cv:
+        return b.add("Noten", "alle", False,
+                     "uebersprungen — der CardVote-Teil hat keine Sitzung geliefert")
+    sch.setze({"auswertung"})
+    z = {}
+
+    def uebernehmen():
+        # Die Rechnung weiter unten gilt nur, wenn keine fremden Abschnitte
+        # mitgewichtet werden — sonst wuerde der Test seine eigene Erwartung
+        # verbiegen, statt einen Unterschied zu melden.
+        vorhanden = api.call("GET", f"/api/noten/classes/{u.class_id}/sections", erwartet=(200,))
+        if vorhanden:
+            raise AssertionError(
+                f"die Testklasse hat schon {len(vorhanden)} Notenabschnitt(e) "
+                f"({[s['name'] for s in vorhanden]}) — der Test raeumt nicht auf")
+        block = api.call("POST", f"/api/noten/classes/{u.class_id}/sections",
+                         {"name": f"{PRAEFIX} Schriftlich", "weight": 60}, erwartet=(201,))
+        z["schriftlich"] = block["id"]
+        spuren.append(("Notenblock schriftlich", lambda: api.call(
+            "DELETE", f"/api/noten/sections/{block['id']}", erwartet=(204, 404))))
+        antwort = api.call("POST", "/api/noten/import-session", {
+            "session_id": cv["sitzung"]["id"], "section_id": block["id"],
+            "column_name": f"{PRAEFIX} Test",
+            "grades": [{"card_id": c, "value": float(g)} for c, g in cv["noten"].items()],
+        }, erwartet=(201,))
+        if antwort.get("imported") != 3:
+            raise AssertionError(f"{antwort.get('imported')} Noten uebernommen statt 3")
+        # Unabhaengig nachsehen: Spalte da, Werte je Kind richtig zugeordnet?
+        abschnitte = api.call("GET", f"/api/noten/classes/{u.class_id}/sections", erwartet=(200,))
+        sec = _finde(abschnitte, id=block["id"])
+        spalte = _finde(sec.get("categories") or [], name=f"{PRAEFIX} Test")
+        if not spalte:
+            raise AssertionError(f"uebernommene Spalte fehlt im Abschnitt: {sec}")
+        z["test_spalte"] = spalte["id"]
+        eintraege = api.call("GET", f"/api/noten/classes/{u.class_id}/entries", erwartet=(200,))
+        haben = {e["student_id"]: e["value"] for e in eintraege
+                 if e["category_id"] == spalte["id"]}
+        soll = {u.students[i]: float(cv["noten"][i + 1]) for i in range(3)}
+        if haben != soll:
+            raise AssertionError(f"Noten je Kind {haben} statt {soll}")
+        # Zweimal uebernehmen wuerde denselben Test doppelt zaehlen.
+        status, _ = api.call("POST", "/api/noten/import-session", {
+            "session_id": cv["sitzung"]["id"], "section_id": block["id"],
+            "column_name": f"{PRAEFIX} Test 2",
+            "grades": [{"card_id": 1, "value": 2.0}],
+        }, roh=True)
+        if status != 409:
+            raise AssertionError(f"zweite Uebernahme derselben Sitzung: HTTP {status} statt 409")
+        return f"3 Noten uebernommen ({soll}), zweite Uebernahme abgelehnt"
+
+    if not b.pruefe("Noten", "Ergebnis als Spalte uebernehmen", uebernehmen):
+        return
+
+    def note_aendern():
+        # Anna von 2 auf 3,0 — es darf KEINE zweite Zelle entstehen.
+        api.call("POST", "/api/noten/entries", {
+            "category_id": z["test_spalte"], "student_id": u.students[0],
+            "kind": "grade", "value": 3.0,
+        }, erwartet=(201,))
+        eintraege = [e for e in api.call("GET", f"/api/noten/classes/{u.class_id}/entries",
+                                         erwartet=(200,))
+                     if e["category_id"] == z["test_spalte"] and e["student_id"] == u.students[0]]
+        if len(eintraege) != 1:
+            raise AssertionError(f"{len(eintraege)} Eintraege in einer Zelle — eine Note je Zelle")
+        if not gleich(eintraege[0]["value"], 3.0):
+            raise AssertionError(f"Note steht auf {eintraege[0]['value']} statt 3,0")
+        zeile = _finde(api.call("GET", f"/api/noten/classes/{u.class_id}/summary", erwartet=(200,)),
+                       student_id=u.students[0])
+        if not gleich(zeile["per_category"][str(z["test_spalte"])], 3.0):
+            raise AssertionError("geaenderte Note kommt in der Zusammenfassung nicht an")
+        return "Note 2,0 -> 3,0 ersetzt die Zelle (kein zweiter Eintrag)"
+
+    b.pruefe("Noten", "Einzelne Note aendern", note_aendern)
+
+    def beobachtung():
+        # Beobachtung OHNE Notenwert: erlaubt, zaehlt aber nie mit.
+        vorher = _finde(api.call("GET", f"/api/noten/classes/{u.class_id}/summary", erwartet=(200,)),
+                        student_id=u.students[0])
+        api.call("POST", "/api/noten/entries", {
+            "category_id": z["test_spalte"], "student_id": u.students[0],
+            "kind": "observation", "note": f"{PRAEFIX} strengt sich an",
+        }, erwartet=(201,))
+        nachher = _finde(api.call("GET", f"/api/noten/classes/{u.class_id}/summary", erwartet=(200,)),
+                         student_id=u.students[0])
+        if nachher["observations"] != vorher["observations"] + 1:
+            raise AssertionError("Beobachtung wird nicht gezaehlt")
+        if nachher["per_category"] != vorher["per_category"] \
+                or nachher["weighted"] != vorher["weighted"]:
+            raise AssertionError(f"Beobachtung hat den Schnitt veraendert: "
+                                 f"{vorher['weighted']} -> {nachher['weighted']}")
+        # Mit Notenwert muss sie abgewiesen werden — sonst erodiert die Trennung.
+        status, _ = api.call("POST", "/api/noten/entries", {
+            "category_id": z["test_spalte"], "student_id": u.students[1],
+            "kind": "observation", "value": 3.0,
+        }, roh=True)
+        if status < 400:
+            raise AssertionError(f"Beobachtung mit Notenwert angenommen (HTTP {status})")
+        return "Beobachtung gezaehlt, Schnitt unveraendert, Beobachtung mit Note abgewiesen"
+
+    b.pruefe("Noten", "Beobachtung zaehlt nie mit", beobachtung)
+
+    def gewichte():
+        """Zweiter Abschnitt mit 40 %, dann den gewichteten Schnitt nachrechnen."""
+        block2 = api.call("POST", f"/api/noten/classes/{u.class_id}/sections",
+                          {"name": f"{PRAEFIX} Sonstige", "weight": 40}, erwartet=(201,))
+        z["sonstige"] = block2["id"]
+        spuren.append(("Notenblock sonstige", lambda: api.call(
+            "DELETE", f"/api/noten/sections/{block2['id']}", erwartet=(204, 404))))
+        spalte = api.call("POST", "/api/noten/categories",
+                          {"name": f"{PRAEFIX} Mitarbeit", "section_id": block2["id"]},
+                          erwartet=(201,))
+        werte = {u.students[0]: 2.0, u.students[1]: 4.0, u.students[2]: 1.0}
+        for sid, wert in werte.items():
+            api.call("POST", "/api/noten/entries", {
+                "category_id": spalte["id"], "student_id": sid, "kind": "grade", "value": wert,
+            }, erwartet=(201,))
+        # Eigene Rechnung: Bereichsnote = Schnitt der Spalten des Bereichs,
+        # Endnote = (60 * schriftlich + 40 * sonstige) / 100.
+        schriftlich = {u.students[0]: 3.0,
+                       u.students[1]: float(cv["noten"][2]),
+                       u.students[2]: float(cv["noten"][3])}
+        soll = {sid: round((schriftlich[sid] * 60 + werte[sid] * 40) / 100, 2)
+                for sid in werte}
+        zus = api.call("GET", f"/api/noten/classes/{u.class_id}/summary", erwartet=(200,))
+        abweichung = []
+        for sid, erwartet in soll.items():
+            zeile = _finde(zus, student_id=sid)
+            if zeile.get("unweighted_fallback"):
+                abweichung.append(f"Kind {sid}: rechnet ungewichtet trotz gesetzter Gewichte")
+            if not gleich(zeile.get("weighted", -1), erwartet, 0.005):
+                abweichung.append(f"Kind {sid}: weighted={zeile.get('weighted')} statt {erwartet}")
+            if not gleich(zeile["section_effective"].get(str(z["schriftlich"]), -1),
+                          schriftlich[sid], 0.005):
+                abweichung.append(f"Kind {sid}: Bereichsnote schriftlich falsch "
+                                  f"({zeile['section_effective']})")
+        if abweichung:
+            raise AssertionError("; ".join(abweichung))
+        z["soll_weighted"] = soll
+        return ("60/40 gewichtet: " +
+                ", ".join(f"{schriftlich[s]}/{werte[s]} -> {soll[s]}" for s in soll))
+
+    b.pruefe("Noten", "Gewichteter Schnitt gegen eigene Rechnung", gewichte)
+
+    def endnote():
+        if "soll_weighted" not in z:
+            raise AssertionError("uebersprungen — der Gewichte-Teil oben ist nicht durchgelaufen")
+        sid = u.students[0]
+        api.call("PUT", "/api/noten/overrides", {
+            "class_id": u.class_id, "student_id": sid, "value": 1.7, "term": "1",
+        }, erwartet=(204,))
+        zeile = _finde(api.call("GET", f"/api/noten/classes/{u.class_id}/summary", erwartet=(200,)),
+                       student_id=sid)
+        if not gleich(zeile.get("total_override", -1), 1.7):
+            raise AssertionError(f"Endnote steht auf {zeile.get('total_override')} statt 1,7")
+        # Der gerechnete Schnitt bleibt daneben stehen — die Note ist eine
+        # Entscheidung, keine Ueberschreibung der Rechnung.
+        if not gleich(zeile["weighted"], z["soll_weighted"][sid], 0.005):
+            raise AssertionError("die Endnote hat den gerechneten Schnitt ueberschrieben")
+        api.call("DELETE", f"/api/noten/overrides?class_id={u.class_id}&student_id={sid}&term=1",
+                 erwartet=(204,))
+        zeile = _finde(api.call("GET", f"/api/noten/classes/{u.class_id}/summary", erwartet=(200,)),
+                       student_id=sid)
+        if zeile.get("total_override") is not None:
+            raise AssertionError(f"Endnote nicht entfernt: {zeile.get('total_override')}")
+        return "Endnote 1,7 gesetzt (Schnitt bleibt daneben) und wieder entfernt"
+
+    b.pruefe("Noten", "Endnote setzen und entfernen", endnote)
+
+
+# ─────────────────────── 5. Bruecken zwischen Modulen ───────────────────────
+
+def teste_bruecken(api, b, u, sch, spuren, cv):
+    """Jede Bruecke zweimal: mit beiden Modulen muss sie wirken, mit nur einem
+    darf sie NICHTS tun — und nichts halb tun. Wer die Bruecke besitzt, weist
+    ohne sein eigenes Modul mit 403 ab."""
+
+    # ── Bruecke 1: CardVote-Ergebnis -> Notenspalte ──
+    def ergebnis_zu_note_ohne_noten():
+        sch.setze({"cardvote"})
+        status, _ = api.call("POST", "/api/noten/import-session", {
+            "session_id": cv["sitzung"]["id"], "section_id": 1,
+            "column_name": f"{PRAEFIX} darf nicht", "grades": [{"card_id": 1, "value": 2.0}],
+        }, roh=True)
+        if status != 403:
+            raise AssertionError(f"Uebernahme ohne Modul Auswertung: HTTP {status} statt 403")
+        return "ohne Auswertung 403 — keine Spalte entsteht"
+
+    if "sitzung" in cv:
+        b.pruefe("Bruecken", "Ergebnis -> Note: ohne Auswertung gesperrt",
+                 ergebnis_zu_note_ohne_noten)
+        b.add("Bruecken", "Ergebnis -> Note: mit beiden Modulen", True,
+              "im Noten-Teil belegt (3 Noten uebernommen, zweite Uebernahme 409)")
+
+    # ── Bruecke 2: Kalender plant Quiz / Deck / Lernleiter ──
+    z = {}
+
+    def kalender_plant():
+        sch.setze({"kalender", "cardvote", "karten", "lernpfad"})
+        pfad = api.call("POST", "/api/lernpfad/paths", {"name": f"{PRAEFIX} Bruecken-Pfad"},
+                        erwartet=(201,))
+        spuren.append(("Bruecken-Lernpfad", lambda: (
+            api.call("DELETE", f"/api/lernpfad/paths/{pfad['id']}", erwartet=(204, 404)),
+            api.call("DELETE", f"/api/lernpfad/paths/{pfad['id']}/purge", erwartet=(204, 404)))))
+        leiter = api.call("POST", f"/api/lernpfad/paths/{pfad['id']}/ladders",
+                          {"class_id": u.class_id, "topic_id": u.topic_id}, erwartet=(201,))
+        deck = api.call("POST", f"/api/karten/classes/{u.class_id}/decks",
+                        {"name": f"{PRAEFIX} Bruecken-Stapel"}, erwartet=(201,))
+        z["deck"] = deck["id"]
+        spuren.append(("Bruecken-Stapel", lambda: (
+            api.call("DELETE", f"/api/karten/decks/{deck['id']}", erwartet=(204, 404)),
+            api.call("DELETE", f"/api/karten/decks/{deck['id']}/purge", erwartet=(204, 404)))))
+        tag = datetime.now().replace(hour=10, minute=0, second=0, microsecond=0)
+        eintrag = api.call("POST", "/api/kalender/entries", {
+            "date": tag.isoformat(), "title": f"{PRAEFIX} geplante Stunde",
+            "class_id": u.class_id, "topic_id": u.topic_id,
+            "cardvote_set_id": cv.get("satz", {}).get("id"),
+            "karten_deck_id": deck["id"], "lernpfad_ladder_id": leiter["id"],
+        }, erwartet=(201,))
+        z["eintrag"] = eintrag["id"]
+        spuren.append(("Bruecken-Kalendereintrag", lambda: api.call(
+            "DELETE", f"/api/kalender/entries/{eintrag['id']}", erwartet=(204, 404))))
+        wieder = _finde(api.call("GET", "/api/kalender/entries", erwartet=(200,)),
+                        id=eintrag["id"])
+        fehlt = [f for f, soll in (("karten_deck_id", deck["id"]),
+                                   ("lernpfad_ladder_id", leiter["id"]),
+                                   ("cardvote_set_id", cv.get("satz", {}).get("id")))
+                 if soll is not None and wieder.get(f) != soll]
+        if fehlt:
+            raise AssertionError(f"geplante Verknuepfungen fehlen: {fehlt} in {wieder}")
+        return "Quiz, Deck und Lernleiter am Eintrag gespeichert und wiedergefunden"
+
+    b.pruefe("Bruecken", "Kalender plant Quiz/Deck/Lernleiter", kalender_plant)
+
+    def kalender_ohne_modul():
+        sch.setze({"cardvote", "karten", "lernpfad"})
+        status, _ = api.call("POST", "/api/kalender/entries", {
+            "date": datetime.now().isoformat(), "title": f"{PRAEFIX} darf nicht",
+            "class_id": u.class_id,
+        }, roh=True)
+        if status != 403:
+            raise AssertionError(f"Kalendereintrag ohne Modul Kalender: HTTP {status} statt 403")
+        return "ohne Kalender 403 — kein halb angelegter Eintrag"
+
+    b.pruefe("Bruecken", "Kalender-Planung ohne Kalender gesperrt", kalender_ohne_modul)
+
+    def deck_freischaltung():
+        """Der Kalender schaltet ein Deck am Termintag frei — aber nur, wenn er
+        selbst aktiv ist (Regel 3). Ohne Kalender bleibt der Stapel Entwurf."""
+        # a) ohne Kalender: neues Deck zum Thema des Eintrags bleibt Entwurf
+        sch.setze({"karten"})
+        ohne = api.call("POST", f"/api/karten/classes/{u.class_id}/decks",
+                        {"name": f"{PRAEFIX} ohne Kalender", "topic_id": u.topic_id},
+                        erwartet=(201,))
+        spuren.append(("Stapel ohne Kalender", lambda: (
+            api.call("DELETE", f"/api/karten/decks/{ohne['id']}", erwartet=(204, 404)),
+            api.call("DELETE", f"/api/karten/decks/{ohne['id']}/purge", erwartet=(204, 404)))))
+        if ohne.get("released_at"):
+            raise AssertionError("Stapel wurde ohne Modul Kalender freigeschaltet — "
+                                 "die Bruecke laeuft, obwohl das Modul aus ist")
+        # b) mit Kalender: derselbe Handgriff schaltet frei
+        sch.setze({"karten", "kalender"})
+        mit = api.call("POST", f"/api/karten/classes/{u.class_id}/decks",
+                       {"name": f"{PRAEFIX} mit Kalender", "topic_id": u.topic_id},
+                       erwartet=(201,))
+        spuren.append(("Stapel mit Kalender", lambda: (
+            api.call("DELETE", f"/api/karten/decks/{mit['id']}", erwartet=(204, 404)),
+            api.call("DELETE", f"/api/karten/decks/{mit['id']}/purge", erwartet=(204, 404)))))
+        frisch = _finde(api.call("GET", f"/api/karten/classes/{u.class_id}/all-decks",
+                                 erwartet=(200,)), id=mit["id"])
+        if not frisch or not frisch.get("released_at"):
+            raise AssertionError("Stapel zum Thema eines Kalendereintrags wurde NICHT "
+                                 "freigeschaltet, obwohl der Kalender laeuft")
+        return "ohne Kalender Entwurf, mit Kalender am Termintag freigeschaltet"
+
+    b.pruefe("Bruecken", "Kalender schaltet Karten-Deck frei", deck_freischaltung)
+
+    # ── Bruecke 3: Klassenarbeit -> gezielte Wiederholung (Karten / Lernpfad) ──
+    def wiederholung():
+        """Aus dem Fehlerprofil einer Klassenarbeit sollen Karten wieder faellig
+        und Lernpfad-Aufgaben angelegt werden — je nach aktivem Modul."""
+        # Vorarbeit: ein Kind hat Karten zum Thema gelernt (sonst gibt es nichts
+        # wieder faellig zu machen), und eine Arbeit, in der es dieses Thema
+        # verhauen hat.
+        sch.setze({"karten"})
+        anonym = Api(api.basis, debug=api.debug)
+        deck = api.call("POST", f"/api/karten/classes/{u.class_id}/decks",
+                        {"name": f"{PRAEFIX} Wiederholung", "topic_id": u.topic_id},
+                        erwartet=(201,))
+        spuren.append(("Wiederholungs-Stapel", lambda: (
+            api.call("DELETE", f"/api/karten/decks/{deck['id']}", erwartet=(204, 404)),
+            api.call("DELETE", f"/api/karten/decks/{deck['id']}/purge", erwartet=(204, 404)))))
+        karte = api.call("POST", f"/api/karten/decks/{deck['id']}/cards",
+                         {"front": "9*9", "back": "81"}, erwartet=(201,))
+        api.call("POST", f"/api/karten/decks/{deck['id']}/release", {"now": True}, erwartet=(200,))
+        token = _finde(api.call("POST", f"/api/karten/classes/{u.class_id}/tokens",
+                                erwartet=(200, 201)), student_id=u.students[0])["token"]
+        anonym.call("POST", f"/api/karten/lernen/{token}/review",
+                    {"card_id": karte["id"], "grade": 3}, erwartet=(200,))
+
+        sch.setze({"auswertung"})
+        arbeit = api.call("POST", "/api/klassenarbeit/works",
+                          {"class_id": u.class_id, "name": f"{PRAEFIX} Bruecken-Arbeit"},
+                          erwartet=(201,))
+        spuren.append(("Bruecken-Klassenarbeit", lambda: api.call(
+            "DELETE", f"/api/klassenarbeit/works/{arbeit['id']}", erwartet=(204, 404))))
+        api.call("PUT", f"/api/klassenarbeit/works/{arbeit['id']}", {
+            "tasks": [{"id": "a1", "label": "Aufgabe 1", "topic_id": u.topic_id, "max": 4}],
+            "results": {str(u.students[0]): {"a1": 0}},
+        }, erwartet=(200,))
+
+        # a) ohne Karten und ohne Lernpfad: die Bruecke darf NICHTS tun.
+        leer = api.call("POST", f"/api/klassenarbeit/works/{arbeit['id']}/remediate",
+                        {"threshold": 0.5, "cards": True, "exercises": True}, erwartet=(200,))
+        if leer.get("cards_requeued") or leer.get("exercises_created"):
+            raise AssertionError(f"Bruecke wirkte ohne die Zielmodule: {leer}")
+        if leer.get("students") != 1:
+            raise AssertionError(f"schwaches Kind nicht erkannt: {leer}")
+
+        # b) mit beiden Modulen: sie muss wirken.
+        sch.setze({"auswertung", "karten", "lernpfad"})
+        voll = api.call("POST", f"/api/klassenarbeit/works/{arbeit['id']}/remediate",
+                        {"threshold": 0.5, "cards": True, "exercises": True}, erwartet=(200,))
+        if not voll.get("cards_requeued"):
+            raise AssertionError(f"keine Karte wieder faellig gemacht: {voll}")
+        if not voll.get("exercises_created"):
+            raise AssertionError(f"keine Wiederholungsaufgabe angelegt: {voll}")
+        # Unabhaengig nachsehen: steht die Aufgabe wirklich im Pool?
+        aufgaben = api.call("GET", f"/api/lernpfad/exercises?topic_id={u.topic_id}",
+                            erwartet=(200,))
+        neu = [a for a in aufgaben if a.get("kategorie") == "Wiederholung"
+               and PRAEFIX in (a.get("aufgabentext") or "")]
+        if not neu:
+            raise AssertionError("Wiederholungsaufgabe gemeldet, steht aber nicht im Pool")
+        for a in neu:
+            spuren.append((f"Wiederholungsaufgabe {a['id']}", lambda aa=a: api.call(
+                "DELETE", f"/api/lernpfad/exercises/{aa['id']}", erwartet=(204, 404))))
+        # Der Fortschritt selbst wird im Karten-Teil geprueft; hier zaehlt, dass
+        # die Bruecke gegriffen hat (Zahl der wieder faellig gemachten Karten).
+        return (f"ohne Zielmodule 0/0, mit ihnen {voll['cards_requeued']} Karten wieder "
+                f"faellig und {voll['exercises_created']} Aufgabe(n) im Pool")
+
+    b.pruefe("Bruecken", "Klassenarbeit -> Wiederholung (Karten/Lernpfad)", wiederholung)
+
+    def wiederholung_ohne_auswertung():
+        sch.setze({"karten", "lernpfad"})
+        status, _ = api.call("POST", "/api/klassenarbeit/works/999999/remediate",
+                             {"threshold": 0.5}, roh=True)
+        if status != 403:
+            raise AssertionError(f"Wiederholung ohne Modul Auswertung: HTTP {status} statt 403")
+        return "ohne Auswertung 403"
+
+    b.pruefe("Bruecken", "Wiederholung ohne Auswertung gesperrt", wiederholung_ohne_auswertung)
+
+    # ── Bruecke 4: schwaches Thema aus CardVote ──
+    def schwache_themen():
+        """CardVote weist die schwachen Themen aus (Ziel 2). Der Weg muss ohne
+        Lernpfad und ohne Karten vollstaendig funktionieren — sonst haengt
+        CardVote an einem anderen Modul."""
+        sch.setze({"cardvote"})
+        stats = api.call(
+            "GET", f"/api/sessions/{cv['sitzung']['id']}/topic-stats", erwartet=(200,))
+        text = json.dumps(stats, ensure_ascii=False)
+        if str(u.topic_id) not in text and f"{PRAEFIX} Thema" not in text:
+            raise AssertionError(f"das Thema der Fragen fehlt in der Themenstatistik: {text[:200]}")
+        schwach = api.call(
+            "GET", f"/api/weak-topics?frm={(datetime.now() - timedelta(days=30)).isoformat()}"
+                   f"&to={datetime.now().isoformat()}", erwartet=(200,))
+        if not isinstance(schwach, (list, dict)):
+            raise AssertionError(f"unerwartete Antwort: {schwach}")
+        return "Themenstatistik und schwache Themen ohne Lernpfad/Karten abrufbar"
+
+    if "sitzung" in cv:
+        b.pruefe("Bruecken", "Schwache Themen (CardVote allein)", schwache_themen)
+
+
+# ─────────────────────── Ablauf ───────────────────────
+
+def main():
+    p = argparse.ArgumentParser(description="Systemtest: jedes Nuvora-Modul einzeln durchgespielt")
+    p.add_argument("--url", default=os.environ.get("SELFTEST_URL") or os.environ.get("SITE_URL"))
+    p.add_argument("--email", default=os.environ.get("SELFTEST_EMAIL"))
+    p.add_argument("--passwort", default=os.environ.get("SELFTEST_PASSWORD"))
+    p.add_argument("--token", default=os.environ.get("SELFTEST_TOKEN"))
+    p.add_argument("--modul", help="nur dieses Modul aus dem REGISTRY pruefen")
+    p.add_argument("--json", action="store_true")
+    p.add_argument("--debug", action="store_true", help="jede Anfrage mitschreiben")
+    args = p.parse_args()
+
+    if not args.url:
+        print("Fehler: keine URL. --url oder SELFTEST_URL/SITE_URL setzen.", file=sys.stderr)
+        return 2
+    if not (args.email and args.passwort):
+        print("Fehler: der Systemtest schreibt Daten und braucht ein Konto "
+              "(--email/--passwort oder SELFTEST_EMAIL/SELFTEST_PASSWORD).", file=sys.stderr)
+        return 2
+
+    api = Api(args.url, debug=args.debug, selftest_token=args.token or "")
+    b = Systembericht()
+    if not args.json:
+        print(f"{FETT}Nuvora-Systemtest{AUS} gegen {args.url}")
+
+    def login():
+        d = api.call("POST", "/api/auth/login",
+                     {"email": args.email, "password": args.passwort}, erwartet=(200,))
+        api.token = d["token"]
+        return f"angemeldet als {d['user'].get('email')}"
+
+    if not b.pruefe("Anmeldung", "Login", login):
+        b.drucke()
+        return 1
+
+    sch = Schalter(api, b)
+    b.add("Register", "Modul-Zustand gesichert", True,
+          f"{len(sch.anfangs_aktiv)} von {len(sch.verfuegbar)} Modulen aktiv — "
+          "wird am Ende wiederhergestellt")
+
+    u = Umgebung(api, b)
+    spuren = []      # (Beschreibung, Aufraeum-Funktion) fuer alles aus den Proben
+    try:
+        # Fuer den Aufbau muessen alle Module an sein (Klasse anlegen beruehrt
+        # nur den Kern, aber das Abraeumen spaeter braucht die Module).
+        sch.alle_an()
+        if not b.pruefe("Kern", "Testdaten anlegen", u.aufbauen):
+            b.add("Module", "alle", False, "uebersprungen — ohne Klasse kein Modultest")
+            b.drucke()
+            return 1
+
+        teste_alleinstellung(api, b, u, sch, spuren, args.modul)
+        if not args.modul:
+            cv = teste_cardvote_voll(api, b, u, sch, spuren)
+            teste_noten(api, b, u, sch, spuren, cv)
+            teste_bruecken(api, b, u, sch, spuren, cv)
+    finally:
+        # Aufraeumen braucht alle Module (jede Loesch-Route haengt hinter ihrer
+        # Schranke) — erst danach den urspruenglichen Zustand herstellen.
+        try:
+            sch.alle_an()
+        except Exception as e:
+            b.reste.append(f"Module zum Aufraeumen nicht einschaltbar: {e}")
+        for was, fn in reversed(spuren):
+            try:
+                fn()
+            except Exception as e:
+                b.reste.append(f"{was}: {e}")
+        u.abbauen()
+        b.add("Aufraeumen", "Modul-Zustand wiederhergestellt", sch.zuruecksetzen(),
+              f"wieder aktiv: {', '.join(sorted(sch.anfangs_aktiv)) or 'keins'}")
+
+    if args.json:
+        print(b.als_json())
+    else:
+        b.drucke()
+    return 1 if b.fehler else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -8,6 +8,10 @@
 #                                je Modul (legt Testdaten an und raeumt sie ab)
 #   scripts/selftest-browser.mjs Rundgang im echten Browser: Seiten, Konsole,
 #                                Verlinkungen (nur mit --browser)
+#   scripts/systemtest.py        Systemtest: jedes Modul EINZELN (nur dieses
+#                                aktiv, alle anderen muessen 403 liefern),
+#                                Inhalte schreiben und wiederfinden, CardVote
+#                                und Noten nachgerechnet (nur mit --system)
 #
 # Zugang kommt aus .deploy.env:
 #   SELFTEST_EMAIL / SELFTEST_PASSWORD  Konto, mit dem geprueft wird
@@ -16,8 +20,13 @@
 #
 # Nutzung: ./selftest.sh                 API-Selbsttest
 #          ./selftest.sh --browser       zusaetzlich der Browser-Rundgang
+#          ./selftest.sh --system        zusaetzlich der Modul-Systemtest
 #          ./selftest.sh --nur-system    ohne Login, ohne Schreiben
 #          ./selftest.sh --url https://… gegen eine andere Instanz
+#
+# --system schaltet Module um und schreibt viel: das gehoert nicht in jeden
+# Deploy, sondern vor ein Release oder nach einem Eingriff an einem Modul.
+# Der Test stellt den Modul-Zustand des Kontos danach wieder her.
 
 set -uo pipefail
 
@@ -34,6 +43,7 @@ fi
 URL="${SELFTEST_URL:-${SITE_URL:-http://localhost:${PORT:-8080}}}"
 
 MIT_BROWSER=0
+MIT_SYSTEM=0
 ARGS=()
 # --url gleich hier mitnehmen. Ein nachtraeglicher Durchlauf durch ARGS ist in
 # der macOS-Bash (3.2) mit set -u nicht sicher: bei leerem Array liefert die
@@ -41,10 +51,11 @@ ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --browser) MIT_BROWSER=1; shift ;;
+    --system) MIT_SYSTEM=1; shift ;;
     --url) URL="${2:-}"; [ -z "$URL" ] && { echo "Fehler: --url braucht eine Adresse."; exit 1; }
            ARGS[${#ARGS[@]}]="--url"; ARGS[${#ARGS[@]}]="$URL"; shift 2 ;;
     --url=*) URL="${1#*=}"; ARGS[${#ARGS[@]}]="--url"; ARGS[${#ARGS[@]}]="$URL"; shift ;;
-    -h|--help) sed -n '2,22p' "$0" | sed 's|^# \{0,1\}||'; exit 0 ;;
+    -h|--help) sed -n '2,29p' "$0" | sed 's|^# \{0,1\}||'; exit 0 ;;
     *) ARGS[${#ARGS[@]}]="$1"; shift ;;
   esac
 done
@@ -70,6 +81,20 @@ fi
 
 STATUS=0
 python3 "$DIR/scripts/selftest.py" "${ARGS[@]+"${ARGS[@]}"}" || STATUS=1
+
+if [ "$MIT_SYSTEM" = "1" ]; then
+  echo ""
+  if [ -z "$SELFTEST_EMAIL" ] || [ -z "$SELFTEST_PASSWORD" ]; then
+    echo "⚠ Systemtest uebersprungen — er schreibt Daten und braucht ein Konto"
+    echo "  (SELFTEST_EMAIL/SELFTEST_PASSWORD in .deploy.env)."
+    STATUS=1
+  else
+    echo "→ Systemtest: jedes Modul einzeln..."
+    # Adresse und Zugang kommen aus der Umgebung (SELFTEST_*), darum ohne ARGS:
+    # der Systemtest kennt die Schalter des Selbsttests nicht.
+    python3 "$DIR/scripts/systemtest.py" || STATUS=1
+  fi
+fi
 
 if [ "$MIT_BROWSER" = "1" ]; then
   echo ""
