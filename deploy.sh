@@ -57,23 +57,309 @@ wiederhole() {
   printf '%s' "$s"
 }
 
-schritt() {
-  SCHRITT=$((SCHRITT + 1))
-  local text="$1"
-  local voll=$((SCHRITT * BALKEN_BREITE / SCHRITTE_GESAMT))
-  local prozent=$((SCHRITT * 100 / SCHRITTE_GESAMT))
-  # Deckel: laeuft die Zaehlung aus dem Ruder, bleibt wenigstens die Breite
-  # konstant — die Bilanz am Ende meldet den Fehler dann laut.
-  [ "$voll" -gt "$BALKEN_BREITE" ] && voll=$BALKEN_BREITE
+# ─── Der Balken klebt unten ───
+# Frueher wurde je Etappe eine Balkenzeile in den Ausgabestrom gedruckt. Die
+# scrollte sofort weg, und waehrend "docker compose build" minutenlang redete,
+# war weit und breit kein Balken zu sehen. Jetzt gibt es EINEN Balken fuer den
+# GESAMTEN Deploy, der in der untersten Zeile stehen bleibt; die normale
+# Ausgabe laeuft darueber weiter.
+#
+# Technik: DECSTBM. Der Scroll-Bereich des Terminals wird auf 1..H-1 verkleinert,
+# die unterste Zeile gehoert damit allein dem Balken. Geschrieben wird per
+# Cursor sichern -> in Zeile H springen -> Zeile loeschen -> zurueck.
+#
+# Der Cursor wird bewusst NICHT versteckt: ssh darf nach einer Passphrase
+# fragen, und ein unsichtbarer Cursor an einer Passwortabfrage ist eine Zumutung.
+BALKEN_AKTIV=0          # 1, sobald die unterste Zeile reserviert ist
+BALKEN_STATUS=""        # Datei, ueber die der Ticker den Stand liest
+BALKEN_TICKER=""        # PID der Uhr, die jede Sekunde neu zeichnet
+BALKEN_HOEHE=0          # zuletzt gesehene Terminalhoehe (fuer SIGWINCH)
+ETAPPE_TEXT=""          # Beschriftung der laufenden Etappe
+ETAPPE_START=$(date +%s)
+ZEITEN_DATEI="$DIR/.deploy-zeiten.json"   # Erfahrungswerte je Etappe (gitignored)
+ZEITEN_SCHNITT=""       # Mittelwert je Etappe aus frueheren Laeufen, leer = keiner
+ZEITEN_LISTE=""         # gemessene Dauer der bisherigen Etappen dieses Laufs
+
+# Fenstergroesse. Zwei Fallen, beide beim Testen aufgelaufen:
+#   1. "tput lines" antwortet aus LINES, wenn die Variable gesetzt ist — nach
+#      dem Aufziehen des Fensters also mit dem ALTEN Wert.
+#   2. Diese Funktionen laufen immer in $(...), dort ist stdout eine Pipe. tput
+#      hat dann gar kein Terminal mehr zum Messen und liefert die terminfo-
+#      Vorgabe 24 — unabhaengig davon, wie gross das Fenster wirklich ist.
+# Deshalb sichert balken_start das echte Terminal auf Dateideskriptor 9 und
+# hier wird "stty size" darauf befragt; das ist immer ein frischer ioctl.
+# (2>/dev/null steht VOR <&9, damit auch die Meldung eines fehlenden fd 9
+# verschwindet — vor balken_start gibt es ihn noch nicht.)
+terminal_hoehe() {
+  local m
+  m=$(stty size 2>/dev/null <&9 | awk '{print $1}')
+  if [ -n "$m" ] && [ "$m" -gt 0 ] 2>/dev/null; then printf '%s' "$m"; return 0; fi
+  tput lines 2>/dev/null || echo 24
+}
+terminal_breite() {
+  local m
+  m=$(stty size 2>/dev/null <&9 | awk '{print $2}')
+  if [ -n "$m" ] && [ "$m" -gt 0 ] 2>/dev/null; then printf '%s' "$m"; return 0; fi
+  tput cols 2>/dev/null || echo 80
+}
+
+# Dauer als m:ss. Eine mitlaufende Uhr ist ehrlich — sie sagt "es arbeitet
+# seit 2:14", ohne einen Fortschritt zu behaupten, den niemand kennt. Ein
+# innerhalb der Etappe wandernder Balken waere eine Luege und bleibt aussen vor.
+dauer_kurz() {
+  local s="$1"
+  [ "$s" -lt 0 ] && s=0
+  printf '%d:%02d' $((s / 60)) $((s % 60))
+}
+
+# Den Stand fuer den Ticker hinterlegen (Datei, weil der Ticker ein eigener
+# Prozess ist und Variablen der Elternshell nicht mitbekommt). Erst schreiben,
+# dann umbenennen — so liest der Ticker nie eine halbe Zeile.
+balken_status_schreiben() {
+  [ -n "$BALKEN_STATUS" ] || return 0
+  printf '%s\t%s\t%s\t%s\n' "$SCHRITT" "$SCHRITTE_GESAMT" "$ETAPPE_START" "$ETAPPE_TEXT" \
+    > "$BALKEN_STATUS.neu" 2>/dev/null || return 0
+  mv -f "$BALKEN_STATUS.neu" "$BALKEN_STATUS" 2>/dev/null || return 0
+}
+
+# Rechte Zeitangabe. MIT Erfahrungswerten die geschaetzte Restdauer, klar als
+# Schaetzung gekennzeichnet ("noch ca."); OHNE sie nur die verstrichene Zeit.
+# Beim allerersten Lauf gibt es nichts zu schaetzen — dann wird auch nichts
+# behauptet. Und wenn die laufende Etappe ihre Erfahrungszeit deutlich reisst,
+# faellt die Schaetzung weg statt auf 0:00 stehenzubleiben: eine Restdauer, die
+# nicht kleiner wird, ist schlimmer als gar keine.
+rest_text() {
+  local n="$1" g="$2" verstrichen="$3"
+  if [ -z "$ZEITEN_SCHNITT" ]; then dauer_kurz "$verstrichen"; return 0; fi
+  local i=0 summe=0 erwartet=0 w
+  for w in $ZEITEN_SCHNITT; do
+    i=$((i + 1))
+    if [ "$i" -lt "$n" ]; then continue
+    elif [ "$i" = "$n" ]; then erwartet="$w"
+    else summe=$((summe + w)); fi
+  done
+  if [ "$erwartet" -gt 0 ] && [ "$verstrichen" -gt $((erwartet * 2)) ]; then
+    dauer_kurz "$verstrichen"; return 0
+  fi
+  local offen=$((erwartet - verstrichen))
+  [ "$offen" -lt 0 ] && offen=0
+  summe=$((summe + offen))
+  [ "$summe" -le 0 ] && { dauer_kurz "$verstrichen"; return 0; }
+  printf 'noch ca. %s' "$(dauer_kurz "$summe")"
+}
+
+# Baut die Balkenzeile aus dem hinterlegten Stand.
+#
+# Die Zeile darf NIE breiter werden als das Terminal. Genau daran ist die erste
+# Fassung gescheitert: sie rechnete blind mit 80 Spalten (tput antwortet in
+# $(...) mit der terminfo-Vorgabe, weil es dort kein Terminal sieht). Auf einem
+# schmaleren Fenster brach die Zeile um, und weil die unterste Zeile ausserhalb
+# des Scroll-Bereichs liegt, landete der umgebrochene Rest wieder am Anfang
+# DERSELBEN Zeile — das sah aus wie ein Balken, der ploetzlich voll ist.
+#
+# Deshalb wird hier mit einem Budget gerechnet und in dieser Reihenfolge
+# geopfert, wenn es eng wird: zuerst der Etappentext (gekuerzt), dann die
+# Schrittnummer, dann die Restdauer, zuletzt schrumpft der Balken selbst.
+balken_zeile() {
+  local n g start text
+  IFS=$'\t' read -r n g start text < "$BALKEN_STATUS" 2>/dev/null || return 1
+  [ -n "${g:-}" ] && [ "$g" -gt 0 ] 2>/dev/null || return 1
+
+  local verstrichen rest
+  verstrichen=$(($(date +%s) - start))
+  rest=$(rest_text "$n" "$g" "$verstrichen")
+
+  # Budget: eine Spalte bleibt frei, damit der Cursor nach dem letzten Zeichen
+  # nicht in den Umbruch laeuft.
+  local budget breite frei
+  budget=$(( $(terminal_breite) - 1 ))
+  breite=$BALKEN_BREITE
+  # Balken (2 + Breite) und Prozent (5) sind gesetzt; passt das nicht, schrumpft
+  # der Balken, und unter vier Zeichen wird gar nichts mehr gezeichnet.
+  if [ $((2 + breite + 5)) -gt "$budget" ]; then
+    breite=$((budget - 7))
+    [ "$breite" -lt 4 ] && return 1
+  fi
+  frei=$((budget - 2 - breite - 5))
+
+  local zeige_rest=0 zeige_nm=0
+  if [ "$frei" -ge $((3 + ${#rest})) ]; then zeige_rest=1; frei=$((frei - 3 - ${#rest})); fi
+  if [ "$frei" -ge 7 ]; then zeige_nm=1; frei=$((frei - 7)); fi
+  local textplatz=$((frei - 1))
+  [ "$textplatz" -lt 0 ] && textplatz=0
+  [ "${#text}" -gt "$textplatz" ] && text="${text:0:$textplatz}"
+
+  local voll prozent
+  voll=$((n * breite / g))
+  prozent=$((n * 100 / g))
   [ "$voll" -lt 0 ] && voll=0
+  [ "$voll" -gt "$breite" ] && voll=$breite
   [ "$prozent" -gt 100 ] && prozent=100
-  local leer=$((BALKEN_BREITE - voll))
-  # voll + leer ist per Konstruktion immer BALKEN_BREITE; %3d und %2d/%-2d
-  # halten Prozentzahl, Schrittnummer und Text in festen Spalten.
-  printf '\n%s[%s%s%s%s] %3d%%%s  %s%2d/%-2d%s %s\n' \
-    "$B_GRUEN" "$(wiederhole '█' "$voll")" "$B_GRAU" \
-    "$(wiederhole '·' "$leer")" "$B_GRUEN" "$prozent" "$B_AUS" \
-    "$B_GRAU" "$SCHRITT" "$SCHRITTE_GESAMT" "$B_AUS" "$B_FETT$text$B_AUS"
+  # Solange Etappen ausstehen, bleibt mindestens ein Punkt frei. Ein voller
+  # Balken heisst damit "fertig" — und sonst nichts.
+  [ "$n" -lt "$g" ] && [ "$voll" -ge "$breite" ] && voll=$((breite - 1))
+  local leer=$((breite - voll))
+
+  # Stueckweise zusammensetzen, damit die sichtbare Laenge exakt der Rechnung
+  # oben entspricht (Farbcodes zaehlen nicht mit).
+  # Klammern um jede Variable: bash 3.2 zieht ein direkt folgendes Multibyte-
+  # Zeichen (hier das ·) sonst in den Variablennamen und bricht unter set -u ab.
+  local aus
+  aus="${B_GRUEN}[$(wiederhole '█' "$voll")${B_GRAU}$(wiederhole '·' "$leer")${B_GRUEN}]"
+  aus="${aus}$(printf ' %3d%%' "$prozent")${B_AUS}"
+  [ "$zeige_nm" = "1" ] && aus="${aus}${B_GRAU}$(printf '  %2d/%-2d' "$n" "$g")${B_AUS}"
+  [ -n "$text" ] && aus="${aus} ${B_FETT}${text}${B_AUS}"
+  [ "$zeige_rest" = "1" ] && aus="${aus} ${B_GRAU}·${B_AUS} ${rest}"
+  printf '%s' "$aus"
+}
+
+# Zeichnet die unterste Zeile neu. Laeuft sowohl im Hauptskript als auch im
+# Ticker-Prozess; deshalb wird die Hoehe jedes Mal frisch geholt und der
+# Scroll-Bereich nachgezogen, wenn das Fenster inzwischen anders gross ist.
+balken_zeichnen() {
+  [ "$BALKEN_AKTIV" = "1" ] || return 0
+  local h zeile
+  h=$(terminal_hoehe)
+  if [ "$h" != "$BALKEN_HOEHE" ]; then
+    BALKEN_HOEHE="$h"
+    printf '\033[s\033[1;%dr\033[u' $((h - 1))
+  fi
+  zeile=$(balken_zeile) || return 0
+  # sichern -> Zeile H -> loeschen -> schreiben -> zurueck
+  printf '\033[s\033[%d;1H\033[2K%s\033[u' "$h" "$zeile"
+}
+
+# Unterste Zeile reservieren und die Uhr starten.
+balken_start() {
+  [ -t 1 ] || return 0                       # kein TTY: kein Sticky-Balken
+  [ -z "${NO_COLOR:-}" ] || return 0
+  command -v tput >/dev/null 2>&1 || return 0
+  # Das echte Terminal auf fd 9 sichern — nur darueber ist die Fenstergroesse
+  # verlaesslich zu erfragen (siehe terminal_hoehe).
+  exec 9>&1
+  local h
+  h=$(terminal_hoehe)
+  [ "$h" -ge 5 ] 2>/dev/null || return 0      # zu kleines Fenster: lieber lassen
+
+  BALKEN_STATUS=$(mktemp -t nuvora-balken 2>/dev/null) || return 0
+  BALKEN_HOEHE="$h"
+  BALKEN_AKTIV=1
+  ETAPPE_TEXT="Deploy startet"
+  balken_status_schreiben
+
+  # Platz schaffen (scrollt bei Bedarf um eine Zeile hoch), Cursor eine Zeile
+  # zurueck, sichern, Scroll-Bereich verkleinern (DECSTBM setzt den Cursor auf
+  # 1;1, deshalb danach wiederherstellen).
+  printf '\n\033[1A\033[s\033[1;%dr\033[u' $((h - 1))
+
+  # Die Uhr: einmal pro Sekunde neu zeichnen, damit die Dauer waehrend des
+  # langen docker-Abschnitts sichtbar weiterlaeuft.
+  # trap - EXIT ist hier entscheidend: die Subshell erbt den EXIT-Trap des
+  # Hauptskripts und wuerde beim Beendetwerden das Aufraeumen ein zweites Mal
+  # ausloesen — mitten im Lauf, mit fremdem Scroll-Bereich.
+  ( trap - EXIT INT TERM WINCH
+    while :; do sleep 1; balken_zeichnen || true; done ) &
+  BALKEN_TICKER=$!
+  disown 2>/dev/null || true
+  balken_zeichnen
+}
+
+# AUFRAEUMEN IST PFLICHT: ein Skript, das den Scroll-Bereich gesetzt laesst,
+# hinterlaesst ein Terminal, in dem nichts mehr richtig scrollt. Deshalb haengt
+# das hier an EXIT, INT und TERM und ist mehrfach aufrufbar.
+balken_ende() {
+  [ "$BALKEN_AKTIV" = "1" ] || { [ -n "$BALKEN_STATUS" ] && rm -f "$BALKEN_STATUS" "$BALKEN_STATUS.neu" 2>/dev/null; return 0; }
+  BALKEN_AKTIV=0
+  if [ -n "$BALKEN_TICKER" ]; then
+    kill "$BALKEN_TICKER" 2>/dev/null || true
+    wait "$BALKEN_TICKER" 2>/dev/null || true
+    BALKEN_TICKER=""
+  fi
+  local h
+  h=$(terminal_hoehe)
+  printf '\033[s\033[%d;1H\033[2K\033[u' "$h"   # Balkenzeile leeren
+  printf '\033[r'                                # Scroll-Bereich: ganzer Schirm
+  printf '\033[u'                                # Cursor zurueck (DECSTBM homed ihn)
+  printf '\033[?25h'                             # Cursor sichtbar, komme was wolle
+  [ -n "$BALKEN_STATUS" ] && rm -f "$BALKEN_STATUS" "$BALKEN_STATUS.neu" 2>/dev/null
+  return 0
+}
+
+# ─── Erfahrungswerte (.deploy-zeiten.json) ───
+# Nach jedem erfolgreichen Deploy wird die Dauer JE ETAPPE gemerkt. Der naechste
+# Lauf schaetzt daraus die Restdauer. Nur Laeufe mit derselben Etappenzahl
+# zaehlen (mit und ohne Selbsttest sind zwei verschiedene Wege), und gemittelt
+# wird ueber die letzten fuenf — ein einzelner Ausreisser soll die Anzeige nicht
+# verbiegen. Die Datei ist rein oertlich und gehoert in .gitignore.
+zeiten_laden() {
+  [ -r "$ZEITEN_DATEI" ] || return 0
+  ZEITEN_SCHNITT=$(awk -v g="$SCHRITTE_GESAMT" -v max=5 '
+    match($0, /"schritte":[0-9]+/) {
+      if (substr($0, RSTART + 11, RLENGTH - 11) + 0 != g) next
+      if (match($0, /"dauer":\[[0-9, ]*\]/))
+        lauf[++c] = substr($0, RSTART + 9, RLENGTH - 10)
+    }
+    END {
+      if (c == 0) exit 0
+      von = (c > max ? c - max + 1 : 1)
+      for (k = von; k <= c; k++) {
+        m = split(lauf[k], a, ",")
+        if (m != g) continue          # unvollstaendig: nicht verwerten
+        for (j = 1; j <= g; j++) sum[j] += a[j] + 0
+        anz++
+      }
+      if (anz == 0) exit 0
+      for (j = 1; j <= g; j++) printf "%d ", int(sum[j] / anz + 0.5)
+      print ""
+    }' "$ZEITEN_DATEI" 2>/dev/null) || ZEITEN_SCHNITT=""
+}
+
+zeiten_merken() {
+  # Dauer der letzten Etappe noch nachtragen.
+  [ "$SCHRITT" -gt 0 ] && ZEITEN_LISTE="$ZEITEN_LISTE $(($(date +%s) - ETAPPE_START))"
+  ZEITEN_LISTE="${ZEITEN_LISTE# }"
+  # Nur vollstaendige Laeufe merken — eine halbe Messreihe verdirbt den Schnitt.
+  local anzahl
+  anzahl=$(printf '%s\n' $ZEITEN_LISTE | grep -c .) || anzahl=0
+  [ "$anzahl" = "$SCHRITTE_GESAMT" ] || return 0
+  {
+    echo '{"laeufe":['
+    grep -h '^{"schritte"' "$ZEITEN_DATEI" 2>/dev/null | tail -9 | sed 's/,$//;s/$/,/'
+    printf '{"schritte":%s,"dauer":[%s]}\n' "$SCHRITTE_GESAMT" "$(printf '%s' "$ZEITEN_LISTE" | tr ' ' ',')"
+    echo ']}'
+  } > "$ZEITEN_DATEI.tmp" 2>/dev/null && mv -f "$ZEITEN_DATEI.tmp" "$ZEITEN_DATEI" 2>/dev/null
+  return 0
+}
+
+balken_abbruch() {
+  balken_ende
+  echo ""
+  echo "  Abgebrochen."
+  exit 130
+}
+
+trap balken_ende EXIT
+trap balken_abbruch INT TERM
+# Fenstergroesse geaendert: Scroll-Bereich und Balkenzeile nachziehen. (Waehrend
+# eines laufenden ssh greift der Trap erst danach — der Ticker holt die Hoehe
+# ohnehin jede Sekunde neu und richtet es innerhalb einer Sekunde selbst.)
+trap 'BALKEN_HOEHE=0; balken_zeichnen || true' WINCH
+
+schritt() {
+  # Dauer der abgeschlossenen Etappe festhalten (fuer .deploy-zeiten.json).
+  [ "$SCHRITT" -gt 0 ] && ZEITEN_LISTE="$ZEITEN_LISTE $(($(date +%s) - ETAPPE_START))"
+  SCHRITT=$((SCHRITT + 1))
+  ETAPPE_TEXT="$1"
+  ETAPPE_START=$(date +%s)
+  if [ "$BALKEN_AKTIV" = "1" ]; then
+    balken_status_schreiben
+    balken_zeichnen
+    return 0
+  fi
+  # Ohne TTY (Logdatei, Pipe, CI): schlichte Zeile, keine einzige Steuersequenz.
+  local prozent=$((SCHRITT * 100 / SCHRITTE_GESAMT))
+  [ "$prozent" -gt 100 ] && prozent=100
+  printf '\n[%2d/%-2d %3d%%] %s\n' "$SCHRITT" "$SCHRITTE_GESAMT" "$prozent" "$ETAPPE_TEXT"
 }
 
 # Sicherung: eine Anzeige, die bei 88 % endet oder ueber 100 % laeuft, ist
@@ -189,6 +475,10 @@ echo "Pfad:   $REMOTE_DIR"
 echo "Port:   $PORT"
 echo "Build:  ${BUILD_SERVICES:-alle Services}"
 echo ""
+
+# Ab hier klebt der Balken unten; alles Weitere scrollt darueber durch.
+zeiten_laden
+balken_start
 
 schritt "Server erreichbar machen (rsync)"
 ssh "$SERVER" "command -v rsync >/dev/null 2>&1 || { echo 'installiere rsync...'; (apt-get update -qq && apt-get install -y -qq rsync) || apk add --no-cache rsync; }"
@@ -455,8 +745,10 @@ if [ "$CV" = "200" ] && [ "$LP" = "200" ]; then
     # Kein eigener Schlusssatz: die Zusammenfassung des Selbsttests sagt bereits
     # alles. Der Rueckgabewert traegt das Ergebnis nach aussen.
     "$DIR/selftest.sh" "${SELFTEST_ARGS[@]+"${SELFTEST_ARGS[@]}"}" || exit 1
+    zeiten_merken
   else
     schritte_bilanz
+    zeiten_merken
   fi
 else
   [ "$CV" != "200" ] && echo "  ⚠ Nuvora-Kern nicht gesund (health=$CV)"

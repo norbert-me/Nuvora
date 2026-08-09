@@ -77,3 +77,6 @@ TODO.md
 .selftest-module.json
 # Zwischendatei von deploy.sh, falls ein Lauf abbricht.
 .deploy.env.tmp
+# Erfahrungswerte des Fortschrittsbalkens (Dauer je Etappe) — rein oertlich
+.deploy-zeiten.json
+.deploy-zeiten.json.tmp
