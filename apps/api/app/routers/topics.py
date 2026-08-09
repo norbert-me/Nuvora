@@ -176,9 +176,17 @@ async def topic_usage(topic_id: int, user: User = Depends(get_current_user), db:
     par = None
     if topic.parent_id:
         par = (await db.execute(select(Topic).where(Topic.id == topic.parent_id))).scalar_one_or_none()
+    # Ein Oberthema zeigt auch, was an seinen Unterthemen haengt. Sonst steht
+    # ueberall "Nichts vorhanden", obwohl die Inhalte eine Ebene tiefer liegen —
+    # und genau so sieht man ein Fach normalerweise an: mit allem darunter.
+    kinder = (await db.execute(
+        select(Topic.id).where(Topic.owner_id == user.id, Topic.parent_id == topic.id)
+    )).scalars().all()
+    themen_ids = [topic.id, *kinder]
     out = {
         "id": topic.id,
         "name": (f"{par.name} / {topic.name}" if par else topic.name),
+        "mit_unterthemen": len(kinder),
         "active": {},
     }
 
@@ -188,10 +196,10 @@ async def topic_usage(topic_id: int, user: User = Depends(get_current_user), db:
         return active
 
     if await on("cardvote"):
-        rows = (await db.execute(select(Question).where(Question.owner_id == user.id, Question.topic_id == topic_id).limit(50))).scalars().all()
+        rows = (await db.execute(select(Question).where(Question.owner_id == user.id, Question.topic_id.in_(themen_ids)).limit(50))).scalars().all()
         out["cardvote"] = [{"id": q.id, "text": (q.text or "")[:120]} for q in rows]
     if await on("karten"):
-        rows = (await db.execute(select(CardDeck).where(CardDeck.owner_id == user.id, CardDeck.topic_id == topic_id, CardDeck.deleted_at.is_(None)).limit(50))).scalars().all()
+        rows = (await db.execute(select(CardDeck).where(CardDeck.owner_id == user.id, CardDeck.topic_id.in_(themen_ids), CardDeck.deleted_at.is_(None)).limit(50))).scalars().all()
         out["karten"] = [{"id": d.id, "name": d.name, "class_id": d.class_id, "released": d.released_at is not None} for d in rows]
     if await on("lernpfad"):
         # Lernleitern (Stufen von Lernpfaden) mit diesem Thema — NICHT die einzelnen
@@ -199,15 +207,15 @@ async def topic_usage(topic_id: int, user: User = Depends(get_current_user), db:
         rows = (await db.execute(
             select(LearningLadder, LearningPath.name)
             .join(LearningPath, LearningLadder.path_id == LearningPath.id)
-            .where(LearningPath.owner_id == user.id, LearningLadder.topic_id == topic_id, LearningPath.deleted_at.is_(None))
+            .where(LearningPath.owner_id == user.id, LearningLadder.topic_id.in_(themen_ids), LearningPath.deleted_at.is_(None))
             .order_by(LearningPath.name, LearningLadder.position).limit(50)
         )).all()
         out["lernpfad"] = [{"id": lad.id, "path": pname, "class_id": lad.class_id} for (lad, pname) in rows]
     if await on("kalender"):
-        rows = (await db.execute(select(CalendarEntry).where(CalendarEntry.owner_id == user.id, CalendarEntry.topic_id == topic_id).order_by(CalendarEntry.date.desc()).limit(50))).scalars().all()
+        rows = (await db.execute(select(CalendarEntry).where(CalendarEntry.owner_id == user.id, CalendarEntry.topic_id.in_(themen_ids)).order_by(CalendarEntry.date.desc()).limit(50))).scalars().all()
         out["kalender"] = [{"id": e.id, "date": e.date.isoformat() if e.date else None, "title": e.title, "class_id": e.class_id} for e in rows]
     if await on("code-detektiv"):
-        rows = (await db.execute(select(CodePuzzle).where(CodePuzzle.owner_id == user.id, CodePuzzle.topic_id == topic_id).limit(50))).scalars().all()
+        rows = (await db.execute(select(CodePuzzle).where(CodePuzzle.owner_id == user.id, CodePuzzle.topic_id.in_(themen_ids)).limit(50))).scalars().all()
         out["codedetektiv"] = [{"id": p.id, "client_id": p.client_id, "title": p.title} for p in rows]
     return out
 
