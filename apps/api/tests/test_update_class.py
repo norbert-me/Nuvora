@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from app.models import (
     Base, User, SchoolClass, Student, GradeSection, GradeCategory, GradeEntry,
 )
+from app.routers import classes as C
 from app.routers.classes import update_class, ClassCreate, StudentIn
 
 
@@ -93,3 +94,45 @@ async def test_removed_student_is_deleted(session):
     assert students == []
     entries = (await session.execute(select(GradeEntry))).scalars().all()
     assert entries == []
+
+
+@pytest.mark.asyncio
+async def test_endgueltig_geloeschte_klasse_nimmt_ihren_leeren_kurs_mit(session):
+    """Sonst bleibt ein Fach in der Liste, das es nicht mehr gibt.
+
+    Jede neue Klasse bekommt ihren eigenen Kurs. Wurde die Klasse endgueltig
+    geloescht, stand er weiter in /api/kurse — leer, ohne Klasse, und die
+    Lehrkraft musste ihn von Hand hinterherraeumen. Aufgefallen ist es dem
+    Oberflaechen-Systemtest, der nach jedem Lauf Reste zaehlt.
+    """
+    from app.models import Kurs
+    s = session
+    u, _, _, _ = await _seed(s)
+    k = await C.create_class(ClassCreate(name="8b", students=[StudentIn(card_id=5, name="Ann")]),
+                             user=u, db=s)
+    kurs_id = (await s.get(SchoolClass, k.id)).kurs_id
+    assert kurs_id is not None, "eine neue Klasse bringt ihren Kurs mit"
+
+    await C.delete_class(k.id, user=u, db=s)
+    await C.purge_class(k.id, user=u, db=s)
+    assert await s.get(Kurs, kurs_id) is None, "der leere Kurs muss mit weg"
+
+
+@pytest.mark.asyncio
+async def test_geteilter_kurs_ueberlebt_die_geloeschte_klasse(session):
+    """Die Gegenprobe: ein Kurs, der noch eine zweite Klasse hat, bleibt.
+
+    Kurse sind ausdruecklich dafuer da, ueber Klassen hinaus zu gelten. Wer
+    beim Aufraeumen zu grosszuegig ist, reisst fremde Noten mit."""
+    from app.models import Kurs, KursTag
+    s = session
+    u, _, _, _ = await _seed(s)
+    a = await C.create_class(ClassCreate(name="8b", students=[StudentIn(card_id=5, name="Ann")]), user=u, db=s)
+    b = await C.create_class(ClassCreate(name="8c", students=[StudentIn(card_id=6, name="Ben")]), user=u, db=s)
+    kurs_id = (await s.get(SchoolClass, a.id)).kurs_id
+    s.add(KursTag(kurs_id=kurs_id, class_id=b.id))
+    await s.commit()
+
+    await C.delete_class(a.id, user=u, db=s)
+    await C.purge_class(a.id, user=u, db=s)
+    assert await s.get(Kurs, kurs_id) is not None, "der geteilte Kurs gehoert noch 7b"

@@ -426,7 +426,28 @@ async def purge_class(class_id: int, user: User = Depends(get_current_user), db:
         raise HTTPException(404)
     if sc.deleted_at is None:
         raise HTTPException(400, "Klasse ist nicht im Papierkorb")
+    kurs_id = sc.kurs_id
     await db.delete(sc)
+    await db.flush()
+
+    # Den mitgelieferten Kurs mitnehmen, wenn nichts mehr an ihm haengt.
+    #
+    # Jede neue Klasse bekommt oben ihren eigenen Kurs. Wurde die Klasse
+    # endgueltig geloescht, blieb er als leerer Eintrag in der Kursliste stehen
+    # — die Lehrkraft musste ihn von Hand hinterherraeumen und sah bis dahin
+    # Faecher, die es nicht mehr gibt. Kurse, die noch eine andere Klasse oder
+    # einzeln zugeordnete SuS haben, bleiben unangetastet: sie wurden bewusst
+    # ueber die Klasse hinaus verwendet.
+    if kurs_id is not None:
+        from .kurse import member_class_ids
+        from ..models import Kurs, KursStudent
+        klassen = await member_class_ids(db, [kurs_id], mit_geloeschten=True)
+        einzeln = (await db.execute(
+            select(KursStudent.id).where(KursStudent.kurs_id == kurs_id).limit(1))).scalar_one_or_none()
+        if not klassen and einzeln is None:
+            kurs = await db.get(Kurs, kurs_id)
+            if kurs is not None and kurs.owner_id == user.id:
+                await db.delete(kurs)
     await db.commit()
 
 
