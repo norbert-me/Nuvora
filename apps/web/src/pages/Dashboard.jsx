@@ -381,9 +381,9 @@ export default function Dashboard() {
                 dauersichtbarer Papierkorb in der Zeile. */}
             {renamingFolder !== f.id ? (
             <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-              <button onClick={(e) => { e.stopPropagation(); exportFolder(f.id, f.name); }} className="icon-btn" style={iconBtn} title={t("classes.export")}><Icon d={ICONS.export} size={18} /></button>
-              <button onClick={(e) => { e.stopPropagation(); setMovingFolder(f.id); }} className="icon-btn" style={iconBtn} title={t("dash.move")}><Icon d={ICONS.move} size={18} /></button>
-              <button onClick={(e) => { e.stopPropagation(); startRenameFolder(f.id, f.name); }} className="icon-btn" style={iconBtn} title={t("dash.rename")}><Icon d={ICONS.edit} size={18} /></button>
+              <button onClick={(e) => { e.stopPropagation(); exportFolder(f.id, f.name); }} className="icon-btn" style={iconBtn} title={t("classes.export")} aria-label={t("classes.export")}><Icon d={ICONS.export} size={18} /></button>
+              <button onClick={(e) => { e.stopPropagation(); setMovingFolder(f.id); }} className="icon-btn" style={iconBtn} title={t("dash.move")} aria-label={t("dash.move")}><Icon d={ICONS.move} size={18} /></button>
+              <button onClick={(e) => { e.stopPropagation(); startRenameFolder(f.id, f.name); }} className="icon-btn" style={iconBtn} title={t("dash.rename")} aria-label={t("dash.rename")}><Icon d={ICONS.edit} size={18} /></button>
             </div>
             ) : (
             <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
@@ -391,7 +391,7 @@ export default function Dashboard() {
                   per onBlur zuerst, der Knopf verschwindet und der Klick geht
                   ins Leere — das Löschen passierte nie. */}
               <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); deleteFolder(f.id); }}
-                className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
+                className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
             </div>
             )}
           </div>
@@ -408,11 +408,11 @@ export default function Dashboard() {
                 <strong style={{ color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{qs.name}</strong>
               </span>
               <div style={{ display: "flex", gap: 6 }}>
-                <button onClick={(e) => { e.stopPropagation(); openPublish(qs); }} className="icon-btn" style={iconBtn} title={t("dash.publishTitle")}>
+                <button onClick={(e) => { e.stopPropagation(); openPublish(qs); }} className="icon-btn" style={iconBtn} title={t("dash.publishTitle")} aria-label={t("dash.publishTitle")}>
                   <Icon d={ICONS.share} size={18} color="var(--accent)" />
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); duplicateSet(qs.id); }} className="icon-btn" style={iconBtn} title={t("dash.duplicate")}><Icon d={ICONS.duplicate} size={18} /></button>
-                <button onClick={async (e) => { e.stopPropagation(); const r = await fetch(`${API}/export/question-set/${qs.id}`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${qs.name}.json`; a.click(); URL.revokeObjectURL(a.href); }} className="icon-btn" style={iconBtn} title={t("classes.export")}><Icon d={ICONS.export} size={18} /></button>
+                <button onClick={(e) => { e.stopPropagation(); duplicateSet(qs.id); }} className="icon-btn" style={iconBtn} title={t("dash.duplicate")} aria-label={t("dash.duplicate")}><Icon d={ICONS.duplicate} size={18} /></button>
+                <button onClick={async (e) => { e.stopPropagation(); const r = await fetch(`${API}/export/question-set/${qs.id}`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${qs.name}.json`; a.click(); URL.revokeObjectURL(a.href); }} className="icon-btn" style={iconBtn} title={t("classes.export")} aria-label={t("classes.export")}><Icon d={ICONS.export} size={18} /></button>
               </div>
             </div>
           ))}
@@ -656,7 +656,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
         <input value={name} onChange={(e) => setName(e.target.value)} onBlur={saveName} onKeyDown={(e) => e.key === "Enter" && saveName()}
           style={{ padding: "10px 14px", fontSize: 20, fontWeight: 700, border: "1px solid var(--border2)", borderRadius: 10, flex: 1, maxWidth: 500, color: "var(--text)" }} />
         {saving && <span style={{ color: "var(--text3)", fontSize: 13 }}>{t("dash.saving")}</span>}
-        {onDelete && <button onClick={onDelete} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
+        {onDelete && <button onClick={onDelete} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
       </div>
 
       <div style={{ display: "flex", gap: 24, marginBottom: 8, flexWrap: "wrap" }}>
@@ -741,7 +741,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
             <Latex>{q.text}</Latex>
             {q.image_url && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 6, verticalAlign: "middle" }}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>}
           </span>
-          <button onClick={() => removeQuestion(idx)} style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
+          <button onClick={() => removeQuestion(idx)} style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
         </div>
           );
         });

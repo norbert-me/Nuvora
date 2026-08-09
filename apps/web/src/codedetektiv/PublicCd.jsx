@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Routes, Route, useParams, useNavigate } from "react-router-dom";
 import { StoreProvider, useStore } from "./data/store";
 import { CdBase } from "./base.jsx";
+import RechtsFuss from "../components/RechtsFuss.jsx";
 import PuzzlePage from "./pages/PuzzlePage";
 import PlaySession from "./pages/PlaySession";
 import "./styles/makecode.css";
@@ -61,6 +62,8 @@ export default function PublicCd() {
             <Route path="puzzle/:id" element={<PuzzlePage />} />
           </Routes>
         </StoreProvider>
+        {/* Pflichtangaben: diese Seite sehen Lernende ohne Konto. */}
+        <RechtsFuss hinweis="Dein gewählter Name und dein Lösungsstand sind für alle sichtbar, die den Sitzungscode haben." />
       </div>
     </CdBase.Provider>
   );

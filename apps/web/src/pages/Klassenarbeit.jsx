@@ -353,7 +353,7 @@ export default function Klassenarbeit() {
             {works.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
           <button data-tour="ka-new" onClick={neueArbeit} style={btnSecondary}>{t("klassenarbeit.new")}</button>
-          {work && <button onClick={loeschen} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
+          {work && <button onClick={loeschen} className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
         </div>
       )}
 
@@ -389,7 +389,7 @@ export default function Klassenarbeit() {
                     </label>
                   )}
                   <button onClick={() => addPart(task.id)} style={{ ...btnSecondary, padding: "5px 10px", fontSize: 12 }} title={t("klassenarbeit.addPartHint")}>+ {t("klassenarbeit.addPart")}</button>
-                  <button onClick={() => delTask(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
+                  <button onClick={() => delTask(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
                 </div>
                 {hasParts && (
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8, paddingLeft: 26 }}>
@@ -397,7 +397,7 @@ export default function Klassenarbeit() {
                       <div key={u.id} style={{ display: "inline-flex", alignItems: "center", gap: 3, background: "var(--bg2)", borderRadius: 8, padding: "3px 6px" }}>
                         <input value={u.label} onChange={(e) => setPart(task.id, u.id, { label: e.target.value })} title={t("klassenarbeit.partLabel")} style={{ ...inputStyle, fontSize: 12, padding: "4px 4px", width: 34, textAlign: "center" }} />
                         <input type="number" min="0.5" step="0.5" value={u.max} onChange={(e) => setPart(task.id, u.id, { max: Math.max(0.5, Number(e.target.value) || 0.5) })} title={t("klassenarbeit.maxPoints")} style={{ ...inputStyle, fontSize: 12, padding: "4px 4px", width: 44, textAlign: "center" }} />
-                        <button onClick={() => delPart(task.id, u.id)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title={t("common.delete")}><Icon d={ICONS.close} size={13} color={C.danger} /></button>
+                        <button onClick={() => delPart(task.id, u.id)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.close} size={13} color={C.danger} /></button>
                       </div>
                     ))}
                   </div>

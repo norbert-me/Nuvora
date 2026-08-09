@@ -433,7 +433,7 @@ export default function Kalender() {
         {view !== "timetable" && view !== "breaks" && view !== "klassenarbeit" && (
           <div style={{ position: "relative" }}>
             {/* Auge = „was anzeigen?": Ganztägige/Externe ein-/ausblenden + Farbe. */}
-            <button data-tour="kal-view-menu" onClick={() => setViewMenuOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn, width: 34, height: 34, opacity: (showAllDay && showExt) ? 1 : 0.55 }} title={t("kalender.viewMenu")}>
+            <button data-tour="kal-view-menu" onClick={() => setViewMenuOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn, width: 34, height: 34, opacity: (showAllDay && showExt) ? 1 : 0.55 }} title={t("kalender.viewMenu")} aria-label={t("kalender.viewMenu")}>
               <Icon d={ICONS.eye} size={18} />
             </button>
             {viewMenuOpen && (<>
@@ -474,7 +474,7 @@ export default function Kalender() {
         )}
         {view !== "timetable" && view !== "breaks" && view !== "klassenarbeit" && (
           <div style={{ position: "relative" }}>
-            <button onClick={() => setMoreOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn, width: 34, height: 34 }} title={t("common.more") !== "common.more" ? t("common.more") : "Mehr"}>
+            <button onClick={() => setMoreOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn, width: 34, height: 34 }} title={t("common.more") !== "common.more" ? t("common.more") : "Mehr"} aria-label={t("common.more") !== "common.more" ? t("common.more") : "Mehr"}>
               <Icon d={ICONS.more} size={18} />
             </button>
             {moreOpen && (<>
@@ -493,7 +493,7 @@ export default function Kalender() {
         <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
           <ExportButton iconOnly title={t("kalender.export")} onClick={exportKal} />
           <ImportButton iconOnly title={t("kalender.import")} onFile={importKal} />
-          <button onClick={() => setShowTimes((v) => !v)} className="icon-btn" title={t("kalender.timesShow")}
+          <button onClick={() => setShowTimes((v) => !v)} className="icon-btn" title={t("kalender.timesShow")} aria-label={t("kalender.timesShow")}
             style={{ ...iconBtn, border: showTimes ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 8 }}>
             <Icon d={ICONS.clock} size={18} color={showTimes ? "var(--accent)" : "var(--text2)"} />
           </button>
@@ -664,7 +664,7 @@ function ExtCalEditor({ cals, onChange, onSave, t }) {
               title={t("kalender.extColor")} style={{ width: 26, height: 26, padding: 0, border: "none", background: "none", cursor: "pointer", flexShrink: 0 }} />
             <input value={c.url || ""} onChange={(e) => setRow(i, { url: e.target.value })} placeholder="https://…/basic.ics"
               style={{ ...inputStyle, flex: 1, fontSize: 12, minWidth: 0 }} />
-            <button onClick={() => delRow(i)} className="icon-btn" style={{ ...iconBtn, padding: 4, flexShrink: 0 }} title={t("common.delete")}>
+            <button onClick={() => delRow(i)} className="icon-btn" style={{ ...iconBtn, padding: 4, flexShrink: 0 }} title={t("common.delete")} aria-label={t("common.delete")}>
               <Icon d={ICONS.trash} size={15} color={C.danger} />
             </button>
           </div>
@@ -888,7 +888,7 @@ function MonthGrid({ extColor, range, cursor, byDay, extByDay, todoByDay, onTodo
                     ) : (<>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <button onClick={() => onDayView(d)} title={t("kalender.toDay")} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--text2)", padding: 0 }}>{d.getDate()}</button>
-                      {!f && <button onClick={(e) => { e.stopPropagation(); onAdd(d); }} className="icon-btn" style={{ ...iconBtn, padding: 0 }} title={t("kalender.add")}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>}
+                      {!f && <button onClick={(e) => { e.stopPropagation(); onAdd(d); }} className="icon-btn" style={{ ...iconBtn, padding: 0 }} title={t("kalender.add")} aria-label={t("kalender.add")}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>}
                     </div>
                     {f ? <FreiMarker label={f.label} t={t} /> : (<>
                       <EntryChips list={byDay(d)} className={className} kursName={kursName} topicName={topicName} onOpen={onOpen} classColor={classColor} />
@@ -1367,12 +1367,12 @@ function ExamPanel({ overview, periods = 6, onAdd, onUpd, onDel, t }) {
               </div>
               {/* Auto-verknüpfte Auswertung im Modul „Klassenarbeit" öffnen. */}
               {e.work_id && e.class_id && (
-                <Link to={`/auswertung?tab=klassenarbeit&class=${e.class_id}${e.kurs_id ? `&kurs=${e.kurs_id}` : ""}&work=${e.work_id}`} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("kalender.openExamWork")}>
+                <Link to={`/auswertung?tab=klassenarbeit&class=${e.class_id}${e.kurs_id ? `&kurs=${e.kurs_id}` : ""}&work=${e.work_id}`} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("kalender.openExamWork")} aria-label={t("kalender.openExamWork")}>
                   <Icon d={ICONS.chart} size={16} color="var(--accent)" />
                 </Link>
               )}
-              <button onClick={() => startEdit(e)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
-              <button onClick={() => onDel(e.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>
+              <button onClick={() => startEdit(e)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
+              <button onClick={() => onDel(e.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>
             </>
           )}
          </div>
@@ -1468,7 +1468,7 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
             <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--card)" }}>
               <span style={{ fontSize: 13.5, fontWeight: 600 }}>{b.label || t("kalender.free")}</span>
               <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{fmt(b.start_date)}{fmt(b.start_date) !== fmt(b.end_date) ? ` – ${fmt(b.end_date)}` : ""}</span>
-              <button onClick={() => onDel(b.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto", padding: 5 }} title={t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>
+              <button onClick={() => onDel(b.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto", padding: 5 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>
             </div>
           ))}
         </div>
@@ -1516,7 +1516,7 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onClo
             onSave({ weekday: slot.weekday, period: slot.period, title: "", class_id: classId ? Number(classId) : null, kurs_id: classId ? kursId : null, topic_id: null });
           }} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
-          {slot.id && <button onClick={() => onDelete(slot.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
+          {slot.id && <button onClick={() => onDelete(slot.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
         </div>
       </div>
     </div>
@@ -1631,7 +1631,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
               <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{new Date(entry.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>
             </div>
           </div>
-          <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
+          <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
         </div>
         <div style={{ padding: "6px 24px 22px" }}>
         {!edit && (
@@ -1712,7 +1712,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
             <div style={{ display: "flex", gap: 8, marginTop: 20, alignItems: "center" }}>
               <button onClick={() => setEdit(true)} style={btnPrimary}>{t("common.edit")}</button>
               <button onClick={onClose} style={btnSecondary}>{t("common.close")}</button>
-              {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
+              {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
             </div>
           </div>
         )}
@@ -1729,7 +1729,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
             <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={{ ...fld, width: "auto" }} title={t("kalender.start")} />
             <span style={{ color: "var(--text3)" }}>–</span>
             <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={{ ...fld, width: "auto" }} title={t("kalender.end")} />
-            {(startTime || endTime) && <button onClick={() => { setStartTime(""); setEndTime(""); }} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.delete")}><Icon d={ICONS.close} size={15} /></button>}
+            {(startTime || endTime) && <button onClick={() => { setStartTime(""); setEndTime(""); }} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.close} size={15} /></button>}
           </div>
           {timeInvalid && <div style={{ fontSize: 12, color: C.danger, marginTop: 5 }}>{t("kalender.timeInvalid")}</div>}
         </>)}
@@ -1825,7 +1825,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         {/* Verlaufsplan: einfache Phasenliste (Phase + Dauer + Freitext). */}
         <div style={{ ...lbl, display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ flex: 1 }}>{t("kalender.verlauf")}</span>
-          <button onClick={addPhase} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("kalender.verlaufAdd")}><Icon d={ICONS.plus} size={15} color="var(--accent)" /></button>
+          <button onClick={addPhase} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("kalender.verlaufAdd")} aria-label={t("kalender.verlaufAdd")}><Icon d={ICONS.plus} size={15} color="var(--accent)" /></button>
         </div>
         {verlauf.length === 0 && <div style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 4 }}>{t("kalender.verlaufEmpty")}</div>}
         {verlauf.map((p, i) => (
@@ -1836,7 +1836,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
               <span style={{ fontSize: 12, color: "var(--text3)", flexShrink: 0 }}>min</span>
               <button onClick={() => movePhase(i, -1)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title="↑" disabled={i === 0}><span style={{ color: i === 0 ? "var(--text3)" : "var(--text2)" }}>↑</span></button>
               <button onClick={() => movePhase(i, 1)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title="↓" disabled={i === verlauf.length - 1}><span style={{ color: i === verlauf.length - 1 ? "var(--text3)" : "var(--text2)" }}>↓</span></button>
-              <button onClick={() => delPhase(i)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title={t("common.delete")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button>
+              <button onClick={() => delPhase(i)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button>
             </div>
             <textarea value={p.text} onChange={(e) => setPhase(i, "text", e.target.value)} rows={2} placeholder={t("kalender.verlaufText")} style={{ ...fld, resize: "vertical", padding: "6px 8px" }} />
           </div>
@@ -1845,7 +1845,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
           <button onClick={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, title, notes, start_time: startTime || "", end_time: endTime || "", verlaufsplan: verlauf.filter((p) => (p.phase || p.text || p.dauer)).map((p) => ({ phase: p.phase || "", dauer: p.dauer || "", text: p.text || "" })), class_id: classId ? Number(classId) : null, kurs_id: classId ? (kursId ?? null) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })} disabled={timeInvalid} style={{ ...btnPrimary, opacity: timeInvalid ? 0.5 : 1 }}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
-          {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
+          {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
         </div>
         </>)}
         </div>

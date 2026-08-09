@@ -152,7 +152,7 @@ export default function Anwesenheit() {
         ) : (
           <KursKlasseSelect value={classId} onChange={setClassId} />
         )}
-        <button onClick={() => setShowLegend((v) => !v)} className="icon-btn" title={t("anwesenheit.legend")}
+        <button onClick={() => setShowLegend((v) => !v)} className="icon-btn" title={t("anwesenheit.legend")} aria-label={t("anwesenheit.legend")}
           style={{ ...iconBtn, marginLeft: "auto", border: showLegend ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 8 }}>
           <Icon d={ICONS.info} size={16} color={showLegend ? "var(--accent)" : "var(--text2)"} />
         </button>

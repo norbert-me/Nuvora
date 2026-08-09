@@ -95,7 +95,7 @@ export default function Ausleihe() {
                 </button>
                 {it.open > 0 && <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 9px", borderRadius: 980, background: "rgba(209,53,15,0.12)", color: C.danger }}>{t("ausleihe.outCount", { n: it.open })}</span>}
                 {it.overdue > 0 && <span title={t("ausleihe.overdueHint", { d: UEBERFAELLIG_TAGE })} style={{ fontSize: 12, fontWeight: 800, padding: "2px 9px", borderRadius: 980, background: C.danger, color: "#fff" }}>{t("ausleihe.overdueCount", { n: it.overdue })}</span>}
-                <button onClick={() => loeschen(it.id)} className="icon-btn" style={{ ...iconBtn, padding: 5 }} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
+                <button onClick={() => loeschen(it.id)} className="icon-btn" style={{ ...iconBtn, padding: 5 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
               </div>
 
               {offen === it.id && (

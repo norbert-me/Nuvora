@@ -340,14 +340,14 @@ export default function Sitzplan() {
           ...(anwesenheitAktiv ? [{ key: "aufruf", label: t("sitzplan.rollcall"), value: aufruf, onChange: (v) => { setAufruf(v); saveView({ aufruf: v }); } }] : []),
           { key: "segel", label: t("sitzplan.segelToggle"), hint: t("sitzplan.segelHint"), value: segelOn, onChange: (v) => { setSegelOn(v); saveView({ segel: v }); } },
         ]} />
-        <button onClick={() => setShowHint((v) => !v)} className="icon-btn" title={t("sitzplan.hintFree")}
+        <button onClick={() => setShowHint((v) => !v)} className="icon-btn" title={t("sitzplan.hintFree")} aria-label={t("sitzplan.hintFree")}
           style={{ ...iconBtn, border: showHint ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 999, width: 30, height: 30, fontWeight: 700, color: showHint ? "var(--accent)" : "var(--text3)" }}>i</button>
         <ExportButton iconOnly title={t("sitzplan.export")} onClick={doExport} style={{ marginLeft: anwesenheitAktiv ? 0 : "auto" }} />
         <ImportButton iconOnly title={t("sitzplan.import")} onFile={doImport} />
         <button onClick={addEmpty} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("sitzplan.addEmpty")}><Icon d={ICONS.plus} size={15} /> {t("sitzplan.emptySeat")}</button>
-        <button onClick={undo} disabled={undoLen === 0} className="icon-btn" style={{ ...iconBtn, opacity: undoLen === 0 ? 0.4 : 1 }} title={t("sitzplan.undo")}><Icon d={ICONS.undo || ICONS.restore} size={18} /></button>
-        <button onClick={redo} disabled={redoLen === 0} className="icon-btn" style={{ ...iconBtn, opacity: redoLen === 0 ? 0.4 : 1 }} title={t("sitzplan.redo")}><span style={{ display: "inline-flex", transform: "scaleX(-1)" }}><Icon d={ICONS.undo || ICONS.restore} size={18} /></span></button>
-        <button onClick={leeren} className="icon-btn" style={iconBtn} title={t("sitzplan.clear")}><Icon d={ICONS.trash} color={C.danger} /></button>
+        <button onClick={undo} disabled={undoLen === 0} className="icon-btn" style={{ ...iconBtn, opacity: undoLen === 0 ? 0.4 : 1 }} title={t("sitzplan.undo")} aria-label={t("sitzplan.undo")}><Icon d={ICONS.undo || ICONS.restore} size={18} /></button>
+        <button onClick={redo} disabled={redoLen === 0} className="icon-btn" style={{ ...iconBtn, opacity: redoLen === 0 ? 0.4 : 1 }} title={t("sitzplan.redo")} aria-label={t("sitzplan.redo")}><span style={{ display: "inline-flex", transform: "scaleX(-1)" }}><Icon d={ICONS.undo || ICONS.restore} size={18} /></span></button>
+        <button onClick={leeren} className="icon-btn" style={iconBtn} title={t("sitzplan.clear")} aria-label={t("sitzplan.clear")}><Icon d={ICONS.trash} color={C.danger} /></button>
       </div>
       {showHint && <p style={{ fontSize: 13, color: "var(--text3)", margin: "8px 0 14px" }}>{t("sitzplan.hintFree")}</p>}
       {segelOn && (

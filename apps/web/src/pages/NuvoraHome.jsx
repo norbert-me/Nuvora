@@ -244,7 +244,7 @@ export default function NuvoraHome({ user }) {
           {firstName ? t("home.welcome", { name: firstName }) : t("home.welcomePlain")}
         </h1>
         {active.length > 1 && (
-          <button onClick={() => setEdit((e) => !e)} className="icon-btn" style={{ ...iconBtn, border: edit ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 10, padding: 8 }} title={t("home.arrange")}>
+          <button onClick={() => setEdit((e) => !e)} className="icon-btn" style={{ ...iconBtn, border: edit ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 10, padding: 8 }} title={t("home.arrange")} aria-label={t("home.arrange")}>
             {edit ? <span style={{ fontSize: 13, fontWeight: 600, color: "var(--accent)", padding: "0 4px" }}>{t("common.done")}</span> : <Icon d={ICONS.edit} size={17} />}
           </button>
         )}

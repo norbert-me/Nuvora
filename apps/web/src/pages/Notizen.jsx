@@ -92,7 +92,7 @@ export default function Notizen() {
                 </div>
                 <div style={{ fontSize: 14, whiteSpace: "pre-wrap" }}>{o.text}</div>
               </div>
-              <button onClick={() => del(o.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
+              <button onClick={() => del(o.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
             </div>
           ))}
         </>

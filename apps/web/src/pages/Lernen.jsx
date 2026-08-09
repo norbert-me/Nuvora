@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import CardFace from "../components/CardFace.jsx";
 import { COLORS as C } from "../components/Icons.jsx";
 import { useParams } from "react-router-dom";
+import RechtsFuss from "../components/RechtsFuss.jsx";
 
 const API = "/api/karten";
 
@@ -201,8 +202,12 @@ function Ergebnisse({ results }) {
 }
 
 const Center = ({ children }) => (
-  <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: "var(--bg)" }}>
-    {children}
+  <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
+    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      {children}
+    </div>
+    {/* Pflichtangaben auch hier: diese Seite sehen Lernende ohne Konto. */}
+    <RechtsFuss hinweis="Dein Übungsstand wird unter deinem Namen gespeichert und ist für deine Lehrkraft sichtbar." />
   </div>
 );
 

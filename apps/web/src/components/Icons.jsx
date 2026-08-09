@@ -208,7 +208,7 @@ export const sectionLabel = { fontSize: 11, fontWeight: 700, color: "var(--text3
 export const COLORS = {
   danger: "#d1350f",
   success: "#0a7d3e",
-  warning: "#b8860b",
+  warning: "#8a6100",   // 4,7:1 auf Weiss — #b8860b lag bei 3,3:1 und wird klein gesetzt
   info: "#2563eb",       // Akzent-/Info-Blau (Badges, „entschuldigt", Standard-Klassenfarbe)
   correctBg: "#d4edda",
   incorrectBg: "#fde2d9",

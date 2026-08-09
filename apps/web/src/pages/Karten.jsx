@@ -339,8 +339,8 @@ export default function Karten() {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                 <strong style={{ fontSize: 15 }}>{f.name}{isTarget ? ` — ${t("karten.dropHere")}` : ""}</strong>
               </button>
-              <button onClick={() => renameFolder(f)} className="icon-btn" style={iconBtn} title={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
-              <button onClick={() => deleteFolder(f)} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
+              <button onClick={() => renameFolder(f)} className="icon-btn" style={iconBtn} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
+              <button onClick={() => deleteFolder(f)} className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
             </div>
             );
           })}
@@ -515,7 +515,7 @@ function StudentDetail({ detail, t, onClose }) {
       <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 520 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
           <h3 style={{ fontSize: 17, fontWeight: 700, flex: 1 }}>{student.name}</h3>
-          <button onClick={onClose} className="icon-btn" style={iconBtn} title={t("common.close")}><Icon d={ICONS.close} size={16} /></button>
+          <button onClick={onClose} className="icon-btn" style={iconBtn} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={16} /></button>
         </div>
         <div style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 16 }}>{student.reviewed} / {student.total} {t("karten.reviewed").toLowerCase()} · {student.due || 0} {t("karten.due").toLowerCase()}</div>
         {rows.length === 0 ? (
@@ -681,12 +681,12 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
               style={{ fontSize: 16, fontWeight: 700, padding: "3px 8px", border: "1px solid var(--border2)", borderRadius: 8, background: "var(--bg)", color: "var(--text)" }} />
             {/* Löschen erscheint erst im Bearbeiten-Modus (nicht dauerhaft im Kopf). */}
             <button data-keep="1" onMouseDown={(e) => e.preventDefault()} onClick={async () => { if (await askConfirm(t("karten.delDeck", { name: deck.name }))) call(() => fetch(`${API}/decks/${deck.id}`, { method: "DELETE" })); }}
-              className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={16} /></button>
+              className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={16} /></button>
           </>
         ) : (
           <>
             <strong onClick={() => setCollapsed((v) => !v)} style={{ fontSize: 16, cursor: "pointer" }}>{deck.name || t("karten.deck")}</strong>
-            <button onClick={() => { setNameVal(deck.name || ""); setRenaming(true); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("karten.renameDeck")}><Icon d={ICONS.edit} size={14} /></button>
+            <button onClick={() => { setNameVal(deck.name || ""); setRenaming(true); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("karten.renameDeck")} aria-label={t("karten.renameDeck")}><Icon d={ICONS.edit} size={14} /></button>
           </>
         )}
         {status !== "entwurf" && <span style={{ fontSize: 11.5, fontWeight: 600, padding: "2px 8px", borderRadius: 980, background: badge.bg, color: badge.col }}>{badge.text}</span>}
@@ -709,7 +709,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         )}
         {!collapsed && onMove && folders.length > 0 && (
           <div style={{ position: "relative" }}>
-            <button onClick={() => setMoveOpen((v) => !v)} className="icon-btn" style={iconBtn} title={t("karten.moveToFolder")}>
+            <button onClick={() => setMoveOpen((v) => !v)} className="icon-btn" style={iconBtn} title={t("karten.moveToFolder")} aria-label={t("karten.moveToFolder")}>
               <Icon d={ICONS.move || ICONS.export} size={18} />
             </button>
             {moveOpen && (<>
@@ -732,14 +732,14 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{deck.cards.length} {t("karten.cards")}</span>
         {!collapsed && (<>
           {cards.length > 0 && (
-            <button onClick={() => setStudying(true)} className="icon-btn" style={iconBtn} title={t("karten.study")}><Icon d={ICONS.eye} size={18} color="var(--accent)" /></button>
+            <button onClick={() => setStudying(true)} className="icon-btn" style={iconBtn} title={t("karten.study")} aria-label={t("karten.study")}><Icon d={ICONS.eye} size={18} color="var(--accent)" /></button>
           )}
           {deck.cards.length > 0 && (
-            <button onClick={exportDeck} className="icon-btn" style={iconBtn} title={t("karten.export")}><Icon d={ICONS.export} size={18} /></button>
+            <button onClick={exportDeck} className="icon-btn" style={iconBtn} title={t("karten.export")} aria-label={t("karten.export")}><Icon d={ICONS.export} size={18} /></button>
           )}
-          <button onClick={() => setImporting(true)} className="icon-btn" style={iconBtn} title={t("karten.import")}><Icon d={ICONS.import} size={18} /></button>
+          <button onClick={() => setImporting(true)} className="icon-btn" style={iconBtn} title={t("karten.import")} aria-label={t("karten.import")}><Icon d={ICONS.import} size={18} /></button>
           {deck.cards.length > 0 && (
-            <button onClick={() => setPublishing(true)} className="icon-btn" style={iconBtn} title={t("karten.publish")}><Icon d={ICONS.share} size={18} color="var(--accent)" /></button>
+            <button onClick={() => setPublishing(true)} className="icon-btn" style={iconBtn} title={t("karten.publish")} aria-label={t("karten.publish")}><Icon d={ICONS.share} size={18} color="var(--accent)" /></button>
           )}
         </>)}
         {publishing && <PublishModal name={deck.name || t("karten.deck")} onClose={() => setPublishing(false)}
@@ -788,8 +788,8 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           {c.has_front_image && <AuthImage src={`${API}/cards/${c.id}/image/front`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: 5, border: "1px solid var(--border2)", flexShrink: 0 }} />}
           <span style={{ flex: 1, minWidth: 0 }}><strong><Latex>{c.front}</Latex></strong> <span style={{ color: "var(--text3)" }}>→ <Latex>{c.back}</Latex></span></span>
           {c.has_back_image && <AuthImage src={`${API}/cards/${c.id}/image/back`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: 5, border: "1px solid var(--border2)", flexShrink: 0 }} />}
-          <button onClick={() => setEditCard(c.id)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>
-          <button onClick={() => call(() => fetch(`${API}/cards/${c.id}`, { method: "DELETE" }))} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
+          <button onClick={() => setEditCard(c.id)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>
+          <button onClick={() => call(() => fetch(`${API}/cards/${c.id}`, { method: "DELETE" }))} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
         </div>
         );
       })}
@@ -846,8 +846,8 @@ function StudyModal({ cards, deckName, t, onClose }) {
           <strong style={{ fontSize: 15 }}>{deckName}</strong>
           <span style={{ fontSize: 13, opacity: 0.7 }}>{done} / {cards.length}</span>
           <span style={{ flex: 1 }} />
-          <button onClick={() => { setOrder(shuffle(cards.map((_, i) => i))); setPos(0); setFlipped(false); }} className="icon-btn" style={{ ...iconBtn, color: "#fff" }} title={t("zufall.reroll")}><Icon d={ICONS.shuffle} size={18} color="#fff" /></button>
-          <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, color: "#fff" }} title={t("common.close")}><Icon d={ICONS.close} size={18} color="#fff" /></button>
+          <button onClick={() => { setOrder(shuffle(cards.map((_, i) => i))); setPos(0); setFlipped(false); }} className="icon-btn" style={{ ...iconBtn, color: "#fff" }} title={t("zufall.reroll")} aria-label={t("zufall.reroll")}><Icon d={ICONS.shuffle} size={18} color="#fff" /></button>
+          <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, color: "#fff" }} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} color="#fff" /></button>
         </div>
         {/* Fortschrittsbalken */}
         <div style={{ height: 4, borderRadius: 3, background: "rgba(255,255,255,0.18)", overflow: "hidden" }}>
@@ -908,7 +908,7 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t })
       <div onClick={(e) => e.stopPropagation()} style={{ ...modalPanel, maxWidth: 480, maxHeight: "90vh", overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, flex: 1 }}>{card.id ? t("karten.editCard") : t("karten.newCard")}</h3>
-          <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
+          <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
         </div>
 
         {/* LaTeX-Schnelltasten (fügen ins zuletzt fokussierte Feld). */}
@@ -962,7 +962,7 @@ function CardImgCtl({ cardId, side, has, imgVer, onUpload, onRemove, t }) {
       <span style={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
         <AuthImage src={`${API}/cards/${cardId}/image/${side}`} reloadKey={imgVer}
           style={{ height: 32, width: 32, objectFit: "cover", borderRadius: 6, border: "1px solid var(--border2)" }} />
-        <button onClick={() => onRemove(cardId, side)} className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={t("karten.imgRemove")}><Icon d={ICONS.close} size={12} color={C.danger} /></button>
+        <button onClick={() => onRemove(cardId, side)} className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={t("karten.imgRemove")} aria-label={t("karten.imgRemove")}><Icon d={ICONS.close} size={12} color={C.danger} /></button>
       </span>
     );
   }

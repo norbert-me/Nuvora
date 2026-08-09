@@ -159,7 +159,7 @@ export default function Methoden({ embedded } = {}) {
         <span style={{ flex: 1 }} />
         <ExportButton iconOnly title={t("common.export")} onClick={doExport} />
         <div style={{ position: "relative" }}>
-          <button onClick={() => setImpOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn }} title={t("common.import")}><Icon d={ICONS.import} size={18} /></button>
+          <button onClick={() => setImpOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn }} title={t("common.import")} aria-label={t("common.import")}><Icon d={ICONS.import} size={18} /></button>
           {impOpen && (
             <>
               <div onClick={() => setImpOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
@@ -226,7 +226,7 @@ export default function Methoden({ embedded } = {}) {
                       onKeyDown={(e) => { if (e.key === "Enter") commitRename(f); if (e.key === "Escape") setRenamingFolder(null); }}
                       onBlur={() => commitRename(f)}
                       style={{ ...inputStyle, flex: 1, minWidth: 0, padding: "6px 8px" }} />
-                    <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); deleteFolder(f); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
+                    <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); deleteFolder(f); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
                   </>
                 ) : (
                   <>
@@ -234,7 +234,7 @@ export default function Methoden({ embedded } = {}) {
                     <Icon d={ICONS.folder} size={18} color="var(--accent)" />
                     <span style={{ fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
                     <span style={{ fontSize: 12, color: "var(--text3)" }}>{count}</span>
-                    <button onClick={(e) => { e.stopPropagation(); startRename(f); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.rename")}><Icon d={ICONS.edit} size={13} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); startRename(f); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.rename")} aria-label={t("common.rename")}><Icon d={ICONS.edit} size={13} /></button>
                   </>
                 )}
               </div>
@@ -297,7 +297,7 @@ function MethodView({ m, t, onEdit, onPublish, onClose }) {
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
           <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, flex: 1 }}>{m.title}</h3>
           {m.dauer != null && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 9px", borderRadius: 980, background: "rgba(37,99,235,0.12)", color: C.info }}>{t("methoden.dauerBadge", { n: m.dauer })}</span>}
-          <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
+          <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
         </div>
         {sec(t("methoden.idee"), m.description)}
         {sec(t("methoden.ablauf"), m.ablauf)}
@@ -320,8 +320,8 @@ function MethodView({ m, t, onEdit, onPublish, onClose }) {
           </div>
         )}
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
-          <button onClick={onEdit} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.edit")}><Icon d={ICONS.edit} size={18} /></button>
-          <button onClick={onPublish} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("methoden.publish")}><Icon d={ICONS.share} size={18} color="var(--accent)" /></button>
+          <button onClick={onEdit} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={18} /></button>
+          <button onClick={onPublish} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("methoden.publish")} aria-label={t("methoden.publish")}><Icon d={ICONS.share} size={18} color="var(--accent)" /></button>
         </div>
       </div>
     </div>
@@ -396,7 +396,7 @@ function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
           <button onClick={submit} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
-          {m.id && <button onClick={() => onDelete(m.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto", padding: 6 }} title={t("common.delete")}><Icon d={ICONS.trash} size={20} color={C.danger} /></button>}
+          {m.id && <button onClick={() => onDelete(m.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto", padding: 6 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={20} color={C.danger} /></button>}
         </div>
       </div>
     </div>

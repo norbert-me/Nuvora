@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { COLORS as C, pageApp } from "../components/Icons.jsx";
 
 const FALLBACK = { betreiber: "[Name eintragen]", strasse: "[Straße]", plz_ort: "[PLZ Ort]", email: "kontakt@example.com" };
@@ -12,7 +13,7 @@ export default function Legal() {
     fetch("/site.json").then((r) => r.ok ? r.json() : FALLBACK).then(setCfg).catch(() => {});
   }, []);
 
-  const { betreiber: name, strasse: street, plz_ort: city, email } = cfg;
+  const { betreiber: name, strasse: street, plz_ort: city, email, telefon, land, verantwortlich } = cfg;
   const mailto = `mailto:${email}`;
 
   return (
@@ -36,17 +37,23 @@ export default function Legal() {
         <p>
           <strong>{name}</strong><br />
           {street}<br />
-          {city}
+          {city}{land ? <><br />{land}</> : null}
         </p>
 
+        {/* § 5 Abs. 1 Nr. 2 DDG verlangt Angaben, die eine unmittelbare
+            Kommunikation ermoeglichen — E-Mail plus ein zweiter Weg. Telefon
+            steht in config/site.json und wurde hier bisher nicht ausgegeben. */}
         <p style={{ marginTop: 12 }}>
           <strong>Kontakt:</strong><br />
           E-Mail: <a href={mailto} style={{ color: "var(--accent)" }}>{email}</a>
+          {telefon ? <><br />Telefon: {telefon}</> : null}
+          <br />
+          <Link to="/contact" style={{ color: "var(--accent)" }}>Kontaktformular</Link>
         </p>
 
         <p style={{ marginTop: 12 }}>
           <strong>Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV:</strong><br />
-          {name}<br />
+          {verantwortlich || name}<br />
           {street}<br />
           {city}
         </p>
@@ -81,7 +88,7 @@ export default function Legal() {
         </p>
         <ul style={{ paddingLeft: 20 }}>
           <li><strong>Art. 6 Abs. 1 lit. b DSGVO</strong> — Vertragserfüllung: Registrierung und Nutzung des Dienstes (Lehrkraft-Konten).</li>
-          <li><strong>Art. 6 Abs. 1 lit. f DSGVO</strong> — Berechtigtes Interesse: Betrieb und Sicherheit der Anwendung (z.&nbsp;B. Protokollierung von Zugriffen).</li>
+          <li><strong>Art. 6 Abs. 1 lit. f DSGVO</strong> — Berechtigtes Interesse: Betrieb und Sicherheit der Anwendung, insbesondere Schutz vor automatisierten Angriffen (Zugriffszählung je IP-Adresse im Arbeitsspeicher).</li>
           <li><strong>Art. 6 Abs. 1 lit. a DSGVO</strong> — Einwilligung: Soweit die nutzende Lehrkraft bzw. Schule Daten von Lernenden eingibt, ist diese für die Einholung einer ggf. erforderlichen Einwilligung der Betroffenen (bzw. der Erziehungsberechtigten) selbst verantwortlich.</li>
         </ul>
 
@@ -89,9 +96,10 @@ export default function Legal() {
         <ul style={{ paddingLeft: 20 }}>
           <li><strong>Nutzungsdaten der Lehrkraft:</strong> E-Mail-Adresse, Name, Passwort (als gesalzener Hash gespeichert, nicht im Klartext).</li>
           <li><strong>Daten der Lernenden:</strong> Name und zugewiesene Kartennummer, eingegeben durch die Lehrkraft. Optional E-/G-Kurs, Klassenleitung sowie – soweit von der Lehrkraft erfasst – Förderschwerpunkte und Notizen.</li>
-          <li><strong>Besondere Kategorien (Art. 9 DSGVO):</strong> Angaben zu Förderschwerpunkten (z.&nbsp;B. LRS, Dyskalkulie) und Notizen zu Nachteilsausgleichen können besondere Kategorien personenbezogener Daten darstellen. Diese Angaben werden ausschließlich auf dem Server des Verantwortlichen verarbeitet, erscheinen in <strong>keinem Export</strong> und in keiner Veröffentlichung. Rechtsgrundlage und Erforderlichkeit ihrer Erhebung liegen in der Verantwortung der erhebenden Lehrkraft bzw. Schule (in der Regel Schulgesetz/-verordnung des jeweiligen Landes).</li>
+          <li><strong>Besondere Kategorien (Art. 9 DSGVO):</strong> Angaben zu Förderschwerpunkten (z.&nbsp;B. LRS, Dyskalkulie) und Notizen zu Nachteilsausgleichen können besondere Kategorien personenbezogener Daten darstellen. Diese Angaben werden ausschließlich auf dem Server des Verantwortlichen verarbeitet, erscheinen in <strong>keinem Export</strong> und in keiner Veröffentlichung. Rechtsgrundlage und Erforderlichkeit ihrer Erhebung liegen in der Verantwortung der erhebenden Lehrkraft bzw. Schule (in der Regel Schulgesetz/-verordnung des jeweiligen Landes). Für die Bereitstellung des Systems stützt sich der Verantwortliche auf Art. 9 Abs. 2 lit. g DSGVO in Verbindung mit § 22 BDSG bzw. den Schulgesetzen der Länder.</li>
           <li><strong>Modul-Daten der Lernenden:</strong> je nach genutztem Modul – Abstimmungsergebnisse (CardVote: Antworten pro Frage und Session), Bewertungen und Beobachtungen (Noten), Lernfortschritt beim Karteikarten-Üben (Karten), Anwesenheit und Fehlzeiten (Anwesenheit), Sitzpositionen (Sitzplan) sowie Unterrichtsplanung mit Klassen- und Themenbezug (Kalender). Alle diese Daten gibt die Lehrkraft ein bzw. erfasst sie im Unterricht.</li>
           <li><strong>Pseudonymer Zugang der Lernenden (Modul Karten):</strong> Zum Üben ohne Konto erhält jede Person einen zufälligen, geheimen Token (in einem QR-Code/Link). Er dient allein dazu, den Übungsfortschritt der richtigen Person zuzuordnen; ein Login findet nicht statt. Wer den Link kennt, kann üben – die Lehrkraft gibt ihn gezielt aus.</li>
+          <li><strong>Öffentliche Spielsitzung (Modul Code-Detektiv):</strong> Zum Mitspielen ohne Konto tritt die Lernperson über einen sechsstelligen Sitzungscode bei und gibt dabei einen selbstgewählten Namen an. Innerhalb der Sitzung sind dieser Name und der Lösungsstand für alle Teilnehmenden mit dem Code sichtbar. Sitzungen werden automatisch gelöscht: beendete nach einem Tag, offen gebliebene nach sieben. Die Lehrkraft sollte statt des vollen Namens ein Kürzel vergeben lassen.</li>
           <li><strong>Kamerabilder:</strong> Werden beim Scannen (CardVote) kurzfristig im Arbeitsspeicher verarbeitet, um ArUco-Marker zu erkennen. Es erfolgt keine dauerhafte Speicherung der Bilder.</li>
           <li><strong>Technische Zugriffsdaten:</strong> IP-Adresse (kurzfristig im Arbeitsspeicher für Brute-Force-Schutz, nicht dauerhaft gespeichert).</li>
         </ul>
@@ -99,7 +107,10 @@ export default function Legal() {
         <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>5. Speicherung und Speicherort</h3>
         <p>
           Alle Daten werden ausschließlich auf dem Server des Verantwortlichen gespeichert.
-          Es erfolgt keine Übermittlung in Drittländer.
+          Ausgenommen ist der Versand von E-Mails (Bestätigung der Registrierung, Passwort-Reset,
+          Kontaktformular): Läuft er über einen externen Anbieter, verarbeitet dieser die
+          Empfängeradresse und den Inhalt der Nachricht im Auftrag des Verantwortlichen
+          (Art. 28 DSGVO). Daten von Lernenden werden dabei nicht übermittelt.
           Die Datenübertragung zwischen Browser und Server ist durch HTTPS (TLS) verschlüsselt.
         </p>
 
@@ -109,6 +120,17 @@ export default function Legal() {
           Klasse bzw. Session in der Anwendung existiert. Die Lehrkraft kann Klassen, Sessions und
           alle zugehörigen Daten jederzeit eigenständig löschen. Konten der Lehrkraft können über
           die Profil-Seite selbst gelöscht werden; dabei werden alle zugehörigen Daten entfernt.
+        </p>
+        <p>Automatisch gelöscht wird:</p>
+        <ul style={{ paddingLeft: 20 }}>
+          <li><strong>Papierkorb:</strong> gelöschte Klassen, Kurse, Kartenstapel, Karten, Lernpfade und Lernleitern nach <strong>30 Tagen</strong> endgültig.</li>
+          <li><strong>Unbestätigte Konten:</strong> nach <strong>14 Tagen</strong> ohne Bestätigung der E-Mail-Adresse.</li>
+          <li><strong>Spielsitzungen (Code-Detektiv):</strong> beendete nach <strong>einem Tag</strong>, offen gebliebene nach <strong>sieben Tagen</strong>.</li>
+          <li><strong>Anmelde-Token:</strong> laufen nach <strong>30 Tagen</strong> ohne Nutzung ab.</li>
+        </ul>
+        <p>
+          Die Übungs-Zugänge der Lernenden (QR-Code/Link im Modul Karten) kann die Lehrkraft
+          jederzeit neu vergeben; bisherige Links werden damit sofort ungültig.
         </p>
 
         <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>7. Cookies und Tracking</h3>

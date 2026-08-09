@@ -93,8 +93,8 @@ export default function Todo({ embedded } = {}) {
             {fmtDate(it.due_date)}{it.due_time ? ` · ${it.due_time}` : ""}
           </span>
         )}
-        <button onClick={() => startEdit(it)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
-        <button onClick={() => del(it.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
+        <button onClick={() => startEdit(it)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
+        <button onClick={() => del(it.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
       </div>
     );
   };
@@ -108,19 +108,19 @@ export default function Todo({ embedded } = {}) {
         {/* Datum/Uhrzeit erst per Icon dazuschalten (Default heute bzw. nächste
             volle Stunde) — kein leeres Feld, das nach nichts aussieht. */}
         {!date ? (
-          <button onClick={() => setDate(heuteYmd())} className="icon-btn" title={t("todo.addDate")} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8 }}>
+          <button onClick={() => setDate(heuteYmd())} className="icon-btn" title={t("todo.addDate")} aria-label={t("todo.addDate")} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8 }}>
             <Icon d={ICONS.calendar} size={18} color="var(--text2)" />
           </button>
         ) : (<>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} title={t("todo.dateHint")} style={{ ...inputStyle, padding: "9px 8px" }} />
           {!time ? (
-            <button onClick={() => setTime(naechsteStunde())} className="icon-btn" title={t("todo.addTime")} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8 }}>
+            <button onClick={() => setTime(naechsteStunde())} className="icon-btn" title={t("todo.addTime")} aria-label={t("todo.addTime")} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8 }}>
               <Icon d={ICONS.clock} size={18} color="var(--text2)" />
             </button>
           ) : (
             <input type="time" value={time} onChange={(e) => setTime(e.target.value)} title={t("todo.timeHint")} style={{ ...inputStyle, padding: "9px 8px" }} />
           )}
-          <button onClick={() => { setDate(""); setTime(""); }} className="icon-btn" title={t("common.remove") || t("common.delete")} style={{ ...iconBtn }}>
+          <button onClick={() => { setDate(""); setTime(""); }} className="icon-btn" title={t("common.remove") || t("common.delete")} aria-label={t("common.remove") || t("common.delete")} style={{ ...iconBtn }}>
             <Icon d={ICONS.close} size={15} color="var(--text3)" />
           </button>
         </>)}

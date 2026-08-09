@@ -746,7 +746,7 @@ function NoteZelle({ t, editing, onEdit, value, isOverride, onSave, onCancel, on
         {value != null ? de(value) : <span style={{ color: "var(--border2)" }}>·</span>}
       </button>
       {isOverride && (
-        <button onClick={onReset} className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={t("noten.overrideReset")}>
+        <button onClick={onReset} className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={t("noten.overrideReset")} aria-label={t("noten.overrideReset")}>
           <Icon d={ICONS.close} color={C.danger} size={12} />
         </button>
       )}
@@ -917,7 +917,7 @@ function SectionMenu({ t, sec, onEdit, onDelete, onAddCol }) {
   const item = { display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "7px 10px", border: "none", background: "none", cursor: "pointer", color: "var(--text)", fontSize: 13, textAlign: "left", fontWeight: 400 };
   return (
     <span style={{ position: "relative", display: "inline-flex" }} onClick={(e) => e.stopPropagation()}>
-      <button onClick={() => setOpen((o) => !o)} className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={t("common.options")}><Icon d={ICONS.more} size={15} /></button>
+      <button onClick={() => setOpen((o) => !o)} className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={t("common.options")} aria-label={t("common.options")}><Icon d={ICONS.more} size={15} /></button>
       {open && (
         <>
           <span onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 9 }} />
@@ -997,7 +997,7 @@ function ColMenu({ t, cat, stats, onStats, onRename, onDelete, onClose, dividerO
         )}
         <div style={{ display: "flex", gap: 6, justifyContent: "space-between", alignItems: "center" }}>
           <button onClick={save} style={{ ...btnPrimary, padding: "5px 12px", fontSize: 12 }}>{t("common.save")}</button>
-          <button onClick={onDelete} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
+          <button onClick={onDelete} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
         </div>
       </Popover>
     </>
@@ -1027,7 +1027,7 @@ function ColForm({ t, onSave, onCancel, initial = "" }) {
         style={{ ...inp, fontSize: 14, padding: "9px 11px", flex: 1, minWidth: 120 }} />
       <DatePick onPick={setName} title={t("noten.useDate")} size={20} />
       <button onClick={() => name.trim() && onSave(name.trim())} style={{ ...btnPrimary }}>OK</button>
-      <button onClick={onCancel} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.abort")}><Icon d={ICONS.close} size={20} /></button>
+      <button onClick={onCancel} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.abort")} aria-label={t("common.abort")}><Icon d={ICONS.close} size={20} /></button>
     </div>
   );
 }
@@ -1230,7 +1230,7 @@ function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete })
               <span style={{ width: 62, color: "var(--text3)" }}>{new Date(e.date).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" })}</span>
               <span style={{ width: 14, fontWeight: 700, color: e.tendency > 0 ? C.success : e.tendency < 0 ? C.danger : "var(--text3)" }}>{e.tendency > 0 ? "+" : e.tendency < 0 ? "−" : "·"}</span>
               <span style={{ flex: 1, minWidth: 0 }}><span style={{ color: "var(--text3)" }}>{k?.name}: </span>{e.note}</span>
-              <button onClick={() => onDelete(e.id)} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
+              <button onClick={() => onDelete(e.id)} className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
             </div>
           );
         })}

@@ -105,11 +105,11 @@ export default function Tests() {
               <div style={{ fontSize: 12, color: "var(--text3)" }}>{formatDate(s.created_at)}</div>
             </Link>
             <div style={{ display: "flex", gap: 4, flexShrink: 0, marginLeft: 12 }}>
-              <button onClick={() => downloadXlsx(s)} className="icon-btn" style={iconBtn} title={t("tests.excel")}><Icon d={ICONS.download} /></button>
+              <button onClick={() => downloadXlsx(s)} className="icon-btn" style={iconBtn} title={t("tests.excel")} aria-label={t("tests.excel")}><Icon d={ICONS.download} /></button>
               <button onClick={() => toggleArchive(s.id)} className="icon-btn" style={iconBtn} title={s.archived ? t("tests.restore") : t("tests.archiveAction")}>
                 <Icon d={s.archived ? ICONS.restore : ICONS.archive} />
               </button>
-              <button onClick={() => remove(s.id)} className="icon-btn" style={iconBtn} title={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
+              <button onClick={() => remove(s.id)} className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>
             </div>
           </div>
         ))}

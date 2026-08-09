@@ -184,7 +184,7 @@ export default function Modules() {
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
               <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, flex: 1 }}>{dispName(helpMod)}</h3>
               <StageBadge stage={helpMod.stage} title={helpMod.stage === "beta" ? t("stage.betaHint") : t("stage.alphaHint")} />
-              <button onClick={() => setHelpMod(null)} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
+              <button onClick={() => setHelpMod(null)} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
             </div>
             <p style={{ fontSize: 14.5, color: "var(--text)", lineHeight: 1.7, margin: "0 0 4px", whiteSpace: "pre-wrap" }}>{helpOf(helpMod)}</p>
             <ModuleIllos mkey={helpMod.key} t={t} />

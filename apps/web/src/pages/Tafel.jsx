@@ -153,11 +153,11 @@ export default function Tafel() {
             <div onPointerDown={(e) => e.stopPropagation()}
               style={{ position: "absolute", left: Math.max(4, ex), top, zIndex: 10, display: "flex", alignItems: "center", gap: 6, padding: "6px 8px", border: "1px solid var(--border2)", borderRadius: 10, background: "var(--card)", boxShadow: "0 6px 20px rgba(0,0,0,0.16)", flexWrap: "wrap", maxWidth: "94%" }}>
               {/* Verschieben-Griff (in Bildschirmpixeln — auf dem Handy gut greifbar) */}
-              <button onPointerDown={(e) => onDown(e, selItem.id, "move")} className="icon-btn" style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8, cursor: "grab", touchAction: "none" }} title={t("tafel.move") || ""}>
+              <button onPointerDown={(e) => onDown(e, selItem.id, "move")} className="icon-btn" style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8, cursor: "grab", touchAction: "none" }} title={t("tafel.move") || ""} aria-label={t("tafel.move") || ""}>
                 <Icon d={ICONS.moveAll} size={18} color="var(--text2)" />
               </button>
               {selItem.type !== "timer" && (<>
-                <button onClick={() => setFontPop((v) => !v)} className="icon-btn" style={{ ...iconBtn, border: fontPop ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 8 }} title={t("tafel.textSize")}>
+                <button onClick={() => setFontPop((v) => !v)} className="icon-btn" style={{ ...iconBtn, border: fontPop ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 8 }} title={t("tafel.textSize")} aria-label={t("tafel.textSize")}>
                   <Icon d={ICONS.edit} size={16} color={fontPop ? "var(--accent)" : "var(--text2)"} />
                 </button>
                 {fontPop && (<>
@@ -176,7 +176,7 @@ export default function Tafel() {
                 </button>
               )}
               <span style={{ width: 1, height: 20, background: "var(--border)", margin: "0 2px" }} />
-              <button onClick={() => del(selItem.id)} className="icon-btn" style={{ ...iconBtn }} title={t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>
+              <button onClick={() => del(selItem.id)} className="icon-btn" style={{ ...iconBtn }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>
             </div>
           );
         })()}

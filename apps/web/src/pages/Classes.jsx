@@ -287,7 +287,7 @@ export default function Classes() {
                         {s.has_photo ? t("classes.photoChange") : t("classes.photoAdd")}
                         <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files[0]; e.target.value = ""; uploadPhoto(idx, s.id, f); }} />
                       </label>
-                      {s.has_photo && <button type="button" onClick={() => removePhoto(idx, s.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>}
+                      {s.has_photo && <button type="button" onClick={() => removePhoto(idx, s.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>}
                     </>
                   ) : <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("classes.photoSaveFirst")}</span>}
                 </div>
@@ -367,7 +367,7 @@ export default function Classes() {
           <button onClick={addRow} disabled={students.length >= MAX_CARDS} style={{ ...btnSecondary, opacity: students.length >= MAX_CARDS ? 0.4 : 1 }}>{t("classes.addRow")}</button>
           <button onClick={save} disabled={!name.trim()} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={() => setEditing(null)} style={btnSecondary}>{t("common.cancel")}</button>
-          {editing.id && <button onClick={() => { remove(editing.id); setEditing(null); }} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("classes.delete") !== "classes.delete" ? t("classes.delete") : t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>}
+          {editing.id && <button onClick={() => { remove(editing.id); setEditing(null); }} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("classes.delete") !== "classes.delete" ? t("classes.delete") : t("common.delete")} aria-label={t("classes.delete") !== "classes.delete" ? t("classes.delete") : t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>}
         </div>
         {cardvote && (
           <p style={{ fontSize: 12, color: students.length >= MAX_CARDS ? C.danger : "var(--text3)", margin: 0 }}>
@@ -408,7 +408,7 @@ export default function Classes() {
             <span style={{ color: "var(--text3)", fontSize: 13 }}>{cls.students.length} {t("classes.learners")}</span>
           </button>
           <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-            <button onClick={() => downloadFile(`${API}/export/class/${cls.id}`, `${cls.name}.json`)} className="icon-btn" style={iconBtn} title={t("classes.export")}><Icon d={ICONS.export} /></button>
+            <button onClick={() => downloadFile(`${API}/export/class/${cls.id}`, `${cls.name}.json`)} className="icon-btn" style={iconBtn} title={t("classes.export")} aria-label={t("classes.export")}><Icon d={ICONS.export} /></button>
           </div>
         </div>
       ))}

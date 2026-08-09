@@ -3,12 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Nuvora</title>
+    <title>Nuvora — Werkzeugkasten für Lehrkräfte</title>
+    <!-- Ohne description zeigen Suchmaschinen und Link-Vorschauen zufaelligen
+         Seitentext; die Landing-Seite ist oeffentlich. -->
+    <meta name="description" content="Nuvora bündelt Unterrichtswerkzeuge für Lehrkräfte: Abstimmung ohne Geräte, Karteikarten, Notenbuch, Lernpfade, Kalender. Selbst gehostet, ohne Konten für Lernende.">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Nuvora — Werkzeugkasten für Lehrkräfte">
+    <meta property="og:description" content="Klassen, Kurse und Themen einmal anlegen, in allen Modulen nutzen. Selbst gehostet, keine Cloud, keine Konten für Lernende.">
+    <meta property="og:image" content="/icon-512.png">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="icon" type="image/png" href="/icon-192.png">
     <link rel="apple-touch-icon" href="/icon-192.png">
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#0066cc">
+    <!-- Zwei Werte: sonst traegt die Statusleiste im dunklen Design die helle Farbe. -->
+    <meta name="theme-color" content="#0066cc" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
     <!-- iPhone/iPad als „Zum Home-Bildschirm"-App (ohne App Store): Vollbild,
          Statusleiste passend, Home-Name kurz. Die App verhält sich dann wie
          ein eigenes Programm (kein Safari-Rahmen). -->
@@ -20,7 +30,7 @@
     <style>
       :root {
         --bg: #ffffff; --bg2: #f5f5f7; --bg3: #fbfbfd;
-        --text: #1d1d1f; --text2: #6e6e73; --text3: #86868b;
+        --text: #1d1d1f; --text2: #6e6e73; --text3: #737378;   /* 4,6:1 — #86868b lag bei 3,6:1 */
         --border: rgba(0,0,0,0.06); --border2: #d2d2d7; --border3: #e5e5e5;
         --card: #fff; --nav-bg: rgba(255,255,255,0.72); --nav-border: rgba(0,0,0,0.08);
         --accent: #0066cc; --accent-bg: #e8f0fe; --input-bg: #fff;
@@ -99,6 +109,13 @@
     <script>if(localStorage.getItem('darkMode')==='true')document.documentElement.classList.add('dark');</script>
   </head>
   <body>
+    <noscript>
+      <div style="max-width: 460px; margin: 80px auto; padding: 0 20px; font-family: system-ui, sans-serif; line-height: 1.6;">
+        <h1 style="font-size: 20px;">Nuvora braucht JavaScript</h1>
+        <p>Die Oberfläche wird im Browser aufgebaut. Bitte JavaScript aktivieren
+           und die Seite neu laden.</p>
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

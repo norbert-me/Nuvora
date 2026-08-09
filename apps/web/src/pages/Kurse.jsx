@@ -75,7 +75,7 @@ export default function Kurse() {
           <div key={k.id} style={cardStyle}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
               <strong style={{ fontSize: 15, flex: 1 }}>{k.name}</strong>
-              <button onClick={() => openEdit(k)} className="icon-btn" style={iconBtn} title={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
+              <button onClick={() => openEdit(k)} className="icon-btn" style={iconBtn} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
             </div>
             {/* Zweiter Weg durch Nuvora: vom Kurs (Fach) aus in die Module.
                 Alles Verlinkte ist fachlich — deshalb hier und nicht an der Klasse. */}
@@ -136,7 +136,7 @@ export default function Kurse() {
                   </div>
                 )}
                 <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
-                  <button onClick={() => delKurs(k)} className="icon-btn" style={{ ...iconBtn }} title={t("kurse.deleteKurs") !== "kurse.deleteKurs" ? t("kurse.deleteKurs") : t("common.delete")}>
+                  <button onClick={() => delKurs(k)} className="icon-btn" style={{ ...iconBtn }} title={t("kurse.deleteKurs") !== "kurse.deleteKurs" ? t("kurse.deleteKurs") : t("common.delete")} aria-label={t("kurse.deleteKurs") !== "kurse.deleteKurs" ? t("kurse.deleteKurs") : t("common.delete")}>
                     <Icon d={ICONS.trash} size={16} color={C.danger} />
                   </button>
                 </div>
@@ -264,7 +264,7 @@ function MassnahmenPanel({ kursId, t }) {
                       <input type="checkbox" checked={!!m.arbeit} onChange={(e) => setFeld(s, i, "arbeit", e.target.checked)} style={{ margin: 0 }} />
                       {t("classes.measureExam")}
                     </label>
-                    <button onClick={() => weg(s, i)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")}>
+                    <button onClick={() => weg(s, i)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")} aria-label={t("common.delete")}>
                       <Icon d={ICONS.trash} size={14} color={C.danger} />
                     </button>
                   </div>

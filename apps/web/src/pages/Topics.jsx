@@ -193,17 +193,17 @@ export default function Topics() {
             </span>
           )}
           {canHaveKids && (
-            <button onClick={() => { setAddingUnder(tp.id); setChildName(""); setExpanded((p) => new Set(p).add(tp.id)); }} className="icon-btn" style={iconBtn} title={t("topics.addSub")}>
+            <button onClick={() => { setAddingUnder(tp.id); setChildName(""); setExpanded((p) => new Set(p).add(tp.id)); }} className="icon-btn" style={iconBtn} title={t("topics.addSub")} aria-label={t("topics.addSub")}>
               <Icon d={ICONS.plus} size={16} color="var(--accent)" />
             </button>
           )}
           {/* Unterthemen: kein Umbenennen-Icon in der Zeile — läuft übers Detail-Popup. */}
           {isRoot && (
-            <button onClick={() => { setEditing(tp.id); setEditName(tp.name); }} className="icon-btn" style={iconBtn} title={t("common.rename")}>
+            <button onClick={() => { setEditing(tp.id); setEditName(tp.name); }} className="icon-btn" style={iconBtn} title={t("common.rename")} aria-label={t("common.rename")}>
               <Icon d={ICONS.edit} />
             </button>
           )}
-          <button onClick={() => remove(tp)} className="icon-btn" style={iconBtn} title={t("common.delete")}>
+          <button onClick={() => remove(tp)} className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}>
             <Icon d={ICONS.trash} color={C.danger} />
           </button>
         </>
@@ -314,8 +314,8 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
           <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, flex: 1 }}>{tp.parent_name ? `${tp.parent_name} / ${name}` : name}</h3>
           {/* Ein Edit-Icon für Titel UND Notiz. */}
-          {!editNote && <button onClick={() => { setTitleVal(name); setNoteVal(notes); setZielGVal(zielG); setZielEVal(zielE); setEditNote(true); }} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.edit")}><Icon d={ICONS.edit} size={16} /></button>}
-          <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
+          {!editNote && <button onClick={() => { setTitleVal(name); setNoteVal(notes); setZielGVal(zielG); setZielEVal(zielE); setEditNote(true); }} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={16} /></button>}
+          <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
         </div>
 
         {editNote ? (

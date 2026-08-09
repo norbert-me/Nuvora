@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import de from "./de.js";
 import en from "./en.js";
 import es from "./es.js";
@@ -21,6 +21,13 @@ const LanguageContext = createContext(null);
 
 export function LanguageProvider({ children }) {
   const [lang, setLangState] = useState(detectLang);
+
+  // <html lang> mitziehen: sonst liest ein Screenreader englischen oder
+  // spanischen Text mit deutscher Aussprache vor, weil index.html fest auf "de"
+  // steht. Eine Zeile, spuerbarer Unterschied fuer alle, die vorlesen lassen.
+  useEffect(() => {
+    try { document.documentElement.lang = lang; } catch { /* egal */ }
+  }, [lang]);
 
   const setLang = useCallback((next) => {
     if (!DICTS[next]) return;

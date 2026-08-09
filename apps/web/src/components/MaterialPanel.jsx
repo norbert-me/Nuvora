@@ -77,12 +77,12 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
         <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("material.empty")}</p>
       ) : items.map((m) => (
         <div key={m.id} style={row}>
-          <button onClick={() => download(m)} title={t("material.download")}
+          <button onClick={() => download(m)} title={t("material.download")} aria-label={t("material.download")}
             style={{ flex: 1, minWidth: 0, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", border: "none", background: "none", cursor: "pointer", color: "var(--accent)", fontWeight: 600, fontSize: 13.5, padding: 0 }}>
             {m.filename}
           </button>
           <span style={{ fontSize: 12, color: "var(--text3)" }}>{fmtSize(m.size)}</span>
-          <button onClick={async () => { if (await askConfirm(t("material.delConfirm", { name: m.filename }))) remove(m); }} title={t("common.delete")}
+          <button onClick={async () => { if (await askConfirm(t("material.delConfirm", { name: m.filename }))) remove(m); }} title={t("common.delete")} aria-label={t("common.delete")}
             style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text3)", display: "inline-flex", padding: 2 }}>
             <Icon d={ICONS.trash} size={15} />
           </button>
