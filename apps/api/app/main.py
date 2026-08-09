@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .database import engine
 from .models import Base
-from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, planung, karten, kalender, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizen, elternlog, notizblock, trash, selftest
+from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizen, elternlog, notizblock, trash, selftest
 from . import websocket as ws
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -125,7 +125,9 @@ app.add_middleware(
 
 app.include_router(questions.router)
 app.include_router(sessions.router)
+app.include_router(sessions.offen_router)
 app.include_router(results.router)
+app.include_router(results.kern_router)
 app.include_router(scan_image.router)
 app.include_router(classes.router)
 app.include_router(folders.router)
@@ -136,7 +138,6 @@ app.include_router(modules.router)
 app.include_router(topics.router)
 app.include_router(lernpfad.router)
 app.include_router(noten.router)
-app.include_router(planung.router)
 app.include_router(karten.router)
 app.include_router(kalender.router)
 app.include_router(methoden.router)
@@ -158,7 +159,9 @@ app.include_router(trash.router)
 app.include_router(selftest.router)
 app.include_router(marketplace.router)
 
-UPLOAD_DIR = "/app/uploads"
+# Im Container /app/uploads (Volume). Ueberschreibbar, damit Tests und die
+# lokale Pruefinstanz nicht ins Wurzelverzeichnis schreiben muessen.
+UPLOAD_DIR = os.environ.get("NUVORA_UPLOAD_DIR", "/app/uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/api/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 

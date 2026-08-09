@@ -10,10 +10,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import get_db
 from ..models import Question, Topic, User
 from .auth import get_current_user, rate_limit
+from .modules import modul_pflicht
 
-router = APIRouter(prefix="/api/questions", tags=["questions"])
+CARDVOTE = Depends(modul_pflicht("cardvote", "CardVote"))
 
-UPLOAD_DIR = "/app/uploads"
+router = APIRouter(prefix="/api/questions", tags=["questions"], dependencies=[CARDVOTE])
+
+# Im Container /app/uploads (Volume). Ueberschreibbar, damit Tests und die
+# lokale Pruefinstanz nicht ins Wurzelverzeichnis schreiben muessen.
+UPLOAD_DIR = os.environ.get("NUVORA_UPLOAD_DIR", "/app/uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 

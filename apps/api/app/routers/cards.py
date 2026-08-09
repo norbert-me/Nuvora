@@ -14,8 +14,11 @@ from sqlalchemy import select
 from ..database import get_db
 from ..models import SchoolClass, Student, User
 from .auth import get_current_user
+from .modules import modul_pflicht
 
-router = APIRouter(prefix="/api", tags=["cards"])
+CARDVOTE = Depends(modul_pflicht("cardvote", "CardVote"))
+
+router = APIRouter(prefix="/api", tags=["cards"], dependencies=[CARDVOTE])
 
 ARUCO_DICT = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_50)
 MARKER_SIZE_PX = 600

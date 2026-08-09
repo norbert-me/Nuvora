@@ -78,7 +78,7 @@ MODUL_PREFIX = {
     "kalender": "/api/kalender",
     "orga": "/api/orga",
     "zufall": "/api/zufall",
-    "unterrichtsplanung": "/api/planung",
+    "unterrichtsplanung": "/api/methoden",
     "notizbrett": "/api/notizblock",
     "notizen": "/api/notizen",
     "klassenleitung": "/api/elternlog",

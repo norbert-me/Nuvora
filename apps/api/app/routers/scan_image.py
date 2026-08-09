@@ -14,8 +14,11 @@ from ..database import get_db
 from ..models import Scan, Session, User
 from .auth import get_current_user
 from .. import websocket as ws
+from .modules import modul_pflicht
 
-router = APIRouter(prefix="/api", tags=["scan"])
+CARDVOTE = Depends(modul_pflicht("cardvote", "CardVote"))
+
+router = APIRouter(prefix="/api", tags=["scan"], dependencies=[CARDVOTE])
 
 ARUCO_DICT = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_50)
 ARUCO_PARAMS = cv2.aruco.DetectorParameters()

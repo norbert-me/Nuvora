@@ -9,8 +9,11 @@ from sqlalchemy.orm import selectinload
 from ..database import get_db
 from ..models import Folder, QuestionSet, QuestionSetItem, User
 from .auth import get_current_user, rate_limit
+from .modules import modul_pflicht
 
-router = APIRouter(prefix="/api", tags=["folders"])
+CARDVOTE = Depends(modul_pflicht("cardvote", "CardVote"))
+
+router = APIRouter(prefix="/api", tags=["folders"], dependencies=[CARDVOTE])
 
 
 # --- Schemas ---

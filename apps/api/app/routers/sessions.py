@@ -10,8 +10,15 @@ from ..database import get_db
 from ..models import Session, QuestionSetItem, SchoolClass, QuestionSet, User
 from .auth import get_current_user, rate_limit, client_ip
 from .. import websocket as ws
+from .modules import modul_pflicht
 
-router = APIRouter(prefix="/api/sessions", tags=["sessions"])
+CARDVOTE = Depends(modul_pflicht("cardvote", "CardVote"))
+
+router = APIRouter(prefix="/api/sessions", tags=["sessions"], dependencies=[CARDVOTE])
+
+# Das QR-Bild haengt bewusst nicht an der Schranke: der Browser laedt es per
+# <img src> und schickt dabei keinen Token mit.
+offen_router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
 
 class SessionCreate(BaseModel):
@@ -241,7 +248,7 @@ async def delete_session(session_id: int, user: User = Depends(get_current_user)
     await db.commit()
 
 
-@router.get("/{session_id}/qr")
+@offen_router.get("/{session_id}/qr")
 async def get_session_qr(session_id: int, request: Request, db: AsyncSession = Depends(get_db)):
     s = await db.get(Session, session_id)
     if not s:

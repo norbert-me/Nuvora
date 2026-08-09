@@ -22,7 +22,9 @@ from ..database import get_db
 from ..models import User, Question, MarketplaceQuiz
 from .. import mailer
 
-UPLOAD_DIR = "/app/uploads"
+# Im Container /app/uploads (Volume). Ueberschreibbar, damit Tests und die
+# lokale Pruefinstanz nicht ins Wurzelverzeichnis schreiben muessen.
+UPLOAD_DIR = os.environ.get("NUVORA_UPLOAD_DIR", "/app/uploads")
 
 
 async def _purge_user_content(db: AsyncSession, user_id: int):

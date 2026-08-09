@@ -875,12 +875,9 @@ def probe_zufall(api, u):
 
 
 def probe_unterrichtsplanung(api, u):
-    api.call("GET", f"/api/planung/classes/{u.class_id}", erwartet=(200,))
-    woche = api.call("POST", f"/api/planung/classes/{u.class_id}/weeks",
-                     {"label": f"{PRAEFIX} Woche"}, erwartet=(201,))
-    api.call("POST", f"/api/planung/weeks/{woche['id']}/blocks",
-             {"topic_id": u.topic_id, "position": 0}, erwartet=(201,))
-    api.call("DELETE", f"/api/planung/weeks/{woche['id']}", erwartet=(204,))
+    # Das Modul ist die Einstiegs-/Methodensammlung. Die frueher hier gepruefte
+    # Wochenplanung (/api/planung) gibt es nicht mehr: die Jahresplanung liegt
+    # an den Themen im Kern, der Rest im Modul Kalender.
     ordner = api.call("POST", "/api/methoden/folders", {"name": f"{PRAEFIX} Methoden"},
                       erwartet=(201,))
     methode = api.call("POST", "/api/methoden/", {
@@ -890,7 +887,7 @@ def probe_unterrichtsplanung(api, u):
     api.call("GET", "/api/methoden/list", erwartet=(200,))
     api.call("DELETE", f"/api/methoden/{methode['id']}", erwartet=(204,))
     api.call("DELETE", f"/api/methoden/folders/{ordner['id']}", erwartet=(204,))
-    return "Wochen mit Bloecken, Methodensammlung"
+    return "Methodensammlung mit Ordner, Eintrag und Thema"
 
 
 def probe_notizbrett(api, u):

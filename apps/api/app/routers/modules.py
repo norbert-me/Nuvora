@@ -247,6 +247,21 @@ async def is_active(db: AsyncSession, user_id: int, key: str) -> bool:
     return result.scalar_one_or_none() is not None
 
 
+def modul_pflicht(key: str, name: str):
+    """Baut die Schranke eines Moduls: ohne Aktivierung 403, kein Datenzugriff.
+
+    Bis dahin schrieb jeder Modul-Router seine eigene Fassung ab — und CardVote
+    hatte schlicht keine, obwohl es das groesste Modul ist. Eine Quelle, damit
+    ein neues Modul die Schranke nicht vergessen kann.
+    """
+    async def schranke(user: User = Depends(get_current_user),
+                       db: AsyncSession = Depends(get_db)) -> User:
+        if not await is_active(db, user.id, key):
+            raise HTTPException(403, f"Modul {name} ist nicht aktiviert")
+        return user
+    return schranke
+
+
 @router.get("", response_model=List[ModuleOut])
 async def list_modules(
     user: User = Depends(get_current_user),

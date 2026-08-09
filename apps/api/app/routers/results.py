@@ -13,8 +13,15 @@ from ..models import Scan, Session, SchoolClass, Student, QuestionSet, QuestionS
 from .auth import get_current_user
 from ..scoring import bewerte, status_of
 from .. import websocket as ws
+from .modules import modul_pflicht
 
-router = APIRouter(prefix="/api", tags=["results"])
+CARDVOTE = Depends(modul_pflicht("cardvote", "CardVote"))
+
+router = APIRouter(prefix="/api", tags=["results"], dependencies=[CARDVOTE])
+
+# Schwache Themen sind Kern-Sicht (Startseite, Kalender) und fassen alle Module
+# zusammen — sie duerfen nicht verschwinden, wenn CardVote aus ist.
+kern_router = APIRouter(prefix="/api", tags=["results"])
 
 
 async def _kurs_roster(db, class_id):
@@ -341,7 +348,7 @@ async def get_topic_stats(session_id: int, user: User = Depends(get_current_user
     return {"class_id": session.class_id, "topics": out}
 
 
-@router.get("/weak-topics")
+@kern_router.get("/weak-topics")
 async def weak_topics_range(frm: datetime, to: datetime, class_id: Optional[int] = None,
                             user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Schwache Themen (Trefferquote < 60 %) über alle Sessions in [frm, to] —
@@ -407,7 +414,7 @@ async def weak_topics_range(frm: datetime, to: datetime, class_id: Optional[int]
     return {"topics": out}
 
 
-@router.get("/weak-review")
+@kern_router.get("/weak-review")
 async def weak_review(class_id: Optional[int] = None, days: int = 7,
                       user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Wochenrückblick 'schwach → geübt': schwache Themen der letzten `days` Tage

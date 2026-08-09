@@ -29,6 +29,12 @@ def strip_latex(text: str) -> str:
     s = re.sub(r'\\[a-zA-Z]+\s*', '', s)
     return s.strip()
 
+from .modules import modul_pflicht
+
+# Klassen-Export/-Import gehoeren dem Kern, Fragen/Sets/Sitzungen dem Modul.
+# Deshalb haengt die Schranke hier an der einzelnen Route, nicht am Router.
+CARDVOTE = Depends(modul_pflicht("cardvote", "CardVote"))
+
 router = APIRouter(prefix="/api", tags=["export"])
 
 
@@ -66,7 +72,7 @@ async def export_class(class_id: int, user: User = Depends(get_current_user), db
     }
 
 
-@router.get("/export/question-set/{set_id}")
+@router.get("/export/question-set/{set_id}", dependencies=[CARDVOTE])
 async def export_question_set(set_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     qs = await db.get(QuestionSet, set_id)
     if not qs:
@@ -184,7 +190,7 @@ async def import_class_xlsx(name: str = "Neue Klasse", file: UploadFile = File(.
 
 # --- Excel template for question set import ---
 
-@router.get("/import/questions-template.xlsx")
+@router.get("/import/questions-template.xlsx", dependencies=[CARDVOTE])
 async def questions_xlsx_template():
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill
@@ -226,7 +232,7 @@ async def questions_xlsx_template():
 
 # --- Excel Import for question sets ---
 
-@router.post("/import/questions-xlsx")
+@router.post("/import/questions-xlsx", dependencies=[CARDVOTE])
 async def import_questions_xlsx(name: str = "Neues Frageset", folder_id: Optional[int] = None, file: UploadFile = File(...), user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("import", f"u{user.id}", 60, 3600, "Zu viele Importe. Bitte kurz warten.")
     from openpyxl import load_workbook
@@ -314,7 +320,7 @@ async def import_class(body: ImportClassBody, user: User = Depends(get_current_u
     return {"id": sc.id, "name": sc.name}
 
 
-@router.post("/import/question-set")
+@router.post("/import/question-set", dependencies=[CARDVOTE])
 async def import_question_set(body: ImportQuestionSetBody, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("import", f"u{user.id}", 60, 3600, "Zu viele Importe. Bitte kurz warten.")
     if body.type != "cardvote_questionset":
@@ -405,7 +411,7 @@ async def _export_folder_recursive(folder_id: int, db: AsyncSession) -> dict:
     }
 
 
-@router.get("/export/folder/{folder_id}")
+@router.get("/export/folder/{folder_id}", dependencies=[CARDVOTE])
 async def export_folder(folder_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     folder = await db.get(Folder, folder_id)
     if not folder:
@@ -451,7 +457,7 @@ async def _import_folder_recursive(data: dict, parent_id, owner_id, db: AsyncSes
     return folder
 
 
-@router.post("/import/folder")
+@router.post("/import/folder", dependencies=[CARDVOTE])
 async def import_folder(body: dict, folder_id: Optional[int] = None, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     rate_limit("import", f"u{user.id}", 60, 3600, "Zu viele Importe. Bitte kurz warten.")
     if body.get("type") != "cardvote_folder":
@@ -473,7 +479,7 @@ async def import_folder(body: dict, folder_id: Optional[int] = None, db: AsyncSe
 
 # --- Duplicate question set ---
 
-@router.post("/question-sets/{set_id}/duplicate")
+@router.post("/question-sets/{set_id}/duplicate", dependencies=[CARDVOTE])
 async def duplicate_question_set(set_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(QuestionSet)
@@ -504,7 +510,7 @@ async def duplicate_question_set(set_id: int, user: User = Depends(get_current_u
 
 # --- Excel export for evaluation ---
 
-@router.get("/sessions/{session_id}/evaluation-xlsx")
+@router.get("/sessions/{session_id}/evaluation-xlsx", dependencies=[CARDVOTE])
 async def evaluation_xlsx(session_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
@@ -602,7 +608,7 @@ async def evaluation_xlsx(session_id: int, user: User = Depends(get_current_user
 
 # --- iDoceo SCSV export ---
 
-@router.get("/sessions/{session_id}/evaluation-scsv")
+@router.get("/sessions/{session_id}/evaluation-scsv", dependencies=[CARDVOTE])
 async def evaluation_scsv(session_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Export as semicolon-separated CSV for iDoceo import."""
     session = await db.get(Session, session_id)
@@ -813,7 +819,7 @@ def _build_student_pdf_single(student, questions, scan_map, session, config, niv
     return buf
 
 
-@router.get("/sessions/{session_id}/student-pdf/{card_id}")
+@router.get("/sessions/{session_id}/student-pdf/{card_id}", dependencies=[CARDVOTE])
 async def student_evaluation_pdf(session_id: int, card_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     session = await db.get(Session, session_id)
     if not session:
@@ -857,7 +863,7 @@ async def student_evaluation_pdf(session_id: int, card_id: int, user: User = Dep
                              headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
-@router.get("/sessions/{session_id}/all-students-pdf")
+@router.get("/sessions/{session_id}/all-students-pdf", dependencies=[CARDVOTE])
 async def all_students_pdf(session_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     session = await db.get(Session, session_id)
     if not session:
@@ -980,7 +986,7 @@ async def all_students_pdf(session_id: int, user: User = Depends(get_current_use
                              headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
-@router.get("/classes/{class_id}/all-tests-student-pdf/{card_id}")
+@router.get("/classes/{class_id}/all-tests-student-pdf/{card_id}", dependencies=[CARDVOTE])
 async def class_student_pdf(class_id: int, card_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     school_class = await db.get(SchoolClass, class_id)
     if not school_class:
