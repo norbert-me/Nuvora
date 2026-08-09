@@ -104,10 +104,19 @@ async def _kurs_roster(db, user, class_id, subset_kurs=None):
 
 
 async def _kurs_decks_where(cls, kurs_id=None):
-    """Stapel hängen am Kurs (Fach). kurs_id gesetzt = die Stapel dieses Kurses;
-    sonst Fallback auf die Klasse ohne Kurs."""
+    """Stapel hängen am Kurs (Fach). kurs_id gesetzt = die Stapel dieses Kurses,
+    PLUS die dieser Klasse ohne Kurszuordnung; sonst nur letztere.
+
+    Der Zusatz ist wichtig: nicht jeder Weg, der einen Stapel anlegt, kennt
+    einen Kurs — das "Karten-Deck" zu einem schwachen Thema auf der Startseite
+    und die Übernahme aus dem Marktplatz legen ohne kurs_id an. Ohne diesen
+    Fallback wäre so ein Stapel angelegt, aber in der Kursansicht unsichtbar.
+    Die Trennung zwischen Geschwister-Klassen desselben Kurses bleibt: der
+    Fallback ist an die eigene class_id gebunden.
+    """
     if kurs_id is not None:
-        return CardDeck.kurs_id == kurs_id
+        return or_(CardDeck.kurs_id == kurs_id,
+                   and_(CardDeck.class_id == cls.id, CardDeck.kurs_id.is_(None)))
     return and_(CardDeck.class_id == cls.id, CardDeck.kurs_id.is_(None))
 
 

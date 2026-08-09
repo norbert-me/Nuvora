@@ -56,3 +56,24 @@ async def test_roster_pro_fach(s):
     u, A, B = await _kurs(s)
     toks = await K.ensure_tokens(A.id, user=u, db=s)
     assert sorted(t.name for t in toks) == ["Lena", "Max"], "Roster der Fach-Klasse A"
+
+
+@pytest.mark.asyncio
+async def test_stapel_ohne_kurs_bleibt_sichtbar(s):
+    """Nicht jeder Weg kennt einen Kurs — sichtbar sein muss der Stapel trotzdem.
+
+    Die Startseite legt zu einem schwachen Thema ein Karten-Deck an, der
+    Marktplatz übernimmt eines: beide ohne kurs_id. Fehlt der Fallback, ist der
+    Stapel angelegt, aber in der Kursansicht unsichtbar — der Knopf meldet
+    Erfolg, im Modul erscheint nichts.
+    """
+    u, A, B = await _kurs(s)
+    await K.create_deck(A.id, K.DeckIn(name="Aus schwachem Thema"), user=u, db=s)  # ohne kurs_id
+
+    mit_kurs = await K.list_decks(A.id, kurs_id=A.kurs_id, user=u, db=s)
+    assert any(d.name == "Aus schwachem Thema" for d in mit_kurs), \
+        "Kursansicht zeigt auch Stapel ohne Kurszuordnung"
+
+    geschwister = await K.list_decks(B.id, kurs_id=B.kurs_id, user=u, db=s)
+    assert not any(d.name == "Aus schwachem Thema" for d in geschwister), \
+        "die Geschwister-Klasse desselben Kurses sieht ihn weiterhin nicht"
