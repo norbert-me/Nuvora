@@ -1,6 +1,9 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> **Kein Projektdokument.** Das hier ist die Arbeitsanweisung für den
+> KI-Assistenten (Claude Code), der an diesem Repository arbeitet: Regeln,
+> Fallstricke, Entscheidungen mit Begründung. Wer wissen will, **was** Nuvora
+> ist und wie man es betreibt, liest [README.md](README.md).
 
 ## Das Prinzip
 
@@ -16,13 +19,15 @@ Verzeichnisse folgen der Architektur, nicht der Herkunft: `apps/api` (Kern + Mod
 
 ## Status
 
-Der Rahmen steht, alle drei Module sitzen auf dem Kern:
+Der Rahmen steht, alle Module sitzen auf dem Kern (die Tabelle nennt die drei,
+an denen sich die Bauformen zeigen — die vollständige Liste ist `REGISTRY` in
+`apps/api/app/routers/modules.py`):
 
 | Modul    | Pfad         | Form                                    |
 | -------- | ------------ | --------------------------------------- |
 | CardVote | `/cardvote/*` | React im Rahmen                        |
 | Lernpfad | `/lernpfad`  | bestehende Vanilla-JS-App, nativ in-page gemountet |
-| Noten    | `/noten`     | React im Rahmen                          |
+| Auswertung | `/auswertung` | React im Rahmen (Notenbuch + Klassenarbeiten) |
 
 Keins hat noch eigene Konten, Klassen oder Datenbank. Die Datenübernahme der Bestandsdaten aus der alten Lernleiter-Installation ist erledigt; das Skript wurde entfernt.
 
@@ -132,11 +137,11 @@ Wer an den Datenformen etwas ändert, ändert den Adapter — nicht die Oberflä
 
 > **Fachbegriff:** Ein **Lernpfad** besteht aus mehreren **Lernleitern**. Das sind zwei Dinge, nicht alter und neuer Name — nicht zusammenführen. Nur die Produktmarke hieß früher „Lernleiter".
 
-### Code-Detektiv — `apps/code-detektiv`
+### Code-Detektiv — `apps/web/src/codedetektiv/`
 
-Ursprünglich eigenständige Client-App (React 19 + Vite), **inzwischen nativ in die Shell portiert** nach `apps/web/src/codedetektiv/` (kein iframe mehr). Der Code läuft unverändert auf React 18 (keine React-19-only-APIs, reiner localStorage-Client). Sein CSS ist unter `.cd-scope` isoliert (`makecode.css` hatte globale `*`/`body`/`:root`), interne Navigation auf `/code-detektiv/*` umgeschrieben, als nested Route in `main.jsx` gemountet. `@dnd-kit` + `lzma` sind dafür web-Dependencies. Der alte `apps/code-detektiv`-Container (`/code-detektiv-app/`) ist ungenutzt. Kein Backend, kein Login — reines Werkzeug, im Rahmen über `ModuleGate`.
+Ursprünglich eigenständige Client-App (React 19 + Vite), **inzwischen nativ in die Shell portiert** (kein iframe mehr). Der Code läuft unverändert auf React 18 (keine React-19-only-APIs, reiner localStorage-Client). Sein CSS ist unter `.cd-scope` isoliert (`makecode.css` hatte globale `*`/`body`/`:root`), interne Navigation auf `/code-detektiv/*` umgeschrieben, als nested Route in `main.jsx` gemountet. `@dnd-kit` + `lzma` sind dafür web-Dependencies. Das alte Verzeichnis `apps/code-detektiv` und sein Container gibt es nicht mehr. Kein Backend, kein Login — reines Werkzeug, im Rahmen über `ModuleGate`.
 
-### Noten — `apps/api/app/routers/noten.py` + `apps/web/src/pages/Noten.jsx`
+### Auswertung (Notenbuch + Klassenarbeiten) — `apps/api/app/routers/noten.py`, `klassenarbeit.py` + `apps/web/src/pages/Auswertung.jsx`
 
 Notenbuch, eigenständig wie die anderen. Bedient sich wie eine leere Tabellenkalkulation: Zeilen sind die Schüler aus dem Kern, Spalten legt die Lehrkraft an (Name + Gewicht in Prozent), in die Zelle wird `2` oder `2,3` getippt.
 

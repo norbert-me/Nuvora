@@ -150,11 +150,19 @@ Verbindendes ist Zusatz, nie Voraussetzung: die geteilte **Themen-Taxonomie** tr
 | Teil       | Stack                                        |
 | ---------- | -------------------------------------------- |
 | Kern-API   | FastAPI · SQLAlchemy 2 (async) · Postgres 16 |
-| Frontend   | React 18 · Vite · react-router · i18n (de/en/es) |
+| Frontend   | React 18 · Vite · react-router · i18n (de vollständig, en/es weitgehend) |
 | Lernpfad   | Vanilla JS, nativ in die Shell gemountet     |
 | Proxy      | nginx — eine Domain, alle Teile              |
 
 Ein Konto sieht nur eigene Daten (`owner_id` überall); Module werden pro Lehrkraft zugeschaltet.
+
+## Wer betreibt, ist verantwortlich
+
+Nuvora läuft auf **deinem** Server. Damit bist du im Sinne der DSGVO Verantwortlicher für die Daten darin — nicht das Projekt. Praktisch heißt das: Rücksprache mit Schulleitung und Schulträger, ein Verzeichnis von Verarbeitungstätigkeiten, ein Blick in die Vorgaben deines Bundeslandes, und Sicherungen, die du auch zurückspielen kannst.
+
+Was Nuvora dafür mitbringt: eine vollständige Datenschutzerklärung und ein Impressum, gespeist aus `config/site.json`, erreichbar unter `/legal` — auch von den Seiten, die Lernende ohne Konto sehen. Dazu eine Auskunft nach Art. 15 (Profil → Daten exportieren), Selbstlöschung des Kontos und automatische Fristen (Papierkorb 30 Tage, unbestätigte Konten 14 Tage, Spielsitzungen 1 bzw. 7 Tage).
+
+Lücken bitte nicht als öffentliches Issue: [SECURITY.md](SECURITY.md) beschreibt den Meldeweg, `/.well-known/security.txt` nennt ihn maschinenlesbar (RFC 9116).
 
 ## Sicherheit & Datenschutz
 
@@ -173,12 +181,26 @@ Ein Konto sieht nur eigene Daten (`owner_id` überall); Module werden pro Lehrkr
 2. Testergebnisse steuern den Lernpfad: schwache Themen erzeugen passende Aufgaben.
 3. Ein Login, eine Domain.
 
+## Releases, Kanäle und Support
+
+Zwei Update-Kanäle, einstellbar im Profil: **Stable** springt nur auf Hauptversionen (4.0.0, 5.0.0), **Beta** nimmt alles dazwischen mit. Auf der Releases-Seite steht deshalb vieles als „Pre-release" — das ist die Beta-Linie, kein Hinweis auf Instabilität. Die Version steht im Profil unter „Über Nuvora".
+
+Das Schema entsteht beim Start von selbst (siehe unten); ein Upgrade braucht keine Migrationsschritte, nur `./deploy.sh`.
+
+**Support:** Nuvora ist ein Ein-Personen-Projekt ohne Einnahmen. Fehlermeldungen und Ideen sind willkommen und werden gelesen, aber es gibt keine Zusage auf Antwortzeit, keinen Support-Vertrag und keine Zusicherung, dass ein Modul erhalten bleibt. Wer Nuvora produktiv einsetzt, sollte das einkalkulieren — der Quellcode liegt offen, die Daten liegen bei dir.
+
 ## Starten
 
 Nuvora läuft als ein Deployment hinter einem Proxy:
 
+**Voraussetzungen:** Docker mit Compose v2, rund 2 GB RAM und 5 GB Platz, ein freier Port (Vorgabe 8080). Alles Weitere bringen die Container mit — Postgres 16, Python, Node.
+
 ```bash
-cp .env.example .env     # POSTGRES_PASSWORD und TOKEN_SECRET sind Pflicht
+cp .env.example .env
+# Ohne diese beiden Werte startet der Stack absichtlich nicht:
+sed -i '' "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 24)|" .env
+sed -i '' "s|^TOKEN_SECRET=.*|TOKEN_SECRET=$(openssl rand -hex 32)|" .env
+cp config/site.example.json config/site.json   # Impressum, sonst bleibt es leer
 docker compose up -d --build
 ```
 
@@ -284,6 +306,14 @@ Regressionstests für die Stellen, an denen ein Fehler still Daten kostet: E/G-W
 
 Kein Alembic. Das Schema entsteht beim Start aus `Base.metadata.create_all` plus additive Spalten/Indizes in `_ensure_columns` (idempotent). Neue Tabellen kommen von selbst; neue Spalten gehören in die `wanted`-Liste.
 
-## Lizenz
+## Lizenz und was sie praktisch heißt
 
 [CC BY-NC 4.0](LICENSE) — Namensnennung, nicht kommerziell.
+
+- **Erlaubt:** Betrieb an Schulen, durch Lehrkräfte, Schulträger und öffentliche Bildungseinrichtungen; Weitergabe und Veränderung, solange Nuvora genannt wird.
+- **Nicht erlaubt:** Verkauf, kostenpflichtiges Hosting als Dienst, Nutzung in kommerziellen Fortbildungen oder als Teil eines bezahlten Angebots.
+- Im Zweifel fragen — Antwort kommt.
+
+Zwei Dinge dazu ehrlich gesagt: Creative-Commons-Lizenzen sind nicht für Software gedacht (keine Patent- und Haftungsklauseln), und „nicht kommerziell" ist juristisch unscharf. Deshalb steht die Abgrenzung oben im Klartext. Nuvora ist damit **keine** OSI-konforme Open-Source-Lizenz, auch wenn der Quellcode offenliegt.
+
+**Ohne Gewähr.** Die Software wird bereitgestellt, wie sie ist — keine Zusicherung von Eignung, Verfügbarkeit oder Fehlerfreiheit, keine Haftung für Datenverlust. Wer sie mit Schülerdaten betreibt, sorgt selbst für Sicherungen.

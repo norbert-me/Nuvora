@@ -14,7 +14,7 @@ Learners need no devices and no accounts — they only appear as records the tea
 
 Nuvora is the base: account, classes, courses, students and topics live here. Modules are switched on and work on this data — they do not own it.
 
-> **Status: stable, still growing.** The frame stands — sign-in, home page, module management, classes, courses and topics are Nuvora. Fourteen modules sit on the core; none has its own accounts or database. Related tools are bundled under one module with **tabs** (e.g. Auswertung = gradebook + class tests, Unterrichtsplanung = curriculum plan + lesson starters, Notizbrett = notes + to-do, Orga = checklists + attendance + lending + seating plan). The shared **topic taxonomy** connects them: a topic students struggled with in CardVote or Code-Detektiv spawns a Karten practice deck or a Lernpfad revision task at the press of a button, test results become a grade column, and the topic view shows everything attached to a topic across the modules — including stored material.
+> **Status: stable, still growing.** The frame stands — sign-in, home page, module management, classes, courses and topics are Nuvora. Fourteen modules sit on the core; none has its own accounts or database. Related tools are bundled under one module with **tabs** (e.g. Auswertung = gradebook + class tests, Notizbrett = notes + to-do, Orga = checklists + attendance + lending + seating plan). The shared **topic taxonomy** connects them: a topic students struggled with in CardVote or Code-Detektiv spawns a Karten practice deck or a Lernpfad revision task at the press of a button, test results become a grade column, and the topic view shows everything attached to a topic across the modules — including stored material.
 
 ## Core
 
@@ -64,11 +64,7 @@ Flashcards with spaced repetition (SM-2). A deck belongs to a course; learners p
 
 Lesson planning: day, week and month views plus a recurring **timetable** (class per period, colours, times). A CardVote quiz, a Karten deck or a learning ladder can be planned onto an entry; **days off** (holidays) hide lessons. **Calendar sync** both ways: your own ICS feed to subscribe to (Apple/Google) and an external calendar shown read-only (SSRF-hardened).
 
-### Unterrichtsplanung — curriculum plan + lesson starters
-
-Lesson prep in one place, in two tabs.
-
-**Curriculum plan** — put topics across the school year into an order (rough calendar week, lesson count, note) and tick them off. The year view to the date-precise calendar.
+### Unterrichtsplanung — lesson starters
 
 **Lesson starters** — ideas for opening a lesson: the idea, the procedure with materials, a materials list and an approximate duration. Reusable, assignable to calendar periods and topic-tagged: for a weak topic the home page suggests a matching starter.
 
@@ -121,7 +117,7 @@ Nuvora is the base, modules are guests. Three rules every change keeps:
 
 1. **No module owns classes or students** — they live in the core, all modules share them.
 2. **No module has its own accounts** — the core authenticates, modules inherit.
-3. **Modules don't depend on each other** — CardVote runs without Lernpfad and without Noten. What connects them (shared topics, result import) is an add-on, never a prerequisite.
+3. **Modules don't depend on each other** — CardVote runs without Lernpfad and without Auswertung. What connects them (shared topics, result import) is an add-on, never a prerequisite.
 
 ```
 Nuvora core (apps/api, apps/web)
@@ -133,7 +129,7 @@ Nuvora core (apps/api, apps/web)
     ├── Karten             /karten             flashcards, spaced repetition
     ├── Kalender           /kalender           planning, timetable, ICS sync
     ├── Auswertung         /auswertung         gradebook + class tests
-    ├── Unterrichtsplanung /unterrichtsplanung curriculum plan + lesson starters
+    ├── Unterrichtsplanung /unterrichtsplanung lesson starters
     ├── Code-Detektiv      /code-detektiv      programming puzzles (native)
     ├── Orga               /orga               checklists · attendance · lending · seating plan
     ├── Zufallsschüler     /zufall             draw a random student / groups
@@ -162,6 +158,14 @@ What connects them is an add-on, never a prerequisite: the shared **topic taxono
 
 An account sees only its own data (`owner_id` everywhere); modules are switched on per teacher.
 
+## Whoever runs it is responsible
+
+Nuvora runs on **your** server. Under the GDPR that makes you the controller for the data in it — not this project. In practice: clear it with your school and its authority, keep a record of processing activities, check your state's rules, and keep backups you can actually restore.
+
+What Nuvora brings along: a full privacy policy and legal notice fed from `config/site.json`, reachable at `/legal` — including from the pages students see without an account. Plus a GDPR Art. 15 export (Profile → export data), self-service account deletion, and automatic retention (trash 30 days, unconfirmed accounts 14 days, game sessions 1 resp. 7 days).
+
+Please do not report vulnerabilities as public issues: [SECURITY.md](SECURITY.md) describes the way, `/.well-known/security.txt` states it machine-readably (RFC 9116).
+
 ## Security & privacy
 
 - **Self-hosted, no cloud.** Student data never leaves your own server.
@@ -179,12 +183,26 @@ An account sees only its own data (`owner_id` everywhere); modules are switched 
 2. Test results steer Lernpfad: weak topics generate matching exercises.
 3. One login, one domain.
 
+## Releases, channels and support
+
+Two update channels, switchable in the profile: **Stable** only moves on major versions (4.0.0, 5.0.0), **Beta** takes everything in between. That is why many entries on the releases page are marked "Pre-release" — that is the beta line, not a sign of instability. The running version is shown in the profile under "About Nuvora".
+
+The schema builds itself on start (see below); upgrading needs no migration steps, just `./deploy.sh`.
+
+**Support:** Nuvora is a one-person project with no revenue. Bug reports and ideas are welcome and get read, but there is no promised response time, no support contract, and no guarantee a module stays. Factor that in before relying on it — the source is public, the data is yours.
+
 ## Running
 
 Nuvora runs as a single deployment behind a proxy:
 
+**Requirements:** Docker with Compose v2, about 2 GB RAM and 5 GB disk, one free port (8080 by default). Everything else ships in the containers — Postgres 16, Python, Node.
+
 ```bash
-cp .env.example .env     # POSTGRES_PASSWORD and TOKEN_SECRET are required
+cp .env.example .env
+# Without these two the stack deliberately refuses to start:
+sed -i '' "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 24)|" .env
+sed -i '' "s|^TOKEN_SECRET=.*|TOKEN_SECRET=$(openssl rand -hex 32)|" .env
+cp config/site.example.json config/site.json   # legal notice, otherwise empty
 docker compose up -d --build
 ```
 
@@ -290,6 +308,14 @@ Regression tests for the places where a bug silently costs data: E/G scoring, cl
 
 No Alembic. The schema is built at startup from `Base.metadata.create_all` plus additive columns/indexes in `_ensure_columns` (idempotent). New tables appear by themselves; new columns go into the `wanted` list.
 
-## License
+## License, in practical terms
 
 [CC BY-NC 4.0](LICENSE) — attribution, non-commercial.
+
+- **Allowed:** running it at schools, by teachers, school authorities and public education bodies; sharing and modifying it as long as Nuvora is credited.
+- **Not allowed:** selling it, offering paid hosting, using it in commercial training or as part of a paid offering.
+- When in doubt, ask — you will get an answer.
+
+Two things said plainly: Creative Commons licences are not designed for software (no patent or warranty clauses), and "non-commercial" is legally fuzzy. That is why the boundary is spelled out above. Nuvora is therefore **not** OSI-approved open source, even though the source is public.
+
+**No warranty.** The software is provided as is — no promise of fitness, availability or correctness, and no liability for data loss. If you run it with student data, keep backups you have actually tested.
