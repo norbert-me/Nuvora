@@ -271,6 +271,8 @@ export default {
   "market.badgeMinus": "Puntos negativos",
   "market.preview": "Vista previa",
   "market.adopt": "Adoptar",
+  "market.needsModule": "Activar módulo",
+  "market.needsModuleHint": "El módulo correspondiente debe estar activo para adoptarlo.",
   "market.removeTitle": "Quitar del mercado",
   "market.removeConfirm": "¿Quitar este banco de preguntas del mercado?",
   "market.added": "«{{title}}» añadido a tu carpeta «Marktplatz».",

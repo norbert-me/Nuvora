@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
+from .modules import is_active
 from ..models import (
     MarketplaceQuiz, MarketplaceRating, QuestionSet, QuestionSetItem, Question, User, Folder,
     CardDeck, Card, Method, SchoolClass, Exercise, LearningPath, LearningLadder, Topic,
@@ -15,6 +16,27 @@ from ..models import (
 from .auth import get_current_user, rate_limit
 
 router = APIRouter(prefix="/api/marketplace", tags=["marketplace"])
+
+# Welche Art gehoert welchem Modul? Der Marktplatz selbst ist Kern (jeder mit
+# Konto darf stoebern), aber Veroeffentlichen und Uebernehmen legt Inhalte IM
+# Modul an — und das ist ohne aktives Modul weder sichtbar noch benutzbar
+# (Regel 3). Deshalb hier der Abgleich, an einer Stelle.
+ART_MODUL = {
+    "cardvote_questionset": ("cardvote", "CardVote"),
+    "karten_deck": ("karten", "Karteikarten"),
+    "method": ("unterrichtsplanung", "Unterrichtsplanung"),
+    "lernpfad_ladder": ("lernpfad", "Lernpfad"),
+}
+
+
+async def _modul_noetig(db: AsyncSession, user: User, kind: str) -> None:
+    """Bricht ab, wenn das Modul zu dieser Art nicht aktiviert ist."""
+    eintrag = ART_MODUL.get(kind)
+    if not eintrag:
+        return
+    key, name = eintrag
+    if not await is_active(db, user.id, key):
+        raise HTTPException(403, f"Modul {name} ist nicht aktiviert — ohne es gibt es hier nichts zu holen oder zu teilen.")
 
 
 class PublishBody(BaseModel):
@@ -247,6 +269,7 @@ async def get_quiz(quiz_id: int, user: User = Depends(get_current_user), db: Asy
 @router.post("/publish", status_code=201)
 async def publish_quiz(body: PublishBody, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("mp_publish", f"u{user.id}", 30, 3600, "Zu viele Veröffentlichungen. Bitte später erneut versuchen.")
+    await _modul_noetig(db, user, "cardvote_questionset")
     qs = await db.get(QuestionSet, body.set_id)
     if not qs:
         raise HTTPException(404, "Frageset nicht gefunden")
@@ -284,6 +307,7 @@ async def publish_quiz(body: PublishBody, user: User = Depends(get_current_user)
 @router.post("/publish/deck", status_code=201)
 async def publish_deck(body: PublishDeckBody, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("mp_publish", f"u{user.id}", 30, 3600, "Zu viele Veröffentlichungen. Bitte später erneut versuchen.")
+    await _modul_noetig(db, user, "karten_deck")
     deck = await db.get(CardDeck, body.deck_id)
     if not deck:
         raise HTTPException(404, "Stapel nicht gefunden")
@@ -307,6 +331,7 @@ async def publish_deck(body: PublishDeckBody, user: User = Depends(get_current_u
 @router.post("/publish/method", status_code=201)
 async def publish_method(body: PublishMethodBody, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("mp_publish", f"u{user.id}", 30, 3600, "Zu viele Veröffentlichungen. Bitte später erneut versuchen.")
+    await _modul_noetig(db, user, "method")
     m = await db.get(Method, body.method_id)
     if not m:
         raise HTTPException(404, "Eintrag nicht gefunden")
@@ -327,6 +352,7 @@ async def publish_method(body: PublishMethodBody, user: User = Depends(get_curre
 @router.post("/publish/ladder", status_code=201)
 async def publish_ladder(body: PublishLadderBody, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("mp_publish", f"u{user.id}", 30, 3600, "Zu viele Veröffentlichungen. Bitte später erneut versuchen.")
+    await _modul_noetig(db, user, "lernpfad_ladder")
     ladder = await db.get(LearningLadder, body.ladder_id)
     if not ladder:
         raise HTTPException(404, "Lernleiter nicht gefunden")
@@ -373,6 +399,7 @@ async def copy_quiz(quiz_id: int, body: Optional[CopyBody] = None, user: User = 
     quiz.copies = (quiz.copies or 0) + 1  # Übernahme zählen (wird mit dem Copy committet)
     data = quiz.payload or {}
     kind = quiz.kind or "cardvote_questionset"
+    await _modul_noetig(db, user, kind)
     if kind == "karten_deck":
         return await _copy_deck(quiz, data, body, user, db)
     if kind == "method":

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
+import { useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { Icon, ICONS, overlayGuard, modalOverlay, modalPanel, btnPrimary, btnSecondary, COLORS as C, pageApp} from "../components/Icons.jsx";
 
@@ -43,8 +44,20 @@ function Stars({ value, my, onRate, count, t }) {
   );
 }
 
+// Welche Art gehoert welchem Modul (wortgleich zu ART_MODUL im Backend).
+// Ohne aktives Modul kann man mit einer Uebernahme nichts anfangen — sie landet
+// in einer Oberflaeche, die gar nicht da ist (Regel 3).
+const ART_MODUL = {
+  cardvote_questionset: "cardvote",
+  karten_deck: "karten",
+  method: "unterrichtsplanung",
+  lernpfad_ladder: "lernpfad",
+};
+
 export default function Marketplace({ fixedKind }) {
   const { t } = useLanguage();
+  const aktiv = useAktiv();
+  const artNutzbar = (k) => !ART_MODUL[k] || aktiv(ART_MODUL[k]);
   const [params] = useSearchParams();
   const [hintBefore, hintAfter] = t("market.publishHint").split("{{link}}");
   const user = currentUser();
@@ -149,7 +162,9 @@ export default function Marketplace({ fixedKind }) {
 
       {!lockedKind && (
       <div style={{ display: "flex", gap: 2, background: "var(--bg2)", padding: 3, borderRadius: 980, marginBottom: 14, width: "fit-content", flexWrap: "wrap" }}>
-        {[["", t("market.kindAll")], ["cardvote_questionset", t("market.kindQuiz")], ["karten_deck", t("market.kindDeck")], ["method", t("market.kindMethod")], ["lernpfad_ladder", t("market.kindLadder")]].map(([k, label]) => (
+        {[["", t("market.kindAll")], ["cardvote_questionset", t("market.kindQuiz")], ["karten_deck", t("market.kindDeck")], ["method", t("market.kindMethod")], ["lernpfad_ladder", t("market.kindLadder")]]
+          .filter(([k]) => artNutzbar(k))
+          .map(([k, label]) => (
           <button key={k} onClick={() => setKind(k)} style={{
             padding: "6px 14px", fontSize: 13, fontWeight: kind === k ? 600 : 400, cursor: "pointer",
             background: kind === k ? "var(--card)" : "transparent", color: kind === k ? "var(--text)" : "var(--text2)",
@@ -211,7 +226,14 @@ export default function Marketplace({ fixedKind }) {
               </div>
               <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                 <button onClick={() => openPreview(q.id)} style={{ ...btnSecondary, padding: "7px 16px", fontSize: 13, whiteSpace: "nowrap" }}>{t("market.preview")}</button>
-                <button onClick={() => copy(q)} style={{ ...btnPrimary, padding: "7px 16px", fontSize: 13, whiteSpace: "nowrap" }}>{t("market.adopt")}</button>
+                {/* Ansehen darf jeder — uebernehmen nur, wer das Modul hat:
+                    der Inhalt landet sonst in einer Oberflaeche, die fehlt. */}
+                {artNutzbar(q.kind) ? (
+                  <button onClick={() => copy(q)} style={{ ...btnPrimary, padding: "7px 16px", fontSize: 13, whiteSpace: "nowrap" }}>{t("market.adopt")}</button>
+                ) : (
+                  <Link to="/modules" style={{ ...btnSecondary, padding: "7px 16px", fontSize: 13, whiteSpace: "nowrap", textDecoration: "none", color: "var(--text3)" }}
+                    title={t("market.needsModuleHint")}>{t("market.needsModule")}</Link>
+                )}
                 {(user && (user.id === q.author_id || user.id === 1)) && (
                   <button onClick={() => remove(q.id)} title={t("market.removeTitle")} style={{ padding: 7, background: "none", border: "1px solid var(--border2)", borderRadius: 980, cursor: "pointer", color: C.danger, display: "flex", alignItems: "center" }}>
                     <Icon d={ICONS.trash} size={15} color={C.danger} />
@@ -304,7 +326,11 @@ export default function Marketplace({ fixedKind }) {
                   </div>
                 ))}
                 <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
-                  <button onClick={() => { const p = preview; setPreview(null); copy(p); }} style={{ ...btnPrimary, padding: "10px 20px" }}>{t("market.adopt")}</button>
+                  {artNutzbar(preview.kind) ? (
+                    <button onClick={() => { const p = preview; setPreview(null); copy(p); }} style={{ ...btnPrimary, padding: "10px 20px" }}>{t("market.adopt")}</button>
+                  ) : (
+                    <Link to="/modules" style={{ ...btnSecondary, padding: "10px 20px", textDecoration: "none" }}>{t("market.needsModule")}</Link>
+                  )}
                   <button onClick={() => setPreview(null)} style={{ ...btnSecondary, padding: "10px 20px" }}>{t("common.close")}</button>
                 </div>
               </>

@@ -271,6 +271,8 @@ export default {
   "market.badgeMinus": "Negative points",
   "market.preview": "Preview",
   "market.adopt": "Adopt",
+  "market.needsModule": "Activate module",
+  "market.needsModuleHint": "The matching module must be active before you can adopt this.",
   "market.removeTitle": "Remove from marketplace",
   "market.removeConfirm": "Remove this question set from the marketplace?",
   "market.added": "\"{{title}}\" added to your \"Marktplatz\" folder.",

@@ -271,6 +271,8 @@ export default {
   "market.badgeMinus": "Minuspunkte",
   "market.preview": "Vorschau",
   "market.adopt": "Übernehmen",
+  "market.needsModule": "Modul aktivieren",
+  "market.needsModuleHint": "Zum Übernehmen muss das passende Modul aktiviert sein.",
   "market.removeTitle": "Aus dem Marktplatz entfernen",
   "market.removeConfirm": "Dieses Frageset aus dem Marktplatz entfernen?",
   "market.added": "„{{title}}\" im Ordner „Marktplatz\" hinzugefügt.",

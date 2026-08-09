@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 
 from app.models import (
     Base, User, SchoolClass, Student, GradeSection, GradeCategory, GradeEntry,
-    CodeSession, Topic, Exercise, LearningPath, LearningLadder,
+    CodeSession, Topic, Exercise, LearningPath, LearningLadder, UserModule,
 )
 from app.routers import noten as N
 from app.routers import marketplace as M
@@ -102,11 +102,17 @@ async def test_ladder_marktplatz_copy_ohne_schuelerbezug(s):
     lad = LearningLadder(path_id=path.id, topic_id=tp.id, position=0, class_id=cls.id,
                          notizen="Max braucht mehr Zeit",
                          assignments=[{"student_id": max_.id, "exercise_ids": [ex.id]}])
-    s.add(lad); await s.commit()
+    s.add(lad)
+    # Marktplatz teilt nur, was zum aktiven Modul gehoert (Regel 3) — sonst
+    # laege die Uebernahme in einer Oberflaeche, die es beim Empfaenger nicht
+    # gibt. Beide Seiten brauchen das Modul also eingeschaltet.
+    s.add(UserModule(user_id=u.id, module_key="lernpfad"))
+    await s.commit()
 
     quiz = await M.publish_ladder(M.PublishLadderBody(ladder_id=lad.id), user=u, db=s)
 
-    v = User(email="v@b.de", password_hash="x", name="V"); s.add(v); await s.commit()
+    v = User(email="v@b.de", password_hash="x", name="V"); s.add(v); await s.flush()
+    s.add(UserModule(user_id=v.id, module_key="lernpfad")); await s.commit()
     out = await M.copy_quiz(quiz["id"], None, user=v, db=s)
 
     # v hat eine eigene Aufgabenkopie + einen Pfad mit einer leeren Lernleiter
