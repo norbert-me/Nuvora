@@ -6,7 +6,7 @@ import { pageTitle, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import ViewMenu from "../components/ViewMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { useModules } from "../core/modules.js";
+import { useAktiv } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import { useUrlClass } from "../core/klassenwahl.js";
 
@@ -26,9 +26,9 @@ const SEGEL_CYCLE = ["", "hafen", "kueste", "meer", "welt"];
 
 export default function Sitzplan() {
   const { t } = useLanguage();
-  const { modules } = useModules();
+  const aktiv = useAktiv();
   // Anwesenheit lebt im Modul „Orga" (Aufruf-Ansicht nutzt sie).
-  const anwesenheitAktiv = modules.find((m) => m.key === "orga")?.active ?? false;
+  const anwesenheitAktiv = aktiv("orga");
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
   const [kursId, setKursId] = useState(null); // Sitzplan hängt am Kurs (Fach)

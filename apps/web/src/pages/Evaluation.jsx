@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
-import { useModules } from "../core/modules.js";
+import { useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
 import { DownloadLink, Icon, ICONS, btnPrimary, btnSecondary, overlayGuard, modalOverlay, modalPanel, inputStyle, COLORS as C, Boxplot } from "../components/Icons.jsx";
@@ -71,10 +71,10 @@ export default function Evaluation() {
   const [gradeView, setGradeView] = useState("bar");
   // Voreinstellung aus dem Profil (grade_tendency): mit Tendenz (2+) oder ganz.
   const [gradeMode, setGradeMode] = useState(() => { try { const u = JSON.parse(localStorage.getItem("user")); return u && u.grade_tendency === false ? "whole" : "tendency"; } catch { return "whole"; } }); // "whole" | "tendency"
-  const { modules } = useModules();
-  const notenAktiv = modules.find((m) => m.key === "noten")?.active ?? false;
-  const kartenAktiv = modules.find((m) => m.key === "karten")?.active ?? false;
-  const lernpfadAktiv = modules.find((m) => m.key === "lernpfad")?.active ?? false;
+  const aktiv = useAktiv();
+  const notenAktiv = aktiv("auswertung");
+  const kartenAktiv = aktiv("karten");
+  const lernpfadAktiv = aktiv("lernpfad");
   const [notenDialog, setNotenDialog] = useState(false);
   const [sp] = useSearchParams();
   // Aus dem Kalender ("Ergebnis als Note"): Import direkt öffnen, sobald Daten
@@ -1124,8 +1124,8 @@ function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
 // Lehrkraft entscheidet.
 function TopicAnalysis({ questions, presentStudents }) {
   const { t } = useLanguage();
-  const { modules } = useModules();
-  const lernpfad = modules.find((m) => m.key === "lernpfad")?.active ?? false;
+  const aktiv = useAktiv();
+  const lernpfad = aktiv("lernpfad");
   const [topics, setTopics] = useState([]);
   const [exCount, setExCount] = useState({}); // topic_id -> Anzahl Aufgaben
 

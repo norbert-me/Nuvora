@@ -6,7 +6,7 @@ import { useSearchParams } from "react-router-dom";
 import { pageTitle, btnSecondary, selectStyle, Toggle, Tabs, inputStyle, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { useModules } from "../core/modules.js";
+import { useAktiv } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import { useUrlClass } from "../core/klassenwahl.js";
 
@@ -17,8 +17,8 @@ const COL = { da: C.success, fehlt: C.danger, spaet: C.warning, entsch: C.info }
 
 export default function Anwesenheit() {
   const { t } = useLanguage();
-  const { modules } = useModules();
-  const kalenderAktiv = modules.find((m) => m.key === "kalender")?.active ?? false;
+  const aktiv = useAktiv();
+  const kalenderAktiv = aktiv("kalender");
   const [params] = useSearchParams();
   const [classes, setClasses] = useState([]);
   const [showLegend, setShowLegend] = useState(false); // Legende (Anwesend/Fehlt…) einklappbar

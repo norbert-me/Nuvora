@@ -7,7 +7,7 @@ import { useSearchParams } from "react-router-dom";
 import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, overlayGuard, modalOverlay, modalPanel, Boxplot, StatCard, pageApp} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { useModules } from "../core/modules.js";
+import { useAktiv } from "../core/modules.js";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { lastClass, rememberClass } from "../core/cache.js";
 import { gradeFromPct, gradeDetailed, quantile, stdev, DEFAULT_SCALE } from "../core/grades.js";
@@ -45,10 +45,10 @@ function StatRow({ row, t, expandable, open, onToggle, small }) {
 
 export default function Klassenarbeit() {
   const { t } = useLanguage();
-  const { modules } = useModules();
-  const kartenAktiv = modules.find((m) => m.key === "karten")?.active ?? false;
-  const lernpfadAktiv = modules.find((m) => m.key === "lernpfad")?.active ?? false;
-  const notenAktiv = modules.find((m) => m.key === "noten")?.active ?? false;
+  const aktiv = useAktiv();
+  const kartenAktiv = aktiv("karten");
+  const lernpfadAktiv = aktiv("lernpfad");
+  const notenAktiv = aktiv("auswertung");
   const [notenModal, setNotenModal] = useState(false);
   const [scale, setScale] = useState(DEFAULT_SCALE);
   useEffect(() => { try { const u = JSON.parse(localStorage.getItem("user")); if (u?.grade_scale) setScale(u.grade_scale); } catch { /* Default */ } }, []);

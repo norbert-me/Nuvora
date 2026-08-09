@@ -36,6 +36,39 @@ export async function setModuleActive(key, active) {
   return fetchModules();
 }
 
+// Bekannte Modul-Schluessel — muessen wortgleich zur REGISTRY im Backend sein
+// (apps/api/app/routers/modules.py). Ein Tippfehler hier ist besonders
+// tueckisch: die Abfrage liefert einfach immer false, das Feature verschwindet
+// stillschweigend, und niemand sieht einen Fehler. Genau so waren die
+// Noten-Uebernahme (Karten, CardVote), die Note im Elternkontakt und der
+// Code-Detektiv-Import monatelang tot ("noten" statt "auswertung",
+// "codedetektiv" statt "code-detektiv").
+export const MODUL_KEYS = [
+  "cardvote", "lernpfad", "auswertung", "code-detektiv", "karten", "kalender",
+  "orga", "zufall", "unterrichtsplanung", "notizbrett", "notizen",
+  "klassenleitung", "tafel", "mathespiele",
+];
+
+/**
+ * Laeuft dieses Modul fuer diese Lehrkraft? Rueckgabe ist eine Funktion, damit
+ * eine Seite mehrere Module abfragen kann:
+ *
+ *   const aktiv = useAktiv();
+ *   aktiv("karten") && <Knopf …/>
+ *
+ * Unbekannte Schluessel melden sich in der Konsole, statt still false zu sein.
+ */
+export function useAktiv() {
+  const { modules } = useModules();
+  return useCallback((key) => {
+    if (!MODUL_KEYS.includes(key)) {
+      console.error(`[Nuvora] Unbekannter Modul-Schluessel "${key}" — Tippfehler? Bekannt: ${MODUL_KEYS.join(", ")}`);
+      return false;
+    }
+    return modules.some((m) => m.key === key && m.active);
+  }, [modules]);
+}
+
 /**
  * @param {boolean} enabled  Nur laden, wenn eingeloggt — sonst antwortet die
  *                           API mit 401 und die Shell wuerde beim Ausloggen

@@ -6,7 +6,7 @@ import { useSearchParams } from "react-router-dom";
 import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Toggle, pageApp} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { useModules } from "../core/modules.js";
+import { useAktiv } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import { useUrlClass } from "../core/klassenwahl.js";
 
@@ -14,9 +14,9 @@ const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0
 
 export default function Zufall() {
   const { t } = useLanguage();
-  const { modules } = useModules();
+  const aktiv = useAktiv();
   // Anwesenheit lebt jetzt im Modul „Orga & Anwesenheit" — daher orga prüfen.
-  const anwesenheitAktiv = modules.find((m) => m.key === "orga")?.active ?? false;
+  const anwesenheitAktiv = aktiv("orga");
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
   // Aus dem Kurs verlinkt (?class=&kurs=): dann diesen Inhalt zeigen.

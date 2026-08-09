@@ -4,7 +4,7 @@ import { pageTitle, btnPrimary, btnSecondary, inputStyle, selectStyle, Icon, ICO
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { Link } from "react-router-dom";
 import { useLanguage } from "../i18n/index.jsx";
-import { useModules } from "../core/modules.js";
+import { useAktiv } from "../core/modules.js";
 import { swr, lastClass, rememberClass } from "../core/cache.js";
 import { useUrlClass } from "../core/klassenwahl.js";
 
@@ -14,8 +14,8 @@ const CHANNELS = [["telefon", "Telefon"], ["mail", "Mail"], ["gespraech", "Gespr
 
 export default function Elternlog() {
   const { t } = useLanguage();
-  const { modules } = useModules();
-  const notenAktiv = modules.find((m) => m.key === "noten")?.active ?? false;
+  const aktiv = useAktiv();
+  const notenAktiv = aktiv("auswertung");
   const [grades, setGrades] = useState({}); // student_id -> Gesamtnote (nur bei aktivem Noten-Modul)
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);

@@ -7,7 +7,7 @@ import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary,
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import AuthImage from "../components/AuthImage.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { useModules } from "../core/modules.js";
+import { useAktiv } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import PublishModal from "../components/PublishModal.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
@@ -59,12 +59,12 @@ export default function Karten() {
   const [addingDeck, setAddingDeck] = useState(false);
   const [detail, setDetail] = useState(null); // { student, cards } — Einzelstatistik
   const [topics, setTopics] = useState([]);
-  const { modules } = useModules();
+  const aktiv = useAktiv();
   // Themen-Bindung ist nur mit Kalender sinnvoll (Auto-Freischaltung). Ohne das
   // Modul bleibt die Option aus (Regel 3: Zusatz, nie Voraussetzung).
-  const kalenderAktiv = modules.find((m) => m.key === "kalender")?.active ?? false;
+  const kalenderAktiv = aktiv("kalender");
   // Brücke zum Notenbuch (Regel 3: Zusatz). Nur wenn das Modul Noten aktiv ist.
-  const notenAktiv = modules.find((m) => m.key === "noten")?.active ?? false;
+  const notenAktiv = aktiv("auswertung");
   const [gradeScale, setGradeScale] = useState(DEFAULT_SCALE);
   const [notenDialog, setNotenDialog] = useState(false);
 

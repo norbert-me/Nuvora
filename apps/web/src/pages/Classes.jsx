@@ -16,7 +16,7 @@ import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary,
 import ImportMenu from "../components/ImportMenu.jsx";
 import AuthImage from "../components/AuthImage.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { useModules } from "../core/modules.js";
+import { useAktiv } from "../core/modules.js";
 import { peek, put } from "../core/cache.js";
 
 const API = "/api";
@@ -47,8 +47,8 @@ const EMPTY_STUDENT = { card_id: 1, name: "", niveau: "", foerder: null, massnah
 
 export default function Classes() {
   const { t } = useLanguage();
-  const { modules } = useModules();
-  const cardvote = modules.find((m) => m.key === "cardvote")?.active ?? false;
+  const aktiv = useAktiv();
+  const cardvote = aktiv("cardvote");
   const [classes, setClasses] = useState([]);
   const [editing, setEditing] = useState(null);
   const [params, setParams] = useSearchParams();

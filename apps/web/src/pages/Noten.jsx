@@ -14,7 +14,7 @@ import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, overlayGuard, modalOverlay, modalPanel, popoverPanel, Empty, Skeleton, ExportButton, ImportButton, inputStyle, Popover} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
-import { useModules } from "../core/modules.js";
+import { useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { useUrlClass } from "../core/klassenwahl.js";
 
@@ -59,9 +59,9 @@ export default function Noten() {
   const [beobFuer, setBeobFuer] = useState(null);
   const [infoFuer, setInfoFuer] = useState(null);
   const [term, setTerm] = useState("1");
-  const { modules } = useModules();
-  const cdAktiv = modules.find((m) => m.key === "codedetektiv")?.active ?? false;
-  const kartenAktiv = modules.find((m) => m.key === "karten")?.active ?? false;
+  const aktiv = useAktiv();
+  const cdAktiv = aktiv("code-detektiv");
+  const kartenAktiv = aktiv("karten");
   const [cdDialog, setCdDialog] = useState(false);
   const [exportOpen, setExportOpen] = useState(false); // Export-Dropdown
   const [topics, setTopics] = useState([]); // Kern-Themen: Spalte einem Thema zuordnen (Nachholbedarf)

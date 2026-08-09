@@ -7,7 +7,7 @@ import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary,
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import TopicPicker from "../components/TopicPicker.jsx";
-import { useModules } from "../core/modules.js";
+import { useAktiv } from "../core/modules.js";
 
 const API = "/api";
 
@@ -813,8 +813,8 @@ const LATEX_BUTTONS = [
 
 function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
   const { t } = useLanguage();
-  const { modules } = useModules();
-  const lernpfad = modules.find((m) => m.key === "lernpfad")?.active ?? false;
+  const aktiv = useAktiv();
+  const lernpfad = aktiv("lernpfad");
   const activeKeys = choiceKeys.slice(0, q.num_choices || 4);
   const inputRefs = useRef({});        // { text: el, A: el, B: el, ... }
   const activeField = useRef("text");  // das zuletzt fokussierte Feld
