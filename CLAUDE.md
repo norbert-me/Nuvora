@@ -52,7 +52,7 @@ Bestandskonten werden beim Start einmalig angeschlossen (`users.modules_initiali
 
 | Teil | Was es prüft |
 | ---- | ------------ |
-| `apps/api/app/routers/selftest.py` (`GET /api/selftest`, nur Administration) | Datenbank, **Schema gegen die Modelle** (es gibt kein Alembic — hier fällt auf, was in `_ensure_columns` fehlt), Konfiguration, `config/site.json`, REGISTRY gegen die gemounteten Router |
+| `apps/api/app/routers/selftest.py` (`GET /api/selftest`, nur Administration) | Datenbank, **Schema gegen die Modelle** (es gibt kein Alembic — hier fällt auf, was in `_ensure_columns` fehlt), Konfiguration, `config/site.json`, REGISTRY gegen die gemounteten Router, **E-Mail bis zur Absender-Freigabe** (Host, Verbindung, Anmeldung, MAIL FROM/RCPT TO, SPF und DMARC — ohne eine Mail zu verschicken) |
 | `scripts/selftest.py` | System und Statik, dann **je Modul ein echter Schreib-Roundtrip** (anlegen, lesen, ändern, löschen) auf Kern-Klasse und -Schülern; schaltet die Module dafür zu und stellt den Zustand danach wieder her |
 | `scripts/selftest-browser.mjs` (`./selftest.sh --browser`) | Rundgang im echten Browser: jede Modul- und Kern-Seite rendert, keine Konsolenfehler, keine toten internen Links. Playwright liegt isoliert in `scripts/`, nie in `apps/web` |
 

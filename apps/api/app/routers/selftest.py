@@ -144,7 +144,7 @@ def _check_config(out: List[Check]) -> None:
                      detail="konfiguriert" if mailer.email_configured() else
                             "unvollstaendig — Registrierung und Passwort-Reset gehen nicht"))
     if mailer.email_configured():
-        out.append(_check_smtp_erreichbar())
+        _check_mail(out)
 
     admin_email = (os.environ.get("ADMIN_EMAIL") or "").strip()
     out.append(Check(gruppe="Konfiguration", name="ADMIN_EMAIL", ok="@" in admin_email,
@@ -152,34 +152,176 @@ def _check_config(out: List[Check]) -> None:
                      detail=admin_email or "nicht gesetzt — Kontaktformular hat keinen Empfaenger"))
 
 
-def _check_smtp_erreichbar() -> Check:
-    """Loest der SMTP-Host auf und nimmt er Verbindungen an?
+def _check_mail(out: List[Check]) -> None:
+    """Kommt Post wirklich raus? Jede Stufe einzeln, bis zur Absender-Freigabe.
 
-    "Konfiguriert" heisst nicht "erreichbar": ein Tippfehler im Hostnamen sieht
-    in der .env vollstaendig aus, und die Anwendung meldet ihn nie — Mails
-    scheitern still im Hintergrund, die Registrierung bleibt haengen. Genau das
-    ist einmal passiert (SMTP_HOST=Serversmtp-relay.brevo.com). Es wird nur
-    verbunden, keine Mail verschickt.
+    "SMTP konfiguriert" sagt nur, dass Werte in der .env stehen. Scheitert der
+    Versand, scheitert er still im Hintergrund (mailer.send_email wirft nie) —
+    die Registrierung bleibt haengen, und niemand erfaehrt, woran. Deshalb hier
+    Stufe fuer Stufe, jede mit dem Klartext des Mailservers:
+
+      1. Host aufloesen        (Tippfehler im Hostnamen)
+      2. Verbinden             (Port, Firewall)
+      3. Anmelden              (SMTP_USER/SMTP_PASSWORD)
+      4. Absender anbieten     (MAIL FROM/RCPT TO — hier sagen die meisten
+                                Relays, wenn SMTP_FROM nicht freigegeben ist)
+      5. SPF und DMARC im DNS  (ohne die weisen Relays und Empfaenger ab)
+
+    Es wird KEINE Mail verschickt: nach RCPT TO folgt RSET, nie DATA.
     """
+    import smtplib
     import socket
+    import ssl
 
     host = (os.environ.get("SMTP_HOST") or "").strip()
     port = int((os.environ.get("SMTP_PORT") or "465").strip() or 465)
+    user = (os.environ.get("SMTP_USER") or "").strip()
+    passwort = os.environ.get("SMTP_PASSWORD") or ""
+    absender = (os.environ.get("SMTP_FROM") or "").strip()
+    # Empfaenger der Probe: die Administration. Es geht nichts raus, die Adresse
+    # wird nur angeboten.
+    empfaenger = (os.environ.get("ADMIN_EMAIL") or "").strip() or absender
+
+    def fehler(name, detail, schwere="fehler"):
+        out.append(Check(gruppe="E-Mail", name=name, ok=False, detail=detail, schwere=schwere))
+
     try:
         socket.getaddrinfo(host, port)
     except Exception:
-        return Check(gruppe="Konfiguration", name="SMTP erreichbar", ok=False,
-                     detail=f"'{host}' laesst sich nicht aufloesen — Tippfehler im Hostnamen? "
-                            "Ohne ihn kommt keine einzige Mail an.")
+        return fehler("Host", f"'{host}' laesst sich nicht aufloesen — Tippfehler im "
+                              "Hostnamen? Ohne ihn kommt keine einzige Mail an.")
+    out.append(Check(gruppe="E-Mail", name="Host", ok=True, detail=f"{host} loest auf"))
+
+    ctx = ssl.create_default_context()
     try:
-        with socket.create_connection((host, port), timeout=5):
-            pass
+        if port == 465:
+            server = smtplib.SMTP_SSL(host, port, context=ctx, timeout=10)
+        else:
+            server = smtplib.SMTP(host, port, timeout=10)
+            server.ehlo()
+            server.starttls(context=ctx)
+            server.ehlo()
     except Exception as e:
-        return Check(gruppe="Konfiguration", name="SMTP erreichbar", ok=False,
-                     detail=f"{host}:{port} nimmt keine Verbindung an ({str(e)[:80]}) — "
-                            "Port oder Firewall pruefen.")
-    return Check(gruppe="Konfiguration", name="SMTP erreichbar", ok=True,
-                 detail=f"{host}:{port} antwortet")
+        return fehler("Verbindung", f"{host}:{port} nimmt keine Verbindung an "
+                                    f"({str(e)[:100]}) — Port oder Firewall pruefen.")
+    out.append(Check(gruppe="E-Mail", name="Verbindung", ok=True, detail=f"{host}:{port} spricht SMTP"))
+
+    try:
+        if user:
+            try:
+                server.login(user, passwort)
+                out.append(Check(gruppe="E-Mail", name="Anmeldung", ok=True,
+                                 detail=f"{user} angenommen"))
+            except Exception as e:
+                return fehler("Anmeldung", f"Der Mailserver lehnt SMTP_USER/SMTP_PASSWORD ab: "
+                                           f"{str(e)[:150]}")
+        else:
+            out.append(Check(gruppe="E-Mail", name="Anmeldung", ok=True, schwere="warnung",
+                             detail="ohne SMTP_USER — Relay ohne Anmeldung"))
+
+        # Absender anbieten. Genau hier meldet ein Relay ueblicherweise, dass
+        # SMTP_FROM nicht freigegeben ist — die Fehlermeldung kommt woertlich
+        # in den Bericht, damit niemand sie im Anbieter-Portal suchen muss.
+        try:
+            code, antwort = server.mail(absender)
+            if code >= 400:
+                return fehler("Absender", f"Der Mailserver lehnt SMTP_FROM '{absender}' ab: "
+                                          f"{antwort.decode('utf-8', 'replace')[:150]} — "
+                                          "Absender beim Anbieter freigeben oder Domain "
+                                          "authentifizieren.")
+            code, antwort = server.rcpt(empfaenger)
+            if code >= 400:
+                return fehler("Absender", f"Empfaenger '{empfaenger}' abgelehnt: "
+                                          f"{antwort.decode('utf-8', 'replace')[:150]}")
+            server.rset()
+            out.append(Check(gruppe="E-Mail", name="Absender", ok=True,
+                             detail=f"{absender} wird angenommen (keine Mail verschickt)"))
+        except Exception as e:
+            return fehler("Absender", f"Probe fehlgeschlagen: {str(e)[:150]}")
+    finally:
+        try:
+            server.quit()
+        except Exception:
+            pass
+
+    _check_absender_dns(absender, host, out)
+
+
+def _dns_txt(name: str) -> list:
+    """TXT-Eintraege ueber DNS-over-HTTPS. Leere Liste = nichts gefunden,
+    None = nicht pruefbar (kein Netz zum Resolver).
+
+    Bewusst ueber HTTPS statt mit einer DNS-Bibliothek: die API kommt ohne
+    zusaetzliche Abhaengigkeit aus, und der Container spricht ohnehin nach
+    draussen (Update-Check).
+    """
+    import json as _json
+    import urllib.request
+
+    try:
+        req = urllib.request.Request(
+            f"https://cloudflare-dns.com/dns-query?name={name}&type=TXT",
+            headers={"Accept": "application/dns-json", "User-Agent": "Nuvora-Selbsttest"})
+        with urllib.request.urlopen(req, timeout=6) as r:
+            daten = _json.loads(r.read().decode("utf-8", "ignore"))
+        return [a.get("data", "").strip('"') for a in (daten.get("Answer") or [])]
+    except Exception:
+        return None
+
+
+def _check_absender_dns(absender: str, smtp_host: str, out: List[Check]) -> None:
+    """SPF und DMARC der Absender-Domain.
+
+    Ohne SPF-Freigabe fuer den Relay landen Mails im Spam oder werden ganz
+    abgewiesen — beim Anbieter heisst das dann "authenticate your domain".
+    Das ist im DNS pruefbar, also wird es hier geprueft und nicht dem Zufall
+    ueberlassen.
+    """
+    domain = absender.split("@")[-1].strip().lower()
+    if not domain:
+        return
+    # Relay-Host -> Kennungen, von denen mindestens eine im SPF stehen muss.
+    # Gruppen, weil dieselbe Firma unter mehreren Namen auftaucht: Brevo hiess
+    # Sendinblue, und beide Includes sind im Umlauf.
+    ANBIETER = [
+        ("brevo", "sendinblue"),
+        ("sendgrid",),
+        ("mailgun",),
+        ("postmark", "postmarkapp"),
+        ("mailjet",),
+        ("cloudflare",),
+        ("amazonses", "amazonaws"),
+        ("google", "gmail"),
+    ]
+    relay = smtp_host.lower()
+    gruppe = next((g for g in ANBIETER if any(k in relay for k in g)), ())
+
+    spf = _dns_txt(domain)
+    if spf is None:
+        out.append(Check(gruppe="E-Mail", name="SPF", ok=True, schwere="warnung",
+                         detail="nicht pruefbar (kein DNS-Zugriff nach draussen)"))
+        return
+    eintrag = next((t for t in spf if t.lower().startswith("v=spf1")), "")
+    if not eintrag:
+        out.append(Check(gruppe="E-Mail", name="SPF", ok=False,
+                         detail=f"{domain} hat keinen SPF-Eintrag — Empfaenger sortieren die "
+                                "Mails als Spam aus oder weisen sie ab."))
+    elif gruppe and not any(k in eintrag.lower() for k in gruppe):
+        out.append(Check(gruppe="E-Mail", name="SPF", ok=False,
+                         detail=f"SPF von {domain} gibt {gruppe[0]} nicht frei ({eintrag[:90]}) — "
+                                "genau das meint der Anbieter mit 'authenticate your domain'. "
+                                "Absender freigeben oder den SPF-Eintrag ergaenzen."))
+    else:
+        out.append(Check(gruppe="E-Mail", name="SPF", ok=True, detail=eintrag[:90]))
+
+    dmarc = _dns_txt("_dmarc." + domain)
+    if dmarc is None:
+        return
+    hat = any(t.lower().startswith("v=dmarc1") for t in dmarc)
+    out.append(Check(gruppe="E-Mail", name="DMARC", ok=hat, schwere="warnung",
+                     detail="vorhanden" if hat else
+                            f"{domain} hat keinen DMARC-Eintrag — empfohlen, sobald Nuvora "
+                            "oeffentlich Mails verschickt."))
 
 
 def _check_site_json(out: List[Check]) -> None:
