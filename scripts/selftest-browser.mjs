@@ -298,7 +298,11 @@ async function aufraeumenBedienung(api, vorher) {
   for (const [pfad, schluessel] of [["/api/notizblock", "notizblock"], ["/api/topics", "topics"]]) {
     try {
       for (const eintrag of await (await api(pfad)).json()) {
-        if (!vorher[schluessel].has(eintrag.id)) await api(`${pfad}/${eintrag.id}`, "delete");
+        const neuAngelegt = !vorher[schluessel].has(eintrag.id);
+        // Zusaetzlich alles mit der Marke: lief ein frueherer Testlauf parallel
+        // oder brach ab, zaehlt sein Rest sonst als "Bestand" und bliebe liegen.
+        const traegtMarke = `${eintrag.title || ""}${eintrag.name || ""}`.includes(MARKE);
+        if (neuAngelegt || traegtMarke) await api(`${pfad}/${eintrag.id}`, "delete");
       }
     } catch { /* was bleibt, faellt beim naechsten Lauf auf */ }
   }
