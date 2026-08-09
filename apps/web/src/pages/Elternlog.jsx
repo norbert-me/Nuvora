@@ -16,7 +16,8 @@ export default function Elternlog() {
   const { t } = useLanguage();
   const aktiv = useAktiv();
   const notenAktiv = aktiv("auswertung");
-  const [grades, setGrades] = useState({}); // student_id -> Gesamtnote (nur bei aktivem Noten-Modul)
+  const [grades, setGrades] = useState({}); // student_id -> [{kursId, name, wert}] (nur bei aktivem Noten-Modul)
+  const [kurse, setKurse] = useState([]);
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
   // Aus dem Kurs verlinkt (?class=&kurs=): dann diesen Inhalt zeigen.
@@ -40,14 +41,35 @@ export default function Elternlog() {
 
   const loadCounts = () => { if (classId) fetch(`${API}/counts?class_id=${classId}`).then((r) => (r.ok ? r.json() : {})).then((d) => setCounts(d || {})).catch(() => {}); };
   // Gesamtnoten der Klasse laden — nur wenn das Noten-Modul aktiv ist (Regel 3).
+  //
+  // Noten haengen am KURS (Fach), nicht an der Klasse: ohne kurs_id findet die
+  // API nur Abschnitte ohne Kurs. Fuer jede Klasse, die mit Kursen arbeitet —
+  // also die normale — kam damit eine leere Liste zurueck und der Notenchip
+  // erschien nie, obwohl Noten da waren. Darum je Kurs eine Abfrage; die
+  // kurslose Variante bleibt als Rueckfall fuer Klassen ohne Kurs.
   const loadGrades = () => {
     if (!classId || !notenAktiv) { setGrades({}); return; }
-    fetch(`/api/noten/classes/${classId}/summary?term=1&agg=mean`).then((r) => (r.ok ? r.json() : [])).then((rows) => {
-      const g = {}; (Array.isArray(rows) ? rows : []).forEach((s) => { const v = s.total_override ?? s.weighted; if (v != null) g[String(s.student_id)] = v; }); setGrades(g);
-    }).catch(() => {});
+    const meine = kurse.filter((k) => (k.classes || []).some((c) => c.id === classId));
+    const quellen = meine.length ? meine.map((k) => ({ id: k.id, name: k.name })) : [{ id: null, name: null }];
+    Promise.all(quellen.map((q) =>
+      fetch(`/api/noten/classes/${classId}/summary?term=1&agg=mean${q.id != null ? `&kurs_id=${q.id}` : ""}`)
+        .then((r) => (r.ok ? r.json() : [])).then((rows) => ({ q, rows: Array.isArray(rows) ? rows : [] }))
+        .catch(() => ({ q, rows: [] }))
+    )).then((teile) => {
+      const g = {};
+      teile.forEach(({ q, rows }) => rows.forEach((s) => {
+        const v = s.total_override ?? s.weighted;
+        if (v == null) return;
+        (g[String(s.student_id)] ||= []).push({ kursId: q.id, name: q.name, wert: v });
+      }));
+      setGrades(g);
+    });
   };
-  useEffect(() => { setSel(null); loadCounts(); loadGrades(); /* eslint-disable-next-line */ }, [classId, notenAktiv]);
-  const noteStr = (sid) => { const v = grades[String(sid)]; return v == null ? null : String(v).replace(".", ","); };
+  // Kurse einmal holen: sie entscheiden, unter welchem Fach eine Note liegt.
+  useEffect(() => { if (notenAktiv) swr("kurse", "/api/kurse", (d) => setKurse(Array.isArray(d) ? d : [])); }, [notenAktiv]);
+  useEffect(() => { setSel(null); loadCounts(); loadGrades(); /* eslint-disable-next-line */ }, [classId, notenAktiv, kurse]);
+  const noten = (sid) => grades[String(sid)] || [];
+  const noteStr = (v) => String(v).replace(".", ",");
 
   const loadList = (sid) => fetch(`${API}?student_id=${sid}`).then((r) => (r.ok ? r.json() : [])).then((d) => setList(Array.isArray(d) ? d : [])).catch(() => {});
   const open = (s) => { setSel(s); setText(""); setChannel("telefon"); setDate(ymd(new Date())); loadList(s.id); };
@@ -82,11 +104,16 @@ export default function Elternlog() {
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
             <button onClick={() => setSel(null)} style={{ ...btnSecondary, padding: "6px 12px" }}>← {t("common.back")}</button>
             <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{sel.name}</h2>
-            {notenAktiv && noteStr(sel.id) && (
-              <Link to="/auswertung?tab=noten" title={t("elternlog.toGrades")} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, padding: "4px 12px", borderRadius: 980, background: "var(--accent-bg, rgba(10,132,255,0.12))", color: "var(--accent)", textDecoration: "none" }}>
-                {t("elternlog.grade")}: {noteStr(sel.id)} ↗
+            {notenAktiv && noten(sel.id).map((n) => (
+              <Link
+                key={n.kursId ?? "ohne"}
+                to={`/auswertung?tab=noten&class=${classId}${n.kursId != null ? `&kurs=${n.kursId}` : ""}`}
+                title={t("elternlog.toGrades")}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, padding: "4px 12px", borderRadius: 980, background: "var(--accent-bg, rgba(10,132,255,0.12))", color: "var(--accent)", textDecoration: "none" }}
+              >
+                {n.name || t("elternlog.grade")}: {noteStr(n.wert)} ↗
               </Link>
-            )}
+            ))}
           </div>
 
           <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 14, marginBottom: 16 }}>

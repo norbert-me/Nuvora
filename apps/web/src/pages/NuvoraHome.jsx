@@ -3,7 +3,7 @@
 // Modulauswahl statt eine leere Seite zu zeigen.
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useModules } from "../core/modules.js";
+import { useModules, useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { StageBadge, Icon, ICONS, MODULE_ICONS, iconBtn, btnSecondary, selectStyle, COLORS as C, pageApp} from "../components/Icons.jsx";
 import { pageTitle } from "../components/Icons.jsx";
@@ -206,7 +206,12 @@ function HeutePanel({ t, orgaAktiv }) {
 export default function NuvoraHome({ user }) {
   const { t } = useLanguage();
   const { active, loading } = useModules();
-  const isOn = (k) => active.some((m) => m.key === k);
+  // Bewusst useAktiv() statt einer eigenen Zeile: die Fassung hier prueft den
+  // Schluessel gegen MODUL_KEYS und meldet Tippfehler in der Konsole. Die
+  // fruehere Eigenbau-Variante lieferte bei "methoden" (den Schluessel gibt es
+  // nicht, das Modul heisst unterrichtsplanung) stillschweigend false — der
+  // Einstiegs-Vorschlag bei schwachen Themen war damit dauerhaft tot.
+  const isOn = useAktiv();
   const orderKey = `nuvora_modorder_${user?.id ?? "x"}`;
   const [order, setOrder] = useState(() => { try { return JSON.parse(localStorage.getItem(orderKey)) || []; } catch { return []; } });
   const [edit, setEdit] = useState(false);
@@ -275,7 +280,7 @@ export default function NuvoraHome({ user }) {
       ) : (
         <>
           {!edit && isOn("kalender") && <HeutePanel t={t} orgaAktiv={isOn("orga")} />}
-          {!edit && isOn("cardvote") && <SchwacheWoche t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} methodenAktiv={isOn("methoden")} />}
+          {!edit && isOn("cardvote") && <SchwacheWoche t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} methodenAktiv={isOn("unterrichtsplanung")} />}
           <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
             {(edit ? displayList : shown).map((m) => {
               // Dashboard braucht keine Erklärung (die steht unter „Module") —

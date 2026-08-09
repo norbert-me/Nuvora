@@ -163,13 +163,15 @@ export default function Kalender() {
     // Fach-Klassen — die Anzeige nutzt darum den Kurs-Namen (siehe className).
     fetch("/api/kurse").then((r) => (r.ok ? r.json() : [])).then((d) => setKurse(Array.isArray(d) ? d : [])).catch(() => {});
     swr("topics", "/api/topics", (d) => setTopics(Array.isArray(d) ? d : []));
-    // Methoden nur, wenn das Modul aktiv ist (sonst 403 -> leer, kein Selektor).
-    fetch("/api/methoden/list").then((r) => (r.ok ? r.json() : [])).then((d) => setMethods(Array.isArray(d) ? d : [])).catch(() => {});
     // Regel 3: Modul-Objekte nur laden/anbieten, wenn das Modul aktiviert ist.
     fetch("/api/modules").then((r) => (r.ok ? r.json() : [])).then((mods) => {
       const on = {};
       (Array.isArray(mods) ? mods : []).forEach((m) => { if (m.active) on[m.key] = true; });
       setAktiv(on);
+      // Einstiege wie alles andere erst nach der Modulfrage. Vorher lief der
+      // Aufruf bedingungslos: ohne das Modul antwortete der Server mit 403 und
+      // auf JEDER Kalenderseite stand ein Fehler in der Konsole.
+      if (on.unterrichtsplanung) fetch("/api/methoden/list").then((r) => (r.ok ? r.json() : [])).then((d) => setMethods(Array.isArray(d) ? d : [])).catch(() => {});
       if (on.cardvote) fetch("/api/folders").then((r) => (r.ok ? r.json() : [])).then((tree) => {
         // Quizze aus dem (rekursiven) Ordnerbaum flach ziehen, Ordnername als Kontext.
         const flat = [];
