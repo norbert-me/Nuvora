@@ -31,6 +31,7 @@
 #          ./selftest.sh --ohne-browser API + Systemtest, ohne Playwright
 #          ./selftest.sh --nur-system   ohne Login, ohne Schreiben
 #          ./selftest.sh --url https://… gegen eine andere Instanz
+#          ./selftest.sh --browser=webkit  Engine der iPads (auch: chromium|beide)
 #
 # Vollstaendig ist die Voreinstellung, und das ist Absicht: ein gruener Deploy
 # muss heissen "die Seite laeuft", nicht "der Teil, den wir angeschaut haben,
@@ -80,6 +81,10 @@ ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --browser) MIT_BROWSER=1; shift ;;          # Altbestand: schon Vorgabe
+    # Engine waehlen (chromium|webkit|beide). Geht per Umgebung an beide
+    # Browser-Laeufe; ohne das landete --browser=webkit im Argumentbeutel der
+    # Python-Skripte, die damit nichts anfangen koennen.
+    --browser=*) MIT_BROWSER=1; export SELFTEST_BROWSERS="${1#*=}"; shift ;;
     --system) MIT_SYSTEM=1; shift ;;            # Altbestand: schon Vorgabe
     --schnell) MIT_BROWSER=0; MIT_SYSTEM=0; shift ;;
     --ohne-browser) MIT_BROWSER=0; shift ;;

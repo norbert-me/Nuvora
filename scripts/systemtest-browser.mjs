@@ -1,5 +1,5 @@
 /**
- * Nuvora — Systemtest im echten Browser (Playwright, headless Chromium).
+ * Nuvora — Systemtest im echten Browser (Playwright; Chromium und/oder WebKit).
  *
  * scripts/selftest-browser.mjs prueft den Rundgang bei EINGESCHALTETEN Modulen.
  * Dieser Test prueft das Gegenteil und ist damit der Beweis fuer Regel 3
@@ -24,11 +24,19 @@
  *
  * Nutzung:  node scripts/systemtest-browser.mjs --url … --email … --passwort …
  *           (oder SELFTEST_URL / SELFTEST_EMAIL / SELFTEST_PASSWORD)
+ *           --browser=chromium|webkit|beide  (Vorgabe: chromium)
+ *           WebKit ist die Engine der iPads, auf denen gearbeitet wird — sie
+ *           laeuft nicht bei jedem Deploy mit, weil das die Laufzeit verdoppelt.
  * Rueckgabewert: 0 = gruen, 1 = mindestens ein Fund.
  */
-import { chromium } from "playwright";
+import { chromium, webkit } from "playwright";
 
 const arg = (name, fallback) => {
+  // Beide Schreibweisen: `--name wert` und `--name=wert`. Ohne die zweite
+  // landet `--browser=webkit` stillschweigend als unbekanntes Argument im
+  // Nirgendwo, und der Lauf nimmt kommentarlos die Vorgabe.
+  const mitGleich = process.argv.find((a) => a.startsWith(`--${name}=`));
+  if (mitGleich) return mitGleich.slice(name.length + 3);
   const i = process.argv.indexOf(`--${name}`);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 };
@@ -42,15 +50,46 @@ if (!URL_BASIS || !EMAIL || !PASSWORT) {
   process.exit(2);
 }
 
+// ── Welche Browser-Engine? ─────────────────────────────────────────────────
+//
+// Gearbeitet wird zu grossen Teilen auf iPads, also auf WebKit. Chromium bleibt
+// trotzdem die VORGABE: der Deploy ruft diesen Test bei jedem Durchlauf, und er
+// soll nicht ungefragt doppelt so lange dauern.
+const MOTOREN_ALLE = { chromium, webkit };
+const MOTOR_WAHL = String(arg("browser", process.env.SELFTEST_BROWSERS) || "chromium").toLowerCase();
+const MOTOREN = MOTOR_WAHL === "beide" ? ["chromium", "webkit"] : [MOTOR_WAHL];
+if (MOTOREN.some((m) => !MOTOREN_ALLE[m])) {
+  console.error(`Fehler: --browser kennt nur chromium, webkit oder beide (bekommen: „${MOTOR_WAHL}").`);
+  process.exit(2);
+}
+// Der Name der laufenden Engine steht in JEDER Zeile und in der
+// Zusammenfassung — sonst ist beim Fehlersuchen nicht zu erkennen, welcher Lauf
+// gemeint war.
+let MOTOR = MOTOREN[0];
+
 // Rauschen, das nichts ueber die Gesundheit der Installation sagt.
 const EGAL = [
   /favicon/i,
   /ResizeObserver loop/i,
   /Download the React DevTools/i,
-  /api\.github\.com/i,
   /\/api\/version/,
 ];
-const istEgal = (text) => EGAL.some((r) => r.test(text));
+
+// Fremde Hosts, deren Fehler nichts ueber die Installation sagen (Marktplatz
+// und Update-Check fragen GitHub). Verglichen wird der HOSTNAME einer
+// geparsten Adresse; frueher stand hier /api\.github\.com/i — nicht verankert
+// und damit auch auf „https://nuvora.example/x/api.github.com/y" passend. Ein
+// Pruefwerkzeug, das Befunde verschluckt, meldet gruen, ohne gruen zu sein.
+const EGAL_HOSTS = new Set(["api.github.com"]);
+const istEgalerHost = (text) => {
+  for (const gefunden of String(text).match(/https?:\/\/[^\s"'<>)]+/gi) || []) {
+    try {
+      if (EGAL_HOSTS.has(new URL(gefunden).hostname.toLowerCase())) return true;
+    } catch { /* keine gueltige Adresse — dann ist es auch kein bekannter Host */ }
+  }
+  return false;
+};
+const istEgal = (text) => EGAL.some((r) => r.test(text)) || istEgalerHost(text);
 
 // HTTP 429 ist Infrastruktur, kein Anwendungsfehler: der Proxy drosselt /api/
 // (nginx.conf, `limit_req zone=api_rl`), und dieser Test klappert Dutzende
@@ -80,10 +119,10 @@ const START = Date.now();
 const seit = () => `${String(Math.round((Date.now() - START) / 1000)).padStart(4)}s`;
 let letzteGruppe = null;
 const notiere = (gruppe, name, ok, detail = "") => {
-  ergebnisse.push({ gruppe, name, ok, detail });
-  if (gruppe !== letzteGruppe) {
-    console.log(`\n${FETT}── ${gruppe}${AUS}`);
-    letzteGruppe = gruppe;
+  ergebnisse.push({ motor: MOTOR, gruppe, name, ok, detail });
+  if (`${MOTOR}/${gruppe}` !== letzteGruppe) {
+    console.log(`\n${FETT}── [${MOTOR}] ${gruppe}${AUS}`);
+    letzteGruppe = `${MOTOR}/${gruppe}`;
   }
   const zeile = `${name}${detail ? `   ${detail}` : ""}`;
   console.log(`  ${GRAU}${seit()}${AUS} ${ok ? `${GRUEN}✓${AUS} ${zeile}` : `${ROT}✗ ${zeile}${AUS}`}`);
@@ -920,8 +959,27 @@ async function knopfInZeile(seite, marke, titel) {
 
 // ─────────────────────────────── Ablauf ───────────────────────────────
 
+/**
+ * Ein Lauf je Engine. Der Modul-Zustand wird nach JEDEM Lauf zurueckgestellt,
+ * also muessen die Merker davor wieder auf Anfang — sonst haelt der zweite Lauf
+ * sich fuer schon aufgeraeumt und laesst das Konto verstellt zurueck.
+ */
 async function main() {
-  const browser = await chromium.launch();
+  for (const name of MOTOREN) {
+    MOTOR = name;
+    letzteGruppe = null;
+    aufgeraeumt = false;
+    sollZustand = null;
+    token = null;
+    console.log(`\n${FETT}══════ Browser-Engine: ${name} ══════${AUS}`);
+    await lauf(MOTOREN_ALLE[name]);
+  }
+  drucke();
+  process.exit(ergebnisse.some((e) => !e.ok) ? 1 : 0);
+}
+
+async function lauf(motor) {
+  const browser = await motor.launch();
   // Deutsch erzwingen: die Marker unten sind die deutschen Beschriftungen, und
   // Playwright startet sonst mit en-US — dann sucht der Test Knoepfe, die es in
   // dieser Sprache gar nicht gibt.
@@ -1052,9 +1110,6 @@ async function main() {
     await modulZustandHerstellen();
     await browser.close().catch(() => {});
   }
-
-  drucke();
-  process.exit(ergebnisse.some((e) => !e.ok) ? 1 : 0);
 }
 
 /**
@@ -1467,7 +1522,7 @@ async function bediene(flow) {
   };
   const dasteht = (warten) => (flow.dasteht ? flow.dasteht(seite) : stehtDa(seite, warten));
   const handgriff = async () => {
-    await seite.goto(flow.pfad, { waitUntil: "networkidle", timeout: 30000 });
+    await beimLaden(seite, () => seite.goto(flow.pfad, { waitUntil: "networkidle", timeout: 30000 }));
     if (new URL(seite.url()).pathname === "/modules")
       return { ok: false, detail: "ModuleGate wirft auf /modules — Modul nicht aktiv?" };
     let fehler = await nachLaden();
@@ -1483,7 +1538,7 @@ async function bediene(flow) {
     }
 
     await flow.anlegen(seite);
-    await seite.reload({ waitUntil: "networkidle" });
+    await beimLaden(seite, () => seite.reload({ waitUntil: "networkidle" }));
     fehler = await nachLaden();
     if (fehler) return { ok: false, detail: `angelegt, danach nicht wiederzufinden: ${fehler}` };
     if (!(await dasteht(true)))
@@ -1491,7 +1546,7 @@ async function bediene(flow) {
 
     fehler = flow.loeschen ? await flow.loeschen(seite) : await zeileLoeschen(seite, MARKE_UI);
     if (fehler) return { ok: false, detail: `angelegt, aber nicht löschbar: ${fehler}` };
-    await seite.reload({ waitUntil: "networkidle" });
+    await beimLaden(seite, () => seite.reload({ waitUntil: "networkidle" }));
     fehler = await nachLaden();
     // Ein Fehlschlag beim Aufmachen ist hier KEIN Befund: die Unteransicht kann
     // ohne den Datensatz anders aussehen. Weg ist weg — genau das wird geprueft.
@@ -1596,7 +1651,19 @@ async function neueSeite() {
     if (istDrosselung(text)) drossel.push("Konsole");
     else merke(`Konsole: ${text.slice(0, 160)}`);
   });
-  seite.on("pageerror", (e) => merke(`Absturz: ${String(e).slice(0, 160)}`));
+  seite.on("pageerror", (e) => {
+    const text = String(e);
+    // Ein Neuladen bricht laufende Anfragen ab. WebKit meldet das als
+    // „TypeError: Load failed" bzw. „Fetch API cannot load … due to access
+    // control checks" und — weil der Aufrufer den Fehler durchreicht
+    // (main.jsx:69) — als abgewiesene Zusage. Chromium haelt in derselben Lage
+    // still. Das ist eine Eigenheit der Engine an einer Stelle, die der Test
+    // selbst verursacht: er laedt die Seite neu, waehrend sie noch laedt.
+    // Nur DANN wird es uebergangen, sonst nicht — ein „Load failed" im Betrieb
+    // bleibt ein Befund.
+    if (seite.__laedtGerade && istAbbruchBeimLaden(text)) return;
+    merke(`Absturz: ${text.slice(0, 160)}`);
+  });
   seite.on("response", (r) => {
     if (r.status() === 429) { drossel.push(new URL(r.url()).pathname); return; }
     if (r.status() >= 400 && !istEgal(r.url())) merke(`HTTP ${r.status()} ${new URL(r.url()).pathname}`);
@@ -1604,6 +1671,31 @@ async function neueSeite() {
   // Loeschen fragt teils per confirm() nach — eine Lehrkraft bestaetigt.
   seite.on("dialog", (d) => d.accept().catch(() => {}));
   return { seite, probleme, drossel, merke };
+}
+
+/**
+ * Abgebrochene Anfrage statt echtem Fehler? Die Texte, mit denen die Engines
+ * einen Abbruch melden — WebKit ist hier gespraechiger als Chromium.
+ */
+const istAbbruchBeimLaden = (text) =>
+  /Load failed|Fetch API cannot load|access control checks|NetworkError|operation was aborted|Failed to fetch/i.test(text);
+
+/**
+ * Etwas laden und dabei wissen, DASS gerade geladen wird.
+ *
+ * Waehrend eines Neuladens sterben laufende Anfragen — das ist normal und
+ * nichts, was eine Lehrkraft je saehe. Der Merker sagt dem Fehler-Mitschnitt
+ * oben, dass er in genau diesem Fenster nachsichtig sein darf.
+ */
+async function beimLaden(seite, tun) {
+  seite.__laedtGerade = true;
+  try {
+    return await tun();
+  } finally {
+    // Kurze Nachlaufzeit: die abgewiesene Zusage einer abgebrochenen Anfrage
+    // trifft manchmal erst ein, wenn das Neuladen schon als fertig gilt.
+    setTimeout(() => { seite.__laedtGerade = false; }, 500);
+  }
 }
 
 /** Was der Proxy gedrosselt hat, kurz gefasst (leer = nichts gedrosselt). */
@@ -1661,16 +1753,26 @@ async function tourWegklicken(seite) {
  */
 function drucke() {
   const fehler = ergebnisse.filter((e) => !e.ok);
+  // Je Engine eine Zeile: „grün" ohne die Engine daneben sagt nicht, WORAUF.
+  const proMotor = MOTOREN.map((m) => {
+    const alle = ergebnisse.filter((e) => e.motor === m);
+    const rot = alle.filter((e) => !e.ok).length;
+    return `${m}: ${rot ? `${rot} von ${alle.length} rot` : `${alle.length} grün`}`;
+  }).join(" · ");
   console.log("\n" + "=".repeat(40));
   if (!fehler.length) {
     console.log(`  ${GRUEN}Systemtest grün${AUS} — ${ergebnisse.length} Prüfungen in ${seit().trim()}.`);
+    console.log(`  ${GRAU}${proMotor}${AUS}`);
     console.log("=".repeat(40));
     return;
   }
   console.log(`  ${ROT}${FETT}Systemtest ROT${AUS} — ${fehler.length} von ${ergebnisse.length} Prüfungen.`);
+  console.log(`  ${GRAU}${proMotor}${AUS}`);
   const nachGrund = new Map();
   for (const f of fehler) {
-    const grund = f.detail || "(ohne Detail)";
+    // Nach Engine UND Grund buendeln: derselbe Text kann in Chromium und
+    // WebKit voellig verschiedene Ursachen haben.
+    const grund = `[${f.motor}] ${f.detail || "(ohne Detail)"}`;
     if (!nachGrund.has(grund)) nachGrund.set(grund, []);
     nachGrund.get(grund).push(`${f.gruppe} / ${f.name}`);
   }

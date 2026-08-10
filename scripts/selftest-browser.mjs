@@ -1,5 +1,5 @@
 /**
- * Nuvora — Selbsttest im echten Browser (Playwright, headless Chromium).
+ * Nuvora — Selbsttest im echten Browser (Playwright; Chromium und/oder WebKit).
  *
  * Ergaenzt scripts/selftest.py: dort wird die API geprueft, hier die Shell.
  * Der Browser meldet sich an, schaltet jedes Modul zu, ruft jede Modul- und
@@ -16,11 +16,19 @@
  *
  * Nutzung:  node scripts/selftest-browser.mjs --url … --email … --passwort …
  *           (oder SELFTEST_URL / SELFTEST_EMAIL / SELFTEST_PASSWORD)
+ *           --browser=chromium|webkit|beide  (Vorgabe: chromium)
+ *           WebKit ist die Engine der iPads, auf denen gearbeitet wird — sie
+ *           laeuft nicht bei jedem Deploy mit, weil das die Laufzeit verdoppelt.
  * Rueckgabewert: 0 = gruen, 1 = mindestens ein Fehler.
  */
-import { chromium } from "playwright";
+import { chromium, webkit } from "playwright";
 
 const arg = (name, fallback) => {
+  // Beide Schreibweisen: `--name wert` und `--name=wert`. Die zweite ist die,
+  // die man beim Tippen erwartet — und ohne sie landete `--browser=webkit`
+  // stillschweigend als unbekanntes Argument im Nirgendwo.
+  const mitGleich = process.argv.find((a) => a.startsWith(`--${name}=`));
+  if (mitGleich) return mitGleich.slice(name.length + 3);
   const i = process.argv.indexOf(`--${name}`);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 };
@@ -33,6 +41,25 @@ if (!URL_BASIS || !EMAIL || !PASSWORT) {
   console.error("Fehler: --url, --email und --passwort noetig (oder SELFTEST_URL/SELFTEST_EMAIL/SELFTEST_PASSWORD).");
   process.exit(2);
 }
+
+// ── Welche Browser-Engine? ─────────────────────────────────────────────────
+//
+// Der Betrieb laeuft zu grossen Teilen auf iPads, also auf WebKit — der Engine
+// mit den meisten Eigenheiten. Chromium bleibt trotzdem die VORGABE: der Deploy
+// ruft diesen Test bei jedem Durchlauf, und er soll nicht ungefragt doppelt so
+// lange dauern. Wer WebKit sehen will, sagt es (`--browser=webkit`), wer beides
+// braucht, auch (`--browser=beide`).
+const MOTOREN_ALLE = { chromium, webkit };
+const MOTOR_WAHL = String(arg("browser", process.env.SELFTEST_BROWSERS) || "chromium").toLowerCase();
+const MOTOREN = MOTOR_WAHL === "beide" ? ["chromium", "webkit"] : [MOTOR_WAHL];
+if (MOTOREN.some((m) => !MOTOREN_ALLE[m])) {
+  console.error(`Fehler: --browser kennt nur chromium, webkit oder beide (bekommen: „${MOTOR_WAHL}").`);
+  process.exit(2);
+}
+// Der Name der laufenden Engine steht in JEDER Zeile und in der
+// Zusammenfassung. Ohne ihn ist beim Fehlersuchen nicht zu erkennen, welcher
+// Lauf gemeint war — und genau das ist der haeufigste Fall bei zwei Engines.
+let MOTOR = MOTOREN[0];
 
 // Kern-Seiten, die immer erreichbar sein muessen. Die Modul-Seiten kommen aus
 // dem Register (/api/modules) — so prueft der Test genau die Module, die es im
@@ -47,14 +74,30 @@ const EGAL = [
   /favicon/i,
   /ResizeObserver loop/i,
   /Download the React DevTools/i,
-  // Der Marktplatz und der Update-Check fragen GitHub — offline im Serverraum
-  // ist das kein Fehler der Installation.
-  /api\.github\.com/i,
   // /api/version gehoert der Administration; fuer jedes andere Konto ist 403
   // die richtige Antwort und kein Befund.
   /\/api\/version/,
 ];
-const istEgal = (text) => EGAL.some((r) => r.test(text));
+
+// Fremde Hosts, deren Fehler nichts ueber die Installation sagen: der
+// Marktplatz und der Update-Check fragen GitHub — offline im Serverraum ist
+// das kein Fehler.
+//
+// Verglichen wird der HOSTNAME einer geparsten Adresse, frueher stand hier
+// /api\.github\.com/i. Ein solcher Ausdruck ist nicht verankert und trifft
+// irgendwo in der Zeichenkette: „https://nuvora.example/x/api.github.com/y"
+// waere stillschweigend durchgewunken worden. Ein Pruefwerkzeug, das Befunde
+// verschluckt, meldet gruen, ohne gruen zu sein.
+const EGAL_HOSTS = new Set(["api.github.com"]);
+const istEgalerHost = (text) => {
+  for (const gefunden of String(text).match(/https?:\/\/[^\s"'<>)]+/gi) || []) {
+    try {
+      if (EGAL_HOSTS.has(new URL(gefunden).hostname.toLowerCase())) return true;
+    } catch { /* keine gueltige Adresse — dann ist es auch kein bekannter Host */ }
+  }
+  return false;
+};
+const istEgal = (text) => EGAL.some((r) => r.test(text)) || istEgalerHost(text);
 
 // HTTP 429 ist Infrastruktur, kein Anwendungsfehler: der Proxy drosselt /api/
 // (nginx.conf, `limit_req zone=api_rl`), und dieser Test klappert Dutzende
@@ -89,10 +132,10 @@ const START = Date.now();
 const seit = () => `${String(Math.round((Date.now() - START) / 1000)).padStart(4)}s`;
 let letzteGruppe = null;
 const notiere = (gruppe, name, ok, detail = "") => {
-  ergebnisse.push({ gruppe, name, ok, detail });
-  if (gruppe !== letzteGruppe) {
-    console.log(`\n${FETT}── ${gruppe}${AUS}`);
-    letzteGruppe = gruppe;
+  ergebnisse.push({ motor: MOTOR, gruppe, name, ok, detail });
+  if (`${MOTOR}/${gruppe}` !== letzteGruppe) {
+    console.log(`\n${FETT}── [${MOTOR}] ${gruppe}${AUS}`);
+    letzteGruppe = `${MOTOR}/${gruppe}`;
   }
   const zeile = `${name}${detail ? `   ${detail}` : ""}`;
   console.log(`  ${GRAU}${seit()}${AUS} ${ok ? `${GRUEN}✓${AUS} ${zeile}` : `${ROT}✗ ${zeile}${AUS}`}`);
@@ -205,8 +248,27 @@ async function anmeldungHinterlegen(kontext, token, user, extra = {}) {
   }, [token, JSON.stringify(user), extra]);
 }
 
+/**
+ * Ein Lauf je Engine. Der Modul-Zustand wird nach JEDEM Lauf zurueckgestellt,
+ * also muessen die Merker davor wieder auf Anfang — sonst haelt der zweite Lauf
+ * sich fuer schon aufgeraeumt und laesst die Module des Kontos an.
+ */
 async function main() {
-  const browser = await chromium.launch();
+  for (const name of MOTOREN) {
+    MOTOR = name;
+    letzteGruppe = null;
+    aufgeraeumt = false;
+    token = null;
+    zurueckzustellen.clear();
+    console.log(`\n${FETT}══════ Browser-Engine: ${name} ══════${AUS}`);
+    await lauf(MOTOREN_ALLE[name]);
+  }
+  drucke();
+  process.exit(ergebnisse.some((e) => !e.ok) ? 1 : 0);
+}
+
+async function lauf(motor) {
+  const browser = await motor.launch();
   const kontext = await browser.newContext({ baseURL: URL_BASIS, viewport: { width: 1280, height: 900 } });
 
   try {
@@ -308,6 +370,10 @@ async function main() {
     // Das Modul ist die einzige Nicht-React-Seite; „rendert" sagt hier am
     // wenigsten. Eigene Gruppe, siehe lernpfadProbe.
     if (module.some((m) => m.key === "lernpfad" && m.available)) await lernpfadProbe(kontext, api);
+
+    // ── Ohne benutzbaren localStorage ──
+    // Am Ende, weil die Probe eigene Kontexte braucht und nichts anlegt.
+    await speicherProbe(browser, token, user);
   } catch (e) {
     notiere("Ablauf", "Selbsttest", false, kurzfehler(e));
   } finally {
@@ -316,9 +382,180 @@ async function main() {
     await modulZustandHerstellen();
     await browser.close().catch(() => {});
   }
+}
 
-  drucke();
-  process.exit(ergebnisse.some((e) => !e.ok) ? 1 : 0);
+// ───────────────────────────────────────────────────────────────────────────
+// Ohne benutzbaren localStorage
+//
+// An localStorage haengt in Nuvora fast alles: der Anmelde-Token, der
+// Modul-Cache (core/modules.js), der Anzeige-Cache des Lernpfads, die Tafel,
+// die Sprache. Auf dem iPad ist das der wackeligste Untergrund im ganzen
+// System, und zwar aus zwei Gruenden, die es in Chromium so nicht gibt:
+//
+//   - Im privaten Modus (und bei blockierten Cookies) WIRFT Safari beim
+//     Zugriff, statt still zu scheitern. Ein ungeschuetztes
+//     `localStorage.getItem(...)` reisst dann alles mit, was daran haengt.
+//   - Der Tracking-Schutz raeumt den Speicher nach sieben Tagen ohne Besuch
+//     ab. Die Kollegin nach den Ferien ist genau dieser Fall.
+//
+// Geprueft wird nicht, ob Nuvora sich dabei alles merkt — das kann es nicht.
+// Geprueft wird, dass eine LESBARE Seite stehenbleibt statt einer weissen.
+const SPEICHER_BRICHT = () => {
+  const werfen = () => { throw new Error("SecurityError: localStorage ist gesperrt (Safari, privater Modus)"); };
+  try {
+    Object.defineProperty(window, "localStorage", { configurable: true, get: werfen });
+  } catch { /* Engine laesst das Umdefinieren nicht zu — faellt in der Probe auf */ }
+};
+
+const SPEICHER_NUR_LESEN = () => {
+  try {
+    const echt = window.localStorage;
+    const kaputt = () => { throw new Error("QuotaExceededError: localStorage ist voll (Safari, privater Modus)"); };
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get: () => ({
+        getItem: (k) => echt.getItem(k),
+        key: (i) => echt.key(i),
+        get length() { return echt.length; },
+        setItem: kaputt,
+        removeItem: kaputt,
+        clear: kaputt,
+      }),
+    });
+  } catch { /* siehe oben */ }
+};
+
+/**
+ * Eine Seite unter erschwerten Speicherbedingungen aufrufen und bewerten.
+ * Weiss = Befund. Alles andere (Anmeldemaske, Hinweis, volle Seite) ist gut.
+ */
+async function speicherSeite(kontext, pfad) {
+  const { seite, probleme } = await neueSeite(kontext);
+  try {
+    const holen = async () => {
+      await seite.goto(pfad, { waitUntil: "domcontentloaded", timeout: 30000 });
+      // NICHT auf „networkidle" warten: bricht der Token-Zugriff, feuert die
+      // Shell womoeglich gar keine Anfrage mehr — dann waere die Wartezeit die
+      // einzige Aussage des Tests.
+      await seite.waitForTimeout(3000);
+      const text = (await seite.locator("body").innerText()).trim();
+      const wo = new URL(seite.url()).pathname;
+      const abstuerze = probleme.filter((p) => p.startsWith("Absturz"));
+      if (text.length < 20)
+        return { ok: false, detail: `WEISSE SEITE auf ${pfad} (${text.length} Zeichen sichtbar`
+          + `${wo !== pfad ? `, gelandet auf ${wo}` : ""})`
+          + (abstuerze.length ? ` — ${abstuerze[0]}` : "") };
+      return { ok: true, detail: `${text.length} Zeichen lesbar (${wo})`
+        + (abstuerze.length ? ` · Absturz im Protokoll: ${abstuerze[0].slice(0, 90)}` : "") };
+    };
+    return await mitFrist(holen(), FRIST_SEITE, pfad);
+  } catch (e) {
+    return { ok: false, detail: String(e.message || e).split("\n")[0].slice(0, 160) };
+  } finally {
+    await seite.close().catch(() => {});
+  }
+}
+
+/**
+ * Anmelden, waehrend der Speicher gesperrt ist.
+ *
+ * Gut ist zweierlei: entweder es klappt trotzdem (die Shell weicht aus), oder
+ * die Meldung sagt, WORAN es liegt. Nicht gut ist eine Meldung, die auf die
+ * falsche Faehrte fuehrt — dann ruft die Lehrkraft an und meldet „Server down".
+ */
+async function speicherAnmeldung(kontext) {
+  const { seite } = await neueSeite(kontext);
+  try {
+    const tun = async () => {
+      await seite.goto("/login", { waitUntil: "domcontentloaded", timeout: 30000 });
+      const felder = seite.locator("input");
+      if (await felder.count() < 2) return { ok: false, detail: "die Anmeldemaske erscheint gar nicht" };
+      await seite.locator("input[type=email], input[name=email]").first().fill(EMAIL);
+      await seite.locator("input[type=password]").first().fill(PASSWORT);
+      // Beschriftung in allen drei Sprachen: welche die Maske zeigt, entscheidet
+      // ohne Speicher das Geraet, nicht das Konto.
+      await seite.getByRole("button", { name: /anmelden|sign in|login|iniciar/i }).first().click({ timeout: 8000 });
+      await seite.waitForTimeout(3000);
+      const text = (await seite.locator("body").innerText()).replace(/\s+/g, " ").trim();
+      const wo = new URL(seite.url()).pathname;
+      if (wo !== "/login") return { ok: true, detail: `kommt trotz gesperrtem Speicher hinein (${wo})` };
+      if (/speicher|privat|cookie|storage|almacen/i.test(text))
+        return { ok: true, detail: "bleibt auf /login und nennt den Speicher als Grund" };
+      const meldung = (text.match(/Verbindungsfehler|Connection error|Error de conexión/i) || [])[0];
+      return { ok: false, detail: meldung
+        ? `meldet „${meldung}" — falsche Fährte: die Anmeldung war erfolgreich, nur das Ablegen des Tokens `
+          + "scheiterte (apps/web/src/pages/Login.jsx:71 im try, Auffangzweig Zeile 74)"
+        : `kommt nicht hinein und nennt keinen Grund (sichtbar: „${text.slice(0, 120)}")` };
+    };
+    return await mitFrist(tun(), FRIST_SEITE, "/login");
+  } catch (e) {
+    return { ok: false, detail: String(e.message || e).split("\n")[0].slice(0, 160) };
+  } finally {
+    await seite.close().catch(() => {});
+  }
+}
+
+async function speicherProbe(browser, token, user) {
+  const G = "Ohne localStorage";
+  // Sprache am Kontext festnageln. Nuvora merkt sich die Sprache im
+  // localStorage — genau der ist hier kaputt, also faellt die Oberflaeche auf
+  // die Sprache des Geraets zurueck. Playwright startet ohne Angabe mit en-US
+  // (Chromium) bzw. der Systemsprache (WebKit); dann sucht der Test deutsche
+  // Beschriftungen in einer englischen Maske. Ein iPad im Kollegium meldet
+  // de-DE, also meldet es der Test auch.
+  const neu = async (skript, mitAnmeldung) => {
+    const k = await browser.newContext({ baseURL: URL_BASIS, locale: "de-DE", viewport: { width: 1280, height: 900 } });
+    // Reihenfolge zaehlt: erst die Anmeldung hinterlegen (braucht einen heilen
+    // Speicher), dann den Speicher kaputtmachen.
+    if (mitAnmeldung) await anmeldungHinterlegen(k, token, user);
+    await k.addInitScript(skript);
+    return k;
+  };
+
+  // 1) Zugriff wirft — privater Modus / blockierte Cookies, nicht angemeldet.
+  let k = await neu(SPEICHER_BRICHT, false);
+  for (const pfad of ["/", "/login"]) {
+    const b = await speicherSeite(k, pfad);
+    notiere(G, `Zugriff wirft · ${pfad}`, b.ok, b.detail);
+  }
+  await k.close();
+
+  // 2) Zugriff wirft, aber die Lehrkraft WAR angemeldet — nach dem Umschalten
+  //    in den privaten Modus oder nach dem Blockieren von Cookies.
+  k = await neu(SPEICHER_BRICHT, true);
+  for (const pfad of ["/modules", "/classes"]) {
+    const b = await speicherSeite(k, pfad);
+    notiere(G, `Zugriff wirft, angemeldet · ${pfad}`, b.ok, b.detail);
+  }
+  await k.close();
+
+  // 3) Lesen geht, Schreiben wirft — Safaris privater Modus in der Variante,
+  //    die den Speicher zwar herausgibt, aber jede Ablage verweigert.
+  k = await neu(SPEICHER_NUR_LESEN, true);
+  for (const pfad of ["/", "/classes"]) {
+    const b = await speicherSeite(k, pfad);
+    notiere(G, `Schreiben wirft · ${pfad}`, b.ok, b.detail);
+  }
+  await k.close();
+
+  // 3b) Und der Weg, an dem es wirklich haengt: ANMELDEN ohne Speicher.
+  //     Die Maske erscheint, der Server nimmt die Anmeldung an — und dann
+  //     scheitert das Ablegen des Tokens. Was die Lehrkraft davon zu sehen
+  //     bekommt, entscheidet, ob sie weiterkommt oder den Server fuer kaputt
+  //     haelt. „Verbindungsfehler" ist die falsche Auskunft: die Verbindung
+  //     stand, der Speicher war es.
+  k = await neu(SPEICHER_BRICHT, false);
+  const anmeldung = await speicherAnmeldung(k);
+  notiere(G, "Anmelden ohne Speicher nennt den Grund", anmeldung.ok, anmeldung.detail);
+  await k.close();
+
+  // 4) Leer statt kaputt — der Tracking-Schutz hat nach sieben Tagen alles
+  //    abgeraeumt. Die Lehrkraft muss auf einer BEDIENBAREN Seite landen
+  //    (Anmeldung oder Startseite), nicht vor einer weissen.
+  k = await browser.newContext({ baseURL: URL_BASIS, locale: "de-DE", viewport: { width: 1280, height: 900 } });
+  const b = await speicherSeite(k, "/classes");
+  notiere(G, "Speicher geleert (7-Tage-Regel) · /classes", b.ok, b.detail);
+  await k.close();
 }
 
 /** Weiterer Browser-Kontext (Handy, dunkles Design) mit derselben Anmeldung. */
@@ -548,8 +785,38 @@ async function lpOeffnen(seite, pfad = "/lernpfad") {
     if (window.__lpToasts) return;
     window.__lpToasts = [];
     window.addEventListener("message", (e) => {
+      // Der Lernpfad wird in-page gemountet und schickt seine Toasts per
+      // window.postMessage an dasselbe Fenster — die Herkunft ist also immer
+      // die eigene. Alles andere (Werbe-Rahmen, fremde Einbettung) hat hier
+      // nichts zu melden: sonst koennte fremder Text als Toast der App im
+      // Testbericht landen.
+      if (e.origin !== location.origin) return;
       if (e.data && e.data.type === "lernpfad:toast") window.__lpToasts.push(String(e.data.msg));
     });
+    // Jeden Klick mitschreiben, samt Ziel. Bleibt ein Handgriff wirkungslos,
+    // ist das die einzige Auskunft darueber, WO der Klick gelandet ist — auf
+    // dem Knopf (dann liegt es an der App) oder daneben (dann an der Ebene
+    // darueber). Ohne das bleibt es bei „nichts passiert".
+    // Stille Ausnahmen: eine abgewiesene Zusage (unhandledrejection) taucht in
+    // WebKit weder als pageerror noch verlaesslich in der Konsole auf. Genau so
+    // verschwindet ein Handgriff spurlos — deshalb hier mitschreiben.
+    // Warnungen mitschreiben. Die App begruendet abgelehnte Handgriffe zum Teil
+    // NUR mit console.warn (savePfad: „laeuft bereits" / „zu schnell
+    // hintereinander") — und weil der Test nur Fehler sammelt, blieb genau die
+    // Begruendung unsichtbar, die den Fall erklaert.
+    window.__lpWarn = [];
+    const _warn = console.warn.bind(console);
+    console.warn = (...a) => { window.__lpWarn.push(a.map(String).join(" ").slice(0, 200)); _warn(...a); };
+    window.__lpFehler = [];
+    window.addEventListener("unhandledrejection", (e) => window.__lpFehler.push(
+      `unhandledrejection: ${String((e.reason && (e.reason.stack || e.reason.message)) || e.reason).slice(0, 300)}`));
+    window.addEventListener("error", (e) => window.__lpFehler.push(`error: ${String(e.message || "").slice(0, 200)}`));
+    window.__lpKlicks = [];
+    document.addEventListener("click", (e) => {
+      const el = e.target;
+      window.__lpKlicks.push(el ? el.tagName.toLowerCase() + (el.id ? `#${el.id}` : "")
+        + (typeof el.className === "string" && el.className ? `.${el.className.trim().split(/\s+/)[0]}` : "") : "?");
+    }, true);
   });
   const geladen = seite.waitForResponse(
     (r) => r.url().includes("/api/lernpfad/exercises") && r.request().method() === "GET",
@@ -602,6 +869,60 @@ async function lpBestaetigen(seite, name) {
 async function lpToast(seite) {
   const msgs = await seite.evaluate(() => window.__lpToasts || []).catch(() => []);
   return msgs.length ? ` (Meldung der App: „${msgs.slice(-2).join(" / ")}")` : "";
+}
+
+/**
+ * Der Zustand des Generators, wenn „In Lernpfad speichern" nichts bewirkt.
+ *
+ * „kein POST" allein ist als Befund wertlos: die App lehnt den Handgriff aus
+ * einem halben Dutzend Gruenden ab, und die meisten davon sagt sie niemandem
+ * (previewData leer, nichts angehakt, kein Thema, falscher Pfad — und die
+ * Bremse in savePfad, die nur eine console.warn hinterlaesst). Genau daran ist
+ * die Suche unter WebKit haengengeblieben, bis hier stand, was der Bildschirm
+ * zeigt: Auswahl, Vorschau, Haken, wer auf dem Knopf liegt, wohin die Klicks
+ * gingen, welche Warnungen und stillen Ausnahmen dabei anfielen.
+ */
+async function lpStand(seite) {
+  const s = await seite.evaluate(() => {
+    const q = (w) => document.querySelector(`#lp-app ${w}`);
+    const pfad = q("#gen-pfad");
+    const vorschau = q("#preview-area");
+    // Wer liegt auf dem Speichern-Knopf? Ein unsichtbarer Deckel faengt den
+    // Fingertipp ab, ohne dass irgendwo ein Fehler entsteht — die Lehrkraft
+    // tippt und nichts passiert. Genau dieser Fall ist ohne Namen nicht zu
+    // finden, deshalb steht hier das Element unter dem Mauszeiger.
+    const knopf = q("#btn-save-to-pfad");
+    let deckung = "kein #btn-save-to-pfad";
+    if (knopf) {
+      const r = knopf.getBoundingClientRect();
+      const oben = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      const name = (el) => el ? el.tagName.toLowerCase() + (el.id ? `#${el.id}` : "")
+        + (typeof el.className === "string" && el.className ? `.${el.className.trim().split(/\s+/)[0]}` : "") : "nichts";
+      deckung = oben === knopf ? "frei" : `verdeckt von ${name(oben)}`;
+    }
+    // Ist der Knopf zwischen Merken und Klicken ausgetauscht worden? app.js
+    // haengt seine Handler EINMAL beim Start an den Knopf (app.js:2222). Wird
+    // der Knoten zwischendurch neu gebaut, sieht alles heil aus, aber der
+    // Handler haengt am weggeworfenen Knoten — der Tipp verpufft.
+    const knopfIdentitaet = !knopf ? "kein Knopf"
+      : (knopf.__zzGemerkt ? "derselbe Knoten wie vor dem Klick" : "AUSGETAUSCHT seit dem Merken (Handler hängt am alten Knoten)");
+    return {
+      deckung, knopfIdentitaet,
+      pfad: pfad ? `${pfad.value || "(leer = Einzeln)"}/${pfad.selectedOptions[0]?.textContent || ""}` : "kein #gen-pfad",
+      thema: q("#gen-thema")?.value || "(leer)",
+      kurs: q("#gen-klasse")?.value || "(leer)",
+      vorschau: vorschau ? (getComputedStyle(vorschau).display === "none" ? "verborgen" : "sichtbar") : "fehlt",
+      angehakt: document.querySelectorAll("#lp-app #preview-area input[type=checkbox]:checked").length,
+      kaesten: document.querySelectorAll("#lp-app #preview-area input[type=checkbox]").length,
+      meldungen: (window.__lpToasts || []).join(" / "),
+      klicks: (window.__lpKlicks || []).slice(-6).join(" → ") || "keine",
+      stilleFehler: (window.__lpFehler || []).slice(0, 2).join(" | ") || "keine",
+      warnungen: (window.__lpWarn || []).slice(-3).join(" | ") || "keine",
+    };
+  }).catch((e) => ({ pfad: `Stand nicht lesbar: ${String(e.message || e).slice(0, 60)}` }));
+  return ` [Stand: Pfad ${s.pfad}, Thema ${s.thema}, Kurs ${s.kurs}, Vorschau ${s.vorschau}, `
+    + `${s.angehakt}/${s.kaesten} angehakt, Knopf ${s.deckung} · ${s.knopfIdentitaet}; letzte Klicks: ${s.klicks}; `
+    + `stille Ausnahmen: ${s.stilleFehler}; Warnungen: ${s.warnungen}; Meldungen: ${s.meldungen || "keine"}]`;
 }
 
 /** Nach der Marke suchen und zaehlen, wie viele Aufgaben-Zeilen sie zeigen. */
@@ -726,7 +1047,10 @@ async function lpKernThemaSichtbar(kontext) {
  * besteht aus mehreren Lernleitern. Beide ueber die Oberflaeche anlegen.
  */
 async function lpPfadMitLernleiter(kontext) {
-  const { seite } = await neueSeite(kontext);
+  // `probleme` wird hier gebraucht: bleibt „In Lernpfad speichern" wirkungslos,
+  // ist ein Fehler in der Konsole die naechstliegende Erklaerung — und er ging
+  // frueher verloren, weil diese Gruppe nur auf Netzantworten geschaut hat.
+  const { seite, probleme } = await neueSeite(kontext);
   try {
     await lpOeffnen(seite, "/lernpfad?tab=lernpfade");
     await seite.fill("#lp-app #pfad-name", LP_PFAD);
@@ -752,7 +1076,9 @@ async function lpPfadMitLernleiter(kontext) {
     // hoechstens vier Mal — gewartet wird auf Ergebnisse, nicht auf die Uhr.
     let vorschau = false;
     let zuletzt = "";
+    let anlaeufe = 0;
     for (let versuch = 1; versuch <= 4 && !vorschau; versuch++) {
+      anlaeufe = versuch;
       await seite.selectOption("#lp-app #gen-thema", LP_GENTHEMA);
       await seite.selectOption("#lp-app #gen-klasse", LP_KLASSE);
       const gewaehlt = {
@@ -778,9 +1104,36 @@ async function lpPfadMitLernleiter(kontext) {
     const llGespeichert = seite.waitForResponse(
       (r) => /\/api\/lernpfad\/paths\/\d+\/ladders$/.test(new URL(r.url()).pathname) && r.request().method() === "POST",
       { timeout: 25000 }).catch(() => null);
+    // Den Knoten markieren, BEVOR geklickt wird — siehe lpStand: nur so laesst
+    // sich hinterher sagen, ob der Knopf noch derselbe ist.
+    await seite.evaluate(() => { const b = document.querySelector("#lp-app #btn-save-to-pfad"); if (b) b.__zzGemerkt = true; });
+    // Kurz warten, BEVOR gespeichert wird — und zwar aus einem konkreten Grund:
+    // `savePfad` (lp/js/app.js:2313) lehnt jeden Aufruf ab, der weniger als
+    // 400 ms nach dem letzten kommt, und `saveToPfad` kehrt danach OHNE Meldung
+    // zurueck (app.js:2287). Unter WebKit laeuft der Weg von der Vorschau zum
+    // Speichern-Klick schnell genug, um genau in dieses Fenster zu fallen — der
+    // Test prueft dann die Bremse statt das Speichern. Der Befund selbst bleibt
+    // ein Befund (stiller Klick ohne Rueckmeldung, siehe Bericht); hier geht es
+    // um das Speichern.
+    await seite.waitForTimeout(700);
     await seite.click("#lp-app #btn-save-to-pfad");
     const a2 = await llGespeichert;
-    if (!a2) return { ok: false, detail: `kein POST …/paths/<id>/ladders nach „In Lernpfad speichern"${await lpToast(seite)}` };
+    if (!a2) {
+      // Gegenprobe: derselbe Knopf, aber per DOM gedrueckt. Spricht die App
+      // darauf an, lag es NICHT an ihr, sondern daran, dass der echte Tipp den
+      // Knopf nie erreicht hat (Deckel, Ebene, Scrollposition) — auf dem iPad
+      // heisst das: die Lehrkraft tippt und es passiert nichts.
+      const nachtrag = seite.waitForResponse(
+        (r) => /\/api\/lernpfad\/paths\/\d+\/ladders$/.test(new URL(r.url()).pathname) && r.request().method() === "POST",
+        { timeout: 8000 }).catch(() => null);
+      await seite.evaluate(() => document.querySelector("#lp-app #btn-save-to-pfad")?.click()).catch(() => {});
+      const domKlick = await nachtrag
+        ? "der Klick per DOM speichert sehr wohl — der echte Klick erreicht den Knopf nicht"
+        : "auch der Klick per DOM bewirkt nichts — die App speichert nicht";
+      return { ok: false, detail: `kein POST …/paths/<id>/ladders nach „In Lernpfad speichern" `
+        + `(Vorschau kam im ${anlaeufe}. Anlauf; ${domKlick})${await lpStand(seite)}`
+        + (probleme.length ? ` [Konsole: ${probleme.slice(0, 3).join(" | ")}]` : " [Konsole still]") };
+    }
     if (a2.status() !== 201) return { ok: false, detail: `POST …/ladders → HTTP ${a2.status()}` };
 
     // Neu laden — steht die Lernleiter danach wirklich im Pfad?
@@ -1215,16 +1568,26 @@ async function rundgang(seite, pfad, linkSenke, opts, probleme, merke) {
  */
 function drucke() {
   const fehler = ergebnisse.filter((e) => !e.ok);
+  // Je Engine eine Zeile: „gruen" ohne die Engine daneben sagt nicht, WORAUF.
+  const proMotor = MOTOREN.map((m) => {
+    const alle = ergebnisse.filter((e) => e.motor === m);
+    const rot = alle.filter((e) => !e.ok).length;
+    return `${m}: ${rot ? `${rot} von ${alle.length} rot` : `${alle.length} grün`}`;
+  }).join(" · ");
   console.log("\n" + "=".repeat(40));
   if (!fehler.length) {
     console.log(`  ${GRUEN}Browser-Selbsttest gruen${AUS} — ${ergebnisse.length} Seiten/Checks in ${seit().trim()}.`);
+    console.log(`  ${GRAU}${proMotor}${AUS}`);
     console.log("=".repeat(40));
     return;
   }
   console.log(`  ${ROT}${FETT}Browser-Selbsttest ROT${AUS} — ${fehler.length} von ${ergebnisse.length} Prüfungen.`);
+  console.log(`  ${GRAU}${proMotor}${AUS}`);
   const nachGrund = new Map();
   for (const f of fehler) {
-    const grund = f.detail || "(ohne Detail)";
+    // Nach Engine UND Grund buendeln: derselbe Text kann in Chromium und
+    // WebKit voellig verschiedene Ursachen haben.
+    const grund = `[${f.motor}] ${f.detail || "(ohne Detail)"}`;
     if (!nachGrund.has(grund)) nachGrund.set(grund, []);
     nachGrund.get(grund).push(`${f.gruppe} / ${f.name}`);
   }
