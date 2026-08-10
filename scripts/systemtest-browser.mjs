@@ -308,6 +308,20 @@ const verbindungen = (td) => [
     name: "Notenbuch → „Aus Code-Detektiv\" (braucht Code-Detektiv)",
     pfad: `/auswertung?tab=noten${klassenParam(td, "&")}`,
     marker: "Aus Code-Detektiv",
+    // Der Knopf haengt an ZWEI Bedingungen: aktives Modul UND mindestens ein
+    // Notenblock (`cdAktiv && sections.length > 0` in Noten.jsx) — ohne Block
+    // gaebe es keine Spalte, in die die Sitzung wandern koennte.
+    //
+    // Die Bloecke kommen aber erst nach mehreren verketteten Ladeschritten
+    // (Klasse -> Kurs -> Abschnitte). Die pauschale Wartezeit von 400 ms reichte
+    // dafuer mal und mal nicht: der Lauf meldete „tote Bruecke", obwohl nur die
+    // Vorbedingung noch nicht auf dem Schirm war. Also ausdruecklich auf den
+    // Abschnitt warten — und wenn DER ausbleibt, sagt die Meldung genau das,
+    // statt auf die Bruecke zu zeigen.
+    vorbereiten: async (seite) => {
+      await seite.locator("th").filter({ hasText: `${MARKE}-Abschnitt` }).first()
+        .waitFor({ state: "visible", timeout: 10000 });
+    },
     allein: ["auswertung"],
     zusammen: ["auswertung", "code-detektiv"],
   },
@@ -1224,7 +1238,10 @@ async function testdatenAnlegen(td) {
     // Knopf (auch nicht "Aus Code-Detektiv"), und ohne eingetragene Note gibt
     // es im Elternkontakt nichts zu verlinken. Beides gehoert zum Aufbau, sonst
     // stehen zwei Bruecken auf Dauer rot, ohne dass etwas kaputt waere.
-    td.section = await apiJson(
+    // muss(): scheitert das hier still (apiJson liefert bei jedem Nicht-2xx
+    // `null`), fehlt spaeter nur ein Knopf — und gemeldet wird „tote Bruecke"
+    // statt „der Abschnitt wurde nie angelegt".
+    td.section = await muss("Notenblock anlegen",
       `/api/noten/classes/${klasse.id}/sections?term=1${td.kurs?.id ? `&kurs_id=${td.kurs.id}` : ""}`,
       "post", { name: `${MARKE}-Abschnitt`, weight: 100 });
     if (td.section?.id) {
