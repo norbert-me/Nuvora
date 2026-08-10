@@ -473,13 +473,13 @@ ergeben.
 cd apps/api
 pip install pip-tools            # einmalig
 # 1. requirements.txt bearbeiten
-# 2. Lock neu erzeugen — mit Python 3.12, wie im Container:
+# 2. Lock neu erzeugen — mit Python 3.14, wie im Container:
 pip-compile --allow-unsafe --generate-hashes --strip-extras \
   --output-file=requirements.lock.txt requirements.txt
 ```
 
 `pip-compile` löst für den Interpreter, unter dem es läuft — deshalb Python
-3.12. Stolperstein: pip-tools 7.6 bricht mit pip 26 ab
+3.14. Stolperstein: pip-tools 7.6 bricht mit pip 26 ab
 (`make_requirement_preparer() missing … allow_editables`); dann im selben Venv
 `pip install "pip<26"`. Die Testwerkzeuge (`requirements-dev.txt`) bleiben
 bewusst ohne Lock.

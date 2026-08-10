@@ -314,12 +314,12 @@ Two files, one direction: `apps/api/requirements.txt` is the source with ranges,
 cd apps/api
 pip install pip-tools            # once
 # 1. edit requirements.txt (add a package, change a range)
-# 2. regenerate the lock — with Python 3.12, same as the container:
+# 2. regenerate the lock — with Python 3.14, same as the container:
 pip-compile --allow-unsafe --generate-hashes --strip-extras \
   --output-file=requirements.lock.txt requirements.txt
 ```
 
-`pip-compile` resolves for the interpreter it runs under, hence Python 3.12. Gotcha: pip-tools 7.6 crashes with pip 26 (`make_requirement_preparer() missing … allow_editables`); if that happens, `pip install "pip<26"` in the same venv. The test tooling (`requirements-dev.txt`) deliberately stays unlocked: it is never shipped, and an unexpected version shows up immediately as a red test run.
+`pip-compile` resolves for the interpreter it runs under, hence Python 3.14. Gotcha: pip-tools 7.6 crashes with pip 26 (`make_requirement_preparer() missing … allow_editables`); if that happens, `pip install "pip<26"` in the same venv. The test tooling (`requirements-dev.txt`) deliberately stays unlocked: it is never shipped, and an unexpected version shows up immediately as a red test run.
 
 ## Schema & migrations
 

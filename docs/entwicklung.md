@@ -6,14 +6,14 @@ Docker-Weg im [README](../README.md#in-10-minuten-lokal-laufend) schneller.
 ## Voraussetzungen
 
 - Docker mit Compose v2 (mindestens für Postgres)
-- Python 3.12 — dieselbe Fassung wie im Container
-- Node 22
+- Python 3.14 — dieselbe Fassung wie im Container
+- Node 26
 
 ## Backend
 
 ```bash
 cd apps/api
-python3.12 -m venv .venv && source .venv/bin/activate
+python3.14 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt -r requirements-dev.txt
 ```
 
@@ -99,13 +99,13 @@ ergeben und ein umgeschriebenes Upstream-Paket am Hash auffällt.
 cd apps/api
 pip install pip-tools                 # einmalig
 # 1. requirements.txt bearbeiten
-# 2. Lock neu erzeugen — mit Python 3.12, wie im Container:
+# 2. Lock neu erzeugen — mit Python 3.14, wie im Container:
 pip-compile --allow-unsafe --generate-hashes --strip-extras \
   --output-file=requirements.lock.txt requirements.txt
 ```
 
 `pip-compile` löst für den Interpreter, unter dem es läuft — deshalb Python
-3.12. Stolperstein: pip-tools 7.6 bricht mit pip 26 ab
+3.14. Stolperstein: pip-tools 7.6 bricht mit pip 26 ab
 (`make_requirement_preparer() missing … allow_editables`); dann im selben Venv
 `pip install "pip<26"`. Die Testwerkzeuge (`requirements-dev.txt`) bleiben
 bewusst ohne Lock: sie werden nie ausgeliefert, und eine unerwartete Fassung
