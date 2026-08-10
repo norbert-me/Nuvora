@@ -29,13 +29,17 @@ from fastapi import HTTPException
 
 from app.routers import backup
 import test_backup
-from test_backup import _ruf, _sichern
 
-# `welt` ist eine pytest-Fixture: sie wird über den Parameternamen gezogen und
-# nie aufgerufen. Als `from test_backup import welt` sieht der Import für jeden
-# Prüfer ungenutzt aus (CodeQL py/unused-import), und ein `# noqa` erklärt das
-# nur, statt es aufzulösen. Ausdrücklich zugewiesen findet pytest die Fixture
-# genauso — und es steht da, dass sie gebraucht wird.
+# Alle drei Namen ausdrücklich hergeholt, und zwar auf **einem** Weg: ein
+# `import test_backup` neben einem `from test_backup import …` ist zweimal
+# dasselbe Modul in zwei Formen (CodeQL py/import-and-import-from).
+#
+# `welt` ist der Grund für die Form: eine pytest-Fixture wird über den
+# Parameternamen gezogen und nie aufgerufen, ein `from … import welt` sähe für
+# jeden Prüfer ungenutzt aus. Zugewiesen findet pytest sie unverändert, und es
+# steht im Code, dass sie gebraucht wird — statt in einem `# noqa`.
+_ruf = test_backup._ruf
+_sichern = test_backup._sichern
 welt = test_backup.welt
 
 
