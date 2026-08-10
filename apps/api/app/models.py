@@ -170,6 +170,15 @@ class Scan(Base):
     scanned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     session: Mapped[Session] = relationship(back_populates="scans")
 
+    # Ein Kind beantwortet eine Frage genau einmal. Ohne diese Bedingung legten
+    # zwei gleichzeitige Scans (Doppelklick, zwei Geraete, wiederholte Aufnahme)
+    # zwei Zeilen an — im Test waren es acht fuer ein Kind und eine Frage. Die
+    # Auswertung zaehlte die Antwort dann mehrfach.
+    __table_args__ = (
+        UniqueConstraint("session_id", "question_id", "student_id",
+                         name="uq_scan_session_question_student"),
+    )
+
 
 # ─── Nuvora-Kern: Klassen und Schueler ───
 # Kerndaten, kein Modulbesitz: beide Module arbeiten darauf. Ein Modul, das

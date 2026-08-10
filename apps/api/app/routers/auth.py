@@ -344,9 +344,23 @@ def client_ip(request: Request) -> str:
 
 
 def rate_limit(bucket: str, ip: str, max_hits: int, window: int, msg: str = "Zu viele Anfragen. Bitte kurz warten."):
+    """Gleitendes Fenster je Bucket + Kennung.
+
+    Die Kennung ist NICHT immer eine IP: auf den Schueler-Wegen (Karten-Token,
+    Code-Detektiv-Sitzungscode) waere sie die falsche Einheit — eine Schulklasse
+    haengt hinter EINER Adresse, 30 Kinder waeren fuer den Server ein Client.
+    Dort wird je Token bzw. je Sitzungscode gezaehlt; siehe karten.py und
+    codedetektiv.py.
+
+    `_buckets` waechst sonst unbegrenzt: jede neue Adresse, jeder Token und jeder
+    erratene Sitzungscode legt einen Eintrag an, der nie wieder verschwindet —
+    Speicher, der sich von aussen beliebig aufblasen laesst. Darum wird
+    regelmaessig ausgekehrt.
+    """
     now = time.time()
+    _buckets_auskehren(now)
     key = f"{bucket}:{ip}"
-    hits = [t for t in _buckets[key] if now - t < window]
+    hits = [t for t in _buckets.get(key, ()) if now - t < window]
     if len(hits) >= max_hits:
         hits_sorted = sorted(hits)
         retry = max(1, int(window - (now - hits_sorted[0])))
@@ -354,6 +368,32 @@ def rate_limit(bucket: str, ip: str, max_hits: int, window: int, msg: str = "Zu 
         raise HTTPException(429, msg, headers={"Retry-After": str(retry)})
     hits.append(now)
     _buckets[key] = hits
+
+
+# Laengstes im Code benutztes Fenster (cd_session/changeemail: 3600 s). Wer
+# laenger nicht aufgefallen ist, braucht keinen Eintrag mehr.
+_BUCKET_MAX_ALTER = 3600
+_BUCKET_MAX_SCHLUESSEL = 50_000
+
+
+def _buckets_auskehren(now: float):
+    """Alte Eintraege wegwerfen — hoechstens einmal je Minute, damit das Kehren
+    nicht teurer wird als das Zaehlen."""
+    if now - _buckets_auskehren.zuletzt < 60:
+        return
+    _buckets_auskehren.zuletzt = now
+    for k in [k for k, v in list(_buckets.items()) if not v or now - v[-1] > _BUCKET_MAX_ALTER]:
+        _buckets.pop(k, None)
+    # Notbremse: bleibt es trotzdem gross (Flut vieler frischer Kennungen),
+    # fliegt die aeltere Haelfte raus. Lieber ein zu grosszuegiges Limit als
+    # ein Prozess, der am Speicher stirbt.
+    if len(_buckets) > _BUCKET_MAX_SCHLUESSEL:
+        nach_alter = sorted(_buckets.items(), key=lambda kv: kv[1][-1] if kv[1] else 0)
+        for k, _ in nach_alter[: len(nach_alter) // 2]:
+            _buckets.pop(k, None)
+
+
+_buckets_auskehren.zuletzt = 0.0
 
 
 class LoginBody(BaseModel):

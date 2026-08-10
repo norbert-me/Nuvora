@@ -9,7 +9,9 @@ Eigenstaendig (Regel 3). Zwei Zugaenge:
 Der Fortschritt liegt am Server (CardReview) — nur so sieht die Lehrkraft ihn,
 anders als bei Anki, wo er am Geraet bleibt.
 """
+import asyncio
 import io
+import random
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
@@ -19,6 +21,9 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select, func as sa_func, and_, or_, delete as sql_delete
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
@@ -47,6 +52,38 @@ def _utc(dt):
     if dt is not None and dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt
+
+
+def _anlegen_falls_fehlt(db: AsyncSession, modell, werte: dict, schluessel: list[str]):
+    """INSERT ... ON CONFLICT DO NOTHING — die Datenbank entscheidet, wer zuerst war.
+
+    Die Alternative („erst lesen, dann anlegen") hat eine Luecke: zwei
+    gleichzeitige Anfragen finden beide nichts und legen beide an. Auf dem
+    Schueler-Weg passiert genau das (Doppeltipp, Wiederholung durch das Netz).
+    Postgres und SQLite koennen beide ON CONFLICT — nur mit eigenem Konstrukt.
+    """
+    ins = pg_insert if db.get_bind().dialect.name == "postgresql" else sqlite_insert
+    return ins(modell).values(**werte).on_conflict_do_nothing(index_elements=schluessel)
+
+
+async def _mit_wiederholung(db: AsyncSession, arbeit, versuche: int = 6):
+    """Schreibvorgang gegen gleichzeitige Schreiber absichern.
+
+    Postgres serialisiert ueber die Zeilensperre (`SELECT ... FOR UPDATE`) —
+    dort greift die Wiederholung praktisch nie. SQLite (Tests, lokale
+    Pruefinstanz) kennt keine Zeilensperre und bricht den zweiten Schreiber
+    stattdessen ab; dann wird zurueckgerollt, neu gelesen und neu gerechnet.
+
+    Bewusst je Modul kopiert statt geteilt: Module haengen nicht voneinander ab.
+    """
+    for versuch in range(versuche):
+        try:
+            return await arbeit()
+        except (IntegrityError, OperationalError):
+            await db.rollback()
+            if versuch == versuche - 1:
+                raise HTTPException(503, "Gerade zu viel los. Bitte gleich noch einmal versuchen.")
+            await asyncio.sleep(0.02 * (versuch + 1) + random.random() * 0.03)
 
 
 def _token():
@@ -1020,39 +1057,49 @@ async def submit_review(token: str, body: ReviewIn, db: AsyncSession = Depends(g
             or deck.released_at is None or _utc(deck.released_at) > now):
         return {"ok": True, "ignoriert": True}
 
-    rev = (await db.execute(select(CardReview).where(
-        CardReview.student_id == st.id, CardReview.card_id == card.id
-    ))).scalar_one_or_none()
-    if rev is None:
-        rev = CardReview(student_id=st.id, card_id=card.id)
-        db.add(rev)
+    # Zwei Zuege desselben Kindes auf dieselbe Karte koennen gleichzeitig
+    # ankommen (Doppeltipp, Wiederholung durch das Netz). Frueher fanden beide
+    # keine Zeile, legten beide eine an — und die zweite lief in
+    # uq_review_student_card: ein 500er auf dem Kindergeraet. Darum erst die
+    # Zeile von der Datenbank sichern lassen, dann gesperrt weiterrechnen.
+    async def rechnen():
+        await db.execute(_anlegen_falls_fehlt(db, CardReview, {
+            "student_id": st.id, "card_id": card.id,
+            "ease": 250, "interval_days": 0, "reps": 0, "lapses": 0, "due": now,
+        }, ["student_id", "card_id"]))
+        await db.commit()
+        rev = (await db.execute(select(CardReview).where(
+            CardReview.student_id == st.id, CardReview.card_id == card.id
+        ).with_for_update())).scalar_one()
 
-    # Alt-Zeilen koennen NULL in den SM-2-Feldern haben (vor Default/Migration
-    # angelegt) — sonst kracht die Arithmetik mit 'NoneType + int'.
-    rev.ease = 250 if rev.ease is None else rev.ease
-    rev.interval_days = 0 if rev.interval_days is None else rev.interval_days
-    rev.reps = 0 if rev.reps is None else rev.reps
-    rev.lapses = 0 if rev.lapses is None else rev.lapses
+        # Alt-Zeilen koennen NULL in den SM-2-Feldern haben (vor Default/Migration
+        # angelegt) — sonst kracht die Arithmetik mit 'NoneType + int'.
+        rev.ease = 250 if rev.ease is None else rev.ease
+        rev.interval_days = 0 if rev.interval_days is None else rev.interval_days
+        rev.reps = 0 if rev.reps is None else rev.reps
+        rev.lapses = 0 if rev.lapses is None else rev.lapses
 
-    # SM-2 (vereinfacht): grade 0 zuruecksetzen, sonst Intervall/Ease anpassen.
-    # Ease und Intervall sind nach OBEN gedeckelt (EASE_MAX/INTERVAL_MAX_DAYS).
-    if body.grade == 0:
-        rev.reps = 0
-        rev.interval_days = 0
-        rev.lapses += 1
-        rev.ease = max(EASE_MIN, rev.ease - 20)
-        rev.due = now + timedelta(minutes=10)
-    else:
-        q = body.grade + 2  # 1..3 -> SM-2 q 3..5
-        rev.ease = min(EASE_MAX, max(EASE_MIN, rev.ease + (q - 3) * 8 - (5 - q) * 2))
-        rev.reps += 1
-        if rev.reps == 1:
-            rev.interval_days = 1
-        elif rev.reps == 2:
-            rev.interval_days = 3
+        # SM-2 (vereinfacht): grade 0 zuruecksetzen, sonst Intervall/Ease anpassen.
+        # Ease und Intervall sind nach OBEN gedeckelt (EASE_MAX/INTERVAL_MAX_DAYS).
+        if body.grade == 0:
+            rev.reps = 0
+            rev.interval_days = 0
+            rev.lapses += 1
+            rev.ease = max(EASE_MIN, rev.ease - 20)
+            rev.due = now + timedelta(minutes=10)
         else:
-            rev.interval_days = min(INTERVAL_MAX_DAYS, max(1, round(rev.interval_days * rev.ease / 100)))
-        rev.due = now + timedelta(days=rev.interval_days)
-    rev.last_reviewed = now
-    await db.commit()
-    return {"ok": True, "interval_days": rev.interval_days}
+            q = body.grade + 2  # 1..3 -> SM-2 q 3..5
+            rev.ease = min(EASE_MAX, max(EASE_MIN, rev.ease + (q - 3) * 8 - (5 - q) * 2))
+            rev.reps += 1
+            if rev.reps == 1:
+                rev.interval_days = 1
+            elif rev.reps == 2:
+                rev.interval_days = 3
+            else:
+                rev.interval_days = min(INTERVAL_MAX_DAYS, max(1, round(rev.interval_days * rev.ease / 100)))
+            rev.due = now + timedelta(days=rev.interval_days)
+        rev.last_reviewed = now
+        await db.commit()
+        return {"ok": True, "interval_days": rev.interval_days}
+
+    return await _mit_wiederholung(db, rechnen)

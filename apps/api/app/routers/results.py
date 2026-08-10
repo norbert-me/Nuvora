@@ -1,10 +1,13 @@
+import asyncio
+import random
 from collections import Counter
 from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update as sa_update
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -57,55 +60,89 @@ class ScanCreate(BaseModel):
         return v
 
 
+async def _mit_wiederholung(db: AsyncSession, arbeit, versuche: int = 6):
+    """Schreibvorgang gegen gleichzeitige Schreiber absichern (siehe submit_scan).
+
+    Bewusst je Modul kopiert statt geteilt: Module haengen nicht voneinander ab.
+    """
+    for versuch in range(versuche):
+        try:
+            return await arbeit()
+        except (IntegrityError, OperationalError):
+            await db.rollback()
+            if versuch == versuche - 1:
+                raise HTTPException(503, "Gerade zu viel los. Bitte gleich noch einmal scannen.")
+            await asyncio.sleep(0.02 * (versuch + 1) + random.random() * 0.03)
+
+
 @router.post("/scan", status_code=201)
 async def submit_scan(body: ScanCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    session = await db.get(Session, body.session_id)
-    if not session or not session.current_question_id:
-        raise HTTPException(400, "No active question in session")
-    if session.owner_id and session.owner_id != user.id:
-        raise HTTPException(403)
-
     if body.answer not in ("A", "B", "C", "D", ""):
         raise HTTPException(400, "Invalid answer")
 
-    existing = await db.execute(
-        select(Scan).where(
-            Scan.session_id == body.session_id,
-            Scan.question_id == session.current_question_id,
-            Scan.student_id == body.student_id,
-        )
-    )
-    scan = existing.scalar_one_or_none()
-    if scan:
-        scan.answer = body.answer
-    else:
-        scan = Scan(
-            session_id=body.session_id,
-            question_id=session.current_question_id,
-            student_id=body.student_id,
-            answer=body.answer,
-        )
-        db.add(scan)
+    async def eintragen():
+        # Die Session-Zeile sperren, BEVOR nach einem vorhandenen Scan gesucht
+        # wird. Ohne Sperre lesen zwei gleichzeitige Scans desselben Kindes
+        # beide „gibt es noch nicht" und legen beide eine Zeile an — das
+        # Balkendiagramm zeigt dann 31 Antworten in einer Klasse mit 30 Kindern.
+        # Postgres: FOR UPDATE. SQLite kennt keine Zeilensperre und beginnt eine
+        # Transaktion erst beim ersten Schreiben, darum dort ein Schein-UPDATE.
+        # (Sauberer waere eine eindeutige Bedingung auf scans — die fehlt bis
+        # heute, siehe uq_scan_session_question_student.)
+        if db.get_bind().dialect.name == "sqlite":
+            await db.execute(sa_update(Session).where(Session.id == body.session_id)
+                             .values(id=Session.id)
+                             .execution_options(synchronize_session=False))
+            session = (await db.execute(select(Session).where(Session.id == body.session_id))).scalar_one_or_none()
+        else:
+            session = (await db.execute(select(Session).where(Session.id == body.session_id)
+                                        .with_for_update())).scalar_one_or_none()
+        if not session or not session.current_question_id:
+            raise HTTPException(400, "No active question in session")
+        if session.owner_id and session.owner_id != user.id:
+            raise HTTPException(403)
 
-    await db.commit()
+        existing = await db.execute(
+            select(Scan).where(
+                Scan.session_id == body.session_id,
+                Scan.question_id == session.current_question_id,
+                Scan.student_id == body.student_id,
+            )
+        )
+        scan = existing.scalar_one_or_none()
+        if scan:
+            scan.answer = body.answer
+        else:
+            scan = Scan(
+                session_id=body.session_id,
+                question_id=session.current_question_id,
+                student_id=body.student_id,
+                answer=body.answer,
+            )
+            db.add(scan)
+
+        await db.commit()
+        return session.current_question_id
+
+    question_id = await _mit_wiederholung(db, eintragen)
 
     await ws.broadcast(body.session_id, {
         "type": "scan",
         "student_id": body.student_id,
         "answer": body.answer,
-        "question_id": session.current_question_id,
+        "question_id": question_id,
     })
 
     all_scans = await db.execute(
         select(Scan).where(
             Scan.session_id == body.session_id,
-            Scan.question_id == session.current_question_id,
+            Scan.question_id == question_id,
         )
     )
     counts = Counter(s.answer for s in all_scans.scalars().all())
     await ws.broadcast(body.session_id, {
         "type": "results",
-        "question_id": session.current_question_id,
+        "question_id": question_id,
         "counts": {"A": counts.get("A", 0), "B": counts.get("B", 0), "C": counts.get("C", 0), "D": counts.get("D", 0)},
     })
 

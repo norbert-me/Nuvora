@@ -44,6 +44,25 @@ def _req_ip(request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+_global_hits_letzte_kehr = 0.0
+
+
+def _global_hits_auskehren(now: float) -> None:
+    """Abgelaufene Zaehler wegwerfen — hoechstens einmal je Minute.
+
+    Der Speicher wuchs sonst unbegrenzt: jede IP legte einen Eintrag an, der
+    nie wieder verschwand, und von aussen liess sich das beliebig aufblasen
+    (eine Anfrage je Adresse genuegt). Bei IPv6 ist das ein /64 je Client.
+    """
+    global _global_hits_letzte_kehr
+    if now - _global_hits_letzte_kehr < 60:
+        return
+    _global_hits_letzte_kehr = now
+    for schluessel in [k for k, v in _global_hits.items()
+                       if not v or now - v[-1] > GLOBAL_RATE_WINDOW]:
+        _global_hits.pop(schluessel, None)
+
+
 class AbuseGuardMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         # 1) Body-Grösse begrenzen (Schutz vor Speicher-Erschöpfung)
@@ -55,8 +74,17 @@ class AbuseGuardMiddleware(BaseHTTPMiddleware):
             except ValueError:
                 pass
         # 2) Globaler Flood-Schutz pro IP (nur /api/, ohne Health)
+        #
+        # Die Schueler-Wege sind ausgenommen: eine Schulklasse haengt hinter EINER
+        # NAT-Adresse, und 30 Kinder erzeugen dort mehr Anfragen als jede sinnvolle
+        # Obergrenze je IP. Ungeschuetzt sind sie deshalb nicht — sie haben eine
+        # feinere Drossel je Token bzw. je Sitzungscode plus eine eigene
+        # nginx-Zone. Ohne diese Ausnahme bremste die grobe IP-Schranke die ganze
+        # Klasse aus, sobald zwei Gruppen gleichzeitig arbeiten.
         path = request.url.path
-        if path.startswith("/api/") and path != "/api/health":
+        schueler_weg = (path.startswith("/api/karten/lernen/")
+                        or path.startswith("/api/codedetektiv/sessions/"))
+        if path.startswith("/api/") and path != "/api/health" and not schueler_weg:
             ip = _req_ip(request)
             now = _time.time()
             hits = [t for t in _global_hits[ip] if now - t < GLOBAL_RATE_WINDOW]
@@ -65,6 +93,7 @@ class AbuseGuardMiddleware(BaseHTTPMiddleware):
                 return JSONResponse(status_code=429, content={"detail": "Zu viele Anfragen"}, headers={"Retry-After": str(GLOBAL_RATE_WINDOW)})
             hits.append(now)
             _global_hits[ip] = hits
+            _global_hits_auskehren(now)
         return await call_next(request)
 
 
@@ -305,6 +334,23 @@ def _ensure_columns(sync_conn):
     for name, table, column in indexes:
         if table in existing_tables:
             sync_conn.execute(text(f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({column})"))
+
+    # Scans eindeutig je (Sitzung, Frage, Kind).
+    #
+    # Reihenfolge ist entscheidend: erst entdoppeln, dann den Index anlegen —
+    # Bestandsdaten koennen Dubletten enthalten (sie entstanden genau dadurch,
+    # dass die Bedingung fehlte), und die Indexanlage wuerde daran scheitern.
+    # Behalten wird die JUENGSTE Zeile: submit_scan hat schon immer "letzter
+    # Scan gewinnt" gemeint.
+    if "scans" in existing_tables:
+        sync_conn.execute(text(
+            "DELETE FROM scans WHERE id NOT IN ("
+            "  SELECT MAX(id) FROM scans GROUP BY session_id, question_id, student_id)"
+        ))
+        sync_conn.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_scan_session_question_student "
+            "ON scans (session_id, question_id, student_id)"
+        ))
 
     # Alt-Zeilen in card_reviews mit NULL-SM-2-Feldern auffuellen — sonst kracht
     # die Bewertung ('NoneType + int') und der Reifegrad. Nur NULL-Zeilen.

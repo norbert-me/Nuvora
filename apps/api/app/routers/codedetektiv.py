@@ -4,13 +4,16 @@ Damit Rätsel themen-getaggt und im Kalender planbar sind, liegen die eigenen
 Rätsel der Lehrkraft im Kern (nicht mehr nur im Browser-localStorage). Die App
 arbeitet weiter mit ihrer stabilen `client_id`; upsert läuft darüber.
 """
+import asyncio
+import random
 import secrets
 from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, update as sa_update
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -103,11 +106,48 @@ def _session_public(s: CodeSession) -> dict:
     }
 
 
-async def _by_code(db: AsyncSession, code: str) -> CodeSession:
-    s = (await db.execute(select(CodeSession).where(CodeSession.code == code.upper()))).scalar_one_or_none()
+async def _by_code(db: AsyncSession, code: str, sperren: bool = False) -> CodeSession:
+    """`sperren=True` fuer jeden, der players/results aendert.
+
+    players und results sind JSON-Listen EINER Zeile. Wer sie ohne Sperre liest,
+    anhaengt und zurueckschreibt, verliert alles, was zwischendurch jemand
+    anderes geschrieben hat — bei 30 Kindern, die gleichzeitig beitreten, bleiben
+    davon zwei uebrig.
+
+    Postgres sperrt die Zeile mit `FOR UPDATE`. SQLite (Tests, lokale
+    Pruefinstanz) kennt das nicht — und schlimmer: pysqlite beginnt eine
+    Transaktion erst beim ersten Schreiben, ein SELECT laeuft also voellig
+    ungeschuetzt. Darum dort ein Schein-UPDATE VOR dem Lesen: das erzwingt die
+    Schreibtransaktion, weitere Schreiber warten (busy_timeout), statt einander
+    zu ueberschreiben.
+    """
+    q = select(CodeSession).where(CodeSession.code == code.upper())
+    if sperren:
+        if db.get_bind().dialect.name == "sqlite":
+            await db.execute(sa_update(CodeSession).where(CodeSession.code == code.upper())
+                             .values(id=CodeSession.id)
+                             .execution_options(synchronize_session=False))
+        else:
+            q = q.with_for_update()
+    s = (await db.execute(q)).scalar_one_or_none()
     if not s:
         raise HTTPException(404, "Session nicht gefunden")
     return s
+
+
+async def _mit_wiederholung(db: AsyncSession, arbeit, versuche: int = 8):
+    """Siehe `_by_code`: der zweite Schreiber rollt zurueck, liest neu, rechnet neu.
+
+    Bewusst je Modul kopiert statt geteilt: Module haengen nicht voneinander ab.
+    """
+    for versuch in range(versuche):
+        try:
+            return await arbeit()
+        except (IntegrityError, OperationalError):
+            await db.rollback()
+            if versuch == versuche - 1:
+                raise HTTPException(503, "Gerade zu viel los. Bitte gleich noch einmal versuchen.")
+            await asyncio.sleep(0.02 * (versuch + 1) + random.random() * 0.03)
 
 
 async def _owned_session(db: AsyncSession, user: User, code: str) -> CodeSession:
@@ -144,10 +184,26 @@ async def create_session(body: SessionCreate, user: User = Depends(require_modul
 
 @router.get("/sessions/{code}")
 async def get_session(code: str, request: Request, db: AsyncSession = Depends(get_db)):
-    """Öffentlich: Zustand pollen (Beitreten, Spielen ohne Login)."""
-    # Öffentlich + kurzer Code -> gegen Erraten/Enumerieren begrenzen (pro IP).
-    rate_limit("cd_code", client_ip(request), 300, 60, "Zu viele Anfragen. Bitte kurz warten.")
-    return _session_public(await _by_code(db, code))
+    """Öffentlich: Zustand pollen (Beitreten, Spielen ohne Login).
+
+    Gedrosselt wird je SITZUNGSCODE, nicht je IP. Eine Schulklasse haengt hinter
+    EINER Adresse (NAT) — fuer den Server ist sie ein einziger Client. Die App
+    fragt alle 1,8 s den Stand ab (store.jsx), 30 Kinder sind also rund 1000
+    Anfragen je Minute aus einer Adresse; das alte Limit (300/min je IP) hat ab
+    dem neunten Kind abgewiesen.
+
+    Der Schutz gegen ERRATEN des sechsstelligen Codes bleibt und wird sogar
+    schaerfer: nicht die Abfragen auf einen gueltigen Code sind das Problem,
+    sondern die FEHLGRIFFE — die zaehlen weiter je Adresse und eng.
+    """
+    ip = client_ip(request)
+    rate_limit("cd_code_ip", ip, 3000, 60)  # Notbremse: ein Geraet/Netz insgesamt
+    s = (await db.execute(select(CodeSession).where(CodeSession.code == code.upper()))).scalar_one_or_none()
+    if not s:
+        rate_limit("cd_code_miss", ip, 30, 60, "Zu viele Versuche. Bitte kurz warten.")
+        raise HTTPException(404, "Session nicht gefunden")
+    rate_limit("cd_code", s.code, 2400, 60)  # ~40/s je Sitzung: Klasse ja, Flut nein
+    return _session_public(s)
 
 
 class JoinIn(BaseModel):
@@ -156,24 +212,38 @@ class JoinIn(BaseModel):
 
 @router.post("/sessions/{code}/join")
 async def join_session(code: str, body: JoinIn, request: Request, db: AsyncSession = Depends(get_db)):
-    """Öffentlich: als Spieler beitreten."""
-    rate_limit("cd_join", client_ip(request), 60, 60, "Zu viele Beitritts-Versuche. Bitte kurz warten.")
-    s = await _by_code(db, code)
-    if s.ended:
-        raise HTTPException(400, "Session ist beendet")
+    """Öffentlich: als Spieler beitreten.
+
+    Gedrosselt je Kind (Sitzungscode + Name) statt je IP: 30 Kinder einer Klasse
+    treten aus derselben Adresse bei, das alte Limit (60/min je IP) reichte fuer
+    eine Klasse mit Nachzueglern und Wiederholungen nicht. Ein Kind, das
+    hundertmal beitritt, wird weiter gebremst — und die beiden groben Zaehler
+    darunter halten Flut ueber viele Namen in Grenzen.
+    """
     name = (body.name or "").strip()[:40]
     if not name:
         raise HTTPException(400, "Name fehlt")
-    players = list(s.players or [])
-    if any(p.get("name") == name for p in players):
-        return _session_public(s)  # schon dabei
-    if s.started:
-        raise HTTPException(400, "Session läuft bereits")
-    players.append({"name": name, "joinedAt": _now().isoformat()})
-    s.players = players
-    flag_modified(s, "players")
-    await db.commit()
-    return _session_public(s)
+    ip = client_ip(request)
+    rate_limit("cd_join_kind", f"{code.upper()}:{name}", 20, 60, "Zu viele Beitritts-Versuche. Bitte kurz warten.")
+    rate_limit("cd_join_code", code.upper(), 600, 60, "Zu viele Beitritte in dieser Sitzung. Bitte kurz warten.")
+    rate_limit("cd_join_ip", ip, 1200, 60, "Zu viele Beitritts-Versuche. Bitte kurz warten.")
+
+    async def eintragen():
+        s = await _by_code(db, code, sperren=True)
+        if s.ended:
+            raise HTTPException(400, "Session ist beendet")
+        players = list(s.players or [])
+        if any(p.get("name") == name for p in players):
+            return _session_public(s)  # schon dabei
+        if s.started:
+            raise HTTPException(400, "Session läuft bereits")
+        players.append({"name": name, "joinedAt": _now().isoformat()})
+        s.players = players
+        flag_modified(s, "players")
+        await db.commit()
+        return _session_public(s)
+
+    return await _mit_wiederholung(db, eintragen)
 
 
 class ResultIn(BaseModel):
@@ -189,38 +259,50 @@ async def submit_result(code: str, body: ResultIn, request: Request, db: AsyncSe
     """Öffentlich: Ergebnis einer Runde melden (einmal je Spieler+Rätsel).
 
     Oeffentlich + ohne Login: darum rate-limitiert, mit Laengen- und Groessen-
-    Grenzen, damit niemand die results-Liste vollschreiben kann (DB-Bloat/DoS)."""
-    rate_limit("cd_result", client_ip(request), 120, 60, "Zu viele Anfragen. Bitte kurz warten.")
-    s = await _by_code(db, code)
-    if s.ended:
-        raise HTTPException(400, "Session ist beendet")
+    Grenzen, damit niemand die results-Liste vollschreiben kann (DB-Bloat/DoS).
+
+    Gedrosselt je Kind (Sitzungscode + Name), nicht je IP — eine Klasse haengt
+    hinter EINER Adresse und meldete gemeinsam mehr als die alten 120/min."""
     pn = (body.playerName or "").strip()[:40]
     pid = (body.puzzleId or "").strip()[:64]
     if not pn or not pid:
         raise HTTPException(400, "Ungültige Angaben")
-    # Nur wer in der Sitzung steht, darf Ergebnisse melden. Wer den Code kennt,
-    # konnte sonst waehrend des laufenden Spiels beliebige Namen in die Liste (und
-    # damit in die Notenspalte) schreiben. Vor dem Start wird ein verlorener
-    # Beitritt still nachgeholt, damit kein Kind sein Ergebnis verliert.
-    players = list(s.players or [])
-    if not any(p.get("name") == pn for p in players):
-        if s.started:
-            raise HTTPException(403, "Nicht in dieser Sitzung angemeldet")
-        players.append({"name": pn, "joinedAt": _now().isoformat()})
-        s.players = players
-        flag_modified(s, "players")
-    results = list(s.results or [])
-    if any(r.get("playerName") == pn and r.get("puzzleId") == pid for r in results):
+    ip = client_ip(request)
+    rate_limit("cd_result_kind", f"{code.upper()}:{pn}", 60, 60, "Zu viele Anfragen. Bitte kurz warten.")
+    rate_limit("cd_result_code", code.upper(), 1200, 60, "Zu viele Meldungen in dieser Sitzung. Bitte kurz warten.")
+    rate_limit("cd_result_ip", ip, 2400, 60, "Zu viele Anfragen. Bitte kurz warten.")
+
+    async def melden():
+        # Gesperrt lesen: players und results sind JSON-Listen EINER Zeile —
+        # ohne Sperre ueberschreiben 30 gleichzeitige Meldungen einander.
+        s = await _by_code(db, code, sperren=True)
+        if s.ended:
+            raise HTTPException(400, "Session ist beendet")
+        # Nur wer in der Sitzung steht, darf Ergebnisse melden. Wer den Code kennt,
+        # konnte sonst waehrend des laufenden Spiels beliebige Namen in die Liste (und
+        # damit in die Notenspalte) schreiben. Vor dem Start wird ein verlorener
+        # Beitritt still nachgeholt, damit kein Kind sein Ergebnis verliert.
+        players = list(s.players or [])
+        if not any(p.get("name") == pn for p in players):
+            if s.started:
+                raise HTTPException(403, "Nicht in dieser Sitzung angemeldet")
+            players.append({"name": pn, "joinedAt": _now().isoformat()})
+            s.players = players
+            flag_modified(s, "players")
+        results = list(s.results or [])
+        if any(r.get("playerName") == pn and r.get("puzzleId") == pid for r in results):
+            return _session_public(s)
+        if len(results) >= 5000:
+            raise HTTPException(400, "Zu viele Ergebnisse in dieser Session")
+        results.append({"playerName": pn, "puzzleId": pid,
+                        "solved": bool(body.solved), "attempts": max(0, min(int(body.attempts), 10000)),
+                        "time": max(0.0, min(float(body.time), 1e7))})
+        s.results = results
+        flag_modified(s, "results")
+        await db.commit()
         return _session_public(s)
-    if len(results) >= 5000:
-        raise HTTPException(400, "Zu viele Ergebnisse in dieser Session")
-    results.append({"playerName": pn, "puzzleId": pid,
-                    "solved": bool(body.solved), "attempts": max(0, min(int(body.attempts), 10000)),
-                    "time": max(0.0, min(float(body.time), 1e7))})
-    s.results = results
-    flag_modified(s, "results")
-    await db.commit()
-    return _session_public(s)
+
+    return await _mit_wiederholung(db, melden)
 
 
 @router.post("/sessions/{code}/start")
