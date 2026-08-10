@@ -8,6 +8,7 @@ import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, put } from "../core/cache.js";
 import { undoDelete } from "../core/undo.jsx";
+import { sende, pruefeAntwort } from "../core/melden.js";
 import MaterialPanel from "../components/MaterialPanel.jsx";
 import ferienDE from "../data/ferien-de.json";
 import { feiertage } from "../data/feiertage.js";
@@ -147,9 +148,12 @@ export default function Kalender() {
   const loadExams = () => fetch(`${API}/klassenarbeiten/uebersicht`).then((r) => (r.ok ? r.json() : [])).then((d) => setExamOverview(Array.isArray(d) ? d : [])).catch(() => {});
   // Nach jeder Änderung auch die Kalender-Einträge neu laden — die Klassenarbeit
   // erzeugt/ändert/löscht serverseitig einen ganztägigen Eintrag.
-  const addExam = async (body) => { await fetch(`${API}/klassenarbeiten`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {}); loadExams(); load(); };
-  const updExam = async (id, body) => { await fetch(`${API}/klassenarbeiten/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => {}); loadExams(); load(); };
-  const delExam = async (id) => { await fetch(`${API}/klassenarbeiten/${id}`, { method: "DELETE" }).catch(() => {}); loadExams(); load(); };
+  // Klassenarbeiten: hier tippt die Lehrkraft Termin und Bezeichnung. Ohne
+  // Prüfung holte loadExams() den alten Stand zurück — der Termin war weg, und
+  // der Kalender zeigte am Tag der Arbeit nichts an.
+  const addExam = async (body) => { await sende(`${API}/klassenarbeiten`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, t("common.save")); loadExams(); load(); };
+  const updExam = async (id, body) => { await sende(`${API}/klassenarbeiten/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, t("common.save")); loadExams(); load(); };
+  const delExam = async (id) => { await sende(`${API}/klassenarbeiten/${id}`, { method: "DELETE" }, t("common.delete")); loadExams(); load(); };
   useEffect(() => { if (view === "klassenarbeit") loadExams(); /* eslint-disable-next-line */ }, [view]);
   const [wdhVorschlag, setWdhVorschlag] = useState([]); // schwache Themen der Vorwoche
   const [slotEdit, setSlotEdit] = useState(null); // { weekday, period, ...slot } oder null
@@ -331,6 +335,10 @@ export default function Kalender() {
     const res = await fetch(e.id ? `${API}/entries/${e.id}` : `${API}/entries`, {
       method: e.id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     }).catch(() => null);
+    // Lehnte der Server ab, passierte bisher NICHTS: das Modal blieb offen, der
+    // getippte Verlaufsplan stand noch da, und nur ein späterer Blick auf den
+    // Tag verriet, dass die Stunde nie gespeichert wurde.
+    if (!(await pruefeAntwort(res, t("common.save")))) return;
     if (res && res.ok) {
       // Nach dem Speichern den Eintrag ANZEIGEN (nicht schließen). _justSaved lässt
       // das Modal in die Ansicht wechseln; date wieder als Date, id vom Server.
@@ -387,17 +395,22 @@ export default function Kalender() {
     if (kursId) {
       setKurse((prev) => prev.map((k) => (k.id === kursId ? { ...k, color } : k)));
       const r = await fetch(`/api/kurse/${kursId}/color`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) }).catch(() => null);
-      console.warn("[Kalender] Kurs-Farbe: kursId=%s -> %s (HTTP %s)", kursId, color, r ? r.status : "netzfehler");
+      // Die Farbe steht sofort lokal; scheiterte das Speichern, war sie nach
+      // dem nächsten Laden wieder weg — bisher nur in der Konsole zu sehen.
+      await pruefeAntwort(r, "Farbe speichern");
     } else if (classId) {
       setClasses((prev) => { const next = prev.map((c) => (c.id === classId ? { ...c, color } : c)); put("classes", next); return next; });
       const r = await fetch(`/api/classes/${classId}/color`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) }).catch(() => null);
-      console.warn("[Kalender] Klassen-Farbe: classId=%s -> %s (HTTP %s)", classId, color, r ? r.status : "netzfehler");
+      await pruefeAntwort(r, "Farbe speichern");
     }
   };
 
   const saveSlot = async (s) => {
     const body = { weekday: s.weekday, period: s.period, title: s.title || "", class_id: s.class_id || null, kurs_id: s.kurs_id ?? null, topic_id: s.topic_id || null };
     const res = await fetch(`${API}/timetable/slot`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
+    // Bisher blieb die Maske bei Ablehnung einfach offen stehen — nicht von
+    // „ich habe den Knopf verfehlt" zu unterscheiden.
+    if (!(await pruefeAntwort(res, t("common.save")))) return;
     if (res && res.ok) { setSlotEdit(null); loadTt(); }
   };
   const removeSlot = async (id) => { await fetch(`${API}/timetable/slot/${id}`, { method: "DELETE" }).catch(() => {}); setSlotEdit(null); loadTt(); };

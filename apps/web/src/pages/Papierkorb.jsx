@@ -5,7 +5,8 @@
 import { useState, useEffect } from "react";
 import { useLanguage } from "../i18n/index.jsx";
 import { askConfirm } from "../core/dialog.jsx";
-import { pageTitle, pageIntro, btnSecondary, Icon, ICONS, iconBtn, COLORS as C, panelStyle, Empty, pageApp } from "../components/Icons.jsx";
+import { pageTitle, pageIntro, btnSecondary, Icon, ICONS, iconBtn, COLORS as C, panelStyle, Empty, pageApp, LoadError } from "../components/Icons.jsx";
+import { sende } from "../core/melden.js";
 
 const API = "/api";
 
@@ -17,26 +18,35 @@ export default function Papierkorb() {
   const [items, setItems] = useState([]);
   const [busy, setBusy] = useState(false);
 
-  const load = () => fetch(`${API}/trash`).then((r) => (r.ok ? r.json() : [])).then((d) => setItems(Array.isArray(d) ? d : [])).catch(() => {});
+  // „Papierkorb ist leer" ist hier die beruhigendste Meldung der Anwendung —
+  // und war bei jedem Serverfehler gelogen. Wer sein geloeschtes Halbjahr
+  // suchte, sah Leere und glaubte, die 30 Tage seien vorbei.
+  const [ladefehler, setLadefehler] = useState(false);
+  const load = () => fetch(`${API}/trash`)
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then((d) => { setItems(Array.isArray(d) ? d : []); setLadefehler(false); })
+    .catch(() => setLadefehler(true));
   useEffect(() => { load(); }, []);
 
   const restore = async (it) => {
     setBusy(true);
-    await fetch(`${API}/trash/${it.kind}/${it.id}/restore`, { method: "POST" }).catch(() => {});
+    // Ein gescheitertes Wiederherstellen war nicht von einem gelungenen zu
+    // unterscheiden: der Eintrag blieb im Papierkorb stehen, kommentarlos.
+    await sende(`${API}/trash/${it.kind}/${it.id}/restore`, { method: "POST" }, t("trash.restore"));
     setBusy(false);
     load();
   };
   const purge = async (it) => {
     if (!await askConfirm(t("trash.purgeConfirm", { name: it.label }))) return;
     setBusy(true);
-    await fetch(`${API}/trash/${it.kind}/${it.id}`, { method: "DELETE" }).catch(() => {});
+    await sende(`${API}/trash/${it.kind}/${it.id}`, { method: "DELETE" }, t("trash.purge"));
     setBusy(false);
     load();
   };
   const leeren = async () => {
     if (!await askConfirm(t("trash.emptyConfirm", { n: items.length }))) return;
     setBusy(true);
-    await fetch(`${API}/trash`, { method: "DELETE" }).catch(() => {});
+    await sende(`${API}/trash`, { method: "DELETE" }, t("trash.empty"));
     setBusy(false);
     load();
   };
@@ -60,7 +70,8 @@ export default function Papierkorb() {
       </div>
       <p style={pageIntro}>{t("trash.intro")}</p>
 
-      {items.length === 0 && <Empty title={t("trash.emptyTitle")} hint={t("trash.emptyHint")} />}
+      {ladefehler ? <LoadError message="Der Papierkorb konnte nicht geladen werden." onRetry={load} />
+        : items.length === 0 && <Empty title={t("trash.emptyTitle")} hint={t("trash.emptyHint")} />}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {gruppen.map(({ kind, list }) => (

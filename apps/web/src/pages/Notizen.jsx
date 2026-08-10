@@ -1,7 +1,8 @@
 // Modul Beobachtungen — formative Notizen je Schüler. Bewusst getrennt von der
 // Note. Klasse wählen → Schüler → Notizen (Datum, Kategorie, Text).
 import { useState, useEffect } from "react";
-import { pageTitle, btnPrimary, btnSecondary, inputStyle, selectStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, pageApp} from "../components/Icons.jsx";
+import { pageTitle, btnPrimary, btnSecondary, inputStyle, selectStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, pageApp, LoadError} from "../components/Icons.jsx";
+import { sende } from "../core/melden.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, lastClass, rememberClass } from "../core/cache.js";
@@ -39,15 +40,25 @@ export default function Notizen() {
   const loadCounts = () => { if (classId) fetch(`${API}/counts?class_id=${classId}`).then((r) => (r.ok ? r.json() : {})).then((d) => setCounts(d || {})).catch(() => {}); };
   useEffect(() => { setSel(null); loadCounts(); }, [classId]);
 
-  const loadList = (sid) => fetch(`${API}?student_id=${sid}`).then((r) => (r.ok ? r.json() : [])).then((d) => setList(Array.isArray(d) ? d : [])).catch(() => {});
+  // Eine gescheiterte Abfrage sah aus wie „noch keine Beobachtungen" — bei
+  // einem Kind, ueber das seit Monaten notiert wird, ist das die gefaehrlichste
+  // aller Falschaussagen: man notiert neu, statt den Fehler zu sehen.
+  const [listFehler, setListFehler] = useState(false);
+  const loadList = (sid) => fetch(`${API}?student_id=${sid}`)
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then((d) => { setList(Array.isArray(d) ? d : []); setListFehler(false); })
+    .catch(() => { setList([]); setListFehler(true); });
   const open = (s) => { setSel(s); setText(""); setCat(""); setDate(ymd(new Date())); loadList(s.id); };
 
   const add = async () => {
     if (!sel || !text.trim()) return;
-    await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ student_id: sel.id, date: date || null, category: cat || "", text: text.trim() }) }).catch(() => {});
+    // Der getippte Text wird erst geleert, wenn der Server ihn hat. Vorher war
+    // eine abgelehnte Beobachtung doppelt weg: nicht gespeichert und aus dem
+    // Feld geloescht — neu tippen aus dem Gedaechtnis.
+    if (!(await sende(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ student_id: sel.id, date: date || null, category: cat || "", text: text.trim() }) }, t("common.add")))) return;
     setText(""); loadList(sel.id); loadCounts();
   };
-  const del = async (id) => { await fetch(`${API}/${id}`, { method: "DELETE" }).catch(() => {}); if (sel) loadList(sel.id); loadCounts(); };
+  const del = async (id) => { await sende(`${API}/${id}`, { method: "DELETE" }, t("common.delete")); if (sel) loadList(sel.id); loadCounts(); };
   const fmt = (iso) => { try { return new Date(iso + "T00:00:00").toLocaleDateString(); } catch { return iso; } };
 
   return (
@@ -88,7 +99,9 @@ export default function Notizen() {
             </div>
           </div>
 
-          {list.length === 0 ? (
+          {listFehler ? (
+            <LoadError message="Die Beobachtungen konnten nicht geladen werden." onRetry={() => loadList(sel.id)} />
+          ) : list.length === 0 ? (
             <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("notizen.empty")}</p>
           ) : list.map((o) => (
             <div key={o.id} style={{ display: "flex", gap: 10, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", marginBottom: 6 }}>

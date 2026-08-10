@@ -7,7 +7,8 @@ import { useLanguage } from "../i18n/index.jsx";
 import { askPrompt, askConfirm } from "../core/dialog.jsx";
 import KursLinks from "../components/KursLinks.jsx";
 import { undoDelete } from "../core/undo.jsx";
-import { AddButton, pageTitle, pageIntro, btnPrimary, btnSecondary, selectStyle, chipStyle, Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, Toggle, Empty, pageApp} from "../components/Icons.jsx";
+import { sende } from "../core/melden.js";
+import { AddButton, pageTitle, pageIntro, btnPrimary, btnSecondary, selectStyle, chipStyle, Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, Toggle, Empty, pageApp, LoadError} from "../components/Icons.jsx";
 
 const API = "/api";
 const editLabel = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text3)", marginBottom: 6 };
@@ -21,28 +22,41 @@ export default function Kurse() {
   const [editKurs, setEditKurs] = useState(null); // aufgeklappter Bearbeiten-Bereich (Name, E/G)
   const [editName, setEditName] = useState("");
 
-  const load = () => fetch(`${API}/kurse`).then((r) => (r.ok ? r.json() : [])).then((d) => setKurse(Array.isArray(d) ? d : [])).catch(() => {});
+  // Ein Serverfehler sah hier aus wie „noch kein Kurs angelegt" — mitsamt der
+  // freundlichen Empty-Kachel. Wer seine Kurse vermisste, suchte den Fehler bei
+  // sich statt beim Endpunkt. Deshalb der eigene Zustand.
+  const [ladefehler, setLadefehler] = useState(false);
+  const load = () => fetch(`${API}/kurse`)
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then((d) => { setKurse(Array.isArray(d) ? d : []); setLadefehler(false); })
+    .catch(() => setLadefehler(true));
   const loadClasses = () => fetch(`${API}/classes`).then((r) => (r.ok ? r.json() : [])).then((d) => setAllClasses(Array.isArray(d) ? d : [])).catch(() => {});
   useEffect(() => { load(); loadClasses(); }, []);
 
   const anlegen = async () => {
     const name = neu.trim(); if (!name) return;
-    await fetch(`${API}/kurse`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }).catch(() => {});
+    // Bei Ablehnung bleibt der getippte Name im Feld stehen — sonst wäre er weg
+    // und der Kurs trotzdem nicht da.
+    if (!(await sende(`${API}/kurse`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }, t("kurse.add")))) return;
     setNeu(""); load();
   };
   const openEdit = (k) => { if (editKurs === k.id) { setEditKurs(null); } else { setEditKurs(k.id); setEditName(k.name); } };
   const saveName = async (k) => {
     const name = editName.trim();
     if (!name) return;
-    await fetch(`${API}/kurse/${k.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }).catch(() => {});
+    // Ohne die Prüfung holte load() den alten Namen zurück: der getippte Name
+    // verschwand vor den Augen der Lehrkraft, ohne Meldung.
+    if (!(await sende(`${API}/kurse/${k.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }, t("kurse.editName")))) return;
     load();
   };
   const setNiveauAktiv = async (k, val) => {
-    await fetch(`${API}/kurse/${k.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: k.name, niveau_aktiv: val }) }).catch(() => {});
+    // Ein abgelehnter Schalter sprang wortlos zurück — das sieht aus wie ein
+    // klemmender Regler, ist aber eine Ablehnung des Servers.
+    if (!(await sende(`${API}/kurse/${k.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: k.name, niveau_aktiv: val }) }, t("kurse.editLevels")))) return;
     load();
   };
-  const addMember = async (kursId, classId) => { await fetch(`${API}/kurse/${kursId}/classes/${classId}`, { method: "POST" }).catch(() => {}); load(); };
-  const removeMember = async (kursId, classId) => { await fetch(`${API}/kurse/${kursId}/classes/${classId}`, { method: "DELETE" }).catch(() => {}); load(); };
+  const addMember = async (kursId, classId) => { if (!(await sende(`${API}/kurse/${kursId}/classes/${classId}`, { method: "POST" }, t("kurse.addClass")))) return; load(); };
+  const removeMember = async (kursId, classId) => { if (!(await sende(`${API}/kurse/${kursId}/classes/${classId}`, { method: "DELETE" }, t("kurse.unlink")))) return; load(); };
   const delKurs = (k) => {
     // Sofort aus der Liste, 5 s Undo-Toast; erst dann wirklich löschen.
     setKurse((prev) => prev.filter((x) => x.id !== k.id));
@@ -69,7 +83,10 @@ export default function Kurse() {
         <AddButton onClick={anlegen} title={t("kurse.add")} />
       </div>
 
-      {kurse.length === 0 && <Empty title={t("kurse.emptyTitle")} hint={t("kurse.emptyHint")} />}
+      {/* Ladefehler ist NICHT dasselbe wie „noch nichts angelegt": das eine
+          repariert der Server, das andere die Lehrkraft. */}
+      {ladefehler ? <LoadError message="Die Kurse konnten nicht geladen werden." onRetry={() => { load(); loadClasses(); }} />
+        : kurse.length === 0 && <Empty title={t("kurse.emptyTitle")} hint={t("kurse.emptyHint")} />}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {kurse.map((k) => (
           <div key={k.id} style={cardStyle}>
@@ -157,8 +174,8 @@ function StudentMembers({ kursId, allClasses, t }) {
   const load = () => fetch(`${API}/kurse/${kursId}/members`).then((r) => (r.ok ? r.json() : [])).then((d) => setMembers(Array.isArray(d) ? d : [])).catch(() => {});
   useEffect(() => { load(); }, [kursId]); // eslint-disable-line
   const memberIds = new Set(members.map((m) => m.student_id));
-  const add = async (sid) => { await fetch(`${API}/kurse/${kursId}/members/${sid}`, { method: "POST" }).catch(() => {}); load(); };
-  const remove = async (sid) => { await fetch(`${API}/kurse/${kursId}/members/${sid}`, { method: "DELETE" }).catch(() => {}); load(); };
+  const add = async (sid) => { await sende(`${API}/kurse/${kursId}/members/${sid}`, { method: "POST" }, t("kurse.editStudents")); load(); };
+  const remove = async (sid) => { await sende(`${API}/kurse/${kursId}/members/${sid}`, { method: "DELETE" }, t("kurse.unlink")); load(); };
   const cls = allClasses.find((c) => String(c.id) === String(pickClass));
   const candidates = cls ? (cls.students || []).filter((sname) => !memberIds.has(sname.id)) : [];
   return (
@@ -219,10 +236,14 @@ function MassnahmenPanel({ kursId, t }) {
 
   const speichern = async (name, liste) => {
     setStuds((prev) => prev.map((s) => (s.name === name ? { ...s, massnahmen: liste } : s)));
-    await fetch(`${API}/kurse/${kursId}/massnahmen`, {
+    // Die Anzeige ist optimistisch: ohne Prüfung stand der Nachteilsausgleich
+    // auf dem Schirm, aber nicht in der Datenbank — und fehlte am Tag der
+    // Klassenarbeit, wo der Kalender ihn zeigen soll.
+    const ok = await sende(`${API}/kurse/${kursId}/massnahmen`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, massnahmen: liste }),
-    }).catch(() => {});
+    }, t("kurse.editMeasures"));
+    if (!ok) fetch(`${API}/kurse/${kursId}/massnahmen`).then((r) => (r.ok ? r.json() : null)).then((d) => { if (Array.isArray(d)) setStuds(d); }).catch(() => {});
   };
   const setFeld = (s, i, feld, wert) => {
     const liste = [...(s.massnahmen || [])];
@@ -289,8 +310,11 @@ function NiveauPanel({ kursId, niveauAktiv = false, t }) {
     fetch(`${API}/kurse/${kursId}/students`).then((r) => (r.ok ? r.json() : [])).then((d) => setStuds(Array.isArray(d) ? d : [])).catch(() => setStuds([]));
   }, [kursId]);
   const setNiveau = async (name, niveau) => {
+    const vorher = studs;
     setStuds((prev) => prev.map((s) => (s.name === name ? { ...s, niveau } : s)));
-    await fetch(`${API}/kurse/${kursId}/niveau`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, niveau }) }).catch(() => {});
+    // E/G steuert die Wertung. Ein still verlorenes E hieße: die Auswertung
+    // rechnet weiter mit G, und niemand merkt es bis zur Notenkonferenz.
+    if (!(await sende(`${API}/kurse/${kursId}/niveau`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, niveau }) }, t("kurse.editLevels")))) setStuds(vorher);
   };
   if (!studs) return null;
   if (studs.length === 0) return <p style={{ fontSize: 12.5, color: "var(--text3)", marginTop: 8 }}>{t("kurse.niveauNoStudents")}</p>;

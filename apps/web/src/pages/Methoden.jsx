@@ -5,7 +5,8 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
-import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, Modal, inputStyle, ExportButton, ImportButton, Popover} from "../components/Icons.jsx";
+import { sende } from "../core/melden.js";
+import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, Modal, inputStyle, ExportButton, ImportButton, Popover, LoadError} from "../components/Icons.jsx";
 import PublishModal from "../components/PublishModal.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -32,7 +33,14 @@ export default function Methoden({ embedded } = {}) {
   const [drag, setDrag] = useState(null);       // { kind: "folder"|"method", id }
   const [dropTarget, setDropTarget] = useState(undefined); // Ziel-Ordner-id | null (Wurzel) | undefined
 
-  const load = () => fetch(`${API}/list`).then((r) => (r.ok ? r.json() : [])).then((d) => setItems(Array.isArray(d) ? d : [])).catch(() => {});
+  // Ein toter Endpunkt sah aus wie eine leere Sammlung („Noch keine Einstiege")
+  // — genau das Bild, das man für „nichts angelegt" hält, während in Wahrheit
+  // alles noch da ist und nur die Anfrage scheitert.
+  const [ladefehler, setLadefehler] = useState(false);
+  const load = () => fetch(`${API}/list`)
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then((d) => { setItems(Array.isArray(d) ? d : []); setLadefehler(false); })
+    .catch(() => setLadefehler(true));
   const loadFolders = () => fetch(`${API}/folders`).then((r) => (r.ok ? r.json() : [])).then((d) => setFolders(Array.isArray(d) ? d : [])).catch(() => {});
   useEffect(() => { load(); loadFolders(); }, []);
   useEffect(() => { fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
@@ -86,7 +94,9 @@ export default function Methoden({ embedded } = {}) {
   const createFolder = async () => {
     const name = folderName.trim();
     if (!name) { setNewFolder(false); return; }
-    await fetch(`${API}/folders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, parent_id: current }) }).catch(() => {});
+    // Bei Ablehnung bleibt die Eingabe offen stehen — sonst schloss sich das
+    // Feld, der Ordner fehlte, und es sah nach einem Klickfehler aus.
+    if (!(await sende(`${API}/folders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, parent_id: current }) }, t("methoden.newFolder")))) return;
     setFolderName(""); setNewFolder(false); loadFolders();
   };
   // Inline-Umbenennen (kein Popup): die Ordnerkarte wird zum Eingabefeld.
@@ -94,23 +104,27 @@ export default function Methoden({ embedded } = {}) {
   const commitRename = async (f) => {
     const name = renameVal.trim();
     if (!name || name === f.name) { setRenamingFolder(null); return; }
-    await fetch(`${API}/folders/${f.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, parent_id: f.parent_id ?? null }) }).catch(() => {});
+    // Ohne Prüfung sprang der alte Name zurück, sobald loadFolders() lief — der
+    // klassische stille Rollback beim Umbenennen.
+    if (!(await sende(`${API}/folders/${f.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, parent_id: f.parent_id ?? null }) }, t("common.rename")))) return;
     setRenamingFolder(null); loadFolders();
   };
   const deleteFolder = async (f) => {
     if (!(await askConfirm(t("methoden.folderDeleteConfirm", { name: f.name })))) return;
-    await fetch(`${API}/folders/${f.id}`, { method: "DELETE" }).catch(() => {});
+    await sende(`${API}/folders/${f.id}`, { method: "DELETE" }, t("common.delete"));
     loadFolders(); load();
   };
   const moveFolder = async (id, parentId) => {
     const f = folderById(id); if (!f) return;
-    await fetch(`${API}/folders/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: f.name, parent_id: parentId }) }).catch(() => {});
+    await sende(`${API}/folders/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: f.name, parent_id: parentId }) }, "Ordner verschieben");
     loadFolders();
   };
   const moveMethod = async (id, folderId) => {
     const m = items.find((x) => x.id === id); if (!m) return;
     setItems((prev) => prev.map((x) => (x.id === id ? { ...x, folder_id: folderId } : x))); // sofort
-    await fetch(`${API}/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: m.title, description: m.description || "", ablauf: m.ablauf || "", material: m.material || "", dauer: m.dauer ?? null, topic_id: m.topic_id ?? null, folder_id: folderId }) }).catch(() => {});
+    // Ohne Meldung sah ein abgelehnter Umzug so aus, als wäre der Einstieg beim
+    // Ziehen verschwunden: erst im Zielordner, nach dem load() nirgends gesucht.
+    await sende(`${API}/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: m.title, description: m.description || "", ablauf: m.ablauf || "", material: m.material || "", dauer: m.dauer ?? null, topic_id: m.topic_id ?? null, folder_id: folderId }) }, "Verschieben");
     load();
   };
 
@@ -243,7 +257,9 @@ export default function Methoden({ embedded } = {}) {
         </div>
       )}
 
-      {visible.length === 0 && subfolders.length === 0 ? (
+      {ladefehler ? (
+        <LoadError message="Die Einstiege konnten nicht geladen werden." onRetry={() => { load(); loadFolders(); }} />
+      ) : visible.length === 0 && subfolders.length === 0 ? (
         <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("methoden.empty")}</p>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>

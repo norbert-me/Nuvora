@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from "react";
 import { pageTitle, btnPrimary, btnSecondary, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import { sende } from "../core/melden.js";
 
 const API = "/api/todo";
 
@@ -26,15 +27,21 @@ export default function Todo({ embedded } = {}) {
   const add = async () => {
     const v = text.trim();
     if (!v) return;
-    await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: v, due_date: date || null, due_time: date ? (time || "") : "" }) }).catch(() => {});
+    // Erst leeren, wenn der Server die Aufgabe hat — sonst war der getippte
+    // Text weg UND die Aufgabe nicht angelegt.
+    if (!(await sende(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: v, due_date: date || null, due_time: date ? (time || "") : "" }) }, t("common.add")))) return;
     setText(""); setDate(""); setTime(""); load();
   };
-  const toggle = async (it) => { await fetch(`${API}/${it.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ done: !it.done }) }).catch(() => {}); load(); };
-  const del = async (id) => { await fetch(`${API}/${id}`, { method: "DELETE" }).catch(() => {}); load(); };
+  // Ein abgelehnter Haken sprang nach dem load() zurueck — das sah aus, als
+  // haette man danebengeklickt.
+  const toggle = async (it) => { await sende(`${API}/${it.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ done: !it.done }) }, "Aufgabe abhaken"); load(); };
+  const del = async (id) => { await sende(`${API}/${id}`, { method: "DELETE" }, t("common.delete")); load(); };
   const startEdit = (it) => { setEditId(it.id); setEText(it.text); setEDate(it.due_date || ""); setETime(it.due_time || ""); };
   const saveEdit = async () => {
     if (!eText.trim()) return;
-    await fetch(`${API}/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: eText.trim(), due_date: eDate || "", due_time: eDate ? (eTime || "") : "" }) }).catch(() => {});
+    // Bei Ablehnung bleibt die Bearbeitung offen: die getippte Fassung steht
+    // noch da, statt beim naechsten load() durch die alte ersetzt zu werden.
+    if (!(await sende(`${API}/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: eText.trim(), due_date: eDate || "", due_time: eDate ? (eTime || "") : "" }) }, t("common.save")))) return;
     setEditId(null); load();
   };
 
