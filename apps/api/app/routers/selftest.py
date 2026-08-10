@@ -281,13 +281,58 @@ def _dns_txt(name: str) -> list:
         return None
 
 
-def _check_absender_dns(absender: str, smtp_host: str, out: List[Check]) -> None:
-    """SPF und DMARC der Absender-Domain.
+# Bekannte DKIM-Selektoren je Versanddienst. Ein Selektor ist der Name, unter
+# dem der Dienst seinen oeffentlichen Schluessel in DER EIGENEN Domain ablegt
+# (<selektor>._domainkey.<domain>). Ohne diese Liste liesse sich von aussen gar
+# nicht feststellen, ob DKIM eingerichtet ist — raten kann man sie nicht.
+DKIM_SELEKTOREN = {
+    "brevo": ("brevo1", "brevo2", "mail"),
+    "sendgrid": ("s1", "s2"),
+    "mailgun": ("mailo", "k1", "smtp"),
+    "postmark": ("pm",),
+    "mailjet": ("mailjet",),
+    "amazonses": ("selector1", "selector2"),
+    "google": ("google",),
+}
 
-    Ohne SPF-Freigabe fuer den Relay landen Mails im Spam oder werden ganz
-    abgewiesen — beim Anbieter heisst das dann "authenticate your domain".
-    Das ist im DNS pruefbar, also wird es hier geprueft und nicht dem Zufall
-    ueberlassen.
+
+def _check_dkim(domain: str, gruppe: tuple) -> tuple:
+    """Steht ein DKIM-Schluessel des Dienstes unter dieser Domain?
+
+    Rueckgabe: (gefunden, wo). Kein Treffer heisst nicht zwingend "kein DKIM" —
+    manche Dienste (Amazon SES) benutzen wechselnde Selektoren, die sich nicht
+    raten lassen. Deshalb ist ein fehlender Treffer allein nie ein Fehler,
+    sondern nur zusammen mit fehlender SPF-Freigabe.
+    """
+    selektoren = ()
+    for schluessel, sel in DKIM_SELEKTOREN.items():
+        if any(schluessel in k for k in gruppe):
+            selektoren = sel
+            break
+    for sel in selektoren:
+        eintraege = _dns_txt(f"{sel}._domainkey.{domain}")
+        if not eintraege:
+            continue
+        if any("v=dkim1" in e.lower() or "p=" in e.lower() for e in eintraege):
+            return True, f"{sel}._domainkey.{domain}"
+    return False, ""
+
+
+def _check_absender_dns(absender: str, smtp_host: str, out: List[Check]) -> None:
+    """Ist die Absender-Domain fuer den Versanddienst beglaubigt? SPF, DKIM, DMARC.
+
+    Wichtig und lange falsch geprueft: **SPF gilt der Envelope-Absenderdomain
+    (Return-Path), nicht der From-Adresse.** Versanddienste wie Brevo setzen
+    dort ihre eigene Domain ein und bouncen selbst — die eigene Domain muss
+    deren Server also gar nicht per SPF freigeben. Die DMARC-Ausrichtung
+    entsteht dann ueber **DKIM**: der Dienst signiert mit einem Schluessel, der
+    unter der eigenen Domain im DNS steht (`<selektor>._domainkey.<domain>`),
+    und damit stimmt die Domain im From mit der Signatur ueberein.
+
+    Beglaubigt ist die Domain also, wenn **eines von beidem** gilt: SPF gibt den
+    Dienst frei ODER DKIM ist fuer ihn eingerichtet. Vorher verlangte dieser
+    Test SPF und meldete eine sauber per DKIM beglaubigte Domain als Fehler —
+    ein Fehlalarm, der zu falschen Aenderungen am DNS verleitet.
     """
     domain = absender.split("@")[-1].strip().lower()
     if not domain:
@@ -323,12 +368,35 @@ def _check_absender_dns(absender: str, smtp_host: str, out: List[Check]) -> None
     frei = domain in FREEMAILER
 
     eintrag = next((t for t in spf if t.lower().startswith("v=spf1")), "")
+    spf_ok = bool(eintrag) and (not gruppe or any(k in eintrag.lower() for k in gruppe))
+
+    # DKIM: der zweite, bei Versanddiensten der WICHTIGERE Weg. Die Selektoren
+    # sind je Anbieter fest — nur damit laesst sich ohne Postfach pruefen, ob
+    # die Domain wirklich signiert wird.
+    dkim_ok, dkim_wo = _check_dkim(domain, gruppe)
+
+    if dkim_ok:
+        out.append(Check(gruppe="E-Mail", name="DKIM", ok=True,
+                         detail=f"{dkim_wo} — die Domain wird signiert, DMARC richtet darueber aus"))
     if not eintrag:
-        out.append(Check(gruppe="E-Mail", name="SPF", ok=False,
-                         detail=f"{domain} hat keinen SPF-Eintrag — Empfaenger sortieren die "
-                                "Mails als Spam aus oder weisen sie ab."))
-    elif gruppe and not any(k in eintrag.lower() for k in gruppe):
-        if frei:
+        out.append(Check(
+            gruppe="E-Mail", name="SPF", ok=dkim_ok,
+            schwere="warnung" if dkim_ok else "fehler",
+            detail=(f"{domain} hat keinen SPF-Eintrag. Notwendig ist er hier nicht (DKIM "
+                    "beglaubigt bereits), aber er kostet nichts und hilft bei Empfaengern, "
+                    "die nur SPF auswerten.") if dkim_ok else
+                   (f"{domain} hat weder SPF- noch DKIM-Eintrag — Empfaenger sortieren die "
+                    "Mails als Spam aus oder weisen sie ab.")))
+    elif not spf_ok:
+        if dkim_ok:
+            # KEIN Fehler: der Envelope-Absender gehoert dem Dienst, SPF wird
+            # gegen dessen Domain geprueft. Frueher stand hier rot.
+            out.append(Check(
+                gruppe="E-Mail", name="SPF", ok=True,
+                detail=f"nennt {gruppe[0] if gruppe else 'den Dienst'} nicht — hier in Ordnung: "
+                       "SPF gilt dem Return-Path, den der Versanddienst auf seine eigene Domain "
+                       "setzt. Beglaubigt wird ueber DKIM."))
+        elif frei:
             out.append(Check(
                 gruppe="E-Mail", name="SPF", ok=False, schwere="warnung",
                 detail=f"{domain} ist ein Freemailer und gibt {gruppe[0]} nicht frei — das laesst "
@@ -338,9 +406,10 @@ def _check_absender_dns(absender: str, smtp_host: str, out: List[Check]) -> None
         else:
             out.append(Check(
                 gruppe="E-Mail", name="SPF", ok=False,
-                detail=f"SPF von {domain} gibt {gruppe[0]} nicht frei ({eintrag[:90]}) — "
-                       "genau das meint der Anbieter mit 'authenticate your domain'. "
-                       "Absender freigeben oder den SPF-Eintrag ergaenzen."))
+                detail=f"weder SPF-Freigabe fuer {gruppe[0]} noch DKIM fuer {domain} gefunden "
+                       f"({eintrag[:70]}) — genau das meint der Anbieter mit 'authenticate your "
+                       "domain'. Entweder DKIM beim Anbieter einrichten (empfohlen) oder den "
+                       "SPF-Eintrag ergaenzen."))
     else:
         out.append(Check(gruppe="E-Mail", name="SPF", ok=True, detail=eintrag[:90]))
 
