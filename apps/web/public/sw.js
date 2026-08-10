@@ -60,7 +60,23 @@ self.addEventListener("install", (event) => {
 });
 
 // Zuruf aus der Update-Leiste (main.jsx): jetzt umschalten, die Seite laedt neu.
+// Herkunft wird geprueft, bevor irgendetwas passiert: nur Seiten dieser Origin
+// duerfen den Worker steuern. (navigator.serviceWorker ist ohnehin an die Origin
+// gebunden, fremde Seiten kommen also gar nicht an diesen Worker heran — die
+// Pruefung haelt das fest, damit es beim naechsten Handler-Typ nicht kippt.
+// Der Lernpfad wird zwar per postMessage angesprochen, aber das ist
+// window.postMessage in der Seite, nicht der Service-Worker — unberuehrt.)
 self.addEventListener("message", (event) => {
+  // event.origin ist bei Client-Nachrichten gesetzt; falls nicht, sagt die URL
+  // des absendenden Clients dasselbe. Kein Treffer -> ignorieren.
+  let herkunft = event.origin || "";
+  if (!herkunft && event.source && event.source.url) {
+    try { herkunft = new URL(event.source.url).origin; } catch { herkunft = ""; }
+  }
+  // Leer bleibt erlaubt: nicht jeder Browser setzt beides. Ein Fremdzugriff ist
+  // damit nicht moeglich (der Worker gehoert der Origin), aber ein stiller
+  // Abbruch waere teuer — dann kaeme das Update nie an.
+  if (herkunft && herkunft !== self.location.origin) return;
   if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 

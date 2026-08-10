@@ -886,8 +886,14 @@
             renderLatex(btn, tool.preview);
             btn.addEventListener('click', () => {
                 const raw = tool.snip;
+                // Absicht: das ERSTE '|' ist der Cursor-Marker und faellt weg,
+                // genau an der Stelle, die `caret` gerade gemessen hat — deshalb
+                // per slice statt replace(), sonst liest sich das wie eine
+                // unvollstaendige Bereinigung. Folge der Konvention: ein Snippet
+                // darf hoechstens EIN '|' enthalten; ein Betragsstrich
+                // (\left| … \right|) braucht daher einen anderen Marker.
                 const caret = raw.indexOf('|');
-                const insert = raw.replace('|', '');
+                const insert = caret === -1 ? raw : raw.slice(0, caret) + raw.slice(caret + 1);
                 const start = ta.selectionStart, end = ta.selectionEnd;
                 ta.value = ta.value.slice(0, start) + insert + ta.value.slice(end);
                 // Cursor an Marker-Position (oder ans Ende des Snippets)
@@ -1707,7 +1713,7 @@
             <tr>
                 <td>${esc(s.name)}</td>
                 <td>${esc(s.klasse)}</td>
-                <td><span class="badge badge-${s.niveau === 'E' ? 'e' : 'g'}">${s.niveau}-Kurs</span></td>
+                <td><span class="badge badge-${s.niveau === 'E' ? 'e' : 'g'}">${esc(s.niveau)}-Kurs</span></td>
                 <td>${s.foerder.length ? s.foerder.map(f => `<span class="badge badge-lrs">${esc(f)}</span>`).join(' ') : '–'}</td>
                 <td>${esc(s.notizen) || '–'}</td>
                 <td>
@@ -2098,7 +2104,7 @@
             header.innerHTML = `
                 <h3>${esc(s.name)}</h3>
                 <div>
-                    <span class="badge badge-${s.niveau === 'E' ? 'e' : 'g'}">${s.niveau}-Kurs</span>
+                    <span class="badge badge-${s.niveau === 'E' ? 'e' : 'g'}">${esc(s.niveau)}-Kurs</span>
                     ${s.foerder.map(f => `<span class="badge badge-lrs">${esc(f)}</span>`).join(' ')}
                     <span style="font-size:0.8rem;color:var(--text-muted);margin-left:0.5rem">${entry.tasks.filter(t => t.selected && t.section !== 'Erklärung').length} Aufgaben</span>
                 </div>
@@ -3370,18 +3376,25 @@
     }
 
     // ─── Helpers ───
+    // Alle HTML-Metazeichen ersetzen, jedes global (/g) — nicht nur das erste.
+    // Frueher lief das ueber ein div + textContent/innerHTML; das escaped zwar
+    // < > &, aber KEINE Anfuehrungszeichen, und keine statische Pruefung kann
+    // dem Umweg ueber das DOM ansehen, dass hier ueberhaupt escaped wird.
+    // Jetzt deckt esc() auch Attributkontexte ab.
     function esc(str) {
         if (!str) return '';
-        const d = document.createElement('div');
-        d.textContent = str;
-        return d.innerHTML;
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
-    // esc() escaped nur < > & — in einem doppelt-gequoteten Attribut bricht ein "
-    // trotzdem aus (…onerror=…). Fuer Attributwerte zusaetzlich " und ' escapen.
-    function escAttr(str) {
-        return esc(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    }
+    // Attributwerte: identisch zu esc() (das escaped " und ' bereits mit).
+    // Der eigene Name bleibt, weil an den Aufrufstellen sichtbar sein soll,
+    // dass dort ein Attributwert steht — nicht Text.
+    function escAttr(str) { return esc(str); }
 
     // Bildquellen aus Import/Marktplatz sind nicht vertrauenswuerdig: nur data:-Bilder,
     // blob: und relative/eigene URLs zulassen — javascript:/andere Schemata raus.
@@ -3604,7 +3617,9 @@
         currentPfad = pfad;
         const panel = document.getElementById('pfad-edit-panel');
         panel.style.display = '';
-        document.getElementById('pfad-edit-title').textContent = 'Lernpfad: ' + esc(pfad.name);
+        // Kein esc(): textContent escaped selbst. Mit esc() stand bei einem Namen
+        // wie „Bruch & Co." woertlich „Bruch &amp; Co." in der Ueberschrift.
+        document.getElementById('pfad-edit-title').textContent = 'Lernpfad: ' + (pfad.name || '');
         renderPfadLernleitern();
         // Ans Panel scrollen — es öffnet unter der Liste; sonst wirkt der
         // Bearbeiten-Klick, als passiere nichts (langer Bildschirm).
@@ -3825,7 +3840,8 @@
             if (istWdh(a)) return 'Wiederholung';
             return k === 'E-Niveau' ? 'E-Niveau' : k === 'G-Niveau' ? 'G-Niveau' : 'Basis';
         };
-        const rang = { 'Wiederholung': 0, 'Erklärung': 1, 'Basis': 2, 'G-Niveau': 3, 'E-Niveau': 4 };
+        // (Kein Sektions-Rang mehr: beim Oeffnen wird bewusst NICHT neu sortiert,
+        //  siehe „NICHT neu sortieren" weiter unten. Die Rang-Tabelle war ein Rest.)
         // Ist das die erste Lernleiter des Pfads? Dann Wiederholung (fremd-thema) beim
         // Anzeigen weglassen — davor gibt es kein Thema. „Eigenes Thema" robust auch
         // bei leerem ll.thema (haeufigstes Thema der Aufgaben).
