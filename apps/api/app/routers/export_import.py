@@ -708,21 +708,18 @@ def _grade_from_pct(pct, scale=None):
 
 
 def _decimal_grade(pct, scale=None):
-    s = scale or DEFAULT_SCALE
-    ranges = [
-        (1, s.get(1, s.get("1", 87)), 100),
-        (2, s.get(2, s.get("2", 73)), s.get(1, s.get("1", 87))),
-        (3, s.get(3, s.get("3", 59)), s.get(2, s.get("2", 73))),
-        (4, s.get(4, s.get("4", 45)), s.get(3, s.get("3", 59))),
-        (5, s.get(5, s.get("5", 20)), s.get(4, s.get("4", 45))),
-    ]
-    for grade, lower, upper in ranges:
-        if pct >= lower:
-            span = upper - lower
-            if span <= 0:
-                return float(grade)
-            return round(grade + (upper - pct) / span, 1)
-    return 6.0
+    """Prozent -> Dezimalnote. Eine Quelle: die Fassung aus noten.py.
+
+    Hier stand eine zweite Umrechnung, die mit Pythons round() rundete — und
+    das rundet die halbe Stelle zur GERADEN Zahl ("Bankers Rounding"). 83,5 %
+    ergaben im Export 2,2, im Notenbuch und auf dem Bildschirm aber 2,3.
+    Dieselbe Leistung stand also im PDF als andere Note als in der Anwendung,
+    und zwar bei jeder Prozentzahl, die genau auf einer halben Stelle liegt.
+
+    Gerechnet wird jetzt an einer Stelle; kaufmaennisch runden steht in
+    scoring.py und ist dort begruendet."""
+    from .noten import _grade_from_pct as _dezimalnote
+    return _dezimalnote(pct, scale or DEFAULT_SCALE)
 
 
 def _build_student_pdf_single(student, questions, scan_map, session, config, niveau_aktiv=False, minuspunkte=False):
