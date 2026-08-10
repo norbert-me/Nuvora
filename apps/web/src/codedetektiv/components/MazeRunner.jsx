@@ -17,7 +17,6 @@ export function MazeRunner({ maze, commands, running, onFinish }) {
   const [pos, setPos] = useState(maze.start);
   const [dir, setDir] = useState(maze.direction);
   const [visited, setVisited] = useState([maze.start]);
-  const [step, setStep] = useState(-1);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const timerRef = useRef(null);
@@ -27,7 +26,6 @@ export function MazeRunner({ maze, commands, running, onFinish }) {
       setPos([...maze.start]);
       setDir(maze.direction);
       setVisited([maze.start]);
-      setStep(-1);
       setError(null);
       setSuccess(false);
       return;
@@ -79,14 +77,12 @@ export function MazeRunner({ maze, commands, running, onFinish }) {
         setDir(currentDir);
       }
 
-      setStep(i);
       i++;
     }, 400);
 
     return () => clearInterval(timerRef.current);
   }, [running]);
 
-  const rows = maze.grid.length;
   const cols = maze.grid[0].length;
 
   return (

@@ -1,7 +1,7 @@
 // Modul Beobachtungen — formative Notizen je Schüler. Bewusst getrennt von der
 // Note. Klasse wählen → Schüler → Notizen (Datum, Kategorie, Text).
 import { useState, useEffect } from "react";
-import { pageTitle, btnPrimary, btnSecondary, inputStyle, selectStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, pageApp, LoadError} from "../components/Icons.jsx";
+import { btnPrimary, btnSecondary, inputStyle, selectStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, pageApp, LoadError} from "../components/Icons.jsx";
 import { sende } from "../core/melden.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";

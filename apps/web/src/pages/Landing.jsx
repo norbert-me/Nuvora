@@ -44,7 +44,6 @@ export default function Landing() {
     title: t(`landing.feature${n}.title`),
     desc: t(`landing.feature${n}.desc`),
   }));
-  const [contributeBefore, contributeAfter] = t("landing.contribute").split("{{link}}");
 
   return (
     <div>

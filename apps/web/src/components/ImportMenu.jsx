@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useLanguage } from "../i18n/index.jsx";
-import { Icon, ICONS, popoverPanel , Popover} from "./Icons.jsx";
+import { Icon, ICONS, Popover} from "./Icons.jsx";
 
 // item: { label, onClick } für Importieren, oder { label, href } für Vorlagen-Downloads
 function MenuRow({ item, onClose }) {

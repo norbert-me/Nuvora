@@ -3,7 +3,7 @@
 // gibt eine Liste Toggles rein. Optional persistiert der Aufrufer die Werte
 // (z.B. pro Kurs). Diese Komponente hält nur das Auf/Zu des Menüs.
 import { useState } from "react";
-import { Icon, ICONS, iconBtn, Toggle, popoverPanel, Popover} from "./Icons.jsx";
+import { Icon, ICONS, iconBtn, Toggle, Popover} from "./Icons.jsx";
 
 // items: [{ key, label, value, onChange, hint }]
 export default function ViewMenu({ items = [], title = "Ansicht" }) {

@@ -11,7 +11,7 @@ import { CATEGORIES, BLOCK_TEMPLATES } from '../data/samplePuzzles';
 import { IconUndo, IconChevronLeft, IconChevronRight } from '../components/Icons';
 import {
   DraggableToolboxBlock, DraggableBlock, DragOverlayBlock,
-  CollapsibleCategory, GhostBlock,
+  CollapsibleCategory,
 } from '../components/MakeCodeBlock';
 import { importPuzzleFromHex } from '../data/makecodeImport';
 

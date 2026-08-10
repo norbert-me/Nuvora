@@ -3,7 +3,7 @@
 // "Ohne Wiederholung" merkt sich die schon Gezogenen, bis die Klasse durch ist.
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Toggle, pageApp} from "../components/Icons.jsx";
+import { btnPrimary, btnSecondary, selectStyle, inputStyle, Toggle, pageApp} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { askConfirm } from "../core/dialog.jsx";

@@ -2,7 +2,7 @@
 // keine Daten. Richtige Antwort schiebt den Ball Richtung gegnerisches Tor;
 // erreicht er das Tor, gibt es ein Tor und der Ball geht zurück in die Mitte.
 import { useState, useRef, useEffect } from "react";
-import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, pageApp} from "../components/Icons.jsx";
+import { btnPrimary, btnSecondary, inputStyle, Icon, ICONS, pageApp} from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const STEPS = 2; // Felder je Seite (2 links, Mitte, 2 rechts); Tor beim Überschreiten des Rands

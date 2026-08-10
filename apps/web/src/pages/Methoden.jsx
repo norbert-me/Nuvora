@@ -3,10 +3,10 @@
 // Wiederverwendbar; im Kalender einer Stunde zuweisbar.
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
+import { askConfirm } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { sende } from "../core/melden.js";
-import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, Modal, inputStyle, ExportButton, ImportButton, Popover, LoadError} from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, Modal, inputStyle, ExportButton, Popover, LoadError} from "../components/Icons.jsx";
 import PublishModal from "../components/PublishModal.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
 import { useLanguage } from "../i18n/index.jsx";

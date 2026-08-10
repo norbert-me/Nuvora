@@ -2,7 +2,7 @@
 // drehen (z.B. schräge Tische). Gespeichert wird { seats: [{sid,x,y,rot}] }.
 // Schüler bleiben im Kern; hier nur ihre Positionen (Regel 3).
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { pageTitle, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, ExportButton, ImportButton } from "../components/Icons.jsx";
+import { btnSecondary, Icon, ICONS, iconBtn, COLORS as C, Empty, ExportButton, ImportButton } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import ViewMenu from "../components/ViewMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";

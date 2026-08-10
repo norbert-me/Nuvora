@@ -8,11 +8,11 @@
 // Klick auf einen Namen öffnet alle Infos zur Person. Beobachtungen zählen nie
 // in den Schnitt — „Anstrengungsbereitschaft“ ist kein Messwert.
 import { useState, useEffect, useRef } from "react";
-import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
+import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, Modal as UiModal, popoverPanel, Empty, Skeleton, ExportButton, ImportButton, inputStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Modal as UiModal, popoverPanel, Empty, Skeleton, ImportButton, inputStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
@@ -610,7 +610,7 @@ export default function Noten() {
                           </span>
                         ) : null}
                         {renameCol === c.id && (
-                          <ColMenu t={t} cat={c} classId={classId} topics={topics} kartenAktiv={kartenAktiv} onNachhol={runNachhol} onCompare={setCompareCat} stats={colStats(c.id)} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
+                          <ColMenu t={t} cat={c} classId={classId} topics={topics} kartenAktiv={kartenAktiv} onNachhol={runNachhol} onCompare={setCompareCat} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
                             onRename={async (name, topicId) => { if (await call(() => fetch(`${API}/categories/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: c.position ?? i, topic_id: topicId }) }))) setRenameCol(null); }}
                             onDelete={() => {
                               setRenameCol(null);
@@ -926,11 +926,10 @@ function SectionMenu({ t, sec, onEdit, onDelete, onAddCol }) {
 }
 
 // Kleine Uebersicht zur Spalte: Anlagedatum plus Umbenennen/Loeschen.
-function ColMenu({ t, cat, stats, onStats, onRename, onDelete, onClose, dividerOn, onToggleDivider, classId, topics = [], onNachhol, onCompare, kartenAktiv }) {
+function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onToggleDivider, classId, topics = [], onNachhol, onCompare, kartenAktiv }) {
   const [name, setName] = useState(cat.name);
   const [topicId, setTopicId] = useState(cat.topic_id ?? "");
   const datum = cat.created_at ? new Date(cat.created_at).toLocaleDateString("de-DE") : "—";
-  const de1 = (n) => String(Math.round(n * 100) / 100).replace(".", ",");
   const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
   const save = () => name.trim() && onRename(name.trim(), topicId === "" ? null : Number(topicId));
   return (

@@ -218,7 +218,6 @@ const KAL = "/kalender";
 const UPLAN = "/unterrichtsplanung";
 const ZUF = "/zufall";
 const ORG = "/orga";
-const AUS = "/ausleihe";
 const NOTIZBRETT = "/notizbrett";
 const NOTIZEN = "/notizen";
 const KLASSENLEITUNG = "/klassenleitung";
@@ -709,59 +708,6 @@ function Nav({ user, onLogout }) {
   );
 }
 
-const HOME_STEP_LINKS = ["/classes", `${CV}/questions`, `${CV}/session`, `${CV}/scan`, `${CV}/tests`];
-
-function Home() {
-  const { t } = useLanguage();
-  const homeSteps = HOME_STEP_LINKS.map((link, i) => ({
-    link,
-    title: t(`home.step${i + 1}.title`),
-    desc: t(`home.step${i + 1}.desc`),
-  }));
-  const [contribBefore, contribAfter] = t("home.contribute").split("{{link}}");
-  return (
-    <div>
-      <style>{`@media (max-width: 640px) { .home-box { padding: 20px 18px !important; } }`}</style>
-      <div className="home-box" style={{ padding: "32px 36px", background: "var(--bg3)", borderRadius: 20, marginBottom: 40, border: "1px solid var(--border)" }}>
-        <h2 style={{ margin: "0 0 6px", fontSize: 28, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.5px" }}>{t("home.title")}</h2>
-        <p style={{ color: "var(--text3)", margin: "0 0 28px", fontSize: 15, lineHeight: 1.6 }}>
-          {t("home.intro")}
-        </p>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
-          {homeSteps.map((step, i) => (
-            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%", maxWidth: 480 }}>
-              <Link to={step.link} style={{
-                display: "flex", alignItems: "center", gap: 16, width: "100%",
-                padding: "18px 22px", background: "var(--card)", borderRadius: 14,
-                border: "1px solid var(--border)", textDecoration: "none",
-                transition: "border-color 0.2s",
-              }}>
-                <div style={{
-                  width: 34, height: 34, borderRadius: 17, flexShrink: 0,
-                  background: "var(--text)", color: "var(--bg)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 14, fontWeight: 700,
-                }}>{i + 1}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: 15, color: "var(--text)", marginBottom: 2, letterSpacing: "-0.2px" }}>{step.title}</div>
-                  <div style={{ fontSize: 13, color: "var(--text3)", lineHeight: 1.4 }}>{step.desc}</div>
-                </div>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                  <path d="M9 18l6-6-6-6"/>
-                </svg>
-              </Link>
-              {i < homeSteps.length - 1 && (
-                <div style={{ width: 2, height: 24, background: "var(--border2)", borderRadius: 1 }} />
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-    </div>
-  );
-}
-
 const footerLink = { color: "var(--text3)", textDecoration: "none", whiteSpace: "nowrap" };
 const footerSep = { color: "var(--text3)" };
 
@@ -789,7 +735,6 @@ function ContentWrapper({ children }) {
 function FirstRun({ user }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const { active } = useModules();
   const key = `nuvora_onboarded_${user?.id ?? "x"}`;
   const [show, setShow] = React.useState(false);
 
@@ -805,7 +750,6 @@ function FirstRun({ user }) {
   };
   if (!show) return null;
 
-  const hasCardvote = active.some((m) => m.key === "cardvote");
   // „Tour" startet die geführte Kern-Tour direkt hier (Spotlight über die Navbar),
   // statt auf die Tutorial-Seite zu springen.
   const startGuided = () => { done(); setTimeout(() => window.dispatchEvent(new Event("nuvora:start-tour")), 60); };

@@ -43,9 +43,6 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv, methodenAktiv }) {
     (async () => {
       const classes = await fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).catch(() => []);
       if (!ab) setClasses(Array.isArray(classes) ? classes : []);
-      const to = new Date();
-      const frm = new Date(Date.now() - 14 * 86400000);
-      const q = `frm=${frm.toISOString()}&to=${to.toISOString()}`;
       const all = [];
       for (const c of classes) {
         const d = await fetch(`/api/weak-review?days=14&class_id=${c.id}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
@@ -222,7 +219,6 @@ export default function NuvoraHome({ user }) {
 
   const firstName = (user?.name || "").split(" ")[0];
   const name = (m) => (t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name);
-  const desc = (m) => (t(`mod.${m.key}.desc`) !== `mod.${m.key}.desc` ? t(`mod.${m.key}.desc`) : m.description);
   // Nach gespeicherter Reihenfolge; unbekannte (neue) Module hinten anhaengen.
   const rank = (k) => { const i = order.indexOf(k); return i < 0 ? 1000 + active.findIndex((m) => m.key === k) : i; };
   const shown = [...active].sort((a, b) => rank(a.key) - rank(b.key));

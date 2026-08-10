@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
+import { askConfirm } from "../core/dialog.jsx";
 import { useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { Icon, ICONS, Modal, btnPrimary, btnSecondary, COLORS as C, pageApp} from "../components/Icons.jsx";
@@ -17,7 +17,6 @@ function Stars({ value, my, onRate, count, t }) {
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <div style={{ display: "flex", gap: 1 }}>
         {[1, 2, 3, 4, 5].map((n) => {
-          const active = hover ? n <= hover : (my ? n <= my : n <= Math.round(value));
           const filled = my ? n <= my : n <= Math.round(value);
           return (
             <button

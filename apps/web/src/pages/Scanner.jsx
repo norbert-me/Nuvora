@@ -19,7 +19,6 @@ export default function Scanner() {
   const [scanning, setScanning] = useState(false);
   const [lastCards, setLastCards] = useState([]);
   const [status, setStatus] = useState("");
-  const [cameraReady, setCameraReady] = useState(false);
   const [debug, setDebug] = useState(false);
   const [sessionInfo, setSessionInfo] = useState(null);
   const [sessionError, setSessionError] = useState("");
@@ -49,7 +48,6 @@ export default function Scanner() {
       });
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
-      setCameraReady(true);
       return true;
     } catch {
       setStatus(t("scanner.cameraDenied"));
@@ -62,7 +60,6 @@ export default function Scanner() {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
-    setCameraReady(false);
   };
 
   useEffect(() => {

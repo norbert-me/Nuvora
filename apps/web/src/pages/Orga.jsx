@@ -3,11 +3,9 @@
 // im Modul, die Schüler im Kern.
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
-import { AddButton, pageTitle, btnPrimary, btnSecondary, selectStyle, Icon, ICONS, iconBtn, COLORS as C, th as thBase, td, Toggle, cardStyle, pageApp} from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, th as thBase, td, Toggle, cardStyle, pageApp} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
-import ViewMenu from "../components/ViewMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import Anwesenheit from "./Anwesenheit.jsx";

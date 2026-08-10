@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
+import { askConfirm } from "../core/dialog.jsx";
 import { Link } from "react-router-dom";
 import { Icon, ICONS, iconBtn, COLORS as C, pageApp} from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";

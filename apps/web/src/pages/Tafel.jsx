@@ -2,7 +2,7 @@
 // Jedes Feld ist verschiebbar, in der Größe änderbar und hat eine Schriftgröße.
 // Reiner Client; der Stand liegt lokal (localStorage), damit er den Reload übersteht.
 import { useState, useRef, useEffect } from "react";
-import { pageTitle, btnPrimary, btnSecondary, Icon, ICONS, iconBtn, COLORS as C, pageFull } from "../components/Icons.jsx";
+import { btnPrimary, btnSecondary, Icon, ICONS, iconBtn, COLORS as C, pageFull } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const KEY = "nuvora_tafel_v1";
