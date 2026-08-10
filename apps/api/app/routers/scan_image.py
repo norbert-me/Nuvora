@@ -12,6 +12,7 @@ from sqlalchemy import select
 
 from ..database import get_db
 from ..models import Scan, Session, User
+from ..uploads import bildtyp
 from .auth import get_current_user
 from .. import websocket as ws
 from .modules import modul_pflicht
@@ -80,6 +81,25 @@ def answer_from_angle(degrees: float) -> str:
         return "B"
 
 
+def zuversicht(degrees: float) -> float:
+    """Wie eindeutig lag die Karte?
+
+    Die Zuordnung viertelt den Kreis: bei 44 Grad Schieflage kommt A heraus, bei
+    45 Grad D. Im Unterricht haelt niemand die Karte exakt gerade — eine Karte,
+    die knapp an dieser Kante lag, ist ein Kandidat fuer eine Verwechslung, und
+    die Lehrkraft soll das sehen koennen.
+
+    Frueher stand hier fest 0.95, egal ob die Karte gerade oder 44 Grad schief
+    gehalten wurde. Die Zahl war damit wertlos, obwohl sie im Antwortmodell
+    genau dafuer vorgesehen ist.
+
+    0 Grad Abweichung -> 1.0, 45 Grad (die Kante) -> 0.0.
+    """
+    normalized = (degrees % 360 + 360) % 360
+    abweichung = min(abs(normalized - viertel) for viertel in (0, 90, 180, 270, 360))
+    return round(max(0.0, 1.0 - abweichung / 45.0), 3)
+
+
 def detect_markers(image_bytes: bytes) -> List[DetectedCard]:
     nparr = np.frombuffer(image_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -102,7 +122,7 @@ def detect_markers(image_bytes: bytes) -> List[DetectedCard]:
         results.append(DetectedCard(
             marker_id=int(marker_id),
             answer=answer,
-            confidence=0.95,
+            confidence=zuversicht(angle),
             corners=norm_corners,
         ))
     return results
@@ -113,7 +133,19 @@ async def scan_image(body: ScanImageRequest, user: User = Depends(get_current_us
     image_data = body.image
     if "," in image_data:
         image_data = image_data.split(",", 1)[1]
-    image_bytes = base64.b64decode(image_data)
+    try:
+        image_bytes = base64.b64decode(image_data, validate=False)
+    except Exception:
+        # Abgeschnittener Upload: vorher lief die binascii-Ausnahme ungefangen
+        # durch und wurde zu HTTP 500 — als waere der Server kaputt.
+        raise HTTPException(400, "Das Bild ist unvollstaendig angekommen. Bitte noch einmal aufnehmen.")
+
+    # Erst den Dateityp pruefen, dann erkennen. Vorher entschied cv2.imdecode,
+    # und bei einer kaputten Aufnahme kam eine LEERE Kartenliste mit HTTP 200
+    # zurueck — fuer die Lehrkraft nicht zu unterscheiden von "niemand hat eine
+    # Karte hochgehalten". uploads.bildtyp() ist genau dafuer da und wird auf
+    # allen anderen Bildwegen (Schuelerfoto, Kartenbild) auch benutzt.
+    bildtyp(image_bytes)
 
     cards = detect_markers(image_bytes)
 
@@ -188,6 +220,16 @@ async def confirm_scans(body: ConfirmScanRequest, user: User = Depends(get_curre
     for item in body.scans:
         mid = item["marker_id"]
         answer = item["answer"]
+        # Die Kartennummer ist die aufgedruckte ArUco-Nummer: DICT_6X6_50 kennt
+        # 0..49. Die Erkennung kann gar nichts anderes liefern und der
+        # Kartendruck nichts anderes erzeugen — aber dieser Endpunkt nimmt die
+        # Liste vom Client entgegen, und Scan.student_id ist ein blankes
+        # Integer ohne Fremdschluessel. Ohne diese Pruefung landete
+        # {"marker_id": 999} still in der Wertung.
+        if not isinstance(mid, int) or isinstance(mid, bool) or not (0 <= mid <= 49):
+            raise HTTPException(400, f"Ungueltige Kartennummer {mid!r} (erlaubt: 0-49)")
+        if answer not in ("A", "B", "C", "D", ""):
+            raise HTTPException(400, f"Ungueltige Antwort {answer!r}")
         existing = await db.execute(
             select(Scan).where(
                 Scan.session_id == body.session_id,
