@@ -204,10 +204,25 @@ function kurzfehler(e, zeilen = 4) {
 // Jede Zeile ist eine Bruecke zwischen zwei Modulen. `allein` schaltet nur die
 // Module ein, die die Bruecke NICHT rechtfertigen — dann darf der Marker nicht
 // auftauchen. `zusammen` schaltet beide ein — dann MUSS er auftauchen.
+/** "?class=7&kurs=3" fuer die Testklasse — die Shell wertet das aus
+ * (core/klassenwahl.js). Ohne diesen Zusatz zeigt jede Seite die zuletzt
+ * gewaehlte Klasse des Kontos, und auf einer Instanz mit echten Daten ist das
+ * nie die Testklasse. */
+const klassenParam = (td, trenner = "?") => {
+  if (!td.klasse?.id) return "";
+  const kurs = td.kurs?.id ? `&kurs=${td.kurs.id}` : "";
+  return `${trenner}class=${td.klasse.id}${kurs}`;
+};
+
 const verbindungen = (td) => [
   {
     name: "Karten → „Als Note übernehmen\" (braucht Auswertung)",
-    pfad: "/karten?tab=progress",
+    // Klasse UND Kurs in der Adresse: die Seiten merken sich sonst die
+    // zuletzt gewaehlte Klasse. Auf einer Instanz mit echten Klassen zeigten
+    // sie deshalb eine fremde — und die Bruecke sah tot aus, obwohl nur die
+    // falsche Klasse offen war. Lokal fiel das nie auf: dort gab es nur die
+    // Testklasse.
+    pfad: `/karten?tab=progress${klassenParam(td, "&")}`,
     marker: "Als Note übernehmen",
     allein: ["karten"],
     zusammen: ["karten", "auswertung"],
@@ -235,7 +250,7 @@ const verbindungen = (td) => [
   },
   {
     name: "Klassenleitung → Note im Elternkontakt (braucht Auswertung)",
-    pfad: "/klassenleitung",
+    pfad: `/klassenleitung${klassenParam(td)}`,
     // Der Notenchip ist ein Link ins Notenmodul — eindeutiger als der Text „Note".
     // Praefix-Vergleich: der Link traegt Klasse und Kurs mit (…&class=7&kurs=3),
     // damit die Auswertung gleich beim richtigen Fach aufgeht.
@@ -252,19 +267,31 @@ const verbindungen = (td) => [
   },
   {
     name: "Notenbuch → „Aus Code-Detektiv\" (braucht Code-Detektiv)",
-    pfad: "/auswertung?tab=noten",
+    pfad: `/auswertung?tab=noten${klassenParam(td, "&")}`,
     marker: "Aus Code-Detektiv",
     allein: ["auswertung"],
     zusammen: ["auswertung", "code-detektiv"],
   },
   {
     name: "Klassenarbeit → „Wiederholung erzeugen\" (braucht Karten/Lernpfad)",
-    pfad: "/auswertung?tab=klassenarbeit",
+    // Auch die Klassenarbeit selbst per Deep-Link waehlen (?work=): die Seite
+    // nimmt sonst die NEUESTE der Klasse, und das ist auf einer Instanz mit
+    // echten Daten nicht die des Tests.
+    pfad: `/auswertung?tab=klassenarbeit${klassenParam(td, "&")}${td.arbeit?.id ? `&work=${td.arbeit.id}` : ""}`,
     marker: "Wiederholung erzeugen",
     allein: ["auswertung"],
     zusammen: ["auswertung", "karten", "lernpfad"],
-    // Die Seite waehlt die erste Klassenarbeit selbst aus — nur abwarten.
-    vorbereiten: (seite) => seite.waitForTimeout(1500),
+    // Auf das ERGEBNIS warten, nicht auf die Uhr: die Seite laedt Klasse, Kurs
+    // und Klassenarbeiten nacheinander nach. Eine feste Wartezeit von 1,5 s
+    // reichte mal und mal nicht — der Test meldete dann eine "tote Bruecke",
+    // die keine war. Flatterige Pruefungen sind schlimmer als fehlende: man
+    // gewoehnt sich an rote Zeilen.
+    vorbereiten: async (seite) => {
+      // "attached", nicht "visible": der Name steht in einem <option> des
+      // Auswahlfeldes, und ein option gilt Playwright grundsaetzlich als
+      // unsichtbar. Vorhanden heisst hier: die Liste ist geladen.
+      await seite.getByText(`${MARKE}-Arbeit`).first().waitFor({ state: "attached", timeout: 15000 });
+    },
   },
   {
     name: "Kalender → Quiz-Selektor im Termin-Dialog (braucht CardVote)",
@@ -600,7 +627,7 @@ async function main() {
     for (const v of verbindungen(testdaten)) {
       const was = v.beschreibung || `„${v.marker}"`;
       await nurDiese(module, v.allein);
-      const solo = await sichtbar(v);
+      const solo = await sichtbar(v, false);
       const nachsatz = (b) => (b.hinweis ? ` · ${b.hinweis}` : "");
       notiere("Verbindung · allein", `${v.name} · ${v.allein.join("+")}`, solo.ok ? !solo.da : false,
         (!solo.ok ? solo.detail : solo.da ? `${was} erscheint OHNE das nötige Modul` : `${was} bleibt weg — richtig`)
@@ -609,7 +636,8 @@ async function main() {
       await nurDiese(module, v.zusammen);
       const paar = await sichtbar(v);
       notiere("Verbindung · zusammen", `${v.name} · ${v.zusammen.join("+")}`, paar.ok ? paar.da : false,
-        (!paar.ok ? paar.detail : paar.da ? `${was} erscheint — richtig` : `${was} fehlt TROTZ aktivem Modul (tote Brücke)`)
+        (!paar.ok ? paar.detail : paar.da ? `${was} erscheint — richtig`
+          : `${was} fehlt TROTZ aktivem Modul (tote Brücke) — Seite war ${paar.wo}`)
           + (paar.ok ? nachsatz(paar) : ""));
     }
 
@@ -735,7 +763,10 @@ async function testdatenAnlegen(td) {
     // Aufraeumen liegen, weil ihn niemand loeschte.
     td.kurs = (await apiJson("/api/kurse") || []).find(
       (x) => (x.classes || []).some((c) => c.id === klasse.id)) || null;
-    td.arbeit = await apiJson("/api/klassenarbeit/works", "post", {
+    // muss(): ein Fehlschlag hier darf nicht still bleiben. apiJson liefert bei
+    // jedem Nicht-2xx `null`, und dann fehlte spaeter nur der Knopf — gemeldet
+    // wurde "tote Bruecke", obwohl die Klassenarbeit gar nicht angelegt war.
+    td.arbeit = await muss("Klassenarbeit anlegen", "/api/klassenarbeit/works", "post", {
       class_id: klasse.id, kurs_id: td.kurs?.id ?? null, name: `${MARKE}-Arbeit`,
     });
 
@@ -966,9 +997,14 @@ async function wohinFuehrt(pfad) {
 }
 
 /** Ist der Marker der Verbindung auf der Seite zu sehen? */
-const sichtbar = (v) => geduldig(() => sichtbarEinmal(v));
+// streng: die Vorbedingung MUSS herstellbar sein. Das gilt nur fuer den
+// Durchgang "zu zweit", in dem der Knopf erscheinen soll. Im Durchgang "allein"
+// wird geprueft, dass er WEGBLEIBT — dort ist eine nicht herstellbare
+// Vorbedingung kein Befund, sondern nur eine Seite, die ohne das zweite Modul
+// weniger anzeigt. Frueher faerbte genau das den Lauf rot.
+const sichtbar = (v, streng = true) => geduldig(() => sichtbarEinmal(v, streng));
 
-async function sichtbarEinmal(v) {
+async function sichtbarEinmal(v, streng = true) {
   const { seite, probleme, drossel } = await neueSeite();
   const schauen = async () => {
     await seite.goto(v.pfad, { waitUntil: "networkidle", timeout: 30000 });
@@ -976,11 +1012,25 @@ async function sichtbarEinmal(v) {
     const jetzt = new URL(seite.url()).pathname;
     if (jetzt === "/modules" && !v.pfad.startsWith("/modules"))
       return { ok: false, wackelig: true, detail: "ModuleGate wirft auf /modules — Modul nicht aktiv?" };
-    if (v.vorbereiten) await v.vorbereiten(seite).catch(() => {});
+    // Fehler beim Vorbereiten NICHT verschlucken. Vorher endete ein
+    // misslungener Klick (Schueler nicht gefunden, weil die Seite die falsche
+    // Klasse zeigte) als "Knopf fehlt TROTZ aktivem Modul" — die Meldung zeigte
+    // auf die Bruecke statt auf die Ursache.
+    if (v.vorbereiten) {
+      try {
+        await v.vorbereiten(seite);
+      } catch (e) {
+        if (streng) return { ok: false, detail: `Vorbereitung misslungen: ${kurzfehler(e)}` };
+      }
+    }
     await seite.waitForTimeout(400);
     const da = v.finde ? await v.finde(seite) : (await seite.locator("body").innerText()).includes(v.marker);
-    if (probleme.length) return { ok: true, da, detail: probleme[0] };
-    return { ok: true, da };
+    // Die tatsaechliche Adresse mitgeben: bleibt ein Knopf aus, ist die haeufigste
+    // Ursache nicht die Bruecke, sondern eine Seite, die etwas anderes zeigt als
+    // erwartet (andere Klasse, andere Auswahl). Ohne die Adresse sucht man lange.
+    const wo = new URL(seite.url()).pathname + new URL(seite.url()).search;
+    if (probleme.length) return { ok: true, da, wo, detail: probleme[0] };
+    return { ok: true, da, wo };
   };
   try {
     const befund = await mitFrist(schauen(), FRIST_SEITE, v.pfad);
