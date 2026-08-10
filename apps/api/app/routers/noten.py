@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
+from ..importe import geprueft
 from ..models import (
     GradeCategory, GradeEntry, GradeSection, GradeOverride, QuartalDivider, SchoolClass,
     Session as TestSession, Student, User, CodeSession,
@@ -1151,10 +1152,182 @@ async def export_noten(class_id: int, term: str = "1", kurs_id: Optional[int] = 
             "dividers": [{"s": s, "c": c} for (s, c) in dividers]}
 
 
+class ImportSection(BaseModel):
+    """Abschnitt aus der Datei — dieselben Regeln wie SectionIn (Name, Gewicht)."""
+    name: str = "Abschnitt"
+    weight: int = 0
+    position: int = 0
+    categories: List["ImportCategory"] = []
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _leer_name(cls, v):
+        # Aeltere Dateien schrieben fehlende Werte als null.
+        return "" if v is None else v
+
+    @field_validator("weight", "position", mode="before")
+    @classmethod
+    def _leer_zahl(cls, v):
+        return 0 if v in (None, "") else v
+
+    @field_validator("name")
+    @classmethod
+    def name_ok(cls, v: str) -> str:
+        return (v or "").strip()[:120] or "Abschnitt"
+
+    @field_validator("weight")
+    @classmethod
+    def weight_ok(cls, v: int) -> int:
+        # Gleiche Regel wie SectionIn.weight_ok — der Importweg darf nicht mehr duerfen.
+        if v < 0 or v > 100:
+            raise ValueError("Gewicht muss zwischen 0 und 100 Prozent liegen")
+        return v
+
+
+class ImportCategory(BaseModel):
+    name: str = "Spalte"
+    position: int = 0
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _leer_name(cls, v):
+        return "" if v is None else v
+
+    @field_validator("position", mode="before")
+    @classmethod
+    def _leer_zahl(cls, v):
+        return 0 if v in (None, "") else v
+
+    @field_validator("name")
+    @classmethod
+    def name_ok(cls, v: str) -> str:
+        return (v or "").strip()[:120] or "Spalte"
+
+
+ImportSection.model_rebuild()
+
+
+def _weich_datum(v):
+    """Datum bewusst weich: ein unlesbares Datum aus einer alten Datei kostet nur
+    den Zeitstempel, nicht die Note. Frueher wurde es ebenso verworfen."""
+    if v in (None, ""):
+        return None
+    if isinstance(v, datetime):
+        return v
+    try:
+        return datetime.fromisoformat(str(v))
+    except ValueError:
+        return None
+
+
+class ImportEntry(BaseModel):
+    """Ein Noteneintrag aus der Datei — dieselben Regeln wie EntryIn.
+
+    Hier lief frueher gar keine Pruefung: value/tendency gingen roh in die
+    Datenbank, eine 99 oder ein Text als Note sprengte danach jeden gewichteten
+    Schnitt. s/c durften Listen sein und rissen den Import in einen 500.
+    """
+    card_id: Optional[int] = None
+    s: Optional[int] = None
+    c: Optional[int] = None
+    kind: str = "grade"
+    value: Optional[float] = None
+    tendency: Optional[int] = None
+    note: str = ""
+    date: Optional[datetime] = None
+
+    @field_validator("kind", "note", mode="before")
+    @classmethod
+    def _leer(cls, v):
+        return v if v is not None else ""
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def _datum(cls, v):
+        return _weich_datum(v)
+
+    @field_validator("kind")
+    @classmethod
+    def kind_ok(cls, v: str) -> str:
+        v = v or "grade"
+        if v not in ("grade", "observation"):
+            raise ValueError("muss 'grade' oder 'observation' sein")
+        return v
+
+    @field_validator("value")
+    @classmethod
+    def value_ok(cls, v):
+        if v is None:
+            return v
+        if v < 1.0 or v > 6.0:
+            raise ValueError("Note muss zwischen 1,0 und 6,0 liegen")
+        return round(v, 2)
+
+    @field_validator("tendency")
+    @classmethod
+    def tendency_ok(cls, v):
+        if v is not None and v not in (-1, 0, 1):
+            raise ValueError("Tendenz muss -1, 0 oder 1 sein")
+        return v
+
+    @field_validator("note")
+    @classmethod
+    def note_ok(cls, v: str) -> str:
+        if len(v) > 2000:
+            raise ValueError("Notiz zu lang (max. 2000 Zeichen)")
+        return v
+
+
+class ImportOverride(BaseModel):
+    card_id: Optional[int] = None
+    s: Optional[int] = None
+    value: Optional[float] = None
+
+    @field_validator("value")
+    @classmethod
+    def value_ok(cls, v):
+        # Gleiche Regel wie OverrideIn.value_ok.
+        if v is None:
+            return v
+        if v < 1.0 or v > 6.0:
+            raise ValueError("Note muss zwischen 1,0 und 6,0 liegen")
+        return round(v, 2)
+
+
+class ImportDivider(BaseModel):
+    s: Optional[int] = None
+    c: Optional[int] = None
+
+
+class NotenImport(BaseModel):
+    """Sicherungsdatei einer Klasse. Unbekannte Felder werden ignoriert, damit
+    eine Datei aus einem NEUEREN Stand hier nicht scheitert."""
+    type: str = ""
+    version: int = 1
+    term: Optional[str] = None
+    sections: List[ImportSection] = []
+    entries: List[ImportEntry] = []
+    overrides: List[ImportOverride] = []
+    dividers: List[ImportDivider] = []
+
+    @field_validator("sections", "entries", "overrides", "dividers", mode="before")
+    @classmethod
+    def _leer(cls, v):
+        return v if v is not None else []
+
+
 @router.post("/classes/{class_id}/import")
 async def import_noten(class_id: int, body: dict, term: str = "1", kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    if body.get("type") != "nuvora_noten":
+    """Sicherung zurueckspielen. Die Datei wird gegen NotenImport geprueft —
+    dieselben Regeln wie beim Tippen im Notenbuch (Note 1,0–6,0, Gewicht
+    0–100 %). Ein falsches Feld gibt 400 samt Feldnamen, nie 500.
+
+    `body: dict` in der Signatur ist Absicht: geprueft() liefert 400 mit
+    deutscher Meldung, ein Modell in der Signatur nur FastAPIs englische 422."""
+    rate_limit("noten_import", f"u{user.id}", 30, 60, "Zu viele Importe in kurzer Zeit. Bitte kurz warten.")
+    if not isinstance(body, dict) or body.get("type") != "nuvora_noten":
         raise HTTPException(400, "Falsches Dateiformat")
+    daten = geprueft(NotenImport, body, "Notendatei")
     await _owned_class(db, user, class_id)
     students = await _kurs_roster(db, user, class_id, kurs_id)
     card2sid = {s.card_id: s.id for s in students}
@@ -1163,49 +1336,43 @@ async def import_noten(class_id: int, body: dict, term: str = "1", kurs_id: Opti
     sec_map = {}  # s_idx -> section_id
     pos0 = (await db.execute(select(GradeSection).where(*_sec_kurs_where(user, class_id, kurs_id), GradeSection.term == term))).scalars().all()
     base = len(pos0)
-    for si, sec in enumerate(body.get("sections") or []):
-        gs = GradeSection(owner_id=user.id, class_id=class_id, kurs_id=kurs_id, term=term, name=(sec.get("name") or "Abschnitt")[:120],
-                          weight=int(sec.get("weight") or 0), position=base + si)
+    for si, sec in enumerate(daten.sections):
+        gs = GradeSection(owner_id=user.id, class_id=class_id, kurs_id=kurs_id, term=term, name=sec.name,
+                          weight=sec.weight, position=base + si)
         db.add(gs)
         await db.flush()
         sec_map[si] = gs.id
-        for ci, c in enumerate(sec.get("categories") or []):
+        for ci, c in enumerate(sec.categories):
             gc = GradeCategory(owner_id=user.id, class_id=class_id, section_id=gs.id,
-                               name=(c.get("name") or "Spalte")[:120], position=ci)
+                               name=c.name, position=ci)
             db.add(gc)
             await db.flush()
             cat_map[(si, ci)] = gc.id
-    for e in (body.get("entries") or []):
-        sid = card2sid.get(e.get("card_id"))
-        cid = cat_map.get((e.get("s"), e.get("c")))
+    for e in daten.entries:
+        sid = card2sid.get(e.card_id)
+        cid = cat_map.get((e.s, e.c))
         if not sid or not cid:
             continue
-        dt = None
-        if e.get("date"):
-            try:
-                dt = datetime.fromisoformat(e["date"])
-            except ValueError:
-                dt = None
-        ge = GradeEntry(category_id=cid, student_id=sid, kind=e.get("kind") or "grade",
-                        value=e.get("value"), tendency=e.get("tendency"), note=e.get("note") or "")
-        if dt:
-            ge.date = dt
+        ge = GradeEntry(category_id=cid, student_id=sid, kind=e.kind,
+                        value=e.value, tendency=e.tendency, note=e.note)
+        if e.date:
+            ge.date = e.date
         db.add(ge)
-    for o in (body.get("overrides") or []):
-        sid = card2sid.get(o.get("card_id"))
-        if not sid or o.get("value") is None:
+    for o in daten.overrides:
+        sid = card2sid.get(o.card_id)
+        if not sid or o.value is None:
             continue
-        section_id = sec_map.get(o.get("s")) if o.get("s") is not None else None
-        if o.get("s") is not None and section_id is None:
+        section_id = sec_map.get(o.s) if o.s is not None else None
+        if o.s is not None and section_id is None:
             continue
         db.add(GradeOverride(owner_id=user.id, class_id=class_id, kurs_id=(None if section_id is not None else kurs_id),
-                             student_id=sid, section_id=section_id, term=term, value=o["value"]))
-    for d in (body.get("dividers") or []):
-        cid = cat_map.get((d.get("s"), d.get("c")))
+                             student_id=sid, section_id=section_id, term=term, value=o.value))
+    for d in daten.dividers:
+        cid = cat_map.get((d.s, d.c))
         if cid:
             db.add(QuartalDivider(class_id=class_id, owner_id=user.id, term=term, after_category_id=cid))
     await db.commit()
-    return {"imported": len(body.get("sections") or [])}
+    return {"imported": len(daten.sections)}
 
 
 # ─── Zeugnis-/Eltern-Export: ein gebuendeltes PDF je Schueler ───

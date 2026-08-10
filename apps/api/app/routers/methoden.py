@@ -7,11 +7,12 @@ ON DELETE SET NULL) — das ist Zusatz, keine Voraussetzung.
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select, delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
+from ..importe import geprueft
 from ..models import CalendarEntry, Kurs, Method, MethodFolder, SchoolClass, Topic, User
 from .auth import rate_limit
 from .modules import is_active, modul_pflicht
@@ -177,22 +178,54 @@ async def export_einstiege(user: User = Depends(require_module), db: AsyncSessio
     }
 
 
+class ImportItem(BaseModel):
+    """Ein Einstieg aus der Datei — dieselben Felder wie MethodIn."""
+    title: str = ""
+    description: str = ""
+    ablauf: str = ""
+    material: str = ""
+    dauer: Optional[int] = None
+
+    @field_validator("title", "description", "ablauf", "material", mode="before")
+    @classmethod
+    def _leer_text(cls, v):
+        return "" if v is None else v
+
+    @field_validator("dauer", mode="before")
+    @classmethod
+    def _leer_zahl(cls, v):
+        return None if v == "" else v
+
+
+class EinstiegeImport(BaseModel):
+    type: str = ""
+    version: int = 1
+    items: List[ImportItem] = []
+
+    @field_validator("items", mode="before")
+    @classmethod
+    def _leer_liste(cls, v):
+        return [] if v is None else v
+
+
 @router.post("/import")
 async def import_einstiege(body: dict, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    if body.get("type") != "nuvora_einstiege":
+    """Sammlung zurueckspielen. Geprueft wie beim Anlegen (dauer als Zahl);
+    ein falsches Feld gibt 400 samt Feldnamen. `body: dict` siehe app/importe.py."""
+    rate_limit("methoden_import", f"u{user.id}", 20, 60, "Zu viele Importe in kurzer Zeit. Bitte kurz warten.")
+    if not isinstance(body, dict) or body.get("type") != "nuvora_einstiege":
         raise HTTPException(400, "Falsches Dateiformat")
-    items = body.get("items") or []
-    if len(items) > 500:
+    roh = body.get("items")
+    if isinstance(roh, list) and len(roh) > 500:
         raise HTTPException(400, "Zu viele Einträge")
+    daten = geprueft(EinstiegeImport, body, "Einstiegsdatei")
     n = 0
-    for it in items:
-        title = (it.get("title") or "").strip()
+    for it in daten.items:
+        title = it.title.strip()
         if not title:
             continue
-        d = it.get("dauer")
-        db.add(Method(owner_id=user.id, title=title[:200], description=it.get("description") or "",
-                      ablauf=it.get("ablauf") or "", material=it.get("material") or "",
-                      dauer=int(d) if isinstance(d, (int, float)) else None))
+        db.add(Method(owner_id=user.id, title=title[:200], description=it.description,
+                      ablauf=it.ablauf, material=it.material, dauer=it.dauer))
         n += 1
     await db.commit()
     return {"imported": n}

@@ -1,17 +1,18 @@
 """Export and import classes and question sets as JSON/CSV/Excel."""
 import io
 import re
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..scoring import bewerte, status_of
 from ..database import get_db
+from ..importe import geprueft
 from ..models import SchoolClass, Student, QuestionSet, QuestionSetItem, Question, Session, Scan, Folder, User
 from .auth import get_current_user, rate_limit
 
@@ -151,16 +152,45 @@ async def class_xlsx_template():
 MAX_XLSX_BYTES = 5 * 1024 * 1024
 
 
+def _arbeitsblatt(data: bytes):
+    """Excel-Datei oeffnen und das erste Blatt liefern.
+
+    Ohne diesen Mantel endete jede Datei, die keine .xlsx ist (eine .csv, eine
+    abgeschnittene Uebertragung, eine .numbers-Datei) als HTTP 500 mit einem
+    openpyxl-Traceback — die Lehrkraft erfuhr nicht, dass schlicht das Format
+    nicht passt."""
+    from openpyxl import load_workbook
+    try:
+        wb = load_workbook(io.BytesIO(data))
+    except Exception:
+        raise HTTPException(400, "Die Datei laesst sich nicht lesen — bitte eine Excel-Datei (.xlsx) hochladen.")
+    ws = wb.active
+    if ws is None:
+        raise HTTPException(400, "Die Excel-Datei enthaelt kein Tabellenblatt")
+    return ws
+
+
+def _skala(config: dict) -> dict:
+    """Notenskala aus der Session-Konfiguration, robust gelesen.
+
+    Ueberall stand ``{int(k): v for k, v in scale_raw.items()}`` — eine
+    Konfiguration mit einem unlesbaren Schluessel (Altbestand, von Hand
+    bearbeitet) liess damit den ganzen Export mit HTTP 500 auffliegen."""
+    roh = (config or {}).get("grade_scale") or DEFAULT_SCALE
+    try:
+        skala = {int(k): float(v) for k, v in roh.items()}
+    except (AttributeError, TypeError, ValueError):
+        return dict(DEFAULT_SCALE)
+    return skala if all(g in skala for g in (1, 2, 3, 4, 5, 6)) else dict(DEFAULT_SCALE)
+
+
 @router.post("/import/class-xlsx")
 async def import_class_xlsx(name: str = "Neue Klasse", file: UploadFile = File(...), user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("import", f"u{user.id}", 60, 3600, "Zu viele Importe. Bitte kurz warten.")
-    from openpyxl import load_workbook
-
     data = await file.read(MAX_XLSX_BYTES + 1)
     if len(data) > MAX_XLSX_BYTES:
         raise HTTPException(400, "Datei zu gross (max 5 MB)")
-    wb = load_workbook(io.BytesIO(data))
-    ws = wb.active
+    ws = _arbeitsblatt(data)
 
     sc = SchoolClass(name=name, owner_id=user.id)
     db.add(sc)
@@ -235,13 +265,10 @@ async def questions_xlsx_template():
 @router.post("/import/questions-xlsx", dependencies=[CARDVOTE])
 async def import_questions_xlsx(name: str = "Neues Frageset", folder_id: Optional[int] = None, file: UploadFile = File(...), user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("import", f"u{user.id}", 60, 3600, "Zu viele Importe. Bitte kurz warten.")
-    from openpyxl import load_workbook
-
     data = await file.read(MAX_XLSX_BYTES + 1)
     if len(data) > MAX_XLSX_BYTES:
         raise HTTPException(400, "Datei zu gross (max 5 MB)")
-    wb = load_workbook(io.BytesIO(data))
-    ws = wb.active
+    ws = _arbeitsblatt(data)
 
     # owner_id: sonst ist das importierte Set fuer JEDES Konto lesbar
     # (ensure_set_access laesst owner-lose Sets als Altbestand durch).
@@ -282,15 +309,71 @@ async def import_questions_xlsx(name: str = "Neues Frageset", folder_id: Optiona
 
 # --- JSON Import ---
 
-class ImportClassBody(BaseModel):
-    type: str
+class ImportStudent(BaseModel):
+    """Ein Kind aus der Klassendatei. Frueher ``int(s["card_id"])`` roh — eine
+    Datei ohne Karten-Nummer endete als HTTP 500 mit Traceback."""
+    # card_id und name waren immer Pflicht — ohne sie warf der Import einen
+    # KeyError (HTTP 500). Jetzt sagt die Meldung, welches Feld fehlt.
+    card_id: int
     name: str
-    students: list
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _text(cls, v):
+        return "" if v is None else str(v)
+
+
+class ImportClassBody(BaseModel):
+    type: str = ""
+    name: str = ""
+    students: List[ImportStudent] = []
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _leer(cls, v):
+        return "" if v is None else v
+
+    @field_validator("students", mode="before")
+    @classmethod
+    def _leer_liste(cls, v):
+        return [] if v is None else v
+
+
+class ImportQuestion(BaseModel):
+    """Eine Frage aus der Datei. ``text`` fehlte -> KeyError -> HTTP 500."""
+    text: str
+    choices: dict = {"A": "", "B": "", "C": "", "D": ""}
+    correct_answer: Optional[str] = None
+    image_url: Optional[str] = None
+    image_layout: str = "above"
+    num_choices: int = 4
+    choice_images: Optional[dict] = None
+    niveau: str = ""
+
+    @field_validator("text", "image_layout", "niveau", mode="before")
+    @classmethod
+    def _leer(cls, v):
+        return "" if v is None else v
+
+    @field_validator("choices", mode="before")
+    @classmethod
+    def _leer_choices(cls, v):
+        return {"A": "", "B": "", "C": "", "D": ""} if v is None else v
+
+    @field_validator("num_choices", mode="before")
+    @classmethod
+    def _leer_zahl(cls, v):
+        return 4 if v in (None, "") else v
+
+    @field_validator("image_layout")
+    @classmethod
+    def _layout(cls, v):
+        return v or "above"
 
 
 class ImportQuestionSetBody(BaseModel):
-    type: str
-    name: str
+    type: str = ""
+    name: str = ""
     folder_id: Optional[int] = None
     shuffle_questions: bool = False
     shuffle_answers: bool = False
@@ -298,63 +381,82 @@ class ImportQuestionSetBody(BaseModel):
     # Fassung anders bewertet als das Original.
     niveau_aktiv: bool = False
     minuspunkte: bool = False
-    questions: list
+    questions: List[ImportQuestion] = []
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _leer(cls, v):
+        return "" if v is None else v
+
+    @field_validator("shuffle_questions", "shuffle_answers", "niveau_aktiv", "minuspunkte", mode="before")
+    @classmethod
+    def _leer_flag(cls, v):
+        return False if v is None else v
+
+    @field_validator("questions", mode="before")
+    @classmethod
+    def _leer_liste(cls, v):
+        return [] if v is None else v
 
 
 @router.post("/import/class")
-async def import_class(body: ImportClassBody, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def import_class(body: dict, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """`body: dict` in der Signatur ist Absicht — geprueft() antwortet mit 400
+    und Feldnamen statt FastAPIs englischer 422 (siehe app/importe.py)."""
     rate_limit("import", f"u{user.id}", 60, 3600, "Zu viele Importe. Bitte kurz warten.")
-    if body.type != "cardvote_class":
+    if not isinstance(body, dict) or body.get("type") != "cardvote_class":
         raise HTTPException(400, "Ungültiges Format")
-    if len(body.students) > 50:
+    if isinstance(body.get("students"), list) and len(body["students"]) > 50:
         raise HTTPException(400, "Maximal 50 Lernende pro Klasse")
-    sc = SchoolClass(name=body.name[:200], owner_id=user.id)
+    daten = geprueft(ImportClassBody, body, "Klassendatei")
+    sc = SchoolClass(name=daten.name[:200], owner_id=user.id)
     db.add(sc)
     await db.flush()
-    for s in body.students:
-        card_id = int(s["card_id"])
-        name = str(s["name"]).strip()[:200]
-        if card_id < 0 or card_id > 49 or not name:
+    for s in daten.students:
+        name = s.name.strip()[:200]
+        if s.card_id < 0 or s.card_id > 49 or not name:
             continue
-        db.add(Student(card_id=card_id, name=name, class_id=sc.id))
+        db.add(Student(card_id=s.card_id, name=name, class_id=sc.id))
     await db.commit()
     await db.refresh(sc)
     return {"id": sc.id, "name": sc.name}
 
 
 @router.post("/import/question-set", dependencies=[CARDVOTE])
-async def import_question_set(body: ImportQuestionSetBody, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def import_question_set(body: dict, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """`body: dict` in der Signatur ist Absicht — siehe app/importe.py."""
     rate_limit("import", f"u{user.id}", 60, 3600, "Zu viele Importe. Bitte kurz warten.")
-    if body.type != "cardvote_questionset":
+    if not isinstance(body, dict) or body.get("type") != "cardvote_questionset":
         raise HTTPException(400, "Ungültiges Format")
-    if len(body.questions) > 200:
+    if isinstance(body.get("questions"), list) and len(body["questions"]) > 200:
         raise HTTPException(400, "Maximal 200 Fragen pro Set")
+    daten = geprueft(ImportQuestionSetBody, body, "Fragendatei")
     qs = QuestionSet(
-        name=body.name,
-        folder_id=body.folder_id,
+        name=daten.name,
+        folder_id=daten.folder_id,
         owner_id=user.id,   # sonst fuer jedes Konto lesbar (Altbestand-Ausnahme)
-        shuffle_questions=body.shuffle_questions,
-        shuffle_answers=body.shuffle_answers,
-        niveau_aktiv=bool(getattr(body, "niveau_aktiv", False)),
-        minuspunkte=bool(getattr(body, "minuspunkte", False)),
+        shuffle_questions=daten.shuffle_questions,
+        shuffle_answers=daten.shuffle_answers,
+        niveau_aktiv=daten.niveau_aktiv,
+        minuspunkte=daten.minuspunkte,
     )
     db.add(qs)
     await db.flush()
-    for pos, qdata in enumerate(body.questions):
+    for pos, qdata in enumerate(daten.questions):
         q = Question(
-            text=qdata["text"],
-            choices=qdata.get("choices", {"A": "", "B": "", "C": "", "D": ""}),
-            correct_answer=qdata.get("correct_answer"),
-            image_url=qdata.get("image_url"),
-            image_layout=qdata.get("image_layout", "above"),
-            num_choices=qdata.get("num_choices", 4),
-            choice_images=qdata.get("choice_images"),
+            text=qdata.text,
+            choices=qdata.choices,
+            correct_answer=qdata.correct_answer,
+            image_url=qdata.image_url,
+            image_layout=qdata.image_layout,
+            num_choices=qdata.num_choices,
+            choice_images=qdata.choice_images,
             owner_id=user.id,
         )
         db.add(q)
         await db.flush()
         db.add(QuestionSetItem(question_set_id=qs.id, question_id=q.id, position=pos,
-                               niveau="E" if qdata.get("niveau") == "E" else ""))
+                               niveau="E" if qdata.niveau == "E" else ""))
     await db.commit()
     return {"id": qs.id, "name": qs.name}
 
@@ -425,58 +527,127 @@ async def export_folder(folder_id: int, user: User = Depends(get_current_user), 
     return {"type": "cardvote_folder", "version": 1, **data}
 
 
-async def _import_folder_recursive(data: dict, parent_id, owner_id, db: AsyncSession):
-    folder = Folder(name=data["name"], parent_id=parent_id, owner_id=owner_id)
+class ImportFolderSet(BaseModel):
+    name: str = ""
+    shuffle_questions: bool = False
+    shuffle_answers: bool = False
+    niveau_aktiv: bool = False
+    minuspunkte: bool = False
+    questions: List[ImportQuestion] = []
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _leer(cls, v):
+        return "" if v is None else v
+
+    @field_validator("shuffle_questions", "shuffle_answers", "niveau_aktiv", "minuspunkte", mode="before")
+    @classmethod
+    def _leer_flag(cls, v):
+        return False if v is None else v
+
+    @field_validator("questions", mode="before")
+    @classmethod
+    def _leer_liste(cls, v):
+        return [] if v is None else v
+
+
+class ImportFolderBody(BaseModel):
+    type: str = ""
+    version: int = 1
+    name: str = "Ordner"
+    question_sets: List[ImportFolderSet] = []
+    children: List["ImportFolderBody"] = []
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _leer(cls, v):
+        return "" if v is None else v
+
+    @field_validator("name")
+    @classmethod
+    def _name_ok(cls, v):
+        return v.strip()[:200] or "Ordner"
+
+    @field_validator("question_sets", "children", mode="before")
+    @classmethod
+    def _leer_liste(cls, v):
+        return [] if v is None else v
+
+
+ImportFolderBody.model_rebuild()
+
+
+async def _import_folder_recursive(data: ImportFolderBody, parent_id, owner_id, db: AsyncSession):
+    folder = Folder(name=data.name, parent_id=parent_id, owner_id=owner_id)
     db.add(folder)
     await db.flush()
-    for qs_data in data.get("question_sets", []):
+    for qs_data in data.question_sets:
         qs = QuestionSet(
-            name=qs_data["name"],
+            name=qs_data.name,
             folder_id=folder.id,
-            owner_id=user.id,   # sonst fuer jedes Konto lesbar
-            shuffle_questions=qs_data.get("shuffle_questions", False),
-            shuffle_answers=qs_data.get("shuffle_answers", False),
-            niveau_aktiv=bool(qs_data.get("niveau_aktiv", False)),
-            minuspunkte=bool(qs_data.get("minuspunkte", False)),
+            # owner_id: sonst fuer jedes Konto lesbar. Hier stand frueher
+            # `user.id` — in dieser Funktion gibt es kein `user`, jeder
+            # Ordner-Import endete daher als NameError, also HTTP 500.
+            owner_id=owner_id,
+            shuffle_questions=qs_data.shuffle_questions,
+            shuffle_answers=qs_data.shuffle_answers,
+            niveau_aktiv=qs_data.niveau_aktiv,
+            minuspunkte=qs_data.minuspunkte,
         )
         db.add(qs)
         await db.flush()
-        for pos, qdata in enumerate(qs_data.get("questions", [])):
+        for pos, qdata in enumerate(qs_data.questions):
             q = Question(
-                text=qdata["text"],
-                choices=qdata.get("choices", {"A": "", "B": "", "C": "", "D": ""}),
-                correct_answer=qdata.get("correct_answer"),
-                image_url=qdata.get("image_url"),
-                image_layout=qdata.get("image_layout", "above"),
-                num_choices=qdata.get("num_choices", 4),
-                choice_images=qdata.get("choice_images"),
+                text=qdata.text,
+                choices=qdata.choices,
+                correct_answer=qdata.correct_answer,
+                image_url=qdata.image_url,
+                image_layout=qdata.image_layout,
+                num_choices=qdata.num_choices,
+                choice_images=qdata.choice_images,
                 owner_id=owner_id,
             )
             db.add(q)
             await db.flush()
             db.add(QuestionSetItem(question_set_id=qs.id, question_id=q.id, position=pos,
-                                   niveau="E" if qdata.get("niveau") == "E" else ""))
-    for child_data in data.get("children", []):
+                                   niveau="E" if qdata.niveau == "E" else ""))
+    for child_data in data.children:
         await _import_folder_recursive(child_data, folder.id, owner_id, db)
     return folder
 
 
 @router.post("/import/folder", dependencies=[CARDVOTE])
 async def import_folder(body: dict, folder_id: Optional[int] = None, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """`body: dict` in der Signatur ist Absicht — siehe app/importe.py."""
     rate_limit("import", f"u{user.id}", 60, 3600, "Zu viele Importe. Bitte kurz warten.")
-    if body.get("type") != "cardvote_folder":
+    if not isinstance(body, dict) or body.get("type") != "cardvote_folder":
         raise HTTPException(400, "Ungültiges Format")
 
     def _count(node):
-        sets = node.get("question_sets", []) or []
-        n = sum(len(s.get("questions", []) or []) for s in sets)
-        for child in (node.get("children", []) or []):
+        if not isinstance(node, dict):
+            return 0
+        sets = node.get("question_sets") or []
+        sets = sets if isinstance(sets, list) else []
+        n = 0
+        for s in sets:
+            fragen = (s.get("questions") if isinstance(s, dict) else None) or []
+            n += len(fragen) if isinstance(fragen, list) else 0
+        kinder = node.get("children") or []
+        for child in (kinder if isinstance(kinder, list) else []):
             n += _count(child)
         return n
     if _count(body) > 5000:
         raise HTTPException(400, "Import zu gross (max. 5000 Fragen pro Ordner)")
 
-    folder = await _import_folder_recursive(body, folder_id, user.id, db)
+    if folder_id is not None:
+        # Ohne diese Pruefung landete der Import im Ordner eines fremden Kontos
+        # — oder in keinem, und der Fremdschluessel warf einen HTTP 500.
+        ziel = await db.get(Folder, folder_id)
+        if not ziel or (ziel.owner_id and ziel.owner_id != user.id):
+            raise HTTPException(404, "Ordner nicht gefunden")
+
+    daten = geprueft(ImportFolderBody, body, "Ordnerdatei")
+    folder = await _import_folder_recursive(daten, folder_id, user.id, db)
     await db.commit()
     return {"id": folder.id, "name": folder.name}
 
@@ -652,8 +823,7 @@ async def evaluation_scsv(session_id: int, user: User = Depends(get_current_user
     niveau_aktiv, minuspunkte = await _quiz_flags(db, session)
     weights = config.get("weights", {})
     get_w = lambda qid: weights.get(str(qid), weights.get(qid, 1))
-    scale_raw = config.get("grade_scale", {1: 87, 2: 73, 3: 59, 4: 45, 5: 20, 6: 0})
-    scale = {int(k): v for k, v in scale_raw.items()}
+    scale = _skala(config)
 
     esc = lambda v: f'"{v}"'
 
@@ -738,8 +908,7 @@ def _build_student_pdf_single(student, questions, scan_map, session, config, niv
     pw, ph = A4
 
     weights = config.get("weights", {}) if config else {}
-    scale_raw = config.get("grade_scale", DEFAULT_SCALE) if config else DEFAULT_SCALE
-    scale = {int(k): v for k, v in scale_raw.items()}
+    scale = _skala(config or {})
     times = config.get("times", {}) if config else {}
     total_time = config.get("total_time") if config else None
 
@@ -905,8 +1074,7 @@ async def all_students_pdf(session_id: int, user: User = Depends(get_current_use
     config = session.eval_config or {}
     niveau_aktiv, minuspunkte = await _quiz_flags(db, session)
     weights = config.get("weights", {})
-    scale_raw = config.get("grade_scale", DEFAULT_SCALE)
-    scale = {int(k): v for k, v in scale_raw.items()}
+    scale = _skala(config)
     get_w = lambda qid: weights.get(str(qid), weights.get(qid, 1))
     max_score = sum(get_w(q["id"]) for q in questions if q["correct_answer"])
 
@@ -1058,8 +1226,7 @@ async def class_student_pdf(class_id: int, card_id: int, user: User = Depends(ge
 
         config = session.eval_config or {}
         weights = config.get("weights", {})
-        scale_raw = config.get("grade_scale", DEFAULT_SCALE)
-        scale = {int(k): v for k, v in scale_raw.items()}
+        scale = _skala(config)
         get_w = lambda qid: weights.get(str(qid), weights.get(qid, 1))
 
         max_sc = sum(get_w(q["id"]) for q in questions if q["correct_answer"])

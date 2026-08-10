@@ -10,11 +10,12 @@ from datetime import datetime, date, timedelta, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, model_validator, field_validator
+from pydantic import BaseModel, Field, model_validator, field_validator
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
+from ..importe import geprueft
 from ..models import CalendarBreak, CalendarEntry, CardDeck, ExamDate, Kurs, SchoolClass, TimetableSlot, SlotCancellation, Topic, User, WorkAnalysis, Session as TestSession
 from .auth import rate_limit
 from .modules import is_active, modul_pflicht
@@ -244,38 +245,146 @@ async def export_kalender(user: User = Depends(require_module), db: AsyncSession
     }
 
 
+class ImportSlot(BaseModel):
+    """Stundenplan-Stunde aus der Datei — dieselben Grenzen wie upsert_slot."""
+    weekday: int = 0
+    period: int = 1
+    class_: Optional[str] = Field(default=None, alias="class")
+    title: str = ""
+    model_config = {"populate_by_name": True}
+
+    @field_validator("weekday", "period", mode="before")
+    @classmethod
+    def _leer_zahl(cls, v):
+        return None if v == "" else v
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def _leer_text(cls, v):
+        return "" if v is None else v
+
+    @field_validator("weekday")
+    @classmethod
+    def weekday_ok(cls, v: int) -> int:
+        if not 0 <= v <= 6:
+            raise ValueError("Wochentag muss zwischen 0 (Montag) und 6 (Sonntag) liegen")
+        return v
+
+    @field_validator("period")
+    @classmethod
+    def period_ok(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("Stunde muss mindestens 1 sein")
+        return v
+
+
+class ImportTimetable(BaseModel):
+    periods: Optional[int] = None
+    times: Optional[list] = None
+    slots: Optional[List[ImportSlot]] = None
+
+    @field_validator("periods", mode="before")
+    @classmethod
+    def _leer_zahl(cls, v):
+        return None if v in ("", 0) else v
+
+    @field_validator("periods")
+    @classmethod
+    def periods_ok(cls, v):
+        # Gleiche Regel wie set_periods.
+        if v is not None and not 1 <= v <= 16:
+            raise ValueError("Stundenzahl muss zwischen 1 und 16 liegen")
+        return v
+
+
+class ImportBreak(BaseModel):
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    label: str = ""
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def _leer_text(cls, v):
+        return "" if v is None else v
+
+
+class ImportKalEntry(BaseModel):
+    date: Optional[datetime] = None
+    period: Optional[int] = None
+    title: str = ""
+    notes: str = ""
+    class_: Optional[str] = Field(default=None, alias="class")
+    topic: Optional[str] = None
+    model_config = {"populate_by_name": True}
+
+    @field_validator("title", "notes", mode="before")
+    @classmethod
+    def _leer_text(cls, v):
+        return "" if v is None else v
+
+    @field_validator("period", mode="before")
+    @classmethod
+    def _leer_zahl(cls, v):
+        return None if v == "" else v
+
+
+class KalenderImport(BaseModel):
+    """Sicherungsdatei des Kalenders. Unbekannte Felder werden ignoriert."""
+    type: str = ""
+    version: int = 1
+    timetable: ImportTimetable = ImportTimetable()
+    breaks: List[ImportBreak] = []
+    entries: List[ImportKalEntry] = []
+
+    @field_validator("timetable", mode="before")
+    @classmethod
+    def _leer_tt(cls, v):
+        return {} if v is None else v
+
+    @field_validator("breaks", "entries", mode="before")
+    @classmethod
+    def _leer_liste(cls, v):
+        return [] if v is None else v
+
+
 @router.post("/import")
 async def import_kalender(body: dict, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    if body.get("type") != "nuvora_kalender":
+    """Sicherung zurueckspielen. Geprueft wie beim Bearbeiten im Stundenplan
+    (Wochentag 0–6, Stunde ≥ 1, Stundenzahl 1–16); ein falsches Feld gibt 400
+    samt Feldnamen statt eines 500 aus int()/TypeError.
+
+    `body: dict` in der Signatur ist Absicht — siehe app/importe.py."""
+    rate_limit("kalender_import", f"u{user.id}", 30, 60, "Zu viele Importe in kurzer Zeit. Bitte kurz warten.")
+    if not isinstance(body, dict) or body.get("type") != "nuvora_kalender":
         raise HTTPException(400, "Falsches Dateiformat")
+    daten = geprueft(KalenderImport, body, "Kalenderdatei")
     _, name2id = await _class_maps(db, user)
     _, path2id = await _topic_maps(db, user)
-    tt = body.get("timetable") or {}
-    if tt.get("periods"):
-        user.timetable_periods = int(tt["periods"])
-    if isinstance(tt.get("times"), list):
-        user.timetable_times = tt["times"]
+    tt = daten.timetable
+    if tt.periods:
+        user.timetable_periods = tt.periods
+    if tt.times is not None:
+        user.timetable_times = tt.times
     # Stundenplan-Slots ersetzen (Wochentag+Stunde eindeutig).
-    if isinstance(tt.get("slots"), list):
+    if tt.slots is not None:
         for s in (await db.execute(select(TimetableSlot).where(TimetableSlot.owner_id == user.id))).scalars().all():
             await db.delete(s)
-        for s in tt["slots"]:
-            db.add(TimetableSlot(owner_id=user.id, weekday=int(s.get("weekday", 0)), period=int(s.get("period", 1)),
-                                 class_id=name2id.get(s.get("class")), title=s.get("title") or ""))
-    for b in (body.get("breaks") or []):
-        try:
-            db.add(CalendarBreak(owner_id=user.id, start_date=datetime.fromisoformat(b["start_date"]),
-                                 end_date=datetime.fromisoformat(b["end_date"]), label=(b.get("label") or "")[:120]))
-        except (KeyError, ValueError):
+        for s in tt.slots:
+            db.add(TimetableSlot(owner_id=user.id, weekday=s.weekday, period=s.period,
+                                 class_id=name2id.get(s.class_), title=s.title))
+    for b in daten.breaks:
+        # Ein Zeitraum ohne Anfang oder Ende wird uebergangen (wie bisher) —
+        # eine unvollstaendige Zeile aus einer alten Datei soll den Lauf nicht abbrechen.
+        if b.start_date is None or b.end_date is None:
             continue
+        db.add(CalendarBreak(owner_id=user.id, start_date=b.start_date,
+                             end_date=b.end_date, label=b.label[:120]))
     n = 0
-    for e in (body.get("entries") or []):
-        try:
-            dt = datetime.fromisoformat(e["date"])
-        except (KeyError, ValueError):
+    for e in daten.entries:
+        if e.date is None:
             continue
-        db.add(CalendarEntry(owner_id=user.id, date=dt, period=e.get("period"), title=(e.get("title") or "")[:200],
-                             notes=e.get("notes") or "", class_id=name2id.get(e.get("class")), topic_id=path2id.get(e.get("topic"))))
+        db.add(CalendarEntry(owner_id=user.id, date=e.date, period=e.period, title=e.title[:200],
+                             notes=e.notes, class_id=name2id.get(e.class_), topic_id=path2id.get(e.topic)))
         n += 1
     await db.commit()
     return {"imported": n}

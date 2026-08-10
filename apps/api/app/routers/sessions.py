@@ -1,12 +1,13 @@
 import io
-from typing import Optional
+from typing import Dict, List, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, RootModel, field_validator
 from sqlalchemy import select, or_, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import get_db
+from ..importe import geprueft
 from ..models import Session, QuestionSetItem, SchoolClass, QuestionSet, User
 from .auth import get_current_user, rate_limit, client_ip
 from .. import websocket as ws
@@ -143,14 +144,33 @@ async def get_session_by_code(code: str, request: Request, user: User = Depends(
     return {"id": s.id, "code": s.code, "name": s.name, "class_id": s.class_id, "current_question_id": s.current_question_id}
 
 
+class QuestionMapIn(RootModel[Dict[str, Optional[str]]]):
+    """Gemischte Loesungen: Frage-ID (als Text) -> richtige Antwort.
+
+    Wird in jeder Auswertung als ``qmap.get(str(q.id), ...)`` gelesen. Kam hier
+    etwas anderes als ein Objekt an (eine Liste, eine Zahl), stuerzte spaeter
+    JEDE Auswertung dieser Session mit HTTP 500 ab — weit weg vom Verursacher."""
+
+    @field_validator("root")
+    @classmethod
+    def klein_genug(cls, v):
+        if len(v) > 1000:
+            raise ValueError("zu viele Fragen (max. 1000)")
+        for k, wert in v.items():
+            if wert is not None and len(wert) > 20:
+                raise ValueError(f"Antwort zu „{k}“ ist zu lang (max. 20 Zeichen)")
+        return v
+
+
 @router.put("/{session_id}/question-map")
 async def save_question_map(session_id: int, body: dict, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """`body: dict` in der Signatur ist Absicht — siehe app/importe.py."""
     s = await db.get(Session, session_id)
     if not s:
         raise HTTPException(404)
     if s.owner_id and s.owner_id != user.id:
         raise HTTPException(403)
-    s.question_map = body
+    s.question_map = geprueft(QuestionMapIn, body, "Loesungen").model_dump()
     await db.commit()
     return {"ok": True}
 
@@ -235,13 +255,47 @@ async def get_eval_config(session_id: int, user: User = Depends(get_current_user
     return s.eval_config or {}
 
 
+class EvalConfigIn(BaseModel):
+    """Auswertungs-Einstellungen einer Session.
+
+    Bewusst offen (``extra="allow"``): die Oberflaeche schickt die vorhandene
+    Konfiguration mit zurueck, und ein spaeter ergaenztes Feld darf hier nicht
+    scheitern. Geprueft wird genau das, woran die Auswertung sonst zerbricht:
+    ``grade_scale`` wird ueberall als ``{int(k): v}`` gelesen — ein Schluessel
+    wie "eins" ergab dort einen HTTP 500, und zwar erst beim Export, nicht beim
+    Speichern."""
+    weights: Optional[Dict[str, float]] = None
+    grade_scale: Optional[Dict[str, float]] = None
+    krank: Optional[List[Union[int, str]]] = None
+    anwesend: Optional[List[Union[int, str]]] = None
+    times: Optional[Dict[str, float]] = None
+    total_time: Optional[float] = None
+    model_config = {"extra": "allow"}
+
+    @field_validator("grade_scale")
+    @classmethod
+    def skala_ok(cls, v):
+        if v is None:
+            return v
+        for k in v:
+            try:
+                stufe = int(k)
+            except (TypeError, ValueError):
+                raise ValueError("Notenstufen muessen 1 bis 6 heissen")
+            if not 1 <= stufe <= 6:
+                raise ValueError("Notenstufen muessen 1 bis 6 heissen")
+        return v
+
+
 @router.put("/{session_id}/eval-config")
 async def save_eval_config(session_id: int, body: dict, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """`body: dict` in der Signatur ist Absicht — siehe app/importe.py."""
     s = await db.get(Session, session_id)
     if not s:
         raise HTTPException(404)
     if s.owner_id and s.owner_id != user.id:
         raise HTTPException(403)
+    geprueft(EvalConfigIn, body, "Einstellungen")
     s.eval_config = body
     await db.commit()
     return {"ok": True}
