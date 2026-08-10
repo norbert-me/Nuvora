@@ -408,9 +408,10 @@ Grenzen (Token im `localStorage`, prozesslokale Rate-Limits, Schüler-Token in
 der Adresse, kein Rollenmodell) stehen offen in [SECURITY.md](SECURITY.md).
 Lücken bitte **nicht** als öffentliches Issue — der Meldeweg steht dort.
 
-> **Offen:** Der Selbsttest verlangt eine `/.well-known/security.txt` nach RFC
-> 9116 (Contact, gültiges Expires), aber das Repository liefert keine mit. Wer
-> selbst betreibt, legt sie am Webserver an — sonst ist dieser Prüfpunkt rot.
+Der Meldeweg steht zusätzlich maschinenlesbar in
+`apps/web/public/.well-known/security.txt` (RFC 9116) und wird vom Selbsttest
+mitgeprüft — inklusive Restlaufzeit des `Expires`-Datums, damit die Datei nicht
+unbemerkt abläuft.
 
 ## Mitentwickeln
 
