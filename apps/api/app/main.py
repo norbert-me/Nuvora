@@ -305,17 +305,82 @@ def _ensure_columns(sync_conn):
         ("users", "timetable_periods", "INTEGER DEFAULT 6 NOT NULL"),
         ("users", "timetable_times", "JSON"),
     ]
+    # Fremdschluessel, die das Modell zu diesen Spalten kennt.
+    #
+    # Das war der teure Teil: ADD COLUMN legte jahrelang ein nacktes INTEGER an,
+    # waehrend create_all dieselbe Spalte MIT ihrem ON DELETE angelegt haette.
+    # In jedem Test existiert der Constraint deshalb, in der gewachsenen
+    # Produktionsdatenbank nicht — und daran haengen zwei Zusagen: Konto loeschen
+    # (owner_id CASCADE, Art. 17) und Thema loeschen (questions.topic_id
+    # SET NULL, Regel 3). Quelle ist das Modell, nicht eine zweite Liste, damit
+    # nichts auseinanderlaufen kann; der Regressionstest vergleicht beides.
+    from app.models import Base
+    fk_soll = {}
+    for table, column, _ in wanted:
+        modell = Base.metadata.tables.get(table)
+        if modell is None or column not in modell.c:
+            continue
+        for fk in modell.c[column].foreign_keys:
+            if fk.ondelete:
+                fk_soll[(table, column)] = (fk.column.table.name, fk.column.name, fk.ondelete.upper())
+
     for table, column, ddl in wanted:
         if table not in existing_tables:
             continue
         cols = {c["name"] for c in inspector.get_columns(table)}
         if column not in cols:
+            # Neue Spalte: der Fremdschluessel kommt inline mit — das koennen
+            # Postgres UND SQLite (SQLite erlaubt REFERENCES bei ADD COLUMN,
+            # solange der Default NULL ist; alle betroffenen Spalten sind
+            # nacktes INTEGER).
+            ziel = fk_soll.get((table, column))
+            if ziel and ziel[0] in existing_tables:
+                ddl = f"{ddl} REFERENCES {ziel[0]}({ziel[1]}) ON DELETE {ziel[2]}"
             sync_conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
             # Bestandsstapel bleiben sichtbar: einmalig als bereits ausgerollt
             # markieren. Laeuft nur beim erstmaligen Anlegen der Spalte, also
             # nicht wieder ueber spaeter angelegte Entwuerfe (released_at NULL).
             if (table, column) == ("card_decks", "released_at"):
                 sync_conn.execute(text("UPDATE card_decks SET released_at = now() WHERE released_at IS NULL"))
+
+    # Der Bestand: Spalten, die ein frueherer Deploy schon nackt nachgezogen hat.
+    # Denen fehlt der Constraint bis heute — nachruesten geht nur auf Postgres,
+    # SQLite kann einer bestehenden Tabelle keinen Fremdschluessel hinzufuegen
+    # (dafuer muesste die Tabelle neu gebaut werden). Produktion ist Postgres;
+    # auf SQLite wird sauber uebersprungen, der Selbsttest meldet den Rest.
+    #
+    # NOT VALID ist Absicht: Bestandsdaten koennen genau die Waisen enthalten,
+    # deren Fehlen der Constraint kuenftig verhindert (Zeilen mit toter
+    # owner_id/topic_id). Eine pruefende Variante wuerde daran scheitern und den
+    # Start abbrechen; NOT VALID greift ab sofort fuer jede weitere Loeschung.
+    if sync_conn.dialect.name == "postgresql":
+        frisch = sa_inspect(sync_conn)  # der alte Inspector kennt die eben angelegten Spalten nicht
+        nachgeruestet, gescheitert = [], []
+        for (table, column), (ziel_t, ziel_c, ondelete) in fk_soll.items():
+            if table not in existing_tables or ziel_t not in existing_tables:
+                continue
+            if column not in {c["name"] for c in frisch.get_columns(table)}:
+                continue
+            # Ein vorhandener Fremdschluessel wird nicht angefasst — auch nicht,
+            # wenn sein ON DELETE abweicht. Das waere ein Umbau, keine additive
+            # Migration; solche Faelle meldet der Selbsttest als Warnung.
+            if any(fk["constrained_columns"] == [column] for fk in frisch.get_foreign_keys(table)):
+                continue
+            name = f"fk_{table}_{column}"
+            try:
+                with sync_conn.begin_nested():
+                    sync_conn.execute(text(
+                        f"ALTER TABLE {table} ADD CONSTRAINT {name} FOREIGN KEY ({column}) "
+                        f"REFERENCES {ziel_t}({ziel_c}) ON DELETE {ondelete} NOT VALID"
+                    ))
+                nachgeruestet.append(f"{table}.{column}")
+            except Exception as e:  # eine kaputte Tabelle darf den Start nicht kosten
+                gescheitert.append(f"{table}.{column} ({type(e).__name__})")
+        if nachgeruestet:
+            print(f"[STARTUP] Fremdschluessel nachgeruestet: {', '.join(nachgeruestet)}", flush=True)
+        if gescheitert:
+            print(f"[STARTUP-WARN] Fremdschluessel nicht nachruestbar: {', '.join(gescheitert)} "
+                  f"— ON DELETE greift dort nicht (Kontoloeschung/Themenloeschung pruefen).", flush=True)
 
     # Indizes auf haeufig gefilterte Fremdschluessel (idempotent, additiv).
     # Ohne sie laufen Auswertung/Live-Session als Full-Table-Scans ueber die scans-Tabelle.

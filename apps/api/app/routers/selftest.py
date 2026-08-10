@@ -112,12 +112,18 @@ async def _check_schema(db: AsyncSession, out: List[Check]) -> None:
     def lies(sync_conn):
         from sqlalchemy import inspect as sa_inspect
         inspector = sa_inspect(sync_conn)
-        return {t: {c["name"] for c in inspector.get_columns(t)}
-                for t in inspector.get_table_names()}
+        spalten, fks = {}, {}
+        for t in inspector.get_table_names():
+            spalten[t] = {c["name"] for c in inspector.get_columns(t)}
+            for fk in inspector.get_foreign_keys(t):
+                if len(fk["constrained_columns"]) == 1:
+                    fks[(t, fk["constrained_columns"][0])] = \
+                        ((fk.get("options") or {}).get("ondelete") or "NO ACTION").upper()
+        return spalten, fks
 
     # Ueber den Inspector statt information_schema: derselbe Weg, den auch
     # _ensure_columns beim Start geht, und unabhaengig vom Datenbank-Dialekt.
-    ist = await db.run_sync(lambda s: lies(s.connection()))
+    ist, ist_fks = await db.run_sync(lambda s: lies(s.connection()))
 
     fehlende_tabellen = [t for t in Base.metadata.tables if t not in ist]
     out.append(Check(
@@ -137,6 +143,39 @@ async def _check_schema(db: AsyncSession, out: List[Check]) -> None:
         gruppe="Schema", name="Spalten", ok=not fehlende_spalten,
         detail="fehlen (gehoeren in _ensure_columns): " + ", ".join(sorted(fehlende_spalten))
                if fehlende_spalten else "alle Modell-Spalten vorhanden",
+    ))
+
+    # Fremdschluessel — die einzige Stelle, die die ECHTE Datenbank sieht.
+    #
+    # Namen zu vergleichen reicht nicht: eine per ALTER TABLE nachgezogene
+    # Spalte heisst richtig und traegt trotzdem kein ON DELETE (siehe
+    # _ensure_columns). Genau daran haengen Kontoloeschung (owner_id CASCADE,
+    # Art. 17) und Themenloeschung (topic_id SET NULL). Bewusst nur eine
+    # WARNUNG: nachruesten geht nur auf Postgres und erst beim naechsten Start —
+    # ein Fehler wuerde den Selbsttest bis dahin rot faerben, ohne dass jemand
+    # etwas falsch gemacht hat.
+    fehlende_fks, falsche_fks = [], []
+    for name, tabelle in Base.metadata.tables.items():
+        if name not in ist:
+            continue
+        for spalte in tabelle.columns:
+            if spalte.name not in ist[name]:
+                continue
+            for fk in spalte.foreign_keys:
+                if not fk.ondelete:
+                    continue
+                soll = fk.ondelete.upper()
+                hat = ist_fks.get((name, spalte.name))
+                if hat is None:
+                    fehlende_fks.append(f"{name}.{spalte.name} (ON DELETE {soll})")
+                elif hat != soll:
+                    falsche_fks.append(f"{name}.{spalte.name} ({hat} statt {soll})")
+    schaeden = fehlende_fks + falsche_fks
+    out.append(Check(
+        gruppe="Schema", name="Fremdschluessel", ok=not schaeden, schwere="warnung",
+        detail=(f"{len(schaeden)} ohne wirksames ON DELETE — Loeschungen raeumen dort nicht auf: "
+                + ", ".join(sorted(schaeden)[:12]) + (" …" if len(schaeden) > 12 else ""))
+               if schaeden else "alle ON-DELETE-Regeln der Modelle stehen in der Datenbank",
     ))
 
 

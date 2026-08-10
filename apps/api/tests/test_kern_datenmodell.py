@@ -295,3 +295,75 @@ async def test_papierkorb_leeren_raeumt_kind_vor_eltern(s):
     for model in (m.Card, m.CardDeck, m.SchoolClass, m.Student):
         n = (await s.execute(select(func.count()).select_from(model))).scalar()
         assert n == 0, f"{model.__tablename__} nach Leeren nicht leer"
+
+
+# ─── Was die Datenbank hält und was der Code hält ───
+#
+# Rund 30 Spalten sind per ALTER TABLE nachgezogen (wanted-Liste in main.py) und
+# trugen in gewachsenen Datenbanken jahrelang KEINEN Fremdschlüssel — also auch
+# kein ON DELETE. `create_all` legt sie dagegen immer mitsamt Constraint an,
+# weshalb jeder Test eine Welt sieht, die es in Produktion nicht gab. Die Fixture
+# `s_ohne_fk` stellt die Produktionslage nach. Was hier grün ist, hält der Code
+# selbst; was xfail ist, hielt allein der Constraint — genau den rüstet
+# `_ensure_columns` seit dem Fremdschlüssel-Nachzug wieder nach (Postgres).
+
+@pytest.mark.asyncio
+async def test_notenabschnitt_loeschen_raeumt_spalten_ohne_fremdschluessel(s_ohne_fk):
+    """`grade_categories.section_id` (ON DELETE CASCADE) steht in der
+    wanted-Liste. Verließe sich das Löschen eines Abschnitts allein darauf,
+    blieben Spalten und Noten eines Abschnitts stehen, den es nicht mehr gibt."""
+    from app.routers import noten as N
+    s = s_ohne_fk
+    u = await _user(s)
+    kl = SchoolClass(name="7a", owner_id=u.id)
+    s.add(kl)
+    await s.flush()
+    sec = m.GradeSection(owner_id=u.id, class_id=kl.id, name="1. Halbjahr")
+    s.add(sec)
+    await s.flush()
+    s.add(m.GradeCategory(owner_id=u.id, class_id=kl.id, section_id=sec.id, name="Test", weight=50))
+    await s.commit()
+
+    await N.delete_section(sec.id, user=u, db=s)
+    assert (await s.execute(select(func.count()).select_from(m.GradeCategory))).scalar() == 0
+
+
+@pytest.mark.xfail(strict=True, reason=(
+    "Art. 17 hängt am Constraint, nicht am Code: User hat keine ORM-Beziehung zu "
+    "questions/question_sets, delete_account verlässt sich auf owner_id ON DELETE "
+    "CASCADE. Fehlt der (nachgezogene Spalte ohne Fremdschlüssel), bleibt Inhalt "
+    "mit toter owner_id stehen. _ensure_columns rüstet ihn auf Postgres nach."))
+@pytest.mark.asyncio
+async def test_konto_loeschen_tilgt_inhalt_ohne_fremdschluessel(s_ohne_fk):
+    from app.routers import auth as A
+    s = s_ohne_fk
+    u = await _user(s)
+    s.add_all([m.Question(owner_id=u.id, text="1+1?"), m.QuestionSet(owner_id=u.id, name="Test")])
+    await s.commit()
+
+    await A._purge_user_content(s, u.id)
+    await s.delete(u)
+    await s.commit()
+    for modell in (m.Question, m.QuestionSet):
+        n = (await s.execute(select(func.count()).select_from(modell))).scalar()
+        assert n == 0, f"{modell.__tablename__} mit toter owner_id nach Kontolöschung"
+
+
+@pytest.mark.xfail(strict=True, reason=(
+    "students.kurs_id (ON DELETE SET NULL) steht in der wanted-Liste. Das "
+    "endgültige Löschen eines Kurses löst die Klasse ausdrücklich, den Schüler "
+    "nicht — ohne Constraint zeigt er auf einen Kurs, den es nicht mehr gibt."))
+@pytest.mark.asyncio
+async def test_kurs_purge_loest_schueler_ohne_fremdschluessel(s_ohne_fk):
+    s = s_ohne_fk
+    u = await _user(s)
+    c = await _klasse(s, u, "Mathe 7a", "Max")
+    kurs_id = (await s.get(SchoolClass, c.id)).kurs_id
+    await K.delete_kurs(kurs_id, user=u, db=s)
+    await TR.purge_item("kurs", kurs_id, user=u, db=s)
+
+    kl = await s.get(SchoolClass, c.id)
+    await s.refresh(kl)
+    assert kl.kurs_id is None
+    for st in (await s.execute(select(Student))).scalars().all():
+        assert st.kurs_id is None, "Schüler zeigt auf einen gelöschten Kurs"
