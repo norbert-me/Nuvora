@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<title>Nuvora offline</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0;
+         display: flex; align-items: center; justify-content: center; height: 100vh;
+         background: #f5f6f8; color: #1b1d22; }
+  @media (prefers-color-scheme: dark) { body { background: #16171b; color: #e8e9ec; } }
+  .card { width: 420px; max-width: 90vw; padding: 32px; border-radius: 16px;
+          background: #fff; box-shadow: 0 8px 40px rgba(0,0,0,0.12); }
+  @media (prefers-color-scheme: dark) { .card { background: #202227; box-shadow: 0 8px 40px rgba(0,0,0,0.5); } }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  p { font-size: 13.5px; color: #6b7280; margin: 0 0 18px; line-height: 1.6; }
+  button { width: 100%; margin-top: 4px; padding: 12px; font-size: 15px; font-weight: 600;
+           border: none; border-radius: 999px; background: #1b1d22; color: #fff; cursor: pointer; }
+  @media (prefers-color-scheme: dark) { button { background: #e8e9ec; color: #16171b; } }
+  .hinweis { font-size: 12.5px; color: #6b7280; margin-top: 14px; line-height: 1.6; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Kein Kontakt zum Server</h1>
+    <p>Nuvora konnte den Server nicht erreichen. Das kann am Netz liegen oder daran,
+       dass der Server gerade nicht läuft.</p>
+    <button id="retry">Erneut verbinden</button>
+    <div class="hinweis">
+      Stimmt die Adresse nicht mehr? Menü <strong>Server → Server-Adresse ändern…</strong>.
+    </div>
+  </div>
+<script>
+  document.getElementById("retry").addEventListener("click", () => {
+    if (window.nuvora && window.nuvora.retry) window.nuvora.retry();
+  });
+</script>
+</body>
+</html>

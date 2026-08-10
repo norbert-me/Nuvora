@@ -17,6 +17,7 @@
       "main.js",
       "preload.js",
       "setup.html",
+      "offline.html",
       "package.json"
     ],
     "mac": {

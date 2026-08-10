@@ -126,7 +126,13 @@ self.addEventListener("fetch", (event) => {
           }
           return res;
         })
-        .catch(() => caches.match(event.request))
+        // Offline: erst die genaue Adresse aus dem Cache, sonst die Shell.
+        // Ohne den zweiten Schritt lief jede Adresse, die online nie besucht
+        // wurde (Deep-Link auf /cardvote o.ae.), in respondWith(undefined) und
+        // damit in einen Netzwerkfehler — weisses Fenster statt App. Nuvora ist
+        // eine SPA: index.html kann jede Route rendern, das Routing macht der
+        // Client. Cache-Schluessel der Shell ist "/index.html" (STATIC_ASSETS).
+        .catch(() => caches.match(event.request).then((r) => r || caches.match("/index.html")))
     );
     return;
   }

@@ -9,7 +9,11 @@ in einem eigenen Fenster (Dock-Icon, kein Browser-Rahmen).
 - Fenster auf den Server; Adresse wird pro Rechner gemerkt.
 - **Offline lesen:** war die App schon einmal online, bleiben die geladenen
   Daten offline sichtbar (Nuvoras Service-Worker, network-first + Cache-Fallback).
-- Externe Links öffnen im Standard-Browser.
+  Auch Seiten, die vorher nie geöffnet wurden, zeigen die Oberfläche statt eines
+  weißen Fensters (Rückfall auf die Shell).
+- Ist der Server gar nicht erreichbar, erscheint eine eigene Seite mit dem Knopf
+  **Erneut verbinden** — kein leeres Fenster.
+- Externe Links öffnen im Standard-Browser (nur `http`, `https`, `mailto`).
 
 **Noch nicht:** offline **schreiben** und synchronisieren (Phase 1 — Outbox +
 Auto-Sync bei Verbindung).
@@ -19,6 +23,19 @@ Auto-Sync bei Verbindung).
 - **macOS 12 (Monterey) oder neuer** — Electron 43 (Chromium 150) unterstützt
   nichts Älteres.
 - **Node 22.12 oder neuer** zum Bauen (verlangt Electron per `engines`).
+
+### Server-Adresse über `http://` (z. B. IP im Schulnetz)
+
+Ein Service-Worker — und damit das Offline-Lesen — läuft im Browser nur in einem
+sicheren Kontext (`https` oder `localhost`). Läuft dein Nuvora unter `http://`
+auf einer IP, erlaubt die App **genau diese eine, von dir eingetragene Adresse**
+ausdrücklich als sicher (Chromium-Schalter
+`unsafely-treat-insecure-origin-as-secure`, siehe Kommentar in `main.js`). Bei
+`https://`-Adressen passiert das nicht.
+
+Der Schalter wird beim **Start** gesetzt: änderst du die Adresse über das Menü
+**Server**, ist das Offline-Lesen erst nach einem Neustart der App aktiv — die
+App weist an dieser Stelle darauf hin.
 
 ## Ausprobieren (Entwicklungsmodus)
 
