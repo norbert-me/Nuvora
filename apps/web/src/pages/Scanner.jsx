@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { COLORS as C, btnPrimary, pageApp} from "../components/Icons.jsx";
 import { useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/index.jsx";
+import { lies } from "../core/speicher.js";
 
 const API = "/api";
 const ANSWER_COLORS = { A: "#0066cc", B: "#5856d6", C: C.warning, D: C.danger };
@@ -81,7 +82,9 @@ export default function Scanner() {
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     const ws = new WebSocket(`${proto}//${location.host}/ws/session/${sid}`);
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: "auth", token: localStorage.getItem("token") || "" }));
+      // ueber speicher.js: Safari wirft im privaten Modus schon beim Zugriff,
+      // und hier haette das den Scanner beim Verbinden abstuerzen lassen.
+      ws.send(JSON.stringify({ type: "auth", token: lies("token") || "" }));
     };
     ws.onmessage = (e) => {
       try {
