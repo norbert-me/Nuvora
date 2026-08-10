@@ -19,7 +19,8 @@
  *      geloescht. Ein Formular, das rendert aber nichts speichert, faellt nur
  *      so auf.
  *
- * Der Modul-Zustand des Kontos und alle Testdaten werden am Ende zurueckgesetzt.
+ * Der Modul-Zustand des Kontos und alle Testdaten werden am Ende zurueckgesetzt
+ * — auch nach Strg-C, siehe `modulZustandHerstellen`.
  *
  * Nutzung:  node scripts/systemtest-browser.mjs --url … --email … --passwort …
  *           (oder SELFTEST_URL / SELFTEST_EMAIL / SELFTEST_PASSWORD)
@@ -51,14 +52,53 @@ const EGAL = [
 ];
 const istEgal = (text) => EGAL.some((r) => r.test(text));
 
+// HTTP 429 ist Infrastruktur, kein Anwendungsfehler: der Proxy drosselt /api/
+// (nginx.conf, `limit_req zone=api_rl`), und dieser Test klappert Dutzende
+// Seiten in Folge ab. Er darf den Lauf nicht rot faerben — aber auch nicht
+// spurlos verschwinden: die Seite wird nach einer Pause noch einmal besucht,
+// und was dann bleibt, steht als Hinweis im Bericht.
+// BEWUSST nur 429. Ein 403 oder 404 ist ein echter Befund.
+const istDrosselung = (text) => /\b429\b|Too Many Requests/i.test(text);
+const PAUSE_429 = 4000;
+// Harte Obergrenze je Seite: ein einzelner Haenger darf nicht den ganzen Lauf
+// blockieren.
+const FRIST_SEITE = 60000;
+
 const ergebnisse = [];
-const notiere = (gruppe, name, ok, detail = "") => ergebnisse.push({ gruppe, name, ok, detail });
 
 const FARBE = process.stdout.isTTY && !process.env.NO_COLOR;
 const ROT = FARBE ? "\x1b[31m" : "";
 const GRUEN = FARBE ? "\x1b[32m" : "";
+const GRAU = FARBE ? "\x1b[90m" : "";
 const FETT = FARBE ? "\x1b[1m" : "";
 const AUS = FARBE ? "\x1b[0m" : "";
+
+// Jede Zeile erscheint SOFORT, nicht erst am Ende. Ein Lauf dauert Minuten; wer
+// nur einen stehenden Bildschirm sieht, haelt das fuer einen Haenger und bricht
+// ab. Die Laufzeit vorn zeigt zusaetzlich, wo die Zeit hingeht.
+const START = Date.now();
+const seit = () => `${String(Math.round((Date.now() - START) / 1000)).padStart(4)}s`;
+let letzteGruppe = null;
+const notiere = (gruppe, name, ok, detail = "") => {
+  ergebnisse.push({ gruppe, name, ok, detail });
+  if (gruppe !== letzteGruppe) {
+    console.log(`\n${FETT}── ${gruppe}${AUS}`);
+    letzteGruppe = gruppe;
+  }
+  const zeile = `${name}${detail ? `   ${detail}` : ""}`;
+  console.log(`  ${GRAU}${seit()}${AUS} ${ok ? `${GRUEN}✓${AUS} ${zeile}` : `${ROT}✗ ${zeile}${AUS}`}`);
+};
+
+/** Harte Frist um eine Zusage. Der Aufrufer schliesst die Seite im finally. */
+function mitFrist(zusage, ms, was) {
+  let uhr;
+  const frist = new Promise((_, ab) => {
+    uhr = setTimeout(() => ab(new Error(`Zeitüberschreitung nach ${Math.round(ms / 1000)}s (${was})`)), ms);
+  });
+  return Promise.race([zusage, frist]).finally(() => clearTimeout(uhr));
+}
+
+const warte = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Marke, an der alles Angelegte erkennbar ist — und wieder wegkommt.
 const MARKE = "ZZ-Systemtest";
@@ -82,6 +122,82 @@ const apiJson = async (pfad, methode = "get", data) => {
   const text = await r.text();
   return text ? JSON.parse(text) : null;
 };
+
+// ── Modul-Zustand zurueckstellen, auch ohne Browser ────────────────────────
+//
+// Der Test schaltet fuer jede Pruefung andere Module ein. Frueher lief das
+// Zuruecksetzen ueber den Playwright-Kontext — nach Strg-C (oder wenn der
+// Browser stirbt) ist der geschlossen, JEDES Zuruecksetzen scheitert, und die
+// Lehrkraft findet ihr Konto verstellt vor. Ein Testwerkzeug darf fremde
+// Einstellungen nicht dauerhaft veraendern. Also laeuft das Aufraeumen ueber
+// schlichtes `fetch`, das den Browser nicht braucht, haengt an SIGINT/SIGTERM —
+// und sieht hinterher nach, statt es nur zu versuchen.
+let sollZustand = null;   // { alle: [key], aktiv: [key] } — Stand vor dem Lauf
+let aufgeraeumt = false;
+
+async function modulZustandHerstellen(ohneBericht = false) {
+  if (aufgeraeumt || !token || !sollZustand) return;
+  aufgeraeumt = true;
+  const kopf = { Authorization: `Bearer ${token}` };
+  const soll = new Set(sollZustand.aktiv);
+  // Alle auf einmal: nach einem Strg-C zaehlt jede Zehntelsekunde (siehe die
+  // Exit-Bremse unten). Die Aufrufe haengen nicht voneinander ab.
+  await Promise.all(sollZustand.alle.map((key) =>
+    fetch(`${URL_BASIS}/api/modules/${key}/activate`,
+      { method: soll.has(key) ? "POST" : "DELETE", headers: kopf })
+      .catch(() => { /* die Nachschau unten sagt, ob es gereicht hat */ })));
+  let falsch;
+  try {
+    const liste = await (await fetch(`${URL_BASIS}/api/modules`, { headers: kopf })).json();
+    falsch = liste
+      .filter((m) => sollZustand.alle.includes(m.key) && !!m.active !== soll.has(m.key))
+      .map((m) => `${m.key} ${m.active ? "noch an" : "aus"}`);
+  } catch (e) {
+    falsch = [`Nachschau fehlgeschlagen: ${String(e.message || e).slice(0, 80)}`];
+  }
+  const gut = falsch.length === 0;
+  const text = gut
+    ? `wie vorher (${soll.size ? [...soll].join(", ") : "kein Modul aktiv"})`
+    : `stimmt NICHT: ${falsch.join(", ")}`;
+  if (ohneBericht) console.error(`\n${gut ? GRUEN : ROT}Modul-Zustand: ${text}${AUS}`);
+  else notiere("Aufräumen", "Modulzustand", gut, text);
+}
+
+// Playwright haengt eigene SIGINT/SIGTERM-Handler an (processLauncher:
+// `gracefullyCloseAll().then(() => process.exit(130))`). Die beenden den
+// Prozess, sobald der Browser zu ist — mitten im Aufraeumen. Genau daran ist es
+// gescheitert: nach einem Strg-C blieb das Konto verstellt. Deshalb wird bis
+// zum fertigen Aufraeumen KEIN Prozessende durchgelassen. Ein zweites Strg-C
+// bricht hart ab, und nach 20 s gibt auch die Bremse auf.
+const echterExit = process.exit.bind(process);
+let abbruchLaeuft = false;
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.on(signal, () => {
+    if (abbruchLaeuft) return echterExit(130);
+    abbruchLaeuft = true;
+    console.error(`\n${ROT}Abbruch (${signal}) — stelle den Modul-Zustand des Kontos wieder her …${AUS}`);
+    process.exit = () => {};
+    const fertig = () => { process.exit = echterExit; echterExit(130); };
+    Promise.race([modulZustandHerstellen(true), warte(20000)]).then(fertig, fertig);
+  });
+}
+
+/**
+ * Fehlertext auf ein lesbares Mass bringen.
+ *
+ * Playwright haengt an seine Fehlermeldungen das komplette Browser-Protokoll.
+ * Kommt ein Konsolenfehler im Sekundentakt, sind das achtzig gleichlautende
+ * Zeilen, die den eigentlichen Grund begraben. Erste Zeile, danach hoechstens
+ * drei weitere VERSCHIEDENE, jede nur einmal und mit Zaehler.
+ */
+function kurzfehler(e, zeilen = 4) {
+  const roh = String(e?.message || e).split("\n").map((z) => z.trim()).filter(Boolean);
+  const zaehl = new Map();
+  for (const z of roh) zaehl.set(z, (zaehl.get(z) || 0) + 1);
+  return [...zaehl.entries()].slice(0, zeilen)
+    .map(([z, n]) => (n > 1 ? `${z.slice(0, 160)} (${n}×)` : z.slice(0, 160)))
+    .join(" | ");
+}
 
 // ───────────────────────── Verbotene Verbindungen ─────────────────────────
 //
@@ -407,22 +523,43 @@ async function main() {
     token = t;
     notiere("Anmeldung", "Login", true, `als ${user.email}`);
 
+    // `addInitScript` laeuft in JEDEM Dokument des Kontexts, auch in solchen
+    // ohne echte Herkunft: dem `about:blank`, mit dem Playwright jede neue
+    // Seite startet, in `data:`/`blob:`-Dokumenten und in sandboxed Rahmen.
+    // Dort ist localStorage gesperrt und der Zugriff wirft SecurityError — bei
+    // jedem Seitenaufruf, bis die Meldung das Protokoll flutet. Also erst die
+    // Herkunft pruefen, dann zugreifen, und beides in try/catch.
     await kontext.addInitScript(([tok, usr]) => {
-      localStorage.setItem("token", tok);
-      localStorage.setItem("user", usr);
-      // Der Modul-Cache wuerde den Stand des vorigen Durchgangs zeigen — hier
-      // wird pro Durchgang umgeschaltet, also immer frisch fragen.
-      localStorage.removeItem("nuvora_cache_modules");
-      // Sprache festnageln (siehe locale oben).
-      localStorage.setItem("cardvote_lang", "de");
+      try {
+        if (!/^https?:$/.test(location.protocol)) return;   // about:blank, data:, blob:
+        if (!window.localStorage) return;
+        localStorage.setItem("token", tok);
+        localStorage.setItem("user", usr);
+        // Der Modul-Cache wuerde den Stand des vorigen Durchgangs zeigen — hier
+        // wird pro Durchgang umgeschaltet, also immer frisch fragen.
+        localStorage.removeItem("nuvora_cache_modules");
+        // Sprache festnageln (siehe locale oben).
+        localStorage.setItem("cardvote_lang", "de");
+      } catch { /* Dokument ohne eigene Herkunft — hier gibt es nichts zu setzen */ }
     }, [token, JSON.stringify(user)]);
 
     module = (await apiJson("/api/modules")).filter((m) => m.available && !m.external);
     vorherAktiv = module.filter((m) => m.active).map((m) => m.key);
     const alle = module.map((m) => m.key);
+    // Ab hier weiss auch der Signal-Handler, wohin er zurueckstellen muss.
+    sollZustand = { alle, aktiv: vorherAktiv };
 
     // ── Testdaten, die es fuer die Brueckenpruefung braucht ──
     await nurDiese(module, alle);
+    // Erst die Reste des letzten Laufs weg: liegen sie noch da, antwortet das
+    // Anlegen mit 409 und der ganze Aufbau faellt aus (siehe resteAbraeumen).
+    try {
+      const weg = await resteAbraeumen();
+      notiere("Testdaten", "Reste des letzten Laufs", true,
+        weg ? `${weg} Reste eines abgebrochenen Laufs abgeräumt` : "keine");
+    } catch (e) {
+      notiere("Testdaten", "Reste des letzten Laufs", false, String(e.message || e).slice(0, 160));
+    }
     const bereit = await testdatenAnlegen(testdaten);
     notiere("Testdaten", "schwaches Thema, Marktplatz-Einträge", bereit.ok, bereit.detail);
 
@@ -464,13 +601,16 @@ async function main() {
       const was = v.beschreibung || `„${v.marker}"`;
       await nurDiese(module, v.allein);
       const solo = await sichtbar(v);
+      const nachsatz = (b) => (b.hinweis ? ` · ${b.hinweis}` : "");
       notiere("Verbindung · allein", `${v.name} · ${v.allein.join("+")}`, solo.ok ? !solo.da : false,
-        !solo.ok ? solo.detail : solo.da ? `${was} erscheint OHNE das nötige Modul` : `${was} bleibt weg — richtig`);
+        (!solo.ok ? solo.detail : solo.da ? `${was} erscheint OHNE das nötige Modul` : `${was} bleibt weg — richtig`)
+          + (solo.ok ? nachsatz(solo) : ""));
 
       await nurDiese(module, v.zusammen);
       const paar = await sichtbar(v);
       notiere("Verbindung · zusammen", `${v.name} · ${v.zusammen.join("+")}`, paar.ok ? paar.da : false,
-        !paar.ok ? paar.detail : paar.da ? `${was} erscheint — richtig` : `${was} fehlt TROTZ aktivem Modul (tote Brücke)`);
+        (!paar.ok ? paar.detail : paar.da ? `${was} erscheint — richtig` : `${was} fehlt TROTZ aktivem Modul (tote Brücke)`)
+          + (paar.ok ? nachsatz(paar) : ""));
     }
 
     // ── 3. Echte Bedienung ──
@@ -480,26 +620,59 @@ async function main() {
       notiere("Bedienung", `${flow.modul}: ${flow.name}`, befund.ok, befund.detail);
     }
   } catch (e) {
-    notiere("Ablauf", "Systemtest", false, String(e.message || e));
+    notiere("Ablauf", "Systemtest", false, kurzfehler(e));
   } finally {
     // Testdaten weg, Modul-Zustand des Kontos wie vorher.
-    try { await testdatenAufraeumen(testdaten); } catch (e) { notiere("Aufräumen", "Testdaten", false, String(e.message || e)); }
-    try { await restLoeschen(); } catch { /* faellt beim naechsten Lauf auf */ }
-    try { if (module.length) await nurDiese(module, vorherAktiv); }
-    catch (e) { notiere("Aufräumen", "Modulzustand", false, String(e.message || e)); }
-    await browser.close();
+    try { await testdatenAufraeumen(testdaten); } catch (e) { notiere("Aufräumen", "Testdaten", false, kurzfehler(e)); }
+    try { await resteAbraeumen(); } catch { /* faellt beim naechsten Lauf auf */ }
+    // Ueber `fetch`, nicht ueber den Browser: der kann hier schon tot sein.
+    await modulZustandHerstellen();
+    await browser.close().catch(() => {});
   }
 
   drucke();
   process.exit(ergebnisse.some((e) => !e.ok) ? 1 : 0);
 }
 
-/** Genau diese Module aktiv, alle anderen aus. */
+/**
+ * Genau diese Module aktiv, alle anderen aus — und nachgesehen, dass es auch
+ * so ist. Rutscht ein Umschalten durch, faerbt das irgendeine spaetere Pruefung
+ * rot („Startseite bietet zusätzlich: zufall"), und niemand findet den Grund
+ * mehr. Einmal nachfassen, dann Bescheid sagen.
+ */
 async function nurDiese(module, keys) {
-  for (const m of module) {
-    const soll = keys.includes(m.key);
-    await api(`/api/modules/${m.key}/activate`, soll ? "post" : "delete");
+  const soll = new Set(keys);
+  const schalten = () => Promise.all(module.map((m) =>
+    api(`/api/modules/${m.key}/activate`, soll.has(m.key) ? "post" : "delete")));
+  await schalten();
+  for (const versuch of [0, 1]) {
+    const liste = (await apiJson("/api/modules")) || [];
+    const ist = new Set(liste.filter((m) => m.active).map((m) => m.key));
+    const falsch = module.filter((m) => soll.has(m.key) !== ist.has(m.key)).map((m) => m.key);
+    if (!falsch.length) return;
+    if (versuch) {
+      notiere("Modulschaltung", keys.join("+") || "keins", false, `nicht übernommen: ${falsch.join(", ")}`);
+      return;
+    }
+    await warte(500);
+    await schalten();
   }
+}
+
+/**
+ * Anlegen, das seinen Fehlschlag SOFORT nennt.
+ *
+ * `apiJson` gibt bei jedem Nicht-2xx still `null` zurueck. Der Fehler faellt
+ * dann drei Zeilen spaeter beim Zugriff auf `.id` auf — als „Cannot read
+ * properties of null", einer Meldung, die niemandem sagt, was los war. Der
+ * Server hatte laengst geantwortet: „HTTP 409: Dieses Thema gibt es an dieser
+ * Stelle schon". Genau das steht jetzt im Bericht.
+ */
+async function muss(was, pfad, methode = "post", data) {
+  const r = await api(pfad, methode, data);
+  const text = await r.text();
+  if (!r.ok()) throw new Error(`${was}: HTTP ${r.status()} ${text.slice(0, 140)}`);
+  return text ? JSON.parse(text) : null;
 }
 
 /**
@@ -519,7 +692,7 @@ async function testdatenAnlegen(td) {
     // alle Vorbedingungen, und jede Bruecke meldete "tote Bruecke" — zehn
     // Falschalarme, die nach einem kaputten System aussehen. Ein Test, der bei
     // fehlenden Daten Fehler erfindet, ist schlimmer als keiner.
-    const klasse = await apiJson("/api/classes", "post", {
+    const klasse = await muss("Testklasse", "/api/classes", "post", {
       name: `${MARKE}-Klasse`,
       // card_id ist Pflicht und je Klasse eindeutig: sie ist die Identitaet,
       // ueber die spaeter zusammengefuehrt wird (siehe update_class). Der Wert
@@ -647,88 +820,185 @@ async function testdatenAufraeumen(td) {
   }
 }
 
+// Felder, unter denen ein Objekt seinen sprechenden Namen traegt — je nach
+// Modul heisst das Feld anders (wie LABEL_FELDER in scripts/aufraeumen.py).
+const LABEL_FELDER = ["name", "title", "text", "label", "front", "aufgabentext"];
+const traegtMarke = (obj) => LABEL_FELDER.some(
+  (f) => typeof obj?.[f] === "string" && obj[f].includes(MARKE));
+
 /**
- * Was die Bedienprobe angelegt hat, wieder loswerden — auch, wenn ein Lauf
- * mittendrin abgebrochen ist. Sonst zaehlt der Rest beim naechsten Mal als
- * Bestand und bleibt fuer immer liegen.
+ * Loeschen mit Sicherheitsnetz — genau wie `Fund.loesche` in
+ * scripts/aufraeumen.py: geprueft wird UNMITTELBAR vor dem DELETE, nicht nur
+ * bei der Auswahl weiter oben. Eine Klasse „7a" bleibt damit auch dann
+ * unberuehrt, wenn sie neben einer „ZZ-Systemtest-Klasse" steht.
  */
-async function restLoeschen() {
-  const klassen = await apiJson("/api/classes");
-  const listen = [
-    ["/api/todo", "/api/todo"],
-    ["/api/notizblock", "/api/notizblock"],
-    ["/api/methoden/list", "/api/methoden"],
-    ["/api/kalender/entries?frm=2000-01-01T00:00:00&to=2100-01-01T00:00:00", "/api/kalender/entries"],
-  ];
-  const kurse = await apiJson("/api/kurse");
-  for (const k of klassen || []) {
+async function wegDamit(eintrag, ...pfade) {
+  if (!traegtMarke(eintrag)) throw new Error("Abgebrochen: Eintrag ohne Testpräfix");
+  for (const pfad of pfade) await api(pfad, "delete");
+}
+
+/**
+ * Reste eines abgebrochenen Laufs abraeumen — und zwar VOR dem Aufbau.
+ *
+ * Bricht ein Lauf ab (Strg-C, toter Browser), bleiben Klasse, Thema, Quiz &Co.
+ * mit dem Praefix liegen. Beim naechsten Mal antwortet das Anlegen dann mit
+ * 409 („gibt es an dieser Stelle schon"), der Aufbau scheitert, und mit ihm
+ * fallen alle Bruecken-Pruefungen aus. Der Test blockierte sich also selbst,
+ * dauerhaft, bis jemand von Hand aufraeumte.
+ *
+ * Reihenfolge wie in scripts/aufraeumen.py: Kinder vor Eltern (Sitzung vor
+ * Quiz vor Frage vor Ordner, Note vor Spalte vor Block, Klasse vor Kurs) —
+ * sonst greift die Kaskade ins Leere.
+ *
+ * Dieselbe Funktion raeumt am Ende des Laufs auf: zwei Fassungen desselben
+ * Aufraeumens laufen sonst auseinander.
+ */
+async function resteAbraeumen() {
+  const liste = async (pfad) => {
+    const d = await apiJson(pfad);
+    return Array.isArray(d) ? d : [];
+  };
+  let weg = 0;
+  const raeume = async (eintraege, pfade) => {
+    for (const e of eintraege) {
+      if (!traegtMarke(e)) continue;
+      await wegDamit(e, ...pfade(e));
+      weg++;
+    }
+  };
+
+  const klassen = await liste("/api/classes");
+  const kurse = await liste("/api/kurse");
+  const ich = (await apiJson("/api/auth/me"))?.id;
+
+  // ── Marktplatz zuerst: ein veroeffentlichtes Quiz haelt sein Original fest.
+  if (ich) await raeume(await liste(`/api/marketplace?author_id=${ich}`), (o) => [`/api/marketplace/${o.id}`]);
+
+  // ── CardVote: Sitzung → Quiz → Frage → Ordner
+  await raeume(await liste("/api/sessions-list"), (o) => [`/api/sessions/${o.id}`]);
+  const ordner = [];
+  const saetze = [...await liste("/api/root-question-sets")];
+  const durchlaufe = (knoten) => {
+    for (const n of knoten) {
+      ordner.push(n);
+      saetze.push(...(n.question_sets || []));
+      durchlaufe(n.children || []);
+    }
+  };
+  durchlaufe(await liste("/api/folders"));
+  await raeume(saetze, (o) => [`/api/question-sets/${o.id}`]);
+  await raeume(await liste("/api/questions"), (o) => [`/api/questions/${o.id}`]);
+  await raeume(ordner, (o) => [`/api/folders/${o.id}`]);
+
+  // ── Was an der Klasse haengt
+  for (const k of klassen) {
+    await raeume(await liste(`/api/karten/classes/${k.id}/all-decks`),
+      (o) => [`/api/karten/decks/${o.id}`, `/api/karten/decks/${o.id}/purge`]);
+    const bloecke = await liste(`/api/noten/classes/${k.id}/sections?term=all`);
+    // Spalte vor Block: der Block nimmt seine Spalten sonst mit, und ein Block
+    // ohne Praefix duerfte seine Testspalte trotzdem nicht behalten.
+    await raeume(bloecke.flatMap((b) => b.categories || []), (o) => [`/api/noten/categories/${o.id}`]);
+    await raeume(bloecke, (o) => [`/api/noten/sections/${o.id}`]);
+    await raeume(await liste(`/api/klassenarbeit/classes/${k.id}/works`),
+      (o) => [`/api/klassenarbeit/works/${o.id}`]);
     // Die Checkliste haengt am Kurs, nicht an der Klasse: ohne kurs_id liefert
     // die Liste nichts und der Rest bliebe fuer immer liegen.
-    listen.push([`/api/orga/${k.id}`, "/api/orga/item"]);
-    for (const ku of kurse || []) listen.push([`/api/orga/${k.id}?kurs_id=${ku.id}`, "/api/orga/item"]);
-    listen.push([`/api/karten/classes/${k.id}/all-decks`, "/api/karten/decks"]);
-  }
-  for (const [lesen, loeschen] of listen) {
-    const daten = await apiJson(lesen);
-    for (const e of Array.isArray(daten) ? daten : []) {
-      const text = `${e.title || ""}${e.name || ""}${e.text || ""}`;
-      if (text.includes(MARKE)) await api(`${loeschen}/${e.id}`, "delete");
+    await raeume(await liste(`/api/orga/${k.id}`), (o) => [`/api/orga/item/${o.id}`]);
+    for (const ku of kurse) {
+      await raeume(await liste(`/api/orga/${k.id}?kurs_id=${ku.id}`), (o) => [`/api/orga/item/${o.id}`]);
     }
   }
+
+  // ── Module ohne Klassenbezug
+  await raeume(await liste("/api/methoden/list"), (o) => [`/api/methoden/${o.id}`]);
+  await raeume(await liste("/api/methoden/folders"), (o) => [`/api/methoden/folders/${o.id}`]);
+  await raeume(await liste("/api/kalender/entries?frm=2000-01-01T00:00:00&to=2100-01-01T00:00:00"),
+    (o) => [`/api/kalender/entries/${o.id}`]);
+  await raeume(await liste("/api/notizblock"), (o) => [`/api/notizblock/${o.id}`]);
+  await raeume(await liste("/api/todo"), (o) => [`/api/todo/${o.id}`]);
+
+  // ── Kern zuletzt: Thema, dann Klasse (mit Papierkorb), dann Kurs
+  await raeume(await liste("/api/topics"), (o) => [`/api/topics/${o.id}`]);
+  await raeume(klassen, (o) => [`/api/classes/${o.id}`, `/api/classes/${o.id}/purge`]);
+  await raeume(await liste("/api/kurse"), (o) => [`/api/kurse/${o.id}`, `/api/kurse/${o.id}/purge`]);
+
+  // ── Papierkorb: Kinder vor Eltern, sonst laeuft der Purge ins Leere.
+  const rang = ["card", "ladder", "deck", "path", "class", "kurs"];
+  const muell = (await liste("/api/trash"))
+    .sort((a, b) => (rang.indexOf(a.kind) + 99 * (rang.indexOf(a.kind) < 0))
+      - (rang.indexOf(b.kind) + 99 * (rang.indexOf(b.kind) < 0)));
+  await raeume(muell, (o) => [`/api/trash/${o.kind}/${o.id}`]);
+
+  return weg;
 }
 
 /** Kachel-Ziele auf der Startseite → welche Module bietet die Shell an? */
 async function startseitenKacheln(module) {
   const { seite } = await neueSeite();
-  try {
+  const schauen = async () => {
     await seite.goto("/", { waitUntil: "networkidle", timeout: 30000 });
     await tourWegklicken(seite);
     const hrefs = await seite.locator("a[href^='/']").evaluateAll((as) => as.map((a) => a.getAttribute("href")));
     return [...new Set(module.filter((m) => hrefs.includes(m.path)).map((m) => m.key))];
+  };
+  try {
+    return await mitFrist(schauen(), FRIST_SEITE, "/");
   } finally {
-    await seite.close();
+    await seite.close().catch(() => {});
   }
 }
 
 /** Wohin fuehrt diese Adresse wirklich? (fuer die ModuleGate-Stichprobe) */
 async function wohinFuehrt(pfad) {
   const { seite } = await neueSeite();
-  try {
+  const gehen = async () => {
     await seite.goto(pfad, { waitUntil: "networkidle", timeout: 30000 });
     await seite.waitForTimeout(400);
     return new URL(seite.url()).pathname;
+  };
+  try {
+    return await mitFrist(gehen(), FRIST_SEITE, pfad);
   } catch (e) {
     return `Fehler: ${String(e.message || e).split("\n")[0].slice(0, 60)}`;
   } finally {
-    await seite.close();
+    await seite.close().catch(() => {});
   }
 }
 
 /** Ist der Marker der Verbindung auf der Seite zu sehen? */
-async function sichtbar(v) {
-  const { seite, probleme } = await neueSeite();
-  try {
+const sichtbar = (v) => geduldig(() => sichtbarEinmal(v));
+
+async function sichtbarEinmal(v) {
+  const { seite, probleme, drossel } = await neueSeite();
+  const schauen = async () => {
     await seite.goto(v.pfad, { waitUntil: "networkidle", timeout: 30000 });
     await tourWegklicken(seite);
     const jetzt = new URL(seite.url()).pathname;
     if (jetzt === "/modules" && !v.pfad.startsWith("/modules"))
-      return { ok: false, detail: "ModuleGate wirft auf /modules — Modul nicht aktiv?" };
+      return { ok: false, wackelig: true, detail: "ModuleGate wirft auf /modules — Modul nicht aktiv?" };
     if (v.vorbereiten) await v.vorbereiten(seite).catch(() => {});
     await seite.waitForTimeout(400);
     const da = v.finde ? await v.finde(seite) : (await seite.locator("body").innerText()).includes(v.marker);
     if (probleme.length) return { ok: true, da, detail: probleme[0] };
     return { ok: true, da };
+  };
+  try {
+    const befund = await mitFrist(schauen(), FRIST_SEITE, v.pfad);
+    return { ...befund, gedrosselt: drosselText(drossel) };
   } catch (e) {
-    return { ok: false, detail: String(e.message || e).split("\n")[0].slice(0, 140) };
+    return { ok: false, detail: String(e.message || e).split("\n")[0].slice(0, 140), gedrosselt: drosselText(drossel) };
   } finally {
-    await seite.close();
+    await seite.close().catch(() => {});
   }
 }
 
 /** Einen Handgriff ausfuehren, das Neuladen ueberstehen und wieder abraeumen. */
 async function bediene(flow) {
   const { seite, probleme } = await neueSeite();
-  try {
+  // Ein Handgriff klickt, tippt, laedt neu und loescht — mehr Wege als ein
+  // blosser Seitenaufruf, also die doppelte Frist. Ohne Frist haengt ein
+  // wartender Locator bis in alle Ewigkeit.
+  const handgriff = async () => {
     await seite.goto(flow.pfad, { waitUntil: "networkidle", timeout: 30000 });
     await tourWegklicken(seite);
     if (new URL(seite.url()).pathname === "/modules")
@@ -749,10 +1019,13 @@ async function bediene(flow) {
 
     if (probleme.length) return { ok: false, detail: probleme[0] };
     return { ok: true, detail: "angelegt, überlebt das Neuladen, wieder gelöscht" };
+  };
+  try {
+    return await mitFrist(handgriff(), FRIST_SEITE * 2, flow.pfad);
   } catch (e) {
     return { ok: false, detail: String(e.message || e).split("\n")[0].slice(0, 160) };
   } finally {
-    await seite.close();
+    await seite.close().catch(() => {});
   }
 }
 
@@ -765,9 +1038,22 @@ async function stehtDa(seite) {
 }
 
 /** Eine Seite oeffnen und alles sammeln, was schiefgeht. */
-async function besuche(pfad) {
-  const { seite, probleme } = await neueSeite();
+const besuche = (pfad) => geduldig(() => besucheEinmal(pfad));
+
+async function besucheEinmal(pfad) {
+  const { seite, probleme, drossel } = await neueSeite();
   try {
+    const befund = await mitFrist(rundgang(seite, pfad, probleme), FRIST_SEITE, pfad);
+    return { ...befund, gedrosselt: drosselText(drossel) };
+  } catch (e) {
+    return { ok: false, detail: String(e.message || e).split("\n")[0].slice(0, 160), gedrosselt: drosselText(drossel) };
+  } finally {
+    await seite.close().catch(() => {});
+  }
+}
+
+async function rundgang(seite, pfad, probleme) {
+  {
     const antwort = await seite.goto(pfad, { waitUntil: "networkidle", timeout: 30000 });
     if (!antwort || antwort.status() >= 400) return { ok: false, detail: `HTTP ${antwort?.status()}` };
     await tourWegklicken(seite);
@@ -776,8 +1062,11 @@ async function besuche(pfad) {
     const drin = jetzt === pfad || jetzt.startsWith(pfad) || pfad.startsWith(jetzt);
     let hinweis = "";
     if (!drin) {
-      if (jetzt === "/modules") return { ok: false, detail: "ModuleGate wirft auf /modules zurück (Modul nicht aktiv?)" };
-      if (jetzt === "/") return { ok: false, detail: "landet auf der Startseite — nicht angemeldet?" };
+      // `wackelig`: den Ruecksprung sieht sich der Aufrufer noch einmal an
+      // (siehe `geduldig`) — ein wirklich abgeschaltetes Modul faellt auch beim
+      // zweiten Versuch zurueck.
+      if (jetzt === "/modules") return { ok: false, wackelig: true, detail: "ModuleGate wirft auf /modules zurück (Modul nicht aktiv?)" };
+      if (jetzt === "/") return { ok: false, wackelig: true, detail: "landet auf der Startseite — nicht angemeldet?" };
       hinweis = ` → ${jetzt}`;
     }
     const textLaenge = (await seite.locator("body").innerText()).trim().length;
@@ -786,62 +1075,113 @@ async function besuche(pfad) {
     return probleme.length
       ? { ok: false, detail: probleme.slice(0, 3).join(" | ") }
       : { ok: true, detail: `${textLaenge} Zeichen gerendert${hinweis}` };
-  } catch (e) {
-    return { ok: false, detail: String(e.message || e).split("\n")[0].slice(0, 160) };
-  } finally {
-    await seite.close();
   }
 }
 
-/** Neue Seite mit Fehler-Mitschrift. */
+/**
+ * Neue Seite mit Fehler-Mitschrift.
+ *
+ * `merke` legt jeden Befund nur EINMAL ab und deckelt die Zahl: eine Seite, die
+ * im Sekundentakt denselben Fehler wirft, erzeugte frueher hunderte Zeilen und
+ * machte alles andere unlesbar. Drosselungen (429) laufen in einen eigenen
+ * Topf und sind kein Befund.
+ */
 async function neueSeite() {
   const seite = await kontext.newPage();
   const probleme = [];
+  const drossel = [];
+  const merke = (text) => {
+    if (probleme.length < 12 && !probleme.includes(text)) probleme.push(text);
+  };
   seite.on("console", (msg) => {
-    if (msg.type() === "error" && !istEgal(msg.text())) probleme.push(`Konsole: ${msg.text().slice(0, 160)}`);
+    if (msg.type() !== "error") return;
+    const text = msg.text();
+    if (istEgal(text)) return;
+    if (istDrosselung(text)) drossel.push("Konsole");
+    else merke(`Konsole: ${text.slice(0, 160)}`);
   });
-  seite.on("pageerror", (e) => probleme.push(`Absturz: ${String(e).slice(0, 160)}`));
+  seite.on("pageerror", (e) => merke(`Absturz: ${String(e).slice(0, 160)}`));
   seite.on("response", (r) => {
-    if (r.status() >= 400 && !istEgal(r.url())) probleme.push(`HTTP ${r.status()} ${new URL(r.url()).pathname}`);
+    if (r.status() === 429) { drossel.push(new URL(r.url()).pathname); return; }
+    if (r.status() >= 400 && !istEgal(r.url())) merke(`HTTP ${r.status()} ${new URL(r.url()).pathname}`);
   });
   // Loeschen fragt teils per confirm() nach — eine Lehrkraft bestaetigt.
   seite.on("dialog", (d) => d.accept().catch(() => {}));
-  return { seite, probleme };
+  return { seite, probleme, drossel, merke };
+}
+
+/** Was der Proxy gedrosselt hat, kurz gefasst (leer = nichts gedrosselt). */
+const drosselText = (drossel) => [...new Set(drossel)].slice(0, 3).join(", ");
+
+/**
+ * Etwas an einer Seite pruefen — und noch einmal, wenn beim ersten Mal etwas
+ * dazwischenkam. Zwei Gruende:
+ *
+ *   - Drosselung (429): Infrastruktur, siehe `istDrosselung`. Bleibt sie beim
+ *     zweiten Mal, steht sie als Hinweis im Bericht — rot wird davon nichts.
+ *   - Ruecksprung ans ModuleGate, OBWOHL das Modul zugeschaltet ist: scheitert
+ *     der Modul-Abruf einmal, arbeitet die Shell mit leerer Modulliste weiter
+ *     (core/modules.js: `_hole` behaelt bei Fehlern den Cache und meldet nichts
+ *     nach) und das Gate schickt auf /modules. Ein wirklich abgeschaltetes
+ *     Modul faellt auch beim zweiten Versuch zurueck — die Pruefung, ob das
+ *     Gate greift, verliert also nichts.
+ */
+async function geduldig(fn) {
+  const erst = await fn();
+  if (!erst.gedrosselt && !erst.wackelig) return erst;
+  await warte(erst.gedrosselt ? PAUSE_429 : 1500);
+  const zweit = await fn();
+  let hinweis = "";
+  if (erst.gedrosselt) {
+    hinweis = zweit.gedrosselt
+      ? `Hinweis: Proxy drosselt weiter (HTTP 429 auf ${zweit.gedrosselt})`
+      : `Hinweis: einmal HTTP 429 (Proxy-Drosselung auf ${erst.gedrosselt}), Wiederholung sauber`;
+  } else if (zweit.wackelig) {
+    hinweis = "auch beim zweiten Versuch";
+  }
+  return { ...zweit, hinweis, detail: [zweit.detail, hinweis].filter(Boolean).join(" · ") };
 }
 
 /** Die Einstiegs-Tour wegklicken — sonst prueft der Test nur das Overlay. */
 async function tourWegklicken(seite) {
+  // Beide Beschriftungen in EINEM Locator (`.or`): frueher wartete der Test je
+  // Runde zweimal hintereinander auf ein Overlay, das es meistens gar nicht
+  // gibt. Jetzt laeuft eine Wartezeit fuer beide, die Abdeckung bleibt gleich.
+  const knopf = seite.getByRole("button", { name: /später|spaeter|later|más tarde/i })
+    .or(seite.getByRole("button", { name: /überspringen|ueberspringen|skip|saltar|omitir/i })).first();
   for (const runde of [0, 1]) {
-    for (const name of [/später|spaeter|later|más tarde/i, /überspringen|ueberspringen|skip|saltar|omitir/i]) {
-      try {
-        const knopf = seite.getByRole("button", { name }).first();
-        if (await knopf.isVisible({ timeout: runde ? 400 : 1000 })) await knopf.click({ timeout: 3000 });
-      } catch { /* kein Overlay da — der Normalfall */ }
-    }
+    try {
+      if (await knopf.isVisible({ timeout: runde ? 400 : 1000 })) await knopf.click({ timeout: 3000 });
+    } catch { /* kein Overlay da — der Normalfall */ }
     if (!runde) await seite.waitForTimeout(500);
   }
 }
 
+/**
+ * Zusammenfassung. Die Einzelzeilen sind waehrend des Laufs schon erschienen
+ * (siehe `notiere`), hier steht nur noch, was schiefging — NACH URSACHE
+ * gebuendelt: ein Fehler, der jede Seite trifft, ist EIN Befund. Frueher
+ * standen dafuer dutzende gleichlautende Zeilen und begruben alles andere.
+ */
 function drucke() {
-  let gruppe = null;
-  for (const e of ergebnisse) {
-    if (e.gruppe !== gruppe) {
-      console.log(`\n${FETT}── ${e.gruppe}${AUS}`);
-      gruppe = e.gruppe;
-    }
-    const zeile = `  ${e.ok ? "✓" : "✗"} ${e.name}${e.detail ? `   ${e.detail}` : ""}`;
-    console.log(e.ok ? `  ${GRUEN}✓${AUS}${zeile.slice(3)}` : `${ROT}${zeile}${AUS}`);
-  }
   const fehler = ergebnisse.filter((e) => !e.ok);
   console.log("\n" + "=".repeat(40));
   if (!fehler.length) {
-    console.log(`  ${GRUEN}Systemtest grün${AUS} — ${ergebnisse.length} Prüfungen.`);
-  } else {
-    console.log(`  ${ROT}${FETT}Systemtest ROT${AUS} — ${fehler.length} von ${ergebnisse.length} Prüfungen.`);
-    for (const f of fehler) {
-      console.log(`${ROT}  ✗ ${f.gruppe} / ${f.name}${AUS}`);
-      if (f.detail) console.log(`      ${f.detail}`);
-    }
+    console.log(`  ${GRUEN}Systemtest grün${AUS} — ${ergebnisse.length} Prüfungen in ${seit().trim()}.`);
+    console.log("=".repeat(40));
+    return;
+  }
+  console.log(`  ${ROT}${FETT}Systemtest ROT${AUS} — ${fehler.length} von ${ergebnisse.length} Prüfungen.`);
+  const nachGrund = new Map();
+  for (const f of fehler) {
+    const grund = f.detail || "(ohne Detail)";
+    if (!nachGrund.has(grund)) nachGrund.set(grund, []);
+    nachGrund.get(grund).push(`${f.gruppe} / ${f.name}`);
+  }
+  for (const [grund, wo] of nachGrund) {
+    const rest = wo.length > 3 ? ` (und ${wo.length - 3} weitere)` : "";
+    console.log(`${ROT}  ✗ ${wo.slice(0, 3).join(", ")}${rest}${AUS}`);
+    console.log(`      ${grund}`);
   }
   console.log("=".repeat(40));
 }
