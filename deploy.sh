@@ -25,56 +25,24 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# ─── Fortschrittsanzeige ───
-# Ein Deploy dauert zwischen zwanzig Sekunden und mehreren Minuten, und der
-# Docker-Build schweigt dazwischen lange. Ohne Anzeige weiss niemand, ob es
-# haengt oder arbeitet.
+# ─── Etappen ───
 #
-# WARUM KEIN KLEBENDER BALKEN MEHR (DECSTBM). Die vorige Fassung hat die
-# unterste Zeile per Scroll-Bereich reserviert und den Cursor per ESC[s/ESC[u
-# gesichert. Das ist im echten Deploy schiefgegangen: der Bildschirm blieb leer,
-# obwohl rsync und docker compose redeten, und "es flackerte immer was auf".
-# Der Grund liegt in der Bauart, nicht in einem Tippfehler:
+# Bewusst KEIN Fortschrittsbalken. Es gab einen, in mehreren Bauformen, und
+# keine davon hat den Lauf uebersichtlicher gemacht:
 #
-#   * ESC[s/ESC[u ist EIN EINZIGER Speicherplatz pro Terminal. Ihn teilen sich
-#     hier die Hauptshell, die Uhr im Hintergrund und JEDES Kind — ssh, rsync,
-#     docker compose, selftest.sh, Playwright. Sichert oder bewegt eines davon
-#     den Cursor, landet unser ESC[u woanders.
-#   * Landet er auf der reservierten Zeile, ist alles verloren: die liegt
-#     AUSSERHALB des Scroll-Bereichs, dort bewirkt ein Zeilenvorschub nichts.
-#     Jede Ausgabezeile wird an dieselbe Stelle geschrieben und eine Sekunde
-#     spaeter von der Uhr weggeputzt — genau das beschriebene Bild.
+#   * Als klebende Zeile am unteren Rand (DECSTBM) verschluckte er die Ausgabe,
+#     sobald ein Kindprozess den Cursor-Speicher benutzte — ESC[s/ESC[u gibt es
+#     pro Terminal nur EINMAL, und ssh, rsync, docker compose und Playwright
+#     benutzen ihn alle.
+#   * Als normale Zeile im Strom stand er zwischen den Ausgaben von docker und
+#     zwischen den Befunden des Selbsttests, der seinen Fortschritt ohnehin
+#     selbst mit Sekundenzahl druckt — mehr Laerm als Nutzen.
 #
-# Mit sauberer Ausgabe liess sich das oertlich nicht nachstellen; es haengt
-# daran, was die Kindprozesse senden, und die gehoeren mir nicht (selftest.sh
-# darf ich nicht anfassen). Ein Verfahren, dessen Versagen ich nicht einmal
-# reproduzieren kann, ist nicht abzusichern — und eine sichtbare Ausgabe ohne
-# klebenden Balken ist unendlich viel besser als ein klebender Balken ohne
-# Ausgabe. Deshalb: kein Scroll-Bereich, kein ESC[s/ESC[u, keine reservierte
-# Zeile. Der Balken ist eine ganz normale Zeile im Ausgabestrom, die bei jedem
-# Etappenwechsel und waehrend langer Etappen alle paar Sekunden erscheint.
-#
-# ZWEI PHASEN. Ausliefern und Pruefen sind zwei verschiedene Dinge. Nach den
-# neun Etappen ist der Deploy fertig — was danach laeuft, ist die Pruefung.
-# Beide bekommen einen eigenen Balken, sonst steht der eine auf 100 %, waehrend
-# der laengste Abschnitt erst anfaengt.
-#
-# DAUER STATT ETAPPENZAHL. Gewichtet wird mit den gemessenen Zeiten aus
-# .deploy-zeiten.json; innerhalb einer Etappe laeuft der Balken anteilig mit.
-# Ohne Erfahrungswerte faellt er auf die Etappenzaehlung zurueck und sagt das
-# mit einer Tilde vor der Prozentzahl. 100 % gibt es erst, wenn es stimmt.
+# Geblieben ist, was wirklich hilft: je Etappe eine Zeile mit Nummer und Namen,
+# und am Ende jeder Phase die gebrauchte Zeit. Beides ist gemessen, nichts ist
+# geschaetzt.
 
-BALKEN_BREITE=28
-BALKEN_TAKT=8            # Sekunden zwischen zwei Balkenzeilen bei langen Etappen
-
-# Ob stdout ein Terminal ist, wird EINMAL hier festgestellt und gemerkt. Nicht
-# spaeter per [ -t 1 ] abfragen: die Zeile wird in $(...) gebaut, und dort ist
-# stdout eine Pipe — die Abfrage saegt sich selbst ab und antwortet immer "nein".
-# Genau daran ist die Breitenbegrenzung schon einmal gescheitert.
-if [ -t 1 ]; then BALKEN_TTY=1; else BALKEN_TTY=0; fi
-
-# Farbe nur im Terminal; in einer Logdatei stoeren Steuerzeichen.
-if [ "$BALKEN_TTY" = "1" ] && [ -z "${NO_COLOR:-}" ]; then
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
   B_GRUEN=$'\033[32m'; B_GRAU=$'\033[90m'; B_FETT=$'\033[1m'; B_AUS=$'\033[0m'
 else
   B_GRUEN=""; B_GRAU=""; B_FETT=""; B_AUS=""
@@ -84,465 +52,47 @@ PHASE_ART=""             # liefern | pruefen
 PHASE_ANZAHL=0           # Etappen dieser Phase
 PHASE_START=0
 SCHRITT=0
-ETAPPE_TEXT=""
-ETAPPE_START=0
-BALKEN_STATUS=""         # Datei, ueber die die Uhr den Stand liest
-BALKEN_TICKER=""         # PID der Uhr
-BALKEN_LETZTE=""         # zuletzt gedruckte Zeile (nichts doppelt drucken)
-SELFTEST_ETAPPEN=""      # Meldedatei von selftest.sh (Teil n/4 + Name)
-BALKEN_MESS=""           # Zeitpunkte, zu denen ein Teil begonnen hat
-BALKEN_LETZTZEIT=0
 
-ZEITEN_DATEI="$DIR/.deploy-zeiten.json"   # Erfahrungswerte (gitignored)
-ZEITEN_P1=""             # Sekunden je Etappe der Phase "Ausliefern"
-ZEITEN_P2=""             # Gesamtdauer der Phase "Pruefen"
-ZEITEN_LISTE=""          # laufende Messung der aktuellen Phase
-
-# Ein Zeichen n-mal. Frueher stand hier "printf '█%.0s' $(seq 1 $n)" — und das
-# war der Grund fuer einen zerbrochenen Balken: BSD-seq auf macOS zaehlt bei
-# "seq 1 0" RUECKWAERTS und gibt "1 0" aus, also zwei Werte statt keinem.
-wiederhole() {
-  local zeichen="$1" anzahl="$2" i=0 s=""
-  while [ "$i" -lt "$anzahl" ]; do s="$s$zeichen"; i=$((i + 1)); done
-  printf '%s' "$s"
-}
-
+# Sekunden als m:ss.
 dauer_kurz() {
   local s="$1"
-  [ "$s" -lt 0 ] && s=0
+  [ "$s" -lt 0 ] 2>/dev/null && s=0
   printf '%d:%02d' $((s / 60)) $((s % 60))
 }
 
-# Fenstergroesse. Zwei Fallen, beide beim Testen aufgelaufen:
-#   1. "tput cols" antwortet aus COLUMNS, wenn die Variable gesetzt ist — also
-#      nach dem Aufziehen des Fensters mit dem ALTEN Wert.
-#   2. Diese Funktion laeuft immer in $(...), dort ist stdout eine Pipe. tput
-#      hat dann gar kein Terminal zum Messen und liefert die terminfo-Vorgabe
-#      80 — unabhaengig davon, wie breit das Fenster wirklich ist. Gemessen:
-#      echtes Fenster 70 Spalten, "tput cols" in $( ) sagt 80.
-# Deshalb wird das echte Terminal auf Dateideskriptor 9 gesichert und "stty
-# size" darauf befragt; das ist immer ein frischer ioctl. (2>/dev/null steht
-# VOR <&9, damit auch die Meldung eines fehlenden fd 9 verschwindet.)
-terminal_breite() {
-  local m
-  m=$(stty size 2>/dev/null <&9 | awk '{print $2}')
-  if [ -n "$m" ] && [ "$m" -gt 0 ] 2>/dev/null; then printf '%s' "$m"; return 0; fi
-  tput cols 2>/dev/null || echo 80
-}
-
-# ─── Erfahrungswerte (.deploy-zeiten.json) ───
-# Je Phase und Lauf eine Zeile mit der Dauer JE ETAPPE. Beide Phasen benutzen
-# dasselbe Format und denselben Mittelwert — auch die Pruefung, denn ihre vier
-# Teile dauern sehr verschieden lang (der Browser-Rundgang und die
-# Modul-Oberflaechen brauchen ein Vielfaches der API-Pruefung). Eine
-# Gleichverteilung waere wieder die Sorte Fortschrittsluege, die hier gerade
-# ausgebaut wurde. Gemittelt wird ueber die letzten fuenf Laeufe mit derselben
-# Etappenzahl — ein Ausreisser soll die Anzeige nicht verbiegen.
-zeiten_schnitt() {        # $1 = Phase, $2 = Etappenzahl -> "s1 s2 ... sn"
-  [ -r "$ZEITEN_DATEI" ] || return 0
-  awk -v ph="\"phase\":\"$1\"" -v g="$2" -v max=5 '
-    index($0, ph) > 0 {
-      if (!match($0, /"schritte":[0-9]+/)) next
-      if (substr($0, RSTART + 11, RLENGTH - 11) + 0 != g) next
-      if (match($0, /"dauer":\[[0-9, ]*\]/)) lauf[++c] = substr($0, RSTART + 9, RLENGTH - 10)
-    }
-    END {
-      if (c == 0) exit 0
-      von = (c > max ? c - max + 1 : 1)
-      for (k = von; k <= c; k++) {
-        if (split(lauf[k], a, ",") != g) continue
-        for (j = 1; j <= g; j++) sum[j] += a[j] + 0
-        anz++
-      }
-      if (anz == 0) exit 0
-      for (j = 1; j <= g; j++) printf "%d ", int(sum[j] / anz + 0.5)
-      print ""
-    }' "$ZEITEN_DATEI" 2>/dev/null
-}
-
-zeiten_laden() {          # $1 = Etappen Phase 1, $2 = Etappen Phase 2
-  ZEITEN_P1=$(zeiten_schnitt ausliefern "$1") || ZEITEN_P1=""
-  ZEITEN_P2=$(zeiten_schnitt pruefen "$2") || ZEITEN_P2=""
-}
-
-zeiten_anhaengen() {
-  {
-    echo '{"laeufe":['
-    grep -h '^{"phase"' "$ZEITEN_DATEI" 2>/dev/null | tail -19 | sed 's/,$//;s/$/,/'
-    printf '%s\n' "$1"
-    echo ']}'
-  } > "$ZEITEN_DATEI.tmp" 2>/dev/null && mv -f "$ZEITEN_DATEI.tmp" "$ZEITEN_DATEI" 2>/dev/null
-  return 0
-}
-
-# Nur VOLLSTAENDIGE Messreihen merken. Ein Abbruch mittendrin (Strg-C, eine
-# gescheiterte Etappe) hat keine brauchbaren Zahlen und darf nichts hinterlassen.
-# Ob der Selbsttest inhaltlich etwas zu beanstanden hatte, ist dagegen
-# gleichgueltig: wie lange er lief, ist eine Messung und stimmt trotzdem.
-zeiten_merken() {
-  local anzahl art=ausliefern
-  anzahl=$(printf '%s\n' $ZEITEN_LISTE | grep -c .) || anzahl=0
-  [ "$anzahl" = "$PHASE_ANZAHL" ] || return 0
-  [ "$PHASE_ART" = "pruefen" ] && art=pruefen
-  zeiten_anhaengen "$(printf '{"phase":"%s","schritte":%s,"dauer":[%s]}' \
-    "$art" "$PHASE_ANZAHL" "$(printf '%s' "$ZEITEN_LISTE" | tr ' ' ',')")"
-}
-
-# ─── Phase 2: die vier Teile des Selbsttests ───
-# selftest.sh meldet jeden Teil in eine Datei, deren Pfad wir ihm ueber
-# SELFTEST_ETAPPEN_DATEI vorgeben (Format: "n/gesamt<TAB>Name", angehaengt).
-# Wir lesen sie beim Zeichnen — deshalb braucht es keinen Eingriff in seine
-# Ausgabe und keine Textmustersuche in seinem Fliesstext.
-datei_zeit() {            # Aenderungszeitpunkt einer Datei (BSD, sonst GNU)
-  stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || date +%s
-}
-
-# Setzt die Gewichte der genannten Teile auf 0.
-#   $1 = "5 5 14 10"   $2 = "2,3,4"   ->   "5 0 0 0"
-# Ein Teil mit Gewicht 0 zaehlt nirgends mit: nicht in der Gesamtsumme, nicht im
-# Anteil und nicht in der Restdauer. Er laesst den Balken deshalb auch nicht
-# springen, wenn er trotzdem seine Etappenzeile schreibt — er verschiebt die
-# Etappennummer weiter, mehr nicht.
-gewichte_nullen() {
-  local i=0 w aus=""
-  for w in $1; do
-    i=$((i + 1))
-    case ",$2," in *",$i,"*) w=0 ;; esac
-    aus="$aus$w "
-  done
-  printf '%s' "${aus% }"
-}
-
-# Haelt fest, WANN ein neuer Teil begonnen hat. Laeuft in der Uhr, weil die
-# Hauptshell waehrend des Selbsttests blockiert ist — die Uhr ist der einzige
-# Beobachter. Sekundengenau reicht fuer eine Schaetzung im Minutenbereich.
-pruefen_beobachten() {
-  [ "$PHASE_ART" = "pruefen" ] || return 0
-  [ -n "$SELFTEST_ETAPPEN" ] && [ -r "$SELFTEST_ETAPPEN" ] || return 0
-  [ -n "$BALKEN_MESS" ] || return 0
-  local jetzt gesehen=0 offen
-  # Die Plan-Zeile ist keine Etappe — sonst haette die Messreihe einen Wert zu viel.
-  offen=$(grep -v '^PLAN' "$SELFTEST_ETAPPEN" 2>/dev/null | grep -c .) || offen=0
-  [ -r "$BALKEN_MESS" ] && gesehen=$(grep -c . "$BALKEN_MESS" 2>/dev/null)
-  [ -n "$gesehen" ] || gesehen=0
-  jetzt=$(date +%s)
-  while [ "$gesehen" -lt "$offen" ]; do
-    printf '%s\n' "$jetzt" >> "$BALKEN_MESS" 2>/dev/null || return 0
-    gesehen=$((gesehen + 1))
-  done
-  return 0
-}
-
-# Dauer je Teil aus den beobachteten Zeitpunkten. Liefert NICHTS, wenn ein Teil
-# uebersprungen wurde: ein uebersprungener Teil dauert fast 0 Sekunden, und
-# dieser Wert wuerde den Mittelwert fuer spaetere vollstaendige Laeufe kaputt
-# machen — die Restdauer bräche dann mitten im Lauf zusammen. Dieselbe Regel wie
-# in Phase 1: nur vollstaendige Messreihen zaehlen. Ein --schnell-Lauf benutzt
-# die Erfahrungswerte also, steuert aber keine bei.
-pruefen_dauern() {
-  [ -n "$BALKEN_MESS" ] && [ -r "$BALKEN_MESS" ] || return 0
-  grep -q '(uebersprungen)' "$SELFTEST_ETAPPEN" 2>/dev/null && return 0
-  local n
-  n=$(grep -c . "$BALKEN_MESS" 2>/dev/null) || return 0
-  [ "$n" = "$PHASE_ANZAHL" ] || return 0
-  awk -v ende="$(date +%s)" 'NF { t[++n] = $1 }
-    END { for (i = 1; i < n; i++) printf "%d ", t[i+1] - t[i]; printf "%d", ende - t[n] }' \
-    "$BALKEN_MESS" 2>/dev/null
-}
-
-# ─── Die Balkenzeile ───
-balken_status_schreiben() {
-  [ -n "$BALKEN_STATUS" ] || return 0
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$PHASE_ART" "$SCHRITT" "$PHASE_ANZAHL" \
-    "$PHASE_START" "$ETAPPE_START" "$ETAPPE_TEXT" > "$BALKEN_STATUS.neu" 2>/dev/null || return 0
-  mv -f "$BALKEN_STATUS.neu" "$BALKEN_STATUS" 2>/dev/null || return 0
-}
-
-# Baut die Zeile. Reihenfolge beim Kuerzen, wenn das Fenster schmal ist:
-# zuerst der Etappentext, dann Phase und Schrittnummer, dann die Zeitangabe,
-# zuletzt schrumpft der Balken. Die Zeile bleibt IMMER schmaler als das Fenster
-# — bricht sie um, zerreisst das Bild.
-balken_zeile() {
-  local art n g pstart estart text
-  IFS=$'\t' read -r art n g pstart estart text < "$BALKEN_STATUS" 2>/dev/null || return 1
-  [ -n "${g:-}" ] && [ "$g" -gt 0 ] 2>/dev/null || return 1
-
-  local jetzt ver_phase ver_etappe
-  jetzt=$(date +%s); ver_phase=$((jetzt - pstart)); ver_etappe=$((jetzt - estart))
-
-  # In der Pruefphase kommen Etappennummer, Name und Etappenbeginn aus der
-  # Meldedatei von selftest.sh statt aus schritt(): dort zaehlt der Selbsttest
-  # weiter, waehrend diese Shell auf ihn wartet.
-  local label="Ausliefern" gewichte="$ZEITEN_P1"
-  if [ "$art" = "pruefen" ]; then
-    label="Prüfen"; gewichte="$ZEITEN_P2"
-    if [ -n "$SELFTEST_ETAPPEN" ] && [ -r "$SELFTEST_ETAPPEN" ]; then
-      # Plan-Zeile "PLAN<TAB>gesamt<TAB>uebersprungene" steht ganz oben und sagt
-      # SCHON BEIM START, welche Teile ausfallen. Deren Erfahrungswerte werden
-      # auf 0 gesetzt — sonst schleppt ein --schnell-Lauf die Zeiten der
-      # vollstaendigen Laeufe mit und schaetzt viel zu lang. Die dritte Spalte
-      # darf leer sein: dann faellt nichts aus.
-      local plan weg
-      plan=$(grep '^PLAN' "$SELFTEST_ETAPPEN" 2>/dev/null | head -1)
-      if [ -n "$plan" ]; then
-        weg=$(printf '%s' "$plan" | cut -f3)
-        [ -n "$weg" ] && gewichte=$(gewichte_nullen "$gewichte" "$weg")
-      fi
-      # Die Plan-Zeile ist KEINE Etappe und darf nicht mitgezaehlt werden.
-      local zeilen
-      zeilen=$(grep -v '^PLAN' "$SELFTEST_ETAPPEN" 2>/dev/null | grep -c .) || zeilen=0
-      if [ -n "$zeilen" ] && [ "$zeilen" -gt 0 ] 2>/dev/null; then
-        n="$zeilen"
-        [ "$n" -gt "$g" ] && n="$g"
-        text=$(grep -v '^PLAN' "$SELFTEST_ETAPPEN" 2>/dev/null | tail -1 | cut -f2-)
-        estart=$(datei_zeit "$SELFTEST_ETAPPEN")
-        ver_etappe=$((jetzt - estart))
-      fi
-    fi
-  fi
-
-  # Fortschritt und Restzeit — nach DAUER, wo Erfahrungswerte da sind.
-  local prozent=-1 rest=-1 marke=' '
-  if [ -n "$gewichte" ] && [ "$n" -gt 0 ]; then
-    local i=0 w ges=0 fertig=0 erw=0
-    for w in $gewichte; do
-      i=$((i + 1)); ges=$((ges + w))
-      if [ "$i" -lt "$n" ]; then fertig=$((fertig + w))
-      elif [ "$i" = "$n" ]; then erw="$w"; fi
-    done
-    if [ "$ges" -gt 0 ]; then
-      # Anteilig innerhalb der Etappe — aber gedeckelt auf ihren Anteil,
-      # damit der Balken nicht in die naechste Etappe hineinlaeuft.
-      local lauf="$ver_etappe"
-      [ "$lauf" -gt "$erw" ] && lauf="$erw"
-      prozent=$(((fertig + lauf) * 100 / ges))
-      rest=$((ges - fertig - lauf))
-      # Reisst die laufende Etappe ihre Erfahrungszeit deutlich, ist die
-      # Schaetzung nichts mehr wert — dann lieber die verstrichene Zeit.
-      [ "$erw" -gt 0 ] && [ "$ver_etappe" -gt $((erw * 2)) ] && rest=-1
-    fi
-  fi
-  if [ "$prozent" -lt 0 ] && [ "$n" -gt 0 ]; then
-    prozent=$((n * 100 / g)); marke='~'
-  fi
-  # 100 % gibt es nur von phase_ende, wenn es auch stimmt.
-  [ "$prozent" -gt 99 ] && prozent=99
-
-  local zeit
-  if [ "$rest" -gt 0 ]; then zeit="noch ca. $(dauer_kurz "$rest")"
-  else zeit="seit $(dauer_kurz "$ver_phase")"; fi
-
-  local nm="$label $n/$g"
-  [ "$n" -gt 0 ] || nm="$label"
-
-  # Wiederholung derselben Etappe wird KURZ gehalten.
-  #
-  # Bei "Container bauen und starten" oder dem Systemtest stand sonst alle acht
-  # Sekunden dieselbe lange Zeile — dreimal, viermal, fuenfmal hintereinander
-  # wortgleich. Beim ersten Mal ist die volle Zeile die Ansage, was gerade
-  # laeuft; danach interessiert nur noch, dass es weitergeht. Also ab dem
-  # zweiten Mal ohne Phase, Nummer und Text: Balken, Prozent, Uhr.
-  # Die Kennung steht in einer DATEI, nicht in einer Variablen: gedruckt wird
-  # aus zwei Prozessen (Hauptshell bei jedem Etappenwechsel, Uhr dazwischen),
-  # und eine Variable haette in beiden ihren eigenen Stand — die volle Zeile
-  # kaeme dann jedes Mal doppelt.
-  local kennung="$art/$n/$text" vorher=""
-  [ -n "$BALKEN_STATUS" ] && vorher=$(cat "$BALKEN_STATUS.etappe" 2>/dev/null || true)
-  if [ "$kennung" = "$vorher" ]; then
-    balken_bauen "$prozent" "$marke" "" "" "$zeit"
-  else
-    [ -n "$BALKEN_STATUS" ] && printf '%s' "$kennung" > "$BALKEN_STATUS.etappe" 2>/dev/null
-    balken_bauen "$prozent" "$marke" "$nm" "$text" "$zeit"
-  fi
-}
-
-# Setzt die Zeile aus Bausteinen zusammen und haelt dabei das Breitenbudget ein.
-balken_bauen() {
-  local prozent="$1" marke="$2" nm="$3" text="$4" zeit="$5"
-  local spalten budget breite frei
-  if [ "$BALKEN_TTY" = "1" ]; then spalten=$(terminal_breite); else spalten=120; fi
-  budget=$((spalten - 1))
-  breite=$BALKEN_BREITE
-  local pbreite=5
-  [ "$prozent" -lt 0 ] && pbreite=0
-  if [ $((2 + breite + pbreite)) -gt "$budget" ]; then
-    breite=$((budget - 2 - pbreite))
-    [ "$breite" -lt 4 ] && return 1
-  fi
-  frei=$((budget - 2 - breite - pbreite))
-
-  local zeige_zeit=0 zeige_nm=0
-  if [ "$frei" -ge $((3 + ${#zeit})) ]; then zeige_zeit=1; frei=$((frei - 3 - ${#zeit})); fi
-  if [ "$frei" -ge $((2 + ${#nm})) ]; then zeige_nm=1; frei=$((frei - 2 - ${#nm})); fi
-  local textplatz=$((frei - 3))
-  [ "$textplatz" -lt 0 ] && textplatz=0
-  [ "${#text}" -gt "$textplatz" ] && text="${text:0:$textplatz}"
-
-  local voll=0
-  [ "$prozent" -gt 0 ] && voll=$((prozent * breite / 100))
-  [ "$voll" -lt 0 ] && voll=0
-  [ "$voll" -gt "$breite" ] && voll=$breite
-  local leer=$((breite - voll))
-
-  # Klammern um jede Variable: bash 3.2 zieht ein direkt folgendes Multibyte-
-  # Zeichen (hier das ·) sonst in den Variablennamen und bricht unter set -u ab.
-  local aus
-  aus="${B_GRUEN}[$(wiederhole '█' "$voll")${B_GRAU}$(wiederhole '·' "$leer")${B_GRUEN}]"
-  [ "$prozent" -ge 0 ] && aus="${aus}$(printf '%s%3d%%' "$marke" "$prozent")"
-  aus="${aus}${B_AUS}"
-  # Trenner nur zwischen Teilen, die es wirklich gibt. In der Kurzform
-  # (Wiederholung derselben Etappe) sind Name und Text leer — sonst staende da
-  # ein Punkt ohne etwas davor und ein doppeltes Leerzeichen.
-  [ "$zeige_nm" = "1" ] && [ -n "$nm" ] && aus="${aus}  ${B_GRAU}${nm}${B_AUS}"
-  if [ -n "$text" ]; then
-    if [ "$zeige_nm" = "1" ] && [ -n "$nm" ]; then
-      aus="${aus} ${B_GRAU}·${B_AUS} ${B_FETT}${text}${B_AUS}"
-    else
-      aus="${aus}  ${B_FETT}${text}${B_AUS}"
-    fi
-  fi
-  if [ "$zeige_zeit" = "1" ]; then
-    if [ -n "$text" ] || { [ "$zeige_nm" = "1" ] && [ -n "$nm" ]; }; then
-      aus="${aus} ${B_GRAU}·${B_AUS} ${zeit}"
-    else
-      aus="${aus}  ${zeit}"
-    fi
-  fi
-  printf '%s' "$aus"
-}
-
-# Druckt die Zeile — gedrosselt, und nie zweimal dasselbe. Das ist die Antwort
-# auf das Flackern: es wird nichts geloescht und nichts neu gemalt, es kommt nur
-# dann eine Zeile dazu, wenn sie etwas Neues sagt.
-balken_drucken() {
-  local erzwingen="${1:-0}" zeile jetzt
-  zeile=$(balken_zeile) || return 0
-  [ -n "$zeile" ] || return 0
-  jetzt=$(date +%s)
-  if [ "$erzwingen" != "1" ]; then
-    [ $((jetzt - BALKEN_LETZTZEIT)) -ge "$BALKEN_TAKT" ] || return 0
-    [ "$zeile" != "$BALKEN_LETZTE" ] || return 0
-  fi
-  BALKEN_LETZTZEIT="$jetzt"
-  BALKEN_LETZTE="$zeile"
-  printf '%s\n' "$zeile"
-}
-
-ticker_stop() {
-  [ -n "$BALKEN_TICKER" ] || return 0
-  kill "$BALKEN_TICKER" 2>/dev/null || true
-  wait "$BALKEN_TICKER" 2>/dev/null || true
-  BALKEN_TICKER=""
-}
-
-# $1 = "still": beobachten, aber nichts drucken.
-ticker_start() {
-  ticker_stop
-  local still="${1:-}"
-  # trap - EXIT ist wichtig: die Subshell erbt den EXIT-Trap des Hauptskripts
-  # und wuerde beim Beendetwerden das Aufraeumen ein zweites Mal ausloesen.
-  ( trap - EXIT INT TERM
-    local_gesehen=0; gesehen_teile=0
-    while :; do
-      sleep 1
-      # Die Uhr ist waehrend des Selbsttests der einzige Beobachter: die
-      # Hauptshell wartet dann auf ihn und sieht die neuen Teile nicht.
-      pruefen_beobachten || true
-      if [ "$still" = "still" ]; then
-        # Still heisst nicht stumm: bei jedem NEUEN Teil eine Zeile, sonst
-        # nichts. Vier Zeilen fuer die ganze Pruefung statt einer alle acht
-        # Sekunden zwischen den Befunden der Tests.
-        jetzt_teile=0
-        [ -n "$SELFTEST_ETAPPEN" ] && [ -r "$SELFTEST_ETAPPEN" ] && \
-          jetzt_teile=$(grep -v '^PLAN' "$SELFTEST_ETAPPEN" 2>/dev/null | grep -c .)
-        if [ "$jetzt_teile" != "$gesehen_teile" ]; then
-          gesehen_teile="$jetzt_teile"
-          balken_drucken 1 || true
-        fi
-      else
-        balken_drucken || true
-      fi
-    done ) &
-  BALKEN_TICKER=$!
-  disown 2>/dev/null || true
-}
-
-# ─── Phasen ───
 phase_start() {           # $1 = liefern|pruefen, $2 = Anzahl Etappen
   PHASE_ART="$1"; PHASE_ANZAHL="$2"
   SCHRITT=0
-  PHASE_START=$(date +%s); ETAPPE_START="$PHASE_START"
-  ETAPPE_TEXT=""; ZEITEN_LISTE=""
-  BALKEN_LETZTE=""; BALKEN_LETZTZEIT="$PHASE_START"
-  [ "$BALKEN_TTY" = "1" ] && exec 9>&1   # echtes Terminal sichern (fuer stty size)
-  if [ -z "$BALKEN_STATUS" ]; then
-    BALKEN_STATUS=$(mktemp -t nuvora-balken 2>/dev/null) || BALKEN_STATUS=""
-  fi
-  balken_status_schreiben
-  # Die Uhr laeuft nur beim Ausliefern. Dort ist es minutenlang still ("docker
-  # compose build"), und ohne sie waere gar nicht zu sehen, dass es weitergeht.
-  #
-  # In der Pruefphase drucken die Tests SELBST jede Zeile mit Sekundenzahl —
-  # dort ist eine zweite Fortschrittsquelle keine Hilfe, sondern Laerm zwischen
-  # den Befunden. Die Phase meldet sich am Anfang, bei jedem der vier Teile und
-  # am Ende; das genuegt.
-  #
-  # Beobachtet werden muss trotzdem: die Etappen der Pruefung kommen aus der
-  # Meldedatei, und die liest sonst niemand (die Hauptshell wartet auf
-  # selftest.sh). Darum laeuft die Uhr dort still weiter.
-  if [ "$1" = "pruefen" ]; then ticker_start still; else ticker_start; fi
+  PHASE_START=$(date +%s)
 }
 
-phase_ende() {            # schliesst die Phase ab: Zeiten merken, 100 % zeigen
-  [ -n "$PHASE_ART" ] || { ticker_stop; return 0; }
-  if [ "$PHASE_ART" = "pruefen" ]; then
-    pruefen_beobachten || true      # letzten Teil noch mitnehmen
-    ticker_stop
-    ZEITEN_LISTE=$(pruefen_dauern) || ZEITEN_LISTE=""
-  else
-    ticker_stop
-    [ "$SCHRITT" -gt 0 ] && ZEITEN_LISTE="$ZEITEN_LISTE $(($(date +%s) - ETAPPE_START))"
-    ZEITEN_LISTE="${ZEITEN_LISTE# }"
-  fi
-  zeiten_merken
+phase_ende() {
+  [ -n "$PHASE_ART" ] || return 0
   local label="Ausliefern"
   [ "$PHASE_ART" = "pruefen" ] && label="Prüfen"
-  printf '%s\n' "$(balken_bauen 100 ' ' "$label $PHASE_ANZAHL/$PHASE_ANZAHL" \
-    "fertig" "in $(dauer_kurz $(($(date +%s) - PHASE_START)))")"
+  printf '\n%s%s fertig in %s%s\n' \
+    "$B_GRAU" "$label" "$(dauer_kurz $(($(date +%s) - PHASE_START)))" "$B_AUS"
   PHASE_ART=""
 }
 
 schritt() {
-  # Dauer der abgeschlossenen Etappe festhalten (fuer .deploy-zeiten.json).
-  [ "$SCHRITT" -gt 0 ] && ZEITEN_LISTE="$ZEITEN_LISTE $(($(date +%s) - ETAPPE_START))"
   SCHRITT=$((SCHRITT + 1))
-  ETAPPE_TEXT="$1"
-  ETAPPE_START=$(date +%s)
-  balken_status_schreiben
-  balken_drucken 1
+  printf '\n%s→%s %s%s/%s%s %s%s%s\n' \
+    "$B_GRUEN" "$B_AUS" "$B_GRAU" "$SCHRITT" "$PHASE_ANZAHL" "$B_AUS" \
+    "$B_FETT" "$1" "$B_AUS"
 }
 
-# Sicherung: eine Anzeige, die bei 88 % endet oder ueber 100 % laeuft, ist
-# schlimmer als keine. Am Ende einer Phase muss die Zahl der gelaufenen Etappen
-# exakt der angekuendigten entsprechen — sonst ist die Zahl beim Ergaenzen eines
-# Schrittes vergessen worden, und genau das soll auffallen.
+# Sicherung: laeuft die Zahl der Etappen und die angekuendigte Zahl auseinander,
+# stimmt die Anzeige nicht mehr — und genau das soll auffallen, statt still
+# falsche Nummern zu drucken.
 schritte_bilanz() {
   [ "$SCHRITT" = "$PHASE_ANZAHL" ] && return 0
   echo ""
-  echo "  ⚠ Fortschrittsanzeige stimmt nicht: $SCHRITT Etappen gelaufen," \
-       "$PHASE_ANZAHL angekündigt."
+  echo "  ⚠ Etappenzahl stimmt nicht: $SCHRITT gelaufen, $PHASE_ANZAHL angekündigt."
   echo "    Die Etappenzahl in deploy.sh an die Zahl der schritt-Aufrufe anpassen."
 }
 
-balken_aufraeumen() {
-  ticker_stop
-  [ -n "$BALKEN_STATUS" ] && rm -f "$BALKEN_STATUS" "$BALKEN_STATUS.neu" "$BALKEN_STATUS.etappe" 2>/dev/null
-  [ -n "$SELFTEST_ETAPPEN" ] && rm -f "$SELFTEST_ETAPPEN" 2>/dev/null
-  [ -n "$BALKEN_MESS" ] && rm -f "$BALKEN_MESS" 2>/dev/null
-  return 0
-}
-trap balken_aufraeumen EXIT
-trap 'balken_aufraeumen; echo ""; echo "  Abgebrochen."; exit 130' INT TERM
+trap 'echo ""; echo "  Abgebrochen."; exit 130' INT TERM
 
 if [ ! -f "$DIR/.deploy.env" ]; then
   echo "Fehler: .deploy.env nicht gefunden. Kopiere .deploy.env.example und passe die Werte an."
@@ -647,12 +197,6 @@ echo "Port:   $PORT"
 echo "Build:  ${BUILD_SERVICES:-alle Services}"
 echo ""
 
-zeiten_laden "$PHASE1_ETAPPEN" "$PHASE2_ETAPPEN"
-if [ -z "$ZEITEN_P1" ]; then
-  echo "  (Erster Lauf ohne Erfahrungswerte — der Balken zählt Etappen statt Dauer;"
-  echo "   erkennbar an der Tilde vor der Prozentzahl. Ab dem nächsten Lauf nach Zeit.)"
-  echo ""
-fi
 phase_start liefern "$PHASE1_ETAPPEN"
 
 schritt "Server erreichbar machen (rsync)"
@@ -900,8 +444,7 @@ LP=$(ssh "$SERVER" "curl -s -o /dev/null -w '%{http_code}' http://localhost:$POR
 echo "  /api/health  -> $CV   (Nuvora-Kern)"
 echo "  /lp/         -> $LP   (Lernpfad-Statik im web)"
 
-# Phase 1 ist hier zu Ende — ausgeliefert ist ausgeliefert. Der Balken darf
-# jetzt auf 100 % stehen, weil er es auch ist.
+# Phase 1 ist hier zu Ende — ausgeliefert ist ausgeliefert.
 schritte_bilanz
 phase_ende
 
@@ -912,38 +455,20 @@ if [ "$CV" = "200" ] && [ "$LP" = "200" ]; then
   echo "  ${SITE_URL:-http://localhost:$PORT}"
   echo "========================================"
   # Health sagt nur "Container laeuft". Der Selbsttest sagt, ob jedes Modul,
-  # die Einrichtung und die Seiten wirklich funktionieren. Das ist Phase 2:
-  # eine eigene Sache mit eigenem Balken, denn hier wartet man am laengsten.
+  # die Einrichtung und die Seiten wirklich funktionieren.
   if [ "$SELFTEST" = "1" ]; then
     SELFTEST_ARGS=()
     [ "$SELFTEST_VOLL" = "0" ] && SELFTEST_ARGS+=(--schnell)
-    echo ""
-    if [ -z "$ZEITEN_P2" ]; then
-      echo "  (Noch keine Erfahrungswerte für die Prüfung — Dauer wird erst"
-      echo "   ab dem nächsten Lauf geschätzt.)"
-    fi
-    # Frische, leere Meldedatei — selftest.sh haengt seine vier Teile an.
-    SELFTEST_ETAPPEN=$(mktemp -t nuvora-etappen 2>/dev/null) || SELFTEST_ETAPPEN=""
-    BALKEN_MESS=$(mktemp -t nuvora-mess 2>/dev/null) || BALKEN_MESS=""
-    [ -n "$SELFTEST_ETAPPEN" ] && : > "$SELFTEST_ETAPPEN"
-    [ -n "$BALKEN_MESS" ] && : > "$BALKEN_MESS"
-    export SELFTEST_ETAPPEN_DATEI="$SELFTEST_ETAPPEN"
     phase_start pruefen "$PHASE2_ETAPPEN"
-    ETAPPE_TEXT="Selbsttest startet"
-    balken_status_schreiben
-    balken_drucken 1
     # Kein eigener Schlusssatz: die Zusammenfassung des Selbsttests sagt bereits
     # alles. Der Rueckgabewert traegt das Ergebnis nach aussen.
     set +e
     "$DIR/selftest.sh" "${SELFTEST_ARGS[@]+"${SELFTEST_ARGS[@]}"}"
     SELFTEST_RC=$?
     set -e
-    # WICHTIG: die Messung wird festgehalten, BEVOR ueber den Rueckgabewert
-    # entschieden wird. Wie lange die Pruefung lief, ist eine Messung — die
-    # stimmt auch dann, wenn die Pruefung inhaltlich etwas zu beanstanden hat.
-    # Vorher stand hier "|| exit 1" vor dem Merken; weil der Selbsttest des
-    # Nutzers rot war (SPF-Eintrag der Domain), entstand nie eine Zeitendatei,
-    # und deshalb fehlte in jedem Lauf die Restdauer.
+    # Die gebrauchte Zeit wird gemeldet, BEVOR ueber den Rueckgabewert
+    # entschieden wird: wie lange die Pruefung lief, stimmt auch dann, wenn sie
+    # inhaltlich etwas zu beanstanden hat.
     phase_ende
     [ "$SELFTEST_RC" = "0" ] || exit 1
   fi
