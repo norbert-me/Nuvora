@@ -401,10 +401,30 @@ async function aktionZuTitel(seite, titel) {
 
 // ───────────────────────────── Bedienung ─────────────────────────────
 //
-// Handgriffe, die eine Lehrkraft wirklich macht — in fuenf verschiedenen
-// Modulen. Jeder legt etwas an, laedt neu, besteht darauf dass es noch da ist,
-// und raeumt ueber die Oberflaeche wieder ab.
-const BEDIENUNG = [
+// Handgriffe, die eine Lehrkraft wirklich macht — in JEDEM Modul mit
+// Oberflaeche (ausser Lernpfad, der haengt an scripts/selftest-browser.mjs).
+// Jeder legt etwas an, laedt neu, besteht darauf dass es noch da ist, und
+// raeumt ueber die Oberflaeche wieder ab.
+//
+// Warum ueberhaupt: „die Seite rendert" ist eine schwache Zusage. Ein toter
+// Knopf mitten drin (`isOn("methoden")`, der Notenchip, der nie erscheint, der
+// Kalender-403) faellt erst auf, wenn jemand ihn drueckt. Genau das tut dieser
+// Teil — und das NEULADEN ist der Beweis, dass wirklich gespeichert wurde und
+// nicht nur React-Zustand gehalten hat.
+//
+// Felder je Handgriff:
+//   pfad      — Adresse, IMMER mit Klasse und Kurs (`klassenParam`), sonst
+//               zeigt die Seite die zuletzt gewaehlte Klasse des Kontos.
+//   oeffnen   — nach JEDEM Laden ausgefuehrt: in die Unteransicht klicken
+//               (Schueler waehlen o.ae.). Gibt "" zurueck oder den Grund.
+//   anlegen   — der eigentliche Handgriff.
+//   dasteht   — eigene Anwesenheitsprobe (Vorgabe: `stehtDa`, Text/Feldwert).
+//   loeschen  — eigenes Abraeumen (Vorgabe: `zeileLoeschen`).
+//   eigen     — ganz eigener Ablauf; nur fuer Module OHNE Speicher (tafel,
+//               mathespiele). Gibt "" zurueck oder den Grund.
+// Deshalb eine Funktion und keine Konstante: die Handgriffe brauchen die
+// Testdaten (Klasse, Kurs, Abschnitt).
+const bedienung = (td) => [
   {
     modul: "notizbrett",
     name: "Aufgabe anlegen (/notizbrett?tab=aufgaben)",
@@ -487,6 +507,252 @@ const BEDIENUNG = [
       return "";
     },
   },
+  {
+    modul: "cardvote",
+    name: "Frageset mit Frage anlegen (/cardvote/questions)",
+    pfad: "/cardvote/questions",
+    async anlegen(seite) {
+      await seite.locator("[title='Hinzufügen']").first().click({ timeout: 8000 });
+      await seite.getByRole("button", { name: "+ Neues Frageset", exact: true }).first().click({ timeout: 8000 });
+      await seite.locator("input[placeholder='Name des Fragesets']").first().fill(MARKE_UI, { timeout: 8000 });
+      await seite.getByRole("button", { name: "OK", exact: true }).first().click({ timeout: 8000 });
+      // Das neue Frageset geht SOFORT im Editor auf (createSet setzt
+      // editingSet) — der Name steht dort in einem Feld, nicht in der Liste.
+      // Also gleich hier die Frage anlegen, wie eine Lehrkraft es taete.
+      await seite.locator("[title='Neue Frage']").first().click({ timeout: 15000 });
+      const dialog = seite.locator("[role='dialog']").last();
+      await dialog.locator("textarea[placeholder^='Fragetext']").first().fill(`${MARKE_UI}-Frage`, { timeout: 8000 });
+      await dialog.locator("textarea[placeholder^='Antwort A']").first().fill("2/3", { timeout: 8000 });
+      await dialog.locator("textarea[placeholder^='Antwort B']").first().fill("2/6", { timeout: 8000 });
+      // Die richtige Antwort markiert der Buchstabenknopf links am Feld.
+      await dialog.locator("div").filter({ hasText: /^A$/ }).first().click({ timeout: 8000 });
+      await dialog.getByRole("button", { name: "Hinzufügen", exact: true }).first().click({ timeout: 8000 });
+      // Auf das Ergebnis warten, nicht auf die Uhr: die Frage steht in der
+      // Liste des Fragesets, sobald der Server geantwortet hat.
+      await seite.getByText(`${MARKE_UI}-Frage`, { exact: false }).first().waitFor({ timeout: 15000 });
+      // Zurueck zur Liste — dort muss das Frageset stehen, und dort wird gleich
+      // auch geprueft, ob es das Neuladen uebersteht.
+      await seite.getByRole("button", { name: "← Zurück" }).first().click({ timeout: 8000 });
+      await seite.getByText(MARKE_UI, { exact: true }).first().waitFor({ timeout: 15000 });
+    },
+    // Ein Frageset hat in der Liste KEINEN Loeschknopf — der sitzt im Kopf des
+    // Editors. Also aufmachen wie eine Lehrkraft und dort loeschen.
+    //
+    // Die FRAGE bleibt dabei im Fragenbestand: das Frageset gibt sie nur frei,
+    // es besitzt sie nicht. Ueber diese Seite ist sie nicht zu loeschen —
+    // `resteAbraeumen` holt sie am Ende (`/api/questions`, Praefix).
+    async loeschen(seite) {
+      await seite.getByText(MARKE_UI, { exact: true }).first().click({ timeout: 8000 });
+      await seite.locator("[title='Löschen']").first().click({ timeout: 8000 });
+      await bestaetigen(seite);   // „Frageset löschen?"
+      // Kein Undo-Fenster hier: das Loeschen geht sofort zum Server. Auf das
+      // Ergebnis warten — die Liste ist wieder da und die Marke ist weg.
+      await seite.getByText(MARKE_UI, { exact: true }).first().waitFor({ state: "detached", timeout: 15000 });
+      return "";
+    },
+  },
+  {
+    modul: "auswertung",
+    name: "Notenspalte anlegen und Note eintippen (/auswertung?tab=noten)",
+    // Klasse UND Kurs: das Notenbuch haengt am Kurs (Fach). Ohne beides steht
+    // die Seite auf einer fremden Klasse, und der Abschnitt aus den Testdaten
+    // ist gar nicht zu sehen.
+    pfad: `/auswertung?tab=noten${klassenParam(td, "&")}`,
+    async anlegen(seite) {
+      // Spalten haengen an einem Abschnitt — der aus den Testdaten.
+      const abschnitt = seite.locator("th").filter({ hasText: `${MARKE}-Abschnitt` }).first();
+      await abschnitt.locator("[title='Optionen']").first().click({ timeout: 15000 });
+      await seite.getByRole("button", { name: "Spalte hinzufügen", exact: true }).first().click({ timeout: 8000 });
+      await seite.locator("input[placeholder^='Spaltenname']").first().fill(MARKE_UI, { timeout: 8000 });
+      await seite.getByRole("button", { name: "OK", exact: true }).first().click({ timeout: 8000 });
+      await spaltenIndex(seite, MARKE_UI, 15000);
+      // Und jetzt das, was das Notenbuch ausmacht: eine Note in die Zelle.
+      // Bewusst eine NOTE, keine Beobachtung — eine Beobachtung mit Notenwert
+      // weist die API zu Recht ab (Produktregel, siehe CLAUDE.md).
+      const fehler = await noteTippen(seite, MARKE_UI, "2,3");
+      if (fehler) throw new Error(fehler);
+    },
+    // Eigene Probe: die Spalte allein beweist nur die halbe Miete. Erst die
+    // Zelle zeigt, dass auch die NOTE gespeichert wurde.
+    async dasteht(seite) {
+      const idx = await spaltenIndex(seite, MARKE_UI, 8000).catch(() => -1);
+      if (idx < 0) return false;
+      const zelle = seite.locator("tbody tr").first().locator("td").nth(idx);
+      return ((await zelle.innerText().catch(() => "")) || "").includes("2,3");
+    },
+    async loeschen(seite) {
+      // Der Loeschknopf sitzt im Menue der Spalte — erst den Kopf antippen.
+      const idx = await spaltenIndex(seite, MARKE_UI, 8000).catch(() => -1);
+      if (idx < 0) return "Spalte steht nicht mehr im Tabellenkopf";
+      await seite.locator("thead tr").last().locator("th").nth(idx)
+        .locator("button").first().click({ timeout: 8000 });
+      // zeileLoeschen wartet die 5-Sekunden-Undo-Frist ab (core/undo.jsx): die
+      // Spalte verschwindet sofort aus der Anzeige, beim Server landet sie erst
+      // danach. Wer vorher neu laedt, macht die Loeschung rueckgaengig.
+      return await zeileLoeschen(seite, MARKE_UI);
+    },
+  },
+  {
+    modul: "code-detektiv",
+    name: "Rätsel anlegen (/code-detektiv/admin)",
+    pfad: "/code-detektiv/admin",
+    async anlegen(seite) {
+      await seite.locator("input[placeholder^='z.B. LED']").first().fill(MARKE_UI, { timeout: 8000 });
+      const fehler = await bausteinZiehen(seite);
+      if (fehler) throw new Error(fehler);
+      // Auf die Antwort des Servers warten, nicht auf die Liste: die Liste baut
+      // sich beim Aufbau der Seite noch einmal aus der Server-Antwort neu
+      // (store.jsx, SET_PUZZLES) — wer sie als Beweis nimmt, prueft ein Rennen.
+      // Der PUT ist der Beweis; dass es wirklich liegen bleibt, zeigt gleich
+      // das Neuladen.
+      const zusage = seite.waitForResponse(
+        (r) => r.url().includes("/api/codedetektiv/puzzles") && r.request().method() === "PUT",
+        { timeout: 25000 });
+      // EIN Klick, und der muss reichen. Frueher klickte der Test bis zu
+      // dreimal, weil `bausteinZiehen` noch nicht abwartete, bis das Ablegen zu
+      // Ende ist — mit so einer Notloesung faellt ein wirklich toter Knopf nie
+      // mehr auf. („Rätsel gespeichert!" kommt als natives alert(); der
+      // Dialog-Handler in `neueSeite` bestaetigt es.)
+      await seite.getByRole("button", { name: "Rätsel speichern", exact: true }).first().click({ timeout: 8000 });
+      const antwort = await zusage;
+      if (!antwort.ok()) throw new Error(`Speichern meldet HTTP ${antwort.status()}`);
+    },
+    async loeschen(seite) {
+      // Streng in der Karte des Raetsels bleiben: die Liste enthaelt die
+      // Beispiel-Raetsel, und „Löschen" steht dort als Text, nicht als title.
+      const karte = seite.locator(".puzzle-card").filter({ hasText: MARKE_UI }).first();
+      if (!(await karte.count())) return "Rätsel nicht in der Liste";
+      // confirm('Rätsel wirklich löschen?') — bestaetigt der Dialog-Handler.
+      await karte.getByRole("button", { name: "Löschen", exact: true }).first().click({ timeout: 8000 });
+      await karte.waitFor({ state: "detached", timeout: 15000 });
+      return "";
+    },
+  },
+  {
+    modul: "zufall",
+    name: "Schüler ziehen (/zufall)",
+    pfad: `/zufall${klassenParam(td)}`,
+    // Kein Anlegen/Loeschen: das Modul legt nichts an, was die Oberflaeche
+    // wieder hergibt. Der Beweis ist ein anderer — siehe unten.
+    beweis: "gezogen, Server hat den Zug gespeichert, Gedächtnis wieder geleert",
+    async eigen(seite) {
+      if (!td.klasse?.id) return "keine Testklasse — Vorbedingung fehlt";
+      // Auf die ANTWORT des Servers warten, nicht auf die Uhr: die Ziehung
+      // laeuft mit einer Animation, und wer danach zu frueh nachsieht, findet
+      // ein leeres Gedaechtnis und meldet einen Fehler, der keiner ist.
+      const zusage = seite.waitForResponse(
+        (r) => r.url().includes(`/api/zufall/${td.klasse.id}/draw`) && r.request().method() === "POST",
+        { timeout: 25000 });
+      await seite.getByRole("button", { name: "Ziehen", exact: true }).first().click({ timeout: 8000 });
+      let antwort;
+      try { antwort = await zusage; } catch { return "Ziehen schickt nichts zum Server (kein POST /api/zufall/…/draw)"; }
+      if (!antwort.ok()) return `Ziehen meldet HTTP ${antwort.status()}`;
+      // Der gezogene Name MUSS aus der Testklasse kommen — sonst zeigt die
+      // Seite eine fremde Klasse und die Probe waere wertlos.
+      await seite.getByText(new RegExp(`${MARKE} (Ann|Ben|Cem)`)).first().waitFor({ timeout: 15000 });
+      const stand = await apiJson(`/api/zufall/${td.klasse.id}`);
+      const gezogen = Object.keys(stand?.history || {}).length;
+      if (!gezogen) return "der Zug steht nach der Rückmeldung nicht im Zieh-Gedächtnis";
+      // Abraeumen ueber die API, NICHT ueber die Oberflaeche: einen Knopf
+      // „Gedächtnis leeren" gibt es nicht (siehe Bericht). Die Klasse selbst
+      // faellt am Ende ohnehin weg, aber ein Testwerkzeug laesst nichts stehen.
+      await api(`/api/zufall/${td.klasse.id}`, "delete");
+      const nachher = await apiJson(`/api/zufall/${td.klasse.id}`);
+      if (Object.keys(nachher?.history || {}).length) return "Zieh-Gedächtnis liess sich nicht leeren";
+      return "";
+    },
+  },
+  {
+    modul: "notizen",
+    name: "Beobachtung anlegen (/notizen)",
+    // Klasse und Kurs stehen in der Adresse, WEIL es so gehoert — die Seite
+    // wertet sie allerdings nicht aus (siehe Bericht). Darum waehlt `oeffnen`
+    // die Klasse zusaetzlich ueber die Oberflaeche.
+    pfad: `/notizen${klassenParam(td)}`,
+    async oeffnen(seite) {
+      const fehler = await kursWaehlen(seite, `${MARKE}-Klasse`);
+      if (fehler) return fehler;
+      return await schuelerOeffnen(seite);
+    },
+    async anlegen(seite) {
+      await seite.locator("textarea[placeholder^='Beobachtung']").first().fill(MARKE_UI, { timeout: 8000 });
+      await seite.getByRole("button", { name: "Hinzufügen", exact: true }).first().click({ timeout: 8000 });
+      await seite.getByText(MARKE_UI, { exact: true }).first().waitFor({ timeout: 15000 });
+    },
+    // Kein Undo-Fenster: die Beobachtung geht sofort weg. Trotzdem ueber den
+    // Papierkorb-Knopf der Zeile, wie eine Lehrkraft es taete.
+    async loeschen(seite) {
+      const fehler = await knopfInZeile(seite, MARKE_UI, "Löschen");
+      if (fehler) return fehler;
+      await seite.getByText(MARKE_UI, { exact: true }).first().waitFor({ state: "detached", timeout: 15000 });
+      return "";
+    },
+  },
+  {
+    modul: "klassenleitung",
+    name: "Elternkontakt anlegen (/klassenleitung)",
+    pfad: `/klassenleitung${klassenParam(td)}`,
+    oeffnen: schuelerOeffnen,
+    async anlegen(seite) {
+      await seite.locator("textarea[placeholder^='Was wurde besprochen']").first().fill(MARKE_UI, { timeout: 8000 });
+      await seite.getByRole("button", { name: "Hinzufügen", exact: true }).first().click({ timeout: 8000 });
+      await seite.getByText(MARKE_UI, { exact: true }).first().waitFor({ timeout: 15000 });
+    },
+    async loeschen(seite) {
+      const fehler = await knopfInZeile(seite, MARKE_UI, "Löschen");
+      if (fehler) return fehler;
+      await seite.getByText(MARKE_UI, { exact: true }).first().waitFor({ state: "detached", timeout: 15000 });
+      return "";
+    },
+  },
+  {
+    modul: "tafel",
+    name: "Textfeld beschriften (/tafel)",
+    pfad: "/tafel",
+    // Die Tafel hat kein Backend — der Stand liegt in localStorage
+    // (`nuvora_tafel_v1`, siehe Tafel.jsx). Das Neuladen beweist hier also
+    // nicht „der Server hat es", sondern „die Seite legt ihren Stand ab und
+    // holt ihn wieder" — genau das, was dieses Modul verspricht. Ein Textfeld,
+    // das den Reload nicht uebersteht, waere fuer den Beamer wertlos.
+    async anlegen(seite) {
+      await seite.getByRole("button", { name: "Textfeld", exact: true }).first().click({ timeout: 8000 });
+      const feld = seite.locator("textarea[placeholder^='Text']").first();
+      await feld.waitFor({ state: "visible", timeout: 8000 });
+      await feld.fill(MARKE_UI, { timeout: 8000 });
+    },
+    async loeschen(seite) {
+      // Erst das Feld anwaehlen — die Leiste mit dem Papierkorb schwebt am
+      // gewaehlten Element und existiert vorher gar nicht.
+      await seite.locator("textarea").first().click({ timeout: 8000 });
+      await seite.locator("[title='Löschen']").first().click({ timeout: 8000 });
+      await seite.locator("textarea").first().waitFor({ state: "detached", timeout: 8000 });
+      return "";
+    },
+  },
+  {
+    modul: "mathespiele",
+    name: "Mathefußball spielen (/mathespiele)",
+    pfad: "/mathespiele",
+    // Reines Spiel, ohne Daten — es gibt nichts, was ein Neuladen ueberstehen
+    // koennte. Geprueft wird darum die Mechanik selbst: Spiel starten, drei
+    // richtige Antworten fuer Team A, und der Ball MUSS im Tor landen (der
+    // Spielstand springt auf 1). Das faellt aus, sobald die Aufgaben ausbleiben,
+    // die Knoepfe nicht mehr freigeben oder die Torlogik kaputt ist — also bei
+    // genau den Fehlern, die ein reines „die Seite rendert" durchlaesst.
+    beweis: "Spiel gestartet, drei Treffer ergeben ein Tor",
+    async eigen(seite) {
+      // Nicht auf „▶ Start" festnageln: das Dreieck gehoert zur Beschriftung,
+      // aber ob es im Namen des Knopfes landet, entscheidet der Browser.
+      await seite.getByRole("button", { name: /Start/ }).first().click({ timeout: 8000 });
+      const treffer = seite.getByRole("button", { name: /Team A richtig/ }).first();
+      // Dreimal: die Spielfeldmitte ist zwei Felder vom Tor entfernt (STEPS=2).
+      // Playwright wartet vor jedem Klick von sich aus, bis der Knopf wieder
+      // freigegeben ist — der 2-Sekunden-Uebergang braucht keine feste Pause.
+      for (const _ of [0, 1, 2]) await treffer.click({ timeout: 20000 });
+      await seite.getByText("Team A · 1", { exact: true }).first().waitFor({ timeout: 15000 });
+      return "";
+    },
+  },
 ];
 
 /**
@@ -510,6 +776,128 @@ async function bestaetigen(seite) {
     const ok = seite.getByRole("button", { name: "OK", exact: true }).first();
     if (await ok.isVisible({ timeout: 1200 })) await ok.click({ timeout: 3000 });
   } catch { /* kein Dialog — der Normalfall */ }
+}
+
+/**
+ * In der Kursauswahl (components/KursKlasseSelect.jsx) diesen Kurs waehlen.
+ *
+ * Fuer Seiten, die `?class=` NICHT auswerten. Ohne das zeigt die Seite die
+ * zuletzt gewaehlte Klasse des Kontos — auf einer Instanz mit echten Daten also
+ * eine fremde, und der ganze Handgriff liefe am falschen Datensatz.
+ */
+async function kursWaehlen(seite, name) {
+  const feld = seite.locator("select").first();
+  try {
+    await feld.waitFor({ state: "visible", timeout: 15000 });
+    await feld.selectOption({ label: name }, { timeout: 8000 });
+  } catch (e) {
+    return `Kurs „${name}" nicht wählbar: ${kurzfehler(e, 1)}`;
+  }
+  return "";
+}
+
+/** Den Testschueler aufmachen (Beobachtungen/Elternkontakte: erst Kind, dann Liste). */
+async function schuelerOeffnen(seite) {
+  try {
+    await seite.getByRole("button", { name: new RegExp(`${MARKE} Ann`) }).first().click({ timeout: 15000 });
+    // Auf das Ergebnis warten: das Eingabefeld gibt es erst in der Detailansicht.
+    await seite.locator("textarea").first().waitFor({ state: "visible", timeout: 8000 });
+  } catch (e) {
+    return `Testschüler „${MARKE} Ann" nicht zu öffnen: ${kurzfehler(e, 1)}`;
+  }
+  return "";
+}
+
+/**
+ * Spaltennummer im Notenbuch: die wievielte Zelle traegt diese Spalte?
+ *
+ * Kopf- und Datenzeile sind gleich aufgebaut (Name, dann je Abschnitt die
+ * Spalten und die Bereichsnote) — die Nummer aus dem Kopf passt darum auf die
+ * Zellen darunter. Wartet, bis die Spalte wirklich da ist, statt einmal
+ * nachzusehen und beim Nachladen ins Leere zu greifen.
+ */
+async function spaltenIndex(seite, name, frist = 8000) {
+  // Als Objekt zurueck, nicht als Zahl: `waitForFunction` wartet auf einen
+  // WAHREN Wert, und eine 0 waere falsch — sie hiesse „gefunden, ganz vorn".
+  const griff = await seite.waitForFunction(([n]) => {
+    const reihen = [...document.querySelectorAll("thead tr")];
+    const kopf = reihen[reihen.length - 1];
+    if (!kopf) return null;
+    const i = [...kopf.children].findIndex((th) => (th.textContent || "").includes(n));
+    return i < 0 ? null : { i };
+  }, [name], { timeout: frist });
+  return (await griff.jsonValue()).i;
+}
+
+/** Eine Note in die Zelle dieser Spalte tippen (erste Zeile = erster Schüler). */
+async function noteTippen(seite, spalte, note) {
+  const idx = await spaltenIndex(seite, spalte).catch(() => -1);
+  if (idx < 0) return "die neue Spalte steht nicht im Tabellenkopf";
+  const zelle = seite.locator("tbody tr").first().locator("td").nth(idx);
+  await zelle.locator("button").first().click({ timeout: 8000 });
+  const feld = zelle.locator("input").first();
+  await feld.waitFor({ state: "visible", timeout: 8000 });
+  await feld.fill(note, { timeout: 8000 });
+  await feld.press("Enter");
+  // Auf das Ergebnis warten: die Note steht in der Zelle, sobald der Server
+  // geantwortet hat und die Tabelle neu gerechnet ist.
+  try {
+    await zelle.getByText(note, { exact: false }).first().waitFor({ timeout: 15000 });
+  } catch {
+    return `die Note „${note}" erscheint nicht in der Zelle`;
+  }
+  return "";
+}
+
+/**
+ * Im Code-Detektiv einen Baustein aus der Werkzeugkiste auf die Flaeche ziehen.
+ *
+ * Ohne mindestens einen Block laesst sich kein Raetsel speichern (Admin.jsx:
+ * „Titel und mindestens ein Block sind nötig"). Das laeuft ueber dnd-kit mit
+ * PointerSensor und 5-px-Schwelle — darum die Zwischenschritte: ein einzelner
+ * Sprung von A nach B loest gar keinen Zug aus.
+ */
+async function bausteinZiehen(seite) {
+  await seite.locator(".toolbox-category-header").first().click({ timeout: 8000 });
+  const block = seite.locator(".block-toolbox .mc-block, .block-toolbox .mc-container-block").first();
+  const ziel = seite.getByText("Blöcke von links hierhin ziehen").first();
+  try {
+    await block.waitFor({ state: "visible", timeout: 8000 });
+    await ziel.waitFor({ state: "visible", timeout: 8000 });
+  } catch (e) {
+    return `Werkzeugkiste oder Fläche fehlt: ${kurzfehler(e, 1)}`;
+  }
+  const von = await block.boundingBox();
+  const nach = await ziel.boundingBox();
+  if (!von || !nach) return "Baustein oder Fläche hat keine Ausdehnung";
+  await seite.mouse.move(von.x + von.width / 2, von.y + von.height / 2);
+  await seite.mouse.down();
+  await seite.mouse.move(von.x + von.width / 2 + 12, von.y + von.height / 2 + 12, { steps: 4 });
+  await seite.mouse.move(nach.x + nach.width / 2, nach.y + nach.height / 2, { steps: 12 });
+  await seite.mouse.up();
+  // Der Zaehler in der Ueberschrift ist das Ergebnis, auf das sich warten
+  // laesst: „Lösung (1 Blöcke)".
+  try {
+    await seite.getByText(/Lösung \(\d+ Blöcke\)/).first().waitFor({ timeout: 8000 });
+  } catch {
+    return "der Baustein ist nicht auf der Fläche gelandet (Drag & Drop)";
+  }
+  // Und jetzt warten, bis das Ablegen wirklich ZU ENDE ist: dnd-kit laesst den
+  // schwebenden Baustein nach dem Loslassen noch die Ablege-Bewegung lang ueber
+  // der Seite stehen (ein `position: fixed`-Knoten direkt an `body`) und
+  // verschluckt in dieser Zeit jeden Klick — den ersten Klick nach dem Ablegen
+  // bekaeme sonst niemand mit (gemessen: das Fenster endet ~50 ms nach dem
+  // Loslassen, die Schicht selbst geht nach ~250 ms). Ein Mensch klickt nie so
+  // schnell, ein Testwerkzeug immer. Also auf den Zustand warten, nicht auf die
+  // Uhr — und danach reicht EIN Klick, worauf der Aufrufer besteht.
+  try {
+    await seite.waitForFunction(() => ![...document.body.children].some(
+      (e) => getComputedStyle(e).position === "fixed"
+        && e.querySelector(".mc-block, .mc-container-block")), null, { timeout: 8000 });
+  } catch {
+    return "die schwebende Ablege-Schicht von dnd-kit verschwindet nicht";
+  }
+  return "";
 }
 
 /** Den Knopf mit diesem title/aria-label in der Zeile mit der Marke druecken. */
@@ -643,7 +1031,14 @@ async function main() {
 
     // ── 3. Echte Bedienung ──
     await nurDiese(module, alle);
-    for (const flow of BEDIENUNG) {
+    // Ohne Testklasse (und ohne den Abschnitt im Notenbuch) haetten die meisten
+    // Handgriffe gar keinen Datensatz, an dem sie arbeiten koennten — dann EIN
+    // klarer Fehler statt einem Dutzend erfundener.
+    if (!bereit.ok) {
+      notiere("Bedienung", "übersprungen", false,
+        `Vorbedingung fehlt (${bereit.detail}) — ${bedienung(testdaten).length} Handgriffe NICHT gelaufen`);
+    } else
+    for (const flow of bedienung(testdaten)) {
       const befund = await bediene(flow);
       notiere("Bedienung", `${flow.modul}: ${flow.name}`, befund.ok, befund.detail);
     }
@@ -940,7 +1335,24 @@ async function resteAbraeumen() {
     }
   }
 
+  // ── An den Schuelern haengendes (Beobachtungen, Elternkontakte)
+  //
+  // Beide haben keine Sammelliste — nur „je Kind". Also je Testschueler
+  // nachsehen; fremde Kinder werden dabei nicht angefasst, weil nur Klassen mit
+  // dem Praefix durchlaufen werden.
+  for (const k of klassen) {
+    if (!traegtMarke(k)) continue;
+    const kinder = (await apiJson(`/api/classes/${k.id}`))?.students || [];
+    for (const s of kinder) {
+      await raeume(await liste(`/api/notizen?student_id=${s.id}`), (o) => [`/api/notizen/${o.id}`]);
+      await raeume(await liste(`/api/elternlog?student_id=${s.id}`), (o) => [`/api/elternlog/${o.id}`]);
+    }
+  }
+
   // ── Module ohne Klassenbezug
+  // Code-Detektiv-Raetsel haengen an ihrer client_id, nicht an einer Zahl.
+  await raeume(await liste("/api/codedetektiv/puzzles"),
+    (o) => [`/api/codedetektiv/puzzles/${encodeURIComponent(o.client_id)}`]);
   await raeume(await liste("/api/methoden/list"), (o) => [`/api/methoden/${o.id}`]);
   await raeume(await liste("/api/methoden/folders"), (o) => [`/api/methoden/folders/${o.id}`]);
   await raeume(await liste("/api/kalender/entries?frm=2000-01-01T00:00:00&to=2100-01-01T00:00:00"),
@@ -1048,23 +1460,42 @@ async function bediene(flow) {
   // Ein Handgriff klickt, tippt, laedt neu und loescht — mehr Wege als ein
   // blosser Seitenaufruf, also die doppelte Frist. Ohne Frist haengt ein
   // wartender Locator bis in alle Ewigkeit.
+  // Nach jedem Laden dasselbe: Tour weg, und wo noetig in die Unteransicht.
+  const nachLaden = async () => {
+    await tourWegklicken(seite);
+    return flow.oeffnen ? await flow.oeffnen(seite) : "";
+  };
+  const dasteht = (warten) => (flow.dasteht ? flow.dasteht(seite) : stehtDa(seite, warten));
   const handgriff = async () => {
     await seite.goto(flow.pfad, { waitUntil: "networkidle", timeout: 30000 });
-    await tourWegklicken(seite);
     if (new URL(seite.url()).pathname === "/modules")
       return { ok: false, detail: "ModuleGate wirft auf /modules — Modul nicht aktiv?" };
+    let fehler = await nachLaden();
+    if (fehler) return { ok: false, detail: fehler };
+
+    // Module ohne Speicher (tafel, mathespiele) bringen ihren eigenen Ablauf
+    // mit: es gibt nichts, was ein Neuladen ueberstehen koennte.
+    if (flow.eigen) {
+      fehler = await flow.eigen(seite);
+      if (fehler) return { ok: false, detail: fehler };
+      if (probleme.length) return { ok: false, detail: probleme[0] };
+      return { ok: true, detail: flow.beweis || "bedient" };
+    }
 
     await flow.anlegen(seite);
     await seite.reload({ waitUntil: "networkidle" });
-    await tourWegklicken(seite);
-    if (!(await stehtDa(seite)))
+    fehler = await nachLaden();
+    if (fehler) return { ok: false, detail: `angelegt, danach nicht wiederzufinden: ${fehler}` };
+    if (!(await dasteht(true)))
       return { ok: false, detail: "nach dem Neuladen verschwunden — wird nicht gespeichert" };
 
-    const fehler = flow.loeschen ? await flow.loeschen(seite) : await zeileLoeschen(seite, MARKE_UI);
+    fehler = flow.loeschen ? await flow.loeschen(seite) : await zeileLoeschen(seite, MARKE_UI);
     if (fehler) return { ok: false, detail: `angelegt, aber nicht löschbar: ${fehler}` };
     await seite.reload({ waitUntil: "networkidle" });
-    await tourWegklicken(seite);
-    if (await stehtDa(seite))
+    fehler = await nachLaden();
+    // Ein Fehlschlag beim Aufmachen ist hier KEIN Befund: die Unteransicht kann
+    // ohne den Datensatz anders aussehen. Weg ist weg — genau das wird geprueft.
+    if (!fehler && (await dasteht(false)))
       return { ok: false, detail: "gelöscht, taucht nach dem Neuladen wieder auf" };
 
     if (probleme.length) return { ok: false, detail: probleme[0] };
@@ -1079,12 +1510,27 @@ async function bediene(flow) {
   }
 }
 
-/** Steht die Marke irgendwo auf der Seite (Text oder Eingabefeld)? */
-async function stehtDa(seite) {
-  const text = await seite.locator("body").innerText();
-  if (text.includes(MARKE_UI)) return true;
-  return await seite.evaluate((m) =>
-    [...document.querySelectorAll("input, textarea")].some((i) => (i.value || "").includes(m)), MARKE_UI);
+/**
+ * Steht die Marke irgendwo auf der Seite (Text oder Eingabefeld)?
+ *
+ * `warten` heisst: bis zu zehn Sekunden darauf WARTEN, dass sie auftaucht.
+ * Die Modulseiten holen ihre Listen per fetch nach — wer direkt nach dem
+ * Neuladen einmal nachsieht, sieht die leere Seite davor und meldet „wird nicht
+ * gespeichert", obwohl der Datensatz eine Zehntelsekunde spaeter da ist. Genau
+ * das ist Beobachtungen und Elternkontakten passiert.
+ * Beim Gegenbeweis (nach dem Loeschen) wird NICHT gewartet: da soll nichts mehr
+ * kommen, und Warten hiesse nur, zehn Sekunden lang nichts zu tun.
+ */
+async function stehtDa(seite, warten = true) {
+  const probe = (m) => document.body.innerText.includes(m)
+    || [...document.querySelectorAll("input, textarea")].some((i) => (i.value || "").includes(m));
+  if (warten) {
+    try {
+      await seite.waitForFunction(probe, MARKE_UI, { timeout: 10000 });
+      return true;
+    } catch { /* nicht gekommen — die Nachschau unten sagt es endgueltig */ }
+  }
+  return await seite.evaluate(probe, MARKE_UI);
 }
 
 /** Eine Seite oeffnen und alles sammeln, was schiefgeht. */
