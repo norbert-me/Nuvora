@@ -28,7 +28,15 @@ import pytest
 from fastapi import HTTPException
 
 from app.routers import backup
-from test_backup import _ruf, _sichern, welt  # noqa: F401 — `welt` ist die Fixture
+import test_backup
+from test_backup import _ruf, _sichern
+
+# `welt` ist eine pytest-Fixture: sie wird über den Parameternamen gezogen und
+# nie aufgerufen. Als `from test_backup import welt` sieht der Import für jeden
+# Prüfer ungenutzt aus (CodeQL py/unused-import), und ein `# noqa` erklärt das
+# nur, statt es aufzulösen. Ausdrücklich zugewiesen findet pytest die Fixture
+# genauso — und es steht da, dass sie gebraucht wird.
+welt = test_backup.welt
 
 
 # Namen, die niemals eine Datei bestimmen dürfen. Der rohe `..`-Anteil kommt
