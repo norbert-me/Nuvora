@@ -8,6 +8,22 @@ from email.message import EmailMessage
 logger = logging.getLogger("cardvote.mail")
 
 
+def _fuer_log(wert: str, max_len: int = 120) -> str:
+    """Adresse logtauglich machen.
+
+    Die Adresse kommt aus dem Formular. Mit einem Zeilenumbruch darin liesse
+    sich eine komplette zusaetzliche Logzeile einschleusen ("Anmeldung
+    erfolgreich" o. ae.) — genau das Log soll im Zweifel eine
+    Datenschutz-Auskunft belegen. Umbrueche und Steuerzeichen fliegen raus,
+    die Adresse bleibt lesbar.
+    """
+    text = "".join(" " if ord(c) < 32 or ord(c) == 127 else c for c in (wert or ""))
+    text = text.strip()
+    if len(text) > max_len:
+        text = text[:max_len] + "…"
+    return text or "(leer)"
+
+
 def email_configured() -> bool:
     return bool(os.environ.get("SMTP_HOST") and os.environ.get("SMTP_FROM"))
 
@@ -49,12 +65,12 @@ def _send_sync(to: str, subject: str, body: str, reply_to: str = "") -> bool:
 async def send_email(to: str, subject: str, body: str, reply_to: str = "") -> bool:
     """Versendet best-effort — wirft nie, blockiert nie den Request (läuft im Threadpool)."""
     if not email_configured():
-        logger.info("SMTP nicht konfiguriert — E-Mail an %s übersprungen", to)
+        logger.info("SMTP nicht konfiguriert — E-Mail an %s übersprungen", _fuer_log(to))
         return False
     try:
         return await asyncio.to_thread(_send_sync, to, subject, body, reply_to)
     except Exception as e:
-        logger.warning("E-Mail-Versand an %s fehlgeschlagen: %s", to, e)
+        logger.warning("E-Mail-Versand an %s fehlgeschlagen: %s", _fuer_log(to), _fuer_log(str(e), 300))
         return False
 
 

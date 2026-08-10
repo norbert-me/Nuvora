@@ -239,8 +239,9 @@ def _check_mail(out: List[Check]) -> None:
     try:
         socket.getaddrinfo(host, port)
     except Exception:
-        return fehler("Host", f"'{host}' laesst sich nicht aufloesen — Tippfehler im "
-                              "Hostnamen? Ohne ihn kommt keine einzige Mail an.")
+        fehler("Host", f"'{host}' laesst sich nicht aufloesen — Tippfehler im "
+                       "Hostnamen? Ohne ihn kommt keine einzige Mail an.")
+        return
     out.append(Check(gruppe="E-Mail", name="Host", ok=True, detail=f"{host} loest auf"))
 
     ctx = ssl.create_default_context()
@@ -253,8 +254,9 @@ def _check_mail(out: List[Check]) -> None:
             server.starttls(context=ctx)
             server.ehlo()
     except Exception as e:
-        return fehler("Verbindung", f"{host}:{port} nimmt keine Verbindung an "
-                                    f"({str(e)[:100]}) — Port oder Firewall pruefen.")
+        fehler("Verbindung", f"{host}:{port} nimmt keine Verbindung an "
+                             f"({str(e)[:100]}) — Port oder Firewall pruefen.")
+        return
     out.append(Check(gruppe="E-Mail", name="Verbindung", ok=True, detail=f"{host}:{port} spricht SMTP"))
 
     try:
@@ -264,8 +266,9 @@ def _check_mail(out: List[Check]) -> None:
                 out.append(Check(gruppe="E-Mail", name="Anmeldung", ok=True,
                                  detail=f"{user} angenommen"))
             except Exception as e:
-                return fehler("Anmeldung", f"Der Mailserver lehnt SMTP_USER/SMTP_PASSWORD ab: "
-                                           f"{str(e)[:150]}")
+                fehler("Anmeldung", f"Der Mailserver lehnt SMTP_USER/SMTP_PASSWORD ab: "
+                                    f"{str(e)[:150]}")
+                return
         else:
             out.append(Check(gruppe="E-Mail", name="Anmeldung", ok=True, schwere="warnung",
                              detail="ohne SMTP_USER — Relay ohne Anmeldung"))
@@ -276,23 +279,29 @@ def _check_mail(out: List[Check]) -> None:
         try:
             code, antwort = server.mail(absender)
             if code >= 400:
-                return fehler("Absender", f"Der Mailserver lehnt SMTP_FROM '{absender}' ab: "
-                                          f"{antwort.decode('utf-8', 'replace')[:150]} — "
-                                          "Absender beim Anbieter freigeben oder Domain "
-                                          "authentifizieren.")
+                fehler("Absender", f"Der Mailserver lehnt SMTP_FROM '{absender}' ab: "
+                                   f"{antwort.decode('utf-8', 'replace')[:150]} — "
+                                   "Absender beim Anbieter freigeben oder Domain "
+                                   "authentifizieren.")
+                return
             code, antwort = server.rcpt(empfaenger)
             if code >= 400:
-                return fehler("Absender", f"Empfaenger '{empfaenger}' abgelehnt: "
-                                          f"{antwort.decode('utf-8', 'replace')[:150]}")
+                fehler("Absender", f"Empfaenger '{empfaenger}' abgelehnt: "
+                                   f"{antwort.decode('utf-8', 'replace')[:150]}")
+                return
             server.rset()
             out.append(Check(gruppe="E-Mail", name="Absender", ok=True,
                              detail=f"{absender} wird angenommen (keine Mail verschickt)"))
         except Exception as e:
-            return fehler("Absender", f"Probe fehlgeschlagen: {str(e)[:150]}")
+            fehler("Absender", f"Probe fehlgeschlagen: {str(e)[:150]}")
+            return
     finally:
         try:
             server.quit()
         except Exception:
+            # Bewusst still: das Ergebnis der Probe steht schon im Bericht. Ein
+            # Fehler beim Verabschieden (Verbindung schon zu, Timeout) sagt
+            # nichts ueber den Mailversand und darf ihn nicht rot faerben.
             pass
 
     _check_absender_dns(absender, host, out)

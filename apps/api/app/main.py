@@ -7,6 +7,10 @@ from fastapi.staticfiles import StaticFiles
 
 from .database import engine
 from .models import Base
+# Hinweis zum gemeldeten Importzyklus main -> routers.backup -> main: er ist
+# bewusst so und aufgeloest. backup.py holt sich `_require_admin` und
+# `APP_VERSION` erst zur Laufzeit IN der Funktion (siehe Begruendung dort), damit
+# die Admin-Pruefung nur einmal existiert. Beim Modulimport gibt es keinen Zyklus.
 from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizen, elternlog, notizblock, trash, selftest, backup
 from . import websocket as ws
 
@@ -44,6 +48,8 @@ def _req_ip(request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+# Zeitpunkt der letzten Auskehr. Wird in _global_hits_auskehren gelesen (Schranke
+# "hoechstens einmal je Minute") und dort auch fortgeschrieben — kein toter Wert.
 _global_hits_letzte_kehr = 0.0
 
 
@@ -72,6 +78,9 @@ class AbuseGuardMiddleware(BaseHTTPMiddleware):
                 if int(cl) > MAX_BODY_BYTES:
                     return JSONResponse(status_code=413, content={"detail": "Anfrage zu gross"})
             except ValueError:
+                # Content-Length ist keine Zahl (kaputter Client, Angriffsversuch).
+                # Dann laesst sich die Groesse hier nicht beurteilen — durchlassen
+                # und den eigentlichen Schutz dem Server/Body-Leser ueberlassen.
                 pass
         # 2) Globaler Flood-Schutz pro IP (nur /api/, ohne Health)
         #
@@ -579,8 +588,13 @@ async def startup():
         try:
             await db.execute(text("ALTER TABLE attendance DROP CONSTRAINT IF EXISTS uq_attendance_student_date"))
             await db.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            # Darf scheitern: SQLite (Pruefinstanz) kennt DROP CONSTRAINT nicht,
+            # und vor der ersten create_all gibt es die Tabelle noch nicht. Der
+            # Start darf daran nicht abbrechen — aber still bleiben auch nicht,
+            # sonst sieht niemand, wenn es auf Postgres wirklich schiefgeht.
+            await db.rollback()
+            print(f"[STARTUP-WARN] uq_attendance_student_date nicht entfernt: {type(e).__name__}: {e}", flush=True)
 
     # Sitzplan hängt jetzt am Kurs (kurs_id); der alte Unique-Constraint auf
     # (owner, class_id) würde mehrere Fach-Kurse derselben Klasse blockieren.
@@ -588,8 +602,10 @@ async def startup():
         try:
             await db.execute(text("ALTER TABLE seating_plans DROP CONSTRAINT IF EXISTS uq_seating_owner_class"))
             await db.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            # Wie oben: auf SQLite erwartbar, auf Postgres ein Befund.
+            await db.rollback()
+            print(f"[STARTUP-WARN] uq_seating_owner_class nicht entfernt: {type(e).__name__}: {e}", flush=True)
 
     # Bestandsnoten an den Kurs anschliessen: wo eine Klasse in GENAU EINEM Kurs
     # liegt, bekommen ihre Abschnitte/Endnoten-Overrides dessen kurs_id — sonst
@@ -633,8 +649,13 @@ async def startup():
                     FROM single s WHERE x.class_id = s.class_id AND x.kurs_id IS NULL
                 """))
             await db.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            # Reiner Backfill (kurs_id nachtragen): scheitert er, laeuft die
+            # Installation weiter, die Zeilen bleiben nur ohne Kurs. Deshalb kein
+            # Abbruch — aber sichtbar, sonst sucht niemand die Ursache dafuer,
+            # dass Sitzplan/Orga/Decks „verschwunden" wirken.
+            await db.rollback()
+            print(f"[STARTUP-WARN] Kurs-Backfill uebersprungen: {type(e).__name__}: {e}", flush=True)
 
     # Kurs-Konzept, Phase 1: jede Klasse ohne Kurs bekommt ihren eigenen Kurs
     # (1:1, gleicher Name/Owner). Ändert nichts am Verhalten, legt nur die
@@ -688,8 +709,12 @@ async def startup():
             if res.rowcount:
                 print(f"[STARTUP] Marktplatz: kind bei {res.rowcount} Eintrag/Einträgen korrigiert.", flush=True)
             await db.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            # Korrektur am Bestand — darf den Start nicht kosten, muss aber im
+            # Log stehen: sonst werden Karten-Decks weiter als Quiz angezeigt und
+            # niemand weiss, warum.
+            await db.rollback()
+            print(f"[STARTUP-WARN] Marktplatz-kind nicht korrigiert: {type(e).__name__}: {e}", flush=True)
 
     # Papierkorb einmal beim Start leeren; danach uebernimmt die Schleife weiter
     # unten. Nur beim Start reichte nicht: ein Container laeuft monatelang durch,
@@ -781,11 +806,17 @@ async def _papierkorb_leeren(laut: bool = False):
                     f"DELETE FROM {tbl} WHERE deleted_at IS NOT NULL "
                     "AND deleted_at < now() - interval '30 days'"
                 ))
+                await db.commit()
                 if res.rowcount and laut:
                     print(f"[STARTUP] Papierkorb: {res.rowcount} {wort} endgültig gelöscht (>30 Tage).", flush=True)
-            except Exception:
-                pass
-        await db.commit()
+            except Exception as e:
+                # Je Tabelle committen und im Fehlerfall zuruecksetzen: sonst
+                # reisst eine fehlende Tabelle die ganze Transaktion in den
+                # Abbruchzustand, alle folgenden DELETEs scheitern still mit —
+                # und die 30-Tage-Frist aus der Datenschutzerklaerung waere
+                # unbemerkt nicht eingehalten.
+                await db.rollback()
+                print(f"[WARN] Papierkorb: {tbl} nicht geleert: {type(e).__name__}: {e}", flush=True)
 
 
 async def _papierkorb_loop():
@@ -820,8 +851,11 @@ async def _codesessions_aufraeumen():
                     "OR created_at < now() - interval '7 days'"
                 ))
                 await db.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            # Die Schleife muss weiterlaufen (ein Ausfall darf die Frist nicht
+            # dauerhaft aussetzen), der Fehlschlag aber sichtbar sein: sonst
+            # bleiben Sitzungen mit Namen unbegrenzt oeffentlich abrufbar.
+            print(f"[WARN] Code-Sitzungen nicht aufgeraeumt: {type(e).__name__}: {e}", flush=True)
         await asyncio.sleep(3600)
 
 
@@ -836,8 +870,10 @@ async def _cleanup_unverified_loop():
                     "WHERE email_verified = false AND created_at < NOW() - INTERVAL '14 days'"
                 ))
                 await db.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            # Weiterlaufen ja, schweigen nein — die 14-Tage-Frist fuer
+            # unbestaetigte Konten ist zugesagt.
+            print(f"[WARN] Unbestaetigte Konten nicht aufgeraeumt: {type(e).__name__}: {e}", flush=True)
         await asyncio.sleep(6 * 3600)  # alle 6 Stunden
 
 
