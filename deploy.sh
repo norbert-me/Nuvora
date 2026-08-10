@@ -435,17 +435,33 @@ ticker_stop() {
   BALKEN_TICKER=""
 }
 
+# $1 = "still": beobachten, aber nichts drucken.
 ticker_start() {
   ticker_stop
+  local still="${1:-}"
   # trap - EXIT ist wichtig: die Subshell erbt den EXIT-Trap des Hauptskripts
   # und wuerde beim Beendetwerden das Aufraeumen ein zweites Mal ausloesen.
   ( trap - EXIT INT TERM
+    local_gesehen=0; gesehen_teile=0
     while :; do
       sleep 1
       # Die Uhr ist waehrend des Selbsttests der einzige Beobachter: die
       # Hauptshell wartet dann auf ihn und sieht die neuen Teile nicht.
       pruefen_beobachten || true
-      balken_drucken || true
+      if [ "$still" = "still" ]; then
+        # Still heisst nicht stumm: bei jedem NEUEN Teil eine Zeile, sonst
+        # nichts. Vier Zeilen fuer die ganze Pruefung statt einer alle acht
+        # Sekunden zwischen den Befunden der Tests.
+        jetzt_teile=0
+        [ -n "$SELFTEST_ETAPPEN" ] && [ -r "$SELFTEST_ETAPPEN" ] && \
+          jetzt_teile=$(grep -v '^PLAN' "$SELFTEST_ETAPPEN" 2>/dev/null | grep -c .)
+        if [ "$jetzt_teile" != "$gesehen_teile" ]; then
+          gesehen_teile="$jetzt_teile"
+          balken_drucken 1 || true
+        fi
+      else
+        balken_drucken || true
+      fi
     done ) &
   BALKEN_TICKER=$!
   disown 2>/dev/null || true
@@ -463,7 +479,18 @@ phase_start() {           # $1 = liefern|pruefen, $2 = Anzahl Etappen
     BALKEN_STATUS=$(mktemp -t nuvora-balken 2>/dev/null) || BALKEN_STATUS=""
   fi
   balken_status_schreiben
-  ticker_start
+  # Die Uhr laeuft nur beim Ausliefern. Dort ist es minutenlang still ("docker
+  # compose build"), und ohne sie waere gar nicht zu sehen, dass es weitergeht.
+  #
+  # In der Pruefphase drucken die Tests SELBST jede Zeile mit Sekundenzahl —
+  # dort ist eine zweite Fortschrittsquelle keine Hilfe, sondern Laerm zwischen
+  # den Befunden. Die Phase meldet sich am Anfang, bei jedem der vier Teile und
+  # am Ende; das genuegt.
+  #
+  # Beobachtet werden muss trotzdem: die Etappen der Pruefung kommen aus der
+  # Meldedatei, und die liest sonst niemand (die Hauptshell wartet auf
+  # selftest.sh). Darum laeuft die Uhr dort still weiter.
+  if [ "$1" = "pruefen" ]; then ticker_start still; else ticker_start; fi
 }
 
 phase_ende() {            # schliesst die Phase ab: Zeiten merken, 100 % zeigen
