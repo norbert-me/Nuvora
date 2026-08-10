@@ -1,7 +1,7 @@
 """Generate printable ArUco card PDFs per class (A4, 2 cards per page, duplex-ready)."""
 import io
+import shutil
 import tempfile
-from pathlib import Path
 
 import cv2
 import numpy as np
@@ -93,7 +93,10 @@ async def class_cards_pdf(class_id: int, user: User = Depends(get_current_user),
         pair = students[i:i + 2]
         pairs.append(pair)
 
-    tmp_files = {}
+    # Eigenes Verzeichnis mit 0700 statt vorhersagbarer Namen in /tmp: auf den
+    # Karten stehen Schülernamen, und tempfile.mktemp() erlaubt es einem anderen
+    # Prozess auf derselben Maschine, die Datei unterzuschieben oder mitzulesen.
+    tmp_dir = tempfile.mkdtemp(prefix="cardvote_")
 
     mark_len = 4 * mm
     mark_inset = 3 * mm
@@ -110,49 +113,48 @@ async def class_cards_pdf(class_id: int, user: User = Depends(get_current_user),
             c.line(cx, cy, cx + dx * mark_len, cy)
             c.line(cx, cy, cx, cy + dy * mark_len)
 
-    for pair in pairs:
-        for idx, student in enumerate(pair):
-            img = build_card_image(student.card_id)
-            tmp_path = tempfile.mktemp(suffix=f"_card_{student.card_id}.png")
-            cv2.imwrite(tmp_path, img)
-            tmp_files[student.card_id] = tmp_path
+    try:
+        for seite, pair in enumerate(pairs):
+            for idx, student in enumerate(pair):
+                img = build_card_image(student.card_id)
+                tmp_path = f"{tmp_dir}/karte_{seite}_{idx}.png"
+                cv2.imwrite(tmp_path, img)
 
-            x = (page_w - card_size) / 2
-            if idx == 0:
-                y = page_h / 2 + 5 * mm
-            else:
-                y = 5 * mm
+                x = (page_w - card_size) / 2
+                if idx == 0:
+                    y = page_h / 2 + 5 * mm
+                else:
+                    y = 5 * mm
 
-            c.drawImage(tmp_path, x, y, width=card_size, height=card_size)
-            draw_crop_marks(c, x, y, card_size, card_size)
+                c.drawImage(tmp_path, x, y, width=card_size, height=card_size)
+                draw_crop_marks(c, x, y, card_size, card_size)
 
-        c.setStrokeColorRGB(0.8, 0.8, 0.8)
-        c.setDash(3, 3)
-        c.line(20 * mm, page_h / 2, page_w - 20 * mm, page_h / 2)
-        c.setDash()
-        c.showPage()
+            c.setStrokeColorRGB(0.8, 0.8, 0.8)
+            c.setDash(3, 3)
+            c.line(20 * mm, page_h / 2, page_w - 20 * mm, page_h / 2)
+            c.setDash()
+            c.showPage()
 
-        for idx, student in enumerate(pair):
-            x = (page_w - card_size) / 2
-            if idx == 0:
-                y_bottom = page_h / 2 + 5 * mm
-            else:
-                y_bottom = 5 * mm
-            y_center = y_bottom + card_size / 2
+            for idx, student in enumerate(pair):
+                if idx == 0:
+                    y_bottom = page_h / 2 + 5 * mm
+                else:
+                    y_bottom = 5 * mm
+                y_center = y_bottom + card_size / 2
 
-            c.setFont("Helvetica-Bold", 28)
-            c.drawCentredString(page_w / 2, y_center, student.name)
+                c.setFont("Helvetica-Bold", 28)
+                c.drawCentredString(page_w / 2, y_center, student.name)
 
-        c.setStrokeColorRGB(0.8, 0.8, 0.8)
-        c.setDash(3, 3)
-        c.line(20 * mm, page_h / 2, page_w - 20 * mm, page_h / 2)
-        c.setDash()
-        c.showPage()
+            c.setStrokeColorRGB(0.8, 0.8, 0.8)
+            c.setDash(3, 3)
+            c.line(20 * mm, page_h / 2, page_w - 20 * mm, page_h / 2)
+            c.setDash()
+            c.showPage()
 
-    c.save()
-
-    for p in tmp_files.values():
-        Path(p).unlink(missing_ok=True)
+        c.save()
+    finally:
+        # Auch im Fehlerfall aufräumen — sonst bleiben Karten mit Namen liegen.
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
     buf.seek(0)
     filename = f"CardVote_{cls.name}.pdf"

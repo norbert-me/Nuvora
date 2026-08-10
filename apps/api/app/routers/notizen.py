@@ -6,7 +6,7 @@ foerder/notizen im Kern sind diese Daten schützenswert — kein Export, kein Ma
 """
 import re
 from datetime import date as _date
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel

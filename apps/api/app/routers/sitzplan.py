@@ -41,10 +41,12 @@ class PlanIn(BaseModel):
 
 def _key_where(user, class_id, kurs_id):
     """Sitzplan haengt am Kurs (Fach). kurs_id gesetzt = je Kurs; sonst
-    Fallback auf die Klasse (ohne Kurs)."""
+    Fallback auf die Klasse (ohne Kurs).
+
+    Liste von WHERE-Bedingungen (unterschiedlich lang) — immer per * entpackt."""
     if kurs_id is not None:
-        return (SeatingPlan.owner_id == user.id, SeatingPlan.kurs_id == kurs_id)
-    return (SeatingPlan.owner_id == user.id, SeatingPlan.class_id == class_id, SeatingPlan.kurs_id.is_(None))
+        return [SeatingPlan.owner_id == user.id, SeatingPlan.kurs_id == kurs_id]
+    return [SeatingPlan.owner_id == user.id, SeatingPlan.class_id == class_id, SeatingPlan.kurs_id.is_(None)]
 
 
 @router.get("/{class_id}")
@@ -94,9 +96,10 @@ SEGEL_STAGES = {"hafen", "kueste", "meer", "welt", ""}
 
 
 def _segel_where(user, class_id, kurs_id):
+    """Liste von WHERE-Bedingungen (unterschiedlich lang) — immer per * entpackt."""
     if kurs_id is not None:
-        return (SegelStatus.owner_id == user.id, SegelStatus.kurs_id == kurs_id)
-    return (SegelStatus.owner_id == user.id, SegelStatus.class_id == class_id, SegelStatus.kurs_id.is_(None))
+        return [SegelStatus.owner_id == user.id, SegelStatus.kurs_id == kurs_id]
+    return [SegelStatus.owner_id == user.id, SegelStatus.class_id == class_id, SegelStatus.kurs_id.is_(None)]
 
 
 class SegelIn(BaseModel):

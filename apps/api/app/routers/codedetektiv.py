@@ -145,6 +145,9 @@ async def _mit_wiederholung(db: AsyncSession, arbeit, versuche: int = 8):
             if versuch == versuche - 1:
                 raise HTTPException(503, "Gerade zu viel los. Bitte gleich noch einmal versuchen.")
             await asyncio.sleep(0.02 * (versuch + 1) + random.random() * 0.03)
+    # Erreichbar nur bei versuche <= 0. Ohne diese Zeile käme dort ein stilles
+    # None heraus, mit dem der Aufrufer weiterrechnet.
+    raise HTTPException(503, "Gerade zu viel los. Bitte gleich noch einmal versuchen.")
 
 
 async def _owned_session(db: AsyncSession, user: User, code: str) -> CodeSession:

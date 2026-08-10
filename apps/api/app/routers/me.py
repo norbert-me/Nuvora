@@ -77,7 +77,7 @@ async def export_me(user=Depends(get_current_user), db: AsyncSession = Depends(g
     if folder_ids:
         qset_ids = [q.id for q in (await db.execute(select(m.QuestionSet).where(m.QuestionSet.folder_id.in_(folder_ids)))).scalars().all()]
     deck_ids = [d.id for d in (await db.execute(select(m.CardDeck).where(m.CardDeck.owner_id == uid))).scalars().all()]
-    item_ids = [i.id for i in (await db.execute(select(m.MaterialItem).where(m.MaterialItem.owner_id == uid))).scalars().all()]
+    # (Keine item_ids nötig: Material und Ausleihen tragen selbst owner_id.)
     cat_ids = [c.id for c in (await db.execute(select(m.GradeCategory).where(m.GradeCategory.owner_id == uid))).scalars().all()]
     session_ids = [s.id for s in (await db.execute(select(m.Session).where(m.Session.owner_id == uid))).scalars().all()]
     path_ids = [p.id for p in (await db.execute(select(m.LearningPath).where(m.LearningPath.owner_id == uid))).scalars().all()]

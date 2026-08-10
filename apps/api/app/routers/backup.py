@@ -59,6 +59,7 @@ import base64
 import hashlib
 import io
 import json
+import logging
 import os
 import re
 import shutil
@@ -76,6 +77,8 @@ from ..models import AppSetting, Base
 from .auth import get_current_user
 
 router = APIRouter(prefix="/api/admin/backup", tags=["backup"])
+
+log = logging.getLogger(__name__)
 
 
 # ── Ablage und Ziele ─────────────────────────────────────────────────────────
@@ -116,7 +119,10 @@ for _kandidat in (BACKUP_DIR, BACKUP_DIR_EXTERN):
 # Zeitstempel auf die Sekunde. Zwei Sicherungen in derselben Sekunde sind
 # selten, aber wenn es passiert, ueberschriebe die zweite die erste lautlos —
 # deshalb der Zaehler dahinter (…-2.zip).
-DATEI_MUSTER = re.compile(r"nuvora-\d{8}-\d{6}(-\d+)?\.zip")
+# `re.ASCII`, weil `\d` sonst auch arabisch-indische Ziffern trifft
+# (`nuvora-٠١٢٣٤٥٦٧-٠١٢٣٤٥.zip` kam durch). Harmlos, aber ein Muster, das mehr
+# durchlaesst als es behauptet, ist kein Muster.
+DATEI_MUSTER = re.compile(r"nuvora-\d{8}-\d{6}(-\d+)?\.zip", re.ASCII)
 PLAENE = ("aus", "taeglich", "woechentlich")
 
 # Diese Einträge muss jede Sicherung haben, sonst ist sie keine.
@@ -174,6 +180,39 @@ def _sicher(name: str) -> str:
     if not DATEI_MUSTER.fullmatch(name or ""):
         raise HTTPException(400, "Ungültiger Sicherungsname")
     return name
+
+
+def _vorhandene_datei(ordner: str, name: str) -> str:
+    """Den vollen Pfad einer Sicherung — **nicht** aus dem Namen der Anfrage
+    zusammengesetzt, sondern in der Liste der tatsächlich vorhandenen Dateien
+    nachgeschlagen.
+
+    Drei Schranken hintereinander, weil eine allein immer die ist, die jemand
+    später versehentlich entfernt:
+
+      1. `_sicher()` — Muster; `..`, `/` und absolute Pfade fallen hier raus.
+      2. Abgleich mit `os.listdir()` — der zurückgegebene Pfad entsteht aus dem
+         Verzeichniseintrag, nicht aus der Anfrage. Was es nicht gibt, kann auch
+         nicht geöffnet werden.
+      3. `_liegt_in()` nach Auflösung — Beleg, dass das Ergebnis wirklich im
+         erlaubten Ordner liegt (fängt auch einen Symlink im Ordner ab).
+
+    Wer nicht durchkommt, bekommt 400 (Name unmöglich) oder 404 (Name möglich,
+    Datei nicht da) — nie einen Pfad zu sehen.
+    """
+    gewuenscht = _sicher(name)
+    try:
+        eintraege = os.listdir(ordner)
+    except OSError:
+        raise HTTPException(404, "Sicherung nicht gefunden")
+    for eintrag in eintraege:
+        if eintrag != gewuenscht or not DATEI_MUSTER.fullmatch(eintrag):
+            continue
+        voll = os.path.realpath(os.path.join(ordner, eintrag))
+        if not _liegt_in(voll, os.path.realpath(ordner)) or not os.path.isfile(voll):
+            break
+        return voll
+    raise HTTPException(404, "Sicherung nicht gefunden")
 
 
 # ── Einstellungen (app_settings) ─────────────────────────────────────────────
@@ -377,6 +416,10 @@ async def sicherung_erstellen(db, ziel: str | None = None) -> dict:
         try:
             os.remove(temp)
         except OSError:
+            # Aufraeumen im Fehlerfall. Klappt das Wegraeumen auch nicht, zaehlt
+            # der urspruengliche Fehler — den `raise` unten weitergibt. Eine
+            # Ausnahme aus dem Aufraeumen wuerde ihn nur verdecken. Die Reste
+            # (.teil-*) holt der naechste `aufraeumen()`-Lauf.
             pass
         raise
 
@@ -445,6 +488,9 @@ def _loeschen(ordner: str, name: str):
         try:
             os.remove(p)
         except OSError:
+            # Die .sha256 fehlt bei alten Sicherungen regelmaessig, und ein
+            # bereits geloeschtes Archiv ist genau das gewuenschte Ergebnis.
+            # „Weg ist weg" — kein Grund, den Aufrufer scheitern zu lassen.
             pass
 
 
@@ -481,6 +527,10 @@ def aufraeumen(ziel: str) -> list[str]:
             try:
                 os.remove(os.path.join(ordner, n))
             except OSError:
+                # Ein .teil-* kann gerade von einem parallel laufenden
+                # `sicherung_erstellen()` beschrieben werden. Dann liegt es beim
+                # naechsten Lauf ohnehin nicht mehr da — die Aufbewahrung darf
+                # daran nicht scheitern.
                 pass
     return weg
 
@@ -490,9 +540,10 @@ def pruefen(ziel: str, name: str) -> dict:
     """Integritätsprüfung ohne Zurückspielen: Prüfsumme der Datei, Prüfsummen
     jedes Eintrags im Manifest, Vollständigkeit, Inhaltsverzeichnis."""
     ordner = _pfad_fuer(ziel)
-    voll = os.path.join(ordner, name)
-    if not os.path.isfile(voll):
-        raise HTTPException(404, "Sicherung nicht gefunden")
+    # Nicht `os.path.join(ordner, name)`: der Pfad kommt aus dem Verzeichnis,
+    # nicht aus der Anfrage — siehe `_vorhandene_datei()`.
+    voll = _vorhandene_datei(ordner, name)
+    name = os.path.basename(voll)
     fehler: list[str] = []
 
     erwartet = ""
@@ -538,7 +589,14 @@ def pruefen(ziel: str, name: str) -> dict:
         # Bewusst breit: ein beschaedigtes Archiv kommt je nach Stelle als
         # BadZipFile, zlib.error, EOFError oder UnicodeDecodeError heraus. Die
         # Pruefung darf daran nicht selbst sterben — sie soll es MELDEN.
-        fehler.append(f"Archiv nicht lesbar ({type(e).__name__}): {e}")
+        #
+        # Gemeldet wird nur die Art des Fehlers, nicht sein Text: eine
+        # Ausnahmemeldung schleppt Pfade und Bruchstuecke des Archivinhalts mit
+        # sich. Wer den genauen Grund braucht, findet ihn samt Aufrufliste im
+        # Protokoll des Dienstes — dort gehoert er hin, nicht in eine Antwort.
+        log.exception("Sicherung %s ist nicht lesbar", name)
+        fehler.append(f"Archiv nicht lesbar ({type(e).__name__}) — "
+                      "Einzelheiten stehen im Protokoll des Dienstes")
 
     return {
         "ok": not fehler,
@@ -649,25 +707,29 @@ async def zurueckspielen(zip_pfad: str, ziel_url: str, uploads_nach: str | None 
 
 def anleitung() -> list[str]:
     """Zurückspielen von Hand — Schritt für Schritt, wie in der Oberfläche."""
+    # Die langen Schritte stehen mit ausdruecklichem `+` zusammen statt durch
+    # blosses Nebeneinanderstellen: in einer Liste sieht ein fehlendes Komma
+    # genauso aus wie eine gewollte Fortsetzung, und dann verschwinden zwei
+    # Eintraege still zu einem. Mit `+` ist die Absicht am Zeichen ablesbar.
     return [
         "1. Sicherung herunterladen und die Prüfsumme vergleichen: "
-        "shasum -a 256 nuvora-JJJJMMTT-HHMMSS.zip",
+        + "shasum -a 256 nuvora-JJJJMMTT-HHMMSS.zip",
         "2. Datei auf den Server legen: "
-        "scp nuvora-*.zip <server>:<pfad>/ und in den api-Container kopieren: "
-        "docker compose cp nuvora-*.zip api:/tmp/sicherung.zip",
+        + "scp nuvora-*.zip <server>:<pfad>/ und in den api-Container kopieren: "
+        + "docker compose cp nuvora-*.zip api:/tmp/sicherung.zip",
         "3. Erst in eine Wegwerf-Datenbank zurückspielen und nachsehen: "
-        "docker compose exec api python -m app.routers.backup /tmp/sicherung.zip "
-        "sqlite+aiosqlite:////tmp/probe.db",
+        + "docker compose exec api python -m app.routers.backup /tmp/sicherung.zip "
+        + "sqlite+aiosqlite:////tmp/probe.db",
         "4. Erst wenn Schritt 3 die erwarteten Zeilenzahlen meldet, in die echte "
-        "Datenbank: docker compose exec api python -m app.routers.backup "
-        "/tmp/sicherung.zip \"$DATABASE_URL\" --uploads /app/uploads "
-        "(löscht vorher alle Zeilen der Nuvora-Tabellen)",
+        + "Datenbank: docker compose exec api python -m app.routers.backup "
+        + "/tmp/sicherung.zip \"$DATABASE_URL\" --uploads /app/uploads "
+        + "(löscht vorher alle Zeilen der Nuvora-Tabellen)",
         "5. config/site.json aus dem Archiv zurück ins Wurzelverzeichnis legen "
-        "(steckt im ZIP unter config/site.json) und ./deploy.sh laufen lassen — "
-        "der Selbsttest sagt danach, ob die Installation wieder steht.",
+        + "(steckt im ZIP unter config/site.json) und ./deploy.sh laufen lassen — "
+        + "der Selbsttest sagt danach, ob die Installation wieder steht.",
         "Nicht enthalten und nicht ersetzbar: die .env (TOKEN_SECRET, "
-        "POSTGRES_PASSWORD). Die gehört getrennt aufbewahrt — ein neues "
-        "TOKEN_SECRET meldet alle angemeldeten Geräte ab, ist sonst aber harmlos.",
+        + "POSTGRES_PASSWORD). Die gehört getrennt aufbewahrt — ein neues "
+        + "TOKEN_SECRET meldet alle angemeldeten Geräte ab, ist sonst aber harmlos.",
     ]
 
 
@@ -718,8 +780,12 @@ async def plan_loop():
     while True:
         try:
             await _lauf()
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001
+            # Diese Schleife darf nie sterben: waere sie weg, sicherte die
+            # Installation still nie wieder. Der Grund gehoert deshalb ins
+            # Protokoll und nicht in ein `raise`. Was `_lauf()` selbst faengt,
+            # steht ausserdem in app_settings und damit in der Oberflaeche.
+            log.exception("Geplante Sicherung fehlgeschlagen")
         await asyncio.sleep(3600)
 
 
@@ -731,6 +797,9 @@ async def nur_admin(user=Depends(get_current_user)):
     deshalb der Import zur Laufzeit statt oben. Eine eigene Kopie der Prüfung
     wäre die Stelle, an der die beiden eines Tages auseinanderlaufen.
     """
+    # Import bewusst hier drin, nicht oben: `main.py` importiert diesen Router,
+    # der Import oben waere ein Ringschluss (CodeQL py/cyclic-import). Zur
+    # Laufzeit steht `main` laengst — siehe Erklaerung im Docstring.
     from ..main import _require_admin
     return await _require_admin(user)
 
@@ -788,7 +857,12 @@ async def jetzt_sichern(user=Depends(nur_admin), db=Depends(get_db)):
         await _schreib(db, "backup_letzte_name", "")
         await _schreib(db, "backup_letzte_fehler", f"{type(e).__name__}: {e}"[:200])
         await db.commit()
-        raise HTTPException(500, f"Sicherung fehlgeschlagen: {e}")
+        # Der Grund steht im Protokoll und in `backup_letzte_fehler` (Status),
+        # nicht im Fehlertext der Antwort: eine Ausnahmemeldung nennt Pfade und
+        # Innereien der Installation.
+        log.exception("Sicherung fehlgeschlagen")
+        raise HTTPException(500, "Sicherung fehlgeschlagen — Grund steht im Status "
+                                 "und im Protokoll des Dienstes")
     await _schreib(db, "backup_letzte_zeit", jetzt)
     await _schreib(db, "backup_letzte_ok", "1")
     await _schreib(db, "backup_letzte_name", eintrag["name"])
@@ -816,30 +890,30 @@ async def einstellungen(body: Einstellungen, user=Depends(nur_admin), db=Depends
 
 @router.get("/{name}")
 async def herunterladen(name: str, user=Depends(nur_admin), db=Depends(get_db)):
-    name = _sicher(name)
-    voll = os.path.join(_pfad_fuer(await aktuelles_ziel(db)), name)
-    if not os.path.isfile(voll):
-        raise HTTPException(404, "Sicherung nicht gefunden")
+    # Welche Datei ausgeliefert wird, entscheidet der Ordner, nicht die Anfrage:
+    # `_vorhandene_datei()` gleicht den gewuenschten Namen mit den wirklich
+    # vorhandenen Sicherungen ab und gibt den Verzeichniseintrag zurueck.
+    voll = _vorhandene_datei(_pfad_fuer(await aktuelles_ziel(db)), name)
     return FileResponse(
         voll,
         media_type="application/zip",
-        filename=name,
+        filename=os.path.basename(voll),
         headers={"Cache-Control": "no-store, private"},
     )
 
 
 @router.post("/{name}/pruefen")
 async def pruefung(name: str, user=Depends(nur_admin), db=Depends(get_db)):
-    return pruefen(await aktuelles_ziel(db), _sicher(name))
+    return pruefen(await aktuelles_ziel(db), name)
 
 
 @router.delete("/{name}", status_code=204)
 async def entfernen(name: str, user=Depends(nur_admin), db=Depends(get_db)):
-    name = _sicher(name)
     ordner = _pfad_fuer(await aktuelles_ziel(db))
-    if not os.path.isfile(os.path.join(ordner, name)):
-        raise HTTPException(404, "Sicherung nicht gefunden")
-    _loeschen(ordner, name)
+    # Geloescht wird ein Verzeichniseintrag, den es nachweislich gibt — der Name
+    # aus der Anfrage baut hier keinen Pfad zusammen.
+    voll = _vorhandene_datei(ordner, name)
+    _loeschen(ordner, os.path.basename(voll))
     return None
 
 

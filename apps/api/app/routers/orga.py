@@ -56,10 +56,12 @@ class ToggleIn(BaseModel):
 
 
 def _key_where(user, class_id, kurs_id):
-    """Checkliste hängt am Kurs (Fach); Fallback Klasse ohne Kurs."""
+    """Checkliste hängt am Kurs (Fach); Fallback Klasse ohne Kurs.
+
+    Liste von WHERE-Bedingungen (unterschiedlich lang) — immer per * entpackt."""
     if kurs_id is not None:
-        return (OrgaItem.owner_id == user.id, OrgaItem.kurs_id == kurs_id)
-    return (OrgaItem.owner_id == user.id, OrgaItem.class_id == class_id, OrgaItem.kurs_id.is_(None))
+        return [OrgaItem.owner_id == user.id, OrgaItem.kurs_id == kurs_id]
+    return [OrgaItem.owner_id == user.id, OrgaItem.class_id == class_id, OrgaItem.kurs_id.is_(None)]
 
 
 @router.get("/{class_id}", response_model=List[ItemOut])

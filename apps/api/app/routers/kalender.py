@@ -1177,7 +1177,7 @@ def _expand_rrule(d0, rule, exdate, win_start, win_end):
 
 def _parse_ics(text: str):
     """Sehr einfacher ICS-Parser: VEVENTs mit DTSTART/DTEND/SUMMARY."""
-    import re
+    # re ist bereits oben im Modul importiert.
     # Gefaltete Zeilen (Fortsetzung mit Leerzeichen/Tab) zusammenführen.
     text = re.sub(r"\r?\n[ \t]", "", text)
     events = []

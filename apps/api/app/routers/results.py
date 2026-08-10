@@ -73,6 +73,9 @@ async def _mit_wiederholung(db: AsyncSession, arbeit, versuche: int = 6):
             if versuch == versuche - 1:
                 raise HTTPException(503, "Gerade zu viel los. Bitte gleich noch einmal scannen.")
             await asyncio.sleep(0.02 * (versuch + 1) + random.random() * 0.03)
+    # Erreichbar nur bei versuche <= 0. Ohne diese Zeile käme dort ein stilles
+    # None heraus, mit dem der Aufrufer weiterrechnet.
+    raise HTTPException(503, "Gerade zu viel los. Bitte gleich noch einmal scannen.")
 
 
 @router.post("/scan", status_code=201)

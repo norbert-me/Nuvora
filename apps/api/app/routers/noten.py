@@ -174,10 +174,12 @@ async def roster_kurs(kurs_id: int, user: User = Depends(require_module), db: As
 
 
 def _sec_kurs_where(user, class_id, kurs_id):
-    """Abschnitte hängen am Kurs (Fach); Fallback Klasse ohne Kurs."""
+    """Abschnitte hängen am Kurs (Fach); Fallback Klasse ohne Kurs.
+
+    Liste von WHERE-Bedingungen (unterschiedlich lang) — immer per * entpackt."""
     if kurs_id is not None:
-        return (GradeSection.owner_id == user.id, GradeSection.kurs_id == kurs_id)
-    return (GradeSection.owner_id == user.id, GradeSection.class_id == class_id, GradeSection.kurs_id.is_(None))
+        return [GradeSection.owner_id == user.id, GradeSection.kurs_id == kurs_id]
+    return [GradeSection.owner_id == user.id, GradeSection.class_id == class_id, GradeSection.kurs_id.is_(None)]
 
 
 @router.get("/classes/{class_id}/sections", response_model=List[SectionOut])
@@ -682,7 +684,6 @@ async def _summarize(db, user, class_id, term, agg="mean", kurs_id=None):
     cats = [c for c in (await db.execute(
         select(GradeCategory).where(GradeCategory.owner_id == user.id, GradeCategory.class_id == class_id)
     )).scalars().all() if c.section_id in sec_ids]
-    cat_section = {c.id: c.section_id for c in cats}
     cat_ids = {c.id for c in cats}
 
     students = await _kurs_roster(db, user, class_id, kurs_id)
@@ -806,7 +807,6 @@ async def year_summary(class_id: int, agg: str = "mean", kurs_id: Optional[int] 
     sections = [YearSection(term="1", id=s.id, name=s.name, weight=s.weight) for s in sec1] \
              + [YearSection(term="2", id=s.id, name=s.name, weight=s.weight) for s in sec2]
 
-    by_id1 = {r.student_id: r for r in sum1}
     by_id2 = {r.student_id: r for r in sum2}
     rows = []
     for r in sum1:  # sum1/sum2 haben dieselben Schueler in gleicher Reihenfolge

@@ -84,6 +84,9 @@ async def _mit_wiederholung(db: AsyncSession, arbeit, versuche: int = 6):
             if versuch == versuche - 1:
                 raise HTTPException(503, "Gerade zu viel los. Bitte gleich noch einmal versuchen.")
             await asyncio.sleep(0.02 * (versuch + 1) + random.random() * 0.03)
+    # Erreichbar nur bei versuche <= 0. Ohne diese Zeile käme dort ein stilles
+    # None heraus, mit dem der Aufrufer weiterrechnet.
+    raise HTTPException(503, "Gerade zu viel los. Bitte gleich noch einmal versuchen.")
 
 
 def _token():
@@ -396,7 +399,7 @@ async def _schedule_deck_from_calendar(db: AsyncSession, user: User, deck: CardD
 @router.post("/classes/{class_id}/decks", response_model=DeckOut, status_code=201)
 async def create_deck(class_id: int, body: DeckIn, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("karten_deck", f"u{user.id}", 100, 60, "Zu viele Stapel. Bitte kurz warten.")
-    cls = await _owned_class(db, user, class_id)
+    await _owned_class(db, user, class_id)  # nur die Zugriffsprüfung, wirft bei fremder Klasse
     last = (await db.execute(select(CardDeck.position).where(CardDeck.class_id == class_id).order_by(CardDeck.position.desc()))).scalars().first()
     deck = CardDeck(class_id=class_id, kurs_id=kurs_id, owner_id=user.id, name=body.name.strip(),
                     topic_id=body.topic_id, niveau=body.niveau if body.niveau in ("E", "G") else "",

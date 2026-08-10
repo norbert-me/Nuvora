@@ -4,7 +4,7 @@ Eigenstaendig (Regel 3): Schueler kommen aus dem Kern, hier liegt nur der
 Status je (Schueler, Datum). status: da | fehlt | spaet | entsch.
 """
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel

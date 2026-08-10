@@ -80,9 +80,10 @@ class WorkOut(BaseModel):
 
 
 def _keyw(user, class_id, kurs_id):
+    """Liste von WHERE-Bedingungen (unterschiedlich lang) — immer per * entpackt."""
     if kurs_id is not None:
-        return (WorkAnalysis.owner_id == user.id, WorkAnalysis.kurs_id == kurs_id)
-    return (WorkAnalysis.owner_id == user.id, WorkAnalysis.class_id == class_id, WorkAnalysis.kurs_id.is_(None))
+        return [WorkAnalysis.owner_id == user.id, WorkAnalysis.kurs_id == kurs_id]
+    return [WorkAnalysis.owner_id == user.id, WorkAnalysis.class_id == class_id, WorkAnalysis.kurs_id.is_(None)]
 
 
 @router.get("/classes/{class_id}/students")

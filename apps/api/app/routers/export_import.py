@@ -822,8 +822,8 @@ async def evaluation_scsv(session_id: int, user: User = Depends(get_current_user
     config = session.eval_config or {}
     niveau_aktiv, minuspunkte = await _quiz_flags(db, session)
     weights = config.get("weights", {})
-    get_w = lambda qid: weights.get(str(qid), weights.get(qid, 1))
     scale = _skala(config)
+    # Gewichte gehen unten direkt an bewerte(weights=...); kein eigener Zugriff nötig.
 
     esc = lambda v: f'"{v}"'
 
@@ -909,11 +909,12 @@ def _build_student_pdf_single(student, questions, scan_map, session, config, niv
 
     weights = config.get("weights", {}) if config else {}
     scale = _skala(config or {})
-    times = config.get("times", {}) if config else {}
+    # eval_config["times"] (Dauer je Frage) zeigt nur die Auswertungsseite;
+    # das PDF nennt allein die Gesamtdauer.
     total_time = config.get("total_time") if config else None
 
     get_w = lambda qid: weights.get(str(qid), weights.get(qid, 1))
-    max_score = sum(get_w(q["id"]) for q in questions if q["correct_answer"])
+    # max_score kommt weiter unten aus bewerte() — eine Quelle für die Wertung.
 
     results = []
     eigene = {}
@@ -1076,7 +1077,8 @@ async def all_students_pdf(session_id: int, user: User = Depends(get_current_use
     weights = config.get("weights", {})
     scale = _skala(config)
     get_w = lambda qid: weights.get(str(qid), weights.get(qid, 1))
-    max_score = sum(get_w(q["id"]) for q in questions if q["correct_answer"])
+    # Die erreichbare Punktzahl steht je Kind in wertung["max_score"] (student_max) —
+    # mit E/G-Bonus kann sie sich unterscheiden, ein Gesamtwert wäre hier falsch.
 
     # Wer als krank gilt, kommt nicht ins Sammel-PDF; eine gewertete 0 schon.
     present = [s for s in students
