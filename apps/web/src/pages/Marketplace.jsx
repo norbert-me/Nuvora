@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { askConfirm } from "../core/dialog.jsx";
 import { useAktiv } from "../core/modules.js";
+import { istAdmin } from "../core/admin.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { Icon, ICONS, Modal, btnPrimary, btnSecondary, COLORS as C, pageApp} from "../components/Icons.jsx";
 
@@ -218,7 +219,7 @@ export default function Marketplace({ fixedKind }) {
                       {q.author_name || t("market.unknown")}
                     </button>
                   ) : (q.author_name || t("market.unknown"))}
-                  {user && user.id === 1 && q.author_email && (
+                  {user && istAdmin(user) && q.author_email && (
                     <span style={{ marginLeft: 6, padding: "1px 6px", background: "var(--bg2)", borderRadius: 980, fontSize: 11 }} title={t("market.adminOnly")}>{q.author_email}</span>
                   )}
                 </div>
@@ -233,7 +234,7 @@ export default function Marketplace({ fixedKind }) {
                   <Link to="/modules" style={{ ...btnSecondary, padding: "7px 16px", fontSize: 13, whiteSpace: "nowrap", textDecoration: "none", color: "var(--text3)" }}
                     title={t("market.needsModuleHint")}>{t("market.needsModule")}</Link>
                 )}
-                {(user && (user.id === q.author_id || user.id === 1)) && (
+                {(user && (user.id === q.author_id || istAdmin(user))) && (
                   <button onClick={() => remove(q.id)} title={t("market.removeTitle")} style={{ padding: 7, background: "none", border: "1px solid var(--border2)", borderRadius: 980, cursor: "pointer", color: C.danger, display: "flex", alignItems: "center" }}>
                     <Icon d={ICONS.trash} size={15} color={C.danger} />
                   </button>

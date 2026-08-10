@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
+import { istAdmin } from "../core/admin.js";
 import { useLanguage, LANGUAGES } from "../i18n/index.jsx";
 import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, th as thBasis, td as tdBasis, badge } from "../components/Icons.jsx";
 
@@ -63,7 +64,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   const [pendingEmail, setPendingEmail] = useState(user.pending_email || "");
 
   const token = localStorage.getItem("token");
-  const isAdmin = user.id === 1;
+  const isAdmin = istAdmin(user);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -368,7 +369,13 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
               <>
                 {adminMsg && <div style={{ fontSize: 13, color: adminMsg.includes("Fehler") ? C.danger : C.success, marginBottom: 10 }}>{adminMsg}</div>}
                 <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-                <table style={{ width: "100%", minWidth: 520, borderCollapse: "collapse", fontSize: 14 }}>
+                {/* Kein `minWidth` an der Tabelle: das erzwang auf schmalen Geräten
+                    einen waagerechten Rollbalken und schnitt die Spalte „Status"
+                    ab. Drei kurze Spalten passen in die Karte, die E-Mail bricht
+                    (`overflowWrap: anywhere` in tdStyle). Das `overflowX: auto` am
+                    Container bleibt nur als Netz — es zeigt nichts, solange nichts
+                    überläuft. */}
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                   <thead>
                     <tr>
                       <th style={thStyle}>{t("profile.email")}</th>
@@ -471,11 +478,15 @@ const linkBtn = {
   background: "none", border: "none", color: "var(--accent)", fontSize: 13, fontWeight: 500, cursor: "pointer", padding: 0,
 };
 
+// Kopf und Zelle müssen dieselbe Ausrichtung haben: `th`/`td` aus Icons.jsx
+// stehen beide auf "center", der Kopf hier auf "left" — dadurch sah die
+// E-Mail-Spalte eingerückt aus, während die Überschrift links stand.
 const thStyle = { ...thBasis,
   textAlign: "left", padding: "6px 8px", borderBottom: "1px solid var(--border2)",
   color: "var(--text3)", fontSize: 12, fontWeight: 600,
 };
 
 const tdStyle = { ...tdBasis,
-  padding: "8px 8px", borderBottom: "1px solid var(--border)", color: "var(--text)",
+  textAlign: "left", padding: "8px 8px", borderBottom: "1px solid var(--border)",
+  color: "var(--text)", overflowWrap: "anywhere",
 };

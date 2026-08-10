@@ -93,6 +93,7 @@ import Landing from "./pages/Landing.jsx";
 import NuvoraHome from "./pages/NuvoraHome.jsx";
 import GuidedTour, { PATH_TOUR, tourFor } from "./components/GuidedTour.jsx";
 import { useModules } from "./core/modules.js";
+import { istAdmin } from "./core/admin.js";
 import { DialogHost } from "./core/dialog.jsx";
 import { UndoHost } from "./core/undo.jsx";
 import { OutboxHost } from "./core/OutboxHost.jsx";
@@ -361,7 +362,7 @@ const getModuleNavItems = (t, location, user) => {
     // Sicherungen enthalten die Daten ALLER Konten (inkl. DSGVO Art. 9) —
     // nur die Administration sieht den Punkt ueberhaupt. Die Schranke sitzt
     // trotzdem im Server (_require_admin), nicht hier.
-    ...(user && user.id === 1 ? [{ to: "/backup", label: t("nav.backup") }] : []),
+    ...(istAdmin(user) ? [{ to: "/backup", label: t("nav.backup") }] : []),
   ];
 };
 
@@ -396,6 +397,23 @@ function ModulstandUnklar() {
       <button onClick={() => window.location.reload()} style={btnPrimary}>
         Erneut versuchen
       </button>
+    </div>
+  );
+}
+
+// Ruhige Auskunft statt leerem Bereich: wer ohne Recht auf eine Adresse der
+// Administration geht, soll wissen, woran es liegt — und einen Weg zurueck haben.
+function NurAdministration() {
+  return (
+    <div style={{ ...pageForm, textAlign: "center", padding: "40px 0" }}>
+      <h1 style={{ ...pageTitle, marginBottom: 10 }}>Nur für die Administration</h1>
+      <p style={{ ...pageIntro, marginBottom: 18 }}>
+        Dieser Bereich gehört der Administration dieser Installation. Mit deinem
+        Konto ist er nicht zugänglich — an deinen eigenen Daten ändert das nichts.
+      </p>
+      {/* Als Link abgeleitet, nicht neu gebaut: `btnPrimary` ist fuer <button>
+          gedacht, ein <a> braucht zusaetzlich inline-block. */}
+      <Link to="/" style={{ ...btnPrimary, display: "inline-block", textDecoration: "none" }}>Zur Startseite</Link>
     </div>
   );
 }
@@ -796,7 +814,10 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path="/kurse" element={user ? <Kurse /> : <Landing />} />
           <Route path="/topics" element={user ? <Topics /> : <Landing />} />
           <Route path="/papierkorb" element={user ? <Papierkorb /> : <Landing />} />
-          <Route path="/backup" element={user ? <Backup /> : <Landing />} />
+          {/* Der Navigationspunkt war bereits auf die Administration beschraenkt,
+              die Route nicht: jede Lehrkraft sah eine Seite voller Absagen der
+              API. Dieselbe Quelle (`istAdmin`) entscheidet jetzt beides. */}
+          <Route path="/backup" element={user ? (istAdmin(user) ? <Backup /> : <NurAdministration />) : <Landing />} />
           <Route path="/thema/:id" element={user ? <ThemaAnsicht /> : <Landing />} />
           <Route path="/login" element={user ? <NuvoraHome user={user} /> : <Login onLogin={handleLogin} />} />
           <Route path="/reset-password" element={<ResetPassword />} />
