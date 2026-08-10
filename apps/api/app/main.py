@@ -7,10 +7,10 @@ from fastapi.staticfiles import StaticFiles
 
 from .database import engine
 from .models import Base
-# Hinweis zum gemeldeten Importzyklus main -> routers.backup -> main: er ist
-# bewusst so und aufgeloest. backup.py holt sich `_require_admin` und
-# `APP_VERSION` erst zur Laufzeit IN der Funktion (siehe Begruendung dort), damit
-# die Admin-Pruefung nur einmal existiert. Beim Modulimport gibt es keinen Zyklus.
+# Admin-Pruefung und Programmfassung kommen aus app/admin.py — dem Blatt, das
+# den frueheren Ring main -> routers.backup -> main aufloest. Hier nur noch
+# hereingeholt, damit die Routen weiter unten `_require_admin` benutzen koennen.
+from .admin import _require_admin, APP_VERSION  # noqa: F401 — Routen unten
 from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizen, elternlog, notizblock, trash, selftest, backup
 from . import websocket as ws
 
@@ -48,9 +48,12 @@ def _req_ip(request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-# Zeitpunkt der letzten Auskehr. Wird in _global_hits_auskehren gelesen (Schranke
-# "hoechstens einmal je Minute") und dort auch fortgeschrieben — kein toter Wert.
-_global_hits_letzte_kehr = 0.0
+# Zeitpunkt der letzten Auskehr — bewusst in einer Zelle statt als
+# `global`-Variable. Gelesen und fortgeschrieben wird beides in
+# _global_hits_auskehren (Schranke "hoechstens einmal je Minute"); als
+# `global` sah die Zuweisung fuer Codepruefer nach einem toten Wert aus
+# (CodeQL py/unused-global-variable), weil sie erst der naechste Aufruf liest.
+_global_hits_kehr = {"zuletzt": 0.0}
 
 
 def _global_hits_auskehren(now: float) -> None:
@@ -60,10 +63,9 @@ def _global_hits_auskehren(now: float) -> None:
     nie wieder verschwand, und von aussen liess sich das beliebig aufblasen
     (eine Anfrage je Adresse genuegt). Bei IPv6 ist das ein /64 je Client.
     """
-    global _global_hits_letzte_kehr
-    if now - _global_hits_letzte_kehr < 60:
+    if now - _global_hits_kehr["zuletzt"] < 60:
         return
-    _global_hits_letzte_kehr = now
+    _global_hits_kehr["zuletzt"] = now
     for schluessel in [k for k, v in _global_hits.items()
                        if not v or now - v[-1] > GLOBAL_RATE_WINDOW]:
         _global_hits.pop(schluessel, None)
@@ -945,28 +947,11 @@ async def health():
 
 
 # --- Version / Update-Check ---
+# `_require_admin` und `APP_VERSION` stehen in app/admin.py, nicht hier: dort
+# importiert nichts einen Router, und nur deshalb kann backup.py sie oben
+# holen statt mitten in der Funktion (siehe Modulkopf von admin.py).
 import pathlib as _pathlib
-from .routers.auth import get_current_user
 
-
-async def _require_admin(user=Depends(get_current_user)):
-    if user.id != 1:
-        raise HTTPException(403, "Nur für die Administration")
-    return user
-
-
-def _read_version() -> str:
-    # VERSION liegt im Repo-Root; im Container unter /app bzw. neben app/
-    for p in ("/app/VERSION", str(_pathlib.Path(__file__).resolve().parent.parent / "VERSION"),
-              str(_pathlib.Path(__file__).resolve().parent.parent.parent / "VERSION")):
-        try:
-            return _pathlib.Path(p).read_text().strip()
-        except Exception:
-            continue
-    return "0.0.0"
-
-
-APP_VERSION = _read_version()
 GITHUB_VERSION_URL = os.environ.get(
     "GITHUB_VERSION_URL", "https://raw.githubusercontent.com/norbert-me/Nuvora/main/apps/api/VERSION"
 )

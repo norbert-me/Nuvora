@@ -72,6 +72,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from starlette.responses import FileResponse
 
+from ..admin import APP_VERSION, _require_admin
 from ..database import DATABASE_URL, async_session, get_db
 from ..models import AppSetting, Base
 from .auth import get_current_user, rate_limit
@@ -350,11 +351,7 @@ def _dialekt(conn) -> str:
 
 
 def _version() -> str:
-    try:
-        from ..main import APP_VERSION
-        return APP_VERSION
-    except Exception:
-        return "0.0.0"
+    return APP_VERSION
 
 
 def _neuer_name(ordner: str) -> str:
@@ -849,14 +846,10 @@ async def plan_loop():
 async def nur_admin(user=Depends(get_current_user)):
     """Sicherungen enthalten DSGVO-Art.-9-Daten — nur die Administration.
 
-    `_require_admin` steht in main.py, das seinerseits diesen Router importiert;
-    deshalb der Import zur Laufzeit statt oben. Eine eigene Kopie der Prüfung
-    wäre die Stelle, an der die beiden eines Tages auseinanderlaufen.
+    Die Prüfung selbst steht in `app/admin.py` und wird von dort geholt, nicht
+    hier kopiert: eine zweite Fassung wäre die Stelle, an der die beiden eines
+    Tages auseinanderlaufen.
     """
-    # Import bewusst hier drin, nicht oben: `main.py` importiert diesen Router,
-    # der Import oben waere ein Ringschluss (CodeQL py/cyclic-import). Zur
-    # Laufzeit steht `main` laengst — siehe Erklaerung im Docstring.
-    from ..main import _require_admin
     return await _require_admin(user)
 
 

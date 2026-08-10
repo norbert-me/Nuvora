@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import get_db
 from ..models import Base
 from .auth import get_current_user
+from .backup import BACKUP_DIR, BACKUP_DIR_EXTERN
 from .modules import REGISTRY
 
 router = APIRouter(prefix="/api/selftest", tags=["selftest"])
@@ -504,7 +505,6 @@ def _check_backup(out: List[Check]) -> None:
     nur die Rechtebits ab und liegt bei ACLs, schreibgeschuetzten Mounts oder
     vollem Datentraeger falsch.
     """
-    from .backup import BACKUP_DIR, BACKUP_DIR_EXTERN
     for pfad, name, pflicht in ((BACKUP_DIR, "Sicherungsordner", True),
                                 (BACKUP_DIR_EXTERN, "Sicherungsordner (extern)", False)):
         if not pfad:
