@@ -335,7 +335,25 @@ balken_zeile() {
   local nm="$label $n/$g"
   [ "$n" -gt 0 ] || nm="$label"
 
-  balken_bauen "$prozent" "$marke" "$nm" "$text" "$zeit"
+  # Wiederholung derselben Etappe wird KURZ gehalten.
+  #
+  # Bei "Container bauen und starten" oder dem Systemtest stand sonst alle acht
+  # Sekunden dieselbe lange Zeile — dreimal, viermal, fuenfmal hintereinander
+  # wortgleich. Beim ersten Mal ist die volle Zeile die Ansage, was gerade
+  # laeuft; danach interessiert nur noch, dass es weitergeht. Also ab dem
+  # zweiten Mal ohne Phase, Nummer und Text: Balken, Prozent, Uhr.
+  # Die Kennung steht in einer DATEI, nicht in einer Variablen: gedruckt wird
+  # aus zwei Prozessen (Hauptshell bei jedem Etappenwechsel, Uhr dazwischen),
+  # und eine Variable haette in beiden ihren eigenen Stand — die volle Zeile
+  # kaeme dann jedes Mal doppelt.
+  local kennung="$art/$n/$text" vorher=""
+  [ -n "$BALKEN_STATUS" ] && vorher=$(cat "$BALKEN_STATUS.etappe" 2>/dev/null || true)
+  if [ "$kennung" = "$vorher" ]; then
+    balken_bauen "$prozent" "$marke" "" "" "$zeit"
+  else
+    [ -n "$BALKEN_STATUS" ] && printf '%s' "$kennung" > "$BALKEN_STATUS.etappe" 2>/dev/null
+    balken_bauen "$prozent" "$marke" "$nm" "$text" "$zeit"
+  fi
 }
 
 # Setzt die Zeile aus Bausteinen zusammen und haelt dabei das Breitenbudget ein.
@@ -372,9 +390,24 @@ balken_bauen() {
   aus="${B_GRUEN}[$(wiederhole '█' "$voll")${B_GRAU}$(wiederhole '·' "$leer")${B_GRUEN}]"
   [ "$prozent" -ge 0 ] && aus="${aus}$(printf '%s%3d%%' "$marke" "$prozent")"
   aus="${aus}${B_AUS}"
-  [ "$zeige_nm" = "1" ] && aus="${aus}  ${B_GRAU}${nm}${B_AUS}"
-  [ -n "$text" ] && aus="${aus} ${B_GRAU}·${B_AUS} ${B_FETT}${text}${B_AUS}"
-  [ "$zeige_zeit" = "1" ] && aus="${aus} ${B_GRAU}·${B_AUS} ${zeit}"
+  # Trenner nur zwischen Teilen, die es wirklich gibt. In der Kurzform
+  # (Wiederholung derselben Etappe) sind Name und Text leer — sonst staende da
+  # ein Punkt ohne etwas davor und ein doppeltes Leerzeichen.
+  [ "$zeige_nm" = "1" ] && [ -n "$nm" ] && aus="${aus}  ${B_GRAU}${nm}${B_AUS}"
+  if [ -n "$text" ]; then
+    if [ "$zeige_nm" = "1" ] && [ -n "$nm" ]; then
+      aus="${aus} ${B_GRAU}·${B_AUS} ${B_FETT}${text}${B_AUS}"
+    else
+      aus="${aus}  ${B_FETT}${text}${B_AUS}"
+    fi
+  fi
+  if [ "$zeige_zeit" = "1" ]; then
+    if [ -n "$text" ] || { [ "$zeige_nm" = "1" ] && [ -n "$nm" ]; }; then
+      aus="${aus} ${B_GRAU}·${B_AUS} ${zeit}"
+    else
+      aus="${aus}  ${zeit}"
+    fi
+  fi
   printf '%s' "$aus"
 }
 
@@ -476,7 +509,7 @@ schritte_bilanz() {
 
 balken_aufraeumen() {
   ticker_stop
-  [ -n "$BALKEN_STATUS" ] && rm -f "$BALKEN_STATUS" "$BALKEN_STATUS.neu" 2>/dev/null
+  [ -n "$BALKEN_STATUS" ] && rm -f "$BALKEN_STATUS" "$BALKEN_STATUS.neu" "$BALKEN_STATUS.etappe" 2>/dev/null
   [ -n "$SELFTEST_ETAPPEN" ] && rm -f "$SELFTEST_ETAPPEN" 2>/dev/null
   [ -n "$BALKEN_MESS" ] && rm -f "$BALKEN_MESS" 2>/dev/null
   return 0
