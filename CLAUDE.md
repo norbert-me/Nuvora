@@ -79,6 +79,8 @@ Der Roundtrip schreibt in das Konto aus `SELFTEST_EMAIL`/`SELFTEST_PASSWORD` (`.
 
 **Reste blockieren nichts mehr.** Bricht ein Lauf ab, liegen Testdaten und ein fremder Modul-Zustand herum — der nächste Lauf scheiterte früher schon am Aufbau (`409: Dieses Thema gibt es an dieser Stelle schon`). Beide Testfamilien räumen ihre Reste vor dem Aufbau selbst weg (`raeume_reste()` in scripts/selftest.py, `resteAbraeumen()` in den `.mjs`); `scripts/aufraeumen.py` macht dasselbe von Hand (ohne Schalter nur anzeigen, löschen erst mit `--loeschen`). Gelöscht wird ausschließlich, was ein Testpräfix trägt — die Prüfung sitzt in der Klasse `Fund` unmittelbar vor jedem DELETE, nicht nur in der Auswahl.
 
+**HTTP-Client und Bericht stehen in `scripts/gemeinsam.py`.** Alle Testskripte holen `Api` und `Bericht` von dort — eine Quelle, kein Nachbau. Die Richtung ist gerade und muss es bleiben: `gemeinsam.py` ← `aufraeumen.py` ← `selftest.py` ← `systemtest.py`. Wer sie umdreht, baut den Importring wieder auf, den es vorher gab (und den nur ein Import mitten in der Funktion offenhielt).
+
 
 ### Alles wird im Wurzelverzeichnis konfiguriert
 
@@ -173,6 +175,7 @@ Die Bestandsdaten aus der alten Lernleiter-SQLite sind in den Kern übernommen; 
 ## Konventionen
 
 - Deutsch für UI, Daten und Kommentare; Code-Bezeichner Englisch.
+- **Die Admin-Prüfung steht in `apps/api/app/admin.py`**, nicht in `main.py`: `_require_admin` und `APP_VERSION` brauchen auch Router (`backup.py`), und `main.py` importiert jeden Router. In `main.py` waren sie deshalb ein Importring, den nur ein Import mitten in der Funktion offenhielt. `admin.py` importiert keinen Router — von dort holen alle oben, und die Prüfung existiert weiter nur einmal.
 - **Kein Alembic.** Es stand als ungenutzte Abhängigkeit in `requirements.txt` und hat genau das suggeriert — inzwischen entfernt. Das Schema entsteht beim Start aus `Base.metadata.create_all` plus `_ensure_columns` in `main.py` (additive Spalten und Indizes, idempotent). Neue Tabellen kommen von selbst; neue Spalten auf bestehenden Tabellen gehören in die `wanted`-Liste in `_ensure_columns`.
 - Schüler sind Daten, keine Nutzer. Jeder Vorschlag, Lernenden ein Konto zu geben, widerspricht dem Produktzweck.
 - **E/G-Differenzierung liegt am Quiz, gewertet wird an einer Stelle.** `question_sets.niveau_aktiv` schaltet sie ein, `question_set_items.niveau` markiert die E-Fragen (bewusst am Set-Eintrag: dieselbe Frage kann anderswo Anforderung sein), `question_sets.minuspunkte` schaltet den Abzug ein. Alle sehen dieselben Fragen; unterschieden wird erst in der Auswertung. Die Regeln stehen doppelt — `apps/api/app/scoring.py` (PDF, Excel, Notenbuch-Brücke) und `apps/web/src/core/scoring.js` (Auswertungsseite, rechnet Gewichte live) — und müssen zusammen geändert werden. Regressionstest: `apps/api/tests/test_scoring.py`. Wer nichts abgegeben hat, gilt als krank und bleibt aus der Wertung; die Lehrkraft kann ihn auf „anwesend" stellen, dann zählt die 0 überall mit (`eval_config.krank` / `.anwesend`).
