@@ -60,7 +60,13 @@ async def _kurs_roster(db, user, class_id, kurs_id=None):
     Klassen-Roster (die Klasse ist dort immer Mitglied); zusätzlich greifen die
     kurs_students-Teilmengen."""
     if kurs_id is not None:
-        from .kurse import member_student_ids
+        # Der Kurs gehoert geprueft. Ohne das reichte ein fremder kurs_id im
+        # Query-Parameter, um die Namen fremder Schueler zu lesen — der
+        # Parameter kam roh aus der Adresse, und `user` wurde hier gar nicht
+        # benutzt. Betroffen waren summary, year, das Zeugnis-PDF und der
+        # Export, also alle Wege, die eine Namensliste ausgeben.
+        from .kurse import _owned_kurs, member_student_ids
+        await _owned_kurs(db, user, kurs_id)
         sids = list(await member_student_ids(db, kurs_id))
         if not sids:
             return []

@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import select, func as sa_func
+from sqlalchemy import select, or_, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import get_db
 from ..models import Session, QuestionSetItem, SchoolClass, QuestionSet, User
@@ -89,6 +89,21 @@ async def create_session(body: SessionCreate, user: User = Depends(get_current_u
     else:
         next_num = 1
     code = str(next_num).zfill(4)
+
+    # Klasse und Quiz gehoeren geprueft. Ohne das liess sich eine Sitzung auf
+    # eine FREMDE Klasse legen, und `GET /api/sessions/{id}` gab danach deren
+    # Namen und den Namen des fremden Quiz heraus.
+    if body.class_id is not None:
+        eigen = (await db.execute(select(SchoolClass.id).where(
+            SchoolClass.id == body.class_id, SchoolClass.owner_id == user.id))).scalar_one_or_none()
+        if eigen is None:
+            raise HTTPException(404, "Klasse nicht gefunden")
+    if body.question_set_id is not None:
+        eigen = (await db.execute(select(QuestionSet.id).where(
+            QuestionSet.id == body.question_set_id,
+            or_(QuestionSet.owner_id == user.id, QuestionSet.owner_id.is_(None))))).scalar_one_or_none()
+        if eigen is None:
+            raise HTTPException(404, "Quiz nicht gefunden")
 
     session = Session(**body.model_dump(), owner_id=user.id, code=code)
     if body.question_set_id:
@@ -197,6 +212,13 @@ async def set_question(session_id: int, question_id: int, user: User = Depends(g
         raise HTTPException(404)
     if s.owner_id and s.owner_id != user.id:
         raise HTTPException(403)
+    # Auch die Frage gehoert geprueft: eine unbekannte ID wurde zum
+    # Fremdschluesselfehler und damit zu HTTP 500.
+    gehoert = (await db.execute(select(QuestionSetItem.id).where(
+        QuestionSetItem.question_set_id == s.question_set_id,
+        QuestionSetItem.question_id == question_id))).scalar_one_or_none()
+    if gehoert is None:
+        raise HTTPException(404, "Frage gehoert nicht zu diesem Quiz")
     s.current_question_id = question_id
     await db.commit()
     await ws.broadcast(s.id, {"type": "next_question", "question_id": question_id, "status": s.status})

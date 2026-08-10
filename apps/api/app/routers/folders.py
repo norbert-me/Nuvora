@@ -2,12 +2,12 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
-from sqlalchemy import select, delete as sql_delete
+from sqlalchemy import select, or_, delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
-from ..models import Folder, QuestionSet, QuestionSetItem, User
+from ..models import Folder, Question, QuestionSet, QuestionSetItem, User
 from .auth import get_current_user, rate_limit
 from .modules import modul_pflicht
 
@@ -180,6 +180,29 @@ async def delete_folder(folder_id: int, user: User = Depends(get_current_user), 
 
 # --- QuestionSet CRUD ---
 
+async def _eigene_fragen(db: AsyncSession, user: User, ids) -> None:
+    """Gehoeren alle diese Fragen dieser Lehrkraft?
+
+    Ohne die Pruefung liess sich ein Quiz aus FREMDEN Fragen bauen — und
+    `GET /api/question-sets/{id}` gab danach deren vollstaendigen Text heraus.
+    Eine unbekannte ID wurde ausserdem zum Fremdschluesselfehler und damit zu
+    HTTP 500, statt zu einer verstaendlichen Absage.
+
+    `owner_id IS NULL` zaehlt als eigen: Bestandsdaten aus der Zeit vor den
+    Konten (siehe die Nachtragung in main.py).
+    """
+    ids = [i for i in (ids or [])]
+    if not ids:
+        return
+    treffer = (await db.execute(select(Question.id).where(
+        Question.id.in_(ids),
+        or_(Question.owner_id == user.id, Question.owner_id.is_(None)),
+    ))).scalars().all()
+    fehlend = set(ids) - set(treffer)
+    if fehlend:
+        raise HTTPException(404, f"Frage nicht gefunden: {sorted(fehlend)}")
+
+
 @router.post("/question-sets", response_model=QuestionSetOut, status_code=201)
 async def create_question_set(body: QuestionSetCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("set_create", f"u{user.id}", 60, 60, "Zu viele Fragesets in kurzer Zeit. Bitte kurz warten.")
@@ -188,6 +211,7 @@ async def create_question_set(body: QuestionSetCreate, user: User = Depends(get_
         shuffle_questions=body.shuffle_questions, shuffle_answers=body.shuffle_answers,
         niveau_aktiv=body.niveau_aktiv, minuspunkte=body.minuspunkte,
     )
+    await _eigene_fragen(db, user, body.question_ids)
     db.add(qs)
     await db.flush()
     for pos, qid in enumerate(body.question_ids):

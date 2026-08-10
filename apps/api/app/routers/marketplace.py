@@ -484,7 +484,10 @@ async def _get_or_create_topic(db, user, name: str, parent_id):
     tid = (await db.execute(q)).scalar_one_or_none()
     if tid:
         return tid
-    tp = Topic(name=name[:200], parent_id=parent_id, owner_id=user.id)
+    # name[:120] und nicht [:200]: die Spalte haelt 120 Zeichen (models.py).
+    # Ein Marktplatz-Import mit 121-200 Zeichen brach mitten in der
+    # Transaktion ab, statt den Namen einfach zu kuerzen.
+    tp = Topic(name=name[:120], parent_id=parent_id, owner_id=user.id)
     db.add(tp)
     await db.flush()
     return tp.id
