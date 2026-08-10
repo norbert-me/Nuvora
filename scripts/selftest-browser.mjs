@@ -303,6 +303,11 @@ async function main() {
       notiere("Bedienung", flow.name, befund.ok, befund.detail);
     }
     await aufraeumenBedienung(api, vorher);
+
+    // ── Lernpfad wirklich bedienen ──
+    // Das Modul ist die einzige Nicht-React-Seite; „rendert" sagt hier am
+    // wenigsten. Eigene Gruppe, siehe lernpfadProbe.
+    if (module.some((m) => m.key === "lernpfad" && m.available)) await lernpfadProbe(kontext, api);
   } catch (e) {
     notiere("Ablauf", "Selbsttest", false, kurzfehler(e));
   } finally {
@@ -489,6 +494,575 @@ async function ladeLernpfadDaten(kontext) {
     return { ok: false, detail: String(e.message || e).split("\n")[0].slice(0, 140) };
   } finally {
     await seite.close().catch(() => {});
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Lernpfad — die einzige Oberflaeche, die nicht React ist
+//
+// Die App ist bewusst NICHT nachgebaut worden (siehe CLAUDE.md): 2000 Zeilen
+// erprobtes Vanilla-JS, in-page in einen Host `#lp-app` gemountet. Genau
+// deshalb steht sie in keinem Unit-Test — geprueft wurde bis hier nur, DASS sie
+// ihre Daten holt. Diese Gruppe bedient sie wie eine Lehrkraft und besteht
+// nach jedem Handgriff auf einem Neuladen: der localStorage der App ist nur
+// Anzeige-Cache, der Server ist autoritativ. Wer nicht neu laedt, prueft den
+// Cache und nennt es „gespeichert".
+//
+// Zusaetzlich der Adapter (vonKern/zuKern in app.js): die Oberflaeche kennt
+// Thema/Unterthema als TEXT, der Kern kennt nur `topic_id`. Bricht die
+// Uebersetzung, sieht die Oberflaeche heil aus und speichert trotzdem falsch —
+// darum wird nach dem Anlegen die API direkt gegengelesen.
+//
+// Alles Angelegte traegt LP_MARKE und wird restlos wieder abgeraeumt; die
+// Themen entstehen dabei IM KERN (die App legt sie bei Bedarf an) und sind
+// damit ebenfalls Testdaten, die weg muessen.
+const LP_MARKE = "ZZ-Selbsttest-LP";
+const LP_THEMA = `${LP_MARKE} Thema`;
+const LP_UNTER = `${LP_MARKE} Unterthema`;
+const LP_KERNTHEMA = `${LP_MARKE} Kernthema`;
+const LP_KLASSE = `${LP_MARKE} 9x`;
+const LP_SCHUELER = `${LP_MARKE} Muster`;
+const LP_GENTHEMA = `${LP_MARKE} Generator`;
+const LP_PFAD = `${LP_MARKE} Pfad`;
+const LP_TEXT = `${LP_MARKE} Aufgabentext`;
+const LP_KARTE = 990001;          // card_id des Testschuelers
+
+/** JSON einer API-Antwort — mit Status im Fehlerfall, nie stilles `null`. */
+async function lpJson(api, pfad) {
+  const r = await api(pfad);
+  if (!r.ok()) throw new Error(`GET ${pfad} → HTTP ${r.status()}`);
+  const daten = await r.json();
+  if (!Array.isArray(daten)) throw new Error(`GET ${pfad} liefert kein Array`);
+  return daten;
+}
+
+/**
+ * Die Lernpfad-Seite oeffnen und warten, bis die eingebettete App wirklich
+ * steht: Host gemountet, Formular im DOM, Aufgaben vom Server geholt.
+ * Gewartet wird auf Ergebnisse, nicht auf die Uhr.
+ */
+async function lpOeffnen(seite, pfad = "/lernpfad") {
+  // Toasts der App mitschneiden — sie sind oft die einzige Begruendung, warum
+  // ein Handgriff nichts gespeichert hat ("Keine Schüler in dieser Klasse").
+  await seite.addInitScript(() => {
+    if (window.__lpToasts) return;
+    window.__lpToasts = [];
+    window.addEventListener("message", (e) => {
+      if (e.data && e.data.type === "lernpfad:toast") window.__lpToasts.push(String(e.data.msg));
+    });
+  });
+  const geladen = seite.waitForResponse(
+    (r) => r.url().includes("/api/lernpfad/exercises") && r.request().method() === "GET",
+    { timeout: 30000 });
+  await seite.goto(pfad, { waitUntil: "domcontentloaded", timeout: 30000 });
+  await tourWegklicken(seite);
+  await seite.waitForSelector("#lp-app #aufgabe-form", { state: "attached", timeout: 20000 });
+  const antwort = await geladen;
+  if (!antwort.ok()) throw new Error(`GET /api/lernpfad/exercises → HTTP ${antwort.status()}`);
+  // Die Oberflaeche baut sich erst NACH der Antwort neu auf. Auf das Ergebnis
+  // warten (Aufgaben-Tabelle fertig gerendert), nicht auf eine Wartezeit.
+  await seite.waitForFunction(() => !!document.querySelector("#lp-app #aufgaben-tabelle tbody"),
+    null, { timeout: 15000 });
+  // Und bis die Nachladerei fertig ist: die App baut ihre Generator-Selektoren
+  // ganz am ENDE des Ladens neu auf (refreshGeneratorDropdowns) und verwirft
+  // dabei eine schon getroffene Themenwahl. Wer frueher tippt, tippt ins Leere.
+  await seite.waitForLoadState("networkidle", { timeout: 25000 }).catch(() => { /* eine haengende Anfrage faellt an anderer Stelle auf */ });
+  return seite;
+}
+
+/**
+ * Auf ein sichtbares Element warten — und im Fehlerfall SAGEN, worauf.
+ *
+ * Ein nacktes `waitFor` meldet nur „Timeout 15000ms". Die App begruendet ihre
+ * Verweigerung aber in einem Toast („Keine Aufgaben für dieses Thema"), und
+ * genau der gehoert in den Bericht.
+ */
+async function lpWarte(seite, selektor, was, ms = 15000) {
+  try {
+    await seite.locator(selektor).waitFor({ state: "visible", timeout: ms });
+  } catch {
+    throw new Error(`${was} erscheint nicht (${selektor})${await lpToast(seite)}`);
+  }
+}
+
+/**
+ * Den gestylten Bestaetigungs-Dialog der App wegklicken.
+ *
+ * `confirmDlg` (app.js) haengt seine Ebene als LETZTES Kind an #lp-app. Ueber
+ * die ganze Seite zu suchen reicht nicht: die Loesch-Knoepfe der Tabelle tragen
+ * denselben Namen (title="Löschen") — Playwright bricht dann mit
+ * „strict mode violation" ab.
+ */
+async function lpBestaetigen(seite, name) {
+  const dialog = seite.locator("#lp-app > div").last();
+  await dialog.getByRole("button", { name }).click({ timeout: 10000 });
+}
+
+/** Zuletzt gezeigte Meldungen der App — als Begruendung im Fehlerfall. */
+async function lpToast(seite) {
+  const msgs = await seite.evaluate(() => window.__lpToasts || []).catch(() => []);
+  return msgs.length ? ` (Meldung der App: „${msgs.slice(-2).join(" / ")}")` : "";
+}
+
+/** Nach der Marke suchen und zaehlen, wie viele Aufgaben-Zeilen sie zeigen. */
+async function lpSuche(seite, text) {
+  // Die Suche filtert synchron im input-Handler; nach `fill` steht das Ergebnis.
+  await seite.fill("#lp-app #aufgaben-suche", text);
+  return await seite.locator(`#lp-app #aufgaben-tabelle tbody tr:has-text("${text}")`).count();
+}
+
+/** Mountet die App ueberhaupt — Host, Reiter, Inhalt, keine Fehler? */
+async function lpMountet(kontext) {
+  const { seite, probleme } = await neueSeite(kontext);
+  try {
+    await lpOeffnen(seite, "/lernpfad");
+    const reiter = await seite.locator("#lp-app .nav-link.tab").count();
+    if (reiter < 4)
+      return { ok: false, detail: `nur ${reiter} Reiter unter #lp-app — das Markup von /lp/index.html ist nicht (vollständig) injiziert` };
+    const zeichen = (await seite.locator("#lp-app").innerText()).trim().length;
+    if (zeichen < 50)
+      return { ok: false, detail: `#lp-app bleibt leer (${zeichen} Zeichen) — App nicht gemountet` };
+    if (probleme.length) return { ok: false, detail: probleme.slice(0, 3).join(" | ") };
+    return { ok: true, detail: `#lp-app gemountet, ${reiter} Reiter, ${zeichen} Zeichen, keine Konsolen-/Netzfehler` };
+  } finally {
+    await seite.close().catch(() => {});
+  }
+}
+
+/** Aufgabe ueber das Formular anlegen — und das Neuladen ueberstehen. */
+async function lpAufgabeAnlegen(kontext) {
+  const { seite } = await neueSeite(kontext);
+  try {
+    await lpOeffnen(seite, "/lernpfad");
+    // Das Formular startet eingeklappt; eine Lehrkraft klickt die Ueberschrift an.
+    await seite.click("#lp-app #aufgaben-form-title");
+    await lpWarte(seite, "#lp-app #aufgabe-form", "Das Aufgaben-Formular", 10000);
+
+    // Autocomplete: nach dem Tippen legt sich eine Vorschlagsliste ueber das
+    // Formular. Escape schliesst sie — sonst faengt sie den naechsten Klick ab.
+    const tippe = async (id, wert) => {
+      await seite.fill(`#lp-app #${id}`, wert);
+      await seite.press(`#lp-app #${id}`, "Escape");
+    };
+    await tippe("aufgabe-thema", LP_THEMA);
+    await seite.selectOption("#lp-app #aufgabe-kategorie", "Basis");
+    await lpWarte(seite, "#lp-app #aufgabe-unterthema", "Das Feld Unterthema", 10000);
+    await tippe("aufgabe-unterthema", LP_UNTER);
+    await tippe("aufgabe-operator", "Berechne");
+    await lpWarte(seite, "#lp-app #aufgabe-aufgabentext", "Das Feld Aufgabentext", 10000);
+    await seite.fill("#lp-app #aufgabe-aufgabentext", LP_TEXT);
+
+    const angelegt = seite.waitForResponse(
+      (r) => /\/api\/lernpfad\/exercises$/.test(new URL(r.url()).pathname) && r.request().method() === "POST",
+      { timeout: 25000 }).catch(() => null);
+    await seite.click("#lp-app #aufgabe-submit-btn");
+    const antwort = await angelegt;
+    if (!antwort)
+      return { ok: false, detail: `kein POST /api/lernpfad/exercises nach „Aufgabe speichern"${await lpToast(seite)}` };
+    if (antwort.status() !== 201)
+      return { ok: false, detail: `POST /api/lernpfad/exercises → HTTP ${antwort.status()} ${(await antwort.text().catch(() => "")).slice(0, 120)}` };
+
+    // Der Beweis: neu laden. Was nur im Anzeige-Cache stand, ist jetzt weg.
+    await lpOeffnen(seite, "/lernpfad");
+    const treffer = await lpSuche(seite, LP_THEMA);
+    if (treffer !== 1)
+      return { ok: false, detail: `nach dem Neuladen ${treffer} Aufgaben zu „${LP_THEMA}" statt 1 — nicht gespeichert` };
+    return { ok: true, detail: "über das Formular angelegt, überlebt das Neuladen" };
+  } finally {
+    await seite.close().catch(() => {});
+  }
+}
+
+/**
+ * Der Adapter, an der API gegengelesen.
+ *
+ * Die Oberflaeche hat Thema/Unterthema als Text getippt. Im Kern muss daraus
+ * eine echte Taxonomie geworden sein (Thema > Unterthema), und die Aufgabe muss
+ * per `topic_id` darauf zeigen — nicht bloss einen Text tragen.
+ */
+async function lpAdapter(api) {
+  const themen = await lpJson(api, "/api/topics");
+  const ober = themen.find((t) => t.name === LP_THEMA && !t.parent_id);
+  if (!ober)
+    return { ok: false, detail: `Thema „${LP_THEMA}" fehlt in /api/topics — der Adapter hat es nicht im Kern angelegt` };
+  const unter = themen.find((t) => t.name === LP_UNTER && t.parent_id === ober.id);
+  if (!unter)
+    return { ok: false, detail: `„${LP_UNTER}" hängt nicht als Unterthema unter „${LP_THEMA}" (Kern-Taxonomie unvollständig)` };
+
+  const aufgaben = await lpJson(api, "/api/lernpfad/exercises");
+  const unsere = aufgaben.filter((e) => String(e.aufgabentext || "") === LP_TEXT);
+  if (unsere.length !== 1)
+    return { ok: false, detail: `${unsere.length} Aufgaben mit der Marke in /api/lernpfad/exercises statt genau 1` };
+  const ex = unsere[0];
+  if (ex.topic_id == null)
+    return { ok: false, detail: `Aufgabe ${ex.id} hat topic_id=null — der Adapter hat das Thema verloren (Text gespeichert, Kern-Bezug nicht)` };
+  if (ex.topic_id !== unter.id)
+    return { ok: false, detail: `Aufgabe ${ex.id} zeigt auf topic_id=${ex.topic_id}, erwartet ${unter.id} („${LP_UNTER}")` };
+  return { ok: true, detail: `topic_id=${unter.id} → „${LP_THEMA} > ${LP_UNTER}" existiert wirklich im Kern` };
+}
+
+/** Und andersherum: ein per API angelegtes Kern-Thema muss die App anzeigen. */
+async function lpKernThemaSichtbar(kontext) {
+  const { seite } = await neueSeite(kontext);
+  try {
+    await lpOeffnen(seite, "/lernpfad?tab=generator");
+    try {
+      await seite.waitForFunction(
+        (name) => [...document.querySelectorAll("#lp-app #gen-thema option")].some((o) => o.value === name),
+        LP_KERNTHEMA, { timeout: 15000 });
+    } catch {
+      const da = await seite.locator("#lp-app #gen-thema option").allTextContents().catch(() => []);
+      return { ok: false, detail: `per API angelegtes Kern-Thema „${LP_KERNTHEMA}" fehlt in der Themenauswahl `
+        + `(${da.length} Optionen: ${da.slice(0, 6).join(", ") || "keine"})` };
+    }
+    return { ok: true, detail: `per API angelegtes Kern-Thema „${LP_KERNTHEMA}" steht in der Themenauswahl` };
+  } finally {
+    await seite.close().catch(() => {});
+  }
+}
+
+/**
+ * Lernpfad UND Lernleiter — zwei verschiedene Dinge (CLAUDE.md): ein Lernpfad
+ * besteht aus mehreren Lernleitern. Beide ueber die Oberflaeche anlegen.
+ */
+async function lpPfadMitLernleiter(kontext) {
+  const { seite } = await neueSeite(kontext);
+  try {
+    await lpOeffnen(seite, "/lernpfad?tab=lernpfade");
+    await seite.fill("#lp-app #pfad-name", LP_PFAD);
+    const pfadAngelegt = seite.waitForResponse(
+      (r) => /\/api\/lernpfad\/paths$/.test(new URL(r.url()).pathname) && r.request().method() === "POST",
+      { timeout: 25000 }).catch(() => null);
+    await seite.click("#lp-app #pfad-create-btn");
+    const a1 = await pfadAngelegt;
+    if (!a1) return { ok: false, detail: `kein POST /api/lernpfad/paths nach „Pfad anlegen"${await lpToast(seite)}` };
+    if (a1.status() !== 201) return { ok: false, detail: `POST /api/lernpfad/paths → HTTP ${a1.status()}` };
+
+    // „+ Lernleiter hinzufügen" springt in den Generator, mit vorgewaehltem Pfad.
+    await lpWarte(seite, "#lp-app #pfad-add-ll-btn", "Der Knopf zum Hinzufügen einer Lernleiter", 10000);
+    await seite.click("#lp-app #pfad-add-ll-btn");
+    await lpWarte(seite, "#lp-app #tab-generator.active", "Der Generator-Reiter", 10000);
+
+    // Thema und Kurs waehlen — mit Wiederholung, und zwar aus einem konkreten
+    // Grund: der Reiterwechsel baut die Selektoren MEHRFACH neu auf. Die App
+    // meldet den Wechsel an die Shell, die setzt ?tab=generator, schickt ihn
+    // zurueck, und jedes switchTab ruft refreshGeneratorDropdowns — asynchron.
+    // Jeder Neuaufbau wirft die Themenwahl weg (der Kurs wird erhalten). Der
+    // Test wiederholt deshalb, bis das ERGEBNIS da ist (die Vorschau steht),
+    // hoechstens vier Mal — gewartet wird auf Ergebnisse, nicht auf die Uhr.
+    let vorschau = false;
+    let zuletzt = "";
+    for (let versuch = 1; versuch <= 4 && !vorschau; versuch++) {
+      await seite.selectOption("#lp-app #gen-thema", LP_GENTHEMA);
+      await seite.selectOption("#lp-app #gen-klasse", LP_KLASSE);
+      const gewaehlt = {
+        thema: await seite.inputValue("#lp-app #gen-thema"),
+        kurs: await seite.inputValue("#lp-app #gen-klasse"),
+      };
+      if (gewaehlt.thema !== LP_GENTHEMA || gewaehlt.kurs !== LP_KLASSE) {
+        zuletzt = `Auswahl hält nicht (Thema „${gewaehlt.thema}", Kurs „${gewaehlt.kurs}")`;
+        continue;
+      }
+      try {
+        await seite.locator("#lp-app #gen-config").waitFor({ state: "visible", timeout: 5000 });
+        await seite.click("#lp-app #btn-generate-config");
+        await seite.locator("#lp-app #preview-area").waitFor({ state: "visible", timeout: 5000 });
+        vorschau = true;
+      } catch {
+        zuletzt = "Vorschau bleibt aus";
+      }
+    }
+    if (!vorschau)
+      return { ok: false, detail: `Die Vorschau der Lernleiter erscheint nicht — ${zuletzt}${await lpToast(seite)}` };
+
+    const llGespeichert = seite.waitForResponse(
+      (r) => /\/api\/lernpfad\/paths\/\d+\/ladders$/.test(new URL(r.url()).pathname) && r.request().method() === "POST",
+      { timeout: 25000 }).catch(() => null);
+    await seite.click("#lp-app #btn-save-to-pfad");
+    const a2 = await llGespeichert;
+    if (!a2) return { ok: false, detail: `kein POST …/paths/<id>/ladders nach „In Lernpfad speichern"${await lpToast(seite)}` };
+    if (a2.status() !== 201) return { ok: false, detail: `POST …/ladders → HTTP ${a2.status()}` };
+
+    // Neu laden — steht die Lernleiter danach wirklich im Pfad?
+    await lpOeffnen(seite, "/lernpfad?tab=lernpfade");
+    const zeile = seite.locator(`#lp-app #pfade-list .list-row:has-text("${LP_PFAD}")`).first();
+    try {
+      await zeile.waitFor({ timeout: 15000 });
+    } catch {
+      return { ok: false, detail: `Pfad „${LP_PFAD}" ist nach dem Neuladen verschwunden — nicht gespeichert` };
+    }
+    const text = (await zeile.innerText()).replace(/\s+/g, " ").trim();
+    if (!/\b1 Lernleitern\b/.test(text))
+      return { ok: false, detail: `Pfad zeigt nach dem Neuladen „${text}" — die Lernleiter ist nicht gespeichert` };
+    return { ok: true, detail: `Pfad + 1 Lernleiter über die Oberfläche angelegt, überlebt das Neuladen` };
+  } finally {
+    await seite.close().catch(() => {});
+  }
+}
+
+/** Pfad ueber die Oberflaeche loeschen (Papierkorb) — und weg bleiben. */
+async function lpPfadLoeschen(kontext) {
+  const { seite } = await neueSeite(kontext);
+  try {
+    await lpOeffnen(seite, "/lernpfad?tab=lernpfade");
+    const zeile = seite.locator(`#lp-app #pfade-list .list-row:has-text("${LP_PFAD}")`).first();
+    try {
+      await zeile.waitFor({ timeout: 15000 });
+    } catch {
+      return { ok: false, detail: `Pfad „${LP_PFAD}" nicht in der Liste — nichts zu löschen` };
+    }
+    // Sicherheitsnetz unmittelbar vor dem Loeschen: nur was die Marke traegt.
+    const beleg = await zeile.innerText();
+    if (!beleg.includes(LP_MARKE))
+      return { ok: false, detail: `Zeile ohne Marke („${beleg.slice(0, 60)}") — nicht gelöscht` };
+
+    const geloescht = seite.waitForResponse(
+      (r) => /\/api\/lernpfad\/paths\/\d+$/.test(new URL(r.url()).pathname) && r.request().method() === "DELETE",
+      { timeout: 25000 }).catch(() => null);
+    await zeile.locator("[data-action='delete']").click();
+    await lpBestaetigen(seite, /^In den Papierkorb$/);
+    const antwort = await geloescht;
+    if (!antwort) return { ok: false, detail: `kein DELETE …/paths/<id> nach dem Löschen${await lpToast(seite)}` };
+    if (antwort.status() >= 400) return { ok: false, detail: `DELETE …/paths/<id> → HTTP ${antwort.status()}` };
+
+    await lpOeffnen(seite, "/lernpfad?tab=lernpfade");
+    const uebrig = await seite.locator(`#lp-app #pfade-list .list-row:has-text("${LP_PFAD}")`).count();
+    if (uebrig) return { ok: false, detail: `nach dem Neuladen noch ${uebrig}× „${LP_PFAD}" — nur lokal gelöscht` };
+    return { ok: true, detail: "in den Papierkorb verschoben, bleibt nach dem Neuladen weg" };
+  } finally {
+    await seite.close().catch(() => {});
+  }
+}
+
+/** Aufgabe ueber die Oberflaeche loeschen — und weg bleiben. */
+async function lpAufgabeLoeschen(kontext) {
+  const { seite } = await neueSeite(kontext);
+  try {
+    await lpOeffnen(seite, "/lernpfad");
+    const treffer = await lpSuche(seite, LP_THEMA);
+    if (treffer !== 1)
+      return { ok: false, detail: `${treffer} Aufgaben zu „${LP_THEMA}" gefunden statt genau 1 — nichts gelöscht` };
+    const zeile = seite.locator(`#lp-app #aufgaben-tabelle tbody tr:has-text("${LP_THEMA}")`).first();
+    const beleg = await zeile.innerText();
+    if (!beleg.includes(LP_MARKE))
+      return { ok: false, detail: `Zeile ohne Marke („${beleg.slice(0, 60)}") — nicht gelöscht` };
+
+    const geloescht = seite.waitForResponse(
+      (r) => /\/api\/lernpfad\/exercises\/\d+$/.test(new URL(r.url()).pathname) && r.request().method() === "DELETE",
+      { timeout: 25000 }).catch(() => null);
+    await zeile.locator("[data-action='delete']").click();
+    await lpBestaetigen(seite, /^Löschen$/);
+    const antwort = await geloescht;
+    if (!antwort) return { ok: false, detail: `kein DELETE …/exercises/<id> nach dem Löschen${await lpToast(seite)}` };
+    if (antwort.status() >= 400) return { ok: false, detail: `DELETE …/exercises/<id> → HTTP ${antwort.status()}` };
+
+    await lpOeffnen(seite, "/lernpfad");
+    const uebrig = await lpSuche(seite, LP_THEMA);
+    if (uebrig !== 0)
+      return { ok: false, detail: `nach dem Neuladen noch ${uebrig} Aufgaben mit der Marke — nur im Anzeige-Cache gelöscht` };
+    return { ok: true, detail: "über die Oberfläche gelöscht, bleibt nach dem Neuladen weg" };
+  } finally {
+    await seite.close().catch(() => {});
+  }
+}
+
+/**
+ * Der Reiter „Klasse" zeigt nur an — gepflegt wird unter /classes (CLAUDE.md).
+ * Zwei getrennte Befunde: erscheinen die Kern-Klassen, und sind die per CSS
+ * versteckten Pflege-Formulare wirklich nicht bedienbar (nur versteckt, nicht
+ * entfernt — app.js haengt ueberall daran).
+ */
+async function lpKlasseTab(kontext) {
+  const { seite } = await neueSeite(kontext);
+  try {
+    await lpOeffnen(seite, "/lernpfad?tab=klasse");
+    await lpWarte(seite, "#lp-app #tab-klasse.active", "Der Reiter Klasse", 10000);
+
+    // Nicht bedienbar sein muessen die BEDIENELEMENTE, nicht der Kasten. Der
+    // Kasten #klasse-form-panel muss sogar sichtbar sein: darin stehen die
+    // Klassen-Chips (#klassen-chips), und ohne sie zeigt der Reiter gar nichts.
+    // Die erste Fassung dieser Pruefung sah auf das ganze Panel — und haette
+    // damit den Fehler zementiert, den sie aufgedeckt hat.
+    const formulare = [];
+    for (const wahl of ["#klasse-name", "#btn-klasse-add", "#schueler-panel"]) {
+      const el = seite.locator(`#lp-app ${wahl}`);
+      if (await el.count() === 0) { formulare.push(`${wahl} ist ENTFERNT statt versteckt — app.js hängt daran`); continue; }
+      if (await el.isVisible()) formulare.push(`${wahl} ist bedienbar — Pflege gehört nach /classes`);
+    }
+    // Und die Gegenprobe: der Loeschknopf am Chip darf nicht erscheinen, sonst
+    // liesse sich eine Kern-Klasse aus dem Modul heraus entfernen.
+    const loeschKnopf = seite.locator("#lp-app .klasse-chip .chip-delete");
+    if (await loeschKnopf.count() > 0 && await loeschKnopf.first().isVisible())
+      formulare.push("der Löschknopf am Klassen-Chip ist sichtbar — Klassen gehören dem Kern");
+    const anzeige = { ok: formulare.length === 0, detail: formulare.length ? formulare.join(" | ")
+      : "Klassen sichtbar, Pflege-Bedienelemente versteckt (CSS) — Ansicht ja, Bearbeitung nein" };
+
+    // Erscheinen die Klassen des Kerns? SICHTBARER Text zaehlt, nicht das DOM —
+    // gerendert und dann per CSS ausgeblendet hilft der Lehrkraft nicht.
+    const reiter = seite.locator("#lp-app #tab-klasse");
+    const sichtbar = await reiter.innerText();
+    const imDom = await reiter.evaluate((el) => el.textContent || "");
+    let klassen;
+    if (sichtbar.includes(LP_KLASSE)) {
+      klassen = { ok: true, detail: `Kern-Klasse „${LP_KLASSE}" wird im Reiter angezeigt` };
+    } else if (imDom.includes(LP_KLASSE)) {
+      // Die Daten sind da, nur unsichtbar: die Chips stehen in #klassen-chips,
+      // das liegt IN dem per CSS versteckten Pflege-Panel; die Klassenübersicht
+      // oeffnet ausschliesslich ein Klick auf eben diese versteckten Chips.
+      klassen = { ok: false, detail: `„${LP_KLASSE}" ist gerendert, aber unsichtbar: #klassen-chips liegt in dem `
+        + "per CSS ausgeblendeten #klasse-form-panel (lp/css/style.scoped.css:1182), und #schueler-overview-panel "
+        + "öffnet nur ein Klick auf genau diese versteckten Chips (lp/js/app.js:1500) — der Reiter „Klasse\" zeigt gar nichts an" };
+    } else {
+      klassen = { ok: false, detail: `Kern-Klasse „${LP_KLASSE}" steht weder sichtbar noch im DOM des Reiters `
+        + `(sichtbar: ${sichtbar.replace(/\s+/g, " ").trim().slice(0, 100)}…)` };
+    }
+    return { anzeige, klassen };
+  } finally {
+    await seite.close().catch(() => {});
+  }
+}
+
+/**
+ * Restlos abraeumen — auch nach einem Fehlschlag, und vor dem Lauf einmal, weil
+ * Reste eines abgebrochenen Laufs den naechsten faelschlich gruen faerben.
+ *
+ * Reihenfolge: Aufgaben (hart), dann Pfade und Klasse (weich → Papierkorb),
+ * dann der Papierkorb selbst, zuletzt die Themen (loeschen ihre Unterthemen
+ * mit). Geprueft wird die Marke UNMITTELBAR vor jedem DELETE, am Beleg, der sie
+ * traegt — nicht bloss bei der Auswahl.
+ */
+async function lernpfadAufraeumen(api) {
+  const traegtMarke = (s) => typeof s === "string" && s.includes(LP_MARKE);
+  let weg = 0;
+  const fehler = [];
+  const holen = async (pfad) => {
+    try { return await lpJson(api, pfad); }
+    catch (e) { fehler.push(String(e.message || e).slice(0, 90)); return []; }
+  };
+  const loesche = async (pfad, beleg) => {
+    if (!traegtMarke(beleg)) return;             // Sicherheitsnetz
+    try {
+      const r = await api(pfad, "delete");
+      if (r.ok() || r.status() === 404) weg++;
+      else fehler.push(`DELETE ${pfad} → HTTP ${r.status()}`);
+    } catch (e) { fehler.push(`DELETE ${pfad} → ${String(e.message || e).slice(0, 60)}`); }
+  };
+
+  const themen = await holen("/api/topics");
+  const themaName = new Map(themen.map((t) => [t.id, t.name]));
+
+  for (const ex of await holen("/api/lernpfad/exercises")) {
+    const beleg = traegtMarke(ex.aufgabentext) ? ex.aufgabentext : (themaName.get(ex.topic_id) || "");
+    await loesche(`/api/lernpfad/exercises/${ex.id}`, beleg);
+  }
+  for (const p of await holen("/api/lernpfad/paths")) await loesche(`/api/lernpfad/paths/${p.id}`, p.name);
+  for (const c of await holen("/api/classes")) await loesche(`/api/classes/${c.id}`, c.name);
+  // Papierkorb: was weich geloescht wurde (Pfade, Lernleitern, Klasse, ihr Kurs)
+  // gehoert endgueltig weg — sonst bleibt es 30 Tage im Konto der Lehrkraft.
+  for (const it of await holen("/api/trash")) await loesche(`/api/trash/${it.kind}/${it.id}`, `${it.label} ${it.context}`);
+  // Themen zuletzt: das Loeschen nimmt die Unterthemen mit.
+  for (const t of themen) if (!t.parent_id) await loesche(`/api/topics/${t.id}`, t.name);
+
+  // Nachschau statt Hoffnung: was traegt die Marke noch?
+  const uebrig = [];
+  const nachsehen = async (pfad, feld) => {
+    for (const x of await holen(pfad)) if (traegtMarke(x[feld])) uebrig.push(`${pfad}: ${x[feld]}`);
+  };
+  await nachsehen("/api/topics", "name");
+  await nachsehen("/api/classes", "name");
+  await nachsehen("/api/lernpfad/paths", "name");
+  await nachsehen("/api/lernpfad/exercises", "aufgabentext");
+  for (const it of await holen("/api/trash")) if (traegtMarke(`${it.label} ${it.context}`)) uebrig.push(`Papierkorb: ${it.label}`);
+  return { weg, uebrig, fehler };
+}
+
+/** Die ganze Gruppe „Lernpfad" — Vorbereitung, Handgriffe, Aufräumen. */
+async function lernpfadProbe(kontext, api) {
+  const G = "Lernpfad";
+  const schritt = async (name, fn) => {
+    let befund;
+    try { befund = await mitFrist(fn(), FRIST_SEITE, name); }
+    catch (e) { befund = { ok: false, detail: String(e.message || e).split("\n")[0].slice(0, 180) }; }
+    notiere(G, name, befund.ok, befund.detail);
+    return befund.ok;
+  };
+
+  try {
+    const vor = await lernpfadAufraeumen(api);
+    notiere(G, "Reste des letzten Laufs", !vor.fehler.length,
+      vor.fehler.length ? vor.fehler.slice(0, 2).join(" | ")
+        : (vor.weg ? `${vor.weg} Reste eines abgebrochenen Laufs abgeräumt` : "keine"));
+
+    // Vorbereitung im Kern: die Lernleiter braucht einen Kurs mit Schülern
+    // (Klassen und Schüler gehören dem Kern, nicht dem Modul — Regel 1), und
+    // die Gegenrichtung des Adapters braucht ein Thema, das die App NICHT
+    // angelegt hat.
+    const klasse = await api("/api/classes", "post",
+      { name: LP_KLASSE, students: [{ card_id: LP_KARTE, name: LP_SCHUELER, niveau: "G" }] });
+    if (!klasse.ok()) {
+      notiere(G, "Vorbereitung im Kern", false,
+        `POST /api/classes → HTTP ${klasse.status()} ${(await klasse.text().catch(() => "")).slice(0, 120)}`);
+      return;
+    }
+    const thema = await api("/api/topics", "post", { name: LP_KERNTHEMA, parent_id: null });
+    if (!thema.ok()) {
+      notiere(G, "Vorbereitung im Kern", false, `POST /api/topics → HTTP ${thema.status()}`);
+      return;
+    }
+    // Futter fuer den Generator: ein eigenes Thema mit je einer Aufgabe pro
+    // Niveau. Zwei Gruende, das NICHT dem Thema der Handprobe aufzuladen:
+    //
+    //  - Die Lernleiter mischt nach Niveau (Basis/G/E). Aus einer einzigen
+    //    Basis-Aufgabe waehlt sie fuer einen G-Schueler nichts aus, und der
+    //    Test scheiterte an der Aufgabenauswahl statt an der Oberflaeche.
+    //  - Die Handprobe zaehlt Zeilen zu „${LP_THEMA}"; alles Weitere gehoert in
+    //    ein anderes Thema, sonst zaehlt der Test sein eigenes Beiwerk mit.
+    //
+    // Nebeneffekt, der ebenfalls gebraucht wird: die Aufgabenliste ist damit nie
+    // leer. Die App spiegelt eine LEERE Liste bewusst nicht zum Server (Schutz
+    // vor Datenverlust, syncAufgaben in lp/js/app.js) — sonst liefe die
+    // Loeschprobe in genau diese Schutzklausel statt in den Alltag.
+    const genThema = await api("/api/topics", "post", { name: LP_GENTHEMA, parent_id: null });
+    if (!genThema.ok()) {
+      notiere(G, "Vorbereitung im Kern", false, `POST /api/topics → HTTP ${genThema.status()}`);
+      return;
+    }
+    const genId = (await genThema.json()).id;
+    for (const kategorie of ["Basis", "G-Niveau", "E-Niveau"]) {
+      const r = await api("/api/lernpfad/exercises", "post",
+        { topic_id: genId, kategorie, operator: "Berechne", aufgabentext: `${LP_MARKE} Generatoraufgabe ${kategorie}` });
+      if (!r.ok()) {
+        notiere(G, "Vorbereitung im Kern", false, `POST /api/lernpfad/exercises (${kategorie}) → HTTP ${r.status()}`);
+        return;
+      }
+    }
+    notiere(G, "Vorbereitung im Kern", true,
+      `Klasse „${LP_KLASSE}" (1 Schüler), Thema „${LP_KERNTHEMA}" und „${LP_GENTHEMA}" mit 3 Aufgaben angelegt`);
+
+    await schritt("App mountet in-page (#lp-app)", () => lpMountet(kontext));
+    const angelegt = await schritt("Aufgabe über das Formular anlegen", () => lpAufgabeAnlegen(kontext));
+    if (angelegt) await schritt("Adapter: Thema landet als topic_id im Kern", () => lpAdapter(api));
+    await schritt("Adapter rückwärts: Kern-Thema erscheint in der App", () => lpKernThemaSichtbar(kontext));
+    if (angelegt) {
+      const pfad = await schritt("Lernpfad mit Lernleiter anlegen", () => lpPfadMitLernleiter(kontext));
+      if (pfad) await schritt("Lernpfad über die Oberfläche löschen", () => lpPfadLoeschen(kontext));
+      await schritt("Aufgabe über die Oberfläche löschen", () => lpAufgabeLoeschen(kontext));
+    }
+
+    // Der Reiter „Klasse" liefert zwei Befunde auf einmal.
+    let klasseTab;
+    try { klasseTab = await mitFrist(lpKlasseTab(kontext), FRIST_SEITE, "Reiter Klasse"); }
+    catch (e) {
+      const detail = String(e.message || e).split("\n")[0].slice(0, 180);
+      klasseTab = { anzeige: { ok: false, detail }, klassen: { ok: false, detail } };
+    }
+    notiere(G, "Reiter Klasse: Kern-Klassen sichtbar", klasseTab.klassen.ok, klasseTab.klassen.detail);
+    notiere(G, "Reiter Klasse: Pflege-Formulare nicht bedienbar", klasseTab.anzeige.ok, klasseTab.anzeige.detail);
+  } finally {
+    const nach = await lernpfadAufraeumen(api);
+    const rest = [...nach.uebrig, ...nach.fehler];
+    notiere(G, "Aufgeräumt", rest.length === 0,
+      rest.length ? `Reste: ${rest.slice(0, 4).join(" | ")}` : `${nach.weg} Testdaten restlos entfernt`);
   }
 }
 

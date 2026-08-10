@@ -186,9 +186,9 @@
     function loadNum(key) {
         return parseInt(localStorage.getItem(key)) || 0;
     }
-    function save(key, data) {
+    function save(key, data, opt) {
         localStorage.setItem(key, JSON.stringify(data));
-        if (key === STORAGE_KEYS.aufgaben) syncAufgaben(data);
+        if (key === STORAGE_KEYS.aufgaben) syncAufgaben(data, opt);
         // schueler/klassen gehoeren dem Kern und werden unter /classes gepflegt —
         // von hier aus wird nichts zurueckgeschrieben.
     }
@@ -205,7 +205,7 @@
     }
 
     // Aufgaben zum Kern spiegeln: anlegen, aendern, geloeschte entfernen.
-    async function syncAufgaben(data) {
+    async function syncAufgaben(data, opt) {
         try {
             const listRes = await api(`${LP}/exercises`);
             // Konnte der Server-Stand gerade NICHT geladen werden (Netz/Fehler),
@@ -217,7 +217,12 @@
             // eine leere lokale Liste gegen vorhandene Server-Aufgaben ist praktisch
             // immer ein nicht-geladener/stale Cache oder ein Ladefehler — KEIN echtes
             // „alles loeschen". Dann nichts spiegeln, sonst reisst es echte Daten weg.
-            if (!data.length && serverIds.size >= 1) {
+            // ... AUSSER die Lehrkraft hat gerade selbst geloescht. Dann ist die
+            // leere Liste das gewollte Ergebnis, und die Sicherung wurde zur
+            // Falle: „Aufgabe geloescht" wurde gemeldet, kein DELETE ging raus,
+            // und nach dem Neuladen war die Aufgabe wieder da. Wer seine
+            // einzige Aufgabe loescht, ist der Normalfall, nicht der Angriff.
+            if (!data.length && serverIds.size >= 1 && !(opt && opt.geloescht)) {
                 console.warn('syncAufgaben: leere Liste gegen', serverIds.size, 'Server-Aufgaben — uebersprungen (Schutz vor Datenverlust)');
                 return;
             }
@@ -1071,7 +1076,9 @@
     async function deleteAufgabe(_id) {
         if (!await confirmDlg('Aufgabe wirklich löschen?', { ok: 'Löschen' })) return;
         aufgaben = aufgaben.filter(a => a._id !== _id);
-        save(STORAGE_KEYS.aufgaben, aufgaben);
+        // { geloescht: true } sagt dem Spiegeln, dass eine leere Liste hier
+        // gewollt ist — siehe die Sicherung in syncAufgaben.
+        save(STORAGE_KEYS.aufgaben, aufgaben, { geloescht: true });
         renderAufgaben();
         toast('Aufgabe gelöscht');
     }

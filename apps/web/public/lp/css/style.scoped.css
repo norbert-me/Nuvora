@@ -1179,4 +1179,13 @@ html.dark #lp-app .chip { background: #2c2c2e; }
    (app.js haengt daran), werden aber nicht mehr gezeigt: Ansicht ja,
    Bearbeitung nein. Ausserhalb der Einbettung greift das ebenfalls, denn die
    Daten kommen so oder so aus dem Kern. */
-#lp-app #klasse-form-panel, #lp-app #schueler-panel, #lp-app .klasse-chip .chip-delete { display: none !important; }
+/* Ausgeblendet gehoert das BEARBEITEN, nicht die Anzeige. Vorher war
+   #klasse-form-panel ganz weg — und darin liegen die Klassen-Chips
+   (#klassen-chips, index.html). Der Reiter „Klasse" zeigte deshalb nur den
+   Hinweistext und darunter nichts; die Daten standen unsichtbar im DOM, und
+   die Klassenuebersicht liess sich gar nicht oeffnen, weil man dafuer auf
+   einen dieser unsichtbaren Chips klicken muss. */
+#lp-app #klasse-form-panel > h2,
+#lp-app #klasse-form-panel .form-row,
+#lp-app #schueler-panel,
+#lp-app .klasse-chip .chip-delete { display: none !important; }

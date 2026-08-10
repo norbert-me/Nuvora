@@ -1181,6 +1181,7 @@ html.dark .chip { background: #2c2c2e; }
    (app.js haengt daran), werden aber nicht mehr gezeigt: Ansicht ja,
    Bearbeitung nein. Ausserhalb der Einbettung greift das ebenfalls, denn die
    Daten kommen so oder so aus dem Kern. */
-#klasse-form-panel,
+#klasse-form-panel > h2,
+#klasse-form-panel .form-row,
 #schueler-panel,
 .klasse-chip .chip-delete { display: none !important; }
