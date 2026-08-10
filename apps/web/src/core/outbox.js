@@ -1,3 +1,4 @@
+import { lies } from "./speicher.js";
 // Offline-Outbox (Phase 1 + 2): puffert Schreibvorgaenge offline und spielt sie
 // bei Verbindung automatisch nach. Kern-Garantie: keine verlorene Aenderung an
 // BESTEHENDEN Daten.
@@ -133,7 +134,7 @@ export async function flush(rawFetch) {
       let res;
       try {
         const headers = { "Content-Type": "application/json" };
-        const token = localStorage.getItem("token");
+        const token = lies("token");   // ueber speicher.js, siehe dort
         if (token) headers["Authorization"] = `Bearer ${token}`;
         res = await doFetch(url, { method: it.method, headers, body: body != null ? JSON.stringify(body) : undefined });
       } catch {

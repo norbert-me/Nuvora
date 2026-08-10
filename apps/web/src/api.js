@@ -1,9 +1,14 @@
+import { lies } from "./core/speicher.js";
+
 const API = "/api";
 
 export { API };
 
 export function authHeaders() {
-  const token = localStorage.getItem("token");
+  // Ueber core/speicher.js, nicht direkt: Safari wirft im privaten Modus schon
+  // beim Zugriff auf localStorage. Hier waere das besonders teuer — die
+  // Funktion laeuft bei JEDEM API-Aufruf.
+  const token = lies("token");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 

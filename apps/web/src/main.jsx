@@ -8,13 +8,17 @@ import "@fontsource/inter/700.css";
 import "@fontsource/inter/800.css";
 import { LanguageProvider, useLanguage } from "./i18n/index.jsx";
 import { enqueue, classify, newTmp, flush as flushOutbox } from "./core/outbox.js";
+// Jeder Speicherzugriff im Rahmen laeuft ueber core/speicher.js: in Safaris
+// privatem Modus wirft `localStorage` schon beim Zugriff, und ein Wurf HIER
+// (im globalen fetch) haette jeden einzelnen API-Aufruf mitgerissen.
+import { lies, liesJson, schreib, schreibJson, loesche, schluessel, speicherNutzbar } from "./core/speicher.js";
 
 // Global fetch interceptor: add auth token to all /api/ requests
 const _origFetch = window.fetch;
 window.fetch = function(input, init) {
   const url = typeof input === "string" ? input : input?.url;
   if (url && url.startsWith("/api/") && !url.includes("/auth/login") && !url.includes("/auth/register")) {
-    const token = localStorage.getItem("token");
+    const token = lies("token");
     if (token) {
       init = init || {};
       const h = new Headers(init.headers || {});
@@ -38,10 +42,10 @@ window.fetch = function(input, init) {
     if (isApi) window.dispatchEvent(new CustomEvent("cardvote:online"));
     // Sliding-Renewal: schickt der Server einen frischen Token, uebernehmen.
     // So bleibt ein aktiver Nutzer angemeldet, statt nach fester Frist rauszufliegen.
-    if (isApi) { try { const rt = res.headers.get("X-Refresh-Token"); if (rt) localStorage.setItem("token", rt); } catch { /* egal */ } }
+    if (isApi) { try { const rt = res.headers.get("X-Refresh-Token"); if (rt) schreib("token", rt); } catch { /* egal */ } }
     if (res.status === 401 && isApi && !url.includes("/auth/")) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      loesche("token");
+      loesche("user");
       location.reload();
     }
     return res;
@@ -496,7 +500,7 @@ function DarkModeToggle() {
     const next = !dark;
     setDark(next);
     document.documentElement.classList.toggle("dark", next);
-    localStorage.setItem("darkMode", String(next));
+    schreib("darkMode", String(next));
   };
   return (
     <button onClick={toggle} style={{
@@ -1002,14 +1006,55 @@ function UpdateBanner() {
   );
 }
 
+/**
+ * Hinweisstreifen, wenn der Browser nichts speichern darf.
+ *
+ * Safari im privaten Modus (und blockierte Website-Daten) lassen `localStorage`
+ * werfen. Nuvora arbeitet dann weiter — der Token liegt im Arbeitsspeicher und
+ * traegt die Sitzung, solange der Tab offen bleibt. Was NICHT geht, ist
+ * angemeldet zu bleiben: nach dem Neuladen ist alles weg. Genau das steht hier,
+ * ohne Fachbegriffe und mit einem Weg heraus. Ohne diesen Streifen wuerde die
+ * Lehrkraft beim naechsten Neuladen ein zweites Mal ueberrascht.
+ */
+function SpeicherHinweis() {
+  const { t } = useLanguage();
+  const [gesperrt, setGesperrt] = useState(() => !speicherNutzbar());
+  const [weg, setWeg] = useState(false);
+
+  useEffect(() => {
+    // Die Anmeldung meldet sich, falls das Ablegen erst dort auffliegt.
+    const merken = () => setGesperrt(true);
+    window.addEventListener("nuvora:speicher-gesperrt", merken);
+    return () => window.removeEventListener("nuvora:speicher-gesperrt", merken);
+  }, []);
+
+  if (!gesperrt || weg) return null;
+
+  return (
+    <div role="status" style={{
+      position: "fixed", left: 16, right: 16, bottom: 16, zIndex: 260,
+      maxWidth: 520, margin: "0 auto",
+      display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap",
+      padding: "12px 14px", borderRadius: 14,
+      background: "var(--card)", border: "1px solid var(--border)",
+      boxShadow: "0 6px 24px rgba(0,0,0,0.14)",
+      fontSize: 13, color: "var(--text2)", lineHeight: 1.5,
+    }}>
+      <span style={{ flex: 1, minWidth: 200 }}>
+        <strong style={{ color: "var(--text)" }}>{t("speicher.titel")}</strong>{" "}
+        {t("speicher.text")}
+      </span>
+      <button onClick={() => setWeg(true)} style={{ ...btnSecondary, ...btnSmall }}>{t("speicher.verstanden")}</button>
+    </div>
+  );
+}
+
 function App() {
-  const [user, setUser] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("user")); } catch { return null; }
-  });
+  const [user, setUser] = useState(() => liesJson("user"));
   // Token beim Laden gegen den Server prüfen: localStorage allein beweist nichts
   // (abgelaufen, widerrufen, manuell gesetzt). Erst wenn /auth/me den Token
   // bestätigt, gilt der Nutzer als eingeloggt — bis dahin keine geschützte Seite.
-  const hasToken = (() => { try { return !!localStorage.getItem("token"); } catch { return false; } })();
+  const hasToken = !!lies("token");
   const [checking, setChecking] = useState(hasToken);
 
   useEffect(() => {
@@ -1019,8 +1064,8 @@ function App() {
       .then((r) => (r.ok ? r.json() : null))
       .then((u) => {
         if (!alive) return;
-        if (u) { setUser(u); try { localStorage.setItem("user", JSON.stringify(u)); } catch { /* egal */ } }
-        else { try { localStorage.removeItem("token"); localStorage.removeItem("user"); } catch { /* egal */ } setUser(null); }
+        if (u) { setUser(u); schreibJson("user", u); }
+        else { loesche("token"); loesche("user"); setUser(null); }
       })
       .catch(() => { /* offline: Interceptor kickt bei 401, sonst optimistisch */ })
       .finally(() => { if (alive) setChecking(false); });
@@ -1028,11 +1073,11 @@ function App() {
   }, []); // eslint-disable-line
 
   const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    loesche("token");
+    loesche("user");
     // Zwischengespeicherte Kerndaten des Nutzers loeschen (kein Rest fuer den
     // naechsten Login am selben Browser).
-    try { Object.keys(localStorage).filter((k) => k.startsWith("nuvora_cache_")).forEach((k) => localStorage.removeItem(k)); } catch { /* egal */ }
+    schluessel("nuvora_cache_").forEach(loesche);
     setUser(null);
   };
 
@@ -1048,6 +1093,7 @@ function App() {
         <UndoHost />
         <OutboxHost />
         <UpdateBanner />
+        <SpeicherHinweis />
         {/* Die beiden oeffentlichen Seiten liegen ausserhalb des Rahmens und
             brauchen deshalb ihre eigene Ladehuelle. */}
         <LadeFehler>

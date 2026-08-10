@@ -245,7 +245,9 @@ export function StoreProvider({ children }) {
       currentUser: state.currentUser,
       currentSession: state.currentSession,
     };
-    localStorage.setItem('code-detektiv-state', JSON.stringify(toSave));
+    // try/catch wie beim Lesen darueber: Safari wirft im privaten Modus, und
+    // eine nicht gespeicherte Spielrunde darf die Seite nicht abstuerzen lassen.
+    try { localStorage.setItem('code-detektiv-state', JSON.stringify(toSave)); } catch { /* kein Speicher — Runde laeuft im Arbeitsspeicher weiter */ }
   }, [state]);
 
   // Cross-Tab-Sync über localStorage entfällt: Sessions kommen jetzt vom Server

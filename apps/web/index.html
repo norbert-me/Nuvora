@@ -106,7 +106,11 @@
       @keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
       @keyframes pulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.05); } }
     </style>
-    <script>if(localStorage.getItem('darkMode')==='true')document.documentElement.classList.add('dark');</script>
+    <!-- Dunkles Design VOR dem ersten Zeichnen setzen, sonst blitzt die helle
+         Flaeche kurz auf. try/catch, weil Safari im privaten Modus schon beim
+         blossen Zugriff auf localStorage eine Ausnahme wirft — die letzte
+         ungeschuetzte Speicherabfrage der Shell. -->
+    <script>try{if(localStorage.getItem('darkMode')==='true')document.documentElement.classList.add('dark');}catch(e){}</script>
   </head>
   <body>
     <noscript>

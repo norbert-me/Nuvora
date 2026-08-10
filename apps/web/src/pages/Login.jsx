@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { COLORS as C } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import { schreib, schreibJson } from "../core/speicher.js";
 
 const API = "/api";
 
@@ -68,8 +69,20 @@ export default function Login({ onLogin }) {
         setMessage(t("login.registerSuccess"));
         return;
       }
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      // Ab hier hat der Server die Anmeldung ANGENOMMEN. Was jetzt noch
+      // schiefgehen kann, ist kein Verbindungsfehler — und darf auch nicht so
+      // heissen. Frueher standen diese beiden Zeilen ungeschuetzt im try: in
+      // Safaris privatem Modus wirft das Ablegen, der Auffangzweig meldete
+      // „Verbindungsfehler", und die Lehrkraft hielt den Server fuer tot.
+      // Beide Ablagen wirklich versuchen (kein &&, das den zweiten Aufruf
+      // ueberspringt) — sonst fehlt der Nutzer, wo der Token noch da ist.
+      const tokenOk = schreib("token", data.token);
+      const userOk = schreibJson("user", data.user);
+      const abgelegt = tokenOk && userOk;
+      // Auch ohne Speicher geht es weiter: der Token liegt dann im
+      // Arbeitsspeicher und traegt die Sitzung, bis der Tab neu laedt. Was das
+      // bedeutet, sagt der Hinweisstreifen des Rahmens (SpeicherHinweis).
+      if (!abgelegt) window.dispatchEvent(new CustomEvent("nuvora:speicher-gesperrt"));
       onLogin(data.user);
     } catch { setError(t("login.connectionError")); }
   };

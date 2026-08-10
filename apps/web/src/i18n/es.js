@@ -73,6 +73,12 @@ export default {
   "login.connectionError": "Error de conexión",
   "login.genericError": "Error",
 
+  // Navegador sin almacenamiento utilizable (ventana privada, datos de sitios
+  // web bloqueados).
+  "speicher.titel": "Este navegador no puede guardar nada.",
+  "speicher.text": "Has iniciado sesión y puedes seguir trabajando, pero solo mientras esta pestaña siga abierta. Al recargar tendrás que iniciar sesión de nuevo. Solución: sal de la ventana privada o permite los datos de sitios web (cookies) para esta página en los ajustes del navegador.",
+  "speicher.verstanden": "Entendido",
+
   // Común
   "common.save": "Guardar",
   "common.cancel": "Cancelar",

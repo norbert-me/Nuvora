@@ -73,6 +73,11 @@ export default {
   "login.connectionError": "Connection error",
   "login.genericError": "Error",
 
+  // Browser without usable storage (private window, blocked website data).
+  "speicher.titel": "This browser cannot save anything.",
+  "speicher.text": "You are signed in and can keep working — but only while this tab stays open. After a reload you will have to sign in again. What helps: leave the private window, or allow website data (cookies) for this site in your browser settings.",
+  "speicher.verstanden": "Got it",
+
   // Common
   "common.save": "Save",
   "common.cancel": "Cancel",

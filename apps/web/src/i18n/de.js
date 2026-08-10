@@ -73,6 +73,13 @@ export default {
   "login.connectionError": "Verbindungsfehler",
   "login.genericError": "Fehler",
 
+  // Browser ohne nutzbaren Speicher (privates Fenster, blockierte
+  // Website-Daten). Kein Fachjargon: die Meldung muss einer Lehrkraft sagen,
+  // was gilt und was sie tun kann.
+  "speicher.titel": "Dieser Browser speichert nichts.",
+  "speicher.text": "Du bist angemeldet und kannst normal weiterarbeiten — aber nur, solange dieser Tab offen bleibt. Nach dem Neuladen musst du dich neu anmelden. Abhilfe: das private Fenster verlassen oder in den Browser-Einstellungen Website-Daten (Cookies) für diese Seite erlauben.",
+  "speicher.verstanden": "Verstanden",
+
   // Gemeinsam
   "common.save": "Speichern",
   "common.cancel": "Abbrechen",
