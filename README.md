@@ -14,7 +14,57 @@ Lernende brauchen keine Geräte und keine Konten — sie tauchen nur als Datens�
 
 Nuvora ist die Basis: Konto, Klassen, Kurse, Schüler und Themen liegen hier. Module werden dazugeschaltet und arbeiten auf diesen Daten — sie besitzen sie nicht.
 
+## Für wen — und was es nicht ist
+
+**Für Lehrkräfte**, die ihre Klassen, Noten, Aufgaben und Planung an einem Ort
+haben wollen, ohne Schülerdaten in fremde Hände zu geben. Betrieben wird es von
+einer Person oder einer Schule auf einem eigenen Server.
+
+Nuvora ist ausdrücklich **nicht**:
+
+- **keine Lernplattform.** Lernende haben keine Konten, melden sich nie an und
+  bekommen keine Oberfläche mit Fortschrittsbalken. Sie sind Datensätze, die
+  die Lehrkraft verwaltet. Zwei Wege führen ohne Konto in die App — Karteikarten
+  üben und einer Code-Detektiv-Sitzung beitreten —, beide über einen geheimen
+  Link, beide ohne Anmeldung.
+- **kein Schulverwaltungsprogramm.** Keine Zeugnisse, keine Stundenpläne für
+  ein Kollegium, keine Elternportale, kein Rollenmodell (Administration ist
+  Konto 1).
+- **kein gehosteter Dienst.** Es gibt keine Nuvora-Cloud, bei der man sich
+  anmeldet. Wer es nutzen will, betreibt es selbst — und ist damit im Sinne der
+  DSGVO verantwortlich.
+- **kein Produkt mit Support.** Ein-Personen-Projekt ohne Einnahmen, ohne
+  Zusage auf Antwortzeit und ohne Zusicherung, dass ein Modul erhalten bleibt.
+
+Wer prüft, ob er dieser Software Schülerdaten anvertrauen kann, fängt am besten
+bei [docs/datenschutz.md](docs/datenschutz.md) an: welche Daten, wo, wie lange,
+was nach außen geht und was das Backup-Skript ausdrücklich *nicht* sichert.
+
+## Dokumentation
+
+| Seite | Für wen |
+| ----- | ------- |
+| [Architektur](docs/architektur.md) | Wie Kern und Module zusammenhängen und warum Module Gäste sind |
+| [Ein neues Modul bauen](docs/neues-modul.md) | Beitragen: die fünf Einträge, ohne die es ungeprüft bleibt |
+| [Selbsttest](docs/selbsttest.md) | Was „grün" bedeutet — und was nicht |
+| [Datenschutz](docs/datenschutz.md) | Welche Daten, wo, wie lange; Auskunft und Löschung |
+| [Entwicklung](docs/entwicklung.md) | Lokal am Code arbeiten, Tests, Abhängigkeiten |
+| [SECURITY.md](SECURITY.md) | Lücken melden, bekannte Grenzen, Signaturen prüfen |
+
 > **Status: stabil, wächst weiter.** Der Rahmen steht — Anmeldung, Startseite, Modulverwaltung, Klassen, Kurse und Themen sind Nuvora. Vierzehn Module sitzen auf dem Kern; keins hat eigene Konten oder eine eigene Datenbank. Verwandte Werkzeuge sind unter einem Modul mit **Reitern** gebündelt (z. B. Auswertung = Notenbuch + Klassenarbeiten, Notizbrett = Notizen + To-do, Orga = Checklisten + Anwesenheit + Ausleihe + Sitzplan). Die geteilte **Themen-Taxonomie** verbindet sie: ein in CardVote oder Code-Detektiv schwaches Thema erzeugt auf Knopfdruck ein Karten-Übungsdeck oder eine Lernpfad-Wiederholung, Test-Ergebnisse werden zu einer Notenspalte, und die Themen-Ansicht zeigt zu einem Thema alles quer über die Module — samt hinterlegtem Material.
+
+Was das konkret heißt, in Zahlen: **14 Module** im Register, **218 API-Tests**
+und **58 Frontend-Tests**, die bei jedem Push laufen, und ein Selbsttest, der
+nach jedem Deploy jedes Modul einmal wirklich benutzt. Was es *nicht* heißt:
+dass jemand außer dem Autor die Software im Alltag betreibt. Nuvora läuft auf
+einer Installation, und der Autor ist dieselbe Person, die sie schreibt.
+
+## Screenshots
+
+*Noch keine im Repository.* Wer beim Lesen wissen will, wie das aussieht, muss
+es derzeit selbst starten — das ist eine Lücke, keine Absicht. Bilder gehören
+nach `docs/bilder/` und werden von hier aus eingebunden; welche Ansichten
+gebraucht werden, steht in [docs/bilder/README.md](docs/bilder/README.md).
 
 ## Kern
 
@@ -156,6 +206,8 @@ Verbindendes ist Zusatz, nie Voraussetzung: die geteilte **Themen-Taxonomie** tr
 
 Ein Konto sieht nur eigene Daten (`owner_id` überall); Module werden pro Lehrkraft zugeschaltet.
 
+Warum das so gebaut ist, wie die drei Bauformen der Module aussehen und wo die Grenzen liegen: [docs/architektur.md](docs/architektur.md).
+
 ## Wer betreibt, ist verantwortlich
 
 Nuvora läuft auf **deinem** Server. Damit bist du im Sinne der DSGVO Verantwortlicher für die Daten darin — nicht das Projekt. Praktisch heißt das: Rücksprache mit Schulleitung und Schulträger, ein Verzeichnis von Verarbeitungstätigkeiten, ein Blick in die Vorgaben deines Bundeslandes, und Sicherungen, die du auch zurückspielen kannst.
@@ -169,11 +221,13 @@ Lücken bitte nicht als öffentliches Issue: [SECURITY.md](SECURITY.md) beschrei
 - **Selbst gehostet, keine Cloud.** Schülerdaten verlassen den eigenen Server nicht.
 - **Lernende haben keine Konten** und loggen sich nie ein — sie sind Datensätze, die die Lehrkraft verwaltet.
 - **Besonders schützenswerte Daten** (Förderschwerpunkte, Notizen — DSGVO Art. 9) stehen in **keinem Export** und in keiner Marktplatz-Veröffentlichung.
-- **Passwörter** mit PBKDF2 (SHA-256, 100 000 Iterationen) gehasht und gesalzen; Pflicht zur E-Mail-Bestätigung, Reset per Einmal-Link.
+- **Passwörter** mit Argon2id gehasht (19 MiB Speicher, 2 Durchgänge); ältere PBKDF2-Hashes werden beim nächsten Login still angehoben, ohne dass jemand etwas tun muss. Pflicht zur E-Mail-Bestätigung, Reset per Einmal-Link.
 - **Externer Kalender-Abruf SSRF-gehärtet** (private/lokale IPs und Redirects gesperrt).
 - **Sicherheits-Header** zentral am Proxy (CSP, `X-Frame-Options: SAMEORIGIN`, `nosniff`, Referrer-Policy); `server_tokens off`.
 - **Rate-Limits** gegen Brute-Force und Massenanlage auf allen schreibenden Endpunkten.
 - **Secrets** liegen nur auf dem Server (`.env`, `chmod 600`) und werden nie ins Repo committet; `POSTGRES_PASSWORD` und `TOKEN_SECRET` sind Pflicht, sonst startet der Stack nicht.
+
+Vollständige Bestandsaufnahme — welche Felder, welche Tabellen, welche Fristen, was nach außen geht, was das Backup-Skript nicht sichert: [docs/datenschutz.md](docs/datenschutz.md). Die bekannten Grenzen (Token im `localStorage`, prozesslokale Rate-Limits, Schüler-Token in der Adresse, kein Rollenmodell) stehen offen in [SECURITY.md](SECURITY.md).
 
 ## Ziel der Bündelung
 
@@ -191,32 +245,85 @@ Tags sind signiert; `git verify-tag v4.0.0` prüft das (Anleitung in [SECURITY.m
 
 **Support:** Nuvora ist ein Ein-Personen-Projekt ohne Einnahmen. Fehlermeldungen und Ideen sind willkommen und werden gelesen, aber es gibt keine Zusage auf Antwortzeit, keinen Support-Vertrag und keine Zusicherung, dass ein Modul erhalten bleibt. Wer Nuvora produktiv einsetzt, sollte das einkalkulieren — der Quellcode liegt offen, die Daten liegen bei dir.
 
-## Starten
+## In 10 Minuten lokal laufend
 
-Nuvora läuft als ein Deployment hinter einem Proxy:
+Zum Ausprobieren auf dem eigenen Rechner. Für den Serverbetrieb siehe
+[Deploy](#deploy) — dort erzeugt `deploy.sh` die Secrets selbst.
 
-**Voraussetzungen:** Docker mit Compose v2, rund 2 GB RAM und 5 GB Platz, ein freier Port (Vorgabe 8080). Alles Weitere bringen die Container mit — Postgres 16, Python, Node.
+**Voraussetzungen:** Docker mit Compose v2, rund 2 GB RAM und 5 GB Platz, ein
+freier Port (Vorgabe 8080). Alles Weitere bringen die Container mit — Postgres
+16, Python, Node. Der erste Build dauert ein paar Minuten.
+
+**1. Konfiguration anlegen**
 
 ```bash
 cp .env.example .env
-# Ohne diese beiden Werte startet der Stack absichtlich nicht:
-sed -i '' "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -hex 24)|" .env
-sed -i '' "s|^TOKEN_SECRET=.*|TOKEN_SECRET=$(openssl rand -hex 32)|" .env
 cp config/site.example.json config/site.json   # Impressum, sonst bleibt es leer
+```
+
+**2. Die beiden Pflichtwerte setzen.** Ohne sie startet der Stack absichtlich
+nicht — Standardpasswörter sollen nicht versehentlich in Produktion landen.
+Zufallswerte erzeugen:
+
+```bash
+openssl rand -hex 24    # → POSTGRES_PASSWORD in .env eintragen
+openssl rand -hex 32    # → TOKEN_SECRET in .env eintragen
+```
+
+Beide Zeilen in `.env` mit einem Editor füllen. (Ein `sed -i`-Einzeiler ist
+zwischen macOS und Linux nicht portabel — deshalb hier von Hand.)
+
+**3. Das erste Konto festlegen.** In `.env` stehen `ADMIN_EMAIL` und
+`ADMIN_PASSWORD`. Aus diesen beiden Werten legt Nuvora **beim ersten Start**
+das Administrationskonto an — bereits bestätigt. Passwort ändern, die
+E-Mail-Adresse kann lokal bleiben, wie sie ist.
+
+> **Das ist der Schritt, an dem man sonst hängenbleibt.** Sich über
+> `/login` selbst zu registrieren funktioniert lokal **nicht**: die Anmeldung
+> verlangt eine bestätigte E-Mail-Adresse, und ohne konfigurierten SMTP-Server
+> wird keine Bestätigungsmail verschickt. Das Admin-Konto aus der `.env` ist
+> der Weg hinein.
+
+**4. Starten**
+
+```bash
 docker compose up -d --build
 ```
 
-Dann auf <http://localhost:8080>:
+**5. Anmelden** auf <http://localhost:8080> mit `ADMIN_EMAIL` und
+`ADMIN_PASSWORD` aus der `.env`.
+
+**6. Ein Modul zuschalten.** Frisch ist die Shell fast leer — das ist Absicht:
+Module werden pro Lehrkraft aktiviert. Unter `/modules` eins auswählen, danach
+erscheint es in der Navigation. Danach unter `/classes` eine Klasse mit ein
+paar Schülern anlegen — fast jedes Modul arbeitet darauf.
+
+(Beispielinhalte legt nur die **Registrierung** über `/login` an, nicht das
+Admin-Konto aus der `.env`. Lokal startet man also mit einer leeren
+Installation.)
+
+Danach erreichbar:
 
 | Pfad         | Was                                                |
 | ------------ | -------------------------------------------------- |
 | `/`          | Nuvora — Startseite, Module, Klassen, Kurse, Themen |
+| `/modules`   | Module zuschalten und abschalten                   |
 | `/cardvote/` | Modul CardVote                                     |
 | `/lernpfad`  | Modul Lernpfad                                      |
 | `/auswertung`| Modul Auswertung (Notenbuch + Klassenarbeiten)     |
 | weitere      | `/karten` · `/kalender` · `/unterrichtsplanung` · `/code-detektiv` · `/orga` · `/zufall` · `/notizbrett` · `/klassenleitung` · `/notizen` · `/tafel` · `/mathespiele` |
 
-Ohne `POSTGRES_PASSWORD` und `TOKEN_SECRET` startet der Stack absichtlich nicht — Standardpasswörter sollen nicht versehentlich in Produktion landen. Zufallswert erzeugen mit `openssl rand -hex 32`.
+**Wenn etwas nicht geht:**
+
+| Symptom | Ursache |
+| ------- | ------- |
+| `POSTGRES_PASSWORD nicht gesetzt` beim `up` | Schritt 2 übersprungen — Compose bricht bewusst ab |
+| Anmeldung sagt „E-Mail noch nicht bestätigt" | Über `/login` registriert statt das Admin-Konto benutzt (Schritt 3) |
+| Modul-Seite leitet auf `/modules` um | Das Modul ist für dieses Konto nicht zugeschaltet |
+| Passwort in `.env` später geändert, DB lässt niemanden rein | Postgres legt die Rolle nur beim **ersten** Start an — siehe [Konfiguration](#konfiguration) |
+| Port 8080 belegt | `PORT` in `.env` ändern |
+
+Wieder abräumen — `docker compose down -v` löscht auch die Datenbank.
 
 ## Deploy
 
@@ -276,9 +383,13 @@ Nach jedem Deploy prüft Nuvora sich selbst — `./deploy.sh` ruft `./selftest.s
 ./selftest.sh                # ALLES: API, Systemtest, beide Browser-Läufe
 ./selftest.sh --schnell      # nur der kurze API-Selbsttest
 ./selftest.sh --ohne-browser # API + Systemtest, ohne Playwright
+./selftest.sh --ohne-system  # ohne den Alleinstellungs-Durchgang
 ./selftest.sh --nur-system   # ohne Anmeldung, ohne Schreiben
 ./selftest.sh --debug        # jede Anfrage mit Status und Dauer
 ```
+
+Ausführlich — auch, was ein grüner Lauf **nicht** bedeutet — in
+[docs/selbsttest.md](docs/selbsttest.md).
 
 „Health" sagt nur, dass ein Container läuft. Die Prüfung sagt, ob die Installation *funktioniert*. Sie besteht aus vier Teilen:
 
@@ -331,7 +442,17 @@ Der Browser-Teil braucht Playwright; `selftest.sh` installiert es beim ersten Ma
 cd apps/api && pip install -r requirements-dev.txt && pytest
 ```
 
-Regressionstests für die Stellen, an denen ein Fehler still Daten kostet: E/G-Wertung, Klassen-Update ohne Datenverlust, Papierkorb-Kaskaden, Mandantentrennung, Kurs-Logik. Bei jedem Push laufen sie zusammen mit dem Web-Build in der CI.
+218 Regressionstests für die Stellen, an denen ein Fehler still Daten kostet: E/G-Wertung, Klassen-Update ohne Datenverlust, Papierkorb-Kaskaden, Mandantentrennung, Kurs-Logik. Dazu 58 Frontend-Tests (`cd apps/web && npm run test`). Bei jedem Push laufen sie zusammen mit dem Web-Build und einem `docker compose build` in der CI.
+
+## Beitragen
+
+Es gibt keinen Prozess und keine Zusage auf Antwortzeit — aber es gibt eine Anleitung:
+
+- [docs/entwicklung.md](docs/entwicklung.md) — lokal am Code arbeiten, Tests, Abhängigkeiten
+- [docs/neues-modul.md](docs/neues-modul.md) — ein neues Modul bauen: die fünf Einträge, ohne die es ungeprüft bleibt
+- [docs/architektur.md](docs/architektur.md) — die drei Regeln, an die sich jede Änderung hält
+
+Vor größerer Arbeit lohnt eine Rückfrage per Issue. Sicherheitslücken **nicht** als Issue, sondern über den Weg in [SECURITY.md](SECURITY.md).
 
 ## Abhängigkeiten ändern (Python)
 
