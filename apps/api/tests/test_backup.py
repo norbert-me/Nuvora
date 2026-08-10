@@ -24,6 +24,7 @@ Lauf:  cd apps/api && pytest tests/test_backup.py
 import asyncio
 import json
 import os
+import tempfile
 import zipfile
 
 import pytest
@@ -52,14 +53,14 @@ class Antwort:
         return json.loads(self.body or b"null")
 
 
-async def _ruf(method, pfad, body=None, query=""):
-    payload = json.dumps(body).encode() if body is not None else b""
+async def _ruf(method, pfad, body=None, query="", roh=None, typ="application/json"):
+    payload = roh if roh is not None else (json.dumps(body).encode() if body is not None else b"")
     scope = {
         "type": "http", "asgi": {"version": "3.0", "spec_version": "2.3"},
         "http_version": "1.1", "method": method, "scheme": "http",
         "path": pfad, "raw_path": pfad.encode(), "query_string": query.encode(),
         "root_path": "", "client": ("127.0.0.1", 12345), "server": ("testserver", 80),
-        "headers": [(b"host", b"testserver"), (b"content-type", b"application/json"),
+        "headers": [(b"host", b"testserver"), (b"content-type", typ.encode()),
                     (b"content-length", str(len(payload)).encode())],
     }
     gesendet = {"status": 500, "body": b"", "headers": {}}
@@ -442,3 +443,226 @@ async def test_anleitung_nennt_die_wegwerf_datenbank_zuerst():
     assert any(".env" in s for s in schritte), (
         "Die Anleitung muss sagen, dass die .env NICHT in der Sicherung steckt"
     )
+
+
+# ── Zurückspielen über die Oberfläche ────────────────────────────────────────
+# Der gefährlichste Weg der ganzen Anwendung: `zurueckspielen()` löscht ALLE
+# Zeilen ALLER Nuvora-Tabellen des Ziels. Diese Tests prüfen nicht, ob die
+# Knöpfe antworten, sondern ob die Schranken davor halten.
+GRENZE = "----ZZBACKUPGRENZE4711"
+
+
+def _formular(dateiname: str, inhalt: bytes) -> tuple[bytes, str]:
+    """Ein multipart/form-data-Rumpf mit genau einem Feld `file`."""
+    kopf = (f"--{GRENZE}\r\n"
+            f'Content-Disposition: form-data; name="file"; filename="{dateiname}"\r\n'
+            f"Content-Type: application/zip\r\n\r\n").encode()
+    rumpf = kopf + inhalt + f"\r\n--{GRENZE}--\r\n".encode()
+    return rumpf, f"multipart/form-data; boundary={GRENZE}"
+
+
+async def _hochladen(dateiname: str, inhalt: bytes):
+    rumpf, typ = _formular(dateiname, inhalt)
+    return await _ruf("POST", "/api/admin/backup/hochladen", roh=rumpf, typ=typ)
+
+
+async def _archiv_bytes(welt) -> bytes:
+    """Eine echte Sicherung erzeugen, ihre Bytes nehmen und sie wieder
+    wegräumen — damit der Upload nachher der einzige Eintrag ist."""
+    eintrag = await _sichern()
+    pfad = welt["sicherungen"] / eintrag["name"]
+    roh = pfad.read_bytes()
+    pfad.unlink()
+    (welt["sicherungen"] / (eintrag["name"] + ".sha256")).unlink(missing_ok=True)
+    return roh
+
+
+@pytest.mark.asyncio
+async def test_hochladen_vergibt_den_namen_selbst(welt):
+    """Der Name aus dem Upload darf den Ablagepfad NICHT bestimmen. Hier kommt
+    er mit `../` und einem absoluten Pfad — abgelegt wird trotzdem unter dem
+    festen Muster, und außerhalb des Ordners entsteht nichts."""
+    roh = await _archiv_bytes(welt)
+
+    r = await _hochladen("../../../etc/nuvora-boese.zip", roh)
+    assert r.status == 201, r.body[:400]
+    name = r.json()["name"]
+    assert backup.DATEI_MUSTER.fullmatch(name), f"Kein Mustername: {name}"
+    assert "boese" not in name and ".." not in name
+
+    dateien = sorted(os.listdir(welt["sicherungen"]))
+    assert dateien == [name, name + ".sha256"], dateien
+    # Nichts neben dem Sicherungsordner angelegt (der Traversal-Versuch).
+    assert not (welt["tmp"].parent / "etc").exists()
+    # Und die hochgeladene Datei ist unverändert angekommen.
+    assert (welt["sicherungen"] / name).read_bytes() == roh
+
+    # Sie steht danach ganz normal in der Liste und lässt sich prüfen.
+    stand = (await _ruf("GET", "/api/admin/backup")).json()
+    assert [s["name"] for s in stand["sicherungen"]] == [name]
+    r = await _ruf("POST", f"/api/admin/backup/{name}/pruefen")
+    assert r.status == 200 and r.json()["ok"] is True, r.json()
+
+
+@pytest.mark.asyncio
+async def test_hochladen_lehnt_alles_ab_was_keine_sicherung_ist(welt):
+    """Eine Datei, die keine Sicherung ist, darf gar nicht erst wie eine in der
+    Liste stehen — sonst verlässt sich jemand im Ernstfall darauf."""
+    import io as _io
+
+    # (a) gar kein ZIP
+    r = await _hochladen("nuvora.zip", b"das ist nur Text, kein Archiv")
+    assert r.status == 400, r.status
+    assert "ZIP" in r.json().get("detail", ""), r.json()
+
+    # (b) ein lesbares ZIP, aber ohne die Pflichteinträge
+    puffer = _io.BytesIO()
+    with zipfile.ZipFile(puffer, "w") as zf:
+        zf.writestr("irgendwas.txt", "hallo")
+    r = await _hochladen("nuvora.zip", puffer.getvalue())
+    assert r.status == 400, r.status
+    assert "manifest.json" in r.json().get("detail", ""), r.json()
+
+    # (c) ZIP mit Manifest, aber ohne die Datenbank
+    puffer = _io.BytesIO()
+    with zipfile.ZipFile(puffer, "w") as zf:
+        zf.writestr("manifest.json", json.dumps({"tabellen": {"students": 1}}))
+    r = await _hochladen("nuvora.zip", puffer.getvalue())
+    assert r.status == 400 and "datenbank.ndjson" in r.json().get("detail", "")
+
+    # (d) leere Datei
+    r = await _hochladen("nuvora.zip", b"")
+    assert r.status == 400
+
+    # Nach vier Fehlversuchen liegt im Ordner nichts herum — auch kein .teil-*.
+    assert sorted(os.listdir(welt["sicherungen"])) == []
+
+
+@pytest.mark.asyncio
+async def test_hochladen_begrenzt_die_groesse(welt, monkeypatch):
+    monkeypatch.setattr(backup, "UPLOAD_MAX_MB", 1)
+    r = await _hochladen("nuvora.zip", b"x" * (1024 * 1024 + 10))
+    assert r.status == 413, r.status
+    assert os.listdir(welt["sicherungen"]) == []
+
+
+@pytest.mark.asyncio
+async def test_probelauf_zeigt_die_zahlen_und_laesst_die_datenbank_in_ruhe(welt):
+    """Der Punkt der Sache: vor dem Ernstfall steht da, was in der Datei steckt.
+    Und zwar ohne dass die laufende Datenbank dabei angefasst wird — deshalb
+    wird sie vorher und nachher gezählt."""
+    from app import models as m
+
+    async def _zaehle():
+        async with welt["Sitzung"]() as s:
+            return {
+                "students": len((await s.execute(select(m.Student))).scalars().all()),
+                "classes": len((await s.execute(select(m.SchoolClass))).scalars().all()),
+                "users": len((await s.execute(select(m.User))).scalars().all()),
+            }
+
+    eintrag = await _sichern()
+    vorher = await _zaehle()
+
+    r = await _ruf("POST", f"/api/admin/backup/{eintrag['name']}/probelauf")
+    assert r.status == 200, r.body[:400]
+    d = r.json()
+    assert d["tabellen"]["students"] == 1
+    assert d["tabellen"]["school_classes"] == 1
+    assert d["tabellen"]["users"] == 2
+    assert d["zeilen"] >= 4
+    assert d["uploads_anzahl"] == 1
+    assert d["nuvora"], "Der Probelauf nennt die Fassung aus dem Manifest nicht"
+    # Leere Tabellen stehen nicht einzeln in der Liste, werden aber gezählt.
+    assert all(n > 0 for n in d["tabellen"].values())
+    assert d["leere_tabellen"] > 0
+
+    assert await _zaehle() == vorher, (
+        "Der Probelauf hat die laufende Datenbank verändert — dann ist er kein Probelauf"
+    )
+    # Die Wegwerf-Datenbank ist wieder weg.
+    assert not [p for p in os.listdir(tempfile.gettempdir())
+                if p.startswith("nuvora-probelauf-")]
+
+
+@pytest.mark.asyncio
+async def test_zurueckspielen_verlangt_das_ausgeschriebene_wort(welt, monkeypatch):
+    """Ohne Bestätigung passiert nichts — und zwar bevor irgendetwas gelöscht
+    oder auch nur gesichert wird."""
+    monkeypatch.setattr(backup, "DATABASE_URL",
+                        f"sqlite+aiosqlite:///{welt['tmp'] / 'niemals.db'}")
+    eintrag = await _sichern()
+    for rumpf in ({}, {"bestaetigung": ""}, {"bestaetigung": "ok"},
+                  {"bestaetigung": "ZURÜCKSPIELEN"}):
+        r = await _ruf("POST", f"/api/admin/backup/{eintrag['name']}/zurueckspielen", rumpf)
+        assert r.status == 400, f"{rumpf} -> {r.status}"
+    assert not (welt["tmp"] / "niemals.db").exists(), (
+        "Ohne Bestätigung wurde trotzdem in die Zieldatenbank geschrieben"
+    )
+    # Und es ist auch keine Sicherheitskopie angefallen (die kostet Platz).
+    assert len([n for n in os.listdir(welt["sicherungen"]) if n.endswith(".zip")]) == 1
+
+
+@pytest.mark.asyncio
+async def test_zurueckspielen_sichert_vorher_und_meldet_die_zahlen(welt, monkeypatch):
+    """Wer die falsche Datei einspielt, muss zurückkönnen: vor dem Einspielen
+    entsteht automatisch eine Sicherung des aktuellen Standes, ihr Name steht in
+    der Antwort."""
+    from app import models as m
+
+    ziel_db = welt["tmp"] / "einspiel-ziel.db"
+    monkeypatch.setattr(backup, "DATABASE_URL", f"sqlite+aiosqlite:///{ziel_db}")
+    eintrag = await _sichern()
+
+    r = await _ruf("POST", f"/api/admin/backup/{eintrag['name']}/zurueckspielen",
+                   {"bestaetigung": "zurueckspielen"})  # Groß/klein egal
+    assert r.status == 200, r.body[:400]
+    d = r.json()
+    assert d["tabellen"]["students"] == 1
+    assert d["dateien"] == 1, "Die Uploads wurden nicht mit zurückgelegt"
+    netz = d["sicherheitsnetz"]
+    assert backup.DATEI_MUSTER.fullmatch(netz) and netz != eintrag["name"], d
+    assert (welt["sicherungen"] / netz).is_file(), "Die Sicherung von vorher fehlt"
+
+    # Und im Ziel stehen die Daten wirklich.
+    probe = create_async_engine(f"sqlite+aiosqlite:///{ziel_db}")
+    try:
+        async with async_sessionmaker(probe, class_=AsyncSession)() as s:
+            schueler = (await s.execute(select(m.Student))).scalars().all()
+            assert [x.name for x in schueler] == ["Anna Sicher"]
+            assert schueler[0].notizen == NOTIZ
+    finally:
+        await probe.dispose()
+
+
+@pytest.mark.asyncio
+async def test_hochladen_probelauf_und_einspielen_nur_fuer_die_administration(welt):
+    """Die drei neuen Wege sind die gefährlichsten der Anwendung — eine normale
+    Lehrkraft darf an keinen davon."""
+    eintrag = await _sichern()
+    roh = (welt["sicherungen"] / eintrag["name"]).read_bytes()
+    welt["zustand"]["user_id"] = 2  # normale Lehrkraft
+
+    offen = []
+    r = await _hochladen("nuvora.zip", roh)
+    if r.status not in (401, 403):
+        offen.append(f"hochladen -> {r.status}")
+    for weg, rumpf in ((f"/api/admin/backup/{eintrag['name']}/probelauf", {}),
+                       (f"/api/admin/backup/{eintrag['name']}/zurueckspielen",
+                        {"bestaetigung": backup.BESTAETIGUNG})):
+        r = await _ruf("POST", weg, rumpf)
+        if r.status not in (401, 403):
+            offen.append(f"{weg} -> {r.status}")
+    assert not offen, f"Ohne Administrationsrechte erreichbar: {offen}"
+    assert sorted(os.listdir(welt["sicherungen"])) == [
+        eintrag["name"], eintrag["name"] + ".sha256"
+    ], "Es ist trotzdem etwas im Sicherungsordner passiert"
+
+
+@pytest.mark.asyncio
+async def test_status_nennt_das_bestaetigungswort(welt):
+    """Anzeige und Prüfung dürfen nicht auseinanderlaufen: die Oberfläche
+    bekommt das Wort vom Server, nicht aus einer Übersetzungsdatei."""
+    stand = (await _ruf("GET", "/api/admin/backup")).json()
+    assert stand["bestaetigung"] == backup.BESTAETIGUNG
+    assert stand["upload_max_mb"] >= 1

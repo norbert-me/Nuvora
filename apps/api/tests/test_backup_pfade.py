@@ -136,10 +136,13 @@ def test_anleitung_hat_alle_schritte():
     Trennzeichen, kleben zwei Schritte still zusammen und einer verschwindet —
     das faellt sonst niemandem auf."""
     schritte = backup.anleitung()
-    assert len(schritte) == 6, schritte
-    for nummer, schritt in enumerate(schritte[:5], start=1):
+    # Schritt 0 ist der Weg über die Oberfläche (hochladen, Probelauf,
+    # einspielen); 1–5 sind der Weg von Hand für den Fall, dass die Oberfläche
+    # nicht mehr läuft.
+    assert len(schritte) == 7, schritte
+    for nummer, schritt in enumerate(schritte[:6], start=0):
         assert schritt.startswith(f"{nummer}. "), schritt
-    assert schritte[5].startswith("Nicht enthalten")
+    assert schritte[6].startswith("Nicht enthalten")
 
 
 def test_pflichteintraege_sind_einzelne_namen():

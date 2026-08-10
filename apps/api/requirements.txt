@@ -27,4 +27,10 @@ qrcode>=8.2,<9.0
 # kommt ueber qrcode und reportlab herein.
 Pillow>=12.3,<13.0
 argon2-cffi>=23.1,<26.0
+# Nicht fuer den Betrieb der Datenbank (das ist asyncpg), sondern fuer den
+# **Probelauf** beim Zurueckspielen: `backup.py` spielt eine Sicherung zuerst in
+# eine Wegwerf-SQLite im temporaeren Verzeichnis und zeigt die Zeilenzahlen an.
+# Ohne aiosqlite gaebe es diesen Probelauf nur in der Testumgebung — also
+# ausgerechnet nicht dort, wo im Ernstfall jemand vor der Entscheidung steht.
+aiosqlite>=0.22.1,<1.0
 

@@ -67,14 +67,14 @@ import tempfile
 import zipfile
 from datetime import datetime, date, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select
 from starlette.responses import FileResponse
 
-from ..database import async_session, get_db
+from ..database import DATABASE_URL, async_session, get_db
 from ..models import AppSetting, Base
-from .auth import get_current_user
+from .auth import get_current_user, rate_limit
 
 router = APIRouter(prefix="/api/admin/backup", tags=["backup"])
 
@@ -127,6 +127,17 @@ PLAENE = ("aus", "taeglich", "woechentlich")
 
 # Diese Einträge muss jede Sicherung haben, sonst ist sie keine.
 PFLICHT_EINTRAEGE = ("manifest.json", "datenbank.ndjson")
+
+# Hochladen: Obergrenze, damit ein Upload nicht die Platte des Schulservers
+# füllt. Voreinstellung wie die Aufbewahrungsgrenze — größer als die größte
+# Sicherung, die diese Installation selbst erzeugen würde, hat keinen Sinn.
+UPLOAD_MAX_MB = max(1, int(os.environ.get("NUVORA_BACKUP_UPLOAD_MAX_MB", str(MAX_MB))))
+
+# Das Wort, das beim Zurückspielen ausgeschrieben werden muss. Kein „OK", kein
+# Häkchen: `zurueckspielen()` löscht ALLE Zeilen ALLER Nuvora-Tabellen der
+# Installation — nicht nur die des eigenen Kontos. Wer das tut, soll es
+# abtippen.
+BESTAETIGUNG = "ZURUECKSPIELEN"
 
 
 def ziele() -> list[dict]:
@@ -346,6 +357,23 @@ def _version() -> str:
         return "0.0.0"
 
 
+def _neuer_name(ordner: str) -> str:
+    """Der Name einer neu abgelegten Sicherung — **immer** selbst vergeben.
+
+    Auch beim Hochladen: der Dateiname aus dem Upload ist eine Angabe des
+    Clients und darf nirgends in einen Pfad geraten. Der Name entsteht hier aus
+    dem Zeitstempel und dem festen Muster, sonst nichts.
+    """
+    stamm = "nuvora-" + datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    # Hoechste vorhandene Laufnummer + 1 — nicht die erste freie. Sonst bekaeme
+    # eine neue Sicherung den Namen einer gerade weggeraeumten und waere damit
+    # nach dem Namen die aelteste.
+    vorhanden = [n for n in os.listdir(ordner)
+                 if n.startswith(stamm) and DATEI_MUSTER.fullmatch(n)]
+    lauf = max((_laufnummer(n) for n in vorhanden), default=0) + 1
+    return stamm + (".zip" if lauf == 1 else f"-{lauf}.zip")
+
+
 async def sicherung_erstellen(db, ziel: str | None = None) -> dict:
     """Erzeugt eine Sicherung und gibt ihren Listeneintrag zurück.
 
@@ -358,14 +386,7 @@ async def sicherung_erstellen(db, ziel: str | None = None) -> dict:
     ziel = ziel or await aktuelles_ziel(db)
     conn = await db.connection()
     ordner = _ordner(ziel)
-    stamm = "nuvora-" + datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    # Hoechste vorhandene Laufnummer + 1 — nicht die erste freie. Sonst bekaeme
-    # eine neue Sicherung den Namen einer gerade weggeraeumten und waere damit
-    # nach dem Namen die aelteste.
-    vorhanden = [n for n in os.listdir(ordner)
-                 if n.startswith(stamm) and DATEI_MUSTER.fullmatch(n)]
-    lauf = max((_laufnummer(n) for n in vorhanden), default=0) + 1
-    name = stamm + (".zip" if lauf == 1 else f"-{lauf}.zip")
+    name = _neuer_name(ordner)
     endziel = os.path.join(ordner, name)
 
     fd, temp = tempfile.mkstemp(dir=ordner, prefix=".teil-", suffix=".zip")
@@ -612,6 +633,37 @@ def pruefen(ziel: str, name: str) -> dict:
     }
 
 
+def manifest_lesen(pfad: str) -> dict:
+    """Ist die Datei überhaupt eine Nuvora-Sicherung? Gibt ihr Manifest zurück.
+
+    Absichtlich vor jedem Hochladen, Probelauf und Zurückspielen: eine Datei,
+    die kein lesbares ZIP mit `manifest.json` und `datenbank.ndjson` ist, hat im
+    Sicherungsordner nichts verloren — dort steht sie sonst als scheinbar
+    gültige Sicherung in der Liste, und jemand verlässt sich darauf.
+    """
+    try:
+        with zipfile.ZipFile(pfad) as zf:
+            namen = set(zf.namelist())
+            fehlend = [p for p in PFLICHT_EINTRAEGE if p not in namen]
+            if fehlend:
+                raise HTTPException(
+                    400, "Das ist keine Nuvora-Sicherung — im Archiv fehlt: "
+                         + ", ".join(fehlend))
+            manifest = json.loads(zf.read("manifest.json"))
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        # Wie in `pruefen()`: breit gefangen, aber nur die Art gemeldet — ein
+        # Ausnahmetext schleppt Pfade und Archivbruchstücke mit.
+        log.exception("Hochgeladene Datei ist keine lesbare Sicherung")
+        raise HTTPException(
+            400, f"Die Datei ist kein lesbares ZIP-Archiv ({type(e).__name__}) — "
+                 "Einzelheiten stehen im Protokoll des Dienstes")
+    if not isinstance(manifest, dict) or not (manifest.get("tabellen") or {}):
+        raise HTTPException(400, "Das Manifest der Sicherung nennt keine einzige Tabelle")
+    return manifest
+
+
 # ── Zurückspielen ────────────────────────────────────────────────────────────
 async def zurueckspielen(zip_pfad: str, ziel_url: str, uploads_nach: str | None = None) -> dict:
     """Spielt eine Sicherung in die Datenbank unter `ziel_url` zurück.
@@ -712,6 +764,10 @@ def anleitung() -> list[str]:
     # genauso aus wie eine gewollte Fortsetzung, und dann verschwinden zwei
     # Eintraege still zu einem. Mit `+` ist die Absicht am Zeichen ablesbar.
     return [
+        "0. Normalfall ist der Weg über diese Seite: Datei hochladen, "
+        + "„Probelauf“ (spielt in eine Wegwerf-Datenbank und zeigt die "
+        + "Zeilenzahlen), dann „Einspielen“. Die Schritte darunter sind der "
+        + "Weg von Hand — für den Fall, dass die Oberfläche nicht mehr läuft.",
         "1. Sicherung herunterladen und die Prüfsumme vergleichen: "
         + "shasum -a 256 nuvora-JJJJMMTT-HHMMSS.zip",
         "2. Datei auf den Server legen: "
@@ -809,6 +865,10 @@ class Einstellungen(BaseModel):
     plan: str | None = None
 
 
+class Rueckspiel(BaseModel):
+    bestaetigung: str = ""
+
+
 @router.get("")
 async def status(user=Depends(nur_admin), db=Depends(get_db)):
     ziel = await aktuelles_ziel(db)
@@ -830,6 +890,10 @@ async def status(user=Depends(nur_admin), db=Depends(get_db)):
         "dauerhaft": os.path.ismount(ordner),
         "aufbewahrung": {"anzahl": KEEP, "max_mb": MAX_MB},
         "verschluesselt": False,
+        # Zurückspielen über die Oberfläche: das Wort steht im Code (nicht in
+        # der Übersetzung), damit Anzeige und Prüfung nicht auseinanderlaufen.
+        "bestaetigung": BESTAETIGUNG,
+        "upload_max_mb": UPLOAD_MAX_MB,
         "sicherungen": eintraege,
         "belegt_bytes": sum(e["bytes"] for e in eintraege),
         "letzte": {
@@ -869,6 +933,175 @@ async def jetzt_sichern(user=Depends(nur_admin), db=Depends(get_db)):
     await _schreib(db, "backup_letzte_fehler", "")
     await db.commit()
     return eintrag
+
+
+@router.post("/hochladen", status_code=201)
+async def hochladen(file: UploadFile = File(...), user=Depends(nur_admin), db=Depends(get_db)):
+    """Eine Sicherung von außen in den Ablageordner legen.
+
+    Der Weg für den Ernstfall: neuer Server, leere Datenbank, die Sicherung
+    liegt auf dem Laptop. Ohne diesen Endpunkt bliebe nur `docker compose cp` —
+    ausgerechnet in dem Moment, in dem niemand eine Kommandozeile sucht.
+
+    **Der Name aus dem Upload bestimmt nichts.** Er wird nicht gelesen, nicht
+    bereinigt und nicht verwendet — `_neuer_name()` vergibt den Namen nach dem
+    festen Muster. Damit gibt es keinen Pfad, den ein `../` beeinflussen könnte.
+    """
+    rate_limit("backup_upload", f"u{user.id}", 10, 600,
+               "Zu viele Uploads. Bitte kurz warten.")
+    ziel = await aktuelles_ziel(db)
+    ordner = _ordner(ziel)
+    grenze = UPLOAD_MAX_MB * 1024 * 1024
+
+    fd, temp = tempfile.mkstemp(dir=ordner, prefix=".teil-", suffix=".zip")
+    os.close(fd)
+    try:
+        geschrieben = 0
+        with open(temp, "wb") as z:
+            while True:
+                brocken = await file.read(1024 * 256)
+                if not brocken:
+                    break
+                geschrieben += len(brocken)
+                if geschrieben > grenze:
+                    # Abbruch beim Überschreiten, nicht erst nach dem Lesen:
+                    # sonst läge die zu große Datei bereits auf der Platte.
+                    raise HTTPException(413, f"Datei zu groß (höchstens {UPLOAD_MAX_MB} MB)")
+                z.write(brocken)
+        if not geschrieben:
+            raise HTTPException(400, "Die Datei ist leer")
+
+        # Erst prüfen, dann in die Liste aufnehmen. Eine Datei, die keine
+        # Sicherung ist, darf gar nicht erst wie eine aussehen.
+        manifest = manifest_lesen(temp)
+
+        name = _neuer_name(ordner)
+        os.chmod(temp, 0o600)
+        os.replace(temp, os.path.join(ordner, name))
+    except Exception:
+        try:
+            os.remove(temp)
+        except OSError:
+            pass  # Rest holt der nächste `aufraeumen()`-Lauf (.teil-*)
+        raise
+
+    endziel = os.path.join(ordner, name)
+    summe = _sha256_datei(endziel)
+    with open(endziel + ".sha256", "w", encoding="utf-8") as f:
+        f.write(f"{summe}  {name}\n")
+    os.chmod(endziel + ".sha256", 0o600)
+
+    eintrag = _eintrag(ordner, name, ziel)
+    eintrag["nuvora"] = manifest.get("nuvora", "")
+    eintrag["erzeugt"] = manifest.get("erzeugt", "")
+    eintrag["zeilen"] = manifest.get("zeilen", 0)
+    # Aufbewahrung erst NACH dem Ablegen — die hochgeladene Datei ist die
+    # jüngste und bleibt damit in jedem Fall stehen.
+    aufraeumen(ziel)
+    return eintrag
+
+
+@router.post("/{name}/probelauf")
+async def probelauf(name: str, user=Depends(nur_admin), db=Depends(get_db)):
+    """Die Sicherung in eine **Wegwerf-SQLite** einspielen und sagen, was drinsteht.
+
+    Das ist der Kern der ganzen Sache: vor dem Ernstfall steht schwarz auf weiß
+    „30 Schüler, 1 Klasse, 214 Noten" — statt dass jemand einer Datei glauben
+    muss. Die echte Datenbank wird dabei **nicht angefasst**: `zurueckspielen()`
+    bekommt ausdrücklich die URL der Wegwerfdatei, und die liegt im temporären
+    Verzeichnis und ist danach weg.
+    """
+    rate_limit("backup_probe", f"u{user.id}", 20, 600, "Zu viele Probeläufe. Bitte kurz warten.")
+    voll = _vorhandene_datei(_pfad_fuer(await aktuelles_ziel(db)), name)
+    manifest = manifest_lesen(voll)
+
+    wegwerf = tempfile.mkdtemp(prefix="nuvora-probelauf-")
+    try:
+        bericht = await zurueckspielen(voll, f"sqlite+aiosqlite:///{os.path.join(wegwerf, 'probe.db')}")
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        log.exception("Probelauf der Sicherung %s fehlgeschlagen", os.path.basename(voll))
+        raise HTTPException(
+            400, f"Die Sicherung ließ sich nicht einspielen ({type(e).__name__}) — "
+                 "Einzelheiten stehen im Protokoll des Dienstes")
+    finally:
+        shutil.rmtree(wegwerf, ignore_errors=True)
+
+    tabellen = {t: n for t, n in bericht["tabellen"].items() if not t.startswith("_")}
+    return {
+        "name": os.path.basename(voll),
+        "zeilen": bericht["zeilen"],
+        # Nur die Tabellen mit Inhalt: eine Liste aus 80 Nullen sagt nichts.
+        "tabellen": {t: n for t, n in sorted(tabellen.items()) if n},
+        "leere_tabellen": sum(1 for n in tabellen.values() if not n),
+        "nuvora": manifest.get("nuvora", ""),
+        "erzeugt": manifest.get("erzeugt", ""),
+        "datenbank": manifest.get("datenbank", ""),
+        "uploads_anzahl": manifest.get("uploads_anzahl", 0),
+        "config": manifest.get("config", False),
+    }
+
+
+@router.post("/{name}/zurueckspielen")
+async def einspielen(name: str, body: Rueckspiel, user=Depends(nur_admin), db=Depends(get_db)):
+    """Die Sicherung in die **laufende** Datenbank einspielen.
+
+    Drei Vorkehrungen, und keine davon ist Zierrat:
+
+      1. Das Wort `BESTAETIGUNG` muss im Rumpf stehen. Ein Knopf allein wäre zu
+         wenig für etwas, das jede Klasse, jede Note und jedes Kind der
+         gesamten Installation ersetzt.
+      2. Vorher wird der **aktuelle Stand gesichert** und deren Name in der
+         Antwort genannt — wer die falsche Datei erwischt, kann zurück.
+      3. Die einzuspielende Datei wird vorher **beiseite kopiert**. Sonst könnte
+         ausgerechnet die Aufbewahrung (`aufraeumen()` in Schritt 2) sie
+         wegräumen, während sie gebraucht wird.
+    """
+    rate_limit("backup_restore", f"u{user.id}", 5, 3600,
+               "Zu viele Versuche. Bitte später erneut.")
+    if (body.bestaetigung or "").strip().upper() != BESTAETIGUNG:
+        raise HTTPException(400, f"Bitte „{BESTAETIGUNG}“ zur Bestätigung eintippen — "
+                                 "das Zurückspielen ersetzt ALLE Daten dieser Installation")
+    ziel = await aktuelles_ziel(db)
+    voll = _vorhandene_datei(_pfad_fuer(ziel), name)
+    manifest_lesen(voll)
+
+    beiseite = tempfile.mkdtemp(prefix="nuvora-einspielen-")
+    quelle = os.path.join(beiseite, "sicherung.zip")
+    shutil.copy2(voll, quelle)
+    try:
+        netz = await sicherung_erstellen(db)
+        await _schreib(db, "backup_letzte_zeit", datetime.now(timezone.utc).isoformat())
+        await _schreib(db, "backup_letzte_ok", "1")
+        await _schreib(db, "backup_letzte_name", netz["name"])
+        await _schreib(db, "backup_letzte_fehler", "")
+        await db.commit()
+        # Die Sitzung MUSS ihre Verbindung loslassen, bevor gelöscht wird:
+        # `zurueckspielen()` macht `DELETE FROM` auf jeder Tabelle über eine
+        # eigene Verbindung — eine offene Transaktion daneben blockiert das auf
+        # Postgres bis zum Zeitüberlauf.
+        await db.close()
+
+        bericht = await zurueckspielen(quelle, DATABASE_URL, UPLOAD_DIR)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        log.exception("Zurückspielen der Sicherung %s fehlgeschlagen", os.path.basename(voll))
+        raise HTTPException(
+            500, f"Zurückspielen fehlgeschlagen ({type(e).__name__}) — Einzelheiten stehen "
+                 "im Protokoll des Dienstes. Der Stand von vorher liegt als Sicherung bereit.")
+    finally:
+        shutil.rmtree(beiseite, ignore_errors=True)
+
+    tabellen = {t: n for t, n in bericht["tabellen"].items() if not t.startswith("_")}
+    return {
+        "name": os.path.basename(voll),
+        "sicherheitsnetz": netz["name"],
+        "zeilen": bericht["zeilen"],
+        "dateien": bericht["dateien"],
+        "tabellen": {t: n for t, n in sorted(tabellen.items()) if n},
+    }
 
 
 @router.put("/einstellungen")
