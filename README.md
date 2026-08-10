@@ -287,10 +287,17 @@ Läuft automatisch, ohne Zutun:
 
 ### Update-Kanäle
 
-Zwei Kanäle, einstellbar im Profil unter „Über Nuvora": **Stable** meldet nur
-das jüngste reguläre Release, **Beta** auch Pre-Releases. Auf der
-Releases-Seite steht deshalb vieles als „Pre-release" — das ist die Beta-Linie,
-kein Hinweis auf Instabilität. Vorbelegung über `UPDATE_CHANNEL` in der `.env`.
+Zwei Kanäle, einstellbar im Profil unter „Über Nuvora": **Stable** meldet das
+jüngste reguläre Release, **Beta** auch Pre-Releases. Vorbelegung über
+`UPDATE_CHANNEL` in der `.env`.
+
+Wichtig dabei, weil es überrascht: der Release-Workflow erklärt ein Release nur
+dann zum regulären, wenn sich die **Hauptversion** ändert (`release.yml`,
+Schritt „Kanal bestimmen"). Alles andere — auch ein Patch mit
+Sicherheitskorrekturen — geht als Pre-Release heraus und erreicht damit nur die
+Beta-Linie. Auf der Releases-Seite steht deshalb vieles als „Pre-release"; das
+ist kein Hinweis auf Instabilität. Wer eine Fehlerbehebung an alle ausliefern
+will, muss das Release von Hand auf regulär stellen.
 
 Tags sind signiert; `git verify-tag v4.0.0` prüft das (Anleitung in
 [SECURITY.md](SECURITY.md)). Jedes Release trägt eine Stückliste der
