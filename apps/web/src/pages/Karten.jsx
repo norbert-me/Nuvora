@@ -100,7 +100,20 @@ export default function Karten() {
   const sq = subsetKurs ? `&subset_kurs=${subsetKurs}` : ""; // Teilkurs-Roster
   const [loadingDecks, setLoadingDecks] = useState(true);
   const decksLoadedOnce = useRef(false); // Skeleton nur beim ersten Laden, nicht bei Klassen-/Kurswechsel
-  const loadDecks = (id) => { if (!id) return; setLoadingDecks(true); return fetch(`${API}/classes/${id}/decks${kq}`).then((r) => (r.ok ? r.json() : [])).then(setDecks).catch(() => {}).finally(() => { setLoadingDecks(false); decksLoadedOnce.current = true; }); };
+  // Laufende Nummer je Ladevorgang: KursKlasseSelect meldet den Kurs bewusst
+  // erst NACH dem Laden der Kursgruppen, der Effekt feuert also immer zweimal —
+  // erst ohne Kurs, dann mit. Kommt die erste (klassenweite) Antwort als zweite
+  // an, stehen die Stapel der ganzen Klasse statt der des Kurses da. Nur die
+  // juengste Antwort darf schreiben.
+  const ladenr = useRef(0);
+  const loadDecks = (id) => {
+    if (!id) return;
+    const meine = ++ladenr.current;
+    setLoadingDecks(true);
+    return fetch(`${API}/classes/${id}/decks${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+      if (meine === ladenr.current) setDecks(d);
+    }).catch(() => {}).finally(() => { setLoadingDecks(false); decksLoadedOnce.current = true; });
+  };
   // Ordner (wie CardVote) zum Gruppieren der Stapel — pro Klasse/Kurs.
   const [cardFolders, setCardFolders] = useState([]);
   const [currentCardFolder, setCurrentCardFolder] = useState(null); // null = Wurzel
@@ -108,7 +121,13 @@ export default function Karten() {
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [addMode, setAddMode] = useState(null); // null | "deck" | "folder"
   const [addName, setAddName] = useState("");
-  const loadFolders = (id) => id && fetch(`${API}/classes/${id}/card-folders${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => setCardFolders(Array.isArray(d) ? d : [])).catch(() => {});
+  const loadFolders = (id) => {
+    if (!id) return;
+    const meine = ++ladenr.current;
+    fetch(`${API}/classes/${id}/card-folders${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+      if (meine === ladenr.current) setCardFolders(Array.isArray(d) ? d : []);
+    }).catch(() => {});
+  };
   useEffect(() => { loadDecks(classId); loadFolders(classId); setCurrentCardFolder(null); }, [classId, kursId]);
   // Deep-Link ?deck=<id> (aus dem Kalender): in den Ordner des Stapels springen,
   // der Stapel klappt sich per autoOpen einmalig auf und scrollt hin.

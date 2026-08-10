@@ -57,9 +57,17 @@ export default function Orga() {
   const students = cls?.students || [];
 
   const kursQ = kursId != null ? `?kurs_id=${kursId}` : "";
+  // Laufende Nummer je Ladevorgang: KursKlasseSelect meldet den Kurs bewusst
+  // erst NACH dem Laden der Kursgruppen, der Effekt feuert also immer zweimal —
+  // erst ohne Kurs, dann mit. Kommt die erste (klassenweite) Antwort als zweite
+  // an, steht der falsche Stand da. Nur die juengste Antwort darf schreiben.
+  const ladenr = useRef(0);
   const load = useCallback((id) => {
     if (!id) return;
-    fetch(`${API}/${id}${kursId != null ? `?kurs_id=${kursId}` : ""}`).then((r) => (r.ok ? r.json() : [])).then((d) => setItems(Array.isArray(d) ? d : [])).catch(() => {});
+    const meine = ++ladenr.current;
+    fetch(`${API}/${id}${kursId != null ? `?kurs_id=${kursId}` : ""}`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+      if (meine === ladenr.current) setItems(Array.isArray(d) ? d : []);
+    }).catch(() => {});
   }, [kursId]);
   useEffect(() => { load(classId); }, [classId, kursId, load]);
 

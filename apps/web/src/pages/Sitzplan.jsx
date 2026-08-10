@@ -80,9 +80,18 @@ export default function Sitzplan() {
   const byId = (id) => students.find((s) => s.id === id);
 
   const kursQ = kursId != null ? `?kurs_id=${kursId}` : "";
+  // Laufende Nummer je Ladevorgang. KursKlasseSelect meldet den Kurs bewusst
+  // erst NACH dem Laden der Kursgruppen — der Effekt feuert also immer zweimal:
+  // erst ohne Kurs, dann mit. Kommt die erste (klassenweite) Antwort als zweite
+  // an, steht hier der falsche Sitzplan, und der naechste Zug schreibt ihn per
+  // persist() auf den Kurs zurueck. Das ist kein Anzeigefehler, das ueberschreibt
+  // einen echten Sitzplan. Nur die juengste Antwort darf also schreiben.
+  const ladenr = useRef(0);
   const load = useCallback((id) => {
     if (!id) return;
+    const meine = ++ladenr.current;
     fetch(`${API}/${id}${kursId != null ? `?kurs_id=${kursId}` : ""}`).then((r) => (r.ok ? r.json() : null)).then((d) => {
+      if (meine !== ladenr.current) return;
       if (!d) { setSeats([]); return; }
       setTafel(d.tafel && typeof d.tafel.x === "number" ? d.tafel : { x: 200, y: 8 });
       // Altes Raster (cells) einmalig in freie Positionen umrechnen.
