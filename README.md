@@ -365,6 +365,11 @@ Datenbank, kein eigener Code-Pfad**; sie zeigt auf einen laufenden
 Nuvora-Server. Offline *lesen* über den Service Worker, offline *schreiben*
 noch offen. Sie ist bewusst kein Modul. Details in `apps/desktop/README.md`.
 
+Fertig gebaut hängt sie an jedem [Release](https://github.com/norbert-me/Nuvora/releases)
+(`.dmg` für Apple Silicon und Intel), unsigniert — beim ersten Start Rechtsklick
+→ *Öffnen*. **Für iPhone/iPad gibt es keine App**; dort führt der Weg über
+Safari: *Teilen* → *Zum Home-Bildschirm*.
+
 ## Datenschutz
 
 Nuvora läuft auf **deinem** Server. Damit bist du im Sinne der DSGVO

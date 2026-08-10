@@ -52,6 +52,23 @@ Seit Electron 42 lädt `npm install` die Electron-Binärdatei **nicht** mehr per
 Ohne `NUVORA_URL` fragt die App beim ersten Start nach der Server-Adresse und
 merkt sie sich (Menü **Server → Server-Adresse ändern…** zum Ändern).
 
+## Fertig gebaut herunterladen
+
+Seit v4.0.3 hängt an jedem [Release](https://github.com/norbert-me/Nuvora/releases)
+eine fertige App — `Nuvora-<Fassung>-arm64.dmg` für Apple Silicon,
+`Nuvora-<Fassung>.dmg` für Intel. Gebaut wird sie von `.github/workflows/release.yml`
+auf einem macOS-Runner; selbst bauen muss also niemand mehr.
+
+Sie ist **nicht signiert** (siehe unten): beim ersten Start meldet macOS „kann
+nicht geöffnet werden". Rechtsklick auf die App → *Öffnen* → *Öffnen*, danach
+startet sie normal.
+
+**Für iPhone/iPad gibt es keine App** und wird es ohne Apple-Developer-Programm
+auch nicht geben — iOS-Programme lassen sich nicht als Datei verteilen. Der Weg
+dorthin ist die Weboberfläche: in Safari öffnen, *Teilen* → *Zum Home-Bildschirm*.
+Nuvora liegt dann als Symbol dort und startet ohne Browserleiste
+(`manifest.json`, `display: standalone`).
+
 ## Als .app / .dmg bauen
 
 ```bash

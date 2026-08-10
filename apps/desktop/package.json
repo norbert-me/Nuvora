@@ -22,7 +22,8 @@
     ],
     "mac": {
       "target": "dmg",
-      "category": "public.app-category.education"
+      "category": "public.app-category.education",
+      "icon": "icon.png"
     }
   },
   "devDependencies": {

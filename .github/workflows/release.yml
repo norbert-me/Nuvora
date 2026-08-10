@@ -12,8 +12,59 @@ permissions:
   contents: write
 
 jobs:
+  # Die Mac-App gehoert ans Release, sonst gibt es sie nur auf dem Rechner
+  # dessen, der sie zufaellig einmal gebaut hat. Sie braucht einen macOS-Runner
+  # (electron-builder kann ein .dmg nicht auf Linux erzeugen), deshalb ein
+  # eigener Job. Faellt er aus, soll das Release trotzdem entstehen — siehe
+  # `if: always()` unten: eine fehlende App ist aergerlich, ein fehlendes
+  # Release mit SBOM waere schlimmer.
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "26"
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Abhaengigkeiten
+        working-directory: apps/desktop
+        run: npm ci
+
+      # Die Huelle traegt ihre eigene Fassung (0.1.0, "Phase 0") — die steht so
+      # im Dateinamen. An einem Release v4.0.2 haenge dann "Nuvora-0.1.0.dmg",
+      # und niemand wuesste, welche App zu welchem Stand gehoert. Hier nur im
+      # Lauf umgeschrieben, nicht im Repo: die Datei heisst nach dem Tag.
+      - name: Fassung aus dem Tag uebernehmen
+        working-directory: apps/desktop
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
+
+      # Beide Architekturen: macos-latest ist arm64, ein x64-Build entstuende
+      # sonst nie — Intel-Macs stehen an Schulen noch reihenweise.
+      # CSC_IDENTITY_AUTO_DISCOVERY=false: ohne Apple-Zertifikat soll
+      # electron-builder gar nicht erst nach einem suchen und daran scheitern.
+      # Die App ist damit unsigniert; was das beim ersten Start bedeutet, steht
+      # im Release-Text und in apps/desktop/README.md.
+      - name: DMG bauen (arm64 und x64)
+        working-directory: apps/desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npx electron-builder --mac dmg --arm64 --x64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-dmg
+          path: apps/desktop/dist/*.dmg
+          if-no-files-found: error
+
   release:
     runs-on: ubuntu-latest
+    needs: mac
+    # Auch dann veroeffentlichen, wenn der Mac-Job gescheitert ist: das Release
+    # ist der Stand des Servers, die App ist eine Beigabe.
+    if: always()
     steps:
       - uses: actions/checkout@v7
         with:
@@ -50,11 +101,34 @@ jobs:
           upload-artifact: false
           upload-release-assets: false
 
+      # Fehlt das Artefakt (Mac-Job gescheitert), soll das Release trotzdem
+      # entstehen — deshalb hier kein hartes Abbrechen.
+      - name: Mac-App holen
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: mac-dmg
+          path: mac
+
       - name: Release anlegen
         uses: softprops/action-gh-release@v3
         with:
-          files: nuvora-sbom.cyclonedx.json
+          files: |
+            nuvora-sbom.cyclonedx.json
+            mac/*.dmg
+          fail_on_unmatched_files: false
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           prerelease: ${{ steps.channel.outputs.prerelease }}
           generate_release_notes: true
+          body: |
+            **Mac-App:** `Nuvora-<Fassung>-arm64.dmg` für Apple Silicon,
+            `Nuvora-<Fassung>.dmg` für Intel. Sie ist **nicht signiert** — beim
+            ersten Start meldet macOS „kann nicht geöffnet werden". Rechtsklick
+            auf die App → *Öffnen* → *Öffnen*; danach startet sie normal. Wer
+            das nicht möchte, benutzt Nuvora im Browser: die App ist nur ein
+            Fenster auf denselben Server.
+
+            **iOS/iPadOS:** es gibt keine App. Auf dem iPad in Safari öffnen,
+            *Teilen* → *Zum Home-Bildschirm* — dann liegt Nuvora als Symbol
+            dort und startet ohne Browserleiste.
