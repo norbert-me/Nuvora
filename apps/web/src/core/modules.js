@@ -25,14 +25,38 @@ function _publish(mods) {
 // Anfragen je Seitenaufruf — auf dem Handy vier Roundtrips und unnoetig nah am
 // Rate-Limit. Laeuft schon eine Anfrage, haengen sich die anderen dran.
 let _laufend = null;
+// Ist der zuletzt gemeldete Stand echt vom Server, oder haben wir nur geraten?
+// Ohne diese Unterscheidung sah eine fehlgeschlagene Anfrage aus wie "keine
+// Module aktiv" — und das ModuleGate warf die Lehrkraft aus ihrer Modulseite
+// auf /modules, obwohl alles aktiviert war. Ein kurzer 429 (Rate-Limit) oder
+// eine Sekunde ohne Netz reichte dafuer.
+let _bekannt = _cache !== null && _cache !== undefined;
+
+export function modulstandBekannt() {
+  return _bekannt;
+}
+
 async function _hole() {
   // Offline/Abbruch darf keine unbehandelte Ablehnung erzeugen — die Shell
   // arbeitet dann mit dem letzten bekannten Stand weiter.
-  const res = await fetch("/api/modules").catch(() => null);
-  if (!res || !res.ok) return _cache || [];   // Cache behalten statt leeren
-  const mods = await res.json();
-  _publish(mods);
-  return mods;
+  //
+  // Zweiter Versuch nach kurzer Pause: die haeufigste Ursache ist ein 429 vom
+  // Proxy (mehrere Seiten kurz hintereinander), und das ist eine Sekunde
+  // spaeter vorbei. Ein zweiter Anlauf ist billiger als eine Fehlermeldung.
+  for (let versuch = 0; versuch < 2; versuch++) {
+    const res = await fetch("/api/modules").catch(() => null);
+    if (res && res.ok) {
+      const mods = await res.json();
+      _bekannt = true;
+      _publish(mods);
+      return mods;
+    }
+    if (versuch === 0) await new Promise((r) => setTimeout(r, 700));
+  }
+  // Kein Stand vom Server. Mit Cache: damit weiterarbeiten (er stimmt fast
+  // immer). Ohne Cache: NICHT so tun, als waeren keine Module aktiv.
+  if (!_cache) _bekannt = false;
+  return _cache || [];
 }
 export function fetchModules({ frisch = false } = {}) {
   // frisch: nach einer Aenderung darf keine bereits laufende (noch alte)
@@ -94,6 +118,7 @@ export function useAktiv() {
 export function useModules(enabled = true) {
   const [modules, setModules] = useState(_cache || []);
   const [loading, setLoading] = useState(!_cache);
+  const [bekannt, setBekannt] = useState(modulstandBekannt());
 
   useEffect(() => {
     if (!enabled) {
@@ -103,7 +128,11 @@ export function useModules(enabled = true) {
     }
     _subscribers.add(setModules);
     let alive = true;
-    fetchModules().finally(() => alive && setLoading(false));
+    fetchModules().finally(() => {
+      if (!alive) return;
+      setBekannt(modulstandBekannt());
+      setLoading(false);
+    });
     return () => {
       alive = false;
       _subscribers.delete(setModules);
@@ -112,5 +141,10 @@ export function useModules(enabled = true) {
 
   const toggle = useCallback((key, active) => setModuleActive(key, active), []);
 
-  return { modules, active: modules.filter((m) => m.active), loading, toggle };
+  return {
+    modules, active: modules.filter((m) => m.active), loading, toggle,
+    // false = die Liste ist geraten, nicht gewusst. Wer daraus eine Sperre
+    // ableitet (ModuleGate), darf dann nicht sperren.
+    bekannt,
+  };
 }

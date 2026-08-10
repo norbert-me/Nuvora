@@ -92,7 +92,7 @@ import { useModules } from "./core/modules.js";
 import { DialogHost } from "./core/dialog.jsx";
 import { UndoHost } from "./core/undo.jsx";
 import { OutboxHost } from "./core/OutboxHost.jsx";
-import { btnPrimary, btnSecondary, btnSmall, Skeleton, Modal } from "./components/Icons.jsx";
+import { btnPrimary, btnSecondary, btnSmall, Skeleton, Modal, pageForm, pageTitle, pageIntro } from "./components/Icons.jsx";
 
 // Alle uebrigen Seiten kommen erst beim Aufruf ueber die Leitung. Vorher lag
 // jedes Modul im selben Bundle: wer nur den Kalender oeffnet, lud auch Scanner,
@@ -358,14 +358,35 @@ const getModuleNavItems = (t, location) => {
 // Register reine Anzeige. Wer eine Modul-Adresse aufruft ohne es aktiviert zu
 // haben, landet bei der Modulauswahl statt auf einer kaputten Seite.
 function ModuleGate({ moduleKey, children }) {
-  const { modules, loading } = useModules();
+  const { modules, loading, bekannt } = useModules();
   // Beim ersten Besuch (noch kein Modul-Cache) und auf langsamer Verbindung
   // stand hier ein leerer Bereich unter der Navigation. Dieselben Ladebalken wie
   // beim Nachladen der Seite: die Lehrkraft sieht, dass etwas kommt.
   if (loading) return <PageFallback />;
+  // Konnte die Modulliste gar nicht geladen werden, ist "nicht aktiviert" eine
+  // Vermutung — und die falsche. Frueher warf ein kurzer 429 oder eine Sekunde
+  // ohne Netz die Lehrkraft aus ihrer Modulseite auf /modules, als haette sie
+  // das Modul nie eingeschaltet. Lieber ehrlich sagen, dass es klemmt.
+  if (!bekannt) return <ModulstandUnklar />;
   const mod = modules.find((m) => m.key === moduleKey);
   if (!mod?.active) return <Navigate to="/modules" replace />;
   return children;
+}
+
+function ModulstandUnklar() {
+  return (
+    <div style={{ ...pageForm, textAlign: "center", padding: "40px 0" }}>
+      <h1 style={{ ...pageTitle, marginBottom: 10 }}>Modulliste nicht erreichbar</h1>
+      <p style={{ ...pageIntro, marginBottom: 18 }}>
+        Ob dieses Modul für dich eingeschaltet ist, lässt sich gerade nicht
+        feststellen — die Verbindung zum Server hat nicht geantwortet. Deine
+        Einstellungen sind davon nicht betroffen.
+      </p>
+      <button onClick={() => window.location.reload()} style={btnPrimary}>
+        Erneut versuchen
+      </button>
+    </div>
+  );
 }
 
 function ConnectionMonitor() {
