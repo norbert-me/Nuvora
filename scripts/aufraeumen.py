@@ -31,7 +31,7 @@ Zugang wie bei den anderen Skripten: --url/--email/--passwort, sonst
 SELFTEST_URL/SELFTEST_EMAIL/SELFTEST_PASSWORD, sonst .deploy.env.
 
 Rueckgabewert: 0 = nichts offen, 1 = es blieb etwas liegen.
-Nur Standardbibliothek — Bericht und Api kommen aus selftest.py.
+Nur Standardbibliothek — Bericht und Api kommen aus gemeinsam.py.
 """
 import argparse
 import contextlib
@@ -41,12 +41,12 @@ import os
 import sys
 from datetime import datetime
 
-# selftest.py liegt daneben. Format, Farben und HTTP-Client kommen von dort:
-# zwei Fassungen desselben Berichts laufen sonst auseinander.
-# Das ist ein Zirkel (selftest.py holt Sammler/modulzustand hier), aber ein
-# bewusster: die Gegenrichtung importiert erst IN der Funktion, nie oben.
+# Format, Farben und HTTP-Client kommen aus gemeinsam.py — zwei Fassungen
+# desselben Berichts laufen sonst auseinander. Frueher standen sie in
+# selftest.py, das umgekehrt von hier holt; das war ein Ring. Jetzt zeigen
+# beide auf dasselbe Blatt (siehe Modulkopf von gemeinsam.py).
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from selftest import Api, Bericht  # noqa: E402
+from gemeinsam import Api, Bericht  # noqa: E402
 
 WURZEL = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -105,7 +105,7 @@ def lies_module(basis):
 # ────────────────── Bericht ──────────────────
 
 class Aufraeumbericht(Bericht):
-    """Der Bericht aus selftest.py, nur mit passender Schlusszeile.
+    """Der Bericht aus gemeinsam.py, nur mit passender Schlusszeile.
 
     Format, Farben und Aufbau kommen unveraendert von dort (eine Quelle);
     ersetzt wird allein das Wort in der Zusammenfassung — hier raeumt jemand

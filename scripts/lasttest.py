@@ -40,8 +40,9 @@ from concurrent.futures import ThreadPoolExecutor
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Bewusst importiert statt kopiert: derselbe HTTP-Client, dieselbe Berichtsform
-# wie im Selbsttest — sonst laufen die beiden Werkzeuge auseinander.
-from selftest import AUS, Api, Bericht, FETT  # noqa: E402
+# wie im Selbsttest — sonst laufen die beiden Werkzeuge auseinander. Sie stehen
+# in gemeinsam.py, dem Blatt unter allen Testskripten.
+from gemeinsam import AUS, Api, Bericht, FETT  # noqa: E402
 
 PRAEFIX = "ZZ-Lasttest"
 

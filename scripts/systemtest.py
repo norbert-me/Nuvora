@@ -41,10 +41,13 @@ import sys
 import time
 from datetime import datetime, timedelta, timezone
 
-# Bausteine kommen aus dem Selbsttest (gleiches Verzeichnis) — nicht kopieren:
-# HTTP-Client, Berichtsform und Farben sollen an EINER Stelle gepflegt werden.
+# Bausteine kommen aus dem gleichen Verzeichnis — nicht kopieren: HTTP-Client,
+# Berichtsform und Farben sollen an EINER Stelle gepflegt werden. gemeinsam.py
+# ist das Blatt (Client/Bericht), selftest.py und aufraeumen.py sitzen darauf.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from selftest import Api, Bericht, FETT, AUS  # noqa: E402
+from gemeinsam import Api, Bericht, FETT, AUS  # noqa: E402
+from aufraeumen import merke_module, vergiss_module  # noqa: E402
+from selftest import raeume_reste  # noqa: E402
 
 PRAEFIX = "ZZ-Systemtest"
 
@@ -787,9 +790,7 @@ class Schalter:
         # laeuft am echten Server in die nginx-Drosselung (limit_req).
         self.aktiv_jetzt = set(self.anfangs_aktiv)   # None = Stand unbekannt
         # Ausgangszustand festhalten, bevor irgendetwas umgeschaltet wird: nach
-        # einem Abbruch stellt scripts/aufraeumen.py ihn wieder her. Import in
-        # der Methode — aufraeumen.py holt Api/Bericht aus selftest.py.
-        from aufraeumen import merke_module
+        # einem Abbruch stellt scripts/aufraeumen.py ihn wieder her.
         merke_module(api.basis, self.anfangs_aktiv)
 
     def frisch_lesen(self):
@@ -840,7 +841,6 @@ class Schalter:
                     f"statt {sorted(self.anfangs_aktiv)}")
                 return False
             # Wiederhergestellt — der gemerkte Stand ist verbraucht.
-            from aufraeumen import vergiss_module
             vergiss_module(self.api.basis)
             return True
         except Exception as e:
@@ -1597,7 +1597,6 @@ def main():
         # schon der Aufbau am 409 ("Dieses Thema gibt es an dieser Stelle
         # schon") und der ganze Modulteil faellt aus. Alle Module sind hier
         # bereits an, die Suche findet also auch die Modul-Reste.
-        from selftest import raeume_reste
         raeume_reste(api, b)
         sch.alle_an()   # raeume_reste stellt den Modulstand zurueck
         if not b.pruefe("Kern", "Testdaten anlegen", u.aufbauen):
