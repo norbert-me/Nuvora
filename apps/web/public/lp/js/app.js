@@ -211,7 +211,13 @@
             // Konnte der Server-Stand gerade NICHT geladen werden (Netz/Fehler),
             // niemals spiegeln — sonst faende die Loesch-Schleife „0 Server-Aufgaben"
             // und/oder wir arbeiteten auf falscher Basis.
-            if (!listRes.ok) { console.warn('syncAufgaben: Server-Liste nicht ladbar — uebersprungen'); return; }
+            // Nicht nur loggen: ohne Abgleich ist die Aenderung NICHT beim Server —
+            // die Lehrkraft haette sonst gespeichert geglaubt, was nur lokal liegt.
+            if (!listRes.ok) {
+                console.warn('syncAufgaben: Server-Liste nicht ladbar — uebersprungen');
+                toast('Aufgaben konnten nicht mit dem Server abgeglichen werden (nur lokal gespeichert).');
+                return;
+            }
             const serverIds = new Set((await listRes.json()).map(e => e.id));
             // Sicherung (CLAUDE.md: Live-Daten nie durch delete+recreate gefaehrden):
             // eine leere lokale Liste gegen vorhandene Server-Aufgaben ist praktisch
@@ -224,6 +230,7 @@
             // einzige Aufgabe loescht, ist der Normalfall, nicht der Angriff.
             if (!data.length && serverIds.size >= 1 && !(opt && opt.geloescht)) {
                 console.warn('syncAufgaben: leere Liste gegen', serverIds.size, 'Server-Aufgaben — uebersprungen (Schutz vor Datenverlust)');
+                toast('Abgleich ausgesetzt: lokale Aufgabenliste ist leer, der Server hat welche. Bitte neu laden.');
                 return;
             }
             for (const a of data) {
@@ -260,17 +267,26 @@
                 console.warn('syncAufgaben: Loeschen uebersprungen —', serverIds.size, 'Server-Aufgaben nicht in lokaler Liste, aber Basis noch nicht vom Server geladen (Schutz vor Datenverlust)');
             }
             localStorage.setItem(STORAGE_KEYS.aufgaben, JSON.stringify(data));
-        } catch(e) { console.error('Sync-Fehler:', e); }
+        } catch(e) {
+            // Bis hierher war der Fehler unsichtbar: die Oberflaeche zeigte den
+            // lokalen Stand, der Server kannte ihn nicht.
+            console.error('Sync-Fehler:', e);
+            toast('Abgleich der Aufgaben mit dem Server fehlgeschlagen: ' + (e && e.message ? e.message : e));
+        }
     }
 
     // Nur die genannten (Temp-)Aufgaben serverseitig anlegen und Temp-id -> echte
     // id in idRemap eintragen. Gezielt statt Voll-Sync, um keinen Request-Sturm
     // (nginx/Abuse-Guard 429) auszuloesen. Kleiner Abstand zwischen den POSTs.
     async function ensureAufgabenGesynct(tempIds) {
+        // Fehlschlaege zaehlen und EINMAL melden: was hier nicht angelegt wird,
+        // faellt in savePfad aus den exercise_ids heraus — die Lernleiter waere
+        // stillschweigend kuerzer als das, was auf dem Bildschirm stand.
+        let fehlgeschlagen = 0;
         for (const tid of tempIds) {
             if (idRemap[tid]) continue;
             const a = aufgaben.find(x => String(x._id) === String(tid) || String(x.id) === String(tid));
-            if (!a) { console.warn('ensureAufgabenGesynct: Aufgabe zu Temp-id nicht gefunden:', tid); continue; }
+            if (!a) { console.warn('ensureAufgabenGesynct: Aufgabe zu Temp-id nicht gefunden:', tid); fehlgeschlagen++; continue; }
             if (/^\d+$/.test(String(a.id))) { idRemap[tid] = String(a.id); continue; }  // schon echt
             try {
                 const r = await api(`${LP}/exercises`, { method: 'POST', body: JSON.stringify(await zuKern(a)) });
@@ -280,11 +296,13 @@
                     syncSigs[a.id] = aufgabeSig(a);
                 } else {
                     console.warn('ensureAufgabenGesynct: POST fehlgeschlagen (%s) für Temp-id %s', r.status, tid);
+                    fehlgeschlagen++;
                 }
-            } catch (e) { console.warn('ensureAufgabenGesynct: Netzfehler bei', tid, e); }
+            } catch (e) { console.warn('ensureAufgabenGesynct: Netzfehler bei', tid, e); fehlgeschlagen++; }
             await new Promise(res => setTimeout(res, 60));   // ~16/s, weit unter dem Limit
         }
         localStorage.setItem(STORAGE_KEYS.aufgaben, JSON.stringify(aufgaben));
+        if (fehlgeschlagen) toast(`${fehlgeschlagen} neue Aufgabe(n) konnten nicht angelegt werden — sie fehlen in der gespeicherten Lernleiter.`);
     }
 
     function toast(msg) {
@@ -721,7 +739,13 @@
                     pfad = findePfad();
                     for (let i = 0; i < 10 && !pfad; i++) { await sleep(150); pfad = findePfad(); }
                 }
-                if (!pfad) { console.warn('[Lernpfad] open-lernleiter: Lernleiter', ziel, 'in keinem Pfad gefunden'); return; }
+                // Bisher still: der Klick aus der Shell fuehrte auf den Tab und
+                // dann passierte nichts mehr. Lieber sagen, was fehlt.
+                if (!pfad) {
+                    console.warn('[Lernpfad] open-lernleiter: Lernleiter', ziel, 'in keinem Pfad gefunden');
+                    toast('Diese Lernleiter wurde nicht gefunden — wurde sie gelöscht?');
+                    return;
+                }
                 // WICHTIG: erst wenn der globale Aufgaben-Pool vom Server da ist. Sonst
                 // baut openLernleiter die Vorschau/Regler aus leerem Pool (Config falsch,
                 // Aufgaben fehlen) — bei frischem Mount lädt loadUserData noch.
@@ -2221,7 +2245,20 @@
     document.getElementById('btn-pdf-loesung').addEventListener('click', () => generatePDF('loesung'));
     document.getElementById('btn-save-to-pfad').addEventListener('click', () => saveToPfad());
 
+    // Re-Entrancy-Sperre: savePfad verwirft schnelle Folgeaufrufe nicht mehr
+    // (es wartet und fasst zusammen). Damit koennte ein zweiter Klick WAEHREND
+    // eines laufenden Speicherns hier erneut durchlaufen und eine zweite,
+    // identische Lernleiter an den Pfad haengen — genau das Duplikat, das die
+    // alte Bremse nebenbei verhindert hat. Also hier sperren, aber sichtbar.
+    let saveToPfadLaeuft = false;
     async function saveToPfad() {
+        if (saveToPfadLaeuft) { toast('Speichern läuft bereits …'); return; }
+        saveToPfadLaeuft = true;
+        try { return await saveToPfadIntern(); }
+        finally { saveToPfadLaeuft = false; }
+    }
+
+    async function saveToPfadIntern() {
         if (!previewData || !previewData.length) { toast('Erst Vorschau generieren'); return; }
         // Nicht leer speichern: klar melden statt still eine leere Lernleiter anzulegen.
         if (!previewData.some(p => p.tasks.some(t => t.selected))) { toast('Keine Aufgaben ausgewählt — nichts zu speichern'); return; }
@@ -2304,16 +2341,44 @@
 
     // Zentral speichern, damit ein fehlgeschlagener Request nicht still
     // verschluckt wird - sonst sieht der Nutzer Daten, die es nicht mehr gibt.
-    let savePfadLaeuft = false;
     let savePfadZuletzt = 0;
+    const SAVE_MINDESTABSTAND = 400;   // ms zwischen zwei Speicher-STARTS
+    let savePfadKette = Promise.resolve();   // serialisiert alle Speichervorgaenge
+    const savePfadWartend = new Map();       // pfad-Objekt -> bereits eingereihter Lauf
+
+    // Warum es hier ueberhaupt eine Bremse gibt (aus echten Vorfaellen):
+    //   1. Ueberlappende Laeufe legten dieselbe Lernleiter zweimal an — der zweite
+    //      Lauf startete, bevor der erste ll.id vom POST zurueckgeschrieben hatte,
+    //      und POSTete darum erneut statt zu PUTten (Duplikat + Alte im Papierkorb).
+    //   2. Schnelle Wiederholungen erzeugten Request-Stuerme (429 am Abuse-Guard),
+    //      weil jeder Save die Pfadliste holt und je Lernleiter schreibt.
+    // Die Bremse war richtig, ihre Umsetzung nicht: sie hat den Aufruf VERWORFEN und
+    // das nur in die Konsole geschrieben. Fuer die Lehrkraft hiess das: klicken,
+    // nichts passiert, keine Meldung (auf dem iPad reichte ein zweiter Tipp).
+    // Jetzt wird nicht mehr verworfen, sondern SERIALISIERT und ZUSAMMENGEFASST:
+    //   - Laeufe haengen an einer Kette, ueberlappen also nie (Grund 1 bleibt gedeckt).
+    //   - Vor dem Start wird die Restzeit des Mindestabstands abgewartet (Grund 2).
+    //   - Mehrere Klicks auf denselben Pfad, die noch nicht gestartet sind, teilen
+    //     sich EINEN Lauf — zehn Klicks ergeben ein Speichern, keine Warteschlange.
+    // Der Lauf liest `pfad` erst beim Start, bekommt also den neuesten Stand mit.
     async function savePfad(pfad) {
-        // Schutz vor Runaway: keine ueberlappenden Speichervorgaenge (sonst legt
-        // jeder halbfertige Lauf neue Lernleitern an) und ein kurzer Mindestabstand
-        // zwischen zwei Speichervorgaengen.
-        if (savePfadLaeuft) { console.warn('savePfad: laeuft bereits — Aufruf ignoriert (Schutz vor Mehrfach-Anlage)'); return false; }
-        const jetzt = Date.now();
-        if (jetzt - savePfadZuletzt < 400) { console.warn('savePfad: zu schnell hintereinander — ignoriert'); return false; }
-        savePfadLaeuft = true; savePfadZuletzt = jetzt;
+        const offen = savePfadWartend.get(pfad);
+        if (offen) return offen;   // schon eingereiht: derselbe Klick, nicht zwei
+        const lauf = savePfadKette.then(async () => {
+            savePfadWartend.delete(pfad);   // ab jetzt zaehlt ein neuer Klick wieder
+            const rest = SAVE_MINDESTABSTAND - (Date.now() - savePfadZuletzt);
+            if (rest > 0) await new Promise(r => setTimeout(r, rest));
+            savePfadZuletzt = Date.now();
+            return savePfadIntern(pfad);
+        });
+        savePfadWartend.set(pfad, lauf);
+        // Die Kette darf nie brechen — savePfadIntern faengt selbst, das hier ist
+        // nur die Sicherung gegen einen unerwarteten Wurf.
+        savePfadKette = lauf.catch(() => {});
+        return lauf;
+    }
+
+    async function savePfadIntern(pfad) {
         try {
             // Bestehende Pfade EINMAL holen (fuer Find-or-create per Name und um die
             // aktuellen Ladder-IDs zu kennen — fuer den Upsert).
@@ -2411,8 +2476,6 @@
         } catch (e) {
             toast('Speichern fehlgeschlagen: ' + e.message);
             return false;
-        } finally {
-            savePfadLaeuft = false;
         }
     }
 
