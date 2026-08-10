@@ -44,10 +44,26 @@ set -uo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# .deploy.env liefert die Vorgaben — aber was ausdruecklich in der Umgebung
+# steht, gewinnt. Vorher ueberschrieb die Datei jede mitgegebene Variable, und
+# ein Lauf gegen eine andere Instanz benutzte stillschweigend das Konto der
+# Produktivinstanz. Genau falsch herum: eine ausdrueckliche Angabe ist die
+# spezifischere.
+_VOR_URL="${SELFTEST_URL:-}"
+_VOR_MAIL="${SELFTEST_EMAIL:-}"
+_VOR_PW="${SELFTEST_PASSWORD:-}"
+_VOR_TOKEN="${SELFTEST_TOKEN:-}"
+
 if [ -f "$DIR/.deploy.env" ]; then
   # shellcheck disable=SC1091
   . "$DIR/.deploy.env"
 fi
+
+[ -n "$_VOR_URL" ]   && SELFTEST_URL="$_VOR_URL"
+[ -n "$_VOR_MAIL" ]  && SELFTEST_EMAIL="$_VOR_MAIL"
+[ -n "$_VOR_PW" ]    && SELFTEST_PASSWORD="$_VOR_PW"
+[ -n "$_VOR_TOKEN" ] && SELFTEST_TOKEN="$_VOR_TOKEN"
+true   # die Kette oben darf den Rueckgabewert nicht auf 1 setzen
 
 # Adresse: --url schlaegt alles, sonst SELFTEST_URL, sonst SITE_URL, sonst der
 # lokale Port. Der Test laeuft von diesem Rechner aus gegen die oeffentliche
@@ -99,12 +115,55 @@ STATUS=0
 # Was lief, was nicht — wird am Ende aufgezaehlt. Ein uebersprungener Teil ist
 # kein Schweigen wert: sonst liest sich "gruen" wie "alles geprueft".
 BERICHT=()
+# Maschinenlesbare Etappenmeldung fuer die Fortschrittsanzeige des Deploys.
+#
+# Bewusst eine eigene Zeile und NICHT der Fliesstext: wer den Fortschritt aus
+# "→ Systemtest: …" herausliest, erklaert eine Ausgabe zur Schnittstelle, und
+# die naechste Umformulierung bricht es still. Geschrieben wird nur, wenn
+# SELFTEST_ETAPPEN_DATEI gesetzt ist — sonst kostet es nichts.
+#
+# Format: "<nummer>/<gesamt>\t<name>". Uebersprungene Teile werden mitgezaehlt
+# und gemeldet, sonst stimmt die Zaehlung nicht.
+ETAPPE_NR=0
+ETAPPEN_GESAMT=4
+
+# Erste Zeile: der Plan. Welche Teile fallen aus, BEVOR der erste laeuft?
+#
+# Ohne das schaetzt die Fortschrittsanzeige des Deploys mit den Gewichten
+# vollstaendiger Laeufe und ist bei --schnell viel zu pessimistisch ("noch ca.
+# 0:26", fertig nach 0:10). Mit dem Plan kann sie die Gewichte der
+# uebersprungenen Teile von vornherein auf 0 setzen.
+#
+# Format: "PLAN<TAB><gesamt><TAB><nummern der uebersprungenen, kommagetrennt>"
+# — die uebrigen Zeilen haben die Form "<n>/<gesamt><TAB><name>", also gut
+# unterscheidbar.
+plan_melden() {
+  [ -n "${SELFTEST_ETAPPEN_DATEI:-}" ] || return 0
+  local aus=""
+  [ "$MIT_SYSTEM" = "1" ] || aus="2"
+  if [ "$MIT_BROWSER" != "1" ]; then
+    [ -n "$aus" ] && aus="$aus,3,4" || aus="3,4"
+  fi
+  printf 'PLAN\t%s\t%s\n' "$ETAPPEN_GESAMT" "$aus" \
+    >> "$SELFTEST_ETAPPEN_DATEI" 2>/dev/null || true
+}
+
+etappe() {
+  ETAPPE_NR=$((ETAPPE_NR + 1))
+  [ -n "${SELFTEST_ETAPPEN_DATEI:-}" ] || return 0
+  printf '%s/%s\t%s\n' "$ETAPPE_NR" "$ETAPPEN_GESAMT" "$1" \
+    >> "$SELFTEST_ETAPPEN_DATEI" 2>/dev/null || true
+}
+
 def_ok() { BERICHT[${#BERICHT[@]}]="  ✓ $1"; }
 def_aus() { BERICHT[${#BERICHT[@]}]="  ○ $1 — UNGEPRUEFT: $2"; }
 def_rot() { BERICHT[${#BERICHT[@]}]="  ✗ $1"; }
 
+plan_melden
+etappe "Selbsttest: API, Einrichtung, Seiten, Module"
 python3 "$DIR/scripts/selftest.py" "${ARGS[@]+"${ARGS[@]}"}" && def_ok "API, Einrichtung, Seiten, Modul-Roundtrips" || { STATUS=1; def_rot "API, Einrichtung, Seiten, Modul-Roundtrips"; }
 
+etappe "Systemtest: jedes Modul einzeln"
 if [ "$MIT_SYSTEM" = "1" ]; then
   echo ""
   if [ -z "$SELFTEST_EMAIL" ] || [ -z "$SELFTEST_PASSWORD" ]; then
@@ -123,6 +182,7 @@ else
   def_aus "Systemtest (jedes Modul einzeln, Regel 3, Noten nachgerechnet)" "mit --schnell/--ohne-system abgeschaltet"
 fi
 
+etappe "Browser-Rundgang: Seiten, Handy, dunkel"
 if [ "$MIT_BROWSER" = "1" ]; then
   echo ""
   echo "→ Browser-Rundgang (Playwright)..."
@@ -133,6 +193,7 @@ if [ "$MIT_BROWSER" = "1" ]; then
       echo "  ⚠ Installation fehlgeschlagen."
       BROWSER_BEREIT=0
       STATUS=1
+      etappe "Modul-Oberflaechen einzeln (uebersprungen)"
       def_aus "Browser-Rundgang" "Playwright liess sich nicht installieren"
       def_aus "Modul-Oberflaechen einzeln" "Playwright liess sich nicht installieren"
     }
@@ -142,6 +203,7 @@ if [ "$MIT_BROWSER" = "1" ]; then
        --email "$SELFTEST_EMAIL" --passwort "$SELFTEST_PASSWORD") \
       && def_ok "Browser-Rundgang: Seiten, Konsole, Verlinkungen, Handy, dunkel" \
       || { STATUS=1; def_rot "Browser-Rundgang"; }
+    etappe "Modul-Oberflaechen einzeln"
     if [ -f "$DIR/scripts/systemtest-browser.mjs" ] && [ -n "$SELFTEST_EMAIL" ]; then
       echo ""
       echo "→ Modul-Oberflaechen einzeln (Playwright)..."
@@ -155,6 +217,7 @@ if [ "$MIT_BROWSER" = "1" ]; then
     fi
   fi
 else
+  etappe "Modul-Oberflaechen einzeln (uebersprungen)"
   def_aus "Browser-Rundgang" "mit --schnell/--ohne-browser abgeschaltet"
   def_aus "Modul-Oberflaechen einzeln" "mit --schnell/--ohne-browser abgeschaltet"
 fi
