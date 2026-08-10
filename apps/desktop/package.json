@@ -13,14 +13,19 @@
   "build": {
     "appId": "de.nuvora.desktop",
     "productName": "Nuvora",
-    "files": ["main.js", "preload.js", "setup.html", "package.json"],
+    "files": [
+      "main.js",
+      "preload.js",
+      "setup.html",
+      "package.json"
+    ],
     "mac": {
       "target": "dmg",
       "category": "public.app-category.education"
     }
   },
   "devDependencies": {
-    "electron": "^32.0.0",
-    "electron-builder": "^25.0.0"
+    "electron": "^43.3.0",
+    "electron-builder": "^26.15.3"
   }
 }

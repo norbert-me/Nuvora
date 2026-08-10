@@ -14,6 +14,12 @@ in einem eigenen Fenster (Dock-Icon, kein Browser-Rahmen).
 **Noch nicht:** offline **schreiben** und synchronisieren (Phase 1 — Outbox +
 Auto-Sync bei Verbindung).
 
+## Voraussetzungen
+
+- **macOS 12 (Monterey) oder neuer** — Electron 43 (Chromium 150) unterstützt
+  nichts Älteres.
+- **Node 22.12 oder neuer** zum Bauen (verlangt Electron per `engines`).
+
 ## Ausprobieren (Entwicklungsmodus)
 
 ```bash
@@ -21,6 +27,10 @@ cd apps/desktop
 npm install
 NUVORA_URL=http://192.168.10.75:8080 npm start
 ```
+
+Seit Electron 42 lädt `npm install` die Electron-Binärdatei **nicht** mehr per
+`postinstall` (Härtung gegen Lieferketten-Angriffe); sie kommt beim ersten
+`npm start` bzw. beim ersten Bau. Der erste Lauf braucht also Netz.
 
 Ohne `NUVORA_URL` fragt die App beim ersten Start nach der Server-Adresse und
 merkt sie sich (Menü **Server → Server-Adresse ändern…** zum Ändern).
