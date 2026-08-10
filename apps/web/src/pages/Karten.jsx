@@ -13,6 +13,7 @@ import PublishModal from "../components/PublishModal.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import Latex from "../components/Latex.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
+import { sende } from "../core/melden.js";
 
 // LaTeX-Schnelltasten (wie im CardVote-Editor): fügt Formeln ins fokussierte Feld.
 const LATEX_BUTTONS = [
@@ -105,13 +106,21 @@ export default function Karten() {
   // erst ohne Kurs, dann mit. Kommt die erste (klassenweite) Antwort als zweite
   // an, stehen die Stapel der ganzen Klasse statt der des Kurses da. Nur die
   // juengste Antwort darf schreiben.
-  const ladenr = useRef(0);
+  //
+  // JE LADEWEG EIN EIGENER ZAEHLER. Mit einem gemeinsamen verwarfen sich die
+  // beiden gegenseitig: loadDecks und loadFolders laufen im selben Effekt,
+  // loadFolders zaehlte hoch, und die Antwort der Stapel galt danach als
+  // veraltet — die Stapelliste blieb leer, ein neu angelegter Stapel war nach
+  // dem Neuladen "verschwunden". Ein Wettlaufschutz, der selbst Daten
+  // verschluckt, ist schlimmer als der Wettlauf.
+  const ladenrDecks = useRef(0);
+  const ladenrFolders = useRef(0);
   const loadDecks = (id) => {
     if (!id) return;
-    const meine = ++ladenr.current;
+    const meine = ++ladenrDecks.current;
     setLoadingDecks(true);
     return fetch(`${API}/classes/${id}/decks${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => {
-      if (meine === ladenr.current) setDecks(d);
+      if (meine === ladenrDecks.current) setDecks(d);
     }).catch(() => {}).finally(() => { setLoadingDecks(false); decksLoadedOnce.current = true; });
   };
   // Ordner (wie CardVote) zum Gruppieren der Stapel — pro Klasse/Kurs.
@@ -123,9 +132,9 @@ export default function Karten() {
   const [addName, setAddName] = useState("");
   const loadFolders = (id) => {
     if (!id) return;
-    const meine = ++ladenr.current;
+    const meine = ++ladenrFolders.current;
     fetch(`${API}/classes/${id}/card-folders${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => {
-      if (meine === ladenr.current) setCardFolders(Array.isArray(d) ? d : []);
+      if (meine === ladenrFolders.current) setCardFolders(Array.isArray(d) ? d : []);
     }).catch(() => {});
   };
   useEffect(() => { loadDecks(classId); loadFolders(classId); setCurrentCardFolder(null); }, [classId, kursId]);
@@ -150,7 +159,7 @@ export default function Karten() {
   const folderById = () => Object.fromEntries(cardFolders.map((f) => [f.id, f]));
   const isAncestor = (aId, bId) => { const m = folderById(); let cur = m[bId]?.parent_id ?? null; while (cur != null) { if (cur === aId) return true; cur = m[cur]?.parent_id ?? null; } return false; };
   const canDropInto = (dragId, targetId) => dragId != null && targetId !== dragId && !isAncestor(dragId, targetId) && ((folderById()[dragId]?.parent_id ?? null) !== (targetId ?? null));
-  const moveFolderTo = async (fId, parentId) => { const f = folderById()[fId]; if (!f) return; await fetch(`${API}/card-folders/${fId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: f.name, parent_id: parentId }) }).catch(() => {}); loadFolders(classId); };
+  const moveFolderTo = async (fId, parentId) => { const f = folderById()[fId]; if (!f) return; await sende(`${API}/card-folders/${fId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: f.name, parent_id: parentId }) }, "Ordner verschieben"); loadFolders(classId); };
   // Generisch: gilt ein Ablegen auf targetId (Ordner oder Wurzel)? Für Ordner mit
   // Zyklus-Schutz, für Stapel wenn er nicht schon dort liegt.
   const canDrop = (targetId) => {
@@ -190,13 +199,15 @@ export default function Karten() {
     loadDecks(classId);
   };
   const folderPath = (fid) => { const byId = Object.fromEntries(cardFolders.map((f) => [f.id, f])); const path = []; let cur = fid; while (cur != null && byId[cur]) { path.unshift(byId[cur]); cur = byId[cur].parent_id ?? null; } return path; };
-  const createFolder = async (name) => { if (!name || !name.trim() || !classId) return; await fetch(`${API}/classes/${classId}/card-folders${kq}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), parent_id: currentCardFolder }) }).catch(() => {}); loadFolders(classId); };
+  const createFolder = async (name) => { if (!name || !name.trim() || !classId) return; await sende(`${API}/classes/${classId}/card-folders${kq}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), parent_id: currentCardFolder }) }, t("karten.newFolderItem")); loadFolders(classId); };
   // askPrompt nimmt ein Optionen-Objekt, keinen zweiten Text: der bisherige Name
   // gehoert unter „initial", sonst startet das Feld leer und die Lehrkraft muss
   // ihn abtippen (oder speichert versehentlich einen leeren Ordnernamen).
-  const renameFolder = async (f) => { const n = await askPrompt(t("karten.renameFolder"), { initial: f.name }); if (n == null || !n.trim()) return; await fetch(`${API}/card-folders/${f.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n.trim(), parent_id: f.parent_id ?? null }) }).catch(() => {}); loadFolders(classId); };
-  const deleteFolder = async (f) => { if (!await askConfirm(t("karten.delFolderConfirm"))) return; await fetch(`${API}/card-folders/${f.id}`, { method: "DELETE" }).catch(() => {}); if (currentCardFolder === f.id) setCurrentCardFolder(f.parent_id ?? null); loadFolders(classId); loadDecks(classId); };
-  const moveDeck = async (deck, folderId) => { await fetch(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", folder_id: folderId }) }).catch(() => {}); loadDecks(classId); };
+  const renameFolder = async (f) => { const n = await askPrompt(t("karten.renameFolder"), { initial: f.name }); if (n == null || !n.trim()) return; await sende(`${API}/card-folders/${f.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n.trim(), parent_id: f.parent_id ?? null }) }, t("karten.renameFolder")); loadFolders(classId); };
+  const deleteFolder = async (f) => { if (!await askConfirm(t("karten.delFolderConfirm"))) return; await sende(`${API}/card-folders/${f.id}`, { method: "DELETE" }, t("common.delete")); if (currentCardFolder === f.id) setCurrentCardFolder(f.parent_id ?? null); loadFolders(classId); loadDecks(classId); };
+  // Der Stapel wandert optisch sofort; ohne Meldung sah eine abgelehnte
+  // Verschiebung so aus, als wäre er beim Ziehen verlorengegangen.
+  const moveDeck = async (deck, folderId) => { await sende(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", folder_id: folderId }) }, "Stapel verschieben"); loadDecks(classId); };
   // Aus dem „+"-Menü gewählten Typ anlegen (Stapel im aktuellen Ordner / Ordner).
   const commitAdd = async () => {
     const name = addName.trim(); if (!name) return;
@@ -220,7 +231,7 @@ export default function Karten() {
       const r = await fetch(`${API}/classes/${classId}/decks${kq}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, folder_id: currentCardFolder }) }).catch(() => null);
       if (!r || !r.ok) return;
       const deck = await r.json();
-      await fetch(`${API}/decks/${deck.id}/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cards }) }).catch(() => {});
+      await sende(`${API}/decks/${deck.id}/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cards }) }, t("common.import"));
       loadDecks(classId);
     };
     input.click();

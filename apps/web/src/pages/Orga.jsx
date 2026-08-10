@@ -1,7 +1,7 @@
 // Modul Orga — Sammel-Checklisten je Klasse. Punkte (z.B. „Unterschrift KA1")
 // als Spalten, Schüler als Zeilen, je Zelle ein Häkchen. Nur die Häkchen liegen
 // im Modul, die Schüler im Kern.
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
