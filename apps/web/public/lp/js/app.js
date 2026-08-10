@@ -1257,8 +1257,8 @@
             const kat = getKategorie(a);
             const hasDetail = a.bild || a.aufgabentext;
             return `
-            <tr class="${hasDetail ? 'task-row-clickable' : ''}" data-detail-id="${a._id}">
-                <td><input type="checkbox" class="bulk-cb" data-id="${a._id}"></td>
+            <tr class="${hasDetail ? 'task-row-clickable' : ''}" data-detail-id="${escAttr(a._id)}">
+                <td><input type="checkbox" class="bulk-cb" data-id="${escAttr(a._id)}"></td>
                 <td><strong>${esc(fmtId(a.code || a.id))}</strong>${hasDetail ? ' <span class="detail-hint" title="Details">' + ICON.chevron + '</span>' : ''}</td>
                 <td>${esc(a.thema)}${a.unterthema ? '<br><small style="color:var(--text-muted)">' + esc(a.unterthema) + '</small>' : ''}</td>
                 <td><span class="badge badge-${katBadgeClass(kat)}">${esc(kat)}</span></td>
@@ -1268,8 +1268,8 @@
                 <td>${a.loesung ? '<span class="icon-success" title="Lösung vorhanden">' + ICON.check + '</span>' : '–'}</td>
                 <td>
                     <div class="btn-group">
-                        <button class="btn icon" data-action="edit" data-id="${a._id}" title="Bearbeiten">${ICON.edit}</button>
-                        <button class="btn icon danger" data-action="delete" data-id="${a._id}" title="Löschen">${ICON.delete}</button>
+                        <button class="btn icon" data-action="edit" data-id="${escAttr(a._id)}" title="Bearbeiten">${ICON.edit}</button>
+                        <button class="btn icon danger" data-action="delete" data-id="${escAttr(a._id)}" title="Löschen">${ICON.delete}</button>
                     </div>
                 </td>
             </tr>`;
@@ -1718,8 +1718,8 @@
                 <td>${esc(s.notizen) || '–'}</td>
                 <td>
                     <div class="btn-group">
-                        <button class="btn icon" data-action="edit" data-id="${s._id}" title="Bearbeiten">${ICON.edit}</button>
-                        <button class="btn icon danger" data-action="delete" data-id="${s._id}" title="Löschen">${ICON.delete}</button>
+                        <button class="btn icon" data-action="edit" data-id="${escAttr(s._id)}" title="Bearbeiten">${ICON.edit}</button>
+                        <button class="btn icon danger" data-action="delete" data-id="${escAttr(s._id)}" title="Löschen">${ICON.delete}</button>
                     </div>
                 </td>
             </tr>
@@ -2216,7 +2216,7 @@
             const list = document.getElementById('add-task-list');
             list.innerHTML = filtered.length ? filtered.map(a => {
                 const kat = getKategorie(a);
-                return `<div class="add-task-item" data-id="${a._id}">
+                return `<div class="add-task-item" data-id="${escAttr(a._id)}">
                     <span class="badge badge-${katBadgeClass(kat)}">${esc(kat)}</span>
                     <strong>${esc(fmtId(a.code || a.id))}</strong> ${esc(a.quelle)}
                     ${a.operator ? ' <span class="badge badge-operator">' + esc(a.operator) + '</span>' : ''}
@@ -3547,7 +3547,7 @@
     function renderLernpfade() {
         const list = document.getElementById('pfade-list');
         list.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn small" id="btn-import-pfad">${ICON.import} Lernpfad/Lernleiter importieren</button></div>` + lernpfade.map(p => `
-            <div class="list-row" data-action="edit" data-id="${p._id}">
+            <div class="list-row" data-action="edit" data-id="${escAttr(p._id)}">
                 <div>
                     <strong>${esc(p.name)}</strong>
                     <span style="color:var(--text-muted)">– ${(p.lernleitern || []).length} Lernleitern</span>
@@ -3556,11 +3556,11 @@
                     <details class="export-menu">
                         <summary class="btn icon" title="Exportieren">${ICON.export}</summary>
                         <div class="export-pop">
-                            <button class="btn small" data-action="export-full" data-id="${p._id}" title="Vollständig, mit Schülerzuweisungen">${ICON.export} Export</button>
-                            <button class="btn small" data-action="export-vorlage" data-id="${p._id}" title="Ohne Schülerdaten (teilbar)">${ICON.download} Vorlage</button>
+                            <button class="btn small" data-action="export-full" data-id="${escAttr(p._id)}" title="Vollständig, mit Schülerzuweisungen">${ICON.export} Export</button>
+                            <button class="btn small" data-action="export-vorlage" data-id="${escAttr(p._id)}" title="Ohne Schülerdaten (teilbar)">${ICON.download} Vorlage</button>
                         </div>
                     </details>
-                    <button class="btn icon danger" data-action="delete" data-id="${p._id}" title="Löschen">${ICON.delete}</button>
+                    <button class="btn icon danger" data-action="delete" data-id="${escAttr(p._id)}" title="Löschen">${ICON.delete}</button>
                 </div>
             </div>
         `).join('');

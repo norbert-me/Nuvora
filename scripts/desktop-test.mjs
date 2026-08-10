@@ -550,7 +550,9 @@ async function lauf() {
   // ── 1b. Start MIT Adresse ──
   const profil = neuerProfilOrdner("haupt");
   let { app, seite } = await starteApp(profil, URL_BASIS);
-  let beobachter = beobachte(seite);
+  // Erst nach dem Neustart (2b) gesetzt: die Fenster-/Menuepruefungen davor
+  // lesen keine Konsolenmeldungen, und die alte Seite ist danach ohnehin weg.
+  let beobachter;
   try {
     const fenster = await app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows().map((w) => ({ titel: w.getTitle(), sichtbar: w.isVisible() })));

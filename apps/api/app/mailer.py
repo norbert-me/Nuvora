@@ -17,7 +17,12 @@ def _fuer_log(wert: str, max_len: int = 120) -> str:
     Datenschutz-Auskunft belegen. Umbrueche und Steuerzeichen fliegen raus,
     die Adresse bleibt lesbar.
     """
-    text = "".join(" " if ord(c) < 32 or ord(c) == 127 else c for c in (wert or ""))
+    # Umbrueche ausdruecklich zuerst — nicht nur der Lesbarkeit wegen: die
+    # Pruefwerkzeuge (CodeQL) erkennen erst diese Form als Bereinigung an und
+    # melden die Stelle sonst weiter als Log-Injektion. Die anschliessende
+    # Schleife raeumt die uebrigen Steuerzeichen weg.
+    text = (wert or "").replace("\r", " ").replace("\n", " ")
+    text = "".join(" " if ord(c) < 32 or ord(c) == 127 else c for c in text)
     text = text.strip()
     if len(text) > max_len:
         text = text[:max_len] + "…"
