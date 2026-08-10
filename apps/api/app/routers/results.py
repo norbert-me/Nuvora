@@ -495,8 +495,20 @@ async def get_question_stats(question_id: int, user: User = Depends(get_current_
     q = await db.get(Question, question_id)
     if not q:
         raise HTTPException(404)
+    # Die Frage gehoert geprueft. Ohne das gab dieser Endpunkt zu JEDER fremden
+    # Frage die Antwortverteilung, die Trefferquote und die Nutzungshaeufigkeit
+    # heraus — durchzaehlbar ueber die ID.
+    # owner_id IS NULL zaehlt als eigen: Bestandsdaten aus der Zeit vor den
+    # Konten (siehe die Nachtragung beim Start in main.py).
+    if q.owner_id and q.owner_id != user.id:
+        raise HTTPException(404)
 
-    result = await db.execute(select(Scan).where(Scan.question_id == question_id))
+    # Und nur die eigenen Scans zaehlen: dieselbe Frage kann in fremden
+    # Sitzungen benutzt worden sein.
+    eigene_sitzungen = select(Session.id).where(
+        (Session.owner_id == user.id) | (Session.owner_id.is_(None)))
+    result = await db.execute(select(Scan).where(
+        Scan.question_id == question_id, Scan.session_id.in_(eigene_sitzungen)))
     scans = result.scalars().all()
 
     total = len(scans)
@@ -643,7 +655,8 @@ async def stats_dashboard(user: User = Depends(get_current_user), db: AsyncSessi
     scan_count = (await db.execute(
         select(func.count(Scan.id)).where(Scan.session_id.in_(select(Session.id).where(own_session)))
     )).scalar()
-    question_count = (await db.execute(select(func.count(Question.id)))).scalar()
+    question_count = (await db.execute(select(func.count(Question.id)).where(
+        (Question.owner_id == user.id) | (Question.owner_id.is_(None))))).scalar()
 
     class_stats = []
     for cls in classes:
@@ -704,7 +717,13 @@ async def stats_dashboard(user: User = Depends(get_current_user), db: AsyncSessi
 
     # Recent sessions with scores
     recent_result = await db.execute(
-        select(Session).where(Session.archived == False).order_by(Session.created_at.desc()).limit(10)
+        # own_session, nicht nur archived: ohne den Filter standen hier die
+        # zuletzt aktiven Sitzungen ALLER Lehrkraefte — mit Sitzungs-, Klassen-
+        # und Quiznamen. Das passierte ohne Zutun, bei jedem Aufruf des
+        # Dashboards, und faellt keinem Test auf, der nur "fremde ID lesen"
+        # prueft.
+        select(Session).where(own_session, Session.archived == False)
+        .order_by(Session.created_at.desc()).limit(10)
     )
     recent_sessions = recent_result.scalars().all()
     recent = []

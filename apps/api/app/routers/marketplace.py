@@ -14,6 +14,7 @@ from ..models import (
     CardDeck, Card, Method, SchoolClass, Exercise, LearningPath, LearningLadder, Topic,
 )
 from .auth import get_current_user, rate_limit
+from .folders import ensure_set_access
 
 router = APIRouter(prefix="/api/marketplace", tags=["marketplace"])
 
@@ -273,11 +274,14 @@ async def publish_quiz(body: PublishBody, user: User = Depends(get_current_user)
     qs = await db.get(QuestionSet, body.set_id)
     if not qs:
         raise HTTPException(404, "Frageset nicht gefunden")
-    # Nur eigene Fragesets veroeffentlichen (Ordner-Eigentuemer pruefen)
-    if qs.folder_id is not None:
-        folder = await db.get(Folder, qs.folder_id)
-        if folder and folder.owner_id and folder.owner_id != user.id:
-            raise HTTPException(403, "Nur eigene Fragesets koennen veroeffentlicht werden")
+    # Nur eigene Fragesets veroeffentlichen.
+    #
+    # Hier stand die Pruefung INNERHALB von "if qs.folder_id is not None" — ein
+    # ORDNERLOSES fremdes Set liess sich damit ungeprueft veroeffentlichen,
+    # samt richtiger Antworten und unter dem eigenen Anzeigenamen. Der richtige
+    # Helfer existiert und wird jetzt benutzt; er kennt beide Wege (Set-Besitzer
+    # und Ordner-Besitzer) und laesst Altbestand ohne Eigentuemer durch.
+    await ensure_set_access(db, qs, user.id)
     result = await db.execute(
         select(QuestionSetItem)
         .options(selectinload(QuestionSetItem.question))

@@ -243,7 +243,9 @@ async def import_questions_xlsx(name: str = "Neues Frageset", folder_id: Optiona
     wb = load_workbook(io.BytesIO(data))
     ws = wb.active
 
-    qs = QuestionSet(name=name, folder_id=folder_id)
+    # owner_id: sonst ist das importierte Set fuer JEDES Konto lesbar
+    # (ensure_set_access laesst owner-lose Sets als Altbestand durch).
+    qs = QuestionSet(name=name, folder_id=folder_id, owner_id=user.id)
     db.add(qs)
     await db.flush()
 
@@ -330,6 +332,7 @@ async def import_question_set(body: ImportQuestionSetBody, user: User = Depends(
     qs = QuestionSet(
         name=body.name,
         folder_id=body.folder_id,
+        owner_id=user.id,   # sonst fuer jedes Konto lesbar (Altbestand-Ausnahme)
         shuffle_questions=body.shuffle_questions,
         shuffle_answers=body.shuffle_answers,
         niveau_aktiv=bool(getattr(body, "niveau_aktiv", False)),
@@ -430,6 +433,7 @@ async def _import_folder_recursive(data: dict, parent_id, owner_id, db: AsyncSes
         qs = QuestionSet(
             name=qs_data["name"],
             folder_id=folder.id,
+            owner_id=user.id,   # sonst fuer jedes Konto lesbar
             shuffle_questions=qs_data.get("shuffle_questions", False),
             shuffle_answers=qs_data.get("shuffle_answers", False),
             niveau_aktiv=bool(qs_data.get("niveau_aktiv", False)),
@@ -495,6 +499,7 @@ async def duplicate_question_set(set_id: int, user: User = Depends(get_current_u
     qs = QuestionSet(
         name=f"{orig.name} (Kopie)",
         folder_id=orig.folder_id,
+        owner_id=user.id,   # die Kopie gehoert der Person, die sie anlegt
         shuffle_questions=orig.shuffle_questions,
         shuffle_answers=orig.shuffle_answers,
     )
