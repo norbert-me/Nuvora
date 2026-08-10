@@ -1444,4 +1444,10 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        # Wie im Systemtest: ruhiger Satz statt Stapelabzug.
+        print("\n  Abgebrochen (Strg-C).\n  Falls Testdaten liegen blieben: "
+              "python3 scripts/aufraeumen.py --loeschen", file=sys.stderr)
+        sys.exit(130)

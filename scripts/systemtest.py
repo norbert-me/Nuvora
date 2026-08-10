@@ -1634,4 +1634,15 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        # Strg-C soll einen ruhigen Satz geben, keinen Stapelabzug. Der Abbruch
+        # ist ungefaehrlich: der `finally`-Block in main() laeuft beim
+        # Aufraeumen mit, stellt den Modulzustand wieder her und raeumt die
+        # Testdaten ab. Nur ein ZWEITES Strg-C waehrenddessen kann Reste und
+        # zugeschaltete Module hinterlassen — dann hilft `scripts/aufraeumen.py`.
+        print("\n  Abgebrochen (Strg-C). Modulzustand und Testdaten wurden "
+              "zurueckgesetzt.\n  Falls doch etwas liegen blieb: "
+              "python3 scripts/aufraeumen.py --loeschen", file=sys.stderr)
+        sys.exit(130)
