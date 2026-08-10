@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .database import engine
 from .models import Base
-from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizen, elternlog, notizblock, trash, selftest
+from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizen, elternlog, notizblock, trash, selftest, backup
 from . import websocket as ws
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -157,6 +157,9 @@ app.include_router(elternlog.router)
 app.include_router(notizblock.router)
 app.include_router(trash.router)
 app.include_router(selftest.router)
+# Sicherungen: Serververwaltung, kein Modul (steht deshalb nicht in REGISTRY).
+# Haengt komplett an _require_admin — die Dateien enthalten Art.-9-Daten.
+app.include_router(backup.router)
 app.include_router(marketplace.router)
 
 # Im Container /app/uploads (Volume). Ueberschreibbar, damit Tests und die
@@ -643,6 +646,7 @@ async def startup():
     asyncio.create_task(_cleanup_unverified_loop())   # unbestaetigte Konten, 14 Tage
     asyncio.create_task(_papierkorb_loop())           # Papierkorb, 30 Tage
     asyncio.create_task(_codesessions_aufraeumen())   # Code-Detektiv-Sitzungen
+    asyncio.create_task(backup.plan_loop())           # geplante Sicherungen, stuendlich geprueft
 
 
 # Arten des gemeinsamen Papierkorbs (routers/trash.py). Kinder zuerst, damit die

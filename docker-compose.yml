@@ -71,6 +71,11 @@ services:
       SELFTEST_TOKEN: ${SELFTEST_TOKEN:-}
     volumes:
       - uploads:/app/uploads
+      # Sicherungen (Administration -> Sicherung). Eigenes Volume, NICHT unter
+      # uploads: /api/uploads ist ein StaticFiles-Mount und ohne Anmeldung
+      # lesbar — eine Sicherung enthaelt Art.-9-Daten aller Schueler. Ohne
+      # dieses Volume waeren alle Sicherungen beim naechsten Bauen weg.
+      - backups:/app/backups
       # Betreiberdaten: der Setup-Check im Admin-Profil prueft
       # /app/config/site.json. Ohne diesen Mount galt das Impressum immer als
       # fehlend, obwohl nginx dieselbe Datei unter /site.json ausliefert.
@@ -121,3 +126,4 @@ services:
 volumes:
   pgdata:
   uploads:
+  backups:

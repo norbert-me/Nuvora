@@ -117,6 +117,10 @@ const Help = React.lazy(() => import("./pages/Help.jsx"));
 const Modules = React.lazy(() => import("./pages/Modules.jsx"));
 const Topics = React.lazy(() => import("./pages/Topics.jsx"));
 const Papierkorb = React.lazy(() => import("./pages/Papierkorb.jsx"));
+// Sicherungen: Serververwaltung, KEIN Modul — deshalb kein REGISTRY-Eintrag
+// und kein ModuleGate, sondern nur fuer die Administration (Nutzer-ID 1),
+// genau wie der Administrationsteil in /profile.
+const Backup = React.lazy(() => import("./pages/Backup.jsx"));
 const ThemaAnsicht = React.lazy(() => import("./pages/ThemaAnsicht.jsx"));
 const LernpfadModule = React.lazy(() => import("./pages/LernpfadModule.jsx"));
 const CodeDetektiv = React.lazy(() => import("./codedetektiv/CodeDetektiv.jsx"));
@@ -220,7 +224,7 @@ const TAFEL = "/tafel";
 // Menue passend zum Bereich. Man soll im Modul-Menue bleiben, auch auf
 // modulneutralen Seiten (Hilfe, Impressum), solange man aus einem Modul kam —
 // dafuer traegt der Hilfe-Link ?area, sonst greift der Pfad.
-const getModuleNavItems = (t, location) => {
+const getModuleNavItems = (t, location, user) => {
   const { pathname, search } = location;
   const params = new URLSearchParams(search);
   const area = pathname.startsWith(CV) ? "cardvote"
@@ -351,6 +355,10 @@ const getModuleNavItems = (t, location) => {
     { to: "/modules", label: t("nav.modules") },
     // Der Papierkorb ist gemeinsam (Kern) — kein Modul hat einen eigenen.
     { to: "/papierkorb", label: t("nav.trash") },
+    // Sicherungen enthalten die Daten ALLER Konten (inkl. DSGVO Art. 9) —
+    // nur die Administration sieht den Punkt ueberhaupt. Die Schranke sitzt
+    // trotzdem im Server (_require_admin), nicht hier.
+    ...(user && user.id === 1 ? [{ to: "/backup", label: t("nav.backup") }] : []),
   ];
 };
 
@@ -541,7 +549,7 @@ function Nav({ user, onLogout }) {
   }, [location.pathname, user]);
   const endTour = () => { const id = tourId; setTourId(null); try { localStorage.setItem(doneKey(id), "1"); } catch { /* egal */ } };
 
-  const navItems = getModuleNavItems(t, location);
+  const navItems = getModuleNavItems(t, location, user);
   const allPages = [...navItems, { to: "/tutorial", label: t("nav.tutorial") }, { to: `${CV}/scan`, label: t("nav.scanner") }, { to: "/profile", label: t("nav.profile") }, { to: `${CV}/evaluation`, label: t("nav.evaluation") }, { to: "/login", label: t("nav.login") }];
   const pageTitle = allPages.find((item) => location.pathname.startsWith(item.to))?.label || "";
 
@@ -840,6 +848,7 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path="/kurse" element={user ? <Kurse /> : <Landing />} />
           <Route path="/topics" element={user ? <Topics /> : <Landing />} />
           <Route path="/papierkorb" element={user ? <Papierkorb /> : <Landing />} />
+          <Route path="/backup" element={user ? <Backup /> : <Landing />} />
           <Route path="/thema/:id" element={user ? <ThemaAnsicht /> : <Landing />} />
           <Route path="/login" element={user ? <NuvoraHome user={user} /> : <Login onLogin={handleLogin} />} />
           <Route path="/reset-password" element={<ResetPassword />} />
