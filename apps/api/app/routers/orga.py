@@ -13,17 +13,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from ..models import OrgaItem, SchoolClass, Student, User
-from .auth import get_current_user, rate_limit
-from .modules import is_active
+from .auth import rate_limit
+from .modules import modul_pflicht
 
 router = APIRouter(prefix="/api/orga", tags=["orga"])
 MODULE_KEY = "orga"
 
 
-async def require_module(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> User:
-    if not await is_active(db, user.id, MODULE_KEY):
-        raise HTTPException(403, "Modul Orga ist nicht aktiviert")
-    return user
+require_module = modul_pflicht(MODULE_KEY)
 
 
 async def _owned_class(db, user, class_id) -> SchoolClass:

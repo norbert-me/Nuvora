@@ -16,17 +16,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from ..models import CalendarBreak, CalendarEntry, CardDeck, ExamDate, Kurs, SchoolClass, TimetableSlot, SlotCancellation, Topic, User, WorkAnalysis, Session as TestSession
-from .auth import get_current_user, rate_limit
-from .modules import is_active
+from .auth import rate_limit
+from .modules import is_active, modul_pflicht
 
 router = APIRouter(prefix="/api/kalender", tags=["kalender"])
 MODULE_KEY = "kalender"
 
 
-async def require_module(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> User:
-    if not await is_active(db, user.id, MODULE_KEY):
-        raise HTTPException(403, "Modul Kalender ist nicht aktiviert")
-    return user
+require_module = modul_pflicht(MODULE_KEY)
 
 
 async def _check_class(db: AsyncSession, user: User, class_id: Optional[int]) -> None:

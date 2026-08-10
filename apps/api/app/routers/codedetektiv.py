@@ -19,17 +19,14 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from ..database import get_db
 from ..models import CodePuzzle, CodeSession, Topic, User
-from .auth import get_current_user, rate_limit, client_ip
-from .modules import is_active
+from .auth import rate_limit, client_ip
+from .modules import modul_pflicht
 
 router = APIRouter(prefix="/api/codedetektiv", tags=["codedetektiv"])
 MODULE_KEY = "code-detektiv"
 
 
-async def require_module(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> User:
-    if not await is_active(db, user.id, MODULE_KEY):
-        raise HTTPException(403, "Modul Code-Detektiv ist nicht aktiviert")
-    return user
+require_module = modul_pflicht(MODULE_KEY)
 
 
 class PuzzleIn(BaseModel):

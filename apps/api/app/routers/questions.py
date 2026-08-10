@@ -13,7 +13,7 @@ from ..uploads import bildtyp
 from .auth import get_current_user, rate_limit
 from .modules import modul_pflicht
 
-CARDVOTE = Depends(modul_pflicht("cardvote", "CardVote"))
+CARDVOTE = Depends(modul_pflicht("cardvote"))
 
 router = APIRouter(prefix="/api/questions", tags=["questions"], dependencies=[CARDVOTE])
 

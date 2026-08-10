@@ -12,7 +12,7 @@ from .auth import get_current_user, rate_limit, client_ip
 from .. import websocket as ws
 from .modules import modul_pflicht
 
-CARDVOTE = Depends(modul_pflicht("cardvote", "CardVote"))
+CARDVOTE = Depends(modul_pflicht("cardvote"))
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"], dependencies=[CARDVOTE])
 

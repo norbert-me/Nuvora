@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from ..models import CalendarEntry, Kurs, Method, MethodFolder, SchoolClass, Topic, User
-from .auth import get_current_user, rate_limit
-from .modules import is_active
+from .auth import rate_limit
+from .modules import is_active, modul_pflicht
 
 router = APIRouter(prefix="/api/methoden", tags=["methoden"])
 MODULE_KEY = "unterrichtsplanung"
@@ -28,10 +28,7 @@ async def _check_topic(db: AsyncSession, user_id: int, topic_id: Optional[int]) 
     return ok
 
 
-async def require_module(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> User:
-    if not await is_active(db, user.id, MODULE_KEY):
-        raise HTTPException(403, "Modul Methoden ist nicht aktiviert")
-    return user
+require_module = modul_pflicht(MODULE_KEY)
 
 
 # Kleine Startsammlung typischer Einstiege — wird einmalig angelegt, wenn die

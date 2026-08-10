@@ -20,23 +20,15 @@ from sqlalchemy.orm import selectinload
 
 from ..database import get_db
 from ..models import Exercise, LearningLadder, LearningPath, SchoolClass, Topic, User
-from .auth import get_current_user, rate_limit
-from .modules import is_active
+from .auth import rate_limit
+from .modules import modul_pflicht
 
 router = APIRouter(prefix="/api/lernpfad", tags=["lernpfad"])
 
 MODULE_KEY = "lernpfad"
 
 
-async def require_module(
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> User:
-    """Modul-Router haengen hinter der Aktivierung — sonst waere das Register
-    eine reine Anzeige und die Daten trotzdem erreichbar."""
-    if not await is_active(db, user.id, MODULE_KEY):
-        raise HTTPException(403, "Modul Lernpfad ist nicht aktiviert")
-    return user
+require_module = modul_pflicht(MODULE_KEY)
 
 
 async def _check_topic(db: AsyncSession, user: User, topic_id: Optional[int]) -> None:

@@ -13,17 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from ..models import SchoolClass, Student, User, ZufallDraw
-from .auth import get_current_user
-from .modules import is_active
+from .modules import modul_pflicht
 
 router = APIRouter(prefix="/api/zufall", tags=["zufall"])
 MODULE_KEY = "zufall"
 
 
-async def require_module(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> User:
-    if not await is_active(db, user.id, MODULE_KEY):
-        raise HTTPException(403, "Modul Zufallsschüler ist nicht aktiviert")
-    return user
+require_module = modul_pflicht(MODULE_KEY)
 
 
 async def _owned_class(db, user, class_id) -> SchoolClass:

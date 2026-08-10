@@ -18,7 +18,7 @@ from ..scoring import bewerte, status_of
 from .. import websocket as ws
 from .modules import modul_pflicht
 
-CARDVOTE = Depends(modul_pflicht("cardvote", "CardVote"))
+CARDVOTE = Depends(modul_pflicht("cardvote"))
 
 router = APIRouter(prefix="/api", tags=["results"], dependencies=[CARDVOTE])
 

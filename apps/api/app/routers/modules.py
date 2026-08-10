@@ -247,17 +247,29 @@ async def is_active(db: AsyncSession, user_id: int, key: str) -> bool:
     return result.scalar_one_or_none() is not None
 
 
-def modul_pflicht(key: str, name: str):
+def modul_pflicht(key: str, name: str = ""):
     """Baut die Schranke eines Moduls: ohne Aktivierung 403, kein Datenzugriff.
 
     Bis dahin schrieb jeder Modul-Router seine eigene Fassung ab — und CardVote
     hatte schlicht keine, obwohl es das groesste Modul ist. Eine Quelle, damit
     ein neues Modul die Schranke nicht vergessen kann.
+
+    Der Name kommt aus dem REGISTRY, er wird nicht uebergeben. Die 16 Kopien
+    hatten ihn abgetippt, und nach den Modul-Zusammenlegungen nannte die Meldung
+    Module, die es in der Uebersicht gar nicht mehr gibt ("Modul Sitzplan ist
+    nicht aktiviert", waehrend dort Orga steht) — die Lehrkraft konnte den
+    Fehler nicht beheben. Ein falscher SCHLUESSEL faellt jetzt beim Import auf,
+    nicht erst in einer 403-Meldung im Unterricht.
     """
+    mod = _BY_KEY.get(key)
+    if not mod:
+        raise KeyError(f"Modul '{key}' steht nicht im REGISTRY (modules.py)")
+    anzeige = name or mod.name
+
     async def schranke(user: User = Depends(get_current_user),
                        db: AsyncSession = Depends(get_db)) -> User:
         if not await is_active(db, user.id, key):
-            raise HTTPException(403, f"Modul {name} ist nicht aktiviert")
+            raise HTTPException(403, f"Modul {anzeige} ist nicht aktiviert")
         return user
     return schranke
 

@@ -33,7 +33,7 @@ from .modules import modul_pflicht
 
 # Klassen-Export/-Import gehoeren dem Kern, Fragen/Sets/Sitzungen dem Modul.
 # Deshalb haengt die Schranke hier an der einzelnen Route, nicht am Router.
-CARDVOTE = Depends(modul_pflicht("cardvote", "CardVote"))
+CARDVOTE = Depends(modul_pflicht("cardvote"))
 
 router = APIRouter(prefix="/api", tags=["export"])
 

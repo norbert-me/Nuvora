@@ -16,7 +16,7 @@ from ..models import SchoolClass, Student, User
 from .auth import get_current_user
 from .modules import modul_pflicht
 
-CARDVOTE = Depends(modul_pflicht("cardvote", "CardVote"))
+CARDVOTE = Depends(modul_pflicht("cardvote"))
 
 router = APIRouter(prefix="/api", tags=["cards"], dependencies=[CARDVOTE])
 

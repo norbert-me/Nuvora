@@ -30,8 +30,8 @@ from ..database import get_db
 from ..uploads import bildtyp
 from sqlalchemy.orm import selectinload
 from ..models import Card, CardDeck, CardFolder, CardReview, SchoolClass, Student, User, Session, Scan, QuestionSetItem
-from .auth import get_current_user, rate_limit
-from .modules import is_active
+from .auth import rate_limit
+from .modules import is_active, modul_pflicht
 
 router = APIRouter(prefix="/api/karten", tags=["karten"])
 MODULE_KEY = "karten"
@@ -133,10 +133,7 @@ def _empty_hist() -> dict:
     return {b: 0 for b in BUCKETS}
 
 
-async def require_module(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> User:
-    if not await is_active(db, user.id, MODULE_KEY):
-        raise HTTPException(403, "Modul Karten ist nicht aktiviert")
-    return user
+require_module = modul_pflicht(MODULE_KEY)
 
 
 async def _owned_class(db, user, class_id) -> SchoolClass:
