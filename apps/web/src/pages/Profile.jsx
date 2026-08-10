@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { useLanguage, LANGUAGES } from "../i18n/index.jsx";
-import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, th as thBasis, td as tdBasis, badge } from "../components/Icons.jsx";
 
 const API = "/api";
 
@@ -371,16 +371,30 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                 <table style={{ width: "100%", minWidth: 520, borderCollapse: "collapse", fontSize: 14 }}>
                   <thead>
                     <tr>
-                      <th style={thStyle}>{t("common.name")}</th>
                       <th style={thStyle}>{t("profile.email")}</th>
+                      <th style={thStyle}>{t("profile.role")}</th>
+                      <th style={thStyle}>{t("profile.accountState")}</th>
                       <th style={thStyle}></th>
                     </tr>
                   </thead>
                   <tbody>
                     {adminUsers.map(u => (
                       <tr key={u.id}>
-                        <td style={tdStyle}>{u.name || "–"}</td>
                         <td style={tdStyle}>{u.email}</td>
+                        {/* Rolle statt Anzeigename: die Administration ist das Konto mit
+                            id 1 (siehe _require_admin), der Name sagt darüber nichts. */}
+                        <td style={tdStyle}>
+                          {u.admin
+                            ? <span style={badge(C.info)}>{t("profile.roleAdmin")}</span>
+                            : <span style={{ color: "var(--text3)" }}>{t("profile.roleTeacher")}</span>}
+                        </td>
+                        {/* Bestätigt oder nicht — das Einzige, was hier eine Entscheidung
+                            stützt: ein unbestätigtes Konto kann sich nie anmelden. */}
+                        <td style={tdStyle}>
+                          {u.email_verified
+                            ? <span style={{ color: "var(--text3)" }}>{t("profile.verified")}</span>
+                            : <span style={badge(C.warning)}>{t("profile.unverified")}</span>}
+                        </td>
                         <td style={{ ...tdStyle, textAlign: "right" }}>
                           {u.id !== 1 && (
                             <button

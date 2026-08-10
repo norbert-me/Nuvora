@@ -759,7 +759,15 @@ async def admin_list_users(user: User = Depends(get_current_user), db: AsyncSess
     if user.id != 1:
         raise HTTPException(403, "Nur Admin")
     result = await db.execute(select(User).order_by(User.id))
-    return [{"id": u.id, "email": u.email, "name": u.name} for u in result.scalars().all()]
+    # Kein `name`: der ist ein freies Anzeigefeld der Lehrkraft und stuetzt
+    # keine Verwaltungsentscheidung — in der Liste las er sich wie eine Rolle
+    # ("Admin"), war aber nur ein Selbstgewaehlter Text. Was niemand braucht,
+    # wird nicht herausgegeben.
+    # Die Rolle haengt allein an der ID: Konto 1 ist die Administration
+    # (siehe _require_admin in main.py) — hier einmal ausgerechnet, damit die
+    # Oberflaeche die Regel nicht nachbaut.
+    return [{"id": u.id, "email": u.email, "admin": u.id == 1,
+             "email_verified": u.email_verified} for u in result.scalars().all()]
 
 
 @router.delete("/admin/users/{user_id}")
