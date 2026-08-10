@@ -12,7 +12,9 @@
 #
 # Nach dem Deploy laeuft ./selftest.sh VOLLSTAENDIG: API und Einrichtung, dann
 # jedes Modul einzeln (nur dieses aktiv, alle anderen muessen abweisen), dann
-# der Rundgang im echten Browser. Das dauert ein paar Minuten und ist Absicht:
+# der Rundgang im echten Browser und zuletzt die Desktop-App (Rundgang und
+# offline lesen; ohne macOS oder Electron uebersprungen, dann steht der Grund
+# im Umfang-Block). Das dauert ein paar Minuten und ist Absicht:
 # ein gruener Deploy soll heissen "die Seite laeuft", nicht "der Teil, den wir
 # angeschaut haben, laeuft". Health allein sagt nur "Container laeuft".
 #
@@ -186,9 +188,9 @@ BUILD_SERVICES="${ARGS[*]:-}"
 # Der Selbsttest gehoert NICHT dazu: er prueft, er liefert nicht aus, und er ist
 # der laengste Teil. Er bekommt in Phase 2 einen eigenen Balken.
 PHASE1_ETAPPEN=9
-# Phase 2 hat vier Teile. Die meldet selftest.sh selbst — uebersprungene zaehlen
-# mit, damit die Summe immer 4 ergibt.
-PHASE2_ETAPPEN=4
+# Phase 2 hat fuenf Teile (der fuenfte ist die Desktop-App). Die meldet
+# selftest.sh selbst — uebersprungene zaehlen mit, damit die Summe immer 5 ergibt.
+PHASE2_ETAPPEN=5
 
 echo "=== Nuvora Deploy ==="
 echo "Server: $SERVER"

@@ -53,7 +53,7 @@ Bestandskonten werden beim Start einmalig angeschlossen (`users.modules_initiali
 
 ### Selbsttest nach dem Deploy
 
-`./deploy.sh` ruft am Ende `./selftest.sh` — Health sagt nur „Container läuft", der Selbsttest sagt, ob es wirklich funktioniert. **Vollständig ist die Voreinstellung**: ein grüner Deploy soll heißen „die Seite läuft", nicht „der Teil, den wir angeschaut haben, läuft". Weniger geht nur ausdrücklich (`--schnell`, `--ohne-browser`, `--ohne-system`; beim Deploy `--schnelltest`), und dann zählt der Block „Umfang dieses Laufs" am Ende jeden übersprungenen Teil mit Grund auf. Fünf Teile:
+`./deploy.sh` ruft am Ende `./selftest.sh` — Health sagt nur „Container läuft", der Selbsttest sagt, ob es wirklich funktioniert. **Vollständig ist die Voreinstellung**: ein grüner Deploy soll heißen „die Seite läuft", nicht „der Teil, den wir angeschaut haben, läuft". Weniger geht nur ausdrücklich (`--schnell`, `--ohne-browser`, `--ohne-system`, `--ohne-desktop`; beim Deploy `--schnelltest`), und dann zählt der Block „Umfang dieses Laufs" am Ende jeden übersprungenen Teil mit Grund auf. Sieben Teile:
 
 | Teil | Was es prüft |
 | ---- | ------------ |
@@ -62,6 +62,10 @@ Bestandskonten werden beim Start einmalig angeschlossen (`users.modules_initiali
 | `scripts/selftest-browser.mjs` | Rundgang im echten Browser: jede Modul- und Kern-Seite rendert, keine Konsolenfehler, keine toten internen Links — dreimal: Desktop, **Handy (390 px, meldet waagerechten Überlauf samt schuldigem Element)** und **dunkles Design**. Dazu **echte Handgriffe** (Notizzettel, Thema anlegen) mit Neuladen als Beweis, dass gespeichert wurde. Playwright liegt isoliert in `scripts/`, nie in `apps/web` |
 | `scripts/systemtest.py` | Jedes Modul **einzeln**: `Schalter.nur(key)` schaltet alle anderen ab, dann müssen die eigenen Endpunkte 2xx liefern und **alle fremden genau 403** — weder 200 (Daten offen) noch 500 (Schranke kracht statt abzuweisen). Dazu 12 Inhalts-Roundtrips, die nach dem Schreiben **unabhängig neu lesen und Werte vergleichen**; CardVote vollständig (4 Fragen mit E/G, 3 Kinder, 12 Scans) mit **im Test nachgerechneten** Erwartungen für Trefferquote, E-Bonus, Notenverteilung, Minuspunkte und krank/anwesend; Noten übernehmen, ändern, gewichten; jede Modul-Brücke **zweimal** (mit beiden Modulen muss sie gehen, mit einem sauber abgelehnt werden) |
 | `scripts/systemtest-browser.mjs` | Dieselbe Matrix in der Oberfläche: je Modul rendert die Seite, die Navigation zeigt **genau dieses** Modul, fremde Adressen laufen ans ModuleGate — und vor allem bleiben **verbotene Verbindungen unsichtbar** (kein „Ins Notenmodul“ ohne Auswertung, kein Quiz-Selektor ohne CardVote), mit dem Gegenbeweis, dass sie bei beiden aktiven Modulen erscheinen. Dazu echte Handgriffe über die Oberfläche mit Neuladen als Beweis |
+| `scripts/desktop-test.mjs` | Die Desktop-App im echten Electron-Fenster — der Browser-Rundgang trifft sie nicht: Start, Anmeldung, alle Kern- und Modulseiten, das Menü, `window.open` bleibt dicht (die Hülle darf keine fremden Fenster aufreißen), ein echter Handgriff |
+| `scripts/desktop-offline.mjs` | Dieselbe App ohne Netz: Service Worker vorhanden, Lesen offline, Deep-Link offline, **echte Inhaltsdaten** statt einer leeren Hülle, und der Fehlerfall bei toter Adresse. Offline lesen ist das einzige Versprechen der Desktop-App — ungeprüft wäre es eine Behauptung |
+
+Die beiden Desktop-Teile brauchen macOS und ein installiertes Electron (`apps/desktop/node_modules`). Fehlt eins davon — oder das Testkonto, oder eins der Skripte —, wird **übersprungen mit Grund**, nicht rot: eine fehlende Werkbank ist kein Befund über die Seite. Anders als Playwright wird Electron dabei **nicht** nachinstalliert; 400 MB Download mitten in einem Deploy erwartet niemand. `--schnell` lässt die Desktop-Teile mit aus (sie sind die langsamsten), `--ohne-desktop` nur sie.
 
 Der Einrichtungsteil gehört der Administration. Damit er trotzdem bei jedem Deploy läuft, zählt auch ein `SELFTEST_TOKEN` — den erzeugt `deploy.sh` beim ersten Lauf selbst, merkt ihn in `.deploy.env` und schreibt denselben Wert in die `.env` auf dem Server — ohne ihn bleiben Schema, Konfiguration und E-Mail-Versand ungeprüft, und der Bericht sagt genau das.
 
@@ -160,7 +164,7 @@ Gewichte gibt das Werkzeug keine vor — das Leistungskonzept ist Fachkonferenz-
 
 ### Desktop-App — `apps/desktop`
 
-Electron-Hülle um dieselbe Weboberfläche (eigenes Fenster, Dock-Icon). **Kein eigener Server, keine eigene Datenbank, kein eigener Code-Pfad** — sie zeigt auf einen laufenden Nuvora-Server. Offline lesen über den Service Worker; offline schreiben ist offen. Sie ist bewusst kein Modul: es gibt nichts im REGISTRY und keinen Selbsttest-Eintrag dafür.
+Electron-Hülle um dieselbe Weboberfläche (eigenes Fenster, Dock-Icon). **Kein eigener Server, keine eigene Datenbank, kein eigener Code-Pfad** — sie zeigt auf einen laufenden Nuvora-Server. Offline lesen über den Service Worker; offline schreiben ist offen. Sie ist bewusst kein Modul: es gibt nichts im REGISTRY und keine Modul-Probe dafür. Geprüft wird sie trotzdem — `scripts/desktop-test.mjs` und `scripts/desktop-offline.mjs` gehen sie nach dem Deploy durch, weil eine Hülle, die niemand testet, genau so lange gut aussieht, bis jemand sie öffnet. Auf einem Rechner ohne macOS oder ohne Electron gilt sie als übersprungen (mit Grund), nicht als rot.
 
 ## Datenübernahme (erledigt)
 

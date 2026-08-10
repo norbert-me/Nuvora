@@ -2,7 +2,7 @@
 # Nuvora — Selbsttest der laufenden Installation.
 #
 # Laeuft am Ende von ./deploy.sh automatisch und lässt sich jederzeit von Hand
-# aufrufen. Vier Teile, und alle vier laufen standardmaessig:
+# aufrufen. Fuenf Teile, und alle fuenf laufen standardmaessig:
 #
 #   scripts/selftest.py          API und Einrichtung, echter Schreib-Roundtrip
 #                                je Modul (legt Testdaten an und raeumt sie ab)
@@ -16,6 +16,12 @@
 #                                rendert es, zeigt die Navigation nur dieses
 #                                Modul, bleiben verbotene Verbindungen
 #                                unsichtbar und erlaubte sichtbar
+#   scripts/desktop-test.mjs     Die Desktop-App im echten Electron-Fenster:
+#                                Start, Anmeldung, Kern- und Modulseiten,
+#                                Menue, window.open dicht, ein Handgriff
+#   scripts/desktop-offline.mjs  Dieselbe App ohne Netz: Service Worker da,
+#                                lesen, Deep-Link, echte Inhaltsdaten,
+#                                Fehlerfall bei toter Adresse
 #
 # Am Ende steht, welche Teile gelaufen sind. Was uebersprungen wurde, steht
 # ebenfalls da — ein gruener Lauf ohne vollen Umfang ist keine Aussage ueber
@@ -26,12 +32,18 @@
 #   SELFTEST_URL                        Adresse (sonst SITE_URL)
 # Ohne Zugangsdaten laufen nur die Checks ohne Login.
 #
-# Nutzung: ./selftest.sh                 ALLES: API, Systemtest, Browser
+# Nutzung: ./selftest.sh                 ALLES: API, Systemtest, Browser, Desktop
 #          ./selftest.sh --schnell      nur der API-Selbsttest (bewusst weniger)
 #          ./selftest.sh --ohne-browser API + Systemtest, ohne Playwright
+#          ./selftest.sh --ohne-desktop alles ausser der Desktop-App
 #          ./selftest.sh --nur-system   ohne Login, ohne Schreiben
 #          ./selftest.sh --url https://… gegen eine andere Instanz
 #          ./selftest.sh --browser=webkit  Engine der iPads (auch: chromium|beide)
+#
+# Die Desktop-Pruefung braucht macOS und ein installiertes Electron
+# (apps/desktop/node_modules). Fehlt eins von beidem, wird sie mit Grund
+# uebersprungen — nachinstalliert wird sie bewusst NICHT: Electron sind 400 MB,
+# die niemand mitten in einem Deploy erwartet.
 #
 # Vollstaendig ist die Voreinstellung, und das ist Absicht: ein gruener Deploy
 # muss heissen "die Seite laeuft", nicht "der Teil, den wir angeschaut haben,
@@ -74,6 +86,7 @@ URL="${SELFTEST_URL:-${SITE_URL:-http://localhost:${PORT:-8080}}}"
 # Voreinstellung: alles. Abschalten geht nur ausdruecklich.
 MIT_BROWSER=1
 MIT_SYSTEM=1
+MIT_DESKTOP=1
 ARGS=()
 # --url gleich hier mitnehmen. Ein nachtraeglicher Durchlauf durch ARGS ist in
 # der macOS-Bash (3.2) mit set -u nicht sicher: bei leerem Array liefert die
@@ -86,13 +99,16 @@ while [ $# -gt 0 ]; do
     # Python-Skripte, die damit nichts anfangen koennen.
     --browser=*) MIT_BROWSER=1; export SELFTEST_BROWSERS="${1#*=}"; shift ;;
     --system) MIT_SYSTEM=1; shift ;;            # Altbestand: schon Vorgabe
-    --schnell) MIT_BROWSER=0; MIT_SYSTEM=0; shift ;;
+    # --schnell nimmt die Desktop-App mit raus: sie startet ein echtes
+    # Electron-Fenster und ist der langsamste der fuenf Teile.
+    --schnell) MIT_BROWSER=0; MIT_SYSTEM=0; MIT_DESKTOP=0; shift ;;
     --ohne-browser) MIT_BROWSER=0; shift ;;
     --ohne-system) MIT_SYSTEM=0; shift ;;
+    --ohne-desktop) MIT_DESKTOP=0; shift ;;
     --url) URL="${2:-}"; [ -z "$URL" ] && { echo "Fehler: --url braucht eine Adresse."; exit 1; }
            ARGS[${#ARGS[@]}]="--url"; ARGS[${#ARGS[@]}]="$URL"; shift 2 ;;
     --url=*) URL="${1#*=}"; ARGS[${#ARGS[@]}]="--url"; ARGS[${#ARGS[@]}]="$URL"; shift ;;
-    -h|--help) sed -n '2,34p' "$0" | sed 's|^# \{0,1\}||'; exit 0 ;;
+    -h|--help) sed -n '2,46p' "$0" | sed 's|^# \{0,1\}||'; exit 0 ;;
     *) ARGS[${#ARGS[@]}]="$1"; shift ;;
   esac
 done
@@ -178,6 +194,52 @@ if [ "$MIT_BROWSER" = "1" ]; then
 else
   def_aus "Browser-Rundgang" "mit --schnell/--ohne-browser abgeschaltet"
   def_aus "Modul-Oberflaechen einzeln" "mit --schnell/--ohne-browser abgeschaltet"
+fi
+
+# ─── Desktop-App ───
+# Die Electron-Huelle zeigt auf dieselbe Weboberflaeche, hat aber Wege, die kein
+# Browser-Lauf trifft: das Fenster selbst, das Menue, window.open und den
+# Service Worker, der offline lesen laesst. Darum ein eigener, fuenfter Teil.
+if [ "$MIT_DESKTOP" = "1" ]; then
+  # Nachinstalliert wird hier bewusst NICHTS. Playwright sind ein paar Megabyte,
+  # Electron sind 400 — das holt niemand mitten in einem Deploy nach. Eine
+  # fehlende Voraussetzung ist deshalb kein Fehler, sondern ein uebersprungener
+  # Teil MIT GRUND, und jeder Fall bekommt seinen eigenen, wahren Grund.
+  DESKTOP_GRUND=""
+  if [ "$(uname -s)" != "Darwin" ]; then
+    DESKTOP_GRUND="laeuft nur auf macOS (hier: $(uname -s))"
+  elif [ ! -d "$DIR/apps/desktop" ]; then
+    DESKTOP_GRUND="apps/desktop fehlt in diesem Arbeitsverzeichnis"
+  elif [ ! -d "$DIR/apps/desktop/node_modules/electron" ]; then
+    DESKTOP_GRUND="Electron nicht installiert — 'cd apps/desktop && npm install' (ca. 400 MB, wird hier absichtlich nicht nachgeholt)"
+  elif [ ! -f "$DIR/scripts/desktop-test.mjs" ] || [ ! -f "$DIR/scripts/desktop-offline.mjs" ]; then
+    DESKTOP_GRUND="scripts/desktop-test.mjs oder scripts/desktop-offline.mjs fehlt"
+  elif [ -z "$SELFTEST_EMAIL" ] || [ -z "$SELFTEST_PASSWORD" ]; then
+    DESKTOP_GRUND="kein Testkonto in .deploy.env"
+  fi
+  if [ -n "$DESKTOP_GRUND" ]; then
+    echo ""
+    echo "⚠ Desktop-App uebersprungen — $DESKTOP_GRUND"
+    def_aus "Desktop-App: Rundgang, Offline, Fehlerfall" "$DESKTOP_GRUND"
+  else
+    DESKTOP_RC=0
+    echo ""
+    echo "→ Desktop-App: Rundgang im Electron-Fenster..."
+    (cd "$DIR/scripts" && node desktop-test.mjs --url "$URL" \
+       --email "$SELFTEST_EMAIL" --passwort "$SELFTEST_PASSWORD") || DESKTOP_RC=1
+    echo ""
+    echo "→ Desktop-App: offline lesen..."
+    (cd "$DIR/scripts" && node desktop-offline.mjs --url "$URL" \
+       --email "$SELFTEST_EMAIL" --passwort "$SELFTEST_PASSWORD") || DESKTOP_RC=1
+    if [ "$DESKTOP_RC" = "0" ]; then
+      def_ok "Desktop-App: Rundgang, Offline, Fehlerfall"
+    else
+      STATUS=1
+      def_rot "Desktop-App: Rundgang, Offline, Fehlerfall"
+    fi
+  fi
+else
+  def_aus "Desktop-App: Rundgang, Offline, Fehlerfall" "mit --schnell/--ohne-desktop abgeschaltet"
 fi
 
 echo ""
