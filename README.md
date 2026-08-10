@@ -225,11 +225,13 @@ cp .deploy.env.example .deploy.env   # Server und Zielpfad eintragen
 ./deploy.sh                          # alles
 ./deploy.sh api                      # nur einen Service neu bauen
 ./deploy.sh --port 8090              # anderer Port, wird in .deploy.env gemerkt
-./deploy.sh --browser                # Selbsttest zusätzlich im echten Browser
-./deploy.sh --kein-selftest          # ohne Selbsttest ausliefern
+./deploy.sh --schnelltest            # nur der kurze API-Selbsttest
+./deploy.sh --kein-selftest          # ohne Prüfung ausliefern
 ```
 
-Lädt hoch, baut auf dem Server, prüft Kern und Module und bricht ab, wenn etwas nicht antwortet. Danach läuft der **Selbsttest** (siehe unten) — der Rückgabewert ist rot, wenn er etwas findet.
+Lädt hoch, baut auf dem Server, prüft Kern und Module und bricht ab, wenn etwas nicht antwortet. Danach läuft die **Prüfung** (siehe unten) — **vollständig**, das ist die Voreinstellung. Der Rückgabewert ist rot, wenn sie etwas findet.
+
+Vollständig ist Absicht: ein grüner Deploy soll heißen „die Seite läuft", nicht „der Teil, den wir angeschaut haben, läuft". Wer weniger prüft, sagt es mit `--schnelltest` — und bekommt am Ende einen Block „Umfang dieses Laufs", der jeden übersprungenen Teil mit Grund aufführt.
 
 Services: `api` (Kern), `web` (Shell + Modul-Seiten inkl. Lernpfad-Statik), `db`, `proxy`. Einen eigenen Lernpfad-Container gibt es nicht mehr.
 
@@ -271,13 +273,25 @@ Datenbanken, Backups und Uploads enthalten personenbezogene Daten und sind grund
 Nach jedem Deploy prüft Nuvora sich selbst — `./deploy.sh` ruft `./selftest.sh` automatisch, einzeln geht es auch:
 
 ```bash
-./selftest.sh              # API, Einrichtung, jedes Modul
-./selftest.sh --browser    # zusätzlich der Rundgang im echten Browser
-./selftest.sh --nur-system  # ohne Anmeldung, ohne Schreiben
-./selftest.sh --debug      # jede Anfrage mit Status und Dauer
+./selftest.sh                # ALLES: API, Systemtest, beide Browser-Läufe
+./selftest.sh --schnell      # nur der kurze API-Selbsttest
+./selftest.sh --ohne-browser # API + Systemtest, ohne Playwright
+./selftest.sh --nur-system   # ohne Anmeldung, ohne Schreiben
+./selftest.sh --debug        # jede Anfrage mit Status und Dauer
 ```
 
-„Health" sagt nur, dass ein Container läuft. Der Selbsttest sagt, ob die Installation *funktioniert*:
+„Health" sagt nur, dass ein Container läuft. Die Prüfung sagt, ob die Installation *funktioniert*. Sie besteht aus vier Teilen:
+
+| Teil | Datei | Was es tut |
+| ---- | ----- | ---------- |
+| Selbsttest | `scripts/selftest.py` | API, Einrichtung, Seiten, je Modul ein Schreib-Roundtrip |
+| Systemtest | `scripts/systemtest.py` | jedes Modul **einzeln**: nur dieses aktiv, alle anderen müssen abweisen |
+| Rundgang | `scripts/selftest-browser.mjs` | jede Seite im echten Browser — Desktop, Handy, dunkel |
+| Oberflächen | `scripts/systemtest-browser.mjs` | jedes Modul einzeln in der Oberfläche, verbotene Verbindungen unsichtbar |
+
+Am Ende steht, welche Teile gelaufen sind. Was übersprungen wurde, steht ebenfalls da — ein grüner Lauf ohne vollen Umfang ist keine Aussage über die Seite.
+
+### Was geprüft wird
 
 | Bereich          | Was geprüft wird |
 | ---------------- | ---------------- |
@@ -287,14 +301,29 @@ Nach jedem Deploy prüft Nuvora sich selbst — `./deploy.sh` ruft `./selftest.s
 | Einrichtung      | Datenbank, **Schema gegen die Modelle** (es gibt kein Alembic — hier fällt auf, was in `_ensure_columns` fehlt), Konfiguration, Betreiberdaten, Modulregister gegen die gemounteten Router |
 | E-Mail           | Host, Verbindung, Anmeldung, Absender-Freigabe (`MAIL FROM`/`RCPT TO`, **ohne** eine Mail zu verschicken), SPF und DMARC der Absender-Domain |
 | Module           | je Modul ein echter Schreib-Roundtrip auf Kern-Klasse und -Schülern: anlegen, lesen, ändern, löschen |
+| Alleinstellung   | je Modul: nur dieses aktiv — die eigenen Endpunkte antworten, **alle fremden liefern genau 403** (Regel 3). Weder 200 (Daten offen) noch 500 (Schranke kracht statt abzuweisen) |
+| Rechnen          | CardVote vollständig durchgespielt (Fragen, E/G, Scans, Auswertung) und die Zahlen im Test **nachgerechnet** — Trefferquote, E-Bonus, Notenverteilung, Minuspunkte, krank/anwesend; dazu Noten übernehmen, ändern, gewichten |
+| Brücken          | jede Modul-Verbindung **zweimal**: mit beiden Modulen muss sie funktionieren, mit einem sauber abgelehnt werden — im Backend und in der Oberfläche |
 | Schüler-Wege     | `/lernen/<token>` und `/cd/<code>` ohne Konto — und Absage bei falschem Token |
 | Mandantentrennung | fremde IDs lesen und beschreiben muss scheitern |
 | Bestand          | Klassen, Schüler, Kurse, Themen im Vergleich zum letzten Lauf — Frühwarnung, falls eine Kaskade zu viel mitreißt |
-| Browser          | jede Seite rendert, keine Konsolenfehler, keine toten Links — auf dem Desktop, am **Handy (390 px)** und im **dunklen Design**; dazu echte Handgriffe mit Neuladen als Beweis, dass gespeichert wurde |
+| Browser          | jede Seite rendert, keine Konsolenfehler, keine toten Links — Desktop, **Handy (390 px)** und **dunkles Design**; dazu echte Handgriffe mit Neuladen als Beweis, dass gespeichert wurde |
 
-Testdaten tragen das Präfix `ZZ-Selbsttest` und werden inklusive Papierkorb wieder abgeräumt; zugeschaltete Module werden zurückgesetzt. Nötig sind ein eigenes Testkonto (`SELFTEST_EMAIL`/`SELFTEST_PASSWORD` in `.deploy.env`, einmalig selbst registrieren) — `SELFTEST_TOKEN` erzeugt `deploy.sh` beim ersten Lauf von allein.
+### Testdaten und Aufräumen
 
-Der Browser-Teil braucht Playwright; `selftest.sh --browser` installiert es beim ersten Mal nach `scripts/node_modules` (bewusst getrennt von `apps/web`, damit es nie ins Web-Image wandert).
+Testdaten tragen das Präfix `ZZ-Selbsttest` bzw. `ZZ-Systemtest` und werden inklusive Papierkorb wieder abgeräumt; zugeschaltete Module werden zurückgesetzt. Nötig ist ein eigenes Testkonto (`SELFTEST_EMAIL`/`SELFTEST_PASSWORD` in `.deploy.env`, einmalig selbst registrieren) — `SELFTEST_TOKEN` erzeugt `deploy.sh` beim ersten Lauf von allein.
+
+Bleibt nach einem Abbruch (Strg-C) etwas liegen, räumen die Tests es beim nächsten Lauf selbst weg. Von Hand geht es auch:
+
+```bash
+python3 scripts/aufraeumen.py             # nur anzeigen, was liegengeblieben ist
+python3 scripts/aufraeumen.py --loeschen  # wirklich abräumen
+python3 scripts/aufraeumen.py --module-aus  # alle Module abschalten
+```
+
+Es fasst ausschließlich an, was ein Testpräfix trägt — die Prüfung sitzt unmittelbar vor jedem Löschen, nicht nur in der Auswahl. Den Modul-Zustand stellt es aus `.selftest-module.json` wieder her, die die Tests vor dem ersten Umschalten schreiben; fehlt sie, sagt es das und rät nicht.
+
+Der Browser-Teil braucht Playwright; `selftest.sh` installiert es beim ersten Mal nach `scripts/node_modules` (bewusst getrennt von `apps/web`, damit es nie ins Web-Image wandert).
 
 ## Tests
 
