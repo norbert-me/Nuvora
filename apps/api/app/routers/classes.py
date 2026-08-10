@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from ..database import get_db
 from ..uploads import bildtyp
-from ..models import SchoolClass, Student, User, Kurs, KursTag
+from ..models import SchoolClass, Student, User, Kurs, KursTag, Session
 from .auth import get_current_user, rate_limit
 
 router = APIRouter(prefix="/api/classes", tags=["classes"])
@@ -427,6 +427,25 @@ async def purge_class(class_id: int, user: User = Depends(get_current_user), db:
     if sc.deleted_at is None:
         raise HTTPException(400, "Klasse ist nicht im Papierkorb")
     kurs_id = sc.kurs_id
+
+    # CardVote-Sitzungen zuerst: sessions.class_id ist der EINZIGE Verweis auf
+    # school_classes ohne ON DELETE CASCADE (models.py). Eine Klasse, die je
+    # fuer ein Quiz benutzt wurde, liess sich damit gar nicht endgueltig
+    # loeschen — der Papierkorb quittierte mit
+    # "FOREIGN KEY constraint failed". Das trifft Postgres genauso; dort werden
+    # Fremdschluessel immer erzwungen. Repariert wird es hier und nicht am
+    # Modell, weil eine bestehende Datenbank ihre Constraint behaelt (es gibt
+    # kein Alembic, _ensure_columns ergaenzt nur Spalten und Indizes).
+    #
+    # Loeschen, nicht abhaengen: die Sitzung gehoert zu dieser Klasse, ihre
+    # Scans haengen an den Schuelern, und die fallen mit der Klasse. Eine
+    # Sitzung ohne Klasse und ohne Scans waere eine leere Huelle im Archiv.
+    sitzungen = (await db.execute(
+        select(Session).where(Session.class_id == class_id))).scalars().all()
+    for s in sitzungen:
+        await db.delete(s)
+    await db.flush()
+
     await db.delete(sc)
     await db.flush()
 

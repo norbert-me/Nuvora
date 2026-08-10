@@ -136,3 +136,30 @@ async def test_geteilter_kurs_ueberlebt_die_geloeschte_klasse(session):
     await C.delete_class(a.id, user=u, db=s)
     await C.purge_class(a.id, user=u, db=s)
     assert await s.get(Kurs, kurs_id) is not None, "der geteilte Kurs gehoert noch 7b"
+
+
+@pytest.mark.asyncio
+async def test_klasse_mit_quiz_laesst_sich_endgueltig_loeschen(session):
+    """Eine Klasse, die je fuer ein CardVote-Quiz benutzt wurde, muss aus dem
+    Papierkorb verschwinden koennen.
+
+    sessions.class_id ist der einzige Verweis auf school_classes OHNE
+    ON DELETE CASCADE. Der Purge lief deshalb in "FOREIGN KEY constraint
+    failed" — und zwar auf Postgres genauso, dort werden Fremdschluessel immer
+    erzwungen. Aufgefallen ist es im Log der Pruefinstanz, nicht in einem Test:
+    die bisherigen Faelle loeschten nur Klassen, mit denen nie ein Quiz lief.
+    """
+    from app.models import Session as CvSession
+    s = session
+    u, _, _, _ = await _seed(s)
+    k = await C.create_class(ClassCreate(name="8b", students=[StudentIn(card_id=5, name="Ann")]),
+                             user=u, db=s)
+    s.add(CvSession(name="Test 1", class_id=k.id, owner_id=u.id))
+    await s.commit()
+
+    await C.delete_class(k.id, user=u, db=s)
+    await C.purge_class(k.id, user=u, db=s)
+
+    assert await s.get(SchoolClass, k.id) is None, "die Klasse muss weg sein"
+    uebrig = (await s.execute(select(CvSession).where(CvSession.class_id == k.id))).scalars().all()
+    assert uebrig == [], "die Sitzung der Klasse gehoert mit geloescht"
