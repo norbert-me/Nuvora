@@ -20,6 +20,16 @@ updates:
     groups:
       alle:
         patterns: ["*"]
+    ignore:
+      # pydantic-core kommt ausschliesslich ueber pydantic herein und wird von
+      # dort auf die Nachkommastelle genau festgenagelt (pydantic 2.13.4 verlangt
+      # pydantic-core==2.46.4). Dependabot sieht es in der Lock-Datei und hebt es
+      # einzeln an — dann ist die Datei nicht mehr aufloesbar und der Bau bricht
+      # ab (ResolutionImpossible), weil Container und CI mit --require-hashes
+      # dagegen installieren. Es darf nur gemeinsam mit pydantic wandern, und das
+      # tut es von selbst, sobald die Lock-Datei nach einem pydantic-Sprung neu
+      # erzeugt wird. Also hier stillstellen.
+      - dependency-name: pydantic-core
 
   - package-ecosystem: npm
     directory: /apps/web
