@@ -96,6 +96,14 @@ export default function Klassenarbeit() {
     }).catch(() => {});
   }, []); // eslint-disable-line
   const repClass = useRef(null); // Referenz-Klasse eines Teilkurses (für work.class_id, FK)
+  // Laufende Nummer je Ladevorgang. Der Effekt feuert zweimal kurz nacheinander:
+  // erst mit kursId = null (Anfangszustand), dann mit dem Kurs aus der Adresse.
+  // Ohne kurs_id liefert list_works nur die KURSLOSEN Arbeiten (klassenarbeit.py,
+  // `kurs_id.is_(None)`) — also meist eine leere Liste. Kommt diese veraltete
+  // Antwort als zweite an, loescht sie die eben geladene Auswahl, und mit ihr
+  // verschwinden alle Knoepfe, die an einer gewaehlten Arbeit haengen. Das war
+  // reines Glueck: in drei von fuenf Laeufen ging das Rennen falsch aus.
+  const ladenr = useRef(0);
   useEffect(() => {
     // Teilkurs (Kurs aus Teilen von Klassen): Roster + Arbeiten über den Kurs.
     if (subsetKurs) {
@@ -110,8 +118,12 @@ export default function Klassenarbeit() {
     repClass.current = null;
     if (classId) rememberClass(classId);
     if (!classId) { setStudents([]); setWorks([]); setWork(null); return; }
-    fetch(`${API}/classes/${classId}/students`).then((r) => (r.ok ? r.json() : [])).then((d) => setStudents(Array.isArray(d) ? d : [])).catch(() => {});
+    const meine = ++ladenr.current;   // nur die jüngste Antwort darf schreiben
+    fetch(`${API}/classes/${classId}/students`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+      if (meine === ladenr.current) setStudents(Array.isArray(d) ? d : []);
+    }).catch(() => {});
     fetch(`${API}/classes/${classId}/works${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+      if (meine !== ladenr.current) return;
       const l = Array.isArray(d) ? d : [];
       setWorks(l);
       // Deep-Link: gewünschte Auswertung wählen, sonst die neueste.

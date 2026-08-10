@@ -5,6 +5,7 @@ import { pageTitle, btnPrimary, btnSecondary, inputStyle, selectStyle, Icon, ICO
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, lastClass, rememberClass } from "../core/cache.js";
+import { useUrlClass } from "../core/klassenwahl.js";
 
 const API = "/api/notizen";
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -25,6 +26,11 @@ export default function Notizen() {
     const l = Array.isArray(d) ? d : []; setClasses(l);
     if (classId === null && l.length) { const w = lastClass(); setClassId(l.some((c) => c.id === w) ? w : l[0].id); }
   }), []);
+  // Aus dem Kurs verlinkt (?class=&kurs=): dann diesen Inhalt zeigen. Als
+  // einzige der Schueler-Seiten fehlte das hier — wer aus dem Kurs in die
+  // Beobachtungen sprang, landete bei der zuletzt gewaehlten Klasse und sah
+  // die Notizen fremder Kinder.
+  useUrlClass(setClassId);
   useEffect(() => { if (classId) rememberClass(classId); }, [classId]);
 
   const cls = classes.find((c) => c.id === classId);

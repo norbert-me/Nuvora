@@ -6,6 +6,7 @@ import { useSearchParams } from "react-router-dom";
 import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Toggle, pageApp} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import { askConfirm } from "../core/dialog.jsx";
 import { useAktiv } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import { useUrlClass } from "../core/klassenwahl.js";
@@ -129,6 +130,22 @@ export default function Zufall() {
   // Gedächtnis für die Fairness bleibt bewusst erhalten.
   const reset = () => { setGezogen([]); setAktuell(null); };
 
+  // Das Zieh-Gedächtnis auf dem Server leeren.
+  //
+  // Es gab dafür keinen Weg über die Oberfläche: „Runde zurücksetzen" setzt nur
+  // den Zustand im Browser, die Zähler auf dem Server blieben für immer stehen.
+  // Zu Schuljahresbeginn oder nach einem Klassenwechsel will man sie aber los —
+  // sonst schleppt die Fairness-Rechnung Zahlen aus dem letzten Jahr mit.
+  const gedaechtnisLeeren = async () => {
+    if (!classId) return;
+    if (!(await askConfirm(t("zufall.forgetAsk"), { danger: true }))) return;
+    await fetch(`/api/zufall/${classId}`, { method: "DELETE" }).catch(() => {});
+    setCounts({});
+    setLastDrawn({});
+    setLastId(null);
+    reset();
+  };
+
   // Zufallsgruppen: anwesende SuS mischen und gleichmäßig (Round-Robin) verteilen.
   const makeGroups = () => {
     const pool = [...(anwesend.length ? anwesend : students)];
@@ -206,6 +223,12 @@ export default function Zufall() {
             )}
             {ohneWdh && gezogen.length > 0 && (
               <button onClick={reset} style={{ ...btnSecondary, marginLeft: "auto" }}>{t("zufall.reset")}</button>
+            )}
+            {Object.keys(counts).length > 0 && (
+              <button onClick={gedaechtnisLeeren} title={t("zufall.forgetHint")}
+                style={{ ...btnSecondary, marginLeft: ohneWdh && gezogen.length > 0 ? 0 : "auto" }}>
+                {t("zufall.forget")}
+              </button>
             )}
           </div>
         </>
