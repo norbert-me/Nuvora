@@ -7,7 +7,7 @@
 #     pip-compile --allow-unsafe --generate-hashes --strip-extras \
 #       --output-file=requirements.lock.txt requirements.txt
 #
-# Mit Python 3.12 erzeugen (wie python:3.12-slim im Dockerfile) — pip-compile
+# Mit Python 3.14 erzeugen (wie python:3.14-slim im Dockerfile) — pip-compile
 # loest fuer den Interpreter, unter dem es laeuft.
 fastapi>=0.110,<1.0
 uvicorn[standard]>=0.29,<1.0
