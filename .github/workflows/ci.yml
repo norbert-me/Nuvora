@@ -18,11 +18,15 @@ jobs:
       run:
         working-directory: apps/api
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
+          # Ohne das haengt der Cache am Standardmuster **/requirements.txt —
+          # installiert wird aber aus der Lock-Datei. Eine Lock-Aenderung traf
+          # damit einen alten Cache-Schluessel.
+          cache-dependency-path: apps/api/requirements.lock.txt
       # Aus der Lock-Datei, damit die Tests gegen genau die Fassungen laufen, die
       # auch im Container landen. Die Testwerkzeuge (requirements-dev.txt) duerfen
       # frei bleiben: sie werden nie ausgeliefert.
@@ -47,8 +51,8 @@ jobs:
       run:
         working-directory: apps/web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -72,7 +76,7 @@ jobs:
   container-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Compose-Datei prüfen und bauen
         env:
           POSTGRES_PASSWORD: ci-test-nur-fuer-den-build
