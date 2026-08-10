@@ -43,6 +43,8 @@ from datetime import datetime
 
 # selftest.py liegt daneben. Format, Farben und HTTP-Client kommen von dort:
 # zwei Fassungen desselben Berichts laufen sonst auseinander.
+# Das ist ein Zirkel (selftest.py holt Sammler/modulzustand hier), aber ein
+# bewusster: die Gegenrichtung importiert erst IN der Funktion, nie oben.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from selftest import Api, Bericht  # noqa: E402
 
@@ -410,7 +412,11 @@ def lies_deploy_env():
                     continue
                 k, v = zeile.split("=", 1)
                 werte[k.strip()] = v.strip().strip('"').strip("'")
-    except Exception:
+    except OSError:
+        # Bewusst still und nur fuer Dateifehler: .deploy.env ist optional
+        # (gitignored, auf fremden Rechnern gar nicht vorhanden). Fehlen die
+        # Werte, sagt main() unten klar, was zu setzen ist — ein Abbruch hier
+        # waere eine schlechtere Auskunft. Andere Fehler bleiben sichtbar.
         pass
     return werte
 

@@ -44,7 +44,7 @@ from datetime import datetime, timedelta, timezone
 # Bausteine kommen aus dem Selbsttest (gleiches Verzeichnis) — nicht kopieren:
 # HTTP-Client, Berichtsform und Farben sollen an EINER Stelle gepflegt werden.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from selftest import Api, ApiFehler, Bericht, FETT, AUS  # noqa: E402
+from selftest import Api, Bericht, FETT, AUS  # noqa: E402
 
 PRAEFIX = "ZZ-Systemtest"
 
@@ -1171,8 +1171,9 @@ def teste_noten(api, b, u, sch, spuren, cv):
     Erwartung fuer `weighted`. Beobachtungen duerfen daran nichts aendern.
     """
     if "sitzung" not in cv or "noten" not in cv:
-        return b.add("Noten", "alle", False,
-                     "uebersprungen — der CardVote-Teil hat keine Sitzung geliefert")
+        b.add("Noten", "alle", False,
+              "uebersprungen — der CardVote-Teil hat keine Sitzung geliefert")
+        return
     sch.setze({"auswertung"})
     z = {}
 

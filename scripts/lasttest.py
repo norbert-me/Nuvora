@@ -41,7 +41,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Bewusst importiert statt kopiert: derselbe HTTP-Client, dieselbe Berichtsform
 # wie im Selbsttest — sonst laufen die beiden Werkzeuge auseinander.
-from selftest import AUS, Api, Bericht, FETT, GELB, GRUEN, ROT  # noqa: E402
+from selftest import AUS, Api, Bericht, FETT  # noqa: E402
 
 PRAEFIX = "ZZ-Lasttest"
 

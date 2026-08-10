@@ -85,6 +85,9 @@ def _ratelimit_text(text: str) -> str:
     try:
         grund = (json.loads(text) or {}).get("detail", "")
     except Exception:
+        # Bewusst still: nginx antwortet auf 429 mit einer HTML-Seite, die sich
+        # nicht als JSON lesen laesst. Genau daran wird unten unterschieden,
+        # wer gedrosselt hat — ein leerer `grund` IST hier die Auskunft.
         pass
     if grund:
         return (f"Ratelimit von Nuvora selbst: „{grund}“ — auch nach "
@@ -335,6 +338,22 @@ def _host_port(url):
     return teile.hostname or "", teile.port or (443 if https else 80), https
 
 
+def _tls_kontext():
+    """TLS-Kontext fuer die eigenen Verbindungen des Selbsttests.
+
+    Das ist der NORMALE Verbindungsweg, kein absichtlicher Versuch mit alten
+    Protokollen: Zertifikat und Hostname werden geprueft (Vorgabe von
+    `create_default_context`), und die Untergrenze steht ausdruecklich auf
+    TLS 1.2. Ohne diese Zeile haengt es von Python- und OpenSSL-Fassung ab, ob
+    TLS 1.0/1.1 noch mitgehen — ein Werkzeug, das die TLS-Lage der Installation
+    beurteilt, darf sich selbst nicht auf veraltete Protokolle einlassen.
+    """
+    import ssl   # wie in teste_erreichbarkeit lokal: Start ohne TLS-Modul soll gehen
+    ctx = ssl.create_default_context()
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    return ctx
+
+
 def _ist_lokal(host):
     """Adresse aus dem eigenen Netz? Dort ist fehlendes HTTPS kein Versaeumnis."""
     import ipaddress
@@ -386,7 +405,7 @@ def teste_erreichbarkeit(api, b):
         roh = socket.create_connection((host, port), timeout=10)
         try:
             if https:
-                roh = ssl.create_default_context().wrap_socket(roh, server_hostname=host)
+                roh = _tls_kontext().wrap_socket(roh, server_hostname=host)
             roh.sendall(anfrage)
             antwort = roh.recv(200).decode("utf-8", "replace")
         finally:
@@ -409,11 +428,21 @@ def teste_erreichbarkeit(api, b):
         return
 
     def zertifikat():
-        ctx = ssl.create_default_context()
-        with socket.create_connection((host, port), timeout=10) as roh:
-            with ctx.wrap_socket(roh, server_hostname=host) as tls:
-                cert = tls.getpeercert()
-                version = tls.version()
+        ctx = _tls_kontext()
+        try:
+            with socket.create_connection((host, port), timeout=10) as roh:
+                with ctx.wrap_socket(roh, server_hostname=host) as tls:
+                    cert = tls.getpeercert()
+                    version = tls.version()
+        except ssl.SSLError as e:
+            # Der Kontext laesst nichts unter TLS 1.2 zu. Scheitert der
+            # Handshake daran, spricht der Server nur noch veraltete
+            # Protokolle — genau der Befund, den frueher die Pruefung auf
+            # tls.version() unten geliefert hat.
+            raise AssertionError(
+                f"TLS-Handshake mit mindestens TLS 1.2 scheitert ({e}) — der Server "
+                "bietet offenbar nur veraltete Verschluesselung (TLS 1.0/1.1) oder "
+                "kein passendes Verfahren an") from e
         # Hostname und Kette hat wrap_socket schon geprueft (sonst haette es
         # geworfen) — bleibt die Restlaufzeit.
         bis = datetime.strptime(cert["notAfter"], "%b %d %H:%M:%S %Y %Z")
@@ -424,8 +453,9 @@ def teste_erreichbarkeit(api, b):
         if tage < 14:
             raise AssertionError(f"Zertifikat laeuft in {tage} Tagen ab (Aussteller {aussteller}) "
                                  "— Erneuerung pruefen")
-        if version in ("TLSv1", "TLSv1.1"):
-            raise AssertionError(f"veraltete Verschluesselung ({version})")
+        # Eine Pruefung auf "TLSv1"/"TLSv1.1" steht hier nicht mehr: mit
+        # ctx.minimum_version = TLSv1_2 kaeme so eine Verbindung gar nicht erst
+        # zustande — sie landet oben im SSLError-Zweig.
         return f"{version}, gueltig noch {tage} Tage, ausgestellt von {aussteller}"
 
     def umleitung():
@@ -1145,8 +1175,9 @@ def teste_fremdzugriff(api, b, u):
     eigene = {k["id"] for k in api.call("GET", "/api/classes", erwartet=(200,))}
     fremde = [i for i in range(1, 40) if i not in eigene][:3]
     if not fremde:
-        return b.add("Mandantentrennung", "Fremde Klassen", True,
-                     "keine fremden IDs im Suchbereich")
+        b.add("Mandantentrennung", "Fremde Klassen", True,
+              "keine fremden IDs im Suchbereich")
+        return
 
     def lesen():
         durchgelassen = []
@@ -1173,8 +1204,11 @@ def teste_fremdzugriff(api, b, u):
                 try:
                     api.call("DELETE", f"/api/orga/item/{json.loads(text)['id']}",
                              erwartet=(204, 404))
-                except Exception:
-                    pass
+                except Exception as e:
+                    # Der Befund ist der gelungene Schreibzugriff (gleich
+                    # darunter). Klappt das Aufraeumen nicht, darf das nicht
+                    # still bleiben: der Eintrag liegt dann in fremden Daten.
+                    b.reste.append(f"Fremdzugriffs-Eintrag in Klasse {fid} nicht entfernt: {e}")
                 raise AssertionError(f"Anlegen in fremder Klasse {fid} war erlaubt (HTTP {status})")
         return f"Schreibversuche auf {len(fremde)} fremde Klassen abgewiesen"
 
@@ -1194,10 +1228,10 @@ def teste_bestand(api, b):
     vergleicht beim naechsten Mal. Gemessen wird VOR den Testdaten.
     """
     quellen = {
-        "Klassen": ("/api/classes", lambda d: len(d)),
+        "Klassen": ("/api/classes", len),
         "Schueler": ("/api/classes", lambda d: sum(len(k.get("students", [])) for k in d)),
-        "Kurse": ("/api/kurse", lambda d: len(d)),
-        "Themen": ("/api/topics", lambda d: len(d)),
+        "Kurse": ("/api/kurse", len),
+        "Themen": ("/api/topics", len),
     }
     jetzt = {}
     for name, (pfad, zaehl) in quellen.items():
@@ -1216,7 +1250,11 @@ def teste_bestand(api, b):
         if "zahlen" in alle:   # altes Format ohne Instanz-Trennung
             alle = {}
     except Exception:
-        pass
+        # Bewusst still: beim ERSTEN Lauf gibt es die Datei nicht, und eine
+        # unlesbare Datei darf den Selbsttest nicht anhalten. Fehlt der
+        # Vergleichsstand, meldet der Bericht das unten selbst
+        # ("erster Lauf — Zahlen gemerkt: ...").
+        alle = {}
     vorher = alle.get(api.basis, {})
 
     if not vorher:
@@ -1278,6 +1316,8 @@ def raeume_reste(api, b):
     Geloescht wird ausschliesslich, was ein Testpraefix traegt; das Netz dafuer
     sitzt in scripts/aufraeumen.py (Klasse `Fund`) und nicht hier.
     """
+    # Import in der Funktion, nicht oben — aufraeumen.py holt Api/Bericht von
+    # hier, auf Modulebene waere es ein Zirkel. Bewusst so.
     from aufraeumen import Sammler, modulzustand, setze_module
 
     verfuegbar, vorher = modulzustand(api)
