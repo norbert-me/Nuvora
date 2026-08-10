@@ -15,10 +15,14 @@ COPY . .
 
 # Nicht als root laufen: der Dienst nimmt Datei-Uploads entgegen und laesst
 # OpenCV darauf los. Ein Fehler darin soll nicht gleich den Container gehoeren.
-# /app/uploads ist ein Volume — es muss dem Benutzer gehoeren, sonst kann er
-# nichts hineinschreiben.
+# /app/uploads und /app/backups sind Volumes — sie muessen dem Benutzer gehoeren,
+# sonst kann er nichts hineinschreiben. Wichtig: die Ordner muessen HIER im Image
+# existieren. Docker uebernimmt Inhalt und Rechte des Image-Ordners nur in ein
+# LEERES benanntes Volume; fehlt der Ordner im Image, legt Docker ihn beim Mounten
+# als root:root an, und der Dienst bekommt beim Schreiben ein
+# "PermissionError: [Errno 13] Permission denied".
 RUN useradd --system --uid 10001 --create-home nuvora \
-    && mkdir -p /app/uploads \
+    && mkdir -p /app/uploads /app/backups \
     && chown -R nuvora:nuvora /app
 USER nuvora
 

@@ -490,6 +490,45 @@ def _check_site_json(out: List[Check]) -> None:
                             "vollstaendig (" + ", ".join(SITE_PFLICHTFELDER) + ")"))
 
 
+def _check_backup(out: List[Check]) -> None:
+    """Laesst sich in den Sicherungsordner wirklich schreiben?
+
+    Der Ordner ist ein benanntes Volume. Fehlt er im Image, legt Docker ihn beim
+    Mounten als root:root an — der Dienst laeuft aber als nuvora (uid 10001) und
+    bekommt beim ersten Schreiben "PermissionError: [Errno 13]". Genau so ist es
+    passiert: Ordner da, Anzeige "0 von hoechstens 7", und erst die Sicherung
+    selbst scheitert. Ein Backup, von dem man erst im Ernstfall erfaehrt, dass es
+    keins gab, ist schlimmer als gar keine Sicherungsfunktion.
+
+    Geprueft wird mit einer echten Probedatei, nicht mit os.access() — das fragt
+    nur die Rechtebits ab und liegt bei ACLs, schreibgeschuetzten Mounts oder
+    vollem Datentraeger falsch.
+    """
+    from .backup import BACKUP_DIR, BACKUP_DIR_EXTERN
+    for pfad, name, pflicht in ((BACKUP_DIR, "Sicherungsordner", True),
+                                (BACKUP_DIR_EXTERN, "Sicherungsordner (extern)", False)):
+        if not pfad:
+            continue
+        schwere = "fehler" if pflicht else "warnung"
+        if not os.path.isdir(pfad):
+            out.append(Check(gruppe="Sicherung", name=name, ok=False, schwere=schwere,
+                             detail=f"{pfad} gibt es nicht (Volume nicht gemountet?)"))
+            continue
+        probe = os.path.join(pfad, ".selbsttest-schreibprobe")
+        try:
+            with open(probe, "wb") as f:
+                f.write(b"probe")
+            os.remove(probe)
+        except Exception as e:
+            out.append(Check(
+                gruppe="Sicherung", name=name, ok=False, schwere=schwere,
+                detail=f"{pfad} ist nicht beschreibbar: {type(e).__name__} — "
+                       f"Eigentuemer des Volumes pruefen (der Dienst laeuft als uid 10001)"))
+            continue
+        out.append(Check(gruppe="Sicherung", name=name, ok=True,
+                         detail=f"{pfad} beschreibbar"))
+
+
 def _check_module(request: Request, out: List[Check]) -> None:
     """Ein Modul existiert nur, wenn es Code dazu gibt — hier gegengeprueft.
 
@@ -542,6 +581,7 @@ async def selftest(request: Request, db: AsyncSession = Depends(get_db),
     # Der SMTP-Check verbindet sich (bis 5 s) — nicht im Event-Loop blockieren.
     await asyncio.to_thread(_check_config, checks)
     _check_site_json(checks)
+    _check_backup(checks)
     _check_module(request, checks)
     fehler = sum(1 for c in checks if not c.ok and c.schwere == "fehler")
     warnungen = sum(1 for c in checks if not c.ok and c.schwere == "warnung")
