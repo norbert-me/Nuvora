@@ -3,11 +3,11 @@
 // und wird nicht gespeichert. Übersicht zeigt Fehlzeiten und lässt nachtragen.
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { pageTitle, btnSecondary, selectStyle, Toggle, Tabs, inputStyle, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
+import { btnSecondary, selectStyle, Tabs, inputStyle, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
-import { swr , lastClass, rememberClass } from "../core/cache.js";
+import { swr , lastClass } from "../core/cache.js";
 import { useUrlClass } from "../core/klassenwahl.js";
 
 const API = "/api/anwesenheit";
@@ -33,7 +33,7 @@ export default function Anwesenheit() {
   const [slots, setSlots] = useState([]);   // Stundenplan-Slots (falls Kalender aktiv)
   // Kam eine Klasse per Link (Kalender), nicht auf heutige Klassen filtern —
   // sonst könnte genau diese Klasse aus der Auswahl fallen.
-  const [nurHeute, setNurHeute] = useState(!params.get("class"));
+  const nurHeute = !params.get("class");
   const [offen, setOffen] = useState(null); // aufgeklappter Schüler in der Übersicht
   const [verlauf, setVerlauf] = useState([]);
   const [stunde, setStunde] = useState(0); // 0 = ganzer Tag, sonst Stundenplan-Period
@@ -61,7 +61,7 @@ export default function Anwesenheit() {
   const stundenWahl = kalenderAktiv && view === "tag" && tagSlots.length > 0;
   // Tag-Ansicht: nur Klassen, die am gewählten Tag Unterricht haben (Stundenplan).
   // Übersicht: alle Klassen. Ohne Kalender/Stundenplan: alle.
-  const filterAktiv = kalenderAktiv && view === "tag" && heutigeIds.size > 0;
+  const filterAktiv = nurHeute && kalenderAktiv && view === "tag" && heutigeIds.size > 0;
   const sichtbareKlassen = filterAktiv ? classes.filter((c) => heutigeIds.has(c.id)) : classes;
 
   // Gültige Klasse sicherstellen, wenn Filter greift.

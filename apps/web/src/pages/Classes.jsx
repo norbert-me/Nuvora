@@ -11,8 +11,8 @@
 import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
-import { useSearchParams, Link } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, selectStyle, pageApp} from "../components/Icons.jsx";
+import { useSearchParams } from "react-router-dom";
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageApp} from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import AuthImage from "../components/AuthImage.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -378,7 +378,7 @@ export default function Classes() {
     );
   }
 
-  if (loadError && classes.length === 0 && !editing) return <p style={{ color: C.danger }}>{t("common.connectionError")}</p>;
+  if (loadError && classes.length === 0) return <p style={{ color: C.danger }}>{t("common.connectionError")}</p>;
 
   return (
     <div style={{ ...pageApp }}>

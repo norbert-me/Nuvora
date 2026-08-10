@@ -1,6 +1,6 @@
 // Modul Elternkontakte — dokumentierte Kontakte je Schüler (Datum, Kanal, Notiz).
 import { useState, useEffect } from "react";
-import { pageTitle, btnPrimary, btnSecondary, inputStyle, selectStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, pageApp} from "../components/Icons.jsx";
+import { btnPrimary, btnSecondary, inputStyle, selectStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, pageApp} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { Link } from "react-router-dom";
 import { useLanguage } from "../i18n/index.jsx";

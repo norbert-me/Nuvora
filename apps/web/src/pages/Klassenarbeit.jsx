@@ -4,7 +4,7 @@
 // und gezielte Wiederholung (Karten des schwachen Themas wieder fällig).
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { pageTitle, btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, Modal, Boxplot, StatCard, pageApp} from "../components/Icons.jsx";
+import { btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, Modal, Boxplot, StatCard, pageApp} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
@@ -75,7 +75,6 @@ export default function Klassenarbeit() {
   useUrlClass(setClassId, setKursId);
   const [subsetKurs, setSubsetKurs] = useState(null); // gewählter Teilkurs (Kurs aus Teilen von Klassen) oder null
   const [subsetKurse, setSubsetKurse] = useState([]); // Kurse mit einzeln hinzugefügten SuS
-  const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
   const [topics, setTopics] = useState([]);
   const [works, setWorks] = useState([]);
@@ -91,7 +90,7 @@ export default function Klassenarbeit() {
   // damit die Arbeitsauswahl nicht ausgeblendet bleibt, bis man von Hand klickt.
   useEffect(() => {
     fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).then((list) => {
-      const l = Array.isArray(list) ? list : []; setClasses(l);
+      const l = Array.isArray(list) ? list : [];
       if (classId == null && l.length) { const w = lastClass(); setClassId(l.some((c) => c.id === w) ? w : l[0].id); }
     }).catch(() => {});
   }, []); // eslint-disable-line
@@ -198,7 +197,6 @@ export default function Klassenarbeit() {
     if (parts.length <= 1) { const only = parts[0]; persist({ ...work, tasks: work.tasks.map((x) => (x.id === tid ? { ...x, parts: [], max: only ? unitMax(only) : 1 } : x)), results }); }
     else persist({ ...work, tasks: work.tasks.map((x) => (x.id === tid ? { ...x, parts } : x)), results });
   };
-  const maxOf = (task) => taskMax(task);
   const pointsOf = (sid, uid) => { const v = ((work.results || {})[String(sid)] || {})[uid]; return v == null ? "" : v; };
   const setPoints = (sid, uid, val) => {
     const row = { ...((work.results || {})[String(sid)] || {}) };
@@ -430,8 +428,9 @@ export default function Klassenarbeit() {
                     <th rowSpan={2} style={{ ...th, textAlign: "left", minWidth: 130, position: "sticky", left: 0, zIndex: 2, background: "var(--card)" }}>{t("common.name")}</th>
                     {(work.tasks || []).map((tk, i) => <th key={tk.id} colSpan={units(tk).length + (units(tk).length > 1 ? 1 : 0)} style={{ ...th, minWidth: 46, borderLeft: "1px solid var(--border)" }} title={tk.label}>{tk.label || (i + 1)}</th>)}
                     <th rowSpan={2} style={{ ...th, minWidth: 58, borderLeft: "1px solid var(--border)" }}>Σ / {totalMax()}</th>
-                    {/* SuS-/Präsentationsansicht: Note oben ausblenden (nicht vor der Klasse zeigen). */}
-                    {!hideIndividual && <th rowSpan={2} style={{ ...th, minWidth: 44 }}>{t("klassenarbeit.grade")}</th>}
+                    {/* Note: in der SuS-/Präsentationsansicht unsichtbar, weil das
+                        ganze Raster oben schon hinter !hideIndividual haengt. */}
+                    <th rowSpan={2} style={{ ...th, minWidth: 44 }}>{t("klassenarbeit.grade")}</th>
                   </tr>
                   <tr>
                     {(work.tasks || []).flatMap((tk) => {
@@ -476,7 +475,7 @@ export default function Klassenarbeit() {
                           return cells;
                         })}
                         <td style={{ ...td, fontWeight: 700, borderLeft: "1px solid var(--border)", color: abw ? "var(--text3)" : (tm && sum / tm < 0.5 ? C.danger : "var(--text)") }}>{`${sum}/${tm}`}{abw ? ` (${t("klassenarbeit.absentShort")})` : ""}</td>
-                        {!hideIndividual && <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : "var(--text)" }}>{note}</td>}
+                        <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : "var(--text)" }}>{note}</td>
                       </tr>
                     );
                   })}

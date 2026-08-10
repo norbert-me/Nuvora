@@ -6,7 +6,7 @@
 // Kern-Klassenseite; damit trug der Kern Modulwissen (Regel 3 in CLAUDE.md).
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Icon, ICONS, iconBtn, pageTitle, pageApp} from "../components/Icons.jsx";
+import { iconBtn, pageApp} from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api";

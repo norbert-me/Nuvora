@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, selectStyle, Modal as UiModal, overlayGuard, modalOverlay, Empty, Skeleton, pageApp, inputStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, selectStyle, Modal as UiModal, overlayGuard, modalOverlay, Empty, Skeleton, pageApp, inputStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import AuthImage from "../components/AuthImage.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -56,8 +56,6 @@ export default function Karten() {
   const [params] = useSearchParams();
   const view = params.get("tab") || "cards"; // cards | progress | qr — aus der Navbar
   const [error, setError] = useState("");
-  const [newDeck, setNewDeck] = useState("");
-  const [addingDeck, setAddingDeck] = useState(false);
   const [detail, setDetail] = useState(null); // { student, cards } — Einzelstatistik
   const [topics, setTopics] = useState([]);
   const aktiv = useAktiv();
@@ -150,7 +148,6 @@ export default function Karten() {
     if (d) setCurrentCardFolder(d.folder_id ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [decks]);
-  const folderName = (fid) => (cardFolders.find((f) => f.id === fid) || {}).name || "";
   // Drag&Drop: Ordner in einen anderen Ordner (oder über den Breadcrumb nach oben)
   // ziehen. Das Ziel wird beim Ziehen hervorgehoben (Vorschau, wohin es landet).
   const [dragFolder, setDragFolder] = useState(null);
@@ -564,10 +561,7 @@ function StudentDetail({ detail, t, onClose }) {
 }
 
 function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onMove, onDragStartDeck, onDragEndDeck, dragging = false, autoOpen = false, onAutoOpened, onReorderOver, onReorderDrop, dropSide = null }) {
-  const [front, setFront] = useState("");
-  const [back, setBack] = useState("");
   const [planDate, setPlanDate] = useState("");
-  const [busy, setBusy] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [importing, setImporting] = useState(false);
   // Standard eingeklappt: nur Kopf zeigen; ausgeklappt kommen Einstellungen,
@@ -590,26 +584,6 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   // bliebe Text-/Button-Interaktion im Deck kaputt. Der Griff setzt das Flag per
   // mousedown; das Wurzel-draggable prüft es beim dragstart.
   const dragFromHandle = useRef(false);
-  // LaTeX-Editor: Formel ins zuletzt fokussierte Feld (Vorder-/Rückseite) einfügen.
-  const frontRef = useRef(null);
-  const backRef = useRef(null);
-  const activeField = useRef("front");
-  const insertLatex = (tex, offset) => {
-    const isBack = activeField.current === "back";
-    const input = isBack ? backRef.current : frontRef.current;
-    const val = isBack ? back : front;
-    const setter = isBack ? setBack : setFront;
-    if (!input) return;
-    const start = input.selectionStart || 0, end = input.selectionEnd || 0;
-    const sel = val.slice(start, end);
-    let insert = tex; if (sel && tex.includes("{}")) insert = tex.replace("{}", `{${sel}}`);
-    const before = val.slice(0, start);
-    const needsDollar = !before.includes("$") || before.split("$").length % 2 === 1;
-    const wrapped = needsDollar ? `$${insert}$` : insert;
-    const next = before + wrapped + val.slice(end);
-    setter(next);
-    setTimeout(() => { const pos = start + wrapped.length + (offset || 0); input.focus(); input.setSelectionRange(pos, pos); }, 0);
-  };
   // folder_id IMMER mitschicken, sonst nullt ein Speichern (Name/Thema/Niveau)
   // die Ordner-Zuordnung.
   const saveDeck = (patch) => call(() => fetch(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", folder_id: deck.folder_id ?? null, ...patch }) }));
@@ -671,14 +645,6 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   };
   const doRename = async () => { const n = nameVal.trim(); setRenaming(false); if (n && n !== deck.name) await saveDeck({ name: n }); };
   const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
-  const add = async (e) => {
-    e.preventDefault();
-    if (busy || !front.trim() || !back.trim()) return;
-    setBusy(true);
-    try {
-      if (await call(() => fetch(`${API}/decks/${deck.id}/cards`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ front: front.trim(), back: back.trim() }) }))) { setFront(""); setBack(""); }
-    } finally { setBusy(false); }
-  };
   const release = (payload) => call(() => fetch(`${API}/decks/${deck.id}/release`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }));
 
   const now = Date.now();

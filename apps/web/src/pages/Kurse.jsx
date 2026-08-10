@@ -2,9 +2,7 @@
 // (per Name); Karten/Noten bleiben pro Fach-Klasse. Eine Klasse darf in mehreren
 // Kursen sein.
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 import { useLanguage } from "../i18n/index.jsx";
-import { askPrompt, askConfirm } from "../core/dialog.jsx";
 import KursLinks from "../components/KursLinks.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { sende } from "../core/melden.js";

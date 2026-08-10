@@ -83,7 +83,8 @@ export default function ClassEvaluation() {
         count++;
       }
     }
-    return count > 0 ? (sum / count).toFixed(1) : "–";
+    // fmt: glatte Werte ohne „,0" anzeigen (4 statt 4.0), sonst eine Nachkommastelle.
+    return count > 0 ? fmt(sum / count) : "–";
   });
 
   const presentStudents = sorted.filter((s) => s.testsPresent > 0);

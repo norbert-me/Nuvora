@@ -1,9 +1,9 @@
 // Modul Kalender — Unterrichtsplanung. Tag-, Wochen- und Monatsansicht; je Tag
 // Stunden eintragen und optional Klasse + Thema (Kern-Taxonomie) zuordnen.
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
-import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
+import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, Modal, popoverPanel, ExportButton, ImportButton, pageApp, Popover} from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, Modal, ExportButton, ImportButton, pageApp, Popover} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, put } from "../core/cache.js";
@@ -57,16 +57,13 @@ function useNarrow(bp = 640) {
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 const mondayOf = (d) => { const x = startOfDay(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
-// Monat/KW-Sprung für den Kalender (<input type=month|week>).
-const monthVal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-const monthValToDate = (s) => { const [y, m] = s.split("-").map(Number); return startOfDay(new Date(y, m - 1, 1)); };
+// Monat/KW-Sprung für den Kalender (Auswahlfelder, siehe Sprung-Popover).
 const isoWeek = (d) => {
   const x = startOfDay(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7) + 3); // Donnerstag dieser Woche
   const firstThu = new Date(x.getFullYear(), 0, 4);
   firstThu.setDate(firstThu.getDate() - ((firstThu.getDay() + 6) % 7) + 3);
   return { year: x.getFullYear(), week: 1 + Math.round((x - firstThu) / (7 * 86400000)) };
 };
-const weekVal = (d) => { const { year, week } = isoWeek(d); return `${year}-W${String(week).padStart(2, "0")}`; };
 const weekValToDate = (s) => { const [y, w] = s.split("-W").map(Number); return addDays(mondayOf(new Date(y, 0, 4)), (w - 1) * 7); };
 
 export default function Kalender() {
@@ -1496,7 +1493,6 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onClo
   const [color, setColor] = useState(clsColorOf(kursId, classId));
   useEffect(() => { setColor(clsColorOf(kursId, classId)); }, [classId, kursId]); // eslint-disable-line
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
-  const fld = { ...inputStyle, width: "100%" };
   const sfld = { ...selectStyle, width: "100%", fontSize: 14, padding: "10px 34px 10px 12px" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
   return (

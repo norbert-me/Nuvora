@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
+import { askConfirm, askPrompt } from "../core/dialog.jsx";
 import Latex from "../components/Latex.jsx";
 import PublishModal from "../components/PublishModal.jsx";
 import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Toggle, Modal, Popover, pageApp, inputStyle as inputBasis } from "../components/Icons.jsx";
@@ -19,7 +19,6 @@ export default function Dashboard() {
   const [path, setPath] = useState([]);
   const [currentFolder, setCurrentFolder] = useState(null);
   const [editingSet, setEditingSet] = useState(null);
-  const [showNewFolder, setShowNewFolder] = useState(false);
   // Ein „+" mit Untermenü (Ordner/Set) statt zwei getrennter Plus-Knöpfe.
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [addMode, setAddMode] = useState(null); // null | "folder" | "set"
@@ -29,8 +28,6 @@ export default function Dashboard() {
   const [loadError, setLoadError] = useState(false);
   const [renamingFolder, setRenamingFolder] = useState(null);
   const [renameValue, setRenameValue] = useState("");
-  const [renamingSet, setRenamingSet] = useState(null);
-  const [renameSetValue, setRenameSetValue] = useState("");
   const [publishingSet, setPublishingSet] = useState(null);
   // Import-Fortschritt: { stage: "reading"|"uploading"|"done"|"error", label }
   const [importStatus, setImportStatus] = useState(null);
@@ -163,7 +160,7 @@ export default function Dashboard() {
     const name = (nm ?? newFolderName).trim();
     if (!name) return;
     await fetch(`${API}/folders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, parent_id: currentFolder }) });
-    setNewFolderName(""); setShowNewFolder(false); load();
+    setNewFolderName(""); load();
   };
 
   const startRenameFolder = (id, oldName) => {
@@ -276,28 +273,6 @@ export default function Dashboard() {
         await load();
         finishImport(true, t("dash.impSetDone", { name: setName, count: "…" }));
       } catch (err) { finishImport(false, err.message || t("dash.impError")); }
-    };
-    input.click();
-  };
-
-  const importSet = async () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".json";
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      setImportStatus({ stage: "reading", label: file.name });
-      try {
-        const text = await file.text();
-        const data = JSON.parse(text);
-        if (data.type !== "cardvote_questionset") { finishImport(false, t("dash.impInvalid")); return; }
-        data.folder_id = currentFolder;
-        const n = (data.questions || []).length;
-        await uploadWithProgress(`${API}/import/question-set`, JSON.stringify(data), { label: data.name || file.name });
-        await load();
-        finishImport(true, t("dash.impSetDone", { name: data.name || "?", count: n }));
-      } catch (err) { finishImport(false, err.message || t("dash.impReadError")); }
     };
     input.click();
   };
@@ -503,24 +478,6 @@ function ImportProgress({ status }) {
 // Aus dem Kern abgeleitet (etwas groesser, auf Kartenfarbe).
 const inputStyle = { ...inputBasis, padding: "10px 14px", background: "var(--card)" };
 const btnSmall = { background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: "4px 10px", fontWeight: 500, color: "var(--text3)" };
-
-function NewSetButton({ onCreate }) {
-  const { t } = useLanguage();
-  const [editing, setEditing] = useState(false);
-  const [name, setName] = useState("");
-  if (editing) {
-    return (
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("dash.setName")} style={inputStyle} autoFocus
-          onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) { onCreate(name.trim()); setName(""); setEditing(false); } }} />
-        <button onClick={() => { if (name.trim()) { onCreate(name.trim()); setName(""); setEditing(false); } }} style={btnSecondary}>OK</button>
-        <button onClick={() => setEditing(false)} style={btnSecondary}>×</button>
-      </div>
-    );
-  }
-  return <AddButton onClick={() => setEditing(true)} title={t("dash.newSet")} />;
-}
-
 
 function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQuestionsChange }) {
   const [qSearch, setQSearch] = useState("");
@@ -993,7 +950,8 @@ function QuestionStats({ questionId }) {
     <div style={{ padding: "10px 0", color: "var(--text3)", fontSize: 13 }}>{t("dash.noStats")}</div>
   );
 
-  const keys = Object.keys(stats.answer_counts).sort();
+  // A–D fest, nicht aus answer_counts abgeleitet: eine Karte hat genau vier
+  // Seiten (scans.answer ist ein Zeichen), und ungewaehlte sollen als 0 stehen.
   return (
     <div style={{ borderTop: "1px solid var(--border3)", paddingTop: 12 }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)", marginBottom: 8 }}>

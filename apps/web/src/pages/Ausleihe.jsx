@@ -1,9 +1,8 @@
 // Modul Material-Ausleihe — Gegenstände verleihen und Rückgabe im Blick.
 // Ausleiher: ein Kern-Schüler (Klasse wählen) oder ein Freitextname.
 import { useState, useEffect, useCallback } from "react";
-import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
-import { AddButton, pageTitle, btnPrimary, btnSecondary, selectStyle, Toggle, Icon, ICONS, iconBtn, COLORS as C, inputStyle, Empty } from "../components/Icons.jsx";
+import { AddButton, btnPrimary, btnSecondary, selectStyle, Toggle, Icon, ICONS, iconBtn, COLORS as C, inputStyle, Empty } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr } from "../core/cache.js";
