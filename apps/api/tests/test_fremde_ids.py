@@ -17,7 +17,7 @@ kaputt.
 import pytest
 import pytest_asyncio
 from fastapi import HTTPException
-from sqlalchemy import event, select
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 from app.models import Base, User, UserModule, SchoolClass, Student, Question, QuestionSet

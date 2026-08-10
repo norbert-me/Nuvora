@@ -9,7 +9,7 @@ from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 from app.models import (
-    Base, User, SchoolClass, Student, Topic, CardDeck, Card, CardReview, WorkAnalysis, UserModule,
+    Base, User, SchoolClass, Student, Topic, CardDeck, Card, CardReview, UserModule,
 )
 from app.routers import klassenarbeit as K
 

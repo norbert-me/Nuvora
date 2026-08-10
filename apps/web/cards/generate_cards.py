@@ -2,7 +2,6 @@
 """Generate printable ArUco marker cards for classroom voting (A5, PDF)."""
 
 import argparse
-import math
 from pathlib import Path
 
 import cv2

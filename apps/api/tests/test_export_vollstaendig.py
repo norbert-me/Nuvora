@@ -52,10 +52,8 @@ def _exportierte_modelle() -> set:
 
 
 def _tabelle_zu_modell() -> dict:
-    return {t.name: k.__name__ for k in Base.registry.mappers
-            for t in [k.local_table] if t is not None
-            for _ in [0]
-            for k in [k.class_]} if False else {
+    """Tabellenname -> Modellname für jedes gemappte Modell."""
+    return {
         mapper.local_table.name: mapper.class_.__name__
         for mapper in Base.registry.mappers if mapper.local_table is not None
     }

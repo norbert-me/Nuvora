@@ -18,7 +18,6 @@ nach oben, der vorher bei -θ stand. Genau das rechnet erwartete_antwort().
 Lauf:  cd apps/api && pip install -r requirements-dev.txt && pytest tests/test_scan_bild.py
 """
 import base64
-import binascii
 
 import cv2
 import numpy as np

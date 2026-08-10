@@ -67,7 +67,8 @@ async def _klasse(s, u, name, *namen):
 async def test_doppelte_card_id_wird_abgelehnt(s):
     """Zwei Schüler mit derselben card_id: update_class führt über card_id
     zusammen — der zweite überschrieb den ersten, einer verschwand still."""
-    u = await _user(s)
+    # Kein Nutzer nötig: die Abwehr sitzt schon in der Eingabeprüfung (Pydantic),
+    # also vor jedem Datenbankzugriff.
     with pytest.raises(ValueError):
         C.ClassCreate(name="7a", students=[
             C.StudentIn(card_id=1, name="Max"), C.StudentIn(card_id=1, name="Mia")])
@@ -146,7 +147,7 @@ async def test_niveau_im_teilkurs_wird_gespeichert(s):
     Schreiben griff nur über die Mitgliedsklassen ins Leere — das gesetzte
     E/G war nach dem Neuladen wieder weg."""
     u = await _user(s)
-    c1 = await _klasse(s, u, "7a", "Max", "Mia")
+    await _klasse(s, u, "7a", "Max", "Mia")
     kurs = await K.create_kurs(K.KursIn(name="Förderkurs"), user=u, db=s)
     max_id = (await s.execute(select(Student.id).where(Student.name == "Max"))).scalar_one()
     await K.add_student_member(kurs.id, max_id, user=u, db=s)

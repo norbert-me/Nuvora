@@ -10,7 +10,6 @@ Datei muss 400 mit Feldnamen geben, niemals 500.
 """
 import pytest
 import pytest_asyncio
-from datetime import datetime, timezone
 from fastapi import HTTPException
 from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession

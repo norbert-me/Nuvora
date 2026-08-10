@@ -2,7 +2,6 @@
 wiederherstellbar, erst purge kaskadiert (Karten bzw. Lernleitern)."""
 import pytest
 import pytest_asyncio
-from fastapi import HTTPException
 from sqlalchemy import event, select, func
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 

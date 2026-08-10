@@ -120,6 +120,9 @@ async def test_ladder_marktplatz_copy_ohne_schuelerbezug(s):
     assert len(v_ex) == 1 and v_ex[0].aufgabentext == "1/2 + 1/2 = ?"
     v_lad = (await s.execute(select(LearningLadder).join(LearningPath).where(LearningPath.owner_id == v.id))).scalars().all()
     assert len(v_lad) == 1
+    # Die Rueckgabe muss auf genau diesen neuen Pfad zeigen — sonst zeigt die
+    # Oberflaeche nach der Uebernahme ins Leere.
+    assert out["id"] == v_lad[0].path_id
     assert (v_lad[0].assignments or []) == [], "keine Schueler-Zuweisungen uebernommen"
     assert not v_lad[0].notizen, "keine Notiz uebernommen (Datenschutz)"
     assert v_lad[0].class_id is None, "kein Klassenbezug uebernommen"

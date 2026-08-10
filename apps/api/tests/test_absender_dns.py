@@ -14,8 +14,6 @@ Ein Fehlalarm dieser Art ist teurer als eine fehlende Pruefung — er verleitet
 dazu, am DNS herumzuaendern, bis der Test schweigt. Darum haelt dieser Test
 beide Richtungen fest.
 """
-import pytest
-
 from app.routers import selftest as S
 
 

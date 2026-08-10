@@ -193,6 +193,11 @@ def _lesbar(antwort: Antwort) -> str:
                 for name in z.namelist():
                     teile.append(z.read(name).decode("utf-8", "replace"))
         except Exception:
+            # Absichtlich geschluckt: nicht jede Antwort, die mit "PK" beginnt,
+            # ist ein lesbares ZIP. Ein Fehler beim Auspacken darf den Rundlauf
+            # nicht abbrechen — die rohen Bytes stehen oben schon in `teile`,
+            # und dass das Auspacken wirklich greift, sichert die Gegenprobe
+            # test_excel_wird_wirklich_durchsucht ab.
             pass
 
     # PDF: der sichtbare Text steht in Streams, die reportlab per ASCII85 UND
@@ -203,7 +208,7 @@ def _lesbar(antwort: Antwort) -> str:
     if roh[:4] == b"%PDF":
         for stream in re.findall(rb"stream\r?\n(.*?)endstream", roh, re.S):
             stream = stream.strip(b"\r\n")
-            for entpacken in (lambda b: zlib.decompress(b),
+            for entpacken in (zlib.decompress,
                               lambda b: zlib.decompress(base64.a85decode(b, adobe=True)),
                               lambda b: base64.a85decode(b, adobe=True)):
                 try:
