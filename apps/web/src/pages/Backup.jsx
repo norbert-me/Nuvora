@@ -77,6 +77,24 @@ export default function Backup() {
   // einzige Stelle, an der die Oberfläche etwas Unwiderrufliches auslöst.
   const [dialog, setDialog] = useState(null);
   const dateiRef = useRef(null);
+  // Ergebnis von Probelauf und Prüfung steht UNTER der Liste der Sicherungen.
+  // Bei sieben Einträgen liegt es außerhalb des Sichtbereichs — der Knopf sah
+  // dann so aus, als hätte er nichts getan. Also hinscrollen.
+  const ergebnisRef = useRef(null);
+  // Meldungen stehen am Seitenkopf — nach einem Klick weiter unten also
+  // ebenfalls außer Sicht. Ein Fehler, den niemand sieht, ist ein Fehler, den
+  // niemand behebt.
+  const meldungRef = useRef(null);
+
+  useEffect(() => {
+    if (!probe && !pruefung) return;
+    ergebnisRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [probe, pruefung]);
+
+  useEffect(() => {
+    if (!meldung) return;
+    meldungRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [meldung]);
 
   const load = () =>
     fetch(API)
@@ -272,7 +290,7 @@ export default function Backup() {
       <p style={pageIntro}>{t("backup.intro")}</p>
 
       {meldung && (
-        <div style={{ ...cardStyle, marginBottom: 14, borderColor: meldung.art === "ok" ? C.success : C.danger, color: meldung.art === "ok" ? C.success : C.danger, fontSize: 13.5 }}>
+        <div ref={meldungRef} style={{ ...cardStyle, marginBottom: 14, borderColor: meldung.art === "ok" ? C.success : C.danger, color: meldung.art === "ok" ? C.success : C.danger, fontSize: 13.5 }}>
           {meldung.text}
         </div>
       )}
@@ -415,7 +433,7 @@ export default function Backup() {
           </div>
         )}
         {pruefung && (
-          <div style={{ ...cardStyle, marginTop: 12, borderColor: pruefung.ok ? C.success : C.danger }}>
+          <div ref={ergebnisRef} style={{ ...cardStyle, marginTop: 12, borderColor: pruefung.ok ? C.success : C.danger }}>
             <div style={{ fontWeight: 600, color: pruefung.ok ? C.success : C.danger, marginBottom: 6 }}>
               {pruefung.ok ? t("backup.verifyOk") : t("backup.verifyBad")} — {pruefung.name}
             </div>
@@ -432,7 +450,7 @@ export default function Backup() {
           </div>
         )}
         {probe && (
-          <div style={{ ...cardStyle, marginTop: 12, borderColor: C.success }}>
+          <div ref={ergebnisRef} style={{ ...cardStyle, marginTop: 12, borderColor: C.success }}>
             <div style={{ fontWeight: 600, color: C.success, marginBottom: 6 }}>
               {t("backup.dryRunOk")} — {probe.name}
             </div>
