@@ -76,6 +76,42 @@ export default function Dashboard() {
     return neu;
   });
 
+  // Die Liste zeigt nur den Fragetext — was tatsaechlich abgefragt wird, steht
+  // in den Antworten und im Bild. Ohne Blick hinein weiss man nicht, wohin die
+  // Frage gehoert. Also aufklappbar, direkt hier: eine Frage ohne Quiz hat
+  // keinen anderen Ort, an dem man sie oeffnen koennte.
+  const [vEdit, setVEdit] = useState(null);
+
+  const vOeffnen = async (id) => {
+    const r = await fetch(`${API}/questions/${id}`);
+    if (r.ok) setVEdit(await r.json());
+  };
+
+  const vSpeichern = async () => {
+    if (!vEdit?.text?.trim()) return;
+    const r = await fetch(`${API}/questions/${vEdit.id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(vEdit),
+    });
+    if (!r.ok) return;
+    setVEdit(null);
+    await ladeVerwaiste();
+  };
+
+  const vBildHochladen = (setter) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*,.svg";
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(`${API}/questions/upload-image`, { method: "POST", body: form });
+      setter((await res.json()).url);
+    };
+    input.click();
+  };
+
   const vZuweisen = async () => {
     if (!vZiel || vAuswahl.size === 0) return;
     setVMeldung("");
@@ -447,7 +483,9 @@ export default function Dashboard() {
                 {vGefiltert.map((q) => (
                   <label key={q.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "6px 10px", borderBottom: "1px solid var(--border)", cursor: "pointer", lineHeight: 1.5 }}>
                     <input type="checkbox" checked={vAuswahl.has(q.id)} onChange={() => vUmschalten(q.id)} style={{ marginTop: 3 }} />
-                    <span style={{ flex: 1, color: "var(--text)" }}>
+                    <span onClick={(e) => { e.preventDefault(); vOeffnen(q.id); }}
+                          title={t("dash.clickEdit")}
+                          style={{ flex: 1, color: "var(--text)", cursor: "pointer" }}>
                       <Latex>{q.text}</Latex>
                       {/* Mit Ergebnissen wird nichts geloescht: daran haengen die
                           Auswertungen gehaltener Sitzungen. */}
@@ -458,6 +496,24 @@ export default function Dashboard() {
                 {vGefiltert.length === 0 && <p style={{ padding: 10, margin: 0, color: "var(--text3)" }}>{t("dash.noSearchHit")}</p>}
               </div>
             </>
+          )}
+
+          {/* Dieselbe Maske wie im Quiz — inklusive Thema. Eine Frage ohne Quiz
+              ist sonst nirgends zu oeffnen. */}
+          {vEdit && (
+            <Modal onClose={() => setVEdit(null)} width={620} label={t("dash.editQ")}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{t("dash.editQ")}</h4>
+                <button onClick={() => setVEdit(null)} title={t("common.close")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", padding: 4, display: "flex" }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+              </div>
+              <QuestionForm q={vEdit} setQ={setVEdit} onUpload={vBildHochladen} choiceKeys={["A", "B", "C", "D"]} />
+              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                <button onClick={vSpeichern} disabled={!vEdit.text?.trim()} style={btnPrimary}>{t("common.save")}</button>
+                <button onClick={() => setVEdit(null)} style={btnSecondary}>{t("common.cancel")}</button>
+              </div>
+            </Modal>
           )}
         </div>
       )}
