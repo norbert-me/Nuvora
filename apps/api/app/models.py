@@ -388,6 +388,11 @@ class Topic(Base):
     # Freie Notiz je Thema/Unterthema: Lernziele/Inhalt ("Was sollen die SuS hier
     # lernen?") zur Unterrichtsplanung. Rein für die Lehrkraft, kein Modul hängt daran.
     notes: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # Was vorher sitzen muss. Freitext und ausdruecklich KEIN Verweis auf andere
+    # Themen: das meiste, was vorausgesetzt wird, hat gar kein eigenes Thema
+    # („Kopfrechnen bis 100", Inhalte frueherer Jahre). Eine Auswahlliste haette
+    # genau das nicht abbilden koennen.
+    voraussetzungen: Mapped[str] = mapped_column(Text, default="", server_default="")
     # Dasselbe, nach Anspruch getrennt: was alle können müssen (G) und was im
     # E-Kurs dazukommt (z.B. Stufenwinkel erkennen vs. damit begründen). Am
     # THEMA und nicht in der Jahresplanung — der Inhalt gehört zum Thema, die

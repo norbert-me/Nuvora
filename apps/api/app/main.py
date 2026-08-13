@@ -315,6 +315,7 @@ def _ensure_columns(sync_conn):
         ("exercises", "sozialform", "VARCHAR(50) DEFAULT '' NOT NULL"),
         ("questions", "deleted_at", "TIMESTAMP WITH TIME ZONE"),
         ("topics", "deleted_at", "TIMESTAMP WITH TIME ZONE"),
+        ("topics", "voraussetzungen", "TEXT DEFAULT '' NOT NULL"),
         ("users", "timetable_periods", "INTEGER DEFAULT 6 NOT NULL"),
         ("users", "timetable_times", "JSON"),
     ]

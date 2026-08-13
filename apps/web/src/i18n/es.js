@@ -555,6 +555,8 @@ export default {
   "topics.subPlaceholder": "Subtema, p. ej. Multiplicar y dividir",
   "topics.empty": "Aún no hay temas. Crea uno; los subtemas van debajo.",
   "topics.emptyHint": "Crea una asignatura (p.ej. Mates), luego temas y subtemas.",
+  "topics.voraus": "Requisito previo",
+  "topics.vorausPlaceholder": "p. ej. medir ángulos, cálculo mental hasta 100",
   "topics.zielG": "Nivel G — esto lo logran todos",
   "topics.zielE": "Nivel E — esto se añade",
   "topics.zielGPlaceholder": "p. ej. reconocer y nombrar ángulos correspondientes",

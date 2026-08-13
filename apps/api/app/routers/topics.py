@@ -34,6 +34,8 @@ class TopicIn(BaseModel):
     # E-Kurs dazukommt. Steht am Thema, nicht in der Jahresplanung.
     ziel_g: str = ""
     ziel_e: str = ""
+    # Was vorher sitzen muss (Freitext, siehe models.Topic).
+    voraussetzungen: str = ""
 
     @field_validator("name")
     @classmethod
@@ -52,7 +54,7 @@ class TopicIn(BaseModel):
             raise ValueError("Notiz ist zu lang (max. 500 Zeichen)")
         return v
 
-    @field_validator("ziel_g", "ziel_e")
+    @field_validator("ziel_g", "ziel_e", "voraussetzungen")
     @classmethod
     def ziel_max(cls, v: str) -> str:
         if v and len(v) > 500:
@@ -68,6 +70,7 @@ class TopicOut(BaseModel):
     notes: str = ""
     ziel_g: str = ""
     ziel_e: str = ""
+    voraussetzungen: str = ""
     # Wie viele CardVote-Fragen haengen an diesem Thema? Macht sichtbar, was
     # ein Loeschen kostet.
     question_count: int = 0
@@ -125,6 +128,7 @@ async def list_topics(
         TopicOut(
             id=t.id, name=t.name, parent_id=t.parent_id, position=t.position,
             notes=t.notes or "", ziel_g=t.ziel_g or "", ziel_e=t.ziel_e or "",
+            voraussetzungen=t.voraussetzungen or "",
             question_count=counts.get(t.id, 0),
         )
         for t in result.scalars().all()
@@ -161,12 +165,14 @@ async def create_topic(
         name=data.name, parent_id=data.parent_id, owner_id=user.id,
         position=(last.scalar_one_or_none() or 0) + 1, notes=data.notes or "",
         ziel_g=data.ziel_g or "", ziel_e=data.ziel_e or "",
+        voraussetzungen=data.voraussetzungen or "",
     )
     db.add(topic)
     await db.commit()
     await db.refresh(topic)
     return TopicOut(id=topic.id, name=topic.name, parent_id=topic.parent_id, position=topic.position,
-                    notes=topic.notes or "", ziel_g=topic.ziel_g or "", ziel_e=topic.ziel_e or "")
+                    notes=topic.notes or "", ziel_g=topic.ziel_g or "", ziel_e=topic.ziel_e or "",
+                    voraussetzungen=topic.voraussetzungen or "")
 
 
 class ReorderIn(BaseModel):
@@ -280,11 +286,13 @@ async def update_topic(
     topic.parent_id = data.parent_id
     topic.notes = data.notes or ""
     topic.ziel_g = data.ziel_g or ""
+    topic.voraussetzungen = data.voraussetzungen or ""
     topic.ziel_e = data.ziel_e or ""
     await db.commit()
     await db.refresh(topic)
     return TopicOut(id=topic.id, name=topic.name, parent_id=topic.parent_id, position=topic.position,
-                    notes=topic.notes or "", ziel_g=topic.ziel_g or "", ziel_e=topic.ziel_e or "")
+                    notes=topic.notes or "", ziel_g=topic.ziel_g or "", ziel_e=topic.ziel_e or "",
+                    voraussetzungen=topic.voraussetzungen or "")
 
 
 @router.delete("/{topic_id}", status_code=204)

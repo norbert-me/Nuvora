@@ -556,6 +556,8 @@ export default {
   "topics.subPlaceholder": "Unterthema, z. B. Vervielfachen und Teilen",
   "topics.empty": "Noch keine Themen. Lege eins an — Unterthemen kommen darunter.",
   "topics.emptyHint": "Lege ein Fach an (z.B. Mathe), darunter Themen und Unterthemen.",
+  "topics.voraus": "Voraussetzung",
+  "topics.vorausPlaceholder": "z. B. Winkel messen, Kopfrechnen bis 100",
   "topics.zielG": "G-Niveau — das können alle",
   "topics.zielE": "E-Niveau — das kommt dazu",
   "topics.zielGPlaceholder": "z. B. Stufenwinkel an einer Skizze erkennen und benennen",

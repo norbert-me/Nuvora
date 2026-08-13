@@ -554,6 +554,8 @@ export default {
   "topics.subPlaceholder": "Subtopic, e.g. Multiplying and dividing",
   "topics.empty": "No topics yet. Create one — subtopics go underneath.",
   "topics.emptyHint": "Create a subject (e.g. Maths), then topics and subtopics.",
+  "topics.voraus": "Prerequisite",
+  "topics.vorausPlaceholder": "e.g. measuring angles, mental arithmetic to 100",
   "topics.zielG": "G level — everyone can do this",
   "topics.zielE": "E level — this comes on top",
   "topics.zielGPlaceholder": "e.g. identify and name corresponding angles in a sketch",

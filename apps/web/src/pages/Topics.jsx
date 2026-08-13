@@ -91,14 +91,16 @@ export default function Topics() {
     call(() => fetch(`${API}/topics/${t.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, parent_id: t.parent_id, notes: t.notes || "", ziel_g: t.ziel_g || "", ziel_e: t.ziel_e || "" }),
+      // Alle Felder mitschicken: PUT setzt, was nicht dasteht, auf leer — ein
+      // Umbenennen haette sonst Notiz, Ziele und Voraussetzungen geloescht.
+      body: JSON.stringify({ name, parent_id: t.parent_id, notes: t.notes || "", ziel_g: t.ziel_g || "", ziel_e: t.ziel_e || "", voraussetzungen: t.voraussetzungen || "" }),
     }));
 
   // Titel + Notiz speichern (aus dem Detail-Popup). Leerer Titel behält den alten.
-  const saveTopic = (tp, name, notes, zielG, zielE) =>
+  const saveTopic = (tp, name, notes, zielG, zielE, voraussetzungen) =>
     call(() => fetch(`${API}/topics/${tp.id}`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: (name || "").trim() || tp.name, parent_id: tp.parent_id, notes, ziel_g: zielG || "", ziel_e: zielE || "" }),
+      body: JSON.stringify({ name: (name || "").trim() || tp.name, parent_id: tp.parent_id, notes, ziel_g: zielG || "", ziel_e: zielE || "", voraussetzungen: voraussetzungen || "" }),
     }));
 
   const remove = async (tp) => {
@@ -280,6 +282,8 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
   const [zielG, setZielG] = useState(tp.ziel_g || "");
   const [zielE, setZielE] = useState(tp.ziel_e || "");
   const [zielGVal, setZielGVal] = useState(tp.ziel_g || "");
+  const [voraus, setVoraus] = useState(tp.voraussetzungen || "");
+  const [vorausVal, setVorausVal] = useState(tp.voraussetzungen || "");
   const [zielEVal, setZielEVal] = useState(tp.ziel_e || "");
   const [name, setName] = useState(tp.name);      // Anzeige-Titel (nach Umbenennen)
   const [titleVal, setTitleVal] = useState(tp.name); // Titel im Edit
@@ -294,8 +298,8 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
   }, [open]);
 
   const saveEdit = async () => {
-    await onSaveTopic(tp, titleVal, noteVal, zielGVal, zielEVal);
-    setNotes(noteVal); setZielG(zielGVal); setZielE(zielEVal);
+    await onSaveTopic(tp, titleVal, noteVal, zielGVal, zielEVal, vorausVal);
+    setNotes(noteVal); setZielG(zielGVal); setZielE(zielEVal); setVoraus(vorausVal);
     setName(titleVal.trim() || name); setEditNote(false);
   };
 
@@ -323,7 +327,7 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
           <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, flex: 1 }}>{tp.parent_name ? `${tp.parent_name} / ${name}` : name}</h3>
           {/* Ein Edit-Icon für Titel UND Notiz. */}
-          {!editNote && <button onClick={() => { setTitleVal(name); setNoteVal(notes); setZielGVal(zielG); setZielEVal(zielE); setEditNote(true); }} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={16} /></button>}
+          {!editNote && <button onClick={() => { setTitleVal(name); setNoteVal(notes); setZielGVal(zielG); setZielEVal(zielE); setVorausVal(voraus); setEditNote(true); }} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={16} /></button>}
           <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
         </div>
 
@@ -336,7 +340,8 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
             <textarea value={noteVal} onChange={(e) => setNoteVal(e.target.value.slice(0, 500))} rows={4} maxLength={500}
               placeholder={t("topics.notesPlaceholder")}
               style={{ width: "100%", boxSizing: "border-box", padding: 10, border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)", fontSize: 14, lineHeight: 1.5, resize: "vertical" }} />
-            {[["g", t("topics.zielG"), t("topics.zielGPlaceholder"), zielGVal, setZielGVal],
+            {[["v", t("topics.voraus"), t("topics.vorausPlaceholder"), vorausVal, setVorausVal],
+              ["g", t("topics.zielG"), t("topics.zielGPlaceholder"), zielGVal, setZielGVal],
               ["e", t("topics.zielE"), t("topics.zielEPlaceholder"), zielEVal, setZielEVal]].map(([k, label, ph, wert, setzen]) => (
               <div key={k}>
                 <div style={secTitle}>{label}</div>
@@ -353,6 +358,12 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
         ) : (<>
           <div style={secTitle}>{t("topics.notes")}</div>
           <div style={{ fontSize: 14, color: notes ? "var(--text2)" : "var(--text3)", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{notes || t("topics.notesEmpty")}</div>
+          {voraus && (
+            <div style={{ marginTop: 10, padding: "8px 10px", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 }}>{t("topics.voraus")}</div>
+              <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{voraus}</div>
+            </div>
+          )}
           {(zielG || zielE) && (
             <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
               {[[t("topics.zielG"), zielG], [t("topics.zielE"), zielE]].filter(([, v]) => v).map(([label, v]) => (

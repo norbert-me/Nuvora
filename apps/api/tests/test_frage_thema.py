@@ -295,3 +295,24 @@ async def test_thema_landet_im_papierkorb_samt_unterthemen(s):
 
     await T.restore_topic(thema.id, user=u, db=s)
     assert sorted(t.id for t in (await T.list_topics(user=u, db=s))) == sorted([thema.id, unter.id])
+
+
+@pytest.mark.asyncio
+async def test_voraussetzung_bleibt_beim_umbenennen_stehen(s):
+    """`PUT /api/topics/{id}` setzt jedes nicht genannte Feld auf leer.
+
+    Genau daran ist das Thema der Frage schon einmal verschwunden (siehe oben).
+    Beim Thema faellt es noch leichter aus dem Blick: das Umbenennen aus der
+    Liste schickt seinen eigenen kleinen Rumpf.
+    """
+    from app.routers import topics as T
+
+    u, thema, frage, quiz = await _welt(s)
+    await T.update_topic(thema.id, T.TopicIn(name="Dreiecke", notes="Notiz",
+                                             voraussetzungen="Winkel messen"), user=u, db=s)
+    await T.update_topic(thema.id, T.TopicIn(name="Dreiecke (7)", notes="Notiz",
+                                             voraussetzungen="Winkel messen"), user=u, db=s)
+
+    frisch = [t for t in (await T.list_topics(user=u, db=s)) if t.id == thema.id][0]
+    assert frisch.name == "Dreiecke (7)"
+    assert frisch.voraussetzungen == "Winkel messen"
