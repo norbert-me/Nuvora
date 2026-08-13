@@ -40,6 +40,11 @@ class QuestionInSet(BaseModel):
     image_layout: str = "above"
     num_choices: int = 4
     choice_images: Optional[dict] = None
+    # Das Thema gehoert zur Frage, nicht zum Quiz — es muss trotzdem hier
+    # stehen: der Fragen-Editor im Quiz baut sein Formular aus GENAU diesem
+    # Objekt. Fehlte es, zeigte er "Kein Thema" und schickte beim Speichern
+    # keins mit.
+    topic_id: Optional[int] = None
     model_config = {"from_attributes": True}
 
 
@@ -315,6 +320,7 @@ def _set_to_dict(qs: QuestionSet) -> dict:
                 "image_layout": item.question.image_layout,
                 "num_choices": item.question.num_choices,
                 "choice_images": item.question.choice_images,
+                "topic_id": item.question.topic_id,
             }
             for item in qs.items
         ],

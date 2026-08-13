@@ -102,7 +102,12 @@ async def update_question(question_id: int, body: QuestionCreate, user: User = D
     if q.owner_id and q.owner_id != user.id:
         raise HTTPException(403, "Kein Zugriff auf diese Frage")
     await _check_topic(db, user, body.topic_id)
-    for k, v in body.model_dump().items():
+    # `exclude_unset`: nur schreiben, was die Anfrage wirklich genannt hat.
+    # Vorher setzte jedes nicht gesendete Feld seinen Default — und weil der
+    # Fragen-Editor im Quiz das Thema gar nicht kannte, loeschte ein Klick auf
+    # „Speichern" die Themenzuordnung still. Ein Feld ausdruecklich leeren geht
+    # weiter: `topic_id: null` steht dann in der Anfrage.
+    for k, v in body.model_dump(exclude_unset=True).items():
         setattr(q, k, v)
     await db.commit()
     await db.refresh(q)
