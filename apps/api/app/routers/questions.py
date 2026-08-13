@@ -124,6 +124,73 @@ async def list_questions(user: User = Depends(get_current_user), db: AsyncSessio
     return result.scalars().all()
 
 
+# ── Fragen ohne Quiz ─────────────────────────────────────────────────────────
+#
+# Eine Frage, die in keinem Quiz steckt, ist im Editor nicht erreichbar: dort
+# kommt man an Fragen nur ueber ein Quiz. Sie steht trotzdem in der
+# Themen-Ansicht — und wenn dort dieselbe Frage zweimal auftaucht, einmal mit
+# und einmal ohne Quiz, sieht das aus wie ein Fehler der Liste.
+#
+# So etwas entsteht beim Entfernen aus einem Quiz (das Quiz verliert den
+# Eintrag, die Frage bleibt) und beim zweiten Import derselben Datei.
+#
+# **Zwei Regeln beim Aufraeumen**, und beide sind wichtiger als eine leere
+# Liste:
+#   1. Nie eine Frage loeschen, auf die Scans zeigen — daran haengen die
+#      Ergebnisse gehaltener Sitzungen. Die bleibt stehen, mit Grund.
+#   2. Gelistet und geloescht wird nur, was der Person gehoert.
+#
+# Diese beiden Routen stehen VOR `/{question_id}` — sonst faengt der
+# Platzhalter den Pfad „verwaist" ab und antwortet mit 422.
+def _verwaist_stmt(user: User):
+    from ..models import QuestionSetItem
+    return (
+        select(Question)
+        .where(Question.owner_id == user.id)
+        .where(~select(QuestionSetItem.id)
+               .where(QuestionSetItem.question_id == Question.id).exists())
+        .order_by(Question.id)
+    )
+
+
+async def _mit_scans(db: AsyncSession, ids: list[int]) -> set[int]:
+    from ..models import Scan
+    if not ids:
+        return set()
+    treffer = await db.execute(select(Scan.question_id).where(Scan.question_id.in_(ids)).distinct())
+    return set(treffer.scalars().all())
+
+
+@router.get("/verwaist")
+async def verwaiste_fragen(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Welche eigenen Fragen stecken in keinem Quiz?"""
+    fragen = (await db.execute(_verwaist_stmt(user))).scalars().all()
+    mit_scans = await _mit_scans(db, [q.id for q in fragen])
+    return {
+        "anzahl": len(fragen),
+        "loeschbar": sum(1 for q in fragen if q.id not in mit_scans),
+        "fragen": [{"id": q.id, "text": (q.text or "")[:160], "topic_id": q.topic_id,
+                    "hat_ergebnisse": q.id in mit_scans} for q in fragen],
+    }
+
+
+@router.delete("/verwaist")
+async def verwaiste_fragen_loeschen(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Fragen ohne Quiz loeschen — ausser denen mit Ergebnissen."""
+    rate_limit("fragen_aufraeumen", f"u{user.id}", 10, 600, "Zu oft aufgeraeumt. Bitte kurz warten.")
+    fragen = (await db.execute(_verwaist_stmt(user))).scalars().all()
+    mit_scans = await _mit_scans(db, [q.id for q in fragen])
+    geloescht = 0
+    for q in fragen:
+        if q.id in mit_scans:
+            continue
+        await db.delete(q)
+        geloescht += 1
+    await db.commit()
+    return {"geloescht": geloescht, "behalten": len(mit_scans),
+            "grund": "Fragen mit Ergebnissen aus gehaltenen Sitzungen bleiben stehen" if mit_scans else ""}
+
+
 @router.get("/{question_id}", response_model=QuestionOut)
 async def get_question(question_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     q = await db.get(Question, question_id)

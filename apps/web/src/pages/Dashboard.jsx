@@ -34,6 +34,27 @@ export default function Dashboard() {
   // Import-Fortschritt: { stage: "reading"|"uploading"|"done"|"error", label }
   const [importStatus, setImportStatus] = useState(null);
 
+  // Fragen, die in keinem Quiz mehr stecken. Sie sind ueber den Editor nicht
+  // erreichbar (dorthin kommt man nur ueber ein Quiz), tauchen aber in der
+  // Themen-Ansicht auf — dort sehen sie neben ihrem Zwilling aus dem Quiz aus
+  // wie eine doppelte Zeile. Deshalb hier sichtbar machen und aufraeumbar.
+  const [verwaist, setVerwaist] = useState(null);
+  const [verwaistOffen, setVerwaistOffen] = useState(false);
+
+  const ladeVerwaiste = () =>
+    fetch(`${API}/questions/verwaist`).then((r) => (r.ok ? r.json() : null)).then(setVerwaist).catch(() => {});
+
+  const verwaisteAufraeumen = async () => {
+    const ok = await askConfirm(t("dash.orphansCleanAsk", { n: verwaist?.loeschbar ?? 0 }),
+                                { ok: t("common.delete"), danger: true });
+    if (!ok) return;
+    const r = await fetch(`${API}/questions/verwaist`, { method: "DELETE" });
+    if (!r.ok) return;
+    await ladeVerwaiste();
+    setVerwaistOffen(false);
+    load();
+  };
+
   // POST mit sichtbarem Fortschritt (XHR liefert Upload-Fortschritt)
   const uploadWithProgress = (url, body, { json = true, label = "" } = {}) =>
     new Promise((resolve, reject) => {
@@ -82,6 +103,7 @@ export default function Dashboard() {
   useEffect(() => {
     const timer = setTimeout(() => { if (folders.length === 0 && allQuestions.length === 0) setLoadError(true); }, 15000);
     load().then(() => clearTimeout(timer));
+    ladeVerwaiste();
     return () => clearTimeout(timer);
   }, []);
 
@@ -313,6 +335,36 @@ export default function Dashboard() {
           </span>
         ))}
       </div>
+
+      {/* Fragen ohne Quiz — nur wenn es welche gibt. Ein Hinweis, der immer da
+          steht, wird nach zwei Tagen nicht mehr gelesen. */}
+      {verwaist?.anzahl > 0 && (
+        <div style={{ marginBottom: 16, padding: "10px 14px", border: "1px solid var(--border2)", borderRadius: 12, background: "var(--bg2)", fontSize: 13.5, color: "var(--text2)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span>{t("dash.orphans", { n: verwaist.anzahl })}</span>
+            <button onClick={() => setVerwaistOffen((v) => !v)} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13 }}>
+              {verwaistOffen ? t("common.close") : t("dash.orphansShow")}
+            </button>
+            {verwaist.loeschbar > 0 && (
+              <button onClick={verwaisteAufraeumen} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13, color: C.danger, borderColor: C.danger }}>
+                {t("dash.orphansClean", { n: verwaist.loeschbar })}
+              </button>
+            )}
+          </div>
+          {verwaistOffen && (
+            <ul style={{ margin: "10px 0 0", paddingLeft: 18, lineHeight: 1.7 }}>
+              {verwaist.fragen.map((q) => (
+                <li key={q.id}>
+                  {q.text}
+                  {/* Mit Ergebnissen wird nichts geloescht: daran haengen die
+                      Auswertungen gehaltener Sitzungen. */}
+                  {q.hat_ergebnisse && <span style={{ color: "var(--text3)" }}> · {t("dash.orphansKept")}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/* Move dialog */}
       {movingFolder && (

@@ -100,3 +100,62 @@ async def test_thema_ausdruecklich_entfernen_geht_weiter(s):
 
     frisch = await s.get(Question, frage.id)
     assert frisch.topic_id is None
+
+
+# ─── Fragen, die in keinem Quiz mehr stecken ───
+#
+# Sie sind ueber den Editor nicht erreichbar (dorthin kommt man nur ueber ein
+# Quiz), stehen aber in der Themen-Ansicht — neben ihrem Zwilling aus dem Quiz
+# sieht das aus wie eine doppelte Zeile. Aufgeraeumt wird deshalb ausdruecklich,
+# und mit einer Ausnahme, die wichtiger ist als eine leere Liste.
+
+
+@pytest.mark.asyncio
+async def test_verwaiste_frage_wird_gefunden_und_geloescht(s):
+    u, thema, frage, quiz = await _welt(s)
+    from app.models import Session as CvSession, SchoolClass
+
+    waise = Question(text="Reste einer geloeschten Reihe", question_type="mc",
+                     choices={"A": "x"}, correct_answer="A", owner_id=u.id)
+    s.add(waise)
+    await s.commit()
+
+    stand = await Q.verwaiste_fragen(user=u, db=s)
+    assert stand["anzahl"] == 1 and stand["loeschbar"] == 1
+    assert stand["fragen"][0]["id"] == waise.id
+
+    weg = await Q.verwaiste_fragen_loeschen(user=u, db=s)
+    assert weg["geloescht"] == 1
+    assert await s.get(Question, waise.id) is None
+    # Die Frage im Quiz bleibt selbstverstaendlich stehen.
+    assert await s.get(Question, frage.id) is not None
+
+
+@pytest.mark.asyncio
+async def test_frage_mit_ergebnissen_bleibt_stehen(s):
+    """Die Ausnahme: an Scans haengen die Auswertungen gehaltener Sitzungen.
+    Eine Frage dafuer zu loeschen, waere ein stiller Datenverlust — und der
+    Bericht sagt, dass sie stehen blieb."""
+    u, thema, frage, quiz = await _welt(s)
+    from app.models import Session as CvSession, SchoolClass, Scan
+
+    cls = SchoolClass(name="7a", owner_id=u.id)
+    s.add(cls)
+    await s.flush()
+    waise = Question(text="War mal in einem Quiz", question_type="mc",
+                     choices={"A": "x"}, correct_answer="A", owner_id=u.id)
+    s.add(waise)
+    await s.flush()
+    sitzung = CvSession(question_set_id=quiz.id, class_id=cls.id, owner_id=u.id)
+    s.add(sitzung)
+    await s.flush()
+    s.add(Scan(session_id=sitzung.id, question_id=waise.id, student_id=1, answer="A"))
+    await s.commit()
+
+    stand = await Q.verwaiste_fragen(user=u, db=s)
+    assert stand["anzahl"] == 1 and stand["loeschbar"] == 0
+    assert stand["fragen"][0]["hat_ergebnisse"] is True
+
+    weg = await Q.verwaiste_fragen_loeschen(user=u, db=s)
+    assert weg["geloescht"] == 0 and weg["behalten"] == 1
+    assert await s.get(Question, waise.id) is not None
