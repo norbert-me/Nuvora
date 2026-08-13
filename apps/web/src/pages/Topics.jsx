@@ -7,6 +7,7 @@ import { askConfirm } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, Empty, Skeleton, Modal, pageApp} from "../components/Icons.jsx";
 import { peek, put } from "../core/cache.js";
+import AutoTextarea from "../components/AutoTextarea.jsx";
 import { Link } from "react-router-dom";
 import { themaZiel } from "../core/themaLinks.js";
 
@@ -337,7 +338,7 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
             <input value={titleVal} onChange={(e) => setTitleVal(e.target.value)} autoFocus maxLength={120}
               style={{ width: "100%", boxSizing: "border-box", padding: 10, border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)", fontSize: 15, fontWeight: 600 }} />
             <div style={secTitle}>{t("topics.notes")}</div>
-            <textarea value={noteVal} onChange={(e) => setNoteVal(e.target.value.slice(0, 500))} rows={4} maxLength={500}
+            <AutoTextarea value={noteVal} onChange={(e) => setNoteVal(e.target.value.slice(0, 500))} rows={2} maxLength={500}
               placeholder={t("topics.notesPlaceholder")}
               style={{ width: "100%", boxSizing: "border-box", padding: 10, border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)", fontSize: 14, lineHeight: 1.5, resize: "vertical" }} />
             {[["v", t("topics.voraus"), t("topics.vorausPlaceholder"), vorausVal, setVorausVal],
@@ -345,7 +346,7 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
               ["e", t("topics.zielE"), t("topics.zielEPlaceholder"), zielEVal, setZielEVal]].map(([k, label, ph, wert, setzen]) => (
               <div key={k}>
                 <div style={secTitle}>{label}</div>
-                <textarea value={wert} onChange={(e) => setzen(e.target.value.slice(0, 500))} rows={2} maxLength={500} placeholder={ph}
+                <AutoTextarea value={wert} onChange={(e) => setzen(e.target.value.slice(0, 500))} rows={2} maxLength={500} placeholder={ph}
                   style={{ width: "100%", boxSizing: "border-box", padding: 10, border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)", fontSize: 14, lineHeight: 1.5, resize: "vertical" }} />
               </div>
             ))}
