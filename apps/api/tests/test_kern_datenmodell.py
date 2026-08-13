@@ -203,7 +203,18 @@ async def test_thema_loeschen_loest_fragen_ohne_fremdschluessel(s_ohne_fk):
     s.add_all([q, d])
     await s.commit()
 
+    # Loeschen ist jetzt weich: das Thema liegt im Papierkorb, und genau
+    # deshalb behalten die Inhalte ihre topic_id — ein zurueckgeholtes Thema
+    # waere sonst leer.
     await T.delete_topic(ober.id, user=u, db=s)
+    await s.refresh(q)
+    await s.refresh(d)
+    assert q.topic_id == unter.id and d.topic_id == ober.id, "Papierkorb hat schon geloest"
+
+    # Erst endgueltig: hier muss es greifen, sonst zeigen Frage und Stapel auf
+    # ein Thema, das es nicht mehr gibt (ohne Fremdschluessel greift kein
+    # ON DELETE SET NULL).
+    await T.purge_topic(ober.id, user=u, db=s)
     await s.refresh(q)
     await s.refresh(d)
     assert q.topic_id is None, "Frage zeigt auf ein gelöschtes Unterthema"

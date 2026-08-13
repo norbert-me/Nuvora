@@ -1,5 +1,5 @@
 // Gemeinsamer Papierkorb des Kerns: alles Gelöschte an einer Stelle — Klassen,
-// Kurse, Kartenstapel, Karten, Lernpfade, Lernleitern. Die Module haben keinen
+// Kurse, Themen, Kartenstapel, Karten, Lernpfade, Lernleitern, CardVote-Fragen. Die Module haben keinen
 // eigenen Papierkorb mehr; sie löschen nur noch (Soft-Delete), gefunden wird
 // hier. Serverseite: apps/api/app/routers/trash.py.
 import { useState, useEffect } from "react";
@@ -11,7 +11,7 @@ import { sende } from "../core/melden.js";
 const API = "/api";
 
 // Anzeige-Reihenfolge der Arten (Kern zuerst, dann die Module).
-const ARTEN = ["kurs", "class", "deck", "card", "path", "ladder"];
+const ARTEN = ["kurs", "class", "topic", "deck", "card", "path", "ladder", "question"];
 
 export default function Papierkorb() {
   const { t } = useLanguage();

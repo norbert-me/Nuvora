@@ -23,12 +23,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Card, CardDeck, Kurs, LearningLadder, LearningPath, SchoolClass, Student, Topic, User
+from ..models import (Card, CardDeck, Kurs, LearningLadder, LearningPath, Question,
+                      QuestionSet, QuestionSetItem, SchoolClass, Student, Topic, User)
 from .auth import get_current_user
 from . import classes as classes_router
 from . import karten as karten_router
 from . import kurse as kurse_router
 from . import lernpfad as lernpfad_router
+from . import questions as questions_router
+from . import topics as topics_router
 
 router = APIRouter(prefix="/api/trash", tags=["trash"])
 
@@ -37,7 +40,7 @@ AUFBEWAHRUNG_TAGE = 30
 
 
 class TrashItem(BaseModel):
-    kind: str            # class | kurs | path | ladder | deck | card
+    kind: str            # class | kurs | path | ladder | deck | card | question | topic
     id: int
     label: str
     context: str = ""    # Wo es lag (Klasse, Pfad, Stapel)
@@ -113,6 +116,39 @@ async def list_trash(user: User = Depends(get_current_user), db: AsyncSession = 
     for cid, front, gel, deck_name in karten:
         add("card", cid, _kurz(front), "Karte", "karten", gel, deck_name or "")
 
+    # ── CardVote-Fragen ──
+    #
+    # Der Kontext ist hier wichtiger als bei allem anderen: „Berechne: 3 · 2/7"
+    # sagt nicht, aus welchem Quiz die Frage stammt.
+    fragen = (await db.execute(
+        select(Question, QuestionSet.name)
+        .outerjoin(QuestionSetItem, QuestionSetItem.question_id == Question.id)
+        .outerjoin(QuestionSet, QuestionSet.id == QuestionSetItem.question_set_id)
+        .where(Question.owner_id == user.id, Question.deleted_at.is_not(None))
+    )).all()
+    gesehen = set()
+    for q, set_name in fragen:
+        if q.id in gesehen:
+            continue          # dieselbe Frage kann in mehreren Quizzen stecken
+        gesehen.add(q.id)
+        add("question", q.id, _kurz(q.text), "Frage", "cardvote", q.deleted_at, set_name or "")
+
+    # ── Themen (Kern) ──
+    #
+    # Nur das oberste geloeschte Thema eines Astes: beim Loeschen wandern die
+    # Unterthemen mit, und eine Liste aus zehn Zeilen fuer einen Klick waere
+    # kein Papierkorb, sondern ein Protokoll.
+    themen = (await db.execute(select(Topic).where(
+        Topic.owner_id == user.id, Topic.deleted_at.is_not(None)))).scalars().all()
+    geloescht_ids = {t.id for t in themen}
+    namen = {t.id: t.name for t in (await db.execute(
+        select(Topic).where(Topic.owner_id == user.id))).scalars().all()}
+    for t in themen:
+        if t.parent_id in geloescht_ids:
+            continue
+        add("topic", t.id, t.name, "Thema", "kern", t.deleted_at,
+            namen.get(t.parent_id, "") if t.parent_id else "")
+
     items.sort(key=lambda i: i.deleted_at, reverse=True)
     return items
 
@@ -126,6 +162,8 @@ _AKTIONEN = {
     "ladder": (lernpfad_router.restore_ladder, lernpfad_router.purge_ladder),
     "deck": (karten_router.restore_deck, karten_router.purge_deck),
     "card": (karten_router.restore_card, karten_router.purge_card),
+    "question": (questions_router.restore_question, questions_router.purge_question),
+    "topic": (topics_router.restore_topic, topics_router.purge_topic),
 }
 
 

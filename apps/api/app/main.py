@@ -313,6 +313,8 @@ def _ensure_columns(sync_conn):
         ("calendar_entries", "end_time", "VARCHAR(5) DEFAULT '' NOT NULL"),
         ("exercises", "code", "VARCHAR(20) DEFAULT '' NOT NULL"),
         ("exercises", "sozialform", "VARCHAR(50) DEFAULT '' NOT NULL"),
+        ("questions", "deleted_at", "TIMESTAMP WITH TIME ZONE"),
+        ("topics", "deleted_at", "TIMESTAMP WITH TIME ZONE"),
         ("users", "timetable_periods", "INTEGER DEFAULT 6 NOT NULL"),
         ("users", "timetable_times", "JSON"),
     ]
@@ -841,6 +843,9 @@ PAPIERKORB_TABELLEN = (
     ("cards", "Karte(n)"), ("learning_ladders", "Lernleiter(n)"),
     ("school_classes", "Klasse(n)"), ("card_decks", "Deck(s)"),
     ("learning_paths", "Lernpfad(e)"), ("kurse", "Kurs(e)"),
+    # Fragen vor Themen: eine Frage zeigt per topic_id auf ihr Thema. Andersherum
+    # bliebe sie fuer den Rest des Laufs auf eine geloeschte ID zeigen.
+    ("questions", "Frage(n)"), ("topics", "Thema/Themen"),
 )
 
 

@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
-from sqlalchemy import select, or_, delete as sql_delete
+from sqlalchemy import select, or_, delete as sql_delete, update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -201,6 +201,7 @@ async def _eigene_fragen(db: AsyncSession, user: User, ids) -> None:
         return
     treffer = (await db.execute(select(Question.id).where(
         Question.id.in_(ids),
+        Question.deleted_at.is_(None),
         or_(Question.owner_id == user.id, Question.owner_id.is_(None)),
     ))).scalars().all()
     fehlend = set(ids) - set(treffer)
@@ -339,7 +340,12 @@ async def delete_question_set(set_id: int, user: User = Depends(get_current_user
     # SET NULL). ORM-Objekt-Delete müsste die items erst laden (async Lazy-Load).
     await db.execute(sql_delete(QuestionSet).where(QuestionSet.id == set_id))
     if nur_hier:
-        await db.execute(sql_delete(Question).where(Question.id.in_(nur_hier)))
+        # Weich: die Fragen liegen danach im Papierkorb (30 Tage) statt weg zu
+        # sein. Ein geloeschtes Quiz nimmt oft Fragen mit, die man doch noch
+        # braucht — zurueckholbar ist das die halbe Miete.
+        from datetime import datetime, timezone
+        await db.execute(sql_update(Question).where(Question.id.in_(nur_hier))
+                         .values(deleted_at=datetime.now(timezone.utc)))
     await db.commit()
 
 
@@ -373,7 +379,8 @@ def _set_to_dict(qs: QuestionSet) -> dict:
         "shuffle_answers": qs.shuffle_answers,
         "niveau_aktiv": bool(qs.niveau_aktiv),
         "minuspunkte": bool(qs.minuspunkte),
-        "niveaus": {str(item.question_id): (item.niveau or "G") for item in qs.items},
+        "niveaus": {str(item.question_id): (item.niveau or "G") for item in qs.items
+                    if item.question and item.question.deleted_at is None},
         "questions": [
             {
                 "id": item.question.id,
@@ -387,7 +394,10 @@ def _set_to_dict(qs: QuestionSet) -> dict:
                 "choice_images": item.question.choice_images,
                 "topic_id": item.question.topic_id,
             }
-            for item in qs.items
+            # Eine Frage im Papierkorb steht nicht mehr im Quiz — ihr
+            # Set-Eintrag bleibt aber liegen, damit sie beim Zurueckholen
+            # wieder an ihrem Platz steht.
+            for item in qs.items if item.question and item.question.deleted_at is None
         ],
     }
 

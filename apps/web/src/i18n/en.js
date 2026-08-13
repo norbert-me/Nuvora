@@ -445,7 +445,7 @@ export default {
   "dash.orphans": "{{n}} question(s) are in no quiz",
   "dash.orphansShow": "Show",
   "dash.orphansClean": "Delete {{n}}",
-  "dash.orphansCleanAsk": "Delete {{n}} question(s) for good? They are in no quiz and have no results.",
+  "dash.orphansCleanAsk": "Move {{n}} question(s) to the trash? They are in no quiz; restorable for 30 days.",
   "dash.orphansKept": "kept — has results",
   "dash.orphansSelectAll": "Select all {{n}}",
   "dash.orphansSelectNone": "Clear selection",

@@ -271,7 +271,10 @@ def test_postgres_ruestet_bestehende_spalte_nach(monkeypatch):
     import sqlalchemy
     fake = _FakePG(
         tabellen=["questions", "users", "topics"],
-        spalten={"questions": ["id", "owner_id", "topic_id"]},
+        # `deleted_at` gehoert zur Ausgangslage: die Tabelle steht seit Jahren,
+        # nur die Fremdschluessel fehlen. Fehlte die Spalte hier, pruefte der
+        # Test nebenbei ein ADD COLUMN mit — und genau das schliesst er aus.
+        spalten={"questions": ["id", "owner_id", "topic_id", "deleted_at"]},
         fks={},
     )
     monkeypatch.setattr(sqlalchemy, "inspect", lambda _: fake)
@@ -294,7 +297,7 @@ def test_postgres_ruehrt_vorhandene_fremdschluessel_nicht_an(monkeypatch):
     import sqlalchemy
     fake = _FakePG(
         tabellen=["questions", "users", "topics"],
-        spalten={"questions": ["id", "owner_id", "topic_id"]},
+        spalten={"questions": ["id", "owner_id", "topic_id", "deleted_at"]},
         fks={"questions": ["owner_id", "topic_id"]},
     )
     monkeypatch.setattr(sqlalchemy, "inspect", lambda _: fake)

@@ -4,7 +4,9 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel, model_validator
-from sqlalchemy import select
+from datetime import datetime, timezone
+
+from sqlalchemy import select, delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
@@ -97,7 +99,7 @@ async def create_question(body: QuestionCreate, user: User = Depends(get_current
 @router.put("/{question_id}", response_model=QuestionOut)
 async def update_question(question_id: int, body: QuestionCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     q = await db.get(Question, question_id)
-    if not q:
+    if not q or q.deleted_at is not None:
         raise HTTPException(404)
     if q.owner_id and q.owner_id != user.id:
         raise HTTPException(403, "Kein Zugriff auf diese Frage")
@@ -119,6 +121,7 @@ async def list_questions(user: User = Depends(get_current_user), db: AsyncSessio
     result = await db.execute(
         select(Question)
         .where((Question.owner_id == user.id) | (Question.owner_id.is_(None)))
+        .where(Question.deleted_at.is_(None))
         .order_by(Question.id.desc())
     )
     return result.scalars().all()
@@ -146,7 +149,7 @@ def _verwaist_stmt(user: User):
     from ..models import QuestionSetItem
     return (
         select(Question)
-        .where(Question.owner_id == user.id)
+        .where(Question.owner_id == user.id, Question.deleted_at.is_(None))
         .where(~select(QuestionSetItem.id)
                .where(QuestionSetItem.question_id == Question.id).exists())
         .order_by(Question.id)
@@ -194,7 +197,7 @@ async def verwaiste_fragen_loeschen(user: User = Depends(get_current_user), db: 
 @router.get("/{question_id}", response_model=QuestionOut)
 async def get_question(question_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     q = await db.get(Question, question_id)
-    if not q:
+    if not q or q.deleted_at is not None:
         raise HTTPException(404)
     if q.owner_id and q.owner_id != user.id:
         raise HTTPException(403, "Kein Zugriff auf diese Frage")
@@ -203,11 +206,43 @@ async def get_question(question_id: int, user: User = Depends(get_current_user),
 
 @router.delete("/{question_id}", status_code=204)
 async def delete_question(question_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Weich loeschen — die Frage liegt danach im Papierkorb (30 Tage).
+
+    Vorher war sie sofort weg, samt Bild und Formeln. Wer sich vertippt hatte,
+    hatte sie verloren; im Quiz sieht man beim Loeschen nicht einmal, was in
+    den Antworten stand. Die Set-Eintraege bleiben absichtlich stehen: so
+    steht die Frage nach dem Wiederherstellen wieder in ihrem Quiz.
+    """
     q = await db.get(Question, question_id)
-    if not q:
+    if not q or q.deleted_at is not None:
         raise HTTPException(404)
     if q.owner_id and q.owner_id != user.id:
         raise HTTPException(403, "Kein Zugriff auf diese Frage")
+    q.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
+
+
+async def restore_question(question_id: int, user: User, db: AsyncSession):
+    """Aus dem Papierkorb zurueck (wird von routers/trash.py aufgerufen)."""
+    q = await db.get(Question, question_id)
+    if not q or q.owner_id not in (None, user.id):
+        raise HTTPException(404)
+    q.deleted_at = None
+    await db.commit()
+
+
+async def purge_question(question_id: int, user: User, db: AsyncSession):
+    """Endgueltig loeschen. Scans zeigen ohne ON DELETE auf die Frage — haengt
+    eine Auswertung daran, bleibt sie stehen, statt dass die Datenbank den
+    Loeschversuch mit einem Fehler quittiert."""
+    q = await db.get(Question, question_id)
+    if not q or q.owner_id not in (None, user.id):
+        raise HTTPException(404)
+    from ..models import Scan, QuestionSetItem
+    hat_scans = (await db.execute(select(Scan.id).where(Scan.question_id == question_id).limit(1))).scalar_one_or_none()
+    if hat_scans:
+        raise HTTPException(409, "Diese Frage hat Ergebnisse aus einer Sitzung — sie bleibt erhalten")
+    await db.execute(sql_delete(QuestionSetItem).where(QuestionSetItem.question_id == question_id))
     await db.delete(q)
     await db.commit()
 

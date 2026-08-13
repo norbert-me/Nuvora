@@ -446,7 +446,7 @@ export default {
   "dash.orphans": "{{n}} pregunta(s) no están en ningún cuestionario",
   "dash.orphansShow": "Mostrar",
   "dash.orphansClean": "Eliminar {{n}}",
-  "dash.orphansCleanAsk": "¿Eliminar definitivamente {{n}} pregunta(s)? No están en ningún cuestionario y no tienen resultados.",
+  "dash.orphansCleanAsk": "¿Mover {{n}} pregunta(s) a la papelera? No están en ningún cuestionario; recuperables 30 días.",
   "dash.orphansKept": "se mantiene — tiene resultados",
   "dash.orphansSelectAll": "Seleccionar las {{n}}",
   "dash.orphansSelectNone": "Quitar selección",

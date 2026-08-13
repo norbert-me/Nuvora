@@ -76,7 +76,8 @@ class TopicOut(BaseModel):
 
 async def _owned(db: AsyncSession, user: User, topic_id: int) -> Topic:
     result = await db.execute(
-        select(Topic).where(Topic.id == topic_id, Topic.owner_id == user.id)
+        select(Topic).where(Topic.id == topic_id, Topic.owner_id == user.id,
+                            Topic.deleted_at.is_(None))
     )
     topic = result.scalar_one_or_none()
     if not topic:
@@ -109,14 +110,15 @@ async def list_topics(
         (
             await db.execute(
                 select(Question.topic_id, sa_func.count(Question.id))
-                .where(Question.owner_id == user.id, Question.topic_id.isnot(None))
+                .where(Question.owner_id == user.id, Question.topic_id.isnot(None),
+                       Question.deleted_at.is_(None))
                 .group_by(Question.topic_id)
             )
         ).all()
     )
     result = await db.execute(
         select(Topic)
-        .where(Topic.owner_id == user.id)
+        .where(Topic.owner_id == user.id, Topic.deleted_at.is_(None))
         .order_by(Topic.position, Topic.name)
     )
     return [
@@ -184,7 +186,8 @@ async def topic_usage(topic_id: int, user: User = Depends(get_current_user), db:
     # ueberall "Nichts vorhanden", obwohl die Inhalte eine Ebene tiefer liegen —
     # und genau so sieht man ein Fach normalerweise an: mit allem darunter.
     kinder = (await db.execute(
-        select(Topic.id).where(Topic.owner_id == user.id, Topic.parent_id == topic.id)
+        select(Topic.id).where(Topic.owner_id == user.id, Topic.parent_id == topic.id,
+                               Topic.deleted_at.is_(None))
     )).scalars().all()
     themen_ids = [topic.id, *kinder]
     out = {
@@ -200,7 +203,9 @@ async def topic_usage(topic_id: int, user: User = Depends(get_current_user), db:
         return active
 
     if await on("cardvote"):
-        rows = (await db.execute(select(Question).where(Question.owner_id == user.id, Question.topic_id.in_(themen_ids)).limit(50))).scalars().all()
+        rows = (await db.execute(select(Question).where(
+            Question.owner_id == user.id, Question.topic_id.in_(themen_ids),
+            Question.deleted_at.is_(None)).limit(50))).scalars().all()
         # Das Quiz dazu, damit die Ansicht auf die Frage verlinken kann: der
         # Fragen-Editor oeffnet ein Set (`?set=`), eine Frage allein hat keinen
         # Ort. Eine Frage kann in mehreren Quizzen stecken — genommen wird das
@@ -296,7 +301,7 @@ async def delete_topic(
     nachgezogen (siehe _ensure_columns in main.py) und tragen dort gar keinen
     Fremdschluessel. Ohne diesen Schritt behielten Fragen, Stapel & Co. die ID
     eines Themas, das es nicht mehr gibt. Also hier ausdruecklich loesen."""
-    from sqlalchemy import update
+    from datetime import datetime, timezone
 
     topic = await _owned(db, user, topic_id)
     # Thema samt aller Nachfahren (das Loeschen kaskadiert ueber parent_id).
@@ -304,6 +309,63 @@ async def delete_topic(
     rand = [topic.id]
     while rand:
         kinder = (await db.execute(select(Topic.id).where(Topic.parent_id.in_(rand)))).scalars().all()
+        rand = [k for k in kinder if k not in ids]
+        ids.update(rand)
+    ids = list(ids)
+    # Weich: Thema und Unterthemen wandern in den Papierkorb (30 Tage). Die
+    # topic_id der Inhalte bleibt UNANGETASTET — wuerde sie jetzt geloest, kaeme
+    # das Thema leer zurueck, und das Zurueckholen waere keins. Geloest wird
+    # erst beim endgueltigen Loeschen (purge_topic).
+    jetzt = datetime.now(timezone.utc)
+    for t in (await db.execute(select(Topic).where(Topic.id.in_(ids)))).scalars().all():
+        t.deleted_at = jetzt
+    await db.commit()
+
+
+async def restore_topic(topic_id: int, user: User, db: AsyncSession):
+    """Aus dem Papierkorb zurueck — samt Unterthemen (wie beim Loeschen)."""
+    from sqlalchemy import select as _select
+    topic = (await db.execute(_select(Topic).where(
+        Topic.id == topic_id, Topic.owner_id == user.id))).scalar_one_or_none()
+    if not topic:
+        raise HTTPException(404, "Thema nicht gefunden")
+    ids, rand = {topic.id}, [topic.id]
+    while rand:
+        kinder = (await db.execute(_select(Topic.id).where(Topic.parent_id.in_(rand)))).scalars().all()
+        rand = [k for k in kinder if k not in ids]
+        ids.update(rand)
+    for t in (await db.execute(_select(Topic).where(Topic.id.in_(list(ids))))).scalars().all():
+        t.deleted_at = None
+    # Das Oberthema muss mit zurueck, sonst haengt das Unterthema im Nichts:
+    # die Liste baut den Baum ueber parent_id, ein Kind ohne Elternteil faellt
+    # aus der Anzeige.
+    eltern = topic.parent_id
+    while eltern:
+        oben = await db.get(Topic, eltern)
+        if not oben:
+            break
+        oben.deleted_at = None
+        eltern = oben.parent_id
+    await db.commit()
+
+
+async def purge_topic(topic_id: int, user: User, db: AsyncSession):
+    """Endgueltig loeschen. JETZT erst verlieren die Inhalte ihr Thema.
+
+    Das ON DELETE SET NULL der Modelle allein reicht dafuer nicht: die meisten
+    topic_id-Spalten sind in gewachsenen Datenbanken per ALTER TABLE
+    nachgezogen (siehe _ensure_columns in main.py) und tragen dort gar keinen
+    Fremdschluessel. Ohne diesen Schritt behielten Fragen, Stapel & Co. die ID
+    eines Themas, das es nicht mehr gibt.
+    """
+    from sqlalchemy import update, select as _select
+    topic = (await db.execute(_select(Topic).where(
+        Topic.id == topic_id, Topic.owner_id == user.id))).scalar_one_or_none()
+    if not topic:
+        raise HTTPException(404, "Thema nicht gefunden")
+    ids, rand = {topic.id}, [topic.id]
+    while rand:
+        kinder = (await db.execute(_select(Topic.id).where(Topic.parent_id.in_(rand)))).scalars().all()
         rand = [k for k in kinder if k not in ids]
         ids.update(rand)
     ids = list(ids)

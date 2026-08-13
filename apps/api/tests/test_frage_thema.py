@@ -206,9 +206,14 @@ async def test_quiz_loeschen_nimmt_seine_eigenen_fragen_mit(s):
 
     await F.delete_question_set(quiz.id, user=u, db=s)
 
-    assert await s.get(Question, nur_hier.id) is None, "Waise blieb liegen"
-    assert await s.get(Question, geteilt.id) is not None, "Frage aus einem anderen Quiz mitgerissen"
-    assert await s.get(Question, gescannt.id) is not None, "Frage mit Ergebnissen geloescht"
+    # Weich: die Frage liegt im Papierkorb, nicht im Nichts. Ein geloeschtes
+    # Quiz nimmt oft Fragen mit, die man doch noch braucht.
+    await s.refresh(nur_hier)
+    assert nur_hier.deleted_at is not None, "Waise blieb sichtbar liegen"
+    await s.refresh(geteilt)
+    assert geteilt.deleted_at is None, "Frage aus einem anderen Quiz mitgerissen"
+    await s.refresh(gescannt)
+    assert gescannt.deleted_at is None, "Frage mit Ergebnissen geloescht"
 
 
 @pytest.mark.asyncio
@@ -234,3 +239,59 @@ async def test_fragen_an_ein_quiz_anhaengen(s):
     assert ids == [frage.id, waise.id], "angehaengt wird ans Ende, ohne Dublette"
     stand = await Q.verwaiste_fragen(user=u, db=s)
     assert stand["anzahl"] == 0
+
+
+# ─── Papierkorb ───
+#
+# Fragen und Themen wurden hart geloescht: ein Fehlklick, und die Frage war mit
+# Bild, Antworten und Formeln weg. Beide gehen jetzt denselben Weg wie alles
+# andere Geloeschte — 30 Tage im Papierkorb (routers/trash.py).
+
+
+@pytest.mark.asyncio
+async def test_frage_landet_im_papierkorb_und_kommt_zurueck(s):
+    from app.routers import trash as TR
+
+    u, thema, frage, quiz = await _welt(s)
+    await Q.delete_question(frage.id, user=u, db=s)
+
+    await s.refresh(frage)
+    assert frage.deleted_at is not None, "hart geloescht statt in den Papierkorb"
+    # Aus dem Quiz ist sie weg, ihr Set-Eintrag bleibt aber liegen — sonst
+    # stuende sie nach dem Zurueckholen nicht wieder an ihrem Platz.
+    assert (await F._load_set(s, quiz.id))["questions"] == []
+    assert (await Q.list_questions(user=u, db=s)) == []
+
+    liste = await TR.list_trash(user=u, db=s)
+    eintrag = [i for i in liste if i.kind == "question"]
+    assert len(eintrag) == 1 and eintrag[0].id == frage.id
+    assert eintrag[0].context == "Test", "das Quiz gehoert als Kontext daneben"
+
+    await Q.restore_question(frage.id, user=u, db=s)
+    assert len((await F._load_set(s, quiz.id))["questions"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_thema_landet_im_papierkorb_samt_unterthemen(s):
+    from app.routers import trash as TR
+    from app.routers import topics as T
+
+    u, thema, frage, quiz = await _welt(s)
+    unter = Topic(name="Winkelsumme", owner_id=u.id, parent_id=thema.id, position=0)
+    s.add(unter)
+    await s.commit()
+
+    await T.delete_topic(thema.id, user=u, db=s)
+
+    assert [t.id for t in (await T.list_topics(user=u, db=s))] == []
+    liste = await TR.list_trash(user=u, db=s)
+    themen = [i for i in liste if i.kind == "topic"]
+    assert len(themen) == 1, "das Unterthema gehoert nicht als eigener Eintrag hinein"
+    assert themen[0].id == thema.id
+
+    # Die Frage behaelt ihr Thema — sonst kaeme es leer zurueck.
+    await s.refresh(frage)
+    assert frage.topic_id == thema.id
+
+    await T.restore_topic(thema.id, user=u, db=s)
+    assert sorted(t.id for t in (await T.list_topics(user=u, db=s))) == sorted([thema.id, unter.id])

@@ -99,6 +99,10 @@ class Question(Base):
     # und ohne Thema bleibt die Frage voll nutzbar.
     topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Weich geloescht: die Frage liegt im Papierkorb (routers/trash.py) und ist
+    # 30 Tage lang zurueckholbar. Hart geloescht wurde sie frueher — wer sich
+    # vertippt hatte, hatte die Frage verloren.
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class QuestionSet(Base):
@@ -377,6 +381,10 @@ class Topic(Base):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Weich geloescht (Papierkorb, 30 Tage). Beim Wiederherstellen kommen die
+    # Unterthemen mit — und die Inhalte behalten waehrenddessen ihre topic_id,
+    # sonst waere ein wiederhergestelltes Thema leer.
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # Freie Notiz je Thema/Unterthema: Lernziele/Inhalt ("Was sollen die SuS hier
     # lernen?") zur Unterrichtsplanung. Rein für die Lehrkraft, kein Modul hängt daran.
     notes: Mapped[str] = mapped_column(Text, default="", server_default="")
