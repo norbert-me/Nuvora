@@ -59,7 +59,10 @@ MODUL_DATEI = os.path.join(WURZEL, ".selftest-module.json")
 
 # Papierkorb: Kinder vor Eltern, sonst greift die Kaskade ins Leere
 # (dieselbe Reihenfolge wie empty_trash in apps/api/app/routers/trash.py).
-TRASH_REIHENFOLGE = ["card", "ladder", "deck", "path", "class", "kurs"]
+# Kinder vor Eltern; Fragen vor Themen, weil purge_topic die topic_id der
+# Fragen erst loest und eine Frage sonst im selben Lauf auf ein weggeraeumtes
+# Thema zeigt.
+TRASH_REIHENFOLGE = ["card", "ladder", "deck", "path", "class", "kurs", "question", "topic"]
 
 
 # ────────────────── Gemerkter Modulzustand (Datei) ──────────────────

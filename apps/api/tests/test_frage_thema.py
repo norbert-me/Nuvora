@@ -316,3 +316,23 @@ async def test_voraussetzung_bleibt_beim_umbenennen_stehen(s):
     frisch = [t for t in (await T.list_topics(user=u, db=s)) if t.id == thema.id][0]
     assert frisch.name == "Dreiecke (7)"
     assert frisch.voraussetzungen == "Winkel messen"
+
+
+@pytest.mark.asyncio
+async def test_loeschen_ist_wiederholbar(s):
+    """Der Fall aus dem Selbsttest: erst das Quiz loeschen (das legt seine
+    alleinigen Fragen selbst in den Papierkorb), dann die Frage loeschen. Das
+    zweite DELETE meinte denselben Zustand und bekam 404 — der Lauf wurde rot,
+    obwohl alles richtig war. Loeschen muss wiederholbar sein."""
+    u, thema, frage, quiz = await _welt(s)
+    await Q.delete_question(frage.id, user=u, db=s)
+    await s.refresh(frage)
+    # SQLite gibt den Zeitstempel ohne Zeitzone zurueck — verglichen wird der
+    # Wert, nicht seine Darstellung.
+    zuvor = frage.deleted_at.replace(tzinfo=None)
+
+    await Q.delete_question(frage.id, user=u, db=s)   # darf nicht werfen
+
+    await s.refresh(frage)
+    assert frage.deleted_at.replace(tzinfo=None) == zuvor, \
+        "der zweite Aufruf hat den Zeitpunkt verschoben"

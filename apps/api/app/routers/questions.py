@@ -214,12 +214,17 @@ async def delete_question(question_id: int, user: User = Depends(get_current_use
     steht die Frage nach dem Wiederherstellen wieder in ihrem Quiz.
     """
     q = await db.get(Question, question_id)
-    if not q or q.deleted_at is not None:
+    if not q:
         raise HTTPException(404)
     if q.owner_id and q.owner_id != user.id:
         raise HTTPException(403, "Kein Zugriff auf diese Frage")
-    q.deleted_at = datetime.now(timezone.utc)
-    await db.commit()
+    # Schon im Papierkorb? Dann ist nichts zu tun — und das ist kein Fehler.
+    # Loeschen muss wiederholbar sein: ein geloeschtes Quiz legt seine
+    # alleinigen Fragen selbst hinein, und wer danach die Frage loescht (die
+    # Oberflaeche wie der Selbsttest), meint denselben Zustand.
+    if q.deleted_at is None:
+        q.deleted_at = datetime.now(timezone.utc)
+        await db.commit()
 
 
 async def restore_question(question_id: int, user: User, db: AsyncSession):
