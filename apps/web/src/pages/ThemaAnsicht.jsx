@@ -7,6 +7,7 @@ import { useParams, Link } from "react-router-dom";
 import { pageTitle, pageApp} from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
+import { themaZiel } from "../core/themaLinks.js";
 
 export default function ThemaAnsicht() {
   const { t } = useLanguage();
@@ -37,14 +38,10 @@ export default function ThemaAnsicht() {
   const row = { display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: "1px solid var(--border)", fontSize: 13.5 };
   const a = data.active || {};
 
-  // Jede Zeile führt an ihren Ort. Vorher war der Inhalt nur aufgezählt: man
-  // sah, DASS eine Frage am Thema hängt, kam aber nur über den Sammel-Link ins
-  // Modul und musste sie dort suchen. Die Ziele gibt es alle schon — das
-  // Fragenset (`?set=`), der Kartenstapel (`?class=&deck=`), die Lernleiter
-  // (`?tab=pfade&ll=`) und der Kalendertag (`?view=day&date=`).
+  // Jede Zeile führt an ihren Ort — die Ziele stehen in core/themaLinks.js,
+  // weil das Panel in Topics.jsx dieselbe Liste zeigt.
   //
-  // `Zeile` ist Link ODER div, je nachdem, ob es ein Ziel gibt: eine Zeile, die
-  // aussieht wie ein Link und beim Klick nichts tut, ist schlimmer als Text.
+  // `Zeile` ist Link ODER div, je nachdem, ob es ein Ziel gibt.
   const Zeile = ({ to, children }) => {
     const stil = { ...row, color: "var(--text)", textDecoration: "none" };
     if (!to) return <div style={stil}>{children}</div>;
@@ -66,7 +63,7 @@ export default function ThemaAnsicht() {
 
       <Section show={a.cardvote} title={t("thema.cardvote")} count={(data.cardvote || []).length} empty={t("thema.empty")}>
         {(data.cardvote || []).map((q) => (
-          <Zeile key={q.id} to={q.set_id ? `/cardvote/questions?set=${q.set_id}` : null}>
+          <Zeile key={q.id} to={themaZiel.cardvote(q)}>
             <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{q.text}</span>
           </Zeile>
         ))}
@@ -75,7 +72,7 @@ export default function ThemaAnsicht() {
 
       <Section show={a.karten} title={t("thema.karten")} count={(data.karten || []).length} empty={t("thema.empty")}>
         {(data.karten || []).map((d) => (
-          <Zeile key={d.id} to={`/karten?class=${d.class_id}&deck=${d.id}`}>
+          <Zeile key={d.id} to={themaZiel.karten(d)}>
             <span style={{ flex: 1 }}>{d.name}</span>
             {!d.released && <span style={{ fontSize: 11.5, color: "var(--text3)" }}>{t("thema.draft")}</span>}
           </Zeile>
@@ -84,7 +81,7 @@ export default function ThemaAnsicht() {
 
       <Section show={a.lernpfad} title={t("thema.lernpfad")} count={(data.lernpfad || []).length} empty={t("thema.empty")}>
         {(data.lernpfad || []).map((e) => (
-          <Zeile key={e.id} to={`/lernpfad?tab=lernpfade&ll=${e.id}`}>
+          <Zeile key={e.id} to={themaZiel.lernpfad(e)}>
             <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{e.path}</span>
           </Zeile>
         ))}
@@ -93,7 +90,7 @@ export default function ThemaAnsicht() {
 
       <Section show={a["code-detektiv"]} title={t("thema.codedetektiv")} count={(data.codedetektiv || []).length} empty={t("thema.empty")}>
         {(data.codedetektiv || []).map((p) => (
-          <Zeile key={p.id} to={`/code-detektiv/puzzle/${p.client_id}?mode=solo`}>
+          <Zeile key={p.id} to={themaZiel.codedetektiv(p)}>
             <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{p.title || p.client_id}</span>
           </Zeile>
         ))}
@@ -101,7 +98,7 @@ export default function ThemaAnsicht() {
 
       <Section show={a.kalender} title={t("thema.kalender")} count={(data.kalender || []).length} empty={t("thema.empty")}>
         {(data.kalender || []).map((e) => (
-          <Zeile key={e.id} to={e.date ? `/kalender?view=day&date=${e.date}` : "/kalender"}>
+          <Zeile key={e.id} to={themaZiel.kalender(e)}>
             <span style={{ color: "var(--text3)", fontSize: 12, minWidth: 90 }}>{e.date ? new Date(e.date).toLocaleDateString() : ""}</span>
             <span style={{ flex: 1 }}>{e.title || "—"}</span>
           </Zeile>

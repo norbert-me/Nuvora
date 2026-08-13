@@ -7,6 +7,8 @@ import { askConfirm } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, Empty, Skeleton, Modal, pageApp} from "../components/Icons.jsx";
 import { peek, put } from "../core/cache.js";
+import { Link } from "react-router-dom";
+import { themaZiel } from "../core/themaLinks.js";
 
 const API = "/api";
 
@@ -306,6 +308,15 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
 
   const secTitle = { fontSize: 11.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", margin: "12px 0 4px" };
   const line = { fontSize: 13.5, color: "var(--text2)", padding: "3px 0", lineHeight: 1.4 };
+  // Dieselben Ziele wie auf der Themenseite (core/themaLinks.js). Ohne Ziel
+  // bleibt die Zeile Text — ein Link, der nichts tut, ist schlimmer als keiner.
+  const Zeile = ({ to, children }) => (to ? (
+    <Link to={to} style={{ ...line, display: "block", color: "var(--text)", textDecoration: "none" }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
+          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text)")}>
+      {children} <span style={{ color: "var(--accent)" }}>↗</span>
+    </Link>
+  ) : <div style={line}>{children}</div>);
 
   return (
     <Modal onClose={onClose} width={520} style={{ maxHeight: "86vh", overflowY: "auto" }} label={tp.parent_name ? `${tp.parent_name} / ${name}` : name}>
@@ -366,11 +377,11 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
                 <div style={secTitle}>{t("nav.classes")}</div>
                 {klassenNamen.length ? <div style={line}>{klassenNamen.join(", ")}</div> : <div style={{ ...line, color: "var(--text3)" }}>{t("topics.noClasses")}</div>}
 
-                {(usage.cardvote?.length > 0) && (<><div style={secTitle}>CardVote</div>{usage.cardvote.map((q) => <div key={q.id} style={line}>{q.text || `#${q.id}`}</div>)}</>)}
-                {(usage.karten?.length > 0) && (<><div style={secTitle}>{t("nav.cards2")}</div>{usage.karten.map((d) => <div key={d.id} style={line}>{d.name}{classes[d.class_id] ? ` · ${classes[d.class_id]}` : ""}{d.released ? "" : ` · ${t("topics.draft")}`}</div>)}</>)}
-                {(usage.lernpfad?.length > 0) && (<><div style={secTitle}>Lernpfad</div>{usage.lernpfad.map((l) => <div key={l.id} style={line}>{l.path || "—"}{classes[l.class_id] ? ` · ${classes[l.class_id]}` : ""}</div>)}</>)}
-                {(usage.kalender?.length > 0) && (<><div style={secTitle}>Kalender</div>{usage.kalender.map((e) => <div key={e.id} style={line}>{e.date ? `${new Date(e.date).toLocaleDateString()} · ` : ""}{e.title || "—"}{classes[e.class_id] ? ` · ${classes[e.class_id]}` : ""}</div>)}</>)}
-                {(usage.codedetektiv?.length > 0) && (<><div style={secTitle}>Code-Detektiv</div>{usage.codedetektiv.map((p) => <div key={p.id} style={line}>{p.title || p.client_id}</div>)}</>)}
+                {(usage.cardvote?.length > 0) && (<><div style={secTitle}>CardVote</div>{usage.cardvote.map((q) => <Zeile key={q.id} to={themaZiel.cardvote(q)}>{q.text || `#${q.id}`}</Zeile>)}</>)}
+                {(usage.karten?.length > 0) && (<><div style={secTitle}>{t("nav.cards2")}</div>{usage.karten.map((d) => <Zeile key={d.id} to={themaZiel.karten(d)}>{d.name}{classes[d.class_id] ? ` · ${classes[d.class_id]}` : ""}{d.released ? "" : ` · ${t("topics.draft")}`}</Zeile>)}</>)}
+                {(usage.lernpfad?.length > 0) && (<><div style={secTitle}>Lernpfad</div>{usage.lernpfad.map((l) => <Zeile key={l.id} to={themaZiel.lernpfad(l)}>{l.path || "—"}{classes[l.class_id] ? ` · ${classes[l.class_id]}` : ""}</Zeile>)}</>)}
+                {(usage.kalender?.length > 0) && (<><div style={secTitle}>Kalender</div>{usage.kalender.map((e) => <Zeile key={e.id} to={themaZiel.kalender(e)}>{e.date ? `${new Date(e.date).toLocaleDateString()} · ` : ""}{e.title || "—"}{classes[e.class_id] ? ` · ${classes[e.class_id]}` : ""}</Zeile>)}</>)}
+                {(usage.codedetektiv?.length > 0) && (<><div style={secTitle}>Code-Detektiv</div>{usage.codedetektiv.map((p) => <Zeile key={p.id} to={themaZiel.codedetektiv(p)}>{p.title || p.client_id}</Zeile>)}</>)}
 
                 {!(usage.cardvote?.length || usage.karten?.length || usage.lernpfad?.length || usage.kalender?.length || usage.codedetektiv?.length) && (
                   <div style={{ ...line, color: "var(--text3)" }}>{t("topics.noContent")}</div>
