@@ -879,16 +879,21 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
           return (
             <div key={k}>
               <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+                {/* flexShrink: 0 ist Pflicht, nicht Kosmetik: ein <textarea>
+                    bringt eine eigene Mindestbreite mit (cols), die Flexbox
+                    nicht unterschreitet — ohne die beiden Angaben quetscht das
+                    Antwortfeld den Buchstaben auf die halbe Breite, und A/B/C
+                    sehen aus, als lägen sie unter dem Feld. */}
                 <div onClick={toggle} style={{
-                  width: 36, minHeight: 38, display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 36, flexShrink: 0, minHeight: 38, display: "flex", alignItems: "center", justifyContent: "center",
                   background: isCorrect ? C.success : "var(--border3)", color: isCorrect ? "#fff" : "var(--text3)",
                   borderRadius: "8px 0 0 8px", cursor: "pointer", fontWeight: 700, fontSize: 14,
                   transition: "all 0.15s ease", userSelect: "none",
                 }}>{k}</div>
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", border: "1px solid var(--border2)", borderLeft: "none", borderRadius: "0 8px 8px 0", overflow: "hidden" }}>
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", border: "1px solid var(--border2)", borderLeft: "none", borderRadius: "0 8px 8px 0", overflow: "hidden" }}>
                   <textarea ref={(el) => (inputRefs.current[k] = el)} onFocus={() => (activeField.current = k)} rows={2}
                     placeholder={t("dash.answerPh", { k })} value={q.choices[k] || ""} onChange={(e) => setQ({ ...q, choices: { ...q.choices, [k]: e.target.value } })}
-                    style={{ padding: "8px 12px", border: "none", fontSize: 14, outline: "none", background: "transparent", color: "var(--text)", resize: "vertical", fontFamily: "inherit", lineHeight: 1.4 }} />
+                    style={{ padding: "8px 12px", width: "100%", boxSizing: "border-box", border: "none", fontSize: 14, outline: "none", background: "transparent", color: "var(--text)", resize: "vertical", fontFamily: "inherit", lineHeight: 1.4 }} />
                   {(q.choices[k] || "").includes("$") && (
                     <div style={{ padding: "6px 12px", background: "var(--bg2)", fontSize: 14, borderTop: "1px solid var(--border3)" }}>
                       <Latex>{q.choices[k]}</Latex>
