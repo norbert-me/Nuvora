@@ -609,6 +609,36 @@ async def test_probelauf_nennt_tabelle_und_bedingung(welt, tmp_path):
     assert "a@b.de" not in text, "Der Fehlertext gibt Daten heraus: " + text
 
 
+@pytest.mark.asyncio
+async def test_alte_sicherung_laesst_sich_weiter_einspielen(welt, tmp_path):
+    """Der Ernstfall: die Datei ist von vor der Reparatur.
+
+    In der laufenden Datenbank sind die NULLs inzwischen gefüllt — in einer
+    Sicherung von davor stecken sie weiter drin. Eine Sicherung, die sich nicht
+    mehr einspielen lässt, ist keine. Also anpassen: NULL in einer
+    Pflichtspalte bekommt den Default des Modells, eine Spalte, die es nicht
+    mehr gibt, fällt weg. Beides muss in der Antwort STEHEN.
+    """
+    alt = tmp_path / "alt.zip"
+    with zipfile.ZipFile(alt, "w") as zf:
+        zf.writestr("manifest.json", json.dumps({"nuvora": "alt", "tabellen": {"users": 1}}))
+        zf.writestr("datenbank.ndjson", "\n".join([
+            json.dumps({"t": "users", "r": {"id": 1, "email": "a@b.de", "password_hash": "x",
+                                            "name": "A", "email_verified": None,
+                                            "lieblingsfarbe": "blau"}}),
+            json.dumps({"t": "grade_categories", "r": {"id": 1, "name": "LEK", "owner_id": 1,
+                                                       "class_id": 1, "source_kind": None}}),
+        ]) + "\n")
+
+    bericht = await backup.zurueckspielen(str(alt), f"sqlite+aiosqlite:///{tmp_path / 'alt.db'}")
+    assert bericht["tabellen"]["users"] == 1
+    assert bericht["tabellen"]["grade_categories"] == 1
+    hinweise = " | ".join(bericht["angepasst"])
+    assert "grade_categories.source_kind war NULL, gefüllt" in hinweise, hinweise
+    assert "users.email_verified war NULL, gefüllt" in hinweise, hinweise
+    assert "users.lieblingsfarbe verworfen" in hinweise, hinweise
+
+
 def test_grund_gibt_keine_werte_heraus():
     """Postgres nennt im Klartext den kollidierenden Wert („Key (email)=(…)").
     In einer HTTP-Antwort wären das Schülerdaten."""

@@ -52,6 +52,15 @@ function Zahlen({ daten, t }) {
           <span key={name} style={{ ...chipStyle, whiteSpace: "nowrap" }}>{name} {n}</span>
         ))}
       </div>
+      {/* Angefasste Daten stehen dran. Eine Sicherung aus einer älteren Fassung
+          wird beim Einspielen an die heutigen Modelle angepasst (NULL in einer
+          Pflichtspalte, Spalte gibt es nicht mehr) — still wäre das eine
+          Veränderung der Daten, von der niemand erfährt. */}
+      {(daten.angepasst || []).length > 0 && (
+        <ul style={{ margin: "8px 0 0", paddingLeft: 18, color: "var(--warn, #b26a00)" }}>
+          {daten.angepasst.map((z) => <li key={z}>{z}</li>)}
+        </ul>
+      )}
     </div>
   );
 }

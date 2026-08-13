@@ -363,27 +363,7 @@ def _ensure_columns(sync_conn):
     # Zurueckspielen auf: der Auszug schreibt die NULL mit, die frische
     # Zieldatenbank entsteht aus create_all MIT dem NOT NULL, und der Probelauf
     # bricht mit IntegrityError ab. Also hier nachziehen, Quelle ist das Modell.
-    from sqlalchemy import types as sa_types
-
-    def fuellwert(col):
-        """Womit eine NOT-NULL-Spalte gefuellt wird, in der noch NULL steht.
-
-        Quelle ist der Default des Modells — dasselbe, was die ORM beim
-        Schreiben einsetzt. Nur wenn es den nicht gibt, entscheidet der Typ
-        (Text `''`, Zahl `0`, Wahrheitswert `false`). Gibt es beides nicht,
-        `None`: dann wird nicht geraten, sondern gemeldet. Ein erfundener Wert
-        stuende hinterher als Tatsache in den Daten.
-        """
-        vor = getattr(col.default, "arg", None)
-        if vor is not None and not callable(vor):
-            return vor
-        if isinstance(col.type, sa_types.Boolean):
-            return False
-        if isinstance(col.type, (sa_types.Integer, sa_types.Numeric, sa_types.Float)):
-            return 0
-        if isinstance(col.type, (sa_types.String, sa_types.Text)):
-            return ""
-        return None
+    from app.spalten import fuellwert
 
     frisch_null = sa_inspect(sync_conn)
     gefuellt, offen = [], []

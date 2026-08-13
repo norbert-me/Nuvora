@@ -76,6 +76,7 @@ from starlette.responses import FileResponse
 from ..admin import APP_VERSION, _require_admin
 from ..database import DATABASE_URL, async_session, get_db
 from ..models import AppSetting, Base
+from ..spalten import fuellwert
 from .auth import get_current_user, rate_limit
 
 router = APIRouter(prefix="/api/admin/backup", tags=["backup"])
@@ -687,6 +688,46 @@ def _grund(fehler: Exception) -> str:
     return roh.strip().splitlines()[0][:200]
 
 
+def _passend_machen(tabelle, zeilen: list[dict]) -> tuple[list[dict], list[str]]:
+    """Zeilen aus der Datei an das heutige Schema anpassen — und sagen, was.
+
+    Eine Sicherung ist ein Stand von damals, das Zielschema ist von heute.
+    Zwei Abweichungen sind harmlos und wurden trotzdem zum Abbruch:
+
+      * **NULL in einer NOT-NULL-Spalte.** Entstanden in der Produktionsdatenbank
+        durch ein `ADD COLUMN` ohne DEFAULT (siehe `_ensure_columns` in
+        main.py). Die laufende Datenbank ist inzwischen repariert — in den
+        Dateien von davor steckt die NULL weiter drin. Gefüllt wird mit dem
+        Default des Modells, also mit dem, was die ORM beim Schreiben gesetzt
+        hätte.
+      * **Eine Spalte, die es nicht mehr gibt.** Sonst scheitert das Einspielen
+        einer älteren Sicherung an einem Feld, das niemand mehr liest.
+
+    Beides wird **gezählt und gemeldet**, nicht stillschweigend gemacht: wer
+    zurückspielt, muss erfahren, dass die Daten dabei angefasst wurden.
+    """
+    spalten = {c.name: c for c in tabelle.c}
+    hinweise: dict[str, int] = {}
+    fertig = []
+    for zeile in zeilen:
+        neu = {}
+        for k, v in zeile.items():
+            col = spalten.get(k)
+            if col is None:
+                hinweise[f"{tabelle.name}.{k} verworfen (Spalte gibt es nicht mehr)"] = \
+                    hinweise.get(f"{tabelle.name}.{k} verworfen (Spalte gibt es nicht mehr)", 0) + 1
+                continue
+            if v is None and not col.nullable and not col.primary_key:
+                ersatz = fuellwert(col)
+                if ersatz is not None:
+                    schluessel = f"{tabelle.name}.{k} war NULL, gefüllt"
+                    hinweise[schluessel] = hinweise.get(schluessel, 0) + 1
+                    v = ersatz
+            neu[k] = v
+        fertig.append(neu)
+    return fertig, [f"{text} ({n})" for text, n in sorted(hinweise.items())]
+
+
 async def zurueckspielen(zip_pfad: str, ziel_url: str, uploads_nach: str | None = None) -> dict:
     """Spielt eine Sicherung in die Datenbank unter `ziel_url` zurück.
 
@@ -704,6 +745,7 @@ async def zurueckspielen(zip_pfad: str, ziel_url: str, uploads_nach: str | None 
 
     ziel_engine = create_async_engine(ziel_url)
     zaehlung: dict[str, int] = {}
+    angepasst: list[str] = []
     try:
         async with ziel_engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -732,6 +774,8 @@ async def zurueckspielen(zip_pfad: str, ziel_url: str, uploads_nach: str | None 
                     if not zeilen:
                         zaehlung[name] = 0
                         continue
+                    zeilen, hinweise = _passend_machen(tabelle, zeilen)
+                    angepasst.extend(hinweise)
                     for i in range(0, len(zeilen), 500):
                         try:
                             await conn.execute(tabelle.insert(), zeilen[i:i + 500])
@@ -781,7 +825,7 @@ async def zurueckspielen(zip_pfad: str, ziel_url: str, uploads_nach: str | None 
                     dateien += 1
 
         return {"tabellen": zaehlung, "zeilen": sum(v for k, v in zaehlung.items() if not k.startswith("_")),
-                "dateien": dateien, "manifest": manifest}
+                "dateien": dateien, "manifest": manifest, "angepasst": angepasst}
     finally:
         await ziel_engine.dispose()
 
@@ -1063,6 +1107,10 @@ async def probelauf(name: str, user=Depends(nur_admin), db=Depends(get_db)):
         # Nur die Tabellen mit Inhalt: eine Liste aus 80 Nullen sagt nichts.
         "tabellen": {t: n for t, n in sorted(tabellen.items()) if n},
         "leere_tabellen": sum(1 for n in tabellen.values() if not n),
+        # Was beim Einspielen an die heutigen Modelle angepasst werden musste.
+        # Leer ist der Normalfall; steht etwas drin, gehoert es vor die Augen
+        # der Administration, BEVOR sie „Einspielen" drueckt.
+        "angepasst": bericht.get("angepasst") or [],
         "nuvora": manifest.get("nuvora", ""),
         "erzeugt": manifest.get("erzeugt", ""),
         "datenbank": manifest.get("datenbank", ""),
@@ -1134,6 +1182,7 @@ async def einspielen(name: str, body: Rueckspiel, user=Depends(nur_admin), db=De
         "zeilen": bericht["zeilen"],
         "dateien": bericht["dateien"],
         "tabellen": {t: n for t, n in sorted(tabellen.items()) if n},
+        "angepasst": bericht.get("angepasst") or [],
     }
 
 
