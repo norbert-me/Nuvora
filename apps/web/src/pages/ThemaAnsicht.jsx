@@ -37,6 +37,27 @@ export default function ThemaAnsicht() {
   const row = { display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: "1px solid var(--border)", fontSize: 13.5 };
   const a = data.active || {};
 
+  // Jede Zeile führt an ihren Ort. Vorher war der Inhalt nur aufgezählt: man
+  // sah, DASS eine Frage am Thema hängt, kam aber nur über den Sammel-Link ins
+  // Modul und musste sie dort suchen. Die Ziele gibt es alle schon — das
+  // Fragenset (`?set=`), der Kartenstapel (`?class=&deck=`), die Lernleiter
+  // (`?tab=pfade&ll=`) und der Kalendertag (`?view=day&date=`).
+  //
+  // `Zeile` ist Link ODER div, je nachdem, ob es ein Ziel gibt: eine Zeile, die
+  // aussieht wie ein Link und beim Klick nichts tut, ist schlimmer als Text.
+  const Zeile = ({ to, children }) => {
+    const stil = { ...row, color: "var(--text)", textDecoration: "none" };
+    if (!to) return <div style={stil}>{children}</div>;
+    return (
+      <Link to={to} style={{ ...stil, cursor: "pointer" }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg2)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+        {children}
+        <span style={{ color: "var(--accent)" }}>↗</span>
+      </Link>
+    );
+  };
+
   return (
     <div style={{ ...pageApp }}>
       <Link to="/topics" style={{ color: "var(--text3)", textDecoration: "none", fontSize: 13, fontWeight: 500 }}>← {t("nav.topics")}</Link>
@@ -45,47 +66,45 @@ export default function ThemaAnsicht() {
 
       <Section show={a.cardvote} title={t("thema.cardvote")} count={(data.cardvote || []).length} empty={t("thema.empty")}>
         {(data.cardvote || []).map((q) => (
-          <div key={q.id} style={row}><span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{q.text}</span></div>
+          <Zeile key={q.id} to={q.set_id ? `/cardvote/questions?set=${q.set_id}` : null}>
+            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{q.text}</span>
+          </Zeile>
         ))}
         <div style={{ marginTop: 10 }}><Link to="/cardvote/questions" style={{ color: "var(--accent)", fontSize: 13, textDecoration: "none" }}>{t("thema.openCardvote")} ↗</Link></div>
       </Section>
 
       <Section show={a.karten} title={t("thema.karten")} count={(data.karten || []).length} empty={t("thema.empty")}>
         {(data.karten || []).map((d) => (
-          <div key={d.id} style={row}>
+          <Zeile key={d.id} to={`/karten?class=${d.class_id}&deck=${d.id}`}>
             <span style={{ flex: 1 }}>{d.name}</span>
             {!d.released && <span style={{ fontSize: 11.5, color: "var(--text3)" }}>{t("thema.draft")}</span>}
-            <Link to={`/karten?class=${d.class_id}`} style={{ color: "var(--accent)", textDecoration: "none" }}>↗</Link>
-          </div>
+          </Zeile>
         ))}
       </Section>
 
       <Section show={a.lernpfad} title={t("thema.lernpfad")} count={(data.lernpfad || []).length} empty={t("thema.empty")}>
         {(data.lernpfad || []).map((e) => (
-          <div key={e.id} style={row}>
-            <span style={{ color: "var(--text3)", fontSize: 12 }}>{e.kategorie}</span>
-            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{e.text || e.code}</span>
-          </div>
+          <Zeile key={e.id} to={`/lernpfad?tab=lernpfade&ll=${e.id}`}>
+            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{e.path}</span>
+          </Zeile>
         ))}
         <div style={{ marginTop: 10 }}><Link to="/lernpfad" style={{ color: "var(--accent)", fontSize: 13, textDecoration: "none" }}>{t("thema.openLernpfad")} ↗</Link></div>
       </Section>
 
       <Section show={a["code-detektiv"]} title={t("thema.codedetektiv")} count={(data.codedetektiv || []).length} empty={t("thema.empty")}>
         {(data.codedetektiv || []).map((p) => (
-          <div key={p.id} style={row}>
+          <Zeile key={p.id} to={`/code-detektiv/puzzle/${p.client_id}?mode=solo`}>
             <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{p.title || p.client_id}</span>
-            <Link to={`/code-detektiv/puzzle/${p.client_id}?mode=solo`} style={{ color: "var(--accent)", textDecoration: "none" }}>↗</Link>
-          </div>
+          </Zeile>
         ))}
       </Section>
 
       <Section show={a.kalender} title={t("thema.kalender")} count={(data.kalender || []).length} empty={t("thema.empty")}>
         {(data.kalender || []).map((e) => (
-          <div key={e.id} style={row}>
+          <Zeile key={e.id} to={e.date ? `/kalender?view=day&date=${e.date}` : "/kalender"}>
             <span style={{ color: "var(--text3)", fontSize: 12, minWidth: 90 }}>{e.date ? new Date(e.date).toLocaleDateString() : ""}</span>
             <span style={{ flex: 1 }}>{e.title || "—"}</span>
-            <Link to="/kalender" style={{ color: "var(--accent)", textDecoration: "none" }}>↗</Link>
-          </div>
+          </Zeile>
         ))}
       </Section>
 

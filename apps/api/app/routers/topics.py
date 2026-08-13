@@ -18,6 +18,7 @@ from ..database import get_db
 from ..models import (
     Question, Topic, User, CardDeck, Exercise, CalendarEntry, CodePuzzle,
     LearningLadder, LearningPath, GradeCategory, Method, TimetableSlot, Material,
+    QuestionSetItem,
 )
 from .auth import get_current_user, rate_limit
 from .modules import is_active
@@ -200,7 +201,20 @@ async def topic_usage(topic_id: int, user: User = Depends(get_current_user), db:
 
     if await on("cardvote"):
         rows = (await db.execute(select(Question).where(Question.owner_id == user.id, Question.topic_id.in_(themen_ids)).limit(50))).scalars().all()
-        out["cardvote"] = [{"id": q.id, "text": (q.text or "")[:120]} for q in rows]
+        # Das Quiz dazu, damit die Ansicht auf die Frage verlinken kann: der
+        # Fragen-Editor oeffnet ein Set (`?set=`), eine Frage allein hat keinen
+        # Ort. Eine Frage kann in mehreren Quizzen stecken — genommen wird das
+        # erste; ohne Quiz bleibt `set_id` leer und die Zeile ist kein Link.
+        sets = {}
+        if rows:
+            for qid, sid in (await db.execute(
+                select(QuestionSetItem.question_id, QuestionSetItem.question_set_id)
+                .where(QuestionSetItem.question_id.in_([q.id for q in rows]))
+                .order_by(QuestionSetItem.question_set_id)
+            )).all():
+                sets.setdefault(qid, sid)
+        out["cardvote"] = [{"id": q.id, "text": (q.text or "")[:120],
+                            "set_id": sets.get(q.id)} for q in rows]
     if await on("karten"):
         rows = (await db.execute(select(CardDeck).where(CardDeck.owner_id == user.id, CardDeck.topic_id.in_(themen_ids), CardDeck.deleted_at.is_(None)).limit(50))).scalars().all()
         out["karten"] = [{"id": d.id, "name": d.name, "class_id": d.class_id, "released": d.released_at is not None} for d in rows]
