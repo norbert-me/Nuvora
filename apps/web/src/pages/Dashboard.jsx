@@ -44,6 +44,63 @@ export default function Dashboard() {
   const ladeVerwaiste = () =>
     fetch(`${API}/questions/verwaist`).then((r) => (r.ok ? r.json() : null)).then(setVerwaist).catch(() => {});
 
+  // Bei 400 Fragen ist Loeschen die falsche erste Antwort: die meisten wollen
+  // zugewiesen werden, nicht weg. Deshalb Auswahl + Ziel-Quiz, und Loeschen
+  // daneben statt davor.
+  const [vAuswahl, setVAuswahl] = useState(() => new Set());
+  const [vSuche, setVSuche] = useState("");
+  const [vZiel, setVZiel] = useState("");
+  const [vMeldung, setVMeldung] = useState("");
+
+  // Alle Quizze flach, mit ihrem Ordnerpfad — sonst heissen drei Quizze
+  // „Test 1" und niemand weiss, welches gemeint ist.
+  const alleQuizze = (() => {
+    const raus = rootSets.map((qs) => ({ id: qs.id, label: qs.name }));
+    const lauf = (knoten, pfad) => {
+      for (const n of knoten) {
+        const hier = pfad ? `${pfad} / ${n.name}` : n.name;
+        (n.question_sets || []).forEach((qs) => raus.push({ id: qs.id, label: `${hier} / ${qs.name}` }));
+        lauf(n.children || [], hier);
+      }
+    };
+    lauf(folders, "");
+    return raus.sort((a, b) => a.label.localeCompare(b.label, "de", { numeric: true }));
+  })();
+
+  const vGefiltert = (verwaist?.fragen || []).filter((q) =>
+    !vSuche.trim() || (q.text || "").toLowerCase().includes(vSuche.trim().toLowerCase()));
+
+  const vUmschalten = (id) => setVAuswahl((alt) => {
+    const neu = new Set(alt);
+    neu.has(id) ? neu.delete(id) : neu.add(id);
+    return neu;
+  });
+
+  const vZuweisen = async () => {
+    if (!vZiel || vAuswahl.size === 0) return;
+    setVMeldung("");
+    const ids = [...vAuswahl];
+    const r = await fetch(`${API}/question-sets/${vZiel}/questions`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question_ids: ids }),
+    });
+    if (!r.ok) { setVMeldung((await r.json().catch(() => ({}))).detail || t("common.error")); return; }
+    setVAuswahl(new Set());
+    setVMeldung(t("dash.orphansAssigned", { n: ids.length }));
+    await ladeVerwaiste();
+    load();
+  };
+
+  const vAuswahlLoeschen = async () => {
+    const ids = [...vAuswahl].filter((id) => !(verwaist?.fragen || []).find((q) => q.id === id)?.hat_ergebnisse);
+    if (!ids.length) return;
+    if (!await askConfirm(t("dash.orphansCleanAsk", { n: ids.length }), { ok: t("common.delete"), danger: true })) return;
+    for (const id of ids) await fetch(`${API}/questions/${id}`, { method: "DELETE" });
+    setVAuswahl(new Set());
+    await ladeVerwaiste();
+    load();
+  };
+
   const verwaisteAufraeumen = async () => {
     const ok = await askConfirm(t("dash.orphansCleanAsk", { n: verwaist?.loeschbar ?? 0 }),
                                 { ok: t("common.delete"), danger: true });
@@ -345,23 +402,62 @@ export default function Dashboard() {
             <button onClick={() => setVerwaistOffen((v) => !v)} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13 }}>
               {verwaistOffen ? t("common.close") : t("dash.orphansShow")}
             </button>
-            {verwaist.loeschbar > 0 && (
-              <button onClick={verwaisteAufraeumen} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13, color: C.danger, borderColor: C.danger }}>
-                {t("dash.orphansClean", { n: verwaist.loeschbar })}
-              </button>
-            )}
           </div>
+
           {verwaistOffen && (
-            <ul style={{ margin: "10px 0 0", paddingLeft: 18, lineHeight: 1.7 }}>
-              {verwaist.fragen.map((q) => (
-                <li key={q.id}>
-                  {q.text}
-                  {/* Mit Ergebnissen wird nichts geloescht: daran haengen die
-                      Auswertungen gehaltener Sitzungen. */}
-                  {q.hat_ergebnisse && <span style={{ color: "var(--text3)" }}> · {t("dash.orphansKept")}</span>}
-                </li>
-              ))}
-            </ul>
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "12px 0 8px" }}>
+                <input value={vSuche} onChange={(e) => setVSuche(e.target.value)} placeholder={t("dash.searchQ")}
+                  style={{ flex: 1, minWidth: 160, maxWidth: 280, padding: "6px 12px", border: "1px solid var(--border2)", borderRadius: 980, fontSize: 13.5, background: "var(--bg)", color: "var(--text)" }} />
+                <button onClick={() => setVAuswahl(new Set(vGefiltert.map((q) => q.id)))} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13 }}>
+                  {t("dash.orphansSelectAll", { n: vGefiltert.length })}
+                </button>
+                {vAuswahl.size > 0 && (
+                  <button onClick={() => setVAuswahl(new Set())} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13 }}>
+                    {t("dash.orphansSelectNone")}
+                  </button>
+                )}
+              </div>
+
+              {/* Zuweisen steht VOR dem Loeschen — bei 400 Fragen ist das der
+                  Normalfall, Loeschen die Ausnahme. */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                <select value={vZiel} onChange={(e) => setVZiel(e.target.value)}
+                  style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border2)", fontSize: 13.5, background: "var(--bg)", color: "var(--text)", maxWidth: 320 }}>
+                  <option value="">{t("dash.orphansPickSet")}</option>
+                  {alleQuizze.map((qs) => <option key={qs.id} value={String(qs.id)}>{qs.label}</option>)}
+                </select>
+                <button onClick={vZuweisen} disabled={!vZiel || vAuswahl.size === 0}
+                  style={{ ...btnPrimary, padding: "5px 12px", fontSize: 13, opacity: (!vZiel || vAuswahl.size === 0) ? 0.5 : 1 }}>
+                  {t("dash.orphansAssign", { n: vAuswahl.size })}
+                </button>
+                <button onClick={vAuswahlLoeschen} disabled={vAuswahl.size === 0}
+                  style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13, color: C.danger, borderColor: C.danger, opacity: vAuswahl.size === 0 ? 0.5 : 1 }}>
+                  {t("dash.orphansDeleteSel", { n: vAuswahl.size })}
+                </button>
+                {verwaist.loeschbar > 0 && (
+                  <button onClick={verwaisteAufraeumen} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13, color: "var(--text3)" }}>
+                    {t("dash.orphansClean", { n: verwaist.loeschbar })}
+                  </button>
+                )}
+                {vMeldung && <span style={{ color: C.success }}>{vMeldung}</span>}
+              </div>
+
+              <div style={{ maxHeight: 320, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)" }}>
+                {vGefiltert.map((q) => (
+                  <label key={q.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "6px 10px", borderBottom: "1px solid var(--border)", cursor: "pointer", lineHeight: 1.5 }}>
+                    <input type="checkbox" checked={vAuswahl.has(q.id)} onChange={() => vUmschalten(q.id)} style={{ marginTop: 3 }} />
+                    <span style={{ flex: 1, color: "var(--text)" }}>
+                      <Latex>{q.text}</Latex>
+                      {/* Mit Ergebnissen wird nichts geloescht: daran haengen die
+                          Auswertungen gehaltener Sitzungen. */}
+                      {q.hat_ergebnisse && <span style={{ color: "var(--text3)" }}> · {t("dash.orphansKept")}</span>}
+                    </span>
+                  </label>
+                ))}
+                {vGefiltert.length === 0 && <p style={{ padding: 10, margin: 0, color: "var(--text3)" }}>{t("dash.noSearchHit")}</p>}
+              </div>
+            </>
           )}
         </div>
       )}

@@ -226,6 +226,47 @@ async def create_question_set(body: QuestionSetCreate, user: User = Depends(get_
     return await _load_set(db, qs.id)
 
 
+class FragenAnhaengen(BaseModel):
+    question_ids: List[int] = []
+
+
+@router.post("/question-sets/{set_id}/questions", response_model=QuestionSetOut)
+async def fragen_anhaengen(set_id: int, body: FragenAnhaengen, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Vorhandene Fragen an ein Quiz anhaengen — ohne die uebrigen anzufassen.
+
+    Der Weg ueber `PUT /question-sets/{id}` verlangt die VOLLSTAENDIGE Liste
+    der Fragen. Wer nur eine anhaengen will, muesste sie erst holen und
+    komplett zurueckschicken; zwei Personen gleichzeitig, und die eine
+    ueberschreibt die Aenderung der anderen. Deshalb hier additiv.
+
+    Fragen, die schon drin sind, werden still uebergangen — sonst scheitert
+    eine Zuweisung von 40 Fragen an der einen, die schon drinsteht.
+    """
+    qs = await db.get(QuestionSet, set_id)
+    if not qs:
+        raise HTTPException(404)
+    await ensure_set_access(db, qs, user.id)
+    rate_limit("set_anhaengen", f"u{user.id}", 60, 60, "Zu viele Zuweisungen. Bitte kurz warten.")
+    await _eigene_fragen(db, user, body.question_ids)
+
+    vorhanden = set((await db.execute(
+        select(QuestionSetItem.question_id).where(QuestionSetItem.question_set_id == set_id)
+    )).scalars().all())
+    letzte = (await db.execute(
+        select(QuestionSetItem.position).where(QuestionSetItem.question_set_id == set_id)
+        .order_by(QuestionSetItem.position.desc())
+    )).scalars().first()
+    pos = (letzte if letzte is not None else -1) + 1
+    for qid in body.question_ids:
+        if qid in vorhanden:
+            continue
+        db.add(QuestionSetItem(question_set_id=set_id, question_id=qid, position=pos, niveau=""))
+        vorhanden.add(qid)
+        pos += 1
+    await db.commit()
+    return await _load_set(db, set_id)
+
+
 @router.get("/question-sets/{set_id}", response_model=QuestionSetOut)
 async def get_question_set(set_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     # Zugriff auf dem ORM-Objekt pruefen, dann als dict ausliefern — _load_set

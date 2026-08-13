@@ -209,3 +209,28 @@ async def test_quiz_loeschen_nimmt_seine_eigenen_fragen_mit(s):
     assert await s.get(Question, nur_hier.id) is None, "Waise blieb liegen"
     assert await s.get(Question, geteilt.id) is not None, "Frage aus einem anderen Quiz mitgerissen"
     assert await s.get(Question, gescannt.id) is not None, "Frage mit Ergebnissen geloescht"
+
+
+@pytest.mark.asyncio
+async def test_fragen_an_ein_quiz_anhaengen(s):
+    """Zuweisen statt loeschen: der Weg fuer die 400 Fragen, die nur ihr Quiz
+    verloren haben.
+
+    Additiv, nicht ersetzend — `PUT /question-sets/{id}` verlangt die ganze
+    Liste, und zwei gleichzeitige Zuweisungen wuerden sich gegenseitig
+    ueberschreiben. Eine Frage, die schon drin ist, wird still uebergangen,
+    sonst scheitert eine Zuweisung von 40 an der einen, die schon drinsteht.
+    """
+    u, thema, frage, quiz = await _welt(s)
+    waise = Question(text="ohne Quiz", question_type="mc", choices={"A": "x"},
+                     correct_answer="A", owner_id=u.id)
+    s.add(waise)
+    await s.commit()
+
+    daten = await F.fragen_anhaengen(
+        quiz.id, F.FragenAnhaengen(question_ids=[waise.id, frage.id]), user=u, db=s)
+
+    ids = [q["id"] for q in daten["questions"]]
+    assert ids == [frage.id, waise.id], "angehaengt wird ans Ende, ohne Dublette"
+    stand = await Q.verwaiste_fragen(user=u, db=s)
+    assert stand["anzahl"] == 0
