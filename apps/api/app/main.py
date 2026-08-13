@@ -231,7 +231,7 @@ def _ensure_columns(sync_conn):
         ("users", "calendar_token", "VARCHAR(64)"),
         ("users", "external_ics_url", "TEXT"),
         ("users", "external_ics_color", "VARCHAR(9) DEFAULT '' NOT NULL"),
-        ("marketplace_quizzes", "copies", "INTEGER DEFAULT 0"),
+        ("marketplace_quizzes", "copies", "INTEGER DEFAULT 0 NOT NULL"),
         ("methods", "topic_id", "INTEGER"),
         ("methods", "folder_id", "INTEGER"),
         ("kurse", "niveau_aktiv", "BOOLEAN DEFAULT false NOT NULL"),
@@ -279,14 +279,14 @@ def _ensure_columns(sync_conn):
         ("card_decks", "topic_id", "INTEGER"),
         ("card_decks", "deleted_at", "TIMESTAMPTZ"),
         ("card_decks", "kurs_id", "INTEGER"),
-        ("card_decks", "niveau", "VARCHAR(1) DEFAULT ''"),
+        ("card_decks", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
         ("learning_paths", "deleted_at", "TIMESTAMPTZ"),
         ("marketplace_quizzes", "kind", "VARCHAR(30) DEFAULT 'cardvote_questionset' NOT NULL"),
         ("methods", "ablauf", "TEXT DEFAULT '' NOT NULL"),
         ("methods", "material", "TEXT DEFAULT '' NOT NULL"),
         ("methods", "dauer", "INTEGER"),
         ("grade_categories", "source_session_id", "INTEGER"),
-        ("grade_categories", "source_kind", "VARCHAR(20)"),
+        ("grade_categories", "source_kind", "VARCHAR(20) DEFAULT '' NOT NULL"),
         ("grade_categories", "topic_id", "INTEGER"),
         ("attendance", "period", "INTEGER"),
         ("calendar_entries", "method_id", "INTEGER"),
@@ -353,6 +353,73 @@ def _ensure_columns(sync_conn):
             # nicht wieder ueber spaeter angelegte Entwuerfe (released_at NULL).
             if (table, column) == ("card_decks", "released_at"):
                 sync_conn.execute(text("UPDATE card_decks SET released_at = now() WHERE released_at IS NULL"))
+
+    # NULL, wo das Modell NOT NULL sagt — daran scheiterte das Zurueckspielen.
+    #
+    # Entstanden ist die Luecke bei jedem ADD COLUMN ohne DEFAULT: Postgres
+    # laesst Bestandszeilen dann auf NULL stehen, waehrend das Modell die Spalte
+    # als NOT NULL kennt (grade_categories.source_kind). Im Betrieb faellt das
+    # nie auf — die ORM setzt beim Schreiben ihren Default. Es faellt erst beim
+    # Zurueckspielen auf: der Auszug schreibt die NULL mit, die frische
+    # Zieldatenbank entsteht aus create_all MIT dem NOT NULL, und der Probelauf
+    # bricht mit IntegrityError ab. Also hier nachziehen, Quelle ist das Modell.
+    from sqlalchemy import types as sa_types
+
+    def fuellwert(col):
+        """Womit eine NOT-NULL-Spalte gefuellt wird, in der noch NULL steht.
+
+        Quelle ist der Default des Modells — dasselbe, was die ORM beim
+        Schreiben einsetzt. Nur wenn es den nicht gibt, entscheidet der Typ
+        (Text `''`, Zahl `0`, Wahrheitswert `false`). Gibt es beides nicht,
+        `None`: dann wird nicht geraten, sondern gemeldet. Ein erfundener Wert
+        stuende hinterher als Tatsache in den Daten.
+        """
+        vor = getattr(col.default, "arg", None)
+        if vor is not None and not callable(vor):
+            return vor
+        if isinstance(col.type, sa_types.Boolean):
+            return False
+        if isinstance(col.type, (sa_types.Integer, sa_types.Numeric, sa_types.Float)):
+            return 0
+        if isinstance(col.type, (sa_types.String, sa_types.Text)):
+            return ""
+        return None
+
+    frisch_null = sa_inspect(sync_conn)
+    gefuellt, offen = [], []
+    for tabelle in Base.metadata.sorted_tables:
+        if tabelle.name not in existing_tables:
+            continue
+        db_spalten = {c["name"]: c for c in frisch_null.get_columns(tabelle.name)}
+        for col in tabelle.c:
+            db = db_spalten.get(col.name)
+            if db is None or col.nullable or col.primary_key or db.get("nullable") is False:
+                continue
+            wert = fuellwert(col)
+            if wert is None:
+                offen.append(f"{tabelle.name}.{col.name}")
+                continue
+            ergebnis = sync_conn.execute(
+                text(f"UPDATE {tabelle.name} SET {col.name} = :v WHERE {col.name} IS NULL"),
+                {"v": wert},
+            )
+            n = getattr(ergebnis, "rowcount", 0) or 0
+            if n:
+                gefuellt.append(f"{tabelle.name}.{col.name} ({n})")
+            # Die Spalte danach festziehen, damit die Luecke nicht wiederkommt.
+            # Nur Postgres: SQLite kann eine bestehende Spalte nicht aendern.
+            if sync_conn.dialect.name == "postgresql":
+                try:
+                    with sync_conn.begin_nested():
+                        sync_conn.execute(text(
+                            f"ALTER TABLE {tabelle.name} ALTER COLUMN {col.name} SET NOT NULL"))
+                except Exception:  # noqa: BLE001 — kein Grund, den Start zu kosten
+                    offen.append(f"{tabelle.name}.{col.name}")
+    if gefuellt:
+        print(f"[STARTUP] NULL-Werte in NOT-NULL-Spalten gefuellt: {', '.join(gefuellt)}", flush=True)
+    if offen:
+        print(f"[STARTUP-WARN] Spalten bleiben NULL-faehig: {', '.join(sorted(set(offen)))} "
+              f"— eine Sicherung daraus laesst sich moeglicherweise nicht zurueckspielen.", flush=True)
 
     # Der Bestand: Spalten, die ein frueherer Deploy schon nackt nachgezogen hat.
     # Denen fehlt der Constraint bis heute — nachruesten geht nur auf Postgres,

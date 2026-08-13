@@ -586,6 +586,44 @@ async def test_probelauf_zeigt_die_zahlen_und_laesst_die_datenbank_in_ruhe(welt)
 
 
 @pytest.mark.asyncio
+async def test_probelauf_nennt_tabelle_und_bedingung(welt, tmp_path):
+    """Eine Zeile, die nicht hineinpasst, muss NAMENTLICH gemeldet werden.
+
+    Vorher hieß die Antwort nur „Die Sicherung ließ sich nicht einspielen
+    (IntegrityError)" — der Grund stand allein im Container-Protokoll, an das im
+    Ernstfall niemand kommt. Der Fall, der das ausgelöst hat: eine Spalte, die
+    das Modell als NOT NULL kennt, stand in der gewachsenen Datenbank auf NULL
+    (siehe `_ensure_columns` in main.py).
+    """
+    kaputt = tmp_path / "kaputt.zip"
+    with zipfile.ZipFile(kaputt, "w") as zf:
+        zf.writestr("manifest.json", json.dumps({"nuvora": "test", "tabellen": {"users": 1}}))
+        zf.writestr("datenbank.ndjson", json.dumps(
+            {"t": "users", "r": {"id": 1, "email": "a@b.de", "password_hash": None,
+                                 "name": "A"}}) + "\n")
+
+    with pytest.raises(backup.Einspielfehler) as fehler:
+        await backup.zurueckspielen(str(kaputt), f"sqlite+aiosqlite:///{tmp_path / 'probe.db'}")
+    text = str(fehler.value)
+    assert "users" in text and "NOT NULL" in text.upper(), text
+    assert "a@b.de" not in text, "Der Fehlertext gibt Daten heraus: " + text
+
+
+def test_grund_gibt_keine_werte_heraus():
+    """Postgres nennt im Klartext den kollidierenden Wert („Key (email)=(…)").
+    In einer HTTP-Antwort wären das Schülerdaten."""
+    class Roh(Exception):
+        pass
+
+    fehler = Roh()
+    fehler.orig = Roh('duplicate key value violates unique constraint "users_email_key"\n'
+                      'DETAIL:  Key (email)=(kind@schule.de) already exists.')
+    grund = backup._grund(fehler)
+    assert "users_email_key" in grund
+    assert "kind@schule.de" not in grund
+
+
+@pytest.mark.asyncio
 async def test_zurueckspielen_verlangt_das_ausgeschriebene_wort(welt, monkeypatch):
     """Ohne Bestätigung passiert nichts — und zwar bevor irgendetwas gelöscht
     oder auch nur gesichert wird."""

@@ -104,6 +104,40 @@ def test_wanted_nennt_nur_spalten_die_es_im_modell_gibt():
     ]
     assert not unbekannt, "wanted nennt Spalten ohne Entsprechung im Modell: " + ", ".join(unbekannt)
 
+def test_wanted_sagt_not_null_wo_das_modell_es_sagt():
+    """Ein `ADD COLUMN` ohne NOT NULL legt eine Spalte an, die das Modell als
+    NOT NULL kennt. Im Betrieb fällt das nie auf — die ORM setzt beim Schreiben
+    ihren Default. Es fällt beim **Zurückspielen** auf: der Auszug schreibt die
+    NULL mit, die Zieldatenbank entsteht aus `create_all` mit dem NOT NULL, und
+    der Probelauf endet als „IntegrityError". Genau so war es bei
+    `grade_categories.source_kind`."""
+    from app.models import Base
+    schief = []
+    for tabelle, spalte, ddl in _wanted():
+        t = Base.metadata.tables.get(tabelle)
+        if t is None or spalte not in t.c:
+            continue
+        if not t.c[spalte].nullable and "NOT NULL" not in ddl.upper():
+            schief.append(f"{tabelle}.{spalte} (DDL: {ddl})")
+    assert not schief, ("Modell sagt NOT NULL, das DDL nicht — Bestandszeilen blieben NULL:\n  "
+                        + "\n  ".join(schief))
+
+
+def test_bestehende_nullwerte_werden_gefuellt_und_die_spalte_festgezogen(conn):
+    """Der Bestand: die Spalte kam vor Jahren nackt dazu, ihre Zeilen stehen bis
+    heute auf NULL. `_ensure_columns` muss sie füllen — sonst lässt sich aus
+    dieser Datenbank keine Sicherung mehr zurückspielen."""
+    conn.execute(text("CREATE TABLE grade_categories ("
+                      "id INTEGER PRIMARY KEY, name VARCHAR(120), source_kind VARCHAR(20))"))
+    conn.execute(text("INSERT INTO grade_categories (id, name, source_kind) VALUES (1, 'LEK', NULL)"))
+
+    _lade("_ensure_columns")(conn)
+
+    assert conn.execute(text("SELECT source_kind FROM grade_categories WHERE id = 1")).scalar() == ""
+    assert conn.execute(
+        text("SELECT count(*) FROM grade_categories WHERE source_kind IS NULL")).scalar() == 0
+
+
 # ─── Fremdschlüssel: was ALTER TABLE nicht mitbringt ───
 #
 # `create_all` legt Spalten MIT ihrem Fremdschlüssel an — in jedem Test also

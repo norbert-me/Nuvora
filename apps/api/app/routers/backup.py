@@ -70,6 +70,7 @@ from datetime import datetime, date, timezone
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from starlette.responses import FileResponse
 
 from ..admin import APP_VERSION, _require_admin
@@ -662,6 +663,30 @@ def manifest_lesen(pfad: str) -> dict:
 
 
 # ── Zurückspielen ────────────────────────────────────────────────────────────
+class Einspielfehler(Exception):
+    """Eine Tabelle liess sich nicht einspielen — mit Tabelle und Bedingung.
+
+    Der Grund kommt aus dem Treiber (`NOT NULL constraint failed:
+    grade_categories.source_kind`), **nicht** aus SQLAlchemys Fehlertext: der
+    haengt die eingesetzten Werte an, und das waeren hier Schuelerdaten in einer
+    HTTP-Antwort. Was uebrig bleibt, sind Tabellen- und Spaltennamen — die
+    stehen ohnehin im Quelltext.
+    """
+
+    def __init__(self, tabelle: str, fehler: Exception):
+        self.tabelle = tabelle
+        self.grund = _grund(fehler)
+        super().__init__(f"Tabelle {tabelle}: {self.grund}")
+
+
+def _grund(fehler: Exception) -> str:
+    roh = str(getattr(fehler, "orig", fehler) or type(fehler).__name__)
+    # Postgres nennt im Klartext den kollidierenden Wert („Key (email)=(...)").
+    # Der gehoert nicht in die Antwort.
+    roh = re.sub(r"\(([^()]*)\)=\(([^()]*)\)", "(…)=(…)", roh)
+    return roh.strip().splitlines()[0][:200]
+
+
 async def zurueckspielen(zip_pfad: str, ziel_url: str, uploads_nach: str | None = None) -> dict:
     """Spielt eine Sicherung in die Datenbank unter `ziel_url` zurück.
 
@@ -708,7 +733,14 @@ async def zurueckspielen(zip_pfad: str, ziel_url: str, uploads_nach: str | None 
                         zaehlung[name] = 0
                         continue
                     for i in range(0, len(zeilen), 500):
-                        await conn.execute(tabelle.insert(), zeilen[i:i + 500])
+                        try:
+                            await conn.execute(tabelle.insert(), zeilen[i:i + 500])
+                        except SQLAlchemyError as e:
+                            # Ohne Tabelle und Bedingung waere die Meldung
+                            # „IntegrityError" — und die Ursache nur im
+                            # Container-Protokoll. Genau das hat hier einmal
+                            # zwei Tage gekostet.
+                            raise Einspielfehler(name, e) from e
                     zaehlung[name] = len(zeilen)
                 unbekannt = set(eimer) - set(tabellen)
                 if unbekannt:
@@ -1013,6 +1045,9 @@ async def probelauf(name: str, user=Depends(nur_admin), db=Depends(get_db)):
         bericht = await zurueckspielen(voll, f"sqlite+aiosqlite:///{os.path.join(wegwerf, 'probe.db')}")
     except HTTPException:
         raise
+    except Einspielfehler as e:
+        log.exception("Probelauf der Sicherung %s fehlgeschlagen", os.path.basename(voll))
+        raise HTTPException(400, f"Die Sicherung ließ sich nicht einspielen — {e}")
     except Exception as e:  # noqa: BLE001
         log.exception("Probelauf der Sicherung %s fehlgeschlagen", os.path.basename(voll))
         raise HTTPException(
@@ -1079,6 +1114,11 @@ async def einspielen(name: str, body: Rueckspiel, user=Depends(nur_admin), db=De
         bericht = await zurueckspielen(quelle, DATABASE_URL, UPLOAD_DIR)
     except HTTPException:
         raise
+    except Einspielfehler as e:
+        log.exception("Zurückspielen der Sicherung %s fehlgeschlagen", os.path.basename(voll))
+        raise HTTPException(
+            500, f"Zurückspielen fehlgeschlagen — {e}. Der Stand von vorher liegt "
+                 f"als Sicherung bereit ({netz['name']}).")
     except Exception as e:  # noqa: BLE001
         log.exception("Zurückspielen der Sicherung %s fehlgeschlagen", os.path.basename(voll))
         raise HTTPException(
