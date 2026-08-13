@@ -35,7 +35,7 @@ Nuvora ist ausdrücklich **nicht**:
 - **kein Produkt mit Support.** Ein-Personen-Projekt ohne Einnahmen, ohne
   Zusage auf Antwortzeit und ohne Zusicherung, dass ein Modul erhalten bleibt.
 
-**Stand:** Version 4.0.3. Der Rahmen steht, 14 Module sitzen darauf, keins hat
+**Stand:** Version 4.0.4. Der Rahmen steht, 14 Module sitzen darauf, keins hat
 eigene Konten oder eine eigene Datenbank. Rund 300 API-Tests und 75
 Frontend-Tests laufen bei jedem Push; nach jedem Deploy benutzt ein Selbsttest
 jedes Modul einmal wirklich. Was das *nicht* heißt: dass jemand außer dem Autor
