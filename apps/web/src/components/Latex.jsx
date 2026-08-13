@@ -14,6 +14,18 @@ function loadKatex() {
   return katexPromise;
 }
 
+// KaTeX kennt `array` (mit \hline und |-Trennern), aber KEIN `tabular` — das
+// gehoert zum LaTeX-Paket und nicht zum Formelsatz. Wer eine Tabelle aus einem
+// Dokument oder einer KI-Antwort herueberkopiert, bringt fast immer `tabular`
+// mit und sah bisher: nichts. Die Umschreibung ist verlustfrei, solange die
+// Spaltenangabe dieselbe Form hat (`{|c|c|}`, `{cc}`) — das ist bei allem der
+// Fall, was KaTeX ueberhaupt darstellen koennte.
+function vorbereiten(tex) {
+  return tex
+    .replace(/\\begin\{tabular\}/g, "\\begin{array}")
+    .replace(/\\end\{tabular\}/g, "\\end{array}");
+}
+
 export default function Latex({ children }) {
   const ref = useRef(null);
   useEffect(() => {
@@ -26,15 +38,29 @@ export default function Latex({ children }) {
       if (cancelled || !ref.current) return;
       const parts = text.split(/(\$\$[\s\S]+?\$\$|\$[^$]+?\$)/g);
       ref.current.innerHTML = "";
+
+      // Was KaTeX nicht kann, wird als Quelltext gezeigt — nicht verschluckt.
+      // Ein leerer Fleck laesst die Lehrkraft raten, ob die Formel fehlt oder
+      // die Anzeige kaputt ist; der Quelltext sagt, was zu reparieren ist.
+      const rendern = (quelle, ziel, displayMode) => {
+        try {
+          katex.render(vorbereiten(quelle), ziel, { displayMode, throwOnError: true });
+        } catch {
+          ziel.textContent = displayMode ? `$$${quelle}$$` : `$${quelle}$`;
+          ziel.style.color = "var(--danger, #d1350f)";
+          ziel.title = "Diese Formel kann nicht dargestellt werden";
+        }
+      };
+
       parts.forEach((part) => {
         if (part.startsWith("$$") && part.endsWith("$$")) {
-          const span = document.createElement("div");
-          try { katex.render(part.slice(2, -2), span, { displayMode: true, throwOnError: false }); } catch {}
-          ref.current.appendChild(span);
+          const el = document.createElement("div");
+          rendern(part.slice(2, -2), el, true);
+          ref.current.appendChild(el);
         } else if (part.startsWith("$") && part.endsWith("$")) {
-          const span = document.createElement("span");
-          try { katex.render(part.slice(1, -1), span, { throwOnError: false }); } catch {}
-          ref.current.appendChild(span);
+          const el = document.createElement("span");
+          rendern(part.slice(1, -1), el, false);
+          ref.current.appendChild(el);
         } else {
           ref.current.appendChild(document.createTextNode(part));
         }

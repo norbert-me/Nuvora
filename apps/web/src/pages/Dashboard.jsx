@@ -1011,6 +1011,10 @@ const LATEX_BUTTONS = [
   { label: "π", tex: "\\pi " },
   { label: "∑", tex: "\\sum " },
   { label: "∞", tex: "\\infty " },
+  // Tabelle: KaTeX kennt `array`, nicht `tabular`. Das Geruest kommt fertig
+  // hin, weil kaum jemand die Spaltenangabe („{|c|c|}") aus dem Kopf schreibt
+  // — und ein halb getipptes array rendert gar nichts.
+  { label: "⊞ Tabelle", tex: "\\begin{array}{|c|c|}\\hline  &  \\\\ \\hline  &  \\\\ \\hline\\end{array}", cursor: -40, display: true },
 ];
 
 function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
@@ -1027,7 +1031,7 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
     : setQ({ ...q, choices: { ...q.choices, [field]: val } });
 
   // Fügt LaTeX in das gerade aktive Feld ein (Fragetext ODER Antwort)
-  const insertLatex = (tex, cursorOffset) => {
+  const insertLatex = (tex, cursorOffset, display = false) => {
     const field = activeField.current || "text";
     const input = inputRefs.current[field];
     if (!input) return;
@@ -1040,7 +1044,9 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
       insert = tex.replace("{}", `{${selected}}`);
     }
     const needsDollar = !text.slice(0, start).includes("$") || text.slice(0, start).split("$").length % 2 === 1;
-    const wrapped = needsDollar ? `$${insert}$` : insert;
+    // Eine Tabelle gehoert in eine eigene Zeile ($$), nicht mitten in den Satz.
+    const zeichen = display ? "$$" : "$";
+    const wrapped = needsDollar ? `${zeichen}${insert}${zeichen}` : insert;
     const newText = text.slice(0, start) + wrapped + text.slice(end);
     setVal(field, newText);
     setTimeout(() => {
@@ -1057,7 +1063,7 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
         style={{ padding: "10px 12px", width: "100%", marginBottom: 4, fontSize: 16, border: "1px solid var(--border2)", borderRadius: 8, boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", lineHeight: 1.4, color: "var(--text)", background: "var(--bg)" }} autoFocus />
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
         {LATEX_BUTTONS.map((b) => (
-          <button key={b.label} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insertLatex(b.tex, b.cursor)}
+          <button key={b.label} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insertLatex(b.tex, b.cursor, b.display)}
             style={{ padding: "3px 8px", fontSize: 13, border: "1px solid var(--border2)", borderRadius: 6, background: "var(--card)", cursor: "pointer", fontFamily: "serif", color: "var(--text)" }}>
             {b.label}
           </button>
