@@ -879,14 +879,19 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
           };
           return (
             <div key={k}>
-              <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+              {/* stretch, nicht center: das Feld ist zwei Zeilen hoch (und per
+                  Ziehgriff noch hoeher), die Marke war 38 px — dann sitzt sie
+                  mittig neben einem hohen Kasten, und der Rahmen des Feldes
+                  laeuft ober- und unterhalb an ihr vorbei. Genau das sah aus,
+                  als haenge sie nicht am Feld. */}
+              <div style={{ display: "flex", alignItems: "stretch", gap: 0 }}>
                 {/* flexShrink: 0 ist Pflicht, nicht Kosmetik: ein <textarea>
                     bringt eine eigene Mindestbreite mit (cols), die Flexbox
                     nicht unterschreitet — ohne die beiden Angaben quetscht das
                     Antwortfeld den Buchstaben auf die halbe Breite, und A/B/C
                     sehen aus, als lägen sie unter dem Feld. */}
                 <div onClick={toggle} style={{
-                  width: 36, flexShrink: 0, minHeight: 38, display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 36, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
                   background: isCorrect ? C.success : "var(--border3)", color: isCorrect ? "#fff" : "var(--text3)",
                   borderRadius: "8px 0 0 8px", cursor: "pointer", fontWeight: 700, fontSize: 14,
                   transition: "all 0.15s ease", userSelect: "none",
