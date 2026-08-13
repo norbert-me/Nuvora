@@ -12,8 +12,9 @@ import { useEffect, useState } from "react";
 export default function ZoomImage({ src, alt = "", style, title }) {
   const [zoom, setZoom] = useState(false);
 
-  // Escape schliesst — ein Overlay ohne Ausweg ist eine Falle, und der Klick
-  // aufs Bild selbst darf nicht schliessen (man will hineinsehen).
+  // Escape schliesst, und jeder Klick im Overlay auch — auf dem Bild wie
+  // daneben. Was per Klick aufgegangen ist, geht per Klick wieder zu; ein Bild,
+  // das den Klick schluckt, laesst einen kurz suchen, wo man hindrücken muss.
   useEffect(() => {
     if (!zoom) return;
     const zu = (e) => { if (e.key === "Escape") setZoom(false); };
@@ -30,8 +31,8 @@ export default function ZoomImage({ src, alt = "", style, title }) {
         <div onClick={() => setZoom(false)}
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.86)", display: "flex",
             alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20, cursor: "zoom-out" }}>
-          <img src={src} alt={alt} onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", cursor: "default" }} />
+          <img src={src} alt={alt}
+            style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", cursor: "zoom-out" }} />
         </div>
       )}
     </>
