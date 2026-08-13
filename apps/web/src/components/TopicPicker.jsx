@@ -5,6 +5,7 @@
 // Zeigt "Thema / Unterthema", damit ein Unterthema ohne sein Oberthema nicht
 // mehrdeutig wird ("Kürzen" gibt es unter mehreren Themen).
 import { useState, useEffect } from "react";
+import { themenIndex } from "../core/topics.js";
 
 export default function TopicPicker({ value, onChange, style }) {
   const [topics, setTopics] = useState([]);
@@ -29,16 +30,9 @@ export default function TopicPicker({ value, onChange, style }) {
     );
   }
 
-  const byId = new Map(topics.map((t) => [t.id, t]));
-  const label = (t) => (t.parent_id ? `${byId.get(t.parent_id)?.name ?? "?"} / ${t.name}` : t.name);
-
-  // Oberthemen mit ihren Unterthemen direkt darunter — alphabetisch aufsteigend.
-  const nameAsc = (a, b) => (a.name || "").localeCompare(b.name || "", "de", { numeric: true });
-  const ordered = [];
-  topics.filter((t) => !t.parent_id).sort(nameAsc).forEach((root) => {
-    ordered.push(root);
-    topics.filter((c) => c.parent_id === root.id).sort(nameAsc).forEach((c) => ordered.push(c));
-  });
+  // Beschriftung („Thema / Unterthema") und Reihenfolge kommen aus
+  // core/topics.js — dieselbe Quelle wie der Themenfilter im Quiz.
+  const { label, geordnet: ordered } = themenIndex(topics);
 
   return (
     <select

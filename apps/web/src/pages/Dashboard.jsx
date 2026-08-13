@@ -8,6 +8,7 @@ import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import TopicPicker from "../components/TopicPicker.jsx";
 import ZoomImage from "../components/ZoomImage.jsx";
+import { themenIndex } from "../core/topics.js";
 import { useAktiv } from "../core/modules.js";
 
 const API = "/api";
@@ -482,6 +483,17 @@ const btnSmall = { background: "none", border: "none", cursor: "pointer", fontSi
 
 function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQuestionsChange }) {
   const [qSearch, setQSearch] = useState("");
+  // Themenfilter und -sortierung der Fragenliste. Beides wirkt nur auf die
+  // ANZEIGE: die gespeicherte Reihenfolge des Quiz bleibt, wie sie ist —
+  // sonst haette ein Blick nach Thema die Abfolge im Unterricht umgestellt.
+  const [qThema, setQThema] = useState("");      // "" = alle, "0" = ohne Thema, sonst topic_id
+  const [qNachThema, setQNachThema] = useState(false);
+  const [themen, setThemen] = useState([]);
+
+  useEffect(() => {
+    fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setThemen(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
+  const themaIdx = themenIndex(themen);
   // Touch-Geraet? Dort funktioniert HTML5-Drag nicht (iOS Safari) — deshalb
   // dort Pfeile statt Ziehen. Desktop behaelt das Ziehen.
   const isTouch = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
@@ -637,20 +649,46 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
             style={{ flex: 1, minWidth: 160, maxWidth: 320, padding: "7px 12px", border: "1px solid var(--border2)", borderRadius: 980, fontSize: 13.5, background: "var(--bg)", color: "var(--text)" }}
           />
         )}
+        {/* Themenfilter — nur wenn es Themen gibt: ein Filter ueber eine leere
+            Liste ist ein toter Kasten. */}
+        {themaIdx.liste.length > 0 && (
+          <>
+            <select value={qThema} onChange={(e) => setQThema(e.target.value)} title={t("dash.filterTopic")}
+              style={{ padding: "6px 10px", borderRadius: 980, border: "1px solid var(--border2)", fontSize: 13.5, background: "var(--bg)", color: "var(--text)", maxWidth: 260 }}>
+              <option value="">{t("dash.allTopics")}</option>
+              <option value="0">{t("dash.withoutTopic")}</option>
+              {themaIdx.geordnet.map((tp) => <option key={tp.id} value={String(tp.id)}>{themaIdx.label(tp)}</option>)}
+            </select>
+            <Toggle checked={qNachThema} onChange={() => setQNachThema((v) => !v)} label={t("dash.sortTopic")} />
+          </>
+        )}
       </div>
 
       {(() => {
         const base = previewQuestions || questions;
         const term = qSearch.trim().toLowerCase();
-        const searching = term.length > 0;
         const inText = (q) => (q.text || "").toLowerCase().includes(term)
           || Object.values(q.choices || {}).some((v) => typeof v === "string" && v.toLowerCase().includes(term));
-        const shown = searching ? base.filter(inText) : base;
-        if (searching && shown.length === 0) {
+        const passtThema = (q) => (qThema === "" ? true
+          : qThema === "0" ? q.topic_id == null
+          : String(q.topic_id ?? "") === qThema);
+        let shown = base.filter((q) => (term ? inText(q) : true) && passtThema(q));
+        if (qNachThema) {
+          // Ohne Thema ans Ende — die Frage „was hat noch keins?" beantwortet
+          // sich sonst nur durch Suchen in der ganzen Liste.
+          shown = [...shown].sort((x, y) => {
+            const a1 = themaIdx.labelFuerId(x.topic_id), b1 = themaIdx.labelFuerId(y.topic_id);
+            if (!a1 !== !b1) return a1 ? -1 : 1;
+            return a1.localeCompare(b1, "de", { numeric: true });
+          });
+        }
+        // Beim Suchen, Filtern oder Sortieren kein Ziehen: der Index der
+        // Anzeige passt dann nicht zur echten Reihenfolge, ein Drop wuerde die
+        // falsche Frage verschieben.
+        const searching = term.length > 0 || qThema !== "" || qNachThema;
+        if (shown.length === 0) {
           return <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("dash.noSearchHit")}</p>;
         }
-        // Beim Suchen kein Ziehen: der gefilterte Index passt nicht zur echten
-        // Reihenfolge, ein Drop wuerde die falsche Frage verschieben.
         return shown.map((q) => {
           const idx = base.indexOf(q);
           return (
@@ -698,6 +736,13 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
           <span onClick={() => setEditingQ({ ...q })} style={{ flex: 1, color: "var(--text)", cursor: "pointer" }} title={t("dash.clickEdit")}>
             <Latex>{q.text}</Latex>
             {q.image_url && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 6, verticalAlign: "middle" }}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>}
+            {/* Das Thema an der Frage — ohne es sieht man zwei gleich
+                aussehende Fragen und weiss nicht, welche wohin gehoert. */}
+            {themaIdx.liste.length > 0 && (
+              <span style={{ marginLeft: 8, fontSize: 12, color: q.topic_id ? "var(--text3)" : "var(--warn, #b26a00)" }}>
+                {q.topic_id ? themaIdx.labelFuerId(q.topic_id) : t("dash.withoutTopic")}
+              </span>
+            )}
           </span>
           <button onClick={() => removeQuestion(idx)} style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
         </div>
