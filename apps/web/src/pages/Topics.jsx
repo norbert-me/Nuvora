@@ -377,7 +377,7 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
                 <div style={secTitle}>{t("nav.classes")}</div>
                 {klassenNamen.length ? <div style={line}>{klassenNamen.join(", ")}</div> : <div style={{ ...line, color: "var(--text3)" }}>{t("topics.noClasses")}</div>}
 
-                {(usage.cardvote?.length > 0) && (<><div style={secTitle}>CardVote</div>{usage.cardvote.map((q) => <Zeile key={q.id} to={themaZiel.cardvote(q)}>{q.text || `#${q.id}`}</Zeile>)}</>)}
+                {(usage.cardvote?.length > 0) && (<><div style={secTitle}>CardVote</div>{usage.cardvote.map((q) => <Zeile key={q.id} to={themaZiel.cardvote(q)}>{q.text || `#${q.id}`}<span style={{ fontSize: 12, color: q.set_id ? "var(--text3)" : "var(--warn, #b26a00)" }}> · {q.set_id ? q.set_name : t("thema.noSet")}</span></Zeile>)}</>)}
                 {(usage.karten?.length > 0) && (<><div style={secTitle}>{t("nav.cards2")}</div>{usage.karten.map((d) => <Zeile key={d.id} to={themaZiel.karten(d)}>{d.name}{classes[d.class_id] ? ` · ${classes[d.class_id]}` : ""}{d.released ? "" : ` · ${t("topics.draft")}`}</Zeile>)}</>)}
                 {(usage.lernpfad?.length > 0) && (<><div style={secTitle}>Lernpfad</div>{usage.lernpfad.map((l) => <Zeile key={l.id} to={themaZiel.lernpfad(l)}>{l.path || "—"}{classes[l.class_id] ? ` · ${classes[l.class_id]}` : ""}</Zeile>)}</>)}
                 {(usage.kalender?.length > 0) && (<><div style={secTitle}>Kalender</div>{usage.kalender.map((e) => <Zeile key={e.id} to={themaZiel.kalender(e)}>{e.date ? `${new Date(e.date).toLocaleDateString()} · ` : ""}{e.title || "—"}{classes[e.class_id] ? ` · ${classes[e.class_id]}` : ""}</Zeile>)}</>)}

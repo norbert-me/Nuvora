@@ -65,6 +65,12 @@ export default function ThemaAnsicht() {
         {(data.cardvote || []).map((q) => (
           <Zeile key={q.id} to={themaZiel.cardvote(q)}>
             <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{q.text}</span>
+            {/* Ohne das sehen zwei gleich lautende Fragen wie ein Fehler der
+                Liste aus — dabei steckt die eine in einem Quiz und die andere
+                in keinem. */}
+            <span style={{ fontSize: 12, color: q.set_id ? "var(--text3)" : "var(--warn, #b26a00)", flexShrink: 0 }}>
+              {q.set_id ? q.set_name : t("thema.noSet")}
+            </span>
           </Zeile>
         ))}
         <div style={{ marginTop: 10 }}><Link to="/cardvote/questions" style={{ color: "var(--accent)", fontSize: 13, textDecoration: "none" }}>{t("thema.openCardvote")} ↗</Link></div>

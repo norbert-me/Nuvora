@@ -18,7 +18,7 @@ from ..database import get_db
 from ..models import (
     Question, Topic, User, CardDeck, Exercise, CalendarEntry, CodePuzzle,
     LearningLadder, LearningPath, GradeCategory, Method, TimetableSlot, Material,
-    QuestionSetItem,
+    QuestionSetItem, QuestionSet,
 )
 from .auth import get_current_user, rate_limit
 from .modules import is_active
@@ -205,16 +205,23 @@ async def topic_usage(topic_id: int, user: User = Depends(get_current_user), db:
         # Fragen-Editor oeffnet ein Set (`?set=`), eine Frage allein hat keinen
         # Ort. Eine Frage kann in mehreren Quizzen stecken — genommen wird das
         # erste; ohne Quiz bleibt `set_id` leer und die Zeile ist kein Link.
+        #
+        # Der Name des Quiz steht mit dabei, und zwar aus einem handfesten
+        # Grund: dasselbe Thema kann acht Fragen haben, von denen nur fuenf in
+        # einem Quiz stecken — dann sehen zwei gleich lautende Zeilen wie ein
+        # Anzeigefehler aus. Mit „in keinem Quiz" daneben ist es eine Aussage.
         sets = {}
         if rows:
-            for qid, sid in (await db.execute(
-                select(QuestionSetItem.question_id, QuestionSetItem.question_set_id)
+            for qid, sid, sname in (await db.execute(
+                select(QuestionSetItem.question_id, QuestionSet.id, QuestionSet.name)
+                .join(QuestionSet, QuestionSetItem.question_set_id == QuestionSet.id)
                 .where(QuestionSetItem.question_id.in_([q.id for q in rows]))
-                .order_by(QuestionSetItem.question_set_id)
+                .order_by(QuestionSet.id)
             )).all():
-                sets.setdefault(qid, sid)
+                sets.setdefault(qid, (sid, sname))
         out["cardvote"] = [{"id": q.id, "text": (q.text or "")[:120],
-                            "set_id": sets.get(q.id)} for q in rows]
+                            "set_id": (sets.get(q.id) or (None, None))[0],
+                            "set_name": (sets.get(q.id) or (None, None))[1]} for q in rows]
     if await on("karten"):
         rows = (await db.execute(select(CardDeck).where(CardDeck.owner_id == user.id, CardDeck.topic_id.in_(themen_ids), CardDeck.deleted_at.is_(None)).limit(50))).scalars().all()
         out["karten"] = [{"id": d.id, "name": d.name, "class_id": d.class_id, "released": d.released_at is not None} for d in rows]

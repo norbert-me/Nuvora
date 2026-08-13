@@ -1504,6 +1504,7 @@ export default {
   "thema.hint": "Todo lo vinculado a este tema — en los módulos activos.",
   "thema.error": "Tema no encontrado.",
   "thema.empty": "Nada aquí.",
+  "thema.noSet": "en ningún cuestionario",
   "thema.noModules": "No hay módulos relevantes activos.",
   "thema.noModulesButMaterial": "Ningún módulo compatible activo — aun así puedes guardar material aquí.",
   "material.title": "Material",

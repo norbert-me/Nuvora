@@ -1471,6 +1471,7 @@ export default {
   "thema.hint": "Alles, was an diesem Thema hängt — über die aktiven Module hinweg.",
   "thema.error": "Thema nicht gefunden.",
   "thema.empty": "Nichts vorhanden.",
+  "thema.noSet": "in keinem Quiz",
   "thema.noModules": "Keine passenden Module aktiv.",
   "thema.noModulesButMaterial": "Keine passenden Module aktiv — Material kannst du trotzdem hier ablegen.",
   "material.title": "Material",

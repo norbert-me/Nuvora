@@ -1503,6 +1503,7 @@ export default {
   "thema.hint": "Everything attached to this topic — across the active modules.",
   "thema.error": "Topic not found.",
   "thema.empty": "Nothing here.",
+  "thema.noSet": "in no quiz",
   "thema.noModules": "No matching modules active.",
   "thema.noModulesButMaterial": "No matching modules active — you can still store material here.",
   "material.title": "Material",
