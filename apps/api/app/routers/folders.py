@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
-from ..models import Folder, Question, QuestionSet, QuestionSetItem, User
+from ..models import Folder, Question, QuestionSet, QuestionSetItem, Scan, User
 from .auth import get_current_user, rate_limit
 from .modules import modul_pflicht
 
@@ -271,10 +271,34 @@ async def delete_question_set(set_id: int, user: User = Depends(get_current_user
     if not qs:
         raise HTTPException(404)
     await ensure_set_access(db, qs, user.id)
+    # Welche Fragen haengen NUR an diesem Quiz? Nach dem Loeschen waeren sie
+    # nirgends mehr erreichbar — an eine Frage kommt man ausschliesslich ueber
+    # ein Quiz. Sie blieben unsichtbar in der Datenbank liegen und tauchten nur
+    # noch in der Themen-Ansicht auf, wo sie neben ihrem Zwilling aus einem
+    # anderen Quiz wie eine doppelte Zeile aussehen. Genau so sind die Reste
+    # entstanden, die niemand mehr zuordnen konnte.
+    eigene = (await db.execute(
+        select(QuestionSetItem.question_id).where(QuestionSetItem.question_set_id == set_id)
+    )).scalars().all()
+    nur_hier = []
+    if eigene:
+        woanders = set((await db.execute(
+            select(QuestionSetItem.question_id)
+            .where(QuestionSetItem.question_id.in_(eigene), QuestionSetItem.question_set_id != set_id)
+        )).scalars().all())
+        # Fragen mit Scans bleiben — daran haengen die Auswertungen gehaltener
+        # Sitzungen. Lieber eine Waise als eine geloeschte Auswertung.
+        mit_ergebnissen = set((await db.execute(
+            select(Scan.question_id).where(Scan.question_id.in_(eigene)).distinct()
+        )).scalars().all())
+        nur_hier = [qid for qid in set(eigene) if qid not in woanders and qid not in mit_ergebnissen]
+
     # Core-DELETE: die DB kaskadiert die Set-Einträge (question_set_items) und
     # NULLt die Verknüpfungen in Kalender-Einträgen (cardvote_set_id ON DELETE
     # SET NULL). ORM-Objekt-Delete müsste die items erst laden (async Lazy-Load).
     await db.execute(sql_delete(QuestionSet).where(QuestionSet.id == set_id))
+    if nur_hier:
+        await db.execute(sql_delete(Question).where(Question.id.in_(nur_hier)))
     await db.commit()
 
 

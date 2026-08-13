@@ -159,3 +159,53 @@ async def test_frage_mit_ergebnissen_bleibt_stehen(s):
     weg = await Q.verwaiste_fragen_loeschen(user=u, db=s)
     assert weg["geloescht"] == 0 and weg["behalten"] == 1
     assert await s.get(Question, waise.id) is not None
+
+
+@pytest.mark.asyncio
+async def test_quiz_loeschen_nimmt_seine_eigenen_fragen_mit(s):
+    """Die Ursache der Reste: ein geloeschtes Quiz liess seine Fragen liegen.
+
+    Danach waren sie nirgends mehr erreichbar (an eine Frage kommt man nur
+    ueber ein Quiz) und standen doch weiter in der Themen-Ansicht — neben dem
+    Zwilling aus einem anderen Quiz sah das aus wie eine doppelte Zeile.
+
+    Drei Faelle in einem Test, weil nur ihr Zusammenspiel die Regel ergibt:
+    allein-am-Quiz faellt weg, auch-woanders bleibt, mit-Ergebnissen bleibt.
+    """
+    u, thema, frage, quiz = await _welt(s)
+    from app.models import Session as CvSession, SchoolClass, Scan
+
+    cls = SchoolClass(name="7a", owner_id=u.id)
+    s.add(cls)
+    nur_hier = Question(text="nur in diesem Quiz", question_type="mc",
+                        choices={"A": "x"}, correct_answer="A", owner_id=u.id)
+    geteilt = Question(text="auch woanders", question_type="mc",
+                       choices={"A": "x"}, correct_answer="A", owner_id=u.id)
+    gescannt = Question(text="hat Ergebnisse", question_type="mc",
+                        choices={"A": "x"}, correct_answer="A", owner_id=u.id)
+    s.add_all([nur_hier, geteilt, gescannt])
+    await s.flush()
+
+    zweites = QuestionSet(name="Zweites Quiz", owner_id=u.id)
+    s.add(zweites)
+    await s.flush()
+    s.add_all([
+        QuestionSetItem(question_set_id=quiz.id, question_id=nur_hier.id, position=1),
+        QuestionSetItem(question_set_id=quiz.id, question_id=geteilt.id, position=2),
+        QuestionSetItem(question_set_id=quiz.id, question_id=gescannt.id, position=3),
+        QuestionSetItem(question_set_id=zweites.id, question_id=geteilt.id, position=0),
+    ])
+    # Die Sitzung haengt am ZWEITEN Quiz: `sessions.question_set_id` hat kein
+    # ON DELETE, ein Quiz mit gehaltener Sitzung laesst sich ohnehin nicht
+    # loeschen. Geprueft wird hier der Schutz der Frage, nicht diese Sperre.
+    sitzung = CvSession(question_set_id=zweites.id, class_id=cls.id, owner_id=u.id)
+    s.add(sitzung)
+    await s.flush()
+    s.add(Scan(session_id=sitzung.id, question_id=gescannt.id, student_id=1, answer="A"))
+    await s.commit()
+
+    await F.delete_question_set(quiz.id, user=u, db=s)
+
+    assert await s.get(Question, nur_hier.id) is None, "Waise blieb liegen"
+    assert await s.get(Question, geteilt.id) is not None, "Frage aus einem anderen Quiz mitgerissen"
+    assert await s.get(Question, gescannt.id) is not None, "Frage mit Ergebnissen geloescht"
