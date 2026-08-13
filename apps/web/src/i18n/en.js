@@ -437,6 +437,7 @@ export default {
   "dash.answers": "Answers:",
   "dash.answerPh": "Answer {{k}} (LaTeX with $...$)",
   "dash.addImg": "+ Image",
+  "dash.zoomImg": "Click to enlarge",
   "dash.noStats": "No statistics yet.",
   "dash.stats": "Statistics (used {{times}}×, {{answers}} answers)",
   "dash.correct": "correct",

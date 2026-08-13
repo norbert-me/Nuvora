@@ -438,6 +438,7 @@ export default {
   "dash.answers": "Respuestas:",
   "dash.answerPh": "Respuesta {{k}} (LaTeX con $...$)",
   "dash.addImg": "+ Imagen",
+  "dash.zoomImg": "Clic para ampliar",
   "dash.noStats": "Aún no hay estadísticas.",
   "dash.stats": "Estadísticas (usada {{times}} veces, {{answers}} respuestas)",
   "dash.correct": "correctas",

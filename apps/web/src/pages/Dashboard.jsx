@@ -7,6 +7,7 @@ import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary,
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import TopicPicker from "../components/TopicPicker.jsx";
+import ZoomImage from "../components/ZoomImage.jsx";
 import { useAktiv } from "../core/modules.js";
 
 const API = "/api";
@@ -822,7 +823,7 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
 
       {/* Image */}
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
-        {q.image_url && <img src={q.image_url} alt="" style={{ height: 60, borderRadius: 6, border: "1px solid var(--border3)" }} />}
+        {q.image_url && <ZoomImage src={q.image_url} title={t("dash.zoomImg")} style={{ height: 60, borderRadius: 6, border: "1px solid var(--border3)" }} />}
         <button onClick={() => onUpload((url) => setQ({ ...q, image_url: url }))} type="button" style={btnSecondary}>
           {q.image_url ? t("dash.changeImg") : t("dash.uploadImg")}
         </button>
@@ -901,7 +902,7 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
                   )}
                   {choiceImg && (
                     <div style={{ padding: "4px 8px", background: "var(--bg2)", display: "flex", alignItems: "center", gap: 6 }}>
-                      <img src={choiceImg} alt="" style={{ height: 40, borderRadius: 4 }} />
+                      <ZoomImage src={choiceImg} title={t("dash.zoomImg")} style={{ height: 40, borderRadius: 4 }} />
                       <button onClick={removeChoiceImg} title={t("dash.removeImg")} style={{ border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", padding: 2 }}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
                     </div>
                   )}
