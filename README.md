@@ -419,6 +419,15 @@ Thema → Unterthema):
 - schwaches Thema → passender Einstieg vorgeschlagen
 - Kalender plant Quiz/Deck/Lernleiter und schaltet Decks am Tag frei
 - Themen-Ansicht zeigt zu einem Thema alles quer über die aktiven Module
+- Karten-Fortschritt zählt in die schwachen Themen mit — woran beim Üben immer
+  wieder gepatzt wird, steht im Wiederholungs-Vorschlag
+- ein Klassenarbeitstermin legt ein Korrektur-To-do eine Woche danach an; wird
+  der Termin verschoben, zieht der Zettel mit, wird er gelöscht, geht er mit
+- die Frühwarnung schreibt aus einer Meldung direkt eine Beobachtung
+- die Frühwarnung markiert Kinder mit vielen Fehltagen (Anwesenheit)
+- der Sitzplan zeigt auf Wunsch, für wen etwas vereinbart ist (Fördermaßnahmen;
+  standardmäßig aus, weil der Plan oft am Beamer hängt)
+- der Elternkontakt zeigt die Fehltage des Kindes
 
 Fehlt das Gegenstück-Modul, ist die Verbindung nicht sichtbar und die API weist
 sie mit 403 ab. Genau das prüft der Systemtest für jede Brücke zweimal.

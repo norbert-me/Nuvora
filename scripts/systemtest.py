@@ -1740,6 +1740,95 @@ def teste_bruecken(api, b, u, sch, spuren, cv):
     if "sitzung" in cv:
         b.pruefe("Bruecken", "Schwache Themen (CardVote allein)", schwache_themen)
 
+    # ── Bruecke 5: Karten-Fortschritt speist die schwachen Themen ──
+    def karten_in_schwache_themen():
+        """Ein Thema, an dem beim Karten-Ueben immer wieder gepatzt wird, gehoert
+        in den Wiederholungs-Vorschlag. Ohne das Modul Karten darf es dort NICHT
+        auftauchen — sonst haengt der Vorschlag an einem fremden Modul."""
+        sch.setze({"karten"})
+        anonym = Api(api.basis, debug=api.debug)
+        deck = api.call("POST", f"/api/karten/classes/{u.class_id}/decks",
+                        {"name": f"{PRAEFIX} Schwach-Stapel", "topic_id": u.topic_id},
+                        erwartet=(201,))
+        spuren.append(("Schwach-Stapel", lambda: (
+            api.call("DELETE", f"/api/karten/decks/{deck['id']}", erwartet=(204, 404)),
+            api.call("DELETE", f"/api/karten/decks/{deck['id']}/purge", erwartet=(204, 404)))))
+        karte = api.call("POST", f"/api/karten/decks/{deck['id']}/cards",
+                         {"front": "7*8", "back": "56"}, erwartet=(201,))
+        api.call("POST", f"/api/karten/decks/{deck['id']}/release", {"now": True}, erwartet=(200,))
+        token = _finde(api.call("POST", f"/api/karten/classes/{u.class_id}/tokens",
+                                erwartet=(200, 201)), student_id=u.students[0])["token"]
+        # dreimal daneben: reps steigt, lapses steigt mit — das ist ein schwaches Thema
+        for _ in range(3):
+            anonym.call("POST", f"/api/karten/lernen/{token}/review",
+                        {"card_id": karte["id"], "grade": 0}, erwartet=(200,))
+
+        spanne = (f"?frm={(datetime.now() - timedelta(days=2)).isoformat()}"
+                  f"&to={datetime.now().isoformat()}&class_id={u.class_id}")
+        mit = api.call("GET", f"/api/weak-topics{spanne}", erwartet=(200,))
+        drin = [t for t in mit.get("topics", []) if t.get("topic_id") == u.topic_id]
+        if not drin:
+            raise AssertionError(f"Karten-Thema fehlt in den schwachen Themen: {mit}")
+
+        sch.setze({"cardvote"})   # Karten aus
+        ohne = api.call("GET", f"/api/weak-topics{spanne}", erwartet=(200,))
+        if [t for t in ohne.get("topics", []) if t.get("topic_id") == u.topic_id]:
+            raise AssertionError(f"Karten-Thema erscheint OHNE Modul Karten: {ohne}")
+        return f"mit Karten schwaches Thema gemeldet ({drin[0].get('pct')} %), ohne Karten nicht"
+
+    b.pruefe("Bruecken", "Karten -> schwache Themen", karten_in_schwache_themen)
+
+    # ── Bruecke 6: Klassenarbeitstermin legt ein Korrektur-To-do an ──
+    def termin_zu_todo():
+        def termin(name):
+            e = api.call("POST", "/api/kalender/klassenarbeiten", {
+                "date": (datetime.now() + timedelta(days=3)).isoformat(),
+                "title": f"{PRAEFIX} {name}", "class_id": u.class_id}, erwartet=(201,))
+            spuren.append((f"Bruecken-Termin {name}", lambda: api.call(
+                "DELETE", f"/api/kalender/klassenarbeiten/{e['id']}", erwartet=(204, 404))))
+            return e
+
+        # a) ohne To-do-Modul: nur der Termin, kein Zettel
+        sch.setze({"kalender"})
+        termin("ohne Todo")
+        sch.setze({"kalender", "notizbrett"})
+        vorher = api.call("GET", "/api/todo", erwartet=(200,))
+        vorher_ids = {t["id"] for t in vorher}
+        if [t for t in vorher if "ohne Todo" in (t.get("text") or "")]:
+            raise AssertionError("Termin hat ohne Modul To-do trotzdem einen Eintrag angelegt")
+
+        # b) mit beiden: genau ein Korrektur-To-do
+        e = termin("mit Todo")
+        nachher = api.call("GET", "/api/todo", erwartet=(200,))
+        neu = [t for t in nachher if t["id"] not in vorher_ids and f"#ka{e['id']}" in (t.get("text") or "")]
+        for t in neu:
+            spuren.append((f"Korrektur-Todo {t['id']}", lambda tt=t: api.call(
+                "DELETE", f"/api/todo/{tt['id']}", erwartet=(204, 404))))
+        if len(neu) != 1:
+            raise AssertionError(f"erwartet genau 1 Korrektur-To-do, gefunden {len(neu)}")
+        if not neu[0].get("due_date"):
+            raise AssertionError(f"Korrektur-To-do ohne Datum: {neu[0]}")
+        return f"ohne To-do-Modul keins, mit ihm eins zum {neu[0]['due_date']}"
+
+    b.pruefe("Bruecken", "Klassenarbeitstermin -> Korrektur-To-do", termin_zu_todo)
+
+    # ── Bruecke 7: Fruehwarnung nennt die Schueler-ID (fuer Beobachtungen) ──
+    def fruehwarnung_ids():
+        """Aus einer Meldung soll direkt eine Beobachtung entstehen koennen —
+        dafuer braucht die Oberflaeche die Datenbank-ID, nicht nur die
+        aufgedruckte Kartennummer. Die Fruehwarnung selbst ist Kern."""
+        sch.setze({"cardvote"})
+        d = api.call("GET", f"/api/classes/{u.class_id}/fruehwarnung", erwartet=(200,))
+        kinder = d.get("schueler") or []
+        if not kinder:
+            return "keine Meldungen im Testbestand — Feldpruefung entfaellt"
+        ohne = [k for k in kinder if k.get("student_id") is None]
+        if ohne:
+            raise AssertionError(f"{len(ohne)} Eintraege ohne student_id — Beobachtung nicht moeglich")
+        return f"{len(kinder)} Eintraege, alle mit student_id"
+
+    b.pruefe("Bruecken", "Fruehwarnung -> Beobachtung (Schueler-ID)", fruehwarnung_ids)
+
 
 # ─────────────────────── Ablauf ───────────────────────
 

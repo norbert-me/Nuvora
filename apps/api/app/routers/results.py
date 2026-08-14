@@ -421,6 +421,31 @@ async def weak_topics_range(frm: datetime, to: datetime, class_id: Optional[int]
             if q_correct.get(s.question_id) and s.answer in q_correct[s.question_id]:
                 a[0] += 1
 
+    # Karten einspeisen (Bruecke Karten -> Lernpfad/Kalender, Regel 3: nur mit
+    # aktivem Modul). Ein Thema, an dem die Kinder beim Ueben immer wieder
+    # haengenbleiben, ist genauso ein schwaches Thema wie eins aus dem Quiz —
+    # es stand nur bisher in keinem Vorschlag. Gerechnet wird aus SM-2:
+    # gelungene Wiederholungen (reps - lapses) von allen (reps). Das Thema
+    # kommt vom Deck, denn Karten selbst tragen keins.
+    from .modules import is_active
+    if await is_active(db, user.id, "karten"):
+        from ..models import Card, CardDeck, CardReview
+        kq = (select(CardDeck.topic_id, CardReview.reps, CardReview.lapses)
+              .join(Card, Card.deck_id == CardDeck.id)
+              .join(CardReview, CardReview.card_id == Card.id)
+              .join(Student, Student.id == CardReview.student_id)
+              .where(CardDeck.owner_id == user.id, CardDeck.topic_id.is_not(None),
+                     CardReview.reps > 0, CardReview.last_reviewed.is_not(None),
+                     CardReview.last_reviewed >= frm, CardReview.last_reviewed <= to))
+        if class_id is not None:
+            from .kurse import sibling_class_ids
+            sib = await sibling_class_ids(db, class_id)
+            kq = kq.where(Student.class_id.in_(sib or [class_id]))
+        for tid, reps, lapses in (await db.execute(kq)).all():
+            a = agg.setdefault(tid, [0, 0])
+            a[1] += reps
+            a[0] += max(0, reps - (lapses or 0))
+
     # Code-Detektiv einspeisen: Raetsel sind themen-getaggt, aber Sessions sind
     # klassenlos — darum nur in die fachuebergreifende Sicht (kein class_id),
     # nicht in die per-Klasse-Liste (sonst taucht ein Info-Thema unter Mathe auf).
@@ -986,6 +1011,26 @@ async def _fruehwarn_quellen(db, user, class_id: int) -> dict:
     return aus
 
 
+async def _fehlzeiten(db, user, class_id: int) -> dict:
+    """Fehltage je Kind — {student_id: {"fehlt": n, "spaet": n, "entsch": n}}.
+
+    Bruecke zum Modul Orga (Regel 3: nur Zusatz). Warum das in die Fruehwarnung
+    gehoert: der haeufigste Grund, warum ein Kind zurueckfaellt, ist Fehlen. Eine
+    Meldung „liegt seit Wochen unter der Klasse" ohne den Zusatz „und hat in der
+    Zeit sechsmal gefehlt" schickt die Lehrkraft auf die falsche Spur.
+    """
+    from .modules import is_active
+    if not await is_active(db, user.id, "orga"):
+        return {}
+    try:
+        from .anwesenheit import summary as _summary
+        return await _summary(class_id, user=user, db=db) or {}
+    except Exception:
+        # Die Fruehwarnung darf nicht an einer Bruecke scheitern — ohne
+        # Fehlzeiten ist sie schwaecher, aber nicht kaputt.
+        return {}
+
+
 @kern_router.get("/classes/{class_id}/fruehwarnung")
 async def fruehwarnung_klasse(class_id: int, empfindlich: bool = False,
                               user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
@@ -1009,6 +1054,30 @@ async def fruehwarnung_klasse(class_id: int, empfindlich: bool = False,
                 "regel": {}, "quellen": quellen}
     ergebnis = fw.analysiere(tests, kinder, fw.EMPFINDLICH if empfindlich else fw.STANDARD)
     await _themennamen(db, ergebnis, user)
+
+    # Fehlzeiten dazu: sie erklaeren oft, was die Zahlen zeigen. Bewusst als
+    # eigenes Etikett und nicht in die Rechnung — Fehlen ist kein Messwert fuer
+    # Koennen, sondern ein Grund, den die Lehrkraft kennen muss.
+    # Datenbank-ID mitgeben: die Oberflaeche braucht sie, um aus einer Meldung
+    # direkt eine Beobachtung anzulegen (die Fruehwarnung selbst rechnet mit der
+    # aufgedruckten Kartennummer).
+    karte_zu_id = {s.card_id: s.id for s in await _kurs_roster(db, class_id)}
+    for eintrag in ergebnis["schueler"]:
+        eintrag["student_id"] = karte_zu_id.get(eintrag["card_id"])
+
+    fehl = await _fehlzeiten(db, user, class_id)
+    if fehl:
+        for eintrag in ergebnis["schueler"]:
+            z = fehl.get(str(karte_zu_id.get(eintrag["card_id"]))) or {}
+            tage = int(z.get("fehlt") or 0) + int(z.get("entsch") or 0)
+            eintrag["fehltage"] = tage
+            if tage >= 5 and eintrag["status"] == "melden":
+                eintrag["etiketten"].append({
+                    "art": "fehlzeit",
+                    "text": f"{tage} Fehltage in dieser Klasse — bevor man am Stoff ansetzt, "
+                            f"lohnt der Blick auf die Anwesenheit",
+                })
+
     ergebnis["class_id"] = class_id
     ergebnis["class_name"] = school_class.name
     ergebnis["quellen"] = quellen

@@ -57,6 +57,8 @@ class WorkIn(BaseModel):
     class_id: int
     kurs_id: Optional[int] = None
     name: str = ""
+    # Tag der Arbeit — nur, um die Abwesenden vorzubelegen (Bruecke zu Orga).
+    datum: Optional[str] = None
 
 
 class WorkPut(BaseModel):
@@ -121,10 +123,41 @@ async def create_work(body: WorkIn, user: User = Depends(require_module), db: As
     rate_limit("ka_work", f"u{user.id}", 100, 60, "Zu viele Arbeiten. Bitte kurz warten.")
     await _owned_class(db, user, body.class_id)
     w = WorkAnalysis(owner_id=user.id, class_id=body.class_id, kurs_id=body.kurs_id, name=(body.name or "Klassenarbeit").strip()[:200], tasks=[], results={})
+
+    # Wer am Tag der Arbeit gefehlt hat, ist hier gleich als abwesend markiert
+    # (Bruecke zu Orga, nur mit aktivem Modul). Vergisst man das, rutschen
+    # Nullen in die Wertung und verfaelschen Schnitt, Trennschaerfe und
+    # Notenverteilung — genau die Zahlen, wegen derer man die Arbeit auswertet.
+    # Es bleibt ein Vorschlag: die Markierung laesst sich je Kind umschalten.
+    w.absent = await _abwesende_am_tag(db, user, body.class_id, body.datum) or None
+
     db.add(w)
     await db.commit()
     await db.refresh(w)
-    return WorkOut(id=w.id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=[], results={}, absent=[])
+    return WorkOut(id=w.id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id,
+                   name=w.name, tasks=[], results={}, absent=w.absent or [])
+
+
+async def _abwesende_am_tag(db, user, class_id: int, datum: Optional[str]) -> list:
+    """student_ids, die an diesem Tag als fehlend erfasst sind (leer ohne Orga)."""
+    from datetime import datetime as _dt
+    from .modules import is_active
+
+    if not datum or not await is_active(db, user.id, "orga"):
+        return []
+    try:
+        tag = _dt.fromisoformat(datum.replace("Z", "+00:00"))
+    except ValueError:
+        return []
+    try:
+        from .anwesenheit import get_day as _tag
+        stand = await _tag(class_id, date=tag, period=None, user=user, db=db) or {}
+    except Exception:
+        return []
+    # „entsch" (entschuldigt) zaehlt mit: das Kind war nicht da und hat die
+    # Arbeit nicht geschrieben. „spaet" nicht — es war da.
+    return [sid for sid, eintrag in stand.items()
+            if (eintrag or {}).get("status") in ("fehlt", "entsch")]
 
 
 class WorkCopyIn(BaseModel):

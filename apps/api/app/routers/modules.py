@@ -125,8 +125,10 @@ REGISTRY: List[ModuleDef] = [
             "Unterrichtsplanung: Tag-, Wochen-, Monatsansicht und ein "
             "wiederkehrender Stundenplan. An einen Eintrag lässt sich ein Quiz, "
             "ein Karten-Deck oder eine Lernleiter planen; freie Tage blenden "
-            "Stunden aus. Kalender-Sync in beide Richtungen (eigener ICS-Feed zum "
-            "Abonnieren + externer Kalender read-only)."
+            "Stunden aus. Ein Klassenarbeitstermin legt mit dem Modul To-do ein "
+            "Korrektur-To-do eine Woche danach an. Kalender-Sync in beide "
+            "Richtungen (eigener ICS-Feed zum Abonnieren + externer Kalender "
+            "read-only)."
         ),
         path="/kalender",
         stage="stable",
@@ -177,8 +179,9 @@ REGISTRY: List[ModuleDef] = [
         description=(
             "Notizen und Aufgaben an einem Ort — zwei Reiter: freie Notizzettel "
             "(Titel + Text, sortierbar) und eine To-do-Liste. Datierte Aufgaben "
-            "erscheinen zusätzlich im Kalender. Nicht an Schüler gebunden (das "
-            "sind die Beobachtungen)."
+            "erscheinen zusätzlich im Kalender; ein Klassenarbeitstermin legt "
+            "hier von selbst ein Korrektur-To-do an. Nicht an Schüler gebunden "
+            "(das sind die Beobachtungen)."
         ),
         path="/notizbrett",
         stage="beta",

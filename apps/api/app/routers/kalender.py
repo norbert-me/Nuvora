@@ -534,9 +534,37 @@ async def create_exam(body: ExamIn, user: User = Depends(require_module), db: As
     await db.flush()
     e.entry_id = entry.id
     await _ensure_work(db, user, e)
+    await _korrektur_todo(db, user, e)
     await db.commit()
     await db.refresh(e)
     return e
+
+
+async def _korrektur_todo(db, user, e: ExamDate, verschieben: bool = False) -> None:
+    """Zum Arbeitstermin ein To-do „korrigieren" eine Woche danach.
+
+    Bruecke zum Notizbrett (Regel 3: nur mit aktivem Modul, nie Voraussetzung).
+    Der Termin steht im Kalender, die Korrektur aber nirgends — und genau die
+    Zettel, die Nuvora ersetzen soll, sind meistens solche Erinnerungen.
+    Angelegt wird genau EINES je Termin: der Text traegt die Termin-ID, ein
+    zweiter Aufruf findet ihn wieder.
+    """
+    from datetime import timedelta
+    from .modules import is_active
+    from ..models import Todo
+
+    if not await is_active(db, user.id, "notizbrett") or not e.date:
+        return
+    marke = f"#ka{e.id}"
+    schon = (await db.execute(select(Todo).where(
+        Todo.owner_id == user.id, Todo.text.like(f"%{marke}%")))).scalars().first()
+    if schon:
+        if verschieben and not schon.done:
+            schon.due_date = (e.date + timedelta(days=7)).date()
+        return
+    titel = (e.title or "").strip() or "Klassenarbeit"
+    db.add(Todo(owner_id=user.id, text=f"{titel} korrigieren {marke}",
+                due_date=(e.date + timedelta(days=7)).date()))
 
 
 @router.put("/klassenarbeiten/{exam_id}", response_model=ExamOut)
@@ -562,6 +590,9 @@ async def update_exam(exam_id: int, body: ExamIn, user: User = Depends(require_m
         e.entry_id = entry.id
     # Auswertung anlegen (falls Modul inzwischen aktiv) bzw. Namen mitziehen.
     await _ensure_work(db, user, e)
+    # Verschobener Termin verschiebt die Korrektur mit — ein Zettel mit altem
+    # Datum ist schlimmer als keiner. Fehlt er (Modul war aus), entsteht er hier.
+    await _korrektur_todo(db, user, e, verschieben=True)
     await db.commit()
     await db.refresh(e)
     return e
@@ -583,6 +614,13 @@ async def delete_exam(exam_id: int, user: User = Depends(require_module), db: As
         w = await db.get(WorkAnalysis, e.work_id)
         if w and w.owner_id == user.id and not (w.tasks or w.results):
             await db.delete(w)
+    # Das automatisch angelegte Korrektur-To-do geht mit — aber nur, solange es
+    # offen ist. Ein abgehaktes ist Verlauf und wird nicht nachtraeglich getilgt.
+    from ..models import Todo
+    for t in (await db.execute(select(Todo).where(
+            Todo.owner_id == user.id, Todo.done.is_(False),
+            Todo.text.like(f"%#ka{e.id}%")))).scalars().all():
+        await db.delete(t)
     await db.delete(e)
     await db.commit()
 

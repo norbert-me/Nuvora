@@ -4,8 +4,10 @@
 // getestet; hier wird nur angezeigt, was sie geliefert hat — samt der Zahlen,
 // aus denen sie entstanden ist. Eine Ampel ohne Begründung wäre ein Orakel.
 import { useEffect, useState } from "react";
-import { COLORS as C, badge } from "./Icons.jsx";
+import { COLORS as C, badge, btnSecondary } from "./Icons.jsx";
 import { useEmpfindlich } from "../core/fruehwarnung.js";
+import { useAktiv } from "../core/modules.js";
+import { askPrompt, showAlert } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 /**
@@ -66,9 +68,25 @@ function StatusChip({ status, t }) {
 }
 
 /** Ein Kind: Kurve, Begründung, Etiketten, Themen. */
-export function FruehwarnKarte({ schueler, t, offen = false }) {
+export function FruehwarnKarte({ schueler, t, offen = false, studentId = null }) {
   const [auf, setAuf] = useState(offen);
+  const [notiert, setNotiert] = useState(false);
+  const aktiv = useAktiv();
   const s = schueler;
+
+  // Aus der Meldung direkt eine Beobachtung: sonst bleibt der Hinweis folgenlos,
+  // weil das Notieren in ein anderes Modul fuehrt. Der Satz der Auswertung steht
+  // als Vorschlag drin — er nennt die Zahlen, um die es geht.
+  const notieren = async () => {
+    const text = await askPrompt(t("fw.noteAsk", { name: s.name }), { initial: s.begruendung || "" });
+    if (!text) return;
+    const r = await fetch("/api/notizen", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ student_id: studentId, text, category: t("fw.noteCategory") }),
+    }).catch(() => null);
+    if (r && r.ok) setNotiert(true);
+    else showAlert(t("common.notWork"));
+  };
   return (
     <div style={{ border: "1px solid var(--border2)", borderRadius: 10, padding: "10px 12px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", cursor: "pointer" }}
@@ -92,6 +110,14 @@ export function FruehwarnKarte({ schueler, t, offen = false }) {
             <ul style={{ margin: "0 0 10px", paddingLeft: 18, fontSize: 12.5, color: "var(--text2)", lineHeight: 1.6 }}>
               {s.etiketten.map((e, i) => <li key={i}>{e.text}</li>)}
             </ul>
+          )}
+          {/* Nur mit dem Modul Beobachtungen und nur, wenn die Zuordnung
+              eindeutig ist (Schueler-ID bekannt). */}
+          {aktiv("notizen") && studentId != null && (
+            <button onClick={notieren} disabled={notiert}
+              style={{ ...btnSecondary, padding: "4px 12px", fontSize: 12.5, marginBottom: 10, opacity: notiert ? 0.6 : 1 }}>
+              {notiert ? t("fw.noteDone") : t("fw.noteAdd")}
+            </button>
           )}
           {s.themen?.length > 0 && (
             <>
@@ -191,7 +217,10 @@ export default function FruehwarnPanel({ classId, nurKind = null, titel = true }
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {zeigen.map((s) => <FruehwarnKarte key={s.card_id} schueler={s} t={t} offen={nurKind != null} />)}
+          {zeigen.map((s) => (
+            <FruehwarnKarte key={s.card_id} schueler={s} t={t} offen={nurKind != null}
+              studentId={s.student_id ?? null} />
+          ))}
         </div>
       )}
       {daten.regel?.abstand && (

@@ -16,6 +16,10 @@ export default function Elternlog() {
   const { t } = useLanguage();
   const aktiv = useAktiv();
   const notenAktiv = aktiv("auswertung");
+  // „Ihr Kind hat 14-mal gefehlt" ist der haeufigere Gespraechsanlass als eine
+  // Note — der Chip dazu fehlte. Bruecke zu Orga, nur mit aktivem Modul.
+  const orgaAktiv = aktiv("orga");
+  const [fehl, setFehl] = useState({});
   const [grades, setGrades] = useState({}); // student_id -> [{kursId, name, wert}] (nur bei aktivem Noten-Modul)
   const [kurse, setKurse] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -67,8 +71,18 @@ export default function Elternlog() {
   };
   // Kurse einmal holen: sie entscheiden, unter welchem Fach eine Note liegt.
   useEffect(() => { if (notenAktiv) swr("kurse", "/api/kurse", (d) => setKurse(Array.isArray(d) ? d : [])); }, [notenAktiv]);
+  useEffect(() => {
+    if (!classId || !orgaAktiv) { setFehl({}); return; }
+    fetch(`/api/anwesenheit/${classId}/summary`).then((r) => (r.ok ? r.json() : {}))
+      .then((d) => setFehl(d && typeof d === "object" ? d : {})).catch(() => setFehl({}));
+  }, [classId, orgaAktiv]);
   useEffect(() => { setSel(null); loadCounts(); loadGrades(); /* eslint-disable-next-line */ }, [classId, notenAktiv, kurse]);
   const noten = (sid) => grades[String(sid)] || [];
+  const fehltage = (sid) => {
+    const z = fehl[String(sid)];
+    if (!z) return 0;
+    return (Number(z.fehlt) || 0) + (Number(z.entsch) || 0);
+  };
   const noteStr = (v) => String(v).replace(".", ",");
 
   const loadList = (sid) => fetch(`${API}?student_id=${sid}`).then((r) => (r.ok ? r.json() : [])).then((d) => setList(Array.isArray(d) ? d : [])).catch(() => {});
@@ -104,6 +118,15 @@ export default function Elternlog() {
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
             <button onClick={() => setSel(null)} style={{ ...btnSecondary, padding: "6px 12px" }}>← {t("common.back")}</button>
             <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{sel.name}</h2>
+            {/* Fehlzeiten neben den Noten: derselbe Chip, andere Quelle. Er
+                fuehrt in die Anwesenheit, wo die Tage im Einzelnen stehen. */}
+            {orgaAktiv && fehltage(sel.id) > 0 && (
+              <Link to={`/orga?tab=anwesenheit&class=${classId}`} title={t("elternlog.toAttendance")}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, padding: "4px 12px", borderRadius: 980, background: "rgba(138,97,0,0.12)", color: C.warning, textDecoration: "none" }}>
+                {t("elternlog.absences", { n: fehltage(sel.id) })}
+                <Icon d={ICONS.open} size={12} color={C.warning} />
+              </Link>
+            )}
             {notenAktiv && noten(sel.id).map((n) => (
               <Link
                 key={n.kursId ?? "ohne"}

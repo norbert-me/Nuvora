@@ -188,7 +188,11 @@ export default function Klassenarbeit() {
     const cid = subsetKurs ? repClass.current : classId;
     const kid = subsetKurs || kursId;
     if (!cid) return;
-    const res = await fetch(`${API}/works`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ class_id: cid, kurs_id: kid, name: t("klassenarbeit.newName") }) }).catch(() => null);
+    const res = await fetch(`${API}/works`, { method: "POST", headers: { "Content-Type": "application/json" }, // Datum mitgeben: der Server markiert daraus die Kinder, die heute fehlen,
+      // gleich als abwesend (nur mit Modul Orga). Vergisst man das von Hand,
+      // rutschen Nullen in die Wertung.
+      body: JSON.stringify({ class_id: cid, kurs_id: kid, name: t("klassenarbeit.newName"),
+                             datum: new Date().toISOString() }) }).catch(() => null);
     if (res && res.ok) { const w = await res.json(); setWorks((p) => [w, ...p]); setWork(w); }
   };
   const [kopieOffen, setKopieOffen] = useState(false);
