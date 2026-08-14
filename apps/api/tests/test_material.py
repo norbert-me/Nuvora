@@ -30,6 +30,13 @@ async def s():
     await e.dispose()
 
 
+class _Anfrage:
+    """Minimal-Attrappe fuer `Request`: die Endpunkte lesen nur `if-none-match`."""
+
+    def __init__(self, etag=None):
+        self.headers = {"if-none-match": etag} if etag else {}
+
+
 def _upload(name, content):
     return UploadFile(filename=name, file=io.BytesIO(content))
 
@@ -68,12 +75,12 @@ async def test_fremdes_material_unsichtbar(s):
     assert await M.list_material(topic_id=tp.id, user=v, db=s) == []
     # Download/Delete durch Fremden -> 404
     with pytest.raises(HTTPException) as ei:
-        await M.download_material(mid, user=v, db=s)
+        await M.download_material(mid, _Anfrage(), user=v, db=s)
     assert ei.value.status_code == 404
     with pytest.raises(HTTPException):
         await M.delete_material(mid, user=v, db=s)
     # Eigentuemer kann herunterladen
-    resp = await M.download_material(mid, user=u, db=s)
+    resp = await M.download_material(mid, _Anfrage(), user=u, db=s)
     assert resp.body == b"data"
 
 
@@ -93,3 +100,30 @@ async def test_material_am_einstieg(s):
     await s.execute(sql_delete(Method).where(Method.id == m.id)); await s.commit()
     mid = (await s.execute(select(Material.method_id).where(Material.id == out.id))).scalar_one()
     assert mid is None
+
+
+@pytest.mark.asyncio
+async def test_zweiter_abruf_spart_die_bytes(s):
+    """Dieselbe Datei zweimal oeffnen darf nur einmal Daten kosten.
+
+    In einem Schulnetz sind 5 MB je Klick spuerbar. Der Server schickt eine
+    Kennung (ETag) mit; bringt der Browser sie zurueck, gibt es 304 und keinen
+    Inhalt.
+    """
+    u, tp = await _setup(s)
+    await M.upload_material(file=_upload("blatt.pdf", b"%PDF-1.4 " + b"x" * 500),
+                            topic_id=tp.id, entry_id=None, method_id=None, work_id=None, rolle="", user=u, db=s)
+    mid = (await s.execute(select(Material.id))).scalar_one()
+
+    erst = await M.download_material(mid, _Anfrage(), user=u, db=s)
+    etag = erst.headers.get("etag")
+    assert etag, "ohne Kennung kann der Browser nichts wiedererkennen"
+    assert erst.headers.get("cache-control", "").startswith("private"), "fremde Zwischenspeicher duerfen die Datei nicht halten"
+
+    zweit = await M.download_material(mid, _Anfrage(etag), user=u, db=s)
+    assert zweit.status_code == 304
+    assert not zweit.body, "bei 304 darf kein Inhalt mitgehen"
+
+    # Andere Kennung (Datei geaendert) -> wieder der volle Inhalt.
+    dritt = await M.download_material(mid, _Anfrage('"d999-1"'), user=u, db=s)
+    assert dritt.status_code == 200 and dritt.body

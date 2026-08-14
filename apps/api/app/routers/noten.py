@@ -12,7 +12,7 @@ zaehlen die Spalten gleich. Beobachtungen zaehlen NIE — 'Anstrengungsbereitsch
 ist kein Messwert.
 """
 import re
-from datetime import datetime
+from datetime import datetime, date as _date
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -134,8 +134,15 @@ class CategoryOut(BaseModel):
     source_session_id: Optional[int] = None
     source_kind: Optional[str] = None  # "cardvote" | "karten" | "codedetektiv" | ""
     topic_id: Optional[int] = None
+    # Tag der Leistung — Eigenschaft, kein Namensbestandteil (siehe models.py).
+    date: Optional[str] = None
     created_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def datum_als_text(cls, v):
+        return v.isoformat() if hasattr(v, "isoformat") else v
 
 
 class SectionOut(BaseModel):
@@ -302,6 +309,7 @@ class CategoryIn(BaseModel):
     section_id: int
     position: int = 0
     topic_id: Optional[int] = None   # Thema der Spalte (z.B. was die Klassenarbeit abdeckt)
+    date: Optional[str] = None       # "YYYY-MM-DD" — Tag der Leistung, optional
 
     @field_validator("name")
     @classmethod
@@ -310,6 +318,21 @@ class CategoryIn(BaseModel):
         if not v:
             raise ValueError("Name darf nicht leer sein")
         return v
+
+
+def _parse_date(v: Optional[str]):
+    """„YYYY-MM-DD" oder nichts. Unlesbares wird abgewiesen, nicht stillschweigend
+    verworfen — sonst steht die Spalte am Ende ohne Termin da und niemand weiss,
+    warum."""
+    if not v:
+        return None
+    if isinstance(v, _date):
+        return v
+    v = str(v).strip()[:10]
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
+        raise HTTPException(400, "Ungültiges Datum (YYYY-MM-DD)")
+    y, m, d = v.split("-")
+    return _date(int(y), int(m), int(d))
 
 
 async def _check_topic(db: AsyncSession, user_id: int, topic_id: Optional[int]) -> Optional[int]:
@@ -326,7 +349,8 @@ async def create_category(body: CategoryIn, user: User = Depends(require_module)
     rate_limit("noten_cat", f"u{user.id}", 200, 60, "Zu viele Spalten in kurzer Zeit. Bitte kurz warten.")
     sec = await _owned_section(db, user, body.section_id)
     tid = await _check_topic(db, user.id, body.topic_id)
-    cat = GradeCategory(name=body.name, position=body.position, section_id=sec.id, class_id=sec.class_id, owner_id=user.id, topic_id=tid)
+    cat = GradeCategory(name=body.name, position=body.position, section_id=sec.id, class_id=sec.class_id,
+                        owner_id=user.id, topic_id=tid, date=_parse_date(body.date))
     db.add(cat)
     await db.commit()
     await db.refresh(cat)
@@ -342,6 +366,7 @@ async def update_category(category_id: int, body: CategoryIn, user: User = Depen
     cat.section_id = sec.id
     cat.class_id = sec.class_id
     cat.topic_id = await _check_topic(db, user.id, body.topic_id)
+    cat.date = _parse_date(body.date)
     await db.commit()
     await db.refresh(cat)
     return cat

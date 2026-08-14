@@ -674,6 +674,17 @@ def teste_kern(api, b, u):
             kopf = api.letzte_kopfe.get("content-disposition", "")
             if "inline" not in kopf:
                 raise AssertionError(f"PDF kommt nicht zum Ansehen zurueck: {kopf}")
+            # Zweiter Aufruf darf nichts mehr kosten: der Server schickt eine
+            # Kennung (ETag) mit, der Browser bringt sie zurueck, es folgt 304
+            # ohne Inhalt. In Schulnetzen ist das der Unterschied zwischen
+            # „sofort da" und „laedt fuenf Sekunden".
+            etag = api.letzte_kopfe.get("etag", "")
+            if not etag:
+                raise AssertionError("Ansicht ohne ETag — jedes Oeffnen laedt die Datei neu")
+            status2, text2 = api.call("GET", f"/api/material/{mid}/pdf", roh=True,
+                                      kopfe={"If-None-Match": etag})
+            if status2 != 304 or text2:
+                raise AssertionError(f"zweiter Abruf liefert HTTP {status2} mit {len(text2)} Zeichen statt 304 ohne Inhalt")
         finally:
             api.call("DELETE", f"/api/material/{mid}", erwartet=(204, 404))
         return "hochladen, wiederfinden, als PDF ansehen, loeschen"
@@ -777,7 +788,13 @@ def probe_auswertung(api, u):
                      {"name": f"{PRAEFIX} Block", "weight": 100}, erwartet=(201,))
     spalte = api.call("POST", "/api/noten/categories",
                       {"name": f"{PRAEFIX} Spalte", "section_id": block["id"],
-                       "topic_id": u.topic_id}, erwartet=(201,))
+                       "topic_id": u.topic_id, "date": "2026-03-02"}, erwartet=(201,))
+    # Das Datum ist eine Eigenschaft der Spalte, kein Namensbestandteil: es muss
+    # haften und getrennt vom Titel zurueckkommen (frueher stand es IM Titel).
+    if spalte.get("date") != "2026-03-02":
+        raise AssertionError(f"Datum der Spalte nicht gespeichert: {spalte}")
+    if "2026" in (spalte.get("name") or ""):
+        raise AssertionError(f"Datum ist in den Titel gerutscht: {spalte['name']}")
     eintrag = api.call("POST", "/api/noten/entries", {
         "category_id": spalte["id"], "student_id": u.students[0], "kind": "grade", "value": 2.0,
     }, erwartet=(201,))

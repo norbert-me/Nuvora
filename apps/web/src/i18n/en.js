@@ -1875,4 +1875,5 @@ export default {
   "noten.verlaufRunningSection": "Each point is this section's average after that grade.",
   "noten.verlaufSingleToggle": "Individual grades",
   "noten.colDefault": "Column {{n}}",
+  "noten.colDate": "Date of the assessment",
 };

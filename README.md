@@ -407,6 +407,13 @@ Bilder direkt, Word/Excel/PowerPoint wandelt der Server beim ersten Ansehen
 einmalig nach PDF (LibreOffice) und behält das Ergebnis. Die Datei verlässt den
 Server dabei nicht.
 
+Große PDFs bekommen für die Ansicht eine leichtere Fassung (Ghostscript, rund
+150 dpi) — der Download liefert immer das Original. Jede Antwort trägt eine
+Kennung (ETag, `Cache-Control: private`): wer dieselbe Arbeit ein zweites Mal
+öffnet, bekommt „304, hast du schon" und lädt kein Byte erneut. Das ist der
+Unterschied zwischen „sofort da" und „lädt fünf Sekunden", wenn eine ganze
+Klasse am selben Schulanschluss hängt.
+
 ### Etwas finden
 
 Oben rechts sitzt eine Lupe, überall erreichbar mit **⌘K / Strg+K**, auf der

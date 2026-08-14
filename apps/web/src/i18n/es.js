@@ -1876,4 +1876,5 @@ export default {
   "noten.verlaufRunningSection": "Cada punto es la media de esta sección tras esa nota.",
   "noten.verlaufSingleToggle": "Notas individuales",
   "noten.colDefault": "Columna {{n}}",
+  "noten.colDate": "Fecha de la evaluación",
 };

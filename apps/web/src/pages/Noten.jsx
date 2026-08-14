@@ -16,7 +16,6 @@ import { Icon, ICONS, iconBtn, toolbarIconBtn, chipStyle, COLORS as C, btnPrimar
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useAktiv } from "../core/modules.js";
-import { mitDatum } from "../core/grades.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { useUrlClass } from "../core/klassenwahl.js";
 
@@ -583,9 +582,9 @@ export default function Noten() {
         return (
           <Modal title={t("noten.addColumn")} onClose={() => setNeuSpalteIn(null)}>
             <ColForm t={t} onCancel={() => setNeuSpalteIn(null)} vorschlag={t("noten.colDefault", { n: pos + 1 })}
-              onSave={async (name) => { if (await callCreate(
-                () => fetch(`${API}/categories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: neuSpalteIn, position: pos }) }),
-                (id) => setSections((prev) => prev.map((s) => s.id === neuSpalteIn ? { ...s, categories: [...(s.categories || []), { id, name, section_id: neuSpalteIn, position: pos }] } : s)),
+              onSave={async (name, datum) => { if (await callCreate(
+                () => fetch(`${API}/categories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: neuSpalteIn, position: pos, date: datum }) }),
+                (id) => setSections((prev) => prev.map((s) => s.id === neuSpalteIn ? { ...s, categories: [...(s.categories || []), { id, name, section_id: neuSpalteIn, position: pos, date: datum }] } : s)),
               )) setNeuSpalteIn(null); }} />
           </Modal>
         );
@@ -714,7 +713,7 @@ export default function Noten() {
                         ) : null}
                         {renameCol === c.id && (
                           <ColMenu t={t} cat={c} classId={classId} topics={topics} kartenAktiv={kartenAktiv} onNachhol={runNachhol} onCompare={setCompareCat} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
-                            onRename={async (name, topicId) => { if (await call(() => fetch(`${API}/categories/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: c.position ?? i, topic_id: topicId }) }))) setRenameCol(null); }}
+                            onRename={async (name, topicId, datum) => { if (await call(() => fetch(`${API}/categories/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: c.position ?? i, topic_id: topicId, date: datum }) }))) setRenameCol(null); }}
                             onDelete={() => {
                               setRenameCol(null);
                               // Spalte sofort raus, 5 s Undo; erst dann Server-Delete.
@@ -1072,16 +1071,17 @@ function SectionMenu({ t, sec, onEdit, onDelete, onAddCol, onOpen }) {
 function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onToggleDivider, classId, topics = [], onNachhol, onCompare, kartenAktiv }) {
   const [name, setName] = useState(cat.name);
   const [topicId, setTopicId] = useState(cat.topic_id ?? "");
-  const datum = cat.created_at ? new Date(cat.created_at).toLocaleDateString("de-DE") : "—";
+  const [datum, setDatum] = useState(cat.date || "");
+  const angelegt = cat.created_at ? new Date(cat.created_at).toLocaleDateString("de-DE") : "—";
   // Siehe core/topics.js: Beschriftung und Reihenfolge kommen von dort, damit
   // dieselbe Auswahl ueberall gleich heisst und gleich sortiert ist.
   const themen = themenIndex(topics);
-  const save = () => name.trim() && onRename(name.trim(), topicId === "" ? null : Number(topicId));
+  const save = () => name.trim() && onRename(name.trim(), topicId === "" ? null : Number(topicId), datum || null);
   return (
     <>
       <span onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 9 }} />
       <Popover align="center" onClick={(e) => e.stopPropagation()} style={{ zIndex: 10, top: 26, minWidth: 210, padding: 12, textAlign: "left", fontWeight: 400 }}>
-        <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 8 }}>{t("noten.colCreated")}: {datum}</div>
+        <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 8 }}>{t("noten.colCreated")}: {angelegt}</div>
         {/* Auswertung: schlichter Details-Knopf, öffnet das zentrale Modal. */}
         <button onClick={() => { onStats(); onClose(); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 10, padding: "7px 9px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer" }}>
           <Icon d={ICONS.chart} size={14} color="var(--accent)" />{t("noten.colDetails")}
@@ -1093,7 +1093,10 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
           <input value={name} onChange={(e) => setName(e.target.value)} autoFocus
             onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") onClose(); }}
             style={{ ...inp, fontSize: 12, padding: 5 }} />
-          <DatePick onPick={(datum) => setName((alt) => mitDatum(alt, datum))} title={t("noten.useDate")} />
+        </div>
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 4 }}>{t("noten.colDate")}</div>
+          <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} style={{ ...inp, fontSize: 12, padding: 5 }} />
         </div>
         {topics.length > 0 && (
           <div style={{ marginBottom: 10 }}>
@@ -1144,29 +1147,24 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
 // Datumswahl ueber ein natives <input type=date>, transparent ueber dem
 // Kalender-Icon: auf dem iPhone erscheinen so die Datumsraeder. Setzt den
 // Spaltennamen auf TT.MM.JJJJ, der Name bleibt aber frei editierbar.
-function DatePick({ onPick, title, size = 14 }) {
-  return (
-    <span className="icon-btn" style={{ ...iconBtn, padding: 6, position: "relative", overflow: "hidden" }} title={title}>
-      <Icon d={ICONS.calendar} size={size} />
-      <input type="date" aria-label={title}
-        onChange={(e) => { if (e.target.value) { const [y, m, d] = e.target.value.split("-"); onPick(`${d}.${m}.${y}`); } }}
-        style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer", width: "100%", height: "100%" }} />
-    </span>
-  );
-}
 
-function ColForm({ t, onSave, onCancel, initial = "", vorschlag = "" }) {
+function ColForm({ t, onSave, onCancel, initial = "", vorschlag = "", initialDatum = "" }) {
   const [name, setName] = useState(initial);
+  // Das Datum ist eine EIGENSCHAFT der Spalte, kein Namensbestandteil: „KA
+  // 02.03.2026" als Zeichenkette kann niemand sortieren oder auswerten. Der
+  // Kopf zeigt weiter nur den Titel.
+  const [datum, setDatum] = useState(initialDatum);
   // Leer abschicken ist erlaubt: dann heisst die Spalte „Spalte 3" (der
   // Vorschlag zaehlt die vorhandenen mit). Vorher passierte auf OK gar nichts
   // — ein Knopf, der stumm bleibt, sieht aus wie ein Fehler.
-  const nimm = () => onSave(name.trim() || vorschlag || t("noten.colName"));
+  const nimm = () => onSave(name.trim() || vorschlag || t("noten.colName"), datum || null);
   return (
-    <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
+    <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center", flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
       <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder={vorschlag || t("noten.colName")}
         onKeyDown={(e) => { if (e.key === "Enter") nimm(); if (e.key === "Escape") onCancel(); }}
         style={{ ...inp, fontSize: 14, padding: "9px 11px", flex: 1, minWidth: 120 }} />
-      <DatePick onPick={(datum) => setName((alt) => mitDatum(alt, datum))} title={t("noten.useDate")} size={20} />
+      <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} title={t("noten.colDate")} aria-label={t("noten.colDate")}
+        style={{ ...inp, fontSize: 13, padding: "8px 10px" }} />
       <button onClick={nimm} style={{ ...btnPrimary }}>OK</button>
       <button onClick={onCancel} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.abort")} aria-label={t("common.abort")}><Icon d={ICONS.close} size={20} /></button>
     </div>
@@ -1277,7 +1275,11 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, o
   // gewichtete Gesamtnote aus allen bis dahin vorhandenen Noten. Kategorien in
   // Zeitreihenfolge (created_at, sonst Reihenfolge Abschnitt/Kategorie).
   const cats = sections.flatMap((s, si) => (s.categories || []).map((c, ci) => ({ ...c, secId: s.id, ord: si * 1000 + ci })));
-  cats.sort((a, b) => (a.created_at && b.created_at ? String(a.created_at).localeCompare(String(b.created_at)) : a.ord - b.ord));
+  // Zeitachse: das Datum der Leistung schlaegt das Anlagedatum — eine
+  // nachgetragene Arbeit vom Maerz gehoert in den Verlauf an ihren Platz, nicht
+  // ans Ende, nur weil die Spalte gestern entstand.
+  const wann = (c) => c.date || (c.created_at ? String(c.created_at).slice(0, 10) : "");
+  cats.sort((a, b) => (wann(a) && wann(b) ? wann(a).localeCompare(wann(b)) : a.ord - b.ord));
   const gradeOf = (cid) => {
     const es = entries.filter((e) => e.student_id === student.id && e.category_id === cid && e.kind === "grade" && e.value != null);
     return es.length ? es[es.length - 1].value : null;

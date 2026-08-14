@@ -149,12 +149,27 @@ const MARKE_UI = `${MARKE}-UI`;
 let kontext = null;
 let token = null;
 
-/** API-Aufruf mit dem Token der Lehrkraft. */
-const api = (pfad, methode = "get", data) =>
-  kontext.request[methode](pfad, {
-    headers: { Authorization: `Bearer ${token}`, ...(data ? { "Content-Type": "application/json" } : {}) },
-    ...(data !== undefined ? { data } : {}),
-  });
+/**
+ * API-Aufruf mit dem Token der Lehrkraft — mit Geduld bei 429.
+ *
+ * Die Testfamilien laufen direkt hintereinander gegen DASSELBE Konto, und der
+ * Server begrenzt das Anlegen (rate_limit in den Routern). Der Selbsttest legt
+ * seine Klassen an, danach kam dieser Test und bekam „HTTP 429" — und meldete
+ * 45 Pruefungen als nicht gelaufen. Das ist ein Befund ueber die Taktung der
+ * Tests, nicht ueber die Seite. Also dreimal versuchen, mit wachsender Pause.
+ */
+const api = async (pfad, methode = "get", data) => {
+  let r;
+  for (const warte of [0, 6000, 15000]) {
+    if (warte) await new Promise((f) => setTimeout(f, warte));
+    r = await kontext.request[methode](pfad, {
+      headers: { Authorization: `Bearer ${token}`, ...(data ? { "Content-Type": "application/json" } : {}) },
+      ...(data !== undefined ? { data } : {}),
+    });
+    if (r.status() !== 429) return r;
+  }
+  return r;
+};
 const apiJson = async (pfad, methode = "get", data) => {
   const r = await api(pfad, methode, data);
   if (!r.ok()) return null;

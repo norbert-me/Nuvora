@@ -1861,4 +1861,5 @@ export default {
   "noten.verlaufRunningSection": "Jeder Punkt ist der Schnitt dieses Bereichs nach der jeweiligen Note.",
   "noten.verlaufSingleToggle": "Einzelne Noten",
   "noten.colDefault": "Spalte {{n}}",
+  "noten.colDate": "Datum der Leistung",
 };

@@ -624,6 +624,10 @@ function Nav({ user, onLogout }) {
           .nav-links-desktop { display: none !important; }
           .nav-burger { display: flex !important; }
           .nav-profile-name { display: none !important; }
+          /* Auf dem Handy nur die Lupe: mit Beschriftung schob der Suchknopf
+             den Profil-Eintrag aus dem Bild (der Rundgang meldete 14 px
+             waagerechtes Scrollen). */
+          .nav-suche-text { display: none !important; }
           .nav-page-title { display: block !important; }
           .page-title { display: none !important; }
         }
@@ -631,6 +635,7 @@ function Nav({ user, onLogout }) {
           .nav-links-desktop { display: flex !important; }
           .nav-burger { display: none !important; }
           .nav-profile-name { display: inline !important; }
+          .nav-suche-text { display: inline !important; }
           .nav-page-title { display: none !important; }
           .nav-mobile-menu { display: none !important; }
         }

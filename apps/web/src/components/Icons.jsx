@@ -437,8 +437,17 @@ export function Boxplot({ values, max = 100, label, unit = "", compact = false }
   const fmt = (n) => (n % 1 === 0 ? String(n) : n.toFixed(1)).replace(".", ",");
   // Kompakt (Listenzeile im Vergleich): nur die Grafik, keine Beschriftungen.
   if (compact) {
+    const mittel = sorted.reduce((a, b) => a + b, 0) / sorted.length;
     return (
       <div style={{ position: "relative", height: 26, flex: 1, minWidth: 160 }}>
+        {/* Gitter bei 0/25/50/75/100: ohne Bezugspunkte liest das Auge zwei
+            Zeilen als „dramatisch verschieden", obwohl die Mittelwerte zwei
+            Prozentpunkte auseinanderliegen. Die Skala ist fuer alle Zeilen
+            dieselbe (0..max) — das Gitter macht sie sichtbar. */}
+        {[0, 25, 50, 75, 100].map((g) => (
+          <div key={g} style={{ position: "absolute", top: 3, left: `${g}%`, width: 1, height: 20,
+            background: g === 50 ? "var(--border2)" : "var(--border)" }} />
+        ))}
         <div style={{ position: "absolute", top: 12, left: `${pct(lo)}%`, width: `${pct(hi - lo)}%`, height: 3, background: "var(--border3)" }} />
         <div style={{ position: "absolute", top: 7, left: `${pct(lo)}%`, width: 2, height: 12, background: "var(--text3)" }} />
         <div style={{ position: "absolute", top: 7, left: `${pct(hi)}%`, width: 2, height: 12, background: "var(--text3)" }} />
@@ -447,6 +456,12 @@ export function Boxplot({ values, max = 100, label, unit = "", compact = false }
         {outliers.map((v, i) => (
           <div key={i} style={{ position: "absolute", top: 9, left: `${pct(v)}%`, width: 8, height: 8, borderRadius: 4, background: COLORS.danger, transform: "translateX(-4px)" }} />
         ))}
+        {/* Der Mittelwert als Punkt: die Tabelle nennt ihn in der Spalte
+            daneben, in der Grafik war er vorher gar nicht zu sehen — der
+            Kasten zeigt die mittlere Haelfte, nicht den Schnitt. */}
+        <div title={`⌀ ${fmt(Math.round(mittel * 10) / 10)}${unit}`}
+          style={{ position: "absolute", top: 9, left: `${pct(mittel)}%`, width: 8, height: 8, borderRadius: 4,
+            background: "var(--card)", border: "2px solid var(--accent)", transform: "translateX(-4px)" }} />
       </div>
     );
   }

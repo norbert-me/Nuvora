@@ -292,8 +292,17 @@ async function lauf(motor) {
     token = t;
     notiere("Anmeldung", "Login", true, `als ${user.email}`);
 
-    const api = (pfad, methode = "get", data) =>
-      kontext.request[methode](pfad, { headers: { Authorization: `Bearer ${token}` }, ...(data ? { data } : {}) });
+    // Mit Geduld bei 429: die Testfamilien laufen hintereinander gegen dasselbe
+    // Konto und teilen sich dessen Rate-Limit (siehe systemtest-browser.mjs).
+    const api = async (pfad, methode = "get", data) => {
+      let r;
+      for (const warte of [0, 6000, 15000]) {
+        if (warte) await new Promise((f) => setTimeout(f, warte));
+        r = await kontext.request[methode](pfad, { headers: { Authorization: `Bearer ${token}` }, ...(data ? { data } : {}) });
+        if (r.status() !== 429) return r;
+      }
+      return r;
+    };
 
     await anmeldungHinterlegen(kontext, token, user);
 
@@ -521,11 +530,17 @@ async function sucheProbe(kontext) {
   try {
     await seite.goto("/", { waitUntil: "networkidle", timeout: 30000 });
     await tourWegklicken(seite);
-    await seite.keyboard.press("Meta+k").catch(() => {});
-    let feld = seite.locator("input[placeholder*='suchen'], input[placeholder*='Suchen']").first();
-    if (!(await feld.count())) {
-      await seite.keyboard.press("Control+k");
-      feld = seite.locator("input[placeholder*='suchen'], input[placeholder*='Suchen']").first();
+    // Drei Wege, einer muss gehen: Tastenkuerzel (je nach System Meta oder
+    // Strg) und der Knopf in der Navigation. Frueher pruefte der Test direkt
+    // nach dem Tastendruck, ob das Feld schon da ist — ein Rennen, das er
+    // regelmaessig verlor.
+    const feld = seite.locator("input[placeholder*='suchen'], input[placeholder*='Suchen']").first();
+    const offen = async () => (await feld.count()) > 0 && await feld.isVisible().catch(() => false);
+    for (const versuch of ["Meta+k", "Control+k", "knopf"]) {
+      if (await offen()) break;
+      if (versuch === "knopf") await seite.getByRole("button", { name: /suchen|search|buscar/i }).first().click({ timeout: 8000 });
+      else await seite.keyboard.press(versuch).catch(() => {});
+      await seite.waitForTimeout(600);
     }
     await feld.waitFor({ state: "visible", timeout: 8000 });
     await feld.fill("ausleihe");

@@ -7,7 +7,7 @@ faellt mit dem Konto weg (owner_id CASCADE).
 """
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -130,11 +130,32 @@ async def upload_material(file: UploadFile = File(...), topic_id: Optional[int] 
     return m
 
 
+# Dieselbe Datei wird oft mehrmals geoeffnet — beim Korrigieren geht man
+# zwischen Arbeit und Erwartungshorizont hin und her. Ohne Kennung laedt der
+# Browser jedes Mal alles neu; in einem Schulnetz sind das bei einer 5-MB-Arbeit
+# spuerbare Sekunden. Mit ETag antwortet der Server beim zweiten Mal „304, du
+# hast es schon" und schickt kein Byte Inhalt.
+#
+# `private`: die Datei gehoert einer Lehrkraft, kein geteilter Zwischenspeicher
+# darf sie halten. Die Kennung enthaelt die Laenge — aendert sich die Datei,
+# aendert sich die Kennung.
+def _cache_kopf(etag: str) -> dict:
+    return {"ETag": etag, "Cache-Control": "private, max-age=300"}
+
+
+def _unveraendert(request, etag: str) -> bool:
+    roh = request.headers.get("if-none-match", "")
+    return any(teil.strip().lstrip("W/") == etag for teil in roh.split(",") if teil.strip())
+
+
 @router.get("/{material_id}/download")
-async def download_material(material_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def download_material(material_id: int, request: Request, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     m = await db.get(Material, material_id)
     if not m or m.owner_id != user.id:
         raise HTTPException(404, "Material nicht gefunden")
+    etag = f'"d{m.id}-{m.size}"'
+    if _unveraendert(request, etag):
+        return Response(status_code=304, headers=_cache_kopf(etag))
     safe = m.filename.replace("\r", " ").replace("\n", " ").replace('"', "'")
     # Inline nur fuer sichere, nicht-skriptfaehige Typen (PDF, Rasterbilder).
     # Alles andere — besonders HTML/SVG — als Download, damit hochgeladener Code
@@ -143,7 +164,7 @@ async def download_material(material_id: int, user: User = Depends(get_current_u
     disp = "inline" if (m.mime in inline_ok) else "attachment"
     return Response(content=m.data, media_type=m.mime or "application/octet-stream",
                     headers={"Content-Disposition": f'{disp}; filename="{safe}"',
-                             "X-Content-Type-Options": "nosniff"})
+                             "X-Content-Type-Options": "nosniff", **_cache_kopf(etag)})
 
 
 # Office-Dateien, die der Browser nicht anzeigen kann — sie werden auf Wunsch
@@ -251,7 +272,7 @@ def _nach_pdf(daten: bytes, dateiname: str) -> bytes:
 
 
 @router.get("/{material_id}/pdf")
-async def material_als_pdf(material_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def material_als_pdf(material_id: int, request: Request, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Die Datei als PDF — zum Ansehen im Browser, ohne Download.
 
     PDFs kommen unveraendert zurueck. Office-Dateien werden beim ERSTEN Aufruf
@@ -259,6 +280,21 @@ async def material_als_pdf(material_id: int, user: User = Depends(get_current_us
     """
     from starlette.concurrency import run_in_threadpool
     from sqlalchemy.orm import undefer
+    from sqlalchemy import func as _func
+
+    # Erst nur die Kenndaten holen: liegt die Ansichtsfassung schon bereit und
+    # hat der Browser sie, ist hier Schluss — ohne die Bytes ueberhaupt aus der
+    # Datenbank zu lesen.
+    kopf = (await db.execute(select(Material.owner_id, Material.size,
+                                    _func.length(Material.pdf_data))
+                             .where(Material.id == material_id))).first()
+    if not kopf or kopf[0] != user.id:
+        raise HTTPException(404, "Material nicht gefunden")
+    fertig = kopf[2] or 0
+    if fertig:
+        etag = f'"p{material_id}-{fertig}"'
+        if _unveraendert(request, etag):
+            return Response(status_code=304, headers=_cache_kopf(etag))
 
     m = (await db.execute(select(Material).options(undefer(Material.pdf_data))
                           .where(Material.id == material_id))).scalar_one_or_none()
@@ -291,7 +327,8 @@ async def material_als_pdf(material_id: int, user: User = Depends(get_current_us
     safe = (m.filename or "datei").rsplit(".", 1)[0].replace('"', "'")[:180]
     return Response(content=pdf, media_type="application/pdf",
                     headers={"Content-Disposition": f'inline; filename="{safe}.pdf"',
-                             "X-Content-Type-Options": "nosniff"})
+                             "X-Content-Type-Options": "nosniff",
+                             **_cache_kopf(f'"p{material_id}-{len(pdf)}"')})
 
 
 @router.delete("/{material_id}", status_code=204)
