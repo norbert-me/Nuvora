@@ -22,8 +22,6 @@ export default function Topics() {
   const [showRootForm, setShowRootForm] = useState(false);
   const [addingUnder, setAddingUnder] = useState(null);
   const [childName, setChildName] = useState("");
-  const [editing, setEditing] = useState(null);
-  const [editName, setEditName] = useState("");
   const [popup, setPopup] = useState(null); // Thema/Unterthema im Detail-Popup
   const [expanded, setExpanded] = useState(() => new Set());
   const [dragId, setDragId] = useState(null);
@@ -88,15 +86,10 @@ export default function Topics() {
       body: JSON.stringify({ name, parent_id }),
     }));
 
-  const rename = (t, name) =>
-    call(() => fetch(`${API}/topics/${t.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      // Alle Felder mitschicken: PUT setzt, was nicht dasteht, auf leer — ein
-      // Umbenennen haette sonst Notiz, Ziele und Voraussetzungen geloescht.
-      body: JSON.stringify({ name, parent_id: t.parent_id, notes: t.notes || "", ziel_g: t.ziel_g || "", ziel_e: t.ziel_e || "", voraussetzungen: t.voraussetzungen || "" }),
-    }));
-
+  // Umbenennen laeuft ueber saveTopic (Detail-Popup) — eine Funktion, ein Weg.
+  // Wichtig dabei: alle Felder mitschicken, PUT setzt fehlende auf leer. Genau
+  // daran ist die frueher getrennte rename()-Fassung fast gescheitert (Notiz,
+  // Ziele und Voraussetzungen weg nach einem Umbenennen).
   // Titel + Notiz speichern (aus dem Detail-Popup). Leerer Titel behält den alten.
   const saveTopic = (tp, name, notes, zielG, zielE, voraussetzungen) =>
     call(() => fetch(`${API}/topics/${tp.id}`, {
@@ -143,7 +136,7 @@ export default function Topics() {
     return (
     <div
       key={tp.id}
-      draggable={isRoot && editing !== tp.id}
+      draggable={isRoot}
       onDragStart={isRoot ? () => setDragId(tp.id) : undefined}
       onDragOver={isRoot ? (e) => dragOverRoot(e, tp.id) : undefined}
       onDragEnd={isRoot ? () => { setDragId(null); setDragOver(null); } : undefined}
@@ -170,19 +163,7 @@ export default function Topics() {
           </span>
         </button>
       ) : null}
-      {editing === tp.id ? (
-        <form
-          onSubmit={async (e) => { e.preventDefault(); if (await rename(tp, editName.trim())) setEditing(null); }}
-          style={{ display: "flex", gap: 8, flex: 1 }}
-        >
-          <input
-            value={editName} onChange={(e) => setEditName(e.target.value)} autoFocus
-            style={{ flex: 1, padding: 7, border: "1px solid var(--border2)", borderRadius: 8, background: "var(--bg)", color: "var(--text)" }}
-          />
-          <button type="submit" style={btnPrimary}>{t("common.save")}</button>
-          <button type="button" onClick={() => setEditing(null)} style={btnSecondary}>{t("common.abort")}</button>
-        </form>
-      ) : (
+      {(
         <>
           {/* Klick auf den Namen öffnet das Detail-Popup (Notiz + Inhalte). Das
               Auf-/Zuklappen der Unterthemen bleibt am Pfeil-Button links. */}
@@ -201,12 +182,11 @@ export default function Topics() {
               <Icon d={ICONS.plus} size={16} color="var(--accent)" />
             </button>
           )}
-          {/* Unterthemen: kein Umbenennen-Icon in der Zeile — läuft übers Detail-Popup. */}
-          {isRoot && (
-            <button onClick={() => { setEditing(tp.id); setEditName(tp.name); }} className="icon-btn" style={iconBtn} title={t("common.rename")} aria-label={t("common.rename")}>
-              <Icon d={ICONS.edit} />
-            </button>
-          )}
+          {/* Kein Umbenennen-Icon in der Zeile — weder bei Themen noch bei
+              Unterthemen. Der Klick auf den Namen oeffnet das Detail-Popup, und
+              dort sitzt das Umbenennen zusammen mit Notiz, Zielen und
+              Voraussetzungen. Zwei Wege zu derselben Sache haben die Zeile nur
+              vollgestellt, und der eine konnte weniger als der andere. */}
           <button onClick={() => remove(tp)} className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}>
             <Icon d={ICONS.trash} color={C.danger} />
           </button>
