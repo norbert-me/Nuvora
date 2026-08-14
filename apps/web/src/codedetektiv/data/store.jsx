@@ -211,13 +211,56 @@ export function StoreProvider({ children }) {
   };
 
   // Laufende Session pollen, damit alle Geräte denselben Stand sehen.
+  //
+  // Dieser Takt ist der teuerste Netzweg der ganzen Installation: 30 Geräte
+  // einer Klasse fragen gleichzeitig, und die Antwort enthält die kompletten
+  // Rätsel. Drei Dinge halten ihn klein, ohne das Spiel träger zu machen:
+  //
+  //  1. Nur wenn das Gerät wirklich zuschaut. Ein Handy mit dunklem Bildschirm
+  //     oder ein Tab im Hintergrund fragte vorher weiter — bei einer Klasse, die
+  //     in der Pause nicht schließt, stundenlang für nichts.
+  //  2. Der Takt richtet sich nach dem Zustand. Schnell nur, wenn gespielt wird
+  //     (da zählt jede Sekunde), gemächlich im Wartezimmer und nach dem Ende.
+  //  3. Der Server schickt einen ETag (siehe ETagMiddleware): hat sich nichts
+  //     geändert, kommt 304 ohne Rumpf zurück. `r.ok` ist dann false, wir lassen
+  //     den Stand einfach stehen — genau richtig, er ist ja unverändert.
   useEffect(() => {
     const code = state.currentSession;
     if (!code) return;
     let alive = true;
-    const tick = () => fetch(`${S_API}/${code}`).then(r => (r.ok ? r.json() : null)).then(srv => { if (alive && srv) rawDispatch({ type: 'SYNC_SESSION', session: mapSession(srv), puzzles: srv.puzzles || [] }); }).catch(() => {});
-    const iv = setInterval(tick, 1800); tick();
-    return () => { alive = false; clearInterval(iv); };
+    let timer = null;
+    // Zustand aus der letzten Antwort, nicht aus `state`: der Effekt hängt nur an
+    // `currentSession`, sein `state` wäre also der vom Start und der Takt bliebe
+    // für immer der erste.
+    let stand = null;
+
+    const takt = () => {
+      if (stand?.ended) return 10000;
+      if (stand?.started) return 1800;
+      return 3000; // Wartezimmer: Beitritte dürfen ein paar Sekunden brauchen
+    };
+
+    const plan = () => { if (alive) timer = setTimeout(tick, takt()); };
+
+    const tick = () => {
+      if (document.hidden) { plan(); return; }
+      fetch(`${S_API}/${code}`)
+        .then(r => (r.ok ? r.json() : null))
+        .then(srv => {
+          if (!alive || !srv) return;
+          stand = { started: srv.started, ended: srv.ended };
+          rawDispatch({ type: 'SYNC_SESSION', session: mapSession(srv), puzzles: srv.puzzles || [] });
+        })
+        .catch(() => {})
+        .finally(plan);
+    };
+
+    // Beim Zurückkehren an das Gerät sofort nachsehen, statt auf den Takt zu warten.
+    const onVis = () => { if (!document.hidden && alive) { clearTimeout(timer); tick(); } };
+    document.addEventListener('visibilitychange', onVis);
+
+    tick();
+    return () => { alive = false; clearTimeout(timer); document.removeEventListener('visibilitychange', onVis); };
   }, [state.currentSession]);
 
   // Beim Start: Rätsel vom Server laden. Lokale (noch nicht übertragene) Rätsel

@@ -114,7 +114,11 @@ class AbuseGuardMiddleware(BaseHTTPMiddleware):
 import hashlib as _hashlib
 from starlette.responses import Response as _Response
 
-_ETAG_PREFIXES = ("/api/classes", "/api/topics", "/api/modules")
+# /api/codedetektiv/sessions ist der teuerste Pfad im Haus: eine Klasse mit 30
+# Geraeten fragt den Stand alle 1,8 s ab, und die Antwort enthaelt die kompletten
+# Raetsel. Solange niemand beigetreten ist und niemand abgegeben hat, ist sie
+# Wort fuer Wort dieselbe — als 304 kostet sie dann nur noch die Kopfzeilen.
+_ETAG_PREFIXES = ("/api/classes", "/api/topics", "/api/modules", "/api/codedetektiv/sessions")
 
 
 class ETagMiddleware(BaseHTTPMiddleware):
@@ -131,9 +135,17 @@ class ETagMiddleware(BaseHTTPMiddleware):
         etag = '"' + _hashlib.md5(body).hexdigest() + '"'
         headers = dict(response.headers)
         headers["etag"] = etag
+        # "no-cache" heisst NICHT "nicht zwischenspeichern", sondern "vor dem
+        # Benutzen nachfragen". Genau das brauchen wir: ohne Cache-Control
+        # schaetzt der Browser selbst, wie lange die Antwort frisch ist — er
+        # kann sie also ungefragt aus dem eigenen Speicher servieren (veralteter
+        # Klassenstand) ODER sie ganz ohne If-None-Match neu holen, womit die
+        # 304-Ersparnis ausfaellt. Mit no-cache validiert er jedes Mal, und
+        # unveraenderte Daten kosten nur noch die Kopfzeilen.
+        headers["cache-control"] = "no-cache, private"
         headers.pop("content-length", None)
         if request.headers.get("if-none-match") == etag:
-            return _Response(status_code=304, headers={"etag": etag})
+            return _Response(status_code=304, headers={"etag": etag, "cache-control": "no-cache, private"})
         return _Response(content=body, status_code=200, headers=headers, media_type=response.media_type)
 
 
@@ -985,17 +997,35 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
         ws.disconnect(session_id, websocket)
 
 
+# Letztes gutes Ergebnis der Datenbankprobe mit Zeitstempel.
+# /api/health ist der am haeufigsten gerufene Endpunkt der ganzen Installation:
+# jeder offene Tab fragt ihn regelmaessig, dazu der Container-Healthcheck. Jede
+# Anfrage holte eine Verbindung aus dem Pool und schickte ein SELECT 1 — bei
+# einem Kollegium mit vielen offenen Tabs dauerhaft Grundlast, die nichts sagt,
+# was sie zwei Sekunden vorher nicht schon gesagt hat.
+_HEALTH_TTL = 3.0
+_health_ok_bis = 0.0
+
+
 @app.get("/api/health")
 async def health():
     # Prüft auch die Datenbank — sonst wäre "ok", obwohl keine Daten gespeichert werden können
+    global _health_ok_bis
     from sqlalchemy import text
     from fastapi.responses import JSONResponse
     from .database import async_session
+    # Nur das GUTE Ergebnis wird kurz gemerkt. Ein Fehler nie: faellt die
+    # Datenbank aus, soll der naechste Aufruf das sofort sehen, nicht erst nach
+    # Ablauf einer Frist.
+    if _time.time() < _health_ok_bis:
+        return {"status": "ok"}
     try:
         async with async_session() as db:
             await db.execute(text("SELECT 1"))
+        _health_ok_bis = _time.time() + _HEALTH_TTL
         return {"status": "ok"}
     except Exception:
+        _health_ok_bis = 0.0
         return JSONResponse(status_code=503, content={"status": "db_down"})
 
 

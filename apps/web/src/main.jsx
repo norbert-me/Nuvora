@@ -448,7 +448,21 @@ function ConnectionMonitor() {
   useEffect(() => {
     const ref = { alive: true };
     check(ref);
-    const iv = setInterval(() => check(ref), 5000);
+    // 30 s statt 5 s, und im verborgenen Tab gar nicht.
+    //
+    // Solange alles laeuft, sagt diese Abfrage jedes Mal dasselbe — sie ist nur
+    // dafuer da, einen Ausfall zu bemerken. Bei 5 s waren das rund 17.000
+    // Anfragen je offenem Tab und Tag; ein Kollegium mit einem Dutzend offenen
+    // Tabs erzeugte damit dauerhaft Grundlast auf Server und Netz, rund um die
+    // Uhr, auch nachts im vergessenen Browserfenster. Einen echten Ausfall
+    // meldet ohnehin der erste fehlgeschlagene API-Aufruf sofort (Interceptor
+    // oben) — und sobald wir offline sind, prueft der zweite Effekt unten weiter
+    // alle 4 s, damit die Rueckkehr schnell auffaellt.
+    const iv = setInterval(() => { if (!document.hidden) check(ref); }, 30000);
+    // Beim Zurueckkehren in den Tab einmal sofort nachsehen, statt bis zum
+    // naechsten Takt einen veralteten Zustand zu zeigen.
+    const onVis = () => { if (!document.hidden) check(ref); };
+    document.addEventListener("visibilitychange", onVis);
     const goOff = () => { setReason("server"); setOnline(false); };
     const goOn = () => setOnline(true);
     const onBrowserOffline = () => { setReason("server"); setOnline(false); };
@@ -460,6 +474,7 @@ function ConnectionMonitor() {
     return () => {
       ref.alive = false;
       clearInterval(iv);
+      document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("cardvote:offline", goOff);
       window.removeEventListener("cardvote:online", goOn);
       window.removeEventListener("offline", onBrowserOffline);
