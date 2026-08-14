@@ -297,9 +297,10 @@ export const panelStyle = {
 export const th = {
   padding: "8px 6px", fontSize: 12, fontWeight: 600, color: "var(--text2)",
   borderBottom: "1px solid var(--border)", textAlign: "center", whiteSpace: "nowrap",
-  // Unter der Navigationsleiste (52 px, plus Offline-Banner, wenn er steht):
-  // bei top: 0 verschwaende der Kopf hinter ihr.
-  position: "sticky", top: "calc(52px + var(--offline-banner-h, 0px))",
+  // Wohin er klebt, entscheidet die Seite: --tabellenkopf-top steht per
+  // Voreinstellung auf der Hoehe der Navigationsleiste (Seiten-Scroll) und wird
+  // von Tabellen, die in einem eigenen Rahmen scrollen, auf 0 gesetzt.
+  position: "sticky", top: "var(--tabellenkopf-top, 0px)",
   zIndex: 2, background: "var(--card)",
 };
 export const td = { padding: "4px 6px", borderBottom: "1px solid var(--border)", textAlign: "center", color: "var(--text)" };

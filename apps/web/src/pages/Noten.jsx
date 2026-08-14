@@ -104,6 +104,23 @@ export default function Noten() {
     return n;
   });
   const [menuSec, setMenuSec] = useState(null);   // Abschnitt mit offenem Menue
+  // Zweite Kopfzeile: klebt um die Hoehe der ersten tiefer (siehe --kopf2).
+  const th2 = { ...th, top: "var(--kopf2, 0px)" };
+  // Der Kopf hat ZWEI Zeilen (Abschnitte, dann Spalten). Beide kleben; die
+  // zweite braucht die Hoehe der ersten als Abstand, sonst liegen sie
+  // uebereinander. Gemessen statt geraten: die erste Zeile ist je nach Inhalt
+  // unterschiedlich hoch.
+  const rahmenRef = useRef(null);
+  const kopf1Ref = useRef(null);
+  useLayoutEffect(() => {
+    const zeile = kopf1Ref.current, rahmen = rahmenRef.current;
+    if (!zeile || !rahmen) return undefined;
+    const mess = () => rahmen.style.setProperty("--kopf2", `${Math.round(zeile.getBoundingClientRect().height)}px`);
+    mess();
+    const beob = new ResizeObserver(mess);
+    beob.observe(zeile);
+    return () => beob.disconnect();
+  });
   const [dragId, setDragId] = useState(null);
   // Vorschau beim Ziehen: auf welchem Abschnitt, und links oder rechts einfuegen.
   const [dragOver, setDragOver] = useState(null); // { id, side: "left"|"right" }
@@ -590,11 +607,22 @@ export default function Noten() {
         // verwirrt mehr als sie hilft).
         <div style={{ marginBottom: 14 }}><Empty title={t("noten.noSections")} hint={t("noten.noSectionsHint")} /></div>
       ) : (
-        <div style={{ overflowX: "auto", overflowY: "visible", border: "1px solid var(--border)", borderRadius: 12, WebkitOverflowScrolling: "touch" }}>
-          <table style={{ borderCollapse: "collapse", fontSize: 13.5, minWidth: "100%" }}>
+        // Eigener Scrollrahmen statt Seiten-Scroll: nur so kann der Kopf
+        // wirklich stehen bleiben (ein Vorfahre mit overflow ist der Bezug fuer
+        // `position: sticky`, und dieser Rahmen scrollt ohnehin waagerecht).
+        // --tabellenkopf-top: 0 heisst „kleb am Rahmen, nicht unter der Navbar";
+        // --kopf2 ist die gemessene Hoehe der ersten Kopfzeile, damit die zweite
+        // darunter einrastet statt darauf.
+        <div ref={rahmenRef} style={{ overflow: "auto", maxHeight: "calc(100vh - 210px)", border: "1px solid var(--border)", borderRadius: 12, WebkitOverflowScrolling: "touch",
+          "--tabellenkopf-top": "0px" }}>
+          {/* borderCollapse: separate — mit „collapse" gehoeren die Rahmen der
+              Tabelle, nicht den Zellen, und ein `position: sticky` an einer
+              Kopfzelle bleibt in Chrome wirkungslos: der Kopf scrollte trotz
+              aller Angaben weg. */}
+          <table style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: 13.5, minWidth: "100%" }}>
             <thead>
-              <tr>
-                <th style={{ ...th, ...stickyL, whiteSpace: "nowrap", textAlign: "left", fontWeight: 400, fontSize: 12.5, color: gewichtSumme === 100 ? "var(--text3)" : C.warning }}>
+              <tr ref={kopf1Ref}>
+                <th style={{ ...th, ...stickyLh, whiteSpace: "nowrap", textAlign: "left", fontWeight: 400, fontSize: 12.5, color: gewichtSumme === 100 ? "var(--text3)" : C.warning }}>
                   {gewichtSumme !== 100 ? t("noten.weightNot100", { n: gewichtSumme }) : t("noten.weightSum", { n: gewichtSumme })}
                 </th>
                 {sections.map((sec) => {
@@ -632,18 +660,18 @@ export default function Noten() {
                 <th rowSpan={2} style={{ ...th, minWidth: 40 }} title={t("noten.obsTitle")}>{t("noten.obs")}</th>
               </tr>
               <tr>
-                <th style={{ ...th, ...stickyL, textAlign: "left" }}>{cls?.name}</th>
+                <th style={{ ...th2, ...stickyLh, textAlign: "left" }}>{cls?.name}</th>
                 {sections.map((sec) => {
                   const cols = sec.categories || [];
                   const bereich = (
-                    <th key={`sn-${sec.id}`} style={{ ...th, borderLeft: collapsed.has(sec.id) ? "2px solid var(--border3)" : undefined, borderRight: "2px solid var(--border3)", fontWeight: 500, minWidth: 56 }} title={t("noten.sectionGradeHint")}>
+                    <th key={`sn-${sec.id}`} style={{ ...th2, borderLeft: collapsed.has(sec.id) ? "2px solid var(--border3)" : undefined, borderRight: "2px solid var(--border3)", fontWeight: 500, minWidth: 56 }} title={t("noten.sectionGradeHint")}>
                       {t("noten.sectionGrade")}
                     </th>
                   );
                   if (collapsed.has(sec.id)) return [bereich];
                   if (cols.length === 0) {
                     return [
-                      <th key={`empty-${sec.id}`} style={{ ...th, borderLeft: "2px solid var(--border3)", fontWeight: 400 }}>
+                      <th key={`empty-${sec.id}`} style={{ ...th2, borderLeft: "2px solid var(--border3)", fontWeight: 400 }}>
                         {/* Spalte anlegen laeuft ueber das Kebab-Menue des
                             Abschnitts; ein zweiter +Spalte-Knopf war doppelt. */}
                         <span style={{ color: "var(--text3)", fontSize: 12 }}>{t("noten.noColumns")}</span>
@@ -661,7 +689,7 @@ export default function Noten() {
                       onDragOver={(e) => dragOverCol(e, c.id, sec.id)}
                       onDrop={() => spalteDrop(c.id, sec)}
                       onDragEnd={() => { setDragCol(null); setDragColOver(null); }}
-                      style={{ ...th, padding: 0, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", minWidth: 70, fontWeight: 500,
+                      style={{ ...th2, padding: 0, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", minWidth: 70, fontWeight: 500,
                         cursor: "grab", opacity: dragCol && dragCol.catId === c.id ? 0.4 : 1,
                         borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined,
                         boxShadow: colOver === "left" ? "inset 3px 0 0 var(--accent)" : colOver === "right" ? "inset -3px 0 0 var(--accent)" : undefined }}>
@@ -1405,13 +1433,13 @@ function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo }
       <table style={{ borderCollapse: "collapse", fontSize: 13.5, minWidth: "100%" }}>
         <thead>
           <tr>
-            <th style={{ ...th, ...stickyL, whiteSpace: "nowrap" }}></th>
+            <th style={{ ...th, ...stickyLh, whiteSpace: "nowrap" }}></th>
             <th colSpan={sec1.length + 1} style={grp}>{t("noten.term1")}</th>
             <th colSpan={sec2.length + 1} style={grp}>{t("noten.term2")}</th>
             <th rowSpan={2} style={{ ...grp, fontWeight: 700 }}>{t("noten.yearGrade")}</th>
           </tr>
           <tr>
-            <th style={{ ...th, ...stickyL, textAlign: "left" }}>{cls?.name}</th>
+            <th style={{ ...th, ...stickyLh, textAlign: "left" }}>{cls?.name}</th>
             {secCols(sec1)}
             <th style={{ ...th, borderLeft: "1px solid var(--border)", fontWeight: 700 }}>{t("noten.termGrade")}</th>
             {secCols(sec2)}
@@ -1470,6 +1498,10 @@ const td = tdBasis;
 // Links klebende Spalte. Der Kopf klebt oben (th in Icons.jsx, z-index 2) —
 // eine Zelle, die BEIDES tut, muss darueber liegen, sonst rutscht der Name
 // beim Scrollen unter die Kopfzeile.
-const stickyL = { position: "sticky", left: 0, background: "var(--card)", zIndex: 3 };
+// Links klebende Zellen. Der Kopf klebt oben (th in Icons.jsx) — eine Zelle,
+// die BEIDES tut, muss ueber den Datenzellen UND ueber den uebrigen Kopfzellen
+// liegen, sonst schiebt sich beim Scrollen eine Zeile darueber.
+const stickyL = { position: "sticky", left: 0, background: "var(--card)", zIndex: 1 };
+const stickyLh = { position: "sticky", left: 0, background: "var(--card)", zIndex: 4 };
 const dtS = { color: "var(--text3)", fontWeight: 500 };
 const ddS = { margin: 0, color: "var(--text)" };

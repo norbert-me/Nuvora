@@ -1073,6 +1073,8 @@ async function lauf(motor) {
         // sondern an einem Willkommensfenster. Wegklicken allein reicht nicht:
         // die naechste Seite bringt die naechste Tour.
         localStorage.setItem("nuvora_kerntour_done", "1");
+        // Dasselbe fuer das Willkommensfenster (eigener Merker je Konto).
+        try { localStorage.setItem(`nuvora_onboarded_${JSON.parse(usr).id}`, "1"); } catch { /* egal */ }
         for (const id of ["kalender", "noten", "karten"]) localStorage.setItem(`nuvora_tour_${id}_done`, "1");
       } catch { /* Dokument ohne eigene Herkunft — hier gibt es nichts zu setzen */ }
     }, [token, JSON.stringify(user)]);

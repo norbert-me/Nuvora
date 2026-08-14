@@ -35,6 +35,11 @@
         --card: #fff; --nav-bg: rgba(255,255,255,0.72); --nav-border: rgba(0,0,0,0.08);
         --accent: #0066cc; --accent-bg: #e8f0fe; --input-bg: #fff;
         --hover: rgba(0,0,0,0.05);
+        /* Wo klebt ein Tabellenkopf? Standard: unter der Navigationsleiste
+           (52 px, plus Offline-Balken). Eine Tabelle, die IN einem eigenen
+           Rahmen scrollt, setzt die Variable bei sich auf 0 — dort ist der
+           Rahmen der Bezug, nicht das Fenster. */
+        --tabellenkopf-top: calc(52px + var(--offline-banner-h, 0px));
         --success-bg: #d4edda; --warn-bg: #fff3cd; --danger-bg: #fde2d9;
         color-scheme: light;
       }
