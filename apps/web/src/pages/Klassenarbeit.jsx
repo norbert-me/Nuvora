@@ -2,7 +2,7 @@
 // Punkte-Raster (Zeilen = SuS, Spalten = Aufgaben, Zelle = erreichte Punkte).
 // Daraus LIVE je SuS ein Fehlerprofil nach Thema, eine Note (Punkte/Max → Skala)
 // und gezielte Wiederholung (Karten des schwachen Themas wieder fällig).
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import { useSearchParams } from "react-router-dom";
 import { btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, Modal, Boxplot, StatCard, Tabs, pageApp} from "../components/Icons.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
@@ -197,7 +197,7 @@ export default function Klassenarbeit() {
       .map(([s, m]) => (m === "abwesend" ? [s, m] : [s, Object.fromEntries(Object.entries(m || {}).filter(([k]) => !removeIds.has(String(k))))]))
       .filter(([, m]) => m === "abwesend" || Object.keys(m).length));
 
-  const addTask = () => persist({ ...work, tasks: [...(work.tasks || []), { id: newId(), label: "", topic_id: null, max: 1, parts: [] }] });
+  const addTask = () => persist({ ...work, tasks: [...(work.tasks || []), { id: newId(), label: "", topic_id: null, max: 1, form: false, parts: [] }] });
   const setTask = (id, patch) => persist({ ...work, tasks: work.tasks.map((x) => (x.id === id ? { ...x, ...patch } : x)) });
   const delTask = (id) => {
     const tk = (work.tasks || []).find((x) => x.id === id);
@@ -452,6 +452,15 @@ export default function Klassenarbeit() {
                       <input type="number" min="0.5" step="0.5" value={task.max ?? 1} onChange={(e) => setTask(task.id, { max: Math.max(0.5, Number(e.target.value) || 0.5) })} style={{ ...inputStyle, fontSize: 13, padding: "6px 6px", width: 56, textAlign: "center" }} />
                     </label>
                   )}
+                  {/* Darstellungsleistung: zaehlt zur Note, aber nicht zur
+                      inhaltlichen Auswertung. Sie misst keine Kompetenz in einem
+                      Thema — im Aufgabenvergleich stuende sie sonst neben
+                      Sachaufgaben und wuerde mit ihnen verglichen. */}
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: task.form ? "var(--accent)" : "var(--text3)", cursor: "pointer", whiteSpace: "nowrap" }}
+                    title={t("klassenarbeit.formHint")}>
+                    <input type="checkbox" checked={!!task.form} onChange={(e) => setTask(task.id, { form: e.target.checked })} />
+                    {t("klassenarbeit.form")}
+                  </label>
                   <button onClick={() => addPart(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }}
                     title={t("klassenarbeit.addPartHint")} aria-label={t("klassenarbeit.addPart")}>
                     <Icon d={ICONS.plus} size={15} color="var(--accent)" />
@@ -885,17 +894,38 @@ export function KlassenarbeitVergleich() {
   // eigene IDs, es ist aber dieselbe Aufgabe an derselben Stelle.
   const aufgaben = useMemo(() => {
     if (!klassen.length) return [];
+    const gesamt = daten?.gesamt || [];
     const laenge = Math.max(...klassen.map((a) => a.einheiten.length));
     return Array.from({ length: laenge }, (_, i) => {
+      const erste = klassen.find((a) => a.einheiten[i])?.einheiten[i];
       const werte = klassen.map((a) => a.einheiten[i]?.pct ?? null);
       const da = werte.filter((v) => v != null);
-      const erste = klassen.find((a) => a.einheiten[i])?.einheiten[i];
       return {
-        i, label: erste ? einheitLabel(erste, i) : String(i + 1), max: erste?.max,
+        i, erste, g: gesamt[i] || null,
+        label: erste ? einheitLabel(erste, i) : String(i + 1),
+        max: erste?.max, form: !!erste?.form,
         werte, spanne: da.length > 1 ? Math.max(...da) - Math.min(...da) : null,
+        // Je Klasse die Kennzahlen, fuer die aufgeklappte Zeile.
+        detail: klassen.map((a) => a.einheiten[i] || null),
       };
     });
   }, [daten]);
+
+  // Darstellung („Form") zaehlt zur Note, aber nicht zum Aufgabenvergleich:
+  // sie misst keine Kompetenz in einem Thema. Sichtbar bleibt sie als Fussnote,
+  // damit niemand sie fuer vergessen haelt.
+  const inhaltlich = aufgaben.filter((r) => !r.form);
+  const formAufgaben = aufgaben.filter((r) => r.form);
+  const [offen, setOffen] = useState(null);        // aufgeklappte Aufgabenzeile
+
+  // Woran man eine misslungene Aufgabe erkennt — bewusst nur zwei Regeln, beide
+  // mit dem Wert daneben, damit die Lehrkraft sie nachpruefen kann.
+  const auffaellig = (g) => {
+    if (!g) return null;
+    if (g.trenn != null && g.trenn < 0.1) return t("klassenarbeit.flagTrenn", { v: String(g.trenn).replace(".", ",") });
+    if (g.null != null && g.null >= 40 && (g.pct ?? 100) < 60) return t("klassenarbeit.flagNull", { v: g.null });
+    return null;
+  };
 
   const kopf = { fontSize: 11, color: "var(--text3)", fontWeight: 600, padding: "8px 10px", textAlign: "right", whiteSpace: "nowrap" };
   const zelle = { fontSize: 13, padding: "8px 10px", textAlign: "right", whiteSpace: "nowrap", borderTop: "1px solid var(--border)" };
@@ -960,40 +990,98 @@ export function KlassenarbeitVergleich() {
         )
       )}
 
-      {/* 2) Je Aufgabe über die Klassen — die Sicht, die CardVote je Frage hat.
-             Die Spanne rechts sagt, wo sich die Klassen am stärksten
-             unterscheiden: große Spanne = es lag an der Klasse, kleine Spanne
-             bei niedrigen Werten = es lag an der Aufgabe. */}
+      {/* 2) Je Aufgabe: Klassen nebeneinander, Gesamtzahlen daneben, Details
+             auf Klick. Die Trefferquote allein sagt nur, wie schwer eine Aufgabe
+             war — ob sie MISSLUNGEN ist, zeigen Trennschärfe und der Anteil
+             leerer Abgaben. */}
       {sicht === "aufgaben" && (
-        aufgaben.length === 0 ? (
+        inhaltlich.length === 0 ? (
           <div style={{ marginTop: 24 }}><Empty title={t("klassenarbeit.compareEmpty")} /></div>
         ) : (
           <div style={{ marginTop: 16, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", overflowX: "auto" }}>
-            <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 520 }}>
+            <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 640 }}>
               <thead>
                 <tr>
                   <th style={{ ...kopf, textAlign: "left" }}>{t("klassenarbeit.cmpTask")}</th>
                   {klassen.map((a) => <th key={a.id} style={kopf} title={a.name}>{a.class_name || "?"}</th>)}
-                  <th style={kopf}>{t("klassenarbeit.cmpSpread")}</th>
+                  {klassen.length > 1 && <th style={kopf}>{t("klassenarbeit.cmpSpread")}</th>}
+                  <th style={{ ...kopf, borderLeft: "1px solid var(--border)" }}>{t("klassenarbeit.cmpAll")}</th>
+                  <th style={kopf} title={t("klassenarbeit.cmpEmptyHint")}>{t("klassenarbeit.cmpEmpty")}</th>
+                  <th style={kopf} title={t("klassenarbeit.cmpDiscrHint")}>{t("klassenarbeit.cmpDiscr")}</th>
                 </tr>
               </thead>
               <tbody>
-                {aufgaben.map((r) => (
-                  <tr key={r.i}>
-                    <td style={{ ...zelle, textAlign: "left", fontWeight: 600 }}>
-                      {r.label}{r.max ? <span style={{ color: "var(--text3)", fontWeight: 400 }}> /{String(r.max).replace(".", ",")}</span> : null}
-                    </td>
-                    {r.werte.map((v, k) => (
-                      <td key={k} style={{ ...zelle, fontWeight: 600, color: v == null ? "var(--text3)" : v < 50 ? C.danger : v < 75 ? C.warning : C.success }}>
-                        {v == null ? "–" : `${v}%`}
-                      </td>
-                    ))}
-                    <td style={{ ...zelle, color: "var(--text3)" }}>{r.spanne == null ? "–" : `${r.spanne} Pp`}</td>
-                  </tr>
-                ))}
+                {inhaltlich.map((r) => {
+                  const g = r.g;
+                  const hinweis = auffaellig(g);
+                  const auf = offen === r.i;
+                  return (
+                    <Fragment key={r.i}>
+                      <tr onClick={() => setOffen(auf ? null : r.i)} style={{ cursor: "pointer" }}>
+                        <td style={{ ...zelle, textAlign: "left", fontWeight: 600 }}>
+                          {r.label}
+                          {r.max ? <span style={{ color: "var(--text3)", fontWeight: 400 }}> /{String(r.max).replace(".", ",")}</span> : null}
+                          {hinweis && <span title={hinweis} style={{ marginLeft: 6, color: C.warning, fontWeight: 700 }}>!</span>}
+                        </td>
+                        {r.werte.map((v, k) => (
+                          <td key={k} style={{ ...zelle, fontWeight: 600, color: v == null ? "var(--text3)" : v < 50 ? C.danger : v < 75 ? C.warning : C.success }}>
+                            {v == null ? "–" : `${v}%`}
+                          </td>
+                        ))}
+                        {klassen.length > 1 && <td style={{ ...zelle, color: "var(--text3)" }}>{r.spanne == null ? "–" : `${r.spanne} Pp`}</td>}
+                        <td style={{ ...zelle, fontWeight: 700, borderLeft: "1px solid var(--border)" }}>
+                          {g?.pct == null ? "–" : `${g.pct}%`}
+                          <span style={{ fontWeight: 400, color: "var(--text3)", fontSize: 11 }}> ({g?.n ?? 0})</span>
+                        </td>
+                        <td style={{ ...zelle, color: (g?.null ?? 0) >= 40 ? C.danger : "var(--text3)" }}>{g?.null == null ? "–" : `${g.null}%`}</td>
+                        <td style={{ ...zelle, fontWeight: 600, color: g?.trenn == null ? "var(--text3)" : g.trenn < 0.1 ? C.danger : g.trenn < 0.2 ? C.warning : "var(--text2)" }}>
+                          {g?.trenn == null ? "–" : String(g.trenn).replace(".", ",")}
+                        </td>
+                      </tr>
+                      {auf && (
+                        <tr>
+                          <td colSpan={klassen.length + (klassen.length > 1 ? 4 : 3)} style={{ padding: "0 10px 12px", borderTop: "none", background: "var(--bg2)" }}>
+                            {hinweis && <div style={{ fontSize: 12.5, color: C.warning, padding: "8px 0 4px", fontWeight: 600 }}>{hinweis}</div>}
+                            <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}>
+                              <thead>
+                                <tr>
+                                  <th style={{ ...kopf, textAlign: "left", padding: "6px 8px" }}>{t("klassenarbeit.cmpClass")}</th>
+                                  <th style={{ ...kopf, padding: "6px 8px" }}>n</th>
+                                  <th style={{ ...kopf, padding: "6px 8px" }}>⌀ {t("klassenarbeit.points")}</th>
+                                  <th style={{ ...kopf, padding: "6px 8px" }}>%</th>
+                                  <th style={{ ...kopf, padding: "6px 8px" }} title={t("klassenarbeit.cmpEmptyHint")}>{t("klassenarbeit.cmpEmpty")}</th>
+                                  <th style={{ ...kopf, padding: "6px 8px" }} title={t("klassenarbeit.cmpFullHint")}>{t("klassenarbeit.cmpFull")}</th>
+                                  <th style={{ ...kopf, padding: "6px 8px" }}>SD</th>
+                                  <th style={{ ...kopf, padding: "6px 8px" }} title={t("klassenarbeit.cmpDiscrHint")}>{t("klassenarbeit.cmpDiscr")}</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {r.detail.map((d, k) => (
+                                  <tr key={k}>
+                                    <td style={{ ...zelle, textAlign: "left", padding: "6px 8px" }}>{klassen[k]?.class_name || "?"}</td>
+                                    <td style={{ ...zelle, padding: "6px 8px", color: "var(--text3)" }}>{d?.n ?? "–"}</td>
+                                    <td style={{ ...zelle, padding: "6px 8px" }}>{d?.schnitt == null ? "–" : String(d.schnitt).replace(".", ",")}</td>
+                                    <td style={{ ...zelle, padding: "6px 8px", fontWeight: 600 }}>{d?.pct == null ? "–" : `${d.pct}%`}</td>
+                                    <td style={{ ...zelle, padding: "6px 8px" }}>{d?.null == null ? "–" : `${d.null}%`}</td>
+                                    <td style={{ ...zelle, padding: "6px 8px" }}>{d?.voll == null ? "–" : `${d.voll}%`}</td>
+                                    <td style={{ ...zelle, padding: "6px 8px", color: "var(--text3)" }}>{d?.sd == null ? "–" : String(d.sd).replace(".", ",")}</td>
+                                    <td style={{ ...zelle, padding: "6px 8px" }}>{d?.trenn == null ? "–" : String(d.trenn).replace(".", ",")}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
-            <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--text3)", lineHeight: 1.5 }}>{t("klassenarbeit.cmpTasksLegend")}</div>
+            <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--text3)", lineHeight: 1.5 }}>
+              {t("klassenarbeit.cmpTasksLegend")}
+              {formAufgaben.length > 0 && ` · ${t("klassenarbeit.cmpFormOut", { n: formAufgaben.length })}`}
+            </div>
           </div>
         )
       )}

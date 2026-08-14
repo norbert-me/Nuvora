@@ -205,7 +205,13 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
             tid = t.get("topic_id")
             ct = {"id": str(t["id"])[:40], "label": str(t.get("label") or "")[:200],
                   "topic_id": tid if (isinstance(tid, int) and tid in own) else None,
-                  "max": _num(t.get("max"), 1)}   # Maximalpunkte (Halbpunkte erlaubt)
+                  "max": _num(t.get("max"), 1),   # Maximalpunkte (Halbpunkte erlaubt)
+                  # „Darstellung" (Form, Sauberkeit, saubere Rechenwege): zaehlt
+                  # zur NOTE, aber nicht zur inhaltlichen Auswertung. Sie misst
+                  # keine Kompetenz in einem Thema — im Aufgabenvergleich stuende
+                  # sie neben Sachaufgaben und wuerde mit ihnen verglichen,
+                  # obwohl beide nichts miteinander zu tun haben.
+                  "form": bool(t.get("form"))}
             # Teilaufgaben (a, b, c …) mit eigenem Maximum — optional.
             parts = t.get("parts")
             if isinstance(parts, list) and parts:
@@ -474,34 +480,91 @@ def _pct_liste(w: WorkAnalysis) -> list[float]:
     return aus
 
 
-def _je_einheit(w: WorkAnalysis) -> list[dict]:
-    """Je Wertungseinheit: Trefferquote der Klasse (wie CardVote je Frage)."""
+def _punkte_je_kind(w: WorkAnalysis) -> tuple[list[str], dict]:
+    """(gewertete Kinder, {unit_id: {sid: Punkte}}) — Grundlage aller Kennzahlen."""
     absent = {str(x) for x in (w.absent or [])}
-    gewertet = [(sid, r) for sid, r in (w.results or {}).items()
-                if r and r != "abwesend" and str(sid) not in absent]
+    kinder = [str(sid) for sid, r in (w.results or {}).items()
+              if r and r != "abwesend" and str(sid) not in absent]
+    punkte: dict = {}
+    for t in (w.tasks or []):
+        for uid, umax in _units(t):
+            je = {}
+            for sid in kinder:
+                r = (w.results or {}).get(sid) or (w.results or {}).get(int(sid) if sid.isdigit() else sid)
+                if isinstance(r, list):
+                    je[sid] = 0.0 if uid in r else float(umax)      # Altformat
+                else:
+                    v = (r or {}).get(uid)
+                    je[sid] = float(v) if isinstance(v, (int, float)) else 0.0
+            punkte[uid] = je
+    return kinder, punkte
+
+
+def _korrelation(xs: list[float], ys: list[float]) -> Optional[float]:
+    n = len(xs)
+    if n < 3:
+        return None
+    mx = sum(xs) / n
+    my = sum(ys) / n
+    sx = (sum((x - mx) ** 2 for x in xs) / (n - 1)) ** 0.5
+    sy = (sum((y - my) ** 2 for y in ys) / (n - 1)) ** 0.5
+    if sx == 0 or sy == 0:
+        return None          # alle gleich — Trennschaerfe nicht definiert
+    cov = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / (n - 1)
+    return round(cov / (sx * sy), 2)
+
+
+def _je_einheit(w: WorkAnalysis) -> list[dict]:
+    """Je Wertungseinheit die Zahlen, an denen man eine misslungene Aufgabe
+    erkennt — nicht nur die Trefferquote.
+
+    * `pct`      Schwierigkeit: wie viel Prozent der Punkte kamen an.
+    * `null`     Anteil Kinder mit 0 Punkten. Ein hoher Wert bei mittlerer Quote
+                 heisst: die Aufgabe wurde von vielen gar nicht angefasst —
+                 typisch fuer eine unklare Aufgabenstellung.
+    * `voll`     Anteil mit voller Punktzahl (Deckeneffekt).
+    * `sd`       Streuung der Punkte.
+    * `trenn`    Trennschaerfe: Korrelation der Aufgabenpunkte mit der
+                 GESAMTleistung ohne diese Aufgabe (part-whole-korrigiert).
+                 Unter etwa 0,2 misst die Aufgabe etwas anderes als der Rest der
+                 Arbeit, negativ heisst: die Guten scheitern daran. Das ist der
+                 Wert, an dem eine schlecht gestellte Aufgabe auffaellt — die
+                 blosse Trefferquote kann eine schwere Aufgabe nicht von einer
+                 missverstaendlichen unterscheiden.
+    """
+    kinder, punkte = _punkte_je_kind(w)
+    gesamt = {sid: sum(je.get(sid, 0.0) for je in punkte.values()) for sid in kinder}
+
     aus = []
     for t in (w.tasks or []):
         teile = _units_mit_thema(t)
         for i, (uid, umax, topic_id) in enumerate(teile):
-            erreicht = 0.0
-            for _, r in gewertet:
-                if isinstance(r, list):
-                    erreicht += 0 if uid in r else umax
-                else:
-                    v = r.get(uid)
-                    erreicht += float(v) if isinstance(v, (int, float)) else 0
-            moeglich = umax * len(gewertet)
+            xs = [punkte.get(uid, {}).get(sid, 0.0) for sid in kinder]
+            n = len(xs)
+            summe = sum(xs)
+            moeglich = umax * n
+            mitte = summe / n if n else 0.0
+            sd = ((sum((x - mitte) ** 2 for x in xs) / (n - 1)) ** 0.5) if n > 1 else 0.0
+            # part-whole-korrigiert: die eigene Aufgabe aus der Gesamtleistung
+            # herausrechnen, sonst korreliert jede Aufgabe mit sich selbst.
+            rest = [gesamt[sid] - punkte.get(uid, {}).get(sid, 0.0) for sid in kinder]
             teil_label = (t.get("parts") or [{}])[i].get("label") if t.get("parts") else ""
             aus.append({
                 "unit_id": uid,
                 "task_id": t.get("id"),
-                # Beschriftung wie auf dem Blatt: „1" oder „1 a".
                 "label": f"{t.get('label') or ''}".strip(),
                 "teil": (teil_label or "").strip(),
                 "topic_id": topic_id,
+                "form": bool(t.get("form")),
                 "max": umax,
-                "pct": round(erreicht / moeglich * 100) if moeglich else None,
-                "n": len(gewertet),
+                "n": n,
+                "punkte": [round(x, 2) for x in xs],
+                "schnitt": round(mitte, 2) if n else None,
+                "pct": round(summe / moeglich * 100) if moeglich else None,
+                "sd": round(sd, 2) if n > 1 else None,
+                "null": round(sum(1 for x in xs if x == 0) / n * 100) if n else None,
+                "voll": round(sum(1 for x in xs if x >= umax) / n * 100) if n else None,
+                "trenn": _korrelation(xs, rest),
             })
     return aus
 
@@ -541,4 +604,45 @@ async def vergleich(work_id: int, user: User = Depends(require_module), db: Asyn
             "schnitt": round(sum(pl) / len(pl), 1) if pl else None,
             "einheiten": _je_einheit(x),
         })
-    return {"work_id": w.id, "gruppe": wurzel, "arbeiten": arbeiten}
+    # Gesamtdaten je Aufgabe ueber ALLE Klassen der Gruppe. Erst hier wird
+    # sichtbar, ob eine Aufgabe misslungen ist: eine Klasse kann schwach sein,
+    # aber wenn dieselbe Aufgabe in jeder Klasse einbricht, lag es an ihr.
+    # Verglichen wird ueber die POSITION — Kopien haben eigene unit_ids, es ist
+    # aber dieselbe Aufgabe an derselben Stelle.
+    laenge = max((len(a["einheiten"]) for a in arbeiten), default=0)
+    gesamt = []
+    for i in range(laenge):
+        teile = [a["einheiten"][i] for a in arbeiten if i < len(a["einheiten"]) and a["einheiten"][i]["n"]]
+        if not teile:
+            gesamt.append(None)
+            continue
+        erste = teile[0]
+        alle_punkte = [x for teil in teile for x in teil["punkte"]]
+        n = len(alle_punkte)
+        umax = erste["max"] or 1
+        summe = sum(alle_punkte)
+        mitte = summe / n if n else 0
+        sd = ((sum((x - mitte) ** 2 for x in alle_punkte) / (n - 1)) ** 0.5) if n > 1 else None
+        werte = [teil["pct"] for teil in teile if teil["pct"] is not None]
+        gesamt.append({
+            "label": erste["label"], "teil": erste["teil"], "max": umax, "form": erste["form"],
+            "topic_id": erste["topic_id"],
+            "n": n,
+            "pct": round(summe / (umax * n) * 100) if n else None,
+            "sd": round(sd, 2) if sd is not None else None,
+            "null": round(sum(1 for x in alle_punkte if x == 0) / n * 100) if n else None,
+            "voll": round(sum(1 for x in alle_punkte if x >= umax) / n * 100) if n else None,
+            # Trennschaerfe wird je Klasse gerechnet (die Gesamtleistung ist nur
+            # innerhalb einer Arbeit vergleichbar) und dann gemittelt.
+            "trenn": (round(sum(teil["trenn"] for teil in teile if teil["trenn"] is not None)
+                            / len([1 for teil in teile if teil["trenn"] is not None]), 2)
+                      if any(teil["trenn"] is not None for teil in teile) else None),
+            "spanne": (max(werte) - min(werte)) if len(werte) > 1 else None,
+        })
+
+    # Die Rohpunkte muessen nicht ueber die Leitung: sie waren nur Zwischenschritt.
+    for a in arbeiten:
+        for e in a["einheiten"]:
+            e.pop("punkte", None)
+
+    return {"work_id": w.id, "gruppe": wurzel, "arbeiten": arbeiten, "gesamt": gesamt}

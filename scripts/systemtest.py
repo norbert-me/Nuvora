@@ -447,6 +447,13 @@ def inhalt_auswertung(api, u, spuren):
     einheit = (eigene.get("einheiten") or [{}])[0]
     if einheit.get("pct") != 62:
         raise AssertionError(f"Aufgabenstatistik {einheit.get('pct')} % statt 62 %")
+    # Kennzahlen, an denen eine misslungene Aufgabe auffaellt: kein Kind hat 0
+    # Punkte (1 und 4 von 4), eines hat die volle Punktzahl.
+    if einheit.get("null") != 0 or einheit.get("voll") != 50:
+        raise AssertionError(f"0-Punkte/Vollpunkte falsch: {einheit.get('null')} / {einheit.get('voll')}")
+    ges = (verg.get("gesamt") or [None])[0]
+    if not ges or ges.get("n") != 2 or ges.get("pct") != 62:
+        raise AssertionError(f"Gesamtdaten der Aufgabe falsch: {ges}")
 
     if (kopie.get("tasks") or [{}])[0].get("max") != 4:
         raise AssertionError(f"Aufgaben nicht mitkopiert: {kopie.get('tasks')}")

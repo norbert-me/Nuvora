@@ -9,7 +9,7 @@ Wiederholung (Karten/Lernpfad) zielt ins Leere.
 Geprüft wird `_profile`, weil daran mehr hängt als die Anzeige: Wiederholung,
 Notenübernahme und die Frühwarnung rechnen alle damit.
 """
-from app.routers.klassenarbeit import _profile, _units, _units_mit_thema
+from app.routers.klassenarbeit import _je_einheit, _profile, _units, _units_mit_thema
 
 
 class FakeWork:
@@ -72,3 +72,60 @@ def test_abwesende_bleiben_draussen():
     work = FakeWork([task], {"7": {"t1": 2}, "8": "abwesend", "9": {"t1": 0}}, absent=["9"])
     prof, _ = _profile(work)
     assert set(prof) == {"7"}
+
+
+# ─── Kennzahlen je Aufgabe: woran eine misslungene Aufgabe auffaellt ───
+#
+# Die Trefferquote allein kann eine SCHWERE Aufgabe nicht von einer
+# MISSVERSTAENDLICHEN unterscheiden — beide liegen niedrig. Dafuer sind die
+# anderen Werte da, und deshalb werden sie hier nachgerechnet.
+
+
+def test_kennzahlen_einer_normalen_aufgabe():
+    # Vier Kinder, zwei gleichwertige Aufgaben zu je 4 Punkten: 4, 3, 1, 0.
+    w = FakeWork(
+        [{"id": "a1", "label": "1", "topic_id": 1, "max": 4},
+         {"id": "a2", "label": "2", "topic_id": 1, "max": 4}],
+        {"1": {"a1": 4, "a2": 4}, "2": {"a1": 3, "a2": 3},
+         "3": {"a1": 1, "a2": 1}, "4": {"a1": 0, "a2": 0}},
+    )
+    e = _je_einheit(w)[0]
+    assert e["n"] == 4
+    assert e["pct"] == 50          # 8 von 16 Punkten
+    assert e["null"] == 25         # ein Kind mit 0 Punkten
+    assert e["voll"] == 25         # ein Kind mit voller Punktzahl
+    assert e["trenn"] == 1.0       # laeuft exakt mit der Gesamtleistung
+
+
+def test_aufgabe_ohne_streuung_hat_keine_trennschaerfe():
+    # Jeder bekommt denselben Punkt: die Aufgabe sagt ueber Unterschiede nichts.
+    # Wichtig, dass hier None steht und nicht 0 — „keine Aussage" ist etwas
+    # anderes als „trennt nicht".
+    w = FakeWork(
+        [{"id": "a1", "max": 4}, {"id": "a2", "max": 4}],
+        {"1": {"a1": 4, "a2": 1}, "2": {"a1": 3, "a2": 1},
+         "3": {"a1": 1, "a2": 1}, "4": {"a1": 0, "a2": 1}},
+    )
+    assert _je_einheit(w)[1]["trenn"] is None
+
+
+def test_negativ_trennende_aufgabe_wird_erkannt():
+    # Genau der Fall, den die Lehrkraft sucht: wer den Rest der Arbeit gut
+    # loest, scheitert HIER — ein Zeichen fuer Formulierung oder Erwartungshorizont.
+    w = FakeWork(
+        [{"id": "a1", "max": 4}, {"id": "a2", "max": 4}],
+        {"1": {"a1": 4, "a2": 0}, "2": {"a1": 3, "a2": 1},
+         "3": {"a1": 1, "a2": 3}, "4": {"a1": 0, "a2": 4}},
+    )
+    assert _je_einheit(w)[1]["trenn"] == -1.0
+
+
+def test_darstellung_ist_gekennzeichnet_und_bleibt_in_der_wertung():
+    # `form` markiert die Darstellungsleistung. Sie faellt aus dem VERGLEICH
+    # heraus (Oberflaeche), bleibt aber eine Wertungseinheit — die Punkte
+    # zaehlen zur Note.
+    w = FakeWork([{"id": "d", "label": "Darstellung", "max": 3, "form": True}],
+                 {"1": {"d": 3}, "2": {"d": 2}})
+    e = _je_einheit(w)[0]
+    assert e["form"] is True
+    assert e["pct"] == 83          # 5 von 6 Punkten
