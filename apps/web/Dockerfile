@@ -11,6 +11,11 @@ COPY package.json package-lock.json* ./
 RUN npm ci --include=dev
 COPY . .
 RUN npx vite build
+# Einmal beim Bauen komprimieren statt bei jedem Aufruf: nginx liefert die
+# .gz-Datei per gzip_static aus (siehe nginx.conf). -9 lohnt hier, weil es genau
+# einmal passiert; -k behaelt das Original fuer Clients ohne gzip.
+RUN find dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.json' -o -name '*.svg' \) \
+    -size +1k -exec gzip -9 -k {} +
 
 # Gleiche Fassung wie der proxy-Dienst in docker-compose.yml — zusammen aendern.
 FROM nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752
