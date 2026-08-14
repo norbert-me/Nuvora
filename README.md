@@ -341,9 +341,10 @@ steht „zu wenig Daten" — bei vier A–D-Fragen trifft reines Raten im Schnit
 Ob es am aktuellen Thema liegt oder an älteren Lücken, beantwortet die Zeitachse
 **ohne gepflegte Voraussetzungen**: Nuvora kennt das Erstvorkommen jedes Themas,
 Fragen zu lange bekannten Themen sind Wiederholung — also der Vorwissenstest,
-den es ohnehin gibt. Zu sehen auf der Startseite, in der Klassen-Auswertung, auf
-der Schülerseite und bei den Klassenarbeiten; jede Meldung nennt die Zahlen, aus
-denen sie entstand. Es ist eine Beobachtung, keine Diagnose — aus Trefferquoten
+den es ohnehin gibt. Zu sehen dort, wo man mit den Ergebnissen arbeitet: in der
+CardVote-Klassenauswertung, auf der Schülerseite und bei den Klassenarbeiten —
+also nur mit dem jeweiligen Modul. Jede Meldung nennt die Zahlen, aus denen sie
+entstand. Es ist eine Beobachtung, keine Diagnose — aus Trefferquoten
 folgt keine Lernstörung.
 
 ### Archiv statt Löschen

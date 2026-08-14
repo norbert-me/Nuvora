@@ -1814,7 +1814,7 @@ export default {
   "tut.auswerten.3": "Los temas débiles se agrupan por tema con los nombres debajo.",
   "tut.auswerten.4": "Adjunta el examen y sus criterios; un clic los muestra en el navegador, también Word.",
   "tut.auswerten.5": "¿El mismo examen en otra clase? Cópialo y compara después clase por clase.",
-  "tut.auswerten.6": "La página de inicio señala a quien queda muy por debajo de la clase en varias pruebas. Es un aviso, no un diagnóstico.",
+  "tut.auswerten.6": "«Merece atención» señala a quien queda muy por debajo de la clase en varias pruebas, en la evaluación de CardVote y en los exámenes. Es un aviso, no un diagnóstico.",
   "tut.jahresende.title": "Fin de curso",
   "tut.jahresende.goto": "Ir a las clases",
   "tut.jahresende.1": "Archiva clases y cursos en lugar de borrarlos: salen de las listas, los datos se conservan.",

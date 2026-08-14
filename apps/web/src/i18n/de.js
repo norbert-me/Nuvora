@@ -1799,7 +1799,7 @@ export default {
   "tut.auswerten.3": "Schwache Themen stehen nach Thema gruppiert mit den Namen darunter — daraus wird eine Wiederholungsstunde oder eine Fördergruppe.",
   "tut.auswerten.4": "Die Arbeit und ihren Erwartungshorizont hängst du als Datei an; ein Klick zeigt sie im Browser, auch Word.",
   "tut.auswerten.5": "Dieselbe Arbeit in einer Parallelklasse? Kopieren statt neu tippen — danach vergleicht der Reiter „Vergleich“ die Klassen je Aufgabe.",
-  "tut.auswerten.6": "Die Startseite meldet unter „Genau hinschauen“, wer über mehrere Erhebungen hinweg deutlich unter der Klasse liegt. Das ist ein Hinweis, keine Diagnose.",
+  "tut.auswerten.6": "„Genau hinschauen“ in der Auswertung meldet, wer über mehrere Erhebungen hinweg deutlich unter der Klasse liegt — in der CardVote-Auswertung und bei den Klassenarbeiten. Das ist ein Hinweis, keine Diagnose.",
   "tut.jahresende.title": "Am Schuljahresende",
   "tut.jahresende.goto": "Zu den Klassen",
   "tut.jahresende.1": "Alte Klassen und Kurse archivierst du, statt sie zu löschen: sie verschwinden aus allen Auswahllisten, alle Daten bleiben.",

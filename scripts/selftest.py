@@ -607,14 +607,19 @@ def teste_kern(api, b, u):
         return "erreichbar"
 
     def fruehwarnung():
-        # Kern-Sicht ueber CardVote-Quizze UND Klassenarbeiten. Sie darf ohne
-        # beide Module antworten (leer), aber niemals 403 oder 500 liefern —
-        # sonst haengt die Startseite an einem Modul, das ihr nicht gehoert.
-        alle = api.call("GET", "/api/fruehwarnung", erwartet=(200,))
+        # Rechnet ueber CardVote-Quizze UND Klassenarbeiten und gehoert deshalb
+        # keinem der beiden Module. Sie darf ohne beide antworten (leer), aber
+        # niemals 403 oder 500 — sonst haengt eine Kern-Sicht an einem Modul.
         eine = api.call("GET", f"/api/classes/{u.class_id}/fruehwarnung", erwartet=(200,))
-        if "schueler" not in alle or "schueler" not in eine:
-            raise AssertionError("Antwort ohne Schuelerliste")
-        return f"Sammelsicht und Klassensicht antworten ({len(alle['schueler'])} gemeldet)"
+        if "schueler" not in eine or "quellen" not in eine:
+            raise AssertionError(f"Antwort unvollstaendig: {list(eine)}")
+        # Die Datenlage muss mitkommen: ohne sie kann die Oberflaeche im
+        # Leerfall nur „nichts gefunden" sagen statt WARUM.
+        q = eine["quellen"]
+        for feld in ("cardvote", "auswertung", "quizze", "arbeiten", "arbeiten_ohne_thema"):
+            if feld not in q:
+                raise AssertionError(f"Datenlage ohne '{feld}': {q}")
+        return f"Klassensicht antwortet ({len(eine['schueler'])} Kinder, Datenlage vollstaendig)"
 
     def material():
         # Dateiablage des Kerns: hochladen, wiederfinden, ansehen, loeschen.

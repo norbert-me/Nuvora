@@ -1813,7 +1813,7 @@ export default {
   "tut.auswerten.3": "Weak topics are grouped by topic with the names underneath — that is your revision lesson.",
   "tut.auswerten.4": "Attach the exam and its marking scheme; one click shows them in the browser, Word included.",
   "tut.auswerten.5": "Same exam in a parallel class? Copy instead of retyping — then the “Compare” tab compares the classes task by task.",
-  "tut.auswerten.6": "The start page flags students who stay well below the class across several assessments. A pointer, not a diagnosis.",
+  "tut.auswerten.6": "“Worth a closer look” flags students who stay well below the class across several assessments — in the CardVote evaluation and with the exams. A pointer, not a diagnosis.",
   "tut.jahresende.title": "End of the school year",
   "tut.jahresende.goto": "Go to classes",
   "tut.jahresende.1": "Archive old classes and courses instead of deleting them: they leave every picker, all data stays.",

@@ -25,10 +25,6 @@ OFFEN = {
         "Kern-Sicht (Kalender): fasst schwache Themen aller Module zusammen.",
     "/api/weak-review":
         "Kern-Sicht (Startseite): schliesst die Bruecke schwach -> geuebt.",
-    "/api/fruehwarnung":
-        "Kern-Sicht (Startseite): rechnet ueber CardVote-Quizze UND Klassenarbeiten. "
-        "Sie gehoert keinem der beiden Module; die Quellen werden einzeln auf ihr "
-        "Modul geprueft (is_active), ohne beide bleibt die Antwort leer.",
 }
 
 # Praefixe der Kern-Router. Der Kern gehoert allen, er hat keine Schranke.

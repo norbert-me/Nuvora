@@ -837,9 +837,11 @@ async def stats_dashboard(user: User = Depends(get_current_user), db: AsyncSessi
 # Auswertung nur Klassenarbeiten, mit beidem beides. Ohne beide bleibt sie leer,
 # statt 403 zu werfen: der Weg gehoert dem Kern, es gibt nur nichts zu zeigen.
 #
-# Der Sammel-Endpunkt (/api/fruehwarnung) fasst alle Klassen zusammen; er
-# liefert nur die gemeldeten Kinder, damit die Startseite nichts nachrechnen
-# muss.
+# Bewusst NUR die Sicht je Klasse: die Fruehwarnung steht dort, wo man mit den
+# Ergebnissen arbeitet (CardVote-Auswertung, Klassenarbeit), nicht auf der
+# Startseite. Eine Kachel, die bei jedem Aufruf ueber alle Klassen rechnet, ist
+# teuer und wird nach zwei Wochen ueberlesen. Den frueheren Sammel-Endpunkt gibt
+# es deshalb nicht mehr.
 
 async def _arbeiten_als_tests(db, user, class_id: int, id_zu_karte: dict):
     """Klassenarbeiten dieser Klasse als Messpunkte — je Aufgabe ihre Punkte.
@@ -1013,41 +1015,3 @@ async def fruehwarnung_klasse(class_id: int, empfindlich: bool = False,
     return ergebnis
 
 
-@kern_router.get("/fruehwarnung")
-async def fruehwarnung_alle(empfindlich: bool = False,
-                            user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Kurzfassung über alle Klassen — nur die Kinder, bei denen hinzusehen ist."""
-    from .. import fruehwarnung as fw
-
-    klassen = (await db.execute(
-        select(SchoolClass).where(SchoolClass.owner_id == user.id, SchoolClass.deleted_at.is_(None),
-                                  # Archivierte Klassen melden nichts mehr: das
-                                  # Schuljahr ist vorbei, und ein Hinweis auf ein
-                                  # Kind, das man nicht mehr unterrichtet, ist
-                                  # kein Hinweis, sondern Rauschen.
-                                  SchoolClass.archived_at.is_(None))
-    )).scalars().all()
-    treffer = []
-    erhebungen = 0          # wie viele Quizze/Arbeiten insgesamt eingeflossen sind
-    ohne_themen = 0         # Klassenarbeiten, die mangels Themen nichts beitragen
-    for k in klassen:
-        tests, kinder = await _fruehwarn_daten(db, user, k.id)
-        quellen = await _fruehwarn_quellen(db, user, k.id)
-        ohne_themen += quellen.get("arbeiten_ohne_thema", 0)
-        erhebungen += len(tests)
-        if not tests:
-            continue
-        ergebnis = fw.analysiere(tests, kinder, fw.EMPFINDLICH if empfindlich else fw.STANDARD)
-        await _themennamen(db, ergebnis, user)
-        for s in ergebnis["schueler"]:
-            if s["status"] != "melden":
-                continue
-            treffer.append({"class_id": k.id, "class_name": k.name, "card_id": s["card_id"],
-                            "name": s["name"], "abstand_median": s["abstand_median"],
-                            "begruendung": s["begruendung"],
-                            "etiketten": [e["art"] for e in s["etiketten"]]})
-    treffer.sort(key=lambda x: x["abstand_median"])
-    # `erhebungen` und `ohne_themen` tragen die Startseite: „niemand faellt ab"
-    # bedeutet etwas anderes bei zwoelf Erhebungen als bei null.
-    return {"schueler": treffer, "empfindlich": empfindlich,
-            "erhebungen": erhebungen, "arbeiten_ohne_thema": ohne_themen}
