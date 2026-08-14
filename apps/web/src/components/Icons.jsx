@@ -76,9 +76,14 @@ export const ICONS = {
   share: ["M14.5 3a2 2 0 100 4 2 2 0 100-4z", "M5.5 8a2 2 0 100 4 2 2 0 100-4z", "M14.5 13a2 2 0 100 4 2 2 0 100-4z", "M7.3 9.1l5.9 3.3M13.2 6.6L7.3 9.9"],
   calendar: ["M4 5h12v11H4z", "M4 8h12M7 3v4M13 3v4"],
   clock: ["M10 4a6 6 0 100 12 6 6 0 000-12z", "M10 7v3.2l2.2 1.3"],
-  // Auge (Ansicht/Präsentation), Kreis (anwesend) + durchgestrichener Kreis (abwesend).
+  // Auge (Ansicht/Präsentation), Kreis (neutrale Markierung), ban (gesperrt).
   eye: ["M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z", "M10 7.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"],
   circle: ["M10 3.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13z"],
+  // Anwesend / nicht mitgeschrieben. Person statt Kreis: ein leerer Kreis sagt
+  // nicht, worum es geht — „war da" ist eine Aussage ueber einen Menschen, und
+  // ein Auge hiesse „anzeigen/verbergen", also etwas anderes.
+  person: ["M10 4.2a2.8 2.8 0 100 5.6 2.8 2.8 0 000-5.6z", "M4.5 16.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"],
+  personOff: ["M10 4.2a2.8 2.8 0 100 5.6 2.8 2.8 0 000-5.6z", "M4.5 16.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5", "M3.5 3.5l13 13"],
   ban: ["M10 3a7 7 0 100 14 7 7 0 000-14z", "M5.5 5.5l9 9"],
   // Zahnrad: Mittelkreis + 8 Speichen (Ansicht-/Einstellungen-Menü).
   settings: ["M10 7.6a2.4 2.4 0 100 4.8 2.4 2.4 0 000-4.8z",

@@ -496,8 +496,12 @@ export default function Klassenarbeit() {
                       <tr key={s.id} style={abw ? { opacity: 0.5 } : undefined}>
                         <td style={{ ...td, textAlign: "left", padding: "4px 8px", position: "sticky", left: 0, zIndex: 1, background: "var(--card)", fontWeight: 500, whiteSpace: "nowrap" }}>
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            {/* Anwesenheit: Person / durchgestrichene Person. Der
+                                leere Kreis vorher sah nach „auswaehlen" aus und
+                                nicht nach „hat nicht mitgeschrieben". */}
                             <button onClick={() => toggleAbsent(s.id)} title={abw ? t("klassenarbeit.present") : t("klassenarbeit.absent")}
-                              style={{ border: "none", background: "none", cursor: "pointer", color: abw ? C.warning : "var(--text3)", padding: 0, display: "inline-flex" }}><Icon d={abw ? ICONS.ban : ICONS.circle} size={14} /></button>
+                              aria-label={abw ? t("klassenarbeit.present") : t("klassenarbeit.absent")} aria-pressed={abw}
+                              style={{ border: "none", background: "none", cursor: "pointer", color: abw ? C.warning : "var(--text3)", padding: 0, display: "inline-flex" }}><Icon d={abw ? ICONS.personOff : ICONS.person} size={15} /></button>
                             {s.name}
                           </span>
                         </td>
