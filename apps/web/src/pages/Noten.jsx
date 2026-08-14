@@ -581,7 +581,7 @@ export default function Noten() {
         const pos = (sec?.categories || []).length;
         return (
           <Modal title={t("noten.addColumn")} onClose={() => setNeuSpalteIn(null)}>
-            <ColForm t={t} onCancel={() => setNeuSpalteIn(null)}
+            <ColForm t={t} onCancel={() => setNeuSpalteIn(null)} vorschlag={t("noten.colDefault", { n: pos + 1 })}
               onSave={async (name) => { if (await callCreate(
                 () => fetch(`${API}/categories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: neuSpalteIn, position: pos }) }),
                 (id) => setSections((prev) => prev.map((s) => s.id === neuSpalteIn ? { ...s, categories: [...(s.categories || []), { id, name, section_id: neuSpalteIn, position: pos }] } : s)),
@@ -1154,15 +1154,19 @@ function DatePick({ onPick, title, size = 14 }) {
   );
 }
 
-function ColForm({ t, onSave, onCancel, initial = "" }) {
+function ColForm({ t, onSave, onCancel, initial = "", vorschlag = "" }) {
   const [name, setName] = useState(initial);
+  // Leer abschicken ist erlaubt: dann heisst die Spalte „Spalte 3" (der
+  // Vorschlag zaehlt die vorhandenen mit). Vorher passierte auf OK gar nichts
+  // — ein Knopf, der stumm bleibt, sieht aus wie ein Fehler.
+  const nimm = () => onSave(name.trim() || vorschlag || t("noten.colName"));
   return (
     <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
-      <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder={t("noten.colName")}
-        onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) onSave(name.trim()); if (e.key === "Escape") onCancel(); }}
+      <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder={vorschlag || t("noten.colName")}
+        onKeyDown={(e) => { if (e.key === "Enter") nimm(); if (e.key === "Escape") onCancel(); }}
         style={{ ...inp, fontSize: 14, padding: "9px 11px", flex: 1, minWidth: 120 }} />
       <DatePick onPick={setName} title={t("noten.useDate")} size={20} />
-      <button onClick={() => name.trim() && onSave(name.trim())} style={{ ...btnPrimary }}>OK</button>
+      <button onClick={nimm} style={{ ...btnPrimary }}>OK</button>
       <button onClick={onCancel} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.abort")} aria-label={t("common.abort")}><Icon d={ICONS.close} size={20} /></button>
     </div>
   );

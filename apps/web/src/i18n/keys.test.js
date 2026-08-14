@@ -72,6 +72,20 @@ describe("i18n", () => {
     expect(bericht, `Schlüssel ohne Übersetzung in de.js:\n${bericht.join("\n")}`).toEqual([]);
   });
 
+  // Platzhalter heissen {{name}}, nicht {name}. Mit einer Klammer steht der
+  // Platzhalter woertlich in der Oberflaeche („Verlauf: {name}") — genau das
+  // ist schon zweimal passiert, und auffallen kann es nur jemandem, der die
+  // Stelle zufaellig oeffnet.
+  it("nutzt {{doppelte}} Klammern als Platzhalter", () => {
+    for (const sprache of ["de.js", "en.js", "es.js"]) {
+      const inhalt = fs.readFileSync(path.join(I18N, sprache), "utf8");
+      const treffer = [...inhalt.matchAll(/^\s*"([\w.]+)":\s*"([^"]*)"/gm)]
+        .filter(([, , wert]) => /(?<!\{)\{[a-zA-Z_][a-zA-Z0-9_]*\}(?!\})/.test(wert))
+        .map(([, key]) => key);
+      expect(treffer, `${sprache}: einfache Klammern in ${treffer.join(", ")}`).toEqual([]);
+    }
+  });
+
   it("hat in en.js und es.js dieselben Schlüssel wie in de.js", () => {
     const de = woerterbuch("de.js");
     for (const sprache of ["en.js", "es.js"]) {
