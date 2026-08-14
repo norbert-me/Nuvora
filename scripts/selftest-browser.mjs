@@ -366,6 +366,9 @@ async function lauf(motor) {
     }
     await aufraeumenBedienung(api, vorher);
 
+    // ── Reihenfolge der Schueler im Formular ──
+    await reihenfolgeProbe(kontext, api);
+
     // ── Lernpfad wirklich bedienen ──
     // Das Modul ist die einzige Nicht-React-Seite; „rendert" sagt hier am
     // wenigsten. Eigene Gruppe, siehe lernpfadProbe.
@@ -492,6 +495,62 @@ async function speicherAnmeldung(kontext) {
     return { ok: false, detail: String(e.message || e).split("\n")[0].slice(0, 160) };
   } finally {
     await seite.close().catch(() => {});
+  }
+}
+
+/**
+ * Die Klassenmaske muss die gespeicherte Reihenfolge zeigen.
+ *
+ * Sie kam vom Server richtig sortiert (position), wurde im Formular aber nach
+ * Kartennummer neu sortiert und durchnummeriert — jedes Verschieben war beim
+ * naechsten Oeffnen wieder weg, und die Kartennummer (sie steht auf der
+ * gedruckten Karte) wanderte auf ein anderes Kind. Geprueft wird deshalb genau
+ * das: umsortieren per API, Maske oeffnen, Reihenfolge der Namensfelder
+ * vergleichen.
+ */
+async function reihenfolgeProbe(kontext, api) {
+  const name = `${MARKE} Reihenfolge`;
+  let klasse = null;
+  try {
+    const angelegt = await api("/api/classes", "post", {
+      name,
+      students: [{ card_id: 1, name: `${MARKE} Anna` }, { card_id: 2, name: `${MARKE} Bea` }],
+    });
+    if (!angelegt.ok()) throw new Error(`Klasse anlegen: HTTP ${angelegt.status()}`);
+    klasse = await angelegt.json();
+
+    // Umdrehen: Bea steht jetzt vorn, die Kartennummern bleiben, wo sie sind.
+    const gedreht = [...klasse.students].reverse();
+    const put = await api(`/api/classes/${klasse.id}`, "put", {
+      name, students: gedreht.map((s) => ({ card_id: s.card_id, name: s.name })),
+    });
+    if (!put.ok()) throw new Error(`Umsortieren: HTTP ${put.status()}`);
+    const soll = gedreht.map((s) => s.name);
+
+    const { seite } = await neueSeite(kontext);
+    try {
+      await seite.goto(`/classes?open=${klasse.id}`, { waitUntil: "networkidle", timeout: 30000 });
+      await tourWegklicken(seite);
+      const felder = seite.locator(`input[value^='${MARKE} ']`);
+      await felder.first().waitFor({ state: "visible", timeout: 15000 });
+      const ist = await felder.evaluateAll((els) => els.map((e) => e.value));
+      if (JSON.stringify(ist) !== JSON.stringify(soll)) {
+        notiere("Bedienung", "Reihenfolge im Klassenformular", false,
+          `Maske zeigt ${JSON.stringify(ist)}, gespeichert ist ${JSON.stringify(soll)}`);
+      } else {
+        notiere("Bedienung", "Reihenfolge im Klassenformular", true,
+          `gespeicherte Reihenfolge steht so in der Maske (${soll.join(", ")})`);
+      }
+    } finally {
+      await seite.close().catch(() => {});
+    }
+  } catch (e) {
+    notiere("Bedienung", "Reihenfolge im Klassenformular", false, kurzfehler(e));
+  } finally {
+    if (klasse?.id) {
+      await api(`/api/classes/${klasse.id}`, "delete").catch(() => {});
+      await api(`/api/classes/${klasse.id}/purge`, "delete").catch(() => {});
+    }
   }
 }
 
@@ -675,11 +734,14 @@ async function bediene(kontext, flow) {
  */
 async function resteAbraeumen(api) {
   let weg = 0;
-  for (const pfad of ["/api/notizblock", "/api/topics"]) {
+  // Klassen auch: die Reihenfolge-Probe legt eine an. Bleibt sie liegen, faellt
+  // die naechste Runde ueber den doppelten Namen.
+  for (const pfad of ["/api/notizblock", "/api/topics", "/api/classes"]) {
     try {
       for (const eintrag of await (await api(pfad)).json()) {
         if (!`${eintrag.title || ""}${eintrag.name || ""}`.includes(MARKE)) continue;
         await api(`${pfad}/${eintrag.id}`, "delete");
+        await api(`${pfad}/${eintrag.id}/purge`, "delete").catch(() => {});
         weg++;
       }
     } catch { /* was bleibt, faellt gleich beim Anlegen auf */ }

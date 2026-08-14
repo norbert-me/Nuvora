@@ -925,7 +925,9 @@ async function tabSpringtWeiter(seite, spalte) {
   const idx = await spaltenIndex(seite, spalte).catch(() => -1);
   if (idx < 0) return "die Spalte steht nicht im Tabellenkopf";
   const zelle = seite.locator("tbody tr").first().locator("td").nth(idx);
-  await zelle.locator("button").first().click({ timeout: 8000 });
+  const knopf = zelle.locator("button").first();
+  await knopf.waitFor({ state: "visible", timeout: 15000 });
+  await knopf.click({ timeout: 15000 });
   const feld = zelle.locator("input").first();
   await feld.waitFor({ state: "visible", timeout: 8000 });
   await feld.press("Tab");

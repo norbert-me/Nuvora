@@ -114,10 +114,15 @@ export default function Classes() {
     setEditing(cls);
     setName(cls.name);
     setColor(cls.color || C.info);
-    const sorted = [...cls.students].sort((a, b) => a.card_id - b.card_id);
+    // Reihenfolge kommt vom Server (position, dann card_id) und wird NICHT
+    // ueberschrieben: sie ist genau das, was hier per Ziehen gesetzt wurde.
+    // Fruehere Fassung sortierte nach card_id und nummerierte durch — damit war
+    // jedes Verschieben beim naechsten Oeffnen wieder weg, und die Kartennummer
+    // (sie steht auf der gedruckten ArUco-Karte und jeder Scan zeigt darauf)
+    // wanderte auf ein anderes Kind.
     // Ganzen Datensatz uebernehmen, nicht nur Nummer und Name: niveau, foerder
     // und notizen wuerden sonst bei jedem Speichern still verschwinden.
-    const rows = sorted.map((s, i) => ({ ...s, card_id: i + 1 }));
+    const rows = [...cls.students].map((s) => ({ ...s }));
     if (rows.length === 0) rows.push({ ...EMPTY_STUDENT, card_id: 1 });
     setStudents(rows);
   };

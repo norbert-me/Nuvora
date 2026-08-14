@@ -425,8 +425,15 @@ async def weak_topics_range(frm: datetime, to: datetime, class_id: Optional[int]
     # aktivem Modul). Ein Thema, an dem die Kinder beim Ueben immer wieder
     # haengenbleiben, ist genauso ein schwaches Thema wie eins aus dem Quiz —
     # es stand nur bisher in keinem Vorschlag. Gerechnet wird aus SM-2:
-    # gelungene Wiederholungen (reps - lapses) von allen (reps). Das Thema
-    # kommt vom Deck, denn Karten selbst tragen keins.
+    # Treffer = die aktuelle Serie gelungener Wiederholungen (reps), Versuche =
+    # reps + lapses. SM-2 setzt reps bei einem Fehler auf 0 zurueck und zaehlt
+    # lapses hoch — eine Karte, an der es dauernd hakt, steht deshalb bei reps=0
+    # und lapses=3. Wer hier `reps > 0` verlangt, filtert genau die schwachen
+    # Faelle heraus (und bekam eine leere Liste). Die Versuchszahl ist damit eine
+    # Untergrenze: vor einem Rueckfall gesammelte reps sind nicht mehr da. Fuer
+    # „wo hakt es?" reicht das, fuer eine Quote auf dem Zeugnis nicht — und die
+    # steht hier auch nicht zur Debatte. Das Thema kommt vom Deck, denn Karten
+    # selbst tragen keins.
     from .modules import is_active
     if await is_active(db, user.id, "karten"):
         from ..models import Card, CardDeck, CardReview
@@ -435,16 +442,19 @@ async def weak_topics_range(frm: datetime, to: datetime, class_id: Optional[int]
               .join(CardReview, CardReview.card_id == Card.id)
               .join(Student, Student.id == CardReview.student_id)
               .where(CardDeck.owner_id == user.id, CardDeck.topic_id.is_not(None),
-                     CardReview.reps > 0, CardReview.last_reviewed.is_not(None),
+                     CardReview.last_reviewed.is_not(None),
                      CardReview.last_reviewed >= frm, CardReview.last_reviewed <= to))
         if class_id is not None:
             from .kurse import sibling_class_ids
             sib = await sibling_class_ids(db, class_id)
             kq = kq.where(Student.class_id.in_(sib or [class_id]))
         for tid, reps, lapses in (await db.execute(kq)).all():
+            versuche = (reps or 0) + (lapses or 0)
+            if not versuche:
+                continue
             a = agg.setdefault(tid, [0, 0])
-            a[1] += reps
-            a[0] += max(0, reps - (lapses or 0))
+            a[1] += versuche
+            a[0] += reps or 0
 
     # Code-Detektiv einspeisen: Raetsel sind themen-getaggt, aber Sessions sind
     # klassenlos — darum nur in die fachuebergreifende Sicht (kein class_id),

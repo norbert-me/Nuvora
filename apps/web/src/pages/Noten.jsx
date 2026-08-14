@@ -52,7 +52,12 @@ function StickyMitte({ scrollRef, children, style }) {
       const grenze = Math.max(0, (z.width - eigen) / 2);   // nie aus der Zelle heraus
       const zellmitte = (z.left + z.right) / 2;
       const ziel = (links + rechts) / 2;
-      setDx(Math.max(-grenze, Math.min(grenze, ziel - zellmitte)));
+      const roh = Math.max(-grenze, Math.min(grenze, ziel - zellmitte));
+      // Auf 8 px rasten und nur bei spuerbarer Aenderung nachziehen: sonst
+      // wandert der Kopf bei jedem Scroll-Pixel ein Stueck, und alles, was ihn
+      // anklicken will (Maus wie Testlauf), zielt auf ein bewegtes Ziel.
+      const gerastert = Math.round(roh / 8) * 8;
+      setDx((vorher) => (Math.abs(gerastert - vorher) >= 8 ? gerastert : vorher));
     };
     rechne();
     sc.addEventListener("scroll", rechne, { passive: true });
@@ -370,7 +375,23 @@ export default function Noten() {
   const noteSetzen = async (studentId, catId, text) => {
     setZelle(null);
     const wert = parseNote(text);
-    if (wert === null) return;
+    // Feld leer geraeumt = Note loeschen. Vorher blieb die alte Note stehen —
+    // ein Vertipper liess sich nur ueber Umwege wieder loswerden.
+    if (wert === null) {
+      if (String(text).trim() !== "") return;      // unlesbare Eingabe: nichts anfassen
+      const alt = notenVon(studentId, catId)[0];
+      if (!alt?.id) return;
+      setSummary((prev) => prev.map((s) => {
+        if (s.student_id !== studentId) return s;
+        const rest = { ...s.per_category };
+        delete rest[String(catId)];
+        return { ...s, per_category: rest };
+      }));
+      setEntries((prev) => prev.filter((e) => e.id !== alt.id));
+      const ok = await call(() => fetch(`${API}/entries/${alt.id}`, { method: "DELETE" }));
+      if (ok) load(classId);
+      return;
+    }
     // Optimistisch lokal setzen, damit die Note auch offline sofort steht.
     setSummary((prev) => prev.map((s) => s.student_id === studentId
       ? { ...s, per_category: { ...s.per_category, [String(catId)]: wert } } : s));
@@ -809,7 +830,7 @@ function Zelle({ onSave, onCancel, onTab, initial = "" }) {
         if (v && !/^[1-6]/.test(v)) v = "";
         e.target.value = v;
       }}
-      onBlur={(e) => { if (weiter.current) return; e.target.value.trim() ? onSave(e.target.value) : onCancel(); }}
+      onBlur={(e) => { if (weiter.current) return; if (e.target.value.trim() || initial) onSave(e.target.value); else onCancel(); }}
       onKeyDown={(e) => {
         if (e.key === "Enter") onSave(e.target.value);
         if (e.key === "Escape") onCancel();
