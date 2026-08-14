@@ -1837,4 +1837,5 @@ export default {
   "classes.qrPrintHint": "PDF con un código QR por alumno para recortar. Lleva a las tarjetas y, con CardVote, a sus propios resultados.",
   "tut.klasse.4": "Imprime los códigos de acceso desde la clase: un QR por alumno. Lleva a las tarjetas y, con CardVote, a sus resultados.",
   "tut.klasse.5": "¿Un enlace acabó en el chat de clase? «Volver a generar» anula todos los impresos anteriores.",
+  "classes.reorderHint": "Arrastra para reordenar: el orden vale en todos los módulos.",
 };

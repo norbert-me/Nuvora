@@ -65,15 +65,15 @@ async def _kurs_roster(db, user, class_id, kurs_id=None):
         sids = list(await member_student_ids(db, kurs_id))
         if not sids:
             return []
-        studs = (await db.execute(select(Student).where(Student.id.in_(sids)).order_by(Student.id))).scalars().all()
+        studs = (await db.execute(select(Student).where(Student.id.in_(sids)).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
     else:
         from .kurse import sibling_class_ids
         sib = await sibling_class_ids(db, class_id)
-        studs = (await db.execute(select(Student).where(Student.class_id.in_(sib)).order_by(Student.id))).scalars().all()
+        studs = (await db.execute(select(Student).where(Student.class_id.in_(sib)).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
     canon = {}
     for s in studs:
         canon.setdefault(s.name.strip(), s)
-    return sorted(canon.values(), key=lambda s: (s.card_id, s.id))
+    return sorted(canon.values(), key=lambda s: (s.position or 0, s.card_id, s.id))
 
 
 async def _student_in_kurs(db, class_id, student_id, kurs_id=None) -> bool:
@@ -165,11 +165,11 @@ async def roster_kurs(kurs_id: int, user: User = Depends(require_module), db: As
     sids = list(await member_student_ids(db, kurs_id))
     if not sids:
         return []
-    studs = (await db.execute(select(Student).where(Student.id.in_(sids)).order_by(Student.id))).scalars().all()
+    studs = (await db.execute(select(Student).where(Student.id.in_(sids)).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
     canon = {}
     for s in studs:
         canon.setdefault(s.name.strip(), s)
-    ordered = sorted(canon.values(), key=lambda s: (s.card_id, s.id))
+    ordered = sorted(canon.values(), key=lambda s: (s.position or 0, s.card_id, s.id))
     return [{"id": s.id, "card_id": s.card_id, "name": s.name, "class_id": s.class_id} for s in ordered]
 
 

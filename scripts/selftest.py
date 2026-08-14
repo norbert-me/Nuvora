@@ -544,6 +544,36 @@ def teste_kern(api, b, u):
                                  "delete+recreate statt merge")
         return "anlegen, lesen, aendern (IDs stabil)"
 
+    def reihenfolge():
+        # Die Reihenfolge der Schuelerliste ist eine eigene Angabe (position) —
+        # NICHT die Kartennummer. Geprueft wird beides: dass Umsortieren wirkt
+        # und dass die Kartennummern dabei stehen bleiben (an ihnen haengen
+        # Scans und Noten).
+        kl = api.call("GET", f"/api/classes/{u.class_id}", erwartet=(200,))
+        vorher = [(s["card_id"], s["name"]) for s in kl["students"]]
+        if len(vorher) < 2:
+            return "uebersprungen — weniger als zwei Schueler"
+        gedreht = list(reversed(kl["students"]))
+        api.call("PUT", f"/api/classes/{u.class_id}",
+                 {"name": kl["name"], "students": [
+                     {"card_id": s["card_id"], "name": s["name"], "niveau": s.get("niveau") or ""}
+                     for s in gedreht]}, erwartet=(200,))
+        nachher = api.call("GET", f"/api/classes/{u.class_id}", erwartet=(200,))["students"]
+        if [s["name"] for s in nachher] != [s["name"] for s in gedreht]:
+            raise AssertionError(f"Reihenfolge nicht uebernommen: {[s['name'] for s in nachher]}")
+        if {s["card_id"] for s in nachher} != {c for c, _ in vorher}:
+            raise AssertionError("Kartennummern haben sich beim Sortieren veraendert")
+        for s in nachher:
+            passend = [n for c, n in vorher if c == s["card_id"]]
+            if passend and passend[0] != s["name"]:
+                raise AssertionError(f"Karte {s['card_id']} gehoert jetzt zu {s['name']} statt zu {passend[0]}")
+        # zurueckdrehen, damit die folgenden Proben ihre gewohnte Reihenfolge sehen
+        api.call("PUT", f"/api/classes/{u.class_id}",
+                 {"name": kl["name"], "students": [
+                     {"card_id": s["card_id"], "name": s["name"], "niveau": s.get("niveau") or ""}
+                     for s in kl["students"]]}, erwartet=(200,))
+        return "umsortiert, Kartennummern bleiben bei ihren Namen"
+
     def kurse():
         mitglieder = api.call("GET", f"/api/kurse/{u.kurs_id}/students", erwartet=(200,))
         if len(mitglieder) < 2:
@@ -679,6 +709,7 @@ def teste_kern(api, b, u):
         return f"{len(module)} Module im Register"
 
     b.pruefe("Kern", "Klassen und Schueler", klassen)
+    b.pruefe("Kern", "Reihenfolge", reihenfolge)
     b.pruefe("Kern", "Kurse", kurse)
     b.pruefe("Kern", "Themen", themen)
     b.pruefe("Kern", "Papierkorb", papierkorb)

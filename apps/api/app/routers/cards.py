@@ -68,7 +68,7 @@ async def class_cards_pdf(class_id: int, user: User = Depends(get_current_user),
     # dedupliziert). card_id ist bei gleicher Lerngruppe deckungsgleich.
     from .kurse import sibling_class_ids
     sib = await sibling_class_ids(db, class_id)
-    all_studs = (await db.execute(select(Student).where(Student.class_id.in_(sib)).order_by(Student.id))).scalars().all()
+    all_studs = (await db.execute(select(Student).where(Student.class_id.in_(sib)).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
     canon = {}
     for s in all_studs:
         canon.setdefault(s.name.strip(), s)

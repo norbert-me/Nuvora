@@ -317,6 +317,7 @@ def _ensure_columns(sync_conn):
         ("materials", "pdf_data", "BYTEA"),
         ("work_analyses", "source_id", "INTEGER"),
         ("school_classes", "archived_at", "TIMESTAMPTZ"),
+        ("students", "position", "INTEGER DEFAULT 0 NOT NULL"),
         ("kurse", "archived_at", "TIMESTAMPTZ"),
         ("materials", "rolle", "VARCHAR(20) DEFAULT '' NOT NULL"),
         ("cards", "deleted_at", "TIMESTAMP WITH TIME ZONE"),

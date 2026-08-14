@@ -175,7 +175,7 @@ async def _kurs_roster(db, user, class_id, subset_kurs=None):
         canon = {}
         for s in studs:
             canon.setdefault(s.name.strip(), s)
-        return sorted(canon.values(), key=lambda s: (s.card_id, s.id))
+        return sorted(canon.values(), key=lambda s: (s.position or 0, s.card_id, s.id))
     return (await db.execute(select(Student).where(Student.class_id == class_id).order_by(Student.card_id, Student.id))).scalars().all()
 
 

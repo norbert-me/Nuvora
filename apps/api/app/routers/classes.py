@@ -195,8 +195,8 @@ async def create_class(body: ClassCreate, user: User = Depends(get_current_user)
     db.add(sc)
     await db.flush()
     db.add(KursTag(kurs_id=kurs.id, class_id=sc.id))  # Mitgliedschaft (many-to-many)
-    for s in body.students:
-        db.add(Student(card_id=s.card_id, name=s.name, class_id=sc.id, kurs_id=kurs.id,
+    for pos, s in enumerate(body.students):
+        db.add(Student(card_id=s.card_id, name=s.name, class_id=sc.id, kurs_id=kurs.id, position=pos,
                        niveau=s.niveau, foerder=s.foerder, massnahmen=_massnahmen(s), notizen=s.notizen,
                        klassenlehrer=s.klassenlehrer))
     await db.commit()
@@ -280,7 +280,7 @@ async def list_massnahmen(
     from .kurse import sibling_class_ids
     sib = await sibling_class_ids(db, class_id)
     rows = (await db.execute(
-        select(Student).where(Student.class_id.in_(sib or [class_id])).order_by(Student.card_id)
+        select(Student).where(Student.class_id.in_(sib or [class_id])).order_by(Student.position, Student.card_id)
     )).scalars().all()
     gesehen = set()
     out = []
@@ -331,10 +331,14 @@ async def update_class(class_id: int, body: ClassCreate, user: User = Depends(ge
     existing = (await db.execute(select(Student).where(Student.class_id == class_id))).scalars().all()
     by_card = {s.card_id: s for s in existing}
     seen = set()
-    for s in body.students:
+    # Die Reihenfolge der uebergebenen Liste IST die Reihenfolge — sie steuert
+    # jede Liste in jedem Modul. Bewusst nicht ueber card_id: die steht auf der
+    # gedruckten Karte, und jeder Scan zeigt darauf.
+    for pos, s in enumerate(body.students):
         seen.add(s.card_id)
         cur = by_card.get(s.card_id)
         if cur:  # vorhandenen Schueler in-place aktualisieren, ID bleibt erhalten
+            cur.position = pos
             cur.name = s.name
             cur.niveau = s.niveau
             cur.foerder = s.foerder
@@ -343,8 +347,8 @@ async def update_class(class_id: int, body: ClassCreate, user: User = Depends(ge
             cur.klassenlehrer = s.klassenlehrer
         else:
             db.add(Student(card_id=s.card_id, name=s.name, class_id=class_id, kurs_id=sc.kurs_id,
-                           niveau=s.niveau, foerder=s.foerder, massnahmen=_massnahmen(s), notizen=s.notizen,
-                           klassenlehrer=s.klassenlehrer))
+                           position=pos, niveau=s.niveau, foerder=s.foerder, massnahmen=_massnahmen(s),
+                           notizen=s.notizen, klassenlehrer=s.klassenlehrer))
     # Nur wirklich entfernte Karten loeschen (deren Daten sollen dann auch weg).
     for card_id, s in by_card.items():
         if card_id not in seen:
@@ -380,6 +384,10 @@ async def _sync_siblings(db: AsyncSession, sc: SchoolClass):
         for m in meine:
             twin = by_name.get(m.name.strip())
             if twin:  # Felder angleichen (Name-Identität bleibt)
+                # Auch die Reihenfolge: „dieselbe Person" heisst, sie steht in
+                # jeder Fach-Klasse desselben Kurses an derselben Stelle. Sonst
+                # sortiert das Notenbuch der Lernzeit anders als das von Mathe.
+                twin.position = m.position
                 twin.niveau = m.niveau
                 twin.foerder = m.foerder
                 twin.massnahmen = m.massnahmen
@@ -387,7 +395,7 @@ async def _sync_siblings(db: AsyncSession, sc: SchoolClass):
                 twin.klassenlehrer = m.klassenlehrer
             else:  # neuer Schüler -> in die Geschwister-Klasse übernehmen
                 db.add(Student(card_id=next_card, name=m.name, class_id=g.id, kurs_id=sc.kurs_id,
-                               niveau=m.niveau, foerder=m.foerder, massnahmen=m.massnahmen,
+                               position=m.position, niveau=m.niveau, foerder=m.foerder, massnahmen=m.massnahmen,
                                notizen=m.notizen, klassenlehrer=m.klassenlehrer))
                 next_card += 1
 

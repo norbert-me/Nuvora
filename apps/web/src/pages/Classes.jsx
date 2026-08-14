@@ -233,15 +233,44 @@ export default function Classes() {
     setStudentField(idx, "has_photo", false); setPhotoVer((v) => v + 1);
   };
 
+  // Kartennummern bleiben, wo sie sind — auch beim Loeschen. Frueher wurde hier
+  // durchnummeriert (card_id = Zeilennummer); da die Zusammenfuehrung beim
+  // Speichern ueber die card_id laeuft, uebernahm das nachrueckende Kind die
+  // Noten und Scans des geloeschten. Die Reihenfolge steckt jetzt in der
+  // Position (Reihenfolge dieser Liste), die Kartennummer bleibt an der
+  // gedruckten Karte.
   const removeStudent = async (idx) => {
     if (!await askConfirm(t("classes.removeCardConfirm"))) return;
-    const updated = students.filter((_, i) => i !== idx);
-    setStudents(updated.map((s, i) => ({ ...s, card_id: i + 1 })));
+    setStudents(students.filter((_, i) => i !== idx));
   };
 
   const addRow = () => {
     if (students.length >= MAX_CARDS) return;
-    setStudents([...students, { ...EMPTY_STUDENT, card_id: students.length + 1 }]);
+    const naechste = students.reduce((m, s) => Math.max(m, Number(s.card_id) || 0), 0) + 1;
+    setStudents([...students, { ...EMPTY_STUDENT, card_id: naechste }]);
+  };
+
+  // ─── Reihenfolge per Ziehen ───
+  // Sie gilt nicht nur hier: Notenbuch, Anwesenheit, Klassenarbeit und
+  // Kartenfortschritt sortieren nach derselben Position. Waehrend des Ziehens
+  // steht die Zeile schon dort, wo sie beim Loslassen landet — man sieht das
+  // Ergebnis, statt es sich vorzustellen.
+  const [zieht, setZieht] = useState(null);   // Index der gezogenen Zeile
+  const [ueber, setUeber] = useState(null);   // Index, ueber dem sie schwebt
+  // Gezogen wird ueber die ORIGINAL-Indizes: so bleibt `idx` in der Zeile der
+  // echte Platz in `students`, und kein Handgriff (umbenennen, Foto, loeschen)
+  // muss davon wissen.
+  const reihenfolge = () => {
+    const ids = students.map((_, i) => i);
+    if (zieht == null || ueber == null || zieht === ueber) return ids;
+    ids.splice(ueber, 0, ids.splice(ids.indexOf(zieht), 1)[0]);
+    return ids;
+  };
+  const ablegen = () => {
+    if (zieht != null && ueber != null && zieht !== ueber) {
+      setStudents(reihenfolge().map((i) => students[i]));
+    }
+    setZieht(null); setUeber(null);
   };
 
   const downloadFile = async (url, filename) => {
@@ -258,7 +287,7 @@ export default function Classes() {
   if (editing) {
     const filled = students.filter((s) => s.name.trim() !== "").length;
     return (
-      <div>
+      <div style={{ ...pageApp }}>
         <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{editing.id ? t("classes.editTitle") : t("classes.newTitle")}</h2>
         <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}>
           {/* Klassen tragen keine Farbe — die Farbe hängt am Kurs (Fach). */}
@@ -272,9 +301,21 @@ export default function Classes() {
           {t("classes.fillHint", { filled, total: students.length })}
         </p>
         <div style={{ maxWidth: 620, marginBottom: 12 }}>
-          {students.map((s, idx) => (
-            <div key={idx}>
+          {reihenfolge().map((idx, platz) => { const s = students[idx]; return (
+            <div key={s.card_id ?? idx}
+              onDragOver={(e) => { e.preventDefault(); if (zieht != null && ueber !== platz) setUeber(platz); }}
+              onDrop={ablegen}
+              style={{ opacity: zieht === idx ? 0.45 : 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              {/* Griff: nur hier wird gezogen, damit man im Namensfeld weiter
+                  Text markieren kann. */}
+              <span draggable
+                onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; setZieht(idx); }}
+                onDragEnd={() => { setZieht(null); setUeber(null); }}
+                className="drag-handle" title={t("classes.reorderHint")}
+                style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex", flexShrink: 0 }}>
+                <Icon d={ICONS.grip} size={15} />
+              </span>
               <span
                 style={{ width: 44, textAlign: "right", fontWeight: 700, color: s.name.trim() ? "var(--text)" : "var(--border2)", fontSize: 14, flexShrink: 0 }}
                 title={cardvote ? t("classes.cardNumberHint") : undefined}
@@ -388,7 +429,7 @@ export default function Classes() {
               </div>
             )}
             </div>
-          ))}
+          ); })}
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
           <button onClick={addRow} disabled={students.length >= MAX_CARDS} style={{ ...btnSecondary, opacity: students.length >= MAX_CARDS ? 0.4 : 1 }}>{t("classes.addRow")}</button>

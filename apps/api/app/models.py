@@ -264,7 +264,7 @@ class SchoolClass(Base):
     # sehen.
     archived_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    students: Mapped[list["Student"]] = relationship(back_populates="school_class", order_by="Student.card_id", cascade="all, delete-orphan")
+    students: Mapped[list["Student"]] = relationship(back_populates="school_class", order_by="Student.position, Student.card_id", cascade="all, delete-orphan")
     owner: Mapped[Optional["User"]] = relationship(back_populates="classes")
 
 
@@ -279,6 +279,13 @@ class Student(Base):
     # aktiviert ist. Weitere Modulbegriffe gehoeren NICHT hierher, sondern in
     # eine Tabelle des jeweiligen Moduls.
     card_id: Mapped[int] = mapped_column(Integer)
+    # Reihenfolge in JEDER Liste (Klasse, Notenbuch, Anwesenheit, Klassenarbeit,
+    # Kartenfortschritt). Bewusst getrennt von card_id: die Kartennummer steht
+    # auf einer gedruckten ArUco-Karte und wird von jedem Scan referenziert —
+    # sie umzunummerieren, nur weil jemand die Liste sortieren will, ordnete
+    # alte Scans dem falschen Kind zu. Sortiert wird nach position, dann
+    # card_id: Bestandsdaten (alle position 0) bleiben damit unveraendert.
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     name: Mapped[str] = mapped_column(String(200))
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"))
     # Zugehöriger Kurs (Lerngruppe der Klasse). Anwesenheit wird über den Kurs

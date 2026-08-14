@@ -1836,4 +1836,5 @@ export default {
   "classes.qrPrintHint": "PDF with one QR code per student to cut out. The code leads to the flashcards and — with CardVote — to their own test results. Missing access links are created.",
   "tut.klasse.4": "Print access codes right from the class: one QR code per student to cut out. It leads to the flashcards and — with CardVote — to their own results.",
   "tut.klasse.5": "A link leaked into the class chat? “Re-issue” in the cards module invalidates every old printout at once.",
+  "classes.reorderHint": "Drag to reorder — the order applies in every module (grade book, attendance, exams, cards).",
 };

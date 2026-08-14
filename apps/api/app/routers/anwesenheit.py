@@ -212,7 +212,7 @@ _LABEL = {"fehlt": "Fehlt", "spaet": "Verspätet", "entsch": "Entschuldigt"}
 
 
 async def _students_of(db, class_id):
-    return (await db.execute(select(Student).where(Student.class_id == class_id).order_by(Student.card_id))).scalars().all()
+    return (await db.execute(select(Student).where(Student.class_id == class_id).order_by(Student.position, Student.card_id))).scalars().all()
 
 
 def _pdf_response(build, filename: str):

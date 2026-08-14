@@ -362,6 +362,14 @@ vorletzten, sonst wäre jede schwache Arbeit ein „Abstieg". Eine Note steht kl
 daneben, ausdrücklich als Orientierung: der Notenschlüssel gilt für eine ganze
 Arbeit, nicht für drei Aufgaben daraus.
 
+### Reihenfolge der Lernenden
+
+Die Liste einer Klasse lässt sich per Ziehen sortieren — und diese Reihenfolge
+gilt überall: Notenbuch, Anwesenheit, Klassenarbeit, Kartenfortschritt. Sie ist
+bewusst eine eigene Angabe und **nicht** die Kartennummer: auf der steht die
+gedruckte CardVote-Karte, und jeder Scan verweist darauf. Wer beim Sortieren
+umnummeriert, ordnet alte Ergebnisse dem falschen Kind zu.
+
 ### Archiv statt Löschen
 
 Am Schuljahresende lassen sich Klassen und Kurse **archivieren**: raus aus allen

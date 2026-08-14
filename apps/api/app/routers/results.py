@@ -37,11 +37,11 @@ async def _kurs_roster(db, class_id):
     Lerngruppe deckungsgleich."""
     from .kurse import sibling_class_ids
     sib = await sibling_class_ids(db, class_id)
-    studs = (await db.execute(select(Student).where(Student.class_id.in_(sib)).order_by(Student.id))).scalars().all()
+    studs = (await db.execute(select(Student).where(Student.class_id.in_(sib)).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
     canon = {}
     for s in studs:
         canon.setdefault(s.name.strip(), s)
-    return sorted(canon.values(), key=lambda s: (s.card_id, s.id))
+    return sorted(canon.values(), key=lambda s: (s.position or 0, s.card_id, s.id))
 
 
 class ScanCreate(BaseModel):
