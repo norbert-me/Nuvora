@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useAktiv } from "../core/modules.js";
+import AbschnittWahl from "../components/AbschnittWahl.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
 import { DownloadLink, Icon, ICONS, btnPrimary, btnSecondary, Modal, inputStyle, COLORS as C, Boxplot, pageApp, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
@@ -1030,8 +1031,6 @@ function StatBox({ label, value, color }) {
 function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
   const { t } = useLanguage();
   const heute = () => { const d = new Date(); return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`; };
-  const [term, setTerm] = useState("1");
-  const [sections, setSections] = useState([]);
   const [sectionId, setSectionId] = useState(null);
   // Standard-Spaltenname ist der Testname (nicht das Datum); ueber lang wird er
   // in der Notentabelle ohnehin per Ellipse gekuerzt. Fallback: heutiges Datum.
@@ -1039,17 +1038,6 @@ function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(null);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    fetch(`/api/noten/classes/${classId}/sections?term=${term}`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((secs) => {
-        const list = secs || [];
-        setSections(list);
-        setSectionId(list.length ? list[0].id : null);
-      })
-      .catch(() => {});
-  }, [classId, term]);
 
   const uebernehmen = async () => {
     setBusy(true); setError("");
@@ -1082,20 +1070,7 @@ function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
             {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 10 }}>{error}</p>}
             {(() => { const fld = { ...inputStyle, width: "100%" }; const lbl = { fontSize: 12.5, color: "var(--text2)", marginBottom: 6, marginTop: 12 }; return (
               <>
-                <div style={{ ...lbl, marginTop: 0 }}>{t("noten.term")}</div>
-                <select value={term} onChange={(e) => setTerm(e.target.value)} style={fld}>
-                  <option value="1">{t("noten.term1")}</option>
-                  <option value="2">{t("noten.term2")}</option>
-                </select>
-
-                <div style={lbl}>{t("notenimp.section")}</div>
-                {sections.length === 0 ? (
-                  <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("notenimp.noSection")}</p>
-                ) : (
-                  <select value={sectionId ?? ""} onChange={(e) => setSectionId(Number(e.target.value))} style={fld}>
-                    {sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                )}
+                <AbschnittWahl classId={classId} value={sectionId} onChange={setSectionId} />
 
                 <div style={lbl}>{t("notenimp.colName")}</div>
                 <div style={{ display: "flex", gap: 6 }}>

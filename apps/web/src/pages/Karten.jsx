@@ -7,6 +7,7 @@ import { NiveauToggle, AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary,
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import AuthImage from "../components/AuthImage.jsx";
+import AbschnittWahl from "../components/AbschnittWahl.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
@@ -465,23 +466,10 @@ export default function Karten() {
 // gelernt haben — nie-Gelernte bekommen keine 6 untergeschoben. Die Spalte ist frei
 // editierbar; die Note bleibt pädagogische Entscheidung.
 function NotenBrueckeModal({ t, classId, kursId, progress, scale, onClose }) {
-  const [sections, setSections] = useState(null);
-  const [sectionId, setSectionId] = useState("");
+  const [sectionId, setSectionId] = useState(null);
   const [name, setName] = useState(`${t("karten.masteryColumn")} ${new Date().toLocaleDateString()}`);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  // term=all: Karten hat keinen Halbjahr-Selektor — sonst waeren im 2. Halbjahr
-  // keine Abschnitte waehlbar. Das Halbjahr steht als Label an der Option.
-  const kq = `?term=all${kursId != null ? `&kurs_id=${kursId}` : ""}`;
-  const secLabel = (s) => `${s.term === "2" ? "2. Hj · " : "1. Hj · "}${s.name}`;
-
-  useEffect(() => {
-    fetch(`/api/noten/classes/${classId}/sections${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => {
-      const list = Array.isArray(d) ? d : [];
-      setSections(list);
-      if (list[0]) setSectionId(String(list[0].id));
-    }).catch(() => setSections([]));
-  }, [classId, kursId]);
 
   const grades = progress
     .filter((p) => p.reviewed > 0)
@@ -489,7 +477,7 @@ function NotenBrueckeModal({ t, classId, kursId, progress, scale, onClose }) {
     .filter((g) => g.value >= 1 && g.value <= 6);
 
   const submit = async () => {
-    if (!sectionId) { setErr(t("karten.masteryNoSection")); return; }
+    if (!sectionId) { setErr(t("notenimp.noSection")); return; }
     if (!name.trim()) { setErr(t("noten.columnName")); return; }
     setBusy(true); setErr("");
     const res = await fetch("/api/noten/import-grades", {
@@ -505,19 +493,12 @@ function NotenBrueckeModal({ t, classId, kursId, progress, scale, onClose }) {
     <UiModal onClose={onClose} width={440} label={t("karten.toNoten")}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t("karten.toNoten")}</h3>
         <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 14px" }}>{t("karten.masteryHint", { n: grades.length })}</p>
-        {sections && sections.length === 0 ? (
-          <p style={{ fontSize: 13, color: C.danger }}>{t("karten.masteryNoSection")}</p>
-        ) : (<>
-          <div style={{ fontSize: 12.5, color: "var(--text2)", margin: "0 0 5px" }}>{t("karten.masterySection")}</div>
-          <select value={sectionId} onChange={(e) => setSectionId(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
-            {(sections || []).map((s) => <option key={s.id} value={s.id}>{secLabel(s)}</option>)}
-          </select>
-          <div style={{ fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" }}>{t("noten.columnName")}</div>
-          <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, width: "100%" }} />
-        </>)}
+        <AbschnittWahl classId={classId} kursId={kursId} value={sectionId} onChange={setSectionId} />
+        <div style={{ fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" }}>{t("noten.columnName")}</div>
+        <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, width: "100%" }} />
         {err && <p style={{ color: C.danger, fontSize: 12.5, marginTop: 10 }}>{err}</p>}
         <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
-          <button onClick={submit} disabled={busy || grades.length === 0 || (sections && sections.length === 0)} style={{ ...btnPrimary, opacity: busy || grades.length === 0 ? 0.6 : 1 }}>{t("common.save")}</button>
+          <button onClick={submit} disabled={busy || grades.length === 0 || !sectionId} style={{ ...btnPrimary, opacity: busy || grades.length === 0 || !sectionId ? 0.6 : 1 }}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
         </div>
     </UiModal>

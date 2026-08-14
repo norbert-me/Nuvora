@@ -382,6 +382,19 @@ def inhalt_auswertung(api, u, spuren):
                      {"name": f"{PRAEFIX} Block", "weight": 60}, erwartet=(201,))
     spuren.append(("Notenblock", lambda: api.call(
         "DELETE", f"/api/noten/sections/{block['id']}", erwartet=(204, 404))))
+    # Abschnitt im 2. Halbjahr: die Uebernahme-Dialoge legen ihn dort direkt an
+    # (frueher endete der Weg bei „lege zuerst einen an"). term muss haften und
+    # term=all muss beide liefern — sonst waehlt man im Dialog ins Leere.
+    zweites = api.call("POST", f"/api/noten/classes/{u.class_id}/sections?term=2",
+                       {"name": f"{PRAEFIX} Block 2. HJ", "weight": 0}, erwartet=(201,))
+    spuren.append(("Notenblock 2. HJ", lambda: api.call(
+        "DELETE", f"/api/noten/sections/{zweites['id']}", erwartet=(204, 404))))
+    if str(zweites.get("term")) != "2":
+        raise AssertionError(f"Halbjahr am Abschnitt verloren: {zweites}")
+    alle = {x["id"] for x in api.call(
+        "GET", f"/api/noten/classes/{u.class_id}/sections?term=all", erwartet=(200,))}
+    if not {block["id"], zweites["id"]} <= alle:
+        raise AssertionError(f"term=all liefert nicht beide Halbjahre: {alle}")
     spalte = api.call("POST", "/api/noten/categories",
                       {"name": f"{PRAEFIX} Spalte", "section_id": block["id"],
                        "topic_id": u.topic_id}, erwartet=(201,))

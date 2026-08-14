@@ -10,6 +10,7 @@ import MaterialPanel from "../components/MaterialPanel.jsx";
 import Themenstand from "../components/Themenstand.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
+import AbschnittWahl from "../components/AbschnittWahl.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
@@ -890,15 +891,10 @@ export default function Klassenarbeit() {
 // Nur SuS mit mind. einer markierten falschen Aufgabe ODER allen richtig — die
 // Spalte ist frei editierbar (Abwesende später herausnehmen).
 function NotenUebernahme({ t, classId, kursId, students, work, scale = DEFAULT_SCALE, onClose }) {
-  const [sections, setSections] = useState(null);
-  const [sectionId, setSectionId] = useState("");
+  const [sectionId, setSectionId] = useState(null);
   const [name, setName] = useState(work.name || t("klassenarbeit.newName"));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const kq = `?term=all${kursId != null ? `&kurs_id=${kursId}` : ""}`;
-  useEffect(() => {
-    fetch(`/api/noten/classes/${classId}/sections${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => { const l = Array.isArray(d) ? d : []; setSections(l); if (l[0]) setSectionId(String(l[0].id)); }).catch(() => setSections([]));
-  }, []);
   const uIds = (tk) => (tk.parts && tk.parts.length) ? tk.parts.map((u) => u.id) : [tk.id];
   const uMaxT = (tk) => (tk.parts && tk.parts.length) ? tk.parts.reduce((n, u) => n + (Number(u.max) > 0 ? Number(u.max) : 1), 0) : (Number(tk.max) > 0 ? Number(tk.max) : 1);
   const totalMax = (work.tasks || []).reduce((n, tk) => n + uMaxT(tk), 0);
@@ -920,9 +916,8 @@ function NotenUebernahme({ t, classId, kursId, students, work, scale = DEFAULT_S
       // Notenwert mit Tendenz (±0,3) — wie in der Excel-Auswertung.
       return { student_id: s.id, value: gradeDetailed(totalMax ? (sum / totalMax) * 100 : 0, scale).wert };
     }).filter((g) => g.value >= 1 && g.value <= 6);
-  const secLabel = (s) => `${s.term === "2" ? "2. Hj · " : "1. Hj · "}${s.name}`;
   const submit = async () => {
-    if (!sectionId) { setErr(t("karten.masteryNoSection")); return; }
+    if (!sectionId) { setErr(t("notenimp.noSection")); return; }
     setBusy(true); setErr("");
     const res = await fetch("/api/noten/import-grades", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ class_id: classId, kurs_id: kursId, section_id: Number(sectionId), column_name: name.trim(), note: t("klassenarbeit.title"), source_kind: "klassenarbeit", grades }) }).catch(() => null);
@@ -935,19 +930,12 @@ function NotenUebernahme({ t, classId, kursId, students, work, scale = DEFAULT_S
     <Modal onClose={onClose} width={440} label={t("klassenarbeit.toNoten")}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t("klassenarbeit.toNoten")}</h3>
         <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 12px" }}>{t("klassenarbeit.toNotenHint", { n: grades.length })}</p>
-        {sections && sections.length === 0 ? (
-          <p style={{ fontSize: 13, color: C.danger }}>{t("karten.masteryNoSection")}</p>
-        ) : (<>
-          <div style={{ ...lbl, marginTop: 0 }}>{t("karten.masterySection")}</div>
-          <select value={sectionId} onChange={(e) => setSectionId(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
-            {(sections || []).map((s) => <option key={s.id} value={s.id}>{secLabel(s)}</option>)}
-          </select>
-          <div style={lbl}>{t("noten.columnName")}</div>
-          <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, width: "100%" }} />
-        </>)}
+        <AbschnittWahl classId={classId} kursId={kursId} value={sectionId} onChange={setSectionId} />
+        <div style={lbl}>{t("noten.columnName")}</div>
+        <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, width: "100%" }} />
         {err && <p style={{ color: C.danger, fontSize: 12.5, marginTop: 10 }}>{err}</p>}
         <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
-          <button onClick={submit} disabled={busy || grades.length === 0 || (sections && sections.length === 0)} style={{ ...btnPrimary, opacity: busy ? 0.6 : 1 }}>{t("common.save")}</button>
+          <button onClick={submit} disabled={busy || grades.length === 0 || !sectionId} style={{ ...btnPrimary, opacity: busy || !sectionId ? 0.6 : 1 }}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
         </div>
     </Modal>

@@ -603,7 +603,7 @@ export default {
   "notenimp.whichCat": "¿En qué categoría?",
   "notenimp.import": "Importar",
   "notenimp.section": "Área",
-  "notenimp.noSection": "Aún no hay área en este semestre. Crea una en el módulo de notas.",
+  "notenimp.noSection": "Todavía no hay ninguna sección en este semestre. Créala aquí mismo.",
   "notenimp.colName": "Nombre de columna (fecha)",
   "notenimp.importing": "Importando…",
   "notenimp.failed": "La importación falló",
@@ -1851,4 +1851,9 @@ export default {
   "help.si.foerder": "En «Vista» se puede mostrar para quién hay algo acordado: el sitio recibe una marca pequeña, el texto está en el tooltip. Desactivado por defecto — el plano suele estar en el proyector. Las medidas se gestionan en las clases.",
   "help.kal.korrT": "No olvidar la corrección",
   "help.kal.korr": "Cada fecha de examen crea una tarea «corregir» una semana después — solo con el módulo Tareas. Si se mueve la fecha, la nota se mueve; si se borra, desaparece (si sigue abierta).",
+  "fw.byTest": "Prueba por prueba",
+  "fw.exam": "Examen",
+  "fw.quiz": "Cuestionario",
+  "fw.noSubmission": "sin entrega",
+  "fw.noTopicsHint": "Sin desglose por tema: las preguntas o tareas no tienen tema asignado. Al asignarlo se ve exactamente dónde falla.",
 };

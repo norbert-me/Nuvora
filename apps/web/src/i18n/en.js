@@ -602,7 +602,7 @@ export default {
   "notenimp.whichCat": "Into which category?",
   "notenimp.import": "Import",
   "notenimp.section": "Section",
-  "notenimp.noSection": "No section in this term yet. Create one in the grades module.",
+  "notenimp.noSection": "No section yet in this term. Create one right here.",
   "notenimp.colName": "Column name (date)",
   "notenimp.importing": "Importing…",
   "notenimp.failed": "Import failed",
@@ -1850,4 +1850,9 @@ export default {
   "help.si.foerder": "Under “View” you can show who has something agreed: the seat gets a small marker, the text is in the tooltip. Off by default — the seating plan is often on the projector. Measures are maintained with the classes.",
   "help.kal.korrT": "Do not forget the marking",
   "help.kal.korr": "Every exam date creates a “mark it” to-do one week after the exam — only with the To-do module. Moving the date moves the note; deleting the date removes it (if still open).",
+  "fw.byTest": "Test by test",
+  "fw.exam": "Exam",
+  "fw.quiz": "Quiz",
+  "fw.noSubmission": "no submission",
+  "fw.noTopicsHint": "No breakdown by topic: the questions or tasks carry no topic. Tag them and you will see exactly where it goes wrong.",
 };

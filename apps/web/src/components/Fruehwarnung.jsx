@@ -119,6 +119,38 @@ export function FruehwarnKarte({ schueler, t, offen = false, studentId = null })
               {notiert ? t("fw.noteDone") : t("fw.noteAdd")}
             </button>
           )}
+          {/* Test fuer Test: die Zahlen, aus denen die Meldung entstand. Ohne sie
+              klappte die Karte bei Fragen ohne Thema ins Leere auf — der Blick
+              ins Detail muss immer etwas zeigen. */}
+          {s.kurve?.length > 0 && (
+            <>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>
+                {t("fw.byTest")}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: s.themen?.length ? 12 : 0 }}>
+                {s.kurve.map((k, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+                    <span style={{ color: "var(--text3)", width: 46, flexShrink: 0 }}>
+                      {(k.datum || "").slice(0, 10).split("-").reverse().slice(0, 2).join(".")}
+                    </span>
+                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{k.name}</span>
+                    <span style={{ fontSize: 11, color: "var(--text3)" }}>{k.art === "arbeit" ? t("fw.exam") : t("fw.quiz")}</span>
+                    {k.pct == null ? (
+                      <span style={{ color: "var(--text3)" }}>{t("fw.noSubmission")}</span>
+                    ) : (
+                      <span style={{ color: "var(--text3)" }}>{Math.round(k.pct)} % / {Math.round(k.klasse)} %</span>
+                    )}
+                    <span style={{ fontWeight: 700, minWidth: 52, textAlign: "right", color: k.abstand == null ? "var(--text3)" : k.abstand < 0 ? C.danger : C.success }}>
+                      {k.abstand == null ? "–" : `${k.abstand > 0 ? "+" : ""}${Math.round(k.abstand)} Pp`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          {!s.themen?.length && (
+            <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8, lineHeight: 1.5 }}>{t("fw.noTopicsHint")}</div>
+          )}
           {s.themen?.length > 0 && (
             <>
               <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>

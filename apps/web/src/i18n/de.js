@@ -604,7 +604,7 @@ export default {
   "notenimp.whichCat": "In welche Kategorie?",
   "notenimp.import": "Übernehmen",
   "notenimp.section": "Abschnitt",
-  "notenimp.noSection": "In diesem Halbjahr gibt es noch keinen Abschnitt. Lege im Notenmodul einen an.",
+  "notenimp.noSection": "In diesem Halbjahr gibt es noch keinen Abschnitt. Lege hier direkt einen an.",
   "notenimp.colName": "Spaltenname (Datum)",
   "notenimp.importing": "Übernehme…",
   "notenimp.failed": "Übernahme fehlgeschlagen",
@@ -1836,4 +1836,9 @@ export default {
   "help.si.foerder": "Unter „Ansicht“ lässt sich einblenden, für wen etwas vereinbart ist: der Platz bekommt ein kleines Zeichen, der Text steht im Tooltip. Standardmäßig aus — der Sitzplan hängt oft am Beamer. Gepflegt werden die Maßnahmen bei den Klassen.",
   "help.kal.korrT": "Korrektur nicht vergessen",
   "help.kal.korr": "Zu jedem Klassenarbeitstermin entsteht ein To-do „korrigieren“ eine Woche nach der Arbeit — nur mit dem Modul To-do. Wird der Termin verschoben, zieht der Zettel mit; wird er gelöscht, verschwindet er wieder (sofern noch offen).",
+  "fw.byTest": "Test für Test",
+  "fw.exam": "Arbeit",
+  "fw.quiz": "Quiz",
+  "fw.noSubmission": "keine Abgabe",
+  "fw.noTopicsHint": "Keine Aufschlüsselung nach Themen: die Fragen bzw. Aufgaben tragen kein Thema. Wer eins hinterlegt, sieht hier, woran es genau hängt.",
 };

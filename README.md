@@ -415,7 +415,8 @@ Thema → Unterthema):
 
 - schwaches CardVote-/Code-Detektiv-/Klassenarbeits-Thema → Karten-Deck oder
   Lernpfad-Aufgabe
-- CardVote-, Karten- und Code-Detektiv-Ergebnisse → Notenspalte
+- CardVote-, Karten- und Code-Detektiv-Ergebnisse → Notenspalte (Abschnitt wird
+  im Dialog gewählt oder dort samt Halbjahr angelegt)
 - schwaches Thema → passender Einstieg vorgeschlagen
 - Kalender plant Quiz/Deck/Lernleiter und schaltet Decks am Tag frei
 - Themen-Ansicht zeigt zu einem Thema alles quer über die aktiven Module
