@@ -1156,6 +1156,12 @@ class Material(Base):
     mime: Mapped[str] = mapped_column(String(120), default="", server_default="")
     size: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     data: Mapped[bytes] = mapped_column(LargeBinary)
+    # Abgeleitete PDF-Fassung von Office-Dateien (docx/xlsx/pptx/odt …). Der
+    # Browser kann Office nicht anzeigen; ohne diese Umwandlung bliebe nur der
+    # Download. Wird beim ersten Ansehen einmalig erzeugt und dann behalten —
+    # die Umwandlung kostet Sekunden, das Nachschlagen soll sie nicht kosten.
+    # deferred: Listen-Abfragen sollen den Blob nicht mitschleppen.
+    pdf_data: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True, deferred=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

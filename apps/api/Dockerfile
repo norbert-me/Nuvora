@@ -4,7 +4,17 @@
 #   N=python T=3.14-slim; TOKEN=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/$N:pull" | python3 -c "import json,sys;print(json.load(sys.stdin)['token'])"); curl -sI -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json" "https://registry-1.docker.io/v2/library/$N/manifests/$T" | grep -i docker-content-digest
 FROM python:3.14-slim@sha256:a7fb1e634c4a578f9e0bd6327f11a3cde11b7a9395f48e24360c0988bcc5c2bc
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 && rm -rf /var/lib/apt/lists/*
+# libgl1/libglib: OpenCV (Scan). libreoffice-writer + -calc + -impress: Office-
+# Dateien im Browser ansehen — der Server wandelt docx/xlsx/pptx einmalig nach
+# PDF, weil kein Browser Office anzeigen kann und ein Download an einer
+# Klassenarbeit vorbeigeht, die man nur kurz nachschlagen will. Bewusst NICHT
+# das Meta-Paket `libreoffice` (zieht Base, Draw, Java und ~1 GB nach) und ohne
+# empfohlene Pakete; dafuer die Kernschriften, sonst rutscht das Layout.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libgl1 libglib2.0-0 \
+      libreoffice-writer libreoffice-calc libreoffice-impress \
+      fonts-liberation fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
 # Aus der Lock-Datei, nicht aus requirements.txt: feste Fassungen statt Bereiche,
 # und --require-hashes laesst pip abbrechen, wenn ein Paket nicht Byte fuer Byte
 # das ist, gegen das hier zuletzt getestet wurde. Neu erzeugt wird sie mit

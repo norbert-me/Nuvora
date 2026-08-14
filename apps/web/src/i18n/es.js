@@ -1805,4 +1805,6 @@ export default {
   "klassenarbeit.tipEmpty": "{{n}} % con cero puntos. Tantas respuestas en blanco suelen indicar un enunciado poco claro o falta de tiempo.",
   "klassenarbeit.tipRepeat": "Solo {{p}} % de los puntos, pero la tarea discrimina bien: el contenido no está. Merece repaso.",
   "klassenarbeit.tipEasy": "{{v}} % con puntuación máxima: sirve de entrada, pero no aporta arriba.",
+  "material.converting": "Convirtiendo para la vista previa … (unos segundos la primera vez)",
+  "material.noPreviewOther": "Descargar: el navegador no puede mostrar este tipo de archivo.",
 };

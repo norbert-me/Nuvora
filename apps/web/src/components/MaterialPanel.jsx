@@ -52,21 +52,32 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
     else { const b = res ? await res.json().catch(() => ({})) : {}; setErr(typeof b.detail === "string" ? b.detail : t("common.notWork")); }
   };
 
-  // Was der Browser selbst zeigen kann, wird gezeigt — ein Klick, Datei da.
-  // Alles andere (docx, zip …) bleibt ein Download: dafuer gibt es im Browser
-  // keine Anzeige, und ein leeres Fenster waere schlechter als eine Datei.
-  const ansehbar = (m) => /^application\/pdf$|^image\//.test(m.mime || "");
+  // Was der Browser selbst zeigen kann, wird gezeigt. Office-Dateien kann er
+  // nicht — die wandelt der Server einmalig nach PDF (LibreOffice) und behaelt
+  // das Ergebnis. Ein Download ist bei einer Klassenarbeit, die man nur kurz
+  // nachschlagen will, der falsche Weg.
+  const OFFICE = /\.(docx?|xlsx?|pptx?|odt|ods|odp|rtf)$/i;
+  const istOffice = (m) => OFFICE.test(m.filename || "") || /officedocument|opendocument|ms-(word|excel|powerpoint)|msword/.test(m.mime || "");
+  const ansehbar = (m) => /^application\/pdf$|^image\//.test(m.mime || "") || istOffice(m);
 
   const ansehen = async (m) => {
     // Sofort das Fenster mit „lädt …" oeffnen: eine 5-MB-Datei braucht ein paar
     // Sekunden, und ohne Rueckmeldung wirkt der Klick wie verschluckt — man
     // klickt dann noch zweimal.
-    setVorschau({ url: null, name: m.filename, mime: m.mime, laedt: true });
-    const res = await fetch(`${API}/${m.id}/download`).catch(() => null);
-    if (!res || !res.ok) { setVorschau(null); setErr(t("common.notWork")); return; }
+    const office = istOffice(m);
+    setVorschau({ url: null, name: m.filename, mime: office ? "application/pdf" : m.mime, laedt: true, office });
+    // Office geht ueber /pdf (wandelt beim ersten Mal), alles andere direkt.
+    const res = await fetch(`${API}/${m.id}/${office ? "pdf" : "download"}`).catch(() => null);
+    if (!res || !res.ok) {
+      const b = res ? await res.json().catch(() => ({})) : {};
+      setVorschau(null);
+      setErr(typeof b.detail === "string" ? b.detail : t("common.notWork"));
+      return;
+    }
     const blob = await res.blob();
     // Typ mitgeben: ohne ihn zeigt der Browser ein PDF als Download-Dialog.
-    setVorschau({ url: URL.createObjectURL(blob.slice(0, blob.size, m.mime || blob.type)), name: m.filename, mime: m.mime });
+    const typ = office ? "application/pdf" : (m.mime || blob.type);
+    setVorschau({ url: URL.createObjectURL(blob.slice(0, blob.size, typ)), name: m.filename, mime: typ, office });
   };
 
   const download = async (m) => {
@@ -107,7 +118,7 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
       ) : items.map((m) => (
         <div key={m.id} style={row}>
           <button onClick={() => (ansehbar(m) ? ansehen(m) : download(m))}
-            title={ansehbar(m) ? t("material.open") : t("material.noPreview")}
+            title={ansehbar(m) ? t("material.open") : t("material.noPreviewOther")}
             aria-label={ansehbar(m) ? t("material.open") : t("material.download")}
             style={{ flex: 1, minWidth: 0, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", border: "none", background: "none", cursor: "pointer", color: "var(--accent)", fontWeight: 600, fontSize: 13.5, padding: 0 }}>
             {m.filename}
@@ -143,7 +154,7 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
           </div>
           {!vorschau.url ? (
             <div style={{ height: "72vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text3)", fontSize: 14, border: "1px solid var(--border)", borderRadius: 8 }}>
-              {t("material.loading")}
+              {vorschau.office ? t("material.converting") : t("material.loading")}
             </div>
           ) : /^image\//.test(vorschau.mime || "") ? (
             <img src={vorschau.url} alt={vorschau.name} style={{ maxWidth: "100%", maxHeight: "72vh", display: "block", margin: "0 auto" }} />

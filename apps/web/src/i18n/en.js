@@ -1804,4 +1804,6 @@ export default {
   "klassenarbeit.tipEmpty": "{{n}} % scored zero. That many blanks usually means unclear wording or too little time — not missing ability.",
   "klassenarbeit.tipRepeat": "Only {{p}} % of the points, but the task discriminates well: the content isn’t there. Worth revisiting.",
   "klassenarbeit.tipEasy": "{{v}} % full marks: fine as a starter, but it adds nothing at the top end.",
+  "material.converting": "Converting for preview … (a few seconds the first time)",
+  "material.noPreviewOther": "Download — the browser cannot display this file type.",
 };

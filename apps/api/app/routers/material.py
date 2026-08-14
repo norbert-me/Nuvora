@@ -146,6 +146,97 @@ async def download_material(material_id: int, user: User = Depends(get_current_u
                              "X-Content-Type-Options": "nosniff"})
 
 
+# Office-Dateien, die der Browser nicht anzeigen kann — sie werden auf Wunsch
+# einmalig nach PDF gewandelt. Alles andere bleibt ein Download.
+OFFICE = {
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",   # docx
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",         # xlsx
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation", # pptx
+    "application/msword", "application/vnd.ms-excel", "application/vnd.ms-powerpoint",
+    "application/vnd.oasis.opendocument.text", "application/vnd.oasis.opendocument.spreadsheet",
+    "application/vnd.oasis.opendocument.presentation", "application/rtf", "text/rtf",
+}
+OFFICE_ENDUNGEN = (".docx", ".doc", ".xlsx", ".xls", ".pptx", ".ppt", ".odt", ".ods", ".odp", ".rtf")
+
+
+def _ist_office(m) -> bool:
+    return (m.mime in OFFICE) or (m.filename or "").lower().endswith(OFFICE_ENDUNGEN)
+
+
+def _nach_pdf(daten: bytes, dateiname: str) -> bytes:
+    """Office-Datei nach PDF wandeln — mit LibreOffice, ohne Netz, im Tempordner.
+
+    Laeuft im Threadpool (der Aufrufer sorgt dafuer): die Umwandlung dauert
+    Sekunden und wuerde sonst die ganze Ereignisschleife blockieren.
+
+    Bewusst ein eigenes Profilverzeichnis je Aufruf: zwei gleichzeitige
+    Umwandlungen mit demselben Profil blockieren einander (LibreOffice laesst nur
+    eine Instanz je Profil zu) — der zweite Aufruf haengt dann bis zum Timeout.
+    """
+    import shutil
+    import subprocess
+    import tempfile
+    from pathlib import Path
+
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if not soffice:
+        raise HTTPException(501, "Umwandlung nicht verfügbar: LibreOffice fehlt im Server-Image.")
+
+    endung = Path(dateiname or "datei").suffix or ".docx"
+    with tempfile.TemporaryDirectory() as tmp:
+        quelle = Path(tmp) / f"eingabe{endung}"
+        quelle.write_bytes(daten)
+        profil = Path(tmp) / "profil"
+        try:
+            subprocess.run(
+                [soffice, "--headless", "--norestore", "--nolockcheck", "--nodefault",
+                 f"-env:UserInstallation=file://{profil}",
+                 "--convert-to", "pdf", "--outdir", tmp, str(quelle)],
+                check=True, timeout=90, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+        except subprocess.TimeoutExpired:
+            raise HTTPException(504, "Die Umwandlung hat zu lange gedauert.")
+        except subprocess.CalledProcessError as e:
+            raise HTTPException(500, f"Die Datei liess sich nicht umwandeln: {(e.stderr or b'')[:200].decode(errors='replace')}")
+        ziel = Path(tmp) / "eingabe.pdf"
+        if not ziel.exists():
+            raise HTTPException(500, "Die Umwandlung hat kein PDF erzeugt.")
+        return ziel.read_bytes()
+
+
+@router.get("/{material_id}/pdf")
+async def material_als_pdf(material_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Die Datei als PDF — zum Ansehen im Browser, ohne Download.
+
+    PDFs kommen unveraendert zurueck. Office-Dateien werden beim ERSTEN Aufruf
+    gewandelt und danach behalten; jede weitere Ansicht ist sofort da.
+    """
+    from starlette.concurrency import run_in_threadpool
+    from sqlalchemy.orm import undefer
+
+    m = (await db.execute(select(Material).options(undefer(Material.pdf_data))
+                          .where(Material.id == material_id))).scalar_one_or_none()
+    if not m or m.owner_id != user.id:
+        raise HTTPException(404, "Material nicht gefunden")
+
+    if m.mime == "application/pdf":
+        pdf = m.data
+    elif m.pdf_data:
+        pdf = m.pdf_data
+    elif _ist_office(m):
+        rate_limit("material_pdf", f"u{user.id}", 30, 60, "Zu viele Umwandlungen. Bitte kurz warten.")
+        pdf = await run_in_threadpool(_nach_pdf, m.data, m.filename)
+        m.pdf_data = pdf
+        await db.commit()
+    else:
+        raise HTTPException(415, "Diese Datei lässt sich nicht als PDF anzeigen.")
+
+    safe = (m.filename or "datei").rsplit(".", 1)[0].replace('"', "'")[:180]
+    return Response(content=pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="{safe}.pdf"',
+                             "X-Content-Type-Options": "nosniff"})
+
+
 @router.delete("/{material_id}", status_code=204)
 async def delete_material(material_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     m = await db.get(Material, material_id)

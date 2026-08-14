@@ -1790,4 +1790,6 @@ export default {
   "klassenarbeit.tipEmpty": "{{n}} % haben null Punkte. Bei so vielen leeren Feldern ist meist die Aufgabenstellung unklar (oder die Zeit war zu knapp) — nicht das Können.",
   "klassenarbeit.tipRepeat": "Nur {{p}} % der Punkte, aber die Aufgabe trennt sauber: Der Stoff sitzt nicht. Wiederholung lohnt — die Namen dazu stehen oben unter den schwachen Themen.",
   "klassenarbeit.tipEasy": "{{v}} % volle Punktzahl: als Einstieg gut, für die Differenzierung nach oben trägt die Aufgabe nichts bei.",
+  "material.converting": "Wird zum Ansehen umgewandelt … (beim ersten Mal ein paar Sekunden)",
+  "material.noPreviewOther": "Herunterladen — diese Dateiart kann der Browser nicht anzeigen.",
 };

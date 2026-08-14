@@ -313,6 +313,7 @@ def _ensure_columns(sync_conn):
         ("students", "photo_mime", "VARCHAR(120) DEFAULT '' NOT NULL"),
         ("materials", "method_id", "INTEGER"),
         ("materials", "work_id", "INTEGER"),
+        ("materials", "pdf_data", "BYTEA"),
         ("work_analyses", "source_id", "INTEGER"),
         ("school_classes", "archived_at", "TIMESTAMPTZ"),
         ("kurse", "archived_at", "TIMESTAMPTZ"),

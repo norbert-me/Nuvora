@@ -180,6 +180,22 @@ async def _check_schema(db: AsyncSession, out: List[Check]) -> None:
     ))
 
 
+def _check_werkzeuge(out: List[Check]) -> None:
+    """Externe Programme, auf die Funktionen bauen.
+
+    LibreOffice wandelt Office-Dateien zum Ansehen nach PDF. Fehlt es, faellt
+    genau diese Funktion aus — und zwar erst dann, wenn jemand im Unterricht auf
+    seine Klassenarbeit klickt. Deshalb hier und nicht dort.
+    """
+    import shutil
+    pfad = shutil.which("soffice") or shutil.which("libreoffice")
+    out.append(Check(
+        gruppe="Einrichtung", name="LibreOffice", ok=bool(pfad), schwere="warnung",
+        detail=(f"{pfad} — Office-Dateien lassen sich im Browser ansehen" if pfad
+                else "fehlt — Word/Excel/PowerPoint lassen sich nur herunterladen, nicht ansehen"),
+    ))
+
+
 def _check_config(out: List[Check]) -> None:
     for var in ("TOKEN_SECRET", "DATABASE_URL"):
         wert = (os.environ.get(var) or "").strip()
@@ -580,6 +596,7 @@ async def selftest(request: Request, db: AsyncSession = Depends(get_db),
         await _check_schema(db, checks)
     # Der SMTP-Check verbindet sich (bis 5 s) — nicht im Event-Loop blockieren.
     await asyncio.to_thread(_check_config, checks)
+    await asyncio.to_thread(_check_werkzeuge, checks)
     _check_site_json(checks)
     _check_backup(checks)
     _check_module(request, checks)
