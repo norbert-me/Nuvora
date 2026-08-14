@@ -313,6 +313,7 @@ def _ensure_columns(sync_conn):
         ("students", "photo_mime", "VARCHAR(120) DEFAULT '' NOT NULL"),
         ("materials", "method_id", "INTEGER"),
         ("materials", "work_id", "INTEGER"),
+        ("work_analyses", "source_id", "INTEGER"),
         ("materials", "rolle", "VARCHAR(20) DEFAULT '' NOT NULL"),
         ("cards", "deleted_at", "TIMESTAMP WITH TIME ZONE"),
         ("cards", "front_image", "BYTEA"),

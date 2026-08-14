@@ -69,6 +69,7 @@ class WorkPut(BaseModel):
 
 class WorkOut(BaseModel):
     id: int
+    source_id: Optional[int] = None
     class_id: int
     kurs_id: Optional[int] = None
     name: str
@@ -112,7 +113,7 @@ async def roster_kurs(kurs_id: int, user: User = Depends(require_module), db: As
 async def list_works(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
     rows = (await db.execute(select(WorkAnalysis).where(*_keyw(user, class_id, kurs_id)).order_by(WorkAnalysis.created_at.desc()))).scalars().all()
-    return [WorkOut(id=w.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or []) for w in rows]
+    return [WorkOut(id=w.id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or []) for w in rows]
 
 
 @router.post("/works", response_model=WorkOut, status_code=201)
@@ -123,7 +124,7 @@ async def create_work(body: WorkIn, user: User = Depends(require_module), db: As
     db.add(w)
     await db.commit()
     await db.refresh(w)
-    return WorkOut(id=w.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=[], results={}, absent=[])
+    return WorkOut(id=w.id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=[], results={}, absent=[])
 
 
 class WorkCopyIn(BaseModel):
@@ -160,6 +161,9 @@ async def copy_work(work_id: int, body: WorkCopyIn, user: User = Depends(require
     import copy as _copy
     ziel = WorkAnalysis(
         owner_id=user.id, class_id=body.class_id, kurs_id=body.kurs_id,
+        # Kette flach halten: die Kopie einer Kopie zeigt auf denselben Ursprung.
+        # So ist die Gruppe „dieselbe Arbeit" eine ID-Abfrage und keine Suche.
+        source_id=quelle.source_id or quelle.id,
         name=((body.name or quelle.name or "Klassenarbeit").strip()[:200]),
         # Tief kopieren: sonst zeigen beide Arbeiten auf dieselben Listen, und
         # eine geaenderte Aufgabe waere still in beiden geaendert.
@@ -180,7 +184,7 @@ async def copy_work(work_id: int, body: WorkCopyIn, user: User = Depends(require
 
     await db.commit()
     await db.refresh(ziel)
-    return WorkOut(id=ziel.id, class_id=ziel.class_id, kurs_id=ziel.kurs_id, name=ziel.name,
+    return WorkOut(id=ziel.id, source_id=ziel.source_id, class_id=ziel.class_id, kurs_id=ziel.kurs_id, name=ziel.name,
                    tasks=ziel.tasks or [], results={}, scale=ziel.scale, absent=[])
 
 
@@ -252,7 +256,7 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
         w.absent = list({str(x)[:40] for x in body.absent[:400]}) or None
     await db.commit()
     await db.refresh(w)
-    return WorkOut(id=w.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [])
+    return WorkOut(id=w.id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [])
 
 
 @router.delete("/works/{work_id}", status_code=204)
@@ -432,3 +436,109 @@ async def remediate(work_id: int, body: RemediateIn, user: User = Depends(requir
 
     await db.commit()
     return {"students": len(weak_by_student), "cards_requeued": requeued, "exercises_created": exercises}
+
+
+# ─── Vergleich: dieselbe Arbeit über mehrere Klassen ───
+#
+# Zwei Fragen, die eine Einzelauswertung nicht beantwortet:
+#   1. Wie hat sich meine andere Klasse in derselben Arbeit geschlagen?
+#   2. Welche Aufgabe lief wo schlecht — und lag es an der Aufgabe oder an der
+#      Klasse? (Genau die Sicht, die CardVote je Frage längst hat.)
+#
+# Zusammengehalten wird die Gruppe über `source_id` (Kopien einer Arbeit).
+# Ältere Arbeiten, die vor dem Kopier-Knopf von Hand doppelt angelegt wurden,
+# haben keine Herkunft — für sie zählt zusätzlich der gleiche NAME. Beides
+# zusammen deckt Bestand und Zukunft ab, ohne dass jemand etwas nachpflegt.
+
+def _pct_liste(w: WorkAnalysis) -> list[float]:
+    """Erreichte Prozent je gewertetem Kind — dieselbe Rechnung wie im Vergleich
+    der Oberfläche, nur an einer Stelle."""
+    tasks = w.tasks or []
+    gesamt = sum(mx for t in tasks for _, mx in _units(t))
+    if not gesamt:
+        return []
+    absent = {str(x) for x in (w.absent or [])}
+    aus = []
+    for sid, r in (w.results or {}).items():
+        if not r or r == "abwesend" or str(sid) in absent:
+            continue
+        erreicht = 0.0
+        for t in tasks:
+            for uid, umax in _units(t):
+                if isinstance(r, list):
+                    erreicht += 0 if uid in r else umax     # Altformat
+                else:
+                    v = r.get(uid)
+                    erreicht += float(v) if isinstance(v, (int, float)) else 0
+        aus.append(round(erreicht / gesamt * 100, 1))
+    return aus
+
+
+def _je_einheit(w: WorkAnalysis) -> list[dict]:
+    """Je Wertungseinheit: Trefferquote der Klasse (wie CardVote je Frage)."""
+    absent = {str(x) for x in (w.absent or [])}
+    gewertet = [(sid, r) for sid, r in (w.results or {}).items()
+                if r and r != "abwesend" and str(sid) not in absent]
+    aus = []
+    for t in (w.tasks or []):
+        teile = _units_mit_thema(t)
+        for i, (uid, umax, topic_id) in enumerate(teile):
+            erreicht = 0.0
+            for _, r in gewertet:
+                if isinstance(r, list):
+                    erreicht += 0 if uid in r else umax
+                else:
+                    v = r.get(uid)
+                    erreicht += float(v) if isinstance(v, (int, float)) else 0
+            moeglich = umax * len(gewertet)
+            teil_label = (t.get("parts") or [{}])[i].get("label") if t.get("parts") else ""
+            aus.append({
+                "unit_id": uid,
+                "task_id": t.get("id"),
+                # Beschriftung wie auf dem Blatt: „1" oder „1 a".
+                "label": f"{t.get('label') or ''}".strip(),
+                "teil": (teil_label or "").strip(),
+                "topic_id": topic_id,
+                "max": umax,
+                "pct": round(erreicht / moeglich * 100) if moeglich else None,
+                "n": len(gewertet),
+            })
+    return aus
+
+
+@router.get("/works/{work_id}/vergleich")
+async def vergleich(work_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Dieselbe Arbeit über alle Klassen, in denen sie geschrieben wurde."""
+    from datetime import datetime, timezone
+    from ..models import SchoolClass
+
+    w = await _owned_work(db, user, work_id)
+    wurzel = w.source_id or w.id
+    name = (w.name or "").strip().lower()
+
+    alle = (await db.execute(select(WorkAnalysis).where(WorkAnalysis.owner_id == user.id))).scalars().all()
+    gruppe = [x for x in alle
+              if (x.id == wurzel or x.source_id == wurzel
+                  # Bestand ohne Herkunft: gleicher Name zaehlt mit. Sonst waere
+                  # der Vergleich fuer alles blind, was vor dem Kopier-Knopf
+                  # entstanden ist — also fuer alles Vorhandene.
+                  or (name and (x.name or "").strip().lower() == name))]
+    # Sortierschluessel muss zeitzonenbewusst sein — created_at ist es.
+    frueh = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    gruppe.sort(key=lambda x: (x.created_at or frueh, x.id))
+
+    klassen = {c.id: c.name for c in (await db.execute(
+        select(SchoolClass).where(SchoolClass.id.in_([x.class_id for x in gruppe])))).scalars().all()}
+
+    arbeiten = []
+    for x in gruppe:
+        pl = _pct_liste(x)
+        arbeiten.append({
+            "id": x.id, "name": x.name, "class_id": x.class_id,
+            "class_name": klassen.get(x.class_id, ""),
+            "eigene": x.id == w.id,
+            "n": len(pl), "pct_liste": pl,
+            "schnitt": round(sum(pl) / len(pl), 1) if pl else None,
+            "einheiten": _je_einheit(x),
+        })
+    return {"work_id": w.id, "gruppe": wurzel, "arbeiten": arbeiten}

@@ -1770,4 +1770,12 @@ export default {
   "klassenarbeit.copyTarget": "Target class",
   "klassenarbeit.copyName": "Name of the copy",
   "klassenarbeit.copyGo": "Copy",
+  "klassenarbeit.cmpClasses": "Classes",
+  "klassenarbeit.cmpTasks": "By task",
+  "klassenarbeit.cmpHistory": "History",
+  "klassenarbeit.cmpClass": "Class",
+  "klassenarbeit.cmpTask": "Task",
+  "klassenarbeit.cmpSpread": "Spread",
+  "klassenarbeit.cmpOnlyOne": "This exam has only been written in one class so far — “Copy to another class” turns it into a comparison.",
+  "klassenarbeit.cmpTasksLegend": "Score per task and class. A wide spread means the classes differ here; a narrow spread at low values means it was the task, not the class.",
 };

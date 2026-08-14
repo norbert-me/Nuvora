@@ -4,7 +4,7 @@
 // und gezielte Wiederholung (Karten des schwachen Themas wieder fällig).
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, Modal, Boxplot, StatCard, pageApp} from "../components/Icons.jsx";
+import { btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, Modal, Boxplot, StatCard, Tabs, pageApp} from "../components/Icons.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
 import { themenIndex } from "../core/topics.js";
@@ -841,55 +841,198 @@ export function KlassenarbeitVergleich() {
   const [classId, setClassId] = useState(null);
   const [kursId, setKursId] = useState(null);
   const [works, setWorks] = useState([]);
+  const [workId, setWorkId] = useState(null);     // gewählte Arbeit (Klassenvergleich)
+  const [daten, setDaten] = useState(null);       // Antwort von /vergleich
   const [scale, setScale] = useState(DEFAULT_SCALE);
+  const [sicht, setSicht] = useState("klassen"); // klassen | aufgaben | verlauf
   useEffect(() => { try { const u = JSON.parse(localStorage.getItem("user")); if (u?.grade_scale) setScale(u.grade_scale); } catch { /* Default */ } }, []);
+
   const kq = kursId != null ? `?kurs_id=${kursId}` : "";
   useEffect(() => {
-    if (!classId) { setWorks([]); return; }
-    fetch(`${API}/classes/${classId}/works${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => setWorks(Array.isArray(d) ? d : [])).catch(() => setWorks([]));
+    if (!classId) { setWorks([]); setWorkId(null); return; }
+    fetch(`${API}/classes/${classId}/works${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+      const liste = Array.isArray(d) ? d : [];
+      setWorks(liste);
+      setWorkId((alt) => (liste.some((w) => w.id === alt) ? alt : (liste[0]?.id ?? null)));
+    }).catch(() => setWorks([]));
   }, [classId, kursId]);
 
-  const rows = useMemo(() => works.map((w) => {
+  // Der Klassenvergleich kommt vom Server: er kennt die Gruppe („dieselbe
+  // Arbeit") über die Herkunft der Kopien und rechnet je Aufgabe mit derselben
+  // Punktelogik wie die Auswertung. Zwei Fassungen derselben Rechnung liefen
+  // sonst auseinander.
+  useEffect(() => {
+    if (!workId) { setDaten(null); return; }
+    fetch(`${API}/works/${workId}/vergleich`).then((r) => (r.ok ? r.json() : null)).then(setDaten).catch(() => setDaten(null));
+  }, [workId]);
+
+  // Verlauf: alle Arbeiten dieser Klasse nacheinander (die frühere Ansicht).
+  const verlauf = useMemo(() => works.map((w) => {
     const pl = pctList(w); const q = quartiles(pl);
     const noten = pl.map((p) => gradeFromPct(p, scale));
     const avgNote = noten.length ? noten.reduce((s, x) => s + x, 0) / noten.length : null;
     return { id: w.id, name: w.name, q, pl, avgNote };
   }).filter((r) => r.q), [works, scale]);
 
-  const fmt = (x) => Math.round(x) + "%";
-  const nt = (x) => x == null ? "–" : String(Math.round(x * 10) / 10).replace(".", ",");
+  const klassen = (daten?.arbeiten || []).filter((a) => a.n > 0);
+  const fmt = (x) => (x == null ? "–" : Math.round(x) + "%");
+  const nt = (x) => (x == null ? "–" : String(Math.round(x * 10) / 10).replace(".", ","));
+  const noteVon = (pl) => { const n = pl.map((p) => gradeFromPct(p, scale)); return n.length ? n.reduce((s, x) => s + x, 0) / n.length : null; };
+  const einheitLabel = (e, i) => [e.label || `${i + 1}`, e.teil].filter(Boolean).join(" ");
+
+  // Aufgaben-Statistik über die Klassen: Zeilen = Aufgabe, Spalten = Klasse.
+  // Verglichen wird über die Position, nicht über die unit_id — Kopien haben
+  // eigene IDs, es ist aber dieselbe Aufgabe an derselben Stelle.
+  const aufgaben = useMemo(() => {
+    if (!klassen.length) return [];
+    const laenge = Math.max(...klassen.map((a) => a.einheiten.length));
+    return Array.from({ length: laenge }, (_, i) => {
+      const werte = klassen.map((a) => a.einheiten[i]?.pct ?? null);
+      const da = werte.filter((v) => v != null);
+      const erste = klassen.find((a) => a.einheiten[i])?.einheiten[i];
+      return {
+        i, label: erste ? einheitLabel(erste, i) : String(i + 1), max: erste?.max,
+        werte, spanne: da.length > 1 ? Math.max(...da) - Math.min(...da) : null,
+      };
+    });
+  }, [daten]);
+
+  const kopf = { fontSize: 11, color: "var(--text3)", fontWeight: 600, padding: "8px 10px", textAlign: "right", whiteSpace: "nowrap" };
+  const zelle = { fontSize: 13, padding: "8px 10px", textAlign: "right", whiteSpace: "nowrap", borderTop: "1px solid var(--border)" };
 
   return (
     <div style={{ ...pageApp, padding: "0 16px 40px" }}>
       <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 16 }}>{t("klassenarbeit.compareHint")}</p>
-      <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
+        {works.length > 0 && (
+          <select value={workId || ""} onChange={(e) => setWorkId(Number(e.target.value))} style={{ ...selectStyle, minWidth: 180 }}>
+            {works.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+          </select>
+        )}
+      </div>
 
-      {classId && rows.length === 0 && <div style={{ marginTop: 24 }}><Empty title={t("klassenarbeit.compareEmpty")} /></div>}
-      {rows.length > 0 && (
-        <div style={{ marginTop: 20, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", overflow: "hidden" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 14px", fontSize: 11, color: "var(--text3)", borderBottom: "1px solid var(--border)" }}>
-            <span style={{ width: 150, flexShrink: 0 }}>{t("klassenarbeit.compareWork")}</span>
-            <span style={{ flex: 1, minWidth: 200 }}>0 % – 100 %</span>
-            <span style={{ width: 44, textAlign: "right", flexShrink: 0 }}>n</span>
-            <span style={{ width: 54, textAlign: "right", flexShrink: 0 }}>⌀ %</span>
-            <span style={{ width: 54, textAlign: "right", flexShrink: 0 }}>⌀ {t("klassenarbeit.grade")}</span>
-          </div>
-          {rows.map((r) => (
-            <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
-              <span style={{ width: 150, flexShrink: 0, fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.name}>{r.name}</span>
-              <Boxplot values={r.pl} max={100} compact />
-              <span style={{ width: 44, textAlign: "right", flexShrink: 0, fontSize: 12.5, color: "var(--text3)" }}>{r.q.n}</span>
-              <span style={{ width: 54, textAlign: "right", flexShrink: 0, fontSize: 12.5, fontWeight: 600 }}>{fmt(r.q.avg)}</span>
-              <span style={{ width: 54, textAlign: "right", flexShrink: 0, fontSize: 13, fontWeight: 700, color: boxColor(r.q.med) }}>{nt(r.avgNote)}</span>
-            </div>
-          ))}
-          <div style={{ padding: "8px 14px", fontSize: 11, color: "var(--text3)" }}>{t("klassenarbeit.boxplotLegend")}</div>
+      {classId && (
+        <div style={{ marginTop: 14 }}>
+          <Tabs value={sicht} onChange={setSicht} options={[
+            ["klassen", t("klassenarbeit.cmpClasses")],
+            ["aufgaben", t("klassenarbeit.cmpTasks")],
+            ["verlauf", t("klassenarbeit.cmpHistory")],
+          ]} />
         </div>
+      )}
+
+      {/* 1) Dieselbe Arbeit über die Klassen: eine Zeile je Klasse. */}
+      {sicht === "klassen" && (
+        klassen.length === 0 ? (
+          <div style={{ marginTop: 24 }}><Empty title={t("klassenarbeit.compareEmpty")} /></div>
+        ) : (
+          <div style={{ marginTop: 16, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", overflowX: "auto" }}>
+            <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 620 }}>
+              <thead>
+                <tr>
+                  <th style={{ ...kopf, textAlign: "left" }}>{t("klassenarbeit.cmpClass")}</th>
+                  <th style={{ ...kopf, textAlign: "left", width: "45%" }}>0 % – 100 %</th>
+                  <th style={kopf}>n</th>
+                  <th style={kopf}>⌀ %</th>
+                  <th style={kopf}>⌀ {t("klassenarbeit.grade")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {klassen.map((a) => {
+                  const q = quartiles(a.pct_liste);
+                  return (
+                    <tr key={a.id} style={a.eigene ? { background: "var(--bg2)" } : undefined}>
+                      <td style={{ ...zelle, textAlign: "left", fontWeight: 600 }} title={a.name}>{a.class_name || a.name}</td>
+                      <td style={{ ...zelle, textAlign: "left" }}><Boxplot values={a.pct_liste} max={100} compact /></td>
+                      <td style={{ ...zelle, color: "var(--text3)" }}>{a.n}</td>
+                      <td style={{ ...zelle, fontWeight: 600 }}>{fmt(a.schnitt)}</td>
+                      <td style={{ ...zelle, fontWeight: 700, color: q ? boxColor(q.med) : "var(--text)" }}>{nt(noteVon(a.pct_liste))}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--text3)" }}>
+              {t("klassenarbeit.boxplotLegend")} {klassen.length === 1 && `· ${t("klassenarbeit.cmpOnlyOne")}`}
+            </div>
+          </div>
+        )
+      )}
+
+      {/* 2) Je Aufgabe über die Klassen — die Sicht, die CardVote je Frage hat.
+             Die Spanne rechts sagt, wo sich die Klassen am stärksten
+             unterscheiden: große Spanne = es lag an der Klasse, kleine Spanne
+             bei niedrigen Werten = es lag an der Aufgabe. */}
+      {sicht === "aufgaben" && (
+        aufgaben.length === 0 ? (
+          <div style={{ marginTop: 24 }}><Empty title={t("klassenarbeit.compareEmpty")} /></div>
+        ) : (
+          <div style={{ marginTop: 16, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", overflowX: "auto" }}>
+            <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 520 }}>
+              <thead>
+                <tr>
+                  <th style={{ ...kopf, textAlign: "left" }}>{t("klassenarbeit.cmpTask")}</th>
+                  {klassen.map((a) => <th key={a.id} style={kopf} title={a.name}>{a.class_name || "?"}</th>)}
+                  <th style={kopf}>{t("klassenarbeit.cmpSpread")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {aufgaben.map((r) => (
+                  <tr key={r.i}>
+                    <td style={{ ...zelle, textAlign: "left", fontWeight: 600 }}>
+                      {r.label}{r.max ? <span style={{ color: "var(--text3)", fontWeight: 400 }}> /{String(r.max).replace(".", ",")}</span> : null}
+                    </td>
+                    {r.werte.map((v, k) => (
+                      <td key={k} style={{ ...zelle, fontWeight: 600, color: v == null ? "var(--text3)" : v < 50 ? C.danger : v < 75 ? C.warning : C.success }}>
+                        {v == null ? "–" : `${v}%`}
+                      </td>
+                    ))}
+                    <td style={{ ...zelle, color: "var(--text3)" }}>{r.spanne == null ? "–" : `${r.spanne} Pp`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--text3)", lineHeight: 1.5 }}>{t("klassenarbeit.cmpTasksLegend")}</div>
+          </div>
+        )
+      )}
+
+      {/* 3) Verlauf: alle Arbeiten dieser Klasse nacheinander (die frühere Sicht). */}
+      {sicht === "verlauf" && (
+        verlauf.length === 0 ? (
+          <div style={{ marginTop: 24 }}><Empty title={t("klassenarbeit.compareEmpty")} /></div>
+        ) : (
+          <div style={{ marginTop: 16, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", overflowX: "auto" }}>
+            <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 620 }}>
+              <thead>
+                <tr>
+                  <th style={{ ...kopf, textAlign: "left" }}>{t("klassenarbeit.compareWork")}</th>
+                  <th style={{ ...kopf, textAlign: "left", width: "45%" }}>0 % – 100 %</th>
+                  <th style={kopf}>n</th>
+                  <th style={kopf}>⌀ %</th>
+                  <th style={kopf}>⌀ {t("klassenarbeit.grade")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {verlauf.map((r) => (
+                  <tr key={r.id}>
+                    <td style={{ ...zelle, textAlign: "left", fontWeight: 600, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis" }} title={r.name}>{r.name}</td>
+                    <td style={{ ...zelle, textAlign: "left" }}><Boxplot values={r.pl} max={100} compact /></td>
+                    <td style={{ ...zelle, color: "var(--text3)" }}>{r.q.n}</td>
+                    <td style={{ ...zelle, fontWeight: 600 }}>{fmt(r.q.avg)}</td>
+                    <td style={{ ...zelle, fontWeight: 700, color: boxColor(r.q.med) }}>{nt(r.avgNote)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--text3)" }}>{t("klassenarbeit.boxplotLegend")}</div>
+          </div>
+        )
       )}
     </div>
   );
 }
-
 
 // Ziel einer Kopie waehlen. Bewusst dieselbe Auswahl wie oben in der Leiste
 // (KursKlasseSelect) — eine Klasse kann in mehreren Kursen liegen, und die

@@ -1087,6 +1087,12 @@ class WorkAnalysis(Base):
     class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
     kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="CASCADE"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    # Herkunft einer Kopie: zeigt auf die Arbeit, aus der kopiert wurde (bzw. auf
+    # deren Ursprung — die Kette bleibt flach). Damit ist „dieselbe Arbeit in
+    # mehreren Klassen" eine belastbare Gruppe und nicht Namensraterei; der
+    # Vergleich ueber Klassen haengt daran. SET NULL: wird das Original
+    # geloescht, bleiben die Kopien vollstaendig bestehen.
+    source_id: Mapped[Optional[int]] = mapped_column(ForeignKey("work_analyses.id", ondelete="SET NULL"), nullable=True, index=True)
     tasks: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     results: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     # Abwesende SuS (Liste von student_id als String). Orthogonal zu results:

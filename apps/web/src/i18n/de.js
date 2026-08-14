@@ -1756,4 +1756,12 @@ export default {
   "klassenarbeit.copyTarget": "Zielklasse",
   "klassenarbeit.copyName": "Name der Kopie",
   "klassenarbeit.copyGo": "Kopieren",
+  "klassenarbeit.cmpClasses": "Klassen",
+  "klassenarbeit.cmpTasks": "Je Aufgabe",
+  "klassenarbeit.cmpHistory": "Verlauf",
+  "klassenarbeit.cmpClass": "Klasse",
+  "klassenarbeit.cmpTask": "Aufgabe",
+  "klassenarbeit.cmpSpread": "Spanne",
+  "klassenarbeit.cmpOnlyOne": "Diese Arbeit wurde bisher nur in einer Klasse geschrieben — mit „In andere Klasse kopieren“ wird daraus ein Vergleich.",
+  "klassenarbeit.cmpTasksLegend": "Trefferquote je Aufgabe und Klasse. Große Spanne heißt: die Klassen unterscheiden sich hier — kleine Spanne bei niedrigen Werten heißt: es lag an der Aufgabe, nicht an der Klasse.",
 };

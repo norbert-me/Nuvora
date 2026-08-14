@@ -428,6 +428,26 @@ def inhalt_auswertung(api, u, spuren):
         "DELETE", f"/api/klassenarbeit/works/{kopie['id']}", erwartet=(204, 404))))
     if kopie["id"] == arbeit["id"]:
         raise AssertionError("Kopie ist dieselbe Arbeit")
+    # Klassenvergleich: Original und Kopie gehoeren zur selben Gruppe. Die
+    # Aufgabenstatistik muss die Aufgabe kennen, auch wenn die Kopie noch keine
+    # Punkte hat — sonst waere die Sicht erst nach dem Korrigieren nutzbar.
+    verg = api.call("GET", f"/api/klassenarbeit/works/{arbeit['id']}/vergleich", erwartet=(200,))
+    ids = {a["id"] for a in verg.get("arbeiten", [])}
+    if arbeit["id"] not in ids or kopie["id"] not in ids:
+        raise AssertionError(f"Vergleich kennt die Gruppe nicht: {ids}")
+    eigene = _finde(verg["arbeiten"], id=arbeit["id"])
+    if not eigene or eigene.get("n") != 2:
+        raise AssertionError(f"Vergleich zaehlt {eigene and eigene.get('n')} gewertete Kinder statt 2")
+    # 1 und 4 von je 4 Punkten: die Kinder liegen bei 25 % und 100 %, der Schnitt
+    # also bei 62,5 %. Die Aufgabenstatistik rechnet ueber die Punkte (5 von 8)
+    # und rundet auf 62 — beides bewusst gegen die Zahl geprueft, nicht gegen
+    # "irgendwas".
+    if eigene.get("schnitt") != 62.5:
+        raise AssertionError(f"Schnitt im Vergleich {eigene.get('schnitt')} statt 62,5 %")
+    einheit = (eigene.get("einheiten") or [{}])[0]
+    if einheit.get("pct") != 62:
+        raise AssertionError(f"Aufgabenstatistik {einheit.get('pct')} % statt 62 %")
+
     if (kopie.get("tasks") or [{}])[0].get("max") != 4:
         raise AssertionError(f"Aufgaben nicht mitkopiert: {kopie.get('tasks')}")
     if kopie.get("results"):

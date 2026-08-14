@@ -1771,4 +1771,12 @@ export default {
   "klassenarbeit.copyTarget": "Clase destino",
   "klassenarbeit.copyName": "Nombre de la copia",
   "klassenarbeit.copyGo": "Copiar",
+  "klassenarbeit.cmpClasses": "Clases",
+  "klassenarbeit.cmpTasks": "Por tarea",
+  "klassenarbeit.cmpHistory": "Histórico",
+  "klassenarbeit.cmpClass": "Clase",
+  "klassenarbeit.cmpTask": "Tarea",
+  "klassenarbeit.cmpSpread": "Diferencia",
+  "klassenarbeit.cmpOnlyOne": "Este examen solo se ha escrito en una clase; con «Copiar a otra clase» se convierte en una comparación.",
+  "klassenarbeit.cmpTasksLegend": "Porcentaje por tarea y clase. Una diferencia grande indica que las clases difieren; una diferencia pequeña con valores bajos indica que fue la tarea.",
 };
