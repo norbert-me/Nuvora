@@ -344,7 +344,10 @@ export default function NuvoraHome({ user }) {
       ) : (
         <>
           {!edit && isOn("kalender") && <HeutePanel t={t} orgaAktiv={isOn("orga")} />}
-          {!edit && isOn("cardvote") && <Fruehwarnung t={t} />}
+          {/* Nicht an CardVote gebunden: die Frühwarnung rechnet über Quizze
+              UND Klassenarbeiten. Wer nur das Notenmodul nutzt, bekommt sie aus
+              den Arbeiten — wer nur CardVote nutzt, aus den Quizzen. */}
+          {!edit && (isOn("cardvote") || isOn("auswertung")) && <Fruehwarnung t={t} />}
           {!edit && isOn("cardvote") && <SchwacheWoche t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} methodenAktiv={isOn("unterrichtsplanung")} />}
           <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
             {(edit ? displayList : shown).map((m) => {

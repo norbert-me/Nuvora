@@ -43,10 +43,15 @@ export function AbstandSpark({ kurve, hoehe = 34, breite = 132 }) {
         }
         const h = Math.max(2, (Math.abs(p.abstand) / max) * (mitte - 2));
         const unten = p.abstand < 0;
+        // Eine Klassenarbeit ist derselbe Messpunkt wie ein Quiz, aber sie wiegt
+        // schwerer — das soll man sehen, ohne den Tooltip zu oeffnen: dunklerer
+        // Rand statt einer zweiten Farbe (die Farbe traegt hier die Richtung).
+        const arbeit = p.art === "arbeit";
         return (
           <rect key={i} x={x} y={unten ? mitte : mitte - h} width={balken} height={h} rx="2"
-            fill={unten ? C.danger : C.success} opacity={Math.abs(p.abstand) < 5 ? 0.45 : 0.9}>
-            <title>{`${p.name}: ${p.abstand > 0 ? "+" : ""}${p.abstand} Pp (${p.pct} % gegen ${p.klasse} %)`}</title>
+            fill={unten ? C.danger : C.success} opacity={Math.abs(p.abstand) < 5 ? 0.45 : 0.9}
+            stroke={arbeit ? "var(--text)" : "none"} strokeWidth={arbeit ? 1 : 0}>
+            <title>{`${arbeit ? "Klassenarbeit" : "Quiz"} · ${p.name}: ${p.abstand > 0 ? "+" : ""}${p.abstand} Pp (${p.pct} % gegen ${p.klasse} %)`}</title>
           </rect>
         );
       })}

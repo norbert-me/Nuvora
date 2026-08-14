@@ -574,6 +574,16 @@ def teste_kern(api, b, u):
         api.call("GET", "/api/trash", erwartet=(200,))
         return "erreichbar"
 
+    def fruehwarnung():
+        # Kern-Sicht ueber CardVote-Quizze UND Klassenarbeiten. Sie darf ohne
+        # beide Module antworten (leer), aber niemals 403 oder 500 liefern —
+        # sonst haengt die Startseite an einem Modul, das ihr nicht gehoert.
+        alle = api.call("GET", "/api/fruehwarnung", erwartet=(200,))
+        eine = api.call("GET", f"/api/classes/{u.class_id}/fruehwarnung", erwartet=(200,))
+        if "schueler" not in alle or "schueler" not in eine:
+            raise AssertionError("Antwort ohne Schuelerliste")
+        return f"Sammelsicht und Klassensicht antworten ({len(alle['schueler'])} gemeldet)"
+
     def modulregister():
         module = api.call("GET", "/api/modules", erwartet=(200,))
         if not module:
@@ -584,6 +594,7 @@ def teste_kern(api, b, u):
     b.pruefe("Kern", "Kurse", kurse)
     b.pruefe("Kern", "Themen", themen)
     b.pruefe("Kern", "Papierkorb", papierkorb)
+    b.pruefe("Kern", "Fruehwarnung", fruehwarnung)
     b.pruefe("Kern", "Modulregister", modulregister)
 
 

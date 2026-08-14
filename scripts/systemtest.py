@@ -176,11 +176,6 @@ def endpunkte(u):
                     f"&to={datetime.now().isoformat()}"),
             ("GET", "/api/weak-review"),
             ("GET", f"/api/classes/{c}/evaluation"),
-            # Fruehwarnung: dieselbe Datenlage, andere Frage — wer haengt ueber
-            # mehrere Tests hinweg hinterher. Beide Wege (Klasse und Sammelsicht
-            # der Startseite), damit ein abgeschaltetes CardVote auffaellt.
-            ("GET", f"/api/classes/{c}/fruehwarnung"),
-            ("GET", "/api/fruehwarnung"),
         ],
         "lernpfad": [
             ("GET", "/api/lernpfad/exercises"),
@@ -270,7 +265,7 @@ def tore(u):
     c, s = u.class_id, u.students[0]
     return {
         "cardvote": [("GET", "/api/questions"), ("GET", "/api/sessions-list"),
-                     ("GET", "/api/folders"), ("GET", "/api/fruehwarnung")],
+                     ("GET", "/api/folders")],
         "lernpfad": [("GET", "/api/lernpfad/exercises"), ("GET", "/api/lernpfad/paths")],
         "auswertung": [("GET", f"/api/noten/classes/{c}/sections"),
                        ("GET", f"/api/klassenarbeit/classes/{c}/works")],

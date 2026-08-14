@@ -23,7 +23,8 @@ def baue(anzahl_tests, quoten, topic_id=1, fragen=4, datum0=START, abstand_tage=
                 continue
             richtige = round(anteil * fragen)
             for f in range(fragen):
-                t.antworten.append(Antwort(card_id=cid, topic_id=topic_id, richtig=f < richtige))
+                t.antworten.append(Antwort(card_id=cid, topic_id=topic_id,
+                                           erreicht=1.0 if f < richtige else 0.0, moeglich=1.0))
         tests.append(t)
     return tests
 
@@ -49,7 +50,7 @@ def test_ein_schlechter_tag_meldet_nicht():
     tests = baue(6, {1: 0.75, 2: 0.75, 3: 0.75})
     # Ein einzelner Einbruch: im letzten Test alles falsch.
     tests[-1].antworten = [a for a in tests[-1].antworten if a.card_id != 1] + [
-        Antwort(card_id=1, topic_id=1, richtig=False) for _ in range(4)
+        Antwort(card_id=1, topic_id=1, erreicht=0.0) for _ in range(4)
     ]
     res = analysiere(tests, {1: "Kind A", 2: "Kind B", 3: "Kind C"})
     assert finde(res, 1)["status"] == "unauffaellig"
@@ -82,7 +83,7 @@ def test_erstvorkommen_trennt_altbestand_von_frischem_stoff():
     # Thema 1 ab Januar, Thema 2 erst im letzten Test.
     tests = baue(4, {1: 0.5, 2: 0.5}, topic_id=1)
     spaet = Test(session_id=99, name="Neu", datum=START + timedelta(days=200))
-    spaet.antworten = [Antwort(card_id=1, topic_id=2, richtig=True)]
+    spaet.antworten = [Antwort(card_id=1, topic_id=2, erreicht=1.0)]
     tests.append(spaet)
     erst = erstvorkommen(tests)
     assert erst[1] == START
@@ -126,3 +127,33 @@ def test_fenster_begrenzt_auf_die_letzten_sechs():
     res = analysiere(tests, {1: "A", 2: "B"})
     assert len(res["tests"]) == 6
     assert res["tests"][0]["session_id"] == 7
+
+
+def test_klassenarbeit_zaehlt_wie_ein_quiz_nur_mit_punkten():
+    """Eine Aufgabe zu 5 Punkten wiegt fuenfmal so schwer wie eine zu einem.
+
+    Ohne Punkte waere eine grosse Aufgabe genauso viel wert wie das Ankreuzen
+    einer Vierer-Frage — die Klassenarbeit wuerde dann falsch mitgerechnet.
+    """
+    tests = baue(5, {1: 0.9, 2: 0.9, 3: 0.9}, fragen=4)
+    arbeit = Test(session_id=50, name="Klassenarbeit 1", art="arbeit",
+                  datum=START + timedelta(days=200))
+    # Kind 1 holt 4 von 20, die anderen 18 von 20 — eine Arbeit, vier Aufgaben.
+    for cid, erreicht in ((1, 1.0), (2, 4.5), (3, 4.5)):
+        for i in range(4):
+            arbeit.antworten.append(Antwort(card_id=cid, topic_id=1, erreicht=erreicht, moeglich=5.0))
+    tests.append(arbeit)
+
+    res = analysiere(tests, {1: "A", 2: "B", 3: "C"})
+    punkt = finde(res, 1)["kurve"][-1]
+    assert punkt["art"] == "arbeit"
+    assert punkt["pct"] == 20.0                      # 4 von 20 Punkten
+    assert punkt["klasse"] == 66.7                   # (20 + 90 + 90) / 3
+    assert punkt["abstand"] < -40
+
+
+def test_arten_stehen_in_der_testliste():
+    tests = baue(3, {1: 0.5, 2: 0.5})
+    tests[-1].art = "arbeit"
+    res = analysiere(tests, {1: "A", 2: "B"})
+    assert [x["art"] for x in res["tests"]] == ["quiz", "quiz", "arbeit"]

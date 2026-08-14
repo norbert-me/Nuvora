@@ -15,6 +15,10 @@ from ..database import get_db
 from ..models import Scan, Session, SchoolClass, Student, QuestionSet, QuestionSetItem, Question, User, Topic
 from .auth import get_current_user
 from ..scoring import bewerte, status_of
+# Punktelogik der Klassenarbeit (Teilaufgaben, Altformat, Abwesende) — die
+# Fruehwarnung rechnet sie NICHT nach, sie ruft sie auf. Kein Importring:
+# klassenarbeit.py holt nur database/models/auth/modules.
+from .klassenarbeit import _profile as _arbeit_profil
 from .. import websocket as ws
 from .modules import modul_pflicht
 
@@ -816,31 +820,90 @@ async def stats_dashboard(user: User = Depends(get_current_user), db: AsyncSessi
     }
 
 
-# ─── Frühwarnung: wer hängt über mehrere Tests hinweg hinterher? ───
+# ─── Frühwarnung: wer hängt über mehrere Erhebungen hinweg hinterher? ───
 #
 # Die Regel steht in app/fruehwarnung.py (mit Regressionstest), hier wird nur
-# eingesammelt: alle Sitzungen einer Klasse, ihre gewerteten Antworten und das
-# Thema jeder Frage. Absichtlich am CardVote-Router — ohne das Modul gibt es
-# keine Tests, aus denen sich etwas ableiten liesse.
+# eingesammelt. Zwei Quellen, gleichwertig behandelt:
+#
+#   CardVote-Sitzungen   viele kleine Messpunkte, je Frage ein Punkt
+#   Klassenarbeiten      wenige grosse, je Aufgabe ihre Punktzahl
+#
+# Getrennte Auswertungen wuerden verschenken, was den Verlauf ausmacht — eine
+# Klassenarbeit ist derselbe Messpunkt wie ein Quiz, nur ein groesserer.
+#
+# Darum haengt die Frühwarnung am KERN-Router und nicht an einem Modul: sie
+# gehoert keinem von beiden. Stattdessen wird je Quelle geprueft, ob ihr Modul
+# aktiv ist (Regel 3) — mit nur CardVote kommen nur Quizze herein, mit nur der
+# Auswertung nur Klassenarbeiten, mit beidem beides. Ohne beide bleibt sie leer,
+# statt 403 zu werfen: der Weg gehoert dem Kern, es gibt nur nichts zu zeigen.
 #
 # Der Sammel-Endpunkt (/api/fruehwarnung) fasst alle Klassen zusammen; er
 # liefert nur die gemeldeten Kinder, damit die Startseite nichts nachrechnen
 # muss.
 
-async def _fruehwarn_daten(db, user, class_id: int):
-    """Tests einer Klasse in der Form, die app/fruehwarnung.py erwartet."""
-    from .. import fruehwarnung as fw
+async def _arbeiten_als_tests(db, user, class_id: int, id_zu_karte: dict):
+    """Klassenarbeiten dieser Klasse als Messpunkte — je Aufgabe ihre Punkte.
 
-    kinder = {s.card_id: s.name for s in await _kurs_roster(db, class_id)}
+    Die Punktelogik wird NICHT nachgebaut: `klassenarbeit._profile` kennt
+    Teilaufgaben, das Altformat (Liste falscher Aufgaben) und die Abwesenden.
+    Zwei Fassungen derselben Rechnung liefen unweigerlich auseinander — und dann
+    stuende in der Auswertung eine andere Zahl als in der Frühwarnung.
+    """
+    from .. import fruehwarnung as fw
+    from ..models import WorkAnalysis
+
+    arbeiten = (await db.execute(
+        select(WorkAnalysis).where(WorkAnalysis.owner_id == user.id, WorkAnalysis.class_id == class_id)
+        .order_by(WorkAnalysis.created_at)
+    )).scalars().all()
+
+    tests = []
+    for w in arbeiten:
+        if not w.created_at:
+            continue
+        prof, _ = _arbeit_profil(w)    # {student_id: {topic_id: [erreicht, max]}}
+        t = fw.Test(session_id=w.id, name=w.name or "Klassenarbeit", datum=w.created_at, art="arbeit")
+        for sid, themen in prof.items():
+            try:
+                card_id = id_zu_karte.get(int(sid))
+            except (TypeError, ValueError):
+                continue               # Altbestand ohne saubere ID: uebergehen
+            if card_id is None:
+                continue               # Kind gehoert nicht (mehr) zum Kurs
+            for topic_id, (erreicht, moeglich) in themen.items():
+                if moeglich:
+                    t.antworten.append(fw.Antwort(card_id=card_id, topic_id=topic_id,
+                                                  erreicht=float(erreicht), moeglich=float(moeglich)))
+        if t.antworten:
+            tests.append(t)
+    return tests
+
+
+async def _fruehwarn_daten(db, user, class_id: int):
+    """Erhebungen einer Klasse in der Form, die app/fruehwarnung.py erwartet."""
+    from .. import fruehwarnung as fw
+    from .modules import is_active
+
+    roster = await _kurs_roster(db, class_id)
+    kinder = {s.card_id: s.name for s in roster}
     if not kinder:
         return [], {}
+    # Klassenarbeiten rechnen mit der Datenbank-ID des Schuelers, CardVote mit
+    # der aufgedruckten Kartennummer. Beides muss auf dieselbe Person zeigen,
+    # sonst stehen zwei halbe Verlaeufe nebeneinander.
+    id_zu_karte = {s.id: s.card_id for s in roster}
+
+    tests = []
+    if await is_active(db, user.id, "auswertung"):
+        tests += await _arbeiten_als_tests(db, user, class_id, id_zu_karte)
+    if not await is_active(db, user.id, "cardvote"):
+        return tests, kinder
 
     sessions = (await db.execute(
         select(Session).where(Session.class_id == class_id, Session.archived == False)
         .order_by(Session.created_at)
     )).scalars().all()
 
-    tests = []
     for sess in sessions:
         if not sess.question_set_id or not sess.created_at:
             continue
@@ -856,7 +919,7 @@ async def _fruehwarn_daten(db, user, class_id: int):
         scans = (await db.execute(select(Scan).where(Scan.session_id == sess.id))).scalars().all()
         config = sess.eval_config or {}
 
-        t = fw.Test(session_id=sess.id, name=sess.name or "", datum=sess.created_at)
+        t = fw.Test(session_id=sess.id, name=sess.name or "", datum=sess.created_at, art="quiz")
         hat_abgegeben = {s.student_id for s in scans}
         for cid in kinder:
             # Wer nichts abgegeben hat, gilt als krank und bleibt draussen —
@@ -868,7 +931,7 @@ async def _fruehwarn_daten(db, user, class_id: int):
             if not richtig_soll or s.student_id not in kinder:
                 continue          # Frage ohne hinterlegte Loesung: nicht wertbar
             t.antworten.append(fw.Antwort(card_id=s.student_id, topic_id=topic_id,
-                                          richtig=s.answer in richtig_soll))
+                                          erreicht=1.0 if s.answer in richtig_soll else 0.0, moeglich=1.0))
         if t.antworten:
             tests.append(t)
     return tests, kinder
@@ -892,7 +955,7 @@ async def _themennamen(db, ergebnis, user):
                           if eltern_id and eltern_id in namen else namen.get(th["topic_id"]))
 
 
-@router.get("/classes/{class_id}/fruehwarnung")
+@kern_router.get("/classes/{class_id}/fruehwarnung")
 async def fruehwarnung_klasse(class_id: int, empfindlich: bool = False,
                               user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Vollbild für eine Klasse: je Kind Kurve, Etiketten, Themen, Begründung."""
@@ -907,7 +970,7 @@ async def fruehwarnung_klasse(class_id: int, empfindlich: bool = False,
     tests, kinder = await _fruehwarn_daten(db, user, class_id)
     if not tests:
         return {"class_id": class_id, "class_name": school_class.name, "tests": [], "schueler": [],
-                "regel": {}, "hinweis": "Noch keine ausgewerteten Tests in dieser Klasse."}
+                "regel": {}, "hinweis": "Noch keine ausgewerteten Quizze oder Klassenarbeiten in dieser Klasse."}
     ergebnis = fw.analysiere(tests, kinder, fw.EMPFINDLICH if empfindlich else fw.STANDARD)
     await _themennamen(db, ergebnis, user)
     ergebnis["class_id"] = class_id
@@ -915,7 +978,7 @@ async def fruehwarnung_klasse(class_id: int, empfindlich: bool = False,
     return ergebnis
 
 
-@router.get("/fruehwarnung")
+@kern_router.get("/fruehwarnung")
 async def fruehwarnung_alle(empfindlich: bool = False,
                             user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Kurzfassung über alle Klassen — nur die Kinder, bei denen hinzusehen ist."""

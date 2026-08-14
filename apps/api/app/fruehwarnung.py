@@ -66,15 +66,32 @@ FEHLT_ANTEIL = 1 / 3
 
 @dataclass
 class Antwort:
-    """Eine gewertete Antwort eines Kindes auf eine Frage."""
+    """Eine gewertete Leistung eines Kindes zu einer Aufgabe oder Frage.
+
+    Punkte statt richtig/falsch, weil hier zwei Quellen zusammenlaufen: eine
+    CardVote-Frage ist 1 von 1 Punkt, eine Aufgabe einer Klassenarbeit kann
+    3,5 von 5 sein. Gerechnet wird immer als Anteil erreichter an moeglichen
+    Punkten — damit zaehlt eine grosse Aufgabe auch schwerer als eine kleine.
+    """
     card_id: int
     topic_id: Optional[int]
-    richtig: bool
+    erreicht: float
+    moeglich: float = 1.0
+
+    @property
+    def richtig(self) -> bool:
+        """Nur fuer die Lesbarkeit alter Aufrufe/Tests — nicht zum Rechnen."""
+        return self.moeglich > 0 and self.erreicht >= self.moeglich
 
 
 @dataclass
 class Test:
-    """Eine Sitzung mit allen gewerteten Antworten.
+    """Eine Erhebung mit allen gewerteten Antworten — Quiz ODER Klassenarbeit.
+
+    `art` unterscheidet die Quelle ("quiz" / "arbeit"). Gerechnet wird gleich:
+    eine Klassenarbeit ist derselbe Messpunkt wie ein Quiz, nur ein groesserer.
+    Getrennte Auswertungen wuerden genau das verschenken, was sie wertvoll macht
+    — den Verlauf ueber alles, was die Klasse geschrieben hat.
 
     `abwesend` sind die Kinder, die nichts abgegeben haben (krank) — sie zaehlen
     weder als falsch noch ins Klassenmittel.
@@ -82,6 +99,7 @@ class Test:
     session_id: int
     name: str
     datum: datetime
+    art: str = "quiz"
     antworten: list[Antwort] = field(default_factory=list)
     abwesend: set[int] = field(default_factory=set)
 
@@ -117,16 +135,16 @@ def analysiere(tests: list[Test], kinder: dict[int, str], schwellen: Schwellen =
     # Je Test: Trefferquote jedes Kindes und das Mittel der Anwesenden.
     je_test: list[dict] = []
     for t in fenster:
-        pro_kind: dict[int, list[int]] = {}
+        pro_kind: dict[int, list[float]] = {}
+        stueck: dict[int, int] = {}
         for a in t.antworten:
-            z = pro_kind.setdefault(a.card_id, [0, 0])
-            z[1] += 1
-            if a.richtig:
-                z[0] += 1
+            z = pro_kind.setdefault(a.card_id, [0.0, 0.0])
+            z[0] += a.erreicht
+            z[1] += a.moeglich
+            stueck[a.card_id] = stueck.get(a.card_id, 0) + 1
         quoten = {cid: _quote(tr, ges) for cid, (tr, ges) in pro_kind.items() if ges}
         mittel = round(sum(quoten.values()) / len(quoten), 1) if quoten else None
-        je_test.append({"test": t, "quoten": quoten, "mittel": mittel,
-                        "antworten": {cid: ges for cid, (_, ges) in pro_kind.items()}})
+        je_test.append({"test": t, "quoten": quoten, "mittel": mittel, "antworten": stueck})
 
     ergebnis = []
     for cid, name in kinder.items():
@@ -139,14 +157,14 @@ def analysiere(tests: list[Test], kinder: dict[int, str], schwellen: Schwellen =
             quote = eintrag["quoten"].get(cid)
             if quote is None or mittel is None:
                 fehlt += 1
-                kurve.append({"session_id": t.session_id, "name": t.name,
+                kurve.append({"session_id": t.session_id, "name": t.name, "art": t.art,
                               "datum": t.datum.isoformat(), "pct": None, "klasse": mittel, "abstand": None})
                 continue
             d = round(quote - mittel, 1)
             abstaende.append(d)
             antworten_gesamt += eintrag["antworten"].get(cid, 0)
-            kurve.append({"session_id": t.session_id, "name": t.name, "datum": t.datum.isoformat(),
-                          "pct": quote, "klasse": mittel, "abstand": d})
+            kurve.append({"session_id": t.session_id, "name": t.name, "art": t.art,
+                          "datum": t.datum.isoformat(), "pct": quote, "klasse": mittel, "abstand": d})
 
         if antworten_gesamt < schwellen.mindest_antworten:
             # Bewusst kein "unauffaellig": bei vier A–D-Fragen trifft reines
@@ -184,7 +202,7 @@ def analysiere(tests: list[Test], kinder: dict[int, str], schwellen: Schwellen =
     rang = {"melden": 0, "unauffaellig": 1, "zu_wenig_daten": 2}
     ergebnis.sort(key=lambda e: (rang[e["status"]], e["abstand_median"] if e["abstand_median"] is not None else 0))
     return {
-        "tests": [{"session_id": e["test"].session_id, "name": e["test"].name,
+        "tests": [{"session_id": e["test"].session_id, "name": e["test"].name, "art": e["test"].art,
                    "datum": e["test"].datum.isoformat(), "klasse": e["mittel"]} for e in je_test],
         "schueler": ergebnis,
         "regel": {"abstand": schwellen.abstand, "von": schwellen.von, "bis": schwellen.bis,
@@ -200,18 +218,20 @@ def _teilquote(cid: int, tests: list[Test], erst: dict[int, datetime], alt: bool
         gealtert = (t.datum - erst[a.topic_id]) > timedelta(days=FRISCH_TAGE)
         return gealtert if alt else not gealtert
 
-    kind = [0, 0]
-    klasse = [0, 0]
+    kind = [0.0, 0.0]
+    klasse = [0.0, 0.0]
+    stueck = 0
     for t in tests:
         for a in t.antworten:
             if not passt(t, a):
                 continue
-            klasse[1] += 1
-            klasse[0] += 1 if a.richtig else 0
+            klasse[1] += a.moeglich
+            klasse[0] += a.erreicht
             if a.card_id == cid:
-                kind[1] += 1
-                kind[0] += 1 if a.richtig else 0
-    if kind[1] < THEMA_MINDEST or not klasse[1]:
+                kind[1] += a.moeglich
+                kind[0] += a.erreicht
+                stueck += 1
+    if stueck < THEMA_MINDEST or not klasse[1] or not kind[1]:
         return None
     return _quote(kind[0], kind[1]), _quote(klasse[0], klasse[1])
 
@@ -254,27 +274,29 @@ def _etiketten(cid: int, tests: list[Test], erst: dict[int, datetime],
 
 def _je_thema(cid: int, tests: list[Test], erst: dict[int, datetime]) -> list[dict]:
     """Abstand zur Klasse, aufgeschlüsselt nach Thema."""
-    kind: dict[int, list[int]] = {}
-    klasse: dict[int, list[int]] = {}
+    kind: dict[int, list[float]] = {}
+    klasse: dict[int, list[float]] = {}
+    stueck: dict[int, int] = {}
     alt: dict[int, bool] = {}
     for t in tests:
         for a in t.antworten:
             if not a.topic_id:
                 continue
-            k = klasse.setdefault(a.topic_id, [0, 0]); k[1] += 1; k[0] += 1 if a.richtig else 0
+            k = klasse.setdefault(a.topic_id, [0.0, 0.0]); k[1] += a.moeglich; k[0] += a.erreicht
             if a.topic_id in erst:
                 alt[a.topic_id] = (t.datum - erst[a.topic_id]) > timedelta(days=FRISCH_TAGE)
             if a.card_id == cid:
-                z = kind.setdefault(a.topic_id, [0, 0]); z[1] += 1; z[0] += 1 if a.richtig else 0
+                z = kind.setdefault(a.topic_id, [0.0, 0.0]); z[1] += a.moeglich; z[0] += a.erreicht
+                stueck[a.topic_id] = stueck.get(a.topic_id, 0) + 1
     aus = []
     for tid, (tr, ges) in kind.items():
-        if ges < THEMA_MINDEST:
+        if stueck.get(tid, 0) < THEMA_MINDEST or not ges:
             continue
         kq = _quote(tr, ges)
         clq = _quote(*klasse[tid])
         aus.append({"topic_id": tid, "name": None, "pct": kq, "klasse": clq,
                     "abstand": round(kq - clq, 1) if kq is not None and clq is not None else None,
-                    "antworten": ges, "altbestand": bool(alt.get(tid))})
+                    "antworten": stueck.get(tid, 0), "altbestand": bool(alt.get(tid))})
     aus.sort(key=lambda x: (x["abstand"] is None, x["abstand"]))
     return aus
 

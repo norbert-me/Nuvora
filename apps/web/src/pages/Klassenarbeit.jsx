@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, Modal, Boxplot, StatCard, pageApp} from "../components/Icons.jsx";
+import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
@@ -355,6 +356,11 @@ export default function Klassenarbeit() {
           </select>
         )}
       </div>
+
+      {/* Frühwarnung: eine einzelne Arbeit zeigt den Stand, nicht die Richtung.
+          Dieselbe Auswertung wie auf der Startseite — sie rechnet über alle
+          Arbeiten dieser Klasse und, falls CardVote läuft, über die Quizze mit. */}
+      {classId && <FruehwarnPanel classId={classId} />}
 
       {/* Auswahlzeile nur, wenn es schon Arbeiten gibt — sonst führt allein die
           Leerzustand-Karte zum Anlegen (kein doppeltes „keine Arbeit"). */}
