@@ -262,6 +262,17 @@ export default function Klassenarbeit() {
     persist({ ...work, results });
   };
   const totalMax = () => (work.tasks || []).reduce((n, tk) => n + taskMax(tk), 0);
+  // Ist zu diesem Kind ueberhaupt etwas erfasst? Eine eingetragene 0 zaehlt,
+  // ein leeres Feld nicht — genau darin unterscheiden sich „hat nichts
+  // geloest" und „ist noch nicht korrigiert".
+  const hatPunkte = (sid) => {
+    const r = (work.results || {})[String(sid)];
+    if (!r) return false;
+    if (r === "abwesend") return true;
+    if (Array.isArray(r)) return true;                       // Altformat
+    return Object.values(r).some((v) => v != null && v !== "");
+  };
+
   const sumOf = (sid) => { const r = (work.results || {})[String(sid)]; if (!r || r === "abwesend") return 0; return (work.tasks || []).reduce((n, tk) => n + units(tk).reduce((m, u) => { const v = r[u.id]; return m + (v == null ? 0 : Number(v)); }, 0), 0); };
   // Abwesend ist ein eigenes Feld (work.absent) — die Punkte in results bleiben
   // erhalten, „abwesend" heisst nur „aus der Klassenstatistik raus". Alt-Marker
@@ -304,8 +315,18 @@ export default function Klassenarbeit() {
     // „krank" (abwesend) bleibt aussen vor. Damit die Auswertung aber nicht schon
     // vor der ersten Eingabe voller Nullen steht, erst wenn irgendein Wert da ist.
     const absent = new Set([...((work.absent) || []).map(String), ...Object.entries(results).filter(([, v]) => v === "abwesend").map(([k]) => k)]);
-    const hasAny = students.some((s) => { const r = results[String(s.id)]; return !absent.has(String(s.id)) && r && r !== "abwesend" && Object.keys(r).length; });
-    const graded = hasAny ? students.filter((s) => !absent.has(String(s.id))) : [];
+    // Gewertet wird, wer erfasst IST — nicht die ganze Klasse, sobald das erste
+    // Kind korrigiert ist. Sonst zieht jede noch leere Zeile den Schnitt mit
+    // einer 0 nach unten, und die Notenverteilung zeigt eine Wand aus Sechsen,
+    // waehrend man noch am Korrigieren ist. Eine bewusst eingetragene 0 zaehlt,
+    // ein leeres Feld nicht.
+    const erfasstIst = (s) => {
+      const r = results[String(s.id)];
+      if (absent.has(String(s.id)) || !r || r === "abwesend") return false;
+      if (Array.isArray(r)) return true;                 // Altformat
+      return Object.values(r).some((v) => v != null && v !== "");
+    };
+    const graded = students.filter(erfasstIst);
     // Gesamtpunkte je SuS (für Trennschärfe = Item-Total-Korrelation).
     const totals = graded.map((s) => tasks.reduce((n, tk) => n + pt(s.id, tk), 0));
     const mean = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
@@ -597,10 +618,17 @@ export default function Klassenarbeit() {
                 <tbody>
                   {students.map((s) => {
                     const sum = sumOf(s.id); const tm = totalMax(); const abw = isAbsent(s.id);
+                    // Nichts eingetragen heisst NICHT „null Punkte". Vor dem
+                    // Korrigieren stand in jeder Zeile 0/59 und eine 6 — eine
+                    // Wand aus roten Sechsen fuer eine Arbeit, die noch niemand
+                    // angesehen hat. Erst wenn zu diesem Kind ein Wert erfasst
+                    // ist, gibt es Summe und Note; eine bewusst eingetragene 0
+                    // zaehlt dabei als Wert.
+                    const erfasst = hatPunkte(s.id);
                     // Note auch für Abwesende zeigen (Punkte bleiben ja erhalten) — nur
                     // die Klassenstatistik unten rechnet sie raus. Anzeige umschaltbar:
                     // Tendenznote (2+) oder Notenwert in 0,3-Schritten (2,3).
-                    const gd = tm ? gradeDetailed((sum / tm) * 100, effScale) : null;
+                    const gd = (erfasst && tm) ? gradeDetailed((sum / tm) * 100, effScale) : null;
                     const note = gd ? (gradeMode === "wert" ? String(gd.wert).replace(".", ",") : gd.note) : "";
                     return (
                       <tr key={s.id} style={abw ? { opacity: 0.5 } : undefined}>
@@ -629,7 +657,7 @@ export default function Klassenarbeit() {
                           if (sub) { const ts = units(tk).reduce((n, u) => n + (Number(pointsOf(s.id, u.id)) || 0), 0); cells.push(<td key={tk.id + "-sum"} style={{ ...td, fontWeight: 700, background: "var(--bg2)", color: "var(--text2)" }}>{ts}</td>); }
                           return cells;
                         })}
-                        <td style={{ ...td, fontWeight: 700, borderLeft: "1px solid var(--border)", color: abw ? "var(--text3)" : (tm && sum / tm < 0.5 ? C.danger : "var(--text)") }}>{`${sum}/${tm}`}{abw ? ` (${t("klassenarbeit.absentShort")})` : ""}</td>
+                        <td style={{ ...td, fontWeight: 700, borderLeft: "1px solid var(--border)", color: !erfasst ? "var(--text3)" : abw ? "var(--text3)" : (tm && sum / tm < 0.5 ? C.danger : "var(--text)") }}>{erfasst ? `${sum}/${tm}` : `–/${tm}`}{abw ? ` (${t("klassenarbeit.absentShort")})` : ""}</td>
                         <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : "var(--text)" }}>{note}</td>
                       </tr>
                     );
@@ -872,7 +900,16 @@ function NotenUebernahme({ t, classId, kursId, students, work, scale = DEFAULT_S
   const totalMax = (work.tasks || []).reduce((n, tk) => n + uMaxT(tk), 0);
   const absentU = new Set((work.absent || []).map(String));
   const grades = students
-    .filter((s) => !absentU.has(String(s.id)) && (work.results || {})[String(s.id)] !== "abwesend")   // Anwesende (leer = 0); krank/abwesend raus, bekommt keine Note
+    // Nur wer erfasst ist: eine noch nicht korrigierte Zeile darf keine 6 ins
+    // Notenbuch tragen. Eine bewusst eingetragene 0 zaehlt, ein leeres Feld
+    // nicht. Krank/abwesend bekommt ohnehin keine Note.
+    .filter((s) => {
+      if (absentU.has(String(s.id))) return false;
+      const r = (work.results || {})[String(s.id)];
+      if (!r || r === "abwesend") return false;
+      if (Array.isArray(r)) return true;                  // Altformat
+      return Object.values(r).some((v) => v != null && v !== "");
+    })
     .map((s) => {
       const row = (work.results || {})[String(s.id)] || {};
       const sum = (work.tasks || []).reduce((n, tk) => n + uIds(tk).reduce((m, id) => m + (Number(row[id]) || 0), 0), 0);
