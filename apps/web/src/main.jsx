@@ -38,8 +38,17 @@ window.fetch = function(input, init) {
     return res;
   });
   return withRetry(0).then((res) => {
-    // Server ist erreichbar (auch bei 4xx/5xx) → online
-    if (isApi) window.dispatchEvent(new CustomEvent("cardvote:online"));
+    // Server ist erreichbar (auch bei 4xx/5xx) → online.
+    // ABER: der Service-Worker beantwortet API-Aufrufe offline aus seinem
+    // Zwischenspeicher, und zwar mit HTTP 200. Die waren hier bisher nicht von
+    // einer echten Antwort zu unterscheiden — jede gecachte Antwort meldete
+    // "online" und loeschte den Offline-Balken wieder weg. Genau der Fall, vor
+    // dem der Balken warnen soll: die Lehrkraft liest alte Daten und haelt sie
+    // fuer aktuell. Der Worker kennzeichnet solche Antworten deshalb (sw.js).
+    if (isApi) {
+      const gecacht = res.headers.get("X-Nuvora-Cache");
+      window.dispatchEvent(new CustomEvent(gecacht ? "cardvote:offline" : "cardvote:online"));
+    }
     // Sliding-Renewal: schickt der Server einen frischen Token, uebernehmen.
     // So bleibt ein aktiver Nutzer angemeldet, statt nach fester Frist rauszufliegen.
     if (isApi) { try { const rt = res.headers.get("X-Refresh-Token"); if (rt) schreib("token", rt); } catch { /* egal */ } }
@@ -419,7 +428,10 @@ function NurAdministration() {
 }
 
 function ConnectionMonitor() {
-  const [online, setOnline] = useState(true);
+  // Startwert aus dem Browser: nach einem Neuladen OHNE Netz gibt es kein
+  // "offline"-Ereignis mehr (das feuert nur beim Wechsel), und die erste Probe
+  // braucht ihre Zeit. Bis dahin stand der Balken auf "alles gut".
+  const [online, setOnline] = useState(navigator.onLine !== false);
   const [reason, setReason] = useState("server"); // "server" | "db"
 
   const check = async (aliveRef) => {

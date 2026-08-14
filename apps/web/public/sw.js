@@ -23,6 +23,21 @@ function apiCacheable(url, method) {
   return true;
 }
 
+// Eine Antwort aus dem Zwischenspeicher als solche kennzeichnen.
+//
+// Warum: sie kommt als HTTP 200 in der Shell an, ununterscheidbar von einer
+// echten Antwort vom Server. Der fetch-Interceptor in main.jsx hat daraus
+// "Server erreichbar" geschlossen und den Offline-Balken wieder ausgeblendet —
+// mitten im Offline-Betrieb, kaum dass die Verbindungsprobe ihn gesetzt hatte.
+// Die Lehrkraft sah damit alte Daten ohne jeden Hinweis. Kopfzeilen einer
+// Antwort sind unveraenderlich, deshalb eine neue Antwort mit demselben Rumpf.
+function ausCache(res) {
+  if (!res) return res;
+  const kopfe = new Headers(res.headers);
+  kopfe.set("X-Nuvora-Cache", "hit");
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers: kopfe });
+}
+
 // Vite haengt an jeden Chunk einen Inhalts-Hash: "Kalender-a1b2c3.js". Nach
 // einem Deploy heisst dieselbe Seite anders, und die alte Datei blieb bisher
 // fuer immer im Cache liegen — der wuchs mit jedem Deploy um das ganze Bundle.
@@ -104,7 +119,7 @@ self.addEventListener("fetch", (event) => {
             }
             return res;
           })
-          .catch(() => caches.match(event.request).then((c) => c || Response.error()))
+          .catch(() => caches.match(event.request).then((c) => (c ? ausCache(c) : Response.error())))
       );
       return;
     }
