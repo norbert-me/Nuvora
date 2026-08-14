@@ -1015,3 +1015,115 @@ async def fruehwarnung_klasse(class_id: int, empfindlich: bool = False,
     return ergebnis
 
 
+
+
+# ─── Themenstand je Kind: wie sicher sitzt ein Unterthema, und wird es besser? ───
+#
+# Aus denselben Daten wie die Fruehwarnung, aber mit anderer Frage: die
+# Fruehwarnung vergleicht das Kind mit der Klasse, der Themenstand das Kind mit
+# dem Stoff. Beide rechnen ueber Klassenarbeiten UND CardVote-Quizze, beide
+# haengen deshalb am Kern und pruefen je Quelle `is_active` (Regel 3).
+
+@kern_router.get("/classes/{class_id}/themenprofil")
+async def themenprofil(class_id: int, student_id: Optional[int] = None,
+                       user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Je Kind je Thema: Gesamtstand in Prozent, Verlauf und Trend.
+
+    `student_id` grenzt auf ein Kind ein (Schuelerseite); ohne ihn kommt die
+    ganze Klasse (Uebersicht).
+    """
+    from .. import themenprofil as tp
+    from ..scoring import note_aus_pct
+    from .modules import is_active
+    from ..models import SchoolClass
+
+    school_class = await db.get(SchoolClass, class_id)
+    if not school_class:
+        raise HTTPException(404)
+    if school_class.owner_id and school_class.owner_id != user.id:
+        raise HTTPException(403, "Kein Zugriff auf diese Klasse")
+
+    roster = await _kurs_roster(db, class_id)
+    if student_id is not None:
+        roster = [s for s in roster if s.id == student_id]
+        if not roster:
+            raise HTTPException(404, "Schüler nicht in dieser Klasse")
+
+    # Erhebungen je Kind sammeln — dieselben Quellen wie die Fruehwarnung, aber
+    # hier je THEMA statt je Erhebung aufgeschluesselt.
+    je_kind: dict[int, list] = {s.id: [] for s in roster}
+    karte_zu_id = {s.card_id: s.id for s in roster}
+
+    if await is_active(db, user.id, "auswertung"):
+        from ..models import WorkAnalysis
+        arbeiten = (await db.execute(select(WorkAnalysis).where(
+            WorkAnalysis.owner_id == user.id, WorkAnalysis.class_id == class_id
+        ).order_by(WorkAnalysis.created_at))).scalars().all()
+        for w in arbeiten:
+            if not w.created_at:
+                continue
+            prof, _ = _arbeit_profil(w)     # {student_id: {topic_id: [erreicht, max]}}
+            for sid, themen in prof.items():
+                try:
+                    sid_int = int(sid)
+                except (TypeError, ValueError):
+                    continue
+                if sid_int not in je_kind:
+                    continue
+                messungen = [tp.Messung(topic_id=tid, erreicht=float(e), moeglich=float(m))
+                             for tid, (e, m) in themen.items() if m]
+                if messungen:
+                    je_kind[sid_int].append(tp.Erhebung(
+                        id=w.id, name=w.name or "Klassenarbeit", datum=w.created_at,
+                        art="arbeit", messungen=messungen))
+
+    if await is_active(db, user.id, "cardvote"):
+        # Quizze: je Frage ein Punkt. Damit zaehlt eine Frage weniger als eine
+        # grosse Aufgabe — richtig so, sie prueft auch weniger.
+        tests, _ = await _fruehwarn_daten(db, user, class_id)
+        for t in tests:
+            if t.art != "quiz":
+                continue
+            gebuendelt: dict[int, dict[int, list]] = {}
+            for a in t.antworten:
+                if not a.topic_id:
+                    continue
+                sid = karte_zu_id.get(a.card_id)
+                if sid is None:
+                    continue
+                z = gebuendelt.setdefault(sid, {}).setdefault(a.topic_id, [0.0, 0.0])
+                z[0] += a.erreicht
+                z[1] += a.moeglich
+            for sid, themen in gebuendelt.items():
+                je_kind[sid].append(tp.Erhebung(
+                    id=t.session_id, name=t.name or "Quiz", datum=t.datum, art="quiz",
+                    messungen=[tp.Messung(topic_id=tid, erreicht=e, moeglich=m)
+                               for tid, (e, m) in themen.items() if m]))
+
+    skala = user.grade_scale or None
+    aus = []
+    for s in roster:
+        themen = tp.profil(je_kind.get(s.id, []))
+        for eintrag in themen:
+            # Orientierungsnote — ausdruecklich nur, wenn genug Punkte da sind.
+            eintrag["note"] = note_aus_pct(eintrag["pct"], skala) if eintrag["pct"] is not None else None
+        aus.append({"student_id": s.id, "card_id": s.card_id, "name": s.name, "themen": themen})
+
+    # Themennamen einmal fuer alle nachschlagen.
+    ids = {e["topic_id"] for k in aus for e in k["themen"]}
+    if ids:
+        topics = (await db.execute(select(Topic).where(Topic.id.in_(list(ids))))).scalars().all()
+        namen = {t.id: t.name for t in topics}
+        eltern = {t.id: t.parent_id for t in topics}
+        if any(eltern.values()):
+            for p in (await db.execute(select(Topic).where(
+                    Topic.id.in_([x for x in eltern.values() if x])))).scalars().all():
+                namen.setdefault(p.id, p.name)
+        for k in aus:
+            for e in k["themen"]:
+                elt = eltern.get(e["topic_id"])
+                e["name"] = (f"{namen[elt]} / {namen[e['topic_id']]}"
+                             if elt and elt in namen else namen.get(e["topic_id"]))
+
+    return {"class_id": class_id, "class_name": school_class.name,
+            "mindest_punkte": tp.MINDEST_PUNKTE, "schueler": aus}

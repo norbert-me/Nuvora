@@ -986,25 +986,9 @@ _DEFAULT_SCALE = {"1": 87, "2": 73, "3": 59, "4": 45, "5": 20, "6": 0}
 
 
 def _grade_from_pct(pct: float, scale: dict) -> float:
-    """Prozent -> Note, identisch zur Frontend-Skala (core/grades.js).
-
-    Gerundet wird kaufmaennisch wie dort (Math.round): Pythons round() rundet
-    die halbe Stelle zur geraden Zahl, 83,5 % ergaebe 2,2 statt 2,3 — dieselbe
-    Leistung stuende dann je nach Weg als andere Note im Notenbuch."""
-    from ..scoring import kaufmaennisch
-    try:
-        s = {int(k): float(v) for k, v in (scale or {}).items()}
-        s = {g: s[g] for g in (1, 2, 3, 4, 5, 6)}  # vollstaendig+lesbar? sonst Default
-    except (ValueError, TypeError, KeyError):
-        s = {int(k): float(v) for k, v in _DEFAULT_SCALE.items()}
-    ranges = [(1, s[1], 100), (2, s[2], s[1]), (3, s[3], s[2]), (4, s[4], s[3]), (5, s[5], s[4])]
-    for grade, lower, upper in ranges:
-        if pct >= lower:
-            span = upper - lower
-            if span <= 0:
-                return float(grade)
-            return kaufmaennisch(grade + (upper - pct) / span, 1)
-    return 6.0
+    """Duenner Durchgriff auf scoring.note_aus_pct — die eine Notenrechnung."""
+    from ..scoring import note_aus_pct
+    return note_aus_pct(pct, scale)
 
 
 def _norm(name: str) -> str:

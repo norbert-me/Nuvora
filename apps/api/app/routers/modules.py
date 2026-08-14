@@ -82,7 +82,8 @@ REGISTRY: List[ModuleDef] = [
             "sich in eine andere Klasse kopieren und danach über die Klassen "
             "vergleichen — je Aufgabe mit Trennschärfe, Nuller-Anteil und Streuung, "
             "damit eine missverständliche Aufgabe von einer schweren zu unterscheiden "
-            "ist."
+            "ist. Je Kind zeigt der Themenstand, wie sicher jedes Unterthema sitzt "
+            "und ob es besser wird — über alle Arbeiten und Quizze hinweg."
         ),
         path="/auswertung",
         stage="stable",

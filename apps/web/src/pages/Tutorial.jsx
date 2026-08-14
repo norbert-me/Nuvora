@@ -86,7 +86,7 @@ export default function Tutorial() {
             {auf && (
               <div style={{ padding: "0 16px 16px 54px" }}>
                 <ul style={{ margin: "0 0 14px", paddingLeft: 18, color: "var(--text2)", fontSize: 14, lineHeight: 1.75 }}>
-{[1,2,3,4,5,6].map((k) => { const key = `tut.${kb(b)}.${k}`; const v = t(key); return v === key ? null : <li key={k}>{v}</li>; })}
+{[1,2,3,4,5,6,7].map((k) => { const key = `tut.${kb(b)}.${k}`; const v = t(key); return v === key ? null : <li key={k}>{v}</li>; })}
                 </ul>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <Link to={b.ziel} style={{ ...btnPrimary, textDecoration: "none", display: "inline-block" }}>{t(`tut.${kb(b)}.goto`)}</Link>

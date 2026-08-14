@@ -7,6 +7,7 @@ import { useSearchParams } from "react-router-dom";
 import { btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, Modal, Boxplot, StatCard, Tabs, pageApp} from "../components/Icons.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
+import Themenstand from "../components/Themenstand.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -833,6 +834,11 @@ export default function Klassenarbeit() {
         </>
       )}
       {hasRoster && works.length === 0 && <Empty title={t("klassenarbeit.empty")} hint={t("klassenarbeit.emptyHint")} action={t("klassenarbeit.new")} onAction={neueArbeit} />}
+      {/* Themenstand: die Arbeit sagt „diese Klassenarbeit", der Themenstand
+          „dieses Unterthema ueber die Zeit". Rechnet ueber alle Arbeiten und
+          Quizze der Klasse — deshalb hier unter der Einzelauswertung. */}
+      {hasRoster && !hideIndividual && classId && <Themenstand classId={classId} />}
+
       {hasRoster && work && students.length === 0 && <Empty title={t("klassenarbeit.noStudents")} />}
 
       {kopieOffen && work && (

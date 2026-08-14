@@ -646,6 +646,19 @@ def teste_kern(api, b, u):
             api.call("DELETE", f"/api/material/{mid}", erwartet=(204, 404))
         return "hochladen, wiederfinden, als PDF ansehen, loeschen"
 
+    def themenstand():
+        # Kern-Sicht wie die Fruehwarnung: rechnet ueber Klassenarbeiten UND
+        # Quizze, gehoert keinem Modul und darf ohne beide leer antworten —
+        # aber nie 403 oder 500.
+        aus = api.call("GET", f"/api/classes/{u.class_id}/themenprofil", erwartet=(200,))
+        if "schueler" not in aus or "mindest_punkte" not in aus:
+            raise AssertionError(f"Antwort unvollstaendig: {list(aus)}")
+        einer = api.call("GET", f"/api/classes/{u.class_id}/themenprofil?student_id={u.students[0]}",
+                         erwartet=(200,))
+        if len(einer.get("schueler") or []) != 1:
+            raise AssertionError("Einschraenkung auf ein Kind wirkt nicht")
+        return f"Klasse und einzelnes Kind ({aus['mindest_punkte']:.0f} Punkte Mindestmass)"
+
     def modulregister():
         module = api.call("GET", "/api/modules", erwartet=(200,))
         if not module:
@@ -659,6 +672,7 @@ def teste_kern(api, b, u):
     b.pruefe("Kern", "Archiv", archiv)
     b.pruefe("Kern", "Dateiablage", material)
     b.pruefe("Kern", "Fruehwarnung", fruehwarnung)
+    b.pruefe("Kern", "Themenstand", themenstand)
     b.pruefe("Kern", "Modulregister", modulregister)
 
 

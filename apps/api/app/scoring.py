@@ -44,6 +44,32 @@ def naechste_stufe(pct: float, scale: dict) -> float:
     return max(0.0, grenzen[0] - pct)
 
 
+def note_aus_pct(pct: float, scale: Optional[dict] = None) -> float:
+    """Prozent -> Note, identisch zur Frontend-Skala (core/grades.js).
+
+    Stand vorher in noten.py und wurde von dort aus benutzt; seit der Themenstand
+    dieselbe Umrechnung braucht, gehoert sie hierher — zwei Fassungen derselben
+    Notenrechnung liefen unweigerlich auseinander, und dann stuende dieselbe
+    Leistung je nach Weg als andere Note da.
+
+    Kaufmaennisch gerundet wie im Frontend (Math.round): Pythons round() rundet
+    die halbe Stelle zur geraden Zahl, 83,5 % ergaebe 2,2 statt 2,3.
+    """
+    try:
+        s = {int(k): float(v) for k, v in (scale or {}).items()}
+        s = {g: s[g] for g in (1, 2, 3, 4, 5, 6)}   # vollstaendig+lesbar? sonst Default
+    except (ValueError, TypeError, KeyError):
+        s = {int(k): float(v) for k, v in DEFAULT_SCALE.items()}
+    ranges = [(1, s[1], 100), (2, s[2], s[1]), (3, s[3], s[2]), (4, s[4], s[3]), (5, s[5], s[4])]
+    for grade, lower, upper in ranges:
+        if pct >= lower:
+            span = upper - lower
+            if span <= 0:
+                return float(grade)
+            return kaufmaennisch(grade + (upper - pct) / span, 1)
+    return 6.0
+
+
 def status_of(card_id: int, has_any_scan: bool, config: Optional[dict]) -> str:
     """"anwesend" oder "krank". Ohne jede Antwort gilt krank — es sei denn, die
     Lehrkraft hat das Kind ausdrücklich auf anwesend gestellt (dann zählt die 0)."""

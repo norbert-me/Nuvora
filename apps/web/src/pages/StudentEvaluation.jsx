@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { DownloadLink, COLORS as C, pageApp, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
+import Themenstand from "../components/Themenstand.jsx";
 
 const API = "/api";
 
@@ -59,6 +60,8 @@ export default function StudentEvaluation() {
       {/* Verlauf gegen die Klasse: dieselbe Auswertung wie auf der Startseite,
           hier nur fuer dieses Kind. Zeigt sich nichts, steht hier auch nichts. */}
       <FruehwarnPanel classId={classId} nurKind={cardId} />
+      {/* Themenstand dieses Kindes: was sitzt, was nicht, und wird es besser? */}
+      <Themenstand classId={classId} cardId={cardId} />
 
       <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
         <StatCard label="Ø Gesamt" value={avgPct != null ? `${avgPct}%` : "–"} color={colorForPct(avgPct)} />

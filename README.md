@@ -347,6 +347,21 @@ also nur mit dem jeweiligen Modul. Jede Meldung nennt die Zahlen, aus denen sie
 entstand. Es ist eine Beobachtung, keine Diagnose — aus Trefferquoten
 folgt keine Lernstörung.
 
+### Themenstand: sitzt das Unterthema — und wird es besser?
+
+Eine Klassenarbeit prüft meist mehrere Unterthemen. Nuvora rechnet daraus (und
+aus den CardVote-Quizzen) je Kind und Thema die erreichten von den möglichen
+Punkten — nicht den Mittelwert der Quoten, sondern gewichtet: eine Aufgabe zu
+acht Punkten wiegt achtmal so schwer wie eine zu einem, denn sie prüft auch
+mehr. Unter sechs möglichen Punkten steht „zu wenig für eine Aussage" statt
+einer Zahl, die nach Wissen aussieht.
+
+Der Pfeil daneben beantwortet die zweite Frage: verglichen wird die erste Hälfte
+der Erhebungen zu diesem Thema mit der zweiten — nicht die letzte mit der
+vorletzten, sonst wäre jede schwache Arbeit ein „Abstieg". Eine Note steht klein
+daneben, ausdrücklich als Orientierung: der Notenschlüssel gilt für eine ganze
+Arbeit, nicht für drei Aufgaben daraus.
+
 ### Archiv statt Löschen
 
 Am Schuljahresende lassen sich Klassen und Kurse **archivieren**: raus aus allen
