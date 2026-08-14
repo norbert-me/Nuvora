@@ -574,6 +574,37 @@ export function Tabs({ value, onChange, options, style }) {
   );
 }
 
+// ─── E/G-Umschalter — EINE Form fuer dieselbe Funktion ───
+//
+// E/G taucht an vier Stellen auf (CardVote-Frage, Karteikarte, Kartenstapel,
+// Kursteilnehmer) und sah an dreien verschieden aus: mal ein quadratischer
+// Knopf, mal ein Auswahlfeld mit „Alle Niveaus/Nur E/Nur G", mal eines mit
+// „–/E-Kurs/G-Kurs". Dieselbe Entscheidung soll ueberall gleich aussehen,
+// sonst muss man sie jedes Mal neu lesen.
+//
+// Ein Klick schaltet weiter. `mitLeer` bestimmt, ob es einen dritten Zustand
+// „gilt fuer alle" gibt (Karte, Stapel, Kursteilnehmer) oder nur E/G
+// (CardVote-Frage: dort ist jede Frage entweder Grund- oder Anforderungsstoff).
+export function NiveauToggle({ wert, onChange, mitLeer = true, size = 26, title }) {
+  const folge = mitLeer ? ["", "E", "G"] : ["G", "E"];
+  const jetzt = folge.includes(wert || "") ? (wert || "") : "";
+  const weiter = () => onChange(folge[(folge.indexOf(jetzt) + 1) % folge.length]);
+  const aktiv = jetzt === "E" || jetzt === "G";
+  const farbe = jetzt === "E" ? COLORS.info : COLORS.success;
+  return (
+    <button type="button" onClick={(e) => { e.stopPropagation(); weiter(); }} title={title}
+      aria-label={title} style={{
+        flexShrink: 0, width: size, height: size, borderRadius: 8, cursor: "pointer",
+        fontSize: size <= 22 ? 11.5 : 12.5, fontWeight: 700, lineHeight: 1, padding: 0,
+        border: `1px solid ${aktiv ? farbe : "var(--border2)"}`,
+        background: aktiv ? farbe + "1e" : "var(--bg)",
+        color: aktiv ? farbe : "var(--text3)",
+      }}>
+      {jetzt || "–"}
+    </button>
+  );
+}
+
 // Reifegrad-Badge (alpha/beta) fuer Module. beta = blau, alpha = orange-Warnung.
 // Leerer Zustand: statt „keine Daten" ein Satz + optional ein erster-Schritt-
 // Knopf. Macht Listen selbsterklaerend.

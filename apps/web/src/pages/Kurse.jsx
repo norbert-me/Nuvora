@@ -6,7 +6,7 @@ import { useLanguage } from "../i18n/index.jsx";
 import KursLinks from "../components/KursLinks.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { sende } from "../core/melden.js";
-import { AddButton, pageTitle, pageIntro, btnPrimary, btnSecondary, selectStyle, chipStyle, Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, Toggle, Tabs, Empty, pageApp, LoadError} from "../components/Icons.jsx";
+import { NiveauToggle, AddButton, pageTitle, pageIntro, btnPrimary, btnSecondary, selectStyle, chipStyle, Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, Toggle, Tabs, Empty, pageApp, LoadError} from "../components/Icons.jsx";
 
 const API = "/api";
 const editLabel = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text3)", marginBottom: 6 };
@@ -339,12 +339,8 @@ function NiveauPanel({ kursId, niveauAktiv = false, t }) {
           <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
           {/* E/G-Selektor nur bei aktivem Regler; sonst nur der Name (Teilnehmer sichtbar). */}
           {niveauAktiv && (
-            <select value={s.niveau || ""} onChange={(e) => setNiveau(s.name, e.target.value)}
-              style={{ ...selectStyle, fontSize: 12.5, padding: "4px 24px 4px 8px" }}>
-              <option value="">–</option>
-              <option value="E">{t("classes.eCourse")}</option>
-              <option value="G">{t("classes.gCourse")}</option>
-            </select>
+            <NiveauToggle wert={s.niveau || ""} onChange={(v) => setNiveau(s.name, v)}
+              size={24} title={t("kurse.niveauToggle")} />
           )}
         </div>
       ))}

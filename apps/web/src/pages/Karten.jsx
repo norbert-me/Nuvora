@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, selectStyle, Modal as UiModal, overlayGuard, modalOverlay, Empty, Skeleton, pageApp, inputStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { NiveauToggle, AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, selectStyle, Modal as UiModal, overlayGuard, modalOverlay, Empty, Skeleton, pageApp, inputStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import AuthImage from "../components/AuthImage.jsx";
@@ -698,12 +698,12 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         {/* Niveau-Stapel: "E"/"G" wird automatisch nur an Schueler des jeweiligen
             Niveaus verteilt, "" an alle. Kein manuelles Zuweisen noetig. */}
         {!collapsed && (
-        <select value={deck.niveau || ""} onChange={(e) => setNiveau(e.target.value)} title={t("karten.niveauHint")}
-          style={{ ...selectStyle, fontSize: 12, padding: "4px 28px 4px 9px", maxWidth: 150 }}>
-          <option value="">{t("karten.niveauAll")}</option>
-          <option value="E">{t("karten.niveauE")}</option>
-          <option value="G">{t("karten.niveauG")}</option>
-        </select>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }} title={t("karten.niveauHint")}>
+          <NiveauToggle wert={deck.niveau || ""} size={24} onChange={setNiveau} title={t("karten.niveauHint")} />
+          <span style={{ fontSize: 12, color: "var(--text3)" }}>
+            {deck.niveau === "E" ? t("karten.niveauE") : deck.niveau === "G" ? t("karten.niveauG") : t("karten.niveauAll")}
+          </span>
+        </span>
         )}
         {!collapsed && onMove && folders.length > 0 && (
           <div style={{ position: "relative" }}>
@@ -785,14 +785,10 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
             className="drag-handle" title={t("karten.reorderHint")} style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex", flexShrink: 0, userSelect: "none" }}><Icon d={ICONS.grip} size={14} /></span>
           {c.has_front_image && <AuthImage src={`${API}/cards/${c.id}/image/front`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: 5, border: "1px solid var(--border2)", flexShrink: 0 }} />}
           <span style={{ flex: 1, minWidth: 0 }}><strong><Latex>{c.front}</Latex></strong> <span style={{ color: "var(--text3)" }}>→ <Latex>{c.back}</Latex></span></span>
-          {/* E/G je Karte: nur zeigen, wenn gesetzt — ein Stapel ohne
-              Differenzierung soll nicht mit „für alle"-Marken zugestellt sein. */}
-          {c.niveau && (
-            <span title={t("karten.cardNiveauHint")}
-              style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 8px", borderRadius: 980, flexShrink: 0,
-                background: c.niveau === "E" ? "rgba(37,99,235,0.14)" : "rgba(10,125,62,0.12)",
-                color: c.niveau === "E" ? C.info : C.success }}>{c.niveau}</span>
-          )}
+          {/* Direkt in der Zeile umschaltbar — dasselbe Bauteil wie bei einer
+              CardVote-Frage und beim Kursteilnehmer. */}
+          <NiveauToggle wert={c.niveau || ""} size={22} title={t("karten.cardNiveauHint")}
+            onChange={(v) => saveEditCard(c.id, c.front, c.back, v)} />
           {c.has_back_image && <AuthImage src={`${API}/cards/${c.id}/image/back`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: 5, border: "1px solid var(--border2)", flexShrink: 0 }} />}
           <button onClick={() => setEditCard(c.id)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>
           <button onClick={() => call(() => fetch(`${API}/cards/${c.id}`, { method: "DELETE" }))} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
@@ -945,11 +941,12 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t })
         {/* E/G je Karte. Der Stapel kann zusätzlich ein Niveau tragen; beides
             wirkt zusammen — eine E-Karte in einem G-Stapel sieht niemand. */}
         <div style={lbl}>{t("karten.cardNiveau")}</div>
-        <select value={niveau} onChange={(e) => setNiveau(e.target.value)} style={{ ...inpS, width: "auto" }} title={t("karten.cardNiveauHint")}>
-          <option value="">{t("karten.niveauAll")}</option>
-          <option value="E">{t("karten.niveauE")}</option>
-          <option value="G">{t("karten.niveauG")}</option>
-        </select>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <NiveauToggle wert={niveau} onChange={setNiveau} title={t("karten.cardNiveauHint")} />
+          <span style={{ fontSize: 12, color: "var(--text3)" }}>
+            {niveau === "E" ? t("karten.niveauE") : niveau === "G" ? t("karten.niveauG") : t("karten.niveauAll")}
+          </span>
+        </div>
 
         {(front.includes("$") || back.includes("$")) && (
           <div style={{ marginTop: 12, padding: "8px 12px", background: "var(--bg2)", borderRadius: 8, fontSize: 14 }}>

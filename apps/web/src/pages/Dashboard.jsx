@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt } from "../core/dialog.jsx";
 import Latex from "../components/Latex.jsx";
 import PublishModal from "../components/PublishModal.jsx";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Toggle, Modal, Popover, pageApp, inputStyle as inputBasis } from "../components/Icons.jsx";
+import { NiveauToggle, AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Toggle, Modal, Popover, pageApp, inputStyle as inputBasis } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import TopicPicker from "../components/TopicPicker.jsx";
@@ -924,18 +924,8 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
             <span className="drag-handle" style={{ color: "var(--text3)", width: 20, display: "inline-flex", justifyContent: "center", cursor: "grab", flexShrink: 0 }}><Icon d={ICONS.grip} size={15} /></span>
           ))}
           {niveauAktiv && (
-            <button
-              onClick={(e) => { e.stopPropagation(); toggleQNiveau(q.id); }}
-              title={t("dash.niveauQHint")}
-              style={{
-                flexShrink: 0, width: 26, height: 26, borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
-                border: niveaus[q.id] === "E" ? "1px solid var(--accent)" : "1px solid var(--border2)",
-                background: niveaus[q.id] === "E" ? "var(--accent-bg)" : "var(--bg)",
-                color: niveaus[q.id] === "E" ? "var(--accent)" : "var(--text3)",
-              }}
-            >
-              {niveaus[q.id] === "E" ? "E" : "G"}
-            </button>
+            <NiveauToggle wert={niveaus[q.id] === "E" ? "E" : "G"} mitLeer={false}
+              onChange={() => toggleQNiveau(q.id)} title={t("dash.niveauQHint")} />
           )}
           <span onClick={() => setEditingQ({ ...q })} style={{ flex: 1, color: "var(--text)", cursor: "pointer" }} title={t("dash.clickEdit")}>
             <Latex>{q.text}</Latex>
