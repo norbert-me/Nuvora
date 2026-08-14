@@ -1796,4 +1796,12 @@ export default {
   "classes.archive": "Archive",
   "classes.unarchive": "Restore from archive",
   "classes.archiveHint": "End of the school year: disappears from all pickers, all data stays (grades, exams, cards). Reversible any time — unlike the bin, which deletes after 30 days.",
+  "material.loading": "Loading file …",
+  "material.newTab": "New tab",
+  "klassenarbeit.weakHint": "Grouped by topic: who stayed below 50 % of the points. The topic with the most students first — that is your revision lesson.",
+  "klassenarbeit.weakCount": "{{n}} of {{all}}",
+  "klassenarbeit.tipTask": "Discrimination {{d}}: students who do well elsewhere fail here just as often — that points at the task, not the class. Check wording and marking scheme first.",
+  "klassenarbeit.tipEmpty": "{{n}} % scored zero. That many blanks usually means unclear wording or too little time — not missing ability.",
+  "klassenarbeit.tipRepeat": "Only {{p}} % of the points, but the task discriminates well: the content isn’t there. Worth revisiting.",
+  "klassenarbeit.tipEasy": "{{v}} % full marks: fine as a starter, but it adds nothing at the top end.",
 };

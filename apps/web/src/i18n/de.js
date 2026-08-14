@@ -1782,4 +1782,12 @@ export default {
   "classes.archive": "Archivieren",
   "classes.unarchive": "Aus dem Archiv holen",
   "classes.archiveHint": "Am Schuljahresende: verschwindet aus allen Auswahllisten, alle Daten bleiben erhalten (Noten, Klassenarbeiten, Karten). Jederzeit zurückholbar — anders als der Papierkorb, der nach 30 Tagen löscht.",
+  "material.loading": "Datei wird geladen …",
+  "material.newTab": "In neuem Tab",
+  "klassenarbeit.weakHint": "Nach Thema gruppiert: wer unter 50 % der Punkte blieb. Das Thema mit den meisten Betroffenen steht oben — daraus wird eine Wiederholungsstunde oder eine Fördergruppe.",
+  "klassenarbeit.weakCount": "{{n}} von {{all}}",
+  "klassenarbeit.tipTask": "Trennschärfe {{d}}: Wer die Arbeit sonst gut löst, scheitert hier genauso oft — das spricht für die Aufgabe, nicht für die Klasse. Formulierung und Erwartungshorizont ansehen, bevor daraus eine Wiederholungsstunde wird.",
+  "klassenarbeit.tipEmpty": "{{n}} % haben null Punkte. Bei so vielen leeren Feldern ist meist die Aufgabenstellung unklar (oder die Zeit war zu knapp) — nicht das Können.",
+  "klassenarbeit.tipRepeat": "Nur {{p}} % der Punkte, aber die Aufgabe trennt sauber: Der Stoff sitzt nicht. Wiederholung lohnt — die Namen dazu stehen oben unter den schwachen Themen.",
+  "klassenarbeit.tipEasy": "{{v}} % volle Punktzahl: als Einstieg gut, für die Differenzierung nach oben trägt die Aufgabe nichts bei.",
 };

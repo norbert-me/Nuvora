@@ -22,9 +22,28 @@ const newId = () => "t" + Date.now().toString(36) + Math.random().toString(36).s
 // Eine Zeile „je Aufgabe/Teilaufgabe": Label, Ø-Punkte, farbige %-Zahl, Balken
 // auf eigener Zeile und (optional) Trennschärfe + 95%-KI darunter. Gemeinsam für
 // „je Aufgabe" und „je Teilaufgabe", damit beide gleich aussehen.
+// Was folgt aus den Zahlen? Die Reihenfolge ist die Reihenfolge der Dringlichkeit,
+// und jeder Satz nennt den Wert, aus dem er stammt — eine Empfehlung ohne Beleg
+// waere ein Orakel, und die Lehrkraft muss sie gegen ihre Klasse pruefen koennen.
+//
+// Der Kern der Sache: eine niedrige Trefferquote allein sagt nur „schwer". Erst
+// zusammen mit der Trennschaerfe wird daraus eine Handlung — trennt die Aufgabe
+// gut, kann die Klasse den Stoff nicht (also: wiederholen); trennt sie nicht,
+// liegt es an der Aufgabe (also: Formulierung und Erwartungshorizont ansehen).
+function schluss(row, t) {
+  if (row.form) return null;                       // Darstellung: keine Sachaussage
+  const d = row.disc, p = row.pct, n = row.nullAnteil;
+  if (d != null && d < 0.1 && p < 75) return { art: "aufgabe", text: t("klassenarbeit.tipTask", { d: d.toFixed(2).replace(".", ",") }) };
+  if (n != null && n >= 40 && p < 60) return { art: "aufgabe", text: t("klassenarbeit.tipEmpty", { n }) };
+  if (p < 50 && (d == null || d >= 0.3)) return { art: "stoff", text: t("klassenarbeit.tipRepeat", { p }) };
+  if (p >= 90 && row.vollAnteil != null && row.vollAnteil >= 70) return { art: "leicht", text: t("klassenarbeit.tipEasy", { v: row.vollAnteil }) };
+  return null;
+}
+
 function StatRow({ row, t, expandable, open, onToggle, small }) {
   const col = row.pct < 50 ? C.danger : row.pct < 75 ? C.warning : C.success;
   const dc = row.disc == null ? "var(--text3)" : row.disc >= 0.4 ? C.success : row.disc >= 0.2 ? C.warning : C.danger;
+  const rat = small ? null : schluss(row, t);
   return (
     <div onClick={expandable ? onToggle : undefined} style={{ padding: small ? "6px 9px" : "8px 10px", borderRadius: 8, background: small ? "var(--bg3)" : "var(--bg2)", marginBottom: 5, cursor: expandable ? "pointer" : "default" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -36,10 +55,20 @@ function StatRow({ row, t, expandable, open, onToggle, small }) {
       <div style={{ marginTop: 5, height: 8, background: "var(--card)", borderRadius: 5, overflow: "hidden" }}>
         <span style={{ display: "block", width: `${row.pct}%`, height: "100%", background: col, borderRadius: 5 }} />
       </div>
-      {(row.disc != null || row.ciLow != null) && (
-        <div style={{ display: "flex", gap: 14, fontSize: 11, color: "var(--text3)", marginTop: 5 }}>
+      {(row.disc != null || row.ciLow != null || row.nullAnteil != null) && (
+        <div style={{ display: "flex", gap: 14, fontSize: 11, color: "var(--text3)", marginTop: 5, flexWrap: "wrap" }}>
           {row.disc != null && <span title={t("klassenarbeit.discHint")}>{t("klassenarbeit.disc")}: <b style={{ color: dc }}>{row.disc.toFixed(2).replace(".", ",")}</b></span>}
           {row.ciLow != null && <span title={t("klassenarbeit.ciHint")}>{t("klassenarbeit.ci")}: <b style={{ color: "var(--text2)" }}>{row.ciLow}–{row.ciHigh}%</b></span>}
+          {row.nullAnteil != null && <span title={t("klassenarbeit.cmpEmptyHint")}>{t("klassenarbeit.cmpEmpty")}: <b style={{ color: row.nullAnteil >= 40 ? C.danger : "var(--text2)" }}>{row.nullAnteil}%</b></span>}
+          {row.vollAnteil != null && <span title={t("klassenarbeit.cmpFullHint")}>{t("klassenarbeit.cmpFull")}: <b style={{ color: "var(--text2)" }}>{row.vollAnteil}%</b></span>}
+        </div>
+      )}
+      {/* Der Schluss aus den Zahlen — nicht nur die Zahlen. */}
+      {rat && (
+        <div style={{ marginTop: 6, fontSize: 12, lineHeight: 1.45, padding: "6px 8px", borderRadius: 6,
+          background: rat.art === "aufgabe" ? "rgba(209,53,15,0.08)" : rat.art === "stoff" ? "rgba(138,97,0,0.10)" : "var(--card)",
+          color: rat.art === "leicht" ? "var(--text3)" : "var(--text2)" }}>
+          {rat.text}
         </div>
       )}
     </div>
@@ -285,6 +314,26 @@ export default function Klassenarbeit() {
       let e = 0, m = 0; graded.forEach((s) => us.forEach((u) => { e += pu(s.id, u.id); m += uMax[u.id]; }));
       return { topic_id: Number(tid), label: topicLabel(Number(tid)), pct: m ? Math.round((e / m) * 100) : 0 };
     }).sort((a, b) => a.pct - b.pct);
+    // Nach Thema gruppiert: {label, namen[], anteil}. Sortiert nach Anzahl —
+    // das Thema, an dem die halbe Klasse haengt, gehoert nach oben, nicht das
+    // erste im Alphabet.
+    const weakGroups = (() => {
+      const map = new Map();
+      graded.forEach((s) => {
+        Object.entries(topicUnits).forEach(([tid, us]) => {
+          let e = 0, m = 0; us.forEach((u) => { e += pu(s.id, u.id); m += uMax[u.id]; });
+          if (m && e / m < 0.5) {
+            const label = topicLabel(Number(tid));
+            if (!map.has(label)) map.set(label, []);
+            map.get(label).push(s.name);
+          }
+        });
+      });
+      return [...map.entries()]
+        .map(([label, namen]) => ({ label, namen, anteil: graded.length ? Math.round(namen.length / graded.length * 100) : 0 }))
+        .sort((a, b) => b.namen.length - a.namen.length);
+    })();
+
     const studentsOut = graded.map((s) => {
       const weak = Object.entries(topicUnits).filter(([, us]) => { let e = 0, m = 0; us.forEach((u) => { e += pu(s.id, u.id); m += uMax[u.id]; }); return m && e / m < 0.5; }).map(([tid]) => topicLabel(Number(tid)));
       return weak.length ? { student_id: s.id, name: s.name, weak } : null;
@@ -313,7 +362,11 @@ export default function Klassenarbeit() {
         ciLow = Math.max(0, Math.round(mean(pcts) - half));
         ciHigh = Math.min(100, Math.round(mean(pcts) + half));
       }
-      return { id: tk.id, label: tk.label || `${i + 1}.`, pct: m ? Math.round((e / m) * 100) : 0, avgP: Math.round(avgP * 10) / 10, max: mx, disc, ciLow, ciHigh };
+      const nullAnteil = xs.length ? Math.round(xs.filter((x) => x === 0).length / xs.length * 100) : null;
+      const vollAnteil = xs.length ? Math.round(xs.filter((x) => x >= mx).length / xs.length * 100) : null;
+      return { id: tk.id, label: tk.label || `${i + 1}.`, pct: m ? Math.round((e / m) * 100) : 0,
+               avgP: Math.round(avgP * 10) / 10, max: mx, disc, ciLow, ciHigh,
+               nullAnteil, vollAnteil, form: !!tk.form };
     });
     // Ø je Teilaufgabe (nur wo eine Aufgabe echte Teile hat) — inkl. Trennschärfe
     // (Item-Total-Korrelation) + 95%-KI, wie bei den ganzen Aufgaben.
@@ -363,7 +416,7 @@ export default function Klassenarbeit() {
     let ciLow = null, ciHigh = null;
     if (pctArr.length >= 2) { const half = 1.96 * (sdOf(pctArr) / Math.sqrt(pctArr.length)); ciLow = Math.max(0, Math.round(mean(pctArr) - half)); ciHigh = Math.min(100, Math.round(mean(pctArr) + half)); }
     const present = graded.length, total = students.length;
-    return { topics: topicsOut, students: studentsOut, perTask, perUnit, noten: { avg, dist, distFine, werte, n: notes.length, notes, stats, minPts, max: tm, avgPct, medPct, sdPct, ciLow, ciHigh, present, total } };
+    return { topics: topicsOut, students: studentsOut, weakGroups, gradedCount: graded.length, perTask, perUnit, noten: { avg, dist, distFine, werte, n: notes.length, notes, stats, minPts, max: tm, avgPct, medPct, sdPct, ciLow, ciHigh, present, total } };
   }, [work, students, topics, scale, effScale]);
   const wiederholen = async () => {
     if (!work) return;
@@ -616,11 +669,31 @@ export default function Klassenarbeit() {
                   <span style={{ fontSize: 12.5, fontWeight: 700, minWidth: 38, textAlign: "right" }}>{tp.pct}%</span>
                 </div>
               ))}
-              {!hideIndividual && analyse.students.length > 0 && (<>
-                <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>{t("klassenarbeit.weakStudents")}</div>
-                {analyse.students.map((s) => (
-                  <div key={s.student_id} style={{ fontSize: 13, padding: "3px 0" }}><b>{s.name}:</b> <span style={{ color: C.danger }}>{s.weak.join(", ")}</span></div>
-                ))}
+              {/* Frueher stand hier je Kind eine Zeile mit allen Themen als
+                  Fliesstext — bei 28 Kindern und langen Themennamen eine Wand,
+                  aus der niemand etwas ableitet. Jetzt andersherum: nach THEMA
+                  gruppiert, das mit den meisten Betroffenen oben. So steht da,
+                  was man am Montag tut — und wen man dazuholt. */}
+              {!hideIndividual && analyse.weakGroups.length > 0 && (<>
+                <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 4px" }}>{t("klassenarbeit.weakStudents")}</div>
+                <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8 }}>{t("klassenarbeit.weakHint")}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {analyse.weakGroups.map((g) => (
+                    <div key={g.label} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "8px 10px" }}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, flex: 1 }}>{g.label}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: g.anteil >= 50 ? C.danger : C.warning }}>
+                          {t("klassenarbeit.weakCount", { n: g.namen.length, all: analyse.gradedCount })}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {g.namen.map((n) => (
+                          <span key={n} style={{ fontSize: 12, padding: "2px 8px", borderRadius: 980, background: "var(--bg2)", color: "var(--text2)" }}>{n}</span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </>)}
 
               {/* je Aufgabe: Ø, Trefferquote + Trennschärfe/95%-KI. Hat eine Aufgabe

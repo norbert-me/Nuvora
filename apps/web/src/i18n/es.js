@@ -1797,4 +1797,12 @@ export default {
   "classes.archive": "Archivar",
   "classes.unarchive": "Sacar del archivo",
   "classes.archiveHint": "Fin de curso: desaparece de las listas, todos los datos se conservan (notas, exámenes, tarjetas). Reversible en cualquier momento, a diferencia de la papelera.",
+  "material.loading": "Cargando archivo …",
+  "material.newTab": "Nueva pestaña",
+  "klassenarbeit.weakHint": "Agrupado por tema: quién se quedó por debajo del 50 % de los puntos. Arriba, el tema con más alumnos afectados.",
+  "klassenarbeit.weakCount": "{{n}} de {{all}}",
+  "klassenarbeit.tipTask": "Discriminación {{d}}: quienes van bien en el resto fallan aquí igual — apunta a la tarea, no a la clase. Revisa el enunciado y los criterios.",
+  "klassenarbeit.tipEmpty": "{{n}} % con cero puntos. Tantas respuestas en blanco suelen indicar un enunciado poco claro o falta de tiempo.",
+  "klassenarbeit.tipRepeat": "Solo {{p}} % de los puntos, pero la tarea discrimina bien: el contenido no está. Merece repaso.",
+  "klassenarbeit.tipEasy": "{{v}} % con puntuación máxima: sirve de entrada, pero no aporta arriba.",
 };

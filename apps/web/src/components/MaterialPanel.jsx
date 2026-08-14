@@ -27,7 +27,7 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
   const [vorschau, setVorschau] = useState(null);   // { url, name, mime }
 
   // Blob-Adresse wieder freigeben, sonst haelt der Tab die Datei im Speicher.
-  useEffect(() => () => { if (vorschau) URL.revokeObjectURL(vorschau.url); }, [vorschau]);
+  useEffect(() => () => { if (vorschau?.url) URL.revokeObjectURL(vorschau.url); }, [vorschau]);
 
   const q = topicId != null ? `?topic_id=${topicId}`
     : methodId != null ? `?method_id=${methodId}`
@@ -58,8 +58,12 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
   const ansehbar = (m) => /^application\/pdf$|^image\//.test(m.mime || "");
 
   const ansehen = async (m) => {
+    // Sofort das Fenster mit „lädt …" oeffnen: eine 5-MB-Datei braucht ein paar
+    // Sekunden, und ohne Rueckmeldung wirkt der Klick wie verschluckt — man
+    // klickt dann noch zweimal.
+    setVorschau({ url: null, name: m.filename, mime: m.mime, laedt: true });
     const res = await fetch(`${API}/${m.id}/download`).catch(() => null);
-    if (!res || !res.ok) return;
+    if (!res || !res.ok) { setVorschau(null); setErr(t("common.notWork")); return; }
     const blob = await res.blob();
     // Typ mitgeben: ohne ihn zeigt der Browser ein PDF als Download-Dialog.
     setVorschau({ url: URL.createObjectURL(blob.slice(0, blob.size, m.mime || blob.type)), name: m.filename, mime: m.mime });
@@ -127,9 +131,21 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
         <Modal onClose={() => setVorschau(null)} width={900} label={vorschau.name}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
             <span style={{ fontSize: 15, fontWeight: 700, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{vorschau.name}</span>
-            <a href={vorschau.url} download={vorschau.name} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12.5, textDecoration: "none" }}>{t("material.download")}</a>
+            {vorschau.url && (
+              <>
+                {/* Neuer Tab als Ausweg: der eingebettete PDF-Betrachter des
+                    Browsers kann in manchen Fenstergroessen unbrauchbar klein
+                    werden, und manche Browser zeigen PDFs nur im Tab. */}
+                <a href={vorschau.url} target="_blank" rel="noreferrer" style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12.5, textDecoration: "none" }}>{t("material.newTab")}</a>
+                <a href={vorschau.url} download={vorschau.name} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12.5, textDecoration: "none" }}>{t("material.download")}</a>
+              </>
+            )}
           </div>
-          {/^image\//.test(vorschau.mime || "") ? (
+          {!vorschau.url ? (
+            <div style={{ height: "72vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text3)", fontSize: 14, border: "1px solid var(--border)", borderRadius: 8 }}>
+              {t("material.loading")}
+            </div>
+          ) : /^image\//.test(vorschau.mime || "") ? (
             <img src={vorschau.url} alt={vorschau.name} style={{ maxWidth: "100%", maxHeight: "72vh", display: "block", margin: "0 auto" }} />
           ) : (
             <iframe title={vorschau.name} src={vorschau.url} style={{ width: "100%", height: "72vh", border: "1px solid var(--border)", borderRadius: 8 }} />
