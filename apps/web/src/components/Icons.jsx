@@ -97,6 +97,12 @@ export const ICONS = {
   // Gluehbirne = Vorschlag/Idee (Einstieg). Ersetzt 💡.
   bulb: ["M7.5 12.5a4.5 4.5 0 115 0V14h-5v-1.5z", "M8 16h4", "M8.8 17.5h2.4"],
   // Zahnrad: Mittelkreis + 8 Speichen (Ansicht-/Einstellungen-Menü).
+  // Lupe, Personen, Etikett — fuer die globale Suche (Seiten, Klassen, Themen).
+  search: ["M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11z", "M13.2 13.2L17 17"],
+  users: ["M7.5 9a2.5 2.5 0 100-5 2.5 2.5 0 000 5z", "M3 16c0-2.2 2-3.6 4.5-3.6S12 13.8 12 16",
+          "M13.5 8.6a2 2 0 100-4", "M14 12.6c1.9.2 3 1.5 3 3.4"],
+  tag: ["M10.6 3H16a1 1 0 011 1v5.4a1 1 0 01-.3.7l-6.6 6.6a1 1 0 01-1.4 0l-5.4-5.4a1 1 0 010-1.4l6.6-6.6a1 1 0 01.7-.3z",
+        "M13.4 6.6h.01"],
   settings: ["M10 7.6a2.4 2.4 0 100 4.8 2.4 2.4 0 000-4.8z",
     "M10 2v2.2M10 15.8V18M2 10h2.2M15.8 10H18M4.4 4.4l1.6 1.6M14 14l1.6 1.6M15.6 4.4L14 6M6 14l-1.6 1.6"],
 };
@@ -355,10 +361,30 @@ export function Popover({ align = "left", style, children, ...rest }) {
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // Naechster waagerecht scrollbarer Vorfahre — in einer breiten Tabelle wird
+    // dort abgeschnitten, nicht am Fensterrand.
+    const scrollElter = () => {
+      for (let p = el.parentElement; p; p = p.parentElement) {
+        const o = getComputedStyle(p).overflowX;
+        if ((o === "auto" || o === "scroll") && p.scrollWidth > p.clientWidth + 1) return p;
+      }
+      return null;
+    };
     const schieben = () => {
       el.style.transform = basis;
-      const r = el.getBoundingClientRect();
       const rand = 12;
+      // Erst den Container mitziehen: ein Menue am rechten Rand einer breiten
+      // Tabelle stand sonst halb ausserhalb — verschoben werden soll die
+      // Tabelle, nicht das Menue aus seiner Zelle heraus.
+      const box = scrollElter();
+      if (box) {
+        const r0 = el.getBoundingClientRect(), c = box.getBoundingClientRect();
+        let ds = 0;
+        if (r0.right > c.right - rand) ds = r0.right - (c.right - rand);
+        else if (r0.left < c.left + rand) ds = r0.left - (c.left + rand);
+        if (ds) box.scrollLeft += ds;
+      }
+      const r = el.getBoundingClientRect();
       let dx = 0;
       if (r.right > window.innerWidth - rand) dx = window.innerWidth - rand - r.right;
       if (r.left + dx < rand) dx = rand - r.left;

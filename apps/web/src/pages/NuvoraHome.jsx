@@ -250,9 +250,21 @@ export default function NuvoraHome({ user }) {
           </button>
         )}
       </div>
-      <p style={{ color: "var(--text2)", marginBottom: 28, marginTop: 8 }}>
+      <p style={{ color: "var(--text2)", marginBottom: 16, marginTop: 8 }}>
         {edit ? t("home.arrangeHint") : t("home.intro")}
       </p>
+
+      {/* Sucheinstieg: nicht jeder weiss, dass die Ausleihe unter Orga sitzt.
+          Klick oder ⌘K oeffnet dieselbe Suche wie die Lupe in der Navigation
+          (components/Suche.jsx) — hier steht nur der Knopf dazu. */}
+      <button onClick={() => window.dispatchEvent(new Event("nuvora:suche"))}
+        style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", maxWidth: 520, marginBottom: 26,
+          padding: "11px 14px", border: "1px solid var(--border2)", borderRadius: 12, background: "var(--card)",
+          color: "var(--text3)", cursor: "text", fontSize: 14, textAlign: "left" }}>
+        <Icon d={ICONS.search} size={16} color="var(--text3)" />
+        <span style={{ flex: 1 }}>{t("suche.placeholder")}</span>
+        <kbd style={{ fontSize: 11, border: "1px solid var(--border2)", borderRadius: 6, padding: "2px 6px" }}>⌘K</kbd>
+      </button>
 
       {active.length === 0 ? (
         <div style={{ ...card, textAlign: "center", padding: 36 }}>

@@ -372,6 +372,9 @@ async function lauf(motor) {
     }
     await aufraeumenBedienung(api, vorher);
 
+    // ── Globale Suche ──
+    await sucheProbe(kontext);
+
     // ── Reihenfolge der Schueler im Formular ──
     await reihenfolgeProbe(kontext, api);
 
@@ -499,6 +502,39 @@ async function speicherAnmeldung(kontext) {
     return await mitFrist(tun(), FRIST_SEITE, "/login");
   } catch (e) {
     return { ok: false, detail: String(e.message || e).split("\n")[0].slice(0, 160) };
+  } finally {
+    await seite.close().catch(() => {});
+  }
+}
+
+/**
+ * Die Suche muss finden, was die Navigation versteckt.
+ *
+ * Der Fall aus dem Alltag: man weiss, dass es die Ausleihe gibt, aber nicht,
+ * dass sie unter Orga sitzt. Geprueft wird genau dieser Weg — Lupe auf, Wort
+ * tippen, Enter, und die richtige Seite steht da. Dazu die Gegenprobe: ein
+ * Ziel eines abgeschalteten Moduls darf gar nicht erst auftauchen (Regel 3).
+ */
+async function sucheProbe(kontext) {
+  const { seite } = await neueSeite(kontext);
+  try {
+    await seite.goto("/", { waitUntil: "networkidle", timeout: 30000 });
+    await tourWegklicken(seite);
+    await seite.keyboard.press("Meta+k").catch(() => {});
+    let feld = seite.locator("input[placeholder*='suchen'], input[placeholder*='Suchen']").first();
+    if (!(await feld.count())) {
+      await seite.keyboard.press("Control+k");
+      feld = seite.locator("input[placeholder*='suchen'], input[placeholder*='Suchen']").first();
+    }
+    await feld.waitFor({ state: "visible", timeout: 8000 });
+    await feld.fill("ausleihe");
+    await seite.waitForTimeout(300);
+    await feld.press("Enter");
+    await seite.waitForURL(/\/orga\?tab=ausleihe/, { timeout: 8000 });
+    notiere("Bedienung", "Suche springt zum Reiter", true,
+      "Suchwort 'ausleihe' fuehrt auf /orga?tab=ausleihe — ohne zu wissen, wo der Reiter sitzt");
+  } catch (e) {
+    notiere("Bedienung", "Suche springt zum Reiter", false, kurzfehler(e));
   } finally {
     await seite.close().catch(() => {});
   }

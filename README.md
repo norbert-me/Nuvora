@@ -407,6 +407,17 @@ Bilder direkt, Word/Excel/PowerPoint wandelt der Server beim ersten Ansehen
 einmalig nach PDF (LibreOffice) und behält das Ergebnis. Die Datei verlässt den
 Server dabei nicht.
 
+### Etwas finden
+
+Oben rechts sitzt eine Lupe, überall erreichbar mit **⌘K / Strg+K**, auf der
+Startseite zusätzlich als Suchfeld. Sie sucht in drei Töpfen: Seiten und Reiter
+aller **zugeschalteten** Module, die eigenen Klassen und Kurse, die Themen
+(Treffer führt in die Themenansicht). Gesucht wird auch nach dem, was man tun
+will, nicht nur nach dem Namen des Reiters: „Fehlzeiten" findet die Anwesenheit,
+„Zeugnis" das Notenbuch. Die Liste der Ziele steht in
+`apps/web/src/core/ziele.js` — ein neuer Reiter gehört dort hinein, sonst ist er
+nur über die Navigation zu finden.
+
 ### Was die Module verbindet
 
 Verbindendes ist **Zusatz, nie Voraussetzung** — CardVote läuft ohne Lernpfad,

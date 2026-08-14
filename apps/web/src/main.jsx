@@ -101,12 +101,13 @@ import Login from "./pages/Login.jsx";
 import Landing from "./pages/Landing.jsx";
 import NuvoraHome from "./pages/NuvoraHome.jsx";
 import GuidedTour, { PATH_TOUR, tourFor } from "./components/GuidedTour.jsx";
+import Suche from "./components/Suche.jsx";
 import { useModules } from "./core/modules.js";
 import { istAdmin } from "./core/admin.js";
 import { DialogHost } from "./core/dialog.jsx";
 import { UndoHost } from "./core/undo.jsx";
 import { OutboxHost } from "./core/OutboxHost.jsx";
-import { btnPrimary, btnSecondary, btnSmall, Skeleton, Modal, pageForm, pageTitle, pageIntro } from "./components/Icons.jsx";
+import { btnPrimary, btnSecondary, btnSmall, Skeleton, Modal, pageForm, pageTitle, pageIntro, Icon, ICONS } from "./components/Icons.jsx";
 
 // Alle uebrigen Seiten kommen erst beim Aufruf ueber die Leitung. Vorher lag
 // jedes Modul im selben Bundle: wer nur den Kalender oeffnet, lud auch Scanner,
@@ -579,6 +580,19 @@ function Nav({ user, onLogout }) {
   // Geführte Touren: Kern-Tour (Navbar) und je-Modul-Touren. Über ein Event
   // startbar (detail.tour), das Onboarding-Modal/Tutorial dispatchen "kern".
   // Modul-Touren starten zusätzlich einmalig beim ersten Besuch der Modulseite.
+  // Globale Suche: ⌘K / Strg+K von ueberall, und ein Event, damit die
+  // Startseite ihr Suchfeld darauf zeigen lassen kann.
+  const [sucheOffen, setSucheOffen] = useState(false);
+  useEffect(() => {
+    const taste = (e) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) { e.preventDefault(); setSucheOffen(true); }
+    };
+    const oeffne = () => setSucheOffen(true);
+    window.addEventListener("keydown", taste);
+    window.addEventListener("nuvora:suche", oeffne);
+    return () => { window.removeEventListener("keydown", taste); window.removeEventListener("nuvora:suche", oeffne); };
+  }, []);
+
   const [tourId, setTourId] = useState(null);
   const doneKey = (id) => (id === "kern" ? "nuvora_kerntour_done" : `nuvora_tour_${id}_done`);
   useEffect(() => {
@@ -700,6 +714,14 @@ function Nav({ user, onLogout }) {
           })}
         </div>
 
+        {user && (
+          <button onClick={() => setSucheOffen(true)} title={`${t("suche.title")} (⌘K)`} aria-label={t("suche.title")}
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", marginRight: 2, border: "1px solid var(--border2)", borderRadius: 980,
+              background: "transparent", color: "var(--text3)", cursor: "pointer", fontSize: 13, flexShrink: 0 }}>
+            <Icon d={ICONS.search} size={15} color="var(--text3)" />
+            <span className="nav-suche-text">{t("suche.short")}</span>
+          </button>
+        )}
         <DarkModeToggle />
         <NavLink to={user ? "/profile" : "/login"} data-tour="profile" onClick={() => { setMenuOpen(false); if (!user) window.dispatchEvent(new Event("cardvote:reset-login-mode")); }} style={{
           padding: 6,
@@ -749,6 +771,7 @@ function Nav({ user, onLogout }) {
         </div>
       )}
       {tourId && user && tourFor(tourId) && <GuidedTour steps={tourFor(tourId)} t={t} onDone={endTour} />}
+      <Suche offen={sucheOffen} onClose={() => setSucheOffen(false)} />
     </>
   );
 }

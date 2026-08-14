@@ -103,7 +103,7 @@ export default function Noten() {
     localStorage.setItem("noten_collapsed", JSON.stringify([...n]));
     return n;
   });
-  const tabelleRef = useRef(null);
+  const [menuSec, setMenuSec] = useState(null);   // Abschnitt mit offenem Menue
   const [dragId, setDragId] = useState(null);
   // Vorschau beim Ziehen: auf welchem Abschnitt, und links oder rechts einfuegen.
   const [dragOver, setDragOver] = useState(null); // { id, side: "left"|"right" }
@@ -590,7 +590,7 @@ export default function Noten() {
         // verwirrt mehr als sie hilft).
         <div style={{ marginBottom: 14 }}><Empty title={t("noten.noSections")} hint={t("noten.noSectionsHint")} /></div>
       ) : (
-        <div ref={tabelleRef} style={{ overflowX: "auto", overflowY: "visible", border: "1px solid var(--border)", borderRadius: 12, WebkitOverflowScrolling: "touch" }}>
+        <div style={{ overflowX: "auto", overflowY: "visible", border: "1px solid var(--border)", borderRadius: 12, WebkitOverflowScrolling: "touch" }}>
           <table style={{ borderCollapse: "collapse", fontSize: 13.5, minWidth: "100%" }}>
             <thead>
               <tr>
@@ -610,7 +610,8 @@ export default function Noten() {
                       onDrop={() => abschnittDrop(sec.id)}
                       style={{ ...th, borderLeft: over && dragOver.side === "left" ? "3px solid var(--accent)" : "2px solid var(--border3)",
                         borderRight: over && dragOver.side === "right" ? "3px solid var(--accent)" : undefined,
-                        cursor: "grab", opacity: dragId === sec.id ? 0.4 : 1 }}>
+                        cursor: "grab", opacity: dragId === sec.id ? 0.4 : 1,
+                        zIndex: menuSec === sec.id ? 6 : th.zIndex }}>
                       <StickyMitte style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
                         <span title={t("noten.dragHint")} style={{ display: "inline-flex", color: "var(--text3)" }}><Icon d={ICONS.grip} size={14} /></span>
                         <button onClick={() => toggleCollapse(sec.id)} className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={isCol ? t("noten.expand") : t("noten.collapse")}>
@@ -619,6 +620,7 @@ export default function Noten() {
                         <span>{sec.name}</span>
                         <span style={{ color: "var(--text3)", fontWeight: 400 }}>{sec.weight} %</span>
                         <SectionMenu t={t} sec={sec}
+                          onOpen={(auf) => setMenuSec(auf ? sec.id : null)}
                           onEdit={(b) => call(() => fetch(`${API}/sections/${sec.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }))}
                           onDelete={async () => { if (await askConfirm(t("noten.delSection", { name: sec.name }))) call(() => fetch(`${API}/sections/${sec.id}`, { method: "DELETE" })); }}
                           onAddCol={() => setNeuSpalteIn(sec.id)} />
@@ -1004,8 +1006,13 @@ function CodeSessionImport({ t, classId, kursId, sections, onClose, onDone }) {
 
 // Kompaktes Kebab-Menue: haelt Spalte-hinzufuegen, Umbenennen und Loeschen,
 // damit der Abschnittskopf schmal bleibt.
-function SectionMenu({ t, sec, onEdit, onDelete, onAddCol }) {
-  const [open, setOpen] = useState(false);
+function SectionMenu({ t, sec, onEdit, onDelete, onAddCol, onOpen }) {
+  const [open, setOpenRoh] = useState(false);
+  // Nach oben melden: die Kopfzelle muss sich ueber ihre Nachbarn legen,
+  // solange das Menue offen ist. Alle Kopfzellen kleben (z-index 2) und bilden
+  // damit eigene Stapel — ohne das lag der Text der Nachbarzelle ueber dem
+  // Menue und schluckte die Klicks.
+  const setOpen = (v) => { setOpenRoh(v); onOpen?.(typeof v === "function" ? v(open) : v); };
   const [edit, setEdit] = useState(false);
   if (edit) {
     return (
