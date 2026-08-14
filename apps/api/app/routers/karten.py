@@ -30,7 +30,7 @@ from ..database import get_db
 from ..uploads import bildtyp
 from sqlalchemy.orm import selectinload
 from ..models import Card, CardDeck, CardFolder, CardReview, SchoolClass, Student, User, Session, Scan, QuestionSetItem
-from .auth import rate_limit
+from .auth import get_current_user, rate_limit
 from .modules import is_active, modul_pflicht
 
 router = APIRouter(prefix="/api/karten", tags=["karten"])

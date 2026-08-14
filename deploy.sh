@@ -187,7 +187,7 @@ BUILD_SERVICES="${ARGS[*]:-}"
 # Phase 1 hat neun Etappen — die neun schritt-Aufrufe bis zu den Health-Checks.
 # Der Selbsttest gehoert NICHT dazu: er prueft, er liefert nicht aus, und er ist
 # der laengste Teil. Er bekommt in Phase 2 einen eigenen Balken.
-PHASE1_ETAPPEN=9
+PHASE1_ETAPPEN=10
 # Phase 2 hat fuenf Teile (der fuenfte ist die Desktop-App). Die meldet
 # selftest.sh selbst — uebersprungene zaehlen mit, damit die Summe immer 5 ergibt.
 PHASE2_ETAPPEN=5
@@ -200,6 +200,16 @@ echo "Build:  ${BUILD_SERVICES:-alle Services}"
 echo ""
 
 phase_start liefern "$PHASE1_ETAPPEN"
+
+# ─── Bevor irgendetwas hochgeht: laesst sich die API ueberhaupt importieren? ───
+# Ein vergessener Import ist syntaktisch tadellos und faellt erst beim Start auf.
+# Der Namens-Check braucht zwei Sekunden und kein Docker.
+schritt "Quelltext prüfen"
+if ! python3 scripts/pruefe_namen.py apps/api/app; then
+  echo
+  echo "  ✗ Abbruch vor dem Hochladen — der Server bleibt unangetastet."
+  exit 1
+fi
 
 schritt "Server erreichbar machen (rsync)"
 ssh "$SERVER" "command -v rsync >/dev/null 2>&1 || { echo 'installiere rsync...'; (apt-get update -qq && apt-get install -y -qq rsync) || apk add --no-cache rsync; }"
@@ -431,7 +441,25 @@ schritt "Container bauen und starten (${BUILD_SERVICES:-alle Dienste})"
 # alles laeuft. Deshalb am Ende immer neu starten: das kostet einen Wimpernschlag
 # und erspart die Suche nach einem Fehler, der keiner ist.
 # shellcheck disable=SC2029
-ssh "$SERVER" "cd '$REMOTE_DIR' && docker compose build $BUILD_SERVICES && docker compose up -d --remove-orphans && docker compose restart proxy"
+ssh "$SERVER" "cd '$REMOTE_DIR' && docker compose build $BUILD_SERVICES"
+
+# ─── Import-Probe VOR dem Umschalten ───
+# Ein vergessener Import (`get_current_user` ohne `from .auth import …`) faellt
+# erst beim Start der Anwendung auf — und dann steht der Container als
+# „unhealthy" da, waehrend der alte schon weg ist. Die Anwendung einmal im
+# frisch gebauten Image importieren kostet zwei Sekunden und faengt genau das
+# ab, bevor irgendetwas ausgetauscht wird. Kein Start, kein Port, keine
+# Datenbank — nur der Import.
+# shellcheck disable=SC2029
+if ! ssh "$SERVER" "cd '$REMOTE_DIR' && docker compose run --rm --no-deps -T --entrypoint python api -c 'import app.main' 2>&1"; then
+  echo
+  echo "  ✗ Die API laesst sich im neuen Image nicht einmal importieren (siehe Fehler oben)."
+  echo "    Der laufende Stand bleibt unangetastet — nichts wurde umgeschaltet."
+  exit 1
+fi
+
+# shellcheck disable=SC2029
+ssh "$SERVER" "cd '$REMOTE_DIR' && docker compose up -d --remove-orphans && docker compose restart proxy"
 
 schritt "Status und Logs"
 sleep 6
