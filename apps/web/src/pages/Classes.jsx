@@ -49,6 +49,11 @@ export default function Classes() {
   const { t } = useLanguage();
   const aktiv = useAktiv();
   const cardvote = aktiv("cardvote");
+  // Zugangs-Codes (QR) fuehren zu den Karteikarten ODER zu den Testergebnissen.
+  // Mit beiden Modulen aus fuehren sie nirgendwohin — dann verschwinden sie auch
+  // aus der Klassenansicht, statt einen toten Ausdruck nahezulegen.
+  const karten = aktiv("karten");
+  const zugaengeMoeglich = karten || cardvote;
   const [classes, setClasses] = useState([]);
   const [editing, setEditing] = useState(null);
   const [params, setParams] = useSearchParams();
@@ -79,6 +84,24 @@ export default function Classes() {
   }, []);
 
   const MAX_CARDS = 50;
+
+  // Der PDF-Endpunkt haengt an der Anmeldung; eine Browser-Navigation schickt
+  // den Token nicht mit. Deshalb holen und als Blob speichern.
+  const zugaengeDrucken = async (classId) => {
+    const url = `${API}/karten/classes/${classId}/zugaenge.pdf?base=${encodeURIComponent(location.origin)}`;
+    const r = await fetch(url).catch(() => null);
+    if (!r || !r.ok) {
+      const b = r ? await r.json().catch(() => ({})) : {};
+      showAlert(typeof b.detail === "string" ? b.detail : t("common.notWork"));
+      return;
+    }
+    const blob = await r.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "Zugaenge.pdf";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  };
 
   const startNew = () => {
     setEditing({ id: null });
@@ -385,6 +408,15 @@ export default function Classes() {
           <p style={{ fontSize: 12, color: students.length >= MAX_CARDS ? C.danger : "var(--text3)", margin: 0 }}>
             {t("classes.limit", { max: MAX_CARDS, count: students.length })}
           </p>
+        )}
+        {/* Zugangs-Zettel drucken: je Kind ein QR-Code zum Ausschneiden. Der
+            Endpunkt legt fehlende Zugaenge selbst an — sonst druckt man leere
+            Zettel und versteht erst danach, warum. */}
+        {editing.id && zugaengeMoeglich && (
+          <button onClick={() => zugaengeDrucken(editing.id)} style={{ ...btnSecondary, marginTop: 8 }}
+            title={t("classes.qrPrintHint")}>
+            {t("classes.qrPrint")}
+          </button>
         )}
       </div>
     );

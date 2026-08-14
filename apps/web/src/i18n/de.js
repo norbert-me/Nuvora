@@ -1818,4 +1818,8 @@ export default {
   "themen.quiz": "Quiz",
   "themen.exam": "Arbeit",
   "tut.auswerten.7": "Der „Themenstand“ unter der Auswertung zeigt je Kind, wie sicher jedes Unterthema sitzt — und ob es besser wird. Er rechnet über alle Arbeiten und Quizze der Klasse.",
+  "classes.qrPrint": "Zugangs-Codes drucken",
+  "classes.qrPrintHint": "PDF mit je einem QR-Code pro Kind zum Ausschneiden. Der Code führt zu den Karteikarten und — mit CardVote — zu den eigenen Testergebnissen. Fehlende Zugänge werden dabei angelegt.",
+  "tut.klasse.4": "Zugangs-Codes druckst du direkt bei der Klasse: ein QR-Code je Kind zum Ausschneiden. Er führt zu den Karteikarten und — mit CardVote — zu den eigenen Testergebnissen.",
+  "tut.klasse.5": "Ist ein Link im Klassenchat gelandet? „Neu vergeben“ im Kartenmodul macht alle alten Ausdrucke sofort ungültig.",
 };

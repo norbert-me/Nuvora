@@ -108,7 +108,9 @@ REGISTRY: List[ModuleDef] = [
             "Karteikarten mit Spaced Repetition. Die Lernenden üben ohne Konto "
             "per QR-Code; ihren Reifegrad siehst du im Modul. Optional an ein "
             "Thema gebunden (der Kalender schaltet den Stapel am Tag frei); die "
-            "Meisterung als Notenspalte übernehmbar. E/G lässt sich am Stapel und "
+            "Meisterung als Notenspalte übernehmbar. Zugangs-Codes druckst du als "
+            "PDF aus der Klasse (ein QR je Kind); schaltest du das Modul ab, "
+            "liefern sie nichts mehr. E/G lässt sich am Stapel und "
             "an der einzelnen Karte setzen — ein gemeinsamer Satz mit einzelnen "
             "Anforderungskarten braucht so keinen zweiten Stapel."
         ),

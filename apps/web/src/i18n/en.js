@@ -1832,4 +1832,8 @@ export default {
   "themen.quiz": "Quiz",
   "themen.exam": "Exam",
   "tut.auswerten.7": "“Topic standing” below the analysis shows per student how firmly each subtopic sits — and whether it is improving. It draws on all exams and quizzes of the class.",
+  "classes.qrPrint": "Print access codes",
+  "classes.qrPrintHint": "PDF with one QR code per student to cut out. The code leads to the flashcards and — with CardVote — to their own test results. Missing access links are created.",
+  "tut.klasse.4": "Print access codes right from the class: one QR code per student to cut out. It leads to the flashcards and — with CardVote — to their own results.",
+  "tut.klasse.5": "A link leaked into the class chat? “Re-issue” in the cards module invalidates every old printout at once.",
 };

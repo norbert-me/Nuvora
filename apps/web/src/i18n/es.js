@@ -1833,4 +1833,8 @@ export default {
   "themen.quiz": "Cuestionario",
   "themen.exam": "Examen",
   "tut.auswerten.7": "«Nivel por tema», bajo el análisis, muestra por alumno cómo domina cada subtema y si mejora, a partir de todos los exámenes y cuestionarios.",
+  "classes.qrPrint": "Imprimir códigos de acceso",
+  "classes.qrPrintHint": "PDF con un código QR por alumno para recortar. Lleva a las tarjetas y, con CardVote, a sus propios resultados.",
+  "tut.klasse.4": "Imprime los códigos de acceso desde la clase: un QR por alumno. Lleva a las tarjetas y, con CardVote, a sus resultados.",
+  "tut.klasse.5": "¿Un enlace acabó en el chat de clase? «Volver a generar» anula todos los impresos anteriores.",
 };

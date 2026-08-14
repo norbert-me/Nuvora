@@ -370,6 +370,27 @@ Einen Kurs zu archivieren nimmt seine Fach-Klassen mit; zurück geht es jederzei
 Bewusst etwas anderes als der Papierkorb — der löscht nach 30 Tagen, und eine
 alte Note muss man Jahre später noch nachschlagen können.
 
+### Zugangs-Codes für die Lernenden
+
+Karteikarten und die eigenen Testergebnisse erreichen Lernende **ohne Konto**
+über einen persönlichen Link (`/lernen/<token>`). Die Klassenseite druckt ihn
+als PDF: je Kind ein Zettel mit Name, QR-Code und dem Link im Klartext zum
+Abtippen, acht pro Seite zum Ausschneiden.
+
+Drei Regeln halten das dicht:
+
+- **Der Code gilt nur, solange etwas dahinter steht.** Ist das Kartenmodul aus,
+  liefert der Link keine Karten mehr; ist auch CardVote aus, ist er ganz tot und
+  verschwindet aus der Klassenansicht. Ein ausgedruckter QR-Code lässt sich
+  nicht einsammeln — deshalb prüft der Server bei **jedem** Aufruf, ob er noch
+  etwas herausgeben darf. Dasselbe gilt für Code-Detektiv-Sitzungscodes.
+- **Jeder Zettel ist einmalig.** Die Token sind Zufall (24 Byte) und in der
+  Datenbank eindeutig; zwei Kinder können nie denselben bekommen.
+- **Ein Link lässt sich zurückholen.** „Neu vergeben" macht alle alten Ausdrucke
+  sofort ungültig — nötig, sobald ein Link im Klassenchat gelandet ist.
+
+Auch eine gelöschte oder archivierte Klasse schaltet ihre Zugänge ab.
+
 ### Dateien ansehen statt herunterladen
 
 An Themen, Stunden, Einstiegen und Klassenarbeiten hängt eine private

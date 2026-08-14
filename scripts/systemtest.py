@@ -612,6 +612,7 @@ def inhalt_karten(api, u, spuren):
     status, _ = anonym.call("GET", "/api/karten/lernen/ZZ-kein-token", roh=True)
     if status < 400:
         raise AssertionError(f"falscher Token liefert HTTP {status}")
+
     return ("Stapel freigegeben, E-Kind sieht 2 von 3 Karten (G-Karte gefiltert), "
             "G-Kind alle 3, ohne Anmeldung gelernt, Fortschritt 0 -> 1 von 2 "
             f"(Detailsicht bestaetigt reps=1), falsche Karte in {frist:.0f} Minuten "
@@ -1036,6 +1037,86 @@ def teste_alleinstellung(api, b, u, sch, spuren, nur_modul=None):
 
 
 # ─────────────────────── 3. CardVote vollstaendig ───────────────────────
+
+def teste_zugang_dicht(api, b, u, sch, spuren):
+    """Ausgeteilte Zugaenge muessen mit dem Modul verstummen.
+
+    Ein QR-Code haengt im Ordner des Kindes und laesst sich nicht einsammeln.
+    Wer Karteikarten abschaltet, erwartet, dass ueber die verteilten Links
+    nichts mehr zu holen ist — weder Kartentexte noch Lernstand. Und wer sie
+    wieder einschaltet, erwartet, dass dieselben Zettel weiter gelten: sonst
+    waere jedes Abschalten ein versehentliches Einsammeln aller Ausdrucke.
+
+    Geprueft wird beides, und zwar mit einem ECHTEN Token — nicht mit einem
+    erfundenen: ein erfundener wird ohnehin abgewiesen und beweist nichts.
+    """
+    anonym = Api(api.basis, debug=api.debug)
+    sch.nur("karten")
+    stapel = api.call("POST", f"/api/karten/classes/{u.class_id}/decks",
+                      {"name": f"{PRAEFIX} Zugangsprobe"}, erwartet=(201,))
+    spuren.append(("Zugangs-Stapel", lambda: (
+        api.call("DELETE", f"/api/karten/decks/{stapel['id']}", erwartet=(204, 404)),
+        api.call("DELETE", f"/api/karten/decks/{stapel['id']}/purge", erwartet=(204, 404)))))
+    api.call("POST", f"/api/karten/decks/{stapel['id']}/cards",
+             {"front": "GEHEIM-VORNE", "back": "GEHEIM-HINTEN"}, erwartet=(201,))
+    api.call("POST", f"/api/karten/decks/{stapel['id']}/release", {"now": True}, erwartet=(200,))
+    zugaenge = api.call("POST", f"/api/karten/classes/{u.class_id}/tokens", erwartet=(200, 201))
+    eintrag = _finde(zugaenge, student_id=u.students[0])
+    if not eintrag:
+        raise AssertionError("kein Zugang erzeugt")
+    token = eintrag["token"]
+
+    def offen():
+        stand = anonym.call("GET", f"/api/karten/lernen/{token}", erwartet=(200,))
+        if not any(c["front"] == "GEHEIM-VORNE" for c in stand.get("cards") or []):
+            raise AssertionError("Karte fehlt, obwohl das Modul laeuft")
+        return "mit Modul: Karten kommen an"
+
+    def zu():
+        sch.nur("auswertung")   # Karten UND CardVote aus
+        status, text = anonym.call("GET", f"/api/karten/lernen/{token}", roh=True)
+        if status < 400:
+            raise AssertionError(f"abgeschaltetes Modul liefert weiter (HTTP {status})")
+        if "GEHEIM" in text:
+            raise AssertionError("Karteninhalte stehen trotz abgeschaltetem Modul in der Antwort")
+        status, _ = anonym.call("POST", f"/api/karten/lernen/{token}/review",
+                                {"card_id": 1, "grade": 2}, roh=True)
+        if status < 400:
+            raise AssertionError(f"Schreiben trotz abgeschaltetem Modul moeglich (HTTP {status})")
+        status, _ = anonym.call("GET", f"/api/karten/lernen/{token}/results", roh=True)
+        if status < 400:
+            raise AssertionError(f"Testergebnisse trotz abgeschaltetem CardVote (HTTP {status})")
+        return "ohne Modul: 401 und keine Inhalte in der Antwort"
+
+    def wieder():
+        sch.nur("karten")
+        stand = anonym.call("GET", f"/api/karten/lernen/{token}", erwartet=(200,))
+        if not (stand.get("cards") or []):
+            raise AssertionError("derselbe Zugang gilt nach dem Wiedereinschalten nicht mehr")
+        return "nach dem Wiedereinschalten gilt derselbe Zettel"
+
+    def frisch():
+        # Rotation macht den alten Ausdruck tot — sonst gaebe es keinen Weg
+        # zurueck, wenn ein Link im Klassenchat gelandet ist.
+        neu = api.call("POST", f"/api/karten/classes/{u.class_id}/tokens/rotate", erwartet=(200,))
+        neuer = _finde(neu, student_id=u.students[0])
+        if not neuer or neuer["token"] == token:
+            raise AssertionError("Rotation vergibt denselben Token")
+        status, _ = anonym.call("GET", f"/api/karten/lernen/{token}", roh=True)
+        if status < 400:
+            raise AssertionError(f"alter Token lebt nach der Rotation weiter (HTTP {status})")
+        alle = {x["token"] for x in neu}
+        if len(alle) != len(neu):
+            raise AssertionError("zwei Kinder haben denselben Zugang bekommen")
+        return f"alter Zettel tot, {len(alle)} neue und alle verschieden"
+
+    b.pruefe("Zugaenge", "Mit Modul erreichbar", offen)
+    b.pruefe("Zugaenge", "Ohne Modul dicht", zu)
+    b.pruefe("Zugaenge", "Wieder an: derselbe Zettel gilt", wieder)
+    b.pruefe("Zugaenge", "Rotation macht alte Codes tot", frisch)
+    api.call("DELETE", f"/api/karten/decks/{stapel['id']}", erwartet=(204, 404))
+    api.call("DELETE", f"/api/karten/decks/{stapel['id']}/purge", erwartet=(204, 404))
+
 
 def teste_cardvote_voll(api, b, u, sch, spuren):
     """Ein ganzer Test von der Frage bis zur gerechneten Auswertung.
@@ -1720,6 +1801,7 @@ def main():
 
         teste_alleinstellung(api, b, u, sch, spuren, args.modul)
         if not args.modul:
+            teste_zugang_dicht(api, b, u, sch, spuren)
             cv = teste_cardvote_voll(api, b, u, sch, spuren)
             teste_noten(api, b, u, sch, spuren, cv)
             teste_bruecken(api, b, u, sch, spuren, cv)

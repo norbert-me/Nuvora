@@ -23,6 +23,10 @@ OFFEN = {
         "Das QR-Bild laedt der Browser per <img src> und schickt keinen Token mit.",
     "/api/weak-topics":
         "Kern-Sicht (Kalender): fasst schwache Themen aller Module zusammen.",
+    "/api/karten/classes/{class_id}/zugaenge.pdf":
+        "Zugangs-Zettel: derselbe Code fuehrt zu Karten ODER Testergebnissen, gilt "
+        "also solange EINES der beiden Module laeuft. Der Endpunkt prueft das selbst "
+        "und antwortet ohne beide mit 409 statt mit einem leeren Blatt.",
     "/api/weak-review":
         "Kern-Sicht (Startseite): schliesst die Bruecke schwach -> geuebt.",
 }

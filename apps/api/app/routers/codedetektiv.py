@@ -20,7 +20,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from ..database import get_db
 from ..models import CodePuzzle, CodeSession, Topic, User
 from .auth import rate_limit, client_ip
-from .modules import modul_pflicht
+from .modules import is_active, modul_pflicht
 
 router = APIRouter(prefix="/api/codedetektiv", tags=["codedetektiv"])
 MODULE_KEY = "code-detektiv"
@@ -103,6 +103,12 @@ def _session_public(s: CodeSession) -> dict:
     }
 
 
+async def _pruefe_modul(db: AsyncSession, s: CodeSession) -> None:
+    """Sitzung nur, solange das Modul laeuft — fuer JEDEN oeffentlichen Weg."""
+    if s.owner_id and not await is_active(db, s.owner_id, "code-detektiv"):
+        raise HTTPException(404, "Session nicht gefunden")
+
+
 async def _by_code(db: AsyncSession, code: str, sperren: bool = False) -> CodeSession:
     """`sperren=True` fuer jeden, der players/results aendert.
 
@@ -129,6 +135,9 @@ async def _by_code(db: AsyncSession, code: str, sperren: bool = False) -> CodeSe
     s = (await db.execute(q)).scalar_one_or_none()
     if not s:
         raise HTTPException(404, "Session nicht gefunden")
+    # Jeder oeffentliche Weg laeuft hier durch (beitreten, spielen, melden) —
+    # deshalb steht die Modulpruefung hier und nicht in jedem Endpunkt einzeln.
+    await _pruefe_modul(db, s)
     return s
 
 
@@ -202,6 +211,10 @@ async def get_session(code: str, request: Request, db: AsyncSession = Depends(ge
     if not s:
         rate_limit("cd_code_miss", ip, 30, 60, "Zu viele Versuche. Bitte kurz warten.")
         raise HTTPException(404, "Session nicht gefunden")
+    # Modul abgeschaltet = Sitzung zu. Ein Sitzungscode steht an der Tafel und
+    # laesst sich nicht einsammeln; wer das Modul abschaltet, erwartet, dass
+    # ueber ihn nichts mehr zu holen ist (auch keine Namen der Mitspielenden).
+    await _pruefe_modul(db, s)
     rate_limit("cd_code", s.code, 2400, 60)  # ~40/s je Sitzung: Klasse ja, Flut nein
     return _session_public(s)
 

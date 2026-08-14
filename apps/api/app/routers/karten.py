@@ -34,6 +34,10 @@ from .auth import rate_limit
 from .modules import is_active, modul_pflicht
 
 router = APIRouter(prefix="/api/karten", tags=["karten"])
+# Der Zugangs-Druck haengt an keinem Modul: derselbe Code fuehrt zu den Karten
+# ODER zu den Testergebnissen, gilt also solange EINES der beiden laeuft. Die
+# Pruefung steht deshalb im Endpunkt und nicht als Router-Schranke.
+kern_router = APIRouter(prefix="/api/karten", tags=["karten"])
 MODULE_KEY = "karten"
 
 
@@ -773,6 +777,94 @@ async def ensure_tokens(class_id: int, subset_kurs: Optional[int] = None, user: 
     return out
 
 
+@kern_router.get("/classes/{class_id}/zugaenge.pdf")
+async def zugaenge_pdf(class_id: int, base: str = "", subset_kurs: Optional[int] = None,
+                       user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Zettel zum Ausschneiden: je Kind Name, QR-Code und der Link als Text.
+
+    Am Kern-Router und nicht am Kartenmodul: der Zugang fuehrt zu den Karten
+    ODER zu den Testergebnissen — er gilt, solange EINES der beiden Module
+    laeuft. Ohne beide gibt es hier nichts (409 mit Grund statt eines leeren
+    Blattes, das man erst ausdruckt und dann versteht).
+
+    Der Link steht zusaetzlich im Klartext darunter: wer den QR nicht scannen
+    kann (kein Handy, kaputte Kamera), tippt ihn ab.
+    """
+    from io import BytesIO
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfgen import canvas as pdf_canvas
+    from .modules import is_active
+
+    karten_an = await is_active(db, user.id, "karten")
+    cardvote_an = await is_active(db, user.id, "cardvote")
+    if not (karten_an or cardvote_an):
+        raise HTTPException(409, "Weder Karteikarten noch CardVote sind aktiv — es gibt nichts, wohin ein Code führen könnte.")
+
+    cls = await _owned_class(db, user, class_id)
+    students = await _kurs_roster(db, user, class_id, subset_kurs)
+    # Fehlende Tokens hier erzeugen: wer drucken will, hat sonst leere Zettel.
+    changed = False
+    for st in students:
+        if not st.karten_token:
+            st.karten_token = _token()
+            changed = True
+    if changed:
+        await db.commit()
+
+    basis = (base or "").rstrip("/")
+    if basis and not (basis.startswith("http://") or basis.startswith("https://")):
+        basis = ""
+
+    puffer = BytesIO()
+    c = pdf_canvas.Canvas(puffer, pagesize=A4)
+    breite, hoehe = A4
+    spalten, zeilen = 2, 4                      # acht Zettel je Seite
+    feld_b, feld_h = breite / spalten, (hoehe - 20 * mm) / zeilen
+
+    for i, st in enumerate(students):
+        platz = i % (spalten * zeilen)
+        if i and platz == 0:
+            c.showPage()
+        sp, ze = platz % spalten, platz // spalten
+        x0 = sp * feld_b
+        y0 = hoehe - 15 * mm - (ze + 1) * feld_h
+
+        # Schnittkante andeuten — der Zettel wird ausgeschnitten und verteilt.
+        c.setStrokeColorRGB(0.85, 0.85, 0.85)
+        c.rect(x0 + 5 * mm, y0 + 4 * mm, feld_b - 10 * mm, feld_h - 8 * mm)
+
+        c.setFillColorRGB(0, 0, 0)
+        c.setFont("Helvetica-Bold", 13)
+        c.drawString(x0 + 12 * mm, y0 + feld_h - 14 * mm, st.name or "")
+        c.setFont("Helvetica", 9)
+        c.drawString(x0 + 12 * mm, y0 + feld_h - 20 * mm, f"{cls.name} · Nr. {st.card_id}")
+
+        url = f"{basis}/lernen/{st.karten_token}"
+        bild = qrcode.make(url)
+        roh = io.BytesIO()
+        bild.save(roh, format="PNG")
+        roh.seek(0)
+        seite = min(feld_b - 24 * mm, feld_h - 34 * mm)
+        c.drawImage(ImageReader(roh), x0 + 12 * mm, y0 + 12 * mm, width=seite, height=seite)
+
+        # Link klein darunter, umbrochen — er ist lang und muss abtippbar sein.
+        c.setFont("Helvetica", 6.5)
+        rest = url
+        zeile_y = y0 + 9 * mm
+        while rest:
+            stueck, rest = rest[:58], rest[58:]
+            c.drawString(x0 + 12 * mm, zeile_y, stueck)
+            zeile_y -= 3 * mm
+
+    c.showPage()
+    c.save()
+    name = f"Zugaenge_{(cls.name or 'Klasse').replace(' ', '_')}.pdf"
+    return Response(content=puffer.getvalue(), media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
 # ─── Lehrkraft: Fortschritt ───
 
 class StudentProgress(BaseModel):
@@ -931,19 +1023,43 @@ async def student_cards(class_id: int, student_id: int, kurs_id: Optional[int] =
 
 # ─── Schueler: Token-Zugang (KEIN Login) ───
 
-async def _student_by_token(db: AsyncSession, token: str) -> Student:
+async def _student_by_token(db: AsyncSession, token: str, modul="karten") -> Student:
+    """Kind zu einem ausgeteilten Token — mit allen Gruenden, warum ein Zugang
+    NICHT mehr gilt.
+
+    Ein QR-Code ist ausgedruckt und im Umlauf; er laesst sich nicht einsammeln.
+    Also muss der Server bei jedem Aufruf pruefen, ob er noch etwas herausgeben
+    darf. Drei Faelle beenden den Zugang:
+
+      * Token unbekannt (auch: rotiert — dann ist der alte Ausdruck tot),
+      * Klasse im Papierkorb oder archiviert (Schuljahr vorbei),
+      * das Modul ist abgeschaltet.
+
+    Der letzte Fall ist der wichtigste und fehlte: wer Karteikarten abschaltet,
+    erwartet, dass ueber die verteilten Links nichts mehr zu sehen ist. Ohne
+    diese Pruefung lieferten sie weiter Kartentexte und Lernstand aus.
+    """
+    from .modules import is_active
+
     if not token:
         raise HTTPException(401, "Kein Token")
     r = await db.execute(select(Student).where(Student.karten_token == token))
     st = r.scalar_one_or_none()
     if not st:
         raise HTTPException(401, "Ungültiger Token")
-    # Klasse im Papierkorb: der Zugang ruht, bis sie wiederhergestellt wird. Sonst
-    # laufen die ausgeteilten Links (und damit der Einblick in Lernstand und
-    # Testergebnisse) weiter, obwohl die Lehrkraft die Klasse geloescht hat.
     cls = await db.get(SchoolClass, st.class_id)
-    if cls is not None and cls.deleted_at is not None:
+    if cls is not None and (cls.deleted_at is not None or cls.archived_at is not None):
         raise HTTPException(401, "Zugang nicht mehr gültig")
+    # `modul` ist ein Schluessel oder mehrere: dann reicht EINES davon. Der
+    # QR-Code selbst gilt naemlich, solange ueberhaupt etwas dahinter steht —
+    # Karten ODER Testergebnisse.
+    schluessel = (modul,) if isinstance(modul, str) else tuple(modul or ())
+    if cls is not None and cls.owner_id and schluessel:
+        erlaubt = [k for k in schluessel if await is_active(db, cls.owner_id, k)]
+        if not erlaubt:
+            # Bewusst dieselbe Meldung wie bei einem toten Token: nach aussen
+            # soll nicht erkennbar sein, welche Module eine Lehrkraft nutzt.
+            raise HTTPException(401, "Zugang nicht mehr gültig")
     return st
 
 
@@ -957,7 +1073,10 @@ class StudentCard(BaseModel):
 async def qr_png(token: str, base: str = "", db: AsyncSession = Depends(get_db)):
     """QR eines Lern-Links. Kein Login: der Token im Link ist ohnehin das
     Secret, die Lehrkraft haelt ihn bereits. base = origin des Rahmens."""
-    st = await _student_by_token(db, token)  # 401 bei ungueltigem Token
+    # Der Code gilt, solange EINES der beiden Module laeuft: mit Karten fuehrt er
+    # zum Ueben, ohne sie zu den Testergebnissen. Erst wenn beide aus sind, ist
+    # er tot — und dann verschwindet er auch aus der Klassenansicht.
+    st = await _student_by_token(db, token, modul=("karten", "cardvote"))
     # Nur die eigene Origin zulassen, kein offener QR-Generator.
     base = base.rstrip("/")
     if base and not (base.startswith("http://") or base.startswith("https://")):
@@ -974,7 +1093,9 @@ async def student_results(token: str, db: AsyncSession = Depends(get_db)):
     """Oeffentlich (Token statt Login): die CardVote-Testergebnisse dieses
     Schuelers — je Session sein Punktestand. Nur Sessions, an denen er
     teilgenommen hat (mindestens ein Scan). Newest first."""
-    st = await _student_by_token(db, token)  # 401 bei ungueltigem Token
+    # Testergebnisse gehoeren CardVote — sie bleiben also erreichbar, wenn nur
+    # das Kartenmodul abgeschaltet ist, und verschwinden mit CardVote.
+    st = await _student_by_token(db, token, modul="cardvote")
     sessions = (await db.execute(
         select(Session).where(Session.class_id == st.class_id).order_by(Session.created_at.desc())
     )).scalars().all()

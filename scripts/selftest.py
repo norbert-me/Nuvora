@@ -659,6 +659,19 @@ def teste_kern(api, b, u):
             raise AssertionError("Einschraenkung auf ein Kind wirkt nicht")
         return f"Klasse und einzelnes Kind ({aus['mindest_punkte']:.0f} Punkte Mindestmass)"
 
+    def zugangsdruck():
+        # Der Zettel zum Ausschneiden. Geprueft wird, dass wirklich ein PDF
+        # herauskommt — ein leeres Blatt faellt sonst erst am Drucker auf.
+        status, text = api.call("GET", f"/api/karten/classes/{u.class_id}/zugaenge.pdf"
+                                       f"?base=http://example.invalid", roh=True)
+        if status == 409:
+            return "uebersprungen — weder Karteikarten noch CardVote aktiv"
+        if status != 200:
+            raise AssertionError(f"HTTP {status} statt eines PDF")
+        if not text.startswith("%PDF"):
+            raise AssertionError("Antwort ist kein PDF")
+        return f"PDF erzeugt ({len(text) // 1024} KB)"
+
     def modulregister():
         module = api.call("GET", "/api/modules", erwartet=(200,))
         if not module:
@@ -673,6 +686,7 @@ def teste_kern(api, b, u):
     b.pruefe("Kern", "Dateiablage", material)
     b.pruefe("Kern", "Fruehwarnung", fruehwarnung)
     b.pruefe("Kern", "Themenstand", themenstand)
+    b.pruefe("Kern", "Zugangs-Zettel", zugangsdruck)
     b.pruefe("Kern", "Modulregister", modulregister)
 
 
