@@ -19,7 +19,11 @@ function fmtSize(n) {
 }
 
 export default function MaterialPanel({ topicId = null, entryId = null, methodId = null,
-                                       workId = null, rolle = null, titel = null }) {
+                                       workId = null, rolle = null, titel = null,
+                                       // Nur ansehen: kein Hochladen, kein Loeschen. Fuer Stellen,
+                                       // an denen die Datei zum Nachschlagen dasteht (Vergleich) —
+                                       // gepflegt wird sie dort, wo sie hingehoert.
+                                       nurLesen = false }) {
   const { t } = useLanguage();
   const [items, setItems] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -99,6 +103,8 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
     });
   };
 
+  if (nurLesen && items.length === 0) return null;
+
   const row = { display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 13.5 };
 
   return (
@@ -106,11 +112,13 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
         {titel || t("material.title")}
         <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", background: "var(--bg2)", borderRadius: 980, padding: "1px 9px" }}>{items.length}</span>
-        <label style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12.5, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1, marginLeft: "auto" }}>
-          {busy ? t("material.uploading") : t("material.upload")}
-          <input type="file" style={{ display: "none" }} disabled={busy}
-            onChange={(e) => { const f = e.target.files[0]; e.target.value = ""; upload(f); }} />
-        </label>
+        {!nurLesen && (
+          <label style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12.5, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1, marginLeft: "auto" }}>
+            {busy ? t("material.uploading") : t("material.upload")}
+            <input type="file" style={{ display: "none" }} disabled={busy}
+              onChange={(e) => { const f = e.target.files[0]; e.target.value = ""; upload(f); }} />
+          </label>
+        )}
       </div>
       {err && <p style={{ color: C.danger, fontSize: 12.5, margin: "0 0 8px" }}>{err}</p>}
       {items.length === 0 ? (
@@ -131,10 +139,12 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
               <Icon d={ICONS.download} size={15} />
             </button>
           )}
-          <button onClick={async () => { if (await askConfirm(t("material.delConfirm", { name: m.filename }))) remove(m); }} title={t("common.delete")} aria-label={t("common.delete")}
-            style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text3)", display: "inline-flex", padding: 2 }}>
-            <Icon d={ICONS.trash} size={15} />
-          </button>
+          {!nurLesen && (
+            <button onClick={async () => { if (await askConfirm(t("material.delConfirm", { name: m.filename }))) remove(m); }} title={t("common.delete")} aria-label={t("common.delete")}
+              style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text3)", display: "inline-flex", padding: 2 }}>
+              <Icon d={ICONS.trash} size={15} />
+            </button>
+          )}
         </div>
       ))}
 

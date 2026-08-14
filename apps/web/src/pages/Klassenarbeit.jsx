@@ -1031,6 +1031,16 @@ export function KlassenarbeitVergleich() {
         )}
       </div>
 
+      {/* Die Arbeit selbst gehoert in den Vergleich: wer eine Zeile „26 %" liest,
+          will nachsehen, was da gefragt war. Nur ansehen — hochgeladen und
+          geloescht wird bei der Arbeit, nicht hier. */}
+      {workId && (
+        <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", marginTop: 14 }}>
+          <MaterialPanel workId={workId} rolle="arbeit" titel={t("klassenarbeit.fileWork")} nurLesen />
+          <MaterialPanel workId={workId} rolle="erwartung" titel={t("klassenarbeit.fileExpect")} nurLesen />
+        </div>
+      )}
+
       {classId && (
         <div style={{ marginTop: 14 }}>
           <Tabs value={sicht} onChange={setSicht} options={[
