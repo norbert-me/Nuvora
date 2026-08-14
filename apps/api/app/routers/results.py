@@ -814,3 +814,129 @@ async def stats_dashboard(user: User = Depends(get_current_user), db: AsyncSessi
         "recent_sessions": recent,
         "grade_distribution": grade_dist,
     }
+
+
+# ─── Frühwarnung: wer hängt über mehrere Tests hinweg hinterher? ───
+#
+# Die Regel steht in app/fruehwarnung.py (mit Regressionstest), hier wird nur
+# eingesammelt: alle Sitzungen einer Klasse, ihre gewerteten Antworten und das
+# Thema jeder Frage. Absichtlich am CardVote-Router — ohne das Modul gibt es
+# keine Tests, aus denen sich etwas ableiten liesse.
+#
+# Der Sammel-Endpunkt (/api/fruehwarnung) fasst alle Klassen zusammen; er
+# liefert nur die gemeldeten Kinder, damit die Startseite nichts nachrechnen
+# muss.
+
+async def _fruehwarn_daten(db, user, class_id: int):
+    """Tests einer Klasse in der Form, die app/fruehwarnung.py erwartet."""
+    from .. import fruehwarnung as fw
+
+    kinder = {s.card_id: s.name for s in await _kurs_roster(db, class_id)}
+    if not kinder:
+        return [], {}
+
+    sessions = (await db.execute(
+        select(Session).where(Session.class_id == class_id, Session.archived == False)
+        .order_by(Session.created_at)
+    )).scalars().all()
+
+    tests = []
+    for sess in sessions:
+        if not sess.question_set_id or not sess.created_at:
+            continue
+        items = (await db.execute(
+            select(QuestionSetItem).options(selectinload(QuestionSetItem.question))
+            .where(QuestionSetItem.question_set_id == sess.question_set_id)
+        )).scalars().all()
+        qmap = sess.question_map or {}
+        # Die richtige Antwort kann je Sitzung abweichen (question_map) — dieselbe
+        # Quelle wie in der Auswertung, sonst rechnen zwei Ansichten verschieden.
+        fragen = {it.question.id: (qmap.get(str(it.question.id), it.question.correct_answer),
+                                   it.question.topic_id) for it in items}
+        scans = (await db.execute(select(Scan).where(Scan.session_id == sess.id))).scalars().all()
+        config = sess.eval_config or {}
+
+        t = fw.Test(session_id=sess.id, name=sess.name or "", datum=sess.created_at)
+        hat_abgegeben = {s.student_id for s in scans}
+        for cid in kinder:
+            # Wer nichts abgegeben hat, gilt als krank und bleibt draussen —
+            # dieselbe Regel wie in der Wertung (scoring.status_of).
+            if status_of(cid, cid in hat_abgegeben, config) == "krank":
+                t.abwesend.add(cid)
+        for s in scans:
+            richtig_soll, topic_id = fragen.get(s.question_id, (None, None))
+            if not richtig_soll or s.student_id not in kinder:
+                continue          # Frage ohne hinterlegte Loesung: nicht wertbar
+            t.antworten.append(fw.Antwort(card_id=s.student_id, topic_id=topic_id,
+                                          richtig=s.answer in richtig_soll))
+        if t.antworten:
+            tests.append(t)
+    return tests, kinder
+
+
+async def _themennamen(db, ergebnis, user):
+    """Themen-IDs in der Ausgabe durch lesbare Namen ersetzen."""
+    ids = {th["topic_id"] for s in ergebnis["schueler"] for th in s["themen"] if th.get("topic_id")}
+    if not ids:
+        return
+    topics = (await db.execute(select(Topic).where(Topic.id.in_(list(ids))))).scalars().all()
+    namen = {t.id: t.name for t in topics}
+    eltern = {t.id: t.parent_id for t in topics}
+    if any(eltern.values()):
+        for p in (await db.execute(select(Topic).where(Topic.id.in_([p for p in eltern.values() if p])))).scalars().all():
+            namen.setdefault(p.id, p.name)
+    for s in ergebnis["schueler"]:
+        for th in s["themen"]:
+            eltern_id = eltern.get(th["topic_id"])
+            th["name"] = (f"{namen[eltern_id]} / {namen[th['topic_id']]}"
+                          if eltern_id and eltern_id in namen else namen.get(th["topic_id"]))
+
+
+@router.get("/classes/{class_id}/fruehwarnung")
+async def fruehwarnung_klasse(class_id: int, empfindlich: bool = False,
+                              user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Vollbild für eine Klasse: je Kind Kurve, Etiketten, Themen, Begründung."""
+    from .. import fruehwarnung as fw
+
+    school_class = await db.get(SchoolClass, class_id)
+    if not school_class:
+        raise HTTPException(404)
+    if school_class.owner_id and school_class.owner_id != user.id:
+        raise HTTPException(403, "Kein Zugriff auf diese Klasse")
+
+    tests, kinder = await _fruehwarn_daten(db, user, class_id)
+    if not tests:
+        return {"class_id": class_id, "class_name": school_class.name, "tests": [], "schueler": [],
+                "regel": {}, "hinweis": "Noch keine ausgewerteten Tests in dieser Klasse."}
+    ergebnis = fw.analysiere(tests, kinder, fw.EMPFINDLICH if empfindlich else fw.STANDARD)
+    await _themennamen(db, ergebnis, user)
+    ergebnis["class_id"] = class_id
+    ergebnis["class_name"] = school_class.name
+    return ergebnis
+
+
+@router.get("/fruehwarnung")
+async def fruehwarnung_alle(empfindlich: bool = False,
+                            user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Kurzfassung über alle Klassen — nur die Kinder, bei denen hinzusehen ist."""
+    from .. import fruehwarnung as fw
+
+    klassen = (await db.execute(
+        select(SchoolClass).where(SchoolClass.owner_id == user.id, SchoolClass.deleted_at.is_(None))
+    )).scalars().all()
+    treffer = []
+    for k in klassen:
+        tests, kinder = await _fruehwarn_daten(db, user, k.id)
+        if not tests:
+            continue
+        ergebnis = fw.analysiere(tests, kinder, fw.EMPFINDLICH if empfindlich else fw.STANDARD)
+        await _themennamen(db, ergebnis, user)
+        for s in ergebnis["schueler"]:
+            if s["status"] != "melden":
+                continue
+            treffer.append({"class_id": k.id, "class_name": k.name, "card_id": s["card_id"],
+                            "name": s["name"], "abstand_median": s["abstand_median"],
+                            "begruendung": s["begruendung"],
+                            "etiketten": [e["art"] for e in s["etiketten"]]})
+    treffer.sort(key=lambda x: x["abstand_median"])
+    return {"schueler": treffer, "empfindlich": empfindlich}

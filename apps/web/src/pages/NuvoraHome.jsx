@@ -4,9 +4,77 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useModules, useAktiv } from "../core/modules.js";
+import { useEmpfindlich } from "../core/fruehwarnung.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { StageBadge, Icon, ICONS, MODULE_ICONS, iconBtn, btnSecondary, selectStyle, COLORS as C, pageApp} from "../components/Icons.jsx";
 import { pageTitle } from "../components/Icons.jsx";
+
+// ─── Frühwarnung: wer hängt über mehrere Tests hinweg hinterher? ───
+//
+// Absichtlich eine stille Kachel: sie erscheint nur, wenn wirklich etwas zu
+// sehen ist. Ein Kasten, der bei jedem Aufruf „alles in Ordnung" meldet, wird
+// nach zwei Wochen überlesen — und dann auch der Tag, an dem etwas drinsteht.
+//
+// Was hier NICHT steht: eine Diagnose. Der Satz nennt die Zahlen, aus denen die
+// Meldung entstanden ist („in 5 von 6 Tests 24 Prozentpunkte unter der Klasse"),
+// damit die Lehrkraft sie prüfen und einordnen kann. Aus Trefferquoten folgt
+// keine Lernstörung; die Kachel sagt nur, wo Hinsehen lohnt.
+function Fruehwarnung({ t }) {
+  const [rows, setRows] = useState(null);
+  const [empfindlich, setEmpfindlich] = useEmpfindlich();
+
+  useEffect(() => {
+    let ab = false;
+    fetch(`/api/fruehwarnung?empfindlich=${empfindlich ? "true" : "false"}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!ab) setRows(d?.schueler || []); })
+      .catch(() => {});
+    return () => { ab = true; };
+  }, [empfindlich]);
+
+  // Nichts gefunden → gar nichts anzeigen, aber den Schalter nicht verstecken:
+  // wer die Kachel kennt, soll „empfindlicher" auch dann finden.
+  if (rows === null) return null;
+
+  return (
+    <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 18, marginBottom: 24 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 3 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, flex: 1 }}>
+          {t("fw.title")}{rows.length > 0 ? ` (${rows.length})` : ""}
+        </div>
+        <button onClick={() => setEmpfindlich(!empfindlich)}
+          style={{ ...btnSecondary, padding: "3px 10px", fontSize: 12,
+            borderColor: empfindlich ? "var(--accent)" : "var(--border2)",
+            color: empfindlich ? "var(--accent)" : "var(--text3)" }}
+          title={t("fw.sensitiveHint")}>
+          {t("fw.sensitive")}
+        </button>
+      </div>
+      <div style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 12 }}>{t("fw.hint")}</div>
+
+      {rows.length === 0 ? (
+        <div style={{ fontSize: 13.5, color: "var(--text2)" }}>{t("fw.none")}</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {rows.map((s) => (
+            <Link key={`${s.class_id}:${s.card_id}`} to={`/cardvote/class-evaluation/${s.class_id}?fw=${s.card_id}`}
+              style={{ textDecoration: "none", color: "var(--text)", border: "1px solid var(--border2)",
+                borderRadius: 10, padding: "10px 12px", display: "block" }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontWeight: 700, fontSize: 14 }}>{s.name}</span>
+                <span style={{ fontSize: 12, color: "var(--text3)" }}>{s.class_name}</span>
+                <span style={{ marginLeft: "auto", fontSize: 13, fontWeight: 700, color: C.warning }}>
+                  {s.abstand_median > 0 ? "+" : ""}{Math.round(s.abstand_median)} Pp
+                </span>
+              </div>
+              <div style={{ fontSize: 12.5, color: "var(--text2)", marginTop: 3, lineHeight: 1.45 }}>{s.begruendung}</div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const card = {
   display: "block",
@@ -276,6 +344,7 @@ export default function NuvoraHome({ user }) {
       ) : (
         <>
           {!edit && isOn("kalender") && <HeutePanel t={t} orgaAktiv={isOn("orga")} />}
+          {!edit && isOn("cardvote") && <Fruehwarnung t={t} />}
           {!edit && isOn("cardvote") && <SchwacheWoche t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} methodenAktiv={isOn("unterrichtsplanung")} />}
           <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
             {(edit ? displayList : shown).map((m) => {

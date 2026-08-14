@@ -1717,4 +1717,22 @@ export default {
   "backup.restoreType": "Zum Bestätigen „{{word}}“ eintippen",
   "backup.restoreGo": "Jetzt einspielen",
   "backup.restoreRunning": "Spielt ein …",
+
+  // ─── Frühwarnung (CardVote-Tests über die Zeit) ───
+  "fw.title": "Genau hinschauen",
+  "fw.hint": "Aus den Tests der letzten Wochen: wer liegt über mehrere Tests hinweg deutlich unter der Klasse? Keine Diagnose — ein Hinweis, wo Hinsehen lohnt.",
+  "fw.none": "Zurzeit fällt niemand über mehrere Tests hinweg ab.",
+  "fw.sensitive": "empfindlicher",
+  "fw.sensitiveHint": "Meldet schon ab 15 statt 20 Prozentpunkten Abstand zur Klasse.",
+  "fw.tab": "Verlauf",
+  "fw.tooFew": "Zu wenig Daten",
+  "fw.watch": "Hinschauen",
+  "fw.ok": "unauffällig",
+  "fw.distance": "Abstand zur Klasse",
+  "fw.byTopic": "Nach Thema",
+  "fw.old": "Wiederholung",
+  "fw.fresh": "frischer Stoff",
+  "fw.noTests": "Noch keine ausgewerteten Tests in dieser Klasse.",
+  "fw.rule": "Gemeldet wird, wer im Median mindestens {{abstand}} Prozentpunkte unter der Klasse liegt und das in {{von}} der letzten {{bis}} Tests — bei mindestens {{min}} gewerteten Antworten.",
+  "fw.curve": "Abstand zur Klasse je Test (Prozentpunkte)",
 };

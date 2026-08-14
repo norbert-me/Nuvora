@@ -1731,4 +1731,22 @@ export default {
   "backup.restoreType": "Type “{{word}}” to confirm",
   "backup.restoreGo": "Restore now",
   "backup.restoreRunning": "Restoring …",
+
+  // ─── Frühwarnung (CardVote-Tests über die Zeit) ───
+  "fw.title": "Worth a closer look",
+  "fw.hint": "From the last few tests: who stays well below the class across several tests? Not a diagnosis — a pointer.",
+  "fw.none": "Nobody is falling behind across several tests right now.",
+  "fw.sensitive": "more sensitive",
+  "fw.sensitiveHint": "Flags from 15 instead of 20 percentage points below the class.",
+  "fw.tab": "Trend",
+  "fw.tooFew": "Not enough data",
+  "fw.watch": "Look closer",
+  "fw.ok": "unremarkable",
+  "fw.distance": "Gap to class",
+  "fw.byTopic": "By topic",
+  "fw.old": "revision",
+  "fw.fresh": "current material",
+  "fw.noTests": "No evaluated tests in this class yet.",
+  "fw.rule": "Flagged: a median of at least {{abstand}} percentage points below the class in {{von}} of the last {{bis}} tests, with at least {{min}} scored answers.",
+  "fw.curve": "Gap to class per test (percentage points)",
 };

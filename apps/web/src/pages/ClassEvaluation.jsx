@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { LoadError, COLORS as C, Boxplot, pageApp, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 
 const API = "/api";
 
@@ -9,6 +10,9 @@ function fmt(n) { return n % 1 === 0 ? String(n) : n.toFixed(1); }
 
 export default function ClassEvaluation() {
   const { id } = useParams();
+  // ?fw=<card_id> kommt von der Startseite: dort steht der Name, hier die
+  // Begruendung im Zusammenhang der Klasse.
+  const [suche] = useSearchParams();
   const [data, setData] = useState(null);
   const [loadError, setLoadError] = useState(false);
   const [chartView, setChartView] = useState("none");
@@ -105,6 +109,11 @@ export default function ClassEvaluation() {
       <h2 style={{ marginTop: 12, marginBottom: 20, fontSize: 24, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.3px" }}>
         {class_name} <span style={{ fontWeight: 400, color: "var(--text3)", fontSize: 18 }}>— Gesamtauswertung</span>
       </h2>
+
+      {/* Frühwarnung: wer hängt über mehrere Tests hinweg hinterher? Steht VOR
+          den Kennzahlen — eine Durchschnittsquote sagt nichts über einzelne
+          Kinder, und genau danach wird hier gesucht. */}
+      <FruehwarnPanel classId={id} nurKind={suche.get("fw")} />
 
       {/* Stat tiles */}
       <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>

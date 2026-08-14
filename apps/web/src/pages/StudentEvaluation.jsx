@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { DownloadLink, COLORS as C, pageApp, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 
 const API = "/api";
 
@@ -54,6 +55,10 @@ export default function StudentEvaluation() {
             G-Wertung sind ohne diesen Hinweis nicht einzuordnen. */}
         {student.niveau ? ` · ${student.niveau}-Kurs` : ""}
       </p>
+
+      {/* Verlauf gegen die Klasse: dieselbe Auswertung wie auf der Startseite,
+          hier nur fuer dieses Kind. Zeigt sich nichts, steht hier auch nichts. */}
+      <FruehwarnPanel classId={classId} nurKind={cardId} />
 
       <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
         <StatCard label="Ø Gesamt" value={avgPct != null ? `${avgPct}%` : "–"} color={colorForPct(avgPct)} />

@@ -1732,4 +1732,22 @@ export default {
   "backup.restoreType": "Escribe «{{word}}» para confirmar",
   "backup.restoreGo": "Restaurar ahora",
   "backup.restoreRunning": "Restaurando …",
+
+  // ─── Frühwarnung (CardVote-Tests über die Zeit) ───
+  "fw.title": "Merece atención",
+  "fw.hint": "De las últimas pruebas: quién queda claramente por debajo de la clase en varias pruebas. No es un diagnóstico.",
+  "fw.none": "Ahora mismo nadie se queda atrás en varias pruebas.",
+  "fw.sensitive": "más sensible",
+  "fw.sensitiveHint": "Avisa desde 15 en lugar de 20 puntos porcentuales por debajo de la clase.",
+  "fw.tab": "Evolución",
+  "fw.tooFew": "Datos insuficientes",
+  "fw.watch": "Mirar de cerca",
+  "fw.ok": "sin novedad",
+  "fw.distance": "Diferencia con la clase",
+  "fw.byTopic": "Por tema",
+  "fw.old": "repaso",
+  "fw.fresh": "materia actual",
+  "fw.noTests": "Todavía no hay pruebas evaluadas en esta clase.",
+  "fw.rule": "Se avisa con una mediana de al menos {{abstand}} puntos por debajo de la clase en {{von}} de las últimas {{bis}} pruebas, con al menos {{min}} respuestas valoradas.",
+  "fw.curve": "Diferencia con la clase por prueba (puntos porcentuales)",
 };
