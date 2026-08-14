@@ -3,7 +3,7 @@
 // und wird nicht gespeichert. Übersicht zeigt Fehlzeiten und lässt nachtragen.
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { btnSecondary, selectStyle, Tabs, inputStyle, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
+import { btnSecondary, selectStyle, Tabs, inputStyle, dateNavBtn, dateNavInput, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
@@ -166,10 +166,10 @@ export default function Anwesenheit() {
               Die Stunde ersetzt „ganzer Tag" — Abwesenheit wird je Stunde
               erfasst; nur wenn kein Stundenplan da ist, gilt der ganze Tag. */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-            <button onClick={() => shift(-1)} style={{ ...btnSecondary, padding: "6px 13px" }}>‹</button>
-            <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} style={inputStyle} />
-            <button onClick={() => shift(1)} style={{ ...btnSecondary, padding: "6px 13px" }}>›</button>
-            <button onClick={() => setDatum(ymd(new Date()))} style={{ ...btnSecondary, padding: "6px 13px" }}>{t("anwesenheit.today")}</button>
+            <button onClick={() => shift(-1)} style={{ ...dateNavBtn, fontSize: 17 }}>‹</button>
+            <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} style={dateNavInput} />
+            <button onClick={() => shift(1)} style={{ ...dateNavBtn, fontSize: 17 }}>›</button>
+            <button onClick={() => setDatum(ymd(new Date()))} style={dateNavBtn}>{t("anwesenheit.today")}</button>
           </div>
           {legende}
           {istFrei ? (

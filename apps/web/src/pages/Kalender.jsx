@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, Modal, ExportButton, ImportButton, pageApp, Popover} from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, dateNavBtn, dateNavInput, Modal, ExportButton, ImportButton, pageApp, Popover} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, put } from "../core/cache.js";
@@ -516,13 +516,13 @@ export default function Kalender() {
           behalten den Selektor im Popover, da ein Tag-Picker dort nicht passt. */}
       {view !== "timetable" && view !== "breaks" && view !== "klassenarbeit" && view !== "today" && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 14, position: "relative", flexWrap: "wrap" }}>
-          <button onClick={() => move(-1)} title="◀" style={{ ...btnSecondary, padding: "4px 13px", fontSize: 17, lineHeight: 1 }}>‹</button>
+          <button onClick={() => move(-1)} title="◀" style={{ ...dateNavBtn, fontSize: 17 }}>‹</button>
           {view === "day" ? (
-            <input type="date" value={ymd(cursor)} onChange={(e) => { if (e.target.value) setCursor(startOfDay(new Date(e.target.value + "T00:00:00"))); }} style={inputStyle} />
+            <input type="date" value={ymd(cursor)} onChange={(e) => { if (e.target.value) setCursor(startOfDay(new Date(e.target.value + "T00:00:00"))); }} style={dateNavInput} />
           ) : (
             <div style={{ position: "relative" }}>
               <button onClick={() => setJumpOpen((v) => !v)} title={t("kalender.jumpToDay")}
-                style={{ border: "none", background: "none", fontSize: 15, fontWeight: 700, color: "var(--text)", minWidth: 170, textAlign: "center", cursor: "pointer", padding: "4px 8px", borderRadius: 8, borderBottom: "1px dotted var(--border2)" }}>{title} ▾</button>
+                style={{ border: "none", background: "none", fontSize: 15, fontWeight: 700, color: "var(--text)", minWidth: 170, textAlign: "center", cursor: "pointer", padding: "0 8px", height: 32, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 8, borderBottom: "1px dotted var(--border2)" }}>{title} ▾</button>
               {jumpOpen && (<>
                 <div onClick={() => setJumpOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
                 <Popover align="center" style={{ padding: 8, display: "flex", gap: 6, alignItems: "center" }}>
@@ -549,8 +549,8 @@ export default function Kalender() {
               </>)}
             </div>
           )}
-          <button onClick={() => move(1)} title="▶" style={{ ...btnSecondary, padding: "4px 13px", fontSize: 17, lineHeight: 1 }}>›</button>
-          <button onClick={() => setCursor(startOfDay(new Date()))} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>{t("kalender.today")}</button>
+          <button onClick={() => move(1)} title="▶" style={{ ...dateNavBtn, fontSize: 17 }}>›</button>
+          <button onClick={() => setCursor(startOfDay(new Date()))} style={dateNavBtn}>{t("kalender.today")}</button>
         </div>
       )}
       {view === "breaks" && <BreaksPanel breaks={breaks} onAdd={addBreak} onDel={delBreak} t={t} standalone />}

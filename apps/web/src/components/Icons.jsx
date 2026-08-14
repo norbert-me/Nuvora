@@ -224,6 +224,23 @@ export const inputStyle = {
   fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box",
 };
 
+// ─── Datums-Navigator: ‹ [Datum] › Heute ───
+// Kalender und Anwesenheit haben dieselbe Zeile, aber jede Seite hat ihre
+// Masse selbst gesetzt: die Knoepfe klein und rund, das Datumsfeld mit dem
+// vollen inputStyle (9 px Polsterung, 14 px Schrift, eckige Ecken). Es stand
+// dadurch sichtbar hoeher als alles daneben. Feste Hoehe statt Polsterung ist
+// hier der verlaessliche Weg — ein natives Datumsfeld bringt eine eigene
+// innere Hoehe mit, die sich ueber padding nicht sauber angleichen laesst.
+const DATE_NAV_H = 32;
+export const dateNavBtn = {
+  ...btnSecondary, height: DATE_NAV_H, padding: "0 14px", fontSize: 13, lineHeight: 1,
+  display: "inline-flex", alignItems: "center", justifyContent: "center",
+};
+export const dateNavInput = {
+  ...inputStyle, height: DATE_NAV_H, padding: "0 12px", fontSize: 13, lineHeight: 1,
+  borderRadius: 980, // Pille wie die Knoepfe daneben
+};
+
 // Container-Karte (Listeneintrag, Modulblock).
 export const cardStyle = {
   border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16,
