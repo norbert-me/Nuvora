@@ -1759,4 +1759,8 @@ export default {
   "fw.noData": "No evaluated quizzes or exams in this class yet.",
   "fw.tooEarly": "Only {{n}} assessment(s) with too few answers — that is not enough to judge individual students.",
   "fw.basedOn": "(from {{n}} assessments)",
+  "klassenarbeit.fileWork": "The exam",
+  "klassenarbeit.fileExpect": "Marking scheme",
+  "klassenarbeit.partTopicInherit": "— topic of the task —",
+  "klassenarbeit.partTopicHint": "Own topic for this subtask. Without a choice the task’s topic applies.",
 };

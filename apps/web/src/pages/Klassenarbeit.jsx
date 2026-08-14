@@ -6,6 +6,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, Modal, Boxplot, StatCard, pageApp} from "../components/Icons.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
+import MaterialPanel from "../components/MaterialPanel.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
@@ -183,7 +184,7 @@ export default function Klassenarbeit() {
   const addPart = (tid) => {
     const tk = work.tasks.find((x) => x.id === tid); if (!tk) return;
     const parts = (tk.parts && tk.parts.length) ? [...tk.parts] : [{ id: tk.id, label: "a", max: Number(tk.max) > 0 ? Number(tk.max) : 1 }];
-    parts.push({ id: newId(), label: partLabel(parts.length), max: 1 });
+    parts.push({ id: newId(), label: partLabel(parts.length), max: 1, topic_id: null });
     setTask(tid, { parts });
   };
   const setPart = (tid, pid, patch) => {
@@ -233,7 +234,15 @@ export default function Klassenarbeit() {
     const tasks = work.tasks || [];
     const results = work.results || {};
     const uMax = {}; tasks.forEach((tk) => units(tk).forEach((u) => { uMax[u.id] = unitMax(u); }));
-    const topicTasks = {}; tasks.forEach((tk) => { if (tk.topic_id) (topicTasks[tk.topic_id] ||= []).push(tk); });
+    // Themen je WERTUNGSEINHEIT, nicht je Aufgabe: eine Teilaufgabe kann ein
+    // eigenes Thema tragen und erbt sonst das der Aufgabe. Dieselbe Regel wie im
+    // Server (_units_mit_thema in klassenarbeit.py) — beide Seiten müssen hier
+    // dasselbe rechnen, sonst zeigt die Seite andere Zahlen als die Auswertung.
+    const topicUnits = {};
+    tasks.forEach((tk) => units(tk).forEach((u) => {
+      const tid = u.topic_id || tk.topic_id;
+      if (tid) (topicUnits[tid] ||= []).push(u);
+    }));
     const pu = (sid, uid) => { const r = results[String(sid)]; if (!r || r === "abwesend") return 0; const v = r[uid]; return v == null ? 0 : Number(v); };
     const pt = (sid, tk) => units(tk).reduce((n, u) => n + pu(sid, u.id), 0);      // Punkte einer Aufgabe
     const tkMax = (tk) => units(tk).reduce((n, u) => n + uMax[u.id], 0);
@@ -248,12 +257,12 @@ export default function Klassenarbeit() {
     const mean = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
     const sdOf = (arr) => { if (arr.length < 2) return 0; const m = mean(arr); return Math.sqrt(arr.reduce((s, x) => s + (x - m) ** 2, 0) / (arr.length - 1)); };
 
-    const topicsOut = Object.entries(topicTasks).map(([tid, tks]) => {
-      let e = 0, m = 0; graded.forEach((s) => tks.forEach((tk) => { e += pt(s.id, tk); m += tkMax(tk); }));
+    const topicsOut = Object.entries(topicUnits).map(([tid, us]) => {
+      let e = 0, m = 0; graded.forEach((s) => us.forEach((u) => { e += pu(s.id, u.id); m += uMax[u.id]; }));
       return { topic_id: Number(tid), label: topicLabel(Number(tid)), pct: m ? Math.round((e / m) * 100) : 0 };
     }).sort((a, b) => a.pct - b.pct);
     const studentsOut = graded.map((s) => {
-      const weak = Object.entries(topicTasks).filter(([, tks]) => { let e = 0, m = 0; tks.forEach((tk) => { e += pt(s.id, tk); m += tkMax(tk); }); return m && e / m < 0.5; }).map(([tid]) => topicLabel(Number(tid)));
+      const weak = Object.entries(topicUnits).filter(([, us]) => { let e = 0, m = 0; us.forEach((u) => { e += pu(s.id, u.id); m += uMax[u.id]; }); return m && e / m < 0.5; }).map(([tid]) => topicLabel(Number(tid)));
       return weak.length ? { student_id: s.id, name: s.name, weak } : null;
     }).filter(Boolean);
     // je Aufgabe: Ø-Punkte (⌀/Max), Trefferquote, Trennschärfe (Item-Total-
@@ -383,6 +392,17 @@ export default function Klassenarbeit() {
           <input value={work.name} onChange={(e) => { const name = e.target.value; persist({ ...work, name }); setWorks((ws) => ws.map((x) => (x.id === work.id ? { ...x, name } : x))); }} placeholder={t("klassenarbeit.newName")}
             style={{ ...inputStyle, fontSize: 16, fontWeight: 600, marginBottom: 12, maxWidth: 360 }} />
 
+          {/* Anhänge: die Arbeit selbst und ihr Erwartungshorizont. Zwei
+              benannte Plätze statt einer namenlosen Liste — beim Nachkorrigieren
+              im nächsten Jahr sucht niemand, welche der vier PDFs der
+              Erwartungshorizont war. Mehrere Dateien je Platz bleiben möglich
+              (A- und B-Gruppe). Die Ablage ist dieselbe wie bei Themen und
+              Stunden (Kern), nur mit einem Bezug mehr. */}
+          <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", marginBottom: 12 }}>
+            <MaterialPanel workId={work.id} rolle="arbeit" titel={t("klassenarbeit.fileWork")} />
+            <MaterialPanel workId={work.id} rolle="erwartung" titel={t("klassenarbeit.fileExpect")} />
+          </div>
+
           {/* 1) Aufgaben definieren: Bezeichnung + Thema + Maximalpunkte. */}
           <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text2)", margin: "4px 0 8px" }}>{t("klassenarbeit.tasksHeading")}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
@@ -405,16 +425,30 @@ export default function Klassenarbeit() {
                       <input type="number" min="0.5" step="0.5" value={task.max ?? 1} onChange={(e) => setTask(task.id, { max: Math.max(0.5, Number(e.target.value) || 0.5) })} style={{ ...inputStyle, fontSize: 13, padding: "6px 6px", width: 56, textAlign: "center" }} />
                     </label>
                   )}
-                  <button onClick={() => addPart(task.id)} style={{ ...btnSecondary, padding: "5px 10px", fontSize: 12 }} title={t("klassenarbeit.addPartHint")}>+ {t("klassenarbeit.addPart")}</button>
+                  <button onClick={() => addPart(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }}
+                    title={t("klassenarbeit.addPartHint")} aria-label={t("klassenarbeit.addPart")}>
+                    <Icon d={ICONS.plus} size={15} color="var(--accent)" />
+                  </button>
                   <button onClick={() => delTask(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
                 </div>
                 {hasParts && (
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8, paddingLeft: 26 }}>
+                  /* Eine Zeile je Teilaufgabe statt Chips nebeneinander: jede
+                     bekommt ein eigenes Thema, und dafür ist in einem Chip kein
+                     Platz. „Aufgabe 1: Wiederholung" prüft in a) Kopfrechnen,
+                     in b) Umwandeln, in c) Runden — hängt das Thema nur oben an
+                     der Aufgabe, wird daraus ein Topf, und die Auswertung sagt
+                     „Wiederholung schwach" statt „Runden schwach". */
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8, paddingLeft: 26 }}>
                     {units(task).map((u) => (
-                      <div key={u.id} style={{ display: "inline-flex", alignItems: "center", gap: 3, background: "var(--bg2)", borderRadius: 8, padding: "3px 6px" }}>
+                      <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", background: "var(--bg2)", borderRadius: 8, padding: "4px 6px" }}>
                         <input value={u.label} onChange={(e) => setPart(task.id, u.id, { label: e.target.value })} title={t("klassenarbeit.partLabel")} style={{ ...inputStyle, fontSize: 12, padding: "4px 4px", width: 34, textAlign: "center" }} />
-                        <input type="number" min="0.5" step="0.5" value={u.max} onChange={(e) => setPart(task.id, u.id, { max: Math.max(0.5, Number(e.target.value) || 0.5) })} title={t("klassenarbeit.maxPoints")} style={{ ...inputStyle, fontSize: 12, padding: "4px 4px", width: 44, textAlign: "center" }} />
-                        <button onClick={() => delPart(task.id, u.id)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.close} size={13} color={C.danger} /></button>
+                        <select value={u.topic_id || ""} onChange={(e) => setPart(task.id, u.id, { topic_id: e.target.value ? Number(e.target.value) : null })}
+                          title={t("klassenarbeit.partTopicHint")} style={{ ...selectStyle, fontSize: 12, padding: "5px 7px", flex: 1, minWidth: 120 }}>
+                          <option value="">{t("klassenarbeit.partTopicInherit")}</option>
+                          {topics.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp.id)}</option>)}
+                        </select>
+                        <input type="number" min="0.5" step="0.5" value={u.max} onChange={(e) => setPart(task.id, u.id, { max: Math.max(0.5, Number(e.target.value) || 0.5) })} title={t("klassenarbeit.maxPoints")} style={{ ...inputStyle, fontSize: 12, padding: "4px 4px", width: 48, textAlign: "center" }} />
+                        <button onClick={() => delPart(task.id, u.id)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button>
                       </div>
                     ))}
                   </div>

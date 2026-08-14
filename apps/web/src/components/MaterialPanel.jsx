@@ -1,6 +1,8 @@
-// Wiederverwendbares Material-/Datei-Panel. Haengt an ein Thema (topicId) oder
-// eine Stunde (entryId) — genau eins von beiden setzen. Kern-Feature, kein
-// Modul-Gate. Download laeuft ueber fetch (Bearer-Token), nicht ueber <a href>,
+// Wiederverwendbares Material-/Datei-Panel. Haengt an ein Thema (topicId), eine
+// Stunde (entryId), einen Einstieg (methodId) oder eine Klassenarbeit (workId)
+// — genau eins davon setzen. Bei der Klassenarbeit sagt `rolle` zusaetzlich,
+// WOFUER die Datei steht ("arbeit"/"erwartung"); `titel` benennt den Kasten
+// entsprechend. Kern-Feature, kein Modul-Gate. Download laeuft ueber fetch (Bearer-Token), nicht ueber <a href>,
 // weil eine Browser-Navigation den Token nicht mitschickt.
 import { useState, useEffect } from "react";
 import { Icon, ICONS, btnSecondary, COLORS as C } from "./Icons.jsx";
@@ -16,15 +18,19 @@ function fmtSize(n) {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default function MaterialPanel({ topicId = null, entryId = null, methodId = null }) {
+export default function MaterialPanel({ topicId = null, entryId = null, methodId = null,
+                                       workId = null, rolle = null, titel = null }) {
   const { t } = useLanguage();
   const [items, setItems] = useState([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  const q = topicId != null ? `?topic_id=${topicId}` : methodId != null ? `?method_id=${methodId}` : `?entry_id=${entryId}`;
+  const q = topicId != null ? `?topic_id=${topicId}`
+    : methodId != null ? `?method_id=${methodId}`
+    : workId != null ? `?work_id=${workId}${rolle != null ? `&rolle=${rolle}` : ""}`
+    : `?entry_id=${entryId}`;
   const load = () => fetch(`${API}${q}`).then((r) => (r.ok ? r.json() : [])).then((d) => setItems(Array.isArray(d) ? d : [])).catch(() => {});
-  useEffect(() => { load(); }, [topicId, entryId, methodId]);
+  useEffect(() => { load(); }, [topicId, entryId, methodId, workId, rolle]);
 
   const upload = async (file) => {
     if (!file) return;
@@ -34,6 +40,8 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
     if (topicId != null) fd.append("topic_id", String(topicId));
     if (entryId != null) fd.append("entry_id", String(entryId));
     if (methodId != null) fd.append("method_id", String(methodId));
+    if (workId != null) fd.append("work_id", String(workId));
+    if (rolle) fd.append("rolle", rolle);
     const res = await fetch(API, { method: "POST", body: fd }).catch(() => null);
     setBusy(false);
     if (res && res.ok) load();
@@ -64,7 +72,7 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, marginBottom: 12 }}>
       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
-        {t("material.title")}
+        {titel || t("material.title")}
         <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", background: "var(--bg2)", borderRadius: 980, padding: "1px 9px" }}>{items.length}</span>
         <label style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12.5, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1, marginLeft: "auto" }}>
           {busy ? t("material.uploading") : t("material.upload")}

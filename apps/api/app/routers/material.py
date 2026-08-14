@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Material, Topic, CalendarEntry, Method, User
+from ..models import Material, Topic, CalendarEntry, Method, WorkAnalysis, User
 from sqlalchemy import func
 
 from .auth import get_current_user, rate_limit
@@ -30,6 +30,8 @@ class MaterialOut(BaseModel):
     topic_id: Optional[int] = None
     entry_id: Optional[int] = None
     method_id: Optional[int] = None
+    work_id: Optional[int] = None
+    rolle: str = ""          # "arbeit" | "erwartung" | "" (sonstiger Anhang)
     filename: str
     mime: str
     size: int
@@ -63,10 +65,26 @@ async def _check_method(db: AsyncSession, user_id: int, method_id: Optional[int]
     return method_id
 
 
+async def _check_work(db: AsyncSession, user_id: int, work_id: Optional[int]) -> Optional[int]:
+    if work_id is None:
+        return None
+    ok = (await db.execute(select(WorkAnalysis.id).where(
+        WorkAnalysis.id == work_id, WorkAnalysis.owner_id == user_id))).scalar_one_or_none()
+    if not ok:
+        raise HTTPException(404, "Klassenarbeit nicht gefunden")
+    return work_id
+
+
+# Nur benannte Rollen, sonst leer: eine erfundene Rolle wuerde die Datei in der
+# Oberflaeche verschwinden lassen (sie zeigt genau die drei Faelle).
+ROLLEN = ("arbeit", "erwartung")
+
+
 @router.get("", response_model=List[MaterialOut])
 async def list_material(topic_id: Optional[int] = None, entry_id: Optional[int] = None, method_id: Optional[int] = None,
+                        work_id: Optional[int] = None, rolle: Optional[str] = None,
                         user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Material der Lehrkraft, gefiltert nach Thema, Stunde und/oder Einstieg."""
+    """Material der Lehrkraft, gefiltert nach Thema, Stunde, Einstieg oder Arbeit."""
     q = select(Material).where(Material.owner_id == user.id)
     if topic_id is not None:
         q = q.where(Material.topic_id == topic_id)
@@ -74,6 +92,10 @@ async def list_material(topic_id: Optional[int] = None, entry_id: Optional[int] 
         q = q.where(Material.entry_id == entry_id)
     if method_id is not None:
         q = q.where(Material.method_id == method_id)
+    if work_id is not None:
+        q = q.where(Material.work_id == work_id)
+    if rolle is not None:
+        q = q.where(Material.rolle == (rolle if rolle in ROLLEN else ""))
     rows = (await db.execute(q.order_by(Material.created_at.desc()))).scalars().all()
     return rows
 
@@ -81,13 +103,15 @@ async def list_material(topic_id: Optional[int] = None, entry_id: Optional[int] 
 @router.post("", response_model=MaterialOut, status_code=201)
 async def upload_material(file: UploadFile = File(...), topic_id: Optional[int] = Form(None),
                           entry_id: Optional[int] = Form(None), method_id: Optional[int] = Form(None),
+                          work_id: Optional[int] = Form(None), rolle: str = Form(""),
                           user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     rate_limit("material_up", f"u{user.id}", 60, 60, "Zu viele Uploads. Bitte kurz warten.")
-    if topic_id is None and entry_id is None and method_id is None:
-        raise HTTPException(400, "Material braucht ein Thema, eine Stunde oder einen Einstieg")
+    if topic_id is None and entry_id is None and method_id is None and work_id is None:
+        raise HTTPException(400, "Material braucht ein Thema, eine Stunde, einen Einstieg oder eine Klassenarbeit")
     topic_id = await _check_topic(db, user.id, topic_id)
     entry_id = await _check_entry(db, user.id, entry_id)
     method_id = await _check_method(db, user.id, method_id)
+    work_id = await _check_work(db, user.id, work_id)
     data = await file.read()
     if not data:
         raise HTTPException(400, "Datei ist leer")
@@ -97,6 +121,7 @@ async def upload_material(file: UploadFile = File(...), topic_id: Optional[int] 
     if used + len(data) > QUOTA_BYTES:
         raise HTTPException(413, "Speicher voll (max. 200 MB je Konto). Bitte alte Dateien löschen.")
     m = Material(owner_id=user.id, topic_id=topic_id, entry_id=entry_id, method_id=method_id,
+                 work_id=work_id, rolle=rolle if rolle in ROLLEN else "",
                  filename=(file.filename or "datei")[:255], mime=(file.content_type or "")[:120],
                  size=len(data), data=data)
     db.add(m)

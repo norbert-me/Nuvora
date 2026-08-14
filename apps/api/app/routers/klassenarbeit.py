@@ -147,7 +147,14 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
             # Teilaufgaben (a, b, c …) mit eigenem Maximum — optional.
             parts = t.get("parts")
             if isinstance(parts, list) and parts:
-                cp = [{"id": str(p["id"])[:40], "label": str(p.get("label") or "")[:40], "max": _num(p.get("max"), 1)}
+                # Thema JE TEILAUFGABE: eine „Aufgabe 1: Wiederholung" enthaelt
+                # in a) Kopfrechnen, in b) Bruch/Dezimal/Prozent, in c) Runden.
+                # Haengt das Thema nur an der Aufgabe, wird all das zu einem
+                # Topf, und die Auswertung sagt „Wiederholung schwach" statt
+                # „Runden schwach". Ohne eigenes Thema erbt die Teilaufgabe das
+                # der Aufgabe (der haeufige Fall bleibt einfach).
+                cp = [{"id": str(p["id"])[:40], "label": str(p.get("label") or "")[:40], "max": _num(p.get("max"), 1),
+                       "topic_id": p.get("topic_id") if (isinstance(p.get("topic_id"), int) and p.get("topic_id") in own) else None}
                       for p in parts[:50] if isinstance(p, dict) and p.get("id")]
                 if cp:
                     ct["parts"] = cp
@@ -192,7 +199,15 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
 
 @router.delete("/works/{work_id}", status_code=204)
 async def delete_work(work_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import delete as sa_delete
+    from ..models import Material
+
     w = await _owned_work(db, user, work_id)
+    # Die Anhaenge (Arbeit, Erwartungshorizont) gehen mit. Der Fremdschluessel
+    # steht bewusst auf SET NULL — ohne dieses Aufraeumen bliebe die Datei als
+    # Karteileiche in der Ablage liegen: sie taucht in keiner Ansicht mehr auf
+    # (die zeigen immer einen Bezug) und belegt trotzdem das Speicherkonto.
+    await db.execute(sa_delete(Material).where(Material.work_id == work_id, Material.owner_id == user.id))
     await db.delete(w)
     await db.commit()
 
@@ -209,11 +224,24 @@ class RemediateIn(BaseModel):
 def _units(t):
     """Wertungseinheiten einer Aufgabe: ihre Teilaufgaben (a, b, c …) oder — ohne
     Teile — die Aufgabe selbst. Liefert [(unit_id, max), …]."""
+    return [(uid, mx) for uid, mx, _ in _units_mit_thema(t)]
+
+
+def _units_mit_thema(t):
+    """Dasselbe, aber mit dem Thema JE Einheit: [(unit_id, max, topic_id), …].
+
+    Die Teilaufgabe gewinnt, die Aufgabe erbt sie weiter. So kann eine
+    Wiederholungsaufgabe vier verschiedene Themen pruefen, ohne dass jemand vier
+    Aufgaben daraus machen muss.
+    """
+    erbe = t.get("topic_id")
     parts = t.get("parts")
     if isinstance(parts, list) and parts:
-        return [(str(p.get("id")), (float(p["max"]) if isinstance(p.get("max"), (int, float)) and p["max"] > 0 else 1))
+        return [(str(p.get("id")),
+                 (float(p["max"]) if isinstance(p.get("max"), (int, float)) and p["max"] > 0 else 1),
+                 p.get("topic_id") or erbe)
                 for p in parts if p.get("id")]
-    return [(t["id"], (float(t["max"]) if isinstance(t.get("max"), (int, float)) and t["max"] > 0 else 1))]
+    return [(t["id"], (float(t["max"]) if isinstance(t.get("max"), (int, float)) and t["max"] > 0 else 1), erbe)]
 
 
 def _profile(work: WorkAnalysis):
@@ -221,10 +249,18 @@ def _profile(work: WorkAnalysis):
     Themas — inkl. Teilaufgaben. Altformat (Liste falscher Aufgaben) wird
     übersetzt (gelistet = 0, sonst volle Punkte)."""
     tasks = work.tasks or []
-    topic_tasks = {}   # topic_id -> [Aufgaben]
+    # Gruppiert wird nach Thema JE WERTUNGSEINHEIT (Teilaufgabe schlaegt Aufgabe).
+    # Frueher lief die Gruppierung ueber die Aufgabe — eine Aufgabe mit vier
+    # Teilaufgaben zu vier Themen landete komplett unter einem davon.
+    topic_units = {}   # topic_id -> [(unit_id, max), …]
+    topic_tasks = {}   # topic_id -> [Aufgaben-ids]  (fuer die Rueckgabe)
     for t in tasks:
-        if t.get("topic_id"):
-            topic_tasks.setdefault(t["topic_id"], []).append(t)
+        for uid, umax, tid in _units_mit_thema(t):
+            if not tid:
+                continue
+            topic_units.setdefault(tid, []).append((uid, umax))
+            if t["id"] not in topic_tasks.setdefault(tid, []):
+                topic_tasks[tid].append(t["id"])
     results = work.results or {}
 
     def unit_pts(entry, uid, umax):
@@ -239,16 +275,15 @@ def _profile(work: WorkAnalysis):
         if entry == "abwesend" or str(sid) in absent:   # abwesend: raus aus der Statistik
             continue
         prof = {}
-        for topic_id, tks in topic_tasks.items():
+        for topic_id, einheiten in topic_units.items():
             erreicht = 0.0
             mx = 0.0
-            for t in tks:
-                for uid, umax in _units(t):
-                    erreicht += unit_pts(entry, uid, umax)
-                    mx += umax
+            for uid, umax in einheiten:
+                erreicht += unit_pts(entry, uid, umax)
+                mx += umax
             prof[topic_id] = [erreicht, mx]
         out[sid] = prof
-    return out, {tid: [t["id"] for t in tks] for tid, tks in topic_tasks.items()}
+    return out, topic_tasks
 
 
 @router.get("/works/{work_id}/analysis")

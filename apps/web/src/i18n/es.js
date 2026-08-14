@@ -1760,4 +1760,8 @@ export default {
   "fw.tooEarly": "Solo {{n}} prueba(s) con pocas respuestas: no basta para juzgar a un alumno.",
   "fw.noData": "Todavía no hay cuestionarios ni exámenes evaluados en esta clase.",
   "fw.basedOn": "(de {{n}} pruebas)",
+  "klassenarbeit.fileWork": "El examen",
+  "klassenarbeit.fileExpect": "Criterios de corrección",
+  "klassenarbeit.partTopicInherit": "— tema de la tarea —",
+  "klassenarbeit.partTopicHint": "Tema propio de esta subtarea. Sin elección se aplica el tema de la tarea.",
 };

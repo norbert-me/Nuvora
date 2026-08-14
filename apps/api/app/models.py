@@ -1128,6 +1128,15 @@ class Material(Base):
     entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("calendar_entries.id", ondelete="SET NULL"), nullable=True, index=True)
     # Auch an einen Einstieg (Methode) haengbar — optional, ON DELETE SET NULL.
     method_id: Mapped[Optional[int]] = mapped_column(ForeignKey("methods.id", ondelete="SET NULL"), nullable=True, index=True)
+    # ... und an eine Klassenarbeit: dort haengen die Arbeit selbst und ihr
+    # Erwartungshorizont. Wie die anderen Bindungen optional und SET NULL — die
+    # Datei ueberlebt das Loeschen der Auswertung und bleibt in der Ablage.
+    work_id: Mapped[Optional[int]] = mapped_column(ForeignKey("work_analyses.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Wozu die Datei gehoert: "arbeit" | "erwartung" | "" (sonstiger Anhang).
+    # Zwei benannte Plaetze statt einer namenlosen Liste — beim Nachkorrigieren
+    # sucht niemand, welche der vier PDFs der Erwartungshorizont war. Mehrere je
+    # Rolle bleiben moeglich (A- und B-Gruppe).
+    rolle: Mapped[str] = mapped_column(String(20), default="", server_default="")
     filename: Mapped[str] = mapped_column(String(255))
     mime: Mapped[str] = mapped_column(String(120), default="", server_default="")
     size: Mapped[int] = mapped_column(Integer, default=0, server_default="0")

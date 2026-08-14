@@ -1745,4 +1745,8 @@ export default {
   "fw.noData": "Noch keine ausgewerteten Quizze oder Klassenarbeiten in dieser Klasse.",
   "fw.tooEarly": "Erst {{n}} Erhebung(en) mit zu wenigen Antworten — für eine Aussage über einzelne Kinder braucht es mehr.",
   "fw.basedOn": "(aus {{n}} Erhebungen)",
+  "klassenarbeit.fileWork": "Die Arbeit",
+  "klassenarbeit.fileExpect": "Erwartungshorizont",
+  "klassenarbeit.partTopicInherit": "— Thema der Aufgabe —",
+  "klassenarbeit.partTopicHint": "Eigenes Thema dieser Teilaufgabe. Ohne Auswahl gilt das Thema der Aufgabe.",
 };
