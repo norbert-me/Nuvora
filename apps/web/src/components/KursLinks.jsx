@@ -25,6 +25,15 @@ export default function KursLinks({ kurs }) {
   const { modules } = useModules();
   const klassen = kurs?.classes || [];
   const [classId, setClassId] = useState(klassen[0]?.id ?? null);
+  // Der Startwert gilt nur beim ersten Rendern. Ein frisch angelegter Kurs hat
+  // aber noch KEINE Klasse — classId blieb dann null, und weil die Leiste ohne
+  // Klasse nichts anzeigen kann, blieb sie auch nach dem Hinzufuegen der Klasse
+  // leer. Erst ein Neuladen half. Darum nachziehen: sobald eine Klasse da ist
+  // (oder die gewaehlte verschwindet), die erste nehmen.
+  useEffect(() => {
+    if (klassen.length === 0) { if (classId !== null) setClassId(null); return; }
+    if (!klassen.some((k) => k.id === classId)) setClassId(klassen[0].id);
+  }, [klassen.map((k) => k.id).join(","), classId]);
   const an = (key) => modules.find((m) => m.key === key)?.active ?? false;
   // Orga bündelt mehrere Reiter; was im Modul-Zahnrad ausgeblendet ist, gehört
   // auch hier nicht hin — sonst führt der Kurs in etwas, das die Lehrkraft
