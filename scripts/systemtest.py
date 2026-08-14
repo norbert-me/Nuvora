@@ -330,7 +330,11 @@ def inhalt_cardvote(api, u, spuren):
     wieder = _finde(liste, id=frage["id"])
     if not wieder or wieder["text"] != f"{PRAEFIX} 7*8 (neu)":
         raise AssertionError("geaenderter Text steht nicht in der Liste")
-    return "Frage geschrieben, einzeln und in der Liste mit gleichen Werten wiedergefunden"
+    # Der Scanner-Weg gehoert zu CardVote und wird sonst von keiner Probe
+    # beruehrt — ein stiller Ausfall faellt erst im Unterricht auf.
+    scanweg = inhalt_scan_roh(api, u, spuren)
+    return ("Frage geschrieben, einzeln und in der Liste mit gleichen Werten "
+            f"wiedergefunden; {scanweg}")
 
 
 def inhalt_lernpfad(api, u, spuren):
@@ -428,6 +432,19 @@ def inhalt_auswertung(api, u, spuren):
         "DELETE", f"/api/klassenarbeit/works/{kopie['id']}", erwartet=(204, 404))))
     if kopie["id"] == arbeit["id"]:
         raise AssertionError("Kopie ist dieselbe Arbeit")
+    # Anhaenge (Arbeit + Erwartungshorizont): sie haengen an der Kern-Ablage,
+    # aber sie sind ein Weg des Auswertungs-Moduls — und ohne Probe faellt ein
+    # kaputter Bezug erst auf, wenn jemand seine Arbeit sucht.
+    pdf = b"%PDF-1.4\ntrailer<</Root 1 0 R>>\n%%EOF\n"
+    anhang = api.upload("/api/material", "file", f"{PRAEFIX}-arbeit.pdf", pdf, "application/pdf",
+                        felder={"work_id": str(arbeit["id"]), "rolle": "arbeit"}, erwartet=(201,))
+    spuren.append(("Anhang", lambda: api.call("DELETE", f"/api/material/{anhang['id']}", erwartet=(204, 404))))
+    nur_arbeit = api.call("GET", f"/api/material?work_id={arbeit['id']}&rolle=arbeit", erwartet=(200,))
+    if not any(m["id"] == anhang["id"] for m in nur_arbeit):
+        raise AssertionError("Anhang der Arbeit nicht unter seiner Rolle wiedergefunden")
+    if api.call("GET", f"/api/material?work_id={arbeit['id']}&rolle=erwartung", erwartet=(200,)):
+        raise AssertionError("Anhang steht unter der falschen Rolle")
+
     # Klassenvergleich: Original und Kopie gehoeren zur selben Gruppe. Die
     # Aufgabenstatistik muss die Aufgabe kennen, auch wenn die Kopie noch keine
     # Punkte hat — sonst waere die Sicht erst nach dem Korrigieren nutzbar.
@@ -465,8 +482,44 @@ def inhalt_auswertung(api, u, spuren):
     # dort eine falsche Erwartung erzeugen. (In `spuren` steht es trotzdem, fuer
     # den Fall, dass die Probe vorher abbricht.)
     api.call("DELETE", f"/api/klassenarbeit/works/{arbeit['id']}", erwartet=(204, 404))
+    # Mit der Arbeit gehen ihre Anhaenge: sonst laegen sie unsichtbar in der
+    # Ablage und belegten das Speicherkonto der Lehrkraft.
+    if api.call("GET", f"/api/material?work_id={arbeit['id']}", erwartet=(200,)):
+        raise AssertionError("Anhaenge ueberleben das Loeschen der Arbeit")
     api.call("DELETE", f"/api/noten/sections/{block['id']}", erwartet=(204, 404))
     return f"Note 2,3 wiedergefunden; Klassenarbeit rechnet {soll} % und findet das schwache Kind"
+
+
+MINI_JPEG = (
+    # Kleinstes gueltiges JPEG (1x1, grau). Reicht, um den Weg zu pruefen:
+    # Upload, Typerkennung, Markererkennung, Antwortform. Karten findet er
+    # keine — genau das ist die erwartete Antwort.
+    "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0a"
+    "HBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAA"
+    "AAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q=="
+)
+
+
+def inhalt_scan_roh(api, u, spuren):
+    """Der Weg, den der Scanner im Unterricht nimmt: rohes JPEG statt base64.
+
+    Geprueft wird nicht die Erkennung (dafuer braeuchte es ein echtes Foto mit
+    Marker), sondern dass der Weg lebt und dieselbe Antwortform liefert wie der
+    alte JSON-Weg — genau daran haengt der Scanner nach jedem Deploy.
+    """
+    import base64
+    sitzung = api.call("POST", "/api/sessions", {"name": f"{PRAEFIX} Scanweg", "class_id": u.class_id}, erwartet=(200, 201))
+    spuren.append(("Scan-Sitzung", lambda: api.call("DELETE", f"/api/sessions/{sitzung['id']}", erwartet=(204, 404))))
+    roh = api.upload_roh(f"/api/scan-image-raw?session_id={sitzung['id']}&save=false",
+                         base64.b64decode(MINI_JPEG), "image/jpeg", erwartet=(200,))
+    if not isinstance(roh, dict) or "cards" not in roh:
+        raise AssertionError(f"Rohweg antwortet ohne Kartenliste: {roh}")
+    json_weg = api.call("POST", "/api/scan-image",
+                        {"session_id": sitzung["id"], "image": MINI_JPEG, "save": False}, erwartet=(200,))
+    if json_weg.get("cards") != roh.get("cards"):
+        raise AssertionError(f"JSON- und Rohweg antworten verschieden: {json_weg} / {roh}")
+    api.call("DELETE", f"/api/sessions/{sitzung['id']}", erwartet=(204, 404))
+    return "rohes JPEG und JSON-Weg liefern dieselbe Antwort"
 
 
 def inhalt_karten(api, u, spuren):

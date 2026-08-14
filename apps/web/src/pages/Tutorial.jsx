@@ -17,6 +17,10 @@ const BEREICHE = [
   { key: "kurse", ziel: "/kurse" },
   { key: "themen", ziel: "/topics" },
   { key: "module", ziel: "/modules" },
+  // Beides gehoert in die Tour, weil es die Fragen sind, die nach ein paar
+  // Wochen kommen: „Was sagen mir die Zahlen?" und „Wohin mit dem alten Jahr?"
+  { key: "auswerten", ziel: "/auswertung?tab=klassenarbeit" },
+  { key: "jahresende", ziel: "/classes" },
   { key: "loslegen", ziel: "/modules" },
 ];
 

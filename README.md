@@ -313,9 +313,9 @@ aktiviert hat. Vierzehn Stück, jedes pro Lehrkraft zuschaltbar:
 | ----- | ---- | ----- |
 | CardVote | `/cardvote` | Abstimmen ohne Geräte: Lernende halten bedruckte Karten hoch, die Lehrkraft scannt sie (ArUco/OpenCV). Live-Ergebnisse, Spiel-Modus, Auswertung mit Notenschlüssel, Export (PDF/Excel/iDoceo), Marktplatz |
 | Lernpfad | `/lernpfad` | Aufgaben und Lernpfade (aus mehreren **Lernleitern**); der Generator verteilt differenziert. Lernleitern über den Marktplatz teilbar |
-| Karteikarten | `/karten` | Spaced Repetition (SM-2). Lernende üben **ohne Konto** per QR-Code; Reifegrad sichtbar, Meisterung als Notenspalte übernehmbar |
+| Karteikarten | `/karten` | Spaced Repetition (SM-2). Lernende üben **ohne Konto** per QR-Code; Reifegrad sichtbar, Meisterung als Notenspalte übernehmbar. E/G am Stapel **und** an der einzelnen Karte |
 | Kalender | `/kalender` | Tag/Woche/Monat + wiederkehrender Stundenplan; Quiz, Deck oder Lernleiter an eine Stunde planen; freie Tage; ICS-Feed raus, externer Kalender read-only rein (SSRF-gehärtet) |
-| Auswertung | `/auswertung` | Zwei Reiter: **Notenbuch** (eigene Spalten mit Gewichten, gewichteter Schnitt, Trend je Schüler) und **Klassenarbeit** (Aufgabe → Thema, richtig/falsch je Schüler, Fehlerprofil, Trennschärfe) |
+| Auswertung | `/auswertung` | Drei Sichten: **Notenbuch** (eigene Spalten mit Gewichten, gewichteter Schnitt, Trend je Schüler), **Klassenarbeit** (Punkte je Aufgabe/Teilaufgabe, Thema bis auf die Teilaufgabe, Arbeit + Erwartungshorizont als Anhang, Fehlerprofil) und **Vergleich** (dieselbe Arbeit über mehrere Klassen, je Aufgabe mit Trennschärfe, Nuller-Anteil und Streuung) |
 | Unterrichtsplanung | `/unterrichtsplanung` | Einstiege sammeln: Idee, Ablauf, Material, Dauer — themen-getaggt und an Kalender-Stunden zuweisbar |
 | Code-Detektiv | `/code-detektiv` | Programmier-Rätsel: Code-Bausteine per Drag & Drop ordnen, allein oder in einer Klassen-Session (Beitritt per Code, ohne Login) |
 | Orga | `/orga` | Klassenführung in Reitern: Checklisten, Anwesenheit/Fehlzeiten (PDF-Report), Ausleihe, Sitzplan (optional SEGEL-Stufen) |
@@ -328,6 +328,39 @@ aktiviert hat. Vierzehn Stück, jedes pro Lehrkraft zuschaltbar:
 
 Ein **Reifegrad** steht an jedem Modul (`stable` / `beta`); die Shell zeigt ihn
 als Badge.
+
+### Frühwarnung: wer hängt über mehrere Erhebungen hinweg hinterher?
+
+Aus den CardVote-Quizzen **und** den Klassenarbeiten einer Klasse rechnet Nuvora
+den **Abstand zum Klassenmittel derselben Erhebung** — eine absolute Quote sagt
+nichts, ein schwerer Test drückt alle. Gemeldet wird erst, was sich wiederholt:
+im Median mindestens 20 Prozentpunkte unter der Klasse, und das in vier der
+letzten fünf Erhebungen, bei mindestens zwölf gewerteten Antworten. Darunter
+steht „zu wenig Daten" — bei vier A–D-Fragen trifft reines Raten im Schnitt eine.
+
+Ob es am aktuellen Thema liegt oder an älteren Lücken, beantwortet die Zeitachse
+**ohne gepflegte Voraussetzungen**: Nuvora kennt das Erstvorkommen jedes Themas,
+Fragen zu lange bekannten Themen sind Wiederholung — also der Vorwissenstest,
+den es ohnehin gibt. Zu sehen auf der Startseite, in der Klassen-Auswertung, auf
+der Schülerseite und bei den Klassenarbeiten; jede Meldung nennt die Zahlen, aus
+denen sie entstand. Es ist eine Beobachtung, keine Diagnose — aus Trefferquoten
+folgt keine Lernstörung.
+
+### Archiv statt Löschen
+
+Am Schuljahresende lassen sich Klassen und Kurse **archivieren**: raus aus allen
+Auswahllisten, alle Daten bleiben (Noten, Klassenarbeiten, Karten-Fortschritt).
+Einen Kurs zu archivieren nimmt seine Fach-Klassen mit; zurück geht es jederzeit.
+Bewusst etwas anderes als der Papierkorb — der löscht nach 30 Tagen, und eine
+alte Note muss man Jahre später noch nachschlagen können.
+
+### Dateien ansehen statt herunterladen
+
+An Themen, Stunden, Einstiegen und Klassenarbeiten hängt eine private
+Dateiablage (200 MB je Konto). Ein Klick zeigt die Datei im Fenster: PDF und
+Bilder direkt, Word/Excel/PowerPoint wandelt der Server beim ersten Ansehen
+einmalig nach PDF (LibreOffice) und behält das Ergebnis. Die Datei verlässt den
+Server dabei nicht.
 
 ### Was die Module verbindet
 

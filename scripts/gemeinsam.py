@@ -163,6 +163,80 @@ class Api:
         except ValueError:
             return text
 
+    def upload(self, pfad, feldname, dateiname, inhalt, mime="application/octet-stream",
+               felder=None, erwartet=None):
+        """Datei hochladen (multipart/form-data) — fuer die Material-Ablage.
+
+        Bewusst von Hand zusammengesetzt statt mit einer Bibliothek: die
+        Testskripte kommen ohne Abhaengigkeiten aus, damit sie auf jedem Rechner
+        und im Deploy laufen, ohne dass vorher etwas installiert werden muss.
+        """
+        grenze = "----nuvora-selbsttest-grenze"
+        teile = []
+        for k, v in (felder or {}).items():
+            teile.append(
+                f'--{grenze}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode()
+            )
+        teile.append(
+            f'--{grenze}\r\nContent-Disposition: form-data; name="{feldname}"; '
+            f'filename="{dateiname}"\r\nContent-Type: {mime}\r\n\r\n'.encode()
+            + inhalt + b"\r\n"
+        )
+        teile.append(f"--{grenze}--\r\n".encode())
+        koerper = b"".join(teile)
+
+        url = self.basis + pfad
+        req = urllib.request.Request(url, data=koerper, method="POST")
+        req.add_header("Content-Type", f"multipart/form-data; boundary={grenze}")
+        if self.token:
+            req.add_header("Authorization", "Bearer " + self.token)
+        if self.selftest_token:
+            req.add_header("X-Selftest-Token", self.selftest_token)
+        start = time.monotonic()
+        try:
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+                status, inhalt_a = r.status, r.read()
+        except urllib.error.HTTPError as e:
+            status, inhalt_a = e.code, e.read()
+        except Exception as e:
+            self._merke("POST", pfad, 0, start, str(e))
+            raise ApiFehler("POST", pfad, 0, str(e))
+        text = inhalt_a.decode("utf-8", "replace")
+        self._merke("POST", pfad, status, start, text)
+        if erwartet and status not in erwartet:
+            raise ApiFehler("POST", pfad, status, text)
+        try:
+            return json.loads(text)
+        except ValueError:
+            return text
+
+    def upload_roh(self, pfad, inhalt: bytes, mime: str, erwartet=None):
+        """Rohdaten im Rumpf (kein multipart) — so schickt der Scanner sein Bild."""
+        url = self.basis + pfad
+        req = urllib.request.Request(url, data=inhalt, method="POST")
+        req.add_header("Content-Type", mime)
+        if self.token:
+            req.add_header("Authorization", "Bearer " + self.token)
+        if self.selftest_token:
+            req.add_header("X-Selftest-Token", self.selftest_token)
+        start = time.monotonic()
+        try:
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+                status, roh = r.status, r.read()
+        except urllib.error.HTTPError as e:
+            status, roh = e.code, e.read()
+        except Exception as e:
+            self._merke("POST", pfad, 0, start, str(e))
+            raise ApiFehler("POST", pfad, 0, str(e))
+        text = roh.decode("utf-8", "replace")
+        self._merke("POST", pfad, status, start, text)
+        if erwartet and status not in erwartet:
+            raise ApiFehler("POST", pfad, status, text)
+        try:
+            return json.loads(text)
+        except ValueError:
+            return text
+
     def _merke(self, methode, pfad, status, start, text):
         """Jede Anfrage mitschreiben — mit --debug wird daraus ein Protokoll,
         das auch beim allgemeinen Suchen hilft (welcher Aufruf ist langsam,

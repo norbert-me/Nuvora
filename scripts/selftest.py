@@ -588,7 +588,19 @@ def teste_kern(api, b, u):
         zurueck = api.call("GET", "/api/classes", erwartet=(200,))
         if not any(k["id"] == u.class_id for k in zurueck):
             raise AssertionError("Klasse kommt nicht aus dem Archiv zurueck")
-        return "archivieren, aus der Liste raus, Schueler bleiben, zurueckholen"
+
+        # Kurs archivieren nimmt seine Fach-Klassen mit — genau das ist der
+        # Sinn am Schuljahresende, und genau das vergisst man beim Nachbauen.
+        if u.kurs_id:
+            api.call("POST", f"/api/kurse/{u.kurs_id}/archive", erwartet=(200,))
+            if any(k["id"] == u.kurs_id for k in api.call("GET", "/api/kurse", erwartet=(200,))):
+                raise AssertionError("archivierter Kurs steht weiter in der aktiven Liste")
+            if any(k["id"] == u.class_id for k in api.call("GET", "/api/classes", erwartet=(200,))):
+                raise AssertionError("Kurs archiviert, seine Klasse aber nicht")
+            api.call("POST", f"/api/kurse/{u.kurs_id}/archive", erwartet=(200,))
+            if not any(k["id"] == u.class_id for k in api.call("GET", "/api/classes", erwartet=(200,))):
+                raise AssertionError("Klasse kommt mit dem Kurs nicht zurueck")
+        return "Klasse und Kurs archivieren (Klassen ziehen mit), Schueler bleiben, zurueckholen"
 
     def papierkorb():
         api.call("GET", "/api/trash", erwartet=(200,))
@@ -604,6 +616,31 @@ def teste_kern(api, b, u):
             raise AssertionError("Antwort ohne Schuelerliste")
         return f"Sammelsicht und Klassensicht antworten ({len(alle['schueler'])} gemeldet)"
 
+    def material():
+        # Dateiablage des Kerns: hochladen, wiederfinden, ansehen, loeschen.
+        # Ein winziges, gueltiges PDF — der Ansehen-Weg (/pdf) muss es
+        # unveraendert durchreichen, ohne LibreOffice zu bemuehen.
+        pdf = (b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+               b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+               b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 99 99]>>endobj\n"
+               b"trailer<</Root 1 0 R>>\n%%EOF\n")
+        hoch = api.upload("/api/material", "file", f"{PRAEFIX}.pdf", pdf, "application/pdf",
+                          felder={"topic_id": str(u.topic_id)}, erwartet=(201,))
+        mid = hoch["id"]
+        try:
+            liste = api.call("GET", f"/api/material?topic_id={u.topic_id}", erwartet=(200,))
+            if not any(m["id"] == mid for m in liste):
+                raise AssertionError("hochgeladene Datei steht nicht in der Liste")
+            status, text = api.call("GET", f"/api/material/{mid}/pdf", roh=True)
+            if status != 200 or not text.startswith("%PDF"):
+                raise AssertionError(f"Ansehen liefert HTTP {status} und kein PDF")
+            kopf = api.letzte_kopfe.get("content-disposition", "")
+            if "inline" not in kopf:
+                raise AssertionError(f"PDF kommt nicht zum Ansehen zurueck: {kopf}")
+        finally:
+            api.call("DELETE", f"/api/material/{mid}", erwartet=(204, 404))
+        return "hochladen, wiederfinden, als PDF ansehen, loeschen"
+
     def modulregister():
         module = api.call("GET", "/api/modules", erwartet=(200,))
         if not module:
@@ -615,6 +652,7 @@ def teste_kern(api, b, u):
     b.pruefe("Kern", "Themen", themen)
     b.pruefe("Kern", "Papierkorb", papierkorb)
     b.pruefe("Kern", "Archiv", archiv)
+    b.pruefe("Kern", "Dateiablage", material)
     b.pruefe("Kern", "Fruehwarnung", fruehwarnung)
     b.pruefe("Kern", "Modulregister", modulregister)
 

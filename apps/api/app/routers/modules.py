@@ -76,8 +76,13 @@ REGISTRY: List[ModuleDef] = [
             "Spalten mit Gewichten, gewichteter Schnitt und Trend je Schüler; die "
             "Zeugnisnote bleibt deine Entscheidung, Beobachtungen zählen nie mit; "
             "CardVote-/Karten-/Code-Detektiv-Ergebnisse als Spalte übernehmbar) und "
-            "Klassenarbeit (je Aufgabe ein Thema, richtig/falsch je Schüler → "
-            "Fehlerprofil und gezielte Wiederholung)."
+            "Klassenarbeit (Punkte je Aufgabe und Teilaufgabe, Thema bis auf die "
+            "Teilaufgabe genau → Fehlerprofil und gezielte Wiederholung). Die Arbeit "
+            "und ihr Erwartungshorizont hängen als Datei daran; dieselbe Arbeit lässt "
+            "sich in eine andere Klasse kopieren und danach über die Klassen "
+            "vergleichen — je Aufgabe mit Trennschärfe, Nuller-Anteil und Streuung, "
+            "damit eine missverständliche Aufgabe von einer schweren zu unterscheiden "
+            "ist."
         ),
         path="/auswertung",
         stage="stable",
@@ -102,7 +107,9 @@ REGISTRY: List[ModuleDef] = [
             "Karteikarten mit Spaced Repetition. Die Lernenden üben ohne Konto "
             "per QR-Code; ihren Reifegrad siehst du im Modul. Optional an ein "
             "Thema gebunden (der Kalender schaltet den Stapel am Tag frei); die "
-            "Meisterung als Notenspalte übernehmbar."
+            "Meisterung als Notenspalte übernehmbar. E/G lässt sich am Stapel und "
+            "an der einzelnen Karte setzen — ein gemeinsamer Satz mit einzelnen "
+            "Anforderungskarten braucht so keinen zweiten Stapel."
         ),
         path="/karten",
         stage="stable",
