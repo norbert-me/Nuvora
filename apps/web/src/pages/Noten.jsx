@@ -1261,7 +1261,13 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, o
               const v = summary.per_section?.[String(sec.id)];
               return (
                 <div key={sec.id} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid var(--border)", fontSize: 13.5 }}>
-                  <span><span style={{ color: "var(--text3)" }}>{sec.weight} % · </span>{sec.name}</span>
+                  {/* Prozente rechtsbuendig in fester Spalte: sonst enden „5 %"
+                      und „50 %" an verschiedenen Stellen und die Namen springen. */}
+                  <span style={{ display: "inline-flex", gap: 6, minWidth: 0 }}>
+                    <span style={{ color: "var(--text3)", width: 42, textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{sec.weight} %</span>
+                    <span style={{ color: "var(--text3)" }}>·</span>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sec.name}</span>
+                  </span>
                   <strong>{v !== undefined ? de(v) : "·"}</strong>
                 </div>
               );
