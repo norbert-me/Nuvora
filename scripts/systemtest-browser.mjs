@@ -1067,6 +1067,13 @@ async function lauf(motor) {
         localStorage.removeItem("nuvora_cache_modules");
         // Sprache festnageln (siehe locale oben).
         localStorage.setItem("cardvote_lang", "de");
+        // Gefuehrte Touren vorab abhaken: die Modul-Tour startet 900 ms nach
+        // dem Seitenaufruf und legt ein Overlay ueber ALLES (z-index 4000).
+        // Genau daran scheiterte die Notenspalten-Probe — nicht an der Seite,
+        // sondern an einem Willkommensfenster. Wegklicken allein reicht nicht:
+        // die naechste Seite bringt die naechste Tour.
+        localStorage.setItem("nuvora_kerntour_done", "1");
+        for (const id of ["kalender", "noten", "karten"]) localStorage.setItem(`nuvora_tour_${id}_done`, "1");
       } catch { /* Dokument ohne eigene Herkunft — hier gibt es nichts zu setzen */ }
     }, [token, JSON.stringify(user)]);
 

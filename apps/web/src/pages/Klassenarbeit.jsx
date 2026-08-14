@@ -525,7 +525,7 @@ export default function Klassenarbeit() {
                     `minWidth: 0` erlaubt dem Flex-Element, kleiner zu werden als
                     sein Inhalt. */}
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 12, color: "var(--text3)", width: 18, flexShrink: 0 }}>{i + 1}.</span>
+                  <span style={{ fontSize: 12, color: "var(--text3)", width: 24, textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{i + 1}.</span>
                   <input value={task.label} onChange={(e) => setTask(task.id, { label: e.target.value })} placeholder={t("klassenarbeit.taskOptional", { n: i + 1 })} title={t("klassenarbeit.taskOptionalHint")} style={{ ...inputStyle, fontSize: 13, padding: "7px 9px", flex: "1 1 150px", minWidth: 0 }} />
                   <select value={task.topic_id || ""} onChange={(e) => setTask(task.id, { topic_id: e.target.value ? Number(e.target.value) : null })}
                     style={{ ...selectStyle, fontSize: 12.5, padding: "7px 9px", flex: "1 1 180px", minWidth: 0, maxWidth: 340 }}>

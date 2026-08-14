@@ -201,7 +201,7 @@ export default {
   "classes.empty": "Noch keine Klassen angelegt.",
   "classes.evalTitle": "Klassenauswertung",
   "classes.printCards": "Karten drucken",
-  "classes.cardNumberHint": "Nummer der bedruckten Karte (CardVote)",
+  "classes.cardNumberHint": "Nummer der bedruckten Karte (CardVote). Beim Verschieben wird neu durchnummeriert — vorhandene Testergebnisse ziehen mit, die gedruckten Karten musst du neu drucken.",
   "classes.export": "Exportieren",
   "classes.open": "Klasse öffnen",
   "classes.importExcel": "Excel importieren",
@@ -1841,4 +1841,5 @@ export default {
   "fw.quiz": "Quiz",
   "fw.noSubmission": "keine Abgabe",
   "fw.noTopicsHint": "Keine Aufschlüsselung nach Themen: die Fragen bzw. Aufgaben tragen kein Thema. Wer eins hinterlegt, sieht hier, woran es genau hängt.",
+  "classes.renumberHint": "Reihenfolge = Kartennummer. Nach dem Speichern gilt die neue Nummerierung in allen Modulen; alte Ausdrucke passen dann nicht mehr.",
 };

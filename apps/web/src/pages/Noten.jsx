@@ -28,45 +28,21 @@ const API = "/api/noten";
 // Bild — man scrollt durch Spalten und weiss nicht mehr, wo man ist. Reines CSS
 // reicht nicht (sticky kennt keine Mitte), also wird die Verschiebung gerechnet:
 // Mitte des sichtbaren Ausschnitts minus Mitte der Zelle, begrenzt auf die Zelle.
-function StickyMitte({ scrollRef, children, style }) {
-  const ref = useRef(null);
-  const [dx, setDx] = useState(0);
-
-  useLayoutEffect(() => {
-    const sc = scrollRef.current;
-    if (!sc) return undefined;
-    const rechne = () => {
-      const el = ref.current;
-      const zelle = el?.parentElement;
-      if (!zelle) return;
-      const z = zelle.getBoundingClientRect();
-      const s = sc.getBoundingClientRect();
-      // Die Namensspalte klebt links und verdeckt den Anfang — sie zaehlt nicht
-      // zum sichtbaren Ausschnitt.
-      const kleber = zelle.parentElement?.firstElementChild;
-      const klebt = kleber && kleber !== zelle ? kleber.getBoundingClientRect().width : 0;
-      const links = Math.max(z.left, s.left + klebt);
-      const rechts = Math.min(z.right, s.right);
-      if (rechts - links <= 0) { setDx(0); return; }
-      const eigen = el.getBoundingClientRect().width;
-      const grenze = Math.max(0, (z.width - eigen) / 2);   // nie aus der Zelle heraus
-      const zellmitte = (z.left + z.right) / 2;
-      const ziel = (links + rechts) / 2;
-      const roh = Math.max(-grenze, Math.min(grenze, ziel - zellmitte));
-      // Auf 8 px rasten und nur bei spuerbarer Aenderung nachziehen: sonst
-      // wandert der Kopf bei jedem Scroll-Pixel ein Stueck, und alles, was ihn
-      // anklicken will (Maus wie Testlauf), zielt auf ein bewegtes Ziel.
-      const gerastert = Math.round(roh / 8) * 8;
-      setDx((vorher) => (Math.abs(gerastert - vorher) >= 8 ? gerastert : vorher));
-    };
-    rechne();
-    sc.addEventListener("scroll", rechne, { passive: true });
-    window.addEventListener("resize", rechne);
-    return () => { sc.removeEventListener("scroll", rechne); window.removeEventListener("resize", rechne); };
-  }, [scrollRef]);
-
-  // transform bewegt nur die Anzeige; die Zellbreite bleibt, wie sie ist.
-  return <div ref={ref} style={{ ...style, transform: dx ? `translateX(${dx}px)` : undefined, willChange: "transform" }}>{children}</div>;
+function StickyMitte({ children, style }) {
+  // Der Titel bleibt im sichtbaren Teil seines Abschnitts.
+  //
+  // Reines CSS, bewusst ohne JS: die erste Fassung rechnete die Verschiebung
+  // bei jedem Scroll-Ereignis und schob den Kopf per transform — ein Ziel, das
+  // sich unter dem Mauszeiger wegbewegt (und im Browser-Test in einen Timeout
+  // lief). `position: sticky` mit left UND right klebt den Inhalt am jeweils
+  // sichtbaren Rand der Zelle fest; solange die ganze Zelle zu sehen ist, steht
+  // er dank `margin: 0 auto` mittig. `width: max-content` ist noetig, sonst ist
+  // das Element so breit wie die Zelle und sticky hat nichts zu tun.
+  return (
+    <div style={{ ...style, position: "sticky", left: 8, right: 8, width: "max-content", margin: "0 auto" }}>
+      {children}
+    </div>
+  );
 }
 
 // Zeile im Export-Dropdown (Icon + Text, linksbündig).
@@ -365,11 +341,21 @@ export default function Noten() {
     const { cats, kinder } = zellFolge();
     const sp = cats.indexOf(catId), ze = kinder.indexOf(studentId);
     if (sp < 0 || ze < 0) return null;
-    let nsp = sp + (rueckwaerts ? -1 : 1), nze = ze;
-    if (nsp >= cats.length) { nsp = 0; nze += 1; }
-    if (nsp < 0) { nsp = cats.length - 1; nze -= 1; }
+    // Am Zeilenende ist Schluss — KEIN stiller Sprung in die naechste Zeile.
+    // Genau das hat Noten in falsche Spalten gebracht: man tippt weiter und
+    // merkt erst beim Neuladen, dass man ein Kind tiefer war.
+    const nsp = sp + (rueckwaerts ? -1 : 1);
+    if (nsp < 0 || nsp >= cats.length) return null;
+    return `${kinder[ze]}:${cats[nsp]}`;
+  };
+  /** Dieselbe Spalte, naechstes Kind — so arbeitet man eine Spalte ab (Enter). */
+  const darunter = (studentId, catId, hoch) => {
+    const { cats, kinder } = zellFolge();
+    const sp = cats.indexOf(catId), ze = kinder.indexOf(studentId);
+    if (sp < 0 || ze < 0) return null;
+    const nze = ze + (hoch ? -1 : 1);
     if (nze < 0 || nze >= kinder.length) return null;
-    return `${kinder[nze]}:${cats[nsp]}`;
+    return `${kinder[nze]}:${cats[sp]}`;
   };
 
   const noteSetzen = async (studentId, catId, text) => {
@@ -625,7 +611,7 @@ export default function Noten() {
                       style={{ ...th, borderLeft: over && dragOver.side === "left" ? "3px solid var(--accent)" : "2px solid var(--border3)",
                         borderRight: over && dragOver.side === "right" ? "3px solid var(--accent)" : undefined,
                         cursor: "grab", opacity: dragId === sec.id ? 0.4 : 1 }}>
-                      <StickyMitte scrollRef={tabelleRef} style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
+                      <StickyMitte style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
                         <span title={t("noten.dragHint")} style={{ display: "inline-flex", color: "var(--text3)" }}><Icon d={ICONS.grip} size={14} /></span>
                         <button onClick={() => toggleCollapse(sec.id)} className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={isCol ? t("noten.expand") : t("noten.collapse")}>
                           <Icon d={isCol ? ICONS.plus : ICONS.minus} size={14} />
@@ -720,7 +706,10 @@ export default function Noten() {
                   <td style={{ ...td, ...stickyL, textAlign: "left", padding: 0 }}>
                     <button onClick={() => setInfoFuer(s.student_id)} title={t("noten.studentInfo")}
                       style={{ width: "100%", textAlign: "left", padding: "6px 8px", border: "none", background: "none", color: "var(--text)", fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}>
-                      <span style={{ color: "var(--text3)", fontWeight: 400, marginRight: 6 }}>{si + 1}.</span>{s.name}
+                      {/* Nummer in fester Breite, rechtsbuendig: sonst faengt
+                          „10. Jamiro" weiter rechts an als „7. Selina" und die
+                          Namensspalte franst aus. */}
+                      <span style={{ display: "inline-block", width: 26, textAlign: "right", color: "var(--text3)", fontWeight: 400, marginRight: 6, fontVariantNumeric: "tabular-nums" }}>{si + 1}.</span>{s.name}
                       {(() => { const tr = trendFor(s.student_id); return tr && tr !== "flat" ? (
                         <span title={t(tr === "up" ? "noten.trendUp" : "noten.trendDown")}
                           style={{ marginLeft: 6, fontSize: 12, fontWeight: 700, color: tr === "up" ? C.success : C.danger }}>
@@ -757,7 +746,12 @@ export default function Noten() {
                                   onCancel={() => setZelle(null)}
                                   onTab={(txt, zurueck) => {
                                     const ziel = nachbar(s.student_id, c.id, zurueck);
-                                    if (txt.trim()) noteSetzen(s.student_id, c.id, txt);
+                                    noteSetzen(s.student_id, c.id, txt);
+                                    setZelle(ziel);
+                                  }}
+                                  onEnter={(txt, hoch) => {
+                                    const ziel = darunter(s.student_id, c.id, hoch);
+                                    noteSetzen(s.student_id, c.id, txt);
                                     setZelle(ziel);
                                   }} />
                               : <button onClick={() => setZelle(id)}
@@ -817,7 +811,7 @@ export default function Noten() {
 
 // Eingabefeld einer Notenzelle. Nur 1–6 mit einer Nachkommastelle ist tippbar:
 // vorher liess sich „42" eintragen, und das Speichern schlug still fehl.
-function Zelle({ onSave, onCancel, onTab, initial = "" }) {
+function Zelle({ onSave, onCancel, onTab, onEnter, initial = "" }) {
   const ref = useRef(null);
   const weiter = useRef(false);   // Tab hat schon gespeichert — onBlur nicht doppelt
   useEffect(() => { ref.current?.focus(); ref.current?.select(); }, []);
@@ -832,7 +826,13 @@ function Zelle({ onSave, onCancel, onTab, initial = "" }) {
       }}
       onBlur={(e) => { if (weiter.current) return; if (e.target.value.trim() || initial) onSave(e.target.value); else onCancel(); }}
       onKeyDown={(e) => {
-        if (e.key === "Enter") onSave(e.target.value);
+        // Enter: dieselbe Spalte, naechstes Kind (so wird eine Spalte
+        // abgearbeitet). Tab: dieselbe Zeile, naechste Spalte. Beides ohne
+        // Sprung ueber den Rand hinaus — dort schliesst das Feld einfach.
+        if (e.key === "Enter") {
+          if (onEnter) { e.preventDefault(); weiter.current = true; onEnter(e.target.value, e.shiftKey); }
+          else onSave(e.target.value);
+        }
         if (e.key === "Escape") onCancel();
         if (e.key === "Tab" && onTab) { e.preventDefault(); weiter.current = true; onTab(e.target.value, e.shiftKey); }
       }}
@@ -1425,6 +1425,9 @@ const inp = { ...inputStyle, width: "100%" };
 // Spalten-Menues.
 const th = { ...thBasis, borderBottom: "2px solid var(--border3)", position: "relative" };
 const td = tdBasis;
-const stickyL = { position: "sticky", left: 0, background: "var(--card)", zIndex: 1 };
+// Links klebende Spalte. Der Kopf klebt oben (th in Icons.jsx, z-index 2) —
+// eine Zelle, die BEIDES tut, muss darueber liegen, sonst rutscht der Name
+// beim Scrollen unter die Kopfzeile.
+const stickyL = { position: "sticky", left: 0, background: "var(--card)", zIndex: 3 };
 const dtS = { color: "var(--text3)", fontWeight: 500 };
 const ddS = { margin: 0, color: "var(--text)" };

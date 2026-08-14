@@ -163,3 +163,66 @@ async def test_klasse_mit_quiz_laesst_sich_endgueltig_loeschen(session):
     assert await s.get(SchoolClass, k.id) is None, "die Klasse muss weg sein"
     uebrig = (await s.execute(select(CvSession).where(CvSession.class_id == k.id))).scalars().all()
     assert uebrig == [], "die Sitzung der Klasse gehoert mit geloescht"
+
+
+@pytest.mark.asyncio
+async def test_umnummerieren_nimmt_die_scans_mit(session):
+    """Reihenfolge ändern vergibt neue Kartennummern — und verschiebt dabei
+    KEINE Testergebnisse auf andere Kinder.
+
+    `Scan.student_id` ist die aufgedruckte Kartennummer (kein Fremdschlüssel).
+    Wer nur `students.card_id` umschreibt, hängt die alten Scans an das Kind,
+    das jetzt auf der Nummer sitzt. Genau das prüft der Test: nach dem Tausch
+    muss Annas Antwort weiterhin Anna gehören.
+    """
+    from app.models import Question, Session as CvSession, Scan
+
+    user = User(email="r@b.de", password_hash="x", name="L")
+    session.add(user)
+    await session.flush()
+    cls = SchoolClass(name="7b", owner_id=user.id)
+    session.add(cls)
+    await session.flush()
+    anna = Student(card_id=1, name="Anna", class_id=cls.id, position=0)
+    bea = Student(card_id=2, name="Bea", class_id=cls.id, position=1)
+    session.add_all([anna, bea])
+    frage = Question(owner_id=user.id, text="1+1", correct_answer="A")
+    session.add(frage)
+    await session.flush()
+    sitzung = CvSession(owner_id=user.id, class_id=cls.id)
+    session.add(sitzung)
+    await session.flush()
+    session.add_all([
+        Scan(session_id=sitzung.id, question_id=frage.id, student_id=1, answer="A"),   # Anna
+        Scan(session_id=sitzung.id, question_id=frage.id, student_id=2, answer="B"),   # Bea
+    ])
+    await session.commit()
+
+    # Bea nach vorn ziehen und speichern.
+    body = ClassCreate(name="7b", renumber=True, students=[
+        StudentIn(card_id=2, name="Bea"), StudentIn(card_id=1, name="Anna"),
+    ])
+    await update_class(cls.id, body, user, session)
+
+    kinder = {s.name: s for s in (await session.execute(
+        select(Student).where(Student.class_id == cls.id))).scalars().all()}
+    assert kinder["Bea"].card_id == 1 and kinder["Anna"].card_id == 2, "nicht neu durchnummeriert"
+    assert kinder["Anna"].id == anna.id, "Schüler-ID muss stabil bleiben"
+
+    scans = (await session.execute(select(Scan))).scalars().all()
+    antwort = {s.student_id: s.answer for s in scans}
+    assert antwort[kinder["Anna"].card_id] == "A", "Annas Antwort ist auf ein anderes Kind gerutscht"
+    assert antwort[kinder["Bea"].card_id] == "B", "Beas Antwort ist auf ein anderes Kind gerutscht"
+
+
+@pytest.mark.asyncio
+async def test_ohne_renumber_bleiben_die_nummern(session):
+    """Gegenprobe: ein gewöhnliches Speichern (Farbe, Name) fasst die
+    Kartennummern nicht an — sonst wäre jeder Ausdruck nach jedem Klick tot."""
+    user, cls, stud_id, _ = await _seed(session)
+    body = ClassCreate(name="7a", color="#111111", students=[StudentIn(card_id=7, name="Max")])
+    # card_id 7 gibt es nicht -> neuer Schueler; der alte (1) faellt weg.
+    await update_class(cls.id, body, user, session)
+    nummern = sorted(s.card_id for s in (await session.execute(
+        select(Student).where(Student.class_id == cls.id))).scalars().all())
+    assert nummern == [7], f"ohne renumber darf nichts umnummeriert werden: {nummern}"

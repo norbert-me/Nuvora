@@ -145,7 +145,7 @@ export default function Orga() {
               {students.map((s, i) => (
                 <tr key={s.id}>
                   <td style={{ ...td, textAlign: "left", position: "sticky", left: 0, background: "var(--card)", fontWeight: 500 }}>
-                    <span style={{ color: "var(--text3)", fontWeight: 400, marginRight: 6 }}>{i + 1}.</span>{s.name}
+                    <span style={{ display: "inline-block", width: 26, textAlign: "right", color: "var(--text3)", fontWeight: 400, marginRight: 6, fontVariantNumeric: "tabular-nums" }}>{i + 1}.</span>{s.name}
                   </td>
                   {items.map((it) => {
                     const on = it.done.includes(s.id);

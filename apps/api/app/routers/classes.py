@@ -3,7 +3,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -150,6 +150,10 @@ class ClassCreate(BaseModel):
     name: str
     color: str = ""
     students: List[StudentIn] = []
+    # Kartennummern nach der neuen Reihenfolge neu vergeben (1, 2, 3 …). Nur die
+    # Klassenmaske setzt das: dort wird sortiert, und dort wird auch neu
+    # gedruckt. Ein Farbwechsel oder ein Import darf keine Nummern verschieben.
+    renumber: bool = False
 
     @field_validator("students")
     @classmethod
@@ -355,6 +359,8 @@ async def update_class(class_id: int, body: ClassCreate, user: User = Depends(ge
             await db.delete(s)
 
     await db.flush()
+    if body.renumber:
+        await _renumber(db, sc)
     await _sync_siblings(db, sc)
     await db.commit()
     return await _load_class(db, class_id)
@@ -398,6 +404,74 @@ async def _sync_siblings(db: AsyncSession, sc: SchoolClass):
                                position=m.position, niveau=m.niveau, foerder=m.foerder, massnahmen=m.massnahmen,
                                notizen=m.notizen, klassenlehrer=m.klassenlehrer))
                 next_card += 1
+
+
+async def _renumber(db: AsyncSession, sc: SchoolClass) -> None:
+    """Kartennummern nach der Reihenfolge neu vergeben — samt aller Verweise.
+
+    Die Nummer steht auf der gedruckten ArUco-Karte, und ``Scan.student_id``
+    IST diese Nummer (kein Fremdschluessel). Wer nur ``students.card_id``
+    umschreibt, schiebt damit alte Testergebnisse auf andere Kinder — genau der
+    Datenschaden, vor dem CLAUDE.md warnt. Deshalb wandern die Scans hier mit:
+    erst alle betroffenen Nummern ins Negative (dort kollidiert nichts), dann
+    auf ihren neuen Wert. Alles andere (Noten, Karten-Fortschritt,
+    Beobachtungen, Anwesenheit, Sitzplan) haengt an ``students.id`` und bleibt
+    davon unberuehrt.
+
+    Die gedruckten Karten stimmen danach nicht mehr — sie muessen neu gedruckt
+    werden. Darauf weist die Oberflaeche vor dem Speichern hin.
+    """
+    from ..models import Scan, Session as CvSession
+    from .kurse import sibling_class_ids
+
+    kinder = (await db.execute(select(Student).where(Student.class_id == sc.id)
+                               .order_by(Student.position, Student.card_id, Student.id))).scalars().all()
+    plan = {k.card_id: i + 1 for i, k in enumerate(kinder)}
+    if all(alt == neu for alt, neu in plan.items()):
+        return   # Reihenfolge entspricht schon den Nummern
+
+    # Alle Klassen desselben Kurses tragen dieselben Kinder unter derselben
+    # Nummer — sonst zeigt derselbe Ausdruck in Mathe auf ein anderes Kind als
+    # in der Lernzeit.
+    sib = await sibling_class_ids(db, sc.id) or {sc.id}
+    sitzungen = [row[0] for row in (await db.execute(
+        select(CvSession.id).where(CvSession.class_id.in_(sib)))).all()]
+
+    async def scans_umschreiben(zuordnung):
+        if not sitzungen:
+            return
+        for alt, neu in zuordnung.items():
+            await db.execute(update(Scan).where(Scan.session_id.in_(sitzungen),
+                                                Scan.student_id == alt)
+                             .values(student_id=neu))
+
+    # Phase 1: alles ins Negative — sonst laeuft 2->1 in eine schon belegte Nummer.
+    await scans_umschreiben({alt: -alt for alt in plan})
+    for kind in kinder:
+        kind.card_id = -kind.card_id
+    await db.flush()
+
+    # Phase 2: auf die neuen Nummern.
+    await scans_umschreiben({-alt: neu for alt, neu in plan.items()})
+    for i, kind in enumerate(kinder):
+        kind.card_id = i + 1
+    await db.flush()
+
+    # Geschwister-Fach-Klassen desselben Kurses ziehen ueber den Namen mit.
+    namen = {k.name.strip(): k.card_id for k in kinder}
+    for gid in sib - {sc.id}:
+        zwillinge = (await db.execute(select(Student).where(Student.class_id == gid))).scalars().all()
+        ihr_plan = {z.card_id: namen[z.name.strip()] for z in zwillinge if z.name.strip() in namen}
+        if not ihr_plan or all(a == n for a, n in ihr_plan.items()):
+            continue
+        for z in zwillinge:
+            if z.name.strip() in namen:
+                z.card_id = -z.card_id
+        await db.flush()
+        for z in zwillinge:
+            if z.name.strip() in namen:
+                z.card_id = namen[z.name.strip()]
+        await db.flush()
 
 
 class ColorIn(BaseModel):

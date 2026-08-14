@@ -610,7 +610,7 @@ export default function Session() {
                   <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text3)", marginBottom: 8, textAlign: "center" }}>{niv}-Kurs</div>
                   {list.map((p, i) => (
                     <div key={p.id} style={{ display: "flex", justifyContent: "space-between", padding: "10px 16px", background: i < 3 ? `${PODIUM_COLORS[i]}22` : "var(--bg2)", borderRadius: 10, marginBottom: 6 }}>
-                      <span style={{ color: "var(--text3)", fontWeight: 600, width: 26 }}>{i + 1}.</span>
+                      <span style={{ color: "var(--text3)", fontWeight: 600, width: 26, textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{i + 1}.</span>
                       <span style={{ flex: 1, marginLeft: 8, color: "var(--text)" }}>{p.name}</span>
                       <span style={{ fontWeight: 700, color: "var(--text)" }}>{p.points}</span>
                     </div>

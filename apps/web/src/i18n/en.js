@@ -199,7 +199,7 @@ export default {
   "classes.empty": "No classes created yet.",
   "classes.evalTitle": "Class results",
   "classes.printCards": "Print cards",
-  "classes.cardNumberHint": "Number of the printed card (CardVote)",
+  "classes.cardNumberHint": "Number on the printed card (CardVote). Reordering renumbers them — existing results move along, but printed cards must be printed again.",
   "classes.export": "Export",
   "classes.open": "Open class",
   "classes.importExcel": "Import Excel",
@@ -1855,4 +1855,5 @@ export default {
   "fw.quiz": "Quiz",
   "fw.noSubmission": "no submission",
   "fw.noTopicsHint": "No breakdown by topic: the questions or tasks carry no topic. Tag them and you will see exactly where it goes wrong.",
+  "classes.renumberHint": "Order = card number. After saving the new numbering applies in every module; old printouts no longer match.",
 };

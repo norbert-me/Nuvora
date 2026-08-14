@@ -282,7 +282,20 @@ export const panelStyle = {
 };
 
 // Tabellenkopf / -zelle (Noten, Orga …).
-export const th = { padding: "8px 6px", fontSize: 12, fontWeight: 600, color: "var(--text2)", borderBottom: "1px solid var(--border)", textAlign: "center", whiteSpace: "nowrap" };
+// Tabellenkopf: immer fixiert. Beim Scrollen durch eine Klassenliste stand
+// sonst nach zehn Zeilen keine Spaltenbeschriftung mehr da, und man zaehlt
+// Spalten ab. `position: sticky` braucht einen eigenen Hintergrund (sonst
+// scheinen die Zeilen durch) und einen z-index ueber den Datenzellen. Zellen,
+// die zusaetzlich LINKS kleben, setzen ihren z-index hoeher (siehe stickyL in
+// Noten.jsx) — sonst verschwindet die Namensspalte unter dem Kopf.
+export const th = {
+  padding: "8px 6px", fontSize: 12, fontWeight: 600, color: "var(--text2)",
+  borderBottom: "1px solid var(--border)", textAlign: "center", whiteSpace: "nowrap",
+  // Unter der Navigationsleiste (52 px, plus Offline-Banner, wenn er steht):
+  // bei top: 0 verschwaende der Kopf hinter ihr.
+  position: "sticky", top: "calc(52px + var(--offline-banner-h, 0px))",
+  zIndex: 2, background: "var(--card)",
+};
 export const td = { padding: "4px 6px", borderBottom: "1px solid var(--border)", textAlign: "center", color: "var(--text)" };
 
 // Kleiner Chip/Tag.

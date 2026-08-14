@@ -140,6 +140,10 @@ export default function Classes() {
     const body = {
       name,
       color,
+      // Reihenfolge = Kartennummer: der Server vergibt 1, 2, 3 … nach dieser
+      // Liste und schreibt die Scans der alten Nummern mit um. Nur von hier
+      // aus, nicht bei Import oder Farbwechsel.
+      renumber: true,
       students: filled.map((s) => ({
         card_id: s.card_id,
         name: s.name.trim(),
@@ -292,7 +296,9 @@ export default function Classes() {
   if (editing) {
     const filled = students.filter((s) => s.name.trim() !== "").length;
     return (
-      <div style={{ ...pageApp }}>
+      // Schmaler als eine Modulseite (die Zeilen sind 620 breit) und trotzdem
+      // mittig: mit der vollen pageApp-Breite klebte das Formular am linken Rand.
+      <div style={{ ...pageApp, maxWidth: 620 }}>
         <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{editing.id ? t("classes.editTitle") : t("classes.newTitle")}</h2>
         <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}>
           {/* Klassen tragen keine Farbe — die Farbe hängt am Kurs (Fach). */}
@@ -305,7 +311,10 @@ export default function Classes() {
         <p style={{ color: "var(--text3)", marginBottom: 8, fontSize: 14 }}>
           {t("classes.fillHint", { filled, total: students.length })}
         </p>
-        <div style={{ maxWidth: 620, marginBottom: 12 }}>
+        {cardvote && (
+          <p style={{ color: "var(--text3)", marginBottom: 8, fontSize: 12.5 }}>{t("classes.renumberHint")}</p>
+        )}
+        <div style={{ marginBottom: 12 }}>
           {reihenfolge().map((idx, platz) => { const s = students[idx]; return (
             <div key={s.card_id ?? idx}
               onDragOver={(e) => { e.preventDefault(); if (zieht != null && ueber !== platz) setUeber(platz); }}
@@ -325,7 +334,10 @@ export default function Classes() {
                 style={{ width: 44, textAlign: "right", fontWeight: 700, color: s.name.trim() ? "var(--text)" : "var(--border2)", fontSize: 14, flexShrink: 0 }}
                 title={cardvote ? t("classes.cardNumberHint") : undefined}
               >
-                {cardvote ? `#${s.card_id}` : `${idx + 1}.`}
+                {/* Die Nummer ist der PLATZ, nicht die alte Kartennummer: beim
+                    Ziehen zaehlt sie sofort neu durch, und genau so wird beim
+                    Speichern vergeben (Server schreibt die Scans mit um). */}
+                {cardvote ? `#${platz + 1}` : `${platz + 1}.`}
               </span>
               <input value={s.name} onChange={(e) => updateStudent(idx, e.target.value)} placeholder={t("common.name")}
                 autoComplete="off" name={`stud-${idx}`} data-lpignore="true"

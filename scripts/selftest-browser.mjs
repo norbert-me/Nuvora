@@ -243,6 +243,12 @@ async function anmeldungHinterlegen(kontext, token, user, extra = {}) {
       if (!window.localStorage) return;
       localStorage.setItem("token", tok);
       localStorage.setItem("user", usr);
+      // Gefuehrte Touren vorab abhaken: sie starten 900 ms nach dem
+      // Seitenaufruf und legen ein Overlay ueber ALLES (z-index 4000).
+      // Wegklicken allein reicht nicht — die naechste Seite bringt die
+      // naechste Tour.
+      localStorage.setItem("nuvora_kerntour_done", "1");
+      for (const id of ["kalender", "noten", "karten"]) localStorage.setItem(`nuvora_tour_${id}_done`, "1");
       for (const [k, v] of Object.entries(mehr)) localStorage.setItem(k, v);
     } catch { /* Dokument ohne eigene Herkunft — hier gibt es nichts zu setzen */ }
   }, [token, JSON.stringify(user), extra]);
@@ -531,7 +537,9 @@ async function reihenfolgeProbe(kontext, api) {
     try {
       await seite.goto(`/classes?open=${klasse.id}`, { waitUntil: "networkidle", timeout: 30000 });
       await tourWegklicken(seite);
-      const felder = seite.locator(`input[value^='${MARKE} ']`);
+      // Nur die Schuelerzeilen: das Feld mit dem KLASSENNAMEN traegt dieselbe
+      // Marke und stuende sonst als erster Treffer in der Liste.
+      const felder = seite.locator(`input[placeholder='Name'][value^='${MARKE} ']`);
       await felder.first().waitFor({ state: "visible", timeout: 15000 });
       const ist = await felder.evaluateAll((els) => els.map((e) => e.value));
       if (JSON.stringify(ist) !== JSON.stringify(soll)) {

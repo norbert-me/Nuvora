@@ -200,7 +200,7 @@ export default {
   "classes.empty": "Aún no hay clases.",
   "classes.evalTitle": "Resultados de la clase",
   "classes.printCards": "Imprimir tarjetas",
-  "classes.cardNumberHint": "Número de la tarjeta impresa (CardVote)",
+  "classes.cardNumberHint": "Número de la tarjeta impresa (CardVote). Al reordenar se renumera — los resultados se mueven con ellos, pero hay que reimprimir las tarjetas.",
   "classes.export": "Exportar",
   "classes.open": "Abrir clase",
   "classes.importExcel": "Importar Excel",
@@ -1856,4 +1856,5 @@ export default {
   "fw.quiz": "Cuestionario",
   "fw.noSubmission": "sin entrega",
   "fw.noTopicsHint": "Sin desglose por tema: las preguntas o tareas no tienen tema asignado. Al asignarlo se ve exactamente dónde falla.",
+  "classes.renumberHint": "Orden = número de tarjeta. Tras guardar, la nueva numeración vale en todos los módulos; las impresiones antiguas ya no coinciden.",
 };

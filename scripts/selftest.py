@@ -555,24 +555,26 @@ def teste_kern(api, b, u):
             return "uebersprungen — weniger als zwei Schueler"
         gedreht = list(reversed(kl["students"]))
         api.call("PUT", f"/api/classes/{u.class_id}",
-                 {"name": kl["name"], "students": [
+                 {"name": kl["name"], "renumber": True, "students": [
                      {"card_id": s["card_id"], "name": s["name"], "niveau": s.get("niveau") or ""}
                      for s in gedreht]}, erwartet=(200,))
         nachher = api.call("GET", f"/api/classes/{u.class_id}", erwartet=(200,))["students"]
         if [s["name"] for s in nachher] != [s["name"] for s in gedreht]:
             raise AssertionError(f"Reihenfolge nicht uebernommen: {[s['name'] for s in nachher]}")
-        if {s["card_id"] for s in nachher} != {c for c, _ in vorher}:
-            raise AssertionError("Kartennummern haben sich beim Sortieren veraendert")
-        for s in nachher:
-            passend = [n for c, n in vorher if c == s["card_id"]]
-            if passend and passend[0] != s["name"]:
-                raise AssertionError(f"Karte {s['card_id']} gehoert jetzt zu {s['name']} statt zu {passend[0]}")
+        # Mit renumber gilt: Reihenfolge IST die Nummer, also 1..n von oben.
+        # Die Testergebnisse ziehen serverseitig mit (Regressionstest dazu:
+        # apps/api/tests/test_update_class.py).
+        soll = list(range(1, len(nachher) + 1))
+        if [s["card_id"] for s in nachher] != soll:
+            raise AssertionError(f"nicht durchnummeriert: {[s['card_id'] for s in nachher]}")
         # zurueckdrehen, damit die folgenden Proben ihre gewohnte Reihenfolge sehen
+        zurueck = api.call("GET", f"/api/classes/{u.class_id}", erwartet=(200,))["students"]
+        namen_vorher = [n for _, n in vorher]
         api.call("PUT", f"/api/classes/{u.class_id}",
-                 {"name": kl["name"], "students": [
-                     {"card_id": s["card_id"], "name": s["name"], "niveau": s.get("niveau") or ""}
-                     for s in kl["students"]]}, erwartet=(200,))
-        return "umsortiert, Kartennummern bleiben bei ihren Namen"
+                 {"name": kl["name"], "renumber": True, "students": [
+                     {"card_id": next(z["card_id"] for z in zurueck if z["name"] == n), "name": n}
+                     for n in namen_vorher]}, erwartet=(200,))
+        return "umsortiert, Kartennummern folgen der Reihenfolge (1..n)"
 
     def kurse():
         mitglieder = api.call("GET", f"/api/kurse/{u.kurs_id}/students", erwartet=(200,))
