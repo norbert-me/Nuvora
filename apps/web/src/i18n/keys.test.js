@@ -15,9 +15,13 @@
 // (`t(`mod.${key}.name`)`) — die kann nur die Laufzeit kennen.
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const WURZEL = path.resolve(process.cwd(), "src");
+// Pfade an DIESER Datei ausrichten, nicht am Arbeitsverzeichnis: aus dem
+// Wurzelverzeichnis aufgerufen suchte der Test sonst in /src und meldete drei
+// Fehler, die keine waren.
+const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const I18N = path.join(WURZEL, "i18n");
 
 function dateien(dir) {
