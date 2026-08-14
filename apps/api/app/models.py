@@ -201,6 +201,8 @@ class Kurs(Base):
     # merkt sich die (Sharing-)Klassen beim Löschen, damit Restore sie neu gruppiert.
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     deleted_members: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # Archiv wie bei der Klasse: raus aus den Listen, Inhalte bleiben.
+    archived_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     # Nutzt dieser Kurs E-/G-Niveaus? Nur dann zeigt die UI die E/G-Auswahl —
     # bei Kursen ohne Niveau-Differenzierung nervt sie sonst. E/G wird im Kurs
     # gepflegt (nicht je Fach-Klasse), weil es die Person betrifft.
@@ -254,6 +256,13 @@ class SchoolClass(Base):
     # Papierkorb: gesetzt = gelöscht, aber 30 Tage wiederherstellbar. Die Kaskade
     # (Schüler → Noten/Karten/…) bleibt in dieser Zeit unangetastet.
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    # Archiv (Schuljahresende): gesetzt = aus den Auswahllisten raus, INHALTE
+    # bleiben vollstaendig — Noten, Klassenarbeiten, Karten-Fortschritt, alles.
+    # Bewusst etwas anderes als der Papierkorb: der loescht nach 30 Tagen, das
+    # Archiv haelt auf Dauer. Wer eine alte Note nachschlagen muss, kann das
+    # Jahre spaeter noch; er soll die Klasse nur nicht mehr in jeder Auswahl
+    # sehen.
+    archived_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     students: Mapped[list["Student"]] = relationship(back_populates="school_class", order_by="Student.card_id", cascade="all, delete-orphan")
     owner: Mapped[Optional["User"]] = relationship(back_populates="classes")

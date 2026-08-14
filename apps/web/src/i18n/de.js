@@ -1777,4 +1777,9 @@ export default {
   "klassenarbeit.flagNull": "{{v}} % haben 0 Punkte — bei dieser Quote deutet das auf eine unklare Aufgabenstellung, nicht auf fehlendes Können.",
   "klassenarbeit.cmpFormOut": "{{n}} Darstellungsaufgabe(n) nicht im Vergleich — Darstellung zählt zur Note, misst aber kein Thema.",
   "klassenarbeit.points": "Punkte",
+  "classes.active": "Aktiv",
+  "classes.archived": "Archiv",
+  "classes.archive": "Archivieren",
+  "classes.unarchive": "Aus dem Archiv holen",
+  "classes.archiveHint": "Am Schuljahresende: verschwindet aus allen Auswahllisten, alle Daten bleiben erhalten (Noten, Klassenarbeiten, Karten). Jederzeit zurückholbar — anders als der Papierkorb, der nach 30 Tagen löscht.",
 };

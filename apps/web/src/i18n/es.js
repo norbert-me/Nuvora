@@ -1792,4 +1792,9 @@ export default {
   "klassenarbeit.flagNull": "{{v}} % con 0 puntos: apunta a un enunciado poco claro más que a falta de conocimientos.",
   "klassenarbeit.cmpFormOut": "{{n}} tarea(s) de presentación fuera de la comparación.",
   "klassenarbeit.points": "puntos",
+  "classes.active": "Activas",
+  "classes.archived": "Archivo",
+  "classes.archive": "Archivar",
+  "classes.unarchive": "Sacar del archivo",
+  "classes.archiveHint": "Fin de curso: desaparece de las listas, todos los datos se conservan (notas, exámenes, tarjetas). Reversible en cualquier momento, a diferencia de la papelera.",
 };

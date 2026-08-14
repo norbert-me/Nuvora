@@ -1020,7 +1020,12 @@ async def fruehwarnung_alle(empfindlich: bool = False,
     from .. import fruehwarnung as fw
 
     klassen = (await db.execute(
-        select(SchoolClass).where(SchoolClass.owner_id == user.id, SchoolClass.deleted_at.is_(None))
+        select(SchoolClass).where(SchoolClass.owner_id == user.id, SchoolClass.deleted_at.is_(None),
+                                  # Archivierte Klassen melden nichts mehr: das
+                                  # Schuljahr ist vorbei, und ein Hinweis auf ein
+                                  # Kind, das man nicht mehr unterrichtet, ist
+                                  # kein Hinweis, sondern Rauschen.
+                                  SchoolClass.archived_at.is_(None))
     )).scalars().all()
     treffer = []
     erhebungen = 0          # wie viele Quizze/Arbeiten insgesamt eingeflossen sind

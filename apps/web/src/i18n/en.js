@@ -1791,4 +1791,9 @@ export default {
   "klassenarbeit.flagNull": "{{v}} % scored 0 — at this score that points to unclear wording rather than missing ability.",
   "klassenarbeit.cmpFormOut": "{{n}} presentation task(s) left out — presentation counts towards the grade but measures no topic.",
   "klassenarbeit.points": "points",
+  "classes.active": "Active",
+  "classes.archived": "Archive",
+  "classes.archive": "Archive",
+  "classes.unarchive": "Restore from archive",
+  "classes.archiveHint": "End of the school year: disappears from all pickers, all data stays (grades, exams, cards). Reversible any time — unlike the bin, which deletes after 30 days.",
 };

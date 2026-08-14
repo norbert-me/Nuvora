@@ -570,6 +570,26 @@ def teste_kern(api, b, u):
         api.call("GET", f"/api/topics/{u.topic_id}/usage", erwartet=(200,))
         return "Thema mit E/G-Zielen"
 
+    def archiv():
+        # Archiv ist NICHT der Papierkorb: die Klasse verschwindet aus den
+        # Listen, ihre Daten bleiben. Geprueft wird beides — raus und zurueck.
+        api.call("POST", f"/api/classes/{u.class_id}/archive", erwartet=(200,))
+        aktiv = api.call("GET", "/api/classes", erwartet=(200,))
+        if any(k["id"] == u.class_id for k in aktiv):
+            raise AssertionError("archivierte Klasse steht weiter in der aktiven Liste")
+        im_archiv = api.call("GET", "/api/classes?archiviert=true", erwartet=(200,))
+        if not any(k["id"] == u.class_id for k in im_archiv):
+            raise AssertionError("archivierte Klasse fehlt im Archiv")
+        # Die Schueler muessen dranbleiben — Archiv heisst nicht Datenverlust.
+        eintrag = next(k for k in im_archiv if k["id"] == u.class_id)
+        if len(eintrag.get("students") or []) != 2:
+            raise AssertionError(f"Archiv hat {len(eintrag.get('students') or [])} Schueler statt 2")
+        api.call("POST", f"/api/classes/{u.class_id}/archive", erwartet=(200,))
+        zurueck = api.call("GET", "/api/classes", erwartet=(200,))
+        if not any(k["id"] == u.class_id for k in zurueck):
+            raise AssertionError("Klasse kommt nicht aus dem Archiv zurueck")
+        return "archivieren, aus der Liste raus, Schueler bleiben, zurueckholen"
+
     def papierkorb():
         api.call("GET", "/api/trash", erwartet=(200,))
         return "erreichbar"
@@ -594,6 +614,7 @@ def teste_kern(api, b, u):
     b.pruefe("Kern", "Kurse", kurse)
     b.pruefe("Kern", "Themen", themen)
     b.pruefe("Kern", "Papierkorb", papierkorb)
+    b.pruefe("Kern", "Archiv", archiv)
     b.pruefe("Kern", "Fruehwarnung", fruehwarnung)
     b.pruefe("Kern", "Modulregister", modulregister)
 

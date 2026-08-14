@@ -12,7 +12,7 @@ import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageApp} from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Tabs, pageApp} from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import AuthImage from "../components/AuthImage.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -62,10 +62,14 @@ export default function Classes() {
   const [loadError, setLoadError] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  const load = () => fetch(`${API}/classes`).then((r) => {
+  // Archiv: am Schuljahresende raus aus den Listen, Daten bleiben. Der
+  // gecachte Stand gilt nur fuer die aktive Ansicht — sonst zeigte die Seite
+  // beim Umschalten kurz die falsche Liste.
+  const [archiv, setArchiv] = useState(false);
+  const load = (imArchiv = archiv) => fetch(`${API}/classes${imArchiv ? "?archiviert=true" : ""}`).then((r) => {
     if (r.status === 401) { localStorage.removeItem("token"); localStorage.removeItem("user"); location.reload(); return []; }
     return r.json();
-  }).then((d) => { const list = Array.isArray(d) ? d : []; setClasses(list); put("classes", list); setLoadError(false); }).catch(() => setLoadError(true)).finally(() => setLoaded(true));
+  }).then((d) => { const list = Array.isArray(d) ? d : []; setClasses(list); if (!imArchiv) put("classes", list); setLoadError(false); }).catch(() => setLoadError(true)).finally(() => setLoaded(true));
   useEffect(() => {
     // Sofort den gecachten Stand zeigen (Seite wirkt instant), dann frisch laden.
     const c = peek("classes"); if (Array.isArray(c)) { setClasses(c); setLoaded(true); }
@@ -367,7 +371,15 @@ export default function Classes() {
           <button onClick={addRow} disabled={students.length >= MAX_CARDS} style={{ ...btnSecondary, opacity: students.length >= MAX_CARDS ? 0.4 : 1 }}>{t("classes.addRow")}</button>
           <button onClick={save} disabled={!name.trim()} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={() => setEditing(null)} style={btnSecondary}>{t("common.cancel")}</button>
-          {editing.id && <button onClick={() => { remove(editing.id); setEditing(null); }} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("classes.delete") !== "classes.delete" ? t("classes.delete") : t("common.delete")} aria-label={t("classes.delete") !== "classes.delete" ? t("classes.delete") : t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>}
+          {editing.id && (
+            <button onClick={async () => {
+              await fetch(`${API}/classes/${editing.id}/archive`, { method: "POST" }).catch(() => {});
+              setEditing(null); load();
+            }} style={{ ...btnSecondary, marginLeft: "auto" }} title={t("classes.archiveHint")}>
+              {archiv ? t("classes.unarchive") : t("classes.archive")}
+            </button>
+          )}
+          {editing.id && <button onClick={() => { remove(editing.id); setEditing(null); }} className="icon-btn" style={{ ...iconBtn }} title={t("classes.delete") !== "classes.delete" ? t("classes.delete") : t("common.delete")} aria-label={t("classes.delete") !== "classes.delete" ? t("classes.delete") : t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>}
         </div>
         {cardvote && (
           <p style={{ fontSize: 12, color: students.length >= MAX_CARDS ? C.danger : "var(--text3)", margin: 0 }}>
@@ -383,7 +395,12 @@ export default function Classes() {
   return (
     <div style={{ ...pageApp }}>
       <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
-        <AddButton onClick={startNew} title={t("classes.new")} />
+        {!archiv && <AddButton onClick={startNew} title={t("classes.new")} />}
+        {/* Archiv statt Papierkorb: der Papierkorb loescht nach 30 Tagen, das
+            Archiv haelt auf Dauer — alte Noten muss man Jahre spaeter noch
+            nachschlagen koennen. */}
+        <Tabs value={archiv ? "archiv" : "aktiv"} onChange={(v) => { const a = v === "archiv"; setArchiv(a); setLoaded(false); load(a).then(() => setLoaded(true)); }}
+          options={[["aktiv", t("classes.active")], ["archiv", t("classes.archived")]]} />
         <div style={{ marginLeft: 8 }}>
           <ImportMenu
             importItems={[

@@ -145,9 +145,15 @@ async def _classes_by_kurs(db, user, kurse):
 
 
 @router.get("", response_model=List[KursOut])
-async def list_kurse(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def list_kurse(archiviert: bool = False, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Aktive Kurse. `archiviert=true` liefert das Archiv (Schuljahresende).
+
+    Archiv heisst: raus aus den Auswahllisten, Inhalte bleiben vollstaendig.
+    Der Papierkorb kann das nicht — der loescht nach 30 Tagen.
+    """
+    zustand = Kurs.archived_at.is_not(None) if archiviert else Kurs.archived_at.is_(None)
     kurse = (await db.execute(select(Kurs).where(
-        Kurs.owner_id == user.id, Kurs.deleted_at.is_(None)).order_by(Kurs.name))).scalars().all()
+        Kurs.owner_id == user.id, Kurs.deleted_at.is_(None), zustand).order_by(Kurs.name))).scalars().all()
     by = await _classes_by_kurs(db, user, kurse)
     from sqlalchemy import func as _f
     mc = dict((await db.execute(
@@ -155,6 +161,28 @@ async def list_kurse(user: User = Depends(get_current_user), db: AsyncSession = 
         .where(KursStudent.kurs_id.in_([k.id for k in kurse] or [-1])).group_by(KursStudent.kurs_id)
     )).all())
     return [KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv, color=k.color, member_count=int(mc.get(k.id, 0))) for k in kurse]
+
+
+@router.post("/{kurs_id}/archive", response_model=KursOut)
+async def archive_kurs(kurs_id: int, mit_klassen: bool = True, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Kurs ins Archiv (oder zurueck). Standardmaessig ziehen seine Fach-Klassen
+    mit: am Schuljahresende ist der ganze Kurs vorbei, und eine Klasse allein in
+    den Listen zu lassen waere genau die halbe Arbeit, die man vergisst."""
+    from datetime import datetime, timezone
+    from ..models import SchoolClass
+
+    k = await _owned_kurs(db, user, kurs_id)
+    jetzt = None if k.archived_at else datetime.now(timezone.utc)
+    k.archived_at = jetzt
+    if mit_klassen:
+        klassen = (await db.execute(select(SchoolClass).where(
+            SchoolClass.owner_id == user.id, SchoolClass.kurs_id == kurs_id,
+            SchoolClass.deleted_at.is_(None)))).scalars().all()
+        for c in klassen:
+            c.archived_at = jetzt
+    await db.commit()
+    await db.refresh(k)
+    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color)
 
 
 @router.get("/trash", response_model=List[KursOut])

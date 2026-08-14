@@ -204,15 +204,33 @@ async def create_class(body: ClassCreate, user: User = Depends(get_current_user)
 
 
 @router.get("", response_model=List[ClassOut])
-async def list_classes(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(SchoolClass)
-        .options(selectinload(SchoolClass.students))
-        .where(SchoolClass.owner_id == user.id)
-        .where(SchoolClass.deleted_at.is_(None))  # Papierkorb-Klassen ausblenden
-        .order_by(SchoolClass.name)
-    )
+async def list_classes(archiviert: bool = False, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Aktive Klassen. `archiviert=true` liefert stattdessen das Archiv.
+
+    Archiv statt Papierkorb: am Schuljahresende soll die Klasse aus den Auswahl-
+    listen verschwinden, ihre Daten aber bleiben — Noten, Klassenarbeiten,
+    Karten-Fortschritt. Der Papierkorb kann das nicht, er loescht nach 30 Tagen.
+    """
+    q = (select(SchoolClass)
+         .options(selectinload(SchoolClass.students))
+         .where(SchoolClass.owner_id == user.id)
+         .where(SchoolClass.deleted_at.is_(None)))   # Papierkorb-Klassen ausblenden
+    q = q.where(SchoolClass.archived_at.is_not(None) if archiviert else SchoolClass.archived_at.is_(None))
+    result = await db.execute(q.order_by(SchoolClass.name))
     return result.scalars().all()
+
+
+@router.post("/{class_id}/archive", response_model=ClassOut)
+async def archive_class(class_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Klasse ins Archiv (oder zurueck, wenn sie schon drin ist)."""
+    from datetime import datetime, timezone
+    cls = await db.get(SchoolClass, class_id, options=[selectinload(SchoolClass.students)])
+    if not cls or (cls.owner_id and cls.owner_id != user.id):
+        raise HTTPException(404, "Klasse nicht gefunden")
+    cls.archived_at = None if cls.archived_at else datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(cls)
+    return cls
 
 
 @router.get("/trash", response_model=List[ClassOut])

@@ -6,7 +6,7 @@ import { useLanguage } from "../i18n/index.jsx";
 import KursLinks from "../components/KursLinks.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { sende } from "../core/melden.js";
-import { AddButton, pageTitle, pageIntro, btnPrimary, btnSecondary, selectStyle, chipStyle, Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, Toggle, Empty, pageApp, LoadError} from "../components/Icons.jsx";
+import { AddButton, pageTitle, pageIntro, btnPrimary, btnSecondary, selectStyle, chipStyle, Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, Toggle, Tabs, Empty, pageApp, LoadError} from "../components/Icons.jsx";
 
 const API = "/api";
 const editLabel = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text3)", marginBottom: 6 };
@@ -24,7 +24,9 @@ export default function Kurse() {
   // freundlichen Empty-Kachel. Wer seine Kurse vermisste, suchte den Fehler bei
   // sich statt beim Endpunkt. Deshalb der eigene Zustand.
   const [ladefehler, setLadefehler] = useState(false);
-  const load = () => fetch(`${API}/kurse`)
+  // Archiv wie bei den Klassen: raus aus den Listen, Inhalte bleiben.
+  const [archiv, setArchiv] = useState(false);
+  const load = (imArchiv = archiv) => fetch(`${API}/kurse${imArchiv ? "?archiviert=true" : ""}`)
     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then((d) => { setKurse(Array.isArray(d) ? d : []); setLadefehler(false); })
     .catch(() => setLadefehler(true));
@@ -75,11 +77,18 @@ export default function Kurse() {
       </div>
       <p style={pageIntro}>{t("kurse.intro")}</p>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-        <input value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()}
-          placeholder={t("kurse.newPlaceholder")} style={{ ...inputStyle, flex: 1, minWidth: 200 }} />
-        <AddButton onClick={anlegen} title={t("kurse.add")} />
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+        <Tabs value={archiv ? "archiv" : "aktiv"} onChange={(v) => { const a = v === "archiv"; setArchiv(a); load(a); }}
+          options={[["aktiv", t("classes.active")], ["archiv", t("classes.archived")]]} />
       </div>
+
+      {!archiv && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+          <input value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()}
+            placeholder={t("kurse.newPlaceholder")} style={{ ...inputStyle, flex: 1, minWidth: 200 }} />
+          <AddButton onClick={anlegen} title={t("kurse.add")} />
+        </div>
+      )}
 
       {/* Ladefehler ist NICHT dasselbe wie „noch nichts angelegt": das eine
           repariert der Server, das andere die Lehrkraft. */}
@@ -90,7 +99,14 @@ export default function Kurse() {
           <div key={k.id} style={cardStyle}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
               <strong style={{ fontSize: 15, flex: 1 }}>{k.name}</strong>
-              <button onClick={() => openEdit(k)} className="icon-btn" style={iconBtn} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
+              {/* Archivieren nimmt die Fach-Klassen mit: am Schuljahresende ist
+                  der ganze Kurs vorbei, und eine Klasse allein in den Listen zu
+                  lassen waere genau die halbe Arbeit, die man vergisst. */}
+              <button onClick={async () => { await sende(`${API}/kurse/${k.id}/archive`, { method: "POST" }, t("classes.archive")); load(); }}
+                style={{ ...btnSecondary, padding: "4px 12px", fontSize: 12.5 }} title={t("classes.archiveHint")}>
+                {archiv ? t("classes.unarchive") : t("classes.archive")}
+              </button>
+              {!archiv && <button onClick={() => openEdit(k)} className="icon-btn" style={iconBtn} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>}
             </div>
             {/* Zweiter Weg durch Nuvora: vom Kurs (Fach) aus in die Module.
                 Alles Verlinkte ist fachlich — deshalb hier und nicht an der Klasse. */}
