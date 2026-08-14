@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
 import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, selectStyle, Modal as UiModal, overlayGuard, modalOverlay, Empty, Skeleton, pageApp, inputStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import AuthImage from "../components/AuthImage.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -644,7 +645,9 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
     a.download = `${(deck.name || "stapel").replace(/[^\w-]+/g, "_")}.json`; a.click(); URL.revokeObjectURL(a.href);
   };
   const doRename = async () => { const n = nameVal.trim(); setRenaming(false); if (n && n !== deck.name) await saveDeck({ name: n }); };
-  const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
+  // Siehe core/topics.js — eine Quelle fuer Beschriftung UND Reihenfolge.
+  const themen = themenIndex(topics);
+  const topicLabel = (tp) => themen.label(tp);
   const release = (payload) => call(() => fetch(`${API}/decks/${deck.id}/release`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }));
 
   const now = Date.now();
@@ -689,7 +692,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           <select value={deck.topic_id ?? ""} onChange={(e) => setTopic(e.target.value)} title={t("karten.topicHint")}
             style={{ ...selectStyle, fontSize: 12, padding: "4px 28px 4px 9px", maxWidth: 180 }}>
             <option value="">– {t("karten.freeCards")} –</option>
-            {[...topics].sort((a, b) => topicLabel(a).localeCompare(topicLabel(b), "de", { numeric: true })).map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
+            {themen.geordnet.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
           </select>
         )}
         {/* Niveau-Stapel: "E"/"G" wird automatisch nur an Schueler des jeweiligen

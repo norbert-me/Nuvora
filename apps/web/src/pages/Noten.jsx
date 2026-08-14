@@ -13,6 +13,7 @@ import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import { Icon, ICONS, iconBtn, toolbarIconBtn, COLORS as C, btnPrimary, btnSecondary, Modal as UiModal, popoverPanel, Empty, Skeleton, ImportButton, inputStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
@@ -930,7 +931,9 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
   const [name, setName] = useState(cat.name);
   const [topicId, setTopicId] = useState(cat.topic_id ?? "");
   const datum = cat.created_at ? new Date(cat.created_at).toLocaleDateString("de-DE") : "—";
-  const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
+  // Siehe core/topics.js: Beschriftung und Reihenfolge kommen von dort, damit
+  // dieselbe Auswahl ueberall gleich heisst und gleich sortiert ist.
+  const themen = themenIndex(topics);
   const save = () => name.trim() && onRename(name.trim(), topicId === "" ? null : Number(topicId));
   return (
     <>
@@ -955,7 +958,7 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
             <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 4 }}>{t("noten.colTopic")}</div>
             <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={{ ...inp, fontSize: 12, padding: 5 }}>
               <option value="">{t("noten.colTopicNone")}</option>
-              {topics.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
+              {themen.geordnet.map((tp) => <option key={tp.id} value={tp.id}>{themen.label(tp)}</option>)}
             </select>
           </div>
         )}

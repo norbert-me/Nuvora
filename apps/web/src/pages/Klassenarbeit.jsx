@@ -7,6 +7,7 @@ import { useSearchParams } from "react-router-dom";
 import { btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, Modal, Boxplot, StatCard, pageApp} from "../components/Icons.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
+import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
@@ -134,7 +135,12 @@ export default function Klassenarbeit() {
     }).catch(() => {});
   }, [classId, kursId, subsetKurs]);
 
-  const topicLabel = (id) => { const tp = topics.find((x) => x.id === id); if (!tp) return ""; const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
+  // Beschriftung UND Reihenfolge aus core/topics.js — die eine Quelle. Die
+  // frueher hier nachgebaute Fassung konnte nur beschriften; die Auswahl stand
+  // dann in der Reihenfolge des Servers (position, name), also alphabetisch
+  // nach dem UNTERthema: „… / 1 Kreis" landete zwischen fremden Oberthemen.
+  const themen = themenIndex(topics);
+  const topicLabel = (id) => themen.labelFuerId(id);
 
   // Änderung lokal + gebündelt speichern (PUT der ganzen Arbeit).
   const persist = (next) => {
@@ -415,7 +421,7 @@ export default function Klassenarbeit() {
                   <input value={task.label} onChange={(e) => setTask(task.id, { label: e.target.value })} placeholder={t("klassenarbeit.taskOptional", { n: i + 1 })} title={t("klassenarbeit.taskOptionalHint")} style={{ ...inputStyle, fontSize: 13, padding: "7px 9px", flex: 1, minWidth: 130 }} />
                   <select value={task.topic_id || ""} onChange={(e) => setTask(task.id, { topic_id: e.target.value ? Number(e.target.value) : null })} style={{ ...selectStyle, fontSize: 12.5, padding: "7px 9px", minWidth: 130 }}>
                     <option value="">{t("klassenarbeit.topicNone")}</option>
-                    {topics.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp.id)}</option>)}
+                    {themen.geordnet.map((tp) => <option key={tp.id} value={tp.id}>{themen.label(tp)}</option>)}
                   </select>
                   {hasParts ? (
                     <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("klassenarbeit.maxPoints")}: <b>{taskMax(task)}</b></span>
@@ -445,7 +451,7 @@ export default function Klassenarbeit() {
                         <select value={u.topic_id || ""} onChange={(e) => setPart(task.id, u.id, { topic_id: e.target.value ? Number(e.target.value) : null })}
                           title={t("klassenarbeit.partTopicHint")} style={{ ...selectStyle, fontSize: 12, padding: "5px 7px", flex: 1, minWidth: 120 }}>
                           <option value="">{t("klassenarbeit.partTopicInherit")}</option>
-                          {topics.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp.id)}</option>)}
+                          {themen.geordnet.map((tp) => <option key={tp.id} value={tp.id}>{themen.label(tp)}</option>)}
                         </select>
                         <input type="number" min="0.5" step="0.5" value={u.max} onChange={(e) => setPart(task.id, u.id, { max: Math.max(0.5, Number(e.target.value) || 0.5) })} title={t("klassenarbeit.maxPoints")} style={{ ...inputStyle, fontSize: 12, padding: "4px 4px", width: 48, textAlign: "center" }} />
                         <button onClick={() => delPart(task.id, u.id)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button>

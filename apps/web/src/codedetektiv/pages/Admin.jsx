@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { themenIndex } from "../../core/topics.js";
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useCdBase } from '../base.jsx';
@@ -99,7 +100,9 @@ export default function Admin() {
   useEffect(() => {
     fetch('/api/topics').then(r => (r.ok ? r.json() : [])).then(d => setTopics(Array.isArray(d) ? d : [])).catch(() => {});
   }, []);
-  const topicLabel = (tp) => { const p = tp.parent_id ? topics.find(x => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
+  // Siehe core/topics.js — eine Quelle fuer Beschriftung UND Reihenfolge.
+  const themen = themenIndex(topics);
+  const topicLabel = (tp) => themen.label(tp);
   const [type, setType] = useState('sort');
   const [difficulty, setDifficulty] = useState(1);
   const [timeLimit, setTimeLimit] = useState(120);
@@ -607,7 +610,7 @@ export default function Admin() {
               <label>Thema (Nuvora) — optional</label>
               <select value={topicId} onChange={e => setTopicId(e.target.value)}>
                 <option value="">– kein Thema –</option>
-                {topics.map(tp => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
+                {themen.geordnet.map(tp => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
               </select>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 2fr', gap: 12 }}>

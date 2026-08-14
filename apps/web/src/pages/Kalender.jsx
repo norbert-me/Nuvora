@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, dateNavBtn, dateNavInput, toolbarIconBtn, CONTROL_H, Modal, ExportButton, ImportButton, pageApp, Popover} from "../components/Icons.jsx";
+import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, put } from "../core/cache.js";
@@ -1610,7 +1611,9 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   const fld = { ...inputStyle, width: "100%" };
   const sfld = { ...selectStyle, width: "100%", fontSize: 14, padding: "10px 34px 10px 12px" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
-  const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
+  // Siehe core/topics.js — eine Quelle fuer Beschriftung UND Reihenfolge.
+  const themen = themenIndex(topics);
+  const topicLabel = (tp) => themen.label(tp);
   // Code-Detektiv ist ein Informatik-Werkzeug: die Rätsel-Auswahl nur zeigen, wenn
   // die gewählte Klasse eine Informatik-Stunde ist (bestehende Verknüpfung bleibt).
   const istInformatik = /informatik/i.test((classId && (classes.find((c) => c.id === Number(classId)) || {}).name) || "");
@@ -1750,7 +1753,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         <div style={lbl}>{t("kalender.topic")}</div>
         <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={sfld}>
           <option value="">– {t("kalender.noTopic")} –</option>
-          {[...topics].sort(byLabel(topicLabel)).map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
+          {themen.geordnet.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
         </select>
         {aktiv.unterrichtsplanung && (
           <>

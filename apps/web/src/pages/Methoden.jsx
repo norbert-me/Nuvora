@@ -7,6 +7,7 @@ import { askConfirm } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { sende } from "../core/melden.js";
 import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, Modal, inputStyle, ExportButton, Popover, LoadError} from "../components/Icons.jsx";
+import { themenIndex } from "../core/topics.js";
 import PublishModal from "../components/PublishModal.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -347,17 +348,12 @@ function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
   const [material, setMaterial] = useState(m.material || "");
   const [topicId, setTopicId] = useState(m.topic_id ?? "");
   const [titleErr, setTitleErr] = useState(false);
-  const topicLabel = (tp) => { const p = tp.parent_id ? topics.find((x) => x.id === tp.parent_id) : null; return p ? `${p.name} / ${tp.name}` : tp.name; };
-  // Oberthemen aufsteigend (1→2→3…), jedes mit seinen Unterthemen direkt darunter.
-  const nameAsc = (a, b) => (a.name || "").localeCompare(b.name || "", "de", { numeric: true });
-  const topicsSorted = (() => {
-    const out = [];
-    topics.filter((tp) => !tp.parent_id).sort(nameAsc).forEach((root) => {
-      out.push(root);
-      topics.filter((c) => c.parent_id === root.id).sort(nameAsc).forEach((c) => out.push(c));
-    });
-    return out;
-  })();
+  // Beschriftung und Reihenfolge aus core/topics.js — dieselbe Auswahl heisst
+  // und sortiert sich in jeder Ansicht gleich (die Regel stand hier vorher als
+  // eigene Kopie, in vier Seiten leicht verschieden).
+  const themen = themenIndex(topics);
+  const topicLabel = (tp) => themen.label(tp);
+  const topicsSorted = themen.geordnet;
   const fld = { ...inputStyle, width: "100%" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
   const submit = () => {
