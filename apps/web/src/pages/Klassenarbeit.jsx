@@ -491,20 +491,25 @@ export default function Klassenarbeit() {
               const hasParts = !!(task.parts && task.parts.length);
               return (
               <div key={task.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "8px 10px", background: "var(--card)" }}>
+                {/* Eine Zeile, solange die Breite reicht: Name und Thema teilen
+                    sich den Platz, alles Weitere behält seine Größe. Der
+                    Themen-Select wuchs vorher mit dem längsten Optionstext
+                    („Mathe 6.8 Daten darstellen und auswerten / 2 Kreisdiagramme
+                    zeichnen") und schob den Mülleimer in die nächste Zeile —
+                    `minWidth: 0` erlaubt dem Flex-Element, kleiner zu werden als
+                    sein Inhalt. */}
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 12, color: "var(--text3)", width: 18 }}>{i + 1}.</span>
-                  <input value={task.label} onChange={(e) => setTask(task.id, { label: e.target.value })} placeholder={t("klassenarbeit.taskOptional", { n: i + 1 })} title={t("klassenarbeit.taskOptionalHint")} style={{ ...inputStyle, fontSize: 13, padding: "7px 9px", flex: 1, minWidth: 130 }} />
-                  {/* 26 px = Breite der Nummer (18) + Abstand (8). Ohne die
-                      Einrueckung beginnt das Themenfeld unter der Nummer statt
-                      unter dem Namen, und die Zeilen stehen versetzt. */}
-                  <select value={task.topic_id || ""} onChange={(e) => setTask(task.id, { topic_id: e.target.value ? Number(e.target.value) : null })} style={{ ...selectStyle, fontSize: 12.5, padding: "7px 9px", minWidth: 130, marginLeft: 26 }}>
+                  <span style={{ fontSize: 12, color: "var(--text3)", width: 18, flexShrink: 0 }}>{i + 1}.</span>
+                  <input value={task.label} onChange={(e) => setTask(task.id, { label: e.target.value })} placeholder={t("klassenarbeit.taskOptional", { n: i + 1 })} title={t("klassenarbeit.taskOptionalHint")} style={{ ...inputStyle, fontSize: 13, padding: "7px 9px", flex: "1 1 150px", minWidth: 0 }} />
+                  <select value={task.topic_id || ""} onChange={(e) => setTask(task.id, { topic_id: e.target.value ? Number(e.target.value) : null })}
+                    style={{ ...selectStyle, fontSize: 12.5, padding: "7px 9px", flex: "1 1 180px", minWidth: 0, maxWidth: 340 }}>
                     <option value="">{t("klassenarbeit.topicNone")}</option>
                     {themen.geordnet.map((tp) => <option key={tp.id} value={tp.id}>{themen.label(tp)}</option>)}
                   </select>
                   {hasParts ? (
-                    <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("klassenarbeit.maxPoints")}: <b>{taskMax(task)}</b></span>
+                    <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap", flexShrink: 0 }}>{t("klassenarbeit.maxPoints")}: <b>{taskMax(task)}</b></span>
                   ) : (
-                    <label style={{ fontSize: 12, color: "var(--text3)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    <label style={{ fontSize: 12, color: "var(--text3)", display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap", flexShrink: 0 }}>
                       {t("klassenarbeit.maxPoints")}
                       <input type="number" min="0.5" step="0.5" value={task.max ?? 1} onChange={(e) => setTask(task.id, { max: Math.max(0.5, Number(e.target.value) || 0.5) })} style={{ ...inputStyle, fontSize: 13, padding: "6px 6px", width: 56, textAlign: "center" }} />
                     </label>
@@ -513,7 +518,7 @@ export default function Klassenarbeit() {
                       inhaltlichen Auswertung. Sie misst keine Kompetenz in einem
                       Thema — im Aufgabenvergleich stuende sie sonst neben
                       Sachaufgaben und wuerde mit ihnen verglichen. */}
-                  <label style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: task.form ? "var(--accent)" : "var(--text3)", cursor: "pointer", whiteSpace: "nowrap" }}
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: task.form ? "var(--accent)" : "var(--text3)", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
                     title={t("klassenarbeit.formHint")}>
                     {/* Ein Haken, zwei Wirkungen — und beide gehoeren zusammen:
                         die Aufgabe faellt aus dem inhaltlichen Vergleich heraus
@@ -530,11 +535,11 @@ export default function Klassenarbeit() {
                       }} />
                     {t("klassenarbeit.form")}
                   </label>
-                  <button onClick={() => addPart(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }}
+                  <button onClick={() => addPart(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4, flexShrink: 0 }}
                     title={t("klassenarbeit.addPartHint")} aria-label={t("klassenarbeit.addPart")}>
                     <Icon d={ICONS.plus} size={15} color="var(--accent)" />
                   </button>
-                  <button onClick={() => delTask(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
+                  <button onClick={() => delTask(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4, flexShrink: 0 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
                 </div>
                 {hasParts && (
                   /* Eine Zeile je Teilaufgabe statt Chips nebeneinander: jede
