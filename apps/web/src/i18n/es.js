@@ -1750,4 +1750,6 @@ export default {
   "fw.noTests": "Todavía no hay pruebas evaluadas en esta clase.",
   "fw.rule": "Se avisa con una mediana de al menos {{abstand}} puntos por debajo de la clase en {{von}} de las últimas {{bis}} pruebas, con al menos {{min}} respuestas valoradas.",
   "fw.curve": "Diferencia con la clase por prueba (puntos porcentuales)",
+  "karten.cardNiveau": "Nivel de esta tarjeta",
+  "karten.cardNiveauHint": "«Solo E»/«Solo G»: solo la ve quien tiene ese nivel. Se combina con el nivel del mazo.",
 };

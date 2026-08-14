@@ -441,6 +441,11 @@ def inhalt_karten(api, u, spuren):
                   {"front": "3+4", "back": "7"}, erwartet=(201,))
     k2 = api.call("POST", f"/api/karten/decks/{stapel['id']}/cards",
                   {"front": "5*6", "back": "30"}, erwartet=(201,))
+    # Dritte Karte NUR fuer G: dasselbe Prinzip wie bei CardVote, aber je Karte
+    # statt je Stapel. Das erste Testkind ist E, das zweite G — die Karte darf
+    # also genau bei einem der beiden auftauchen.
+    api.call("POST", f"/api/karten/decks/{stapel['id']}/cards",
+             {"front": "G-Karte", "back": "nur G", "niveau": "G"}, erwartet=(201,))
 
     # Vor der Freigabe darf ein Kind nichts sehen — sonst waeren Entwuerfe oeffentlich.
     zugaenge = api.call("POST", f"/api/karten/classes/{u.class_id}/tokens", erwartet=(200, 201))
@@ -459,6 +464,19 @@ def inhalt_karten(api, u, spuren):
     vorderseiten = {c["front"] for c in sitzung["cards"]}
     if vorderseiten != {"3+4", "5*6"}:
         raise AssertionError(f"falsche Karten ausgeliefert: {vorderseiten}")
+
+    # Gegenprobe: dasselbe Deck, ein G-Kind — es MUSS die G-Karte zusaetzlich
+    # bekommen. Ohne diese Richtung wuerde ein Filter, der einfach alles
+    # wegwirft, unbemerkt durchgehen.
+    token_g = _finde(zugaenge, student_id=u.students[1])
+    if not token_g:
+        raise AssertionError("kein Zugang fuer das zweite Kind erzeugt")
+    sitzung_g = anonym.call("GET", f"/api/karten/lernen/{token_g['token']}", erwartet=(200,))
+    fronts_g = {c["front"] for c in sitzung_g.get("cards") or []}
+    if fronts_g != {"3+4", "5*6", "G-Karte"}:
+        raise AssertionError(f"G-Kind sieht {fronts_g} statt aller drei Karten")
+    if sitzung_g.get("total") != 3:
+        raise AssertionError(f"G-Kind zaehlt {sitzung_g.get('total')} Karten statt 3")
 
     vorher = _finde(api.call("GET", f"/api/karten/classes/{u.class_id}/progress", erwartet=(200,)),
                     student_id=u.students[0])
@@ -499,7 +517,8 @@ def inhalt_karten(api, u, spuren):
     status, _ = anonym.call("GET", "/api/karten/lernen/ZZ-kein-token", roh=True)
     if status < 400:
         raise AssertionError(f"falscher Token liefert HTTP {status}")
-    return ("Stapel freigegeben, ohne Anmeldung gelernt, Fortschritt 0 -> 1 von 2 "
+    return ("Stapel freigegeben, E-Kind sieht 2 von 3 Karten (G-Karte gefiltert), "
+            "G-Kind alle 3, ohne Anmeldung gelernt, Fortschritt 0 -> 1 von 2 "
             f"(Detailsicht bestaetigt reps=1), falsche Karte in {frist:.0f} Minuten "
             "wieder faellig, falscher Token abgewiesen")
 

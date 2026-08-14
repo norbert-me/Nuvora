@@ -1031,6 +1031,12 @@ class Card(Base):
     back_image: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True, deferred=True)
     back_image_mime: Mapped[str] = mapped_column(String(120), default="", server_default="")
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # E/G je KARTE — feiner als das Niveau am Stapel (card_decks.niveau), das
+    # weiterhin gilt. Zwei Ebenen, weil beide gebraucht werden: ein reiner
+    # E-Stapel ist die eine Arbeitsweise, ein gemeinsamer Stapel mit einzelnen
+    # E-Karten die andere. "" = fuer alle, "E"/"G" = nur dieses Niveau. Dieselbe
+    # Bedeutung wie question_set_items.niveau bei CardVote.
+    niveau: Mapped[str] = mapped_column(String(1), default="", server_default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Papierkorb je Karte: gesetzt = gelöscht (wiederherstellbar), sonst aktiv.
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)

@@ -607,12 +607,12 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   const [cardDrop, setCardDrop] = useState(null); // { id, side: "above"|"below" }
   // Karte bearbeiten (Text + Bilder) — in einem Popup.
   const [editCard, setEditCard] = useState(null); // Karten-id im Edit
-  const saveEditCard = (id, front, back) => call(() => fetch(`${API}/cards/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ front, back }) })).then(() => setEditCard(null));
+  const saveEditCard = (id, front, back, niveau) => call(() => fetch(`${API}/cards/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ front, back, niveau: niveau || "" }) })).then(() => setEditCard(null));
   // Neue Karte per Popup (wie Bearbeiten) statt Inline-Formular.
   const [newOpen, setNewOpen] = useState(false);
-  const createCard = async (frontV, backV) => {
+  const createCard = async (frontV, backV, niveauV) => {
     if (!frontV.trim() && !backV.trim()) return;
-    await call(() => fetch(`${API}/decks/${deck.id}/cards`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ front: frontV.trim(), back: backV.trim() }) }));
+    await call(() => fetch(`${API}/decks/${deck.id}/cards`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ front: frontV.trim(), back: backV.trim(), niveau: niveauV || "" }) }));
     setNewOpen(false);
   };
   // Gelöschte Karten liegen im gemeinsamen Papierkorb des Kerns (/papierkorb).
@@ -638,7 +638,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
     call(() => fetch(`${API}/decks/${deck.id}/cards/reorder`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: neu }) }));
   };
   const exportDeck = () => {
-    const data = { type: "nuvora_karten_deck", version: 1, name: deck.name || "", cards: deck.cards.map((c) => ({ front: c.front, back: c.back })) };
+    const data = { type: "nuvora_karten_deck", version: 1, name: deck.name || "", cards: deck.cards.map((c) => ({ front: c.front, back: c.back, niveau: c.niveau || "" })) };
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
     a.download = `${(deck.name || "stapel").replace(/[^\w-]+/g, "_")}.json`; a.click(); URL.revokeObjectURL(a.href);
@@ -782,6 +782,14 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
             className="drag-handle" title={t("karten.reorderHint")} style={{ color: "var(--text3)", cursor: "grab", fontSize: 14, flexShrink: 0, userSelect: "none" }}>⠿</span>
           {c.has_front_image && <AuthImage src={`${API}/cards/${c.id}/image/front`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: 5, border: "1px solid var(--border2)", flexShrink: 0 }} />}
           <span style={{ flex: 1, minWidth: 0 }}><strong><Latex>{c.front}</Latex></strong> <span style={{ color: "var(--text3)" }}>→ <Latex>{c.back}</Latex></span></span>
+          {/* E/G je Karte: nur zeigen, wenn gesetzt — ein Stapel ohne
+              Differenzierung soll nicht mit „für alle"-Marken zugestellt sein. */}
+          {c.niveau && (
+            <span title={t("karten.cardNiveauHint")}
+              style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 8px", borderRadius: 980, flexShrink: 0,
+                background: c.niveau === "E" ? "rgba(37,99,235,0.14)" : "rgba(10,125,62,0.12)",
+                color: c.niveau === "E" ? C.info : C.success }}>{c.niveau}</span>
+          )}
           {c.has_back_image && <AuthImage src={`${API}/cards/${c.id}/image/back`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: 5, border: "1px solid var(--border2)", flexShrink: 0 }} />}
           <button onClick={() => setEditCard(c.id)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>
           <button onClick={() => call(() => fetch(`${API}/cards/${c.id}`, { method: "DELETE" }))} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
@@ -798,7 +806,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
       </>)}
       {newOpen && (
         <CardEditModal card={{ id: null, front: "", back: "", has_front_image: false, has_back_image: false }} imgVer={imgVer}
-          onSave={(_id, f, b) => createCard(f, b)} onClose={() => setNewOpen(false)} t={t} />
+          onSave={(_id, f, b, n) => createCard(f, b, n)} onClose={() => setNewOpen(false)} t={t} />
       )}
       {studying && <StudyModal cards={cards} deckName={deck.name || t("karten.deck")} t={t} onClose={() => setStudying(false)} />}
       {importing && <ImportModal deckName={deck.name || t("karten.deck")} t={t}
@@ -875,6 +883,7 @@ function StudyModal({ cards, deckName, t, onClose }) {
 function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t }) {
   const [front, setFront] = useState(card.front || "");
   const [back, setBack] = useState(card.back || "");
+  const [niveau, setNiveau] = useState(card.niveau || "");
   const inpS = { padding: "8px 10px", border: "1px solid var(--border2)", borderRadius: 8, background: "var(--bg)", color: "var(--text)", fontSize: 14, width: "100%", boxSizing: "border-box", resize: "vertical" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
   // LaTeX-Schnelltasten fügen in das zuletzt fokussierte Feld ein (wie in der Anlege-Maske).
@@ -930,6 +939,15 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t })
           <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 6 }}>{t("karten.imgAfterSave")}</div>
         )}
 
+        {/* E/G je Karte. Der Stapel kann zusätzlich ein Niveau tragen; beides
+            wirkt zusammen — eine E-Karte in einem G-Stapel sieht niemand. */}
+        <div style={lbl}>{t("karten.cardNiveau")}</div>
+        <select value={niveau} onChange={(e) => setNiveau(e.target.value)} style={{ ...inpS, width: "auto" }} title={t("karten.cardNiveauHint")}>
+          <option value="">{t("karten.niveauAll")}</option>
+          <option value="E">{t("karten.niveauE")}</option>
+          <option value="G">{t("karten.niveauG")}</option>
+        </select>
+
         {(front.includes("$") || back.includes("$")) && (
           <div style={{ marginTop: 12, padding: "8px 12px", background: "var(--bg2)", borderRadius: 8, fontSize: 14 }}>
             <Latex>{front}</Latex> <span style={{ color: "var(--text3)" }}>→ <Latex>{back}</Latex></span>
@@ -937,7 +955,7 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t })
         )}
 
         <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
-          <button onClick={() => onSave(card.id, front.trim(), back.trim())} style={btnPrimary}>{t("common.save")}</button>
+          <button onClick={() => onSave(card.id, front.trim(), back.trim(), niveau)} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
         </div>
     </UiModal>
@@ -972,7 +990,10 @@ function parseCards(text) {
     try {
       const data = JSON.parse(trimmed);
       const arr = Array.isArray(data) ? data : (Array.isArray(data.cards) ? data.cards : []);
-      return arr.map((c) => ({ front: String(c.front ?? "").trim(), back: String(c.back ?? "").trim() }))
+      // Niveau mitnehmen, damit ein Export dieser App verlustfrei zurueckkommt
+      // (der Export schreibt es mit). Unbekanntes fällt auf "" zurück.
+      return arr.map((c) => ({ front: String(c.front ?? "").trim(), back: String(c.back ?? "").trim(),
+                               niveau: ["E", "G"].includes(c.niveau) ? c.niveau : "" }))
         .filter((c) => c.front || c.back);
     } catch { /* kein gültiges JSON — als CSV/Text weiter */ }
   }

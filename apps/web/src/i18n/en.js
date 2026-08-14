@@ -1749,4 +1749,6 @@ export default {
   "fw.noTests": "No evaluated tests in this class yet.",
   "fw.rule": "Flagged: a median of at least {{abstand}} percentage points below the class in {{von}} of the last {{bis}} tests, with at least {{min}} scored answers.",
   "fw.curve": "Gap to class per test (percentage points)",
+  "karten.cardNiveau": "Level of this card",
+  "karten.cardNiveauHint": "“E only”/“G only”: shown to students of that level. Combines with the deck level.",
 };

@@ -129,7 +129,10 @@ def _snapshot_from_deck(deck: CardDeck, cards: list[Card]) -> dict:
         "type": "karten_deck",
         "version": 1,
         "name": deck.name,
-        "cards": [{"front": c.front, "back": c.back, "position": c.position} for c in cards],
+        # Niveau je Karte kommt mit: ein differenzierter Stapel ist ohne die
+        # E/G-Marken ein anderer Stapel, und der Uebernehmende muesste sie neu
+        # setzen, ohne zu wissen, welche Karte gemeint war.
+        "cards": [{"front": c.front, "back": c.back, "position": c.position, "niveau": c.niveau or ""} for c in cards],
     }
 
 
@@ -245,7 +248,7 @@ async def get_quiz(quiz_id: int, user: User = Depends(get_current_user), db: Asy
     kind = quiz.kind or "cardvote_questionset"
     if kind == "karten_deck":
         # Vorschau: die Karten (Vorder-/Rueckseite).
-        base["cards"] = [{"front": c.get("front", ""), "back": c.get("back", "")} for c in data.get("cards", [])]
+        base["cards"] = [{"front": c.get("front", ""), "back": c.get("back", ""), "niveau": c.get("niveau", "")} for c in data.get("cards", [])]
     elif kind == "method":
         base["method"] = {"description": data.get("description", ""), "ablauf": data.get("ablauf", ""), "material": data.get("material", ""), "dauer": data.get("dauer")}
     elif kind == "lernpfad_ladder":
@@ -467,7 +470,9 @@ async def _copy_deck(quiz, data, body, user, db):
     db.add(deck)
     await db.flush()
     for pos, c in enumerate(cards):
-        db.add(Card(deck_id=deck.id, front=c.get("front", ""), back=c.get("back", ""), position=c.get("position", pos)))
+        niveau = c.get("niveau", "")
+        db.add(Card(deck_id=deck.id, front=c.get("front", ""), back=c.get("back", ""),
+                    niveau=niveau if niveau in ("E", "G") else "", position=c.get("position", pos)))
     await db.commit()
     return {"id": deck.id, "name": deck.name}
 

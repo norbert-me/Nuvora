@@ -224,6 +224,36 @@ def _niveau_where(st):
     return CardDeck.niveau == ""
 
 
+def _sichtbar(schueler_niveau: str, *niveaus: str) -> bool:
+    """Dieselbe Regel wie die WHERE-Fassungen, nur fuer schon geladene Zeilen.
+
+    Ein Kind sieht neutrale Karten/Stapel und die seines eigenen Niveaus. Wird
+    in der Lehrkraft-Uebersicht gebraucht, wo eine einzige Abfrage fuer die
+    ganze Klasse laeuft und je Kind gefiltert werden muss.
+    """
+    erlaubt = {"", schueler_niveau} if schueler_niveau in ("E", "G") else {""}
+    return all((n or "") in erlaubt for n in niveaus)
+
+
+def _karten_niveau_where(st):
+    """Dasselbe eine Ebene tiefer: einzelne Karten koennen E oder G tragen.
+
+    Warum beides: ein reiner E-Stapel ist die eine Arbeitsweise, ein gemeinsamer
+    Stapel mit ein paar E-Karten die andere. Wer nur das Stapel-Niveau haette,
+    muesste jeden gemischten Satz doppelt pflegen.
+
+    Die Regel ist dieselbe wie oben und dieselbe wie bei CardVote: neutrale
+    Karten sehen alle, Niveau-Karten nur das eigene Niveau. Ein Kind ohne
+    hinterlegtes Niveau bekommt die neutralen — nie stillschweigend die eines
+    fremden Niveaus.
+    """
+    if st.niveau == "E":
+        return Card.niveau.in_(["", "E"])
+    if st.niveau == "G":
+        return Card.niveau.in_(["", "G"])
+    return Card.niveau == ""
+
+
 # ─── Lehrkraft: Stapel & Karten ───
 
 class DeckIn(BaseModel):
@@ -238,6 +268,7 @@ class CardOut(BaseModel):
     front: str
     back: str
     position: int
+    niveau: str = ""      # "" = fuer alle, "E"/"G" = nur dieses Niveau
     has_front_image: bool = False
     has_back_image: bool = False
     model_config = {"from_attributes": True}
@@ -498,6 +529,7 @@ async def release_deck(deck_id: int, body: ReleaseIn, user: User = Depends(requi
 class CardIn(BaseModel):
     front: str
     back: str
+    niveau: str = ""
 
     @field_validator("front", "back")
     @classmethod
@@ -506,13 +538,21 @@ class CardIn(BaseModel):
             raise ValueError("Text zu lang")
         return v
 
+    @field_validator("niveau")
+    @classmethod
+    def niveau_ok(cls, v: str) -> str:
+        # Stillschweigend auf "" zurueckfallen statt 422: ein unbekannter Wert
+        # soll eine Karte nicht unsichtbar machen, sondern sie allen zeigen.
+        return v if v in ("E", "G") else ""
+
 
 @router.post("/decks/{deck_id}/cards", response_model=CardOut, status_code=201)
 async def add_card(deck_id: int, body: CardIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("karten_card", f"u{user.id}", 600, 60, "Zu viele Karten. Bitte kurz warten.")
     await _owned_deck(db, user, deck_id)
     last = (await db.execute(select(Card.position).where(Card.deck_id == deck_id).order_by(Card.position.desc()))).scalars().first()
-    card = Card(deck_id=deck_id, front=body.front.strip(), back=body.back.strip(), position=(last if last is not None else -1) + 1)
+    card = Card(deck_id=deck_id, front=body.front.strip(), back=body.back.strip(),
+                niveau=body.niveau, position=(last if last is not None else -1) + 1)
     db.add(card)
     await db.commit()
     await db.refresh(card)
@@ -548,15 +588,15 @@ async def import_cards(deck_id: int, body: ImportIn, user: User = Depends(requir
     """Mehrere Karten auf einmal anhaengen (CSV/Anki-Import)."""
     rate_limit("karten_import", f"u{user.id}", 20, 60, "Zu viele Importe. Bitte kurz warten.")
     await _owned_deck(db, user, deck_id)
-    paare = [(c.front.strip(), c.back.strip()) for c in body.cards if c.front.strip() or c.back.strip()]
+    paare = [(c.front.strip(), c.back.strip(), c.niveau) for c in body.cards if c.front.strip() or c.back.strip()]
     if not paare:
         return {"added": 0}
     if len(paare) > 2000:
         raise HTTPException(400, "Zu viele Karten auf einmal (max. 2000)")
     last = (await db.execute(select(Card.position).where(Card.deck_id == deck_id).order_by(Card.position.desc()))).scalars().first()
     pos = (last if last is not None else -1) + 1
-    for front, back in paare:
-        db.add(Card(deck_id=deck_id, front=front, back=back, position=pos))
+    for front, back, niveau in paare:
+        db.add(Card(deck_id=deck_id, front=front, back=back, niveau=niveau, position=pos))
         pos += 1
     await db.commit()
     return {"added": len(paare)}
@@ -570,6 +610,7 @@ async def update_card(card_id: int, body: CardIn, user: User = Depends(require_m
     await _owned_deck(db, user, card.deck_id)
     card.front = body.front.strip()
     card.back = body.back.strip()
+    card.niveau = body.niveau
     await db.commit()
     await db.refresh(card)
     return card
@@ -694,7 +735,7 @@ async def student_card_image(token: str, card_id: int, side: str, db: AsyncSessi
     dw = await _student_deck_where(db, st)
     ok = (await db.execute(
         select(Card.id).join(CardDeck, Card.deck_id == CardDeck.id).where(
-            Card.id == card_id, dw, _niveau_where(st), Card.deleted_at.is_(None),
+            Card.id == card_id, dw, _niveau_where(st), _karten_niveau_where(st), Card.deleted_at.is_(None),
             CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None), CardDeck.released_at <= now,
         )
     )).scalar_one_or_none()
@@ -787,16 +828,26 @@ async def progress(class_id: int, kurs_id: Optional[int] = None, subset_kurs: Op
         CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None),
         CardDeck.released_at <= now,
     ))).scalars().all()
-    card_ids = []
+    karten = []   # (card_id, Karten-Niveau, Stapel-Niveau)
     if deck_ids:
         # Geloeschte Karten zaehlen nicht mit: sonst sinkt „total" nie wieder, und
         # weil eine geloeschte Karte nie gelernt wird, blieb sie fuer immer
         # „faellig" — die Lehrkraft sah dauerhaft offene Karten, die es nicht gibt.
-        card_ids = (await db.execute(select(Card.id).where(
-            Card.deck_id.in_(deck_ids), Card.deleted_at.is_(None)))).scalars().all()
-    total = len(card_ids)
+        #
+        # Die Niveaus kommen mit, weil „total" NICHT mehr fuer alle gleich ist:
+        # ein G-Kind hat die E-Karten nie zu sehen bekommen, und eine Uebersicht,
+        # die sie ihm trotzdem als offen anrechnet, meldet dauerhaft Rueckstand,
+        # den es gar nicht aufholen kann. Das galt schon fuer Niveau-STAPEL und
+        # wurde hier bisher nicht beachtet.
+        karten = (await db.execute(
+            select(Card.id, Card.niveau, CardDeck.niveau)
+            .join(CardDeck, Card.deck_id == CardDeck.id)
+            .where(Card.deck_id.in_(deck_ids), Card.deleted_at.is_(None))
+        )).all()
     out = []
     for st in students:
+        card_ids = [cid for cid, kn, dn in karten if _sichtbar(st.niveau or "", kn, dn)]
+        total = len(card_ids)
         reviews = {r.card_id: r for r in (await db.execute(select(CardReview).where(CardReview.student_id == st.id))).scalars().all()}
         hist = _empty_hist()
         due = 0
@@ -848,13 +899,20 @@ async def student_cards(class_id: int, student_id: int, kurs_id: Optional[int] =
         from .kurse import _owned_kurs
         await _owned_kurs(db, user, kurs_id)   # sonst liest ein fremder Kurs Stapelnamen + Kartentexte aus
     now = _now()
-    decks = {d.id: d.name for d in (await db.execute(select(CardDeck).where(
+    _dl = (await db.execute(select(CardDeck).where(
         CardDeck.owner_id == user.id,
         await _kurs_decks_where(cls, kurs_id), CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None), CardDeck.released_at <= now,
-    ))).scalars().all()}
+    ))).scalars().all()
+    decks = {d.id: d.name for d in _dl}
+    deck_niveaus = {d.id: d.niveau or "" for d in _dl}
     if not decks:
         return []
-    cards = (await db.execute(select(Card).where(Card.deck_id.in_(decks.keys()), Card.deleted_at.is_(None)).order_by(Card.deck_id, Card.position))).scalars().all()
+    # Genau die Karten, die dieses Kind auch bekommt (Stapel- UND Kartenniveau) —
+    # sonst steht in der Detailsicht eine Karte, die es nie gesehen hat.
+    cards = [c for c in (await db.execute(select(Card).where(
+        Card.deck_id.in_(decks.keys()), Card.deleted_at.is_(None),
+    ).order_by(Card.deck_id, Card.position))).scalars().all()
+        if _sichtbar(st.niveau or "", c.niveau, deck_niveaus.get(c.deck_id, ""))]
     reviews = {r.card_id: r for r in (await db.execute(select(CardReview).where(CardReview.student_id == student_id))).scalars().all()}
     out = []
     for c in cards:
@@ -981,7 +1039,13 @@ async def student_session(token: str, all: bool = False, db: AsyncSession = Depe
         ))).scalar()
         return {"name": st.name, "cards": [], "total": 0, "due": 0, "learned": 0,
                 "hist": _empty_hist(), "next_due": naechste.isoformat() if naechste else None}
-    cards = (await db.execute(select(Card).where(Card.deck_id.in_(decks), Card.deleted_at.is_(None)).order_by(Card.position))).scalars().all()
+    # Auch auf Kartenebene filtern: der Stapel darf gemischt sein, das Kind
+    # bekommt daraus nur die neutralen und die eigenen Niveau-Karten. Ohne
+    # diesen Filter zaehlten "total"/"faellig" Karten mit, die es nie zu sehen
+    # bekommt — die Anzeige stuende dauerhaft auf offenen Karten.
+    cards = (await db.execute(select(Card).where(
+        Card.deck_id.in_(decks), Card.deleted_at.is_(None), _karten_niveau_where(st),
+    ).order_by(Card.position))).scalars().all()
     reviews = {r.card_id: r for r in (await db.execute(select(CardReview).where(CardReview.student_id == st.id))).scalars().all()}
     faellig = []
     hist = _empty_hist()

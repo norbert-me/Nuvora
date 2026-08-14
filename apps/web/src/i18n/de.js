@@ -1735,4 +1735,6 @@ export default {
   "fw.noTests": "Noch keine ausgewerteten Tests in dieser Klasse.",
   "fw.rule": "Gemeldet wird, wer im Median mindestens {{abstand}} Prozentpunkte unter der Klasse liegt und das in {{von}} der letzten {{bis}} Tests — bei mindestens {{min}} gewerteten Antworten.",
   "fw.curve": "Abstand zur Klasse je Test (Prozentpunkte)",
+  "karten.cardNiveau": "Niveau dieser Karte",
+  "karten.cardNiveauHint": "„Nur E“/„Nur G“: die Karte bekommt nur, wer dieses Niveau hat. Wirkt zusammen mit dem Niveau des Stapels.",
 };

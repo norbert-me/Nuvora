@@ -231,6 +231,7 @@ def _ensure_columns(sync_conn):
         ("question_sets", "owner_id", "INTEGER"),
         ("card_decks", "folder_id", "INTEGER"),
         ("card_decks", "position", "INTEGER DEFAULT 0 NOT NULL"),
+        ("cards", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
         ("users", "external_calendars", "JSON"),
         ("users", "external_hidden", "JSON"),
         ("users", "marketplace_name", "VARCHAR(100) DEFAULT '' NOT NULL"),
