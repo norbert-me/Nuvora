@@ -614,6 +614,14 @@ const bedienung = (td) => [
     async anlegen(seite) {
       // Spalten haengen an einem Abschnitt — der aus den Testdaten.
       const abschnitt = seite.locator("th").filter({ hasText: `${MARKE}-Abschnitt` }).first();
+      // Erst warten, bis der Abschnittskopf wirklich steht, dann klicken.
+      // Vorher lief beides in EINE Frist von 15 s, und die Notenseite ist die
+      // langsamste im Test (Klasse, Kurs, Abschnitte, Spalten, Noten in einem
+      // Rutsch): ein Lauf scheiterte mit „locator.click: Timeout 15000ms",
+      // derselbe Stand ging beim naechsten Mal durch. Getrennte, groessere
+      // Fristen sagen im Fehlerfall ausserdem, WORAN es lag — an der Seite, die
+      // nicht kommt, oder am Knopf, der sich nicht druecken laesst.
+      await abschnitt.waitFor({ state: "visible", timeout: 25000 });
       await abschnitt.locator("[title='Optionen']").first().click({ timeout: 15000 });
       await seite.getByRole("button", { name: "Spalte hinzufügen", exact: true }).first().click({ timeout: 8000 });
       await seite.locator("input[placeholder^='Spaltenname']").first().fill(MARKE_UI, { timeout: 8000 });
