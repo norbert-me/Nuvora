@@ -1751,4 +1751,12 @@ export default {
   "fw.curve": "Gap to class per test (percentage points)",
   "karten.cardNiveau": "Level of this card",
   "karten.cardNiveauHint": "“E only”/“G only”: shown to students of that level. Combines with the deck level.",
+  "home.intro": "Your tools — pick where to start.",
+  "common.error": "That didn’t work.",
+  "fw.needTopics": "{{n}} exams exist, but their tasks carry no topic. Without a topic there is no way to tell WHAT is missing — add topics to the tasks and the analysis counts them retroactively.",
+  "fw.someWithoutTopics": "{{n}} exams don’t count: their tasks carry no topic.",
+  "fw.needModule": "This needs CardVote or the grading module.",
+  "fw.noData": "No evaluated quizzes or exams in this class yet.",
+  "fw.tooEarly": "Only {{n}} assessment(s) with too few answers — that is not enough to judge individual students.",
+  "fw.basedOn": "(from {{n}} assessments)",
 };

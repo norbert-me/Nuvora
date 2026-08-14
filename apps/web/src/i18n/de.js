@@ -1737,4 +1737,12 @@ export default {
   "fw.curve": "Abstand zur Klasse je Test (Prozentpunkte)",
   "karten.cardNiveau": "Niveau dieser Karte",
   "karten.cardNiveauHint": "„Nur E“/„Nur G“: die Karte bekommt nur, wer dieses Niveau hat. Wirkt zusammen mit dem Niveau des Stapels.",
+  "home.intro": "Deine Werkzeuge — such dir aus, womit du anfängst.",
+  "common.error": "Das hat nicht geklappt.",
+  "fw.needTopics": "{{n}} Klassenarbeiten sind da, aber ihre Aufgaben tragen kein Thema. Ohne Thema lässt sich nicht sagen, WORAN es hängt — Themen an den Aufgaben nachtragen, dann rechnet die Auswertung rückwirkend mit.",
+  "fw.someWithoutTopics": "{{n}} Klassenarbeiten zählen nicht mit: ihre Aufgaben tragen kein Thema.",
+  "fw.needModule": "Dafür braucht es CardVote oder das Auswertungs-Modul.",
+  "fw.noData": "Noch keine ausgewerteten Quizze oder Klassenarbeiten in dieser Klasse.",
+  "fw.tooEarly": "Erst {{n}} Erhebung(en) mit zu wenigen Antworten — für eine Aussage über einzelne Kinder braucht es mehr.",
+  "fw.basedOn": "(aus {{n}} Erhebungen)",
 };

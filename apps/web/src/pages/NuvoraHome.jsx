@@ -20,17 +20,18 @@ import { pageTitle } from "../components/Icons.jsx";
 // damit die Lehrkraft sie prüfen und einordnen kann. Aus Trefferquoten folgt
 // keine Lernstörung; die Kachel sagt nur, wo Hinsehen lohnt.
 function Fruehwarnung({ t }) {
-  const [rows, setRows] = useState(null);
+  const [daten, setDaten] = useState(null);
   const [empfindlich, setEmpfindlich] = useEmpfindlich();
 
   useEffect(() => {
     let ab = false;
     fetch(`/api/fruehwarnung?empfindlich=${empfindlich ? "true" : "false"}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (!ab) setRows(d?.schueler || []); })
+      .then((d) => { if (!ab) setDaten(d); })
       .catch(() => {});
     return () => { ab = true; };
   }, [empfindlich]);
+  const rows = daten?.schueler || null;
 
   // Nichts gefunden → gar nichts anzeigen, aber den Schalter nicht verstecken:
   // wer die Kachel kennt, soll „empfindlicher" auch dann finden.
@@ -53,7 +54,17 @@ function Fruehwarnung({ t }) {
       <div style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 12 }}>{t("fw.hint")}</div>
 
       {rows.length === 0 ? (
-        <div style={{ fontSize: 13.5, color: "var(--text2)" }}>{t("fw.none")}</div>
+        // Unterschied, der zaehlt: „niemand faellt ab" gilt nur, wenn ueberhaupt
+        // gerechnet werden konnte. Ohne Erhebungen ist es keine Entwarnung,
+        // sondern eine Leerstelle — und der haeufigste Grund (Aufgaben ohne
+        // Thema) laesst sich in zwei Minuten beheben.
+        <div style={{ fontSize: 13.5, color: "var(--text2)" }}>
+          {(daten?.erhebungen || 0) === 0
+            ? ((daten?.arbeiten_ohne_thema || 0) > 0
+                ? t("fw.needTopics", { n: daten.arbeiten_ohne_thema })
+                : t("fw.noData"))
+            : <>{t("fw.none")} <span style={{ color: "var(--text3)" }}>{t("fw.basedOn", { n: daten.erhebungen })}</span></>}
+        </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {rows.map((s) => (

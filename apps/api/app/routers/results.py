@@ -955,6 +955,35 @@ async def _themennamen(db, ergebnis, user):
                           if eltern_id and eltern_id in namen else namen.get(th["topic_id"]))
 
 
+async def _fruehwarn_quellen(db, user, class_id: int) -> dict:
+    """Woran liegt es, wenn nichts zu sehen ist? Zaehlt die Datenlage.
+
+    Ohne diese Zahlen kann die Oberflaeche nur „nichts gefunden" sagen — und das
+    ist der unbrauchbarste Satz, den ein Werkzeug schreiben kann, waehrend die
+    Lehrkraft gerade sechs Klassenarbeiten vor sich sieht.
+    """
+    from .modules import is_active
+    from ..models import WorkAnalysis
+
+    aus = {"cardvote": await is_active(db, user.id, "cardvote"),
+           "auswertung": await is_active(db, user.id, "auswertung"),
+           "quizze": 0, "arbeiten": 0, "arbeiten_ohne_thema": 0}
+
+    if aus["cardvote"]:
+        aus["quizze"] = (await db.execute(select(func.count()).select_from(Session).where(
+            Session.class_id == class_id, Session.archived == False,
+            Session.question_set_id.is_not(None)))).scalar() or 0
+    if aus["auswertung"]:
+        arbeiten = (await db.execute(select(WorkAnalysis).where(
+            WorkAnalysis.owner_id == user.id, WorkAnalysis.class_id == class_id))).scalars().all()
+        aus["arbeiten"] = len(arbeiten)
+        # Eine Arbeit ohne Themen an den Aufgaben kann nichts beitragen: die
+        # ganze Auswertung haengt daran, welches Thema eine Aufgabe prueft.
+        aus["arbeiten_ohne_thema"] = sum(
+            1 for w in arbeiten if not any((t or {}).get("topic_id") for t in (w.tasks or [])))
+    return aus
+
+
 @kern_router.get("/classes/{class_id}/fruehwarnung")
 async def fruehwarnung_klasse(class_id: int, empfindlich: bool = False,
                               user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
@@ -968,13 +997,19 @@ async def fruehwarnung_klasse(class_id: int, empfindlich: bool = False,
         raise HTTPException(403, "Kein Zugriff auf diese Klasse")
 
     tests, kinder = await _fruehwarn_daten(db, user, class_id)
+    quellen = await _fruehwarn_quellen(db, user, class_id)
     if not tests:
+        # Kein blosses "nichts da": WARUM nichts da ist, ist der eigentliche
+        # Hinweis. „Noch keine ausgewerteten Tests" neben sechs eingetragenen
+        # Klassenarbeiten ist schlicht falsch — es fehlen dann die Themen an den
+        # Aufgaben, und das kann die Lehrkraft in zwei Minuten nachtragen.
         return {"class_id": class_id, "class_name": school_class.name, "tests": [], "schueler": [],
-                "regel": {}, "hinweis": "Noch keine ausgewerteten Quizze oder Klassenarbeiten in dieser Klasse."}
+                "regel": {}, "quellen": quellen}
     ergebnis = fw.analysiere(tests, kinder, fw.EMPFINDLICH if empfindlich else fw.STANDARD)
     await _themennamen(db, ergebnis, user)
     ergebnis["class_id"] = class_id
     ergebnis["class_name"] = school_class.name
+    ergebnis["quellen"] = quellen
     return ergebnis
 
 
@@ -988,8 +1023,13 @@ async def fruehwarnung_alle(empfindlich: bool = False,
         select(SchoolClass).where(SchoolClass.owner_id == user.id, SchoolClass.deleted_at.is_(None))
     )).scalars().all()
     treffer = []
+    erhebungen = 0          # wie viele Quizze/Arbeiten insgesamt eingeflossen sind
+    ohne_themen = 0         # Klassenarbeiten, die mangels Themen nichts beitragen
     for k in klassen:
         tests, kinder = await _fruehwarn_daten(db, user, k.id)
+        quellen = await _fruehwarn_quellen(db, user, k.id)
+        ohne_themen += quellen.get("arbeiten_ohne_thema", 0)
+        erhebungen += len(tests)
         if not tests:
             continue
         ergebnis = fw.analysiere(tests, kinder, fw.EMPFINDLICH if empfindlich else fw.STANDARD)
@@ -1002,4 +1042,7 @@ async def fruehwarnung_alle(empfindlich: bool = False,
                             "begruendung": s["begruendung"],
                             "etiketten": [e["art"] for e in s["etiketten"]]})
     treffer.sort(key=lambda x: x["abstand_median"])
-    return {"schueler": treffer, "empfindlich": empfindlich}
+    # `erhebungen` und `ohne_themen` tragen die Startseite: „niemand faellt ab"
+    # bedeutet etwas anderes bei zwoelf Erhebungen als bei null.
+    return {"schueler": treffer, "empfindlich": empfindlich,
+            "erhebungen": erhebungen, "arbeiten_ohne_thema": ohne_themen}

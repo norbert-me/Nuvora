@@ -1752,4 +1752,12 @@ export default {
   "fw.curve": "Diferencia con la clase por prueba (puntos porcentuales)",
   "karten.cardNiveau": "Nivel de esta tarjeta",
   "karten.cardNiveauHint": "«Solo E»/«Solo G»: solo la ve quien tiene ese nivel. Se combina con el nivel del mazo.",
+  "home.intro": "Tus herramientas: elige por dónde empezar.",
+  "common.error": "No ha funcionado.",
+  "fw.needTopics": "Hay {{n}} exámenes, pero sus tareas no tienen tema. Sin tema no se puede decir DÓNDE está el problema: añade temas a las tareas y el análisis los contará con efecto retroactivo.",
+  "fw.someWithoutTopics": "{{n}} exámenes no cuentan: sus tareas no tienen tema.",
+  "fw.needModule": "Para esto hace falta CardVote o el módulo de evaluación.",
+  "fw.tooEarly": "Solo {{n}} prueba(s) con pocas respuestas: no basta para juzgar a un alumno.",
+  "fw.noData": "Todavía no hay cuestionarios ni exámenes evaluados en esta clase.",
+  "fw.basedOn": "(de {{n}} pruebas)",
 };

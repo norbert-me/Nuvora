@@ -141,6 +141,20 @@ export default function FruehwarnPanel({ classId, nurKind = null, titel = true }
 
   if (!daten) return null;
 
+  // Warum ist nichts zu sehen? Der Server liefert die Datenlage mit, damit hier
+  // ein brauchbarer Satz steht statt „nichts gefunden". Der häufigste Fall:
+  // Klassenarbeiten sind da, aber ihre Aufgaben tragen kein Thema — dann kann
+  // die Auswertung nichts zuordnen, und genau das gehört gesagt.
+  const q = daten.quellen || {};
+  const erhebungen = (daten.tests || []).length;
+  const grund = () => {
+    if (q.arbeiten > 0 && q.arbeiten_ohne_thema === q.arbeiten && !q.quizze) return t("fw.needTopics", { n: q.arbeiten });
+    if (!q.cardvote && !q.auswertung) return t("fw.needModule");
+    if (!q.quizze && !q.arbeiten) return t("fw.noData");
+    if (q.arbeiten_ohne_thema > 0) return t("fw.someWithoutTopics", { n: q.arbeiten_ohne_thema });
+    return t("fw.noData");
+  };
+
   const alle = daten.schueler || [];
   const liste = nurKind != null ? alle.filter((s) => String(s.card_id) === String(nurKind)) : alle;
   // In der Klassenansicht nur die Auffaelligen zeigen — sonst steht die halbe
@@ -165,10 +179,16 @@ export default function FruehwarnPanel({ classId, nurKind = null, titel = true }
           </button>
         </div>
       )}
-      {(daten.tests || []).length === 0 ? (
-        <div style={{ fontSize: 13, color: "var(--text3)" }}>{t("fw.noTests")}</div>
+      {erhebungen === 0 ? (
+        <div style={{ fontSize: 13, color: "var(--text3)" }}>{grund()}</div>
+      ) : alle.every((s) => s.status === "zu_wenig_daten") ? (
+        // Nicht „niemand fällt ab": bei einer einzigen Arbeit weiss das niemand.
+        <div style={{ fontSize: 13, color: "var(--text3)" }}>{t("fw.tooEarly", { n: erhebungen })}</div>
       ) : zeigen.length === 0 ? (
-        <div style={{ fontSize: 13.5, color: "var(--text2)" }}>{t("fw.none")}</div>
+        <div style={{ fontSize: 13.5, color: "var(--text2)" }}>
+          {t("fw.none")}{" "}
+          <span style={{ color: "var(--text3)" }}>{t("fw.basedOn", { n: erhebungen })}</span>
+        </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {zeigen.map((s) => <FruehwarnKarte key={s.card_id} schueler={s} t={t} offen={nurKind != null} />)}
