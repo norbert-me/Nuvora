@@ -757,7 +757,9 @@ function EntryChips({ list, className, kursName = () => "", topicName, onOpen, c
 function HeuteView({ t, tt, weekdayOf, byDay, todoByDay, onTodo, className, slotName, slotColor, classColor, topicName, frei, heuteAbsent, orgaAktiv, onOpen, onSlot }) {
   const heute = startOfDay(new Date());
   const istFrei = frei(heute);
-  const slots = (tt.slots || []).filter((s) => s.weekday === weekdayOf(heute) && slotActiveOn(s, heute)).sort((a, b) => a.period - b.period);
+  // An freien Tagen faellt der Stundenplan weg — Termine und ganztaegige
+  // Eintraege bleiben. Vorher raeumte ein Ferientag die ganze Ansicht leer.
+  const slots = istFrei ? [] : (tt.slots || []).filter((s) => s.weekday === weekdayOf(heute) && slotActiveOn(s, heute)).sort((a, b) => a.period - b.period);
   const eintraege = byDay(heute);
   const zeit = (period) => { const w = (tt.times || [])[period - 1]; return w && (w.start || w.end) ? `${w.start || ""}–${w.end || ""}` : ""; };
   // Zeilen: pro Stundenplan-Slot; Ganztägige (ohne Stunde) als Banner oben,
@@ -783,7 +785,7 @@ function HeuteView({ t, tt, weekdayOf, byDay, todoByDay, onTodo, className, slot
           {t("kalender.freeDay")}: {istFrei.label || ""}
         </div>
       )}
-      {!istFrei && allDay.length > 0 && (
+      {allDay.length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ ...sectionLabel, marginBottom: 6 }}>{t("kalender.allDay")}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -797,8 +799,9 @@ function HeuteView({ t, tt, weekdayOf, byDay, todoByDay, onTodo, className, slot
           </div>
         </div>
       )}
-      {/* An freien Tagen (Ferien/Feiertag) den Stundenplan komplett ausblenden. */}
-      {istFrei ? null : slots.length === 0 && extras.length === 0 && allDay.length === 0 ? (
+      {/* An freien Tagen ist `slots` leer (siehe oben) — die Zeilen unten zeigen
+          dann nur noch die Eintraege des Tages. */}
+      {!istFrei && slots.length === 0 && extras.length === 0 && allDay.length === 0 ? (
         <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("kalender.todayEmpty")}</p>
       ) : slots.length === 0 && extras.length === 0 ? null : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -886,23 +889,25 @@ function MonthGrid({ extColor, range, cursor, byDay, extByDay, todoByDay, onTodo
                     {narrow ? (
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
                         <span style={{ fontSize: 12, fontWeight: ymd(d) === heute ? 700 : 500, color: "var(--text2)" }}>{d.getDate()}</span>
-                        {f ? <span style={{ width: 5, height: 5, borderRadius: 5, background: "rgba(184,134,11,0.7)" }} /> : (
-                          <div style={{ display: "flex", gap: 2, flexWrap: "wrap", justifyContent: "center", maxWidth: "100%" }}>
-                            {dotsFor(d).slice(0, 4).map((c, i) => <span key={i} style={{ width: 5, height: 5, borderRadius: 5, background: c }} />)}
-                            {dotsFor(d).length > 4 && <span style={{ fontSize: 8, color: "var(--text3)", lineHeight: "5px" }}>+{dotsFor(d).length - 4}</span>}
-                          </div>
-                        )}
+                        {/* Der Ferien-Punkt kommt ZU den Termin-Punkten, nicht
+                            statt ihnen — sonst verschwindet ein Termin in den
+                            Ferien auch aus der schmalen Monatsansicht. */}
+                        <div style={{ display: "flex", gap: 2, flexWrap: "wrap", justifyContent: "center", maxWidth: "100%" }}>
+                          {f && <span style={{ width: 5, height: 5, borderRadius: 5, background: "rgba(184,134,11,0.7)" }} />}
+                          {dotsFor(d).slice(0, 4).map((c, i) => <span key={i} style={{ width: 5, height: 5, borderRadius: 5, background: c }} />)}
+                          {dotsFor(d).length > 4 && <span style={{ fontSize: 8, color: "var(--text3)", lineHeight: "5px" }}>+{dotsFor(d).length - 4}</span>}
+                        </div>
                       </div>
                     ) : (<>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <button onClick={() => onDayView(d)} title={t("kalender.toDay")} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--text2)", padding: 0 }}>{d.getDate()}</button>
-                      {!f && <button onClick={(e) => { e.stopPropagation(); onAdd(d); }} className="icon-btn" style={{ ...iconBtn, padding: 0 }} title={t("kalender.add")} aria-label={t("kalender.add")}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>}
+                      <button onClick={(e) => { e.stopPropagation(); onAdd(d); }} className="icon-btn" style={{ ...iconBtn, padding: 0 }} title={t("kalender.add")} aria-label={t("kalender.add")}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>
                     </div>
-                    {f ? <FreiMarker label={f.label} t={t} /> : (<>
-                      <EntryChips list={byDay(d)} className={className} kursName={kursName} topicName={topicName} onOpen={onOpen} classColor={classColor} />
-                      <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} extColor={extColor} />
-                      {slotsFor && <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} slotName={slotName} topicName={topicName} onSlot={onSlot} day={d} t={t} />}
-                    </>)}
+                    {/* Siehe WeekView: frei blendet nur den Stundenplan aus. */}
+                    {f && <FreiMarker label={f.label} t={t} />}
+                    <EntryChips list={byDay(d)} className={className} kursName={kursName} topicName={topicName} onOpen={onOpen} classColor={classColor} />
+                    <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} extColor={extColor} />
+                    {!f && slotsFor && <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} slotName={slotName} topicName={topicName} onSlot={onSlot} day={d} t={t} />}
                     {/* To-dos zeigen auch an freien Tagen (Ferien/Feiertag). */}
                     <TodoChips list={todoByDay && todoByDay(d)} onOpen={onTodo} />
                     </>)}
@@ -930,13 +935,17 @@ function WeekView({ extColor, range, byDay, extByDay, todoByDay, onTodo, slotsFo
           style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 8, minHeight: 160, background: f ? "rgba(184,134,11,0.09)" : "var(--card)", minWidth: 90, cursor: "pointer" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
             <button onClick={() => onDayView(d)} title={t("kalender.toDay")} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--text)", padding: 0 }}>{d.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}</button>
-            {!f && <button onClick={(e) => { e.stopPropagation(); onAdd(d); }} className="icon-btn" style={{ ...iconBtn, padding: 0 }}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>}
+            <button onClick={(e) => { e.stopPropagation(); onAdd(d); }} className="icon-btn" style={{ ...iconBtn, padding: 0 }}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>
           </div>
-          {f ? <FreiMarker label={f.label} t={t} /> : (<>
-            <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} slotName={slotName} topicName={topicName} onSlot={onSlot} day={d} t={t} />
-            <EntryChips list={byDay(d)} className={className} kursName={kursName} topicName={topicName} onOpen={onOpen} classColor={classColor} />
-            <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} extColor={extColor} />
-          </>)}
+          {/* Ferien blenden den STUNDENPLAN aus, nicht die Termine: in den
+              Sommerferien lagen ein Vorbereitungstag und ein Teamtag im
+              Kalender und waren nirgends zu sehen, weil der freie Zeitraum den
+              ganzen Tag leergeraeumt hat — auch die externen Termine aus dem
+              Abo. Ferien heissen „kein Unterricht", nicht „keine Termine". */}
+          {f && <FreiMarker label={f.label} t={t} />}
+          {!f && <SlotGhosts list={slotsFor(d)} entries={byDay(d)} className={className} slotName={slotName} topicName={topicName} onSlot={onSlot} day={d} t={t} />}
+          <EntryChips list={byDay(d)} className={className} kursName={kursName} topicName={topicName} onOpen={onOpen} classColor={classColor} />
+          <ExtChips list={extByDay && extByDay(d)} onOpen={onExt} extColor={extColor} />
           {/* To-dos auch an freien Tagen. */}
           <TodoChips list={todoByDay && todoByDay(d)} onOpen={onTodo} />
         </div>
@@ -962,9 +971,13 @@ function FreiMarker({ label, t }) {
 
 function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDay, todoByDay, onTodo, slotsFor, cancelledFor, onCancelSlot, onRestoreSlot, frei, className, slotName, slotColor, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
   const list = byDay(day);
-  const slots = slotsFor(day);
-  const ext = extByDay ? extByDay(day) : [];
   const f = frei && frei(day);
+  // An freien Tagen faellt der Stundenplan weg — die Termine des Tages nicht.
+  // Vorher stieg diese Ansicht bei einem freien Tag sofort aus und zeigte nur
+  // das Ferien-Etikett; ein Vorbereitungstag in den Sommerferien war damit
+  // unsichtbar, obwohl er im Kalender stand.
+  const slots = f ? [] : slotsFor(day);
+  const ext = extByDay ? extByDay(day) : [];
   const linked = (e) => e.cardvote_set_id || e.karten_deck_id || e.lernpfad_ladder_id || e.method_id || e.codedetektiv_puzzle;
   const toMin = (hhmm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || ""); return m ? (+m[1]) * 60 + (+m[2]) : null; };
   const pTime = (p) => { const w = (tt.times || [])[p - 1]; return w ? { s: toMin(w.start), e: toMin(w.end) } : { s: null, e: null }; };
@@ -974,18 +987,6 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
   const scrollRef = useRef(null);
   const dayKey = ymd(day);
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 6 * HOUR; }, [dayKey]);
-  if (f) return (
-    <div>
-      <p style={{ fontSize: 14, color: "var(--text3)", fontStyle: "italic" }}>{f.label ? `${f.label} — ${t("kalender.free")}` : t("kalender.free")}</p>
-      {todoByDay && todoByDay(day).length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <div style={{ ...sectionLabel, marginBottom: 6 }}>{t("todo.title")}</div>
-          <TodoChips list={todoByDay(day)} onOpen={onTodo} />
-        </div>
-      )}
-    </div>
-  );
-
   // Ganztägig / ohne verortbare Uhrzeit -> Banner oben (auch externe Termine).
   // Einträge mit freier Uhrzeit gehören in die Zeitspur, nicht ins Banner.
   const ganztags = list.filter((e) => e.period == null && toMin(e.start_time) == null);
@@ -1062,6 +1063,12 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
 
   return (
     <div>
+      {/* Freier Tag: als Hinweis oben, nicht als Ersatz fuer den ganzen Tag. */}
+      {f && (
+        <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(184,134,11,0.12)", color: "#8a6d00", fontSize: 13.5, fontWeight: 600, marginBottom: 14 }}>
+          🌴 {f.label ? `${f.label} — ${t("kalender.free")}` : t("kalender.free")}
+        </div>
+      )}
       {hasBanner && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ ...sectionLabel, marginBottom: 6 }}>{t("kalender.allDay")}</div>
