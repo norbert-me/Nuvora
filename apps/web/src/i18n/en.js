@@ -1871,4 +1871,7 @@ export default {
   "noten.verlaufSection": "History: {name}",
   "noten.verlaufRunning": "Each point is the overall grade after that entry — weighted across all sections.",
   "noten.verlaufSingle": "The individual grades of this section, in the order they were entered.",
+  "noten.verlaufPick": "Click to show the history for this section",
+  "noten.verlaufRunningSection": "Each point is this section's average after that grade.",
+  "noten.verlaufSingleToggle": "Individual grades",
 };

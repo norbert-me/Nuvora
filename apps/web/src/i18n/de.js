@@ -1857,4 +1857,7 @@ export default {
   "noten.verlaufSection": "Verlauf: {name}",
   "noten.verlaufRunning": "Jeder Punkt ist der Stand der Gesamtnote nach dieser Note — gewichtet über alle Bereiche.",
   "noten.verlaufSingle": "Die einzelnen Noten dieses Bereichs in der Reihenfolge, in der sie entstanden sind.",
+  "noten.verlaufPick": "Klicken: Verlauf für diesen Bereich anzeigen",
+  "noten.verlaufRunningSection": "Jeder Punkt ist der Schnitt dieses Bereichs nach der jeweiligen Note.",
+  "noten.verlaufSingleToggle": "Einzelne Noten",
 };

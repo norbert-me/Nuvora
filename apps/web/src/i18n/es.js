@@ -1872,4 +1872,7 @@ export default {
   "noten.verlaufSection": "Evolución: {name}",
   "noten.verlaufRunning": "Cada punto es la nota global tras esa entrada, ponderada sobre todas las secciones.",
   "noten.verlaufSingle": "Las notas individuales de esta sección, en el orden en que se registraron.",
+  "noten.verlaufPick": "Clic para ver la evolución de esta sección",
+  "noten.verlaufRunningSection": "Cada punto es la media de esta sección tras esa nota.",
+  "noten.verlaufSingleToggle": "Notas individuales",
 };

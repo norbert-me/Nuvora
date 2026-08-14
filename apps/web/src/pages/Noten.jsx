@@ -12,7 +12,7 @@ import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { Icon, ICONS, iconBtn, toolbarIconBtn, chipStyle, COLORS as C, btnPrimary, btnSecondary, Modal as UiModal, popoverPanel, Empty, Skeleton, ImportButton, inputStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, toolbarIconBtn, chipStyle, COLORS as C, btnPrimary, btnSecondary, Modal as UiModal, popoverPanel, Empty, Skeleton, ImportButton, inputStyle, Popover, Toggle, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useAktiv } from "../core/modules.js";
@@ -1227,7 +1227,7 @@ function CompareModal({ t, cat, onClose }) {
 // zeigen kann: den laufenden Gesamtschnitt (jeder Punkt = Stand nach dieser
 // Note) oder die Einzelnoten eines Abschnitts. Das muss dranstehen — eine
 // Kurve, die beides sein kann, ist sonst nicht zu lesen.
-function GradeChart({ series, t, titel, hinweis }) {
+function GradeChart({ series, t, titel, hinweis, rechts }) {
   if (series.length < 2) return null;
   const W = 340, H = 170, padL = 26, padR = 12, padT = 12, padB = 20;
   const n = series.length;
@@ -1237,7 +1237,10 @@ function GradeChart({ series, t, titel, hinweis }) {
   const line = pts.map((p, i) => `${i ? "L" : "M"}${p.cx.toFixed(1)},${p.cy.toFixed(1)}`).join(" ");
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{titel || t("noten.verlauf")}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 2 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, flex: 1 }}>{titel || t("noten.verlauf")}</div>
+        {rechts}
+      </div>
       {hinweis && <div style={{ fontSize: 11.5, color: "var(--text3)", marginBottom: 6 }}>{hinweis}</div>}
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }} role="img" aria-label={t("noten.verlauf")}>
         {[1, 2, 3, 4, 5, 6].map((g) => (
@@ -1263,6 +1266,7 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, o
   // Hook vor jedem fruehen Ausstieg: sonst haengt die Hook-Reihenfolge daran,
   // ob gerade ein Kind gewaehlt ist.
   const [bereich, setBereich] = useState("gesamt");
+  const [modus, setModus] = useState("schnitt");   // „schnitt" (laufend) oder „einzeln"
   if (!student) return null;
   // Verlauf der GESAMTNOTE (gewichtet) über die Zeit: nach jeder neuen Note die
   // gewichtete Gesamtnote aus allen bis dahin vorhandenen Noten. Kategorien in
@@ -1297,8 +1301,21 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, o
   const einzeln = (secId) => cats.filter((c) => c.secId === secId)
     .map((c) => ({ cat: c, value: gradeOf(c.id) }))
     .filter((p) => p.value != null);
+  // Laufender Schnitt INNERHALB eines Bereichs: nach jeder Note der Mittelwert
+  // aller bisherigen Noten dieses Bereichs. Das ist die Zahl, die auch in der
+  // Liste unten steht — der Verlauf zeigt, wie sie dorthin gekommen ist.
+  const schnittLauf = (secId) => {
+    const bisher = [];
+    return einzeln(secId).map((p) => {
+      bisher.push(p.value);
+      return { cat: p.cat, value: bisher.reduce((a, b) => a + b, 0) / bisher.length };
+    });
+  };
+  const alleEinzeln = cats.map((c) => ({ cat: c, value: gradeOf(c.id) })).filter((p) => p.value != null);
   const waehlbar = sections.filter((sec) => einzeln(sec.id).length >= 2);
-  const serie = bereich === "gesamt" ? gesamt : einzeln(bereich);
+  const serie = bereich === "gesamt"
+    ? (modus === "einzeln" ? alleEinzeln : gesamt)
+    : (modus === "einzeln" ? einzeln(bereich) : schnittLauf(bereich));
   const secName = sections.find((x) => x.id === bereich)?.name || "";
   return (
     <UiModal onClose={onClose} width={460} label={student.name}>
@@ -1325,33 +1342,37 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, o
           {student.notizen && (<><dt style={dtS}>{t("noten.notes")}</dt><dd style={ddS}>{student.notizen}</dd></>)}
         </dl>
 
-        {waehlbar.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
-            {[{ id: "gesamt", name: t("noten.total") }, ...waehlbar].map((x) => {
-              const an = bereich === x.id;
-              return (
-                <button key={x.id} onClick={() => setBereich(x.id)}
-                  style={{ ...chipStyle, cursor: "pointer", border: "1px solid " + (an ? "var(--accent)" : "var(--border2)"),
-                    background: an ? "var(--bg2)" : "transparent", color: an ? "var(--text)" : "var(--text2)", fontWeight: an ? 700 : 600 }}>
-                  {x.name}
-                </button>
-              );
-            })}
-          </div>
-        )}
         <GradeChart series={serie} t={t}
           titel={bereich === "gesamt" ? t("noten.verlauf") : t("noten.verlaufSection", { name: secName })}
-          hinweis={bereich === "gesamt" ? t("noten.verlaufRunning") : t("noten.verlaufSingle")} />
+          hinweis={modus === "einzeln" ? t("noten.verlaufSingle")
+                   : bereich === "gesamt" ? t("noten.verlaufRunning") : t("noten.verlaufRunningSection")}
+          rechts={(
+            /* Umschalter Schnitt/Einzelnoten — der Schnitt beantwortet „wo
+               stehe ich?", die Einzelnoten „woran lag es?". */
+            <Toggle checked={modus === "einzeln"} onChange={(v) => setModus(v ? "einzeln" : "schnitt")}
+              label={<span style={{ fontSize: 12.5, color: "var(--text2)" }}>{t("noten.verlaufSingleToggle")}</span>} />
+          )} />
 
         <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t("noten.gradesBySection")}</div>
         {sections.length === 0 || !summary ? (
           <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("noten.noGrades")}</p>
         ) : (
           <div style={{ marginBottom: 14 }}>
+            {/* Die Liste IST die Auswahl fuer die Kurve darueber — ein zweiter
+                Chip-Streifen daneben waere dieselbe Sache zweimal. Bereiche mit
+                weniger als zwei Noten bleiben unklickbar: aus einem Punkt wird
+                kein Verlauf. */}
             {sections.map((sec) => {
               const v = summary.per_section?.[String(sec.id)];
+              const klickbar = waehlbar.some((x) => x.id === sec.id);
+              const an = bereich === sec.id;
               return (
-                <div key={sec.id} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid var(--border)", fontSize: 13.5 }}>
+                <div key={sec.id} onClick={() => klickbar && setBereich(an ? "gesamt" : sec.id)}
+                  title={klickbar ? t("noten.verlaufPick") : undefined}
+                  style={{ display: "flex", justifyContent: "space-between", padding: "5px 6px", borderBottom: "1px solid var(--border)", fontSize: 13.5,
+                    cursor: klickbar ? "pointer" : "default", borderRadius: 6,
+                    background: an ? "var(--bg2)" : "transparent",
+                    boxShadow: an ? "inset 3px 0 0 var(--accent)" : undefined }}>
                   {/* Prozente rechtsbuendig in fester Spalte: sonst enden „5 %"
                       und „50 %" an verschiedenen Stellen und die Namen springen. */}
                   <span style={{ display: "inline-flex", gap: 6, minWidth: 0 }}>
@@ -1363,7 +1384,10 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, o
                 </div>
               );
             })}
-            <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0 0", fontSize: 14, fontWeight: 700 }}>
+            <div onClick={() => setBereich("gesamt")} title={t("noten.verlaufPick")}
+              style={{ display: "flex", justifyContent: "space-between", padding: "8px 6px 4px", fontSize: 14, fontWeight: 700,
+                cursor: "pointer", borderRadius: 6, background: bereich === "gesamt" ? "var(--bg2)" : "transparent",
+                boxShadow: bereich === "gesamt" ? "inset 3px 0 0 var(--accent)" : undefined }}>
               <span>{t("noten.total")}</span>
               <span>{summary.weighted !== null ? de(summary.weighted) : "·"}{summary.unweighted_fallback ? ` (${t("noten.unweighted")})` : ""}</span>
             </div>
@@ -1493,7 +1517,11 @@ const inp = { ...inputStyle, width: "100%" };
 // Aus dem Kern abgeleitet (Icons.jsx), nicht neu gebaut: die Notentabelle
 // braucht nur eine kraeftigere Kopflinie und relative Zellen fuer die
 // Spalten-Menues.
-const th = { ...thBasis, borderBottom: "2px solid var(--border3)", position: "relative" };
+// position bewusst NICHT auf relative setzen: thBasis klebt (sticky), und
+// „relative" hat das stillschweigend abgeschaltet — nur die Zellen mit eigenem
+// sticky (die Namensspalte) blieben dann beim Scrollen stehen, der Rest lief
+// weg. Als Bezug fuer die absolut gesetzten Menues taugt sticky genauso.
+const th = { ...thBasis, borderBottom: "2px solid var(--border3)" };
 const td = tdBasis;
 // Links klebende Spalte. Der Kopf klebt oben (th in Icons.jsx, z-index 2) —
 // eine Zelle, die BEIDES tut, muss darueber liegen, sonst rutscht der Name
