@@ -304,6 +304,9 @@ def _ensure_columns(sync_conn):
         ("grade_categories", "topic_id", "INTEGER"),
         # Tag der Leistung — Eigenschaft der Spalte, nicht Teil ihres Namens.
         ("grade_categories", "date", "DATE"),
+        # Kurs-Kette ueber Schuljahre (siehe Kurs in models.py).
+        ("kurse", "schuljahr", "VARCHAR(9) DEFAULT '' NOT NULL"),
+        ("kurse", "vorgaenger_id", "INTEGER"),
         ("attendance", "period", "INTEGER"),
         ("calendar_entries", "method_id", "INTEGER"),
         ("calendar_entries", "kurs_id", "INTEGER"),
@@ -588,6 +591,22 @@ async def startup():
         # Wer schon Einstiege hat, gilt als geseedet — sonst wuerde die
         # Startsammlung nach dem Loeschen aller Einstiege einmal neu auftauchen.
         await db.execute(text("UPDATE users SET methoden_seeded = true WHERE methoden_seeded = false AND EXISTS (SELECT 1 FROM methods m WHERE m.owner_id = users.id)"))
+        await db.commit()
+
+    # Schuljahr aus dem Kursnamen uebernehmen — einmalig und idempotent.
+    # Bestandskurse heissen „6.5 Mathematik (2025-2026)", weil es bis jetzt kein
+    # Feld dafuer gab. Der Name bleibt unangetastet; gesetzt wird nur, was leer
+    # ist, damit eine spaetere Korrektur von Hand nicht wieder ueberschrieben
+    # wird. Die Regex steht bewusst hier und nicht im Router: sie laeuft einmal
+    # beim Start, nicht bei jeder Anfrage.
+    async with async_session() as db:
+        await db.execute(text(r"""
+            UPDATE kurse
+               SET schuljahr = substring(name from '(20\d{2})\s*[-/]\s*(?:20)?\d{2}')
+                             || '/' || right(substring(name from '20\d{2}\s*[-/]\s*((?:20)?\d{2})'), 2)
+             WHERE coalesce(schuljahr, '') = ''
+               AND name ~ '20\d{2}\s*[-/]\s*(20)?\d{2}'
+        """))
         await db.commit()
 
     # Anwesenheit ist ins Modul „Orga & Anwesenheit" aufgegangen. Wer Anwesenheit

@@ -19,6 +19,12 @@ export default function Kurse() {
   const [neu, setNeu] = useState("");
   const [editKurs, setEditKurs] = useState(null); // aufgeklappter Bearbeiten-Bereich (Name, E/G)
   const [editName, setEditName] = useState("");
+  // Jahresfolge: Schuljahr und der Kurs des Vorjahres. Die Daten bleiben
+  // getrennt (Zeugnisnoten gelten je Schuljahr) — verbunden wird nur die Kette,
+  // damit „6.5 Mathe" und „7.5 Mathe" nicht als zwei fremde Gruppen dastehen.
+  const [editJahr, setEditJahr] = useState("");
+  const [editVor, setEditVor] = useState("");
+  const [alleKurse, setAlleKurse] = useState([]);   // inkl. Archiv — das Vorjahr liegt meist dort
 
   // Ein Serverfehler sah hier aus wie „noch kein Kurs angelegt" — mitsamt der
   // freundlichen Empty-Kachel. Wer seine Kurse vermisste, suchte den Fehler bei
@@ -40,13 +46,25 @@ export default function Kurse() {
     if (!(await sende(`${API}/kurse`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }, t("kurse.add")))) return;
     setNeu(""); load();
   };
-  const openEdit = (k) => { if (editKurs === k.id) { setEditKurs(null); } else { setEditKurs(k.id); setEditName(k.name); } };
+  const openEdit = (k) => {
+    if (editKurs === k.id) { setEditKurs(null); return; }
+    setEditKurs(k.id); setEditName(k.name);
+    setEditJahr(k.schuljahr || ""); setEditVor(k.vorgaenger_id ? String(k.vorgaenger_id) : "");
+    // Auswahl fuer „Vorjahr": aktive UND archivierte Kurse. Nach dem
+    // Schuljahresende steht der Vorgaenger im Archiv, und genau dann braucht
+    // man ihn hier.
+    Promise.all([
+      fetch(`${API}/kurse`).then((r) => (r.ok ? r.json() : [])),
+      fetch(`${API}/kurse?archiviert=true`).then((r) => (r.ok ? r.json() : [])),
+    ]).then(([a, b]) => setAlleKurse([...(a || []), ...(b || [])])).catch(() => {});
+  };
   const saveName = async (k) => {
     const name = editName.trim();
     if (!name) return;
     // Ohne die Prüfung holte load() den alten Namen zurück: der getippte Name
     // verschwand vor den Augen der Lehrkraft, ohne Meldung.
-    if (!(await sende(`${API}/kurse/${k.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }, t("kurse.editName")))) return;
+    const koerper = { name, schuljahr: editJahr.trim(), vorgaenger_id: editVor ? Number(editVor) : 0 };
+    if (!(await sende(`${API}/kurse/${k.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(koerper) }, t("kurse.editName")))) return;
     load();
   };
   const setNiveauAktiv = async (k, val) => {
@@ -98,7 +116,9 @@ export default function Kurse() {
         {kurse.map((k) => (
           <div key={k.id} style={cardStyle}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <strong style={{ fontSize: 15, flex: 1 }}>{k.name}</strong>
+              <strong style={{ fontSize: 15 }}>{k.name}</strong>
+              {k.schuljahr && <span style={{ ...chipStyle, fontSize: 11.5 }}>{k.schuljahr}</span>}
+              <span style={{ flex: 1 }} />
               {/* Archivieren nimmt die Fach-Klassen mit: am Schuljahresende ist
                   der ganze Kurs vorbei, und eine Klasse allein in den Listen zu
                   lassen waere genau die halbe Arbeit, die man vergisst. */}
@@ -110,6 +130,13 @@ export default function Kurse() {
             </div>
             {/* Zweiter Weg durch Nuvora: vom Kurs (Fach) aus in die Module.
                 Alles Verlinkte ist fachlich — deshalb hier und nicht an der Klasse. */}
+            {(k.vorgaenger_name || k.nachfolger_name) && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontSize: 12.5, color: "var(--text3)", marginBottom: 10 }}>
+                {k.vorgaenger_name && <span title={t("kurse.chainHint")}>← {t("kurse.previousYear")}: {k.vorgaenger_name}</span>}
+                {k.vorgaenger_name && k.nachfolger_name && <span>·</span>}
+                {k.nachfolger_name && <span title={t("kurse.chainHint")}>{t("kurse.nextYear")}: {k.nachfolger_name} →</span>}
+              </div>
+            )}
             <KursLinks kurs={k} />
 
             {/* Bearbeiten-Bereich (hinter dem Stift): klar gegliedert in Name,
@@ -123,6 +150,21 @@ export default function Kurse() {
                       onKeyDown={(e) => e.key === "Enter" && saveName(k)} style={{ ...inputStyle, flex: 1, minWidth: 160 }} />
                     <button onClick={() => saveName(k)} style={btnPrimary}>{t("common.save")}</button>
                   </div>
+                </div>
+
+                <div>
+                  <div style={editLabel}>{t("kurse.editYear")}</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <input value={editJahr} onChange={(e) => setEditJahr(e.target.value)} placeholder="2025/26"
+                      style={{ ...inputStyle, width: 120 }} />
+                    <select value={editVor} onChange={(e) => setEditVor(e.target.value)} style={{ ...selectStyle, flex: 1, minWidth: 200 }}>
+                      <option value="">{t("kurse.noPrevious")}</option>
+                      {alleKurse.filter((x) => x.id !== k.id).map((x) => (
+                        <option key={x.id} value={x.id}>{x.name}{x.schuljahr ? ` (${x.schuljahr})` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 4 }}>{t("kurse.chainHint")}</div>
                 </div>
 
                 <div>

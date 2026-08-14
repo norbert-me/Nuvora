@@ -1876,4 +1876,9 @@ export default {
   "noten.verlaufSingleToggle": "Individual grades",
   "noten.colDefault": "Column {{n}}",
   "noten.colDate": "Date of the assessment",
+  "kurse.editYear": "School year and previous year",
+  "kurse.noPrevious": "no previous year",
+  "kurse.previousYear": "Previous year",
+  "kurse.nextYear": "Next year",
+  "kurse.chainHint": "The same group one year earlier. The data stays separate — only the order is linked, so you can find the prior knowledge.",
 };

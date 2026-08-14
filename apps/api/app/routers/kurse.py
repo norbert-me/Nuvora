@@ -8,6 +8,7 @@ Mitgliedschaft ist many-to-many (Tabelle kurs_tags): eine Klasse kann in
 mehreren Kursen sein. Alle Mitglieder eines Kurses teilen — es gibt keinen
 Unterschied „Sharing vs. Tag" mehr.
 """
+import re
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -27,6 +28,8 @@ router = APIRouter(prefix="/api/kurse", tags=["kurse"])
 class KursIn(BaseModel):
     name: str
     niveau_aktiv: Optional[bool] = None
+    schuljahr: Optional[str] = None      # "2025/26" — Beschriftung, kein Zeitraum
+    vorgaenger_id: Optional[int] = None  # dieselbe Lerngruppe im Vorjahr (0/None = keiner)
 
 
 class NiveauIn(BaseModel):
@@ -46,6 +49,47 @@ class KursOut(BaseModel):
     niveau_aktiv: bool = False
     color: str = ""
     member_count: int = 0    # einzeln hinzugefügte SuS (Kurs aus Teilen von Klassen)
+    schuljahr: str = ""
+    vorgaenger_id: Optional[int] = None
+    vorgaenger_name: str = ""       # damit die Liste nicht je Kurs nachfragen muss
+    nachfolger_id: Optional[int] = None
+    nachfolger_name: str = ""
+
+
+# Schuljahr aus einem Kursnamen lesen: "6.5 Mathematik (2025-2026)" -> "2025/26".
+# Bestandskurse tragen es im Namen, weil es bisher kein Feld dafuer gab; der
+# Backfill beim Start (main.py) fuellt daraus einmalig das Feld.
+_JAHR = re.compile(r"(20\d{2})\s*[-/–]\s*(20\d{2}|\d{2})")
+
+
+def schuljahr_aus_name(name: str) -> str:
+    m = _JAHR.search(name or "")
+    if not m:
+        return ""
+    von, bis = m.group(1), m.group(2)
+    return f"{von}/{bis[-2:]}"
+
+
+async def _kette_ok(db, user, kurs_id: int, vorgaenger_id: int) -> None:
+    """Ein Kurs darf nicht sein eigener Vorgaenger sein — auch nicht ueber Ecken.
+
+    Ohne diese Pruefung laesst sich A→B→A bauen, und jede Anzeige, die der Kette
+    folgt, dreht sich im Kreis (die Liste laedt dann bis zum Anschlag).
+    """
+    if vorgaenger_id == kurs_id:
+        raise HTTPException(400, "Ein Kurs kann nicht sein eigenes Vorjahr sein")
+    gesehen = {kurs_id}
+    lauf = vorgaenger_id
+    for _ in range(20):
+        if lauf is None:
+            return
+        if lauf in gesehen:
+            raise HTTPException(400, "Das ergäbe einen Kreis in der Jahresfolge")
+        gesehen.add(lauf)
+        k = await db.get(Kurs, lauf)
+        if not k or k.owner_id != user.id:
+            raise HTTPException(404, "Vorjahres-Kurs nicht gefunden")
+        lauf = k.vorgaenger_id
 
 
 async def _owned_kurs(db, user, kurs_id) -> Kurs:
@@ -160,7 +204,21 @@ async def list_kurse(archiviert: bool = False, user: User = Depends(get_current_
         select(KursStudent.kurs_id, _f.count(KursStudent.id))
         .where(KursStudent.kurs_id.in_([k.id for k in kurse] or [-1])).group_by(KursStudent.kurs_id)
     )).all())
-    return [KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv, color=k.color, member_count=int(mc.get(k.id, 0))) for k in kurse]
+    # Namen der Nachbarn in der Jahresfolge mitgeben — auch die des Vorjahres,
+    # das meist im ARCHIV liegt und in dieser Liste sonst gar nicht vorkaeme.
+    alle = dict((await db.execute(
+        select(Kurs.id, Kurs.name).where(Kurs.owner_id == user.id, Kurs.deleted_at.is_(None))
+    )).all())
+    nachfolger = {}   # vorgaenger_id -> (id, name) des Folgejahres
+    for k2 in (await db.execute(select(Kurs.id, Kurs.name, Kurs.vorgaenger_id).where(
+            Kurs.owner_id == user.id, Kurs.deleted_at.is_(None), Kurs.vorgaenger_id.is_not(None)))).all():
+        nachfolger[k2[2]] = (k2[0], k2[1])
+    return [KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv,
+                    color=k.color, member_count=int(mc.get(k.id, 0)),
+                    schuljahr=k.schuljahr, vorgaenger_id=k.vorgaenger_id,
+                    vorgaenger_name=alle.get(k.vorgaenger_id, "") if k.vorgaenger_id else "",
+                    nachfolger_id=(nachfolger.get(k.id) or (None, ""))[0],
+                    nachfolger_name=(nachfolger.get(k.id) or (None, ""))[1]) for k in kurse]
 
 
 @router.post("/{kurs_id}/archive", response_model=KursOut)
@@ -197,7 +255,9 @@ async def create_kurs(body: KursIn, user: User = Depends(get_current_user), db: 
     name = (body.name or "").strip()
     if not name:
         raise HTTPException(400, "Name darf nicht leer sein")
-    k = Kurs(owner_id=user.id, name=name[:100])
+    # Neu angelegte Kurse bekommen das Schuljahr aus ihrem Namen, falls es
+    # dort steht — dieselbe Regel wie beim Backfill der Bestandskurse.
+    k = Kurs(owner_id=user.id, name=name[:100], schuljahr=schuljahr_aus_name(name))
     db.add(k)
     await db.commit()
     await db.refresh(k)
@@ -212,8 +272,16 @@ async def rename_kurs(kurs_id: int, body: KursIn, user: User = Depends(get_curre
         k.name = name[:100]
     if body.niveau_aktiv is not None:
         k.niveau_aktiv = bool(body.niveau_aktiv)
+    if body.schuljahr is not None:
+        k.schuljahr = (body.schuljahr or "").strip()[:9]
+    if body.vorgaenger_id is not None:
+        neu_id = body.vorgaenger_id or None
+        if neu_id:
+            await _kette_ok(db, user, k.id, neu_id)
+        k.vorgaenger_id = neu_id
     await db.commit()
-    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color)
+    return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color,
+                   schuljahr=k.schuljahr, vorgaenger_id=k.vorgaenger_id)
 
 
 class ColorIn(BaseModel):

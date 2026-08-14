@@ -590,10 +590,30 @@ def teste_kern(api, b, u):
             if len(geteilt) < 2:
                 raise AssertionError("Klasse teilt ihre Schueler nicht mit dem zweiten Kurs")
             api.call("DELETE", f"/api/kurse/{zweit['id']}/classes/{u.class_id}", erwartet=(204,))
+            # Jahresfolge: der zweite Kurs bekommt den ersten als Vorjahr. Die
+            # Liste muss den Namen des Vorjahres mitliefern, sonst muesste die
+            # Oberflaeche je Kurs nachfragen — und das Vorjahr liegt meist im
+            # Archiv, wo diese Liste gar nicht hinsieht.
+            api.call("PUT", f"/api/kurse/{zweit['id']}",
+                     {"name": f"{PRAEFIX} Zweitkurs B", "schuljahr": "2025/26",
+                      "vorgaenger_id": u.kurs_id}, erwartet=(200,))
+            liste = api.call("GET", "/api/kurse", erwartet=(200,))
+            mein = next((x for x in liste if x["id"] == zweit["id"]), None)
+            if not mein or mein.get("vorgaenger_id") != u.kurs_id or not mein.get("vorgaenger_name"):
+                raise AssertionError(f"Vorjahr fehlt in der Kursliste: {mein}")
+            if mein.get("schuljahr") != "2025/26":
+                raise AssertionError(f"Schuljahr nicht gespeichert: {mein}")
+            # Ein Kreis muss abgewiesen werden (sonst dreht sich jede Anzeige,
+            # die der Kette folgt, im Kreis).
+            status, _ = api.call("PUT", f"/api/kurse/{zweit['id']}",
+                                 {"name": f"{PRAEFIX} Zweitkurs B", "vorgaenger_id": zweit["id"]}, roh=True)
+            if status != 400:
+                raise AssertionError(f"Kurs als eigenes Vorjahr: HTTP {status} statt 400")
         finally:
             api.call("DELETE", f"/api/kurse/{zweit['id']}", erwartet=(204, 404))
             api.call("DELETE", f"/api/kurse/{zweit['id']}/purge", erwartet=(204, 404))
-        return f"{len(mitglieder)} Schueler im Kurs, zweiter Kurs teilt dieselben"
+        return (f"{len(mitglieder)} Schueler im Kurs, zweiter Kurs teilt dieselben, "
+                f"Jahresfolge gesetzt und Kreis abgewiesen")
 
     def themen():
         api.call("PUT", f"/api/topics/{u.topic_id}",

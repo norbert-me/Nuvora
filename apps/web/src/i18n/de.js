@@ -1862,4 +1862,9 @@ export default {
   "noten.verlaufSingleToggle": "Einzelne Noten",
   "noten.colDefault": "Spalte {{n}}",
   "noten.colDate": "Datum der Leistung",
+  "kurse.editYear": "Schuljahr und Vorjahr",
+  "kurse.noPrevious": "kein Vorjahr",
+  "kurse.previousYear": "Vorjahr",
+  "kurse.nextYear": "Folgejahr",
+  "kurse.chainHint": "Dieselbe Lerngruppe im Jahr davor. Die Daten bleiben getrennt — verbunden wird nur die Reihenfolge, damit du das Vorwissen wiederfindest.",
 };

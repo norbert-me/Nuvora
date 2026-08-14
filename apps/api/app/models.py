@@ -210,6 +210,16 @@ class Kurs(Base):
     # Farbe des Kurses (Stundenplan/Kalender). Die Fach-Klassen teilen sie sich —
     # darum am Kurs, nicht je Klasse.
     color: Mapped[str] = mapped_column(String(9), default="", server_default="")
+    # Schuljahr als Text, z.B. "2025/26". Bewusst kein Datumsbereich: das
+    # Schuljahr ist eine Beschriftung, kein Zeitraum, mit dem gerechnet wird.
+    schuljahr: Mapped[str] = mapped_column(String(9), default="", server_default="")
+    # Dieselbe Lerngruppe im Vorjahr. Die Daten bleiben getrennt (Zeugnisnoten
+    # gelten je Schuljahr) — verbunden wird nur die Kette, damit „6.5 Mathe" und
+    # „7.5 Mathe" nicht als zwei fremde Gruppen dastehen. SET NULL: wird das
+    # Vorjahr endgueltig geloescht, bleibt der Nachfolger vollstaendig.
+    vorgaenger_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

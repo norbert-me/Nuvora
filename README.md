@@ -378,6 +378,20 @@ Einen Kurs zu archivieren nimmt seine Fach-Klassen mit; zurück geht es jederzei
 Bewusst etwas anderes als der Papierkorb — der löscht nach 30 Tagen, und eine
 alte Note muss man Jahre später noch nachschlagen können.
 
+### Dieselbe Lerngruppe im nächsten Schuljahr
+
+Aus „6.5 Mathematik" wird „7.5 Mathematik" — dieselben Kinder, ein Jahr später.
+Beides in **eine** Klasse zu legen ginge nicht gut: am Notenbuch hängen
+Halbjahre, an der Klasse Kartennummern, Sitzplan und Anwesenheit, und eine
+Zeugnisnote gilt je Schuljahr.
+
+Verbunden wird deshalb die **Reihenfolge**, nicht der Inhalt: ein Kurs trägt
+sein **Schuljahr** (`2025/26`) und darf auf den Kurs des **Vorjahres** zeigen.
+In der Kursliste steht dann „← Vorjahr: 6.5 Mathematik" bzw. „Folgejahr: 7.5
+Mathematik →" — auch wenn das Vorjahr längst im Archiv liegt. Bestandskurse
+bekommen ihr Schuljahr beim ersten Start aus dem Namen („(2025-2026)"); der
+Name selbst bleibt unverändert. Ein Kreis in der Kette wird abgewiesen.
+
 ### Zugangs-Codes für die Lernenden
 
 Karteikarten und die eigenen Testergebnisse erreichen Lernende **ohne Konto**

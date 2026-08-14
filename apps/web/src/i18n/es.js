@@ -1877,4 +1877,9 @@ export default {
   "noten.verlaufSingleToggle": "Notas individuales",
   "noten.colDefault": "Columna {{n}}",
   "noten.colDate": "Fecha de la evaluación",
+  "kurse.editYear": "Curso escolar y año anterior",
+  "kurse.noPrevious": "sin año anterior",
+  "kurse.previousYear": "Año anterior",
+  "kurse.nextYear": "Año siguiente",
+  "kurse.chainHint": "El mismo grupo un año antes. Los datos siguen separados — solo se enlaza el orden, para reencontrar los conocimientos previos.",
 };
