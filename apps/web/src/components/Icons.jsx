@@ -5,12 +5,17 @@ const iconSvg = { fill: "none", stroke: "var(--text3)", strokeWidth: 1.5, stroke
 // Icon skaliert standardmäßig mit der Schriftgröße (1em) und sitzt auf der
 // Textlinie — so bleibt jedes Symbol im Verhältnis zum umgebenden Text. Eine
 // feste Größe (px als Zahl oder z.B. "1.2em") bleibt möglich, wo gewollt.
-export function Icon({ d, color, size, ...props }) {
+export function Icon({ d, color, size, style, ...props }) {
   // Default 18px statt 1em: die feinen Strich-Icons wirkten bei 1em (~14px)
   // durchgehend zu klein. Explizite size-Angaben bleiben unberuehrt.
+  //
+  // style wird GEMERGT, nicht ersetzt: ein `style={{ transform: … }}` von aussen
+  // hat vorher width/height/fill mitgeloescht — das Icon wurde dann so breit wie
+  // seine Zelle und schwarz gefuellt (der Pfeil im Notenbuch war ein Dreieck
+  // ueber die halbe Zeile).
   const s = size || 18;
   return (
-    <svg style={{ ...iconSvg, width: s, height: s, stroke: color || iconSvg.stroke, verticalAlign: "-0.125em", flexShrink: 0 }} viewBox="0 0 20 20" {...props}>
+    <svg style={{ ...iconSvg, width: s, height: s, stroke: color || iconSvg.stroke, verticalAlign: "-0.125em", flexShrink: 0, ...style }} viewBox="0 0 20 20" {...props}>
       {Array.isArray(d) ? d.map((p, i) => <path key={i} d={p} />) : <path d={d} />}
     </svg>
   );

@@ -633,6 +633,8 @@ const bedienung = (td) => [
       // weist die API zu Recht ab (Produktregel, siehe CLAUDE.md).
       const fehler = await noteTippen(seite, MARKE_UI, "2,3");
       if (fehler) throw new Error(fehler);
+      const tab = await tabSpringtWeiter(seite, MARKE_UI);
+      if (tab) throw new Error(tab);
     },
     // Eigene Probe: die Spalte allein beweist nur die halbe Miete. Erst die
     // Zelle zeigt, dass auch die NOTE gespeichert wurde.
@@ -908,6 +910,33 @@ async function noteTippen(seite, spalte, note) {
   } catch {
     return `die Note „${note}" erscheint nicht in der Zelle`;
   }
+  return "";
+}
+
+/**
+ * Tab in einer Notenzelle muss die naechste Zelle zum Tippen oeffnen.
+ *
+ * Ohne das endet jede Eingabe in einem Mausklick: der Browser gibt den Fokus
+ * zwar weiter, aber daneben steht ein Knopf und kein Eingabefeld — man tippt
+ * ins Leere. Geprueft wird genau das: nach Tab liegt der Fokus in einem INPUT,
+ * und zwar in einer ANDEREN Zelle als vorher.
+ */
+async function tabSpringtWeiter(seite, spalte) {
+  const idx = await spaltenIndex(seite, spalte).catch(() => -1);
+  if (idx < 0) return "die Spalte steht nicht im Tabellenkopf";
+  const zelle = seite.locator("tbody tr").first().locator("td").nth(idx);
+  await zelle.locator("button").first().click({ timeout: 8000 });
+  const feld = zelle.locator("input").first();
+  await feld.waitFor({ state: "visible", timeout: 8000 });
+  await feld.press("Tab");
+  try {
+    await seite.waitForFunction(() => document.activeElement?.tagName === "INPUT", null, { timeout: 8000 });
+  } catch {
+    return "nach Tab liegt der Fokus in keinem Eingabefeld — die Zelle daneben laesst sich nicht tippen";
+  }
+  const gleiche = await zelle.locator("input").count();
+  if (gleiche > 0) return "nach Tab steht das Eingabefeld noch in derselben Zelle";
+  await seite.keyboard.press("Escape");
   return "";
 }
 

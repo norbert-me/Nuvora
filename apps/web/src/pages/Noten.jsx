@@ -7,7 +7,7 @@
 //
 // Klick auf einen Namen öffnet alle Infos zur Person. Beobachtungen zählen nie
 // in den Schnitt — „Anstrengungsbereitschaft“ ist kein Messwert.
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
@@ -20,6 +20,49 @@ import { useLanguage } from "../i18n/index.jsx";
 import { useUrlClass } from "../core/klassenwahl.js";
 
 const API = "/api/noten";
+
+// Abschnittstitel bleibt im SICHTBAREN Teil seines Abschnitts mittig.
+//
+// Ein breiter Abschnitt ist beim Scrollen nur zum Teil zu sehen; sein Titel war
+// in der ganzen (auch verdeckten) Breite zentriert und rutschte damit aus dem
+// Bild — man scrollt durch Spalten und weiss nicht mehr, wo man ist. Reines CSS
+// reicht nicht (sticky kennt keine Mitte), also wird die Verschiebung gerechnet:
+// Mitte des sichtbaren Ausschnitts minus Mitte der Zelle, begrenzt auf die Zelle.
+function StickyMitte({ scrollRef, children, style }) {
+  const ref = useRef(null);
+  const [dx, setDx] = useState(0);
+
+  useLayoutEffect(() => {
+    const sc = scrollRef.current;
+    if (!sc) return undefined;
+    const rechne = () => {
+      const el = ref.current;
+      const zelle = el?.parentElement;
+      if (!zelle) return;
+      const z = zelle.getBoundingClientRect();
+      const s = sc.getBoundingClientRect();
+      // Die Namensspalte klebt links und verdeckt den Anfang — sie zaehlt nicht
+      // zum sichtbaren Ausschnitt.
+      const kleber = zelle.parentElement?.firstElementChild;
+      const klebt = kleber && kleber !== zelle ? kleber.getBoundingClientRect().width : 0;
+      const links = Math.max(z.left, s.left + klebt);
+      const rechts = Math.min(z.right, s.right);
+      if (rechts - links <= 0) { setDx(0); return; }
+      const eigen = el.getBoundingClientRect().width;
+      const grenze = Math.max(0, (z.width - eigen) / 2);   // nie aus der Zelle heraus
+      const zellmitte = (z.left + z.right) / 2;
+      const ziel = (links + rechts) / 2;
+      setDx(Math.max(-grenze, Math.min(grenze, ziel - zellmitte)));
+    };
+    rechne();
+    sc.addEventListener("scroll", rechne, { passive: true });
+    window.addEventListener("resize", rechne);
+    return () => { sc.removeEventListener("scroll", rechne); window.removeEventListener("resize", rechne); };
+  }, [scrollRef]);
+
+  // transform bewegt nur die Anzeige; die Zellbreite bleibt, wie sie ist.
+  return <div ref={ref} style={{ ...style, transform: dx ? `translateX(${dx}px)` : undefined, willChange: "transform" }}>{children}</div>;
+}
 
 // Zeile im Export-Dropdown (Icon + Text, linksbündig).
 const expRow = { display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "8px 10px", background: "none", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 13.5, color: "var(--text)", textAlign: "left" };
@@ -79,6 +122,7 @@ export default function Noten() {
     localStorage.setItem("noten_collapsed", JSON.stringify([...n]));
     return n;
   });
+  const tabelleRef = useRef(null);
   const [dragId, setDragId] = useState(null);
   // Vorschau beim Ziehen: auf welchem Abschnitt, und links oder rechts einfuegen.
   const [dragOver, setDragOver] = useState(null); // { id, side: "left"|"right" }
@@ -303,6 +347,26 @@ export default function Noten() {
     showAlert(t("noten.nachholDone", { weak: j.weak, cards: j.cards_requeued }));
   };
 
+  // Tab springt zur naechsten Zelle rechts (Shift+Tab nach links), am Zeilenende
+  // in die naechste Zeile. Ohne das endete jede Eingabe in einem Mausklick: der
+  // Browser gibt den Fokus zwar weiter, aber die Zelle daneben ist ein Knopf und
+  // kein Eingabefeld — man tippt ins Leere.
+  const zellFolge = () => {
+    const cats = sections.filter((sec) => !collapsed.has(sec.id))
+      .flatMap((sec) => (sec.categories || []).map((c) => c.id));
+    return { cats, kinder: (summary || []).map((s) => s.student_id) };
+  };
+  const nachbar = (studentId, catId, rueckwaerts) => {
+    const { cats, kinder } = zellFolge();
+    const sp = cats.indexOf(catId), ze = kinder.indexOf(studentId);
+    if (sp < 0 || ze < 0) return null;
+    let nsp = sp + (rueckwaerts ? -1 : 1), nze = ze;
+    if (nsp >= cats.length) { nsp = 0; nze += 1; }
+    if (nsp < 0) { nsp = cats.length - 1; nze -= 1; }
+    if (nze < 0 || nze >= kinder.length) return null;
+    return `${kinder[nze]}:${cats[nsp]}`;
+  };
+
   const noteSetzen = async (studentId, catId, text) => {
     setZelle(null);
     const wert = parseNote(text);
@@ -519,7 +583,7 @@ export default function Noten() {
         // verwirrt mehr als sie hilft).
         <div style={{ marginBottom: 14 }}><Empty title={t("noten.noSections")} hint={t("noten.noSectionsHint")} /></div>
       ) : (
-        <div style={{ overflowX: "auto", overflowY: "visible", border: "1px solid var(--border)", borderRadius: 12, WebkitOverflowScrolling: "touch" }}>
+        <div ref={tabelleRef} style={{ overflowX: "auto", overflowY: "visible", border: "1px solid var(--border)", borderRadius: 12, WebkitOverflowScrolling: "touch" }}>
           <table style={{ borderCollapse: "collapse", fontSize: 13.5, minWidth: "100%" }}>
             <thead>
               <tr>
@@ -540,7 +604,7 @@ export default function Noten() {
                       style={{ ...th, borderLeft: over && dragOver.side === "left" ? "3px solid var(--accent)" : "2px solid var(--border3)",
                         borderRight: over && dragOver.side === "right" ? "3px solid var(--accent)" : undefined,
                         cursor: "grab", opacity: dragId === sec.id ? 0.4 : 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
+                      <StickyMitte scrollRef={tabelleRef} style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
                         <span title={t("noten.dragHint")} style={{ display: "inline-flex", color: "var(--text3)" }}><Icon d={ICONS.grip} size={14} /></span>
                         <button onClick={() => toggleCollapse(sec.id)} className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={isCol ? t("noten.expand") : t("noten.collapse")}>
                           <Icon d={isCol ? ICONS.plus : ICONS.minus} size={14} />
@@ -551,7 +615,7 @@ export default function Noten() {
                           onEdit={(b) => call(() => fetch(`${API}/sections/${sec.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }))}
                           onDelete={async () => { if (await askConfirm(t("noten.delSection", { name: sec.name }))) call(() => fetch(`${API}/sections/${sec.id}`, { method: "DELETE" })); }}
                           onAddCol={() => setNeuSpalteIn(sec.id)} />
-                      </div>
+                      </StickyMitte>
                     </th>
                   );
                 })}
@@ -667,7 +731,14 @@ export default function Noten() {
                         return (
                           <td key={c.id} style={{ ...td, padding: 0, width: 56, minWidth: 56, maxWidth: 56, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined }}>
                             {zelle === id
-                              ? <Zelle initial={noten[0] ? de(noten[0].value) : ""} onSave={(txt) => noteSetzen(s.student_id, c.id, txt)} onCancel={() => setZelle(null)} />
+                              ? <Zelle initial={noten[0] ? de(noten[0].value) : ""}
+                                  onSave={(txt) => noteSetzen(s.student_id, c.id, txt)}
+                                  onCancel={() => setZelle(null)}
+                                  onTab={(txt, zurueck) => {
+                                    const ziel = nachbar(s.student_id, c.id, zurueck);
+                                    if (txt.trim()) noteSetzen(s.student_id, c.id, txt);
+                                    setZelle(ziel);
+                                  }} />
                               : <button onClick={() => setZelle(id)}
                                   style={{ width: "100%", minHeight: 32, border: "none", background: "none", cursor: "text", color: "var(--text)", fontSize: 13.5, fontWeight: noten.length ? 600 : 400 }}>
                                   {s.per_category[String(c.id)] !== undefined ? de(s.per_category[String(c.id)]) : <span style={{ color: "var(--border2)" }}>·</span>}
@@ -723,13 +794,27 @@ export default function Noten() {
   );
 }
 
-function Zelle({ onSave, onCancel, initial = "" }) {
+// Eingabefeld einer Notenzelle. Nur 1–6 mit einer Nachkommastelle ist tippbar:
+// vorher liess sich „42" eintragen, und das Speichern schlug still fehl.
+function Zelle({ onSave, onCancel, onTab, initial = "" }) {
   const ref = useRef(null);
+  const weiter = useRef(false);   // Tab hat schon gespeichert — onBlur nicht doppelt
   useEffect(() => { ref.current?.focus(); ref.current?.select(); }, []);
   return (
-    <input ref={ref} defaultValue={initial} size={1}
-      onBlur={(e) => (e.target.value.trim() ? onSave(e.target.value) : onCancel())}
-      onKeyDown={(e) => { if (e.key === "Enter") onSave(e.target.value); if (e.key === "Escape") onCancel(); }}
+    <input ref={ref} defaultValue={initial} size={1} inputMode="decimal" maxLength={4}
+      onInput={(e) => {
+        let v = e.target.value.replace(".", ",").replace(/[^0-9,]/g, "");
+        const teile = v.split(",");
+        v = teile.length > 1 ? `${teile[0].slice(0, 1)},${teile.slice(1).join("").slice(0, 1)}` : v.slice(0, 1);
+        if (v && !/^[1-6]/.test(v)) v = "";
+        e.target.value = v;
+      }}
+      onBlur={(e) => { if (weiter.current) return; e.target.value.trim() ? onSave(e.target.value) : onCancel(); }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onSave(e.target.value);
+        if (e.key === "Escape") onCancel();
+        if (e.key === "Tab" && onTab) { e.preventDefault(); weiter.current = true; onTab(e.target.value, e.shiftKey); }
+      }}
       placeholder="2,3"
       style={{ width: "100%", minHeight: 32, border: "2px solid var(--accent)", borderRadius: 4, background: "var(--input-bg, var(--bg))", color: "var(--text)", textAlign: "center", fontSize: 13.5, padding: 0, boxSizing: "border-box" }} />
   );
@@ -1151,10 +1236,16 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, o
         </div>
 
         <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "6px 14px", fontSize: 13.5, marginBottom: 18 }}>
-          <dt style={dtS}>{t("noten.course")}</dt>
-          <dd style={ddS}>{student.niveau ? (student.niveau === "E" ? "E-Kurs" : "G-Kurs") : "—"}</dd>
-          <dt style={dtS}>{t("noten.supportNeeds")}</dt>
-          <dd style={ddS}>{student.foerder?.length ? student.foerder.join(", ") : "—"}</dd>
+          {/* Nur zeigen, was es gibt: eine Zeile „Kurs —" behauptet eine
+              E/G-Einteilung, die in diesem Fach gar nicht gefuehrt wird. */}
+          {student.niveau && (<>
+            <dt style={dtS}>{t("noten.course")}</dt>
+            <dd style={ddS}>{student.niveau === "E" ? "E-Kurs" : "G-Kurs"}</dd>
+          </>)}
+          {student.foerder?.length > 0 && (<>
+            <dt style={dtS}>{t("noten.supportNeeds")}</dt>
+            <dd style={ddS}>{student.foerder.join(", ")}</dd>
+          </>)}
           {student.klassenlehrer && (<><dt style={dtS}>{t("noten.classTeacher")}</dt><dd style={ddS}>{student.klassenlehrer}</dd></>)}
           {student.notizen && (<><dt style={dtS}>{t("noten.notes")}</dt><dd style={ddS}>{student.notizen}</dd></>)}
         </dl>
