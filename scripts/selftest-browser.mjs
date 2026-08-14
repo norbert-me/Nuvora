@@ -1310,11 +1310,14 @@ async function lernpfadAufraeumen(api) {
   }
   for (const p of await holen("/api/lernpfad/paths")) await loesche(`/api/lernpfad/paths/${p.id}`, p.name);
   for (const c of await holen("/api/classes")) await loesche(`/api/classes/${c.id}`, c.name);
-  // Papierkorb: was weich geloescht wurde (Pfade, Lernleitern, Klasse, ihr Kurs)
-  // gehoert endgueltig weg — sonst bleibt es 30 Tage im Konto der Lehrkraft.
-  for (const it of await holen("/api/trash")) await loesche(`/api/trash/${it.kind}/${it.id}`, `${it.label} ${it.context}`);
-  // Themen zuletzt: das Loeschen nimmt die Unterthemen mit.
+  // Themen: das Loeschen nimmt die Unterthemen mit.
   for (const t of themen) if (!t.parent_id) await loesche(`/api/topics/${t.id}`, t.name);
+  // Papierkorb ZULETZT: alles hier ist weiches Loeschen, auch Themen — der
+  // Durchgang stand vorher VOR dem Loeschen der Themen und hat sie deshalb
+  // nicht mehr gesehen. Die drei Themen blieben als „Reste" liegen und der
+  // Lauf war rot, obwohl aufgeraeumt wurde. Endgueltig weg muss es, sonst
+  // liegt es 30 Tage im Konto der Lehrkraft.
+  for (const it of await holen("/api/trash")) await loesche(`/api/trash/${it.kind}/${it.id}`, `${it.label} ${it.context}`);
 
   // Nachschau statt Hoffnung: was traegt die Marke noch?
   const uebrig = [];
