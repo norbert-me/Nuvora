@@ -31,7 +31,22 @@ export default function Scanner() {
   const recentTimers = useRef({});
   const confirmBuffer = useRef({});
   const CONFIRM_COUNT = 2;
-  const SCAN_GAP_MS = 120; // Mindestpause zwischen zwei Scans
+  // Mindestpause zwischen zwei Scans — zwei Werte statt einem.
+  //
+  // Der Scanner schickt jedes Bild an den Server; bei 120 ms sind das gut acht
+  // Bilder je Sekunde, dauerhaft, auch wenn die Kamera gerade auf den Tisch
+  // zeigt. Sobald eine Weile keine Karte im Bild war, reicht ein langsamerer
+  // Takt: es gibt nichts zu erkennen, und die erste Karte, die wieder auftaucht,
+  // schaltet sofort zurueck auf schnell (siehe captureAndScan). Fuer die
+  // Lehrkraft aendert sich nichts — beim Hochhalten laeuft er voll.
+  const SCAN_GAP_MS = 120;      // Karten im Bild: so schnell wie moeglich
+  const SCAN_GAP_IDLE_MS = 500; // nichts im Bild: sparsam
+  const LEERE_BIS_LANGSAM = 8;  // so viele leere Bilder, dann runterschalten
+  const leereBilder = useRef(0);
+  // JPEG-Guete: die Erkennung sucht schwarz-weisse Muster mit harten Kanten,
+  // die 0,8 waren fuer sie Verschwendung. 0,6 spart grob ein Drittel Bytes je
+  // Bild, ohne dass ein Marker verloren geht.
+  const JPEG_GUETE = 0.6;
   const scanLoopActive = useRef(false);
   const scanInFlight = useRef(false);
   const intervalRef = useRef(null);
@@ -198,7 +213,8 @@ export default function Scanner() {
       scanInFlight.current = false;
     }
     if (scanLoopActive.current) {
-      intervalRef.current = setTimeout(scanLoop, SCAN_GAP_MS);
+      const pause = leereBilder.current >= LEERE_BIS_LANGSAM ? SCAN_GAP_IDLE_MS : SCAN_GAP_MS;
+      intervalRef.current = setTimeout(scanLoop, pause);
     }
   }, []);
 
@@ -212,18 +228,25 @@ export default function Scanner() {
     const ctx = canvas.getContext("2d");
     ctx.drawImage(video, 0, 0);
 
-    const jpeg = canvas.toDataURL("image/jpeg", 0.8);
+    // Das Bild als Rohdaten schicken, nicht als base64 in JSON: toDataURL
+    // erzeugte eine Zeichenkette, die ein Drittel groesser ist als das Bild
+    // selbst (und blockiert dabei den Hauptthread, waehrend toBlob nebenher
+    // arbeitet). Bei mehreren Bildern je Sekunde ueber eine Unterrichtsstunde
+    // war das der groesste Netzposten im ganzen Werkzeug.
+    const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", JPEG_GUETE));
+    if (!blob) return;
 
     try {
-      const res = await fetch(`${API}/scan-image`, {
+      const res = await fetch(`${API}/scan-image-raw?session_id=${resolvedIdRef.current}&save=false`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: resolvedIdRef.current, image: jpeg, save: false }),
+        headers: { "Content-Type": "image/jpeg" },
+        body: blob,
       });
       const data = await res.json();
       drawOverlay(data.cards || []);
 
-      if (!data.cards || data.cards.length === 0) return;
+      if (!data.cards || data.cards.length === 0) { leereBilder.current++; return; }
+      leereBilder.current = 0;
 
       const confirmed = [];
       for (const card of data.cards) {

@@ -5,8 +5,9 @@ from typing import List
 
 import cv2
 import numpy as np
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -34,6 +35,9 @@ class DetectedCard(BaseModel):
 
 
 MAX_IMAGE_B64_LEN = 5 * 1024 * 1024
+# Rohdaten sind ein Viertel kleiner als ihre base64-Fassung — dieselbe Grenze,
+# nur ohne die Aufblaehung mitzuzaehlen.
+MAX_IMAGE_BYTES = MAX_IMAGE_B64_LEN * 3 // 4
 
 
 class ScanImageRequest(BaseModel):
@@ -102,12 +106,16 @@ def zuversicht(degrees: float) -> float:
 
 def detect_markers(image_bytes: bytes) -> List[DetectedCard]:
     nparr = np.frombuffer(image_bytes, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    # Direkt grau dekodieren, nicht farbig und dann umrechnen: die Erkennung
+    # arbeitet ausschliesslich auf Graustufen. IMREAD_COLOR baute erst ein
+    # Bild mit drei Kanaelen (bei 1280x720 rund 2,7 MB) und cvtColor danach
+    # ein zweites — pro Bild, und der Scanner schickt mehrere pro Sekunde.
+    # IMREAD_GRAYSCALE spart beides: ein Drittel Speicher, kein Umrechnen.
+    img = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
     if img is None:
         return []
 
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    corners_list, ids, _ = DETECTOR.detectMarkers(gray)
+    corners_list, ids, _ = DETECTOR.detectMarkers(img)
 
     if ids is None:
         return []
@@ -128,6 +136,78 @@ def detect_markers(image_bytes: bytes) -> List[DetectedCard]:
     return results
 
 
+async def _erkenne_und_speichere(image_bytes: bytes, session_id: int, save: bool,
+                                user: User, db: AsyncSession) -> ScanImageResponse:
+    """Gemeinsamer Weg fuer beide Aufnahme-Endpunkte (JSON und rohes Bild)."""
+    # Erst den Dateityp pruefen, dann erkennen. Vorher entschied cv2.imdecode,
+    # und bei einer kaputten Aufnahme kam eine LEERE Kartenliste mit HTTP 200
+    # zurueck — fuer die Lehrkraft nicht zu unterscheiden von "niemand hat eine
+    # Karte hochgehalten". uploads.bildtyp() ist genau dafuer da und wird auf
+    # allen anderen Bildwegen (Schuelerfoto, Kartenbild) auch benutzt.
+    bildtyp(image_bytes)
+
+    # In den Threadpool: Dekodieren und Markererkennung sind reine Rechenarbeit
+    # (OpenCV, kein await). Direkt in der Coroutine blockierten sie die ganze
+    # Ereignisschleife — waehrend ein Bild lief, wartete JEDE andere Anfrage an
+    # den Server, und der Scanner schickt mehrere Bilder pro Sekunde.
+    cards = await run_in_threadpool(detect_markers, image_bytes)
+
+    if not save:
+        return ScanImageResponse(cards=cards)
+
+    session = await db.get(Session, session_id)
+    if session and session.owner_id and session.owner_id != user.id:
+        raise HTTPException(403)
+    if session and session.current_question_id:
+        # Alle vorhandenen Scans dieser Frage EINMAL holen statt je Karte eine
+        # eigene Abfrage: bei 30 Kindern im Bild waren das 30 Abfragen, wo eine
+        # reicht — und das mehrmals pro Sekunde.
+        vorhanden = {
+            s.student_id: s
+            for s in (await db.execute(
+                select(Scan).where(
+                    Scan.session_id == session_id,
+                    Scan.question_id == session.current_question_id,
+                )
+            )).scalars().all()
+        }
+        for card in cards:
+            scan = vorhanden.get(card.marker_id)
+            if scan:
+                scan.answer = card.answer
+            else:
+                scan = Scan(
+                    session_id=session_id,
+                    question_id=session.current_question_id,
+                    student_id=card.marker_id,
+                    answer=card.answer,
+                )
+                db.add(scan)
+                vorhanden[card.marker_id] = scan
+
+            await ws.broadcast(session_id, {
+                "type": "scan",
+                "student_id": card.marker_id,
+                "answer": card.answer,
+                "question_id": session.current_question_id,
+            })
+
+        if cards:
+            await db.commit()
+            # Aus dem schon geladenen Stand zaehlen — die Zeilen sind dieselben,
+            # die oben gelesen und gerade geschrieben wurden. Eine zweite
+            # Abfrage ueber alle Scans der Frage kostete nur Zeit.
+            from collections import Counter
+            counts = Counter(s.answer for s in vorhanden.values())
+            await ws.broadcast(session_id, {
+                "type": "results",
+                "question_id": session.current_question_id,
+                "counts": {k: counts.get(k, 0) for k in "ABCD"},
+            })
+
+    return ScanImageResponse(cards=cards)
+
+
 @router.post("/scan-image", response_model=ScanImageResponse)
 async def scan_image(body: ScanImageRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     image_data = body.image
@@ -140,66 +220,28 @@ async def scan_image(body: ScanImageRequest, user: User = Depends(get_current_us
         # durch und wurde zu HTTP 500 — als waere der Server kaputt.
         raise HTTPException(400, "Das Bild ist unvollstaendig angekommen. Bitte noch einmal aufnehmen.")
 
-    # Erst den Dateityp pruefen, dann erkennen. Vorher entschied cv2.imdecode,
-    # und bei einer kaputten Aufnahme kam eine LEERE Kartenliste mit HTTP 200
-    # zurueck — fuer die Lehrkraft nicht zu unterscheiden von "niemand hat eine
-    # Karte hochgehalten". uploads.bildtyp() ist genau dafuer da und wird auf
-    # allen anderen Bildwegen (Schuelerfoto, Kartenbild) auch benutzt.
-    bildtyp(image_bytes)
+    return await _erkenne_und_speichere(image_bytes, body.session_id, body.save, user, db)
 
-    cards = detect_markers(image_bytes)
 
-    if not body.save:
-        return ScanImageResponse(cards=cards)
+@router.post("/scan-image-raw", response_model=ScanImageResponse)
+async def scan_image_raw(request: Request, session_id: int, save: bool = True,
+                         user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Dasselbe, aber das Bild kommt als Rohdaten im Rumpf statt als base64.
 
-    session = await db.get(Session, body.session_id)
-    if session and session.owner_id and session.owner_id != user.id:
-        raise HTTPException(403)
-    if session and session.current_question_id:
-        for card in cards:
-            existing = await db.execute(
-                select(Scan).where(
-                    Scan.session_id == body.session_id,
-                    Scan.question_id == session.current_question_id,
-                    Scan.student_id == card.marker_id,
-                )
-            )
-            scan = existing.scalar_one_or_none()
-            if scan:
-                scan.answer = card.answer
-            else:
-                scan = Scan(
-                    session_id=body.session_id,
-                    question_id=session.current_question_id,
-                    student_id=card.marker_id,
-                    answer=card.answer,
-                )
-                db.add(scan)
+    Der Scanner schickt im Betrieb mehrere Bilder pro Sekunde. base64 blaeht
+    jedes um ein Drittel auf (und muss auf beiden Seiten umgerechnet werden) —
+    ueber eine Unterrichtsstunde sind das hunderte Megabyte umsonst, im
+    Schulnetz ueber WLAN der teuerste Weg im ganzen Werkzeug. Der alte
+    JSON-Endpunkt bleibt daneben stehen: aeltere Clients (und die Desktop-App
+    mit ihrem Zwischenspeicher) rufen ihn weiter auf.
+    """
+    image_bytes = await request.body()
+    if not image_bytes:
+        raise HTTPException(400, "Das Bild ist unvollstaendig angekommen. Bitte noch einmal aufnehmen.")
+    if len(image_bytes) > MAX_IMAGE_BYTES:
+        raise HTTPException(400, "Bild zu gross")
 
-            await ws.broadcast(body.session_id, {
-                "type": "scan",
-                "student_id": card.marker_id,
-                "answer": card.answer,
-                "question_id": session.current_question_id,
-            })
-
-        if cards:
-            await db.commit()
-            from collections import Counter
-            all_scans = await db.execute(
-                select(Scan).where(
-                    Scan.session_id == body.session_id,
-                    Scan.question_id == session.current_question_id,
-                )
-            )
-            counts = Counter(s.answer for s in all_scans.scalars().all())
-            await ws.broadcast(body.session_id, {
-                "type": "results",
-                "question_id": session.current_question_id,
-                "counts": {k: counts.get(k, 0) for k in "ABCD"},
-            })
-
-    return ScanImageResponse(cards=cards)
+    return await _erkenne_und_speichere(image_bytes, session_id, save, user, db)
 
 
 class ConfirmScanRequest(BaseModel):
@@ -217,6 +259,17 @@ async def confirm_scans(body: ConfirmScanRequest, user: User = Depends(get_curre
     if not session.current_question_id:
         return {"ok": True}
 
+    # Wie oben: einmal lesen statt je Karte einmal.
+    vorhanden = {
+        s.student_id: s
+        for s in (await db.execute(
+            select(Scan).where(
+                Scan.session_id == body.session_id,
+                Scan.question_id == session.current_question_id,
+            )
+        )).scalars().all()
+    }
+
     for item in body.scans:
         mid = item["marker_id"]
         answer = item["answer"]
@@ -230,14 +283,7 @@ async def confirm_scans(body: ConfirmScanRequest, user: User = Depends(get_curre
             raise HTTPException(400, f"Ungueltige Kartennummer {mid!r} (erlaubt: 0-49)")
         if answer not in ("A", "B", "C", "D", ""):
             raise HTTPException(400, f"Ungueltige Antwort {answer!r}")
-        existing = await db.execute(
-            select(Scan).where(
-                Scan.session_id == body.session_id,
-                Scan.question_id == session.current_question_id,
-                Scan.student_id == mid,
-            )
-        )
-        scan = existing.scalar_one_or_none()
+        scan = vorhanden.get(mid)
         if scan:
             scan.answer = answer
         else:
@@ -248,6 +294,7 @@ async def confirm_scans(body: ConfirmScanRequest, user: User = Depends(get_curre
                 answer=answer,
             )
             db.add(scan)
+            vorhanden[mid] = scan
 
         await ws.broadcast(body.session_id, {
             "type": "scan",
@@ -259,13 +306,7 @@ async def confirm_scans(body: ConfirmScanRequest, user: User = Depends(get_curre
     if body.scans:
         await db.commit()
         from collections import Counter
-        all_scans_result = await db.execute(
-            select(Scan).where(
-                Scan.session_id == body.session_id,
-                Scan.question_id == session.current_question_id,
-            )
-        )
-        counts = Counter(s.answer for s in all_scans_result.scalars().all())
+        counts = Counter(s.answer for s in vorhanden.values())
         await ws.broadcast(body.session_id, {
             "type": "results",
             "question_id": session.current_question_id,
