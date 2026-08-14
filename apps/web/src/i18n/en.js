@@ -1868,4 +1868,7 @@ export default {
   "ziele.lpPfade": "Learning paths",
   "help.core.searchT": "Finding things (⌘K)",
   "help.core.search": "The magnifier at the top right — or ⌘K / Ctrl+K — finds pages, tabs, classes, courses and topics. Search for what you want to do: “absences” leads to attendance, “report card” to the gradebook. Only what your enabled modules offer is listed.",
+  "noten.verlaufSection": "History: {name}",
+  "noten.verlaufRunning": "Each point is the overall grade after that entry — weighted across all sections.",
+  "noten.verlaufSingle": "The individual grades of this section, in the order they were entered.",
 };

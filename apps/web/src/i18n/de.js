@@ -1854,4 +1854,7 @@ export default {
   "ziele.lpPfade": "Lernpfade",
   "help.core.searchT": "Etwas finden (⌘K)",
   "help.core.search": "Die Lupe oben rechts — oder ⌘K bzw. Strg+K — findet Seiten, Reiter, Klassen, Kurse und Themen. Gesucht werden darf nach dem, was du tun willst: „Fehlzeiten“ führt zur Anwesenheit, „Zeugnis“ ins Notenbuch. Angezeigt wird nur, was deine zugeschalteten Module hergeben.",
+  "noten.verlaufSection": "Verlauf: {name}",
+  "noten.verlaufRunning": "Jeder Punkt ist der Stand der Gesamtnote nach dieser Note — gewichtet über alle Bereiche.",
+  "noten.verlaufSingle": "Die einzelnen Noten dieses Bereichs in der Reihenfolge, in der sie entstanden sind.",
 };

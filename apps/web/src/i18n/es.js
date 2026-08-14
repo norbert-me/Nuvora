@@ -1869,4 +1869,7 @@ export default {
   "ziele.lpPfade": "Itinerarios",
   "help.core.searchT": "Encontrar algo (⌘K)",
   "help.core.search": "La lupa arriba a la derecha — o ⌘K / Ctrl+K — encuentra páginas, pestañas, clases, cursos y temas. Busca por lo que quieres hacer: «ausencias» lleva a asistencia, «boletín» al cuaderno de notas. Solo aparece lo que ofrecen tus módulos activos.",
+  "noten.verlaufSection": "Evolución: {name}",
+  "noten.verlaufRunning": "Cada punto es la nota global tras esa entrada, ponderada sobre todas las secciones.",
+  "noten.verlaufSingle": "Las notas individuales de esta sección, en el orden en que se registraron.",
 };
