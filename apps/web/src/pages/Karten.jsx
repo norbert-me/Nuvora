@@ -365,7 +365,7 @@ export default function Karten() {
               onDragLeave={() => setDropTarget((cur) => (cur === f.id ? undefined : cur))}
               onDrop={(e) => { e.preventDefault(); if (canDrop(f.id)) doDrop(f.id); endDrag(); }}
               style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", marginBottom: 8, borderRadius: 14, background: isTarget ? "var(--accent-bg, rgba(10,132,255,0.10))" : "var(--card)", opacity: isDrag ? 0.4 : 1, cursor: "grab", border: isTarget ? "2px solid var(--accent)" : "1px solid var(--border)" }}>
-              <span className="drag-handle" style={{ color: "var(--text3)", cursor: "grab", fontSize: 15, flexShrink: 0 }}>⠿</span>
+              <span className="drag-handle" style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex", flexShrink: 0 }}><Icon d={ICONS.grip} size={15} /></span>
               <button onClick={() => setCurrentCardFolder(f.id)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", textAlign: "left", minWidth: 0, color: "var(--text)" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                 <strong style={{ fontSize: 15 }}>{f.name}{isTarget ? ` — ${t("karten.dropHere")}` : ""}</strong>
@@ -667,7 +667,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: collapsed ? 0 : 10, flexWrap: "wrap" }}>
         {onDragStartDeck && (
           <span onMouseDown={() => { dragFromHandle.current = true; }}
-            className="drag-handle" title={t("karten.moveToFolder")} style={{ color: "var(--text3)", cursor: "grab", fontSize: 15, flexShrink: 0, userSelect: "none" }}>⠿</span>
+            className="drag-handle" title={t("karten.moveToFolder")} style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex", flexShrink: 0, userSelect: "none" }}><Icon d={ICONS.grip} size={15} /></span>
         )}
         <button onClick={() => setCollapsed((v) => !v)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title={collapsed ? t("topics.expand") : t("topics.collapse")}>
           <span style={{ display: "inline-flex", transform: collapsed ? "none" : "rotate(90deg)", transition: "transform 0.15s", color: "var(--text3)" }}><Icon d={ICONS.open} size={16} /></span>
@@ -749,7 +749,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
       {deck.cards.length > 0 && (
         <div style={{ position: "relative", display: "inline-block", marginBottom: 12 }}>
           <button onClick={() => setRollOpen((v) => !v)} style={{ ...btnSecondary, padding: "5px 12px", display: "inline-flex", alignItems: "center", gap: 6 }}>
-            {t("karten.rollout")} <span style={{ color: "var(--text3)" }}>▾</span>
+            {t("karten.rollout")} <Icon d={ICONS.open} size={10} style={{ transform: "rotate(90deg)" }} />
           </button>
           {rollOpen && (
             <>
@@ -782,7 +782,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
             opacity: dragCard === c.id ? 0.4 : 1,
             boxShadow: over && cardDrop.side === "above" ? "inset 0 2px 0 var(--accent)" : over && cardDrop.side === "below" ? "inset 0 -2px 0 var(--accent)" : undefined }}>
           <span draggable onDragStart={(e) => { e.stopPropagation(); e.dataTransfer.effectAllowed = "move"; setDragCard(c.id); }} onDragEnd={() => { setDragCard(null); setCardDrop(null); }}
-            className="drag-handle" title={t("karten.reorderHint")} style={{ color: "var(--text3)", cursor: "grab", fontSize: 14, flexShrink: 0, userSelect: "none" }}>⠿</span>
+            className="drag-handle" title={t("karten.reorderHint")} style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex", flexShrink: 0, userSelect: "none" }}><Icon d={ICONS.grip} size={14} /></span>
           {c.has_front_image && <AuthImage src={`${API}/cards/${c.id}/image/front`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: 5, border: "1px solid var(--border2)", flexShrink: 0 }} />}
           <span style={{ flex: 1, minWidth: 0 }}><strong><Latex>{c.front}</Latex></strong> <span style={{ color: "var(--text3)" }}>→ <Latex>{c.back}</Latex></span></span>
           {/* E/G je Karte: nur zeigen, wenn gesetzt — ein Stapel ohne

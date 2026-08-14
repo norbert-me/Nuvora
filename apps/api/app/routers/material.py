@@ -163,6 +163,52 @@ def _ist_office(m) -> bool:
     return (m.mime in OFFICE) or (m.filename or "").lower().endswith(OFFICE_ENDUNGEN)
 
 
+# Ab dieser Groesse lohnt es, fuer die Ansicht eine leichtere Fassung zu bauen.
+# Darunter ist der Aufwand groesser als der Gewinn.
+VORSCHAU_AB = 1_500_000
+
+
+def _verkleinern(pdf: bytes) -> bytes:
+    """Leichtere PDF-Fassung fuer die Bildschirmansicht (Ghostscript).
+
+    Eine 5-MB-Arbeit mit eingescannten Bildern laedt spuerbar lange, obwohl
+    niemand sie am Bildschirm in Druckaufloesung braucht. `/ebook` rechnet Bilder
+    auf rund 150 dpi herunter — am Monitor nicht zu unterscheiden, oft ein
+    Viertel der Groesse. Der Download bleibt davon unberuehrt: dort geht immer
+    das Original raus.
+
+    Faellt Ghostscript aus (nicht installiert, kaputte Datei), bleibt es beim
+    Original — eine langsamere Vorschau ist besser als gar keine.
+    """
+    import shutil
+    import subprocess
+    import tempfile
+    from pathlib import Path
+
+    gs = shutil.which("gs")
+    if not gs:
+        return pdf
+    with tempfile.TemporaryDirectory() as tmp:
+        quelle = Path(tmp) / "gross.pdf"
+        ziel = Path(tmp) / "klein.pdf"
+        quelle.write_bytes(pdf)
+        try:
+            subprocess.run(
+                [gs, "-sDEVICE=pdfwrite", "-dCompatibilityLevel=1.5", "-dPDFSETTINGS=/ebook",
+                 "-dNOPAUSE", "-dBATCH", "-dQUIET", "-dSAFER",
+                 f"-sOutputFile={ziel}", str(quelle)],
+                check=True, timeout=60, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+        except Exception:
+            return pdf
+        if not ziel.exists():
+            return pdf
+        klein = ziel.read_bytes()
+        # Nur nehmen, wenn es wirklich kleiner ist — bei reinen Textdateien
+        # kommt manchmal eine groessere Datei heraus.
+        return klein if 0 < len(klein) < len(pdf) else pdf
+
+
 def _nach_pdf(daten: bytes, dateiname: str) -> bytes:
     """Office-Datei nach PDF wandeln — mit LibreOffice, ohne Netz, im Tempordner.
 
@@ -219,13 +265,24 @@ async def material_als_pdf(material_id: int, user: User = Depends(get_current_us
     if not m or m.owner_id != user.id:
         raise HTTPException(404, "Material nicht gefunden")
 
-    if m.mime == "application/pdf":
+    if m.pdf_data:
+        pdf = m.pdf_data                     # schon gebaute Ansichtsfassung
+    elif m.mime == "application/pdf":
         pdf = m.data
-    elif m.pdf_data:
-        pdf = m.pdf_data
+        if len(pdf) > VORSCHAU_AB:
+            # Grosse PDFs einmalig leichter machen und behalten: die Ansicht
+            # soll beim zweiten Aufruf sofort da sein.
+            rate_limit("material_pdf", f"u{user.id}", 30, 60, "Zu viele Umwandlungen. Bitte kurz warten.")
+            klein = await run_in_threadpool(_verkleinern, pdf)
+            if len(klein) < len(pdf):
+                m.pdf_data = klein
+                await db.commit()
+                pdf = klein
     elif _ist_office(m):
         rate_limit("material_pdf", f"u{user.id}", 30, 60, "Zu viele Umwandlungen. Bitte kurz warten.")
         pdf = await run_in_threadpool(_nach_pdf, m.data, m.filename)
+        if len(pdf) > VORSCHAU_AB:
+            pdf = await run_in_threadpool(_verkleinern, pdf)
         m.pdf_data = pdf
         await db.commit()
     else:

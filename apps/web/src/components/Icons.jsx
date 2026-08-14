@@ -78,13 +78,19 @@ export const ICONS = {
   clock: ["M10 4a6 6 0 100 12 6 6 0 000-12z", "M10 7v3.2l2.2 1.3"],
   // Auge (Ansicht/Präsentation), Kreis (neutrale Markierung), ban (gesperrt).
   eye: ["M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z", "M10 7.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"],
+  // Durchgestrichenes Auge: „zaehlt nicht mit" / „bleibt draussen".
+  eyeOff: ["M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z", "M10 7.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z", "M3.5 3.5l13 13"],
   circle: ["M10 3.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13z"],
-  // Anwesend / nicht mitgeschrieben. Person statt Kreis: ein leerer Kreis sagt
-  // nicht, worum es geht — „war da" ist eine Aussage ueber einen Menschen, und
-  // ein Auge hiesse „anzeigen/verbergen", also etwas anderes.
-  person: ["M10 4.2a2.8 2.8 0 100 5.6 2.8 2.8 0 000-5.6z", "M4.5 16.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"],
-  personOff: ["M10 4.2a2.8 2.8 0 100 5.6 2.8 2.8 0 000-5.6z", "M4.5 16.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5", "M3.5 3.5l13 13"],
   ban: ["M10 3a7 7 0 100 14 7 7 0 000-14z", "M5.5 5.5l9 9"],
+  // Kette (externe Quelle/Verknuepfung) — ersetzt das Emoji 🔗, das je nach
+  // System und Theme anders aussieht und sich nicht einfaerben laesst.
+  link: ["M8.5 11.5a3 3 0 004.2 0l2.6-2.6a3 3 0 10-4.2-4.2l-.9.9",
+         "M11.5 8.5a3 3 0 00-4.2 0l-2.6 2.6a3 3 0 104.2 4.2l.9-.9"],
+  // Sonne = unterrichtsfrei (Ferien/Feiertag). Ersetzt 🌴.
+  sun: ["M10 6.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7z",
+        "M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6L16 16M16 4l-1.4 1.4M5.4 14.6L4 16"],
+  // Gluehbirne = Vorschlag/Idee (Einstieg). Ersetzt 💡.
+  bulb: ["M7.5 12.5a4.5 4.5 0 115 0V14h-5v-1.5z", "M8 16h4", "M8.8 17.5h2.4"],
   // Zahnrad: Mittelkreis + 8 Speichen (Ansicht-/Einstellungen-Menü).
   settings: ["M10 7.6a2.4 2.4 0 100 4.8 2.4 2.4 0 000-4.8z",
     "M10 2v2.2M10 15.8V18M2 10h2.2M15.8 10H18M4.4 4.4l1.6 1.6M14 14l1.6 1.6M15.6 4.4L14 6M6 14l-1.6 1.6"],

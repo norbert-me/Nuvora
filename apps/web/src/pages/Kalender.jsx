@@ -523,7 +523,7 @@ export default function Kalender() {
           ) : (
             <div style={{ position: "relative" }}>
               <button onClick={() => setJumpOpen((v) => !v)} title={t("kalender.jumpToDay")}
-                style={{ border: "none", background: "none", fontSize: 15, fontWeight: 700, color: "var(--text)", minWidth: 170, textAlign: "center", cursor: "pointer", padding: "0 8px", height: CONTROL_H, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 8, borderBottom: "1px dotted var(--border2)" }}>{title} ▾</button>
+                style={{ border: "none", background: "none", fontSize: 15, fontWeight: 700, color: "var(--text)", minWidth: 170, textAlign: "center", cursor: "pointer", padding: "0 8px", height: CONTROL_H, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 8, borderBottom: "1px dotted var(--border2)" }}>{title} <Icon d={ICONS.open} size={11} style={{ transform: "rotate(90deg)" }} /></button>
               {jumpOpen && (<>
                 <div onClick={() => setJumpOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
                 <Popover align="center" style={{ padding: 8, display: "flex", gap: 6, alignItems: "center" }}>
@@ -636,7 +636,7 @@ function ExtInfoModal({ ev, onClose, onHide, t }) {
   return (
     <Modal onClose={onClose} width={440} label={ev.title || t("kalender.entry")}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-          <span>🔗</span>
+          <Icon d={ICONS.link} size={14} />
           <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, flex: 1 }}>{ev.title || "—"}</h3>
         </div>
         <p style={{ fontSize: 12, color: "var(--text3)", margin: "0 0 12px" }}>{t("kalender.extEventNote")}</p>
@@ -717,7 +717,7 @@ function ExtChips({ list, onOpen, extColor }) {
   if (!list || !list.length) return null;
   return list.map((ev, i) => (
     <button key={`ext-${i}`} onClick={onOpen ? (e) => { e.stopPropagation(); onOpen(ev); } : undefined} title={ev.title}
-      style={{ display: "block", width: "100%", textAlign: "left", fontSize: 11, color: colOf(ev) || "var(--text3)", background: colOf(ev) ? colOf(ev) + "1e" : "var(--bg2)", border: `1px dashed ${colOf(ev) || "var(--border2)"}`, borderRadius: 6, padding: "1px 5px", margin: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: onOpen ? "pointer" : "default" }}>{(ev.time ? ev.time + " " : "")}🔗 {ev.title || "—"}</button>
+      style={{ display: "block", width: "100%", textAlign: "left", fontSize: 11, color: colOf(ev) || "var(--text3)", background: colOf(ev) ? colOf(ev) + "1e" : "var(--bg2)", border: `1px dashed ${colOf(ev) || "var(--border2)"}`, borderRadius: 6, padding: "1px 5px", margin: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: onOpen ? "pointer" : "default" }}>{(ev.time ? ev.time + " " : "")}<Icon d={ICONS.link} size={11} /> {ev.title || "—"}</button>
   ));
 }
 
@@ -964,7 +964,7 @@ function FreiMarker({ label, t }) {
       color: "#8a6d00", background: "rgba(184,134,11,0.16)", borderRadius: 6, padding: "3px 7px", lineHeight: 1.3,
       maxWidth: "100%", boxSizing: "border-box" }}
       title={label ? `${label} — ${t("kalender.freeDay")}` : t("kalender.freeDay")}>
-      <span style={{ fontSize: 12, flexShrink: 0 }}>🌴</span>
+      <Icon d={ICONS.sun} size={13} color="#8a6d00" />
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label || t("kalender.free")}</span>
     </div>
   );
@@ -1025,7 +1025,7 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
     const sm = toMin(ev.time);
     const emx = toMin(ev.endtime); // echte Endzeit aus dem Feed, sonst 60min-Fallback
     timed.push({ key: "x" + i, start: sm, end: emx != null && emx > sm ? emx : sm + 60, col: ev.color || extColor || "var(--text3)", dashed: true,
-      label: "🔗 " + (ev.title || "—"), sub: ev.location || "", onClick: () => onExt(ev) });
+      label: (ev.title || "—"), extern: true, sub: ev.location || "", onClick: () => onExt(ev) });
   });
 
   // Überlappende Termine nebeneinander: jedem Termin eine Spalte (lane) zuweisen,
@@ -1067,7 +1067,7 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
       {/* Freier Tag: als Hinweis oben, nicht als Ersatz fuer den ganzen Tag. */}
       {f && (
         <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(184,134,11,0.12)", color: "#8a6d00", fontSize: 13.5, fontWeight: 600, marginBottom: 14 }}>
-          🌴 {f.label ? `${f.label} — ${t("kalender.free")}` : t("kalender.free")}
+          <Icon d={ICONS.sun} size={14} color="#8a6d00" /> {f.label ? `${f.label} — ${t("kalender.free")}` : t("kalender.free")}
         </div>
       )}
       {hasBanner && (
@@ -1075,7 +1075,7 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
           <div style={{ ...sectionLabel, marginBottom: 6 }}>{t("kalender.allDay")}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {ganztags.map((e) => bannerBtn("g" + e.id, `${e.title || topicName(e.topic_id) || "—"}${linked(e) ? " ↗" : ""}`, e.notes || "", () => onOpen({ ...e, date: new Date(e.date) }), false))}
-            {extAllDay.map((ev, i) => bannerBtn("xa" + i, `🔗 ${ev.title || "—"}`, ev.location || "", () => onExt(ev), true, ev.color))}
+            {extAllDay.map((ev, i) => bannerBtn("xa" + i, ev.title || "—", ev.location || "", () => onExt(ev), true, ev.color))}
           </div>
         </div>
       )}
@@ -1282,7 +1282,8 @@ function ExamMassnahmen({ classId, kursId = null, t }) {
   return (
     <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
       <button onClick={() => setOffen((v) => !v)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--accent)", fontSize: 12.5, fontWeight: 600 }}>
-        {t("kalender.examMeasures", { n: rows.length })} {offen ? "▲" : "▾"}
+        {t("kalender.examMeasures", { n: rows.length })}
+        <Icon d={ICONS.open} size={11} style={{ transform: offen ? "rotate(-90deg)" : "rotate(90deg)", marginLeft: 4 }} />
       </button>
       {offen && (
         <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 5 }}>

@@ -413,7 +413,7 @@ export default function Noten() {
           <div style={{ display: "flex", gap: 8, marginLeft: "auto", alignItems: "center" }}>
             <div style={{ position: "relative" }}>
               <button onClick={() => setExportOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn, display: "inline-flex", alignItems: "center", gap: 2 }} title={t("noten.export")} aria-label={t("noten.export")}>
-                <Icon d={ICONS.export} size={18} /><span style={{ fontSize: 10, color: "var(--text3)" }}>▾</span>
+                <Icon d={ICONS.export} size={18} /><Icon d={ICONS.open} size={9} style={{ transform: "rotate(90deg)" }} />
               </button>
               {exportOpen && (<>
                 <div onClick={() => setExportOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
@@ -639,7 +639,7 @@ export default function Noten() {
                       {(() => { const tr = trendFor(s.student_id); return tr && tr !== "flat" ? (
                         <span title={t(tr === "up" ? "noten.trendUp" : "noten.trendDown")}
                           style={{ marginLeft: 6, fontSize: 12, fontWeight: 700, color: tr === "up" ? C.success : C.danger }}>
-                          {tr === "up" ? "▲" : "▼"}
+                          <Icon d={ICONS.open} size={11} style={{ transform: tr === "up" ? "rotate(-90deg)" : "rotate(90deg)" }} />
                         </span>
                       ) : null; })()}
                     </button>
@@ -965,7 +965,7 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
         {cat.topic_id && kartenAktiv && (
           <button onClick={() => { onNachhol(cat); onClose(); }}
             style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 10, padding: "7px 9px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: C.warning, cursor: "pointer" }}>
-            💡 {t("noten.nachhol")}
+            <Icon d={ICONS.bulb} size={14} /> {t("noten.nachhol")}
           </button>
         )}
         {cat.source_session_id && (

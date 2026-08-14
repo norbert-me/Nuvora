@@ -86,7 +86,7 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv, methodenAktiv }) {
             <span style={{ fontSize: 12.5, fontWeight: 700, color: row.pct < 40 ? C.danger : C.warning }}>{row.pct}%</span>
             {methodByTopic[row.topic_id] && (
               <Link to="/unterrichtsplanung?tab=einstiege" title={methodByTopic[row.topic_id].title} style={{ fontSize: 12, fontWeight: 700, color: C.info, textDecoration: "none", padding: "3px 9px", borderRadius: 980, background: "rgba(37,99,235,0.12)" }}>
-                💡 {t("home.weakEinstieg")}
+                <Icon d={ICONS.bulb} size={13} /> {t("home.weakEinstieg")}
               </Link>
             )}
             {row.geuebt ? (

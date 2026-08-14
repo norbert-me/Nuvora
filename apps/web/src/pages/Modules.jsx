@@ -290,7 +290,7 @@ function Collapsible({ title, children }) {
     <div style={{ marginTop: 14, border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
       <button onClick={() => setOpen((o) => !o)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "12px 14px", background: "var(--bg3)", border: "none", cursor: "pointer", font: "inherit", fontSize: 14.5, fontWeight: 600, color: "var(--text)", textAlign: "left" }}>
         <span>{title}</span>
-        <span style={{ color: "var(--text3)", display: "inline-block", transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▸</span>
+        <span style={{ color: "var(--text3)", display: "inline-flex", transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }}><Icon d={ICONS.open} size={12} /></span>
       </button>
       {open && <div style={{ padding: "12px 14px 14px" }}>{children}</div>}
     </div>

@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libgl1 libglib2.0-0 \
       libreoffice-writer libreoffice-calc libreoffice-impress \
       fonts-liberation fonts-dejavu-core \
+      ghostscript \
     && rm -rf /var/lib/apt/lists/*
 # Aus der Lock-Datei, nicht aus requirements.txt: feste Fassungen statt Bereiche,
 # und --require-hashes laesst pip abbrechen, wenn ein Paket nicht Byte fuer Byte

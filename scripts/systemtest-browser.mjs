@@ -396,7 +396,8 @@ const verbindungen = (td) => [
   {
     name: "Startseite → Einstieg-Chip bei schwachem Thema (braucht Unterrichtsplanung)",
     pfad: "/",
-    marker: "💡 Einstieg",
+    // Ohne Emoji: der Chip traegt jetzt ein SVG-Icon, im Text steht nur das Wort.
+    marker: "Einstieg",
     allein: ["cardvote"],
     zusammen: ["cardvote", "unterrichtsplanung"],
   },

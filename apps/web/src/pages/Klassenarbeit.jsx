@@ -493,7 +493,10 @@ export default function Klassenarbeit() {
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 12, color: "var(--text3)", width: 18 }}>{i + 1}.</span>
                   <input value={task.label} onChange={(e) => setTask(task.id, { label: e.target.value })} placeholder={t("klassenarbeit.taskOptional", { n: i + 1 })} title={t("klassenarbeit.taskOptionalHint")} style={{ ...inputStyle, fontSize: 13, padding: "7px 9px", flex: 1, minWidth: 130 }} />
-                  <select value={task.topic_id || ""} onChange={(e) => setTask(task.id, { topic_id: e.target.value ? Number(e.target.value) : null })} style={{ ...selectStyle, fontSize: 12.5, padding: "7px 9px", minWidth: 130 }}>
+                  {/* 26 px = Breite der Nummer (18) + Abstand (8). Ohne die
+                      Einrueckung beginnt das Themenfeld unter der Nummer statt
+                      unter dem Namen, und die Zeilen stehen versetzt. */}
+                  <select value={task.topic_id || ""} onChange={(e) => setTask(task.id, { topic_id: e.target.value ? Number(e.target.value) : null })} style={{ ...selectStyle, fontSize: 12.5, padding: "7px 9px", minWidth: 130, marginLeft: 26 }}>
                     <option value="">{t("klassenarbeit.topicNone")}</option>
                     {themen.geordnet.map((tp) => <option key={tp.id} value={tp.id}>{themen.label(tp)}</option>)}
                   </select>
@@ -511,7 +514,19 @@ export default function Klassenarbeit() {
                       Sachaufgaben und wuerde mit ihnen verglichen. */}
                   <label style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: task.form ? "var(--accent)" : "var(--text3)", cursor: "pointer", whiteSpace: "nowrap" }}
                     title={t("klassenarbeit.formHint")}>
-                    <input type="checkbox" checked={!!task.form} onChange={(e) => setTask(task.id, { form: e.target.checked })} />
+                    {/* Ein Haken, zwei Wirkungen — und beide gehoeren zusammen:
+                        die Aufgabe faellt aus dem inhaltlichen Vergleich heraus
+                        UND heisst „Darstellung". Den Namen nur setzen, wenn das
+                        Feld leer ist: einen selbst getippten Namen wegzuwerfen
+                        waere eine Ueberraschung, keine Hilfe. */}
+                    <input type="checkbox" checked={!!task.form}
+                      onChange={(e) => {
+                        const an = e.target.checked;
+                        const patch = { form: an };
+                        if (an && !(task.label || "").trim()) patch.label = t("klassenarbeit.form");
+                        else if (!an && (task.label || "").trim() === t("klassenarbeit.form")) patch.label = "";
+                        setTask(task.id, patch);
+                      }} />
                     {t("klassenarbeit.form")}
                   </label>
                   <button onClick={() => addPart(task.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }}
@@ -585,12 +600,13 @@ export default function Klassenarbeit() {
                       <tr key={s.id} style={abw ? { opacity: 0.5 } : undefined}>
                         <td style={{ ...td, textAlign: "left", padding: "4px 8px", position: "sticky", left: 0, zIndex: 1, background: "var(--card)", fontWeight: 500, whiteSpace: "nowrap" }}>
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                            {/* Anwesenheit: Person / durchgestrichene Person. Der
-                                leere Kreis vorher sah nach „auswaehlen" aus und
-                                nicht nach „hat nicht mitgeschrieben". */}
+                            {/* Anwesenheit: Auge / durchgestrichenes Auge —
+                                „zaehlt in der Auswertung mit" bzw. „bleibt
+                                draussen". Der leere Kreis vorher sah nach
+                                „auswaehlen" aus. */}
                             <button onClick={() => toggleAbsent(s.id)} title={abw ? t("klassenarbeit.present") : t("klassenarbeit.absent")}
                               aria-label={abw ? t("klassenarbeit.present") : t("klassenarbeit.absent")} aria-pressed={abw}
-                              style={{ border: "none", background: "none", cursor: "pointer", color: abw ? C.warning : "var(--text3)", padding: 0, display: "inline-flex" }}><Icon d={abw ? ICONS.personOff : ICONS.person} size={15} /></button>
+                              style={{ border: "none", background: "none", cursor: "pointer", color: abw ? C.warning : "var(--text3)", padding: 0, display: "inline-flex" }}><Icon d={abw ? ICONS.eyeOff : ICONS.eye} size={15} /></button>
                             {s.name}
                           </span>
                         </td>

@@ -194,6 +194,12 @@ def _check_werkzeuge(out: List[Check]) -> None:
         detail=(f"{pfad} — Office-Dateien lassen sich im Browser ansehen" if pfad
                 else "fehlt — Word/Excel/PowerPoint lassen sich nur herunterladen, nicht ansehen"),
     ))
+    gs = shutil.which("gs")
+    out.append(Check(
+        gruppe="Einrichtung", name="Ghostscript", ok=bool(gs), schwere="warnung",
+        detail=(f"{gs} — grosse PDFs werden fuer die Ansicht leichter gemacht" if gs
+                else "fehlt — grosse PDFs werden in voller Groesse ausgeliefert (Ansicht laedt laenger)"),
+    ))
 
 
 def _check_config(out: List[Check]) -> None:

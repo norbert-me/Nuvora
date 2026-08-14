@@ -174,7 +174,7 @@ export default function Anwesenheit() {
           {legende}
           {istFrei ? (
             <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(184,134,11,0.12)", color: "#8a6d00", fontSize: 14, fontWeight: 600 }}>
-              🌴 {t("anwesenheit.freeDay")}{istFrei.label ? `: ${istFrei.label}` : ""}
+              <Icon d={ICONS.sun} size={14} color="#8a6d00" /> {t("anwesenheit.freeDay")}{istFrei.label ? `: ${istFrei.label}` : ""}
             </div>
           ) : students.length === 0 ? (
             <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("anwesenheit.noStudents")}</p>
@@ -227,7 +227,7 @@ export default function Anwesenheit() {
                         {a.entsch > 0 && <span style={{ color: COL.entsch }}>{a.entsch}× {t("anwesenheit.entschShort")}</span>}
                       </span>
                     )}
-                    <span style={{ color: "var(--text3)", fontSize: 12 }}>{auf ? "▾" : "▸"}</span>
+                    <span style={{ color: "var(--text3)", display: "inline-flex", transform: auf ? "rotate(90deg)" : "none" }}><Icon d={ICONS.open} size={12} /></span>
                   </button>
                   {auf && (
                     <div style={{ borderTop: "1px solid var(--border)", padding: "8px 12px" }}>

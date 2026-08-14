@@ -245,7 +245,7 @@ export default function Methoden({ embedded } = {}) {
                   </>
                 ) : (
                   <>
-                    <span style={{ color: "var(--text3)", cursor: "grab", fontSize: 13 }} title={t("methoden.dragHint")}>⠿</span>
+                    <span style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex" }} title={t("methoden.dragHint")}><Icon d={ICONS.grip} size={14} /></span>
                     <Icon d={ICONS.folder} size={18} color="var(--accent)" />
                     <span style={{ fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
                     <span style={{ fontSize: 12, color: "var(--text3)" }}>{count}</span>
@@ -268,7 +268,7 @@ export default function Methoden({ embedded } = {}) {
             <div key={m.id} draggable onDragStart={() => setDrag({ kind: "method", id: m.id })} onDragEnd={endDrag}
               onClick={() => setViewing(m)}
               style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "12px 14px", minHeight: 58, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", cursor: "pointer", opacity: drag && drag.kind === "method" && drag.id === m.id ? 0.5 : 1 }}>
-              <span style={{ color: "var(--text3)", cursor: "grab", fontSize: 13, lineHeight: "1.4" }} title={t("methoden.dragHint")}>⠿</span>
+              <span style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex" }} title={t("methoden.dragHint")}><Icon d={ICONS.grip} size={14} /></span>
               <span style={{ fontWeight: 600, flex: 1, minWidth: 0, lineHeight: 1.35, wordBreak: "break-word" }}>{m.title}</span>
             </div>
           ))}

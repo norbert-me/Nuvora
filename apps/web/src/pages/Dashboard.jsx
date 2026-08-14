@@ -921,7 +921,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
               </button>
             </span>
           ) : (
-            <span className="drag-handle" style={{ color: "var(--text3)", width: 20, textAlign: "center", fontSize: 18, cursor: "grab", lineHeight: 1, flexShrink: 0 }}>⠿</span>
+            <span className="drag-handle" style={{ color: "var(--text3)", width: 20, display: "inline-flex", justifyContent: "center", cursor: "grab", flexShrink: 0 }}><Icon d={ICONS.grip} size={15} /></span>
           ))}
           {niveauAktiv && (
             <button
