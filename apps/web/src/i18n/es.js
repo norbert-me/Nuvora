@@ -1764,4 +1764,6 @@ export default {
   "klassenarbeit.fileExpect": "Criterios de corrección",
   "klassenarbeit.partTopicInherit": "— tema de la tarea —",
   "klassenarbeit.partTopicHint": "Tema propio de esta subtarea. Sin elección se aplica el tema de la tarea.",
+  "material.open": "Ver",
+  "material.noPreview": "Descargar: el navegador no puede mostrar archivos de Office. En PDF se abriría con un clic.",
 };

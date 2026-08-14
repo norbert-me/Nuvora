@@ -1749,4 +1749,6 @@ export default {
   "klassenarbeit.fileExpect": "Erwartungshorizont",
   "klassenarbeit.partTopicInherit": "— Thema der Aufgabe —",
   "klassenarbeit.partTopicHint": "Eigenes Thema dieser Teilaufgabe. Ohne Auswahl gilt das Thema der Aufgabe.",
+  "material.open": "Ansehen",
+  "material.noPreview": "Herunterladen — Word/Office kann der Browser nicht anzeigen. Als PDF hochgeladen ginge es mit einem Klick.",
 };

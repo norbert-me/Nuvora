@@ -1763,4 +1763,6 @@ export default {
   "klassenarbeit.fileExpect": "Marking scheme",
   "klassenarbeit.partTopicInherit": "— topic of the task —",
   "klassenarbeit.partTopicHint": "Own topic for this subtask. Without a choice the task’s topic applies.",
+  "material.open": "View",
+  "material.noPreview": "Download — the browser cannot display Office files. Uploaded as PDF it would open in one click.",
 };
