@@ -1766,4 +1766,9 @@ export default {
   "klassenarbeit.partTopicHint": "Tema propio de esta subtarea. Sin elección se aplica el tema de la tarea.",
   "material.open": "Ver",
   "material.noPreview": "Descargar: el navegador no puede mostrar archivos de Office. En PDF se abriría con un clic.",
+  "klassenarbeit.copyTo": "Copiar a otra clase",
+  "klassenarbeit.copyHint": "Se copian tareas, subtareas, temas, escala de notas y los adjuntos. Los puntos y las ausencias no: pertenecen a esta clase. Después son dos exámenes separados.",
+  "klassenarbeit.copyTarget": "Clase destino",
+  "klassenarbeit.copyName": "Nombre de la copia",
+  "klassenarbeit.copyGo": "Copiar",
 };

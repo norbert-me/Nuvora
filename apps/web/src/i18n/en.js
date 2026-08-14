@@ -1765,4 +1765,9 @@ export default {
   "klassenarbeit.partTopicHint": "Own topic for this subtask. Without a choice the task’s topic applies.",
   "material.open": "View",
   "material.noPreview": "Download — the browser cannot display Office files. Uploaded as PDF it would open in one click.",
+  "klassenarbeit.copyTo": "Copy to another class",
+  "klassenarbeit.copyHint": "Tasks, subtasks, topics, grading scale and the attachments come along. Points and absences do not — they belong to this class. Afterwards they are two separate exams.",
+  "klassenarbeit.copyTarget": "Target class",
+  "klassenarbeit.copyName": "Name of the copy",
+  "klassenarbeit.copyGo": "Copy",
 };

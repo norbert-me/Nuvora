@@ -418,6 +418,21 @@ def inhalt_auswertung(api, u, spuren):
     schwach = _finde(ausw.get("students"), student_id=u.students[0])
     if not schwach:
         raise AssertionError("Kind mit 1 von 4 Punkten gilt nicht als schwach")
+
+    # Kopie in dieselbe Klasse (eine zweite Klasse gibt es im Test nicht): die
+    # Aufgaben muessen mitkommen, die PUNKTE nicht. Eine Kopie mit fremden
+    # Punkten waere eine Note am falschen Kind.
+    kopie = api.call("POST", f"/api/klassenarbeit/works/{arbeit['id']}/copy",
+                     {"class_id": u.class_id, "name": f"{PRAEFIX} Arbeit Kopie"}, erwartet=(201,))
+    spuren.append(("Klassenarbeit-Kopie", lambda: api.call(
+        "DELETE", f"/api/klassenarbeit/works/{kopie['id']}", erwartet=(204, 404))))
+    if kopie["id"] == arbeit["id"]:
+        raise AssertionError("Kopie ist dieselbe Arbeit")
+    if (kopie.get("tasks") or [{}])[0].get("max") != 4:
+        raise AssertionError(f"Aufgaben nicht mitkopiert: {kopie.get('tasks')}")
+    if kopie.get("results"):
+        raise AssertionError(f"Punkte mitkopiert — sie gehoeren der Quellklasse: {kopie['results']}")
+    api.call("DELETE", f"/api/klassenarbeit/works/{kopie['id']}", erwartet=(204, 404))
     # Sofort wieder abraeumen: der Noten-Teil weiter unten rechnet mit den
     # Gewichten ALLER Abschnitte — ein liegengebliebener Testabschnitt wuerde
     # dort eine falsche Erwartung erzeugen. (In `spuren` steht es trotzdem, fuer

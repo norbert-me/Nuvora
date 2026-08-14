@@ -161,6 +161,24 @@ export default function Klassenarbeit() {
     const res = await fetch(`${API}/works`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ class_id: cid, kurs_id: kid, name: t("klassenarbeit.newName") }) }).catch(() => null);
     if (res && res.ok) { const w = await res.json(); setWorks((p) => [w, ...p]); setWork(w); }
   };
+  const [kopieOffen, setKopieOffen] = useState(false);
+  // Kopie in eine andere Klasse: Aufgaben, Themen, Notenschluessel und die
+  // Anhaenge kommen mit, die Punkte NICHT — sie gehoeren zu Kindern, die es in
+  // der anderen Klasse nicht gibt.
+  const kopieren = async (zielClassId, zielKursId, name) => {
+    const r = await fetch(`${API}/works/${work.id}/copy`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ class_id: zielClassId, kurs_id: zielKursId ?? null, name }),
+    }).catch(() => null);
+    if (!r || !r.ok) return false;
+    const neu = await r.json();
+    setKopieOffen(false);
+    // Direkt hinspringen: die Kopie ist das, womit weitergearbeitet wird.
+    setClassId(zielClassId); setKursId(zielKursId ?? null); setSubsetKurs(null);
+    setWorks((ws) => [neu, ...ws]); setWork(neu);
+    return true;
+  };
+
   const loeschen = async () => {
     if (!work || !(await askConfirm(t("klassenarbeit.delConfirm", { name: work.name })))) return;
     await fetch(`${API}/works/${work.id}`, { method: "DELETE" }).catch(() => {});
@@ -385,6 +403,9 @@ export default function Klassenarbeit() {
             {works.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
           <button data-tour="ka-new" onClick={neueArbeit} style={btnSecondary}>{t("klassenarbeit.new")}</button>
+          {/* Parallelklassen schreiben dieselbe Arbeit — sie zweimal einzutippen
+              ist dieselbe Arbeit zweimal. */}
+          {work && <button onClick={() => setKopieOffen(true)} className="icon-btn" style={iconBtn} title={t("klassenarbeit.copyTo")} aria-label={t("klassenarbeit.copyTo")}><Icon d={ICONS.duplicate} /></button>}
           {work && <button onClick={loeschen} className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
         </div>
       )}
@@ -715,6 +736,10 @@ export default function Klassenarbeit() {
       )}
       {hasRoster && works.length === 0 && <Empty title={t("klassenarbeit.empty")} hint={t("klassenarbeit.emptyHint")} action={t("klassenarbeit.new")} onAction={neueArbeit} />}
       {hasRoster && work && students.length === 0 && <Empty title={t("klassenarbeit.noStudents")} />}
+
+      {kopieOffen && work && (
+        <KopieModal work={work} onClose={() => setKopieOffen(false)} onCopy={kopieren} t={t} />
+      )}
     </div>
   );
 }
@@ -862,5 +887,44 @@ export function KlassenarbeitVergleich() {
         </div>
       )}
     </div>
+  );
+}
+
+
+// Ziel einer Kopie waehlen. Bewusst dieselbe Auswahl wie oben in der Leiste
+// (KursKlasseSelect) — eine Klasse kann in mehreren Kursen liegen, und die
+// Arbeit haengt am Kurs, wenn es einen gibt.
+function KopieModal({ work, onClose, onCopy, t }) {
+  const [classId, setClassId] = useState(null);
+  const [kursId, setKursId] = useState(null);
+  const [name, setName] = useState(work.name || "");
+  const [busy, setBusy] = useState(false);
+  const [fehler, setFehler] = useState("");
+
+  const los = async () => {
+    if (!classId) return;
+    setBusy(true); setFehler("");
+    const ok = await onCopy(classId, kursId, name.trim() || work.name);
+    setBusy(false);
+    if (!ok) setFehler(t("common.notWork"));
+  };
+
+  return (
+    <Modal onClose={onClose} width={420} label={t("klassenarbeit.copyTo")}>
+      <h3 style={{ fontSize: 17, fontWeight: 700, margin: "0 0 6px" }}>{t("klassenarbeit.copyTo")}</h3>
+      <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 12px", lineHeight: 1.5 }}>{t("klassenarbeit.copyHint")}</p>
+
+      <div style={{ fontSize: 12.5, color: "var(--text2)", margin: "0 0 5px" }}>{t("klassenarbeit.copyTarget")}</div>
+      <KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
+
+      <div style={{ fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" }}>{t("klassenarbeit.copyName")}</div>
+      <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, width: "100%" }} />
+
+      {fehler && <p style={{ color: C.danger, fontSize: 12.5, margin: "10px 0 0" }}>{fehler}</p>}
+      <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+        <button onClick={los} disabled={!classId || busy} style={{ ...btnPrimary, opacity: !classId || busy ? 0.5 : 1 }}>{t("klassenarbeit.copyGo")}</button>
+        <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
+      </div>
+    </Modal>
   );
 }

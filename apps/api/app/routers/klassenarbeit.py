@@ -126,6 +126,64 @@ async def create_work(body: WorkIn, user: User = Depends(require_module), db: As
     return WorkOut(id=w.id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=[], results={}, absent=[])
 
 
+class WorkCopyIn(BaseModel):
+    class_id: int
+    kurs_id: Optional[int] = None
+    name: Optional[str] = None
+
+
+@router.post("/works/{work_id}/copy", response_model=WorkOut, status_code=201)
+async def copy_work(work_id: int, body: WorkCopyIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Dieselbe Arbeit in einer anderen Klasse — als Vorlage, ohne Punkte.
+
+    Parallelklassen schreiben dieselbe Arbeit; sie zweimal einzutippen ist
+    dieselbe Arbeit zweimal. Kopiert wird alles, was die Arbeit AUSMACHT:
+    Aufgaben samt Teilaufgaben, Themen, Maximalpunkte, der Notenschluessel und
+    die Anhaenge (Arbeit + Erwartungshorizont).
+
+    NICHT kopiert werden Punkte und Abwesende — die gehoeren zu Kindern, die es
+    in der anderen Klasse nicht gibt. Eine Kopie mit fremden Punkten waere im
+    besten Fall Muell und im schlimmsten eine Note am falschen Kind.
+
+    Nach dem Kopieren sind es zwei unabhaengige Arbeiten: eine Korrektur an den
+    Aufgaben gilt nur dort, wo sie gemacht wird.
+    """
+    rate_limit("ka_copy", f"u{user.id}", 60, 60, "Zu viele Kopien. Bitte kurz warten.")
+    from ..models import Material
+
+    quelle = await _owned_work(db, user, work_id)
+    await _owned_class(db, user, body.class_id)
+    if body.kurs_id is not None:
+        from .kurse import _owned_kurs
+        await _owned_kurs(db, user, body.kurs_id)
+
+    import copy as _copy
+    ziel = WorkAnalysis(
+        owner_id=user.id, class_id=body.class_id, kurs_id=body.kurs_id,
+        name=((body.name or quelle.name or "Klassenarbeit").strip()[:200]),
+        # Tief kopieren: sonst zeigen beide Arbeiten auf dieselben Listen, und
+        # eine geaenderte Aufgabe waere still in beiden geaendert.
+        tasks=_copy.deepcopy(quelle.tasks or []),
+        results={}, absent=None,
+        scale=_copy.deepcopy(quelle.scale) if quelle.scale else None,
+    )
+    db.add(ziel)
+    await db.flush()
+
+    # Anhaenge mitnehmen: der Erwartungshorizont gilt fuer beide Klassen, und
+    # ihn zweimal hochzuladen waere derselbe Handgriff zweimal.
+    anhaenge = (await db.execute(select(Material).where(
+        Material.owner_id == user.id, Material.work_id == quelle.id))).scalars().all()
+    for a in anhaenge:
+        db.add(Material(owner_id=user.id, work_id=ziel.id, rolle=a.rolle,
+                        filename=a.filename, mime=a.mime, size=a.size, data=a.data))
+
+    await db.commit()
+    await db.refresh(ziel)
+    return WorkOut(id=ziel.id, class_id=ziel.class_id, kurs_id=ziel.kurs_id, name=ziel.name,
+                   tasks=ziel.tasks or [], results={}, scale=ziel.scale, absent=[])
+
+
 @router.put("/works/{work_id}", response_model=WorkOut)
 async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     w = await _owned_work(db, user, work_id)

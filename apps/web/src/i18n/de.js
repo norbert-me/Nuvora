@@ -1751,4 +1751,9 @@ export default {
   "klassenarbeit.partTopicHint": "Eigenes Thema dieser Teilaufgabe. Ohne Auswahl gilt das Thema der Aufgabe.",
   "material.open": "Ansehen",
   "material.noPreview": "Herunterladen — Word/Office kann der Browser nicht anzeigen. Als PDF hochgeladen ginge es mit einem Klick.",
+  "klassenarbeit.copyTo": "In andere Klasse kopieren",
+  "klassenarbeit.copyHint": "Aufgaben, Teilaufgaben, Themen, Notenschlüssel und die Anhänge kommen mit. Punkte und Abwesende nicht — die gehören zu dieser Klasse. Danach sind es zwei getrennte Arbeiten.",
+  "klassenarbeit.copyTarget": "Zielklasse",
+  "klassenarbeit.copyName": "Name der Kopie",
+  "klassenarbeit.copyGo": "Kopieren",
 };
