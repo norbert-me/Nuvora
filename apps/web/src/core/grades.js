@@ -75,3 +75,15 @@ export function stdev(arr) {
   const m = arr.reduce((a, b) => a + b, 0) / n;
   return Math.sqrt(arr.reduce((s, x) => s + (x - m) ** 2, 0) / (n - 1));
 }
+
+/**
+ * Datum an einen Spaltentitel haengen, statt ihn zu ersetzen.
+ *
+ * „Mini-Test" plus Kalenderklick ergab vorher nur noch „01.01.26" — der Name
+ * war weg. Ein bereits angehaengtes Datum wird ausgetauscht, damit zweimaliges
+ * Klicken nicht zwei Daten aneinanderreiht.
+ */
+export function mitDatum(titel, datum) {
+  const rest = String(titel || "").replace(/\s*\d{1,2}\.\d{1,2}\.\d{2,4}\s*$/, "").trim();
+  return rest ? `${rest} ${datum}` : datum;
+}

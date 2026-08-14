@@ -5,7 +5,7 @@
 // Die Uebernahme ins Notenbuch filtert auf 1..6 — STILL. Der beste Schueler
 // der Klasse fiel damit aus der uebernommenen Spalte heraus, ohne Fehler.
 import { describe, it, expect } from "vitest";
-import { DEFAULT_SCALE, gradeFromPct, gradeDetailed, quantile, stdev } from "./grades.js";
+import { DEFAULT_SCALE, gradeFromPct, gradeDetailed, quantile, stdev, mitDatum } from "./grades.js";
 
 // Eigener Schluessel einer Lehrkraft (users.grade_scale). Vom Server kommt er
 // als JSON, die Schluessel sind dort Zeichenketten — genau so getestet.
@@ -160,5 +160,25 @@ describe("Statistik-Helfer", () => {
     expect(stdev([])).toBe(0);
     expect(stdev([3])).toBe(0);
     expect(stdev([2, 4])).toBeCloseTo(Math.SQRT2, 10);
+  });
+});
+
+describe("mitDatum", () => {
+  it("haengt das Datum an, statt den Titel zu ersetzen", () => {
+    expect(mitDatum("Mini-Test", "01.01.26")).toBe("Mini-Test 01.01.26");
+  });
+
+  it("nimmt nur das Datum, wenn kein Titel dasteht", () => {
+    expect(mitDatum("", "01.01.26")).toBe("01.01.26");
+    expect(mitDatum("   ", "01.01.26")).toBe("01.01.26");
+  });
+
+  it("tauscht ein schon angehaengtes Datum aus, statt zwei zu sammeln", () => {
+    expect(mitDatum("Mini-Test 01.01.26", "02.02.26")).toBe("Mini-Test 02.02.26");
+    expect(mitDatum("01.01.26", "02.02.26")).toBe("02.02.26");
+  });
+
+  it("laesst ein Datum MITTEN im Titel in Ruhe", () => {
+    expect(mitDatum("Test 1.1. Wiederholung", "05.05.26")).toBe("Test 1.1. Wiederholung 05.05.26");
   });
 });

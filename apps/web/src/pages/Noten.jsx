@@ -16,6 +16,7 @@ import { Icon, ICONS, iconBtn, toolbarIconBtn, chipStyle, COLORS as C, btnPrimar
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useAktiv } from "../core/modules.js";
+import { mitDatum } from "../core/grades.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { useUrlClass } from "../core/klassenwahl.js";
 
@@ -1092,7 +1093,7 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
           <input value={name} onChange={(e) => setName(e.target.value)} autoFocus
             onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") onClose(); }}
             style={{ ...inp, fontSize: 12, padding: 5 }} />
-          <DatePick onPick={setName} title={t("noten.useDate")} />
+          <DatePick onPick={(datum) => setName((alt) => mitDatum(alt, datum))} title={t("noten.useDate")} />
         </div>
         {topics.length > 0 && (
           <div style={{ marginBottom: 10 }}>
@@ -1165,7 +1166,7 @@ function ColForm({ t, onSave, onCancel, initial = "", vorschlag = "" }) {
       <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder={vorschlag || t("noten.colName")}
         onKeyDown={(e) => { if (e.key === "Enter") nimm(); if (e.key === "Escape") onCancel(); }}
         style={{ ...inp, fontSize: 14, padding: "9px 11px", flex: 1, minWidth: 120 }} />
-      <DatePick onPick={setName} title={t("noten.useDate")} size={20} />
+      <DatePick onPick={(datum) => setName((alt) => mitDatum(alt, datum))} title={t("noten.useDate")} size={20} />
       <button onClick={nimm} style={{ ...btnPrimary }}>OK</button>
       <button onClick={onCancel} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.abort")} aria-label={t("common.abort")}><Icon d={ICONS.close} size={20} /></button>
     </div>
