@@ -98,10 +98,23 @@ export const pageFull = { maxWidth: "100%", margin: "0 auto", width: "100%", box
 
 export const iconBtn = { cursor: "pointer", padding: "6px", border: "none", background: "transparent", borderRadius: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s" };
 
+// ─── EINE Hoehe fuer alles, was in einer Werkzeugleiste nebeneinander steht ───
+// Reiter, Hinzufuegen-Knopf, Auge, Datumsfeld: jedes Element hatte seine Hoehe
+// selbst gesetzt (Reiter ~30 aus Polsterung, Auge 34, Plus 36, Datumsfeld 38).
+// Nebeneinander sah das aus wie drei verschiedene Groessen — am deutlichsten am
+// Plus, das ueber den Reitern stand. Wer eine Leiste baut, nimmt diese Hoehe;
+// abweichen nur mit Grund.
+export const CONTROL_H = 34;
+
+// Icon-Knopf in einer Werkzeugleiste: quadratisch auf Leistenhoehe. `iconBtn`
+// bleibt daneben stehen — der wird auch in Tabellenzeilen benutzt, und dort
+// waeren 34 px zu wuchtig.
+export const toolbarIconBtn = { ...iconBtn, width: CONTROL_H, height: CONTROL_H };
+
 // EINHEITLICHER Hinzufügen-Knopf: quadratisch, nur ein „+" (Akzentfarbe), das
 // Label steckt in title/aria-label. So sehen ALLE „Hinzufügen"-Aktionen gleich
 // aus — nicht mal Text, mal btnPrimary. Abweichung nur per Spread ableiten.
-export function AddButton({ onClick, title, size = 36, style, ...rest }) {
+export function AddButton({ onClick, title, size = CONTROL_H, style, ...rest }) {
   return (
     <button onClick={onClick} title={title} aria-label={title} className="icon-btn"
       style={{ ...iconBtn, width: size, height: size, border: "1px solid var(--border2)", borderRadius: 10, flexShrink: 0, ...style }} {...rest}>
@@ -231,13 +244,14 @@ export const inputStyle = {
 // dadurch sichtbar hoeher als alles daneben. Feste Hoehe statt Polsterung ist
 // hier der verlaessliche Weg — ein natives Datumsfeld bringt eine eigene
 // innere Hoehe mit, die sich ueber padding nicht sauber angleichen laesst.
-const DATE_NAV_H = 32;
+// Hoehe kommt aus CONTROL_H (oben) — der Navigator ist eine Werkzeugleiste wie
+// jede andere und soll nicht seine eigene Groesse mitbringen.
 export const dateNavBtn = {
-  ...btnSecondary, height: DATE_NAV_H, padding: "0 14px", fontSize: 13, lineHeight: 1,
+  ...btnSecondary, height: CONTROL_H, padding: "0 14px", fontSize: 13, lineHeight: 1,
   display: "inline-flex", alignItems: "center", justifyContent: "center",
 };
 export const dateNavInput = {
-  ...inputStyle, height: DATE_NAV_H, padding: "0 12px", fontSize: 13, lineHeight: 1,
+  ...inputStyle, height: CONTROL_H, padding: "0 12px", fontSize: 13, lineHeight: 1,
   borderRadius: 980, // Pille wie die Knoepfe daneben
 };
 
@@ -535,10 +549,12 @@ export function Modal({ children, onClose, width = 480, style, title, titleStyle
 // Pillen-Umschalter (Tabs/Ansichten). options: [[value, label], …].
 export function Tabs({ value, onChange, options, style }) {
   return (
-    <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden", ...style }}>
+    <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden",
+      height: CONTROL_H, boxSizing: "border-box", ...style }}>
       {options.map(([v, label]) => (
         <button key={v} onClick={() => onChange(v)} style={{
-          padding: "6px 14px", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
+          padding: "0 14px", height: "100%", display: "inline-flex", alignItems: "center",
+          fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
           background: value === v ? "var(--accent)" : "transparent",
           color: value === v ? "#fff" : "var(--text2)",
         }}>{label}</button>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, dateNavBtn, dateNavInput, Modal, ExportButton, ImportButton, pageApp, Popover} from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, dateNavBtn, dateNavInput, toolbarIconBtn, CONTROL_H, Modal, ExportButton, ImportButton, pageApp, Popover} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, put } from "../core/cache.js";
@@ -445,7 +445,7 @@ export default function Kalender() {
         {view !== "timetable" && view !== "breaks" && view !== "klassenarbeit" && (
           <div style={{ position: "relative" }}>
             {/* Auge = „was anzeigen?": Ganztägige/Externe ein-/ausblenden + Farbe. */}
-            <button data-tour="kal-view-menu" onClick={() => setViewMenuOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn, width: 34, height: 34, opacity: (showAllDay && showExt) ? 1 : 0.55 }} title={t("kalender.viewMenu")} aria-label={t("kalender.viewMenu")}>
+            <button data-tour="kal-view-menu" onClick={() => setViewMenuOpen((v) => !v)} className="icon-btn" style={{ ...toolbarIconBtn, opacity: (showAllDay && showExt) ? 1 : 0.55 }} title={t("kalender.viewMenu")} aria-label={t("kalender.viewMenu")}>
               <Icon d={ICONS.eye} size={18} />
             </button>
             {viewMenuOpen && (<>
@@ -486,7 +486,7 @@ export default function Kalender() {
         )}
         {view !== "timetable" && view !== "breaks" && view !== "klassenarbeit" && (
           <div style={{ position: "relative" }}>
-            <button onClick={() => setMoreOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn, width: 34, height: 34 }} title={t("common.more") !== "common.more" ? t("common.more") : "Mehr"} aria-label={t("common.more") !== "common.more" ? t("common.more") : "Mehr"}>
+            <button onClick={() => setMoreOpen((v) => !v)} className="icon-btn" style={toolbarIconBtn} title={t("common.more") !== "common.more" ? t("common.more") : "Mehr"} aria-label={t("common.more") !== "common.more" ? t("common.more") : "Mehr"}>
               <Icon d={ICONS.more} size={18} />
             </button>
             {moreOpen && (<>
@@ -522,7 +522,7 @@ export default function Kalender() {
           ) : (
             <div style={{ position: "relative" }}>
               <button onClick={() => setJumpOpen((v) => !v)} title={t("kalender.jumpToDay")}
-                style={{ border: "none", background: "none", fontSize: 15, fontWeight: 700, color: "var(--text)", minWidth: 170, textAlign: "center", cursor: "pointer", padding: "0 8px", height: 32, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 8, borderBottom: "1px dotted var(--border2)" }}>{title} ▾</button>
+                style={{ border: "none", background: "none", fontSize: 15, fontWeight: 700, color: "var(--text)", minWidth: 170, textAlign: "center", cursor: "pointer", padding: "0 8px", height: CONTROL_H, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 8, borderBottom: "1px dotted var(--border2)" }}>{title} ▾</button>
               {jumpOpen && (<>
                 <div onClick={() => setJumpOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
                 <Popover align="center" style={{ padding: 8, display: "flex", gap: 6, alignItems: "center" }}>

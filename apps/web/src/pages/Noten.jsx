@@ -12,7 +12,7 @@ import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Modal as UiModal, popoverPanel, Empty, Skeleton, ImportButton, inputStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, toolbarIconBtn, COLORS as C, btnPrimary, btnSecondary, Modal as UiModal, popoverPanel, Empty, Skeleton, ImportButton, inputStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
@@ -427,7 +427,7 @@ export default function Noten() {
             {cdAktiv && sections.length > 0 && <button onClick={() => setCdDialog(true)} style={btnSecondary} title={t("noten.fromCdHint")}>{t("noten.fromCd")}</button>}
             <button data-tour="noten-add" onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}
               className="icon-btn"
-              style={{ ...iconBtn, width: 36, height: 36, border: "1px solid var(--border2)", borderRadius: 10 }}>
+              style={{ ...toolbarIconBtn, border: "1px solid var(--border2)", borderRadius: 10 }}>
               <Icon d={ICONS.plus} size={20} color="var(--accent)" />
             </button>
           </div>

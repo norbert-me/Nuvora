@@ -3,7 +3,7 @@
 // gibt eine Liste Toggles rein. Optional persistiert der Aufrufer die Werte
 // (z.B. pro Kurs). Diese Komponente hält nur das Auf/Zu des Menüs.
 import { useState } from "react";
-import { Icon, ICONS, iconBtn, Toggle, Popover} from "./Icons.jsx";
+import { Icon, ICONS, toolbarIconBtn, Toggle, Popover} from "./Icons.jsx";
 
 // items: [{ key, label, value, onChange, hint }]
 export default function ViewMenu({ items = [], title = "Ansicht" }) {
@@ -12,7 +12,7 @@ export default function ViewMenu({ items = [], title = "Ansicht" }) {
   return (
     <span style={{ position: "relative", display: "inline-flex" }}>
       <button onClick={() => setOpen((o) => !o)} className="icon-btn" title={title} aria-label={title}
-        style={{ ...iconBtn, border: (open || anyOn) ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 999, width: 30, height: 30, color: (open || anyOn) ? "var(--accent)" : "var(--text3)" }}>
+        style={{ ...toolbarIconBtn, border: (open || anyOn) ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 999, color: (open || anyOn) ? "var(--accent)" : "var(--text3)" }}>
         <Icon d={ICONS.settings} size={17} />
       </button>
       {open && (
