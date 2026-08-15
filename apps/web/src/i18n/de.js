@@ -1869,4 +1869,13 @@ export default {
   "kurse.chainHint": "Dieselbe Lerngruppe im Jahr davor. Die Daten bleiben getrennt — verbunden wird nur die Reihenfolge, damit du das Vorwissen wiederfindest.",
   "sitzplan.photoToggle": "Fotos anzeigen",
   "sitzplan.photoHint": "Gesicht statt nur Name am Platz. Ohne hinterlegtes Foto stehen die Initialen.",
+  "noten.runningAvg": "Stand",
+  "noten.gradeShortLabel": "Note",
+  "noten.commentTitle": "Kommentar zur Note",
+  "noten.commentHint": "Gehört zu dieser Zelle und zählt nie in einen Schnitt — die Note wird gerechnet, der Text steht daneben.",
+  "noten.commentPlaceholder": "z. B. krank, nachgeschrieben am 12.03.",
+  "noten.commentAdd": "Kommentar hinzufügen",
+  "noten.commentRow": "In dieser Zeile gibt es Kommentare",
+  "help.au.commentT": "Kommentar an der Note",
+  "help.au.comment": "Jede Zelle kann einen Kommentar tragen — über die kleine Ecke oben rechts. Er gehört zur Note („Formel vergessen“, „krank, nachgeschrieben“), zählt aber nie in einen Schnitt. Zeilen mit Kommentaren tragen einen Punkt hinter dem Namen.",
 };

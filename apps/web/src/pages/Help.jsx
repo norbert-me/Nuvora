@@ -82,6 +82,7 @@ function AuswertungHilfe({ t }) {
   return (
     <>
       <Section title={t("help.au.tabsT")}>{t("help.au.tabs")}</Section>
+      <Section title={t("help.au.commentT")}>{t("help.au.comment")}</Section>
       <Section title={t("help.nt.howT")}>{t("help.nt.how")}</Section>
       <Section title={t("help.nt.avgT")}>{t("help.nt.avg")}</Section>
       <Section title={t("help.nt.trendT")}>{t("help.nt.trend")}</Section>
@@ -172,24 +173,6 @@ function NotizbrettHilfe({ t }) {
   );
 }
 
-function KlassenleitungHilfe({ t }) {
-  return (
-    <>
-      <Section title={t("help.kl.whatT")}>{t("help.kl.what")}</Section>
-      <Section title={t("help.kl.privT")}>{t("help.kl.priv")}</Section>
-    </>
-  );
-}
-
-function BeobachtungenHilfe({ t }) {
-  return (
-    <>
-      <Section title={t("help.beo.whatT")}>{t("help.beo.what")}</Section>
-      <Section title={t("help.beo.sepT")}>{t("help.beo.sep")}</Section>
-    </>
-  );
-}
-
 function TafelHilfe({ t }) {
   return (
     <>
@@ -209,7 +192,7 @@ const AREA_COMP = {
   core: KernHilfe, cardvote: CardVoteHilfe, lernpfad: LernpfadHilfe, karten: KartenHilfe,
   auswertung: AuswertungHilfe, kalender: KalenderHilfe, unterrichtsplanung: UnterrichtsplanungHilfe,
   "code-detektiv": DetektivHilfe, orga: OrgaHilfe, zufall: ZufallHilfe,
-  notizbrett: NotizbrettHilfe, klassenleitung: KlassenleitungHilfe, notizen: BeobachtungenHilfe,
+  notizbrett: NotizbrettHilfe,
   tafel: TafelHilfe, mathespiele: MathespieleHilfe,
 };
 

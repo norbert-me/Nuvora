@@ -1883,4 +1883,13 @@ export default {
   "kurse.chainHint": "The same group one year earlier. The data stays separate — only the order is linked, so you can find the prior knowledge.",
   "sitzplan.photoToggle": "Show photos",
   "sitzplan.photoHint": "A face instead of just a name on each seat. Without a photo, the initials are shown.",
+  "noten.runningAvg": "Running average",
+  "noten.gradeShortLabel": "Grade",
+  "noten.commentTitle": "Comment on the grade",
+  "noten.commentHint": "Belongs to this cell and never counts towards an average — the grade is calculated, the text sits beside it.",
+  "noten.commentPlaceholder": "e.g. ill, sat the test on 12 Mar",
+  "noten.commentAdd": "Add comment",
+  "noten.commentRow": "This row has comments",
+  "help.au.commentT": "Comment on a grade",
+  "help.au.comment": "Every cell can carry a comment — via the small corner at the top right. It belongs to the grade (“forgot the formula”, “ill, sat it later”) but never counts towards an average. Rows with comments carry a dot after the name.",
 };

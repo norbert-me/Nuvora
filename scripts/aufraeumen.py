@@ -231,7 +231,6 @@ class Sammler:
         self._orga()
         self._unterrichtsplanung()
         self._notizbrett()
-        self._notizen_und_eltern()
         self._code_detektiv()
         self._kern(klassen)
         self._papierkorb()
@@ -331,42 +330,6 @@ class Sammler:
                   lambda o: [f"/api/notizblock/{o['id']}"])
         self.nimm(g, "To-do", self._get("/api/todo"), lambda o: [f"/api/todo/{o['id']}"])
 
-    def _notizen_und_eltern(self):
-        """Beide haengen am einzelnen Kind — es gibt keine Gesamtliste.
-
-        Frueher lief hier je Kind eine Anfrage an beide Endpunkte. Bei einer
-        Klasse mit 30 Kindern sind das 60 Anfragen im Sekundentakt; die
-        Missbrauchsschranke antwortet mit 429, der Selbsttest wartet brav die
-        Sperre ab, und das Aufraeumen steht minutenlang scheinbar still. Genau
-        deshalb wurde der letzte Lauf von Hand abgebrochen.
-
-        Es gibt aber je Modul einen Zaehl-Endpunkt fuer die ganze Klasse. Wer 0
-        Eintraege hat, kann auch keine Reste haben — also erst zaehlen, dann nur
-        die wenigen Kinder abfragen, bei denen ueberhaupt etwas liegt. Aus 60
-        Anfragen werden zwei plus eine Handvoll.
-        """
-        traeger: dict = {}   # student_id -> {"notizen", "elternlog"}
-        for kid, _name in self.klassen:
-            for modul, pfad in (("notizen", "/api/notizen/counts"),
-                                ("elternlog", "/api/elternlog/counts")):
-                zahlen = self.api.call("GET", f"{pfad}?class_id={kid}", erwartet=(200, 403, 404))
-                # 403 (Modul aus) und 404 liefern KEINE Zaehlung, sondern
-                # {"detail": "..."} — das sah wie ein Ergebnis aus und riss den
-                # Lauf mit `int('detail')` ab. Nur echte Zaehlwerte nehmen:
-                # Schluessel ist die Schueler-ID, Wert die Anzahl.
-                if not isinstance(zahlen, dict):
-                    continue
-                for sid, anzahl in zahlen.items():
-                    if str(sid).isdigit() and isinstance(anzahl, int) and anzahl:
-                        traeger.setdefault(int(sid), set()).add(modul)
-
-        for sid, module in sorted(traeger.items()):
-            if "notizen" in module:
-                self.nimm("Notizen", "Beobachtung", self._get(f"/api/notizen?student_id={sid}"),
-                          lambda o: [f"/api/notizen/{o['id']}"])
-            if "elternlog" in module:
-                self.nimm("Klassenleitung", "Elternkontakt", self._get(f"/api/elternlog?student_id={sid}"),
-                          lambda o: [f"/api/elternlog/{o['id']}"])
 
     def _code_detektiv(self):
         # Geloescht wird ueber die client_id, nicht ueber die Datenbank-ID.

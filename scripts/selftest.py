@@ -944,26 +944,6 @@ def probe_notizbrett(api, u):
     return "Notizzettel und To-dos"
 
 
-def probe_notizen(api, u):
-    beobachtung = api.call("POST", "/api/notizen",
-                           {"student_id": u.students[0], "text": f"{PRAEFIX} Beobachtung"},
-                           erwartet=(201,))
-    api.call("PUT", f"/api/notizen/{beobachtung['id']}",
-             {"student_id": u.students[0], "text": f"{PRAEFIX} Beobachtung 2"}, erwartet=(200,))
-    api.call("GET", f"/api/notizen/counts?class_id={u.class_id}", erwartet=(200,))
-    api.call("DELETE", f"/api/notizen/{beobachtung['id']}", erwartet=(204,))
-    return "Beobachtung anlegen, aendern, loeschen"
-
-
-def probe_klassenleitung(api, u):
-    kontakt = api.call("POST", "/api/elternlog",
-                       {"student_id": u.students[0], "channel": "Telefon",
-                        "text": f"{PRAEFIX} Gespraech"}, erwartet=(201,))
-    api.call("PUT", f"/api/elternlog/{kontakt['id']}",
-             {"student_id": u.students[0], "text": f"{PRAEFIX} Gespraech 2"}, erwartet=(200,))
-    api.call("GET", f"/api/elternlog/counts?class_id={u.class_id}", erwartet=(200,))
-    api.call("DELETE", f"/api/elternlog/{kontakt['id']}", erwartet=(204,))
-    return "Elternkontakt anlegen, aendern, loeschen"
 
 
 def probe_code_detektiv(api, u):
@@ -989,8 +969,6 @@ PROBEN = {
     "zufall": probe_zufall,
     "unterrichtsplanung": probe_unterrichtsplanung,
     "notizbrett": probe_notizbrett,
-    "notizen": probe_notizen,
-    "klassenleitung": probe_klassenleitung,
     "code-detektiv": probe_code_detektiv,
     "tafel": None,
     "mathespiele": None,

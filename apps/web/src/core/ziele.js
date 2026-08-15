@@ -40,7 +40,7 @@ export const ZIELE = [
   { pfad: "/lernpfad?tab=lernpfade", key: "ziele.lpPfade", modul: "lernpfad", worte: ["lernpfad", "leitern", "zuweisen"] },
 
   // ── Auswertung ──
-  { pfad: "/auswertung?tab=noten", key: "auswertung.tabGrades", modul: "auswertung", worte: ["note", "noten", "notenbuch", "zeugnis", "schnitt", "gewichtung"] },
+  { pfad: "/auswertung?tab=noten", key: "auswertung.tabGrades", modul: "auswertung", worte: ["note", "noten", "notenbuch", "zeugnis", "schnitt", "gewichtung", "kommentar", "beobachtung", "notiz"] },
   { pfad: "/auswertung?tab=klassenarbeit", key: "auswertung.tabWorks", modul: "auswertung", worte: ["klassenarbeit", "arbeit", "punkte", "erwartungshorizont"] },
   { pfad: "/auswertung/vergleich", key: "klassenarbeit.navCompare", modul: "auswertung", worte: ["vergleich", "klassen vergleichen", "statistik"] },
 
@@ -69,8 +69,6 @@ export const ZIELE = [
   { pfad: "/unterrichtsplanung", key: "unterrichtsplanung.tabEinstiege", modul: "unterrichtsplanung", worte: ["einstieg", "methode", "stundenanfang"] },
   { pfad: "/notizbrett?tab=notizen", key: "notizbrett.tabNotes", modul: "notizbrett", worte: ["notiz", "zettel", "merken"] },
   { pfad: "/notizbrett?tab=aufgaben", key: "notizbrett.tabTodos", modul: "notizbrett", worte: ["to-do", "todo", "aufgabe", "erledigen"] },
-  { pfad: "/notizen", key: "notizen.title", modul: "notizen", worte: ["beobachtung", "verhalten", "anstrengung", "formativ"] },
-  { pfad: "/klassenleitung", key: "klassenleitung.title", modul: "klassenleitung", worte: ["eltern", "elternkontakt", "gespräch", "telefonat"] },
   { pfad: "/tafel", key: "tafel.title", modul: "tafel", worte: ["tafel", "whiteboard", "anschrieb"] },
   { pfad: "/mathespiele", key: "mathefussball.title", modul: "mathespiele", worte: ["spiel", "fußball", "üben"] },
 ];

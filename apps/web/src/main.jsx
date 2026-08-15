@@ -152,8 +152,6 @@ const Orga = React.lazy(() => import("./pages/Orga.jsx"));
 // Benannter Export — lazy will ein default, deshalb hier umgehaengt.
 const KlassenarbeitVergleich = React.lazy(() => import("./pages/Klassenarbeit.jsx").then((m) => ({ default: m.KlassenarbeitVergleich })));
 const Notizbrett = React.lazy(() => import("./pages/Notizbrett.jsx"));
-const Notizen = React.lazy(() => import("./pages/Notizen.jsx"));
-const Elternlog = React.lazy(() => import("./pages/Elternlog.jsx"));
 const Mathefussball = React.lazy(() => import("./pages/Mathefussball.jsx"));
 const Tafel = React.lazy(() => import("./pages/Tafel.jsx"));
 const NichtGefunden = React.lazy(() => import("./pages/NichtGefunden.jsx"));
@@ -215,8 +213,6 @@ function helpArea(pathname) {
   if (pathname.startsWith("/orga")) return "orga";
   if (pathname.startsWith("/zufall")) return "zufall";
   if (pathname.startsWith("/notizbrett")) return "notizbrett";
-  if (pathname.startsWith("/klassenleitung")) return "klassenleitung";
-  if (pathname.startsWith("/notizen")) return "notizen";
   if (pathname.startsWith("/tafel")) return "tafel";
   if (pathname.startsWith("/mathespiele")) return "mathespiele";
   return "core";
@@ -230,8 +226,6 @@ const UPLAN = "/unterrichtsplanung";
 const ZUF = "/zufall";
 const ORG = "/orga";
 const NOTIZBRETT = "/notizbrett";
-const NOTIZEN = "/notizen";
-const KLASSENLEITUNG = "/klassenleitung";
 const MATHEF = "/mathespiele";
 const TAFEL = "/tafel";
 
@@ -250,8 +244,6 @@ const getModuleNavItems = (t, location, user) => {
     : pathname.startsWith(ZUF) ? "zufall"
     : pathname.startsWith(ORG) ? "orga"
     : pathname.startsWith(NOTIZBRETT) ? "notizbrett"
-    : pathname.startsWith(NOTIZEN) ? "notizen"
-    : pathname.startsWith(KLASSENLEITUNG) ? "klassenleitung"
     : pathname.startsWith(MATHEF) ? "mathespiele"
     : pathname.startsWith(TAFEL) ? "tafel"
     : pathname.startsWith(KA) ? "karten"
@@ -316,8 +308,6 @@ const getModuleNavItems = (t, location, user) => {
       { to: `${NOTIZBRETT}?tab=aufgaben`, label: t("notizbrett.tabTodos"), active: cur === "aufgaben" },
     ];
   }
-  if (area === "notizen") return [{ to: NOTIZEN, label: t("notizen.title") }];
-  if (area === "klassenleitung") return [{ to: KLASSENLEITUNG, label: t("klassenleitung.title") }];
   if (area === "mathespiele") return [{ to: MATHEF, label: t("mathefussball.title") }];
   if (area === "tafel") return [{ to: TAFEL, label: t("tafel.title") }];
   if (area === "orga") {
@@ -892,8 +882,6 @@ function AppRoutes({ user, setUser, logout }) {
           <Route path={UPLAN} element={user ? <ModuleGate moduleKey="unterrichtsplanung"><Unterrichtsplanung /></ModuleGate> : <Landing />} />
           <Route path={ZUF} element={user ? <ModuleGate moduleKey="zufall"><Zufall /></ModuleGate> : <Landing />} />
           <Route path={NOTIZBRETT} element={user ? <ModuleGate moduleKey="notizbrett"><Notizbrett /></ModuleGate> : <Landing />} />
-          <Route path={NOTIZEN} element={user ? <ModuleGate moduleKey="notizen"><Notizen /></ModuleGate> : <Landing />} />
-          <Route path={KLASSENLEITUNG} element={user ? <ModuleGate moduleKey="klassenleitung"><Elternlog /></ModuleGate> : <Landing />} />
           <Route path={MATHEF} element={user ? <ModuleGate moduleKey="mathespiele"><Mathefussball /></ModuleGate> : <Landing />} />
           <Route path={TAFEL} element={user ? <ModuleGate moduleKey="tafel"><Tafel /></ModuleGate> : <Landing />} />
           <Route path={`${AUSW}/vergleich`} element={user ? <ModuleGate moduleKey="auswertung"><KlassenarbeitVergleich /></ModuleGate> : <Landing />} />

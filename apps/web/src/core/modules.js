@@ -86,8 +86,7 @@ export async function setModuleActive(key, active) {
 // "codedetektiv" statt "code-detektiv").
 export const MODUL_KEYS = [
   "cardvote", "lernpfad", "auswertung", "code-detektiv", "karten", "kalender",
-  "orga", "zufall", "unterrichtsplanung", "notizbrett", "notizen",
-  "klassenleitung", "tafel", "mathespiele",
+  "orga", "zufall", "unterrichtsplanung", "notizbrett", "tafel", "mathespiele",
 ];
 
 /**

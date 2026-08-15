@@ -62,7 +62,6 @@ export default function KursLinks({ kurs }) {
     orgaAn("sitzplan") && { to: `/orga?tab=sitzplan&${q}`, icon: ICONS.grip, label: t("sitzplan.title") },
     orgaAn("anwesenheit") && { to: `/orga?tab=anwesenheit&${q}`, icon: ICONS.circle, label: t("anwesenheit.title") },
     orgaAn("ausleihe") && { to: `/orga?tab=ausleihe&${q}`, icon: ICONS.archive, label: t("ausleihe.title") },
-    an("klassenleitung") && { to: `/klassenleitung?${q}`, icon: ICONS.note, label: t("kursLinks.klassenleitung") },
     an("zufall") && { to: `/zufall?${q}`, icon: ICONS.shuffle, label: t("kursLinks.zufall") },
   ].filter(Boolean);
 

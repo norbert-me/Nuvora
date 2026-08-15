@@ -187,30 +187,6 @@ REGISTRY: List[ModuleDef] = [
         stage="beta",
     ),
     ModuleDef(
-        key="notizen",
-        group="werkzeug",
-        name="Beobachtungen",
-        description=(
-            "Formative Notizen je Schüler mit Datum (Anstrengung, Sozialverhalten, "
-            "Fortschritt) — bewusst getrennt von der Note. Was das Notenbuch nicht "
-            "misst, hat hier seinen Platz."
-        ),
-        path="/notizen",
-        stage="beta",
-    ),
-    ModuleDef(
-        key="klassenleitung",
-        group="organisation",
-        name="Klassenleitung",
-        description=(
-            "Aufgaben der Klassenleitung — derzeit die Elternkontakte je Schüler: "
-            "Datum, Kanal (Telefon/Mail/Gespräch) und Notiz. Erfüllt die "
-            "Dokumentationspflicht ohne Zettel."
-        ),
-        path="/klassenleitung",
-        stage="beta",
-    ),
-    ModuleDef(
         key="tafel",
         group="werkzeug",
         name="Tafel",

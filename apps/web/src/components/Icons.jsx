@@ -305,6 +305,25 @@ export const th = {
 };
 export const td = { padding: "4px 6px", borderBottom: "1px solid var(--border)", textAlign: "center", color: "var(--text)" };
 
+/**
+ * Zieht hier gerade jemand — oder markiert er nur Text?
+ *
+ * Ein ganzer Kasten mit `draggable` verschluckt jede Textmarkierung darin: wer
+ * im Spaltennamen einen Tippfehler ausbessern will, schiebt stattdessen die
+ * Spalte durch die Tabelle. Diese Prüfung gehört an JEDEN `onDragStart` eines
+ * Containers, der Eingaben enthält (oder ein Menü öffnen kann).
+ *
+ *   onDragStart={(e) => { if (nichtZiehen(e)) return; … }}
+ */
+export function nichtZiehen(e) {
+  const ziel = e.target;
+  if (ziel?.closest?.("input, textarea, select, [contenteditable='true'], [data-nodrag]")) {
+    e.preventDefault();
+    return true;
+  }
+  return false;
+}
+
 // Kleiner Chip/Tag.
 export const chipStyle = {
   display: "inline-block", fontSize: 12, fontWeight: 600, padding: "2px 9px",
@@ -397,7 +416,7 @@ export function Popover({ align = "left", style, children, ...rest }) {
   });
   const pos = align === "center" ? { left: "50%", transform: basis } : { [align]: 0 };
   return (
-    <div ref={ref} style={{ ...popoverPanel, position: "absolute", top: "calc(100% + 6px)", zIndex: 50, ...pos, ...style }} {...rest}>
+    <div ref={ref} data-nodrag style={{ ...popoverPanel, position: "absolute", top: "calc(100% + 6px)", zIndex: 50, ...pos, ...style }} {...rest}>
       {children}
     </div>
   );

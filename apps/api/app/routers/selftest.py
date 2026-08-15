@@ -81,8 +81,6 @@ MODUL_PREFIX = {
     "zufall": "/api/zufall",
     "unterrichtsplanung": "/api/methoden",
     "notizbrett": "/api/notizblock",
-    "notizen": "/api/notizen",
-    "klassenleitung": "/api/elternlog",
     "code-detektiv": "/api/codedetektiv",
     "tafel": None,
     "mathespiele": None,

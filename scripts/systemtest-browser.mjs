@@ -303,23 +303,6 @@ const verbindungen = (td) => [
     zusammen: ["cardvote", "lernpfad"],
   },
   {
-    name: "Klassenleitung → Note im Elternkontakt (braucht Auswertung)",
-    pfad: `/klassenleitung${klassenParam(td)}`,
-    // Der Notenchip ist ein Link ins Notenmodul — eindeutiger als der Text „Note".
-    // Praefix-Vergleich: der Link traegt Klasse und Kurs mit (…&class=7&kurs=3),
-    // damit die Auswertung gleich beim richtigen Fach aufgeht.
-    finde: async (seite) => (await seite.locator("a[href^='/auswertung?tab=noten']").count()) > 0,
-    beschreibung: "Notenchip (Link auf /auswertung?tab=noten)",
-    // Bewusst der EIGENE Schueler, nicht ein Name aus einer geseedeten
-    // Spielinstanz: im Deploy laeuft der Test mit einem leeren Testkonto.
-    vorbereiten: async (seite) => {
-      await seite.getByRole("button", { name: new RegExp(`${MARKE} Ann`) }).first().click({ timeout: 8000 });
-      await seite.waitForTimeout(600);
-    },
-    allein: ["klassenleitung"],
-    zusammen: ["klassenleitung", "auswertung"],
-  },
-  {
     name: "Notenbuch → „Aus Code-Detektiv\" (braucht Code-Detektiv)",
     pfad: `/auswertung?tab=noten${klassenParam(td, "&")}`,
     marker: "Aus Code-Detektiv",
@@ -740,49 +723,6 @@ const bedienung = (td) => [
       await api(`/api/zufall/${td.klasse.id}`, "delete");
       const nachher = await apiJson(`/api/zufall/${td.klasse.id}`);
       if (Object.keys(nachher?.history || {}).length) return "Zieh-Gedächtnis liess sich nicht leeren";
-      return "";
-    },
-  },
-  {
-    modul: "notizen",
-    name: "Beobachtung anlegen (/notizen)",
-    // Klasse und Kurs stehen in der Adresse, WEIL es so gehoert — die Seite
-    // wertet sie allerdings nicht aus (siehe Bericht). Darum waehlt `oeffnen`
-    // die Klasse zusaetzlich ueber die Oberflaeche.
-    pfad: `/notizen${klassenParam(td)}`,
-    async oeffnen(seite) {
-      const fehler = await kursWaehlen(seite, `${MARKE}-Klasse`);
-      if (fehler) return fehler;
-      return await schuelerOeffnen(seite);
-    },
-    async anlegen(seite) {
-      await seite.locator("textarea[placeholder^='Beobachtung']").first().fill(MARKE_UI, { timeout: 8000 });
-      await seite.getByRole("button", { name: "Hinzufügen", exact: true }).first().click({ timeout: 8000 });
-      await seite.getByText(MARKE_UI, { exact: true }).first().waitFor({ timeout: 15000 });
-    },
-    // Kein Undo-Fenster: die Beobachtung geht sofort weg. Trotzdem ueber den
-    // Papierkorb-Knopf der Zeile, wie eine Lehrkraft es taete.
-    async loeschen(seite) {
-      const fehler = await knopfInZeile(seite, MARKE_UI, "Löschen");
-      if (fehler) return fehler;
-      await seite.getByText(MARKE_UI, { exact: true }).first().waitFor({ state: "detached", timeout: 15000 });
-      return "";
-    },
-  },
-  {
-    modul: "klassenleitung",
-    name: "Elternkontakt anlegen (/klassenleitung)",
-    pfad: `/klassenleitung${klassenParam(td)}`,
-    oeffnen: schuelerOeffnen,
-    async anlegen(seite) {
-      await seite.locator("textarea[placeholder^='Was wurde besprochen']").first().fill(MARKE_UI, { timeout: 8000 });
-      await seite.getByRole("button", { name: "Hinzufügen", exact: true }).first().click({ timeout: 8000 });
-      await seite.getByText(MARKE_UI, { exact: true }).first().waitFor({ timeout: 15000 });
-    },
-    async loeschen(seite) {
-      const fehler = await knopfInZeile(seite, MARKE_UI, "Löschen");
-      if (fehler) return fehler;
-      await seite.getByText(MARKE_UI, { exact: true }).first().waitFor({ state: "detached", timeout: 15000 });
       return "";
     },
   },
@@ -1478,15 +1418,6 @@ async function resteAbraeumen() {
   // Beide haben keine Sammelliste — nur „je Kind". Also je Testschueler
   // nachsehen; fremde Kinder werden dabei nicht angefasst, weil nur Klassen mit
   // dem Praefix durchlaufen werden.
-  for (const k of klassen) {
-    if (!traegtMarke(k)) continue;
-    const kinder = (await apiJson(`/api/classes/${k.id}`))?.students || [];
-    for (const s of kinder) {
-      await raeume(await liste(`/api/notizen?student_id=${s.id}`), (o) => [`/api/notizen/${o.id}`]);
-      await raeume(await liste(`/api/elternlog?student_id=${s.id}`), (o) => [`/api/elternlog/${o.id}`]);
-    }
-  }
-
   // ── Module ohne Klassenbezug
   // Code-Detektiv-Raetsel haengen an ihrer client_id, nicht an einer Zahl.
   await raeume(await liste("/api/codedetektiv/puzzles"),

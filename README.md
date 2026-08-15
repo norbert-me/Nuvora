@@ -321,8 +321,6 @@ aktiviert hat. Vierzehn Stück, jedes pro Lehrkraft zuschaltbar:
 | Orga | `/orga` | Klassenführung in Reitern: Checklisten, Anwesenheit/Fehlzeiten (PDF-Report), Ausleihe, Sitzplan (optional SEGEL-Stufen) |
 | Zufall | `/zufall` | Zufallsschüler (fair gewichtet nach Zeit seit dem letzten Ziehen) und Zufallsgruppen |
 | Notizbrett | `/notizbrett` | Notizzettel + To-do-Liste. Datierte Aufgaben erscheinen im Kalender. Nicht an Schüler gebunden |
-| Klassenleitung | `/klassenleitung` | Elternkontakte je Schüler: Datum, Kanal, Notiz — Dokumentationspflicht ohne Zettel |
-| Beobachtungen | `/notizen` | Formative Notizen je Schüler, bewusst getrennt von der Note |
 | Tafel | `/tafel` | Classroom-Screen für den Beamer: frei platzierbare Textfelder, Timer. Ohne Daten |
 | Mathespiele | `/mathespiele` | Aktuell Mathefußball: Kopfrechen-Duell für zwei Teams am Beamer |
 
@@ -377,6 +375,19 @@ Auswahllisten, alle Daten bleiben (Noten, Klassenarbeiten, Karten-Fortschritt).
 Einen Kurs zu archivieren nimmt seine Fach-Klassen mit; zurück geht es jederzeit.
 Bewusst etwas anderes als der Papierkorb — der löscht nach 30 Tagen, und eine
 alte Note muss man Jahre später noch nachschlagen können.
+
+### Bemerkungen stehen an der Note
+
+Jede Zelle im Notenbuch kann einen Kommentar tragen — über die kleine Ecke oben
+rechts. „Formel vergessen", „krank, nachgeschrieben am 12.03." Zeilen mit
+Kommentaren tragen einen Punkt hinter dem Namen, damit man sie beim Durchsehen
+findet.
+
+Der Kommentar zählt **nie** in einen Schnitt: gerechnet wird die Note, der Text
+steht daneben. Das ist dieselbe Trennung, die vorher das eigene Modul
+„Beobachtungen" gezogen hat — nur an der richtigen Stelle. Dieses Modul und
+„Klassenleitung" gibt es deshalb nicht mehr; ihre Tabellen bleiben bestehen,
+damit vorhandene Einträge nicht verloren gehen.
 
 ### Dieselbe Lerngruppe im nächsten Schuljahr
 

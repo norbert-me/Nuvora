@@ -1884,4 +1884,13 @@ export default {
   "kurse.chainHint": "El mismo grupo un año antes. Los datos siguen separados — solo se enlaza el orden, para reencontrar los conocimientos previos.",
   "sitzplan.photoToggle": "Mostrar fotos",
   "sitzplan.photoHint": "Una cara en vez de solo el nombre. Sin foto se muestran las iniciales.",
+  "noten.runningAvg": "Media acumulada",
+  "noten.gradeShortLabel": "Nota",
+  "noten.commentTitle": "Comentario sobre la nota",
+  "noten.commentHint": "Pertenece a esta celda y nunca cuenta en una media — se calcula la nota, el texto queda al lado.",
+  "noten.commentPlaceholder": "p. ej. enfermo, examen recuperado el 12/03",
+  "noten.commentAdd": "Añadir comentario",
+  "noten.commentRow": "Esta fila tiene comentarios",
+  "help.au.commentT": "Comentario en la nota",
+  "help.au.comment": "Cada celda puede llevar un comentario, mediante la esquina pequeña arriba a la derecha. Pertenece a la nota («olvidó la fórmula», «enfermo, recuperado»), pero nunca cuenta en una media. Las filas con comentarios llevan un punto tras el nombre.",
 };

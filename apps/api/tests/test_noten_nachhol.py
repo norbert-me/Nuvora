@@ -72,3 +72,56 @@ async def test_nachhol_ohne_thema_wirft(s):
     with pytest.raises(HTTPException) as ei:
         await N.nachholbedarf(cat.id, N.NachholIn(), user=u, db=s)
     assert ei.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_kommentar_an_der_zelle(s):
+    """Ein Kommentar gehört zur Notenzelle — und zählt nie in einen Schnitt.
+
+    Das frühere Modul „Beobachtungen" lag neben dem Notenbuch: Note hier,
+    Bemerkung woanders. Jetzt hängt sie an der Zelle. Der Test hält die
+    Trennung fest, die dabei erhalten bleiben muss: gerechnet wird `value`, der
+    Text steht daneben — und eine Zelle ohne beides verschwindet.
+    """
+    from app.models import GradeCategory, GradeEntry, GradeSection, SchoolClass, Student, User
+    from app.routers import noten as N
+
+    u = User(email="komm@b.de", password_hash="x", name="L")
+    s.add(u)
+    await s.flush()
+    kl = SchoolClass(name="7c", owner_id=u.id)
+    s.add(kl)
+    await s.flush()
+    kind = Student(card_id=1, name="Ann", class_id=kl.id)
+    sec = GradeSection(owner_id=u.id, class_id=kl.id, term="1", name="Mündlich", weight=100)
+    s.add_all([kind, sec])
+    await s.flush()
+    cat = GradeCategory(owner_id=u.id, class_id=kl.id, section_id=sec.id, name="Spalte")
+    s.add(cat)
+    await s.commit()
+
+    # Kommentar ohne Note: Eintrag entsteht, aber ohne Wert.
+    await N.set_comment(N.KommentarIn(category_id=cat.id, student_id=kind.id, text="krank, nachgeschrieben"),
+                        user=u, db=s)
+    eintraege = (await s.execute(select(GradeEntry))).scalars().all()
+    assert len(eintraege) == 1
+    assert eintraege[0].value is None, "ein Kommentar ist keine Note"
+    assert eintraege[0].note == "krank, nachgeschrieben"
+
+    # Note dazu: der Kommentar bleibt stehen.
+    await N.create_entry(N.EntryIn(category_id=cat.id, student_id=kind.id, kind="grade", value=2.0),
+                         user=u, db=s)
+    eintraege = (await s.execute(select(GradeEntry))).scalars().all()
+    assert len(eintraege) == 1, "Note und Kommentar teilen sich die Zelle"
+    assert eintraege[0].value == 2.0
+
+    # Kommentar löschen, Note bleibt.
+    await N.set_comment(N.KommentarIn(category_id=cat.id, student_id=kind.id, text=""), user=u, db=s)
+    eintrag = (await s.execute(select(GradeEntry))).scalars().one()
+    assert eintrag.value == 2.0 and eintrag.note == ""
+
+    # Beides weg: die Zelle verschwindet ganz.
+    eintrag.value = None
+    await s.commit()
+    await N.set_comment(N.KommentarIn(category_id=cat.id, student_id=kind.id, text=""), user=u, db=s)
+    assert (await s.execute(select(GradeEntry))).scalars().all() == []

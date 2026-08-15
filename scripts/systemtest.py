@@ -238,14 +238,6 @@ def endpunkte(u):
             ("GET", "/api/todo"),
             ("GET", "/api/todo/calendar"),
         ],
-        "notizen": [
-            ("GET", f"/api/notizen?student_id={s}"),
-            ("GET", f"/api/notizen/counts?class_id={c}"),
-        ],
-        "klassenleitung": [
-            ("GET", f"/api/elternlog?student_id={s}"),
-            ("GET", f"/api/elternlog/counts?class_id={c}"),
-        ],
         "code-detektiv": [
             ("GET", "/api/codedetektiv/puzzles"),
         ],
@@ -277,9 +269,6 @@ def tore(u):
         "zufall": [("GET", f"/api/zufall/{c}")],
         "unterrichtsplanung": [("GET", "/api/methoden/list"), ("GET", "/api/methoden/folders")],
         "notizbrett": [("GET", "/api/notizblock"), ("GET", "/api/todo")],
-        "notizen": [("GET", f"/api/notizen?student_id={s}"),
-                    ("GET", f"/api/notizen/counts?class_id={c}")],
-        "klassenleitung": [("GET", f"/api/elternlog?student_id={s}")],
         "code-detektiv": [("GET", "/api/codedetektiv/puzzles")],
         "tafel": [],
         "mathespiele": [],
@@ -814,38 +803,6 @@ def inhalt_notizbrett(api, u, spuren):
     return "Notiz mit Zeilenumbruch, To-do mit Datum/Uhrzeit, Haken und Kalender-Auszug"
 
 
-def inhalt_notizen(api, u, spuren):
-    heute = datetime.now().date().isoformat()
-    beob = api.call("POST", "/api/notizen",
-                    {"student_id": u.students[0], "text": f"{PRAEFIX} arbeitet konzentriert",
-                     "category": "Arbeitsverhalten", "date": heute}, erwartet=(201,))
-    spuren.append(("Beobachtung", lambda: api.call(
-        "DELETE", f"/api/notizen/{beob['id']}", erwartet=(204, 404))))
-    wieder = _finde(api.call("GET", f"/api/notizen?student_id={u.students[0]}", erwartet=(200,)),
-                    id=beob["id"])
-    if not wieder or wieder.get("category") != "Arbeitsverhalten" or wieder.get("date") != heute:
-        raise AssertionError(f"Beobachtung kam anders zurueck: {wieder}")
-    zahlen = api.call("GET", f"/api/notizen/counts?class_id={u.class_id}", erwartet=(200,))
-    if int((zahlen or {}).get(str(u.students[0]), 0)) < 1:
-        raise AssertionError(f"Zaehler zeigt keine Beobachtung: {zahlen}")
-    return "Beobachtung mit Kategorie und Datum wiedergefunden, Zaehler stimmt"
-
-
-def inhalt_klassenleitung(api, u, spuren):
-    heute = datetime.now().date().isoformat()
-    kontakt = api.call("POST", "/api/elternlog",
-                       {"student_id": u.students[1], "channel": "telefon", "date": heute,
-                        "text": f"{PRAEFIX} Rueckmeldung zu den Hausaufgaben"}, erwartet=(201,))
-    spuren.append(("Elternkontakt", lambda: api.call(
-        "DELETE", f"/api/elternlog/{kontakt['id']}", erwartet=(204, 404))))
-    wieder = _finde(api.call("GET", f"/api/elternlog?student_id={u.students[1]}", erwartet=(200,)),
-                    id=kontakt["id"])
-    if not wieder or wieder.get("channel") != "telefon" or wieder.get("date") != heute:
-        raise AssertionError(f"Elternkontakt kam anders zurueck: {wieder}")
-    zahlen = api.call("GET", f"/api/elternlog/counts?class_id={u.class_id}", erwartet=(200,))
-    if int((zahlen or {}).get(str(u.students[1]), 0)) < 1:
-        raise AssertionError(f"Zaehler zeigt keinen Kontakt: {zahlen}")
-    return "Elternkontakt mit Kanal und Datum wiedergefunden, Zaehler stimmt"
 
 
 def inhalt_code_detektiv(api, u, spuren):
@@ -894,8 +851,6 @@ INHALT = {
     "zufall": inhalt_zufall,
     "unterrichtsplanung": inhalt_unterrichtsplanung,
     "notizbrett": inhalt_notizbrett,
-    "notizen": inhalt_notizen,
-    "klassenleitung": inhalt_klassenleitung,
     "code-detektiv": inhalt_code_detektiv,
     "tafel": None,
     "mathespiele": None,
@@ -1479,6 +1434,42 @@ def teste_noten(api, b, u, sch, spuren, cv):
         return "Beobachtung gezaehlt, Schnitt unveraendert, Beobachtung mit Note abgewiesen"
 
     b.pruefe("Noten", "Beobachtung zaehlt nie mit", beobachtung)
+
+    def kommentar():
+        """Kommentar an der Zelle: gehoert zur Note, zaehlt nie mit.
+
+        Seit das Modul „Beobachtungen" weg ist, haengt die Bemerkung an der
+        Zelle. Geprueft wird beides: sie kommt zurueck, und der Schnitt bleibt
+        unveraendert — sonst waere aus einer Notiz eine Note geworden.
+        """
+        vorher = _finde(api.call("GET", f"/api/noten/classes/{u.class_id}/summary", erwartet=(200,)),
+                        student_id=u.students[1])
+        api.call("PUT", "/api/noten/entries/comment", {
+            "category_id": z["test_spalte"], "student_id": u.students[1],
+            "text": f"{PRAEFIX} krank, nachgeschrieben",
+        }, erwartet=(200,))
+        eintraege = api.call("GET", f"/api/noten/classes/{u.class_id}/entries", erwartet=(200,))
+        meiner = [e for e in eintraege
+                  if e["category_id"] == z["test_spalte"] and e["student_id"] == u.students[1]]
+        if not meiner or PRAEFIX not in (meiner[0].get("note") or ""):
+            raise AssertionError(f"Kommentar nicht wiedergefunden: {meiner}")
+        nachher = _finde(api.call("GET", f"/api/noten/classes/{u.class_id}/summary", erwartet=(200,)),
+                         student_id=u.students[1])
+        if nachher["weighted"] != vorher["weighted"]:
+            raise AssertionError(f"Kommentar hat den Schnitt veraendert: "
+                                 f"{vorher['weighted']} -> {nachher['weighted']}")
+        # Leerer Text loescht ihn wieder.
+        api.call("PUT", "/api/noten/entries/comment", {
+            "category_id": z["test_spalte"], "student_id": u.students[1], "text": "",
+        }, erwartet=(200,))
+        rest = [e for e in api.call("GET", f"/api/noten/classes/{u.class_id}/entries", erwartet=(200,))
+                if e["category_id"] == z["test_spalte"] and e["student_id"] == u.students[1]
+                and (e.get("note") or "").strip()]
+        if rest:
+            raise AssertionError(f"Kommentar liess sich nicht loeschen: {rest}")
+        return "Kommentar an der Zelle gespeichert, Schnitt unveraendert, wieder geloescht"
+
+    b.pruefe("Noten", "Kommentar an der Notenzelle", kommentar)
 
     def gewichte():
         """Zweiter Abschnitt mit 40 %, dann den gewichteten Schnitt nachrechnen."""

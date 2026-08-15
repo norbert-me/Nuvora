@@ -11,7 +11,7 @@ from .models import Base
 # den frueheren Ring main -> routers.backup -> main aufloest. Hier nur noch
 # hereingeholt, damit die Routen weiter unten `_require_admin` benutzen koennen.
 from .admin import _require_admin, APP_VERSION  # noqa: F401 — Routen unten
-from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizen, elternlog, notizblock, trash, selftest, backup
+from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizblock, trash, selftest, backup
 from . import websocket as ws
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -205,8 +205,6 @@ app.include_router(kurse.router)
 app.include_router(material.router)
 app.include_router(klassenarbeit.router)
 app.include_router(todos.router)
-app.include_router(notizen.router)
-app.include_router(elternlog.router)
 app.include_router(notizblock.router)
 app.include_router(trash.router)
 app.include_router(selftest.router)
@@ -644,14 +642,14 @@ async def startup():
             ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
         """))
         await db.execute(text("DELETE FROM user_modules WHERE module_key IN ('todo', 'notizblock')"))
-        # Elternkontakte sind ins Modul „Klassenleitung" umgezogen (gleiche Daten,
-        # parent_contacts). Idempotent.
-        await db.execute(text("""
-            INSERT INTO user_modules (user_id, module_key)
-            SELECT DISTINCT user_id, 'klassenleitung' FROM user_modules WHERE module_key = 'elternlog'
-            ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
-        """))
-        await db.execute(text("DELETE FROM user_modules WHERE module_key = 'elternlog'"))
+        # Beobachtungen und Klassenleitung gibt es nicht mehr als Module: die
+        # Beobachtung ist als Kommentar an der Notenzelle aufgegangen, wo sie
+        # hingehoert. Die Zuschaltungen fallen weg, sonst stehen sie ewig in
+        # user_modules und tauchen bei jedem REGISTRY-Abgleich als Unbekannte
+        # auf. Die TABELLEN (observations, parent_contacts) bleiben — dort
+        # liegen echte Eintraege, und die vernichtet kein Umbau.
+        await db.execute(text(
+            "DELETE FROM user_modules WHERE module_key IN ('elternlog', 'klassenleitung', 'notizen')"))
         # Stoffverteilung + Einstiege sind ins Modul „Unterrichtsplanung" (2 Reiter)
         # aufgegangen. Daten (curriculum_items, methods) bleiben. Idempotent.
         await db.execute(text("""

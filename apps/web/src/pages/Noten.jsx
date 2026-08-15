@@ -12,7 +12,7 @@ import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { Icon, ICONS, iconBtn, toolbarIconBtn, chipStyle, COLORS as C, btnPrimary, btnSecondary, Modal as UiModal, popoverPanel, Empty, Skeleton, ImportButton, inputStyle, Popover, Toggle, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, toolbarIconBtn, chipStyle, COLORS as C, btnPrimary, btnSecondary, Modal as UiModal, popoverPanel, Empty, Skeleton, ImportButton, inputStyle, Popover, Toggle, nichtZiehen, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useAktiv } from "../core/modules.js";
@@ -407,6 +407,27 @@ export default function Noten() {
     if (ok === false) load(classId); // echter Server-Fehler: Wahrheit zurückholen
   };
 
+  // Kommentar an einer Zelle: „Formel vergessen", „krank, nachgeschrieben".
+  // Er zaehlt nie in einen Schnitt — gerechnet wird die Note, der Text steht
+  // daneben. (Das frühere Modul „Beobachtungen" lag neben dem Notenbuch; jetzt
+  // haengt die Bemerkung an der Zelle, zu der sie gehoert.)
+  const [kommentarFuer, setKommentarFuer] = useState(null);   // {sid, cid, text}
+  const kommentarVon = (sid, cid) => (notenVon(sid, cid)[0]?.note || "");
+  const kommentarSetzen = async (sid, cid, text) => {
+    setKommentarFuer(null);
+    setEntries((prev) => {
+      const rest = prev.filter((e) => !(e.student_id === sid && e.category_id === cid && e.kind === "grade"));
+      const alt = prev.find((e) => e.student_id === sid && e.category_id === cid && e.kind === "grade");
+      if (!text.trim() && (!alt || alt.value == null)) return rest;
+      return [...rest, { ...(alt || { student_id: sid, category_id: cid, kind: "grade", value: null }), note: text.trim() }];
+    });
+    const ok = await call(() => fetch(`${API}/entries/comment`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category_id: cid, student_id: sid, text }),
+    }));
+    if (ok !== false) load(classId);
+  };
+
   const allCats = sections.flatMap((s) => s.categories || []);
   const gewichtSumme = sections.reduce((n, s) => n + (s.weight || 0), 0);
   const notenVon = (sid, cid) => entries.filter((e) => e.student_id === sid && e.category_id === cid && e.kind === "grade");
@@ -632,7 +653,7 @@ export default function Noten() {
                   return (
                     <th key={sec.id} colSpan={cols + 1}
                       draggable
-                      onDragStart={() => setDragId(sec.id)}
+                      onDragStart={(e) => { if (nichtZiehen(e)) return; setDragId(sec.id); }}
                       onDragOver={(e) => dragOverHeader(e, sec.id)}
                       onDragEnd={() => { setDragId(null); setDragOver(null); }}
                       onDrop={() => abschnittDrop(sec.id)}
@@ -685,7 +706,7 @@ export default function Noten() {
                     return (
                     <th key={c.id}
                       draggable
-                      onDragStart={() => setDragCol({ catId: c.id, secId: sec.id })}
+                      onDragStart={(e) => { if (nichtZiehen(e)) return; setDragCol({ catId: c.id, secId: sec.id }); }}
                       onDragOver={(e) => dragOverCol(e, c.id, sec.id)}
                       onDrop={() => spalteDrop(c.id, sec)}
                       onDragEnd={() => { setDragCol(null); setDragColOver(null); }}
@@ -740,6 +761,11 @@ export default function Noten() {
                           „10. Jamiro" weiter rechts an als „7. Selina" und die
                           Namensspalte franst aus. */}
                       <span style={{ display: "inline-block", width: 26, textAlign: "right", color: "var(--text3)", fontWeight: 400, marginRight: 6, fontVariantNumeric: "tabular-nums" }}>{si + 1}.</span>{s.name}
+                      {/* Zeile mit Kommentaren: ein Punkt genuegt — die Zelle
+                          selbst zeigt, wo er sitzt. */}
+                      {entries.some((e) => e.student_id === s.student_id && e.kind === "grade" && (e.note || "").trim()) && (
+                        <span title={t("noten.commentRow")} style={{ display: "inline-block", width: 6, height: 6, borderRadius: 3, background: C.warning, marginLeft: 6, verticalAlign: "middle" }} />
+                      )}
                       {(() => { const tr = trendFor(s.student_id); return tr && tr !== "flat" ? (
                         <span title={t(tr === "up" ? "noten.trendUp" : "noten.trendDown")}
                           style={{ marginLeft: 6, fontSize: 12, fontWeight: 700, color: tr === "up" ? C.success : C.danger }}>
@@ -794,10 +820,25 @@ export default function Noten() {
                                     noteSetzen(s.student_id, c.id, txt);
                                     setZelle(ziel);
                                   }} />
-                              : <button onClick={() => setZelle(id)}
-                                  style={{ width: "100%", minHeight: 32, border: "none", background: "none", cursor: "text", color: "var(--text)", fontSize: 13.5, fontWeight: noten.length ? 600 : 400 }}>
-                                  {s.per_category[String(c.id)] !== undefined ? de(s.per_category[String(c.id)]) : <span style={{ color: "var(--border2)" }}>·</span>}
-                                </button>}
+                              : (<div style={{ position: "relative" }}>
+                                  <button onClick={() => setZelle(id)}
+                                    style={{ width: "100%", minHeight: 32, border: "none", background: "none", cursor: "text", color: "var(--text)", fontSize: 13.5, fontWeight: noten.length ? 600 : 400 }}>
+                                    {s.per_category[String(c.id)] !== undefined ? de(s.per_category[String(c.id)]) : <span style={{ color: "var(--border2)" }}>·</span>}
+                                  </button>
+                                  {/* Ecke oben rechts: vorhandener Kommentar ist
+                                      ein gefuelltes Dreieck, sonst erscheint es
+                                      blass beim Ueberfahren. Kein zusaetzlicher
+                                      Knopf, der in jeder Zelle Platz kostet. */}
+                                  <button className="komm-ecke" title={kommentarVon(s.student_id, c.id) || t("noten.commentAdd")}
+                                    onClick={(ev) => { ev.stopPropagation(); setKommentarFuer({ sid: s.student_id, cid: c.id, text: kommentarVon(s.student_id, c.id) }); }}
+                                    style={{ position: "absolute", top: 0, right: 0, width: 14, height: 14, padding: 0, border: "none", cursor: "pointer",
+                                      background: "transparent", lineHeight: 0,
+                                      opacity: kommentarVon(s.student_id, c.id) ? 1 : 0 }}>
+                                    <span style={{ display: "block", width: 0, height: 0,
+                                      borderTop: `9px solid ${kommentarVon(s.student_id, c.id) ? C.warning : "var(--border2)"}`,
+                                      borderLeft: "9px solid transparent", marginLeft: 5 }} />
+                                  </button>
+                                </div>)}
                           </td>
                         );
                       }),
@@ -840,6 +881,14 @@ export default function Noten() {
           onClose={() => setBeobFuer(null)}
           onSave={(b) => call(() => fetch(`${API}/entries`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }))}
           onDelete={(id) => call(() => fetch(`${API}/entries/${id}`, { method: "DELETE" }))} />
+      )}
+
+      {kommentarFuer && (
+        <Modal title={t("noten.commentTitle")} onClose={() => setKommentarFuer(null)}>
+          <KommentarForm t={t} initial={kommentarFuer.text}
+            onCancel={() => setKommentarFuer(null)}
+            onSave={(txt) => kommentarSetzen(kommentarFuer.sid, kommentarFuer.cid, txt)} />
+        </Modal>
       )}
 
       {infoFuer && (
@@ -1258,6 +1307,29 @@ function CompareModal({ t, cat, onClose }) {
 // zeigen kann: den laufenden Gesamtschnitt (jeder Punkt = Stand nach dieser
 // Note) oder die Einzelnoten eines Abschnitts. Das muss dranstehen — eine
 // Kurve, die beides sein kann, ist sonst nicht zu lesen.
+/**
+ * Was steht an einem Punkt der Kurve?
+ *
+ * Datum und Spaltenname, die Note dieser Erhebung und — wenn der Punkt ein
+ * laufender Schnitt ist — auch dieser. Ohne den Text ist die Kurve nur eine
+ * Form: man sieht, dass es abwaerts ging, aber nicht, woran es lag.
+ */
+function punktText(p, t) {
+  const cat = p.cat || {};
+  const tag = cat.date || (cat.created_at ? String(cat.created_at).slice(0, 10) : "");
+  const datum = tag ? tag.split("-").reverse().join(".") : "";
+  const herkunft = cat.source_kind === "karten" ? t("noten.fromKarten")
+    : cat.source_session_id ? t("noten.fromCardvote")
+    : cat.source_kind === "codedetektiv" ? t("noten.fromCd") : "";
+  const zeilen = [
+    [datum, cat.name].filter(Boolean).join(" · "),
+    p.einzeln != null ? `${t("noten.gradeShortLabel")}: ${de(Math.round(p.einzeln * 100) / 100)}` : null,
+    `${p.istSchnitt ? t("noten.runningAvg") : t("noten.gradeShortLabel")}: ${de(Math.round(p.value * 100) / 100)}`,
+    herkunft || null,
+  ].filter(Boolean);
+  return zeilen.join("\n");
+}
+
 function GradeChart({ series, t, titel, hinweis, rechts }) {
   if (series.length < 2) return null;
   const W = 340, H = 170, padL = 26, padR = 12, padT = 12, padB = 20;
@@ -1283,12 +1355,38 @@ function GradeChart({ series, t, titel, hinweis, rechts }) {
         <path d={line} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
         {pts.map((p, i) => (
           <g key={i}>
+            {/* Groesserer, unsichtbarer Kreis darunter: der 4-px-Punkt ist mit
+                der Maus kaum zu treffen, und ohne Treffer gibt es keinen
+                Hinweistext. */}
+            <circle cx={p.cx} cy={p.cy} r="11" fill="transparent" />
             <circle cx={p.cx} cy={p.cy} r="4" fill="var(--accent)" stroke="var(--card)" strokeWidth="1.5" />
-            <title>{`${p.s.cat.name}: ${de(Math.round(p.s.value * 10) / 10)}`}</title>
+            <title>{punktText(p.s, t)}</title>
           </g>
         ))}
       </svg>
       <div style={{ fontSize: 11, color: "var(--text3)", textAlign: "right", marginTop: 2 }}>{t("noten.verlaufAxis")}</div>
+    </div>
+  );
+}
+
+// Kommentar an einer Zelle. Bewusst mehrzeilig: „krank, Arbeit nachgeschrieben
+// am 12.03." ist ein Satz, kein Stichwort.
+function KommentarForm({ t, initial = "", onSave, onCancel }) {
+  const [text, setText] = useState(initial);
+  return (
+    <div onClick={(e) => e.stopPropagation()}>
+      <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 8px" }}>{t("noten.commentHint")}</p>
+      <textarea value={text} onChange={(e) => setText(e.target.value)} autoFocus rows={4} maxLength={2000}
+        placeholder={t("noten.commentPlaceholder")}
+        onKeyDown={(e) => { if (e.key === "Escape") onCancel(); }}
+        style={{ ...inp, width: "100%", fontSize: 14, padding: 10, resize: "vertical", boxSizing: "border-box" }} />
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <button onClick={() => onSave(text)} style={btnPrimary}>{t("common.save")}</button>
+        <button onClick={onCancel} style={btnSecondary}>{t("common.abort")}</button>
+        {initial && (
+          <button onClick={() => onSave("")} style={{ ...btnSecondary, marginLeft: "auto", color: C.danger }}>{t("common.delete")}</button>
+        )}
+      </div>
     </div>
   );
 }
@@ -1327,7 +1425,7 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, o
   cats.forEach((c) => {
     prefix.add(c.id);
     const v = overallUpTo(prefix);
-    if (v != null) gesamt.push({ cat: c, value: v });
+    if (v != null) gesamt.push({ cat: c, value: v, istSchnitt: true, einzeln: gradeOf(c.id) });
   });
   // Je Abschnitt die EINZELNEN Noten in Zeitreihenfolge — der laufende
   // Gesamtschnitt glaettet alles weg (er mittelt ja jedes Mal neu ueber alles),
@@ -1343,7 +1441,8 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, o
     const bisher = [];
     return einzeln(secId).map((p) => {
       bisher.push(p.value);
-      return { cat: p.cat, value: bisher.reduce((a, b) => a + b, 0) / bisher.length };
+      return { cat: p.cat, value: bisher.reduce((a, b) => a + b, 0) / bisher.length,
+               istSchnitt: true, einzeln: p.value };
     });
   };
   const alleEinzeln = cats.map((c) => ({ cat: c, value: gradeOf(c.id) })).filter((p) => p.value != null);

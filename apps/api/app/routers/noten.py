@@ -588,6 +588,49 @@ async def create_entry(body: EntryIn, user: User = Depends(require_module), db: 
     return entry
 
 
+class KommentarIn(BaseModel):
+    category_id: int
+    student_id: int
+    text: str = ""
+
+
+@router.put("/entries/comment", status_code=200)
+async def set_comment(body: KommentarIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Kommentar an eine Notenzelle — auch ohne Note.
+
+    Das frühere Modul „Beobachtungen" lag neben dem Notenbuch: man trug die
+    Note hier ein und die Bemerkung dazu woanders. Jetzt hängt die Bemerkung an
+    der Zelle, zu der sie gehört („Formel vergessen", „krank, nachgeschrieben").
+
+    Sie zählt NIE in einen Schnitt — das ist dieselbe Trennung wie vorher, nur
+    an der richtigen Stelle: gerechnet wird `value`, der Text steht daneben.
+    Ein leerer Text löscht den Kommentar; eine Zelle, die dann weder Note noch
+    Kommentar hat, verschwindet ganz.
+    """
+    rate_limit("noten_entry", f"u{user.id}", 600, 60, "Zu viele Einträge in kurzer Zeit. Bitte kurz warten.")
+    await _owned_category(db, user, body.category_id)
+    text_ = (body.text or "").strip()[:2000]
+    vorhanden = (await db.execute(select(GradeEntry).where(
+        GradeEntry.category_id == body.category_id,
+        GradeEntry.student_id == body.student_id,
+        GradeEntry.kind == "grade",
+    ))).scalar_one_or_none()
+
+    if vorhanden:
+        vorhanden.note = text_
+        # Weder Note noch Text: die Zelle ist leer, der Eintrag hat keinen Zweck.
+        if not text_ and vorhanden.value is None:
+            await db.delete(vorhanden)
+        await db.commit()
+        return {"ok": True}
+    if not text_:
+        return {"ok": True}          # nichts zu löschen
+    db.add(GradeEntry(category_id=body.category_id, student_id=body.student_id,
+                      kind="grade", value=None, note=text_))
+    await db.commit()
+    return {"ok": True}
+
+
 @router.delete("/entries/{entry_id}", status_code=204)
 async def delete_entry(entry_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     entry = await db.get(GradeEntry, entry_id)
