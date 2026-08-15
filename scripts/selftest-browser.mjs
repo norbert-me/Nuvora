@@ -377,7 +377,7 @@ async function lauf(motor) {
 
     const vorher = await bestand(api);
     for (const flow of BEDIENUNG) {
-      const befund = await bediene(kontext, flow);
+      const befund = await bediene(kontext, flow, api);
       notiere("Bedienung", flow.name, befund.ok, befund.detail);
     }
     await aufraeumenBedienung(api, vorher);
@@ -807,15 +807,33 @@ const BEDIENUNG = [
   {
     name: "Notizzettel anlegen und tippen (/notizbrett)",
     pfad: "/notizbrett",
-    async schritte(seite) {
+    async schritte(seite, api) {
       // Beschriftung je nach Sprache des Kontos.
       const neu = seite.getByRole("button", { name: /neuer? zettel|neu$|new note|new$|nueva? nota/i }).first();
       await neu.click({ timeout: 8000 });
       const feld = seite.locator("input[placeholder]").first();
       await feld.fill(MARKE, { timeout: 8000 });
-      // Der Zettel speichert gebuendelt (600 ms) — abwarten, sonst prueft der
-      // Test das Neuladen gegen einen noch nicht gesendeten Stand.
-      await seite.waitForTimeout(1500);
+
+      // Frueher speicherte der Zettel von selbst (600 ms nach dem letzten
+      // Tastendruck) und der Test wartete das nur ab. Jetzt gilt: getippt ist
+      // NICHT gespeichert. Damit ist die Zusicherung dreiteilig, und alle drei
+      // Teile werden geprueft — sonst faellt ein Speichern-Knopf, der wieder
+      // heimlich mitschreibt, niemandem auf.
+      //
+      //   1. die Seite sagt sichtbar „nicht gespeichert"
+      const offen = seite.getByText(/nicht gespeichert|unsaved|sin guardar/i).first();
+      await offen.waitFor({ state: "visible", timeout: 8000 });
+      //   2. beim Server steht davon noch nichts
+      const vorher = await (await api("/api/notizblock")).json();
+      if ((vorher || []).some((n) => `${n.title || ""}${n.content || ""}`.includes(MARKE)))
+        throw new Error("der Server kennt den Text schon VOR dem Speichern — die Seite speichert doch von selbst");
+      //   3. erst der Knopf schickt ihn hin
+      // Beschriftung aus `common.save`; das Testkonto laeuft teils auf
+      // Englisch, darum alle drei Sprachen in EINEM Muster.
+      await seite.getByRole("button", { name: /^(Speichern|Save|Guardar)$/ }).first().click({ timeout: 8000 });
+      // Auf das Ergebnis warten, nicht auf die Uhr: der Hinweis verschwindet,
+      // sobald der Entwurf uebernommen ist.
+      await offen.waitFor({ state: "hidden", timeout: 15000 });
     },
   },
   {
@@ -834,13 +852,15 @@ const BEDIENUNG = [
 ];
 
 /** Einen Handgriff ausfuehren und pruefen, dass er das Neuladen ueberlebt. */
-async function bediene(kontext, flow) {
+async function bediene(kontext, flow, api) {
   const { seite, probleme } = await neueSeite(kontext);
   // Hier zaehlt nur der Absturz: Konsolenfehler und 4xx bewertet der Rundgang.
   const handgriff = async () => {
     await seite.goto(flow.pfad, { waitUntil: "networkidle", timeout: 30000 });
     await tourWegklicken(seite);
-    await flow.schritte(seite);
+    // `api` fuer Handgriffe, die zwischendurch gegen den Server pruefen
+    // muessen (der Notizzettel: „vor dem Speichern steht dort nichts").
+    await flow.schritte(seite, api);
     await seite.reload({ waitUntil: "networkidle" });
     const text = await seite.locator("body").innerText();
     const drin = text.includes(MARKE) || (await seite.locator(`input[value='${MARKE}']`).count()) > 0;
@@ -874,11 +894,35 @@ async function resteAbraeumen(api) {
       for (const eintrag of await (await api(pfad)).json()) {
         if (!`${eintrag.title || ""}${eintrag.name || ""}`.includes(MARKE)) continue;
         await api(`${pfad}/${eintrag.id}`, "delete");
-        await api(`${pfad}/${eintrag.id}/purge`, "delete").catch(() => {});
         weg++;
       }
     } catch { /* was bleibt, faellt gleich beim Anlegen auf */ }
   }
+  return weg + await papierkorbLeeren(api);
+}
+
+/**
+ * Testreste ENDGUELTIG entfernen — sie liegen nach dem Loeschen im Papierkorb.
+ *
+ * Module und Kern loeschen nur noch weich (`deleted_at`, siehe CLAUDE.md), und
+ * ein weich geloeschtes Thema belegt seinen Namen weiter: der naechste Lauf
+ * bekommt beim Anlegen 409 („Dieses Thema gibt es an dieser Stelle schon") und
+ * die Probe waere bei jedem zweiten Lauf rot. Der Weg dafuer ist
+ * `DELETE /api/trash/{art}/{id}` — ein `…/purge` an der Modul-Adresse gibt es
+ * nicht (hier stand genau das, lief immer ins Leere und wurde verschluckt).
+ *
+ * Sicherheitsnetz wie ueberall: geloescht wird ausschliesslich, was die Marke
+ * traegt, geprueft unmittelbar vor dem DELETE.
+ */
+async function papierkorbLeeren(api) {
+  let weg = 0;
+  try {
+    for (const eintrag of await (await api("/api/trash")).json()) {
+      if (!`${eintrag.label || ""}`.includes(MARKE)) continue;
+      await api(`/api/trash/${eintrag.kind}/${eintrag.id}`, "delete");
+      weg++;
+    }
+  } catch { /* was bleibt, faellt beim naechsten Lauf auf */ }
   return weg;
 }
 
@@ -903,11 +947,15 @@ async function aufraeumenBedienung(api, vorher) {
       }
     } catch { /* was bleibt, faellt beim naechsten Lauf auf */ }
   }
+  // Und aus dem Papierkorb heraus: weich geloescht heisst „liegt noch da" und
+  // blockiert den Namen fuer den naechsten Lauf.
+  await papierkorbLeeren(api);
 }
 
 /** Holt die eingebettete Lernpfad-App ihre Inhalte vom Server? */
 async function ladeLernpfadDaten(kontext) {
   const seite = await kontext.newPage();
+  dialogeAnnehmen(seite);   // siehe dort: die Verlassen-Warnung braucht ein „Ja"
   const gesehen = [];
   seite.on("request", (r) => { if (r.url().includes("/api/lernpfad/")) gesehen.push(new URL(r.url()).pathname); });
   const holen = async () => {
@@ -1618,6 +1666,26 @@ async function lernpfadProbe(kontext, api) {
 }
 
 /**
+ * Rueckfragen bestaetigen — GENAU EIN Handler je Seite.
+ *
+ * Warum das sein muss: seit „wo sich etwas aendern laesst, gibt es einen
+ * Speichern-Knopf" warnt Nuvora beim Verlassen einer Seite mit offenen
+ * Aenderungen (`useVerlassenWarnung` in components/Speichern.jsx, ein
+ * `window.confirm`). Playwright weist Dialoge von sich aus AB — damit
+ * antwortet der Test „Nein", der Seitenwechsel bleibt haengen und der Locator
+ * dahinter laeuft in sein Zeitlimit. Eine Lehrkraft, die bewusst weggeht,
+ * bestaetigt; also bestaetigt der Test auch.
+ *
+ * Und genau EINER: zwei Handler auf demselben Dialog lassen den zweiten ins
+ * Leere greifen („Protocol error (Page.handleJavaScriptDialog): No dialog is
+ * showing") und reissen den ganzen Lauf ab. Wer hier etwas braucht, erweitert
+ * diese Funktion — kein zweites `seite.on("dialog", …)` daneben.
+ */
+function dialogeAnnehmen(seite) {
+  seite.on("dialog", (d) => d.accept().catch(() => {}));
+}
+
+/**
  * Neue Seite mit Mitschrift.
  *
  * `merke` legt jeden Befund nur EINMAL ab und deckelt die Zahl: eine Seite, die
@@ -1627,6 +1695,7 @@ async function lernpfadProbe(kontext, api) {
  */
 async function neueSeite(kontext) {
   const seite = await kontext.newPage();
+  dialogeAnnehmen(seite);
   const probleme = [];
   const drossel = [];
   const merke = (text) => {

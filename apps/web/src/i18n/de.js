@@ -1931,7 +1931,6 @@ export default {
   "lernen.noResultHint": "Deine Testergebnisse erscheinen hier, sobald der erste Test ausgewertet wurde.",
   "lernen.resultsTitle": "Deine Ergebnisse",
   "lernen.footerHint": "Dein Übungsstand wird unter deinem Namen gespeichert und ist für deine Lehrkraft sichtbar.",
-  "(`common.more": "Mehr",
   "common.more": "Mehr",
   "cv.backAllTests": "Alle Tests",
   "cv.backOverview": "Zurück zur Übersicht",
@@ -2303,4 +2302,6 @@ export default {
   "themen.tooThinCards": "erst {{k}} geübte Karten — zu wenig für eine Aussage",
   "themen.hintCards": "Karteikarten zählen mit: ein Kartenversuch ist ein Punkt, Treffer sind die richtig erinnerten. Karten haben kein Datum und stehen deshalb nicht im Verlauf.",
   "classes.nameRequired": "Bitte einen Klassennamen eingeben.",
+  "karten.expandDeck": "Karten anzeigen",
+  "karten.collapseDeck": "Karten ausblenden",
 };

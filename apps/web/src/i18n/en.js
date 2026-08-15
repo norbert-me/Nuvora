@@ -1945,7 +1945,6 @@ export default {
   "lernen.noResultHint": "Your test results appear here as soon as the first test has been evaluated.",
   "lernen.resultsTitle": "Your results",
   "lernen.footerHint": "Your practice progress is stored under your name and visible to your teacher.",
-  "(`common.more": "More",
   "common.more": "More",
   "cv.backAllTests": "All tests",
   "cv.backOverview": "Back to overview",
@@ -2317,4 +2316,6 @@ export default {
   "themen.tooThinCards": "only {{k}} practised cards — too little to say anything",
   "themen.hintCards": "Flashcards count too: one attempt is one point, hits are the ones recalled correctly. Cards carry no date and therefore do not appear in the timeline.",
   "classes.nameRequired": "Please enter a class name.",
+  "karten.expandDeck": "Show cards",
+  "karten.collapseDeck": "Hide cards",
 };

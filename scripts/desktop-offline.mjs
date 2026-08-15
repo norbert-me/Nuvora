@@ -172,6 +172,27 @@ async function tourWegklicken(seite) {
 /** Sichtbarer Text des Fensters, robust auch wenn gerade nichts gerendert ist. */
 const text = (seite) => seite.evaluate(() => (document.body ? document.body.innerText : "")).catch(() => "");
 
+/**
+ * Rueckfragen bestaetigen — GENAU EIN Handler je Fenster, gesetzt dort, wo das
+ * Fenster entsteht.
+ *
+ * Warum: seit „wo sich etwas aendern laesst, gibt es einen Speichern-Knopf"
+ * warnt Nuvora beim Verlassen einer Seite mit offenen Aenderungen
+ * (`useVerlassenWarnung` in components/Speichern.jsx, ein `window.confirm`).
+ * Playwright weist Dialoge von sich aus AB — der Test antwortet damit „Nein",
+ * der Seitenwechsel bleibt haengen und alles danach laeuft in sein Zeitlimit.
+ * Dieser Test liest zwar nur, aber die Warnung haengt an der Seite, nicht am
+ * Vorsatz: ein Handgriff, der hier einmal dazukommt, faende sonst dieselbe
+ * Falle vor.
+ *
+ * Und genau EINER: zwei Handler auf demselben Dialog lassen den zweiten ins
+ * Leere greifen („Protocol error … No dialog is showing") und reissen den Lauf
+ * ab. Wer etwas braucht, erweitert diese Funktion.
+ */
+function dialogeAnnehmen(seite) {
+  seite.on("dialog", (d) => d.accept().catch(() => {}));
+}
+
 async function starteApp(url, exe, profil = null) {
   return _electron.launch({
     // Ohne `profil` laeuft die App im DAUERHAFTEN Profil der Lehrkraft — das ist
@@ -341,6 +362,7 @@ async function offlineProbe(exe, user, lauf, profil) {
   let seite;
   try {
     seite = await app.firstWindow();
+    dialogeAnnehmen(seite);
     await seite.waitForLoadState("domcontentloaded").catch(() => {});
     // Bei einem frischen Profil laedt die Huelle noch waehrend der Pruefung um
     // (setup.html -> Server-Adresse -> Shell). Wer dazwischen `evaluate` ruft,
@@ -563,6 +585,7 @@ async function toteAdresse(exe) {
   const app = await starteApp("http://127.0.0.1:9", exe);
   try {
     const seite = await app.firstWindow();
+    dialogeAnnehmen(seite);
     let inhalt = "";
     for (let i = 0; i < 10; i++) {
       inhalt = await text(seite);

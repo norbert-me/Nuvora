@@ -1946,7 +1946,6 @@ export default {
   "lernen.noResultHint": "Tus resultados aparecerán aquí en cuanto se evalúe la primera prueba.",
   "lernen.resultsTitle": "Tus resultados",
   "lernen.footerHint": "Tu progreso se guarda con tu nombre y tu profesor puede verlo.",
-  "(`common.more": "Más`), muss aber jemand ändern, der",
   "common.more": "Más",
   "cv.backAllTests": "Todos los tests",
   "cv.backOverview": "Volver al resumen",
@@ -2318,4 +2317,6 @@ export default {
   "themen.tooThinCards": "solo {{k}} tarjetas practicadas: demasiado poco para afirmar algo",
   "themen.hintCards": "Las tarjetas también cuentan: un intento es un punto y los aciertos son los recordados correctamente. Las tarjetas no llevan fecha, por eso no aparecen en el historial.",
   "classes.nameRequired": "Introduce un nombre de clase.",
+  "karten.expandDeck": "Mostrar tarjetas",
+  "karten.collapseDeck": "Ocultar tarjetas",
 };

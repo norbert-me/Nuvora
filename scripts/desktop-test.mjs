@@ -283,6 +283,27 @@ async function resteAbraeumen() {
 
 // ───────────────────────── Die App starten ─────────────────────────────────
 
+/**
+ * Rueckfragen bestaetigen — GENAU EIN Handler je Seite, gesetzt DORT, wo eine
+ * Seite entsteht (App-Fenster und Vergleichs-Browser).
+ *
+ * Warum: seit „wo sich etwas aendern laesst, gibt es einen Speichern-Knopf"
+ * warnt Nuvora beim Verlassen einer Seite mit offenen Aenderungen
+ * (`useVerlassenWarnung` in components/Speichern.jsx, ein `window.confirm`).
+ * Playwright weist Dialoge von sich aus AB — der Test antwortet damit „Nein",
+ * der Seitenwechsel bleibt haengen, und was danach kommt, laeuft in sein
+ * Zeitlimit.
+ *
+ * Und genau EINER: zwei Handler auf demselben Dialog lassen den zweiten ins
+ * Leere greifen — „Protocol error (Page.handleJavaScriptDialog): No dialog is
+ * showing". Das hat hier schon einmal den ganzen Rundgang abgerissen, sodass
+ * die Seiten danach gar nicht mehr liefen. Wer etwas braucht, erweitert diese
+ * Funktion; kein zweites `seite.on("dialog", …)` daneben.
+ */
+function dialogeAnnehmen(seite) {
+  seite.on("dialog", (d) => d.accept().catch(() => {}));
+}
+
 /** Ein frisches, leeres userData-Verzeichnis (wird am Ende geloescht). */
 function neuerProfilOrdner(zweck) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), `nuvora-desktop-${zweck}-`));
@@ -311,6 +332,7 @@ async function starteApp(profil, url) {
     timeout: 60000,
   });
   const seite = await app.firstWindow({ timeout: 30000 });
+  dialogeAnnehmen(seite);
   await seite.waitForLoadState("domcontentloaded").catch(() => {});
   // Ladefehler meldet nur der Hauptprozess (`did-fail-load`) — im Renderer ist
   // davon nichts zu sehen. Gefiltert wie in apps/desktop/main.js: -3 ist der
@@ -436,6 +458,7 @@ function appOeffner(seite, app, beobachter) {
 function browserOeffner(kontext) {
   return async (pfad) => {
     const seite = await kontext.newPage();
+    dialogeAnnehmen(seite);   // siehe dort: die Verlassen-Warnung braucht ein „Ja"
     const beobachter = beobachte(seite);
     try {
       const befund = await mitFrist(rundgang(seite, pfad, beobachter.probleme), FRIST_SEITE, pfad);
@@ -855,10 +878,18 @@ async function handgriffProbe(app, seite, profil) {
       .first().click({ timeout: 8000 });
     const feld = seite.locator("input[placeholder]").first();
     await feld.fill(MARKE, { timeout: 8000 });
-    // Der Zettel speichert gebuendelt (600 ms) — abwarten, sonst prueft der
-    // Neustart gegen einen nie gesendeten Stand.
-    await seite.waitForTimeout(1500);
-    notiere("Bedienung", "Notizzettel anlegen (/notizbrett)", true, `„${MARKE}" getippt`);
+    // Frueher speicherte der Zettel von selbst (600 ms nach dem letzten
+    // Tastendruck) und der Test wartete das nur ab. Jetzt gilt: getippt ist
+    // NICHT gespeichert — erst der Knopf schickt es hin. Der Hinweis „nicht
+    // gespeichert" ist der Beleg, dass wirklich etwas offen war.
+    const offen = seite.getByText(/nicht gespeichert|unsaved|sin guardar/i).first();
+    await offen.waitFor({ state: "visible", timeout: 8000 });
+    // Beschriftung aus `common.save`; das Testkonto laeuft teils auf Englisch,
+    // darum alle drei Sprachen in EINEM Muster.
+    await seite.getByRole("button", { name: /^(Speichern|Save|Guardar)$/ }).first().click({ timeout: 8000 });
+    // Auf das Ergebnis warten, nicht auf die Uhr.
+    await offen.waitFor({ state: "hidden", timeout: 15000 });
+    notiere("Bedienung", "Notizzettel anlegen (/notizbrett)", true, `„${MARKE}" getippt und gespeichert`);
   } catch (e) {
     notiere("Bedienung", "Notizzettel anlegen (/notizbrett)", false, kurzfehler(e, 1));
     return;

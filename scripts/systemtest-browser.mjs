@@ -517,11 +517,30 @@ const bedienung = (td) => [
       await seite.waitForTimeout(900);
     },
     async loeschen(seite) {
-      // Der Loeschknopf des Stapels erscheint erst im Umbenennen-Modus.
-      const fehler = await knopfInZeile(seite, MARKE_UI, "Stapel umbenennen");
+      // Einen Knopf „Stapel umbenennen" gibt es nicht mehr: der Name IST das
+      // Eingabefeld im Stapelkopf (Karten.jsx, Werkzeugleiste), und das
+      // Loeschen sitzt im ⋯-Menue. Das Menue haengt am AUFGEKLAPPTEN Stapel
+      // (`mehr={collapsed ? [] : …}`), zugeklappt gibt es dort gar keinen
+      // Knopf — also erst aufklappen.
+      //
+      // Der Aufklapp-Knopf traegt `topics.expand` („Unterthemen anzeigen") —
+      // eine Beschriftung aus der Themenseite, die der Kartenstapel
+      // mitbenutzt (siehe Bericht).
+      let fehler = await knopfInZeile(seite, MARKE_UI, "Unterthemen anzeigen");
       if (fehler) return fehler;
-      await seite.waitForTimeout(400);
-      return await zeileLoeschen(seite, MARKE_UI);
+      // Aufgeklappt steht die Marke im Namensfeld statt als Text — kurz warten,
+      // bis der Kopf umgebaut ist, sonst sucht der naechste Griff im alten.
+      const feld = seite.locator(`input[value='${MARKE_UI}']`).first();
+      await feld.waitFor({ state: "visible", timeout: 8000 });
+      fehler = await knopfInZeile(seite, MARKE_UI, "Mehr");
+      if (fehler) return fehler;
+      // „Löschen" steht im aufgeklappten ⋯-Menue; askConfirm fragt danach nach.
+      await seite.getByRole("button", { name: "Löschen", exact: true }).first().click({ timeout: 8000 });
+      await bestaetigen(seite);
+      // Kein Undo-Fenster: der Stapel geht sofort zum Server (`call` in
+      // Karten.jsx). Also auf das Ergebnis warten statt auf die Uhr.
+      await feld.waitFor({ state: "detached", timeout: 15000 });
+      return "";
     },
   },
   {
@@ -645,6 +664,17 @@ const bedienung = (td) => [
       if (fehler) throw new Error(fehler);
       const tab = await tabSpringtWeiter(seite, MARKE_UI);
       if (tab) throw new Error(tab);
+      // Die Spalte selbst legt der Server sofort an; die NOTE dagegen sammelt
+      // die Tabelle nur im Entwurf (useEntwurf in Noten.jsx). Ohne diesen Klick
+      // prueft das Neuladen gleich einen Stand, der nie abgeschickt wurde — und
+      // die Verlassen-Warnung stuende obendrein im Weg.
+      // Der Knopf schwebt unten mittig (components/SpeicherBalken.jsx).
+      const speichern = seite.getByRole("button", { name: "Speichern", exact: true }).first();
+      await speichern.waitFor({ state: "visible", timeout: 15000 });
+      await speichern.click({ timeout: 8000 });
+      // Auf das Ergebnis warten: der Hinweis geht weg, sobald der Entwurf
+      // uebernommen ist.
+      await seite.getByText("nicht gespeichert").first().waitFor({ state: "hidden", timeout: 20000 });
     },
     // Eigene Probe: die Spalte allein beweist nur die halbe Miete. Erst die
     // Zelle zeigt, dass auch die NOTE gespeichert wurde.
@@ -1662,7 +1692,19 @@ async function neueSeite() {
     if (r.status() === 429) { drossel.push(new URL(r.url()).pathname); return; }
     if (r.status() >= 400 && !istEgal(r.url())) merke(`HTTP ${r.status()} ${new URL(r.url()).pathname}`);
   });
-  // Loeschen fragt teils per confirm() nach — eine Lehrkraft bestaetigt.
+  // GENAU EIN Dialog-Handler je Seite, und er bestaetigt.
+  //
+  // Zwei Rueckfragen laufen hier durch: das Loeschen fragt teils per confirm()
+  // nach, und seit „wo sich etwas aendern laesst, gibt es einen
+  // Speichern-Knopf" warnt Nuvora beim Verlassen einer Seite mit offenen
+  // Aenderungen (`useVerlassenWarnung` in components/Speichern.jsx). Playwright
+  // weist Dialoge von sich aus AB — der Test antwortete damit „Nein", der
+  // Seitenwechsel blieb haengen und der Locator dahinter lief in sein
+  // Zeitlimit. Eine Lehrkraft, die weggeht, bestaetigt; also der Test auch.
+  //
+  // Kein zweiter Handler daneben: zwei auf demselben Dialog lassen den zweiten
+  // ins Leere greifen („Protocol error … No dialog is showing") und reissen den
+  // Lauf ab. Wer etwas braucht, erweitert DIESE Zeile.
   seite.on("dialog", (d) => d.accept().catch(() => {}));
   return { seite, probleme, drossel, merke };
 }
