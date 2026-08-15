@@ -1037,7 +1037,8 @@ async def health():
         _health_ok_bis = _time.time() + _HEALTH_TTL
         return {"status": "ok"}
     except Exception:
-        _health_ok_bis = 0.0
+        # Kein Zuruecksetzen noetig: hierher kommt nur, wessen Frist ohnehin
+        # abgelaufen ist. Gemerkt wird weiter nur das gute Ergebnis.
         return JSONResponse(status_code=503, content={"status": "db_down"})
 
 

@@ -3,7 +3,7 @@
 // und wird nicht gespeichert. Übersicht zeigt Fehlzeiten und lässt nachtragen.
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { btnSecondary, selectStyle, Tabs, inputStyle, dateNavBtn, dateNavInput, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
+import { btnSecondary, selectStyle, Tabs, dateNavBtn, dateNavInput, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Portrait from "../components/Portrait.jsx";
 import { useLanguage } from "../i18n/index.jsx";

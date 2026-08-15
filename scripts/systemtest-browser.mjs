@@ -808,36 +808,6 @@ async function bestaetigen(seite) {
 }
 
 /**
- * In der Kursauswahl (components/KursKlasseSelect.jsx) diesen Kurs waehlen.
- *
- * Fuer Seiten, die `?class=` NICHT auswerten. Ohne das zeigt die Seite die
- * zuletzt gewaehlte Klasse des Kontos — auf einer Instanz mit echten Daten also
- * eine fremde, und der ganze Handgriff liefe am falschen Datensatz.
- */
-async function kursWaehlen(seite, name) {
-  const feld = seite.locator("select").first();
-  try {
-    await feld.waitFor({ state: "visible", timeout: 15000 });
-    await feld.selectOption({ label: name }, { timeout: 8000 });
-  } catch (e) {
-    return `Kurs „${name}" nicht wählbar: ${kurzfehler(e, 1)}`;
-  }
-  return "";
-}
-
-/** Den Testschueler aufmachen (Beobachtungen/Elternkontakte: erst Kind, dann Liste). */
-async function schuelerOeffnen(seite) {
-  try {
-    await seite.getByRole("button", { name: new RegExp(`${MARKE} Ann`) }).first().click({ timeout: 15000 });
-    // Auf das Ergebnis warten: das Eingabefeld gibt es erst in der Detailansicht.
-    await seite.locator("textarea").first().waitFor({ state: "visible", timeout: 8000 });
-  } catch (e) {
-    return `Testschüler „${MARKE} Ann" nicht zu öffnen: ${kurzfehler(e, 1)}`;
-  }
-  return "";
-}
-
-/**
  * Spaltennummer im Notenbuch: die wievielte Zelle traegt diese Spalte?
  *
  * Kopf- und Datenzeile sind gleich aufgebaut (Name, dann je Abschnitt die

@@ -339,15 +339,6 @@ export default function Sitzplan() {
     });
   };
 
-  // Vorlage: alle SuS automatisch in Reihen anordnen (6 pro Reihe).
-  const anordnen = () => {
-    snapshot();
-    const cols = 6, gx = SEAT_W + 16, gy = SEAT_H + 22, x0 = 20, y0 = 60;
-    const next = students.map((s, i) => ({ sid: s.id, x: x0 + (i % cols) * gx, y: y0 + Math.floor(i / cols) * gy, rot: 0 }));
-    persist(next);
-    setTafel((tf) => { const t2 = { ...tf, x: 200, y: 8, rot: 0 }; persist(next, t2); return t2; });
-  };
-
   const doExport = () => {
     const data = { type: "nuvora_sitzplan", slots: seats.map((s) => ({ x: s.x, y: s.y, rot: s.rot || 0 })), tafel };
     const a = document.createElement("a");

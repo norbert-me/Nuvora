@@ -353,7 +353,7 @@ async function offlineProbe(exe, user, lauf, profil) {
     // Anmeldung wie die Shell, dann neu laden, damit React sie sieht.
     // Zweimal versuchen: navigiert die Seite genau dazwischen, ist der Kontext
     // weg und der Aufruf scheitert — beim zweiten Mal steht sie still.
-    for (const versuch of [0, 1]) {
+    for (let versuch = 0; versuch < 2; versuch++) {
       const ok = await seite.evaluate(([tok, usr]) => {
         localStorage.setItem("token", tok);
         localStorage.setItem("user", usr);
