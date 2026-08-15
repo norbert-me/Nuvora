@@ -467,7 +467,21 @@ async function anmelden(seite) {
   // zusammen (Deploy, dann sofort die Tests) und traf einmal genau in dessen
   // Aufwaermphase — 31 s fuer den ersten Seitenaufbau, danach lief alles. Ein
   // Timeout, der nur die eigene Startlast misst, ist kein Befund ueber die App.
-  await seite.goto(`${URL_BASIS}/login`, { waitUntil: "networkidle", timeout: 60000 });
+  // Die App navigiert beim Start selbst (Shell -> „/"). Faellt unser Aufruf
+  // genau dahinein, bricht Playwright ihn ab: „interrupted by another
+  // navigation". Das ist kein Befund ueber die App, sondern ein Rennen — also
+  // erst abwarten, bis die eigene Navigation durch ist, dann gehen, und den
+  // Abbruch einmal verzeihen.
+  await seite.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
+  for (const versuch of [0, 1]) {
+    try {
+      await seite.goto(`${URL_BASIS}/login`, { waitUntil: "networkidle", timeout: 60000 });
+      break;
+    } catch (e) {
+      if (versuch || !/interrupted by another navigation/i.test(String(e))) throw e;
+      await seite.waitForTimeout(1500);
+    }
+  }
   const felder = seite.locator("input");
   if (await felder.count() < 2) return { ok: false, detail: "die Anmeldemaske erscheint gar nicht" };
   await seite.locator("input[type=email], input[name=email]").first().fill(EMAIL, { timeout: 8000 });

@@ -39,8 +39,13 @@ function StickyMitte({ children, style }) {
   // sichtbaren Rand der Zelle fest; solange die ganze Zelle zu sehen ist, steht
   // er dank `margin: 0 auto` mittig. `width: max-content` ist noetig, sonst ist
   // das Element so breit wie die Zelle und sticky hat nichts zu tun.
+  //
+  // `--spalte1` ist die Breite der klebenden Namensspalte: sie liegt UEBER dem
+  // Kopf, und ohne diesen Abstand rutscht der Abschnittstitel darunter — dann
+  // stand da nur noch „5 % …" ohne Namen.
   return (
-    <div style={{ ...style, position: "sticky", left: 8, right: 8, width: "max-content", margin: "0 auto" }}>
+    <div style={{ ...style, position: "sticky", left: "calc(var(--spalte1, 0px) + 8px)", right: 8,
+      width: "max-content", margin: "0 auto" }}>
       {children}
     </div>
   );
@@ -1316,7 +1321,12 @@ function useKlebenderKopf() {
   useLayoutEffect(() => {
     const zeile = kopf1Ref.current, rahmen = rahmenRef.current;
     if (!zeile || !rahmen) return undefined;
-    const mess = () => rahmen.style.setProperty("--kopf2", `${Math.round(zeile.getBoundingClientRect().height)}px`);
+    const mess = () => {
+      rahmen.style.setProperty("--kopf2", `${Math.round(zeile.getBoundingClientRect().height)}px`);
+      // Breite der klebenden Namensspalte — siehe StickyMitte.
+      const erste = zeile.querySelector("th");
+      if (erste) rahmen.style.setProperty("--spalte1", `${Math.round(erste.getBoundingClientRect().width)}px`);
+    };
     mess();
     const beob = new ResizeObserver(mess);
     beob.observe(zeile);

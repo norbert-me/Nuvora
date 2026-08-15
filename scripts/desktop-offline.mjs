@@ -342,14 +342,26 @@ async function offlineProbe(exe, user, lauf, profil) {
   try {
     seite = await app.firstWindow();
     await seite.waitForLoadState("domcontentloaded").catch(() => {});
+    // Bei einem frischen Profil laedt die Huelle noch waehrend der Pruefung um
+    // (setup.html -> Server-Adresse -> Shell). Wer dazwischen `evaluate` ruft,
+    // bekommt „Execution context was destroyed" — ein Rennen, kein Befund.
+    // Also erst Ruhe abwarten.
+    await seite.waitForLoadState("networkidle", { timeout: 45000 }).catch(() => {});
     const geladen = seite.url().startsWith(URL_BASIS);
     notiere(G("Start"), "Fenster lädt die konfigurierte Adresse", geladen, geladen ? seite.url() : `stattdessen: ${seite.url()}`);
 
     // Anmeldung wie die Shell, dann neu laden, damit React sie sieht.
-    await seite.evaluate(([tok, usr]) => {
-      localStorage.setItem("token", tok);
-      localStorage.setItem("user", usr);
-    }, [token, JSON.stringify(user)]).catch(() => {});
+    // Zweimal versuchen: navigiert die Seite genau dazwischen, ist der Kontext
+    // weg und der Aufruf scheitert — beim zweiten Mal steht sie still.
+    for (const versuch of [0, 1]) {
+      const ok = await seite.evaluate(([tok, usr]) => {
+        localStorage.setItem("token", tok);
+        localStorage.setItem("user", usr);
+        return true;
+      }, [token, JSON.stringify(user)]).catch(() => false);
+      if (ok) break;
+      await seite.waitForLoadState("networkidle", { timeout: 20000 }).catch(() => {});
+    }
     await seite.goto(`${URL_BASIS}/`, { waitUntil: "networkidle", timeout: 45000 }).catch(() => {});
     await tourWegklicken(seite);
 
