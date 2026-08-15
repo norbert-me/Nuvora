@@ -2046,4 +2046,5 @@ export default {
   "kalender.aboFetched": "Zuletzt vom Kalender geholt",
   "kalender.aboChanged": "Inhalt zuletzt geändert",
   "kalender.aboNever": "noch nie",
+  "karten.importPlaceholder": "Vorderseite;Rückseite  (CSV)\noder JSON: { \"cards\": [{ \"front\": \"…\", \"back\": \"$a^2$\" }] }",
 };

@@ -1037,7 +1037,7 @@ function ImportModal({ deckName, onClose, onImport, t }) {
           <input type="file" accept=".csv,.tsv,.txt,.json" onChange={onFile} style={{ fontSize: 13 }} />
           <a href="/beispiel-karten.json" download style={{ fontSize: 12.5, color: "var(--accent)" }}>{t("karten.jsonTemplate")}</a>
         </div>
-        <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={"Vorderseite;Rückseite  (CSV)\noder JSON: { \"cards\": [{ \"front\": \"…\", \"back\": \"$a^2$\" }] }"} rows={8}
+        <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={t("karten.importPlaceholder")} rows={8}
           style={{ ...inp, width: "100%", boxSizing: "border-box", fontFamily: "monospace", fontSize: 13, resize: "vertical" }} />
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14 }}>
           <button onClick={doImport} disabled={!parsed.length || busy} style={{ ...btnPrimary, opacity: (parsed.length && !busy) ? 1 : 0.4 }}>

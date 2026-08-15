@@ -2061,4 +2061,5 @@ export default {
   "kalender.aboFetched": "Última descarga del calendario",
   "kalender.aboChanged": "Contenido modificado por última vez",
   "kalender.aboNever": "nunca",
+  "karten.importPlaceholder": "Anverso;Reverso  (CSV)\no JSON: { \"cards\": [{ \"front\": \"…\", \"back\": \"$a^2$\" }] }",
 };
