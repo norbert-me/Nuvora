@@ -109,7 +109,7 @@ window.addEventListener("online", _flush);
 window.addEventListener("cardvote:offline", () => { _wasOffline = true; });
 window.addEventListener("cardvote:online", () => { if (_wasOffline) { _wasOffline = false; _flush(); } });
 setTimeout(_flush, 2000);
-import { BrowserRouter, Routes, Route, NavLink, Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Routes, Route, NavLink, Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 // Statisch bleibt nur, was fuer das erste Bild gebraucht wird: Rahmen, Landing,
 // Login und die Startseite. Alles andere wuerde beim Start einen Ladezustand
 // aufblitzen lassen, ohne dass jemand die Seite ueberhaupt sehen will.
@@ -1096,7 +1096,27 @@ function App() {
 
   return (
     <LanguageProvider>
-      <BrowserRouter>
+      <RahmenKontext.Provider value={{ user, setUser, logout }}>
+        <RouterProvider router={ROUTER} />
+      </RahmenKontext.Provider>
+    </LanguageProvider>
+  );
+}
+
+// Datenrouter statt BrowserRouter — sonst gibt es `useBlocker` nicht, und ohne
+// den laesst sich ein Seitenwechsel mit ungespeicherten Aenderungen nicht
+// aufhalten. Die Routen bleiben, wie sie waren: eine einzige Auffangroute, die
+// den bisherigen Baum rendert. Der Router entsteht genau EINMAL (Modulebene) —
+// ein bei jedem Neuzeichnen neu gebauter Router wuerfe den Zustand der ganzen
+// Anwendung weg. Was sich aendert (angemeldeter Nutzer), kommt deshalb ueber
+// einen Kontext herein, nicht ueber Eigenschaften am Routen-Element.
+const RahmenKontext = React.createContext({ user: null, setUser: () => {}, logout: () => {} });
+const ROUTER = createBrowserRouter([{ path: "*", element: <Wurzel /> }]);
+
+function Wurzel() {
+  const { user, setUser, logout } = React.useContext(RahmenKontext);
+  return (
+    <>
         <ConnectionMonitor />
         <DialogHost />
         <UndoHost />
@@ -1116,8 +1136,7 @@ function App() {
             </Routes>
           </React.Suspense>
         </LadeFehler>
-      </BrowserRouter>
-    </LanguageProvider>
+    </>
   );
 }
 

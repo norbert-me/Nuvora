@@ -2299,4 +2299,7 @@ export default {
   "karten.latexTable": "Insert table",
   "karten.latexRow": "Row +",
   "karten.latexCol": "Column +",
+  "speichern.offen": "unsaved",
+  "speichern.laeuft": "Saving …",
+  "speichern.verlassen": "There are unsaved changes. Discard them?",
 };

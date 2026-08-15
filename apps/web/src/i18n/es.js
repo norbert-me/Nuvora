@@ -2300,4 +2300,7 @@ export default {
   "karten.latexTable": "Insertar tabla",
   "karten.latexRow": "Fila +",
   "karten.latexCol": "Columna +",
+  "speichern.offen": "sin guardar",
+  "speichern.laeuft": "Guardando …",
+  "speichern.verlassen": "Hay cambios sin guardar. ¿Descartarlos?",
 };

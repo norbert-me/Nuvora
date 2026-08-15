@@ -2285,4 +2285,7 @@ export default {
   "karten.latexTable": "Tabelle einfügen",
   "karten.latexRow": "Zeile +",
   "karten.latexCol": "Spalte +",
+  "speichern.offen": "nicht gespeichert",
+  "speichern.laeuft": "Speichert …",
+  "speichern.verlassen": "Es gibt ungespeicherte Änderungen. Verwerfen?",
 };
