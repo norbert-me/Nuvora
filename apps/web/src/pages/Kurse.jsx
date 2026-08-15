@@ -2,6 +2,7 @@
 // (per Name); Karten/Noten bleiben pro Fach-Klasse. Eine Klasse darf in mehreren
 // Kursen sein.
 import { useState, useEffect } from "react";
+import { liegtDavor, nachJahrAbsteigend } from "../core/schuljahr.js";
 import { useLanguage } from "../i18n/index.jsx";
 import KursLinks from "../components/KursLinks.jsx";
 import { undoDelete } from "../core/undo.jsx";
@@ -159,9 +160,18 @@ export default function Kurse() {
                       style={{ ...inputStyle, width: 120 }} />
                     <select value={editVor} onChange={(e) => setEditVor(e.target.value)} style={{ ...selectStyle, flex: 1, minWidth: 200 }}>
                       <option value="">{t("kurse.noPrevious")}</option>
-                      {alleKurse.filter((x) => x.id !== k.id).map((x) => (
-                        <option key={x.id} value={x.id}>{x.name}{x.schuljahr ? ` (${x.schuljahr})` : ""}</option>
-                      ))}
+                      {/* Nur FRUEHERE Jahrgaenge: ein Kurs aus demselben
+                          Schuljahr ist nie das Vorjahr. Kurse ohne
+                          Jahresangabe bleiben in der Liste — Bestandskurse
+                          tragen keins, und sie zu verstecken hiesse, sie gar
+                          nicht verknuepfen zu koennen. Neueste zuerst, damit
+                          das direkt vorangehende Jahr oben steht. */}
+                      {alleKurse
+                        .filter((x) => x.id !== k.id && liegtDavor(x.schuljahr, editJahr))
+                        .sort((a, b) => nachJahrAbsteigend(a.schuljahr, b.schuljahr))
+                        .map((x) => (
+                          <option key={x.id} value={x.id}>{x.name}{x.schuljahr ? ` (${x.schuljahr})` : ""}</option>
+                        ))}
                     </select>
                   </div>
                   <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 4 }}>{t("kurse.chainHint")}</div>
