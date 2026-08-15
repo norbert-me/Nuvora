@@ -9,6 +9,8 @@ import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, cardStyle, C
 import Werkzeugleiste, { MehrMenu } from "../../components/Werkzeugleiste.jsx";
 import TopicPicker from "../../components/TopicPicker.jsx";
 import { useLanguage } from "../../i18n/index.jsx";
+import { alsJson } from "../../core/melden.js";
+import { useThemen } from "../../core/topics.js";
 
 const API = "/api/lernpfad";
 
@@ -26,7 +28,8 @@ const EMPTY = {
 export default function Exercises() {
   const { t } = useLanguage();
   const [items, setItems] = useState([]);
-  const [topics, setTopics] = useState([]);
+  // Kern-Themen aus core/topics.js — dieselbe Zeile stand auf sechs Seiten.
+  const topics = useThemen();
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(null);
@@ -39,10 +42,7 @@ export default function Exercises() {
       .catch(() => setError(t("lp.ex.loadError")))
       .finally(() => setLoaded(true));
 
-  useEffect(() => {
-    load();
-    fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {});
-  }, []);
+  useEffect(() => { load(); }, []);
 
   const topicLabel = (id) => {
     const t = topics.find((x) => x.id === id);
@@ -54,11 +54,7 @@ export default function Exercises() {
   const save = async () => {
     setError("");
     const isNew = !editing.id;
-    const res = await fetch(isNew ? `${API}/exercises` : `${API}/exercises/${editing.id}`, {
-      method: isNew ? "POST" : "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...EMPTY, ...editing, id: undefined }),
-    });
+    const res = await fetch(isNew ? `${API}/exercises` : `${API}/exercises/${editing.id}`, alsJson(isNew ? "POST" : "PUT", { ...EMPTY, ...editing, id: undefined }));
     if (!res.ok) {
       const b = await res.json().catch(() => ({}));
       setError(b.detail || t("lp.ex.saveError"));

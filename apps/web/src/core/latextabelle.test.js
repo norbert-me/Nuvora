@@ -2,7 +2,7 @@
 // herum. Geht dabei etwas daneben, sieht die Lehrkraft keine Fehlermeldung,
 // sondern eine rote Formel — deshalb hier nachgerechnet statt nachgeschaut.
 import { describe, expect, it } from "vitest";
-import { TABELLE_GERUEST, zeileAnhaengen, spalteAnhaengen } from "./latextabelle.js";
+import { formelEinfuegen, spalteAnhaengen, TABELLE_GERUEST, zeileAnhaengen } from "./latextabelle.js";
 
 // Zellen einer Zeile zählen: alles zwischen den Zeilentrennern `\\`.
 function zeilen(tex) {
@@ -75,5 +75,43 @@ describe("LaTeX-Tabellen", () => {
     const { text } = spalteAnhaengen(ohne, 25);
     expect(text).toContain("\\begin{array}{ccc}");
     zeilen(text).forEach((r) => expect(zellen(r)).toBe(3));
+  });
+});
+
+// ─── Schnelltasten ───────────────────────────────────────────────────────────
+// Zusammengefuehrt aus zwei gleichlautenden `insertLatex` (Dashboard, Karten).
+// Ohne Test ist die Dollarzeichen-Regel genau die Art Rechnung, die man beim
+// Zusammenlegen still verdreht.
+describe("formelEinfuegen", () => {
+  it("setzt Dollarzeichen, wenn der Schreibpunkt ausserhalb einer Formel steht", () => {
+    expect(formelEinfuegen("Rechne ", 7, 7, "\\pi ")).toEqual({ text: "Rechne $\\pi $", pos: 13 });
+  });
+
+  it("setzt KEINE Dollarzeichen INNERHALB einer Formel", () => {
+    // Ein einzelnes offenes „$" davor heisst: wir stehen mitten in der Formel.
+    const r = formelEinfuegen("a $x", 4, 4, "\\pi ");
+    expect(r.text).toBe("a $x\\pi ");
+  });
+
+  it("setzt wieder Dollarzeichen hinter einer abgeschlossenen Formel", () => {
+    const r = formelEinfuegen("a $x$ b", 7, 7, "\\pi ");
+    expect(r.text).toBe("a $x$ b$\\pi $");
+  });
+
+  it("nimmt markierten Text in die erste Luecke", () => {
+    const r = formelEinfuegen("ab", 0, 2, "\\sqrt{}", -1);
+    expect(r.text).toBe("$\\sqrt{ab}$");
+    expect(r.pos).toBe("$\\sqrt{ab}$".length - 1);
+  });
+
+  it("display setzt doppelte Dollarzeichen (Tabelle in eigener Zeile)", () => {
+    const r = formelEinfuegen("", 0, 0, "T", 0, true);
+    expect(r.text).toBe("$$T$$");
+  });
+
+  it("der Schreibpunkt landet um `cursor` versetzt hinter dem Eingesetzten", () => {
+    const r = formelEinfuegen("", 0, 0, "\\frac{}{}", -3);
+    expect(r.text).toBe("$\\frac{}{}$");
+    expect(r.pos).toBe("$\\frac{}{}$".length - 3);
   });
 });

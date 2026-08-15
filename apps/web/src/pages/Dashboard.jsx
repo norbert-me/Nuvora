@@ -3,9 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt } from "../core/dialog.jsx";
 import Latex from "../components/Latex.jsx";
 import PublishModal from "../components/PublishModal.jsx";
-import { NiveauToggle, AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, btnSmall, Toggle, Modal, Popover,
-  pageApp, pageTitle, cardStyle, panelStyle, menuRow, SHADOW, inputStyle as inputBasis, selectStyle,
-  toolbarBtn, toolbarBtnPrimary, toolbarInput, StatCard, CONTROL_R, badge, chipStyle, sectionLabel } from "../components/Icons.jsx";
+import { AddButton, COLORS as C, CONTROL_R, ICONS, Icon, Modal, NiveauToggle, Popover, SHADOW, StatCard, Toggle, badge, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, dateiWaehlen, iconBtn, inputStyle as inputBasis, menuRow, pageApp, pageTitle, panelStyle, sectionLabel, selectStyle, toolbarBtn, toolbarBtnPrimary, toolbarInput } from "../components/Icons.jsx";
 import { dublettenZahlen, findeDubletten, istInSammlung } from "../core/dubletten.js";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
@@ -13,10 +11,24 @@ import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import TopicPicker from "../components/TopicPicker.jsx";
 import ZoomImage from "../components/ZoomImage.jsx";
-import { themenIndex } from "../core/topics.js";
+import { themenIndex, useThemen } from "../core/topics.js";
 import { useAktiv } from "../core/modules.js";
+import { useZiehVorschau } from "../core/ziehsortieren.js";
+import { alsJson, hol } from "../core/melden.js";
+import { formelEinfuegen, LATEX_TASTEN_LANG } from "../core/latextabelle.js";
 
 const API = "/api";
+
+// Bild zu einer Frage hochladen. Stand zweimal in dieser Datei (verwaiste
+// Fragen und Frageeditor) — dieselben vierzehn Zeilen. `dateiWaehlen` aus
+// Icons.jsx macht den Dialog, hier bleibt nur das Hochladen.
+const bildHochladen = (setter) => dateiWaehlen(async (file) => {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API}/questions/upload-image`, { method: "POST", body: form });
+  if (res.ok) setter((await res.json()).url);
+}, "image/*,.svg");
+
 
 export default function Dashboard() {
   const { t } = useLanguage();
@@ -50,7 +62,7 @@ export default function Dashboard() {
   const [verwaistOffen, setVerwaistOffen] = useState(false);
 
   const ladeVerwaiste = () =>
-    fetch(`${API}/questions/verwaist`).then((r) => (r.ok ? r.json() : null)).then(setVerwaist).catch(() => {});
+    hol(`${API}/questions/verwaist`, null).then(setVerwaist);
 
   // Bei 400 Fragen ist Loeschen die falsche erste Antwort: die meisten wollen
   // zugewiesen werden, nicht weg. Deshalb Auswahl + Ziel-Quiz, und Loeschen
@@ -171,37 +183,18 @@ export default function Dashboard() {
     if (!vEdit?.text?.trim()) return;
     // `sammlungen` ist reine Anzeige und gehoert nicht in die Frage zurueck.
     const { sammlungen, ...frage } = vEdit;
-    const r = await fetch(`${API}/questions/${vEdit.id}`, {
-      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(frage),
-    });
+    const r = await fetch(`${API}/questions/${vEdit.id}`, alsJson("PUT", frage));
     if (!r.ok) return;
     setVEdit(null);
     await ladeVerwaiste();
   };
 
-  const vBildHochladen = (setter) => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*,.svg";
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch(`${API}/questions/upload-image`, { method: "POST", body: form });
-      setter((await res.json()).url);
-    };
-    input.click();
-  };
 
   const vZuweisen = async () => {
     if (!vZiel || vAuswahl.size === 0) return;
     setVMeldung("");
     const ids = [...vAuswahl];
-    const r = await fetch(`${API}/question-sets/${vZiel}/questions`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question_ids: ids }),
-    });
+    const r = await fetch(`${API}/question-sets/${vZiel}/questions`, alsJson("POST", { question_ids: ids }));
     if (!r.ok) { setVMeldung((await r.json().catch(() => ({}))).detail || t("common.error")); return; }
     setVAuswahl(new Set());
     setVMeldung(t("dash.orphansAssigned", { n: ids.length }));
@@ -290,7 +283,7 @@ export default function Dashboard() {
       setFolders(Array.isArray(f) ? f : []);
       setAllQuestions(Array.isArray(q) ? q : []);
       // Top-Level-Fragensets (ohne Ordner) — werden am Wurzel-Level angezeigt.
-      fetch(`${API}/root-question-sets`).then((r) => (r.ok ? r.json() : [])).then((d) => setRootSets(Array.isArray(d) ? d : [])).catch(() => {});
+      hol(`${API}/root-question-sets`).then((d) => setRootSets(Array.isArray(d) ? d : []));
       setLoadError(false);
     } catch { setLoadError(true); }
   };
@@ -387,7 +380,7 @@ export default function Dashboard() {
   const createFolder = async (nm) => {
     const name = (nm ?? newFolderName).trim();
     if (!name) return;
-    await fetch(`${API}/folders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, parent_id: currentFolder }) });
+    await fetch(`${API}/folders`, alsJson("POST", { name, parent_id: currentFolder }));
     setNewFolderName(""); load();
   };
 
@@ -400,10 +393,7 @@ export default function Dashboard() {
     const neu = wert.name.trim();
     const node = renamingFolder ? findNode(folders, renamingFolder) : null;
     if (!neu || !node) return false;
-    const r = await fetch(`${API}/folders/${renamingFolder}`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: neu, parent_id: node.parent_id }),
-    }).catch(() => null);
+    const r = await fetch(`${API}/folders/${renamingFolder}`, alsJson("PUT", { name: neu, parent_id: node.parent_id })).catch(() => null);
     if (!r || !r.ok) return false;
     setRenameBasis({ name: neu });
     setRenamingFolder(null);
@@ -432,13 +422,9 @@ export default function Dashboard() {
     a.click();
   };
 
-  const importFolder = async () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".json";
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
+  // `dateiWaehlen` (Icons.jsx) baut den Dateidialog — fuenf Seiten hatten ihn
+  // von Hand zusammengesetzt.
+  const importFolder = () => dateiWaehlen(async (file) => {
       setImportStatus({ stage: "reading", label: file.name });
       try {
         const text = await file.text();
@@ -457,9 +443,7 @@ export default function Dashboard() {
           finishImport(false, t("dash.impUnknown"));
         }
       } catch (err) { finishImport(false, err.message || t("dash.impReadError")); }
-    };
-    input.click();
-  };
+  }, ".json");
 
   const deleteFolder = async (id) => {
     if (!await askConfirm(t("dash.deleteFolderConfirm"))) return;
@@ -469,18 +453,12 @@ export default function Dashboard() {
   const moveFolder = async (folderId, newParentId) => {
     const node = findNode(folders, folderId);
     if (!node) return;
-    await fetch(`${API}/folders/${folderId}`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: node.name, parent_id: newParentId }),
-    });
+    await fetch(`${API}/folders/${folderId}`, alsJson("PUT", { name: node.name, parent_id: newParentId }));
     setMovingFolder(null); load();
   };
 
   const createSet = async (name) => {
-    const res = await fetch(`${API}/question-sets`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, folder_id: currentFolder, question_ids: [] }),
-    });
+    const res = await fetch(`${API}/question-sets`, alsJson("POST", { name, folder_id: currentFolder, question_ids: [] }));
     const qs = await res.json();
     setEditingSet(qs); load();
   };
@@ -500,12 +478,7 @@ export default function Dashboard() {
   const importXlsx = async () => {
     const setName = await askPrompt(t("dash.setNamePrompt"));
     if (!setName) return;
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".xlsx";
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
+    dateiWaehlen(async (file) => {
       setImportStatus({ stage: "reading", label: file.name });
       const form = new FormData();
       form.append("file", file);
@@ -514,8 +487,7 @@ export default function Dashboard() {
         await load();
         finishImport(true, t("dash.impSetDone", { name: setName, count: "…" }));
       } catch (err) { finishImport(false, err.message || t("dash.impError")); }
-    };
-    input.click();
+    }, ".xlsx");
   };
 
   if (editingSet) {
@@ -675,7 +647,7 @@ export default function Dashboard() {
                     ))
                   : <span style={{ color: "var(--text3)" }}>{t("cv.dup.inNoSet")}</span>}
               </div>
-              <QuestionForm q={vEdit} setQ={setVEdit} onUpload={vBildHochladen} choiceKeys={["A", "B", "C", "D"]} />
+              <QuestionForm q={vEdit} setQ={setVEdit} onUpload={bildHochladen} choiceKeys={["A", "B", "C", "D"]} />
               <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                 <button onClick={vSpeichern} disabled={!vEdit.text?.trim()} style={btnPrimary}>{t("common.save")}</button>
                 <button onClick={() => setVEdit(null)} style={btnSecondary}>{t("common.cancel")}</button>
@@ -810,7 +782,7 @@ export default function Dashboard() {
       </Werkzeugleiste>
 
       {publishingSet && <PublishModal name={publishingSet.name} onClose={() => setPublishingSet(null)}
-        onPublish={(description) => fetch(`${API}/marketplace/publish`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ set_id: publishingSet.id, description }) }).catch(() => null)} />}
+        onPublish={(description) => fetch(`${API}/marketplace/publish`, alsJson("POST", { set_id: publishingSet.id, description })).catch(() => null)} />}
 
       {importStatus && <ImportProgress status={importStatus} />}
     </div>
@@ -871,11 +843,8 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
   // sonst haette ein Blick nach Thema die Abfolge im Unterricht umgestellt.
   const [qThema, setQThema] = useState("");      // "" = alle, "0" = ohne Thema, sonst topic_id
   const [qNachThema, setQNachThema] = useState(false);
-  const [themen, setThemen] = useState([]);
-
-  useEffect(() => {
-    fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setThemen(Array.isArray(d) ? d : [])).catch(() => {});
-  }, []);
+  // Kern-Themen aus core/topics.js — dieselbe Zeile stand auf sechs Seiten.
+  const themen = useThemen();
   const themaIdx = themenIndex(themen);
   // Touch-Geraet? Dort funktioniert HTML5-Drag nicht (iOS Safari) — deshalb
   // dort Pfeile statt Ziehen. Desktop behaelt das Ziehen.
@@ -902,9 +871,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
   const [qMap, setQMap] = useState(() => Object.fromEntries((questionSet.questions || []).map((q) => [q.id, q])));
 
   const e = useEntwurf(gespeichert, async (wert) => {
-    const res = await fetch(`${API}/question-sets/${questionSet.id}`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const res = await fetch(`${API}/question-sets/${questionSet.id}`, alsJson("PUT", {
         name: wert.name, folder_id: questionSet.folder_id,
         question_ids: wert.ids,
         shuffle_questions: wert.shuffleQ,
@@ -915,8 +882,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
         // behaelt der Server ihr altes Niveau — ein Zurueckstellen auf G waere
         // dann wirkungslos.
         niveaus: Object.fromEntries(wert.ids.map((qid) => [String(qid), wert.eFragen.includes(qid) ? "E" : "G"])),
-      }),
-    }).catch(() => null);
+      })).catch(() => null);
     if (!res || !res.ok) return false;
     setGespeichert(wert);
     onQuestionsChange();
@@ -933,12 +899,13 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
 
   const setzeReihenfolge = (arr) => e.setz({ ids: arr.map((q) => q.id) });
 
+  // Touch-Ersatz fuer das Ziehen (Pfeiltasten in der Zeile). Waehrend eines
+  // Zuges kann er nicht ausgeloest werden, deshalb reicht hier die echte Liste.
   const moveQuestion = (from, delta) => {
-    const arr = [...(previewQuestions || questions)];
+    const arr = [...questions];
     const to = from + delta;
     if (to < 0 || to >= arr.length) return;
     [arr[from], arr[to]] = [arr[to], arr[from]];
-    setPreviewQuestions(null);
     setzeReihenfolge(arr);
   };
 
@@ -951,10 +918,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
   // wird sie mit dem Speichern — wie jede andere Aenderung an der Liste.
   const addNewQuestion = async () => {
     if (!newQ.text.trim()) return;
-    const res = await fetch(`${API}/questions`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newQ),
-    });
+    const res = await fetch(`${API}/questions`, alsJson("POST", newQ));
     const q = await res.json();
     setQMap((m) => ({ ...m, [q.id]: q }));
     e.setz((v) => ({ ids: [...v.ids, q.id] }));
@@ -965,10 +929,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
   // FRAGE. Am Quiz aendert er nichts.
   const updateExistingQuestion = async () => {
     if (!editingQ || !editingQ.text.trim()) return;
-    const res = await fetch(`${API}/questions/${editingQ.id}`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editingQ),
-    });
+    const res = await fetch(`${API}/questions/${editingQ.id}`, alsJson("PUT", editingQ));
     if (!res.ok) return;
     const q = await res.json();
     setQMap((m) => ({ ...m, [q.id]: q }));
@@ -979,36 +940,15 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
   // Frage — also in den Entwurf.
   const removeQuestion = (idx) => e.setz((v) => ({ ids: v.ids.filter((_, i) => i !== idx) }));
 
-  const dragIdx = useRef(null);
-  const dragWork = useRef(null); // Arbeits-Reihenfolge während des Ziehens (stabil, kein State-Lag)
-  const [previewQuestions, setPreviewQuestions] = useState(null);
+  // Ziehen mit Live-Vorschau — dieselbe Mechanik wie bei den To-dos und den
+  // Notizzetteln, seit dem Zusammenfuehren nur noch in core/ziehsortieren.js.
+  // Beim Suchen, Filtern oder Sortieren wird nicht gezogen: der Index der
+  // Anzeige passt dann nicht zur echten Reihenfolge, ein Ablegen wuerde die
+  // falsche Frage verschieben.
+  const suchend = qSearch.trim().length > 0 || qThema !== "" || qNachThema;
+  const zieh = useZiehVorschau(questions, setzeReihenfolge, !suchend && !isTouch);
+  const previewQuestions = zieh.vorschau;
 
-  // Vorschau inkrementell: das gezogene Element in der ARBEITS-Liste von seiner
-  // aktuellen Position auf die überfahrene schieben — nicht immer aus dem Original
-  // (das verlor bei Mehrschritt-Drags die Identität; Ablegen speicherte falsch).
-  const reorderPreview = (from, to) => {
-    if (from == null || from === to || !dragWork.current) return;
-    const arr = dragWork.current;
-    const [moved] = arr.splice(from, 1);
-    arr.splice(to, 0, moved);
-    setPreviewQuestions([...arr]);
-  };
-
-  const uploadImage = async (setter) => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*,.svg";
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch(`${API}/questions/upload-image`, { method: "POST", body: form });
-      const data = await res.json();
-      setter(data.url);
-    };
-    input.click();
-  };
 
   const CHOICE_KEYS = ["A", "B", "C", "D"];
 
@@ -1083,10 +1023,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
             return a1.localeCompare(b1, "de", { numeric: true });
           });
         }
-        // Beim Suchen, Filtern oder Sortieren kein Ziehen: der Index der
-        // Anzeige passt dann nicht zur echten Reihenfolge, ein Drop wuerde die
-        // falsche Frage verschieben.
-        const searching = term.length > 0 || qThema !== "" || qNachThema;
+        const searching = suchend;
         if (shown.length === 0) {
           return <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("dash.noSearchHit")}</p>;
         }
@@ -1095,11 +1032,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
           return (
         <div
           key={q.id}
-          draggable={!searching && !isTouch}
-          onDragStart={(ev) => { if (searching) return; ev.dataTransfer.effectAllowed = "move"; dragWork.current = [...base]; dragIdx.current = idx; }}
-          onDragOver={(ev) => { if (searching || dragIdx.current == null) return; ev.preventDefault(); ev.dataTransfer.dropEffect = "move"; if (idx !== dragIdx.current) { reorderPreview(dragIdx.current, idx); dragIdx.current = idx; } }}
-          onDrop={(ev) => { if (searching) return; ev.preventDefault(); const arr = dragWork.current || previewQuestions || questions; setPreviewQuestions(null); setzeReihenfolge(arr); dragIdx.current = null; dragWork.current = null; }}
-          onDragEnd={() => { setPreviewQuestions(null); dragIdx.current = null; dragWork.current = null; }}
+          {...zieh.props(idx)}
           style={{
             ...cardStyle,
             display: "flex", alignItems: "center", gap: 8, padding: 12, marginBottom: 4,
@@ -1153,7 +1086,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
                 <Icon d={ICONS.close} size={18} />
               </button>
             </div>
-            <QuestionForm q={editingQ} setQ={setEditingQ} onUpload={uploadImage} choiceKeys={CHOICE_KEYS} />
+            <QuestionForm q={editingQ} setQ={setEditingQ} onUpload={bildHochladen} choiceKeys={CHOICE_KEYS} />
             <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
               <button onClick={updateExistingQuestion} disabled={!editingQ.text.trim()} style={btnPrimary}>{t("common.save")}</button>
               <button onClick={() => setEditingQ(null)} style={btnSecondary}>{t("common.cancel")}</button>
@@ -1171,7 +1104,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
                 <Icon d={ICONS.close} size={18} />
               </button>
             </div>
-            <QuestionForm q={newQ} setQ={setNewQ} onUpload={uploadImage} choiceKeys={CHOICE_KEYS} />
+            <QuestionForm q={newQ} setQ={setNewQ} onUpload={bildHochladen} choiceKeys={CHOICE_KEYS} />
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={async () => { await addNewQuestion(); setShowAdd(false); }} disabled={!newQ.text.trim()} style={btnPrimary}>{t("dash.add")}</button>
               <button onClick={() => setShowAdd(false)} style={btnSecondary}>{t("common.cancel")}</button>
@@ -1184,24 +1117,6 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
 
 
 
-const LATEX_BUTTONS = [
-  { label: "a/b", tex: "\\frac{}{}", cursor: -3 },
-  { label: "x²", tex: "^{}", cursor: -1 },
-  { label: "x₂", tex: "_{}", cursor: -1 },
-  { label: "√", tex: "\\sqrt{}", cursor: -1 },
-  { label: "±", tex: "\\pm " },
-  { label: "·", tex: "\\cdot " },
-  { label: "≠", tex: "\\neq " },
-  { label: "≤", tex: "\\leq " },
-  { label: "≥", tex: "\\geq " },
-  { label: "π", tex: "\\pi " },
-  { label: "∑", tex: "\\sum " },
-  { label: "∞", tex: "\\infty " },
-  // Tabelle: KaTeX kennt `array`, nicht `tabular`. Das Geruest kommt fertig
-  // hin, weil kaum jemand die Spaltenangabe („{|c|c|}") aus dem Kopf schreibt
-  // — und ein halb getipptes array rendert gar nichts.
-  { label: "⊞ Tabelle", tex: "\\begin{array}{|c|c|}\\hline  &  \\\\ \\hline  &  \\\\ \\hline\\end{array}", cursor: -40, display: true },
-];
 
 function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
   const { t } = useLanguage();
@@ -1217,29 +1132,14 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
     : setQ({ ...q, choices: { ...q.choices, [field]: val } });
 
   // Fügt LaTeX in das gerade aktive Feld ein (Fragetext ODER Antwort)
+  // Die Zeichenarbeit steht in core/latextabelle.js — Karten.jsx hatte dieselbe.
   const insertLatex = (tex, cursorOffset, display = false) => {
     const field = activeField.current || "text";
     const input = inputRefs.current[field];
     if (!input) return;
-    const start = input.selectionStart || 0;
-    const end = input.selectionEnd || 0;
-    const text = getVal(field);
-    const selected = text.slice(start, end);
-    let insert = tex;
-    if (selected && tex.includes("{}")) {
-      insert = tex.replace("{}", `{${selected}}`);
-    }
-    const needsDollar = !text.slice(0, start).includes("$") || text.slice(0, start).split("$").length % 2 === 1;
-    // Eine Tabelle gehoert in eine eigene Zeile ($$), nicht mitten in den Satz.
-    const zeichen = display ? "$$" : "$";
-    const wrapped = needsDollar ? `${zeichen}${insert}${zeichen}` : insert;
-    const newText = text.slice(0, start) + wrapped + text.slice(end);
-    setVal(field, newText);
-    setTimeout(() => {
-      const pos = start + wrapped.length + (cursorOffset || 0);
-      input.focus();
-      input.setSelectionRange(pos, pos);
-    }, 0);
+    const { text, pos } = formelEinfuegen(getVal(field), input.selectionStart || 0, input.selectionEnd || 0, tex, cursorOffset, display);
+    setVal(field, text);
+    setTimeout(() => { input.focus(); input.setSelectionRange(pos, pos); }, 0);
   };
 
   return (
@@ -1248,7 +1148,7 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
         placeholder={t("dash.qTextPh")} value={q.text} onChange={(e) => setQ({ ...q, text: e.target.value })}
         style={{ ...inputBasis, width: "100%", marginBottom: 4, fontSize: 16, resize: "vertical", fontFamily: "inherit", lineHeight: 1.4 }} autoFocus />
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
-        {LATEX_BUTTONS.map((b) => (
+        {LATEX_TASTEN_LANG.map((b) => (
           <button key={b.label} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insertLatex(b.tex, b.cursor, b.display)}
             style={{ ...btnSecondary, ...btnSmall, padding: "4px 8px", borderRadius: CONTROL_R, fontFamily: "serif" }}>
             {b.label}

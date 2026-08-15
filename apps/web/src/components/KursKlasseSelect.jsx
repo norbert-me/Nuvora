@@ -3,6 +3,7 @@
 // die Oberfläche denkt aber in Kursen. Bei 1 Klasse/Kurs nur ein Feld.
 import { useEffect, useState } from "react";
 import { selectStyle } from "./Icons.jsx";
+import { hol } from "../core/melden.js";
 
 // allowNone + noneLabel: erlaubt eine Leer-Option (z.B. „Freitext") — dann kann
 // value "" sein und onChange("") gemeldet werden.
@@ -17,10 +18,7 @@ export default function KursKlasseSelect({ value, kursValue = null, onChange, on
   const [kursId, setKursId] = useState(null);
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/kurse").then((r) => (r.ok ? r.json() : [])).catch(() => []),
-      fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).catch(() => []),
-    ]).then(([kurse, classes]) => {
+    Promise.all([hol("/api/kurse"), hol("/api/classes")]).then(([kurse, classes]) => {
       const g = (Array.isArray(kurse) ? kurse : [])
         .map((k) => ({ id: k.id, name: k.name, classes: k.classes || [] }))
         .filter((x) => x.classes.length);

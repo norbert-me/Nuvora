@@ -13,9 +13,10 @@ import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
 import { swr , lastClass } from "../core/cache.js";
 import { useUrlClass } from "../core/klassenwahl.js";
+import { wochentagMo0, ymd } from "../core/datum.js";
+import { alsJson, hol } from "../core/melden.js";
 
 const API = "/api/anwesenheit";
-const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const STATI = ["da", "fehlt", "spaet", "entsch"];
 const COL = { da: C.success, fehlt: C.danger, spaet: C.warning, entsch: C.info };
 
@@ -45,8 +46,8 @@ export default function Anwesenheit() {
   useEffect(() => {
     const stop = swr("classes", "/api/classes", (d) => setClasses(Array.isArray(d) ? d : []));
     if (kalenderAktiv) {
-      fetch("/api/kalender/timetable").then((r) => (r.ok ? r.json() : null)).then((d) => setSlots(d?.slots || [])).catch(() => {});
-      fetch("/api/kalender/breaks").then((r) => (r.ok ? r.json() : [])).then((d) => setBreaks(Array.isArray(d) ? d : [])).catch(() => {});
+      hol("/api/kalender/timetable", null).then((d) => setSlots(d?.slots || []));
+      hol("/api/kalender/breaks").then((d) => setBreaks(Array.isArray(d) ? d : []));
     }
     return stop;
   }, [kalenderAktiv]);
@@ -55,7 +56,7 @@ export default function Anwesenheit() {
   const istFrei = useMemo(() => breaks.find((b) => datum >= b.start_date.slice(0, 10) && datum <= b.end_date.slice(0, 10)), [breaks, datum]);
 
   // Klassen, die am gewählten Wochentag im Stundenplan stehen.
-  const weekday = (new Date(datum + "T00:00:00").getDay() + 6) % 7; // 0 = Montag
+  const weekday = wochentagMo0(datum + "T00:00:00");
   const heutigeIds = useMemo(() => new Set(slots.filter((s) => s.weekday === weekday && s.class_id).map((s) => s.class_id)), [slots, weekday]);
   // Stunden dieser Klasse am gewählten Wochentag (für die optionale Stunden-Zuordnung).
   const tagStunden = useMemo(() => [...new Set(slots.filter((s) => s.weekday === weekday && s.class_id === classId).map((s) => s.period))].sort((a, b) => a - b), [slots, weekday, classId]);
@@ -94,17 +95,16 @@ export default function Anwesenheit() {
     // Bei gewählter Stunde diese Stunde laden (Server belegt sie aus der
     // vorherigen vor); Stunde 0 = ganzer Tag (stärkster Status).
     const p = stunde ? `&period=${stunde}` : "";
-    fetch(`${API}/${classId}?date=${isoOf(datum)}${p}`).then((r) => (r.ok ? r.json() : {})).then((d) => { frisch.current = true; setTag(d || {}); }).catch(() => {});
+    hol(`${API}/${classId}?date=${isoOf(datum)}${p}`, {}).then((d) => { frisch.current = true; setTag(d || {}); });
   }, [classId, datum, stunde]);
   const loadSumme = useCallback(() => {
     if (!classId) return;
-    fetch(`${API}/${classId}/summary`).then((r) => (r.ok ? r.json() : {})).then((d) => setSumme(d || {})).catch(() => {});
+    hol(`${API}/${classId}/summary`, {}).then((d) => setSumme(d || {}));
   }, [classId]);
   useEffect(() => { loadTag(); }, [loadTag]);
   useEffect(() => { if (view === "uebersicht") { loadSumme(); setOffen(null); } }, [view, loadSumme]);
 
-  const mark = (sid, status, dateIso, period = null) => fetch(`${API}/${classId}`, { method: "PUT", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ student_id: sid, date: dateIso, status, note: "", period }) });
+  const mark = (sid, status, dateIso, period = null) => fetch(`${API}/${classId}`, alsJson("PUT", { student_id: sid, date: dateIso, status, note: "", period }));
 
   // ── Ein Entwurf für die ganze Tagesliste ──
   // Bisher schrieb jeder Klick sofort. Jetzt sammelt der Entwurf „Kind → Status"
@@ -141,7 +141,7 @@ export default function Anwesenheit() {
     a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href);
   };
 
-  const ladeVerlauf = (sid) => fetch(`${API}/${classId}/student/${sid}`).then((r) => (r.ok ? r.json() : [])).then((d) => { frischV.current = true; setVerlauf(Array.isArray(d) ? d : []); }).catch(() => {});
+  const ladeVerlauf = (sid) => hol(`${API}/${classId}/student/${sid}`).then((d) => { frischV.current = true; setVerlauf(Array.isArray(d) ? d : []); });
   const oeffnen = (sid) => {
     if (offen === sid) { setOffen(null); return; }
     setOffen(sid); frischV.current = true; setVerlauf([]);

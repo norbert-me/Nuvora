@@ -9,6 +9,7 @@ import { Icon, ICONS, btnSecondary, btnSmall, iconBtn, chipStyle, cardStyle, COL
 import { useLanguage } from "../i18n/index.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { askConfirm } from "../core/dialog.jsx";
+import { hol } from "../core/melden.js";
 
 const API = "/api/material";
 
@@ -37,7 +38,7 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
     : methodId != null ? `?method_id=${methodId}`
     : workId != null ? `?work_id=${workId}${rolle != null ? `&rolle=${rolle}` : ""}`
     : `?entry_id=${entryId}`;
-  const load = () => fetch(`${API}${q}`).then((r) => (r.ok ? r.json() : [])).then((d) => setItems(Array.isArray(d) ? d : [])).catch(() => {});
+  const load = () => hol(`${API}${q}`).then((d) => setItems(Array.isArray(d) ? d : []));
   useEffect(() => { load(); }, [topicId, entryId, methodId, workId, rolle]);
 
   const upload = async (file) => {

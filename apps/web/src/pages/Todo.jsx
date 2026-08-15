@@ -7,8 +7,10 @@ import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { sende } from "../core/melden.js";
+import { alsJson, hol, sende } from "../core/melden.js";
 import { useAktiv } from "../core/modules.js";
+import { heuteYmd } from "../core/datum.js";
+import { useZiehVorschau } from "../core/ziehsortieren.js";
 
 const API = "/api/todo";
 
@@ -32,9 +34,8 @@ export default function Todo({ embedded } = {}) {
   const [eDate, setEDate] = useState("");
   const [eTime, setETime] = useState("");
 
-  const heuteYmd = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
   const naechsteStunde = () => { const d = new Date(); d.setMinutes(0, 0, 0); d.setHours(d.getHours() + 1); return `${String(d.getHours()).padStart(2, "0")}:00`; };
-  const load = () => fetch(API).then((r) => (r.ok ? r.json() : [])).then((d) => setItems(Array.isArray(d) ? d : [])).catch(() => {});
+  const load = () => hol(API).then((d) => setItems(Array.isArray(d) ? d : []));
   useEffect(() => { load(); }, []);
 
   // ── Ein Entwurf für Haken und Reihenfolge ──
@@ -51,11 +52,11 @@ export default function Todo({ embedded } = {}) {
   const e = useEntwurf(basis, async (wert) => {
     for (const it of items) {
       const soll = wert.erledigt.includes(it.id);
-      if (soll !== !!it.done) await fetch(`${API}/${it.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ done: soll }) }).catch(() => {});
+      if (soll !== !!it.done) await fetch(`${API}/${it.id}`, alsJson("PUT", { done: soll })).catch(() => {});
     }
     const ids = wert.reihenfolge.filter((id) => items.some((x) => x.id === id));
     if (ids.join() !== basis.reihenfolge.join())
-      await fetch(`${API}/reorder`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) }).catch(() => {});
+      await fetch(`${API}/reorder`, alsJson("PUT", { ids })).catch(() => {});
     nachSpeichern.current = true;
     await load();
   });
@@ -73,7 +74,7 @@ export default function Todo({ embedded } = {}) {
     if (!v) return;
     // Erst leeren, wenn der Server die Aufgabe hat — sonst war der getippte
     // Text weg UND die Aufgabe nicht angelegt.
-    if (!(await sende(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: v, due_date: date || null, due_time: date ? (time || "") : "" }) }, t("common.add")))) return;
+    if (!(await sende(API, alsJson("POST", { text: v, due_date: date || null, due_time: date ? (time || "") : "" }), t("common.add")))) return;
     setText(""); setDate(""); setTime(""); load();
   };
   // Der Haken sammelt nur — geschrieben wird er mit „Speichern".
@@ -97,7 +98,7 @@ export default function Todo({ embedded } = {}) {
     if (!eText.trim()) return;
     // Bei Ablehnung bleibt die Bearbeitung offen: die getippte Fassung steht
     // noch da, statt beim naechsten load() durch die alte ersetzt zu werden.
-    if (!(await sende(`${API}/${editId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: eText.trim(), due_date: eDate || "", due_time: eDate ? (eTime || "") : "" }) }, t("common.save")))) return;
+    if (!(await sende(`${API}/${editId}`, alsJson("PUT", { text: eText.trim(), due_date: eDate || "", due_time: eDate ? (eTime || "") : "" }), t("common.save")))) return;
     setEditId(null); load();
   };
 
@@ -106,34 +107,11 @@ export default function Todo({ embedded } = {}) {
   const offen = items.filter((i) => !istErledigt(i)).sort((a, b) => platz(a) - platz(b));
   const erledigt = items.filter((i) => istErledigt(i));
 
-  // Drag&Drop der offenen To-dos mit Live-Vorschau (stabile Arbeits-Liste im Ref,
-  // damit das Ablegen genau die vorgeschaute Reihenfolge speichert).
-  const dragIdx = useRef(null);
-  const dragWork = useRef(null);
-  const [previewOpen, setPreviewOpen] = useState(null);
-  const reorderPreview = (from, to) => {
-    if (from == null || from === to || !dragWork.current) return;
-    const a = dragWork.current;
-    const [m] = a.splice(from, 1);
-    a.splice(to, 0, m);
-    setPreviewOpen([...a]);
-  };
-  // Die neue Reihenfolge geht in den Entwurf, nicht zum Server.
-  const commitOrder = () => {
-    const arr = dragWork.current;
-    if (!arr) return;
-    setPreviewOpen(null);
-    const ids = arr.map((x) => x.id);
-    dragIdx.current = null; dragWork.current = null;
-    e.setz({ reihenfolge: ids });
-  };
-  const dndFor = (idx) => ({
-    draggable: editId == null,
-    onDragStart: () => { dragWork.current = [...(previewOpen || offen)]; dragIdx.current = idx; },
-    onDragOver: (e) => { if (dragIdx.current == null) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (idx !== dragIdx.current) { reorderPreview(dragIdx.current, idx); dragIdx.current = idx; } },
-    onDrop: (e) => { e.preventDefault(); commitOrder(); },
-    onDragEnd: () => { setPreviewOpen(null); dragIdx.current = null; dragWork.current = null; },
-  });
+  // Ziehen mit Live-Vorschau — dieselbe Mechanik wie bei den Fragen im Quiz
+  // (Dashboard) und den Notizzetteln; sie steht seit dem Zusammenfuehren nur
+  // noch in core/ziehsortieren.js. Die neue Reihenfolge geht in den Entwurf,
+  // nicht zum Server.
+  const zieh = useZiehVorschau(offen, (arr) => e.setz({ reihenfolge: arr.map((x) => x.id) }), editId == null);
 
   const Row = (it, dnd) => {
     if (editId === it.id) {
@@ -200,7 +178,7 @@ export default function Todo({ embedded } = {}) {
         <Empty title={t("todo.empty")} hint={t("todo.emptyHint")} />
       ) : (
         <>
-          {(previewOpen || offen).map((it, idx) => Row(it, dndFor(idx)))}
+          {zieh.sichtbar.map((it, idx) => Row(it, zieh.props(idx)))}
           {erledigt.length > 0 && (
             <>
               <div style={{ ...sectionLabel, margin: "16px 0 8px" }}>{t("todo.done")} ({erledigt.length})</div>

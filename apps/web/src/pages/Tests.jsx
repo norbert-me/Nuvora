@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Icon, ICONS, iconBtn, cardStyle, sectionLabel, Tabs, COLORS as C, pageApp } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import { hol } from "../core/melden.js";
 
 const API = "/api";
 
@@ -15,7 +16,7 @@ export default function Tests() {
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    fetch(`${API}/classes`).then((r) => (r.ok ? r.json() : [])).then((d) => setClasses(Array.isArray(d) ? d : [])).catch(() => {});
+    hol(`${API}/classes`).then((d) => setClasses(Array.isArray(d) ? d : []));
   }, []);
 
   const load = () => {

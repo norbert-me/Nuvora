@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { COLORS as C, cardStyle, inputStyle as feld, btnPrimary as knopf, pageForm, SHADOW } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { schreib, schreibJson } from "../core/speicher.js";
+import { alsJson } from "../core/melden.js";
 
 const API = "/api";
 
@@ -17,10 +18,7 @@ export default function Login({ onLogin }) {
   const resendVerification = async () => {
     setMessage(""); setError("");
     try {
-      await fetch(`${API}/auth/resend-verification`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
+      await fetch(`${API}/auth/resend-verification`, alsJson("POST", { email }));
       setShowResend(false);
       setMessage(t("login.resendSuccess"));
     } catch { setError(t("login.connectionError")); }
@@ -39,10 +37,7 @@ export default function Login({ onLogin }) {
 
     if (mode === "forgot") {
       try {
-        await fetch(`${API}/auth/forgot-password`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email }),
-        });
+        await fetch(`${API}/auth/forgot-password`, alsJson("POST", { email }));
         setMessage(t("login.forgotSuccess"));
       } catch { setError(t("login.connectionError")); }
       return;
@@ -51,11 +46,7 @@ export default function Login({ onLogin }) {
     const endpoint = mode === "login" ? "/auth/login" : "/auth/register";
     const body = mode === "login" ? { email, password } : { email, password };
     try {
-      const res = await fetch(`${API}${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const res = await fetch(`${API}${endpoint}`, alsJson("POST", body));
       const data = await res.json();
       if (!res.ok) {
         setError(data.detail || t("login.genericError"));

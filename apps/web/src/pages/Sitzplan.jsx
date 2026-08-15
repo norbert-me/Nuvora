@@ -11,11 +11,11 @@ import Portrait from "../components/Portrait.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
-import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { useUrlClass } from "../core/klassenwahl.js";
+import { useKlasseMerken, useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
+import { ymd } from "../core/datum.js";
+import { alsJson, hol } from "../core/melden.js";
 
 const API = "/api/sitzplan";
-const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const ABS_COL = { fehlt: C.danger, spaet: C.warning, entsch: C.info };
 const SEAT_W = 108, SEAT_H = 46;
 // SEGEL-Stufen (Helios-Konzept): Boot vom Hafen bis in die Welt, zunehmende
@@ -72,15 +72,12 @@ export default function Sitzplan() {
 
   const [kurse, setKurse] = useState([]);
   useEffect(() => {
-    fetch("/api/kurse").then((r) => (r.ok ? r.json() : [])).then((d) => setKurse(Array.isArray(d) ? d : [])).catch(() => {});
-    return swr("classes", "/api/classes", (d) => {
-      const list = Array.isArray(d) ? d : [];
-      setClasses(list);
-      if (classId === null && list.length) { const w = lastClass(); setClassId(list.some((c) => c.id === w) ? w : list[0].id); }
-    });
+    hol("/api/kurse").then((d) => setKurse(Array.isArray(d) ? d : []));
   }, []);
-
-  useEffect(() => { if (classId) rememberClass(classId); }, [classId]);
+  // Klassenliste, Vorwahl und „zuletzt gewaehlt" — dieselben sechs Zeilen
+  // standen auf fuenf Seiten; sie liegen jetzt in core/klassenwahl.js.
+  useKlassenListe(setClasses, setClassId);
+  useKlasseMerken(classId);
 
   const cls = useMemo(() => classes.find((c) => c.id === classId), [classes, classId]);
   // Sitzplan gilt kursweit: Roster = kanonische SuS des Kurses (gleichnamige
@@ -112,7 +109,7 @@ export default function Sitzplan() {
   const load = useCallback((id) => {
     if (!id) return;
     const meine = ++ladenr.current;
-    fetch(`${API}/${id}${kursId != null ? `?kurs_id=${kursId}` : ""}`).then((r) => (r.ok ? r.json() : null)).then((d) => {
+    hol(`${API}/${id}${kursId != null ? `?kurs_id=${kursId}` : ""}`, null).then((d) => {
       if (meine !== ladenr.current) return;
       frisch.current = true;
       if (!d) { setGSeats([]); return; }
@@ -125,7 +122,7 @@ export default function Sitzplan() {
         d.cells.forEach((sid, i) => { if (sid != null) migr.push({ sid, x: 20 + (i % cols) * (SEAT_W + 14), y: 20 + Math.floor(i / cols) * (SEAT_H + 18), rot: 0 }); });
         setGSeats(migr);
       } else setGSeats([]);
-    }).catch(() => {});
+    });
   }, [kursId]);
   useEffect(() => { load(classId); }, [classId, kursId, load]);
 
@@ -136,14 +133,14 @@ export default function Sitzplan() {
   const basis = useMemo(() => ({ seats: gSeats, tafel: gTafel, segel: gSegel }), [gSeats, gTafel, gSegel]);
   const e = useEntwurf(basis, async (wert) => {
     if (!classId) return false;
-    const r = await fetch(`${API}/${classId}${kursQ}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seats: wert.seats, tafel: wert.tafel }) }).catch(() => null);
+    const r = await fetch(`${API}/${classId}${kursQ}`, alsJson("PUT", { seats: wert.seats, tafel: wert.tafel })).catch(() => null);
     if (!r || !r.ok) { setMsg(t("common.notWork")); return false; }
     // SEGEL hängt an einem eigenen Endpunkt (je Kind eine Stufe) — nur die
     // geänderten schreiben.
     const keys = new Set([...Object.keys(gSegel), ...Object.keys(wert.segel)]);
     for (const k of keys) {
       if ((gSegel[k] || "") === (wert.segel[k] || "")) continue;
-      await fetch(`${API}/${classId}/segel${kursQ}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ student_id: Number(k), stage: wert.segel[k] || "" }) }).catch(() => {});
+      await fetch(`${API}/${classId}/segel${kursQ}`, alsJson("PUT", { student_id: Number(k), stage: wert.segel[k] || "" })).catch(() => {});
     }
     setGSeats(wert.seats); setGTafel(wert.tafel); setGSegel(wert.segel);
     return true;
@@ -160,7 +157,7 @@ export default function Sitzplan() {
   // SEGEL-Stufen je SuS laden (pro Kurs). Toggle in localStorage merken.
   useEffect(() => {
     if (!classId) { setGSegel({}); return; }
-    fetch(`${API}/${classId}/segel${kursQ}`).then((r) => (r.ok ? r.json() : {})).then((d) => { frisch.current = true; setGSegel(d || {}); }).catch(() => {});
+    hol(`${API}/${classId}/segel${kursQ}`, {}).then((d) => { frisch.current = true; setGSegel(d || {}); });
   }, [classId, kursId]);
   // „Ansicht"-Voreinstellung PRO KURS (Fallback Klasse): welche Zusatz-Anzeigen
   // an sind. Beim Kurswechsel neu laden — so merkt sich jeder Kurs seine Ansicht.
@@ -189,21 +186,18 @@ export default function Sitzplan() {
   // der Sitzplan hängt oft am Beamer) und nur mit Kurs-Zuschnitt.
   useEffect(() => {
     if (!foerderOn || !classId) { setMassn({}); return; }
-    fetch(`/api/classes/${classId}/massnahmen${kursId != null ? `?kurs_id=${kursId}` : ""}`)
-      .then((r) => (r.ok ? r.json() : []))
+    hol(`/api/classes/${classId}/massnahmen${kursId != null ? `?kurs_id=${kursId}` : ""}`)
       .then((d) => {
         const m = {};
         (Array.isArray(d) ? d : []).forEach((x) => { m[String(x.student_id)] = x; });
         setMassn(m);
-      }).catch(() => {});
+      });
   }, [foerderOn, classId, kursId]);
 
   useEffect(() => {
     if (!anwesenheitAktiv || !aufruf || !classId) { setAbwesend({}); return; }
-    fetch(`/api/anwesenheit/${classId}?date=${new Date(ymd(new Date()) + "T00:00:00").toISOString()}`)
-      .then((r) => (r.ok ? r.json() : {}))
-      .then((d) => { const m = {}; Object.entries(d || {}).forEach(([sid, v]) => { if (v.status && v.status !== "da") m[sid] = v.status; }); setAbwesend(m); })
-      .catch(() => {});
+    hol(`/api/anwesenheit/${classId}?date=${new Date(ymd(new Date()) + "T00:00:00").toISOString()}`, {})
+      .then((d) => { const m = {}; Object.entries(d || {}).forEach(([sid, v]) => { if (v.status && v.status !== "da") m[sid] = v.status; }); setAbwesend(m); });
   }, [anwesenheitAktiv, aufruf, classId]);
 
   // „persist" schreibt NICHT mehr — es legt den Zug in den Entwurf. Der Name

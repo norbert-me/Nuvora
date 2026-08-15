@@ -11,6 +11,7 @@ import { COLORS as C, REIFE_COLORS, Icon, ICONS, Tabs, btnPrimary, btnSecondary,
 import { useParams } from "react-router-dom";
 import RechtsFuss from "../components/RechtsFuss.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import { alsJson } from "../core/melden.js";
 
 const API = "/api/karten";
 
@@ -44,10 +45,7 @@ export default function Lernen() {
     // beginnt spaeter von vorn. Schlaegt der Aufruf fehl, hier stoppen und
     // melden statt still weiterzublaettern.
     try {
-      const r = await fetch(`${API}/lernen/${token}/review`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ card_id: card.card_id, grade }),
-      });
+      const r = await fetch(`${API}/lernen/${token}/review`, alsJson("POST", { card_id: card.card_id, grade }));
       console.debug("[Karten] Review", card.card_id, "grade", grade, "→", r.status, r.ok);
       if (!r.ok) { setError(t("lernen.saveFailed", { status: r.status })); return; }
     } catch (e) {

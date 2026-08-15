@@ -3,9 +3,9 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
-import { NiveauToggle, AddButton, Toggle, Icon, ICONS, iconBtn, toolbarIconBtn, toolbarBtn, toolbarBtnPrimary, toolbarInput, menuRow, CONTROL_H, CONTROL_R, COLORS as C, REIFE_COLORS, btnPrimary, btnSecondary, btnSmall, selectStyle, Modal as UiModal, overlayGuard, modalOverlay, modalPanel, Empty, Skeleton, pageApp, inputStyle, cardStyle, panelStyle, chipStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { AddButton, COLORS as C, CONTROL_H, CONTROL_R, Empty, ICONS, Icon, Modal as UiModal, NiveauToggle, Popover, REIFE_COLORS, Skeleton, Toggle, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, dateiWaehlen, iconBtn, inputStyle, menuRow, modalOverlay, modalPanel, overlayGuard, pageApp, panelStyle, selectStyle, td as tdBasis, th as thBasis, toolbarBtn, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
-import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
+import Speicherleiste, { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Themenstand from "../components/Themenstand.jsx";
@@ -13,27 +13,18 @@ import AuthImage from "../components/AuthImage.jsx";
 import AbschnittWahl from "../components/AbschnittWahl.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
-import { swr , lastClass, rememberClass } from "../core/cache.js";
+import { swr } from "../core/cache.js";
+import { useKlasseMerken, useKlassenListe } from "../core/klassenwahl.js";
 import PublishModal from "../components/PublishModal.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import Latex from "../components/Latex.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
-import { TABELLE_GERUEST, zeileAnhaengen, spalteAnhaengen } from "../core/latextabelle.js";
-import { sende } from "../core/melden.js";
+import { formelEinfuegen, LATEX_TASTEN, spalteAnhaengen, TABELLE_GERUEST, zeileAnhaengen } from "../core/latextabelle.js";
+import { alsJson, hol, sende } from "../core/melden.js";
+import { mondayOf } from "../core/datum.js";
+import { useAblegeZiel, useEinfuegen } from "../core/ziehsortieren.js";
+import NotenUebernahme from "../components/NotenUebernahme.jsx";
 
-// LaTeX-Schnelltasten (wie im CardVote-Editor): fügt Formeln ins fokussierte Feld.
-const LATEX_BUTTONS = [
-  { label: "a/b", tex: "\\frac{}{}", cursor: -3 },
-  { label: "x²", tex: "^{}", cursor: -1 },
-  { label: "x₂", tex: "_{}", cursor: -1 },
-  { label: "√", tex: "\\sqrt{}", cursor: -1 },
-  { label: "±", tex: "\\pm " },
-  { label: "·", tex: "\\cdot " },
-  { label: "≠", tex: "\\neq " },
-  { label: "≤", tex: "\\leq " },
-  { label: "≥", tex: "\\geq " },
-  { label: "π", tex: "\\pi " },
-];
 
 // Meisterung aus dem Reifegrad: gewichteter Anteil reifer Karten. Neu zählt
 // nicht, langfristig voll. Ergibt 0–100 %, das die Notenskala in eine Note übersetzt.
@@ -93,17 +84,11 @@ export default function Karten() {
     }).catch(() => { try { const c = JSON.parse(localStorage.getItem("user")); if (c?.grade_scale) setGradeScale(c.grade_scale); } catch {} });
   }, [notenAktiv]);
 
-  useEffect(() => {
-    return swr("classes", "/api/classes", (d) => {
-      const list = Array.isArray(d) ? d : [];
-      setClasses(list);
-      // Vorauswahl per ?class=<id> (z. B. Link aus dem Kalender), sonst erste Klasse.
-      const wanted = Number(params.get("class")) || null;
-      if (classId === null) { const w = lastClass(); setClassId((wanted && list.some((c) => c.id === wanted)) ? wanted : (list.some((c) => c.id === w) ? w : (list[0]?.id ?? null))); }
-    });
-  }, []);
-
-  useEffect(() => { if (classId) rememberClass(classId); }, [classId]);
+  // Klassenliste, Vorwahl und „zuletzt gewaehlt" aus core/klassenwahl.js.
+  // `vorzug` ist die Klasse aus der Adresse (?class=, z.B. Link aus dem
+  // Kalender) — sie geht der zuletzt gewaehlten vor.
+  useKlassenListe(setClasses, setClassId, { vorzug: Number(params.get("class")) || null });
+  useKlasseMerken(classId);
 
   // Gelöschte Stapel und Karten liegen im gemeinsamen Papierkorb des Kerns
   // (/papierkorb) — das Modul löscht nur noch.
@@ -129,9 +114,9 @@ export default function Karten() {
   const loadDecks = () => {
     const meine = ++ladenrDecks.current;
     setLoadingDecks(true);
-    return fetch(`${API}/decks`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+    return hol(`${API}/decks`).then((d) => {
       if (meine === ladenrDecks.current) setDecks(Array.isArray(d) ? d : []);
-    }).catch(() => {}).finally(() => { setLoadingDecks(false); decksLoadedOnce.current = true; });
+    }).finally(() => { setLoadingDecks(false); decksLoadedOnce.current = true; });
   };
   // Ordner (wie CardVote) zum Gruppieren der Stapel — pro Klasse/Kurs.
   const [cardFolders, setCardFolders] = useState([]);
@@ -142,9 +127,9 @@ export default function Karten() {
   const [addName, setAddName] = useState("");
   const loadFolders = () => {
     const meine = ++ladenrFolders.current;
-    fetch(`${API}/card-folders`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+    hol(`${API}/card-folders`).then((d) => {
       if (meine === ladenrFolders.current) setCardFolders(Array.isArray(d) ? d : []);
-    }).catch(() => {});
+    });
   };
   // Die Sammlung haengt an keiner Klasse mehr — neu geladen wird nur, wenn sich
   // der Kurs-Filter aendert.
@@ -165,11 +150,10 @@ export default function Karten() {
   // ziehen. Das Ziel wird beim Ziehen hervorgehoben (Vorschau, wohin es landet).
   const [dragFolder, setDragFolder] = useState(null);
   const [dragDeckId, setDragDeckId] = useState(null); // Stapel-Drag (in Ordner verschieben)
-  const [dropTarget, setDropTarget] = useState(undefined); // undefined = keins, null = Wurzel, id = Ordner
   const folderById = () => Object.fromEntries(cardFolders.map((f) => [f.id, f]));
   const isAncestor = (aId, bId) => { const m = folderById(); let cur = m[bId]?.parent_id ?? null; while (cur != null) { if (cur === aId) return true; cur = m[cur]?.parent_id ?? null; } return false; };
   const canDropInto = (dragId, targetId) => dragId != null && targetId !== dragId && !isAncestor(dragId, targetId) && ((folderById()[dragId]?.parent_id ?? null) !== (targetId ?? null));
-  const moveFolderTo = async (fId, parentId) => { const f = folderById()[fId]; if (!f) return; await sende(`${API}/card-folders/${fId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: f.name, parent_id: parentId }) }, t("karten.moveFolder")); loadFolders(); };
+  const moveFolderTo = async (fId, parentId) => { const f = folderById()[fId]; if (!f) return; await sende(`${API}/card-folders/${fId}`, alsJson("PUT", { name: f.name, parent_id: parentId }), t("karten.moveFolder")); loadFolders(); };
   // Generisch: gilt ein Ablegen auf targetId (Ordner oder Wurzel)? Für Ordner mit
   // Zyklus-Schutz, für Stapel wenn er nicht schon dort liegt.
   const canDrop = (targetId) => {
@@ -181,19 +165,17 @@ export default function Karten() {
     if (dragFolder != null) moveFolderTo(dragFolder, targetId);
     else if (dragDeckId != null) { const d = decks.find((x) => x.id === dragDeckId); if (d) moveDeck(d, targetId); }
   };
-  const endDrag = () => { setDragFolder(null); setDragDeckId(null); setDropTarget(undefined); setDeckDrop(null); };
+  // Ziel-Hervorhebung und die drei Handler kommen aus core/ziehsortieren.js —
+  // hier standen sie viermal inline (beide Brotkrumen, die Ordnerkarte) und
+  // jedes Mal ein bisschen anders. Methoden.jsx hatte dieselbe Gruppe.
+  const ablage = useAblegeZiel({ erlaubt: canDrop, ablegen: (t) => { doDrop(t); endDrag(); } });
+  const endDrag = () => { setDragFolder(null); setDragDeckId(null); ablage.zuruecksetzen(); ziehDeck.beenden(); };
   // Stapel-Reorder INNERHALB des Ordners: einen Stapel auf einen anderen ziehen.
-  const [deckDrop, setDeckDrop] = useState(null); // { id, side: "above"|"below" }
-  const onDeckDragOver = (e, id) => {
-    if (dragDeckId == null || id === dragDeckId) return;
-    // Nur reorder, wenn beide Stapel im selben Ordner liegen.
-    const src = decks.find((x) => x.id === dragDeckId), tgt = decks.find((x) => x.id === id);
-    if (!src || !tgt || (src.folder_id ?? null) !== (tgt.folder_id ?? null)) return;
-    e.preventDefault();
-    const r = e.currentTarget.getBoundingClientRect();
-    const side = e.clientY < r.top + r.height / 2 ? "above" : "below";
-    setDeckDrop((p) => (p && p.id === id && p.side === side ? p : { id, side }));
-  };
+  // Einfuegemarke aus core/ziehsortieren.js — dieselbe Bauform wie bei Themen,
+  // Karten und Notenbuch-Spalten. `nurGleicheGruppe` ist der Ordner: umsortiert
+  // wird nur innerhalb desselben Ordners, sonst greift das Ablegen IN einen
+  // Ordner (eine Zeile weiter oben).
+  const ziehDeck = useEinfuegen({ nurGleicheGruppe: true });
   // Die Reihenfolge der Stapel im aktuellen Ordner ist ein ENTWURF: das Ziehen
   // ordnet nur die Anzeige, zum Server geht sie erst per „Speichern". Sonst
   // aendert ein Verrutschen beim Scrollen die Sammlung, ohne dass jemand etwas
@@ -203,7 +185,7 @@ export default function Karten() {
     [decks, currentCardFolder]);
   const ordnungGespeichert = useMemo(() => ({ ids: imOrdner.map((d) => d.id) }), [imOrdner]);
   const ordnung = useEntwurf(ordnungGespeichert, async (wert) => {
-    const r = await fetch(`${API}/decks/reorder`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: wert.ids }) }).catch(() => null);
+    const r = await fetch(`${API}/decks/reorder`, alsJson("PUT", { ids: wert.ids })).catch(() => null);
     if (!r || !r.ok) { setError(t("common.notWork")); return false; }
     await loadDecks();
   });
@@ -222,56 +204,43 @@ export default function Karten() {
   }, [imOrdner]);
   const sichtbareDecks = ordnung.wert.ids.map((id) => imOrdner.find((d) => d.id === id)).filter(Boolean);
   const dropDeck = (targetId) => {
-    const von = dragDeckId, ov = deckDrop;
-    endDrag();
-    if (von == null || von === targetId) return;
-    const ids = sichtbareDecks.map((d) => d.id);
-    const from = ids.indexOf(von); let to = ids.indexOf(targetId);
-    if (from < 0 || to < 0) return;
-    if (ov && ov.id === targetId && ov.side === "below") to += 1;
-    if (from < to) to -= 1;
-    const neu = [...ids]; neu.splice(to, 0, neu.splice(from, 1)[0]);
-    ordnung.setz({ ids: neu });
+    const neu = ziehDeck.ablegen(targetId, sichtbareDecks.map((d) => d.id));
+    setDragFolder(null); setDragDeckId(null); ablage.zuruecksetzen();
+    if (neu) ordnung.setz({ ids: neu });
   };
   const folderPath = (fid) => { const byId = Object.fromEntries(cardFolders.map((f) => [f.id, f])); const path = []; let cur = fid; while (cur != null && byId[cur]) { path.unshift(byId[cur]); cur = byId[cur].parent_id ?? null; } return path; };
-  const createFolder = async (name) => { if (!name || !name.trim()) return; await sende(`${API}/card-folders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), parent_id: currentCardFolder }) }, t("karten.newFolderItem")); loadFolders(); };
+  const createFolder = async (name) => { if (!name || !name.trim()) return; await sende(`${API}/card-folders`, alsJson("POST", { name: name.trim(), parent_id: currentCardFolder }), t("karten.newFolderItem")); loadFolders(); };
   // askPrompt nimmt ein Optionen-Objekt, keinen zweiten Text: der bisherige Name
   // gehoert unter „initial", sonst startet das Feld leer und die Lehrkraft muss
   // ihn abtippen (oder speichert versehentlich einen leeren Ordnernamen).
-  const renameFolder = async (f) => { const n = await askPrompt(t("karten.renameFolder"), { initial: f.name }); if (n == null || !n.trim()) return; await sende(`${API}/card-folders/${f.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n.trim(), parent_id: f.parent_id ?? null }) }, t("karten.renameFolder")); loadFolders(); };
+  const renameFolder = async (f) => { const n = await askPrompt(t("karten.renameFolder"), { initial: f.name }); if (n == null || !n.trim()) return; await sende(`${API}/card-folders/${f.id}`, alsJson("PUT", { name: n.trim(), parent_id: f.parent_id ?? null }), t("karten.renameFolder")); loadFolders(); };
   const deleteFolder = async (f) => { if (!await askConfirm(t("karten.delFolderConfirm"))) return; await sende(`${API}/card-folders/${f.id}`, { method: "DELETE" }, t("common.delete")); if (currentCardFolder === f.id) setCurrentCardFolder(f.parent_id ?? null); loadFolders(); loadDecks(); };
   // Der Stapel wandert optisch sofort; ohne Meldung sah eine abgelehnte
   // Verschiebung so aus, als wäre er beim Ziehen verlorengegangen.
-  const moveDeck = async (deck, folderId) => { await sende(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", niveau_aktiv: !!deck.niveau_aktiv, folder_id: folderId }) }, t("karten.moveDeck")); loadDecks(); };
+  const moveDeck = async (deck, folderId) => { await sende(`${API}/decks/${deck.id}`, alsJson("PUT", { name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", niveau_aktiv: !!deck.niveau_aktiv, folder_id: folderId }), t("karten.moveDeck")); loadDecks(); };
   // Aus dem „+"-Menü gewählten Typ anlegen (Stapel im aktuellen Ordner / Ordner).
   const commitAdd = async () => {
     const name = addName.trim(); if (!name) return;
     // Ohne Kurs-Filter entsteht der Stapel unzugewiesen — erlaubt, er ist dann
     // nur noch nicht ausgerollt. Mit Filter erbt er genau diesen Kurs.
-    if (addMode === "deck") { await call(() => fetch(`${API}/decks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, folder_id: currentCardFolder}) })); }
+    if (addMode === "deck") { await call(() => fetch(`${API}/decks`, alsJson("POST", { name, folder_id: currentCardFolder}))); }
     else if (addMode === "folder") { await createFolder(name); }
     setAddName(""); setAddMode(null);
   };
   // Seitenweiter Import: eine JSON/CSV-Datei wird zu einem NEUEN Stapel im
   // aktuellen Ordner (wie CardVote-Import). Name aus JSON, sonst Dateiname.
-  const importDeck = () => {
-    const input = document.createElement("input");
-    input.type = "file"; input.accept = ".json,.csv,.tsv,.txt";
-    input.onchange = async (e) => {
-      const f = e.target.files?.[0]; if (!f) return;
+  const importDeck = () => dateiWaehlen(async (f) => {
       const text = await f.text();
       let name = f.name.replace(/\.[^.]+$/, "");
       try { const j = JSON.parse(text); if (j && j.name) name = String(j.name); } catch { /* CSV */ }
       const cards = parseCards(text);
       if (!cards.length) { showAlert(t("karten.importEmpty")); return; }
-      const r = await fetch(`${API}/decks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, folder_id: currentCardFolder}) }).catch(() => null);
+      const r = await fetch(`${API}/decks`, alsJson("POST", { name, folder_id: currentCardFolder})).catch(() => null);
       if (!r || !r.ok) return;
       const deck = await r.json();
-      await sende(`${API}/decks/${deck.id}/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cards }) }, t("common.import"));
+      await sende(`${API}/decks/${deck.id}/import`, alsJson("POST", { cards }), t("common.import"));
       loadDecks();
-    };
-    input.click();
-  };
+  }, ".json,.csv,.tsv,.txt");
 
   const call = async (fn) => {
     setError("");
@@ -281,7 +250,7 @@ export default function Karten() {
     return true;
   };
 
-  const loadProgress = () => fetch(`${API}/classes/${classId}/progress${kq}${sq}`).then((r) => (r.ok ? r.json() : [])).then(setProgress).catch(() => {});
+  const loadProgress = () => hol(`${API}/classes/${classId}/progress${kq}${sq}`).then(setProgress);
   const openDetail = async (p) => {
     const cards = await fetch(`${API}/classes/${classId}/students/${p.student_id}/cards${kq}${sq}`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
     setDetail({ student: p, cards });
@@ -292,7 +261,7 @@ export default function Karten() {
       { method: "POST" }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
     if (r) setTokens(r);
   };
-  const loadTokens = () => fetch(`${API}/classes/${classId}/tokens${subsetKurs ? `?subset_kurs=${subsetKurs}` : ""}`, { method: "POST" }).then((r) => (r.ok ? r.json() : [])).then(setTokens).catch(() => {});
+  const loadTokens = () => hol(`${API}/classes/${classId}/tokens${subsetKurs ? `?subset_kurs=${subsetKurs}` : ""}`, { method: "POST" }).then(setTokens);
   // Daten laden, wenn der Tab (aus der Navbar) oder die Klasse wechselt.
   useEffect(() => {
     if (!classId) return;
@@ -303,11 +272,11 @@ export default function Karten() {
   // Kurse: fuer den Filter, die Zuweisung UND die Frage, ob mit E/G gearbeitet
   // wird. Teilkurse sind daraus die mit einzeln hinzugefuegten SuS.
   useEffect(() => {
-    fetch("/api/kurse").then((r) => (r.ok ? r.json() : [])).then((d) => {
+    hol("/api/kurse").then((d) => {
       const list = Array.isArray(d) ? d : [];
       setKurse(list);
       setSubsetKurse(list.filter((k) => (k.member_count || 0) > 0));
-    }).catch(() => {});
+    });
   }, []);
 
   // Name je Kurs und „arbeitet dieser Stapel mit E/G?" — ein Stapel kann in
@@ -377,18 +346,14 @@ export default function Karten() {
           <Werkzeugleiste style={{ marginBottom: 16 }} links={
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
               <button onClick={() => setCurrentCardFolder(null)}
-                onDragOver={(e) => { if (canDrop(null)) { e.preventDefault(); if (dropTarget !== null) setDropTarget(null); } }}
-                onDragLeave={() => setDropTarget((cur) => (cur === null ? undefined : cur))}
-                onDrop={(e) => { e.preventDefault(); if (canDrop(null)) doDrop(null); endDrag(); }}
-                style={krumeBtn(dropTarget === null && canDrop(null), currentCardFolder == null)}>{t("karten.allDecks")}</button>
+                {...ablage.props(null)}
+                style={krumeBtn(ablage.aktiv(null), currentCardFolder == null)}>{t("karten.allDecks")}</button>
               {folderPath(currentCardFolder).map((f, i, arr) => (
                 <span key={f.id} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                   <span style={{ color: "var(--text3)" }}>›</span>
                   <button onClick={() => setCurrentCardFolder(f.id)}
-                    onDragOver={(e) => { if (canDrop(f.id)) { e.preventDefault(); if (dropTarget !== f.id) setDropTarget(f.id); } }}
-                    onDragLeave={() => setDropTarget((cur) => (cur === f.id ? undefined : cur))}
-                    onDrop={(e) => { e.preventDefault(); if (canDrop(f.id)) doDrop(f.id); endDrag(); }}
-                    style={krumeBtn(dropTarget === f.id && canDrop(f.id), i === arr.length - 1)}>{f.name}</button>
+                    {...ablage.props(f.id)}
+                    style={krumeBtn(ablage.aktiv(f.id), i === arr.length - 1)}>{f.name}</button>
                 </span>
               ))}
             </span>
@@ -421,14 +386,12 @@ export default function Karten() {
           {/* Unterordner des aktuellen Ordners — per Drag&Drop verschiebbar. */}
           {cardFolders.filter((f) => (f.parent_id ?? null) === currentCardFolder).map((f) => {
             const isDrag = dragFolder === f.id;
-            const isTarget = dropTarget === f.id && canDrop(f.id);
+            const isTarget = ablage.aktiv(f.id);
             return (
             <div key={f.id} draggable
               onDragStart={(e) => { setDragFolder(f.id); e.dataTransfer.effectAllowed = "move"; }}
               onDragEnd={endDrag}
-              onDragOver={(e) => { if (canDrop(f.id)) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dropTarget !== f.id) setDropTarget(f.id); } }}
-              onDragLeave={() => setDropTarget((cur) => (cur === f.id ? undefined : cur))}
-              onDrop={(e) => { e.preventDefault(); if (canDrop(f.id)) doDrop(f.id); endDrag(); }}
+              {...ablage.props(f.id)}
               style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", marginBottom: 8, opacity: isDrag ? 0.4 : 1, cursor: "grab",
                 ...(isTarget ? { background: "var(--accent-bg, rgba(10,132,255,0.10))", border: "1px solid var(--accent)" } : null) }}>
               <span className="drag-handle" style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex", flexShrink: 0 }}><Icon d={ICONS.grip} size={15} /></span>
@@ -452,7 +415,7 @@ export default function Karten() {
               <Speicherleiste entwurf={ordnung} />
             </div>
           )}
-          {sichtbareDecks.map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} onDragStartDeck={() => setDragDeckId(d.id)} onDragEndDeck={endDrag} dragging={dragDeckId === d.id} autoOpen={autoDeck === d.id} onAutoOpened={() => setAutoDeck(null)} onReorderOver={(e) => onDeckDragOver(e, d.id)} onReorderDrop={() => dropDeck(d.id)} dropSide={deckDrop && deckDrop.id === d.id ? deckDrop.side : null} />)}
+          {sichtbareDecks.map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} onDragStartDeck={() => { setDragDeckId(d.id); ziehDeck.start(d.id, d.folder_id ?? null); }} onDragEndDeck={endDrag} dragging={dragDeckId === d.id} autoOpen={autoDeck === d.id} onAutoOpened={() => setAutoDeck(null)} onReorderOver={(e) => ziehDeck.ueber(e, d.id, d.folder_id ?? null)} onReorderDrop={() => dropDeck(d.id)} dropSide={ziehDeck.seite(d.id)} />)}
         </>
       )}
 
@@ -471,7 +434,7 @@ export default function Karten() {
         // Klassen-Reifegrad zeigt nur aktiv gelernte Karten — "Neu" (noch nicht
         // angefasst) bleibt aussen vor, sonst spiegelt der Balken vor allem
         // Wochenansicht: wer hat diese Woche (ab Montag) gelernt, wer noch nie.
-        const wochStart = (() => { const d = new Date(); const wd = (d.getDay() + 6) % 7; d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - wd); return d.getTime(); })();
+        const wochStart = mondayOf(new Date()).getTime();
         const nStud = progress.length;
         const dieseWoche = progress.filter((p) => p.last_reviewed && new Date(p.last_reviewed).getTime() >= wochStart).length;
         const nieGelernt = progress.filter((p) => !p.last_reviewed).length;
@@ -543,54 +506,20 @@ export default function Karten() {
       )}
 
       {detail && <StudentDetail detail={detail} t={t} onClose={() => setDetail(null)} />}
-      {notenDialog && <NotenBrueckeModal t={t} classId={classId} kursId={kursId} progress={progress} scale={gradeScale} onClose={() => setNotenDialog(false)} />}
+      {notenDialog && (() => {
+        // Nur wer schon gelernt hat — nie-Gelernten wird keine 6 untergeschoben.
+        const noten = progress.filter((p) => p.reviewed > 0)
+          .map((p) => ({ student_id: p.student_id, value: gradeFromPct(masteryPct(p.hist), gradeScale) }))
+          .filter((g) => g.value >= 1 && g.value <= 6);
+        return <NotenUebernahme titel={t("karten.toNoten")} hinweis={t("karten.masteryHint", { n: noten.length })}
+          classId={classId} kursId={kursId} grades={noten} quelle="karten" notiz={t("karten.masteryNote")}
+          spalte={`${t("karten.masteryColumn")} ${new Date().toLocaleDateString()}`}
+          onClose={() => setNotenDialog(false)} />;
+      })()}
     </div>
   );
 }
 
-// Brücke Karten → Notenbuch: rechnet je SuS die Meisterung in eine Note (über die
-// Notenskala der Lehrkraft) und legt daraus eine neue Spalte an. Nur SuS, die schon
-// gelernt haben — nie-Gelernte bekommen keine 6 untergeschoben. Die Spalte ist frei
-// editierbar; die Note bleibt pädagogische Entscheidung.
-function NotenBrueckeModal({ t, classId, kursId, progress, scale, onClose }) {
-  const [sectionId, setSectionId] = useState(null);
-  const [name, setName] = useState(`${t("karten.masteryColumn")} ${new Date().toLocaleDateString()}`);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-
-  const grades = progress
-    .filter((p) => p.reviewed > 0)
-    .map((p) => ({ student_id: p.student_id, value: gradeFromPct(masteryPct(p.hist), scale) }))
-    .filter((g) => g.value >= 1 && g.value <= 6);
-
-  const submit = async () => {
-    if (!sectionId) { setErr(t("notenimp.noSection")); return; }
-    if (!name.trim()) { setErr(t("noten.columnName")); return; }
-    setBusy(true); setErr("");
-    const res = await fetch("/api/noten/import-grades", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ class_id: classId, kurs_id: kursId, section_id: Number(sectionId), column_name: name.trim(), note: t("karten.masteryNote"), source_kind: "karten", grades }),
-    }).catch(() => null);
-    setBusy(false);
-    if (res && res.ok) onClose();
-    else { const b = res ? await res.json().catch(() => ({})) : {}; setErr(typeof b.detail === "string" ? b.detail : t("common.notWork")); }
-  };
-
-  return (
-    <UiModal onClose={onClose} width={440} label={t("karten.toNoten")}>
-        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{t("karten.toNoten")}</h3>
-        <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 16px" }}>{t("karten.masteryHint", { n: grades.length })}</p>
-        <AbschnittWahl classId={classId} kursId={kursId} value={sectionId} onChange={setSectionId} />
-        <div style={{ fontSize: 13, color: "var(--text2)", margin: "12px 0 4px" }}>{t("noten.columnName")}</div>
-        <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, width: "100%" }} />
-        {err && <p style={{ color: C.danger, fontSize: 13, marginTop: 8 }}>{err}</p>}
-        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-          <button onClick={submit} disabled={busy || grades.length === 0 || !sectionId} style={{ ...btnPrimary, opacity: busy || grades.length === 0 || !sectionId ? 0.6 : 1 }}>{t("common.save")}</button>
-          <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
-        </div>
-    </UiModal>
-  );
-}
 
 // Einzelstatistik je Schueler: alle Karten mit Reifegrad, Faelligkeit und
 // Fehlversuchen. Nur Anzeige.
@@ -656,7 +585,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   const dragFromHandle = useRef(false);
   // folder_id IMMER mitschicken, sonst nullt ein Speichern (Name/Thema/Niveau)
   // die Ordner-Zuordnung.
-  const saveDeck = (patch) => call(() => fetch(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", niveau_aktiv: !!deck.niveau_aktiv, folder_id: deck.folder_id ?? null, ...patch }) }));
+  const saveDeck = (patch) => call(() => fetch(`${API}/decks/${deck.id}`, alsJson("PUT", { name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", niveau_aktiv: !!deck.niveau_aktiv, folder_id: deck.folder_id ?? null, ...patch })));
 
   // ─── Der ganze Stapel als EIN Entwurf ───
   //
@@ -685,7 +614,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
     const karten = Object.fromEntries((deck.cards || []).map((c) => [c.id, c]));
     const altNiveau = Object.fromEntries(gespeichert.ordnung.map((id, i) => [id, gespeichert.niveaus[i]]));
     // 1. Reihenfolge
-    const jsonPut = (body) => ({ method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const jsonPut = (body) => (alsJson("PUT", body));
     if (String(wert.ordnung) !== String(gespeichert.ordnung))
       ok = (await roh(`${API}/decks/${deck.id}/cards/reorder`, jsonPut({ ids: wert.ordnung }))) && ok;
     // 2. E/G je Karte — nur die wirklich geaenderten
@@ -697,8 +626,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
     }
     // 3. Ausrollen / Zurueckziehen
     if (wert.ausrollen !== gespeichert.ausrollen)
-      ok = (await roh(`${API}/decks/${deck.id}/release`, { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(wert.ausrollen ? { released_at: new Date(Number(wert.ausrollen) * 1000).toISOString() } : {}) })) && ok;
+      ok = (await roh(`${API}/decks/${deck.id}/release`, alsJson("POST", wert.ausrollen ? { released_at: new Date(Number(wert.ausrollen) * 1000).toISOString() } : {}))) && ok;
     // 4. Name — und zugleich das Neuladen der Liste (call meldet auch Fehler).
     //    Leerer Name behaelt den alten, statt einen namenlosen Stapel zu bauen.
     const okName = await saveDeck({ name: wert.name.trim() || deck.name });
@@ -739,40 +667,25 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
 
   // Karten innerhalb des Stapels per Drag & Drop sortieren — mit Vorschau, wo
   // die Karte landet (Linie ober-/unterhalb der Zielzeile).
-  const [dragCard, setDragCard] = useState(null);
   const [hoverCard, setHoverCard] = useState(null); // Zeile leuchtet auf: sie ist anklickbar
-  const [cardDrop, setCardDrop] = useState(null); // { id, side: "above"|"below" }
+  const ziehKarte = useEinfuegen();
   // Karte bearbeiten (Text + Bilder) — in einem Popup.
   const [editCard, setEditCard] = useState(null); // Karten-id im Edit
-  const saveEditCard = (id, front, back, niveau) => call(() => fetch(`${API}/cards/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ front, back, niveau: niveau || "" }) })).then(() => setEditCard(null));
+  const saveEditCard = (id, front, back, niveau) => call(() => fetch(`${API}/cards/${id}`, alsJson("PUT", { front, back, niveau: niveau || "" }))).then(() => setEditCard(null));
   // Neue Karte per Popup (wie Bearbeiten) statt Inline-Formular.
   const [newOpen, setNewOpen] = useState(false);
   const createCard = async (frontV, backV, niveauV) => {
     if (!frontV.trim() && !backV.trim()) return;
-    await call(() => fetch(`${API}/decks/${deck.id}/cards`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ front: frontV.trim(), back: backV.trim(), niveau: niveauV || "" }) }));
+    await call(() => fetch(`${API}/decks/${deck.id}/cards`, alsJson("POST", { front: frontV.trim(), back: backV.trim(), niveau: niveauV || "" })));
     setNewOpen(false);
   };
   // Gelöschte Karten liegen im gemeinsamen Papierkorb des Kerns (/papierkorb).
   const [studying, setStudying] = useState(false); // Lernmodus (Karten durchgehen)
-  const onCardDragOver = (e, id) => {
-    e.preventDefault();
-    if (dragCard == null || id === dragCard) { setCardDrop(null); return; }
-    const r = e.currentTarget.getBoundingClientRect();
-    const side = e.clientY < r.top + r.height / 2 ? "above" : "below";
-    setCardDrop((p) => (p && p.id === id && p.side === side ? p : { id, side }));
-  };
   // Ablegen ordnet nur den ENTWURF um (sofort sichtbar) — zum Server geht die
   // neue Reihenfolge erst mit „Speichern".
   const dropCard = (targetId) => {
-    const von = dragCard, ov = cardDrop;
-    setDragCard(null); setCardDrop(null);
-    if (von == null || von === targetId) return;
-    const ids = cards.map((c) => c.id);
-    const from = ids.indexOf(von); let to = ids.indexOf(targetId);
-    if (from < 0 || to < 0) return;
-    if (ov && ov.id === targetId && ov.side === "below") to += 1;
-    if (from < to) to -= 1;
-    const neu = [...ids]; neu.splice(to, 0, neu.splice(from, 1)[0]);
+    const neu = ziehKarte.ablegen(targetId, cards.map((c) => c.id));
+    if (!neu) return;
     // Die E/G-Zeichen ziehen mit ihrer Karte um, sonst haengen sie an der
     // Position statt an der Karte.
     entwurf.setz((v) => ({ ordnung: neu, niveaus: neu.map((id) => v.niveaus[v.ordnung.indexOf(id)] || "") }));
@@ -809,7 +722,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         // Kein Schatten, sondern die Einfuege-Marke: eine Linie oben oder unten,
         // die zeigt, wo der Stapel landet. EINE Staerke (MARKE) fuer Stapel und
         // Karten — vorher waren es 3 px hier und 2 px eine Ebene tiefer.
-        boxShadow: dropSide === "above" ? `inset 0 ${MARKE}px 0 var(--accent)` : dropSide === "below" ? `inset 0 -${MARKE}px 0 var(--accent)` : undefined }}>
+        boxShadow: dropSide === "vor" ? `inset 0 ${MARKE}px 0 var(--accent)` : dropSide === "nach" ? `inset 0 -${MARKE}px 0 var(--accent)` : undefined }}>
       {/* Kopf des Stapels als Werkzeugleiste: sichtbar bleibt, was man staendig
           braucht (Aufklappen, Name, Durchgehen) — Export, Import, Veroeffentlichen
           und Verschieben liegen im ⋯-Menue. Vorher standen hier bis zu elf
@@ -820,7 +733,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           <span onMouseDown={() => { dragFromHandle.current = true; }}
             className="drag-handle" title={t("karten.moveToFolder")} style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex", flexShrink: 0, userSelect: "none" }}><Icon d={ICONS.grip} size={15} /></span>
         )}
-        <button onClick={() => (collapsed ? setCollapsed(false) : zuklappen())} className="icon-btn" style={toolbarIconBtn} title={collapsed ? t("topics.expand") : t("topics.collapse")}>
+        <button onClick={() => (collapsed ? setCollapsed(false) : zuklappen())} className="icon-btn" style={toolbarIconBtn} title={collapsed ? t("karten.expandDeck") : t("karten.collapseDeck")}>
           <span style={{ display: "inline-flex", transform: collapsed ? "none" : "rotate(90deg)", transition: "transform 0.15s", color: "var(--text3)" }}><Icon d={ICONS.open} size={16} /></span>
         </button>
         {/* Offen IST der Name das Eingabefeld — kein Stift daneben, der einen
@@ -947,27 +860,27 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         onClose={() => setEinstellungen(false)}
         onSave={async (werte) => { const ok = await saveDeck(werte); if (ok) setEinstellungen(false); return ok; }} />}
       {publishing && <PublishModal name={deck.name || t("karten.deck")} onClose={() => setPublishing(false)}
-        onPublish={(description) => fetch(`/api/marketplace/publish/deck`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deck_id: deck.id, description }) }).catch(() => null)} />}
+        onPublish={(description) => fetch(`/api/marketplace/publish/deck`, alsJson("POST", { deck_id: deck.id, description })).catch(() => null)} />}
 
       {!collapsed && (<>
       {cards.map((c) => {
-        const over = dragCard != null && cardDrop && cardDrop.id === c.id;
+        const kartenSeite = ziehKarte.seite(c.id);
         return (
-        <div key={c.id} onDragOver={(e) => onCardDragOver(e, c.id)} onDrop={() => dropCard(c.id)}
+        <div key={c.id} onDragOver={(e) => ziehKarte.ueber(e, c.id)} onDrop={() => dropCard(c.id)}
           onMouseEnter={() => setHoverCard(c.id)} onMouseLeave={() => setHoverCard(null)}
           style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderTop: "1px solid var(--border)", fontSize: 14,
-            opacity: dragCard === c.id ? 0.4 : 1,
+            opacity: ziehKarte.zieht === c.id ? 0.4 : 1,
             // Die ganze Zeile öffnet die Karte — das Aufleuchten beim Überfahren
             // ist der Ersatz für das Stift-Symbol, das hier stand.
             background: hoverCard === c.id ? "var(--bg2)" : "transparent",
-            boxShadow: over && cardDrop.side === "above" ? `inset 0 ${MARKE}px 0 var(--accent)` : over && cardDrop.side === "below" ? `inset 0 -${MARKE}px 0 var(--accent)` : undefined }}>
+            boxShadow: kartenSeite === "vor" ? `inset 0 ${MARKE}px 0 var(--accent)` : kartenSeite === "nach" ? `inset 0 -${MARKE}px 0 var(--accent)` : undefined }}>
           {/* Dieselbe Zeile wie bei einer CardVote-Frage (Dashboard.jsx): Griff,
               Niveau-Zeichen, Text. Rechts steht gar nichts mehr — der Klick auf
               die Zeile öffnet den Editor, ein Stift daneben wäre ein zweiter Weg
               zur selben Sache. Vorher standen hier vier Knöpfe nebeneinander,
               zwei davon Bildvorschauen; in einer Liste, durch die man scrollt
               und zieht, ist das eine Reihe von Fallen. */}
-          <span draggable onDragStart={(e) => { e.stopPropagation(); e.dataTransfer.effectAllowed = "move"; setDragCard(c.id); }} onDragEnd={() => { setDragCard(null); setCardDrop(null); }}
+          <span draggable onDragStart={(e) => { e.stopPropagation(); e.dataTransfer.effectAllowed = "move"; ziehKarte.start(c.id); }} onDragEnd={ziehKarte.beenden}
             className="drag-handle" title={t("karten.reorderHint")} style={{ color: "var(--text3)", width: 20, display: "inline-flex", justifyContent: "center", cursor: "grab", flexShrink: 0, userSelect: "none" }}><Icon d={ICONS.grip} size={15} /></span>
           {/* Der EINZIGE Weg, das Niveau zu setzen — im Bearbeiten-Dialog gibt
               es ihn bewusst nicht mehr. Arbeitet der Kurs mit E/G, faellt der
@@ -1017,7 +930,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
       {studying && <StudyModal cards={cards} deckName={deck.name || t("karten.deck")} t={t} onClose={() => setStudying(false)} />}
       {importing && <ImportModal deckName={deck.name || t("karten.deck")} t={t}
         onClose={() => setImporting(false)}
-        onImport={async (cards) => call(() => fetch(`${API}/decks/${deck.id}/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cards }) }))} />}
+        onImport={async (cards) => call(() => fetch(`${API}/decks/${deck.id}/import`, alsJson("POST", { cards })))} />}
     </div>
   );
 }
@@ -1149,20 +1062,15 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onDelete, onC
   const lbl = { fontSize: 13, color: "var(--text2)", margin: "12px 0 4px" };
   // LaTeX-Schnelltasten fügen in das zuletzt fokussierte Feld ein (wie in der Anlege-Maske).
   const frontRef = useRef(null), backRef = useRef(null), activeField = useRef("front");
+  // Die Zeichenarbeit steht in core/latextabelle.js — Dashboard.jsx hatte dieselbe.
   const insertLatex = (tex, offset) => {
     const isBack = activeField.current === "back";
     const input = isBack ? backRef.current : frontRef.current;
-    const val = isBack ? back : front;
     const setter = isBack ? setBack : setFront;
     if (!input) return;
-    const start = input.selectionStart || 0, end = input.selectionEnd || 0;
-    const sel = val.slice(start, end);
-    let insert = tex; if (sel && tex.includes("{}")) insert = tex.replace("{}", `{${sel}}`);
-    const before = val.slice(0, start);
-    const needsDollar = !before.includes("$") || before.split("$").length % 2 === 1;
-    const wrapped = needsDollar ? `$${insert}$` : insert;
-    setter(before + wrapped + val.slice(end));
-    setTimeout(() => { const pos = start + wrapped.length + (offset || 0); input.focus(); input.setSelectionRange(pos, pos); }, 0);
+    const { text, pos } = formelEinfuegen(isBack ? back : front, input.selectionStart || 0, input.selectionEnd || 0, tex, offset);
+    setter(text);
+    setTimeout(() => { input.focus(); input.setSelectionRange(pos, pos); }, 0);
   };
   // Tabellen-Tasten. Sie schreiben ihr eigenes `$$…$$` — die Automatik von
   // insertLatex passt hier nicht, eine Tabelle ist abgesetzter Formelsatz.
@@ -1197,7 +1105,7 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onDelete, onC
 
         {/* LaTeX-Schnelltasten (fügen ins zuletzt fokussierte Feld). */}
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", margin: "4px 0 6px" }}>
-          {LATEX_BUTTONS.map((b) => (
+          {LATEX_TASTEN.map((b) => (
             <button key={b.label} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insertLatex(b.tex, b.cursor)}
               style={{ ...btnSecondary, ...btnSmall, fontFamily: "serif" }}>{b.label}</button>
           ))}
@@ -1239,9 +1147,7 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onDelete, onC
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center" }}>
-          <button onClick={() => onSave(card.id, front.trim(), back.trim(), niveau)} style={btnPrimary}>{t("common.save")}</button>
-          <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
+        <DialogFuss onSpeichern={() => onSave(card.id, front.trim(), back.trim(), niveau)} onAbbrechen={onClose}>
           {/* Loeschen liegt hier statt in der Zeile: dort lag der Papierkorb
               beim Ziehen und Scrollen unter dem Finger. Ganz rechts, in
               Gefahrenfarbe, mit Rueckfrage. */}
@@ -1251,7 +1157,7 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onDelete, onC
               <Icon d={ICONS.trash} size={15} color={C.danger} /> {t("common.delete")}
             </button>
           )}
-        </div>
+        </DialogFuss>
     </UiModal>
   );
 }

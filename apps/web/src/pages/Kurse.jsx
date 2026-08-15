@@ -6,7 +6,7 @@ import { liegtDavor, nachJahrAbsteigend } from "../core/schuljahr.js";
 import { useLanguage } from "../i18n/index.jsx";
 import KursLinks from "../components/KursLinks.jsx";
 import { undoDelete } from "../core/undo.jsx";
-import { sende } from "../core/melden.js";
+import { alsJson, hol, sende } from "../core/melden.js";
 import { NiveauToggle, AddButton, pageTitle, pageIntro, btnSecondary, btnSmall, selectStyle, chipStyle,
   Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, toolbarInput, sectionLabel, Toggle, Tabs, Empty, pageApp, LoadError } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
@@ -45,14 +45,14 @@ export default function Kurse() {
     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then((d) => { setKurse(Array.isArray(d) ? d : []); setLadefehler(false); })
     .catch(() => setLadefehler(true));
-  const loadClasses = () => fetch(`${API}/classes`).then((r) => (r.ok ? r.json() : [])).then((d) => setAllClasses(Array.isArray(d) ? d : [])).catch(() => {});
+  const loadClasses = () => hol(`${API}/classes`).then((d) => setAllClasses(Array.isArray(d) ? d : []));
   useEffect(() => { load(); loadClasses(); }, []);
 
   const anlegen = async () => {
     const name = neu.trim(); if (!name) return;
     // Bei Ablehnung bleibt der getippte Name im Feld stehen — sonst wäre er weg
     // und der Kurs trotzdem nicht da.
-    if (!(await sende(`${API}/kurse`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }, t("kurse.add")))) return;
+    if (!(await sende(`${API}/kurse`, alsJson("POST", { name }), t("kurse.add")))) return;
     setNeu(""); load();
   };
   const openEdit = (k) => {
@@ -83,7 +83,7 @@ export default function Kurse() {
     const name = w.name.trim();
     if (!name) return false;
     const koerper = { name, schuljahr: w.jahr.trim(), vorgaenger_id: w.vorgaenger ? Number(w.vorgaenger) : 0, niveau_aktiv: w.niveauAktiv };
-    if (!(await sende(`${API}/kurse/${k.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(koerper) }, t("kurse.editName")))) return false;
+    if (!(await sende(`${API}/kurse/${k.id}`, alsJson("PUT", koerper), t("kurse.editName")))) return false;
     for (const id of w.klassen.filter((x) => !kursBasis.klassen.includes(x)))
       if (!(await sende(`${API}/kurse/${k.id}/classes/${id}`, { method: "POST" }, t("kurse.addClass")))) return false;
     for (const id of kursBasis.klassen.filter((x) => !w.klassen.includes(x)))
@@ -273,11 +273,11 @@ export default function Kurse() {
 function StudentMembers({ kursId, allClasses, t }) {
   const [members, setMembers] = useState([]);
   const [pickClass, setPickClass] = useState("");
-  const load = () => fetch(`${API}/kurse/${kursId}/members`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+  const load = () => hol(`${API}/kurse/${kursId}/members`).then((d) => {
     const liste = Array.isArray(d) ? d : [];
     setMembers(liste);
     uebernehmen({ ids: liste.map((m) => m.student_id) });
-  }).catch(() => {});
+  });
   useEffect(() => { load(); }, [kursId]); // eslint-disable-line
   // Wer im Kurs ist, sammelt sich im Entwurf: Hinzufügen und Entfernen gehen
   // gemeinsam mit einem Speichern hinaus.
@@ -363,10 +363,7 @@ function MassnahmenPanel({ kursId, t }) {
   const e = useEntwurf(basis, async (w) => {
     for (const [name, m] of Object.entries(w.liste)) {
       if (m === basis.liste[name]) continue;
-      if (!(await sende(`${API}/kurse/${kursId}/massnahmen`, {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, massnahmen: m }),
-      }, t("kurse.editMeasures")))) return false;
+      if (!(await sende(`${API}/kurse/${kursId}/massnahmen`, alsJson("PUT", { name, massnahmen: m }), t("kurse.editMeasures")))) return false;
     }
     setBasis(w);
   });
@@ -455,7 +452,7 @@ function NiveauPanel({ kursId, niveauAktiv = false, t }) {
   const e = useEntwurf(basis, async (w) => {
     for (const [name, niveau] of Object.entries(w)) {
       if (niveau === basis[name]) continue;
-      if (!(await sende(`${API}/kurse/${kursId}/niveau`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, niveau }) }, t("kurse.editLevels")))) return false;
+      if (!(await sende(`${API}/kurse/${kursId}/niveau`, alsJson("PUT", { name, niveau }), t("kurse.editLevels")))) return false;
     }
     setBasis(w);
   });

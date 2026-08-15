@@ -3,19 +3,22 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, badge, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, COLORS as C, selectStyle, SHADOW, Tabs, td as tdCell, th, inputStyle, menuRow, toolbarInput, toolbarBtn, toolbarBtnPrimary, DatumNavigator, segmentBtn, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, dateiWaehlen, pageApp, Popover } from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, COLORS as C, selectStyle, SHADOW, Tabs, td as tdCell, th, inputStyle, menuRow, toolbarInput, toolbarBtn, toolbarBtnPrimary, DatumNavigator, segmentBtn, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, dateiWaehlen, pageApp, Popover } from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
-import { useEntwurf } from "../components/Speichern.jsx";
+import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, put } from "../core/cache.js";
 import { undoDelete } from "../core/undo.jsx";
-import { sende, pruefeAntwort } from "../core/melden.js";
+import { alsJson, hol, pruefeAntwort, sende } from "../core/melden.js";
 import MaterialPanel from "../components/MaterialPanel.jsx";
 import ferienDE from "../data/ferien-de.json";
 import { feiertage } from "../data/feiertage.js";
+// ymd/isoDay/hmToMin/startOfDay/addDays/mondayOf/isoWeek standen hier eigens —
+// dieselben Zeilen lagen in Zufall, Sitzplan, Anwesenheit und feiertage.js.
+import { addDays, hmToMin, isoDay, isoWeek, mondayOf, startOfDay, wochentagMo0, ymd } from "../core/datum.js";
 
 // Bundeslaender fuer den Ferien-Import (Kuerzel muss zu ferien-de.json passen).
 const BUNDESLAENDER = [
@@ -31,7 +34,6 @@ const API = "/api/kalender";
 // <input type="color"> nimmt keine CSS-Variable an.
 const EXT_FARBE = "#8e8e93";
 
-const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 // Gilt die (versionierte) Stundenplan-Stunde am Tag d? valid_from/valid_to sind
 // "YYYY-MM-DD" oder null (offen). Änderungen am Plan wirken ab heute, ältere Tage
@@ -42,12 +44,6 @@ const slotActiveOn = (s, d) => {
   if (s.valid_to && dd > s.valid_to) return false;
   return true;
 };
-// Kalenderdatum als ISO auf 12:00 Uhr LOKAL verankert: so verschiebt die
-// UTC-Umrechnung (toISOString) das Datum nie über die Tagesgrenze. Sonst wird
-// lokale Mitternacht in +TZ zum UTC-Vortag und der ICS-Export (server .date())
-// zeigt einen Tag zu früh (z.B. 3.9 als 2.9 im Apple-Kalender).
-const isoDay = (d) => { const x = new Date(d); return new Date(x.getFullYear(), x.getMonth(), x.getDate(), 12, 0, 0).toISOString(); };
-const hmToMin = (hhmm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || ""); return m ? (+m[1]) * 60 + (+m[2]) : null; };
 // Auswahl-Dropdowns alphabetisch aufsteigend (A→Z / 1→2→3, zahlenbewusst) sortieren.
 const byLabel = (label) => (a, b) => String(label(a)).localeCompare(String(label(b)), "de", { numeric: true });
 // Ein Eintrag ist ganztägig, wenn er weder an einer Stunde noch an einer freien Uhrzeit hängt.
@@ -62,16 +58,6 @@ function useNarrow(bp = 640) {
   }, [bp]);
   return n;
 }
-const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
-const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
-const mondayOf = (d) => { const x = startOfDay(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
-// Monat/KW-Sprung für den Kalender (Auswahlfelder, siehe Sprung-Popover).
-const isoWeek = (d) => {
-  const x = startOfDay(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7) + 3); // Donnerstag dieser Woche
-  const firstThu = new Date(x.getFullYear(), 0, 4);
-  firstThu.setDate(firstThu.getDate() - ((firstThu.getDay() + 6) % 7) + 3);
-  return { year: x.getFullYear(), week: 1 + Math.round((x - firstThu) / (7 * 86400000)) };
-};
 const weekValToDate = (s) => { const [y, w] = s.split("-W").map(Number); return addDays(mondayOf(new Date(y, 0, 4)), (w - 1) * 7); };
 
 export default function Kalender() {
@@ -116,11 +102,11 @@ export default function Kalender() {
     if (r) { setAbo((a) => ({ ...a, url: r.url, webcal: r.webcal })); showAlert(t("kalender.resyncDone")); }
   };
   const [extBusy, setExtBusy] = useState(false);
-  const loadExt = (force = false) => { if (force) setExtBusy(true); return fetch(`${API}/external-events${force ? "?refresh=1" : ""}`).then((r) => (r.ok ? r.json() : [])).then((d) => setExtEvents(Array.isArray(d) ? d : [])).catch(() => {}).finally(() => force && setExtBusy(false)); };
+  const loadExt = (force = false) => { if (force) setExtBusy(true); return hol(`${API}/external-events${force ? "?refresh=1" : ""}`).then((d) => setExtEvents(Array.isArray(d) ? d : [])).finally(() => force && setExtBusy(false)); };
   // Kalenderliste speichern (URL/Farbe je Kalender) und Events neu ziehen.
   const saveCals = async (cals) => {
     const clean = cals.filter((c) => (c.url || "").trim());
-    await fetch(`${API}/external`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ calendars: clean }) }).catch(() => {});
+    await fetch(`${API}/external`, alsJson("PUT", { calendars: clean })).catch(() => {});
     setExtCals(clean); loadExt(true);
   };
   // Ein externes Ereignis aus-/wieder einblenden (Schlüssel uid|Datum).
@@ -128,14 +114,14 @@ export default function Kalender() {
     if (!key) return;
     setExtHidden((h) => [...h, key]);
     setExtEvents((evs) => evs.filter((e) => e.key !== key));  // sofort raus
-    await fetch(`${API}/external/hide`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key }) }).catch(() => {});
+    await fetch(`${API}/external/hide`, alsJson("POST", { key })).catch(() => {});
   };
   const unhideExtEvent = async (key) => {
     setExtHidden((h) => h.filter((k) => k !== key));
-    await fetch(`${API}/external/unhide`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key }) }).catch(() => {});
+    await fetch(`${API}/external/unhide`, alsJson("POST", { key })).catch(() => {});
     loadExt(true);
   };
-  useEffect(() => { fetch(`${API}/external`).then((r) => (r.ok ? r.json() : {})).then((d) => { setExtCals(d.calendars || []); setExtHidden(d.hidden || []); if ((d.calendars || []).length) loadExt(); }).catch(() => {}); }, []);
+  useEffect(() => { hol(`${API}/external`, {}).then((d) => { setExtCals(d.calendars || []); setExtHidden(d.hidden || []); if ((d.calendars || []).length) loadExt(); }); }, []);
   const extByDay = (d) => extEvents.filter((e) => e.date === ymd(d));
   const [entries, setEntries] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -151,14 +137,14 @@ export default function Kalender() {
   const [showTimes, setShowTimes] = useState(false); // Uhrzeiten-Spalte im Stundenplan
   const [breaks, setBreaks] = useState([]); // unterrichtsfreie Zeitraeume (Ferien/Feiertage)
   const [examOverview, setExamOverview] = useState([]); // Klassenarbeiten-Übersicht (kommend + Reststunden)
-  const loadExams = () => fetch(`${API}/klassenarbeiten/uebersicht`).then((r) => (r.ok ? r.json() : [])).then((d) => setExamOverview(Array.isArray(d) ? d : [])).catch(() => {});
+  const loadExams = () => hol(`${API}/klassenarbeiten/uebersicht`).then((d) => setExamOverview(Array.isArray(d) ? d : []));
   // Nach jeder Änderung auch die Kalender-Einträge neu laden — die Klassenarbeit
   // erzeugt/ändert/löscht serverseitig einen ganztägigen Eintrag.
   // Klassenarbeiten: hier tippt die Lehrkraft Termin und Bezeichnung. Ohne
   // Prüfung holte loadExams() den alten Stand zurück — der Termin war weg, und
   // der Kalender zeigte am Tag der Arbeit nichts an.
-  const addExam = async (body) => { await sende(`${API}/klassenarbeiten`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, t("common.save")); loadExams(); load(); };
-  const updExam = async (id, body) => { await sende(`${API}/klassenarbeiten/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, t("common.save")); loadExams(); load(); };
+  const addExam = async (body) => { await sende(`${API}/klassenarbeiten`, alsJson("POST", body), t("common.save")); loadExams(); load(); };
+  const updExam = async (id, body) => { await sende(`${API}/klassenarbeiten/${id}`, alsJson("PUT", body), t("common.save")); loadExams(); load(); };
   const delExam = async (id) => { await sende(`${API}/klassenarbeiten/${id}`, { method: "DELETE" }, t("common.delete")); loadExams(); load(); };
   useEffect(() => { if (view === "klassenarbeit") loadExams(); /* eslint-disable-next-line */ }, [view]);
   const [wdhVorschlag, setWdhVorschlag] = useState([]); // schwache Themen der Vorwoche
@@ -170,41 +156,41 @@ export default function Kalender() {
     swr("classes", "/api/classes", (d) => setClasses(Array.isArray(d) ? d : []));
     // Kurse (Fächer) laden: der Stundenplan/Kalender denkt in Kursen, nicht in
     // Fach-Klassen — die Anzeige nutzt darum den Kurs-Namen (siehe className).
-    fetch("/api/kurse").then((r) => (r.ok ? r.json() : [])).then((d) => setKurse(Array.isArray(d) ? d : [])).catch(() => {});
+    hol("/api/kurse").then((d) => setKurse(Array.isArray(d) ? d : []));
     swr("topics", "/api/topics", (d) => setTopics(Array.isArray(d) ? d : []));
     // Regel 3: Modul-Objekte nur laden/anbieten, wenn das Modul aktiviert ist.
-    fetch("/api/modules").then((r) => (r.ok ? r.json() : [])).then((mods) => {
+    hol("/api/modules").then((mods) => {
       const on = {};
       (Array.isArray(mods) ? mods : []).forEach((m) => { if (m.active) on[m.key] = true; });
       setAktiv(on);
       // Einstiege wie alles andere erst nach der Modulfrage. Vorher lief der
       // Aufruf bedingungslos: ohne das Modul antwortete der Server mit 403 und
       // auf JEDER Kalenderseite stand ein Fehler in der Konsole.
-      if (on.unterrichtsplanung) fetch("/api/methoden/list").then((r) => (r.ok ? r.json() : [])).then((d) => setMethods(Array.isArray(d) ? d : [])).catch(() => {});
-      if (on.cardvote) fetch("/api/folders").then((r) => (r.ok ? r.json() : [])).then((tree) => {
+      if (on.unterrichtsplanung) hol("/api/methoden/list").then((d) => setMethods(Array.isArray(d) ? d : []));
+      if (on.cardvote) hol("/api/folders").then((tree) => {
         // Quizze aus dem (rekursiven) Ordnerbaum flach ziehen, Ordnername als Kontext.
         const flat = [];
         const walk = (f) => { (f.question_sets || []).forEach((q) => flat.push({ id: q.id, name: q.name, folder: f.name })); (f.children || []).forEach(walk); };
         (Array.isArray(tree) ? tree : []).forEach(walk);
         setQuizze(flat);
-      }).catch(() => {});
-      if (on.lernpfad) fetch("/api/lernpfad/paths").then((r) => (r.ok ? r.json() : [])).then((paths) => {
+      });
+      if (on.lernpfad) hol("/api/lernpfad/paths").then((paths) => {
         const flat = [];
         // LadderOut hat kein name, nur topic_id — Thema/Unterthema wird per topicName aufgelöst.
         (Array.isArray(paths) ? paths : []).forEach((p) => (p.ladders || []).forEach((l) => flat.push({ id: l.id, topic_id: l.topic_id, path: p.name })));
         setLadders(flat);
-      }).catch(() => {});
-      if (on["code-detektiv"]) fetch("/api/codedetektiv/puzzles").then((r) => (r.ok ? r.json() : [])).then((d) => setPuzzles(Array.isArray(d) ? d : [])).catch(() => {});
-    }).catch(() => {});
+      });
+      if (on["code-detektiv"]) hol("/api/codedetektiv/puzzles").then((d) => setPuzzles(Array.isArray(d) ? d : []));
+    });
   }, []);
 
   const loadTt = useCallback(() => {
-    fetch(`${API}/timetable`).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setTt(d); }).catch(() => {});
+    hol(`${API}/timetable`, null).then((d) => { if (d) setTt(d); });
   }, []);
   useEffect(() => { loadTt(); }, [loadTt]);
 
   const loadBreaks = useCallback(() => {
-    fetch(`${API}/breaks`).then((r) => (r.ok ? r.json() : [])).then((d) => setBreaks(Array.isArray(d) ? d : [])).catch(() => {});
+    hol(`${API}/breaks`).then((d) => setBreaks(Array.isArray(d) ? d : []));
   }, []);
   useEffect(() => { loadBreaks(); }, [loadBreaks]);
 
@@ -212,35 +198,34 @@ export default function Kalender() {
   // einem Tag entfällt, ohne den ganzen Tag (freie Tage) auszublenden.
   const [slotCancels, setSlotCancels] = useState([]);
   const loadCancels = useCallback(() => {
-    fetch(`${API}/slot-cancellations`).then((r) => (r.ok ? r.json() : [])).then((d) => setSlotCancels(Array.isArray(d) ? d : [])).catch(() => {});
+    hol(`${API}/slot-cancellations`).then((d) => setSlotCancels(Array.isArray(d) ? d : []));
   }, []);
   useEffect(() => { loadCancels(); }, [loadCancels]);
   const cancelSet = new Set(slotCancels.map((c) => `${ymd(new Date(c.date))}|${c.period}`));
   const isCancelled = (d, period) => cancelSet.has(`${ymd(d)}|${period}`);
   const cancelSlot = async (d, period) => {
-    await fetch(`${API}/slot-cancellations`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: isoDay(d), period }) }).catch(() => {});
+    await fetch(`${API}/slot-cancellations`, alsJson("POST", { date: isoDay(d), period })).catch(() => {});
     loadCancels();
   };
   const restoreSlot = async (d, period) => {
-    await fetch(`${API}/slot-cancellations`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: isoDay(d), period }) }).catch(() => {});
+    await fetch(`${API}/slot-cancellations`, alsJson("DELETE", { date: isoDay(d), period })).catch(() => {});
     loadCancels();
   };
   // Ausgefallene Stunden eines Tages (für die „entfällt"-Chips mit Wiederherstellen).
-  const cancelledFor = (d) => tt.slots.filter((s) => s.weekday === weekdayOf(d) && slotActiveOn(s, d) && isCancelled(d, s.period)).sort((a, b) => a.period - b.period);
+  const cancelledFor = (d) => tt.slots.filter((s) => s.weekday === wochentagMo0(d) && slotActiveOn(s, d) && isCancelled(d, s.period)).sort((a, b) => a.period - b.period);
 
   // Wochenansicht: schwache Themen der Vorwoche als Wiederholungs-Vorschlag.
   useEffect(() => {
     if (view !== "week" || !aktiv.cardvote) { setWdhVorschlag([]); return; }
     const vorMo = addDays(mondayOf(cursor), -7);
     const vorSo = addDays(vorMo, 6);
-    fetch(`/api/weak-topics?frm=${vorMo.toISOString()}&to=${addDays(vorSo, 1).toISOString()}`)
-      .then((r) => (r.ok ? r.json() : null)).then((d) => setWdhVorschlag(d && Array.isArray(d.topics) ? d.topics : [])).catch(() => {});
+    hol(`/api/weak-topics?frm=${vorMo.toISOString()}&to=${addDays(vorSo, 1).toISOString()}`, null).then((d) => setWdhVorschlag(d && Array.isArray(d.topics) ? d.topics : []));
   }, [view, cursor, aktiv.cardvote]);
   // Ist der Tag unterrichtsfrei (in einem Ferien-/Feiertags-Zeitraum)?
   const frei = (d) => breaks.find((b) => ymd(d) >= ymd(new Date(b.start_date)) && ymd(d) <= ymd(new Date(b.end_date)));
 
   const addBreak = async (b) => {
-    const res = await fetch(`${API}/breaks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }).catch(() => null);
+    const res = await fetch(`${API}/breaks`, alsJson("POST", b)).catch(() => null);
     if (res && res.ok) loadBreaks();
   };
   const delBreak = (id) => {
@@ -261,7 +246,7 @@ export default function Kalender() {
   const importKal = async (file) => {
     try {
       const data = JSON.parse(await file.text());
-      const r = await fetch(`${API}/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      const r = await fetch(`${API}/import`, alsJson("POST", data));
       if (r.ok) { load(); loadTt(); loadBreaks(); }
     } catch { /* ignorieren */ }
   };
@@ -277,12 +262,10 @@ export default function Kalender() {
 
   const load = useCallback(() => {
     const [a, b] = range;
-    fetch(`${API}/entries?frm=${a.toISOString()}&to=${addDays(b, 1).toISOString()}`)
-      .then((r) => (r.ok ? r.json() : [])).then((d) => setEntries(Array.isArray(d) ? d : [])).catch(() => {});
+    hol(`${API}/entries?frm=${a.toISOString()}&to=${addDays(b, 1).toISOString()}`).then((d) => setEntries(Array.isArray(d) ? d : []));
     // Datierte To-dos (nur bei aktivem Modul) mit anzeigen — Regel-3-Zusatz.
     if (aktiv.notizbrett) {
-      fetch(`/api/todo/calendar?frm=${ymd(a)}&to=${ymd(b)}`)
-        .then((r) => (r.ok ? r.json() : [])).then((d) => setTodoEvents(Array.isArray(d) ? d : [])).catch(() => {});
+      hol(`/api/todo/calendar?frm=${ymd(a)}&to=${ymd(b)}`).then((d) => setTodoEvents(Array.isArray(d) ? d : []));
     } else setTodoEvents([]);
   }, [view, cursor, aktiv.notizbrett]); // eslint-disable-line
   useEffect(() => { load(); }, [load]);
@@ -324,9 +307,7 @@ export default function Kalender() {
 
   const save = async (e) => {
     const body = { date: isoDay(e.date), title: e.title || "", notes: e.notes || "", verlaufsplan: Array.isArray(e.verlaufsplan) ? e.verlaufsplan : [], class_id: e.class_id || null, kurs_id: e.kurs_id ?? null, topic_id: e.topic_id || null, method_id: e.method_id || null, period: e.period ?? null, start_time: e.start_time || "", end_time: e.end_time || "", cardvote_set_id: e.cardvote_set_id || null, karten_deck_id: e.karten_deck_id || null, lernpfad_ladder_id: e.lernpfad_ladder_id || null, codedetektiv_puzzle: e.codedetektiv_puzzle || null };
-    const res = await fetch(e.id ? `${API}/entries/${e.id}` : `${API}/entries`, {
-      method: e.id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-    }).catch(() => null);
+    const res = await fetch(e.id ? `${API}/entries/${e.id}` : `${API}/entries`, alsJson(e.id ? "PUT" : "POST", body)).catch(() => null);
     // Lehnte der Server ab, passierte bisher NICHTS: das Modal blieb offen, der
     // getippte Verlaufsplan stand noch da, und nur ein späterer Blick auf den
     // Tag verriet, dass die Stunde nie gespeichert wurde.
@@ -367,8 +348,7 @@ export default function Kalender() {
   const classColor = (id) => (classes.find((c) => c.id === id) || {}).color || C.info; // Fallback (Einträge ohne Kurs)
   const kursColor = (id) => (kurse.find((k) => k.id === id) || {}).color || "";
   const slotColor = (s) => (s && s.kurs_id && kursColor(s.kurs_id)) || (s && s.class_id ? classColor(s.class_id) : C.info);
-  const weekdayOf = (d) => (new Date(d).getDay() + 6) % 7; // 0 = Montag
-  const slotsFor = (d) => tt.slots.filter((s) => s.weekday === weekdayOf(d) && slotActiveOn(s, d) && !isCancelled(d, s.period)).sort((a, b) => a.period - b.period);
+  const slotsFor = (d) => tt.slots.filter((s) => s.weekday === wochentagMo0(d) && slotActiveOn(s, d) && !isCancelled(d, s.period)).sort((a, b) => a.period - b.period);
   // Klick auf eine Stundenplan-Vorlage: gibt es an dem Tag schon einen Eintrag
   // dieser Klasse, wird der bearbeitet; sonst ein neuer aus der Vorlage.
   const fromSlot = (day, s) => {
@@ -386,20 +366,20 @@ export default function Kalender() {
     // wenn mehrere Kurse dieselbe Fach-Klasse teilen. Nur ohne Kurs an der Klasse.
     if (kursId) {
       setKurse((prev) => prev.map((k) => (k.id === kursId ? { ...k, color } : k)));
-      const r = await fetch(`/api/kurse/${kursId}/color`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) }).catch(() => null);
+      const r = await fetch(`/api/kurse/${kursId}/color`, alsJson("PUT", { color })).catch(() => null);
       // Die Farbe steht sofort lokal; scheiterte das Speichern, war sie nach
       // dem nächsten Laden wieder weg — bisher nur in der Konsole zu sehen.
       await pruefeAntwort(r, t("kalender.colorSave"));
     } else if (classId) {
       setClasses((prev) => { const next = prev.map((c) => (c.id === classId ? { ...c, color } : c)); put("classes", next); return next; });
-      const r = await fetch(`/api/classes/${classId}/color`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) }).catch(() => null);
+      const r = await fetch(`/api/classes/${classId}/color`, alsJson("PUT", { color })).catch(() => null);
       await pruefeAntwort(r, t("kalender.colorSave"));
     }
   };
 
   const saveSlot = async (s) => {
     const body = { weekday: s.weekday, period: s.period, title: s.title || "", class_id: s.class_id || null, kurs_id: s.kurs_id ?? null, topic_id: s.topic_id || null };
-    const res = await fetch(`${API}/timetable/slot`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
+    const res = await fetch(`${API}/timetable/slot`, alsJson("PUT", body)).catch(() => null);
     // Bisher blieb die Maske bei Ablehnung einfach offen stehen — nicht von
     // „ich habe den Knopf verfehlt" zu unterscheiden.
     if (!(await pruefeAntwort(res, t("common.save")))) return;
@@ -407,11 +387,11 @@ export default function Kalender() {
   };
   const removeSlot = async (id) => { await fetch(`${API}/timetable/slot/${id}`, { method: "DELETE" }).catch(() => {}); setSlotEdit(null); loadTt(); };
   const setPeriods = async (n) => {
-    const res = await fetch(`${API}/timetable/periods`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ periods: n }) }).catch(() => null);
+    const res = await fetch(`${API}/timetable/periods`, alsJson("PUT", { periods: n })).catch(() => null);
     if (res && res.ok) setTt(await res.json());
   };
   const setTimes = async (times) => {
-    const res = await fetch(`${API}/timetable/times`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ times }) }).catch(() => null);
+    const res = await fetch(`${API}/timetable/times`, alsJson("PUT", { times })).catch(() => null);
     if (res && res.ok) setTt(await res.json());
   };
 
@@ -896,8 +876,7 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
   const slots = f ? [] : slotsFor(day);
   const ext = extByDay ? extByDay(day) : [];
   const linked = (e) => e.cardvote_set_id || e.karten_deck_id || e.lernpfad_ladder_id || e.method_id || e.codedetektiv_puzzle;
-  const toMin = (hhmm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || ""); return m ? (+m[1]) * 60 + (+m[2]) : null; };
-  const pTime = (p) => { const w = (tt.times || [])[p - 1]; return w ? { s: toMin(w.start), e: toMin(w.end) } : { s: null, e: null }; };
+  const pTime = (p) => { const w = (tt.times || [])[p - 1]; return w ? { s: hmToMin(w.start), e: hmToMin(w.end) } : { s: null, e: null }; };
   // Zeitleiste 0–24 Uhr, aber scrollbar: der Blick startet standardmaessig bei
   // 6 Uhr (nach oben scrollen fuer die Nachtstunden).
   const HOUR = 40;
@@ -906,7 +885,7 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 6 * HOUR; }, [dayKey]);
   // Ganztägig / ohne verortbare Uhrzeit -> Banner oben (auch externe Termine).
   // Einträge mit freier Uhrzeit gehören in die Zeitspur, nicht ins Banner.
-  const ganztags = list.filter((e) => e.period == null && toMin(e.start_time) == null);
+  const ganztags = list.filter((e) => e.period == null && hmToMin(e.start_time) == null);
   const belegte = new Set(slots.map((s) => s.period));
 
   const yOf = (min) => (min / 60) * HOUR;
@@ -930,16 +909,16 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
       label: e.title || topicName(e.topic_id) || t("kalender.planned"), sub: "", onClick: () => onOpen({ ...e, date: new Date(e.date) }) });
   });
   // Einträge mit freier Uhrzeit (kein Stundenplan-Slot) in die Zeitspur.
-  list.filter((e) => e.period == null && toMin(e.start_time) != null).forEach((e) => {
-    const sm = toMin(e.start_time);
-    const emv = toMin(e.end_time);
+  list.filter((e) => e.period == null && hmToMin(e.start_time) != null).forEach((e) => {
+    const sm = hmToMin(e.start_time);
+    const emv = hmToMin(e.end_time);
     timed.push({ key: "t" + e.id, start: sm, end: emv != null && emv > sm ? emv : sm + 45, col: e.class_id ? classColor(e.class_id) : "var(--accent)",
       label: e.title || topicName(e.topic_id) || t("kalender.planned"), sub: "", onClick: () => onOpen({ ...e, date: new Date(e.date) }) });
   });
-  const extAllDay = ext.filter((ev) => toMin(ev.time) == null);
-  ext.filter((ev) => toMin(ev.time) != null).forEach((ev, i) => {
-    const sm = toMin(ev.time);
-    const emx = toMin(ev.endtime); // echte Endzeit aus dem Feed, sonst 60min-Fallback
+  const extAllDay = ext.filter((ev) => hmToMin(ev.time) == null);
+  ext.filter((ev) => hmToMin(ev.time) != null).forEach((ev, i) => {
+    const sm = hmToMin(ev.time);
+    const emx = hmToMin(ev.endtime); // echte Endzeit aus dem Feed, sonst 60min-Fallback
     timed.push({ key: "x" + i, start: sm, end: emx != null && emx > sm ? emx : sm + 60, col: ev.color || extColor || "var(--text3)", dashed: true,
       label: (ev.title || "—"), extern: true, sub: ev.location || "", onClick: () => onExt(ev) });
   });
@@ -1098,10 +1077,9 @@ function TimetableView({ tt, showTimes = false, className, slotName, slotColor, 
   const tdBase = { ...tdCell, border: "1px solid var(--border)", padding: 0, textAlign: "left", verticalAlign: "top", background: "var(--card)" };
   // Vertikal konstant: Zeilenhoehe = Dauer * px/min. Pausen zwischen den Stunden
   // erscheinen als leere Zwischenzeile derselben Skalierung.
-  const toMin = (s) => { const m = /^(\d{1,2}):(\d{2})$/.exec(s || ""); return m ? (+m[1]) * 60 + (+m[2]) : null; };
   const PXMIN = 1.3;
-  const rowH = (p) => { const a = toMin(timeVal(p - 1, "start")), b = toMin(timeVal(p - 1, "end")); return a != null && b != null && b > a ? Math.max(52, (b - a) * PXMIN) : 72; };
-  const gapH = (p) => { const a = toMin(timeVal(p - 1, "end")), b = toMin(timeVal(p, "start")); return a != null && b != null && b > a ? (b - a) * PXMIN : 0; };
+  const rowH = (p) => { const a = hmToMin(timeVal(p - 1, "start")), b = hmToMin(timeVal(p - 1, "end")); return a != null && b != null && b > a ? Math.max(52, (b - a) * PXMIN) : 72; };
+  const gapH = (p) => { const a = hmToMin(timeVal(p - 1, "end")), b = hmToMin(timeVal(p, "start")); return a != null && b != null && b > a ? (b - a) * PXMIN : 0; };
   return (
     <div>
       <div style={{ margin: "0 0 12px" }}>
@@ -1191,10 +1169,8 @@ function ExamMassnahmen({ classId, kursId = null, t }) {
       .then((r) => { if (!r.ok) { if (alive) setFehler(true); return []; } return r.json(); })
       .then((d) => { if (alive) setRows(Array.isArray(d) ? d : []); })
       .catch(() => { if (alive) setFehler(true); });
-    fetch(`/api/classes/${classId}/massnahmen?arbeit=true`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((d) => { if (alive) setGesamt(Array.isArray(d) ? d.length : 0); })
-      .catch(() => {});
+    hol(`/api/classes/${classId}/massnahmen?arbeit=true`)
+      .then((d) => { if (alive) setGesamt(Array.isArray(d) ? d.length : 0); });
     return () => { alive = false; };
   }, [classId, kursId]);
   // Auch ohne Eintrag sichtbar: „nichts hinterlegt" ist eine Aussage. Sonst
@@ -1507,15 +1483,13 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onClo
             <Link to={`/classes?open=${classId}`} onClick={onClose} style={{ fontSize: 13, color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>{t("kalender.toClass")} ↗</Link>
           </div>
         )}
-        <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center" }}>
-          <button onClick={() => {
+        <DialogFuss onAbbrechen={onClose} onSpeichern={() => {
             // Farbe erst beim Speichern anwenden — und nur, wenn sie sich geändert hat.
             if ((kursId || classId) && color && color !== clsColorOf(kursId, classId)) onColor && onColor(kursId, classId ? Number(classId) : null, color);
             onSave({ weekday: slot.weekday, period: slot.period, title: "", class_id: classId ? Number(classId) : null, kurs_id: classId ? kursId : null, topic_id: null });
-          }} style={btnPrimary}>{t("common.save")}</button>
-          <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
+          }}>
           {slot.id && <button onClick={() => onDelete(slot.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
-        </div>
+        </DialogFuss>
     </Modal>
   );
 }
@@ -1552,7 +1526,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   // Decks haengen an der Klasse: neu laden, wenn Klasse wechselt und Modul aktiv.
   useEffect(() => {
     if (!aktiv.karten || !classId) { setDecks([]); return; }
-    fetch(`/api/karten/classes/${classId}/all-decks`).then((r) => (r.ok ? r.json() : [])).then((d) => setDecks(Array.isArray(d) ? d : [])).catch(() => {});
+    hol(`/api/karten/classes/${classId}/all-decks`).then((d) => setDecks(Array.isArray(d) ? d : []));
   }, [aktiv.karten, classId]);
   // Sofort beim Thema-Wählen das passende Deck + die passende Lernleiter
   // vorschlagen — nicht erst beim Speichern. Nur, wenn das Feld leer ist oder
@@ -1840,11 +1814,9 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
           </div>
         ))}
 
-        <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center" }}>
-          <button onClick={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, title, notes, start_time: startTime || "", end_time: endTime || "", verlaufsplan: verlauf.filter((p) => (p.phase || p.text || p.dauer)).map((p) => ({ phase: p.phase || "", dauer: p.dauer || "", text: p.text || "" })), class_id: classId ? Number(classId) : null, kurs_id: classId ? (kursId ?? null) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })} disabled={timeInvalid} style={{ ...btnPrimary, opacity: timeInvalid ? 0.5 : 1 }}>{t("common.save")}</button>
-          <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
+        <DialogFuss onAbbrechen={onClose} aus={timeInvalid} onSpeichern={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, title, notes, start_time: startTime || "", end_time: endTime || "", verlaufsplan: verlauf.filter((p) => (p.phase || p.text || p.dauer)).map((p) => ({ phase: p.phase || "", dauer: p.dauer || "", text: p.text || "" })), class_id: classId ? Number(classId) : null, kurs_id: classId ? (kursId ?? null) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })}>
           {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
-        </div>
+        </DialogFuss>
         </>)}
         </div>
     </Modal>

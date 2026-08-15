@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { COLORS as C, cardStyle, btnPrimary as knopf, pageForm, SHADOW } from "../components/Icons.jsx";
 
 import { useLanguage } from "../i18n/index.jsx";
+import { alsJson } from "../core/melden.js";
 
 const API = "/api";
 
@@ -12,10 +13,7 @@ export default function VerifyEmail() {
 
   useEffect(() => {
     if (!token) { setState("error"); return; }
-    fetch(`${API}/auth/verify-email`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    }).then(r => setState(r.ok ? "ok" : "error")).catch(() => setState("error"));
+    fetch(`${API}/auth/verify-email`, alsJson("POST", { token })).then(r => setState(r.ok ? "ok" : "error")).catch(() => setState("error"));
   }, [token]);
 
   return (

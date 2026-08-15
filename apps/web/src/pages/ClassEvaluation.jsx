@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { LoadError, COLORS as C, Boxplot, pageApp, th as thBasis, td as tdBasis, Icon, ICONS, chipStyle, panelStyle, Toggle, StatCard } from "../components/Icons.jsx";
+import { Boxplot, COLORS as C, ICONS, Icon, LoadError, StatCard, Toggle, chipStyle, klebtLinks, pageApp, panelStyle, td as tdBasis, th as thBasis } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -188,7 +188,7 @@ export default function ClassEvaluation() {
           <tbody>
             {sorted.map((student) => (
               <tr key={student.card_id} style={student.testsPresent === 0 ? { opacity: 0.4 } : {}}>
-                <td style={{ ...td, fontWeight: 600, position: "sticky", left: 0, background: "var(--card)", zIndex: 1 }}>
+                <td style={{ ...td, ...klebtLinks, fontWeight: 600 }}>
                   {student.testsPresent > 0 ? (
                     <Link
                       to={`/cardvote/student-evaluation/${id}/${student.card_id}`}

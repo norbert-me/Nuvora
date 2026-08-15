@@ -4,16 +4,17 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { undoDelete } from "../core/undo.jsx";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, CONTROL_R, th as thBase, td, toolbarInput, Toggle, cardStyle, pageApp} from "../components/Icons.jsx";
+import { AddButton, COLORS as C, CONTROL_R, ICONS, Icon, Toggle, cardStyle, iconBtn, klebtLinks, pageApp, td, th as thBase, toolbarInput } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { swr , lastClass, rememberClass } from "../core/cache.js";
+import { useKlasseMerken, useKlassenListe } from "../core/klassenwahl.js";
 import Anwesenheit from "./Anwesenheit.jsx";
 import Ausleihe from "./Ausleihe.jsx";
 import Sitzplan from "./Sitzplan.jsx";
+import { alsJson, hol } from "../core/melden.js";
 
 const API = "/api/orga";
 
@@ -44,15 +45,10 @@ export default function Orga() {
     window.dispatchEvent(new Event("nuvora:settings")); // Navbar neu berechnen
   };
 
-  useEffect(() => {
-    return swr("classes", "/api/classes", (d) => {
-      const list = Array.isArray(d) ? d : [];
-      setClasses(list);
-      if (classId === null && list.length) { const w = lastClass(); setClassId(list.some((c) => c.id === w) ? w : list[0].id); }
-    });
-  }, []);
-
-  useEffect(() => { if (classId) rememberClass(classId); }, [classId]);
+  // Klassenliste, Vorwahl und „zuletzt gewaehlt" — dieselben sechs Zeilen
+  // standen auf fuenf Seiten; sie liegen jetzt in core/klassenwahl.js.
+  useKlassenListe(setClasses, setClassId);
+  useKlasseMerken(classId);
 
   const cls = useMemo(() => classes.find((c) => c.id === classId), [classes, classId]);
   const students = cls?.students || [];
@@ -69,9 +65,9 @@ export default function Orga() {
   const load = useCallback((id) => {
     if (!id) return;
     const meine = ++ladenr.current;
-    fetch(`${API}/${id}${kursId != null ? `?kurs_id=${kursId}` : ""}`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+    hol(`${API}/${id}${kursId != null ? `?kurs_id=${kursId}` : ""}`).then((d) => {
       if (meine === ladenr.current) { frisch.current = true; setItems(Array.isArray(d) ? d : []); }
-    }).catch(() => {});
+    });
   }, [kursId]);
   useEffect(() => { load(classId); }, [classId, kursId, load]);
 
@@ -89,7 +85,7 @@ export default function Orga() {
       for (const s of students) {
         const k = `${it.id}:${s.id}`;
         if (!!wert[k] === !!basis[k]) continue;
-        await fetch(`${API}/item/${it.id}/toggle`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ student_id: s.id }) }).catch(() => {});
+        await fetch(`${API}/item/${it.id}/toggle`, alsJson("PUT", { student_id: s.id })).catch(() => {});
       }
     }
     load(classId);
@@ -101,7 +97,7 @@ export default function Orga() {
   const anlegen = async () => {
     const name = neu.trim();
     if (!name || !classId) return;
-    const r = await fetch(`${API}/${classId}${kursQ}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }).catch(() => null);
+    const r = await fetch(`${API}/${classId}${kursQ}`, alsJson("POST", { name })).catch(() => null);
     if (r && r.ok) { setNeu(""); load(classId); }
   };
   const loeschen = (id) => {
@@ -155,7 +151,7 @@ export default function Orga() {
           <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 14 }}>
             <thead>
               <tr>
-                <th style={{ ...th, textAlign: "left", position: "sticky", left: 0, background: "var(--card)", minWidth: 140 }}>{cls?.name}</th>
+                <th style={{ ...th, ...klebtLinks, textAlign: "left", minWidth: 140 }}>{cls?.name}</th>
                 {items.map((it) => (
                   <th key={it.id} style={{ ...th, minWidth: 90 }}>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
@@ -174,7 +170,7 @@ export default function Orga() {
             <tbody>
               {students.map((s, i) => (
                 <tr key={s.id}>
-                  <td style={{ ...td, textAlign: "left", position: "sticky", left: 0, background: "var(--card)", fontWeight: 500 }}>
+                  <td style={{ ...td, ...klebtLinks, textAlign: "left", fontWeight: 500 }}>
                     <span style={{ display: "inline-block", width: 26, textAlign: "right", color: "var(--text3)", fontWeight: 400, marginRight: 8, fontVariantNumeric: "tabular-nums" }}>{i + 1}.</span>{s.name}
                   </td>
                   {items.map((it) => {

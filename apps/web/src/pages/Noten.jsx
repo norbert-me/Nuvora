@@ -11,17 +11,19 @@ import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
-import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { Icon, ICONS, iconBtn, toolbarBtn, toolbarBtnPrimary, toolbarIconBtn, toolbarInput, selectStyle, cardStyle, chipStyle, panelStyle, CONTROL_R, SHADOW, COLORS as C, btnPrimary, btnSecondary, Modal as UiModal, popoverPanel, Empty, Skeleton, inputStyle, Popover, Tabs, Toggle, nichtZiehen, dateiWaehlen, thKlebend as thBasis, td as tdBasis } from "../components/Icons.jsx";
-import { themenIndex } from "../core/topics.js";
+import { COLORS as C, CONTROL_R, Empty, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Skeleton, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
+import { themenIndex, useThemen } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { MehrMenu } from "../components/Werkzeugleiste.jsx";
-import { useEntwurf } from "../components/Speichern.jsx";
+import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { useAktiv } from "../core/modules.js";
 import { datumKurz } from "../core/grades.js";
 import { useLanguage } from "../i18n/index.jsx";
-import { useUrlClass } from "../core/klassenwahl.js";
+import { useKlasseMerken, useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
+import { useEinfuegen } from "../core/ziehsortieren.js";
+import { alsJson, hol } from "../core/melden.js";
+import { ymd } from "../core/datum.js";
 
 const API = "/api/noten";
 
@@ -99,8 +101,8 @@ export default function Noten() {
   const cvAktiv = aktiv("cardvote");
   const kartenAktiv = aktiv("karten");
   const [cdDialog, setCdDialog] = useState(false);
-  const [topics, setTopics] = useState([]); // Kern-Themen: Spalte einem Thema zuordnen (Nachholbedarf)
-  useEffect(() => { fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
+  // Kern-Themen aus core/topics.js — dieselbe Zeile stand auf sechs Seiten.
+  const topics = useThemen();
   // Wie mehrere Einzelnoten zusammengefasst werden: Mittel oder Median. Merkt
   // sich die Wahl pro Browser. Die Abschnitts-Gewichtung bleibt unberuehrt.
   const [agg, setAgg] = useState(() => { try { return localStorage.getItem("noten_agg") === "median" ? "median" : "mean"; } catch { return "mean"; } });
@@ -119,60 +121,24 @@ export default function Noten() {
   // uebereinander. Gemessen statt geraten: die erste Zeile ist je nach Inhalt
   // unterschiedlich hoch.
   const { rahmenRef, kopf1Ref, th2 } = useKlebenderKopf();
-  const [dragId, setDragId] = useState(null);
-  // Vorschau beim Ziehen: auf welchem Abschnitt, und links oder rechts einfuegen.
-  const [dragOver, setDragOver] = useState(null); // { id, side: "left"|"right" }
+  // Abschnitte und Spalten ziehen beide „links/rechts neben den Nachbarn" — das
+  // ist dieselbe Bauform wie bei Themen, Kartenstapeln und Karten und steht seit
+  // dem Zusammenfuehren nur noch in core/ziehsortieren.js. Die Spalten laufen
+  // mit `nurGleicheGruppe`: eine Spalte bleibt in ihrem Abschnitt.
+  const ziehSec = useEinfuegen({ waagerecht: true });
+  const ziehCol = useEinfuegen({ waagerecht: true, nurGleicheGruppe: true });
 
-  const dragOverHeader = (e, secId) => {
-    e.preventDefault();
-    if (!dragId || secId === dragId) { setDragOver(null); return; }
-    const r = e.currentTarget.getBoundingClientRect();
-    const side = e.clientX < r.left + r.width / 2 ? "left" : "right";
-    setDragOver((p) => (p && p.id === secId && p.side === side ? p : { id: secId, side }));
-  };
-
-  // Spalten je Abschnitt: gleiche Mechanik wie Abschnitte, nur innerhalb eines
-  // Abschnitts. dragCol haelt {catId, secId}, dragColOver die Vorschau.
-  const [dragCol, setDragCol] = useState(null);
-  const [dragColOver, setDragColOver] = useState(null); // { id, side }
-  const dragOverCol = (e, catId, catSecId) => {
-    e.preventDefault();
-    if (!dragCol || dragCol.secId !== catSecId || catId === dragCol.catId) { setDragColOver(null); return; }
-    const r = e.currentTarget.getBoundingClientRect();
-    const side = e.clientX < r.left + r.width / 2 ? "left" : "right";
-    setDragColOver((p) => (p && p.id === catId && p.side === side ? p : { id: catId, side }));
-  };
   // Umsortieren ist eine Änderung wie jede andere: sie landet im Entwurf und
   // wird mit „Speichern" geschrieben (vorher schrieb das Loslassen sofort).
   const spalteDrop = (zielId, sec) => {
-    const von = dragCol, ov = dragColOver;
-    setDragCol(null); setDragColOver(null);
-    if (!von || von.secId !== sec.id || von.catId === zielId) return;
-    const cols = catsVon(sec).map((c) => c.id);
-    const from = cols.indexOf(von.catId);
-    let to = cols.indexOf(zielId);
-    if (from < 0 || to < 0) return;
-    if (ov && ov.id === zielId && ov.side === "right") to += 1;
-    if (from < to) to -= 1;
-    const neuCols = [...cols];
-    neuCols.splice(to, 0, neuCols.splice(from, 1)[0]);
-    entwurf.setz({ [`oc:${sec.id}`]: neuCols });
+    const neuCols = ziehCol.ablegen(zielId, catsVon(sec).map((c) => c.id));
+    if (neuCols) entwurf.setz({ [`oc:${sec.id}`]: neuCols });
   };
 
   // Abschnitt per Drag & Drop verschieben — ebenfalls in den Entwurf.
   const abschnittDrop = (zielId) => {
-    const von = dragId, ov = dragOver;
-    setDragId(null); setDragOver(null);
-    if (!von || von === zielId) return;
-    const ids = secListe.map((x) => x.id);
-    const from = ids.indexOf(von);
-    let to = ids.indexOf(zielId);
-    if (from < 0 || to < 0) return;
-    if (ov && ov.id === zielId && ov.side === "right") to += 1;
-    if (from < to) to -= 1;  // Entnahme verschiebt den Zielindex
-    const neu = [...ids];
-    neu.splice(to, 0, neu.splice(from, 1)[0]);
-    entwurf.setz({ os: neu });
+    const neu = ziehSec.ablegen(zielId, secListe.map((x) => x.id));
+    if (neu) entwurf.setz({ os: neu });
   };
 
   // Bereichs-/Endnote manuell setzen oder zuruecksetzen — in den Entwurf.
@@ -185,28 +151,23 @@ export default function Noten() {
   const overrideReset = (studentId, sectionId) =>
     entwurf.setz({ [sectionId == null ? `to:${studentId}` : `so:${studentId}:${sectionId}`]: null });
 
-  useEffect(() => {
-    return swr("classes", "/api/classes", (d) => {
-      const list = Array.isArray(d) ? d : [];
-      setClasses(list);
-      if (list.length && classId === null) { const w = lastClass(); setClassId(list.some((c) => c.id === w) ? w : list[0].id); }
-    });
-  }, []);
-
-  useEffect(() => { if (classId) rememberClass(classId); }, [classId]);
+  // Klassenliste, Vorwahl und „zuletzt gewaehlt" — dieselben sechs Zeilen
+  // standen auf fuenf Seiten; sie liegen jetzt in core/klassenwahl.js.
+  useKlassenListe(setClasses, setClassId);
+  useKlasseMerken(classId);
 
   // Teilkurse (nur solche mit einzeln hinzugefügten SuS) für die Auswahl.
   useEffect(() => {
-    fetch("/api/kurse").then((r) => (r.ok ? r.json() : [])).then((d) => {
+    hol("/api/kurse").then((d) => {
       setSubsetKurse((Array.isArray(d) ? d : []).filter((k) => (k.member_count || 0) > 0));
-    }).catch(() => {});
+    });
   }, []);
 
   // Noten-Zeilen kommen aus dem KURS (dedupliziert), nicht aus der Fach-Klasse.
   // Beim Teilkurs aus der Kurs-Route (enthält auch die Einzel-SuS fremder Klassen).
   const loadRoster = (id) => {
     const url = subsetKurs ? `${API}/noten/kurse/${subsetKurs}/students` : `${API}/classes/${id}/students`;
-    return fetch(url).then((r) => (r.ok ? r.json() : [])).then((d) => setStudents(Array.isArray(d) ? d : [])).catch(() => {});
+    return hol(url).then((d) => setStudents(Array.isArray(d) ? d : []));
   };
   const load = async (id) => {
     if (!id) return;
@@ -224,12 +185,10 @@ export default function Noten() {
     ]);
     setSections(sec); setEntries(ent); setSummary(sum); setLoading(false);
     loadedOnce.current = true; // ab jetzt kein Skeleton mehr (Reloads z.B. bei Median/Mittel nicht flackern lassen)
-    fetch(`${API}/classes/${id}/dividers?term=${term}${kp}`).then((r) => (r.ok ? r.json() : [])).then((d) => setDividers(Array.isArray(d) ? d : [])).catch(() => {});
+    hol(`${API}/classes/${id}/dividers?term=${term}${kp}`).then((d) => setDividers(Array.isArray(d) ? d : []));
   };
   const toggleDivider = async (catId) => {
-    const r = await fetch(`${API}/classes/${classId}/dividers/toggle?term=${term}${kp}`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ after_category_id: catId }),
-    }).catch(() => null);
+    const r = await fetch(`${API}/classes/${classId}/dividers/toggle?term=${term}${kp}`, alsJson("POST", { after_category_id: catId })).catch(() => null);
     if (r && r.ok) setDividers(await r.json());
   };
   useEffect(() => { if (classId) load(classId); }, [classId, kursId, subsetKurs, classes, term, agg]);
@@ -273,7 +232,7 @@ export default function Noten() {
     setError("");
     try {
       const data = JSON.parse(await file.text());
-      const r = await fetch(`${API}/classes/${classId}/import?term=${term}${kp}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      const r = await fetch(`${API}/classes/${classId}/import?term=${term}${kp}`, alsJson("POST", data));
       if (r.ok) load(classId); else setError(t("noten.importError"));
     } catch { setError(t("noten.importError")); }
   };
@@ -310,9 +269,7 @@ export default function Noten() {
   // Nachholbedarf aus einer themen-getaggten Klassenarbeit: schwache SuS →
   // deren Karten des Themas wieder fällig setzen (im Üben tauchen sie erneut auf).
   const runNachhol = async (cat) => {
-    const res = await fetch(`${API}/categories/${cat.id}/nachholbedarf`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ threshold: 4.0 }),
-    }).catch(() => null);
+    const res = await fetch(`${API}/categories/${cat.id}/nachholbedarf`, alsJson("POST", { threshold: 4.0 })).catch(() => null);
     if (!res || !res.ok) { const b = res ? await res.json().catch(() => ({})) : {}; showAlert(typeof b.detail === "string" ? b.detail : t("common.notWork")); return; }
     const j = await res.json();
     showAlert(t("noten.nachholDone", { weak: j.weak, cards: j.cards_requeued }));
@@ -401,37 +358,33 @@ export default function Noten() {
               const alt = notenVon(s.student_id, c.id)[0];
               if (alt?.id) { const r = await fetch(`${API}/entries/${alt.id}`, { method: "DELETE" }).catch(() => null); ok = !!(r && r.ok) && ok; }
             } else {
-              const r = await fetch(`${API}/entries`, { method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ category_id: c.id, student_id: s.student_id, kind: "grade", value: wert[k], note: "" }) }).catch(() => null);
+              const r = await fetch(`${API}/entries`, alsJson("POST", { category_id: c.id, student_id: s.student_id, kind: "grade", value: wert[k], note: "" })).catch(() => null);
               ok = !!(r && r.ok) && ok;
             }
           }
           const kk = `k:${s.student_id}:${c.id}`;
           if (wert[kk] !== basis[kk])
-            await fetch(`${API}/entries/comment`, { method: "PUT", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ category_id: c.id, student_id: s.student_id, text: wert[kk] }) }).catch(() => {});
+            await fetch(`${API}/entries/comment`, alsJson("PUT", { category_id: c.id, student_id: s.student_id, text: wert[kk] })).catch(() => {});
         }
         const so = `so:${s.student_id}:${sec.id}`;
         if (wert[so] !== basis[so]) {
           if (wert[so] == null) await fetch(`${API}/overrides?${q({ student_id: s.student_id, section_id: sec.id })}`, { method: "DELETE" }).catch(() => {});
-          else await fetch(`${API}/overrides`, { method: "PUT", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ class_id: classId, kurs_id: kursId, student_id: s.student_id, section_id: sec.id, term, value: wert[so] }) }).catch(() => {});
+          else await fetch(`${API}/overrides`, alsJson("PUT", { class_id: classId, kurs_id: kursId, student_id: s.student_id, section_id: sec.id, term, value: wert[so] })).catch(() => {});
         }
       }
       const to = `to:${s.student_id}`;
       if (wert[to] !== basis[to]) {
         if (wert[to] == null) await fetch(`${API}/overrides?${q({ student_id: s.student_id })}`, { method: "DELETE" }).catch(() => {});
-        else await fetch(`${API}/overrides`, { method: "PUT", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ class_id: classId, kurs_id: kursId, student_id: s.student_id, section_id: null, term, value: wert[to] }) }).catch(() => {});
+        else await fetch(`${API}/overrides`, alsJson("PUT", { class_id: classId, kurs_id: kursId, student_id: s.student_id, section_id: null, term, value: wert[to] })).catch(() => {});
       }
     }
     // Reihenfolgen zuletzt: sie ändern die Struktur, nicht die Werte.
     if ((wert.os || []).join() !== (basis.os || []).join())
-      await fetch(`${API}/classes/${classId}/sections/reorder`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: wert.os }) }).catch(() => {});
+      await fetch(`${API}/classes/${classId}/sections/reorder`, alsJson("PUT", { ids: wert.os })).catch(() => {});
     for (const sec of sections) {
       const ck = `oc:${sec.id}`;
       if ((wert[ck] || []).join() !== (basis[ck] || []).join())
-        await fetch(`${API}/sections/${sec.id}/categories/reorder`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: wert[ck] }) }).catch(() => {});
+        await fetch(`${API}/sections/${sec.id}/categories/reorder`, alsJson("PUT", { ids: wert[ck] })).catch(() => {});
     }
     if (!ok) setError(t("common.notWork"));
     frisch.current = true;
@@ -572,7 +525,7 @@ export default function Noten() {
         <Modal title={t("noten.addSection")} onClose={() => setNeuAbschnitt(false)}>
           <SectionForm t={t} onCancel={() => setNeuAbschnitt(false)}
             onSave={async (b) => { if (await callCreate(
-              () => fetch(`${API}/classes/${classId}/sections?term=${term}${kp}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...b, position: sections.length }) }),
+              () => fetch(`${API}/classes/${classId}/sections?term=${term}${kp}`, alsJson("POST", { ...b, position: sections.length })),
               (id) => setSections((prev) => [...prev, { id, name: b.name, weight: b.weight || 0, position: sections.length, term, class_id: classId, kurs_id: kursId, categories: [] }]),
             )) setNeuAbschnitt(false); }} />
         </Modal>
@@ -627,7 +580,7 @@ export default function Noten() {
           <Modal title={t("noten.addColumn")} onClose={() => setNeuSpalteIn(null)}>
             <ColForm t={t} onCancel={() => setNeuSpalteIn(null)} vorschlag={t("noten.colDefault", { n: pos + 1 })}
               onSave={async (name, datum) => { if (await callCreate(
-                () => fetch(`${API}/categories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: neuSpalteIn, position: pos, date: datum }) }),
+                () => fetch(`${API}/categories`, alsJson("POST", { name, section_id: neuSpalteIn, position: pos, date: datum })),
                 (id) => setSections((prev) => prev.map((s) => s.id === neuSpalteIn ? { ...s, categories: [...(s.categories || []), { id, name, section_id: neuSpalteIn, position: pos, date: datum }] } : s)),
               )) setNeuSpalteIn(null); }} />
           </Modal>
@@ -672,17 +625,17 @@ export default function Noten() {
                 {secListe.map((sec) => {
                   const isCol = collapsed.has(sec.id);
                   const cols = isCol ? 0 : catsVon(sec).length || 1;
-                  const over = dragId && dragOver && dragOver.id === sec.id;
+                  const secSeite = ziehSec.seite(sec.id);
                   return (
                     <th key={sec.id} colSpan={cols + 1}
                       draggable
-                      onDragStart={(e) => { if (nichtZiehen(e)) return; setDragId(sec.id); }}
-                      onDragOver={(e) => dragOverHeader(e, sec.id)}
-                      onDragEnd={() => { setDragId(null); setDragOver(null); }}
+                      onDragStart={(e) => { if (nichtZiehen(e)) return; ziehSec.start(sec.id); }}
+                      onDragOver={(e) => ziehSec.ueber(e, sec.id)}
+                      onDragEnd={ziehSec.beenden}
                       onDrop={() => abschnittDrop(sec.id)}
-                      style={{ ...th, borderLeft: over && dragOver.side === "left" ? "3px solid var(--accent)" : "2px solid var(--border3)",
-                        borderRight: over && dragOver.side === "right" ? "3px solid var(--accent)" : undefined,
-                        cursor: "grab", opacity: dragId === sec.id ? 0.4 : 1,
+                      style={{ ...th, borderLeft: secSeite === "vor" ? "3px solid var(--accent)" : "2px solid var(--border3)",
+                        borderRight: secSeite === "nach" ? "3px solid var(--accent)" : undefined,
+                        cursor: "grab", opacity: ziehSec.zieht === sec.id ? 0.4 : 1,
                         zIndex: menuSec === sec.id ? 6 : th.zIndex }}>
                       <StickyMitte style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
                         <span title={t("noten.dragHint")} style={{ display: "inline-flex", color: "var(--text3)" }}><Icon d={ICONS.grip} size={14} /></span>
@@ -693,7 +646,7 @@ export default function Noten() {
                         <span style={{ color: "var(--text3)", fontWeight: 400 }}>{sec.weight} %</span>
                         <SectionMenu t={t} sec={sec}
                           onOpen={(auf) => setMenuSec(auf ? sec.id : null)}
-                          onEdit={(b) => call(() => fetch(`${API}/sections/${sec.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }))}
+                          onEdit={(b) => call(() => fetch(`${API}/sections/${sec.id}`, alsJson("PUT", b)))}
                           onDelete={async () => { if (await askConfirm(t("noten.delSection", { name: sec.name }))) call(() => fetch(`${API}/sections/${sec.id}`, { method: "DELETE" })); }}
                           onAddCol={() => setNeuSpalteIn(sec.id)} />
                       </StickyMitte>
@@ -725,18 +678,18 @@ export default function Noten() {
                   }
                   return [
                     ...cols.map((c, i) => {
-                    const colOver = dragCol && dragColOver && dragColOver.id === c.id ? dragColOver.side : null;
+                    const colSeite = ziehCol.seite(c.id);
                     return (
                     <th key={c.id}
                       draggable
-                      onDragStart={(e) => { if (nichtZiehen(e)) return; setDragCol({ catId: c.id, secId: sec.id }); }}
-                      onDragOver={(e) => dragOverCol(e, c.id, sec.id)}
+                      onDragStart={(e) => { if (nichtZiehen(e)) return; ziehCol.start(c.id, sec.id); }}
+                      onDragOver={(e) => ziehCol.ueber(e, c.id, sec.id)}
                       onDrop={() => spalteDrop(c.id, sec)}
-                      onDragEnd={() => { setDragCol(null); setDragColOver(null); }}
+                      onDragEnd={ziehCol.beenden}
                       style={{ ...th2, padding: 0, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", minWidth: 70, fontWeight: 500,
-                        cursor: "grab", opacity: dragCol && dragCol.catId === c.id ? 0.4 : 1,
+                        cursor: "grab", opacity: ziehCol.zieht === c.id ? 0.4 : 1,
                         borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined,
-                        boxShadow: colOver === "left" ? "inset 3px 0 0 var(--accent)" : colOver === "right" ? "inset -3px 0 0 var(--accent)" : undefined }}>
+                        boxShadow: colSeite === "vor" ? "inset 3px 0 0 var(--accent)" : colSeite === "nach" ? "inset -3px 0 0 var(--accent)" : undefined }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 3, justifyContent: "center", position: "relative" }}>
                         <button onClick={() => setRenameCol(renameCol === c.id ? null : c.id)} title={t("noten.colOverview")}
                           style={{ width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", border: "none", background: "none", cursor: "pointer", color: "var(--text2)", fontWeight: 500, fontSize: 12, padding: "8px 6px" }}>{c.name}</button>
@@ -757,7 +710,7 @@ export default function Noten() {
                         ) : null}
                         {renameCol === c.id && (
                           <ColMenu t={t} cat={c} classId={classId} topics={topics} kartenAktiv={kartenAktiv} cvAktiv={cvAktiv} onNachhol={runNachhol} onCompare={setCompareCat} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
-                            onRename={async (name, topicId, datum) => { if (await call(() => fetch(`${API}/categories/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: c.position ?? i, topic_id: topicId, date: datum }) }))) setRenameCol(null); }}
+                            onRename={async (name, topicId, datum) => { if (await call(() => fetch(`${API}/categories/${c.id}`, alsJson("PUT", { name, section_id: sec.id, position: c.position ?? i, topic_id: topicId, date: datum })))) setRenameCol(null); }}
                             onDelete={() => {
                               setRenameCol(null);
                               // Spalte sofort raus, 5 s Undo; erst dann Server-Delete.
@@ -907,7 +860,7 @@ export default function Noten() {
         <Beobachtungen t={t} student={summary.find((s) => s.student_id === beobFuer)} cats={allCats}
           entries={entries.filter((e) => e.student_id === beobFuer && e.kind === "observation")}
           onClose={() => setBeobFuer(null)}
-          onSave={(b) => call(() => fetch(`${API}/entries`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }))}
+          onSave={(b) => call(() => fetch(`${API}/entries`, alsJson("POST", b)))}
           onDelete={(id) => call(() => fetch(`${API}/entries/${id}`, { method: "DELETE" }))} />
       )}
 
@@ -1090,10 +1043,7 @@ function CodeSessionImport({ t, classId, kursId, sections, onClose, onDone }) {
     if (!sessionId) { setErr(t("noten.fromCdNoSession")); return; }
     if (!sectionId || !name.trim()) { setErr(t("noten.columnName")); return; }
     setBusy(true); setErr("");
-    const res = await fetch("/api/noten/import-code-session", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code_session_id: Number(sessionId), class_id: classId, kurs_id: kursId, section_id: Number(sectionId), column_name: name.trim() }),
-    }).catch(() => null);
+    const res = await fetch("/api/noten/import-code-session", alsJson("POST", { code_session_id: Number(sessionId), class_id: classId, kurs_id: kursId, section_id: Number(sectionId), column_name: name.trim() })).catch(() => null);
     setBusy(false);
     if (res && res.ok) {
       const b = await res.json().catch(() => ({}));
@@ -1132,10 +1082,7 @@ function CodeSessionImport({ t, classId, kursId, sections, onClose, onDone }) {
       <div style={lbl}>{t("noten.columnName")}</div>
       <input value={name} onChange={(e) => setName(e.target.value)} style={inp} />
       {err && <p style={{ color: C.danger, fontSize: 13, marginTop: 12 }}>{err}</p>}
-      <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-        <button onClick={submit} disabled={busy} style={{ ...btnPrimary, opacity: busy ? 0.6 : 1 }}>{t("common.save")}</button>
-        <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
-      </div>
+      <DialogFuss onSpeichern={submit} onAbbrechen={onClose} aus={busy} />
     </div>
   );
 }
@@ -1282,7 +1229,9 @@ function ColForm({ t, onSave, onCancel, initial = "", vorschlag = "", initialDat
   // sagt nichts ueber die Leistung — das Datum schon, und es fuellt zugleich
   // die Eigenschaft, nach der der Verlauf sortiert.
   const nimm = () => {
-    const heute = new Date().toISOString().slice(0, 10);
+    // Ortszeit: mit toISOString() trug eine abends angelegte Spalte das Datum
+    // von morgen.
+    const heute = ymd(new Date());
     const tag = datum || (name.trim() ? "" : heute);
     onSave(name.trim() || datumKurz(tag) || vorschlag || t("noten.colName"), tag || null);
   };
@@ -1776,7 +1725,7 @@ const td = tdBasis;
 // Links klebende Zellen. Der Kopf klebt oben (th in Icons.jsx) — eine Zelle,
 // die BEIDES tut, muss ueber den Datenzellen UND ueber den uebrigen Kopfzellen
 // liegen, sonst schiebt sich beim Scrollen eine Zeile darueber.
-const stickyL = { position: "sticky", left: 0, background: "var(--card)", zIndex: 1 };
-const stickyLh = { position: "sticky", left: 0, background: "var(--card)", zIndex: 4 };
+// Die klebende erste Spalte kommt aus Icons.jsx (sechs Stellen hatten sie).
+const stickyL = klebtLinks, stickyLh = klebtLinksOben;
 const dtS = { color: "var(--text3)", fontWeight: 500 };
 const ddS = { margin: 0, color: "var(--text)" };

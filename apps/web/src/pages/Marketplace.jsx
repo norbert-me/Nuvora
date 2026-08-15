@@ -7,6 +7,7 @@ import { useLanguage } from "../i18n/index.jsx";
 import { Icon, ICONS, Modal, Tabs, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, toolbarInput, iconBtn, COLORS as C, pageApp } from "../components/Icons.jsx";
 import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
+import { alsJson, hol } from "../core/melden.js";
 
 const API = "/api";
 
@@ -102,7 +103,7 @@ export default function Marketplace({ fixedKind }) {
   const [copyDeckFor, setCopyDeckFor] = useState(null); // { id, title } — Klassenwahl fuers Deck
 
   useEffect(() => {
-    fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).then((d) => setClasses(Array.isArray(d) ? d : [])).catch(() => {});
+    hol("/api/classes").then((d) => setClasses(Array.isArray(d) ? d : []));
   }, []);
 
   // Zahl-/Autor-Zeile je Art (Prefix vor dem Autorennamen).
@@ -134,10 +135,7 @@ export default function Marketplace({ fixedKind }) {
   }, [search]);
 
   const rate = async (id, stars) => {
-    const r = await fetch(`${API}/marketplace/${id}/rate`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stars }),
-    }).catch(() => null);
+    const r = await fetch(`${API}/marketplace/${id}/rate`, alsJson("POST", { stars })).catch(() => null);
     if (!r || !r.ok) return false;
     setQuizzes((prev) => prev.map((q) => q.id === id ? { ...q, my_rating: stars } : q));
     load();
@@ -157,10 +155,7 @@ export default function Marketplace({ fixedKind }) {
       setCopyDeckFor({ id: q.id, title: q.title });
       return;
     }
-    const res = await fetch(`${API}/marketplace/${q.id}/copy`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(classId ? { class_id: classId } : {}),
-    });
+    const res = await fetch(`${API}/marketplace/${q.id}/copy`, alsJson("POST", classId ? { class_id: classId } : {}));
     if (res.ok) { setMsg(t("market.added", { title: q.title })); setTimeout(() => setMsg(""), 4000); setCopyDeckFor(null); }
     else setMsg(t("market.adoptError"));
   };

@@ -138,3 +138,23 @@ export default function Speicherleiste({ entwurf, immer = false, style, klein = 
     </span>
   );
 }
+
+/**
+ * Der Fuß eines Formulardialogs: Speichern, Abbrechen, dann `children`
+ * (das Löschen, das sich per `marginLeft:auto` nach rechts absetzt).
+ *
+ * Dieselben vier Zeilen standen in sechs Dialogen (Methoden, Kalender zweimal,
+ * Karten, Noten, Klassenarbeit). `Speicherleiste` daneben bleibt die Fassung
+ * für einen Entwurf auf der Seite — hier geht es um einen Dialog, der mit dem
+ * Speichern zugeht.
+ */
+export function DialogFuss({ onSpeichern, onAbbrechen, aus = false, speichern, children, style }) {
+  const { t } = useLanguage();
+  return (
+    <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center", ...style }}>
+      <button onClick={onSpeichern} disabled={aus} style={{ ...btnPrimary, opacity: aus ? 0.6 : 1 }}>{speichern || t("common.save")}</button>
+      <button onClick={onAbbrechen} style={btnSecondary}>{t("common.abort")}</button>
+      {children}
+    </div>
+  );
+}

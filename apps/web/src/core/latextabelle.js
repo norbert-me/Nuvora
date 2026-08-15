@@ -79,3 +79,57 @@ export function spalteAnhaengen(text, pos) {
     pos: cursor === null ? pos : vorne.length + cursor,
   };
 }
+
+// ─── Schnelltasten: Formel an der Auswahl einfügen ───────────────────────────
+//
+// Die Tastenreihe gab es zweimal: im Frageeditor (Dashboard.jsx) mit sechzehn
+// Zeichen, im Karteneditor (Karten.jsx) mit den ersten zehn. `LATEX_TASTEN`
+// sind die zehn gemeinsamen, `LATEX_TASTEN_LANG` die lange Reihe; die kurze
+// bleibt kurz, der Karteneditor hat für Tabellen eigene Tasten daneben.
+export const LATEX_TASTEN = [
+  { label: "a/b", tex: "\\frac{}{}", cursor: -3 },
+  { label: "x²", tex: "^{}", cursor: -1 },
+  { label: "x₂", tex: "_{}", cursor: -1 },
+  { label: "√", tex: "\\sqrt{}", cursor: -1 },
+  { label: "±", tex: "\\pm " },
+  { label: "·", tex: "\\cdot " },
+  { label: "≠", tex: "\\neq " },
+  { label: "≤", tex: "\\leq " },
+  { label: "≥", tex: "\\geq " },
+  { label: "π", tex: "\\pi " },
+];
+
+export const LATEX_TASTEN_LANG = [
+  ...LATEX_TASTEN,
+  { label: "∑", tex: "\\sum " },
+  { label: "∞", tex: "\\infty " },
+  // Tabelle: KaTeX kennt `array`, nicht `tabular`. Das Geruest kommt fertig
+  // hin, weil kaum jemand die Spaltenangabe („{|c|c|}") aus dem Kopf schreibt
+  // — und ein halb getipptes array rendert gar nichts.
+  { label: "⊞ Tabelle", tex: "\\begin{array}{|c|c|}\\hline  &  \\\\ \\hline  &  \\\\ \\hline\\end{array}", cursor: -40, display: true },
+];
+
+/**
+ * Eine Formel an der Auswahl einsetzen — reine Zeichenkettenrechnung.
+ * Dieselben zwölf Zeilen standen als `insertLatex` in Dashboard.jsx und in
+ * Karten.jsx; verschieden war nur, woher Text und Schreibpunkt kamen.
+ *
+ *   • markierter Text wandert in die erste Lücke `{}` der Vorlage
+ *   • die `$` kommen nur dazu, wenn der Schreibpunkt nicht schon in einer
+ *     Formel steht; `display` setzt `$$` (Tabelle in eigener Zeile)
+ *
+ * @returns { text, pos } — neuer Text und wohin der Schreibpunkt danach gehört
+ */
+export function formelEinfuegen(text, start, end, tex, cursor = 0, display = false) {
+  const quelle = text || "";
+  const markiert = quelle.slice(start, end);
+  const einsatz = markiert && tex.includes("{}") ? tex.replace("{}", `{${markiert}}`) : tex;
+  const davor = quelle.slice(0, start);
+  const inFormel = davor.includes("$") && davor.split("$").length % 2 === 0;
+  const zeichen = display ? "$$" : "$";
+  const umschlossen = inFormel ? einsatz : `${zeichen}${einsatz}${zeichen}`;
+  return {
+    text: davor + umschlossen + quelle.slice(end),
+    pos: start + umschlossen.length + (cursor || 0),
+  };
+}

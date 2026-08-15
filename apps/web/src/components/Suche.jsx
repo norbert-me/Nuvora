@@ -14,6 +14,7 @@ import { COLORS as C, CONTROL_R, Icon, ICONS, inputStyle, menuRow, modalOverlay,
 import { ZIELE, passt, rang } from "../core/ziele.js";
 import { useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
+import { hol } from "../core/melden.js";
 
 const MAX = 8;   // je Gruppe — mehr liest niemand, und die Liste soll nicht scrollen
 
@@ -31,7 +32,6 @@ export default function Suche({ offen, onClose }) {
     setQ(""); setWahl(0);
     setTimeout(() => feld.current?.focus(), 30);
     let ab = false;
-    const hol = (p) => fetch(p).then((r) => (r.ok ? r.json() : [])).catch(() => []);
     Promise.all([hol("/api/classes"), hol("/api/kurse"), hol("/api/topics")]).then(([k, ku, th]) => {
       if (!ab) setDaten({ klassen: k || [], kurse: ku || [], themen: th || [] });
     });

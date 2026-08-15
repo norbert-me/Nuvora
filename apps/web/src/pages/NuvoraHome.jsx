@@ -5,9 +5,10 @@ import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useModules, useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
-import { StageBadge, Icon, ICONS, MODULE_ICONS, iconBtn, btnSecondary, selectStyle, COLORS as C, pageApp,
-  pageTitle, cardStyle, chipStyle, badge, btnSmall, CONTROL_R, toolbarIconBtn } from "../components/Icons.jsx";
+import { StageBadge, Icon, ICONS, MODULE_ICONS, btnSecondary, selectStyle, COLORS as C, pageApp, pageTitle, cardStyle, chipStyle, badge, btnSmall, CONTROL_R, toolbarIconBtn } from "../components/Icons.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
+import { alsJson, hol } from "../core/melden.js";
+import { ymd } from "../core/datum.js";
 
 // Modul-Kachel: dieselbe Karte wie überall, nur als Link (kein eigener Kasten).
 // Die frühere Eigenbau-Fassung stand auf `var(--surface)` — die Variable gibt es
@@ -32,11 +33,11 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv, methodenAktiv }) {
 
   useEffect(() => {
     if (!methodenAktiv) return;
-    fetch("/api/methoden/list").then((r) => (r.ok ? r.json() : [])).then((d) => {
+    hol("/api/methoden/list").then((d) => {
       const map = {};
       (Array.isArray(d) ? d : []).forEach((m) => { if (m.topic_id != null && !map[m.topic_id]) map[m.topic_id] = m; });
       setMethodByTopic(map);
-    }).catch(() => {});
+    });
   }, [methodenAktiv]);
 
   useEffect(() => {
@@ -66,7 +67,7 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv, methodenAktiv }) {
   const run = async (row, art, url, body) => {
     const key = `${row.class_id}:${row.topic_id}:${art}`;
     setBusy(key);
-    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
+    const r = await fetch(url, alsJson("POST", body)).catch(() => null);
     setBusy(null);
     if (r && r.ok) setDone((d) => ({ ...d, [key]: true }));
   };
@@ -126,7 +127,10 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv, methodenAktiv }) {
 // Kalender. Erscheint nur, wenn das Modul Kalender aktiv ist.
 const wochentag = () => (new Date().getDay() + 6) % 7; // Mo=0 … So=6
 function HeutePanel({ t, orgaAktiv }) {
-  const heuteYmd = new Date().toISOString().slice(0, 10);
+  // Ortszeit, nicht UTC: `toISOString()` liefert in +02:00 ab 22 Uhr schon den
+  // Folgetag — die Kachel „was ist heute" zeigte abends den morgigen Stundenplan
+  // und hielt laufende Ferien fuer beendet.
+  const heuteYmd = ymd(new Date());
   const [data, setData] = useState(null); // { slots, times, entries, classes, frei }
   useEffect(() => {
     let ab = false;
@@ -138,7 +142,6 @@ function HeutePanel({ t, orgaAktiv }) {
         fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).catch(() => []),
         fetch("/api/kalender/breaks").then((r) => (r.ok ? r.json() : [])).catch(() => []),
       ]);
-      const ymd = (d) => d.toISOString().slice(0, 10);
       const frm = new Date(heute); frm.setHours(0, 0, 0, 0);
       const to = new Date(heute); to.setHours(23, 59, 59, 0);
       const entries = await fetch(`/api/kalender/entries?frm=${frm.toISOString()}&to=${to.toISOString()}`).then((r) => (r.ok ? r.json() : [])).catch(() => []);

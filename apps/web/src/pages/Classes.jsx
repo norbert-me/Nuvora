@@ -13,14 +13,14 @@ import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { useSearchParams } from "react-router-dom";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnSecondary, btnSmall, Tabs, pageApp, pageTitle,
-  cardStyle, chipStyle, inputStyle, toolbarBtn, CONTROL_R } from "../components/Icons.jsx";
+import { AddButton, COLORS as C, CONTROL_R, ICONS, Icon, Tabs, btnSecondary, btnSmall, cardStyle, chipStyle, dateiWaehlen, iconBtn, inputStyle, pageApp, pageTitle, toolbarBtn } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import AuthImage from "../components/AuthImage.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
 import { peek, put } from "../core/cache.js";
+import { alsJson } from "../core/melden.js";
 
 const API = "/api";
 
@@ -171,8 +171,8 @@ export default function Classes() {
       })),
     };
     const res = editing.id
-      ? await fetch(`${API}/classes/${editing.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
-      : await fetch(`${API}/classes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      ? await fetch(`${API}/classes/${editing.id}`, alsJson("PUT", body))
+      : await fetch(`${API}/classes`, alsJson("POST", body));
     // Fehler nicht verschlucken: sonst schließt sich der Editor und die
     // Eingaben (Förderdaten!) sind still verloren.
     if (res && !res.ok) {
@@ -204,38 +204,24 @@ export default function Classes() {
     });
   };
 
-  const importJson = async () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".json";
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const text = await file.text();
-      const data = JSON.parse(text);
-      if (data.type === "cardvote_class") {
-        await fetch(`${API}/import/class`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
-        load();
-      } else { showAlert(t("classes.invalidFormat")); }
-    };
-    input.click();
-  };
+  // Dateidialog aus Icons.jsx (`dateiWaehlen`) statt von Hand gebautem <input>.
+  const importJson = () => dateiWaehlen(async (file) => {
+    const data = JSON.parse(await file.text());
+    if (data.type === "cardvote_class") {
+      await fetch(`${API}/import/class`, alsJson("POST", data));
+      load();
+    } else { showAlert(t("classes.invalidFormat")); }
+  }, ".json");
 
   const importXlsx = async () => {
     const className = await askPrompt(t("classes.classNamePrompt"));
     if (!className) return;
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".xlsx";
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
+    dateiWaehlen(async (file) => {
       const form = new FormData();
       form.append("file", file);
       const res = await fetch(`${API}/import/class-xlsx?name=${encodeURIComponent(className)}`, { method: "POST", body: form });
       if (res.ok) { load(); } else { const err = await res.json(); showAlert(err.detail || t("classes.importError")); }
-    };
-    input.click();
+    }, ".xlsx");
   };
 
   const updateStudent = (idx, value) => setStudentField(idx, "name", value);

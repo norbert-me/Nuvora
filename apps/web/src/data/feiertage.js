@@ -1,6 +1,10 @@
 // Gesetzliche Feiertage je Bundesland, berechnet (kein stale Datensatz).
 // Oster-Sonntag via Gauß/Anonymer-Algorithmus; bewegliche Feste relativ dazu.
 // Rückgabe: [{ start, end, label }] (jeweils ein Tag, start === end).
+//
+// `ymd` und `plus` standen hier eigens noch einmal — wortgleich zu vier anderen
+// Seiten bzw. zu `addDays` im Kalender. Beides kommt jetzt aus `core/datum.js`.
+import { addDays as plus, ymd } from "../core/datum.js";
 
 function ostersonntag(year) {
   const a = year % 19, b = Math.floor(year / 100), c = year % 100;
@@ -15,8 +19,6 @@ function ostersonntag(year) {
   return new Date(year, month - 1, day);
 }
 
-const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-const plus = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 
 // Bundesland -> Zusatz-Feiertage (über die bundesweiten hinaus).
 // h3k=Hl. Drei Könige, fron=Fronleichnam, mhf=Mariä Himmelfahrt, ref=Reformationstag,

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { COLORS as C, cardStyle, btnPrimary as knopf, pageForm, SHADOW } from "../components/Icons.jsx";
 
 import { useLanguage } from "../i18n/index.jsx";
+import { alsJson } from "../core/melden.js";
 
 const API = "/api";
 
@@ -13,10 +14,7 @@ export default function ConfirmEmailChange() {
 
   useEffect(() => {
     if (!token) { setState("error"); return; }
-    fetch(`${API}/auth/confirm-email-change`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    }).then(async (r) => {
+    fetch(`${API}/auth/confirm-email-change`, alsJson("POST", { token })).then(async (r) => {
       if (r.ok) { setState("ok"); return; }
       const d = await r.json().catch(() => ({}));
       setError(d.detail || "Bestätigung fehlgeschlagen.");

@@ -11,6 +11,7 @@
 import { useEffect, useState } from "react";
 import { COLORS as C, Icon, ICONS, selectStyle, cardStyle, CONTROL_R } from "./Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import { hol } from "../core/melden.js";
 
 // Reine Grafik, kein Bedienelement: der Fortschrittsbalken bekommt seine
 // Rundung aus der halben Hoehe, damit die Kappen rund sind. Deshalb hier eine
@@ -156,8 +157,7 @@ export default function Themenstand({ classId, studentId = null, cardId = null, 
     // Die CardVote-Schuelerseite kennt nur die aufgedruckte Kartennummer, die
     // Klassenarbeit die Datenbank-ID — beide Wege muessen gehen.
     const q = studentId != null ? `?student_id=${studentId}` : "";
-    fetch(`/api/classes/${classId}/themenprofil${q}`)
-      .then((r) => (r.ok ? r.json() : null))
+    hol(`/api/classes/${classId}/themenprofil${q}`, null)
       .then((d) => {
         if (ab) return;
         setDaten(d);
@@ -165,8 +165,7 @@ export default function Themenstand({ classId, studentId = null, cardId = null, 
           ? (d?.schueler || []).find((k) => String(k.card_id) === String(cardId))
           : null;
         setWahl((alt) => treffer?.student_id ?? alt ?? d?.schueler?.[0]?.student_id ?? null);
-      })
-      .catch(() => {});
+      });
     return () => { ab = true; };
   }, [classId, studentId, cardId]);
 

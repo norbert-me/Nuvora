@@ -5,12 +5,13 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { askConfirm } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
-import { sende } from "../core/melden.js";
+import { alsJson, hol, sende } from "../core/melden.js";
+import { useAblegeZiel } from "../core/ziehsortieren.js";
 import { AddButton, badge, cardStyle, CONTROL_H, CONTROL_R, dateiWaehlen, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, menuRow, pageTitle, sectionLabel, toolbarBtn, toolbarBtnPrimary, toolbarInput, COLORS as C, Modal, inputStyle, Popover, LoadError} from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
-import { useEntwurf } from "../components/Speichern.jsx";
+import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
-import { themenIndex } from "../core/topics.js";
+import { themenIndex, useThemen } from "../core/topics.js";
 import { useAktiv } from "../core/modules.js";
 import PublishModal from "../components/PublishModal.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
@@ -27,14 +28,14 @@ export default function Methoden({ embedded } = {}) {
   const [publishing, setPublishing] = useState(null);
   const [viewing, setViewing] = useState(null); // Einstieg im Detail-Popup
   const [error, setError] = useState("");
-  const [topics, setTopics] = useState([]);
+  // Kern-Themen aus core/topics.js — dieselbe Zeile stand auf sechs Seiten.
+  const topics = useThemen();
   const [addOpen, setAddOpen] = useState(false);
   const [newFolder, setNewFolder] = useState(false); // Ordner-Anlege-Eingabe offen?
   const [folderName, setFolderName] = useState("");
   const [renamingFolder, setRenamingFolder] = useState(null); // Ordner-id im Inline-Umbenennen
   const [renameVal, setRenameVal] = useState("");
   const [drag, setDrag] = useState(null);       // { kind: "folder"|"method", id }
-  const [dropTarget, setDropTarget] = useState(undefined); // Ziel-Ordner-id | null (Wurzel) | undefined
 
   // Ein toter Endpunkt sah aus wie eine leere Sammlung („Noch keine Einstiege")
   // — genau das Bild, das man für „nichts angelegt" hält, während in Wahrheit
@@ -44,9 +45,8 @@ export default function Methoden({ embedded } = {}) {
     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then((d) => { setItems(Array.isArray(d) ? d : []); setLadefehler(false); })
     .catch(() => setLadefehler(true));
-  const loadFolders = () => fetch(`${API}/folders`).then((r) => (r.ok ? r.json() : [])).then((d) => setFolders(Array.isArray(d) ? d : [])).catch(() => {});
+  const loadFolders = () => hol(`${API}/folders`).then((d) => setFolders(Array.isArray(d) ? d : []));
   useEffect(() => { load(); loadFolders(); }, []);
-  useEffect(() => { fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
 
   // Deep-Link ?open=<id> (z. B. aus dem Kalender): den Einstieg in der ANSICHT
   // (Detail) öffnen — nicht direkt im Bearbeiten. Von dort geht Bearbeiten weiter.
@@ -81,12 +81,12 @@ export default function Methoden({ embedded } = {}) {
     for (const f of folders) {
       const p = wert[`f:${f.id}`] ?? null, n = (wert[`nf:${f.id}`] || "").trim() || f.name;
       if (p === (f.parent_id ?? null) && n === f.name) continue;
-      if (!(await sende(`${API}/folders/${f.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n, parent_id: p }) }, t("common.save")))) return false;
+      if (!(await sende(`${API}/folders/${f.id}`, alsJson("PUT", { name: n, parent_id: p }), t("common.save")))) return false;
     }
     for (const m of items) {
       const fid = wert[`m:${m.id}`] ?? null;
       if (fid === (m.folder_id ?? null)) continue;
-      if (!(await sende(`${API}/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: m.title, description: m.description || "", ablauf: m.ablauf || "", material: m.material || "", dauer: m.dauer ?? null, topic_id: m.topic_id ?? null, folder_id: fid }) }, t("common.move")))) return false;
+      if (!(await sende(`${API}/${m.id}`, alsJson("PUT", { title: m.title, description: m.description || "", ablauf: m.ablauf || "", material: m.material || "", dauer: m.dauer ?? null, topic_id: m.topic_id ?? null, folder_id: fid }), t("common.move")))) return false;
     }
     frisch.current = true;
     loadFolders(); load();
@@ -119,9 +119,7 @@ export default function Methoden({ embedded } = {}) {
       folder_id: m.id ? (m.folder_id ?? null) : current, // neuer Einstieg landet im offenen Ordner
     };
     if (!body.title) { setError(t("methoden.titleRequired")); return; }
-    const res = await fetch(m.id ? `${API}/${m.id}` : `${API}/`, {
-      method: m.id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-    }).catch(() => null);
+    const res = await fetch(m.id ? `${API}/${m.id}` : `${API}/`, alsJson(m.id ? "PUT" : "POST", body)).catch(() => null);
     if (res && res.ok) { setEdit(null); load(); } else setError(t("common.notWork"));
   };
   const remove = (id) => {
@@ -139,7 +137,7 @@ export default function Methoden({ embedded } = {}) {
     if (!name) { setNewFolder(false); return; }
     // Bei Ablehnung bleibt die Eingabe offen stehen — sonst schloss sich das
     // Feld, der Ordner fehlte, und es sah nach einem Klickfehler aus.
-    if (!(await sende(`${API}/folders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, parent_id: current }) }, t("methoden.newFolder")))) return;
+    if (!(await sende(`${API}/folders`, alsJson("POST", { name, parent_id: current }), t("methoden.newFolder")))) return;
     setFolderName(""); setNewFolder(false); loadFolders();
   };
   // Inline-Umbenennen (kein Popup): die Ordnerkarte wird zum Eingabefeld. Der
@@ -168,18 +166,17 @@ export default function Methoden({ embedded } = {}) {
     const m = items.find((x) => x.id === drag.id);
     return !!m && ordnerVon(m) !== targetId; // Methode: nur wenn woanders
   };
-  const doDrop = (targetId) => {
-    if (!canDrop(targetId)) { setDrag(null); setDropTarget(undefined); return; }
-    if (drag.kind === "folder") moveFolder(drag.id, targetId); else moveMethod(drag.id, targetId);
-    setDrag(null); setDropTarget(undefined);
-  };
-  const endDrag = () => { setDrag(null); setDropTarget(undefined); };
-  // Props für ein Drop-Ziel (Ordnerkarte oder Breadcrumb).
-  const dropProps = (targetId) => ({
-    onDragOver: (e) => { if (canDrop(targetId)) { e.preventDefault(); if (dropTarget !== targetId) setDropTarget(targetId); } },
-    onDragLeave: () => setDropTarget((cur) => (cur === targetId ? undefined : cur)),
-    onDrop: (e) => { e.preventDefault(); doDrop(targetId); },
+  // Ziel-Hervorhebung und die drei Handler kommen aus core/ziehsortieren.js —
+  // Karten.jsx hatte dieselbe Gruppe. Was erlaubt ist und was beim Ablegen
+  // geschieht, bleibt hier: das ist je Modul etwas anderes.
+  const ablage = useAblegeZiel({
+    erlaubt: canDrop,
+    ablegen: (targetId) => {
+      if (drag.kind === "folder") moveFolder(drag.id, targetId); else moveMethod(drag.id, targetId);
+      setDrag(null);
+    },
   });
+  const endDrag = () => { setDrag(null); ablage.zuruecksetzen(); };
 
   const doExport = async () => {
     const r = await fetch(`${API}/export`).catch(() => null);
@@ -191,7 +188,7 @@ export default function Methoden({ embedded } = {}) {
     setError("");
     try {
       const data = JSON.parse(await file.text());
-      const r = await fetch(`${API}/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      const r = await fetch(`${API}/import`, alsJson("POST", data));
       if (r.ok) load(); else setError(t("common.notWork"));
     } catch { setError(t("methoden.importError")); }
   };
@@ -226,13 +223,13 @@ export default function Methoden({ embedded } = {}) {
 
       {/* Breadcrumb: Wurzel + Pfad. Jeder Teil ist Drop-Ziel zum Hochschieben. */}
       <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", marginBottom: 12, fontSize: 13 }}>
-        <button onClick={() => setCurrent(null)} {...dropProps(null)}
-          style={{ ...crumbBtn, ...(dropTarget === null ? crumbDrop : {}), fontWeight: current == null ? 700 : 500 }}>{t("methoden.root")}</button>
+        <button onClick={() => setCurrent(null)} {...ablage.props(null)}
+          style={{ ...crumbBtn, ...(ablage.ziel === null ? crumbDrop : {}), fontWeight: current == null ? 700 : 500 }}>{t("methoden.root")}</button>
         {crumbs.map((f) => (
           <span key={f.id} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
             <span style={{ color: "var(--text3)" }}>/</span>
-            <button onClick={() => setCurrent(f.id)} {...dropProps(f.id)}
-              style={{ ...crumbBtn, ...(dropTarget === f.id ? crumbDrop : {}), fontWeight: current === f.id ? 700 : 500 }}>{nameVon(f)}</button>
+            <button onClick={() => setCurrent(f.id)} {...ablage.props(f.id)}
+              style={{ ...crumbBtn, ...(ablage.ziel === f.id ? crumbDrop : {}), fontWeight: current === f.id ? 700 : 500 }}>{nameVon(f)}</button>
           </span>
         ))}
       </div>
@@ -253,10 +250,10 @@ export default function Methoden({ embedded } = {}) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12, marginBottom: 16 }}>
           {subfolders.map((f) => {
             const count = items.filter((m) => ordnerVon(m) === f.id).length + childFolders(f.id).length;
-            const over = dropTarget === f.id && canDrop(f.id);
+            const over = ablage.aktiv(f.id);
             const renaming = renamingFolder === f.id;
             return (
-              <div key={f.id} draggable={!renaming} onDragStart={() => setDrag({ kind: "folder", id: f.id })} onDragEnd={endDrag} {...dropProps(f.id)}
+              <div key={f.id} draggable={!renaming} onDragStart={() => setDrag({ kind: "folder", id: f.id })} onDragEnd={endDrag} {...ablage.props(f.id)}
                 onClick={renaming ? undefined : () => setCurrent(f.id)}
                 style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, padding: 12, border: `1px solid ${over ? "var(--accent)" : "var(--border)"}`, background: over ? "var(--accent-bg, rgba(10,132,255,0.10))" : "var(--card)", cursor: renaming ? "default" : "pointer" }}>
                 {renaming ? (
@@ -306,7 +303,7 @@ export default function Methoden({ embedded } = {}) {
       {edit && <MethodModal m={edit} topics={topics} onSave={save} onDelete={(id) => { remove(id); setEdit(null); }} onClose={() => setEdit(null)} t={t} />}
       <SpeicherBalken entwurf={entwurf} />
       {publishing && <PublishModal name={publishing.title} onClose={() => setPublishing(null)}
-        onPublish={(description) => fetch(`/api/marketplace/publish/method`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method_id: publishing.id, description }) }).catch(() => null)} />}
+        onPublish={(description) => fetch(`/api/marketplace/publish/method`, alsJson("POST", { method_id: publishing.id, description })).catch(() => null)} />}
     </div>
   );
 }
@@ -327,7 +324,7 @@ function MethodView({ m, t, onEdit, onPublish, onClose }) {
   const [linked, setLinked] = useState([]);
   useEffect(() => {
     if (!m.id || !kalenderAktiv) { setLinked([]); return; }
-    fetch(`${API}/${m.id}/kalender`).then((r) => (r.ok ? r.json() : [])).then((d) => setLinked(Array.isArray(d) ? d : [])).catch(() => {});
+    hol(`${API}/${m.id}/kalender`).then((d) => setLinked(Array.isArray(d) ? d : []));
   }, [m.id, kalenderAktiv]);
   const sec = (label, val) => val ? (
     <div style={{ marginTop: 12 }}>
@@ -426,11 +423,9 @@ function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
         )}
         {/* Datei-Upload nur beim gespeicherten Einstieg (braucht die id). */}
         {m.id && <div style={{ marginTop: 16 }}><MaterialPanel methodId={m.id} /></div>}
-        <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center" }}>
-          <button onClick={submit} style={btnPrimary}>{t("common.save")}</button>
-          <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
+        <DialogFuss onSpeichern={submit} onAbbrechen={onClose}>
           {m.id && <button onClick={() => onDelete(m.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto", padding: 6 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={20} color={C.danger} /></button>}
-        </div>
+        </DialogFuss>
     </Modal>
   );
 }

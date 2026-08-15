@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { COLORS as C, btnSecondary, btnSmall, inputStyle, selectStyle } from "./Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import { alsJson } from "../core/melden.js";
 
 const feld = { ...selectStyle, width: "100%" };
 
@@ -49,10 +50,7 @@ export default function AbschnittWahl({ classId, kursId = null, value, onChange 
     if (!name.trim()) { setErr(t("noten.sectionName")); return; }
     setBusy(true); setErr("");
     const q = `?term=${term}${kursId != null ? `&kurs_id=${kursId}` : ""}`;
-    const res = await fetch(`/api/noten/classes/${classId}/sections${q}`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), weight: 0, position: 0 }),
-    }).catch(() => null);
+    const res = await fetch(`/api/noten/classes/${classId}/sections${q}`, alsJson("POST", { name: name.trim(), weight: 0, position: 0 })).catch(() => null);
     setBusy(false);
     if (!res || !res.ok) { setErr(t("common.notWork")); return; }
     const sec = await res.json();

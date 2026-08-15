@@ -519,6 +519,17 @@ export const thKlebend = {
 };
 export const td = { padding: "4px 6px", borderBottom: "1px solid var(--border)", textAlign: "center", color: "var(--text)" };
 
+// Erste Spalte, die beim Rollen nach rechts stehen bleibt (Namensspalte in
+// Notenbuch, Klassenarbeit, Orga, Auswertungen). Sie war an sechs Stellen
+// inline nachgebaut — und weil `thKlebend` schon existierte, war es reiner
+// Zufall, dass alle sechs denselben Hintergrund und dieselbe Stapelhoehe
+// trafen. Der z-index MUSS ueber dem der Datenzellen und unter dem des Kopfes
+// liegen; wo Kopf UND Spalte kleben, gilt `thKlebendLinks` (siehe dort).
+export const klebtLinks = { position: "sticky", left: 0, background: "var(--card)", zIndex: 1 };
+// Ecke oben links: klebt in beide Richtungen und muss ueber dem Kopf liegen,
+// sonst verschwindet die Namensspalte unter der Kopfzeile.
+export const klebtLinksOben = { ...klebtLinks, zIndex: 4 };
+
 /**
  * Zieht hier gerade jemand — oder markiert er nur Text?
  *

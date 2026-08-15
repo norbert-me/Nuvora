@@ -2,6 +2,7 @@ import { useState } from "react";
 import { COLORS as C, cardStyle, inputStyle as feld, btnPrimary as knopf, pageForm, SHADOW } from "../components/Icons.jsx";
 
 import { useLanguage } from "../i18n/index.jsx";
+import { alsJson } from "../core/melden.js";
 
 const API = "/api";
 
@@ -19,10 +20,7 @@ export default function Contact() {
     setError("");
     setSending(true);
     try {
-      const res = await fetch(`${API}/contact`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, message }),
-      });
+      const res = await fetch(`${API}/contact`, alsJson("POST", { name, email, message }));
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.detail || t("contact.error")); setSending(false); return; }
       setSent(true);

@@ -11,6 +11,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useLanguage } from "../i18n/index.jsx";
 import { askConfirm } from "../core/dialog.jsx";
+import { alsJson } from "../core/melden.js";
 import {
   pageApp, pageTitle, pageIntro, panelStyle, cardStyle, btnPrimary, btnSecondary,
   btnSmall, selectStyle, inputStyle, chipStyle, sectionLabel, COLORS as C, Icon, ICONS, iconBtn, Empty,
@@ -122,11 +123,7 @@ export default function Backup() {
   const einstellen = async (feld, wert) => {
     setBusy(feld); setMeldung(null);
     try {
-      const r = await fetch(`${API}/einstellungen`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [feld]: wert }),
-      });
+      const r = await fetch(`${API}/einstellungen`, alsJson("PUT", { [feld]: wert }));
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.detail || r.status);
       setStand(d);
@@ -229,11 +226,7 @@ export default function Backup() {
     const name = dialog.name;
     setDialog((v) => ({ ...v, laeuft: true, fehler: "" }));
     try {
-      const r = await fetch(`${API}/${encodeURIComponent(name)}/zurueckspielen`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bestaetigung: dialog.wort }),
-      });
+      const r = await fetch(`${API}/${encodeURIComponent(name)}/zurueckspielen`, alsJson("POST", { bestaetigung: dialog.wort }));
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.detail || r.status);
       // Neu laden, nicht neu rendern: die Oberfläche hält sonst Klassen, Namen

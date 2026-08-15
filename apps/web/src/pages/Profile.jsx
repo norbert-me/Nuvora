@@ -5,6 +5,7 @@ import { useLanguage, LANGUAGES } from "../i18n/index.jsx";
 import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, pageTitle, panelStyle, popoverPanel,
   sectionLabel, Tabs, th as thBasis, td as tdBasis, badge, iconBtn, inputStyle as inputBasis, Icon, ICONS, CONTROL_R } from "../components/Icons.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
+import { alsJson } from "../core/melden.js";
 
 const API = "/api";
 
@@ -91,10 +92,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   const [kanalBasis, setKanalBasis] = useState({ channel: "" });
   const kanal = useEntwurf(kanalBasis, async (w) => {
     setVersionLoading(true);
-    await fetch(`${API}/version/channel`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channel: w.channel }),
-    }).catch(() => {});
+    await fetch(`${API}/version/channel`, alsJson("PUT", { channel: w.channel })).catch(() => {});
     const d = await fetch(`${API}/version`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
     setVersionInfo(d);
     setKanalBasis({ channel: d?.channel || w.channel });

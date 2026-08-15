@@ -11,10 +11,10 @@ import Portrait from "../components/Portrait.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { askConfirm } from "../core/dialog.jsx";
 import { useAktiv } from "../core/modules.js";
-import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { useUrlClass } from "../core/klassenwahl.js";
+import { useKlasseMerken, useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
+import { ymd } from "../core/datum.js";
+import { alsJson, hol } from "../core/melden.js";
 
-const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 export default function Zufall() {
   const { t } = useLanguage();
@@ -44,15 +44,10 @@ export default function Zufall() {
   const [groupN, setGroupN] = useState(4);
   const [groups, setGroups] = useState([]);
 
-  useEffect(() => {
-    return swr("classes", "/api/classes", (d) => {
-      const list = Array.isArray(d) ? d : [];
-      setClasses(list);
-      if (classId === null && list.length) { const w = lastClass(); setClassId(list.some((c) => c.id === w) ? w : list[0].id); }
-    });
-  }, []);
-
-  useEffect(() => { if (classId) rememberClass(classId); }, [classId]);
+  // Klassenliste, Vorwahl und „zuletzt gewaehlt" — dieselben sechs Zeilen
+  // standen auf fuenf Seiten; sie liegen jetzt in core/klassenwahl.js.
+  useKlassenListe(setClasses, setClassId);
+  useKlasseMerken(classId);
 
   const cls = useMemo(() => classes.find((c) => c.id === classId), [classes, classId]);
   const students = cls?.students || [];
@@ -60,22 +55,20 @@ export default function Zufall() {
   // Heutige Abwesende laden (nur wenn Modul aktiv und Option an).
   useEffect(() => {
     if (!anwesenheitAktiv || !skipAbs || !classId) { setAbsent(new Set()); return; }
-    fetch(`/api/anwesenheit/${classId}?date=${new Date(ymd(new Date()) + "T00:00:00").toISOString()}`)
-      .then((r) => (r.ok ? r.json() : {}))
-      .then((d) => { const s = new Set(); Object.entries(d || {}).forEach(([sid, v]) => { if (v.status && v.status !== "da") s.add(Number(sid)); }); setAbsent(s); })
-      .catch(() => {});
+    hol(`/api/anwesenheit/${classId}?date=${new Date(ymd(new Date()) + "T00:00:00").toISOString()}`, {})
+      .then((d) => { const s = new Set(); Object.entries(d || {}).forEach(([sid, v]) => { if (v.status && v.status !== "da") s.add(Number(sid)); }); setAbsent(s); });
   }, [anwesenheitAktiv, skipAbs, classId]);
 
   // Klassenwechsel: Runde zurücksetzen und Zieh-Gedächtnis vom Server laden.
   useEffect(() => {
     setGezogen([]); setAktuell(null);
     if (!classId) { setCounts({}); setLastDrawn({}); setLastId(null); return; }
-    fetch(`/api/zufall/${classId}`).then((r) => (r.ok ? r.json() : null)).then((d) => {
+    hol(`/api/zufall/${classId}`, null).then((d) => {
       if (!d) return;
       const c = {}, ld = {};
       Object.entries(d.history || {}).forEach(([sid, v]) => { c[sid] = v.count; ld[sid] = v.drawn_at; });
       setCounts(c); setLastDrawn(ld); setLastId(d.last_student_id ?? null);
-    }).catch(() => {});
+    });
   }, [classId]);
   useEffect(() => { setGezogen([]); setAktuell(null); }, [ohneWdh, niveau]);
 
@@ -124,7 +117,7 @@ export default function Zufall() {
         setLastId(pick.id);
         setRollt(false);
         // Serverseitig merken (fair über Stunden/Tage hinweg).
-        fetch(`/api/zufall/${classId}/draw`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ student_id: pick.id }) }).catch(() => {});
+        fetch(`/api/zufall/${classId}/draw`, alsJson("POST", { student_id: pick.id })).catch(() => {});
       }
     }, 55);
   };

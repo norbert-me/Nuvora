@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Icon, ICONS, iconBtn, cardStyle, sectionLabel, pageApp } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import { hol } from "../core/melden.js";
 
 const API = "/api";
 
@@ -23,7 +24,7 @@ export default function Cards() {
       .then((d) => setClasses(Array.isArray(d) ? d : []))
       .catch(() => setClasses([]))
       .finally(() => setLoaded(true));
-    fetch(`${API}/kurse`).then((r) => (r.ok ? r.json() : [])).then((d) => setKurse(Array.isArray(d) ? d : [])).catch(() => {});
+    hol(`${API}/kurse`).then((d) => setKurse(Array.isArray(d) ? d : []));
   }, []);
 
   const download = async (url, filename) => {

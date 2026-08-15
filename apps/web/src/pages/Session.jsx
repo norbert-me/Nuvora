@@ -10,6 +10,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import Latex from "../components/Latex.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
+import { mmss } from "../core/datum.js";
+import { alsJson } from "../core/melden.js";
 
 const API = "/api";
 // Antwort- und Podiumsfarben kommen aus dem Kern (ANTWORT_COLORS,
@@ -96,16 +98,12 @@ export default function Session() {
   const startSession = async () => {
     if (!selectedClass || !selectedSet) return;
     const prefix = gameMode ? "Game: " : "";
-    const res = await fetch(`${API}/sessions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const res = await fetch(`${API}/sessions`, alsJson("POST", {
         name: `${prefix}${selectedClass.name} — ${selectedSet.name}`,
         class_id: selectedClass.id,
         question_set_id: selectedSet.id,
         mode: gameMode ? "game" : "test",
-      }),
-    });
+      }));
     const s = await res.json();
     setSessionId(s.id);
     setSessionCode(s.code || String(s.id).padStart(4, "0"));
@@ -116,11 +114,7 @@ export default function Session() {
     if (selectedSet.shuffle_answers || selectedSet.shuffle_questions || gameMode) {
       const qmap = {};
       qs.forEach((q) => { qmap[String(q.id)] = q.correct_answer || ""; });
-      fetch(`${API}/sessions/${s.id}/question-map`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(qmap),
-      });
+      fetch(`${API}/sessions/${s.id}/question-map`, alsJson("PUT", qmap));
     }
     if (gameMode && timerSeconds === 0) setTimerSeconds(0);
   };
@@ -344,11 +338,7 @@ export default function Session() {
       finalTimes[question.id] = Math.round((Date.now() - questionStartRef.current) / 1000);
     }
     fetch(`${API}/sessions/${sessionId}/eval-config`).then((r) => r.json()).then((existing) => {
-      fetch(`${API}/sessions/${sessionId}/eval-config`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...existing, times: finalTimes, total_time: totalSec }),
-      });
+      fetch(`${API}/sessions/${sessionId}/eval-config`, alsJson("PUT", { ...existing, times: finalTimes, total_time: totalSec }));
     });
     if (timerRef.current) clearInterval(timerRef.current);
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -663,12 +653,9 @@ export default function Session() {
         <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{t("session.finished")}</h2>
         <p style={{ color: "var(--text2)", marginBottom: 20 }}>
           {selectedClass?.name} — {selectedSet?.name}
-          {sessionStartRef.current && (() => {
-            const totalSec = Math.round((Date.now() - sessionStartRef.current) / 1000);
-            const min = Math.floor(totalSec / 60);
-            const sec = totalSec % 60;
-            return <span style={{ marginLeft: 12, color: "var(--text3)" }}>⏱ {min}:{String(sec).padStart(2, "0")}</span>;
-          })()}
+          {sessionStartRef.current && (
+            <span style={{ marginLeft: 12, color: "var(--text3)" }}>⏱ {mmss(Math.round((Date.now() - sessionStartRef.current) / 1000))}</span>
+          )}
         </p>
         <div style={{
           display: "inline-block", padding: "16px 32px", borderRadius: cardStyle.borderRadius,
@@ -701,7 +688,7 @@ export default function Session() {
                   {q.pct === null ? "–" : `${q.pct}%`}
                 </td>
                 <td style={{ padding: "10px 12px", textAlign: "center", color: "var(--text3)", fontSize: 13 }}>
-                  {qTime != null ? `${Math.floor(qTime / 60)}:${String(qTime % 60).padStart(2, "0")}` : "–"}
+                  {qTime != null ? mmss(qTime) : "–"}
                 </td>
               </tr>
               );
@@ -794,7 +781,7 @@ export default function Session() {
             color: timerColor, transition: "all 0.3s",
             animation: timeLeft <= 5 && timeLeft > 0 ? "pulse 0.5s infinite" : "none",
           }}>
-            {timeLeft > 0 ? `${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, "0")}` : t("session.timeUp")}
+            {timeLeft > 0 ? mmss(timeLeft) : t("session.timeUp")}
           </span>
         )}
       </div>

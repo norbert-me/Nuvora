@@ -5,10 +5,12 @@
 // und schickte jede Umsortierung sofort. Beides ist jetzt ein Entwurf mit einem
 // Speichern-Knopf: wo sich etwas ändern lässt, entscheidet der Mensch, wann es
 // gilt — sonst fragt man sich, ob es drin ist.
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { pageTitle, btnPrimary, cardStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, SHADOW } from "../components/Icons.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+import { useZiehVorschau } from "../core/ziehsortieren.js";
+import { alsJson, hol } from "../core/melden.js";
 
 const API = "/api/notizblock";
 
@@ -16,7 +18,7 @@ export default function Notizblock({ embedded } = {}) {
   const { t } = useLanguage();
   const [notes, setNotes] = useState([]);
 
-  const load = () => fetch(API).then((r) => (r.ok ? r.json() : [])).then((d) => setNotes(Array.isArray(d) ? d : [])).catch(() => {});
+  const load = () => hol(API).then((d) => setNotes(Array.isArray(d) ? d : []));
   useEffect(() => { load(); }, []);
 
   // Arbeitskopie aller Zettel: Reihenfolge, Titel und Text laufen als drei
@@ -28,7 +30,7 @@ export default function Notizblock({ embedded } = {}) {
     texte: notes.map((n) => n.content || ""),
   }), [notes]);
   const entwurf = useEntwurf(gespeichert, async (wert) => {
-    const put = (url, body) => fetch(url, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    const put = (url, body) => fetch(url, alsJson("PUT", body))
       .then((r) => r.ok).catch(() => false);
     let ok = true;
     if (String(wert.ids) !== String(gespeichert.ids)) ok = (await put(`${API}/reorder`, { ids: wert.ids })) && ok;
@@ -70,7 +72,7 @@ export default function Notizblock({ embedded } = {}) {
   // Anlegen und Löschen sind Befehle und bleiben sofortig — den Entwurf zieht
   // der Abgleich oben nach.
   const add = async () => {
-    const r = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "", content: "" }) }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+    const r = await fetch(API, alsJson("POST", { title: "", content: "" })).then((x) => (x.ok ? x.json() : null)).catch(() => null);
     if (r) setNotes((p) => [r, ...p]);
   };
   const del = async (id) => {
@@ -79,26 +81,20 @@ export default function Notizblock({ embedded } = {}) {
   };
   const patch = (idx, feld, value) => entwurf.setz((v) => ({ [feld]: v[feld].map((x, i) => (i === idx ? value : x)) }));
 
-  // Drag&Drop ordnet den ENTWURF um — das ist zugleich die Vorschau, und
-  // gespeichert wird per Knopf.
-  const dragIdx = useRef(null);
-  const move = (from, to) => entwurf.setz((v) => {
-    const idx = v.ids.map((_, i) => i);
-    const [m] = idx.splice(from, 1); idx.splice(to, 0, m);
-    return { ids: idx.map((i) => v.ids[i]), titel: idx.map((i) => v.titel[i]), texte: idx.map((i) => v.texte[i]) };
-  });
-  const dnd = (idx) => ({
-    onDragStart: () => { dragIdx.current = idx; },
-    onDragOver: (e) => { if (dragIdx.current == null) return; e.preventDefault(); if (idx !== dragIdx.current) { move(dragIdx.current, idx); dragIdx.current = idx; } },
-    onDrop: (e) => { e.preventDefault(); dragIdx.current = null; },
-    onDragEnd: () => { dragIdx.current = null; },
-  });
-
   // Angezeigt wird der Entwurf, nicht der Serverstand.
   const bekannt = Object.fromEntries(notes.map((n) => [n.id, n]));
   const view = entwurf.wert.ids
     .map((id, i) => (bekannt[id] ? { id, title: entwurf.wert.titel[i], content: entwurf.wert.texte[i], idx: i } : null))
     .filter(Boolean);
+
+  // Ziehen mit Live-Vorschau — dieselbe Mechanik wie bei den To-dos und den
+  // Fragen im Quiz, seit dem Zusammenfuehren nur noch in
+  // core/ziehsortieren.js. Das Ablegen ordnet den ENTWURF um; gespeichert wird
+  // per Knopf.
+  const zieh = useZiehVorschau(view, (arr) => entwurf.setz((v) => {
+    const pos = arr.map((n) => v.ids.indexOf(n.id));
+    return { ids: pos.map((i) => v.ids[i]), titel: pos.map((i) => v.titel[i]), texte: pos.map((i) => v.texte[i]) };
+  }));
   return (
     <div style={{ maxWidth: embedded ? "none" : 900, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
@@ -111,8 +107,8 @@ export default function Notizblock({ embedded } = {}) {
         <Empty title={t("notizblock.empty")} hint={t("notizblock.emptyHint")} action={t("notizblock.new")} onAction={add} />
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
-          {view.map((n) => (
-            <div key={n.id} draggable {...dnd(n.idx)}
+          {zieh.sichtbar.map((n, idx) => (
+            <div key={n.id} {...zieh.props(idx)}
               style={{ ...cardStyle, display: "flex", flexDirection: "column", padding: 12, boxShadow: SHADOW.ruhig }}>
               <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 8 }}>
                 <span className="drag-handle" title={t("notizblock.reorderHint")} style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex", flexShrink: 0 }}><Icon d={ICONS.grip} size={15} /></span>

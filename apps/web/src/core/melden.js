@@ -72,3 +72,30 @@ export async function sende(url, options, was = "") {
   try { res = await fetch(url, options); } catch { res = null; }
   return pruefeAntwort(res, was);
 }
+
+/**
+ * Die Optionen eines Schreib-Aufrufs mit JSON-Rumpf.
+ *
+ * Genau dieses Objekt stand 115-mal im Code — zeichengleich, nur Methode und
+ * Rumpf wechselten: `method`, dazu `headers` mit `"Content-Type"` auf
+ * `"application/json"` und `body: JSON.stringify(…)`.
+ *
+ * Den Anmelde-Kopf setzt der globale `fetch`-Aufsatz in `main.jsx`; hier geht
+ * es nur um Inhaltstyp und Serialisierung.
+ *
+ *   await sende(url, alsJson("PUT", { name }), "Kurs umbenennen")
+ */
+export function alsJson(method, body) {
+  return { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+}
+
+/**
+ * Lesen: holen, JSON auspacken, im Fehlerfall den Ersatzwert.
+ *
+ * `fetch(u).then(r => r.ok ? r.json() : []).catch(…)` stand über hundertmal da
+ * und war zweimal lokal nacherfunden (Suche.jsx, KursKlasseSelect.jsx). Lesen
+ * darf still scheitern — beim Schreiben meldet `sende`.
+ */
+export function hol(url, ersatz = []) {
+  return fetch(url).then((r) => (r.ok ? r.json() : ersatz)).catch(() => ersatz);
+}

@@ -4,6 +4,10 @@
 // überall „Thema / Unterthema". Stünde diese Regel zweimal im Code, hieße
 // dieselbe Auswahl in der einen Ansicht „Kürzen" und in der anderen
 // „Brüche / Kürzen" — und niemand wüsste, ob das dasselbe ist.
+import { useEffect, useState } from "react";
+
+import { hol } from "./melden.js";
+
 export function themenIndex(topics) {
   const liste = Array.isArray(topics) ? topics : [];
   const byId = new Map(liste.map((t) => [t.id, t]));
@@ -29,4 +33,20 @@ export function themenIndex(topics) {
     // Beschriftung zu einer ID — für Listen, die nur `topic_id` haben.
     labelFuerId: (id) => (id == null ? "" : label(byId.get(id))),
   };
+}
+
+/**
+ * Die Kern-Themen laden.
+ *
+ * Diese eine Zeile stand sechsmal wortgleich in Seiten (Methoden, Noten,
+ * Dashboard, Klassenarbeit, Evaluation, lernpfad/Exercises) — direkt neben dem
+ * `themenIndex`, dessen Beschriftungsregel längst hier liegt. Geladen, nicht
+ * gecacht: `swr` würde beim ersten Aufbau kurz den alten Stand zeigen, und
+ * genau das tun heute nur die zwei Seiten, die es ausdrücklich so wollen
+ * (Kalender, Karten).
+ */
+export function useThemen() {
+  const [topics, setTopics] = useState([]);
+  useEffect(() => { hol("/api/topics").then((d) => setTopics(Array.isArray(d) ? d : [])); }, []);
+  return topics;
 }

@@ -4,11 +4,14 @@ import { useAktiv } from "../core/modules.js";
 import AbschnittWahl from "../components/AbschnittWahl.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
-import { Icon, ICONS, Tabs, ANTWORT_COLORS, btnPrimary, btnSecondary, Modal, inputStyle, iconBtn, cardStyle, chipStyle, panelStyle, toolbarBtn, CONTROL_R, COLORS as C, Boxplot, pageApp, StatCard, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { ANTWORT_COLORS, Boxplot, COLORS as C, CONTROL_R, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, pageApp, panelStyle, td as tdBasis, th as thBasis, toolbarBtn } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
 import { bewerte, statusOf } from "../core/scoring.js";
+import { mmss } from "../core/datum.js";
+import { alsJson, hol } from "../core/melden.js";
+import { useThemen } from "../core/topics.js";
 
 const API = "/api";
 // Antwortfarben A–D kommen aus dem Kern (ANTWORT_COLORS) — die Kopie hier war
@@ -103,15 +106,11 @@ export default function Evaluation() {
   // ersten Speichern weg.
   const restConfig = useRef({});
   const eConf = useEntwurf(gespeicherteConfig, async (wert) => {
-    const r = await fetch(`${API}/sessions/${id}/eval-config`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const r = await fetch(`${API}/sessions/${id}/eval-config`, alsJson("PUT", {
         ...restConfig.current,
         weights: wert.weights, grade_scale: wert.gradeScale,
         krank: wert.krank, anwesend: wert.anwesend,
-      }),
-    }).catch(() => null);
+      })).catch(() => null);
     if (!r || !r.ok) return false;
     setGespeicherteConfig(wert);
   });
@@ -446,7 +445,7 @@ const gradeDistribution = (() => {
           <StatCard label={t("cv.statWeight")} value={`×${getWeight(q.id)}`} />
           {timesData[String(q.id)] != null && (() => {
             const sek = timesData[String(q.id)];
-            return <StatCard label={t("cv.statTime")} value={`${Math.floor(sek / 60)}:${String(sek % 60).padStart(2, "0")}`} />;
+            return <StatCard label={t("cv.statTime")} value={mmss(sek)} />;
           })()}
         </div>
 
@@ -551,7 +550,7 @@ const gradeDistribution = (() => {
           />
         )}
         {totalTime != null && (
-          <Stat label={t("cv.statDuration")} value={`${Math.floor(totalTime / 60)}:${String(totalTime % 60).padStart(2, "0")}`} />
+          <Stat label={t("cv.statDuration")} value={mmss(totalTime)} />
         )}
       </div>
 
@@ -732,7 +731,7 @@ const gradeDistribution = (() => {
               const grade = gradeFromPct(pct, gradeScale);
               return (
                 <tr key={student.card_id}>
-                  <td style={{ ...td, fontWeight: "bold", position: "sticky", left: 0, background: "var(--card)", zIndex: 1 }}>
+                  <td style={{ ...td, ...klebtLinks, fontWeight: "bold" }}>
                     <a
                       href="#"
                       onClick={async (e) => { e.preventDefault(); const r = await fetch(`${API}/sessions/${id}/student-pdf/${student.card_id}`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${student.name}_${id}.pdf`; a.click(); URL.revokeObjectURL(a.href); }}
@@ -810,7 +809,7 @@ const gradeDistribution = (() => {
             )}
             {absentStudents.map((student) => (
               <tr key={student.card_id} style={{ opacity: 0.4 }}>
-                <td style={{ ...td, fontWeight: "bold", position: "sticky", left: 0, background: "var(--card)", zIndex: 1, fontStyle: "italic" }}>
+                <td style={{ ...td, ...klebtLinks, fontWeight: "bold", fontStyle: "italic" }}>
                   {student.name}
                   {/* Doch anwesend: dann zählt die fehlende Abgabe als 0 mit. */}
                   <button onClick={() => setStatus(student.card_id, "anwesend")}
@@ -1006,10 +1005,7 @@ function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
 
   const uebernehmen = async () => {
     setBusy(true); setError("");
-    const res = await fetch("/api/noten/import-session", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id: sessionId, section_id: sectionId, column_name: colName.trim() || heute(), grades: grades.map((g) => ({ card_id: g.card_id, value: g.value })) }),
-    });
+    const res = await fetch("/api/noten/import-session", alsJson("POST", { session_id: sessionId, section_id: sectionId, column_name: colName.trim() || heute(), grades: grades.map((g) => ({ card_id: g.card_id, value: g.value })) }));
     setBusy(false);
     if (!res.ok) { const b = await res.json().catch(() => ({})); setError(b.detail || t("notenimp.failed")); return; }
     const b = await res.json();
@@ -1065,17 +1061,17 @@ function TopicAnalysis({ questions, presentStudents }) {
   const { t } = useLanguage();
   const aktiv = useAktiv();
   const lernpfad = aktiv("lernpfad");
-  const [topics, setTopics] = useState([]);
+  // Kern-Themen aus core/topics.js — dieselbe Zeile stand auf sechs Seiten.
+  const topics = useThemen();
   const [exCount, setExCount] = useState({}); // topic_id -> Anzahl Aufgaben
 
   useEffect(() => {
-    fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {});
     if (lernpfad) {
-      fetch("/api/lernpfad/exercises").then((r) => (r.ok ? r.json() : [])).then((exs) => {
+      hol("/api/lernpfad/exercises").then((exs) => {
         const c = {};
         (exs || []).forEach((e) => { if (e.topic_id) c[e.topic_id] = (c[e.topic_id] || 0) + 1; });
         setExCount(c);
-      }).catch(() => {});
+      });
     }
   }, [lernpfad]);
 
@@ -1155,8 +1151,8 @@ function WeakTopics({ sessionId, classId, karten, lernpfad, t }) {
   const [done, setDone] = useState({});          // { `${topic_id}:${art}`: true }
 
   useEffect(() => {
-    fetch(`/api/sessions/${sessionId}/topic-stats`).then((r) => (r.ok ? r.json() : null))
-      .then((d) => setTopics(d && Array.isArray(d.topics) ? d.topics : [])).catch(() => {});
+    hol(`/api/sessions/${sessionId}/topic-stats`, null)
+      .then((d) => setTopics(d && Array.isArray(d.topics) ? d.topics : []));
   }, [sessionId]);
 
   // Schwach = unter 60 % Trefferquote.
@@ -1166,7 +1162,7 @@ function WeakTopics({ sessionId, classId, karten, lernpfad, t }) {
   const run = async (tp, art, req) => {
     const key = `${tp.topic_id}:${art}`;
     setBusy(key);
-    const r = await fetch(req.url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req.body) }).catch(() => null);
+    const r = await fetch(req.url, alsJson("POST", req.body)).catch(() => null);
     setBusy(null);
     if (r && r.ok) setDone((d) => ({ ...d, [key]: true }));
   };

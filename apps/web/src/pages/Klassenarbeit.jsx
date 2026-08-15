@@ -4,22 +4,25 @@
 // und gezielte Wiederholung (Karten des schwachen Themas wieder fällig).
 import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import { useSearchParams } from "react-router-dom";
-import { badge, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, CONTROL_R, panelStyle, selectStyle, inputStyle, Segment, segmentBtn, th as thBase, td as tdBase, toolbarBtn, toolbarIconBtn, Icon, ICONS, iconBtn, COLORS as C, Empty, Modal, Boxplot, StatCard, Tabs, pageApp} from "../components/Icons.jsx";
+import { Boxplot, COLORS as C, CONTROL_R, Empty, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, pageApp, panelStyle, selectStyle, td as tdBase, th as thBase, toolbarBtn, toolbarIconBtn } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
-import { useEntwurf } from "../components/Speichern.jsx";
+import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
 import Themenstand from "../components/Themenstand.jsx";
-import { themenIndex } from "../core/topics.js";
+import { themenIndex, useThemen } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import AbschnittWahl from "../components/AbschnittWahl.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
-import { lastClass, rememberClass } from "../core/cache.js";
+import { rememberClass } from "../core/cache.js";
 import { gradeFromPct, gradeDetailed, quantile, stdev, DEFAULT_SCALE } from "../core/grades.js";
-import { useUrlClass } from "../core/klassenwahl.js";
+import { useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
+import { alsJson, hol } from "../core/melden.js";
+import NotenUebernahme from "../components/NotenUebernahme.jsx";
+import { konfidenzProzent, mittel, streuung, trennschaerfe } from "../core/aufgabenstatistik.js";
 
 const API = "/api/klassenarbeit";
 const newId = () => "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -114,7 +117,8 @@ export default function Klassenarbeit() {
   const [subsetKurs, setSubsetKurs] = useState(null); // gewählter Teilkurs (Kurs aus Teilen von Klassen) oder null
   const [subsetKurse, setSubsetKurse] = useState([]); // Kurse mit einzeln hinzugefügten SuS
   const [students, setStudents] = useState([]);
-  const [topics, setTopics] = useState([]);
+  // Kern-Themen aus core/topics.js — dieselbe Zeile stand auf sechs Seiten.
+  const topics = useThemen();
   const [works, setWorks] = useState([]);
   // Serverstand der Arbeit (Basis) — die Arbeitskopie liegt im Entwurf.
   const [savedWork, setSavedWork] = useState(null);
@@ -125,17 +129,13 @@ export default function Klassenarbeit() {
   const [busy, setBusy] = useState(false);
   const kq = kursId != null ? `?kurs_id=${kursId}` : "";
 
-  useEffect(() => { fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
   // Teilkurse (Kurse aus Teilen von Klassen = einzeln hinzugefügte SuS) laden.
-  useEffect(() => { fetch("/api/kurse").then((r) => (r.ok ? r.json() : [])).then((d) => setSubsetKurse((Array.isArray(d) ? d : []).filter((k) => k.member_count > 0))).catch(() => {}); }, []);
+  useEffect(() => { hol("/api/kurse").then((d) => setSubsetKurse((Array.isArray(d) ? d : []).filter((k) => k.member_count > 0))); }, []);
   // Beim ersten Besuch gleich eine Klasse wählen (zuletzt genutzte, sonst erste),
   // damit die Arbeitsauswahl nicht ausgeblendet bleibt, bis man von Hand klickt.
-  useEffect(() => {
-    fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).then((list) => {
-      const l = Array.isArray(list) ? list : [];
-      if (classId == null && l.length) { const w = lastClass(); setClassId(l.some((c) => c.id === w) ? w : l[0].id); }
-    }).catch(() => {});
-  }, []); // eslint-disable-line
+  // Dieselbe Vorwahl wie ueberall (core/klassenwahl.js). Sie lief hier als
+  // einzige mit rohem `fetch` statt `swr` — ohne Cache und ohne Grund.
+  useKlassenListe(null, setClassId);
   const repClass = useRef(null); // Referenz-Klasse eines Teilkurses (für work.class_id, FK)
   // Laufende Nummer je Ladevorgang. Der Effekt feuert zweimal kurz nacheinander:
   // erst mit kursId = null (Anfangszustand), dann mit dem Kurs aus der Adresse.
@@ -151,7 +151,7 @@ export default function Klassenarbeit() {
       fetch(`${API}/kurse/${subsetKurs}/students`).then((r) => (r.ok ? r.json() : [])).then((list) => {
         const studs = Array.isArray(list) ? list : []; setStudents(studs);
         const rep = studs[0]?.class_id || null; repClass.current = rep;
-        if (rep) fetch(`${API}/classes/${rep}/works?kurs_id=${subsetKurs}`).then((r) => (r.ok ? r.json() : [])).then((d) => { const l = Array.isArray(d) ? d : []; setWorks(l); zeigeArbeit(l[0] || null); }).catch(() => {});
+        if (rep) hol(`${API}/classes/${rep}/works?kurs_id=${subsetKurs}`).then((d) => { const l = Array.isArray(d) ? d : []; setWorks(l); zeigeArbeit(l[0] || null); });
         else { setWorks([]); zeigeArbeit(null); }
       }).catch(() => { setStudents([]); setWorks([]); zeigeArbeit(null); });
       return;
@@ -160,10 +160,10 @@ export default function Klassenarbeit() {
     if (classId) rememberClass(classId);
     if (!classId) { setStudents([]); setWorks([]); zeigeArbeit(null); return; }
     const meine = ++ladenr.current;   // nur die jüngste Antwort darf schreiben
-    fetch(`${API}/classes/${classId}/students`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+    hol(`${API}/classes/${classId}/students`).then((d) => {
       if (meine === ladenr.current) setStudents(Array.isArray(d) ? d : []);
-    }).catch(() => {});
-    fetch(`${API}/classes/${classId}/works${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+    });
+    hol(`${API}/classes/${classId}/works${kq}`).then((d) => {
       if (meine !== ladenr.current) return;
       const l = Array.isArray(d) ? d : [];
       setWorks(l);
@@ -171,7 +171,7 @@ export default function Klassenarbeit() {
       const target = wantWork.current ? l.find((x) => x.id === wantWork.current) : null;
       if (target) wantWork.current = null;
       zeigeArbeit(target || l[0] || null);
-    }).catch(() => {});
+    });
   }, [classId, kursId, subsetKurs]);
 
   // Beschriftung UND Reihenfolge aus core/topics.js — die eine Quelle. Die
@@ -189,7 +189,7 @@ export default function Klassenarbeit() {
     if (!next || !next.id) return false;
     // scale: echtes dict = Override, sonst {} (Server setzt zurueck auf Profil).
     const scaleOut = (next.scale && Object.keys(next.scale).length) ? next.scale : {};
-    const r = await fetch(`${API}/works/${next.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: next.name, tasks: next.tasks, results: next.results, scale: scaleOut, absent: next.absent || [] }) }).catch(() => null);
+    const r = await fetch(`${API}/works/${next.id}`, alsJson("PUT", { name: next.name, tasks: next.tasks, results: next.results, scale: scaleOut, absent: next.absent || [] })).catch(() => null);
     if (!r || !r.ok) { showAlert(t("common.notWork")); return false; }
     setSavedWork(next);
     setWorks((ws) => ws.map((x) => (x.id === next.id ? { ...x, name: next.name } : x)));
@@ -209,11 +209,11 @@ export default function Klassenarbeit() {
     const cid = subsetKurs ? repClass.current : classId;
     const kid = subsetKurs || kursId;
     if (!cid) return;
-    const res = await fetch(`${API}/works`, { method: "POST", headers: { "Content-Type": "application/json" }, // Datum mitgeben: der Server markiert daraus die Kinder, die heute fehlen,
-      // gleich als abwesend (nur mit Modul Orga). Vergisst man das von Hand,
-      // rutschen Nullen in die Wertung.
-      body: JSON.stringify({ class_id: cid, kurs_id: kid, name: t("klassenarbeit.newName"),
-                             datum: new Date().toISOString() }) }).catch(() => null);
+    // Datum mitgeben: der Server markiert daraus die Kinder, die heute fehlen,
+    // gleich als abwesend (nur mit Modul Orga). Vergisst man das von Hand,
+    // rutschen Nullen in die Wertung.
+    const res = await fetch(`${API}/works`,
+      alsJson("POST", { class_id: cid, kurs_id: kid, name: t("klassenarbeit.newName"), datum: new Date().toISOString() })).catch(() => null);
     if (res && res.ok) { const w = await res.json(); setWorks((p) => [w, ...p]); zeigeArbeit(w); }
   };
   const [kopieOffen, setKopieOffen] = useState(false);
@@ -221,10 +221,7 @@ export default function Klassenarbeit() {
   // Anhaenge kommen mit, die Punkte NICHT — sie gehoeren zu Kindern, die es in
   // der anderen Klasse nicht gibt.
   const kopieren = async (zielClassId, zielKursId, name) => {
-    const r = await fetch(`${API}/works/${work.id}/copy`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ class_id: zielClassId, kurs_id: zielKursId ?? null, name }),
-    }).catch(() => null);
+    const r = await fetch(`${API}/works/${work.id}/copy`, alsJson("POST", { class_id: zielClassId, kurs_id: zielKursId ?? null, name })).catch(() => null);
     if (!r || !r.ok) return false;
     const neu = await r.json();
     setKopieOffen(false);
@@ -354,8 +351,7 @@ export default function Klassenarbeit() {
     const graded = students.filter(erfasstIst);
     // Gesamtpunkte je SuS (für Trennschärfe = Item-Total-Korrelation).
     const totals = graded.map((s) => tasks.reduce((n, tk) => n + pt(s.id, tk), 0));
-    const mean = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
-    const sdOf = (arr) => { if (arr.length < 2) return 0; const m = mean(arr); return Math.sqrt(arr.reduce((s, x) => s + (x - m) ** 2, 0) / (arr.length - 1)); };
+    const mean = mittel, sdOf = streuung;   // beide aus core/aufgabenstatistik.js
 
     const topicsOut = Object.entries(topicUnits).map(([tid, us]) => {
       let e = 0, m = 0; graded.forEach((s) => us.forEach((u) => { e += pu(s.id, u.id); m += uMax[u.id]; }));
@@ -393,22 +389,10 @@ export default function Klassenarbeit() {
       const e = xs.reduce((a, b) => a + b, 0);
       const m = graded.length * mx;
       const avgP = mean(xs);
-      // Trennschärfe: Korrelation Aufgabenpunkte ↔ Gesamtpunkte (−1..+1).
-      let disc = null;
-      if (graded.length >= 3) {
-        const mxk = mean(xs), myk = mean(totals);
-        let cov = 0, sx = 0, sy = 0;
-        xs.forEach((x, idx) => { const dx = x - mxk, dy = totals[idx] - myk; cov += dx * dy; sx += dx * dx; sy += dy * dy; });
-        disc = (sx > 0 && sy > 0) ? cov / Math.sqrt(sx * sy) : null;
-      }
-      // 95%-KI der mittleren Trefferquote (Prozent): Mittel ± 1,96·SE.
-      let ciLow = null, ciHigh = null;
-      if (graded.length >= 2 && mx > 0) {
-        const pcts = xs.map((x) => (x / mx) * 100);
-        const half = 1.96 * (sdOf(pcts) / Math.sqrt(pcts.length));
-        ciLow = Math.max(0, Math.round(mean(pcts) - half));
-        ciHigh = Math.min(100, Math.round(mean(pcts) + half));
-      }
+      // Trennschärfe und 95%-KI rechnet core/aufgabenstatistik.js — dieselben
+      // vierzehn Zeilen standen hier und gleich noch einmal bei den Teilaufgaben.
+      const disc = trennschaerfe(xs, totals);
+      const { ciLow, ciHigh } = konfidenzProzent(xs, mx);
       const nullAnteil = xs.length ? Math.round(xs.filter((x) => x === 0).length / xs.length * 100) : null;
       const vollAnteil = xs.length ? Math.round(xs.filter((x) => x >= mx).length / xs.length * 100) : null;
       return { id: tk.id, label: tk.label || `${i + 1}.`, pct: m ? Math.round((e / m) * 100) : 0,
@@ -424,20 +408,8 @@ export default function Klassenarbeit() {
         const xs = graded.map((s) => pu(s.id, u.id));
         const umx = uMax[u.id];
         const avgP = mean(xs);
-        let disc = null;
-        if (graded.length >= 3) {
-          const mxk = mean(xs), myk = mean(totals);
-          let cov = 0, sx = 0, sy = 0;
-          xs.forEach((x, idx) => { const dx = x - mxk, dy = totals[idx] - myk; cov += dx * dy; sx += dx * dx; sy += dy * dy; });
-          disc = (sx > 0 && sy > 0) ? cov / Math.sqrt(sx * sy) : null;
-        }
-        let ciLow = null, ciHigh = null;
-        if (graded.length >= 2 && umx > 0) {
-          const pcts = xs.map((x) => (x / umx) * 100);
-          const half = 1.96 * (sdOf(pcts) / Math.sqrt(pcts.length));
-          ciLow = Math.max(0, Math.round(mean(pcts) - half));
-          ciHigh = Math.min(100, Math.round(mean(pcts) + half));
-        }
+        const disc = trennschaerfe(xs, totals);
+        const { ciLow, ciHigh } = konfidenzProzent(xs, umx);
         perUnit.push({ id: u.id, taskId: tk.id, label: u.label || "", avgP: Math.round(avgP * 10) / 10, max: umx, pct: umx ? Math.round((avgP / umx) * 100) : 0, disc, ciLow, ciHigh });
       });
     });
@@ -468,7 +440,7 @@ export default function Klassenarbeit() {
   const wiederholen = async () => {
     if (!work) return;
     setBusy(true);
-    const res = await fetch(`${API}/works/${work.id}/remediate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ threshold: 0.5, cards: kartenAktiv, exercises: lernpfadAktiv }) }).catch(() => null);
+    const res = await fetch(`${API}/works/${work.id}/remediate`, alsJson("POST", { threshold: 0.5, cards: kartenAktiv, exercises: lernpfadAktiv })).catch(() => null);
     setBusy(false);
     if (res && res.ok) { const j = await res.json(); showAlert(t("klassenarbeit.remediateDone", { students: j.students, cards: j.cards_requeued, exercises: j.exercises_created || 0 })); }
     else showAlert(t("common.notWork"));
@@ -632,7 +604,7 @@ export default function Klassenarbeit() {
               <table style={{ borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr>
-                    <th rowSpan={2} style={{ ...th, textAlign: "left", minWidth: 130, position: "sticky", left: 0, zIndex: 2, background: "var(--card)" }}>{t("common.name")}</th>
+                    <th rowSpan={2} style={{ ...th, ...klebtLinks, textAlign: "left", minWidth: 130, zIndex: 2 }}>{t("common.name")}</th>
                     {(work.tasks || []).map((tk, i) => <th key={tk.id} colSpan={units(tk).length + (units(tk).length > 1 ? 1 : 0)} style={{ ...th, minWidth: 46, borderLeft: "1px solid var(--border)" }} title={tk.label}>{tk.label || (i + 1)}</th>)}
                     <th rowSpan={2} style={{ ...th, minWidth: 58, borderLeft: "1px solid var(--border)" }}>Σ / {totalMax()}</th>
                     {/* Note: in der SuS-/Präsentationsansicht unsichtbar, weil das
@@ -668,7 +640,7 @@ export default function Klassenarbeit() {
                     const note = gd ? (gradeMode === "wert" ? String(gd.wert).replace(".", ",") : gd.note) : "";
                     return (
                       <tr key={s.id} style={abw ? { opacity: 0.5 } : undefined}>
-                        <td style={{ ...td, textAlign: "left", padding: "4px 8px", position: "sticky", left: 0, zIndex: 1, background: "var(--card)", fontWeight: 500, whiteSpace: "nowrap" }}>
+                        <td style={{ ...td, ...klebtLinks, textAlign: "left", padding: "4px 8px", fontWeight: 500, whiteSpace: "nowrap" }}>
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                             {/* Anwesenheit: Auge / durchgestrichenes Auge —
                                 „zaehlt in der Auswertung mit" bzw. „bleibt
@@ -735,7 +707,13 @@ export default function Klassenarbeit() {
               </div>
             </div>
           )}
-          {notenModal && <NotenUebernahme t={t} classId={subsetKurs ? repClass.current : classId} kursId={subsetKurs || kursId} students={students} work={work} scale={effScale} onClose={() => setNotenModal(false)} />}
+          {notenModal && (() => {
+            const noten = notenAusArbeit(students, work, effScale);
+            return <NotenUebernahme titel={t("klassenarbeit.toNoten")} hinweis={t("klassenarbeit.toNotenHint", { n: noten.length })}
+              classId={subsetKurs ? repClass.current : classId} kursId={subsetKurs || kursId} grades={noten}
+              quelle="klassenarbeit" notiz={t("klassenarbeit.title")} spalte={work.name || t("klassenarbeit.newName")}
+              onClose={() => setNotenModal(false)} />;
+          })()}
           </>)}
 
           {analyse && (analyse.topics.length > 0 || analyse.students.length > 0 || analyse.perUnit.length > 0 || analyse.noten.n > 0) && (
@@ -921,23 +899,19 @@ export default function Klassenarbeit() {
   );
 }
 
-// In Noten übernehmen: aus der Trefferquote (richtige/gesamt) je SuS eine Note
-// über die Notenskala der Lehrkraft, als neue Spalte im gewählten Abschnitt.
-// Nur SuS mit mind. einer markierten falschen Aufgabe ODER allen richtig — die
-// Spalte ist frei editierbar (Abwesende später herausnehmen).
-function NotenUebernahme({ t, classId, kursId, students, work, scale = DEFAULT_SCALE, onClose }) {
-  const [sectionId, setSectionId] = useState(null);
-  const [name, setName] = useState(work.name || t("klassenarbeit.newName"));
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
+// Brücke Klassenarbeit → Notenbuch. Der Dialog ist derselbe wie bei den
+// Karteikarten (components/NotenUebernahme.jsx); hier steht nur, WIE aus
+// Punkten eine Note wird — das ist die Fachlichkeit dieser Seite.
+//
+// Nur wer erfasst ist: eine noch nicht korrigierte Zeile darf keine 6 ins
+// Notenbuch tragen. Eine bewusst eingetragene 0 zaehlt, ein leeres Feld nicht.
+// Krank/abwesend bekommt ohnehin keine Note.
+function notenAusArbeit(students, work, scale) {
   const uIds = (tk) => (tk.parts && tk.parts.length) ? tk.parts.map((u) => u.id) : [tk.id];
   const uMaxT = (tk) => (tk.parts && tk.parts.length) ? tk.parts.reduce((n, u) => n + (Number(u.max) > 0 ? Number(u.max) : 1), 0) : (Number(tk.max) > 0 ? Number(tk.max) : 1);
   const totalMax = (work.tasks || []).reduce((n, tk) => n + uMaxT(tk), 0);
   const absentU = new Set((work.absent || []).map(String));
-  const grades = students
-    // Nur wer erfasst ist: eine noch nicht korrigierte Zeile darf keine 6 ins
-    // Notenbuch tragen. Eine bewusst eingetragene 0 zaehlt, ein leeres Feld
-    // nicht. Krank/abwesend bekommt ohnehin keine Note.
+  return students
     .filter((s) => {
       if (absentU.has(String(s.id))) return false;
       const r = (work.results || {})[String(s.id)];
@@ -951,30 +925,6 @@ function NotenUebernahme({ t, classId, kursId, students, work, scale = DEFAULT_S
       // Notenwert mit Tendenz (±0,3) — wie in der Excel-Auswertung.
       return { student_id: s.id, value: gradeDetailed(totalMax ? (sum / totalMax) * 100 : 0, scale).wert };
     }).filter((g) => g.value >= 1 && g.value <= 6);
-  const submit = async () => {
-    if (!sectionId) { setErr(t("notenimp.noSection")); return; }
-    setBusy(true); setErr("");
-    const res = await fetch("/api/noten/import-grades", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ class_id: classId, kurs_id: kursId, section_id: Number(sectionId), column_name: name.trim(), note: t("klassenarbeit.title"), source_kind: "klassenarbeit", grades }) }).catch(() => null);
-    setBusy(false);
-    if (res && res.ok) onClose();
-    else { const b = res ? await res.json().catch(() => ({})) : {}; setErr(typeof b.detail === "string" ? b.detail : t("common.notWork")); }
-  };
-  const lbl = { fontSize: 13, color: "var(--text2)", margin: "12px 0 5px" };
-  return (
-    <Modal onClose={onClose} width={440} label={t("klassenarbeit.toNoten")}>
-        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{t("klassenarbeit.toNoten")}</h3>
-        <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 12px" }}>{t("klassenarbeit.toNotenHint", { n: grades.length })}</p>
-        <AbschnittWahl classId={classId} kursId={kursId} value={sectionId} onChange={setSectionId} />
-        <div style={lbl}>{t("noten.columnName")}</div>
-        <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, width: "100%" }} />
-        {err && <p style={{ color: C.danger, fontSize: 13, marginTop: 12 }}>{err}</p>}
-        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-          <button onClick={submit} disabled={busy || grades.length === 0 || !sectionId} style={{ ...btnPrimary, opacity: busy || !sectionId ? 0.6 : 1 }}>{t("common.save")}</button>
-          <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
-        </div>
-    </Modal>
-  );
 }
 
 // ── Vergleich ────────────────────────────────────────────────────────────────
@@ -1329,10 +1279,7 @@ function KopieModal({ work, onClose, onCopy, t }) {
       <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, width: "100%" }} />
 
       {fehler && <p style={{ color: C.danger, fontSize: 13, margin: "10px 0 0" }}>{fehler}</p>}
-      <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-        <button onClick={los} disabled={!classId || busy} style={{ ...btnPrimary, opacity: !classId || busy ? 0.5 : 1 }}>{t("klassenarbeit.copyGo")}</button>
-        <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
-      </div>
+      <DialogFuss onSpeichern={los} onAbbrechen={onClose} aus={!classId || busy} speichern={t("klassenarbeit.copyGo")} />
     </Modal>
   );
 }

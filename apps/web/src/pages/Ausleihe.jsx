@@ -6,6 +6,7 @@ import { AddButton, badge, btnPrimary, btnSecondary, cardStyle, CONTROL_R, selec
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr } from "../core/cache.js";
+import { alsJson, hol } from "../core/melden.js";
 
 const API = "/api/ausleihe";
 const fld = inputStyle; // gemeinsame Texteingabe
@@ -29,7 +30,7 @@ export default function Ausleihe() {
   }, []);
 
   const load = useCallback(() => {
-    fetch(`${API}/items`).then((r) => (r.ok ? r.json() : [])).then((d) => setItems(Array.isArray(d) ? d : [])).catch(() => {});
+    hol(`${API}/items`).then((d) => setItems(Array.isArray(d) ? d : []));
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -37,7 +38,7 @@ export default function Ausleihe() {
 
   const anlegen = async () => {
     const name = neu.trim(); if (!name) return;
-    const r = await fetch(`${API}/items`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }).catch(() => null);
+    const r = await fetch(`${API}/items`, alsJson("POST", { name })).catch(() => null);
     if (r && r.ok) { setNeu(""); load(); }
   };
   const loeschen = (id) => {
@@ -50,15 +51,14 @@ export default function Ausleihe() {
   const oeffnen = (id) => {
     if (offen === id) { setOffen(null); return; }
     setOffen(id); setBorrower(""); setStudentId("");
-    fetch(`${API}/loans?item_id=${id}`).then((r) => (r.ok ? r.json() : [])).then((d) => setLoans(Array.isArray(d) ? d : [])).catch(() => {});
+    hol(`${API}/loans?item_id=${id}`).then((d) => setLoans(Array.isArray(d) ? d : []));
   };
-  const reloadLoans = (id) => fetch(`${API}/loans?item_id=${id}`).then((r) => (r.ok ? r.json() : [])).then((d) => setLoans(Array.isArray(d) ? d : [])).catch(() => {});
+  const reloadLoans = (id) => hol(`${API}/loans?item_id=${id}`).then((d) => setLoans(Array.isArray(d) ? d : []));
 
   const verleihen = async (itemId) => {
     const b = studentId ? "" : borrower.trim();
     if (!studentId && !b) return;
-    const r = await fetch(`${API}/loans`, { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ item_id: itemId, borrower: b, student_id: studentId ? Number(studentId) : null }) }).catch(() => null);
+    const r = await fetch(`${API}/loans`, alsJson("POST", { item_id: itemId, borrower: b, student_id: studentId ? Number(studentId) : null })).catch(() => null);
     if (r && r.ok) { setBorrower(""); setStudentId(""); reloadLoans(itemId); load(); }
   };
   const zurueck = async (loanId, itemId) => { await fetch(`${API}/loans/${loanId}/return`, { method: "PUT" }).catch(() => {}); reloadLoans(itemId); load(); };

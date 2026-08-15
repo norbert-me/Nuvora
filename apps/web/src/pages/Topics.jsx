@@ -13,6 +13,8 @@ import { peek, put } from "../core/cache.js";
 import AutoTextarea from "../components/AutoTextarea.jsx";
 import { Link } from "react-router-dom";
 import { themaZiel } from "../core/themaLinks.js";
+import { useEinfuegen } from "../core/ziehsortieren.js";
+import { alsJson, hol } from "../core/melden.js";
 
 const API = "/api";
 
@@ -27,33 +29,18 @@ export default function Topics() {
   const [childName, setChildName] = useState("");
   const [popup, setPopup] = useState(null); // Thema/Unterthema im Detail-Popup
   const [expanded, setExpanded] = useState(() => new Set());
-  const [dragId, setDragId] = useState(null);
-  const [dragOver, setDragOver] = useState(null); // { id, side: "above"|"below" }
+  // Ziehen zum Umsortieren kommt aus core/ziehsortieren.js — dieselbe Marke
+  // („vor"/„nach") wie bei Kartenstapeln, Karten und Notenbuch-Spalten.
+  const zieh = useEinfuegen();
 
   const toggleExpand = (id) => setExpanded((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-
-  const dragOverRoot = (e, id) => {
-    e.preventDefault();
-    if (!dragId || id === dragId) { setDragOver(null); return; }
-    const r = e.currentTarget.getBoundingClientRect();
-    const side = e.clientY < r.top + r.height / 2 ? "above" : "below";
-    setDragOver((p) => (p && p.id === id && p.side === side ? p : { id, side }));
-  };
 
   // Umsortieren ist eine Änderung wie jede andere: sie sammelt sich im Entwurf
   // und geht erst mit „Speichern" zum Server. Vorher lag jede losgelassene
   // Karte sofort in der Datenbank — ein Verrutschen war nicht zurückzunehmen.
   const dropRoot = (targetId) => {
-    const von = dragId, ov = dragOver;
-    setDragId(null); setDragOver(null);
-    if (!von || von === targetId) return;
-    const ids = [...ordnung.wert.ids];
-    const from = ids.indexOf(von); let to = ids.indexOf(targetId);
-    if (from < 0 || to < 0) return;
-    if (ov && ov.id === targetId && ov.side === "below") to += 1;
-    if (from < to) to -= 1;
-    ids.splice(to, 0, ids.splice(from, 1)[0]);
-    ordnung.setz({ ids });
+    const ids = zieh.ablegen(targetId, ordnung.wert.ids);
+    if (ids) ordnung.setz({ ids });
   };
 
   const load = () =>
@@ -92,14 +79,10 @@ export default function Topics() {
   const idSchluessel = wurzelIds.join(",");
   const basisOrdnung = useMemo(() => ({ ids: idSchluessel ? idSchluessel.split(",").map(Number) : [] }), [idSchluessel]);
   const ordnung = useEntwurf(basisOrdnung, (w) =>
-    call(() => fetch(`${API}/topics/reorder`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: w.ids }) })));
+    call(() => fetch(`${API}/topics/reorder`, alsJson("PUT", { ids: w.ids }))));
 
   const add = (name, parent_id) =>
-    call(() => fetch(`${API}/topics`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, parent_id }),
-    }));
+    call(() => fetch(`${API}/topics`, alsJson("POST", { name, parent_id })));
 
   // Umbenennen laeuft ueber saveTopic (Detail-Popup) — eine Funktion, ein Weg.
   // Wichtig dabei: alle Felder mitschicken, PUT setzt fehlende auf leer. Genau
@@ -107,10 +90,7 @@ export default function Topics() {
   // Ziele und Voraussetzungen weg nach einem Umbenennen).
   // Titel + Notiz speichern (aus dem Detail-Popup). Leerer Titel behält den alten.
   const saveTopic = (tp, name, notes, zielG, zielE, voraussetzungen) =>
-    call(() => fetch(`${API}/topics/${tp.id}`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: (name || "").trim() || tp.name, parent_id: tp.parent_id, notes, ziel_g: zielG || "", ziel_e: zielE || "", voraussetzungen: voraussetzungen || "" }),
-    }));
+    call(() => fetch(`${API}/topics/${tp.id}`, alsJson("PUT", { name: (name || "").trim() || tp.name, parent_id: tp.parent_id, notes, ziel_g: zielG || "", ziel_e: zielE || "", voraussetzungen: voraussetzungen || "" })));
 
   const remove = async (tp) => {
     const kids = topics.filter((x) => x.parent_id === tp.id);
@@ -155,14 +135,14 @@ export default function Topics() {
     const isRoot = depth === 0;
     const canHaveKids = depth < MAX_DEPTH;                 // neues Unterthema erlauben?
     const subCount = childrenOf(tp.id).length;             // vorhandene Kinder immer zeigen
-    const over = isRoot && dragId && dragOver && dragOver.id === tp.id;
+    const seite = isRoot ? zieh.seite(tp.id) : null;
     return (
     <div
       key={tp.id}
       draggable={isRoot}
-      onDragStart={isRoot ? () => setDragId(tp.id) : undefined}
-      onDragOver={isRoot ? (e) => dragOverRoot(e, tp.id) : undefined}
-      onDragEnd={isRoot ? () => { setDragId(null); setDragOver(null); } : undefined}
+      onDragStart={isRoot ? () => zieh.start(tp.id) : undefined}
+      onDragOver={isRoot ? (e) => zieh.ueber(e, tp.id) : undefined}
+      onDragEnd={isRoot ? zieh.beenden : undefined}
       onDrop={isRoot ? () => dropRoot(tp.id) : undefined}
       style={{
         // Thema = Karte (cardStyle), Unterthema = flachere Zeile mit
@@ -174,9 +154,9 @@ export default function Topics() {
         borderRadius: isChild ? CONTROL_R : cardStyle.borderRadius,
         background: isChild ? "var(--bg)" : "var(--card)",
         cursor: isRoot ? "grab" : "default",
-        opacity: dragId === tp.id ? 0.4 : 1,
-        borderTop: over && dragOver.side === "above" ? "3px solid var(--accent)" : undefined,
-        borderBottom: over && dragOver.side === "below" ? "3px solid var(--accent)" : undefined,
+        opacity: zieh.zieht === tp.id ? 0.4 : 1,
+        borderTop: seite === "vor" ? "3px solid var(--accent)" : undefined,
+        borderBottom: seite === "nach" ? "3px solid var(--accent)" : undefined,
       }}
     >
       {canHaveKids ? (
@@ -319,7 +299,7 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
   useEffect(() => {
     if (!open || usage) return;
     fetch(`/api/topics/${tp.id}/usage`).then((r) => (r.ok ? r.json() : null)).then(setUsage).catch(() => setUsage(null));
-    fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).then((d) => setClasses(Object.fromEntries((Array.isArray(d) ? d : []).map((c) => [c.id, c.name])))).catch(() => {});
+    hol("/api/classes").then((d) => setClasses(Object.fromEntries((Array.isArray(d) ? d : []).map((c) => [c.id, c.name]))));
   }, [open]);
 
   // Der Dialog ist der zweite Weg hinaus: ohne Nachfrage wäre alles Getippte

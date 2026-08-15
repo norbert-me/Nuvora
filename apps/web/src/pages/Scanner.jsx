@@ -7,6 +7,7 @@ import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/index.jsx";
 import { lies } from "../core/speicher.js";
+import { alsJson } from "../core/melden.js";
 
 const API = "/api";
 // Antwortfarben kommen aus dem Kern (ANTWORT_COLORS) — die Kopie hier war die
@@ -269,14 +270,10 @@ export default function Scanner() {
       setStatus(t("scanner.detected", { count: data.cards.length }) + (confirmed.length > 0 ? ` · ${confirmed.length} ${t("scanner.confirmed")}` : ""));
 
       if (confirmed.length > 0) {
-        await fetch(`${API}/scan-confirm`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        await fetch(`${API}/scan-confirm`, alsJson("POST", {
             session_id: resolvedIdRef.current,
             scans: confirmed.map((c) => ({ marker_id: c.marker_id, answer: c.answer })),
-          }),
-        });
+          }));
 
         setLastCards((prev) => {
           const updated = [...prev];

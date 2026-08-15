@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { COLORS as C, badge, cardStyle, chipStyle, sectionLabel, CONTROL_R } from "./Icons.jsx";
 import { useEmpfindlich } from "../core/fruehwarnung.js";
 import { useLanguage } from "../i18n/index.jsx";
+import { hol } from "../core/melden.js";
 
 /**
  * Abstand zur Klasse je Test, als kleine Balkenreihe um eine Nulllinie.
@@ -165,10 +166,8 @@ export default function FruehwarnPanel({ classId, nurKind = null, titel = true }
   useEffect(() => {
     if (!classId) return;
     let ab = false;
-    fetch(`/api/classes/${classId}/fruehwarnung?empfindlich=${empfindlich ? "true" : "false"}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (!ab) setDaten(d); })
-      .catch(() => {});
+    hol(`/api/classes/${classId}/fruehwarnung?empfindlich=${empfindlich ? "true" : "false"}`, null)
+      .then((d) => { if (!ab) setDaten(d); });
     return () => { ab = true; };
   }, [classId, empfindlich]);
 

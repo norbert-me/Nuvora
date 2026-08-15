@@ -2,6 +2,7 @@ import { useState } from "react";
 import { COLORS as C, cardStyle, inputStyle as feld, btnPrimary as knopf, pageForm, SHADOW } from "../components/Icons.jsx";
 
 import { useLanguage } from "../i18n/index.jsx";
+import { alsJson } from "../core/melden.js";
 
 const API = "/api";
 
@@ -20,10 +21,7 @@ export default function ResetPassword() {
     if (pw.length < 8) { setError(t("reset.tooShort")); return; }
     if (pw !== pw2) { setError(t("reset.mismatch")); return; }
     try {
-      const res = await fetch(`${API}/auth/reset-password`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, new_password: pw }),
-      });
+      const res = await fetch(`${API}/auth/reset-password`, alsJson("POST", { token, new_password: pw }));
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.detail || t("reset.error")); return; }
       setDone(true);
