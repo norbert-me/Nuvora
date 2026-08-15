@@ -6,7 +6,7 @@ Thema ist ON DELETE SET NULL, damit das Loeschen eines Themas keinen Eintrag
 mitreisst.
 """
 import re
-from datetime import datetime, date, timedelta, timezone
+from datetime import datetime, date, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,6 +14,11 @@ from pydantic import BaseModel, Field, model_validator, field_validator
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..zeit import tagesbeginn
+from ..felder import ohne_leer, ohne_none
+# `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
+# der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
+from ..besitz import eigenes
 from ..database import get_db
 from ..importe import geprueft
 from ..models import CalendarBreak, CalendarEntry, CardDeck, ExamDate, Kurs, SchoolClass, TimetableSlot, SlotCancellation, Topic, User, WorkAnalysis, Session as TestSession
@@ -178,9 +183,7 @@ async def create_entry(body: EntryIn, user: User = Depends(require_module), db: 
 
 @router.put("/entries/{entry_id}", response_model=EntryOut)
 async def update_entry(entry_id: int, body: EntryIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    e = await db.get(CalendarEntry, entry_id)
-    if not e or e.owner_id != user.id:
-        raise HTTPException(404, "Eintrag nicht gefunden")
+    e = await eigenes(db, CalendarEntry, entry_id, user, "Eintrag nicht gefunden")
     await _check_class(db, user, body.class_id)
     await _check_kurs(db, user, body.kurs_id)
     await _check_topic(db, user, body.topic_id)
@@ -193,13 +196,10 @@ async def update_entry(entry_id: int, body: EntryIn, user: User = Depends(requir
     return e
 
 
-def _tagesbeginn(dt) -> datetime:
-    """Beginn des Kalendertags (UTC). Eintraege sind auf die Tagesmitte verankert;
-    wer daraus direkt ein released_at macht, schaltet den Stapel erst am Nachmittag
-    frei — die Stunde am Vormittag sieht ihn nicht. Freigegeben wird AB TAGESBEGINN.
-    (Gleiche Funktion in karten.py — kein Modul haengt am anderen, Regel 3.)"""
-    d = dt.date() if isinstance(dt, datetime) else dt
-    return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+# Stand hier und in karten.py wortgleich, mit dem Vermerk „Regel 3". Die
+# Rechnung liegt jetzt im KERN (app/zeit.py) — damit haengt weiterhin kein Modul
+# am anderen, und es gibt nur noch einen Tagesbeginn.
+_tagesbeginn = tagesbeginn
 
 
 async def _release_matching_decks(db: AsyncSession, user: User, e: CalendarEntry) -> None:
@@ -324,15 +324,9 @@ class ImportSlot(BaseModel):
     title: str = ""
     model_config = {"populate_by_name": True}
 
-    @field_validator("weekday", "period", mode="before")
-    @classmethod
-    def _leer_zahl(cls, v):
-        return None if v == "" else v
+    _leer_zahl = field_validator("weekday", "period", mode="before")(ohne_leer(None, ("",)))
 
-    @field_validator("title", mode="before")
-    @classmethod
-    def _leer_text(cls, v):
-        return "" if v is None else v
+    _leer_text = field_validator("title", mode="before")(ohne_none(""))
 
     @field_validator("weekday")
     @classmethod
@@ -354,10 +348,9 @@ class ImportTimetable(BaseModel):
     times: Optional[list] = None
     slots: Optional[List[ImportSlot]] = None
 
-    @field_validator("periods", mode="before")
-    @classmethod
-    def _leer_zahl(cls, v):
-        return None if v in ("", 0) else v
+    # Hier zaehlt auch die 0 als „nichts angegeben" — deshalb ohne_leer mit
+    # eigener Liste und nicht die Standardfassung.
+    _leer_zahl = field_validator("periods", mode="before")(ohne_leer(None, ("", 0)))
 
     @field_validator("periods")
     @classmethod
@@ -373,10 +366,7 @@ class ImportBreak(BaseModel):
     end_date: Optional[datetime] = None
     label: str = ""
 
-    @field_validator("label", mode="before")
-    @classmethod
-    def _leer_text(cls, v):
-        return "" if v is None else v
+    _leer_text = field_validator("label", mode="before")(ohne_none(""))
 
 
 class ImportKalEntry(BaseModel):
@@ -388,15 +378,9 @@ class ImportKalEntry(BaseModel):
     topic: Optional[str] = None
     model_config = {"populate_by_name": True}
 
-    @field_validator("title", "notes", mode="before")
-    @classmethod
-    def _leer_text(cls, v):
-        return "" if v is None else v
+    _leer_text = field_validator("title", "notes", mode="before")(ohne_none(""))
 
-    @field_validator("period", mode="before")
-    @classmethod
-    def _leer_zahl(cls, v):
-        return None if v == "" else v
+    _leer_zahl = field_validator("period", mode="before")(ohne_leer(None, ("",)))
 
 
 class KalenderImport(BaseModel):
@@ -407,15 +391,9 @@ class KalenderImport(BaseModel):
     breaks: List[ImportBreak] = []
     entries: List[ImportKalEntry] = []
 
-    @field_validator("timetable", mode="before")
-    @classmethod
-    def _leer_tt(cls, v):
-        return {} if v is None else v
+    _leer_tt = field_validator("timetable", mode="before")(ohne_none({}))
 
-    @field_validator("breaks", "entries", mode="before")
-    @classmethod
-    def _leer_liste(cls, v):
-        return [] if v is None else v
+    _leer_liste = field_validator("breaks", "entries", mode="before")(ohne_none([]))
 
 
 @router.post("/import")
@@ -512,18 +490,14 @@ async def create_break(body: BreakIn, user: User = Depends(require_module), db: 
 
 @router.delete("/breaks/{break_id}", status_code=204)
 async def delete_break(break_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    b = await db.get(CalendarBreak, break_id)
-    if not b or b.owner_id != user.id:
-        raise HTTPException(404, "Zeitraum nicht gefunden")
+    b = await eigenes(db, CalendarBreak, break_id, user, "Zeitraum nicht gefunden")
     await db.delete(b)
     await db.commit()
 
 
 @router.delete("/entries/{entry_id}", status_code=204)
 async def delete_entry(entry_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    e = await db.get(CalendarEntry, entry_id)
-    if not e or e.owner_id != user.id:
-        raise HTTPException(404, "Eintrag nicht gefunden")
+    e = await eigenes(db, CalendarEntry, entry_id, user, "Eintrag nicht gefunden")
     # Haengt eine Klassenarbeit an diesem Eintrag, geht sie mit: sonst bleibt der
     # Termin in der Klassenarbeits-Uebersicht (und zaehlt Stunden), obwohl er im
     # Kalender geloescht wurde. Eine bereits befuellte Auswertung bleibt (Live-Daten).
@@ -647,9 +621,7 @@ async def _korrektur_todo(db, user, e: ExamDate, verschieben: bool = False) -> N
 
 @router.put("/klassenarbeiten/{exam_id}", response_model=ExamOut)
 async def update_exam(exam_id: int, body: ExamIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    e = await db.get(ExamDate, exam_id)
-    if not e or e.owner_id != user.id:
-        raise HTTPException(404, "Klassenarbeit nicht gefunden")
+    e = await eigenes(db, ExamDate, exam_id, user, "Klassenarbeit nicht gefunden")
     await _check_class(db, user, body.class_id)
     await _check_kurs(db, user, body.kurs_id)
     for k, v in body.model_dump().items():
@@ -678,9 +650,7 @@ async def update_exam(exam_id: int, body: ExamIn, user: User = Depends(require_m
 
 @router.delete("/klassenarbeiten/{exam_id}", status_code=204)
 async def delete_exam(exam_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    e = await db.get(ExamDate, exam_id)
-    if not e or e.owner_id != user.id:
-        raise HTTPException(404, "Klassenarbeit nicht gefunden")
+    e = await eigenes(db, ExamDate, exam_id, user, "Klassenarbeit nicht gefunden")
     # Auch den automatisch erzeugten Kalendereintrag entfernen.
     if e.entry_id:
         entry = await db.get(CalendarEntry, e.entry_id)
@@ -941,9 +911,7 @@ async def upsert_slot(body: SlotIn, user: User = Depends(require_module), db: As
 
 @router.delete("/timetable/slot/{slot_id}", status_code=204)
 async def delete_slot(slot_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    s = await db.get(TimetableSlot, slot_id)
-    if not s or s.owner_id != user.id:
-        raise HTTPException(404, "Stunde nicht gefunden")
+    s = await eigenes(db, TimetableSlot, slot_id, user, "Stunde nicht gefunden")
     today = date.today()
     vf = s.valid_from.date() if isinstance(s.valid_from, datetime) else s.valid_from
     if vf is not None and vf >= today:

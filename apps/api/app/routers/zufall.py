@@ -11,8 +11,9 @@ from pydantic import BaseModel
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..besitz import klasse_oder_403
 from ..database import get_db
-from ..models import SchoolClass, Student, User, ZufallDraw
+from ..models import Student, User, ZufallDraw
 from .modules import modul_pflicht
 
 router = APIRouter(prefix="/api/zufall", tags=["zufall"])
@@ -22,13 +23,10 @@ MODULE_KEY = "zufall"
 require_module = modul_pflicht(MODULE_KEY)
 
 
-async def _owned_class(db, user, class_id) -> SchoolClass:
-    sc = await db.get(SchoolClass, class_id)
-    if not sc:
-        raise HTTPException(404, "Klasse nicht gefunden")
-    if sc.owner_id and sc.owner_id != user.id:
-        raise HTTPException(403, "Keine Berechtigung")
-    return sc
+# Frueher stand die Klassenpruefung in fuenf Routern wortgleich; jetzt eine
+# Quelle (app/besitz.py). Der alte Name bleibt, damit die Aufrufer unberuehrt
+# sind.
+_owned_class = klasse_oder_403
 
 
 class DrawIn(BaseModel):

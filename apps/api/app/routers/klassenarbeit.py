@@ -9,13 +9,17 @@ passiert dort nichts.
 """
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..besitz import eigenes, klasse_oder_403, kurs_oder_klasse
 from ..database import get_db
-from ..models import WorkAnalysis, SchoolClass, Student, Topic, User
+# `roster_kurs` heisst hier unten schon ein Endpunkt — deshalb umbenannt
+# importiert, sonst ueberdeckt der Endpunkt den Helfer.
+from ..schueler import roster_klasse, roster_kurs as _kanon_kurs
+from ..models import WorkAnalysis, Student, Topic, User
 from .auth import rate_limit
 from .modules import is_active, modul_pflicht
 
@@ -26,31 +30,19 @@ MODULE_KEY = "auswertung"
 require_module = modul_pflicht(MODULE_KEY)
 
 
-async def _owned_class(db, user, class_id) -> SchoolClass:
-    sc = await db.get(SchoolClass, class_id)
-    if not sc:
-        raise HTTPException(404, "Klasse nicht gefunden")
-    if sc.owner_id and sc.owner_id != user.id:
-        raise HTTPException(403, "Keine Berechtigung")
-    return sc
+# Frueher stand die Klassenpruefung in fuenf Routern wortgleich; jetzt eine
+# Quelle (app/besitz.py). Der alte Name bleibt, damit die Aufrufer unberuehrt
+# sind.
+_owned_class = klasse_oder_403
 
 
 async def _owned_work(db, user, work_id) -> WorkAnalysis:
-    w = await db.get(WorkAnalysis, work_id)
-    if not w or w.owner_id != user.id:
-        raise HTTPException(404, "Arbeit nicht gefunden")
-    return w
+    return await eigenes(db, WorkAnalysis, work_id, user, "Arbeit nicht gefunden")
 
 
-async def _roster(db, class_id):
-    """Kanonische SuS des Kurses (gleichnamige Fach-Klassen-SuS dedupliziert)."""
-    from .kurse import sibling_class_ids
-    sib = await sibling_class_ids(db, class_id)
-    studs = (await db.execute(select(Student).where(Student.class_id.in_(sib)).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
-    canon = {}
-    for s in studs:
-        canon.setdefault(s.name.strip(), s)
-    return sorted(canon.values(), key=lambda s: (s.position or 0, s.card_id, s.id))
+# Der kanonische Roster stand hier und in results.py Zeile fuer Zeile gleich;
+# er lebt jetzt in app/schueler.py. Der alte Name bleibt als Durchgriff.
+_roster = roster_klasse
 
 
 class WorkIn(BaseModel):
@@ -83,10 +75,13 @@ class WorkOut(BaseModel):
 
 
 def _keyw(user, class_id, kurs_id):
-    """Liste von WHERE-Bedingungen (unterschiedlich lang) — immer per * entpackt."""
-    if kurs_id is not None:
-        return [WorkAnalysis.owner_id == user.id, WorkAnalysis.kurs_id == kurs_id]
-    return [WorkAnalysis.owner_id == user.id, WorkAnalysis.class_id == class_id, WorkAnalysis.kurs_id.is_(None)]
+    """Arbeit haengt am Kurs (Fach); Fallback Klasse ohne Kurs.
+
+    Die Schluesselregel steht seit dem Zusammenfuehren in
+    `app/besitz.kurs_oder_klasse` — sie lag fuenfmal als eigenes `_key_where`
+    herum und unterschied sich nur im Modell. Liste von WHERE-Bedingungen
+    (unterschiedlich lang) — immer per * entpackt."""
+    return kurs_oder_klasse(WorkAnalysis, user, class_id, kurs_id)
 
 
 @router.get("/classes/{class_id}/students")
@@ -99,16 +94,9 @@ async def roster(class_id: int, user: User = Depends(require_module), db: AsyncS
 async def roster_kurs(kurs_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """SuS eines Kurses — inkl. der EINZELN hinzugefügten (Kurse aus Teilen von
     Klassen). Deduplikat per Name wie beim Klassen-Roster."""
-    from .kurse import _owned_kurs, member_student_ids
+    from .kurse import _owned_kurs
     await _owned_kurs(db, user, kurs_id)
-    sids = list(await member_student_ids(db, kurs_id))
-    if not sids:
-        return []
-    studs = (await db.execute(select(Student).where(Student.id.in_(sids)).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
-    canon = {}
-    for s in studs:
-        canon.setdefault(s.name.strip(), s)
-    return [{"id": s.id, "name": s.name, "class_id": s.class_id} for s in sorted(canon.values(), key=lambda s: (s.position or 0, s.card_id, s.id))]
+    return [{"id": s.id, "name": s.name, "class_id": s.class_id} for s in await _kanon_kurs(db, kurs_id)]
 
 
 @router.get("/classes/{class_id}/works", response_model=List[WorkOut])

@@ -27,7 +27,11 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..besitz import eigene_klasse, eigenes
+from ..zeit import als_utc, jetzt, tagesbeginn
+from ..pdfdruck import neue_seite
 from ..database import get_db
+from ..schueler import roster_kurs, sortiert
 from ..uploads import bildtyp
 from sqlalchemy.orm import selectinload
 from ..models import (Card, CardDeck, CardDeckKurs, CardFolder, CardReview, Kurs,
@@ -43,21 +47,10 @@ kern_router = APIRouter(prefix="/api/karten", tags=["karten"])
 MODULE_KEY = "karten"
 
 
-def _now():
-    return datetime.now(timezone.utc)
-
-
-def _utc(dt):
-    """Zeitstempel vergleichbar machen.
-
-    Postgres liefert TIMESTAMPTZ mit Zeitzone zurueck, SQLite (Tests, lokale
-    Pruefinstanz) ohne — ein Vergleich mit datetime.now(timezone.utc) wirft dann
-    "can't compare offset-naive and offset-aware datetimes", und zwar erst zur
-    Laufzeit auf dem Geraet eines Kindes.
-    """
-    if dt is not None and dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt
+# „Jetzt" und „mit Zeitzone" stehen im Kern (app/zeit.py); die alten Namen
+# bleiben, damit die vielen Aufrufer unberuehrt sind.
+_now = jetzt
+_utc = als_utc
 
 
 def _anlegen_falls_fehlt(db: AsyncSession, modell, werte: dict, schluessel: list[str]):
@@ -99,16 +92,8 @@ def _token():
     return secrets.token_urlsafe(24)  # ~32 Zeichen, unratbar
 
 
-def _tagesbeginn(dt: datetime) -> datetime:
-    """Beginn des Kalendertags (UTC). Kalender-Eintraege sind auf die Tagesmitte
-    verankert; wer daraus direkt ein released_at macht, schaltet den Stapel erst
-    am Nachmittag frei — die Stunde am Vormittag sieht ihn nicht. Freigegeben
-    wird darum AB TAGESBEGINN.
-
-    Bewusst hier dupliziert (gleiche Funktion in kalender.py): kein Modul haengt
-    am anderen (Regel 3)."""
-    d = dt.date() if isinstance(dt, datetime) else dt
-    return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+# Stand hier und in kalender.py wortgleich; liegt jetzt im KERN (app/zeit.py).
+_tagesbeginn = tagesbeginn
 
 
 # SM-2-Grenzen. Ohne Deckel waechst der Erleichterungsfaktor bei jedem „leicht"
@@ -145,20 +130,15 @@ def _empty_hist() -> dict:
 require_module = modul_pflicht(MODULE_KEY)
 
 
-async def _owned_class(db, user, class_id) -> SchoolClass:
-    r = await db.execute(select(SchoolClass).where(SchoolClass.id == class_id, SchoolClass.owner_id == user.id))
-    cls = r.scalar_one_or_none()
-    if not cls:
-        raise HTTPException(404, "Klasse nicht gefunden")
-    return cls
+# Frueher stand die strenge Klassenpruefung hier und in noten.py doppelt;
+# jetzt eine Quelle (app/besitz.py).
+_owned_class = eigene_klasse
 
 
 async def _owned_deck(db, user, deck_id) -> CardDeck:
-    r = await db.execute(select(CardDeck).where(CardDeck.id == deck_id, CardDeck.owner_id == user.id))
-    d = r.scalar_one_or_none()
-    if not d:
-        raise HTTPException(404, "Stapel nicht gefunden")
-    return d
+    # Bewusst OHNE weich=True: die Papierkorb-Wege fassen genau den geloeschten
+    # Stapel an.
+    return await eigenes(db, CardDeck, deck_id, user, "Stapel nicht gefunden")
 
 
 async def _kurs_roster(db, user, class_id, subset_kurs=None):
@@ -173,16 +153,13 @@ async def _kurs_roster(db, user, class_id, subset_kurs=None):
     ArUco-Karte, keine Reihenfolge: nach ihr sortiert stünde die Liste hier
     anders als überall sonst, sobald die Lehrkraft umsortiert hat."""
     if subset_kurs is not None:
-        from .kurse import member_student_ids
-        sids = list(await member_student_ids(db, subset_kurs))
-        if not sids:
-            return []
-        studs = (await db.execute(select(Student).where(Student.id.in_(sids)).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
-        canon = {}
-        for s in studs:
-            canon.setdefault(s.name.strip(), s)
-        return sorted(canon.values(), key=lambda s: (s.position or 0, s.card_id, s.id))
-    return (await db.execute(select(Student).where(Student.class_id == class_id).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
+        # Derselbe Kurs-Roster wie in noten.py und klassenarbeit.py — er steht
+        # seit dem Zusammenfuehren in app/schueler.py.
+        return await roster_kurs(db, subset_kurs)
+    # OHNE Kurs bewusst NUR diese eine Fach-Klasse, nicht die Geschwister:
+    # Karten-Fortschritt wird je Fach gefuehrt (siehe oben). Sieht aus wie der
+    # Klassen-Roster der anderen Module, meint aber etwas anderes.
+    return await sortiert(db, Student.class_id == class_id)
 
 
 # ─── Wer sieht welchen Stapel? ───
@@ -424,10 +401,7 @@ class CardFolderOut(BaseModel):
 
 
 async def _owned_card_folder(db, user, folder_id):
-    f = await db.get(CardFolder, folder_id)
-    if not f or f.owner_id != user.id:
-        raise HTTPException(404, "Ordner nicht gefunden")
-    return f
+    return await eigenes(db, CardFolder, folder_id, user, "Ordner nicht gefunden")
 
 
 def _folder_scope(class_id, kurs_id):
@@ -494,15 +468,23 @@ async def delete_card_folder(folder_id: int, user: User = Depends(require_module
     await db.commit()
 
 
-@router.get("/classes/{class_id}/decks", response_model=List[DeckOut])
-async def list_decks(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    cls = await _owned_class(db, user, class_id)
-    from sqlalchemy.orm import selectinload
+async def _aktive_decks(db, user, bereich):
+    """Nicht geloeschte Stapel eines Bereichs, fertig fuer die Ausgabe.
+
+    Stand zweimal wortgleich in /decks und /all-decks; der einzige Unterschied
+    war die Bereichsbedingung (Kurs bzw. ganze Klasse) — die kommt jetzt herein.
+    """
     r = await db.execute(
-        select(CardDeck).where(CardDeck.owner_id == user.id, await _kurs_decks_where(cls, kurs_id), CardDeck.deleted_at.is_(None))
+        select(CardDeck).where(CardDeck.owner_id == user.id, bereich, CardDeck.deleted_at.is_(None))
         .options(selectinload(CardDeck.cards)).order_by(CardDeck.position, CardDeck.id)
     )
     return await _decks_out(db, r.scalars().all())
+
+
+@router.get("/classes/{class_id}/decks", response_model=List[DeckOut])
+async def list_decks(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    cls = await _owned_class(db, user, class_id)
+    return await _aktive_decks(db, user, await _kurs_decks_where(cls, kurs_id))
 
 
 @router.get("/classes/{class_id}/all-decks", response_model=List[DeckOut])
@@ -510,12 +492,7 @@ async def list_all_decks(class_id: int, user: User = Depends(require_module), db
     """Alle Stapel der Klasse (kursübergreifend) — für die Kalender-Deck-Auswahl,
     damit auch Kurs-Stapel erscheinen (nicht nur die ohne Kurs)."""
     await _owned_class(db, user, class_id)
-    from sqlalchemy.orm import selectinload
-    r = await db.execute(
-        select(CardDeck).where(CardDeck.owner_id == user.id, await _class_all_decks_where(db, class_id), CardDeck.deleted_at.is_(None))
-        .options(selectinload(CardDeck.cards)).order_by(CardDeck.position, CardDeck.id)
-    )
-    return await _decks_out(db, r.scalars().all())
+    return await _aktive_decks(db, user, await _class_all_decks_where(db, class_id))
 
 
 @router.get("/classes/{class_id}/decks/trash", response_model=List[DeckOut])
@@ -748,33 +725,34 @@ class DeckReorderIn(BaseModel):
     ids: List[int]
 
 
-@router.put("/decks/reorder", status_code=204)
-async def reorder_collection(body: DeckReorderIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    """Reihenfolge in der Sammlung setzen (nur eigene Stapel)."""
-    rows = (await db.execute(select(CardDeck).where(CardDeck.owner_id == user.id))).scalars().all()
+async def _reihenfolge_setzen(db, ids, *bedingungen):
+    """Position der Stapel aus der ID-Liste setzen; Unbekanntes wird uebergangen.
+
+    Stand zweimal wortgleich (Sammlung und Klasse); der einzige Unterschied war
+    die Auswahl der Stapel — die kommt jetzt als Bedingung herein.
+    """
+    rows = (await db.execute(select(CardDeck).where(*bedingungen))).scalars().all()
     by_id = {d.id: d for d in rows}
     pos = 0
-    for did in body.ids:
+    for did in ids:
         d = by_id.get(did)
         if d is not None:
             d.position = pos
             pos += 1
     await db.commit()
+
+
+@router.put("/decks/reorder", status_code=204)
+async def reorder_collection(body: DeckReorderIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Reihenfolge in der Sammlung setzen (nur eigene Stapel)."""
+    await _reihenfolge_setzen(db, body.ids, CardDeck.owner_id == user.id)
 
 
 @router.put("/classes/{class_id}/decks/reorder", status_code=204)
 async def reorder_decks(class_id: int, body: DeckReorderIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Reihenfolge der Stapel der Klasse anhand der ID-Liste setzen (nur eigene)."""
     await _owned_class(db, user, class_id)
-    rows = (await db.execute(select(CardDeck).where(CardDeck.class_id == class_id, CardDeck.owner_id == user.id))).scalars().all()
-    by_id = {d.id: d for d in rows}
-    pos = 0
-    for did in body.ids:
-        d = by_id.get(did)
-        if d is not None:
-            d.position = pos
-            pos += 1
-    await db.commit()
+    await _reihenfolge_setzen(db, body.ids, CardDeck.class_id == class_id, CardDeck.owner_id == user.id)
 
 
 @router.put("/decks/{deck_id}", response_model=DeckOut)
@@ -1124,10 +1102,8 @@ async def zugaenge_pdf(class_id: int, base: str = "", subset_kurs: Optional[int]
     kann (kein Handy, kaputte Kamera), tippt ihn ab.
     """
     from io import BytesIO
-    from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
     from reportlab.lib.utils import ImageReader
-    from reportlab.pdfgen import canvas as pdf_canvas
     from .modules import is_active
 
     karten_an = await is_active(db, user.id, "karten")
@@ -1151,8 +1127,8 @@ async def zugaenge_pdf(class_id: int, base: str = "", subset_kurs: Optional[int]
         basis = ""
 
     puffer = BytesIO()
-    c = pdf_canvas.Canvas(puffer, pagesize=A4)
-    breite, hoehe = A4
+    # A4-Leinwand aus app/pdfdruck.py — dieselben Zeilen standen an acht Stellen.
+    c, breite, hoehe = neue_seite(puffer)
     spalten, zeilen = 2, 4                      # acht Zettel je Seite
     feld_b, feld_h = breite / spalten, (hoehe - 20 * mm) / zeilen
 

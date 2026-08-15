@@ -10,7 +10,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ..scoring import bewerte, status_of
+# Die Standard-Notenskala stand hier ein zweites Mal (wortgleich, nur ohne
+# Unterstrich im Namen) und in noten.py ein drittes Mal mit Text-Schluesseln.
+# Es gibt eine: die in scoring.py, wo auch gerechnet wird.
+from ..scoring import DEFAULT_SCALE, bewerte, status_of
+from ..schueler import sortiert
+from ..pdfdruck import als_anhang, neue_seite
 from ..database import get_db
 from ..importe import geprueft
 from ..models import SchoolClass, Student, QuestionSet, QuestionSetItem, Question, Session, Scan, Folder, User
@@ -47,6 +52,124 @@ async def _quiz_flags(db, session):
     if not qs:
         return False, False
     return bool(qs.niveau_aktiv), bool(qs.minuspunkte)
+
+
+async def _session_items(db, session):
+    """Die Set-Eintraege einer Session in Reihenfolge — eine Abfrage, vier Stellen."""
+    if not session.question_set_id:
+        return []
+    result = await db.execute(
+        select(QuestionSetItem)
+        .options(selectinload(QuestionSetItem.question))
+        .where(QuestionSetItem.question_set_id == session.question_set_id)
+        .order_by(QuestionSetItem.position)
+    )
+    return list(result.scalars().all())
+
+
+async def _session_questions(db, session):
+    """Fragen einer Session als ORM-Objekte, mit gemischter Loesung und Niveau.
+
+    Stand wortgleich in evaluation_xlsx und evaluation_scsv. Die beiden
+    Zusatzfelder haengen bewusst am Objekt (nicht in der DB): sie gelten nur
+    fuer diese Session, weil question_map die Antworten gemischt hat."""
+    questions = []
+    qmap = session.question_map or {}
+    for item in await _session_items(db, session):
+        q = item.question
+        q._shuffled_correct = qmap.get(str(q.id), q.correct_answer)
+        q._niveau = item.niveau or ""
+        questions.append(q)
+    return questions
+
+
+async def _session_question_dicts(db, session):
+    """Fragen einer Session als Dicts mit Text — fuer die PDFs.
+
+    Stand wortgleich in student_evaluation_pdf und all_students_pdf. Die
+    aehnlich aussehende Fassung in results.py hat kein "text" (andere
+    Nutzlast) und bleibt bewusst getrennt."""
+    qmap = session.question_map or {}
+    return [
+        {"id": item.question.id, "text": item.question.text,
+         "correct_answer": qmap.get(str(item.question.id), item.question.correct_answer),
+         "niveau": item.niveau or ""}
+        for item in await _session_items(db, session)
+    ]
+
+
+def _question_snapshot(item) -> dict:
+    """Eine Frage als Datei-Abbild (Export von Set und Ordner).
+
+    Stand wortgleich in export_question_set und _export_folder_recursive.
+    Der aehnliche Schnappschuss in marketplace.py laesst "niveau" bewusst
+    weg — Marktplatz-Fragen tragen kein E/G — und bleibt getrennt."""
+    q = item.question
+    return {
+        "niveau": item.niveau or "",
+        "text": q.text,
+        "choices": q.choices,
+        "correct_answer": q.correct_answer,
+        "image_url": q.image_url,
+        "image_layout": q.image_layout,
+        "num_choices": q.num_choices,
+        "choice_images": q.choice_images,
+    }
+
+
+def _question_from_import(qdata, owner_id) -> Question:
+    """Frage aus einer Importdatei. Stand wortgleich in import_question_set
+    und _import_folder_recursive."""
+    return Question(
+        text=qdata.text,
+        choices=qdata.choices,
+        correct_answer=qdata.correct_answer,
+        image_url=qdata.image_url,
+        image_layout=qdata.image_layout,
+        num_choices=qdata.num_choices,
+        choice_images=qdata.choice_images,
+        owner_id=owner_id,
+    )
+
+
+XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _xlsx_response(wb, filename: str) -> StreamingResponse:
+    """Arbeitsmappe als Download. Stand dreimal wortgleich, nur der Dateiname
+    war verschieden."""
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type=XLSX_MEDIA,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _xlsx_template(title: str, headers: list, ausrichten: bool = False):
+    """Leere Vorlage mit formatierter Kopfzeile (Workbook + ws).
+
+    Stand zweimal fast wortgleich; die Klassenvorlage richtet ihre Kopfzeile
+    zusaetzlich aus, die Fragenvorlage nicht — deshalb der Schalter, damit
+    beide Dateien Zelle fuer Zelle bleiben, was sie waren."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = title
+
+    header_font = Font(bold=True, size=11)
+    header_fill = PatternFill(fgColor="F5F5F7", fill_type="solid")
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        if ausrichten:
+            cell.alignment = Alignment(horizontal="center" if col == 1 else "left")
+    return wb, ws
 
 
 # --- Export ---
@@ -95,19 +218,7 @@ async def export_question_set(set_id: int, user: User = Depends(get_current_user
         "shuffle_answers": qs.shuffle_answers,
         "niveau_aktiv": bool(qs.niveau_aktiv),
         "minuspunkte": bool(qs.minuspunkte),
-        "questions": [
-            {
-                "niveau": item.niveau or "",
-                "text": item.question.text,
-                "choices": item.question.choices,
-                "correct_answer": item.question.correct_answer,
-                "image_url": item.question.image_url,
-                "image_layout": item.question.image_layout,
-                "num_choices": item.question.num_choices,
-                "choice_images": item.question.choice_images,
-            }
-            for item in items
-        ],
+        "questions": [_question_snapshot(item) for item in items],
     }
 
 
@@ -115,20 +226,9 @@ async def export_question_set(set_id: int, user: User = Depends(get_current_user
 
 @router.get("/import/class-template.xlsx")
 async def class_xlsx_template():
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment, PatternFill
+    from openpyxl.styles import Alignment
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Klasse"
-
-    header_font = Font(bold=True, size=11)
-    header_fill = PatternFill(fgColor="F5F5F7", fill_type="solid")
-    for col, h in enumerate(["Karten-Nr", "Name"], 1):
-        cell = ws.cell(row=1, column=col, value=h)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = Alignment(horizontal="center" if col == 1 else "left")
+    wb, ws = _xlsx_template("Klasse", ["Karten-Nr", "Name"], ausrichten=True)
 
     for i in range(1, 36):
         ws.cell(row=i + 1, column=1, value=i).alignment = Alignment(horizontal="center")
@@ -136,15 +236,7 @@ async def class_xlsx_template():
     ws.column_dimensions["A"].width = 12
     ws.column_dimensions["B"].width = 30
 
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-
-    return StreamingResponse(
-        buf,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": 'attachment; filename="CardVote_Vorlage.xlsx"'},
-    )
+    return _xlsx_response(wb, "CardVote_Vorlage.xlsx")
 
 
 # --- Excel Import for classes ---
@@ -222,20 +314,8 @@ async def import_class_xlsx(name: str = "Neue Klasse", file: UploadFile = File(.
 
 @router.get("/import/questions-template.xlsx", dependencies=[CARDVOTE])
 async def questions_xlsx_template():
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment, PatternFill
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Fragen"
-
-    header_font = Font(bold=True, size=11)
-    header_fill = PatternFill(fgColor="F5F5F7", fill_type="solid")
     headers = ["Frage", "Antwort A", "Antwort B", "Antwort C", "Antwort D", "Richtig (z.B. A oder AB)"]
-    for col, h in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=h)
-        cell.font = header_font
-        cell.fill = header_fill
+    wb, ws = _xlsx_template("Fragen", headers)
 
     ws.cell(row=2, column=1, value="Was ist 2+2?")
     ws.cell(row=2, column=2, value="3")
@@ -249,15 +329,7 @@ async def questions_xlsx_template():
         ws.column_dimensions[col].width = 18
     ws.column_dimensions["F"].width = 22
 
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-
-    return StreamingResponse(
-        buf,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": 'attachment; filename="CardVote_Fragen_Vorlage.xlsx"'},
-    )
+    return _xlsx_response(wb, "CardVote_Fragen_Vorlage.xlsx")
 
 
 # --- Excel Import for question sets ---
@@ -443,16 +515,7 @@ async def import_question_set(body: dict, user: User = Depends(get_current_user)
     db.add(qs)
     await db.flush()
     for pos, qdata in enumerate(daten.questions):
-        q = Question(
-            text=qdata.text,
-            choices=qdata.choices,
-            correct_answer=qdata.correct_answer,
-            image_url=qdata.image_url,
-            image_layout=qdata.image_layout,
-            num_choices=qdata.num_choices,
-            choice_images=qdata.choice_images,
-            owner_id=user.id,
-        )
+        q = _question_from_import(qdata, user.id)
         db.add(q)
         await db.flush()
         db.add(QuestionSetItem(question_set_id=qs.id, question_id=q.id, position=pos,
@@ -488,19 +551,7 @@ async def _export_folder_recursive(folder_id: int, db: AsyncSession) -> dict:
             # zurueckgespielte Fassung anders bewertet als das Original.
             "niveau_aktiv": bool(qs.niveau_aktiv),
             "minuspunkte": bool(qs.minuspunkte),
-            "questions": [
-                {
-                    "niveau": item.niveau or "",
-                    "text": item.question.text,
-                    "choices": item.question.choices,
-                    "correct_answer": item.question.correct_answer,
-                    "image_url": item.question.image_url,
-                    "image_layout": item.question.image_layout,
-                    "num_choices": item.question.num_choices,
-                    "choice_images": item.question.choice_images,
-                }
-                for item in items
-            ],
+            "questions": [_question_snapshot(item) for item in items],
         })
     children_r = await db.execute(
         select(Folder).where(Folder.parent_id == folder_id)
@@ -597,16 +648,7 @@ async def _import_folder_recursive(data: ImportFolderBody, parent_id, owner_id, 
         db.add(qs)
         await db.flush()
         for pos, qdata in enumerate(qs_data.questions):
-            q = Question(
-                text=qdata.text,
-                choices=qdata.choices,
-                correct_answer=qdata.correct_answer,
-                image_url=qdata.image_url,
-                image_layout=qdata.image_layout,
-                num_choices=qdata.num_choices,
-                choice_images=qdata.choice_images,
-                owner_id=owner_id,
-            )
+            q = _question_from_import(qdata, owner_id)
             db.add(q)
             await db.flush()
             db.add(QuestionSetItem(question_set_id=qs.id, question_id=q.id, position=pos,
@@ -699,28 +741,11 @@ async def evaluation_xlsx(session_id: int, user: User = Depends(get_current_user
 
     students = []
     if session.class_id:
-        result = await db.execute(
-            # Klassenreihenfolge wie auf dem Bildschirm: position. card_id ist
-            # die Nummer der gedruckten ArUco-Karte, keine Reihenfolge.
-            select(Student).where(Student.class_id == session.class_id)
-            .order_by(Student.position, Student.card_id, Student.id)
-        )
-        students = result.scalars().all()
+        # Klassenreihenfolge wie auf dem Bildschirm: position. card_id ist die
+        # Nummer der gedruckten ArUco-Karte, keine Reihenfolge (app/schueler.py).
+        students = await sortiert(db, Student.class_id == session.class_id)
 
-    questions = []
-    qmap = session.question_map or {}
-    if session.question_set_id:
-        result = await db.execute(
-            select(QuestionSetItem)
-            .options(selectinload(QuestionSetItem.question))
-            .where(QuestionSetItem.question_set_id == session.question_set_id)
-            .order_by(QuestionSetItem.position)
-        )
-        for item in result.scalars().all():
-            q = item.question
-            q._shuffled_correct = qmap.get(str(q.id), q.correct_answer)
-            q._niveau = item.niveau or ""
-            questions.append(q)
+    questions = await _session_questions(db, session)
 
     result = await db.execute(select(Scan).where(Scan.session_id == session_id))
     all_scans = result.scalars().all()
@@ -773,16 +798,7 @@ async def evaluation_xlsx(session_id: int, user: User = Depends(get_current_user
 
     ws.column_dimensions["A"].width = 20
 
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-
-    filename = f"CardVote_Auswertung_{session_id}.xlsx"
-    return StreamingResponse(
-        buf,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    return _xlsx_response(wb, f"CardVote_Auswertung_{session_id}.xlsx")
 
 
 # --- iDoceo SCSV export ---
@@ -798,28 +814,11 @@ async def evaluation_scsv(session_id: int, user: User = Depends(get_current_user
 
     students = []
     if session.class_id:
-        result = await db.execute(
-            # Klassenreihenfolge wie auf dem Bildschirm: position. card_id ist
-            # die Nummer der gedruckten ArUco-Karte, keine Reihenfolge.
-            select(Student).where(Student.class_id == session.class_id)
-            .order_by(Student.position, Student.card_id, Student.id)
-        )
-        students = result.scalars().all()
+        # Klassenreihenfolge wie auf dem Bildschirm: position. card_id ist die
+        # Nummer der gedruckten ArUco-Karte, keine Reihenfolge (app/schueler.py).
+        students = await sortiert(db, Student.class_id == session.class_id)
 
-    questions = []
-    qmap = session.question_map or {}
-    if session.question_set_id:
-        result = await db.execute(
-            select(QuestionSetItem)
-            .options(selectinload(QuestionSetItem.question))
-            .where(QuestionSetItem.question_set_id == session.question_set_id)
-            .order_by(QuestionSetItem.position)
-        )
-        for item in result.scalars().all():
-            q = item.question
-            q._shuffled_correct = qmap.get(str(q.id), q.correct_answer)
-            q._niveau = item.niveau or ""
-            questions.append(q)
+    questions = await _session_questions(db, session)
 
     result = await db.execute(select(Scan).where(Scan.session_id == session_id))
     all_scans = result.scalars().all()
@@ -877,9 +876,6 @@ async def evaluation_scsv(session_id: int, user: User = Depends(get_current_user
 
 # --- Individual student evaluation PDFs ---
 
-DEFAULT_SCALE = {1: 87, 2: 73, 3: 59, 4: 45, 5: 20, 6: 0}
-
-
 def _grade_from_pct(pct, scale=None):
     s = scale or DEFAULT_SCALE
     for g in range(1, 6):
@@ -903,15 +899,40 @@ def _decimal_grade(pct, scale=None):
     return _dezimalnote(pct, scale or DEFAULT_SCALE)
 
 
-def _build_student_pdf_single(student, questions, scan_map, session, config, niveau_aktiv=False, minuspunkte=False):
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.units import mm
-    from reportlab.pdfgen import canvas as pdf_canvas
+def _antwort_zeilen(questions, card_id, scan_map, get_w):
+    """Antworten eines Kindes je Frage: Zeilen fuer die Tabelle und die
+    Abgaben fuer bewerte(). Stand wortgleich im Einzel- und im Sammel-PDF."""
+    results = []
+    eigene = {}
+    for q in questions:
+        ans = scan_map.get((card_id, q["id"]))
+        eigene[q["id"]] = ans
+        correct = q["correct_answer"]
+        is_correct = ans and correct and ans in correct
+        w = get_w(q["id"])
+        results.append({"text": q["text"], "answer": ans, "correct": correct, "is_correct": is_correct, "weight": w})
+    return results, eigene
+
+
+def _antwort_farbe(c, r):
+    """Zeilenfarbe im PDF: richtig gruen, falsch rot, keine Abgabe grau.
+    Stand wortgleich im Einzel- und im Sammel-PDF."""
     from reportlab.lib.colors import HexColor
+    if r["is_correct"]:
+        c.setFillColor(HexColor("#0a7d3e"))
+    elif r["answer"] and r["correct"]:
+        c.setFillColor(HexColor("#d1350f"))
+    else:
+        c.setFillColorRGB(0.4, 0.4, 0.4)
+
+
+def _build_student_pdf_single(student, questions, scan_map, session, config, niveau_aktiv=False, minuspunkte=False):
+    from reportlab.lib.units import mm
+    # HexColor faellt hier weg: die Farbwahl steckt jetzt in _antwort_farbe().
 
     buf = io.BytesIO()
-    c = pdf_canvas.Canvas(buf, pagesize=A4)
-    pw, ph = A4
+    # A4-Leinwand aus app/pdfdruck.py — dieselben Zeilen standen an acht Stellen.
+    c, pw, ph = neue_seite(buf)
 
     weights = config.get("weights", {}) if config else {}
     scale = _skala(config or {})
@@ -922,15 +943,7 @@ def _build_student_pdf_single(student, questions, scan_map, session, config, niv
     get_w = lambda qid: weights.get(str(qid), weights.get(qid, 1))
     # max_score kommt weiter unten aus bewerte() — eine Quelle für die Wertung.
 
-    results = []
-    eigene = {}
-    for q in questions:
-        ans = scan_map.get((student["card_id"], q["id"]))
-        eigene[q["id"]] = ans
-        correct = q["correct_answer"]
-        is_correct = ans and correct and ans in correct
-        w = get_w(q["id"])
-        results.append({"text": q["text"], "answer": ans, "correct": correct, "is_correct": is_correct, "weight": w})
+    results, eigene = _antwort_zeilen(questions, student["card_id"], scan_map, get_w)
 
     # Punkte, Prozent und damit die Note kommen aus der gemeinsamen Wertung
     # (E/G-Bonus, Minuspunkte) — sonst stuende im PDF etwas anderes als am Schirm.
@@ -974,12 +987,7 @@ def _build_student_pdf_single(student, questions, scan_map, session, config, niv
             y = ph - 25 * mm
             c.setFont("Helvetica", 9)
 
-        if r["is_correct"]:
-            c.setFillColor(HexColor("#0a7d3e"))
-        elif r["answer"] and r["correct"]:
-            c.setFillColor(HexColor("#d1350f"))
-        else:
-            c.setFillColorRGB(0.4, 0.4, 0.4)
+        _antwort_farbe(c, r)
 
         text = strip_latex(r["text"])
         text = text[:60] + ("…" if len(text) > 60 else "")
@@ -1016,18 +1024,7 @@ async def student_evaluation_pdf(session_id: int, card_id: int, user: User = Dep
     if not student:
         raise HTTPException(404, "Lernende/r nicht gefunden")
 
-    questions = []
-    qmap = session.question_map or {}
-    if session.question_set_id:
-        result = await db.execute(
-            select(QuestionSetItem).options(selectinload(QuestionSetItem.question))
-            .where(QuestionSetItem.question_set_id == session.question_set_id)
-            .order_by(QuestionSetItem.position)
-        )
-        for item in result.scalars().all():
-            q = item.question
-            questions.append({"id": q.id, "text": q.text, "correct_answer": qmap.get(str(q.id), q.correct_answer),
-                              "niveau": item.niveau or ""})
+    questions = await _session_question_dicts(db, session)
 
     result = await db.execute(select(Scan).where(Scan.session_id == session_id))
     scan_map = {(s.student_id, s.question_id): s.answer for s in result.scalars().all()}
@@ -1037,8 +1034,7 @@ async def student_evaluation_pdf(session_id: int, card_id: int, user: User = Dep
     niveau_aktiv, minuspunkte = await _quiz_flags(db, session)
     buf = _build_student_pdf_single(student, questions, scan_map, session, config, niveau_aktiv, minuspunkte)
     filename = f"Auswertung_{student['name']}_{session_id}.pdf"
-    return StreamingResponse(buf, media_type="application/pdf",
-                             headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+    return als_anhang(buf, filename)
 
 
 @router.get("/sessions/{session_id}/all-students-pdf", dependencies=[CARDVOTE])
@@ -1051,35 +1047,18 @@ async def all_students_pdf(session_id: int, user: User = Depends(get_current_use
 
     students = []
     if session.class_id:
-        result = await db.execute(
-            # Klassenreihenfolge wie auf dem Bildschirm: position. card_id ist
-            # die Nummer der gedruckten ArUco-Karte, keine Reihenfolge.
-            select(Student).where(Student.class_id == session.class_id)
-            .order_by(Student.position, Student.card_id, Student.id)
-        )
-        students = [{"card_id": s.card_id, "name": s.name, "niveau": s.niveau or ""} for s in result.scalars().all()]
+        # Klassenreihenfolge wie auf dem Bildschirm: position (app/schueler.py).
+        students = [{"card_id": s.card_id, "name": s.name, "niveau": s.niveau or ""}
+                    for s in await sortiert(db, Student.class_id == session.class_id)]
 
-    questions = []
-    qmap = session.question_map or {}
-    if session.question_set_id:
-        result = await db.execute(
-            select(QuestionSetItem).options(selectinload(QuestionSetItem.question))
-            .where(QuestionSetItem.question_set_id == session.question_set_id)
-            .order_by(QuestionSetItem.position)
-        )
-        for item in result.scalars().all():
-            q = item.question
-            questions.append({"id": q.id, "text": q.text, "correct_answer": qmap.get(str(q.id), q.correct_answer),
-                              "niveau": item.niveau or ""})
+    questions = await _session_question_dicts(db, session)
 
     result = await db.execute(select(Scan).where(Scan.session_id == session_id))
     all_scans = result.scalars().all()
     scan_map = {(s.student_id, s.question_id): s.answer for s in all_scans}
 
-    from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
-    from reportlab.pdfgen import canvas as pdf_canvas
-    from reportlab.lib.colors import HexColor
+    # HexColor faellt hier weg: die Farbwahl steckt jetzt in _antwort_farbe().
 
     config = session.eval_config or {}
     niveau_aktiv, minuspunkte = await _quiz_flags(db, session)
@@ -1094,8 +1073,8 @@ async def all_students_pdf(session_id: int, user: User = Depends(get_current_use
                if status_of(s["card_id"], any((s["card_id"], q["id"]) in scan_map for q in questions), config) != "krank"]
 
     buf = io.BytesIO()
-    c = pdf_canvas.Canvas(buf, pagesize=A4)
-    pw, ph = A4
+    # A4-Leinwand aus app/pdfdruck.py — dieselben Zeilen standen an acht Stellen.
+    c, pw, ph = neue_seite(buf)
 
     for si, student in enumerate(present):
         y = ph - 30 * mm
@@ -1107,15 +1086,7 @@ async def all_students_pdf(session_id: int, user: User = Depends(get_current_use
         y -= 10 * mm
 
         student_questions = [q for q in questions if (student["card_id"], q["id"]) in scan_map]
-        results = []
-        eigene = {}
-        for q in student_questions:
-            ans = scan_map.get((student["card_id"], q["id"]))
-            eigene[q["id"]] = ans
-            correct = q["correct_answer"]
-            is_correct = ans and correct and ans in correct
-            w = get_w(q["id"])
-            results.append({"text": q["text"], "answer": ans, "correct": correct, "is_correct": is_correct, "weight": w})
+        results, eigene = _antwort_zeilen(student_questions, student["card_id"], scan_map, get_w)
 
         wertung = bewerte(student_questions, eigene, niveau=student.get("niveau", ""),
                           niveau_aktiv=niveau_aktiv, minuspunkte=minuspunkte,
@@ -1139,12 +1110,7 @@ async def all_students_pdf(session_id: int, user: User = Depends(get_current_use
 
         c.setFont("Helvetica", 9)
         for i, r in enumerate(results):
-            if r["is_correct"]:
-                c.setFillColor(HexColor("#0a7d3e"))
-            elif r["answer"] and r["correct"]:
-                c.setFillColor(HexColor("#d1350f"))
-            else:
-                c.setFillColorRGB(0.4, 0.4, 0.4)
+            _antwort_farbe(c, r)
 
             text = strip_latex(r["text"])
             text = text[:55] + ("…" if len(text) > 55 else "")
@@ -1163,8 +1129,7 @@ async def all_students_pdf(session_id: int, user: User = Depends(get_current_use
     c.save()
     buf.seek(0)
     filename = f"CardVote_Auswertungen_{session_id}.pdf"
-    return StreamingResponse(buf, media_type="application/pdf",
-                             headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+    return als_anhang(buf, filename)
 
 
 @router.get("/classes/{class_id}/all-tests-student-pdf/{card_id}", dependencies=[CARDVOTE])
@@ -1183,14 +1148,12 @@ async def class_student_pdf(class_id: int, card_id: int, user: User = Depends(ge
     result = await db.execute(select(Session).where(Session.class_id == class_id).order_by(Session.created_at))
     sessions = result.scalars().all()
 
-    from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
-    from reportlab.pdfgen import canvas as pdf_canvas
     from reportlab.lib.colors import HexColor
 
     buf = io.BytesIO()
-    c = pdf_canvas.Canvas(buf, pagesize=A4)
-    pw, ph = A4
+    # A4-Leinwand aus app/pdfdruck.py — dieselben Zeilen standen an acht Stellen.
+    c, pw, ph = neue_seite(buf)
 
     y = ph - 30 * mm
     c.setFont("Helvetica-Bold", 18)
@@ -1216,18 +1179,13 @@ async def class_student_pdf(class_id: int, card_id: int, user: User = Depends(ge
 
     c.setFont("Helvetica", 10)
     for session in sessions:
-        questions = []
+        # Nur die Abfrage ist dieselbe wie in den PDFs (_session_items); die
+        # Uebersicht braucht keinen Fragetext, deshalb hier eigene Dicts.
         qmap = session.question_map or {}
-        if session.question_set_id:
-            q_result = await db.execute(
-                select(QuestionSetItem).options(selectinload(QuestionSetItem.question))
-                .where(QuestionSetItem.question_set_id == session.question_set_id)
-                .order_by(QuestionSetItem.position)
-            )
-            for item in q_result.scalars().all():
-                q = item.question
-                questions.append({"id": q.id, "correct_answer": qmap.get(str(q.id), q.correct_answer),
-                                  "niveau": item.niveau or ""})
+        questions = [{"id": item.question.id,
+                      "correct_answer": qmap.get(str(item.question.id), item.question.correct_answer),
+                      "niveau": item.niveau or ""}
+                     for item in await _session_items(db, session)]
 
         scan_result = await db.execute(select(Scan).where(Scan.session_id == session.id, Scan.student_id == card_id))
         scans = {s.question_id: s.answer for s in scan_result.scalars().all()}
@@ -1289,5 +1247,4 @@ async def class_student_pdf(class_id: int, card_id: int, user: User = Depends(ge
     c.save()
     buf.seek(0)
     filename = f"CardVote_{student_obj.name}_Gesamtübersicht.pdf"
-    return StreamingResponse(buf, media_type="application/pdf",
-                             headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+    return als_anhang(buf, filename)

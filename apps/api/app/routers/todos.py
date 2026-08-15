@@ -14,6 +14,9 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
+# der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
+from ..besitz import eigenes
 from ..database import get_db
 from ..models import Todo, User
 from .modules import modul_pflicht
@@ -116,9 +119,7 @@ async def reorder_todos(body: ReorderIn, user: User = Depends(require_module), d
 
 @router.put("/{todo_id}", response_model=TodoOut)
 async def update_todo(todo_id: int, body: TodoPatch, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    t = await db.get(Todo, todo_id)
-    if not t or t.owner_id != user.id:
-        raise HTTPException(404, "To-do nicht gefunden")
+    t = await eigenes(db, Todo, todo_id, user, "To-do nicht gefunden")
     if body.text is not None:
         t.text = body.text.strip()[:500] or t.text
     if body.done is not None:
@@ -136,9 +137,7 @@ async def update_todo(todo_id: int, body: TodoPatch, user: User = Depends(requir
 
 @router.delete("/{todo_id}", status_code=204)
 async def delete_todo(todo_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    t = await db.get(Todo, todo_id)
-    if not t or t.owner_id != user.id:
-        raise HTTPException(404, "To-do nicht gefunden")
+    t = await eigenes(db, Todo, todo_id, user, "To-do nicht gefunden")
     await db.delete(t)
     await db.commit()
 

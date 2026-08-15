@@ -14,6 +14,7 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy import select, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..besitz import eigenes
 from ..database import get_db
 from ..models import (
     Question, Topic, User, CardDeck, Exercise, CalendarEntry, CodePuzzle,
@@ -78,14 +79,32 @@ class TopicOut(BaseModel):
 
 
 async def _owned(db: AsyncSession, user: User, topic_id: int) -> Topic:
-    result = await db.execute(
-        select(Topic).where(Topic.id == topic_id, Topic.owner_id == user.id,
-                            Topic.deleted_at.is_(None))
-    )
-    topic = result.scalar_one_or_none()
+    # weich=True: ein Thema im Papierkorb ist hier keines mehr.
+    return await eigenes(db, Topic, topic_id, user, "Thema nicht gefunden", weich=True)
+
+
+async def _owned_auch_geloescht(db: AsyncSession, user: User, topic_id: int) -> Topic:
+    """Eigenes Thema — auch eins im Papierkorb. War wortgleich in restore_topic
+    und purge_topic; beide arbeiten auf geloeschten Themen und koennen deshalb
+    NICHT `_owned` nehmen (weich, uebersieht den Papierkorb)."""
+    topic = (await db.execute(select(Topic).where(
+        Topic.id == topic_id, Topic.owner_id == user.id))).scalar_one_or_none()
     if not topic:
         raise HTTPException(404, "Thema nicht gefunden")
     return topic
+
+
+async def _mit_unterthemen(db: AsyncSession, topic_id: int) -> List[int]:
+    """Thema samt aller Nachfahren (ueber parent_id abgestiegen). Stand dreimal
+    fast wortgleich da (delete_topic, restore_topic, purge_topic) — loeschen,
+    zurueckholen und endgueltig loeschen fassen denselben Teilbaum an, also
+    wird er auch nur einmal ermittelt (`ids` bremst kaputte Daten aus)."""
+    ids, rand = {topic_id}, [topic_id]
+    while rand:
+        kinder = (await db.execute(select(Topic.id).where(Topic.parent_id.in_(rand)))).scalars().all()
+        rand = [k for k in kinder if k not in ids]
+        ids.update(rand)
+    return list(ids)
 
 
 async def _would_cycle(db: AsyncSession, topic_id: int, new_parent_id: int) -> bool:
@@ -313,13 +332,7 @@ async def delete_topic(
 
     topic = await _owned(db, user, topic_id)
     # Thema samt aller Nachfahren (das Loeschen kaskadiert ueber parent_id).
-    ids = {topic.id}
-    rand = [topic.id]
-    while rand:
-        kinder = (await db.execute(select(Topic.id).where(Topic.parent_id.in_(rand)))).scalars().all()
-        rand = [k for k in kinder if k not in ids]
-        ids.update(rand)
-    ids = list(ids)
+    ids = await _mit_unterthemen(db, topic.id)
     # Weich: Thema und Unterthemen wandern in den Papierkorb (30 Tage). Die
     # topic_id der Inhalte bleibt UNANGETASTET — wuerde sie jetzt geloest, kaeme
     # das Thema leer zurueck, und das Zurueckholen waere keins. Geloest wird
@@ -332,17 +345,9 @@ async def delete_topic(
 
 async def restore_topic(topic_id: int, user: User, db: AsyncSession):
     """Aus dem Papierkorb zurueck — samt Unterthemen (wie beim Loeschen)."""
-    from sqlalchemy import select as _select
-    topic = (await db.execute(_select(Topic).where(
-        Topic.id == topic_id, Topic.owner_id == user.id))).scalar_one_or_none()
-    if not topic:
-        raise HTTPException(404, "Thema nicht gefunden")
-    ids, rand = {topic.id}, [topic.id]
-    while rand:
-        kinder = (await db.execute(_select(Topic.id).where(Topic.parent_id.in_(rand)))).scalars().all()
-        rand = [k for k in kinder if k not in ids]
-        ids.update(rand)
-    for t in (await db.execute(_select(Topic).where(Topic.id.in_(list(ids))))).scalars().all():
+    topic = await _owned_auch_geloescht(db, user, topic_id)
+    ids = await _mit_unterthemen(db, topic.id)
+    for t in (await db.execute(select(Topic).where(Topic.id.in_(ids)))).scalars().all():
         t.deleted_at = None
     # Das Oberthema muss mit zurueck, sonst haengt das Unterthema im Nichts:
     # die Liste baut den Baum ueber parent_id, ein Kind ohne Elternteil faellt
@@ -366,17 +371,9 @@ async def purge_topic(topic_id: int, user: User, db: AsyncSession):
     Fremdschluessel. Ohne diesen Schritt behielten Fragen, Stapel & Co. die ID
     eines Themas, das es nicht mehr gibt.
     """
-    from sqlalchemy import update, select as _select
-    topic = (await db.execute(_select(Topic).where(
-        Topic.id == topic_id, Topic.owner_id == user.id))).scalar_one_or_none()
-    if not topic:
-        raise HTTPException(404, "Thema nicht gefunden")
-    ids, rand = {topic.id}, [topic.id]
-    while rand:
-        kinder = (await db.execute(_select(Topic.id).where(Topic.parent_id.in_(rand)))).scalars().all()
-        rand = [k for k in kinder if k not in ids]
-        ids.update(rand)
-    ids = list(ids)
+    from sqlalchemy import update
+    topic = await _owned_auch_geloescht(db, user, topic_id)
+    ids = await _mit_unterthemen(db, topic.id)
     for modell in (Question, CardDeck, Exercise, CalendarEntry, CodePuzzle,
                    LearningLadder, GradeCategory, Method, TimetableSlot, Material):
         await db.execute(update(modell).where(modell.topic_id.in_(ids)).values(topic_id=None))

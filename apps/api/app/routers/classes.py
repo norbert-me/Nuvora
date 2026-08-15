@@ -7,6 +7,10 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from ..schueler import sortiert
+# `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
+# der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
+from ..besitz import eigenes
 from ..database import get_db
 from ..uploads import bildtyp, vorschaubild
 from ..models import SchoolClass, Student, User, Kurs, KursTag, Session
@@ -285,19 +289,14 @@ async def list_massnahmen(
     kurs_id grenzt auf das Fach ein (plus Altbestand ohne Kurs).
 
     Besonders schützenswert (DSGVO Art. 9): nur der Besitzer der Klasse."""
-    sc = await db.get(SchoolClass, class_id)
-    if not sc or sc.owner_id != user.id:
-        raise HTTPException(404, "Klasse nicht gefunden")
+    await eigenes(db, SchoolClass, class_id, user, "Klasse nicht gefunden")
     # Kursweit suchen: dieselben Kinder stehen in den Geschwister-Fach-Klassen
     # (Mathe 7.5, Lernzeit 7.5) noch einmal. Gepflegt wird eine Maßnahme meist
     # nur an einer davon — sonst meldet der Kalender „nichts hinterlegt",
     # obwohl es sie gibt. Gleicher Name = dieselbe Person (wie im Roster).
     from .kurse import sibling_class_ids
     sib = await sibling_class_ids(db, class_id)
-    rows = (await db.execute(
-        select(Student).where(Student.class_id.in_(sib or [class_id]))
-        .order_by(Student.position, Student.card_id, Student.id)
-    )).scalars().all()
+    rows = await sortiert(db, Student.class_id.in_(sib or [class_id]))
     gesehen = set()
     out = []
     for s in rows:
@@ -436,8 +435,7 @@ async def _renumber(db: AsyncSession, sc: SchoolClass) -> None:
     from ..models import Scan, Session as CvSession
     from .kurse import sibling_class_ids
 
-    kinder = (await db.execute(select(Student).where(Student.class_id == sc.id)
-                               .order_by(Student.position, Student.card_id, Student.id))).scalars().all()
+    kinder = await sortiert(db, Student.class_id == sc.id)
     plan = {k.card_id: i + 1 for i, k in enumerate(kinder)}
     if all(alt == neu for alt, neu in plan.items()):
         return   # Reihenfolge entspricht schon den Nummern

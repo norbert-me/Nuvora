@@ -5,6 +5,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPExcept
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from .netz import client_ip
 from .database import engine
 from .models import Base
 # Admin-Pruefung und Programmfassung kommen aus app/admin.py — dem Blatt, das
@@ -37,15 +38,8 @@ GLOBAL_RATE_WINDOW = int(os.environ.get("GLOBAL_RATE_WINDOW", 60))
 _global_hits: dict[str, list] = _defaultdict(list)
 
 
-def _req_ip(request) -> str:
-    # X-Real-IP zuerst (von unserem nginx gesetzt, nicht spoofbar) — siehe client_ip in auth.py
-    real = request.headers.get("X-Real-IP")
-    if real:
-        return real.strip()
-    xff = request.headers.get("X-Forwarded-For", "")
-    if xff:
-        return xff.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+# Stand hier und in auth.py wortgleich; die Rechnung liegt jetzt in app/netz.py.
+_req_ip = client_ip
 
 
 # Zeitpunkt der letzten Auskehr — bewusst in einer Zelle statt als

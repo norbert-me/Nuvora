@@ -10,6 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+# `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
+# der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
+from ..besitz import eigenes
 from ..database import get_db
 from ..models import MaterialItem, MaterialLoan, SchoolClass, Student, User
 from .auth import rate_limit
@@ -74,9 +77,7 @@ async def create_item(body: ItemIn, user: User = Depends(require_module), db: As
 
 @router.delete("/items/{item_id}", status_code=204)
 async def delete_item(item_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    it = await db.get(MaterialItem, item_id)
-    if not it or it.owner_id != user.id:
-        raise HTTPException(404, "Gegenstand nicht gefunden")
+    it = await eigenes(db, MaterialItem, item_id, user, "Gegenstand nicht gefunden")
     await db.delete(it)
     await db.commit()
 
@@ -124,9 +125,7 @@ async def create_loan(body: LoanIn, user: User = Depends(require_module), db: As
 
 @router.put("/loans/{loan_id}/return")
 async def return_loan(loan_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    loan = await db.get(MaterialLoan, loan_id)
-    if not loan or loan.owner_id != user.id:
-        raise HTTPException(404, "Ausleihe nicht gefunden")
+    loan = await eigenes(db, MaterialLoan, loan_id, user, "Ausleihe nicht gefunden")
     loan.returned_at = datetime.now().astimezone()
     await db.commit()
     return _loan_dict(loan)

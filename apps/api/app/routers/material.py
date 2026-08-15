@@ -13,6 +13,9 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
+# der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
+from ..besitz import eigenes
 from ..database import get_db
 from ..models import Material, Topic, CalendarEntry, Method, WorkAnalysis, User
 from sqlalchemy import func
@@ -150,9 +153,7 @@ def _unveraendert(request, etag: str) -> bool:
 
 @router.get("/{material_id}/download")
 async def download_material(material_id: int, request: Request, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    m = await db.get(Material, material_id)
-    if not m or m.owner_id != user.id:
-        raise HTTPException(404, "Material nicht gefunden")
+    m = await eigenes(db, Material, material_id, user, "Material nicht gefunden")
     etag = f'"d{m.id}-{m.size}"'
     if _unveraendert(request, etag):
         return Response(status_code=304, headers=_cache_kopf(etag))
@@ -339,8 +340,6 @@ async def material_als_pdf(material_id: int, request: Request, user: User = Depe
 
 @router.delete("/{material_id}", status_code=204)
 async def delete_material(material_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    m = await db.get(Material, material_id)
-    if not m or m.owner_id != user.id:
-        raise HTTPException(404, "Material nicht gefunden")
+    m = await eigenes(db, Material, material_id, user, "Material nicht gefunden")
     await db.delete(m)
     await db.commit()

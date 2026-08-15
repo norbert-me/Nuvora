@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..besitz import klasse_oder_403, kurs_oder_klasse
 from ..database import get_db
 from ..models import SchoolClass, SeatingPlan, SegelStatus, Student, User
 from .auth import rate_limit
@@ -23,13 +24,10 @@ MODULE_KEY = "orga"
 require_module = modul_pflicht(MODULE_KEY)
 
 
-async def _owned_class(db: AsyncSession, user: User, class_id: int) -> SchoolClass:
-    sc = await db.get(SchoolClass, class_id)
-    if not sc:
-        raise HTTPException(404, "Klasse nicht gefunden")
-    if sc.owner_id and sc.owner_id != user.id:
-        raise HTTPException(403, "Keine Berechtigung")
-    return sc
+# Frueher stand die Klassenpruefung in fuenf Routern wortgleich; jetzt eine
+# Quelle (app/besitz.py). Der alte Name bleibt, damit die Aufrufer unberuehrt
+# sind.
+_owned_class = klasse_oder_403
 
 
 class PlanIn(BaseModel):
@@ -40,13 +38,13 @@ class PlanIn(BaseModel):
 
 
 def _key_where(user, class_id, kurs_id):
-    """Sitzplan haengt am Kurs (Fach). kurs_id gesetzt = je Kurs; sonst
-    Fallback auf die Klasse (ohne Kurs).
+    """Sitzplan haengt am Kurs (Fach); Fallback Klasse ohne Kurs.
 
-    Liste von WHERE-Bedingungen (unterschiedlich lang) — immer per * entpackt."""
-    if kurs_id is not None:
-        return [SeatingPlan.owner_id == user.id, SeatingPlan.kurs_id == kurs_id]
-    return [SeatingPlan.owner_id == user.id, SeatingPlan.class_id == class_id, SeatingPlan.kurs_id.is_(None)]
+    Die Schluesselregel steht seit dem Zusammenfuehren in
+    `app/besitz.kurs_oder_klasse` — sie lag fuenfmal als eigenes `_key_where`
+    herum und unterschied sich nur im Modell. Liste von WHERE-Bedingungen
+    (unterschiedlich lang) — immer per * entpackt."""
+    return kurs_oder_klasse(SeatingPlan, user, class_id, kurs_id)
 
 
 @router.get("/{class_id}")
@@ -96,10 +94,13 @@ SEGEL_STAGES = {"hafen", "kueste", "meer", "welt", ""}
 
 
 def _segel_where(user, class_id, kurs_id):
-    """Liste von WHERE-Bedingungen (unterschiedlich lang) — immer per * entpackt."""
-    if kurs_id is not None:
-        return [SegelStatus.owner_id == user.id, SegelStatus.kurs_id == kurs_id]
-    return [SegelStatus.owner_id == user.id, SegelStatus.class_id == class_id, SegelStatus.kurs_id.is_(None)]
+    """SEGEL-Stufe haengt am Kurs (Fach); Fallback Klasse ohne Kurs.
+
+    Die Schluesselregel steht seit dem Zusammenfuehren in
+    `app/besitz.kurs_oder_klasse` — sie lag fuenfmal als eigenes `_key_where`
+    herum und unterschied sich nur im Modell. Liste von WHERE-Bedingungen
+    (unterschiedlich lang) — immer per * entpackt."""
+    return kurs_oder_klasse(SegelStatus, user, class_id, kurs_id)
 
 
 class SegelIn(BaseModel):

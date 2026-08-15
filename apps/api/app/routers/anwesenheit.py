@@ -11,8 +11,11 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..besitz import klasse_oder_403
+from ..schueler import sortiert
+from ..pdfdruck import als_anhang, neue_seite
 from ..database import get_db
-from ..models import Attendance, CalendarBreak, SchoolClass, Student, User
+from ..models import Attendance, CalendarBreak, Student, User
 from .auth import rate_limit
 from .modules import modul_pflicht
 
@@ -26,13 +29,10 @@ _STATUS = {"da", "fehlt", "spaet", "entsch"}
 require_module = modul_pflicht(MODULE_KEY)
 
 
-async def _owned_class(db: AsyncSession, user: User, class_id: int) -> SchoolClass:
-    sc = await db.get(SchoolClass, class_id)
-    if not sc:
-        raise HTTPException(404, "Klasse nicht gefunden")
-    if sc.owner_id and sc.owner_id != user.id:
-        raise HTTPException(403, "Keine Berechtigung")
-    return sc
+# Frueher stand die Klassenpruefung in fuenf Routern wortgleich; jetzt eine
+# Quelle (app/besitz.py). Der alte Name bleibt, damit die Aufrufer unberuehrt
+# sind.
+_owned_class = klasse_oder_403
 
 
 def _day_bounds(d: datetime):
@@ -215,17 +215,16 @@ async def _students_of(db, class_id):
     # id als letzter Schluessel: bei gleicher Position/Kartennummer waere die
     # Reihenfolge sonst der Datenbank ueberlassen — und die PDF-Liste saehe bei
     # jedem Druck anders aus.
-    return (await db.execute(select(Student).where(Student.class_id == class_id).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
+    return await sortiert(db, Student.class_id == class_id)
 
 
 def _pdf_response(build, filename: str):
+    # Das Ausliefern steht in app/pdfdruck.py — es stand hier und noch fuenfmal
+    # woanders wortgleich. Hier bleibt nur „Puffer aufmachen und zeichnen lassen".
     import io
-    from fastapi.responses import StreamingResponse
     buf = io.BytesIO()
     build(buf)
-    buf.seek(0)
-    return StreamingResponse(buf, media_type="application/pdf",
-                             headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+    return als_anhang(buf, filename)
 
 
 @router.get("/{class_id}/report.pdf")
@@ -236,11 +235,9 @@ async def class_report(class_id: int, user: User = Depends(require_module), db: 
     students = await _students_of(db, class_id)
 
     def build(buf):
-        from reportlab.lib.pagesizes import A4
         from reportlab.lib.units import mm
-        from reportlab.pdfgen import canvas
-        c = canvas.Canvas(buf, pagesize=A4)
-        w, h = A4
+        # A4-Leinwand aus app/pdfdruck.py — dieselben Zeilen standen an acht Stellen.
+        c, w, h = neue_seite(buf)
         y = h - 25 * mm
         c.setFont("Helvetica-Bold", 16)
         c.drawString(20 * mm, y, f"Fehlzeiten – {sc.name}")
@@ -286,11 +283,9 @@ async def student_report(class_id: int, student_id: int, user: User = Depends(re
             zaehler[r["status"]] += 1
 
     def build(buf):
-        from reportlab.lib.pagesizes import A4
         from reportlab.lib.units import mm
-        from reportlab.pdfgen import canvas
-        c = canvas.Canvas(buf, pagesize=A4)
-        w, h = A4
+        # A4-Leinwand aus app/pdfdruck.py — dieselben Zeilen standen an acht Stellen.
+        c, w, h = neue_seite(buf)
         y = h - 25 * mm
         c.setFont("Helvetica-Bold", 16)
         c.drawString(20 * mm, y, f"Fehlzeiten – {st.name}")

@@ -5,11 +5,14 @@ das Modul Beobachtungen). Reine private Ablage — kein Export, kein Marktplatz.
 """
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
+# der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
+from ..besitz import eigenes
 from ..database import get_db
 from ..models import NotepadNote, User
 from .modules import modul_pflicht
@@ -72,9 +75,7 @@ async def reorder_notes(body: ReorderIn, user: User = Depends(require_module), d
 
 @router.put("/{note_id}")
 async def update_note(note_id: int, body: NotePatch, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    n = await db.get(NotepadNote, note_id)
-    if not n or n.owner_id != user.id:
-        raise HTTPException(404, "Notiz nicht gefunden")
+    n = await eigenes(db, NotepadNote, note_id, user, "Notiz nicht gefunden")
     if body.title is not None:
         n.title = body.title.strip()[:200]
     if body.content is not None:
@@ -86,8 +87,6 @@ async def update_note(note_id: int, body: NotePatch, user: User = Depends(requir
 
 @router.delete("/{note_id}", status_code=204)
 async def delete_note(note_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    n = await db.get(NotepadNote, note_id)
-    if not n or n.owner_id != user.id:
-        raise HTTPException(404, "Notiz nicht gefunden")
+    n = await eigenes(db, NotepadNote, note_id, user, "Notiz nicht gefunden")
     await db.delete(n)
     await db.commit()

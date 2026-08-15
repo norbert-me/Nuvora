@@ -18,6 +18,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+# `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
+# der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
+from ..besitz import eigenes
 from ..database import get_db
 from ..models import Exercise, LearningLadder, LearningPath, SchoolClass, Topic, User
 from .auth import rate_limit
@@ -120,9 +123,7 @@ async def update_exercise(
     user: User = Depends(require_module),
     db: AsyncSession = Depends(get_db),
 ):
-    ex = await db.get(Exercise, exercise_id)
-    if not ex or ex.owner_id != user.id:
-        raise HTTPException(404, "Aufgabe nicht gefunden")
+    ex = await eigenes(db, Exercise, exercise_id, user, "Aufgabe nicht gefunden")
     await _check_topic(db, user, body.topic_id)
     for k, v in body.model_dump().items():
         setattr(ex, k, v)
@@ -137,9 +138,7 @@ async def delete_exercise(
     user: User = Depends(require_module),
     db: AsyncSession = Depends(get_db),
 ):
-    ex = await db.get(Exercise, exercise_id)
-    if not ex or ex.owner_id != user.id:
-        raise HTTPException(404, "Aufgabe nicht gefunden")
+    ex = await eigenes(db, Exercise, exercise_id, user, "Aufgabe nicht gefunden")
     await db.delete(ex)
     await db.commit()
 
@@ -269,18 +268,14 @@ async def delete_path(
     """Soft-Delete: in den Papierkorb (30 Tage). Lernleitern bleiben so lange
     erhalten. Aufgaben gehoeren ohnehin nicht dem Pfad."""
     from datetime import datetime, timezone
-    path = await db.get(LearningPath, path_id)
-    if not path or path.owner_id != user.id:
-        raise HTTPException(404, "Lernpfad nicht gefunden")
+    path = await eigenes(db, LearningPath, path_id, user, "Lernpfad nicht gefunden")
     path.deleted_at = datetime.now(timezone.utc)
     await db.commit()
 
 
 @router.post("/paths/{path_id}/restore", response_model=PathOut)
 async def restore_path(path_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    path = await db.get(LearningPath, path_id)
-    if not path or path.owner_id != user.id:
-        raise HTTPException(404, "Lernpfad nicht gefunden")
+    path = await eigenes(db, LearningPath, path_id, user, "Lernpfad nicht gefunden")
     path.deleted_at = None
     await db.commit()
     await db.refresh(path, ["ladders"])
@@ -291,9 +286,7 @@ async def restore_path(path_id: int, user: User = Depends(require_module), db: A
 async def purge_path(path_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Endgültig löschen (aus dem Papierkorb). Erst hier greift die Kaskade auf
     die Lernleitern."""
-    path = await db.get(LearningPath, path_id)
-    if not path or path.owner_id != user.id:
-        raise HTTPException(404, "Lernpfad nicht gefunden")
+    path = await eigenes(db, LearningPath, path_id, user, "Lernpfad nicht gefunden")
     if path.deleted_at is None:
         raise HTTPException(400, "Lernpfad ist nicht im Papierkorb")
     await db.delete(path)
@@ -301,10 +294,7 @@ async def purge_path(path_id: int, user: User = Depends(require_module), db: Asy
 
 
 async def _owned_path(db: AsyncSession, user: User, path_id: int) -> LearningPath:
-    path = await db.get(LearningPath, path_id)
-    if not path or path.owner_id != user.id:
-        raise HTTPException(404, "Lernpfad nicht gefunden")
-    return path
+    return await eigenes(db, LearningPath, path_id, user, "Lernpfad nicht gefunden")
 
 
 @router.post("/paths/{path_id}/ladders", response_model=LadderOut, status_code=201)

@@ -11,6 +11,10 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy import select, delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
+# der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
+from ..besitz import eigenes
+from ..felder import ohne_leer, ohne_none
 from ..database import get_db
 from ..importe import geprueft
 from ..models import CalendarEntry, Kurs, Method, MethodFolder, SchoolClass, Topic, User
@@ -75,10 +79,7 @@ class FolderOut(BaseModel):
 
 
 async def _owned_folder(db: AsyncSession, user: User, folder_id: int) -> MethodFolder:
-    f = await db.get(MethodFolder, folder_id)
-    if not f or f.owner_id != user.id:
-        raise HTTPException(404, "Ordner nicht gefunden")
-    return f
+    return await eigenes(db, MethodFolder, folder_id, user, "Ordner nicht gefunden")
 
 
 @router.get("/folders", response_model=List[FolderOut])
@@ -153,9 +154,7 @@ async def create_method(body: MethodIn, user: User = Depends(require_module), db
 
 @router.put("/{method_id}", response_model=MethodOut)
 async def update_method(method_id: int, body: MethodIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    m = await db.get(Method, method_id)
-    if not m or m.owner_id != user.id:
-        raise HTTPException(404, "Eintrag nicht gefunden")
+    m = await eigenes(db, Method, method_id, user, "Eintrag nicht gefunden")
     data = body.model_dump()
     data["topic_id"] = await _check_topic(db, user.id, data.get("topic_id"))
     if data.get("folder_id") is not None:
@@ -186,15 +185,9 @@ class ImportItem(BaseModel):
     material: str = ""
     dauer: Optional[int] = None
 
-    @field_validator("title", "description", "ablauf", "material", mode="before")
-    @classmethod
-    def _leer_text(cls, v):
-        return "" if v is None else v
+    _leer_text = field_validator("title", "description", "ablauf", "material", mode="before")(ohne_none(""))
 
-    @field_validator("dauer", mode="before")
-    @classmethod
-    def _leer_zahl(cls, v):
-        return None if v == "" else v
+    _leer_zahl = field_validator("dauer", mode="before")(ohne_leer(None, ("",)))
 
 
 class EinstiegeImport(BaseModel):
@@ -202,10 +195,7 @@ class EinstiegeImport(BaseModel):
     version: int = 1
     items: List[ImportItem] = []
 
-    @field_validator("items", mode="before")
-    @classmethod
-    def _leer_liste(cls, v):
-        return [] if v is None else v
+    _leer_liste = field_validator("items", mode="before")(ohne_none([]))
 
 
 @router.post("/import")
@@ -233,9 +223,7 @@ async def import_einstiege(body: dict, user: User = Depends(require_module), db:
 
 @router.delete("/{method_id}", status_code=204)
 async def delete_method(method_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
-    m = await db.get(Method, method_id)
-    if not m or m.owner_id != user.id:
-        raise HTTPException(404, "Eintrag nicht gefunden")
+    m = await eigenes(db, Method, method_id, user, "Eintrag nicht gefunden")
     await db.delete(m)
     await db.commit()
 
@@ -244,9 +232,7 @@ async def delete_method(method_id: int, user: User = Depends(require_module), db
 async def method_calendar(method_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Kalendereinträge (Stunden), an die dieser Einstieg gehängt ist — die
     Rückrichtung zu CalendarEntry.method_id. Read-only, mit Kurs/Klassen-Name."""
-    m = await db.get(Method, method_id)
-    if not m or m.owner_id != user.id:
-        raise HTTPException(404, "Eintrag nicht gefunden")
+    m = await eigenes(db, Method, method_id, user, "Eintrag nicht gefunden")
     # Verknüpfung nur, wenn BEIDE Module aktiv sind — ohne Kalender keine Stunden.
     if not await is_active(db, user.id, "kalender"):
         return []

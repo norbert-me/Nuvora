@@ -18,6 +18,7 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..netz import client_ip as _client_ip
 from ..database import get_db
 from ..models import User, Question, MarketplaceQuiz
 from .. import mailer
@@ -255,7 +256,13 @@ def _make_verify_token(user: User) -> str:
     return base64.urlsafe_b64encode(f"{user.id}:{sig}".encode()).decode().rstrip("=")
 
 
-def _decode_verify_token(token: str):
+def _decode_id_sig(token: str):
+    """Base64-Token "<user_id>:<sig>" zerlegen; None, wenn etwas nicht stimmt.
+
+    War wortgleich zweimal da (_decode_verify_token, _decode_email_change_token):
+    gleiche Form, nur die Signatur meint etwas anderes — und die prueft ohnehin
+    erst der Endpunkt. Die beiden Namen bleiben als sprechende Aliase.
+    """
     try:
         pad = "=" * (-len(token) % 4)
         raw = base64.urlsafe_b64decode(token + pad).decode()
@@ -263,21 +270,15 @@ def _decode_verify_token(token: str):
         return int(user_id), sig
     except Exception:
         return None
+
+
+_decode_verify_token = _decode_id_sig
+_decode_email_change_token = _decode_id_sig
 
 
 def _make_email_change_token(user: User) -> str:
     sig = hmac.new(SECRET.encode(), f"emailchange:{user.id}:{user.pending_email}".encode(), "sha256").hexdigest()[:32]
     return base64.urlsafe_b64encode(f"{user.id}:{sig}".encode()).decode().rstrip("=")
-
-
-def _decode_email_change_token(token: str):
-    try:
-        pad = "=" * (-len(token) % 4)
-        raw = base64.urlsafe_b64decode(token + pad).decode()
-        user_id, sig = raw.split(":")
-        return int(user_id), sig
-    except Exception:
-        return None
 
 
 async def _send_verify_mail(user: User):
@@ -331,16 +332,9 @@ def _check_rate_limit(ip: str):
 _buckets: dict[str, list[float]] = defaultdict(list)
 
 
-def client_ip(request: Request) -> str:
-    # X-Real-IP zuerst: wird von UNSEREM nginx aus $remote_addr gesetzt (nicht spoofbar).
-    # X-Forwarded-For kaeme direkt vom Client durch und liesse sich faelschen -> Rate-Limit-Bypass.
-    real = request.headers.get("X-Real-IP")
-    if real:
-        return real.strip()
-    xff = request.headers.get("X-Forwarded-For", "")
-    if xff:
-        return xff.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+# Stand hier und in main.py wortgleich; die Rechnung liegt jetzt in app/netz.py.
+# Der Name bleibt: die Router holen ihn seit jeher aus auth.
+client_ip = _client_ip
 
 
 def rate_limit(bucket: str, ip: str, max_hits: int, window: int, msg: str = "Zu viele Anfragen. Bitte kurz warten."):
@@ -396,6 +390,20 @@ def _buckets_auskehren(now: float):
 _buckets_auskehren.zuletzt = 0.0
 
 
+def _check_pw_length(v: str) -> str:
+    """Laengenregel fuer ein NEUES Passwort (min. 8, max. 256).
+
+    War dreimal wortgleich als Validator da (Register, ChangePassword, Reset).
+    LoginBody bleibt aussen vor: dort nur die Obergrenze (ein Bestandspasswort
+    darf kuerzer sein) und mit anderer Meldung.
+    """
+    if len(v) < 8:
+        raise ValueError("Passwort muss mindestens 8 Zeichen lang sein")
+    if len(v) > 256:
+        raise ValueError("Passwort zu lang (max. 256 Zeichen)")
+    return v
+
+
 class LoginBody(BaseModel):
     email: str
     password: str
@@ -417,11 +425,7 @@ class RegisterBody(BaseModel):
     @field_validator("password")
     @classmethod
     def pw_length(cls, v):
-        if len(v) < 8:
-            raise ValueError("Passwort muss mindestens 8 Zeichen lang sein")
-        if len(v) > 256:
-            raise ValueError("Passwort zu lang (max. 256 Zeichen)")
-        return v
+        return _check_pw_length(v)
 
     @field_validator("email")
     @classmethod
@@ -446,11 +450,7 @@ class ChangePasswordBody(BaseModel):
     @field_validator("new_password")
     @classmethod
     def pw_min_length(cls, v):
-        if len(v) < 8:
-            raise ValueError("Passwort muss mindestens 8 Zeichen lang sein")
-        if len(v) > 256:
-            raise ValueError("Passwort zu lang (max. 256 Zeichen)")
-        return v
+        return _check_pw_length(v)
 
 
 class UpdateProfileBody(BaseModel):
@@ -585,11 +585,7 @@ class ResetPasswordBody(BaseModel):
     @field_validator("new_password")
     @classmethod
     def pw_length(cls, v):
-        if len(v) < 8:
-            raise ValueError("Passwort muss mindestens 8 Zeichen lang sein")
-        if len(v) > 256:
-            raise ValueError("Passwort zu lang (max. 256 Zeichen)")
-        return v
+        return _check_pw_length(v)
 
 
 @router.post("/reset-password")

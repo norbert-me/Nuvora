@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
+from ..schueler import roster_klasse
 from ..models import Scan, Session, SchoolClass, Student, QuestionSet, QuestionSetItem, Question, User, Topic
 from .auth import get_current_user
 from ..scoring import bewerte, status_of
@@ -31,17 +32,11 @@ router = APIRouter(prefix="/api", tags=["results"], dependencies=[CARDVOTE])
 kern_router = APIRouter(prefix="/api", tags=["results"])
 
 
-async def _kurs_roster(db, class_id):
-    """Kanonische SuS des Kurses (gleichnamige Fach-Klassen-SuS dedupliziert).
-    CardVote-Auswertung/Roster laufen kursweit; card_id ist bei gleicher
-    Lerngruppe deckungsgleich."""
-    from .kurse import sibling_class_ids
-    sib = await sibling_class_ids(db, class_id)
-    studs = (await db.execute(select(Student).where(Student.class_id.in_(sib)).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
-    canon = {}
-    for s in studs:
-        canon.setdefault(s.name.strip(), s)
-    return sorted(canon.values(), key=lambda s: (s.position or 0, s.card_id, s.id))
+# Kanonische SuS des Kurses (gleichnamige Fach-Klassen-SuS dedupliziert).
+# CardVote-Auswertung/Roster laufen kursweit; card_id ist bei gleicher
+# Lerngruppe deckungsgleich. Dieselbe Funktion stand auch in klassenarbeit.py —
+# jetzt eine Quelle in app/schueler.py.
+_kurs_roster = roster_klasse
 
 
 class ScanCreate(BaseModel):
@@ -80,6 +75,42 @@ async def _mit_wiederholung(db: AsyncSession, arbeit, versuche: int = 6):
     # Erreichbar nur bei versuche <= 0. Ohne diese Zeile käme dort ein stilles
     # None heraus, mit dem der Aufrufer weiterrechnet.
     raise HTTPException(503, "Gerade zu viel los. Bitte gleich noch einmal scannen.")
+
+
+async def _set_items(db: AsyncSession, question_set_id: int, sortiert: bool = False):
+    """Die Fragen eines Quiz-Sets laden (Frage gleich mitgeladen).
+
+    Vorher stand dieselbe Abfrage wortgleich an fuenf Stellen. `sortiert` bleibt
+    ein ausdruecklicher Schalter und keine Voreinstellung: die Auswertung braucht
+    die Reihenfolge des Sets, die reinen Zaehlungen nicht — ein stillschweigend
+    ergaenztes ORDER BY waere eine Verhaltensaenderung.
+    """
+    q = (select(QuestionSetItem).options(selectinload(QuestionSetItem.question))
+         .where(QuestionSetItem.question_set_id == question_set_id))
+    if sortiert:
+        q = q.order_by(QuestionSetItem.position)
+    return (await db.execute(q)).scalars().all()
+
+
+async def _fragen_und_flags(db: AsyncSession, session):
+    """Kurzform der Fragen einer Sitzung plus die E/G-Flags ihres Quiz.
+
+    Vorher zweimal wortgleich im Dashboard (Klassenschnitt und
+    Notenverteilung). Kurzform heisst id/correct_answer/niveau — mehr braucht
+    `bewerte` nicht.
+    """
+    questions = []
+    if session.question_set_id:
+        qmap = session.question_map or {}
+        for item in await _set_items(db, session.question_set_id):
+            q = item.question
+            questions.append({"id": q.id, "correct_answer": qmap.get(str(q.id), q.correct_answer),
+                              "niveau": item.niveau or ""})
+
+    qs_flags = await db.get(QuestionSet, session.question_set_id) if session.question_set_id else None
+    niveau_aktiv = bool(qs_flags.niveau_aktiv) if qs_flags else False
+    minuspunkte = bool(qs_flags.minuspunkte) if qs_flags else False
+    return questions, niveau_aktiv, minuspunkte
 
 
 @router.post("/scan", status_code=201)
@@ -252,14 +283,9 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
 
     questions = []
     if session.question_set_id:
-        result = await db.execute(
-            select(QuestionSetItem)
-            .options(selectinload(QuestionSetItem.question))
-            .where(QuestionSetItem.question_set_id == session.question_set_id)
-            .order_by(QuestionSetItem.position)
-        )
+        # Sortiert: die Auswertung zeigt die Fragen in der Reihenfolge des Sets.
         qmap = session.question_map or {}
-        for item in result.scalars().all():
+        for item in await _set_items(db, session.question_set_id, sortiert=True):
             q = item.question
             correct = qmap.get(str(q.id), q.correct_answer)
             questions.append({
@@ -342,10 +368,7 @@ async def get_topic_stats(session_id: int, user: User = Depends(get_current_user
     if not session.question_set_id:
         return {"class_id": session.class_id, "topics": []}
 
-    items = (await db.execute(
-        select(QuestionSetItem).options(selectinload(QuestionSetItem.question))
-        .where(QuestionSetItem.question_set_id == session.question_set_id)
-    )).scalars().all()
+    items = await _set_items(db, session.question_set_id)   # ungeordnet: hier wird nur gezaehlt
     qmap = session.question_map or {}
     q_topic = {}   # question_id -> topic_id
     q_correct = {}  # question_id -> correct_answer
@@ -405,10 +428,7 @@ async def weak_topics_range(frm: datetime, to: datetime, class_id: Optional[int]
     for sess in sessions:
         if not sess.question_set_id:
             continue
-        items = (await db.execute(
-            select(QuestionSetItem).options(selectinload(QuestionSetItem.question))
-            .where(QuestionSetItem.question_set_id == sess.question_set_id)
-        )).scalars().all()
+        items = await _set_items(db, sess.question_set_id)   # ungeordnet: hier wird nur gezaehlt
         qmap = sess.question_map or {}
         q_topic = {it.question.id: it.question.topic_id for it in items if it.question.topic_id}
         q_correct = {it.question.id: qmap.get(str(it.question.id), it.question.correct_answer) for it in items}
@@ -614,14 +634,9 @@ async def get_class_evaluation(class_id: int, user: User = Depends(get_current_u
     for session in sessions:
         questions = []
         if session.question_set_id:
-            q_result = await db.execute(
-                select(QuestionSetItem)
-                .options(selectinload(QuestionSetItem.question))
-                .where(QuestionSetItem.question_set_id == session.question_set_id)
-                .order_by(QuestionSetItem.position)
-            )
+            # Sortiert wie in der Einzelauswertung — dieselbe Reihenfolge.
             qmap = session.question_map or {}
-            for item in q_result.scalars().all():
+            for item in await _set_items(db, session.question_set_id, sortiert=True):
                 q = item.question
                 questions.append({
                     "id": q.id,
@@ -717,21 +732,10 @@ async def stats_dashboard(user: User = Depends(get_current_user), db: AsyncSessi
 
         all_pcts = []
         for session in sessions:
-            questions = []
-            if session.question_set_id:
-                q_result = await db.execute(
-                    select(QuestionSetItem).options(selectinload(QuestionSetItem.question))
-                    .where(QuestionSetItem.question_set_id == session.question_set_id)
-                )
-                qmap = session.question_map or {}
-                for item in q_result.scalars().all():
-                    q = item.question
-                    questions.append({"id": q.id, "correct_answer": qmap.get(str(q.id), q.correct_answer),
-                                      "niveau": item.niveau or ""})
-
-            qs_flags = await db.get(QuestionSet, session.question_set_id) if session.question_set_id else None
-            niveau_aktiv = bool(qs_flags.niveau_aktiv) if qs_flags else False
-            minuspunkte = bool(qs_flags.minuspunkte) if qs_flags else False
+            # Stand zweimal wortgleich hier (Klassenschnitt und
+            # Notenverteilung) — jetzt eine Stelle: Fragen-Kurzform samt der
+            # E/G-Flags des Quiz.
+            questions, niveau_aktiv, minuspunkte = await _fragen_und_flags(db, session)
 
             scan_result = await db.execute(select(Scan).where(Scan.session_id == session.id))
             scans_list = scan_result.scalars().all()
@@ -806,21 +810,10 @@ async def stats_dashboard(user: User = Depends(get_current_user), db: AsyncSessi
             scale = {int(k): v for k, v in scale_raw.items()}
             weights = config.get("weights", {})
 
-            questions = []
-            if session.question_set_id:
-                q_result = await db.execute(
-                    select(QuestionSetItem).options(selectinload(QuestionSetItem.question))
-                    .where(QuestionSetItem.question_set_id == session.question_set_id)
-                )
-                qmap = session.question_map or {}
-                for item in q_result.scalars().all():
-                    q = item.question
-                    questions.append({"id": q.id, "correct_answer": qmap.get(str(q.id), q.correct_answer),
-                                      "niveau": item.niveau or ""})
-
-            qs_flags = await db.get(QuestionSet, session.question_set_id) if session.question_set_id else None
-            niveau_aktiv = bool(qs_flags.niveau_aktiv) if qs_flags else False
-            minuspunkte = bool(qs_flags.minuspunkte) if qs_flags else False
+            # Stand zweimal wortgleich hier (Klassenschnitt und
+            # Notenverteilung) — jetzt eine Stelle: Fragen-Kurzform samt der
+            # E/G-Flags des Quiz.
+            questions, niveau_aktiv, minuspunkte = await _fragen_und_flags(db, session)
 
             get_w = lambda qid: weights.get(str(qid), weights.get(qid, 1))
             max_score = sum(get_w(q["id"]) for q in questions if q["correct_answer"])
@@ -947,10 +940,7 @@ async def _fruehwarn_daten(db, user, class_id: int):
     for sess in sessions:
         if not sess.question_set_id or not sess.created_at:
             continue
-        items = (await db.execute(
-            select(QuestionSetItem).options(selectinload(QuestionSetItem.question))
-            .where(QuestionSetItem.question_set_id == sess.question_set_id)
-        )).scalars().all()
+        items = await _set_items(db, sess.question_set_id)   # ungeordnet: hier wird nur gezaehlt
         qmap = sess.question_map or {}
         # Die richtige Antwort kann je Sitzung abweichen (question_map) — dieselbe
         # Quelle wie in der Auswertung, sonst rechnen zwei Ansichten verschieden.

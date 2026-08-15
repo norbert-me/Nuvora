@@ -11,8 +11,9 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..besitz import eigenes, klasse_oder_403, kurs_oder_klasse
 from ..database import get_db
-from ..models import OrgaItem, SchoolClass, Student, User
+from ..models import OrgaItem, Student, User
 from .auth import rate_limit
 from .modules import modul_pflicht
 
@@ -23,20 +24,16 @@ MODULE_KEY = "orga"
 require_module = modul_pflicht(MODULE_KEY)
 
 
-async def _owned_class(db, user, class_id) -> SchoolClass:
-    sc = await db.get(SchoolClass, class_id)
-    if not sc:
-        raise HTTPException(404, "Klasse nicht gefunden")
-    if sc.owner_id and sc.owner_id != user.id:
-        raise HTTPException(403, "Keine Berechtigung")
-    return sc
+# Frueher stand die Klassenpruefung in fuenf Routern wortgleich; jetzt eine
+# Quelle (app/besitz.py). Der alte Name bleibt, damit die Aufrufer unberuehrt
+# sind.
+_owned_class = klasse_oder_403
 
 
 async def _owned_item(db, user, item_id) -> OrgaItem:
-    it = await db.get(OrgaItem, item_id)
-    if not it or it.owner_id != user.id:
-        raise HTTPException(404, "Punkt nicht gefunden")
-    return it
+    # War der uebliche Dreizeiler „holen, owner_id vergleichen, sonst 404" —
+    # der stand in jedem Router noch einmal und heisst jetzt `besitz.eigenes`.
+    return await eigenes(db, OrgaItem, item_id, user, "Punkt nicht gefunden")
 
 
 class ItemIn(BaseModel):
@@ -56,12 +53,13 @@ class ToggleIn(BaseModel):
 
 
 def _key_where(user, class_id, kurs_id):
-    """Checkliste hängt am Kurs (Fach); Fallback Klasse ohne Kurs.
+    """Checkliste haengt am Kurs (Fach); Fallback Klasse ohne Kurs.
 
-    Liste von WHERE-Bedingungen (unterschiedlich lang) — immer per * entpackt."""
-    if kurs_id is not None:
-        return [OrgaItem.owner_id == user.id, OrgaItem.kurs_id == kurs_id]
-    return [OrgaItem.owner_id == user.id, OrgaItem.class_id == class_id, OrgaItem.kurs_id.is_(None)]
+    Die Schluesselregel steht seit dem Zusammenfuehren in
+    `app/besitz.kurs_oder_klasse` — sie lag fuenfmal als eigenes `_key_where`
+    herum und unterschied sich nur im Modell. Liste von WHERE-Bedingungen
+    (unterschiedlich lang) — immer per * entpackt."""
+    return kurs_oder_klasse(OrgaItem, user, class_id, kurs_id)
 
 
 @router.get("/{class_id}", response_model=List[ItemOut])

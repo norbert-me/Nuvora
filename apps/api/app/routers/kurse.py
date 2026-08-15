@@ -18,6 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from datetime import datetime, timezone
 
+from ..besitz import eigenes
+from ..schueler import sortiert
 from ..database import get_db
 from ..models import Kurs, KursTag, KursStudent, SchoolClass, Student, User
 from .auth import get_current_user
@@ -93,20 +95,16 @@ async def _kette_ok(db, user, kurs_id: int, vorgaenger_id: int) -> None:
 
 
 async def _owned_kurs(db, user, kurs_id) -> Kurs:
-    k = await db.get(Kurs, kurs_id)
-    if not k or k.owner_id != user.id:
-        raise HTTPException(404, "Kurs nicht gefunden")
-    return k
+    return await eigenes(db, Kurs, kurs_id, user, "Kurs nicht gefunden")
 
 
 async def _own_class(db, user, class_id) -> SchoolClass:
     # Besitz strikt wie in classes.py: eine Klasse ohne owner_id gehoert
     # niemandem und darf nicht in einen fremden Kurs wandern — ueber den Kurs
-    # wuerden sonst Niveau und Massnahmen ihrer SuS geschrieben.
-    c = await db.get(SchoolClass, class_id)
-    if not c or c.owner_id != user.id:
-        raise HTTPException(404, "Klasse nicht gefunden")
-    return c
+    # wuerden sonst Niveau und Massnahmen ihrer SuS geschrieben. Deshalb der
+    # allgemeine `eigenes` und NICHT `besitz.klasse_oder_403`, das eine Klasse
+    # ohne owner_id durchlaesst.
+    return await eigenes(db, SchoolClass, class_id, user, "Klasse nicht gefunden")
 
 
 # ─── Mitgliedschaft (wird auch von Anwesenheit/Klassen genutzt) ───
@@ -175,6 +173,37 @@ async def sibling_class_ids(db, class_id) -> set:
     ids = await member_class_ids(db, kurse)
     ids.add(class_id)
     return ids
+
+
+async def _students_of_kurs(db, kurs_id, ordered: bool = False) -> list:
+    """Alle SuS-Zeilen des Kurses; leere Liste, wenn keiner drin ist. Stand
+    viermal fast wortgleich da (kurs_students, set_niveau, kurs_massnahmen,
+    set_kurs_massnahmen) — Lesen und Schreiben MUESSEN dieselbe Menge treffen,
+    sonst speichert eine Seite, was die andere nicht zeigt. Einziger
+    Unterschied: `ordered` fuer die Anzeigereihenfolge der Leseseiten."""
+    sids = list(await member_student_ids(db, kurs_id))
+    if not sids:
+        return []
+    if ordered:
+        return await sortiert(db, Student.id.in_(sids))
+    return (await db.execute(select(Student).where(Student.id.in_(sids)))).scalars().all()
+
+
+async def _rows_of_person(db, studs, name: str) -> list:
+    """Alle Zeilen einer Person (gleicher Name) — die des Kurses und die aus den
+    Geschwisterklassen, ohne Dubletten. War wortgleich in set_niveau und
+    set_kurs_massnahmen: E/G wie Massnahmen haengen an der Person, nicht an der
+    Fach-Klasse, und gehen deshalb auf jede ihrer Zeilen — eine Aufloesung
+    statt zwei."""
+    klassen = {s.class_id for s in studs if s.name.strip() == name}
+    zwillinge = []
+    if klassen:
+        alle = set()
+        for cid in klassen:
+            alle |= await sibling_class_ids(db, cid)
+        zwillinge = (await db.execute(select(Student).where(Student.class_id.in_(list(alle))))).scalars().all()
+    return [s for s in {x.id: x for x in list(studs) + list(zwillinge)}.values()
+            if s.name.strip() == name]
 
 
 async def _classes_by_kurs(db, user, kurse):
@@ -381,12 +410,8 @@ async def kurs_students(kurs_id: int, user: User = Depends(get_current_user), db
     """SuS des Kurses (per Name dedupliziert) mit ihrem E/G-Niveau. E/G ist eine
     Eigenschaft der Person, nicht der Fach-Klasse — darum hier gepflegt."""
     await _owned_kurs(db, user, kurs_id)
-    sids = list(await member_student_ids(db, kurs_id))
-    if not sids:
-        return []
-    studs = (await db.execute(select(Student).where(Student.id.in_(sids)).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
     out = {}
-    for s in studs:
+    for s in await _students_of_kurs(db, kurs_id, ordered=True):
         n = s.name.strip()
         if not n:
             continue
@@ -409,22 +434,13 @@ async def set_niveau(kurs_id: int, body: NiveauIn, user: User = Depends(get_curr
     # Dieselbe Menge wie beim Lesen (kurs_students): SuS der Mitgliedsklassen
     # UND einzeln hinzugefuegte. Ueber member_class_ids allein blieb ein Kurs
     # aus Teilen von Klassen ohne Treffer — gespeichert wurde dann nichts.
-    sids = list(await member_student_ids(db, kurs_id))
-    if not sids:
+    studs = await _students_of_kurs(db, kurs_id)
+    if not studs:
         return
-    studs = (await db.execute(select(Student).where(Student.id.in_(sids)))).scalars().all()
     # Auf alle Fach-Klassen-Zeilen der Person schreiben (gleicher Name) — E/G
     # ist eine Eigenschaft der Person, nicht der einzelnen Fach-Klasse.
-    klassen = {s.class_id for s in studs if s.name.strip() == name}
-    zwillinge = []
-    if klassen:
-        alle = set()
-        for cid in klassen:
-            alle |= await sibling_class_ids(db, cid)
-        zwillinge = (await db.execute(select(Student).where(Student.class_id.in_(list(alle))))).scalars().all()
-    for s in {x.id: x for x in list(studs) + list(zwillinge)}.values():
-        if s.name.strip() == name:
-            s.niveau = niveau
+    for s in await _rows_of_person(db, studs, name):
+        s.niveau = niveau
     await db.commit()
 
 
@@ -444,14 +460,9 @@ class MassnahmenIn(BaseModel):
 async def kurs_massnahmen(kurs_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """SuS des Kurses (per Name dedupliziert) mit ihren Maßnahmen FÜR DIESEN
     Kurs. Altbestand ohne kurs_id gilt weiter überall und wird mitgezeigt."""
-    from .classes import MASSNAHMEN_VALUES  # ein Vokabular, eine Quelle
     await _owned_kurs(db, user, kurs_id)
-    sids = list(await member_student_ids(db, kurs_id))
-    if not sids:
-        return []
-    studs = (await db.execute(select(Student).where(Student.id.in_(sids)).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
     out = {}
-    for s in studs:
+    for s in await _students_of_kurs(db, kurs_id, ordered=True):
         n = s.name.strip()
         if not n:
             continue
@@ -488,23 +499,13 @@ async def set_kurs_massnahmen(kurs_id: int, body: MassnahmenIn, user: User = Dep
     # Dieselbe Menge wie beim Lesen: SuS der Mitgliedsklassen UND einzeln
     # hinzugefügte. Über member_class_ids allein blieb ein Kurs aus Teilen von
     # Klassen ohne Treffer — gespeichert wurde dann nichts.
-    sids = list(await member_student_ids(db, kurs_id))
-    if not sids:
+    studs = await _students_of_kurs(db, kurs_id)
+    if not studs:
         return
-    studs = (await db.execute(select(Student).where(Student.id.in_(sids)))).scalars().all()
     # Auf alle Fach-Klassen-Zeilen der Person schreiben (gleicher Name), damit
     # jede Ansicht dieselben Daten sieht — auch die des Kalenders, der über die
     # Geschwisterklassen der Termin-Klasse sucht.
-    klassen = {s.class_id for s in studs if s.name.strip() == name}
-    zwillinge = []
-    if klassen:
-        alle = set()
-        for cid in klassen:
-            alle |= await sibling_class_ids(db, cid)
-        zwillinge = (await db.execute(select(Student).where(Student.class_id.in_(list(alle))))).scalars().all()
-    for s in {x.id: x for x in list(studs) + list(zwillinge)}.values():
-        if s.name.strip() != name:
-            continue
+    for s in await _rows_of_person(db, studs, name):
         fremd = [m for m in (s.massnahmen or []) if m.get("kurs_id") not in (None, kurs_id)]
         s.massnahmen = (fremd + neu) or None
     await db.commit()

@@ -6,13 +6,14 @@ import tempfile
 import cv2
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy import select
 
+from ..schueler import roster_klasse
+from ..pdfdruck import als_anhang, neue_seite
 from ..database import get_db
-from ..models import SchoolClass, Student, User
+from ..models import SchoolClass, User
 from .auth import get_current_user
 from .modules import modul_pflicht
 
@@ -66,25 +67,18 @@ async def class_cards_pdf(class_id: int, user: User = Depends(get_current_user),
 
     # Karten kursweit: eine Karte je Person (gleichnamige Fach-Klassen-SuS
     # dedupliziert). card_id ist bei gleicher Lerngruppe deckungsgleich.
-    from .kurse import sibling_class_ids
-    sib = await sibling_class_ids(db, class_id)
-    all_studs = (await db.execute(select(Student).where(Student.class_id.in_(sib)).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
-    canon = {}
-    for s in all_studs:
-        canon.setdefault(s.name.strip(), s)
     # Die Bögen kommen in Klassenreihenfolge aus dem Drucker — also position,
     # nicht card_id: die steht nur AUF der Karte und ist keine Reihenfolge.
-    students = sorted(canon.values(), key=lambda s: (s.position or 0, s.card_id, s.id))
+    # Genau der kanonische Roster der anderen Module; er steht in app/schueler.py.
+    students = await roster_klasse(db, class_id)
     if not students:
         raise HTTPException(400, "Keine Lernenden in der Klasse")
 
-    from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
-    from reportlab.pdfgen import canvas
 
     buf = io.BytesIO()
-    c = canvas.Canvas(buf, pagesize=A4)
-    page_w, page_h = A4
+    # A4-Leinwand aus app/pdfdruck.py — dieselben Zeilen standen an acht Stellen.
+    c, page_w, page_h = neue_seite(buf)
 
     card_w = page_w - 20 * mm
     card_h = (page_h - 30 * mm) / 2
@@ -160,8 +154,4 @@ async def class_cards_pdf(class_id: int, user: User = Depends(get_current_user),
 
     buf.seek(0)
     filename = f"CardVote_{cls.name}.pdf"
-    return StreamingResponse(
-        buf,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    return als_anhang(buf, filename)

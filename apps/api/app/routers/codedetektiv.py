@@ -7,7 +7,6 @@ arbeitet weiter mit ihrer stabilen `client_id`; upsert läuft darüber.
 import asyncio
 import random
 import secrets
-from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -17,6 +16,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
+from ..zeit import jetzt
 from ..database import get_db
 from ..models import CodePuzzle, CodeSession, Topic, User
 from .auth import rate_limit, client_ip
@@ -84,8 +84,7 @@ async def delete_puzzle(client_id: str, user: User = Depends(require_module), db
 
 # ─── Klassen-Sessions (serverseitig, öffentliches Beitreten ohne Login) ───
 
-def _now():
-    return datetime.now(timezone.utc)
+_now = jetzt   # dieselbe Uhr wie in karten.py — sie steht im Kern (app/zeit.py)
 
 
 def _session_public(s: CodeSession) -> dict:

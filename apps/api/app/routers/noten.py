@@ -21,7 +21,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from ..besitz import eigene_klasse, eigenes, kurs_oder_klasse
+from ..felder import ohne_leer, ohne_none
+from ..pdfdruck import als_anhang, neue_seite
 from ..database import get_db
+# `roster_kurs` heisst hier unten schon ein Endpunkt — deshalb umbenannt
+# importiert, sonst ueberdeckt der Endpunkt den Helfer.
+from ..schueler import roster_klasse, roster_kurs as _kanon_kurs
 from ..importe import geprueft
 from ..models import (
     GradeCategory, GradeEntry, GradeSection, GradeOverride, QuartalDivider, SchoolClass,
@@ -38,12 +44,9 @@ MODULE_KEY = "auswertung"
 require_module = modul_pflicht(MODULE_KEY)
 
 
-async def _owned_class(db: AsyncSession, user: User, class_id: int) -> SchoolClass:
-    r = await db.execute(select(SchoolClass).where(SchoolClass.id == class_id, SchoolClass.owner_id == user.id))
-    cls = r.scalar_one_or_none()
-    if not cls:
-        raise HTTPException(404, "Klasse nicht gefunden")
-    return cls
+# Frueher stand die strenge Klassenpruefung hier und in karten.py doppelt;
+# jetzt eine Quelle (app/besitz.py).
+_owned_class = eigene_klasse
 
 
 async def _kurs_roster(db, user, class_id, kurs_id=None):
@@ -60,20 +63,12 @@ async def _kurs_roster(db, user, class_id, kurs_id=None):
         # Parameter kam roh aus der Adresse, und `user` wurde hier gar nicht
         # benutzt. Betroffen waren summary, year, das Zeugnis-PDF und der
         # Export, also alle Wege, die eine Namensliste ausgeben.
-        from .kurse import _owned_kurs, member_student_ids
+        from .kurse import _owned_kurs
         await _owned_kurs(db, user, kurs_id)
-        sids = list(await member_student_ids(db, kurs_id))
-        if not sids:
-            return []
-        studs = (await db.execute(select(Student).where(Student.id.in_(sids)).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
-    else:
-        from .kurse import sibling_class_ids
-        sib = await sibling_class_ids(db, class_id)
-        studs = (await db.execute(select(Student).where(Student.class_id.in_(sib)).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
-    canon = {}
-    for s in studs:
-        canon.setdefault(s.name.strip(), s)
-    return sorted(canon.values(), key=lambda s: (s.position or 0, s.card_id, s.id))
+        return await _kanon_kurs(db, kurs_id)
+    # Beide Zweige rechneten dieselbe kanonische Liste aus; sie steht jetzt in
+    # app/schueler.py und wird auch von results.py und klassenarbeit.py benutzt.
+    return await roster_klasse(db, class_id)
 
 
 async def _student_in_kurs(db, class_id, student_id, kurs_id=None) -> bool:
@@ -87,19 +82,57 @@ async def _student_in_kurs(db, class_id, student_id, kurs_id=None) -> bool:
 
 
 async def _owned_section(db: AsyncSession, user: User, section_id: int) -> GradeSection:
-    r = await db.execute(select(GradeSection).where(GradeSection.id == section_id, GradeSection.owner_id == user.id))
-    sec = r.scalar_one_or_none()
-    if not sec:
-        raise HTTPException(404, "Abschnitt nicht gefunden")
-    return sec
+    return await eigenes(db, GradeSection, section_id, user, "Abschnitt nicht gefunden")
 
 
 async def _owned_category(db: AsyncSession, user: User, category_id: int) -> GradeCategory:
-    r = await db.execute(select(GradeCategory).where(GradeCategory.id == category_id, GradeCategory.owner_id == user.id))
-    cat = r.scalar_one_or_none()
-    if not cat:
-        raise HTTPException(404, "Spalte nicht gefunden")
-    return cat
+    return await eigenes(db, GradeCategory, category_id, user, "Spalte nicht gefunden")
+
+
+# ─── Regeln, die Eingabe UND Import teilen ───
+#
+# Jede dieser Regeln stand zweimal im Modul: einmal an den In-Modellen der
+# Oberflaeche, einmal wortgleich an den Import-Modellen weiter unten (mit dem
+# Kommentar „gleiche Regel wie …" — der Hinweis war da, die Kopie auch). Jetzt
+# ist es eine Funktion, die beide als Validator einhaengen: der Importweg kann
+# nicht mehr aus Versehen mehr duerfen als die Maske.
+
+def _pruefe_note(v):
+    """Note: nichts oder 1,0 bis 6,0, auf zwei Stellen."""
+    if v is None:
+        return v
+    if v < 1.0 or v > 6.0:
+        raise ValueError("Note muss zwischen 1,0 und 6,0 liegen")
+    return round(v, 2)
+
+
+def _pruefe_gewicht(v: int) -> int:
+    """Gewicht in Prozent."""
+    if v < 0 or v > 100:
+        raise ValueError("Gewicht muss zwischen 0 und 100 Prozent liegen")
+    return v
+
+
+def _pruefe_notiz(v: str) -> str:
+    if len(v) > 2000:
+        raise ValueError("Notiz zu lang (max. 2000 Zeichen)")
+    return v
+
+
+def _pflicht_spaltenname(v: str) -> str:
+    """Name einer Notenspalte — stand dreimal wortgleich an den Uebernahme-Modellen."""
+    v = (v or "").strip()
+    if not v:
+        raise ValueError("Spaltenname darf nicht leer sein")
+    return v
+
+
+def _pflichtname(v: str) -> str:
+    """Name der Maske: leer ist ein Fehler, kein Ersatzwert."""
+    v = v.strip()
+    if not v:
+        raise ValueError("Name darf nicht leer sein")
+    return v
 
 
 # ─── Abschnitte ───
@@ -109,20 +142,8 @@ class SectionIn(BaseModel):
     weight: int = 0
     position: int = 0
 
-    @field_validator("name")
-    @classmethod
-    def name_ok(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
-            raise ValueError("Name darf nicht leer sein")
-        return v
-
-    @field_validator("weight")
-    @classmethod
-    def weight_ok(cls, v: int) -> int:
-        if v < 0 or v > 100:
-            raise ValueError("Gewicht muss zwischen 0 und 100 Prozent liegen")
-        return v
+    name_ok = field_validator("name")(_pflichtname)
+    weight_ok = field_validator("weight")(_pruefe_gewicht)
 
 
 class CategoryOut(BaseModel):
@@ -167,26 +188,20 @@ async def kurs_students(class_id: int, user: User = Depends(require_module), db:
 async def roster_kurs(kurs_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Noten-Zeilen eines Teilkurses — inkl. der EINZELN hinzugefügten SuS
     (Kurse aus Teilen von Klassen). Deduplikat per Name wie beim Klassen-Roster."""
-    from .kurse import _owned_kurs, member_student_ids
+    from .kurse import _owned_kurs
     await _owned_kurs(db, user, kurs_id)
-    sids = list(await member_student_ids(db, kurs_id))
-    if not sids:
-        return []
-    studs = (await db.execute(select(Student).where(Student.id.in_(sids)).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
-    canon = {}
-    for s in studs:
-        canon.setdefault(s.name.strip(), s)
-    ordered = sorted(canon.values(), key=lambda s: (s.position or 0, s.card_id, s.id))
+    ordered = await _kanon_kurs(db, kurs_id)
     return [{"id": s.id, "card_id": s.card_id, "name": s.name, "class_id": s.class_id} for s in ordered]
 
 
 def _sec_kurs_where(user, class_id, kurs_id):
-    """Abschnitte hängen am Kurs (Fach); Fallback Klasse ohne Kurs.
+    """Abschnitte haengen am Kurs (Fach); Fallback Klasse ohne Kurs.
 
-    Liste von WHERE-Bedingungen (unterschiedlich lang) — immer per * entpackt."""
-    if kurs_id is not None:
-        return [GradeSection.owner_id == user.id, GradeSection.kurs_id == kurs_id]
-    return [GradeSection.owner_id == user.id, GradeSection.class_id == class_id, GradeSection.kurs_id.is_(None)]
+    Die Schluesselregel steht seit dem Zusammenfuehren in
+    `app/besitz.kurs_oder_klasse` — sie lag fuenfmal als eigenes `_key_where`
+    herum und unterschied sich nur im Modell. Liste von WHERE-Bedingungen
+    (unterschiedlich lang) — immer per * entpackt."""
+    return kurs_oder_klasse(GradeSection, user, class_id, kurs_id)
 
 
 @router.get("/classes/{class_id}/sections", response_model=List[SectionOut])
@@ -311,13 +326,7 @@ class CategoryIn(BaseModel):
     topic_id: Optional[int] = None   # Thema der Spalte (z.B. was die Klassenarbeit abdeckt)
     date: Optional[str] = None       # "YYYY-MM-DD" — Tag der Leistung, optional
 
-    @field_validator("name")
-    @classmethod
-    def name_ok(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
-            raise ValueError("Name darf nicht leer sein")
-        return v
+    name_ok = field_validator("name")(_pflichtname)
 
 
 def _parse_date(v: Optional[str]):
@@ -490,14 +499,8 @@ class EntryIn(BaseModel):
             raise ValueError("kind muss 'grade' oder 'observation' sein")
         return v
 
-    @field_validator("value")
-    @classmethod
-    def value_ok(cls, v):
-        if v is None:
-            return v
-        if v < 1.0 or v > 6.0:
-            raise ValueError("Note muss zwischen 1,0 und 6,0 liegen")
-        return round(v, 2)
+    value_ok = field_validator("value")(_pruefe_note)
+    note_ok = field_validator("note")(_pruefe_notiz)
 
     @field_validator("tendency")
     @classmethod
@@ -506,13 +509,6 @@ class EntryIn(BaseModel):
             return v
         if v not in (-1, 0, 1):
             raise ValueError("Tendenz muss -1, 0 oder 1 sein")
-        return v
-
-    @field_validator("note")
-    @classmethod
-    def note_ok(cls, v: str) -> str:
-        if len(v) > 2000:
-            raise ValueError("Notiz zu lang (max. 2000 Zeichen)")
         return v
 
 
@@ -651,12 +647,7 @@ class OverrideIn(BaseModel):
     term: str = "1"                   # nur fuer die Endnote (section_id None) relevant
     value: float
 
-    @field_validator("value")
-    @classmethod
-    def value_ok(cls, v):
-        if v < 1.0 or v > 6.0:
-            raise ValueError("Note muss zwischen 1,0 und 6,0 liegen")
-        return round(v, 2)
+    value_ok = field_validator("value")(_pruefe_note)
 
 
 async def _find_override(db, user, class_id, student_id, section_id, term, kurs_id=None):
@@ -918,13 +909,7 @@ class ImportBody(BaseModel):
     column_name: str
     grades: List[ImportGrade]
 
-    @field_validator("column_name")
-    @classmethod
-    def name_ok(cls, v: str) -> str:
-        v = (v or "").strip()
-        if not v:
-            raise ValueError("Spaltenname darf nicht leer sein")
-        return v
+    name_ok = field_validator("column_name")(_pflicht_spaltenname)
 
 
 @router.post("/import-session", status_code=201)
@@ -999,13 +984,7 @@ class ImportGradesBody(BaseModel):
     source_kind: str = ""   # Herkunft, z.B. "karten" (fuer die Kennzeichnung im Notenbuch)
     grades: List[GradeCell]
 
-    @field_validator("column_name")
-    @classmethod
-    def name_ok(cls, v: str) -> str:
-        v = (v or "").strip()
-        if not v:
-            raise ValueError("Spaltenname darf nicht leer sein")
-        return v
+    name_ok = field_validator("column_name")(_pflicht_spaltenname)
 
 
 @router.post("/import-grades", status_code=201)
@@ -1050,7 +1029,10 @@ async def import_grades(body: ImportGradesBody, user: User = Depends(require_mod
 # bei. Uebernahme matcht diesen Namen gegen die SuS des Kurses (normalisiert).
 # Nicht zuordenbare Namen werden gemeldet, nicht geraten.
 
-_DEFAULT_SCALE = {"1": 87, "2": 73, "3": 59, "4": 45, "5": 20, "6": 0}
+# Frueher stand die Standardskala hier noch einmal (mit Text-Schluesseln).
+# `note_aus_pct` normalisiert die Schluessel ohnehin, gerechnet wird an einer
+# Stelle — also auch nur eine Skala.
+from ..scoring import DEFAULT_SCALE as _DEFAULT_SCALE  # noqa: E402
 
 
 def _grade_from_pct(pct: float, scale: dict) -> float:
@@ -1085,13 +1067,7 @@ class ImportCodeBody(BaseModel):
     section_id: int
     column_name: str
 
-    @field_validator("column_name")
-    @classmethod
-    def name_ok(cls, v: str) -> str:
-        v = (v or "").strip()
-        if not v:
-            raise ValueError("Spaltenname darf nicht leer sein")
-        return v
+    name_ok = field_validator("column_name")(_pflicht_spaltenname)
 
 
 @router.post("/import-code-session", status_code=201)
@@ -1211,44 +1187,26 @@ class ImportSection(BaseModel):
     position: int = 0
     categories: List["ImportCategory"] = []
 
-    @field_validator("name", mode="before")
-    @classmethod
-    def _leer_name(cls, v):
-        # Aeltere Dateien schrieben fehlende Werte als null.
-        return "" if v is None else v
+    # Aeltere Dateien schrieben fehlende Werte als null.
+    _leer_name = field_validator("name", mode="before")(ohne_none(""))
 
-    @field_validator("weight", "position", mode="before")
-    @classmethod
-    def _leer_zahl(cls, v):
-        return 0 if v in (None, "") else v
+    _leer_zahl = field_validator("weight", "position", mode="before")(ohne_leer(0))
 
     @field_validator("name")
     @classmethod
     def name_ok(cls, v: str) -> str:
         return (v or "").strip()[:120] or "Abschnitt"
 
-    @field_validator("weight")
-    @classmethod
-    def weight_ok(cls, v: int) -> int:
-        # Gleiche Regel wie SectionIn.weight_ok — der Importweg darf nicht mehr duerfen.
-        if v < 0 or v > 100:
-            raise ValueError("Gewicht muss zwischen 0 und 100 Prozent liegen")
-        return v
+    weight_ok = field_validator("weight")(_pruefe_gewicht)
 
 
 class ImportCategory(BaseModel):
     name: str = "Spalte"
     position: int = 0
 
-    @field_validator("name", mode="before")
-    @classmethod
-    def _leer_name(cls, v):
-        return "" if v is None else v
+    _leer_name = field_validator("name", mode="before")(ohne_none(""))
 
-    @field_validator("position", mode="before")
-    @classmethod
-    def _leer_zahl(cls, v):
-        return 0 if v in (None, "") else v
+    _leer_zahl = field_validator("position", mode="before")(ohne_leer(0))
 
     @field_validator("name")
     @classmethod
@@ -1288,10 +1246,7 @@ class ImportEntry(BaseModel):
     note: str = ""
     date: Optional[datetime] = None
 
-    @field_validator("kind", "note", mode="before")
-    @classmethod
-    def _leer(cls, v):
-        return v if v is not None else ""
+    _leer = field_validator("kind", "note", mode="before")(ohne_none(""))
 
     @field_validator("date", mode="before")
     @classmethod
@@ -1306,14 +1261,8 @@ class ImportEntry(BaseModel):
             raise ValueError("muss 'grade' oder 'observation' sein")
         return v
 
-    @field_validator("value")
-    @classmethod
-    def value_ok(cls, v):
-        if v is None:
-            return v
-        if v < 1.0 or v > 6.0:
-            raise ValueError("Note muss zwischen 1,0 und 6,0 liegen")
-        return round(v, 2)
+    value_ok = field_validator("value")(_pruefe_note)
+    note_ok = field_validator("note")(_pruefe_notiz)
 
     @field_validator("tendency")
     @classmethod
@@ -1322,28 +1271,13 @@ class ImportEntry(BaseModel):
             raise ValueError("Tendenz muss -1, 0 oder 1 sein")
         return v
 
-    @field_validator("note")
-    @classmethod
-    def note_ok(cls, v: str) -> str:
-        if len(v) > 2000:
-            raise ValueError("Notiz zu lang (max. 2000 Zeichen)")
-        return v
-
 
 class ImportOverride(BaseModel):
     card_id: Optional[int] = None
     s: Optional[int] = None
     value: Optional[float] = None
 
-    @field_validator("value")
-    @classmethod
-    def value_ok(cls, v):
-        # Gleiche Regel wie OverrideIn.value_ok.
-        if v is None:
-            return v
-        if v < 1.0 or v > 6.0:
-            raise ValueError("Note muss zwischen 1,0 und 6,0 liegen")
-        return round(v, 2)
+    value_ok = field_validator("value")(_pruefe_note)
 
 
 class ImportDivider(BaseModel):
@@ -1362,10 +1296,7 @@ class NotenImport(BaseModel):
     overrides: List[ImportOverride] = []
     dividers: List[ImportDivider] = []
 
-    @field_validator("sections", "entries", "overrides", "dividers", mode="before")
-    @classmethod
-    def _leer(cls, v):
-        return v if v is not None else []
+    _leer = field_validator("sections", "entries", "overrides", "dividers", mode="before")(ohne_none([]))
 
 
 @router.post("/classes/{class_id}/import")
@@ -1459,11 +1390,9 @@ async def _zeugnis_pdf(class_id: int, term: str, agg: str, kurs_id: Optional[int
             karten = {}
 
     def build(buf):
-        from reportlab.lib.pagesizes import A4
         from reportlab.lib.units import mm
-        from reportlab.pdfgen import canvas
-        c = canvas.Canvas(buf, pagesize=A4)
-        w, h = A4
+        # A4-Leinwand aus app/pdfdruck.py — dieselben Zeilen standen an acht Stellen.
+        c, w, h = neue_seite(buf)
         for st in students:
             s = sum_by_id.get(st.id)
             y = h - 25 * mm
@@ -1546,11 +1475,8 @@ async def zeugnis_export(class_id: int, term: str = "1", agg: str = "mean", kurs
     Fehlzeiten/Karten nur, wenn die Module aktiv sind (Regel 3 — Noten laeuft
     ohne sie voll). Besonders schuetzenswerte Daten (foerder/notizen) sind
     bewusst NICHT enthalten."""
-    import io
-    from fastapi.responses import StreamingResponse
     pdf, name = await _zeugnis_pdf(class_id, term, agg, kurs_id, student_id, user, db)
-    return StreamingResponse(io.BytesIO(pdf), media_type="application/pdf",
-                             headers={"Content-Disposition": f'attachment; filename="{name}"'})
+    return als_anhang(pdf, name)
 
 
 @router.get("/classes/{class_id}/export.zip")
