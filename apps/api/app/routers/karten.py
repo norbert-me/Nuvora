@@ -1041,25 +1041,33 @@ async def _student_by_token(db: AsyncSession, token: str, modul="karten") -> Stu
     """
     from .modules import is_active
 
+    # EINE Meldung fuer jeden Grund. Vorher gab es drei („Kein Token",
+    # „Ungültiger Token", „Zugang nicht mehr gültig") — daran liess sich von
+    # aussen ablesen, ob ein Token ueberhaupt existiert und nur das Modul aus
+    # ist. Das ist genau die Auskunft, die niemand bekommen soll.
+    tot = HTTPException(401, "Zugang nicht mehr gültig")
+
     if not token:
-        raise HTTPException(401, "Kein Token")
+        raise tot
     r = await db.execute(select(Student).where(Student.karten_token == token))
     st = r.scalar_one_or_none()
     if not st:
-        raise HTTPException(401, "Ungültiger Token")
+        raise tot
     cls = await db.get(SchoolClass, st.class_id)
-    if cls is not None and (cls.deleted_at is not None or cls.archived_at is not None):
-        raise HTTPException(401, "Zugang nicht mehr gültig")
+    # Keine Klasse = kein Zugang. Frueher hingen beide Pruefungen an
+    # `cls is not None`; bei einer verwaisten class_id (harte Loeschung) fielen
+    # damit Papierkorb-, Archiv- UND Modulpruefung aus, und der Zettel lieferte
+    # weiter Karten aus. Fehlt der Traeger, gilt der Zugang nicht.
+    if cls is None or cls.deleted_at is not None or cls.archived_at is not None:
+        raise tot
     # `modul` ist ein Schluessel oder mehrere: dann reicht EINES davon. Der
     # QR-Code selbst gilt naemlich, solange ueberhaupt etwas dahinter steht —
     # Karten ODER Testergebnisse.
     schluessel = (modul,) if isinstance(modul, str) else tuple(modul or ())
-    if cls is not None and cls.owner_id and schluessel:
+    if cls.owner_id and schluessel:
         erlaubt = [k for k in schluessel if await is_active(db, cls.owner_id, k)]
         if not erlaubt:
-            # Bewusst dieselbe Meldung wie bei einem toten Token: nach aussen
-            # soll nicht erkennbar sein, welche Module eine Lehrkraft nutzt.
-            raise HTTPException(401, "Zugang nicht mehr gültig")
+            raise tot
     return st
 
 

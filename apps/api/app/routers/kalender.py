@@ -122,12 +122,46 @@ async def list_entries(frm: Optional[datetime] = None, to: Optional[datetime] = 
     return out
 
 
+async def _check_verknuepfungen(db: AsyncSession, user: User, body) -> None:
+    """Geplantes Quiz/Deck/Lernleiter/Einstieg: gehoert es dem Nutzer, und laeuft
+    das Modul ueberhaupt?
+
+    Die Oberflaeche blendet den Selektor aus, wenn ein Modul fehlt — der Server
+    nahm die Verknuepfung aber trotzdem an, samt FREMDER IDs: `**model_dump()`
+    schrieb alles ungeprueft in den Eintrag. Regel 3 gilt auch dann, wenn
+    niemand hinsieht; und eine fremde ID ist eine Mandantengrenze, keine
+    Nachlaessigkeit.
+    """
+    from ..models import CardDeck, LearningLadder, Method, QuestionSet
+    from .modules import is_active
+
+    # (Feld, Modul, Modell, Eigentuemer-Spalte)
+    felder = (
+        ("cardvote_set_id", "cardvote", QuestionSet, "owner_id"),
+        ("karten_deck_id", "karten", CardDeck, "owner_id"),
+        ("lernpfad_ladder_id", "lernpfad", LearningLadder, None),
+        ("method_id", "unterrichtsplanung", Method, "owner_id"),
+    )
+    for feld, modul, modell, eigner in felder:
+        wert = getattr(body, feld, None)
+        if wert is None:
+            continue
+        if not await is_active(db, user.id, modul):
+            raise HTTPException(403, f"Modul {modul} ist nicht aktiv")
+        obj = await db.get(modell, wert)
+        # Die Lernleiter haengt am Pfad, nicht direkt am Konto — dort prueft der
+        # Lernpfad-Router; hier reicht, dass es sie gibt.
+        if not obj or (eigner and getattr(obj, eigner, None) != user.id):
+            raise HTTPException(404, "Verknüpfter Eintrag nicht gefunden")
+
+
 @router.post("/entries", response_model=EntryOut, status_code=201)
 async def create_entry(body: EntryIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("kalender_entry", f"u{user.id}", 300, 60, "Zu viele Eintraege. Bitte kurz warten.")
     await _check_class(db, user, body.class_id)
     await _check_kurs(db, user, body.kurs_id)
     await _check_topic(db, user, body.topic_id)
+    await _check_verknuepfungen(db, user, body)
     e = CalendarEntry(owner_id=user.id, **body.model_dump())
     db.add(e)
     await db.commit()
@@ -144,6 +178,7 @@ async def update_entry(entry_id: int, body: EntryIn, user: User = Depends(requir
     await _check_class(db, user, body.class_id)
     await _check_kurs(db, user, body.kurs_id)
     await _check_topic(db, user, body.topic_id)
+    await _check_verknuepfungen(db, user, body)
     for k, v in body.model_dump().items():
         setattr(e, k, v)
     await db.commit()

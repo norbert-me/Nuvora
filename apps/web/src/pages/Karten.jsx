@@ -384,7 +384,12 @@ export default function Karten() {
       )}
 
       {view === "progress" && (() => {
-        const total = progress[0]?.total || 0;
+        // Die Kartenzahl gilt JE KIND: der Server filtert sie nach Niveau
+        // (E-Kind sieht E- und neutrale Karten, G-Kind G- und neutrale). Hier
+        // stand `progress[0].total` — die Zahl des ersten Kindes als Nenner fuer
+        // alle. Ein G-Kind bekam damit Rueckstand fuer Karten angerechnet, die
+        // es nie zu sehen bekommt; genau das verbietet die E/G-Regel.
+        const gesamtIrgendwo = progress.some((p) => (p.total || 0) > 0);
         // Klassen-Reifegrad zeigt nur aktiv gelernte Karten — "Neu" (noch nicht
         // angefasst) bleibt aussen vor, sonst spiegelt der Balken vor allem
         // Wochenansicht: wer hat diese Woche (ab Montag) gelernt, wer noch nie.
@@ -394,7 +399,7 @@ export default function Karten() {
         const nieGelernt = progress.filter((p) => !p.last_reviewed).length;
         return (
           <>
-            {total === 0 ? (
+            {!gesamtIrgendwo ? (
               <p style={{ fontSize: 13.5, color: "var(--text3)", marginBottom: 16 }}>{t("karten.noRolledOut")}</p>
             ) : (
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
@@ -420,7 +425,7 @@ export default function Karten() {
                         <button onClick={() => openDetail(p)} style={{ border: "none", background: "none", color: "var(--accent)", cursor: "pointer", fontWeight: 600, fontSize: 13.5, padding: 0, textAlign: "left" }}>{p.name}</button>
                       </td>
                       <td style={{ ...td, textAlign: "left" }}><ReifeBar hist={p.hist} /></td>
-                      <td style={td}>{p.reviewed}{total ? ` / ${total}` : ""}</td>
+                      <td style={td}>{p.reviewed}{p.total ? ` / ${p.total}` : ""}</td>
                       <td style={{ ...td, color: p.due ? C.warning : "var(--text3)" }}>{p.due || "—"}</td>
                       <td style={{ ...td, color: "var(--text3)", fontSize: 12.5 }}>{p.last_reviewed ? new Date(p.last_reviewed).toLocaleDateString() : "—"}</td>
                     </tr>

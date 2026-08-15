@@ -92,6 +92,9 @@ export default function Noten() {
   const [term, setTerm] = useState("1");
   const aktiv = useAktiv();
   const cdAktiv = aktiv("code-detektiv");
+  // Auch die Herkunfts-Links sind Bruecken (Regel 3): ohne das Zielmodul fuehrt
+  // der Weg ins ModuleGate — der Verweis darf dann gar nicht erst dastehen.
+  const cvAktiv = aktiv("cardvote");
   const kartenAktiv = aktiv("karten");
   const [cdDialog, setCdDialog] = useState(false);
   const [topics, setTopics] = useState([]); // Kern-Themen: Spalte einem Thema zuordnen (Nachholbedarf)
@@ -706,12 +709,12 @@ export default function Noten() {
                       <div style={{ display: "flex", alignItems: "center", gap: 3, justifyContent: "center", position: "relative" }}>
                         <button onClick={() => setRenameCol(renameCol === c.id ? null : c.id)} title={t("noten.colOverview")}
                           style={{ width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", border: "none", background: "none", cursor: "pointer", color: "var(--text2)", fontWeight: 500, fontSize: 12, padding: "8px 6px" }}>{c.name}</button>
-                        {c.source_session_id ? (
+                        {c.source_session_id && cvAktiv ? (
                           <Link to={`/cardvote/evaluation/${c.source_session_id}`} title={t("noten.fromCardvote")} onClick={(e) => e.stopPropagation()}
                             style={{ display: "inline-flex", color: "var(--accent)", padding: "0 2px" }}>
                             <Icon d={ICONS.chart} size={13} />
                           </Link>
-                        ) : c.source_kind === "karten" ? (
+                        ) : c.source_kind === "karten" && kartenAktiv ? (
                           <Link to={`/karten?tab=progress&class=${classId}`} title={t("noten.fromKarten")} onClick={(e) => e.stopPropagation()}
                             style={{ display: "inline-flex", color: C.success, padding: "0 2px" }}>
                             <Icon d={ICONS.chart} size={13} />
@@ -722,7 +725,7 @@ export default function Noten() {
                           </span>
                         ) : null}
                         {renameCol === c.id && (
-                          <ColMenu t={t} cat={c} classId={classId} topics={topics} kartenAktiv={kartenAktiv} onNachhol={runNachhol} onCompare={setCompareCat} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
+                          <ColMenu t={t} cat={c} classId={classId} topics={topics} kartenAktiv={kartenAktiv} cvAktiv={cvAktiv} onNachhol={runNachhol} onCompare={setCompareCat} onStats={() => setStatsCol(c)} dividerOn={dividers.includes(c.id)} onToggleDivider={() => toggleDivider(c.id)}
                             onRename={async (name, topicId, datum) => { if (await call(() => fetch(`${API}/categories/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, section_id: sec.id, position: c.position ?? i, topic_id: topicId, date: datum }) }))) setRenameCol(null); }}
                             onDelete={() => {
                               setRenameCol(null);
@@ -814,18 +817,22 @@ export default function Noten() {
                                     style={{ width: "100%", minHeight: 32, border: "none", background: "none", cursor: "text", color: "var(--text)", fontSize: 13.5, fontWeight: noten.length ? 600 : 400 }}>
                                     {s.per_category[String(c.id)] !== undefined ? de(s.per_category[String(c.id)]) : <span style={{ color: "var(--border2)" }}>·</span>}
                                   </button>
-                                  {/* Ecke oben rechts: vorhandener Kommentar ist
-                                      ein gefuelltes Dreieck, sonst erscheint es
-                                      blass beim Ueberfahren. Kein zusaetzlicher
-                                      Knopf, der in jeder Zelle Platz kostet. */}
+                                  {/* Ecke oben rechts. Die Trefferflaeche ist 20 px
+                                      gross, das Dreieck darin nur 9 — vorher war der
+                                      Knopf so gross wie das Zeichen und kaum zu
+                                      treffen, erst recht nicht mit dem Finger. Das
+                                      Dreieck selbst faengt keine Klicks
+                                      (pointerEvents: none), sonst zielt man auf
+                                      seine schraege Kante. */}
                                   <button className="komm-ecke" title={kommentarVon(s.student_id, c.id) || t("noten.commentAdd")}
+                                    aria-label={t("noten.commentAdd")}
                                     onClick={(ev) => { ev.stopPropagation(); setKommentarFuer({ sid: s.student_id, cid: c.id, text: kommentarVon(s.student_id, c.id) }); }}
-                                    style={{ position: "absolute", top: 0, right: 0, width: 14, height: 14, padding: 0, border: "none", cursor: "pointer",
+                                    style={{ position: "absolute", top: 0, right: 0, width: 20, height: 20, padding: 0, border: "none", cursor: "pointer",
                                       background: "transparent", lineHeight: 0,
                                       opacity: kommentarVon(s.student_id, c.id) ? 1 : 0 }}>
-                                    <span style={{ display: "block", width: 0, height: 0,
+                                    <span style={{ display: "block", width: 0, height: 0, pointerEvents: "none",
                                       borderTop: `9px solid ${kommentarVon(s.student_id, c.id) ? C.warning : "var(--border2)"}`,
-                                      borderLeft: "9px solid transparent", marginLeft: 5 }} />
+                                      borderLeft: "9px solid transparent", marginLeft: 11 }} />
                                   </button>
                                 </div>)}
                           </td>
@@ -1132,7 +1139,7 @@ function SectionMenu({ t, sec, onEdit, onDelete, onAddCol, onOpen }) {
 }
 
 // Kleine Uebersicht zur Spalte: Anlagedatum plus Umbenennen/Loeschen.
-function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onToggleDivider, classId, topics = [], onNachhol, onCompare, kartenAktiv }) {
+function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onToggleDivider, classId, topics = [], onNachhol, onCompare, kartenAktiv, cvAktiv }) {
   const [name, setName] = useState(cat.name);
   const [topicId, setTopicId] = useState(cat.topic_id ?? "");
   const [datum, setDatum] = useState(cat.date || "");
@@ -1185,13 +1192,13 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
             <Icon d={ICONS.bulb} size={14} /> {t("noten.nachhol")}
           </button>
         )}
-        {cat.source_session_id && (
+        {cat.source_session_id && cvAktiv && (
           <Link to={`/cardvote/evaluation/${cat.source_session_id}`} onClick={onClose}
             style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 10, padding: "6px 8px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--accent)", textDecoration: "none", boxSizing: "border-box" }}>
             <Icon d={ICONS.chart} size={14} color="var(--accent)" />{t("noten.fromCardvote")}
           </Link>
         )}
-        {!cat.source_session_id && cat.source_kind === "karten" && (
+        {!cat.source_session_id && cat.source_kind === "karten" && kartenAktiv && (
           <Link to={`/karten?tab=progress&class=${classId}`} onClick={onClose}
             style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 10, padding: "6px 8px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: C.success, textDecoration: "none", boxSizing: "border-box" }}>
             <Icon d={ICONS.chart} size={14} color={C.success} />{t("noten.fromKarten")}
@@ -1230,8 +1237,14 @@ function ColForm({ t, onSave, onCancel, initial = "", vorschlag = "", initialDat
   // so heissen die meisten Spalten ohnehin („09.02.26"). Ohne beides gibt es
   // „Spalte 3" (der Vorschlag zaehlt die vorhandenen mit). Vorher passierte auf
   // OK gar nichts — ein Knopf, der stumm bleibt, sieht aus wie ein Fehler.
-  const nimm = () => onSave(name.trim() || datumKurz(datum) || vorschlag || t("noten.colName"),
-                            datum || null);
+  // Weder Titel noch Datum: dann ist heute gemeint. Der Vorschlag „Spalte 3"
+  // sagt nichts ueber die Leistung — das Datum schon, und es fuellt zugleich
+  // die Eigenschaft, nach der der Verlauf sortiert.
+  const nimm = () => {
+    const heute = new Date().toISOString().slice(0, 10);
+    const tag = datum || (name.trim() ? "" : heute);
+    onSave(name.trim() || datumKurz(tag) || vorschlag || t("noten.colName"), tag || null);
+  };
   return (
     <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center", flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
       {/* data-spalte: der Platzhalter ist jetzt der Namensvorschlag („Spalte 3")
@@ -1361,6 +1374,10 @@ function punktText(p, t) {
 }
 
 function GradeChart({ series, t, titel, hinweis, rechts }) {
+  // Eigenes Hinweisfeld statt `<title>` im SVG: das zeigt der Browser
+  // unzuverlaessig (und nur einzeilig, nach Verzoegerung). Hier steht es sofort
+  // und mehrzeilig — Datum, Spalte, Note.
+  const [zeigt, setZeigt] = useState(null);   // { x, y, text }
   if (series.length < 2) return null;
   const W = 340, H = 170, padL = 26, padR = 12, padT = 12, padB = 20;
   const n = series.length;
@@ -1375,7 +1392,9 @@ function GradeChart({ series, t, titel, hinweis, rechts }) {
         {rechts}
       </div>
       {hinweis && <div style={{ fontSize: 11.5, color: "var(--text3)", marginBottom: 6 }}>{hinweis}</div>}
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }} role="img" aria-label={t("noten.verlauf")}>
+      <div style={{ position: "relative" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }} role="img" aria-label={t("noten.verlauf")}
+        onMouseLeave={() => setZeigt(null)}>
         {[1, 2, 3, 4, 5, 6].map((g) => (
           <g key={g}>
             <line x1={padL} y1={y(g)} x2={W - padR} y2={y(g)} stroke="var(--border)" strokeWidth="1" />
@@ -1385,15 +1404,33 @@ function GradeChart({ series, t, titel, hinweis, rechts }) {
         <path d={line} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
         {pts.map((p, i) => (
           <g key={i}>
-            {/* Groesserer, unsichtbarer Kreis darunter: der 4-px-Punkt ist mit
-                der Maus kaum zu treffen, und ohne Treffer gibt es keinen
-                Hinweistext. */}
-            <circle cx={p.cx} cy={p.cy} r="11" fill="transparent" />
-            <circle cx={p.cx} cy={p.cy} r="4" fill="var(--accent)" stroke="var(--card)" strokeWidth="1.5" />
-            <title>{punktText(p.s, t)}</title>
+            {/* Grosse, unsichtbare Trefferflaeche: der 4-px-Punkt ist mit der
+                Maus kaum zu treffen. */}
+            <circle cx={p.cx} cy={p.cy} r="12" fill="transparent"
+              onMouseEnter={() => setZeigt({ i, text: punktText(p.s, t) })}
+              onFocus={() => setZeigt({ i, text: punktText(p.s, t) })}
+              tabIndex={0} style={{ cursor: "pointer", outline: "none" }} />
+            <circle cx={p.cx} cy={p.cy} r={zeigt?.i === i ? 6 : 4} fill="var(--accent)"
+              stroke="var(--card)" strokeWidth="1.5" style={{ pointerEvents: "none" }} />
           </g>
         ))}
       </svg>
+      {zeigt && (() => {
+        const p = pts[zeigt.i];
+        // In Prozent umrechnen: das SVG skaliert mit der Breite, absolute
+        // Pixel aus dem viewBox-System waeren daneben.
+        const links = (p.cx / W) * 100;
+        return (
+          <div style={{ position: "absolute", left: `${links}%`, top: `${(p.cy / H) * 100}%`,
+            transform: `translate(${links > 70 ? "-100%" : links < 30 ? "0" : "-50%"}, calc(-100% - 10px))`,
+            background: "var(--text)", color: "var(--bg)", fontSize: 12, lineHeight: 1.45,
+            padding: "6px 9px", borderRadius: 8, whiteSpace: "pre", pointerEvents: "none",
+            boxShadow: "0 4px 14px rgba(0,0,0,0.25)", zIndex: 5 }}>
+            {zeigt.text}
+          </div>
+        );
+      })()}
+      </div>
       <div style={{ fontSize: 11, color: "var(--text3)", textAlign: "right", marginTop: 2 }}>{t("noten.verlaufAxis")}</div>
     </div>
   );
