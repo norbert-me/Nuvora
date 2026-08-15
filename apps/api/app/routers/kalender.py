@@ -211,11 +211,33 @@ async def _release_matching_decks(db: AsyncSession, user: User, e: CalendarEntry
     """
     if not await is_active(db, user.id, "karten"):
         return
+    from .kurse import class_kurs_ids
+
+    async def _stunde_weist_zu(deck_id: int) -> None:
+        """Die Stunde erzeugt die Kurs-Zuweisung des Stapels.
+
+        Kartenstapel werden nicht mehr von Hand Kursen zugewiesen — sie kommen
+        über die Stunde bei den Kindern an. Bewusst hier mit dem MODELL statt
+        über eine Funktion aus karten.py: Module hängen nicht voneinander ab
+        (Regel 3), Tabellen teilen sie sich. Additiv, nie entfernend.
+        """
+        from ..models import CardDeckKurs
+        ziel = set(await class_kurs_ids(db, e.class_id)) if e.class_id else set()
+        if e.kurs_id:
+            ziel.add(e.kurs_id)
+        for kid in ziel:
+            da = (await db.execute(select(CardDeckKurs.id).where(
+                CardDeckKurs.deck_id == deck_id, CardDeckKurs.kurs_id == kid))).scalars().first()
+            if not da:
+                db.add(CardDeckKurs(deck_id=deck_id, kurs_id=kid))
+
     # Explizit verknuepftes Deck: am Kalendertag freischalten, falls noch Entwurf.
     if e.karten_deck_id:
         deck = await db.get(CardDeck, e.karten_deck_id)
-        if deck and deck.owner_id == user.id and deck.released_at is None:
-            deck.released_at = _tagesbeginn(e.date)
+        if deck and deck.owner_id == user.id:
+            if deck.released_at is None:
+                deck.released_at = _tagesbeginn(e.date)
+            await _stunde_weist_zu(deck.id)
             await db.commit()
     if not e.topic_id:
         return
@@ -228,7 +250,6 @@ async def _release_matching_decks(db: AsyncSession, user: User, e: CalendarEntry
         CardDeck.deleted_at.is_(None),
     )
     if e.class_id:
-        from .kurse import class_kurs_ids
         from sqlalchemy import and_ as _and, exists as _exists
         from ..models import CardDeckKurs
         kurse = list(await class_kurs_ids(db, e.class_id))
@@ -246,6 +267,7 @@ async def _release_matching_decks(db: AsyncSession, user: User, e: CalendarEntry
     for deck in matched:
         if deck.released_at is None:   # Entwürfe ab Beginn des Termintags freischalten
             deck.released_at = _tagesbeginn(e.date)
+        await _stunde_weist_zu(deck.id)
     # Automatisch mit dem Eintrag verknüpfen, wenn dort noch kein Stapel hängt.
     if matched and not e.karten_deck_id:
         e.karten_deck_id = matched[0].id

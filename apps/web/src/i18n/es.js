@@ -2303,4 +2303,13 @@ export default {
   "speichern.offen": "sin guardar",
   "speichern.laeuft": "Guardando …",
   "speichern.verlassen": "Hay cambios sin guardar. ¿Descartarlos?",
+  "karten.deckName": "Nombre del mazo",
+  "karten.unsaved": "sin guardar",
+  "karten.unsavedName": "Cambios sin guardar, ¿descartar?",
+  "karten.deckSettings": "Ajustes del mazo",
+  "karten.niveauAktiv": "Usar E/G por tarjeta",
+  "karten.niveauAktivHint": "Desactivado: todos ven todas las tarjetas. Activado: una tarjeta nueva es nivel básico (G) hasta que la cambies a E.",
+  "karten.noStunde": "aún sin asignar a una clase",
+  "karten.noStundeHint": "Nadie recibe aún este mazo. Prográmalo en una clase del calendario: así lo publicas para ese curso.",
+  "karten.needKalender": "Los mazos llegan al alumnado a través de una clase en el calendario, lo que requiere el módulo Calendario. Crear, editar e imprimir funciona sin él.",
 };

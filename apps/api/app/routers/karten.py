@@ -21,7 +21,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
 from sqlalchemy import (select, func as sa_func, and_, or_, exists as sa_exists,
-                        false as sa_false, delete as sql_delete)
+                        false as sa_false, true as sa_true, delete as sql_delete)
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError, OperationalError
@@ -291,6 +291,20 @@ def _niveau_where(st):
     return CardDeck.niveau == ""
 
 
+def _sichtbar_karte(schueler_niveau: str, karten_niveau: str, deck_niveau: str, niveau_aktiv: bool) -> bool:
+    """Sieht dieses Kind diese Karte? Fuer schon geladene Zeilen.
+
+    Zwei Ebenen, aber nur die untere haengt am Schalter: das Niveau des STAPELS
+    gilt immer (ein reiner E-Stapel bleibt einer), das Niveau der einzelnen
+    KARTE nur, wenn die Differenzierung am Stapel eingeschaltet ist. Sonst
+    saehen Kinder Karten nicht, ohne dass jemand E/G ueberhaupt angeschaltet
+    haette — das war der Stolperstein bei CardVote und ist hier derselbe.
+    """
+    if not _sichtbar(schueler_niveau, deck_niveau):
+        return False
+    return _sichtbar(schueler_niveau, karten_niveau) if niveau_aktiv else True
+
+
 def _sichtbar(schueler_niveau: str, *niveaus: str) -> bool:
     """Dieselbe Regel wie die WHERE-Fassungen, nur fuer schon geladene Zeilen.
 
@@ -302,7 +316,7 @@ def _sichtbar(schueler_niveau: str, *niveaus: str) -> bool:
     return all((n or "") in erlaubt for n in niveaus)
 
 
-def _karten_niveau_where(st):
+def _karten_niveau_where(st, deck_ids_aktiv=None):
     """Dasselbe eine Ebene tiefer: einzelne Karten koennen E oder G tragen.
 
     Warum beides: ein reiner E-Stapel ist die eine Arbeitsweise, ein gemeinsamer
@@ -315,10 +329,20 @@ def _karten_niveau_where(st):
     fremden Niveaus.
     """
     if st.niveau == "E":
-        return Card.niveau.in_(["", "E"])
-    if st.niveau == "G":
-        return Card.niveau.in_(["", "G"])
-    return Card.niveau == ""
+        regel = Card.niveau.in_(["", "E"])
+    elif st.niveau == "G":
+        regel = Card.niveau.in_(["", "G"])
+    else:
+        regel = Card.niveau == ""
+    # Der Filter gilt nur, wo die Differenzierung am Stapel eingeschaltet ist.
+    # `deck_ids_aktiv` ist fuer Abfragen OHNE Join auf CardDeck (dort steht die
+    # Deck-Liste schon fest); mit Join reicht die Spalte selbst.
+    if deck_ids_aktiv is None:
+        return or_(CardDeck.niveau_aktiv.is_(False), regel)
+    ids = list(deck_ids_aktiv)
+    if not ids:
+        return sa_true()
+    return or_(Card.deck_id.notin_(ids), regel)
 
 
 # ─── Lehrkraft: Stapel & Karten ───
@@ -327,6 +351,9 @@ class DeckIn(BaseModel):
     name: str = ""
     topic_id: Optional[int] = None
     niveau: str = ""  # "" = alle, "E"/"G" = nur dieses Niveau
+    # E/G je Karte ueberhaupt benutzen? Aus = alle sehen alle Karten (wie ein
+    # CardVote-Quiz ohne Niveau). Voreinstellung aus.
+    niveau_aktiv: bool = False
     folder_id: Optional[int] = None  # Ordner (wie CardVote); NULL = Wurzel
     # Nur beim Anlegen in der Sammlung: Kurse, fuer die der Stapel gelten soll.
     # None = keine Angabe (nichts zuweisen), [] = ausdruecklich niemandem.
@@ -352,6 +379,7 @@ class DeckOut(BaseModel):
     name: str
     topic_id: Optional[int] = None
     niveau: str = ""
+    niveau_aktiv: bool = False
     folder_id: Optional[int] = None
     released_at: Optional[datetime] = None
     cards: List[CardOut] = []
@@ -364,7 +392,8 @@ def _deck_out(deck, kurs_ids=()) -> "DeckOut":
     return DeckOut(
         id=deck.id, class_id=deck.class_id, kurs_id=deck.kurs_id,
         kurs_ids=sorted(kurs_ids or []), name=deck.name,
-        topic_id=deck.topic_id, niveau=deck.niveau, folder_id=deck.folder_id,
+        topic_id=deck.topic_id, niveau=deck.niveau, niveau_aktiv=bool(deck.niveau_aktiv),
+        folder_id=deck.folder_id,
         released_at=deck.released_at,
         cards=[CardOut.model_validate(c) for c in deck.cards if c.deleted_at is None],
     )
@@ -501,6 +530,28 @@ async def list_deck_trash(class_id: int, kurs_id: Optional[int] = None, user: Us
     return await _decks_out(db, r.scalars().all())
 
 
+async def zuweisung_aus_stunde(db: AsyncSession, deck_id: int, kurs_ids) -> int:
+    """Die Stunde erzeugt die Zuweisung.
+
+    Seit der Entscheidung „Karteikarten werden nicht mehr von Hand Kursen
+    zugewiesen, sondern über die Stunde" ist DAS der Weg, auf dem ein Stapel bei
+    Kindern ankommt: wer ihn in eine Stunde plant, weist ihn damit dem Kurs
+    dieser Stunde zu. Die Tabelle dahinter (card_deck_kurse) und die ganze
+    Sichtbarkeitsauflösung bleiben unverändert — nur die Hand fällt weg.
+
+    Additiv: eine bestehende Zuweisung wird nie entfernt (der Stapel kann in
+    mehreren Stunden liegen), doppelt angelegt wird nichts.
+    """
+    neu = 0
+    for kid in {k for k in (kurs_ids or []) if k}:
+        da = (await db.execute(select(CardDeckKurs.id).where(
+            CardDeckKurs.deck_id == deck_id, CardDeckKurs.kurs_id == kid))).scalars().first()
+        if not da:
+            db.add(CardDeckKurs(deck_id=deck_id, kurs_id=kid))
+            neu += 1
+    return neu
+
+
 async def _schedule_deck_from_calendar(db: AsyncSession, user: User, deck: CardDeck) -> None:
     """Gegenstück zu _release_matching_decks (kalender.py): plant/verknüpft ein
     neu angelegtes oder frisch mit Thema versehenes Deck mit einem bereits
@@ -527,6 +578,9 @@ async def _schedule_deck_from_calendar(db: AsyncSession, user: User, deck: CardD
             deck.released_at = _tagesbeginn(e.date)  # ab Beginn des Termintags (frühester Eintrag)
             if not e.karten_deck_id:
                 e.karten_deck_id = deck.id       # Eintrag auf dieses Deck verlinken
+            # … und die Stunde weist den Stapel ihrem Kurs zu — ohne das wäre er
+            # ausgerollt, aber bei niemandem.
+            await zuweisung_aus_stunde(db, deck.id, kurse | ({e.kurs_id} if e.kurs_id else set()))
             await db.commit()
             return
 
@@ -544,7 +598,7 @@ async def create_deck(class_id: int, body: DeckIn, kurs_id: Optional[int] = None
     last = (await db.execute(select(CardDeck.position).where(CardDeck.class_id == class_id).order_by(CardDeck.position.desc()))).scalars().first()
     deck = CardDeck(class_id=class_id, kurs_id=kurs_id, owner_id=user.id, name=body.name.strip(),
                     topic_id=body.topic_id, niveau=body.niveau if body.niveau in ("E", "G") else "",
-                    folder_id=body.folder_id, position=(last if last is not None else -1) + 1)
+                    niveau_aktiv=bool(body.niveau_aktiv), folder_id=body.folder_id, position=(last if last is not None else -1) + 1)
     db.add(deck)
     await db.commit()
     await db.refresh(deck, ["cards"])
@@ -659,7 +713,7 @@ async def create_collection_deck(body: DeckIn, user: User = Depends(require_modu
                              .order_by(CardDeck.position.desc()))).scalars().first()
     deck = CardDeck(class_id=None, kurs_id=None, owner_id=user.id, name=body.name.strip(),
                     topic_id=body.topic_id, niveau=body.niveau if body.niveau in ("E", "G") else "",
-                    folder_id=body.folder_id, position=(last if last is not None else -1) + 1)
+                    niveau_aktiv=bool(body.niveau_aktiv), folder_id=body.folder_id, position=(last if last is not None else -1) + 1)
     db.add(deck)
     await db.flush()
     await _setze_deck_kurse(db, deck.id, kurse)
@@ -730,6 +784,7 @@ async def update_deck(deck_id: int, body: DeckIn, user: User = Depends(require_m
     deck.name = body.name.strip()
     deck.topic_id = body.topic_id
     deck.niveau = body.niveau if body.niveau in ("E", "G") else ""
+    deck.niveau_aktiv = bool(body.niveau_aktiv)
     deck.folder_id = body.folder_id
     await db.commit()
     await db.refresh(deck, ["cards"])
@@ -808,32 +863,20 @@ class CardIn(BaseModel):
         return v if v in ("E", "G") else ""
 
 
-async def _deck_kurs_ids(db, deck) -> list:
-    """Alle Kurse, unter denen dieser Stapel laeuft: die Zuweisungen, der
-    Herkunfts-Kurs und (fuer Bestand ohne beides) die Kurse seiner Klasse."""
-    ids = set((await _kurse_je_deck(db, [deck.id])).get(deck.id, []))
-    if deck.kurs_id:
-        ids.add(deck.kurs_id)
-    if not ids and deck.class_id:
-        from .kurse import class_kurs_ids
-        ids |= await class_kurs_ids(db, deck.class_id)
-    return sorted(ids)
+def _niveau_vorgabe(deck) -> str:
+    """Karteikarten sind G, solange nicht anders gesagt — ABER nur, wo die
+    Differenzierung AM STAPEL eingeschaltet ist (`card_decks.niveau_aktiv`,
+    dasselbe Gegenstueck wie `question_sets.niveau_aktiv` bei CardVote).
 
+    Sie hing zuerst am Kurs. Das war die falsche Ebene: derselbe Kurs hat
+    Stapel, bei denen E/G eine Rolle spielt, und solche, bei denen es keine
+    spielt — und ein Kurs-Schalter hat dann ueber beide entschieden.
 
-async def _niveau_vorgabe(db, deck) -> str:
-    """Karteikarten sind G, solange nicht anders gesagt — ABER nur, wo der Kurs
-    ueberhaupt mit E/G arbeitet (`kurse.niveau_aktiv`).
-
-    Ohne aktives Niveau bleibt eine neue Karte neutral (sie gilt fuer alle);
-    mit aktivem Niveau ist sie Grundstoff und wird per Umschalter zu E. Gilt nur
-    beim ANLEGEN — Bestandskarten bleiben, was sie sind, sonst verschwaenden sie
-    ueber Nacht aus der Sicht der E-Kinder."""
-    kurse = await _deck_kurs_ids(db, deck)
-    if not kurse:
-        return ""
-    aktiv = (await db.execute(select(Kurs.id).where(
-        Kurs.id.in_(kurse), Kurs.niveau_aktiv.is_(True)))).scalars().first()
-    return "G" if aktiv else ""
+    Ohne eingeschaltete Differenzierung bleibt eine neue Karte neutral; mit ist
+    sie Grundstoff und wird per Umschalter zu E. Gilt nur beim ANLEGEN —
+    Bestandskarten bleiben, was sie sind, sonst verschwaenden sie ueber Nacht
+    aus der Sicht der E-Kinder."""
+    return "G" if deck.niveau_aktiv else ""
 
 
 @router.post("/decks/{deck_id}/cards", response_model=CardOut, status_code=201)
@@ -842,7 +885,7 @@ async def add_card(deck_id: int, body: CardIn, user: User = Depends(require_modu
     deck = await _owned_deck(db, user, deck_id)
     last = (await db.execute(select(Card.position).where(Card.deck_id == deck_id).order_by(Card.position.desc()))).scalars().first()
     card = Card(deck_id=deck_id, front=body.front.strip(), back=body.back.strip(),
-                niveau=body.niveau or await _niveau_vorgabe(db, deck),
+                niveau=body.niveau or _niveau_vorgabe(deck),
                 position=(last if last is not None else -1) + 1)
     db.add(card)
     await db.commit()
@@ -881,7 +924,7 @@ async def import_cards(deck_id: int, body: ImportIn, user: User = Depends(requir
     deck = await _owned_deck(db, user, deck_id)
     # Dieselbe Vorgabe wie beim einzelnen Anlegen: bei aktivem Niveau ist eine
     # importierte Karte ohne Angabe Grundstoff, nicht „fuer alle".
-    vorgabe = await _niveau_vorgabe(db, deck)
+    vorgabe = _niveau_vorgabe(deck)
     paare = [(c.front.strip(), c.back.strip(), c.niveau or vorgabe) for c in body.cards if c.front.strip() or c.back.strip()]
     if not paare:
         return {"added": 0}
@@ -1210,7 +1253,7 @@ async def progress(class_id: int, kurs_id: Optional[int] = None, subset_kurs: Op
         CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None),
         CardDeck.released_at <= now,
     ))).scalars().all()
-    karten = []   # (card_id, Karten-Niveau, Stapel-Niveau)
+    karten = []   # (card_id, Karten-Niveau, Stapel-Niveau, Differenzierung an?)
     if deck_ids:
         # Geloeschte Karten zaehlen nicht mit: sonst sinkt „total" nie wieder, und
         # weil eine geloeschte Karte nie gelernt wird, blieb sie fuer immer
@@ -1222,13 +1265,13 @@ async def progress(class_id: int, kurs_id: Optional[int] = None, subset_kurs: Op
         # den es gar nicht aufholen kann. Das galt schon fuer Niveau-STAPEL und
         # wurde hier bisher nicht beachtet.
         karten = (await db.execute(
-            select(Card.id, Card.niveau, CardDeck.niveau)
+            select(Card.id, Card.niveau, CardDeck.niveau, CardDeck.niveau_aktiv)
             .join(CardDeck, Card.deck_id == CardDeck.id)
             .where(Card.deck_id.in_(deck_ids), Card.deleted_at.is_(None))
         )).all()
     out = []
     for st in students:
-        card_ids = [cid for cid, kn, dn in karten if _sichtbar(st.niveau or "", kn, dn)]
+        card_ids = [cid for cid, kn, dn, na in karten if _sichtbar_karte(st.niveau or "", kn, dn, na)]
         total = len(card_ids)
         reviews = {r.card_id: r for r in (await db.execute(select(CardReview).where(CardReview.student_id == st.id))).scalars().all()}
         hist = _empty_hist()
@@ -1287,6 +1330,7 @@ async def student_cards(class_id: int, student_id: int, kurs_id: Optional[int] =
     ))).scalars().all()
     decks = {d.id: d.name for d in _dl}
     deck_niveaus = {d.id: d.niveau or "" for d in _dl}
+    deck_aktiv = {d.id: bool(d.niveau_aktiv) for d in _dl}
     if not decks:
         return []
     # Genau die Karten, die dieses Kind auch bekommt (Stapel- UND Kartenniveau) —
@@ -1294,7 +1338,8 @@ async def student_cards(class_id: int, student_id: int, kurs_id: Optional[int] =
     cards = [c for c in (await db.execute(select(Card).where(
         Card.deck_id.in_(decks.keys()), Card.deleted_at.is_(None),
     ).order_by(Card.deck_id, Card.position))).scalars().all()
-        if _sichtbar(st.niveau or "", c.niveau, deck_niveaus.get(c.deck_id, ""))]
+        if _sichtbar_karte(st.niveau or "", c.niveau, deck_niveaus.get(c.deck_id, ""),
+                           deck_aktiv.get(c.deck_id, False))]
     reviews = {r.card_id: r for r in (await db.execute(select(CardReview).where(CardReview.student_id == student_id))).scalars().all()}
     out = []
     for c in cards:
@@ -1444,11 +1489,14 @@ async def student_session(token: str, all: bool = False, db: AsyncSession = Depe
     dw = await _student_deck_where(db, st)
     # Nur ausgerollte Stapel: Entwuerfe (released_at NULL) und geplante in der
     # Zukunft bleiben fuer SuS unsichtbar.
-    decks = (await db.execute(select(CardDeck.id).where(
+    zeilen = (await db.execute(select(CardDeck.id, CardDeck.niveau_aktiv).where(
         dw, _niveau_where(st),
         CardDeck.released_at.is_not(None), CardDeck.deleted_at.is_(None),
         CardDeck.released_at <= now,
-    ))).scalars().all()
+    ))).all()
+    decks = [i for i, _ in zeilen]
+    # Nur diese Stapel unterscheiden ueberhaupt nach Niveau (siehe _karten_niveau_where).
+    aktiv = [i for i, na in zeilen if na]
     if not decks:
         # Auch hier gehoert next_due dazu: wer NUR geplante Stapel hat (typisch am
         # Tag vor der Stunde), bekam eine leere Seite ohne jeden Hinweis, wann es
@@ -1463,7 +1511,7 @@ async def student_session(token: str, all: bool = False, db: AsyncSession = Depe
     # diesen Filter zaehlten "total"/"faellig" Karten mit, die es nie zu sehen
     # bekommt — die Anzeige stuende dauerhaft auf offenen Karten.
     cards = (await db.execute(select(Card).where(
-        Card.deck_id.in_(decks), Card.deleted_at.is_(None), _karten_niveau_where(st),
+        Card.deck_id.in_(decks), Card.deleted_at.is_(None), _karten_niveau_where(st, aktiv),
     ).order_by(Card.position))).scalars().all()
     reviews = {r.card_id: r for r in (await db.execute(select(CardReview).where(CardReview.student_id == st.id))).scalars().all()}
     faellig = []

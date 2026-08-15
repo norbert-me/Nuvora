@@ -297,6 +297,7 @@ def _ensure_columns(sync_conn):
         ("card_decks", "deleted_at", "TIMESTAMPTZ"),
         ("card_decks", "kurs_id", "INTEGER"),
         ("card_decks", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
+        ("card_decks", "niveau_aktiv", "BOOLEAN DEFAULT false NOT NULL"),
         ("learning_paths", "deleted_at", "TIMESTAMPTZ"),
         ("marketplace_quizzes", "kind", "VARCHAR(30) DEFAULT 'cardvote_questionset' NOT NULL"),
         ("methods", "ablauf", "TEXT DEFAULT '' NOT NULL"),

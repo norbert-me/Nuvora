@@ -2302,4 +2302,13 @@ export default {
   "speichern.offen": "unsaved",
   "speichern.laeuft": "Saving …",
   "speichern.verlassen": "There are unsaved changes. Discard them?",
+  "karten.deckName": "Deck name",
+  "karten.unsaved": "not saved",
+  "karten.unsavedName": "Unsaved changes — discard?",
+  "karten.deckSettings": "Deck settings",
+  "karten.niveauAktiv": "Use E/G per card",
+  "karten.niveauAktivHint": "Off: everyone sees every card. On: a new card is basic level (G) until you switch it to E.",
+  "karten.noStunde": "not scheduled in a lesson yet",
+  "karten.noStundeHint": "Nobody gets this deck yet. Schedule it in a calendar lesson — that releases it for that course.",
+  "karten.needKalender": "Decks reach learners through a lesson in the calendar — that requires the Calendar module. Creating, editing and printing work without it.",
 };

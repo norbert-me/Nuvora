@@ -1045,6 +1045,11 @@ class CardDeck(Base):
     # Niveau-Stapel: "E"/"G" nur fuer Schueler des jeweiligen Niveaus, "" fuer
     # alle. So teilt eine Stunde automatisch getrennte Kartensaetze aus.
     niveau: Mapped[str] = mapped_column(String(1), default="", server_default="")
+    # Schaltet die E/G-Unterscheidung JE KARTE ein — dasselbe Gegenstueck wie
+    # `question_sets.niveau_aktiv` bei CardVote. Aus (Voreinstellung) heisst:
+    # `cards.niveau` spielt keine Rolle, alle sehen alle Karten des Stapels. An
+    # heisst: neue Karten sind Grundstoff (G) und der Filter greift.
+    niveau_aktiv: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Optionale Bindung an ein Kern-Thema (oder NULL = freie Karten). Kalender-
     # Eintraege mit demselben Thema rollen den Stapel automatisch aus.
     topic_id: Mapped[Optional[int]] = mapped_column(ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True)

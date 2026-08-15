@@ -58,8 +58,8 @@ async def _kurs_mit_klasse(s, u, name, token, niveau_aktiv=False, niveau=""):
     return k, c, st
 
 
-async def _sammlungsstapel(s, u, name="Sammlung", kurs_ids=None, karte=True, ausgerollt=True):
-    deck = await K.create_collection_deck(K.DeckIn(name=name, kurs_ids=kurs_ids), user=u, db=s)
+async def _sammlungsstapel(s, u, name="Sammlung", kurs_ids=None, karte=True, ausgerollt=True, niveau_aktiv=False):
+    deck = await K.create_collection_deck(K.DeckIn(name=name, kurs_ids=kurs_ids, niveau_aktiv=niveau_aktiv), user=u, db=s)
     if karte:
         await K.add_card(deck.id, K.CardIn(front="2+2", back="4"), user=u, db=s)
     if ausgerollt:
@@ -229,8 +229,8 @@ async def test_bestand_bleibt_bis_zur_uebernahme_sichtbar(s):
 @pytest.mark.asyncio
 async def test_neue_karte_ist_g_bei_aktivem_niveau(s):
     u = await _lehrkraft(s)
-    k, _, _ = await _kurs_mit_klasse(s, u, "Mathe", "tok-1", niveau_aktiv=True)
-    deck = await _sammlungsstapel(s, u, kurs_ids=[k.id], karte=False, ausgerollt=False)
+    k, _, _ = await _kurs_mit_klasse(s, u, "Mathe", "tok-1")
+    deck = await _sammlungsstapel(s, u, kurs_ids=[k.id], karte=False, ausgerollt=False, niveau_aktiv=True)
 
     neu = await K.add_card(deck.id, K.CardIn(front="a", back="b"), user=u, db=s)
     assert neu.niveau == "G", "Karteikarten sind G, solange nicht anders gesagt"
@@ -248,10 +248,33 @@ async def test_neue_karte_ist_g_bei_aktivem_niveau(s):
 @pytest.mark.asyncio
 async def test_ohne_aktives_niveau_bleibt_die_karte_neutral(s):
     u = await _lehrkraft(s)
-    k, _, _ = await _kurs_mit_klasse(s, u, "Mathe", "tok-1", niveau_aktiv=False)
+    k, _, _ = await _kurs_mit_klasse(s, u, "Mathe", "tok-1")
     deck = await _sammlungsstapel(s, u, kurs_ids=[k.id], karte=False, ausgerollt=False)
     neu = await K.add_card(deck.id, K.CardIn(front="a", back="b"), user=u, db=s)
-    assert neu.niveau == "", "ohne E/G am Kurs aendert sich nichts"
+    assert neu.niveau == "", "ohne eingeschaltete Differenzierung aendert sich nichts"
+
+
+@pytest.mark.asyncio
+async def test_ausgeschaltete_differenzierung_zeigt_allen_alles(s):
+    """Der Schalter am Stapel entscheidet, ob `cards.niveau` ueberhaupt zaehlt.
+
+    Aus heisst aus: eine Karte, die irgendwann einmal auf G stand, darf ein
+    E-Kind nicht heimlich verlieren, nur weil sie den Buchstaben noch traegt."""
+    u = await _lehrkraft(s)
+    k, cls, kind = await _kurs_mit_klasse(s, u, "Mathe", "tok-1", niveau="E")
+    deck = await _sammlungsstapel(s, u, kurs_ids=[k.id], karte=False, ausgerollt=False)
+    g = Card(deck_id=deck.id, front="G-Karte", back="x", position=0, niveau="G")
+    s.add(g)
+    await s.commit()
+    await K.release_deck(deck.id, K.ReleaseIn(now=True), user=u, db=s)
+
+    assert [c["card_id"] for c in (await K.student_session("tok-1", db=s))["cards"]] == [g.id]
+    assert (await K.progress(cls.id, kurs_id=k.id, user=u, db=s))[0].total == 1
+
+    # Eingeschaltet greift die Regel — dieselbe Karte, dasselbe Kind.
+    await K.update_deck(deck.id, K.DeckIn(name=deck.name, niveau_aktiv=True), user=u, db=s)
+    assert (await K.student_session("tok-1", db=s))["cards"] == []
+    assert (await K.progress(cls.id, kurs_id=k.id, user=u, db=s))[0].total == 0
 
 
 @pytest.mark.asyncio
@@ -259,8 +282,8 @@ async def test_bestandskarten_bleiben_neutral(s):
     """Wer heute neutral ist, bleibt neutral — sonst verschwinden Karten
     schlagartig aus der Sicht der Kinder."""
     u = await _lehrkraft(s)
-    k, _, kind = await _kurs_mit_klasse(s, u, "Mathe", "tok-1", niveau_aktiv=True, niveau="E")
-    deck = await _sammlungsstapel(s, u, kurs_ids=[k.id], karte=False, ausgerollt=False)
+    k, _, kind = await _kurs_mit_klasse(s, u, "Mathe", "tok-1", niveau="E")
+    deck = await _sammlungsstapel(s, u, kurs_ids=[k.id], karte=False, ausgerollt=False, niveau_aktiv=True)
     alt = Card(deck_id=deck.id, front="alt", back="alt", position=0, niveau="")
     s.add(alt)
     await s.commit()
@@ -278,3 +301,64 @@ async def test_bestandskarten_bleiben_neutral(s):
     g = await K.add_card(deck.id, K.CardIn(front="neu", back="neu"), user=u, db=s)
     assert g.niveau == "G"
     assert [c["card_id"] for c in (await K.student_session("tok-1", db=s))["cards"]] == [alt.id]
+
+
+# ─── Die Stunde weist zu (statt der Hand) ───
+
+@pytest.mark.asyncio
+async def test_die_stunde_erzeugt_die_zuweisung(s):
+    """Wer einen Stapel in eine Stunde plant, weist ihn damit dem Kurs zu.
+
+    Das ist seit der Entscheidung des Nutzers der EINE Weg: von Hand zugewiesen
+    wird in der Oberfläche nicht mehr. Die API dahinter bleibt — hier wird der
+    Weg über den Kalender nachgerechnet.
+    """
+    from datetime import datetime, timezone
+    from app.models import CalendarEntry, Topic
+    from app.routers import kalender as KAL
+
+    u = await _lehrkraft(s)
+    s.add(UserModule(user_id=u.id, module_key="kalender"))
+    k, cls, kind = await _kurs_mit_klasse(s, u, "Mathe", "tok-1")
+    thema = Topic(name="Brüche", owner_id=u.id)
+    s.add(thema)
+    await s.flush()
+
+    deck = await _sammlungsstapel(s, u, name="Zur Stunde", karte=True, ausgerollt=False)
+    # Noch keiner Stunde zugeordnet — also bei niemandem.
+    assert (await K._kurse_je_deck(s, [deck.id])).get(deck.id) is None
+    assert (await K.student_session("tok-1", db=s))["cards"] == []
+
+    # „In eine Stunde planen" ist genau das: der Eintrag zeigt auf den Stapel.
+    e = CalendarEntry(owner_id=u.id, date=datetime.now(timezone.utc), class_id=cls.id,
+                      topic_id=thema.id, karten_deck_id=deck.id)
+    s.add(e)
+    await s.commit()
+    await KAL._release_matching_decks(s, u, e)
+
+    assert (await K._kurse_je_deck(s, [deck.id])).get(deck.id) == [k.id], "die Stunde hat zugewiesen"
+    assert len((await K.student_session("tok-1", db=s))["cards"]) == 1, "und das Kind bekommt die Karte"
+
+
+@pytest.mark.asyncio
+async def test_stunde_nimmt_bestehende_zuweisung_nicht_weg(s):
+    """Ein Stapel kann in mehreren Stunden liegen — die zweite Planung darf die
+    erste nicht überschreiben."""
+    from datetime import datetime, timezone
+    from app.models import CalendarEntry
+    from app.routers import kalender as KAL
+
+    u = await _lehrkraft(s)
+    s.add(UserModule(user_id=u.id, module_key="kalender"))
+    k1, cls1, _ = await _kurs_mit_klasse(s, u, "Mathe", "tok-1")
+    k2, cls2, _ = await _kurs_mit_klasse(s, u, "Lernzeit", "tok-2")
+    deck = await _sammlungsstapel(s, u, kurs_ids=[k1.id], ausgerollt=False)
+
+    e = CalendarEntry(owner_id=u.id, date=datetime.now(timezone.utc), class_id=cls2.id, karten_deck_id=deck.id)
+    s.add(e)
+    await s.commit()
+    await KAL._release_matching_decks(s, u, e)
+
+    assert (await K._kurse_je_deck(s, [deck.id])).get(deck.id) == sorted([k1.id, k2.id])
+    assert len((await K.student_session("tok-1", db=s))["cards"]) == 1
+    assert len((await K.student_session("tok-2", db=s))["cards"]) == 1

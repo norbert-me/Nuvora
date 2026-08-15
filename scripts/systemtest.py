@@ -532,8 +532,11 @@ def inhalt_karten(api, u, spuren):
     OHNE Anmeldung lernen, antworten — und danach als Lehrkraft nachsehen, ob
     der Fortschritt wirklich gestiegen ist."""
     anonym = Api(api.basis, debug=api.debug)
+    # niveau_aktiv: die E/G-Unterscheidung JE KARTE ist ein Schalter am Stapel
+    # (wie am CardVote-Quiz) und aus, bis jemand sie anmacht. Ohne ihn saehen
+    # alle alles — genau das prueft der Gegenzweig weiter unten.
     stapel = api.call("POST", f"/api/karten/classes/{u.class_id}/decks",
-                      {"name": f"{PRAEFIX} Stapel", "topic_id": u.topic_id}, erwartet=(201,))
+                      {"name": f"{PRAEFIX} Stapel", "topic_id": u.topic_id, "niveau_aktiv": True}, erwartet=(201,))
     spuren.append(("Kartenstapel", lambda: (
         api.call("DELETE", f"/api/karten/decks/{stapel['id']}", erwartet=(204, 404)),
         api.call("DELETE", f"/api/karten/decks/{stapel['id']}/purge", erwartet=(204, 404)))))
@@ -613,6 +616,17 @@ def inhalt_karten(api, u, spuren):
     eine = _finde(detail, card_id=k1["id"])
     if not eine or eine["reps"] != 1:
         raise AssertionError(f"Detailsicht zeigt {eine} statt reps=1")
+    # Gegenprobe zum Schalter: ausgeschaltet zaehlt das Karten-Niveau nicht
+    # mehr, das E-Kind bekommt auch die G-Karte. Ohne diese Richtung koennte der
+    # Filter einfach immer greifen und niemandem fiele es auf.
+    api.call("PUT", f"/api/karten/decks/{stapel['id']}",
+             {"name": f"{PRAEFIX} Stapel", "topic_id": u.topic_id, "niveau_aktiv": False}, erwartet=(200,))
+    ohne_schalter = anonym.call("GET", f"/api/karten/lernen/{token}?all=true", erwartet=(200,))
+    if ohne_schalter.get("total") != 3:
+        raise AssertionError(f"ohne Niveau-Schalter zaehlt das E-Kind {ohne_schalter.get('total')} Karten statt 3")
+    api.call("PUT", f"/api/karten/decks/{stapel['id']}",
+             {"name": f"{PRAEFIX} Stapel", "topic_id": u.topic_id, "niveau_aktiv": True}, erwartet=(200,))
+
     # Fremder Token darf nichts oeffnen.
     status, _ = anonym.call("GET", "/api/karten/lernen/ZZ-kein-token", roh=True)
     if status < 400:
@@ -660,8 +674,9 @@ def inhalt_karten(api, u, spuren):
     return ("Stapel freigegeben, E-Kind sieht 2 von 3 Karten (G-Karte gefiltert), "
             "G-Kind alle 3, ohne Anmeldung gelernt, Fortschritt 0 -> 1 von 2 "
             f"(Detailsicht bestaetigt reps=1), falsche Karte in {frist:.0f} Minuten "
-            "wieder faellig, falscher Token abgewiesen; Sammlungsstapel erst nach "
-            "Kurs-Zuweisung sichtbar und nach Ruecknahme wieder still")
+            "wieder faellig, falscher Token abgewiesen; Niveau-Schalter aus = alle "
+            "sehen alles; Sammlungsstapel erst nach Kurs-Zuweisung sichtbar und "
+            "nach Ruecknahme wieder still")
 
 
 def inhalt_kalender(api, u, spuren):
@@ -1642,7 +1657,14 @@ def teste_bruecken(api, b, u, sch, spuren, cv):
                  if soll is not None and wieder.get(f) != soll]
         if fehlt:
             raise AssertionError(f"geplante Verknuepfungen fehlen: {fehlt} in {wieder}")
-        return "Quiz, Deck und Lernleiter am Eintrag gespeichert und wiedergefunden"
+        # Die Stunde weist den Stapel ihrem Kurs zu — das ist seit dem Umbau der
+        # Weg, auf dem er bei Kindern ankommt (von Hand zugewiesen wird nicht
+        # mehr). Ohne diese Probe waere der Stapel geplant, aber bei niemandem.
+        zu = api.call("GET", f"/api/karten/decks/{deck['id']}/kurse", erwartet=(200,))
+        if u.kurs_id not in (zu.get("kurs_ids") or []):
+            raise AssertionError(f"die geplante Stunde hat den Stapel nicht zugewiesen: {zu}")
+        return ("Quiz, Deck und Lernleiter am Eintrag gespeichert und wiedergefunden; "
+                "die Stunde hat den Stapel ihrem Kurs zugewiesen")
 
     b.pruefe("Bruecken", "Kalender plant Quiz/Deck/Lernleiter", kalender_plant)
 

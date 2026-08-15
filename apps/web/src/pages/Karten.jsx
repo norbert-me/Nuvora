@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
-import { NiveauToggle, AddButton, Icon, ICONS, iconBtn, toolbarIconBtn, toolbarBtn, toolbarBtnPrimary, toolbarInput, menuRow, CONTROL_H, CONTROL_R, COLORS as C, REIFE_COLORS, btnPrimary, btnSecondary, btnSmall, selectStyle, Modal as UiModal, overlayGuard, modalOverlay, modalPanel, Empty, Skeleton, pageApp, inputStyle, cardStyle, panelStyle, chipStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { NiveauToggle, AddButton, Toggle, Icon, ICONS, iconBtn, toolbarIconBtn, toolbarBtn, toolbarBtnPrimary, toolbarInput, menuRow, CONTROL_H, CONTROL_R, COLORS as C, REIFE_COLORS, btnPrimary, btnSecondary, btnSmall, selectStyle, Modal as UiModal, overlayGuard, modalOverlay, modalPanel, Empty, Skeleton, pageApp, inputStyle, cardStyle, panelStyle, chipStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
@@ -216,7 +216,7 @@ export default function Karten() {
   const deleteFolder = async (f) => { if (!await askConfirm(t("karten.delFolderConfirm"))) return; await sende(`${API}/card-folders/${f.id}`, { method: "DELETE" }, t("common.delete")); if (currentCardFolder === f.id) setCurrentCardFolder(f.parent_id ?? null); loadFolders(); loadDecks(); };
   // Der Stapel wandert optisch sofort; ohne Meldung sah eine abgelehnte
   // Verschiebung so aus, als wäre er beim Ziehen verlorengegangen.
-  const moveDeck = async (deck, folderId) => { await sende(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", folder_id: folderId }) }, t("karten.moveDeck")); loadDecks(); };
+  const moveDeck = async (deck, folderId) => { await sende(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", niveau_aktiv: !!deck.niveau_aktiv, folder_id: folderId }) }, t("karten.moveDeck")); loadDecks(); };
   // Aus dem „+"-Menü gewählten Typ anlegen (Stapel im aktuellen Ordner / Ordner).
   const commitAdd = async () => {
     const name = addName.trim(); if (!name) return;
@@ -286,8 +286,6 @@ export default function Karten() {
 
   // Name je Kurs und „arbeitet dieser Stapel mit E/G?" — ein Stapel kann in
   // mehreren Kursen liegen; sobald EINER Niveaus fuehrt, gilt die G-Vorgabe.
-  const kursName = (id) => kurse.find((k) => k.id === id)?.name || "";
-  const deckNiveauAktiv = (deck) => (deck.kurs_ids || []).some((id) => kurse.find((k) => k.id === id)?.niveau_aktiv);
 
   if (classes.length === 0) {
     return (
@@ -342,6 +340,18 @@ export default function Karten() {
 
       {view === "cards" && (
         <>
+          {/* Stapel erreichen die Kinder über eine Stunde im Kalender. Ohne das
+              Modul lässt sich hier alles bauen, drucken und durchgehen — nur
+              ausgerollt wird nichts. Das gehört gesagt, nicht verschwiegen:
+              sonst legt jemand Karten an und wundert sich, warum sie nirgends
+              ankommen. Karteikarten bleiben ohne Kalender voll bedienbar (kein
+              403, keine leere Liste). */}
+          {!kalenderAktiv && (
+            <div style={{ ...panelStyle, marginBottom: 16, fontSize: 13, color: "var(--text2)" }}>
+              {t("karten.needKalender")}{" "}
+              <Link to="/modules" style={{ color: "var(--accent)" }}>{t("nav.modules")}</Link>
+            </div>
+          )}
           {/* Brotkrume und Anlegen sind EINE Leiste: „wo bin ich" und „was lege
               ich hier an" gehoeren zusammen — vorher standen sie in zwei Zeilen
               untereinander, jede mit eigenen Massen. */}
@@ -415,7 +425,7 @@ export default function Karten() {
 
           {loadingDecks && !decksLoadedOnce.current ? <Skeleton rows={3} height={60} />
             : (decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).length === 0 && cardFolders.filter((f) => (f.parent_id ?? null) === currentCardFolder).length === 0) ? <Empty title={t("karten.noDecks")} hint={t("karten.noDecksHint")} /> : null}
-          {decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} kurse={kurse} kursName={kursName} niveauAktiv={deckNiveauAktiv(d)} onZuweisen={loadDecks} onDragStartDeck={() => setDragDeckId(d.id)} onDragEndDeck={endDrag} dragging={dragDeckId === d.id} autoOpen={autoDeck === d.id} onAutoOpened={() => setAutoDeck(null)} onReorderOver={(e) => onDeckDragOver(e, d.id)} onReorderDrop={() => dropDeck(d.id)} dropSide={deckDrop && deckDrop.id === d.id ? deckDrop.side : null} />)}
+          {decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} onDragStartDeck={() => setDragDeckId(d.id)} onDragEndDeck={endDrag} dragging={dragDeckId === d.id} autoOpen={autoDeck === d.id} onAutoOpened={() => setAutoDeck(null)} onReorderOver={(e) => onDeckDragOver(e, d.id)} onReorderDrop={() => dropDeck(d.id)} dropSide={deckDrop && deckDrop.id === d.id ? deckDrop.side : null} />)}
         </>
       )}
 
@@ -587,14 +597,14 @@ function StudentDetail({ detail, t, onClose }) {
   );
 }
 
-function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onMove, kurse = [], kursName = () => "", niveauAktiv = false, onZuweisen, onDragStartDeck, onDragEndDeck, dragging = false, autoOpen = false, onAutoOpened, onReorderOver, onReorderDrop, dropSide = null }) {
+function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onMove, onDragStartDeck, onDragEndDeck, dragging = false, autoOpen = false, onAutoOpened, onReorderOver, onReorderDrop, dropSide = null }) {
   const [planDate, setPlanDate] = useState("");
-  const [zuweisen, setZuweisen] = useState(false);   // Dialog „welchen Kursen?"
   const [publishing, setPublishing] = useState(false);
   const [importing, setImporting] = useState(false);
   // Standard eingeklappt: nur Kopf zeigen; ausgeklappt kommen Einstellungen,
-  // Karten und Eingabe dazu. Umbenennen per Stift am Namen.
+  // Karten und Eingabe dazu. Offen IST der Name das Eingabefeld.
   const [collapsed, setCollapsed] = useState(true);
+  const [einstellungen, setEinstellungen] = useState(false); // Thema/Niveau (selten, deshalb im ⋯)
   const rootRef = useRef(null);
   // Deep-Link (?deck=<id> aus dem Kalender): einmalig aufklappen + hinscrollen.
   useEffect(() => {
@@ -604,8 +614,18 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
     onAutoOpened && onAutoOpened();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpen]);
-  const [renaming, setRenaming] = useState(false);
+  // Der Name als Entwurf. NICHTS speichert von selbst — auch nicht beim
+  // Verlassen des Feldes: wo sich etwas ändern lässt, gehört ein Speichern-
+  // Knopf hin, sonst weiß niemand, ob es drin ist.
+  //
+  // TODO: auf den gemeinsamen Entwurfs-Baustein aus Icons.jsx umstellen, sobald
+  // er steht (Entwurfszustand + Speicherleiste + Warnung beim Verlassen) —
+  // diese Fassung hier ist bewusst die schlichteste mögliche.
   const [nameVal, setNameVal] = useState(deck.name || "");
+  const [nameHover, setNameHover] = useState(false);
+  const [nameFocus, setNameFocus] = useState(false);
+  useEffect(() => { setNameVal(deck.name || ""); }, [deck.name]);
+  const nameOffen = nameVal.trim() !== (deck.name || "").trim() && nameVal.trim() !== "";
   const [moveOpen, setMoveOpen] = useState(false); // „Verschieben"-Popover (Ziel-Ordner)
   const [rollOpen, setRollOpen] = useState(false);  // Ausrollen-Untermenü
   // Deck als Ganzes ziehbar, aber nur wenn der Zug am Griff (⠿) beginnt — sonst
@@ -614,7 +634,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   const dragFromHandle = useRef(false);
   // folder_id IMMER mitschicken, sonst nullt ein Speichern (Name/Thema/Niveau)
   // die Ordner-Zuordnung.
-  const saveDeck = (patch) => call(() => fetch(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", folder_id: deck.folder_id ?? null, ...patch }) }));
+  const saveDeck = (patch) => call(() => fetch(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", niveau_aktiv: !!deck.niveau_aktiv, folder_id: deck.folder_id ?? null, ...patch }) }));
   const setTopic = (tid) => saveDeck({ topic_id: tid ? Number(tid) : null });
   const setNiveau = (n) => saveDeck({ niveau: n });
   // Karten-Bilder je Seite (oben-zentral). imgVer erzwingt ein Neu-Laden der
@@ -632,6 +652,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   const [cards, setCards] = useState(deck.cards);
   useEffect(() => { setCards(deck.cards); }, [deck.cards]);
   const [dragCard, setDragCard] = useState(null);
+  const [hoverCard, setHoverCard] = useState(null); // Zeile leuchtet auf: sie ist anklickbar
   const [cardDrop, setCardDrop] = useState(null); // { id, side: "above"|"below" }
   // Karte bearbeiten (Text + Bilder) — in einem Popup.
   const [editCard, setEditCard] = useState(null); // Karten-id im Edit
@@ -671,7 +692,15 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
     a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
     a.download = `${(deck.name || "stapel").replace(/[^\w-]+/g, "_")}.json`; a.click(); URL.revokeObjectURL(a.href);
   };
-  const doRename = async () => { const n = nameVal.trim(); setRenaming(false); if (n && n !== deck.name) await saveDeck({ name: n }); };
+  // Leerer Name behält den alten — nicht speichern, nicht meckern (wie bei den Themen).
+  const doRename = async () => { const n = nameVal.trim(); if (n && n !== deck.name) await saveDeck({ name: n }); };
+  const nameVerwerfen = () => setNameVal(deck.name || "");
+  /** Zuklappen/Verlassen mit offenem Entwurf: fragen, nie still verwerfen. */
+  const zuklappen = async () => {
+    if (nameOffen && !await askConfirm(t("karten.unsavedName"))) return;
+    nameVerwerfen();
+    setCollapsed(true);
+  };
   // Siehe core/topics.js — eine Quelle fuer Beschriftung UND Reihenfolge.
   const themen = themenIndex(topics);
   const topicLabel = (tp) => themen.label(tp);
@@ -699,66 +728,120 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           braucht (Aufklappen, Name, Durchgehen) — Export, Import, Veroeffentlichen
           und Verschieben liegen im ⋯-Menue. Vorher standen hier bis zu elf
           Bedienelemente in einer Reihe. */}
-      <Werkzeugleiste style={{ marginBottom: collapsed ? 0 : 10 }}
+      <Werkzeugleiste style={{ marginBottom: collapsed ? 0 : 12 }}
         links={<>
         {onDragStartDeck && (
           <span onMouseDown={() => { dragFromHandle.current = true; }}
             className="drag-handle" title={t("karten.moveToFolder")} style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex", flexShrink: 0, userSelect: "none" }}><Icon d={ICONS.grip} size={15} /></span>
         )}
-        <button onClick={() => setCollapsed((v) => !v)} className="icon-btn" style={toolbarIconBtn} title={collapsed ? t("topics.expand") : t("topics.collapse")}>
+        <button onClick={() => (collapsed ? setCollapsed(false) : zuklappen())} className="icon-btn" style={toolbarIconBtn} title={collapsed ? t("topics.expand") : t("topics.collapse")}>
           <span style={{ display: "inline-flex", transform: collapsed ? "none" : "rotate(90deg)", transition: "transform 0.15s", color: "var(--text3)" }}><Icon d={ICONS.open} size={16} /></span>
         </button>
-        {renaming ? (
-          <>
-            <input value={nameVal} onChange={(e) => setNameVal(e.target.value)} autoFocus onBlur={(e) => { if (!e.relatedTarget || !e.relatedTarget.dataset || e.relatedTarget.dataset.keep !== "1") doRename(); }}
-              onKeyDown={(e) => { if (e.key === "Enter") doRename(); if (e.key === "Escape") { setNameVal(deck.name || ""); setRenaming(false); } }}
-              style={{ ...toolbarInput, fontSize: 16, fontWeight: 700 }} />
-            {/* Löschen erscheint erst im Bearbeiten-Modus (nicht dauerhaft im Kopf). */}
-            <button data-keep="1" onMouseDown={(e) => e.preventDefault()} onClick={async () => { if (await askConfirm(t("karten.delDeck", { name: deck.name }))) call(() => fetch(`${API}/decks/${deck.id}`, { method: "DELETE" })); }}
-              className="icon-btn" style={toolbarIconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={16} /></button>
-          </>
+        {/* Offen IST der Name das Eingabefeld — kein Stift daneben, der einen
+            zweiten Zustand aufmacht. Rahmen und Hintergrund zeigt es nur beim
+            Überfahren und beim Schreiben: sonst stünde dauerhaft ein Kasten um
+            eine Überschrift. Zugeklappt bleibt es schlichter Text. */}
+        {collapsed ? (
+          <strong onClick={() => setCollapsed(false)} style={{ fontSize: 16, cursor: "pointer" }}>{deck.name || t("karten.deck")}</strong>
         ) : (
+          <input value={nameVal} onChange={(e) => setNameVal(e.target.value)}
+            title={t("karten.deckName")} aria-label={t("karten.deckName")}
+            size={Math.max(6, Math.min(36, nameVal.length + 1))}
+            onMouseEnter={() => setNameHover(true)} onMouseLeave={() => setNameHover(false)}
+            onFocus={() => setNameFocus(true)}
+            onBlur={() => setNameFocus(false)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { doRename(); e.currentTarget.blur(); }
+              if (e.key === "Escape") { nameVerwerfen(); e.currentTarget.blur(); }
+            }}
+            style={{
+              ...toolbarInput, fontSize: 16, fontWeight: 700, minWidth: 80,
+              // Wie eine Überschrift, bis man sie anfasst.
+              border: `1px solid ${nameHover || nameFocus ? "var(--border2)" : "transparent"}`,
+              background: nameHover || nameFocus ? "var(--bg)" : "transparent",
+            }} />
+        )}
+        {/* Ein Entwurf speichert NIE von selbst — auch nicht beim Verlassen des
+            Feldes. Solange nichts abweicht, steht hier nichts; sobald etwas
+            abweicht, sieht man es und entscheidet selbst. */}
+        {!collapsed && nameOffen && (
           <>
-            <strong onClick={() => setCollapsed((v) => !v)} style={{ fontSize: 16, cursor: "pointer" }}>{deck.name || t("karten.deck")}</strong>
-            <button onClick={() => { setNameVal(deck.name || ""); setRenaming(true); }} className="icon-btn" style={toolbarIconBtn} title={t("karten.renameDeck")} aria-label={t("karten.renameDeck")}><Icon d={ICONS.edit} size={15} /></button>
+            <span style={{ fontSize: 12, color: C.warning }}>{t("karten.unsaved")}</span>
+            <button onMouseDown={(e) => e.preventDefault()} onClick={doRename} style={toolbarBtnPrimary}>{t("common.save")}</button>
+            <button onMouseDown={(e) => e.preventDefault()} onClick={nameVerwerfen} style={toolbarBtn}>{t("common.abort")}</button>
           </>
         )}
+        {/* Angaben zum Stapel — alle in EINER Form (Chip, grau). Geändert wird
+            im ⋯: ein Auswahlfeld, ein Umschalter und ein Chip nebeneinander
+            waren drei Formen für dieselbe Art Auskunft. Farbe trägt nur, was
+            eine bedeutet: der Ausroll-Stand und die fehlende Zuweisung. */}
         {status !== "entwurf" && <span style={{ ...chipStyle, background: badge.bg, color: badge.col }}>{badge.text}</span>}
-        {/* Wem gilt dieser Stapel? Ohne Zuweisung ist er angelegt, aber fuer
-            niemanden ausgerollt — das muss man sehen, nicht suchen muessen. */}
-        <button onClick={() => setZuweisen(true)} title={t("karten.assignKurse")}
-          style={{ ...chipStyle, border: "none", cursor: "pointer",
-            ...(zugewiesen.length ? null : { background: C.warning + "1f", color: C.warning }) }}>
-          {zugewiesen.length ? zugewiesen.map(kursName).filter(Boolean).join(", ") : t("karten.noKurs")}
-        </button>
+        {/* Nur der Warnfall steht hier. Wem der Stapel gilt, entscheidet die
+            Stunde — das steht im Kalender und muss den Kopf nicht füllen. */}
+        {!zugewiesen.length && (
+          <span style={{ ...angabeChip, background: C.warning + "1f", color: C.warning }} title={t("karten.noStundeHint")}>
+            {t("karten.noStunde")}
+          </span>
+        )}
+        {!collapsed && showTopic && deck.topic_id != null && (
+          <span style={angabeChip} title={topicLabel(themen.geordnet.find((tp) => tp.id === deck.topic_id) || {})}>
+            {topicLabel(themen.geordnet.find((tp) => tp.id === deck.topic_id) || {})}
+          </span>
+        )}
+        {/* Kein Chip für „gilt für alle" — das ist der Normalfall und braucht
+            keine Beschriftung. */}
+        {!collapsed && (deck.niveau === "E" || deck.niveau === "G") && (
+          <span style={angabeChip} title={t("karten.niveauHint")}>
+            {deck.niveau === "E" ? t("karten.niveauE") : t("karten.niveauG")}
+          </span>
+        )}
+        {/* Die Zahl interessiert erst, wenn der Stapel offen ist — in der
+            Vorschau ist sie Beiwerk. Grauer Text, kein eigener Kasten. */}
+        {!collapsed && <span style={{ fontSize: 13, color: "var(--text3)" }}>{deck.cards.length} {t("karten.cards")}</span>}
         </>}
         mehr={collapsed ? [] : [
-          { key: "kurse", label: t("karten.assignKurse"), icon: ICONS.users, onClick: () => setZuweisen(true) },
+          { key: "einstellungen", label: t("karten.deckSettings"), icon: ICONS.settings, onClick: () => setEinstellungen(true) },
           deck.cards.length > 0 && { key: "export", label: t("karten.export"), icon: ICONS.export, onClick: exportDeck },
           { key: "import", label: t("karten.import"), icon: ICONS.import, onClick: () => setImporting(true) },
           deck.cards.length > 0 && { key: "publish", label: t("karten.publish"), icon: ICONS.share, onClick: () => setPublishing(true) },
           (onMove && folders.length > 0) && { key: "move", label: t("karten.moveToFolder"), icon: ICONS.moveAll, onClick: () => setMoveOpen(true) },
+          // Der Papierkorb hing bisher am Umbenennen-Zustand, den es nicht mehr
+          // gibt. Gefährliches gehört ohnehin ins Menü (und dort nach unten).
+          { key: "del", label: t("common.delete"), icon: ICONS.trash, gefahr: true,
+            onClick: async () => { if (await askConfirm(t("karten.delDeck", { name: deck.name }))) call(() => fetch(`${API}/decks/${deck.id}`, { method: "DELETE" })); } },
         ]}>
-        {!collapsed && showTopic && (
-          <select value={deck.topic_id ?? ""} onChange={(e) => setTopic(e.target.value)} title={t("karten.topicHint")}
-            style={{ ...selectStyle, fontSize: 13, maxWidth: 180 }}>
-            <option value="">– {t("karten.freeCards")} –</option>
-            {themen.geordnet.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
-          </select>
-        )}
-        {/* Niveau-Stapel: "E"/"G" wird automatisch nur an Schueler des jeweiligen
-            Niveaus verteilt, "" an alle. Kein manuelles Zuweisen noetig. */}
-        {!collapsed && (
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }} title={t("karten.niveauHint")}>
-          <NiveauToggle wert={deck.niveau || ""} size={24} onChange={setNiveau} title={t("karten.niveauHint")} />
-          <span style={{ fontSize: 12, color: "var(--text3)" }}>
-            {deck.niveau === "E" ? t("karten.niveauE") : deck.niveau === "G" ? t("karten.niveauG") : t("karten.niveauAll")}
+        {/* Rechts, kurz vor den Menüs: links steht, WELCHER Stapel das ist,
+            rechts, was man mit ihm tut — dieselbe Leserichtung wie in jeder
+            anderen Werkzeugleiste. Ausrollen ist der Haupthandgriff und bleibt
+            deshalb sichtbar, statt im ⋯ zu verschwinden. */}
+        {!collapsed && deck.cards.length > 0 && (
+          <span style={{ position: "relative", display: "inline-flex" }}>
+            <button onClick={() => setRollOpen((v) => !v)} style={toolbarBtn}>
+              {t("karten.rollout")} <Icon d={ICONS.open} size={10} style={{ transform: "rotate(90deg)" }} />
+            </button>
+            {rollOpen && (<>
+              <div onClick={() => setRollOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 30 }} />
+              <Popover style={{ zIndex: 31, padding: 8, minWidth: 240 }}>
+                {status !== "aus" && <button onClick={() => { setRollOpen(false); release({ now: true }); }} style={{ ...menuRow }}><Icon d={ICONS.upload} size={15} color="var(--accent)" /> {t("karten.rollOutNow")}</button>}
+                {status !== "aus" && (
+                  <div style={{ padding: "8px 10px" }}>
+                    <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 4 }}>{t("karten.planLabel")}</div>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      {/* Nur Datum wählen — freigeschaltet wird immer 07:00 morgens des Tages. */}
+                      <input type="date" value={planDate} onChange={(e) => setPlanDate(e.target.value)} style={{ ...toolbarInput, flex: 1, minWidth: 150 }} />
+                      <button disabled={!planDate} onClick={() => { if (planDate) { const [y, mo, d] = planDate.split("-").map(Number); setRollOpen(false); release({ released_at: new Date(y, mo - 1, d, 7, 0, 0).toISOString() }); } }}
+                        style={{ ...toolbarBtnPrimary, opacity: planDate ? 1 : 0.4 }}>{t("karten.plan")}</button>
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 4 }}>{t("karten.planTime")}</div>
+                  </div>
+                )}
+                {status !== "entwurf" && <button onClick={() => { setRollOpen(false); release({}); }} style={{ ...menuRow, color: C.danger }}><Icon d={ICONS.ban} size={15} color={C.danger} /> {t("karten.withdraw")}</button>}
+              </Popover>
+            </>)}
           </span>
-        </span>
         )}
-        <span style={{ fontSize: 13, color: "var(--text3)" }}>{deck.cards.length} {t("karten.cards")}</span>
         {!collapsed && cards.length > 0 && (
-          <button onClick={() => setStudying(true)} className="icon-btn" style={toolbarIconBtn} title={t("karten.study")} aria-label={t("karten.study")}><Icon d={ICONS.eye} size={18} color="var(--accent)" /></button>
+          <button onClick={() => setStudying(true)} className="icon-btn" style={toolbarIconBtn} title={t("karten.study")} aria-label={t("karten.study")}><Icon d={ICONS.eye} size={18} /></button>
         )}
       </Werkzeugleiste>
       {/* Ziel-Ordner zum Verschieben — aus dem ⋯-Menue geoeffnet, deshalb
@@ -778,70 +861,47 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           })}
         </Popover>
       </>)}
-      {zuweisen && <KursZuweisungModal deck={deck} kurse={kurse} t={t}
-        onClose={() => setZuweisen(false)}
-        onSave={async (ids) => {
-          await sende(`${API}/decks/${deck.id}/kurse`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kurs_ids: ids }) }, t("karten.assignKurse"));
-          setZuweisen(false);
-          onZuweisen && onZuweisen();
-        }} />}
+      {einstellungen && <StapelEinstellungenModal deck={deck} t={t} themen={themen} showTopic={showTopic}
+        onClose={() => setEinstellungen(false)}
+        onSave={async (werte) => { await saveDeck(werte); setEinstellungen(false); }} />}
       {publishing && <PublishModal name={deck.name || t("karten.deck")} onClose={() => setPublishing(false)}
         onPublish={(description) => fetch(`/api/marketplace/publish/deck`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deck_id: deck.id, description }) }).catch(() => null)} />}
 
       {!collapsed && (<>
-      {/* Ausrollen gebündelt in einem Untermenü: sofort, geplant, zurückziehen. */}
-      {deck.cards.length > 0 && (
-        <div style={{ position: "relative", display: "inline-block", marginBottom: 12 }}>
-          <button onClick={() => setRollOpen((v) => !v)} style={toolbarBtn}>
-            {t("karten.rollout")} <Icon d={ICONS.open} size={10} style={{ transform: "rotate(90deg)" }} />
-          </button>
-          {rollOpen && (
-            <>
-              <div onClick={() => setRollOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 30 }} />
-              <Popover style={{ zIndex: 31, padding: 8, minWidth: 240 }}>
-                {status !== "aus" && <button onClick={() => { setRollOpen(false); release({ now: true }); }} style={{ ...menuRow }}><Icon d={ICONS.upload} size={15} color="var(--accent)" /> {t("karten.rollOutNow")}</button>}
-                {status !== "aus" && (
-                  <div style={{ padding: "8px 10px" }}>
-                    <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 4 }}>{t("karten.planLabel")}</div>
-                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                      {/* Nur Datum wählen — freigeschaltet wird immer 07:00 morgens des Tages. */}
-                      <input type="date" value={planDate} onChange={(e) => setPlanDate(e.target.value)} style={{ ...toolbarInput, flex: 1, minWidth: 150 }} />
-                      <button disabled={!planDate} onClick={() => { if (planDate) { const [y, mo, d] = planDate.split("-").map(Number); setRollOpen(false); release({ released_at: new Date(y, mo - 1, d, 7, 0, 0).toISOString() }); } }}
-                        style={{ ...toolbarBtnPrimary, opacity: planDate ? 1 : 0.4 }}>{t("karten.plan")}</button>
-                    </div>
-                    <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 4 }}>{t("karten.planTime")}</div>
-                  </div>
-                )}
-                {status !== "entwurf" && <button onClick={() => { setRollOpen(false); release({}); }} style={{ ...menuRow, color: C.danger }}><Icon d={ICONS.ban} size={15} color={C.danger} /> {t("karten.withdraw")}</button>}
-              </Popover>
-            </>
-          )}
-        </div>
-      )}
       {cards.map((c) => {
         const over = dragCard != null && cardDrop && cardDrop.id === c.id;
         return (
         <div key={c.id} onDragOver={(e) => onCardDragOver(e, c.id)} onDrop={() => dropCard(c.id)}
+          onMouseEnter={() => setHoverCard(c.id)} onMouseLeave={() => setHoverCard(null)}
           style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderTop: "1px solid var(--border)", fontSize: 14,
             opacity: dragCard === c.id ? 0.4 : 1,
+            // Die ganze Zeile öffnet die Karte — das Aufleuchten beim Überfahren
+            // ist der Ersatz für das Stift-Symbol, das hier stand.
+            background: hoverCard === c.id ? "var(--bg2)" : "transparent",
             boxShadow: over && cardDrop.side === "above" ? `inset 0 ${MARKE}px 0 var(--accent)` : over && cardDrop.side === "below" ? `inset 0 -${MARKE}px 0 var(--accent)` : undefined }}>
           {/* Dieselbe Zeile wie bei einer CardVote-Frage (Dashboard.jsx): Griff,
-              Niveau-Zeichen, Text — und rechts EIN Symbol. Vorher standen hier
-              vier Knoepfe nebeneinander, zwei davon Bildvorschauen; in einer
-              Liste, durch die man scrollt und zieht, ist das eine Reihe von
-              Fallen. Das Bild meldet sich jetzt wie dort als Zeichen im Text. */}
+              Niveau-Zeichen, Text. Rechts steht gar nichts mehr — der Klick auf
+              die Zeile öffnet den Editor, ein Stift daneben wäre ein zweiter Weg
+              zur selben Sache. Vorher standen hier vier Knöpfe nebeneinander,
+              zwei davon Bildvorschauen; in einer Liste, durch die man scrollt
+              und zieht, ist das eine Reihe von Fallen. */}
           <span draggable onDragStart={(e) => { e.stopPropagation(); e.dataTransfer.effectAllowed = "move"; setDragCard(c.id); }} onDragEnd={() => { setDragCard(null); setCardDrop(null); }}
             className="drag-handle" title={t("karten.reorderHint")} style={{ color: "var(--text3)", width: 20, display: "inline-flex", justifyContent: "center", cursor: "grab", flexShrink: 0, userSelect: "none" }}><Icon d={ICONS.grip} size={15} /></span>
           {/* Der EINZIGE Weg, das Niveau zu setzen — im Bearbeiten-Dialog gibt
               es ihn bewusst nicht mehr. Arbeitet der Kurs mit E/G, faellt der
               dritte Zustand („gilt fuer alle") weg. */}
-          <NiveauToggle wert={c.niveau || ""} mitLeer={!niveauAktiv} title={t("karten.cardNiveauHint")}
-            onChange={(v) => saveEditCard(c.id, c.front, c.back, v)} />
-          <span onClick={() => setEditCard(c.id)} title={t("common.edit")} style={{ flex: 1, minWidth: 0, cursor: "pointer" }}>
+          {/* Nur wo die Differenzierung am Stapel eingeschaltet ist — sonst
+              stuende ein Umschalter da, der nichts bewirkt. */}
+          {deck.niveau_aktiv && (
+            <NiveauToggle wert={c.niveau || ""} mitLeer={false} title={t("karten.cardNiveauHint")}
+              onChange={(v) => saveEditCard(c.id, c.front, c.back, v)} />
+          )}
+          <span role="button" tabIndex={0} onClick={() => setEditCard(c.id)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setEditCard(c.id); } }}
+            title={t("common.edit")} style={{ flex: 1, minWidth: 0, cursor: "pointer" }}>
             <strong><Latex>{c.front}</Latex></strong> <span style={{ color: "var(--text3)" }}>→ <Latex>{c.back}</Latex></span>
             {(c.has_front_image || c.has_back_image) && <Icon d={ICONS.image} size={18} color="var(--accent)" style={{ marginLeft: 4 }} />}
           </span>
-          <button onClick={() => setEditCard(c.id)} className="icon-btn" style={iconBtn} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={18} /></button>
         </div>
         );
       })}
@@ -861,7 +921,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
       {newOpen && (
         // Karteikarten sind G, solange nicht anders gesagt — aber nur, wo der
         // Kurs mit E/G arbeitet. Sonst startet die neue Karte neutral.
-        <CardEditModal card={{ id: null, front: "", back: "", niveau: niveauAktiv ? "G" : "", has_front_image: false, has_back_image: false }} imgVer={imgVer}
+        <CardEditModal card={{ id: null, front: "", back: "", niveau: deck.niveau_aktiv ? "G" : "", has_front_image: false, has_back_image: false }} imgVer={imgVer}
           onSave={(_id, f, b, n) => createCard(f, b, n)} onClose={() => setNewOpen(false)} t={t} />
       )}
       {studying && <StudyModal cards={cards} deckName={deck.name || t("karten.deck")} t={t} onClose={() => setStudying(false)} />}
@@ -872,28 +932,44 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   );
 }
 
-// Welchen Kursen gilt dieser Stapel? Häkchenliste der eigenen Kurse — ein
-// Stapel darf in mehreren liegen und in keinem (dann ist er nur nicht
-// ausgerollt). Die Klasse spielt hier keine Rolle mehr.
-function KursZuweisungModal({ deck, kurse, t, onClose, onSave }) {
-  const [ids, setIds] = useState(() => new Set(deck.kurs_ids || []));
-  const [busy, setBusy] = useState(false);
-  const um = (id) => setIds((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+// Thema und Niveau des Stapels — beides selten geändert und deshalb aus dem
+// Kopf ins ⋯ gewandert. Im Kopf stand dafür ein Auswahlfeld neben einem
+// Umschalter neben einem Chip: drei Formen für dieselbe Art Angabe.
+//
+// Geändert wird auch hier nur über „Speichern": kein Feld schreibt von selbst.
+// TODO: auf den gemeinsamen Entwurfs-Baustein aus Icons.jsx umstellen.
+function StapelEinstellungenModal({ deck, t, themen, showTopic, onClose, onSave }) {
+  const [topicId, setTopicId] = useState(deck.topic_id ?? "");
+  const [niveau, setNiveau] = useState(deck.niveau || "");
+  const [niveauAktiv, setNiveauAktiv] = useState(!!deck.niveau_aktiv);
+  const offen = String(topicId) !== String(deck.topic_id ?? "") || niveau !== (deck.niveau || "")
+    || niveauAktiv !== !!deck.niveau_aktiv;
   return (
-    <UiModal onClose={onClose} width={440} label={t("karten.assignKurse")}>
-      <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{t("karten.assignKurse")}</h3>
-      <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 12px" }}>{t("karten.assignHint")}</p>
-      {kurse.length === 0 ? (
-        <p style={{ fontSize: 14, color: "var(--text3)" }}>{t("karten.noKurseYet")}</p>
-      ) : kurse.map((k) => (
-        <label key={k.id} style={{ ...menuRow, cursor: "pointer" }}>
-          <input type="checkbox" checked={ids.has(k.id)} onChange={() => um(k.id)} />
-          {k.name}
-        </label>
-      ))}
-      {ids.size === 0 && <p style={{ fontSize: 12, color: C.warning, marginTop: 8 }}>{t("karten.noKursWarn")}</p>}
+    <UiModal onClose={onClose} width={440} label={t("karten.deckSettings")}>
+      <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>{t("karten.deckSettings")}</h3>
+      {showTopic && (<>
+        <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 4 }}>{t("karten.topicHint")}</div>
+        <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={{ ...selectStyle, width: "100%", marginBottom: 12 }}>
+          <option value="">– {t("karten.freeCards")} –</option>
+          {themen.geordnet.map((tp) => <option key={tp.id} value={tp.id}>{themen.label(tp)}</option>)}
+        </select>
+      </>)}
+      <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 4 }}>{t("karten.niveauHint")}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <NiveauToggle wert={niveau} onChange={setNiveau} title={t("karten.niveauHint")} />
+        <span style={{ fontSize: 12, color: "var(--text3)" }}>
+          {niveau === "E" ? t("karten.niveauE") : niveau === "G" ? t("karten.niveauG") : t("karten.niveauAll")}
+        </span>
+      </div>
+      {/* E/G je Karte — zum Einschalten, wie am CardVote-Quiz. Aus heisst: das
+          Niveau einzelner Karten spielt keine Rolle, alle sehen alles. */}
+      <div style={{ marginTop: 16 }}>
+        <Toggle checked={niveauAktiv} onChange={setNiveauAktiv} label={t("karten.niveauAktiv")} />
+        <p style={{ fontSize: 12, color: "var(--text3)", margin: "4px 0 0" }}>{t("karten.niveauAktivHint")}</p>
+      </div>
+      {offen && <p style={{ fontSize: 12, color: C.warning, marginTop: 12 }}>{t("karten.unsaved")}</p>}
       <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-        <button disabled={busy} onClick={() => { setBusy(true); onSave([...ids]); }} style={btnPrimary}>{t("common.save")}</button>
+        <button onClick={() => onSave({ topic_id: topicId ? Number(topicId) : null, niveau, niveau_aktiv: niveauAktiv })} style={btnPrimary}>{t("common.save")}</button>
         <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
       </div>
     </UiModal>
@@ -1206,6 +1282,13 @@ function ReifeBar({ hist, height = 10 }) {
 }
 
 const inp = { ...inputStyle };
+// Angabe im Stapelkopf: EINE Form für Kurs, Thema und Niveau. Grau — Farbe
+// trägt nur, was eine Bedeutung hat (Ausroll-Stand, fehlende Zuweisung). Lange
+// Namen werden abgeschnitten statt umgebrochen; der volle Text steht im title.
+const angabeChip = {
+  ...chipStyle, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis",
+  whiteSpace: "nowrap", verticalAlign: "middle",
+};
 // Einfuege-Marke beim Ziehen (kein Schatten): eine Linie ober- oder unterhalb
 // der Zielzeile. EINE Staerke fuer Stapel und Karten.
 const MARKE = 3;

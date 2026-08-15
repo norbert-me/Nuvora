@@ -2288,4 +2288,13 @@ export default {
   "speichern.offen": "nicht gespeichert",
   "speichern.laeuft": "Speichert …",
   "speichern.verlassen": "Es gibt ungespeicherte Änderungen. Verwerfen?",
+  "karten.deckName": "Name des Stapels",
+  "karten.unsaved": "nicht gespeichert",
+  "karten.unsavedName": "Ungespeicherte Änderungen — verwerfen?",
+  "karten.deckSettings": "Stapel-Einstellungen",
+  "karten.niveauAktiv": "E/G je Karte benutzen",
+  "karten.niveauAktivHint": "Aus: alle sehen alle Karten. An: eine neue Karte ist Grundstoff (G), bis du sie auf E schaltest.",
+  "karten.noStunde": "noch keiner Stunde zugeordnet",
+  "karten.noStundeHint": "Dieser Stapel erreicht noch niemanden. Plane ihn im Kalender in eine Stunde — damit gibst du ihn für diesen Kurs frei.",
+  "karten.needKalender": "Stapel erreichen die Kinder über eine Stunde im Kalender — dafür muss das Modul Kalender zugeschaltet sein. Anlegen, ändern und drucken geht auch ohne.",
 };
