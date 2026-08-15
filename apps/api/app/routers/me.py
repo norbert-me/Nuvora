@@ -109,6 +109,7 @@ async def export_me(user=Depends(get_current_user), db: AsyncSession = Depends(g
         "quartalsstriche": await _rows(db, m.QuartalDivider, m.QuartalDivider.owner_id == uid),
         "karten_decks": await _rows(db, m.CardDeck, m.CardDeck.owner_id == uid),
         "karten": await _rows(db, m.Card, in_(m.Card, "deck_id", deck_ids)),
+        "karten_deck_kurse": await _rows(db, m.CardDeckKurs, in_(m.CardDeckKurs, "deck_id", deck_ids)),
         "kalender_eintraege": await _rows(db, m.CalendarEntry, m.CalendarEntry.owner_id == uid),
         "kalender_freie_zeiten": await _rows(db, m.CalendarBreak, m.CalendarBreak.owner_id == uid),
         "stundenplan": await _rows(db, m.TimetableSlot, m.TimetableSlot.owner_id == uid),

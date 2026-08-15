@@ -274,13 +274,14 @@ class Sammler:
 
     def _karten(self):
         g = "Karten"
-        for cid, _name in self.klassen:
-            # all-decks nimmt auch Entwuerfe mit, die in der Freigabe-Liste fehlen.
-            self.nimm(g, "Kartenstapel", self._get(f"/api/karten/classes/{cid}/all-decks"),
-                      lambda o: [f"/api/karten/decks/{o['id']}",
-                                 f"/api/karten/decks/{o['id']}/purge"])
-            self.nimm(g, "Karten-Ordner", self._get(f"/api/karten/classes/{cid}/card-folders"),
-                      lambda o: [f"/api/karten/card-folders/{o['id']}"])
+        # Die Sammlung statt Klasse fuer Klasse: seit der Kurs-Zuweisung gehoert
+        # ein Stapel keiner Klasse mehr, und ein Rest ohne Klasse waere ueber
+        # /classes/<id>/all-decks unauffindbar gewesen. Entwuerfe sind mit drin.
+        self.nimm(g, "Kartenstapel", self._get("/api/karten/decks"),
+                  lambda o: [f"/api/karten/decks/{o['id']}",
+                             f"/api/karten/decks/{o['id']}/purge"])
+        self.nimm(g, "Karten-Ordner", self._get("/api/karten/card-folders"),
+                  lambda o: [f"/api/karten/card-folders/{o['id']}"])
 
     def _auswertung(self):
         g = "Auswertung"

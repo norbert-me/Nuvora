@@ -66,6 +66,11 @@ class User(Base):
     # Einstiege-Startsammlung einmalig angelegt? Danach nicht erneut seeden,
     # auch wenn die Lehrkraft alle Einstiege loescht (sonst tauchen sie wieder auf).
     methoden_seeded: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Karteikarten: wurden die Bestandsstapel dieses Kontos einmalig aus ihrer
+    # Klasse/ihrem Kurs in die neue Kurs-Zuweisung (card_deck_kurse) uebernommen?
+    # Einmalig heisst einmalig — ohne diese Marke zauberte jeder Neustart eine
+    # von Hand entfernte Zuweisung wieder herbei.
+    karten_kurse_initialized: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Modul Kalender: Stunden pro Tag im hinterlegten Stundenplan (Einstellung).
     timetable_periods: Mapped[int] = mapped_column(Integer, default=6, server_default="6")
     # Uhrzeiten je Stunde: Liste [{start,end}] (Index = Stunde-1). Optional.
@@ -1017,14 +1022,24 @@ class PlanBlock(Base):
 # einzigartigen Token pro Schueler (wie die gedruckte CardVote-Karte). Der
 # Token IST die Identitaet — Bearer-Secret, muss unratbar sein.
 class CardDeck(Base):
-    """Ein Kartenstapel je Klasse."""
+    """Ein Kartenstapel in der Sammlung der Lehrkraft.
+
+    Umgedrehte Zuordnung: der Stapel gehoert nicht mehr EINER Klasse, sondern
+    liegt in der Sammlung (Ordner) und wird EINEM ODER MEHREREN KURSEN
+    zugewiesen (card_deck_kurse). class_id/kurs_id bleiben als HERKUNFT stehen —
+    sie werden nicht mehr gesetzt, wenn ein Stapel in der Sammlung entsteht, und
+    sind fuer Bestandsstapel der Weg, aus dem die einmalige Uebernahme ihre
+    Zuweisung errechnet hat.
+    """
     __tablename__ = "card_decks"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
-    class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
-    # Kartenstapel gelten für den ganzen KURS (alle Fach-Klassen), nicht die
-    # einzelne Klasse. class_id bleibt als Herkunft/Fallback.
+    # Nullable, seit ein Stapel ohne Klasse in der Sammlung entstehen kann.
+    # Bestand behaelt seine Herkunftsklasse; geloescht wird sie nie.
+    class_id: Mapped[Optional[int]] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), nullable=True, index=True)
+    # Herkunft: bis zur Sammlung hing der Stapel an genau einem Kurs. Die
+    # Zuweisung steht jetzt in card_deck_kurse (mehrere moeglich).
     kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(120), default="", server_default="")
     # Niveau-Stapel: "E"/"G" nur fuer Schueler des jeweiligen Niveaus, "" fuer
@@ -1047,15 +1062,33 @@ class CardDeck(Base):
     cards: Mapped[list["Card"]] = relationship(back_populates="deck", cascade="all, delete-orphan", order_by="Card.position")
 
 
+class CardDeckKurs(Base):
+    """Zuweisung eines Kartenstapels an einen Kurs (many-to-many).
+
+    Die Sammlung gehoert der Lehrkraft, ausgerollt wird je Kurs: derselbe Stapel
+    kann in mehreren Kursen gelten, und ein Stapel ohne Zeile hier ist fuer
+    niemanden ausgerollt. Beide Seiten CASCADE — eine Zuweisung ohne Stapel oder
+    ohne Kurs waere Datenmuell, an dem die Sichtbarkeit haengt.
+    """
+    __tablename__ = "card_deck_kurse"
+    __table_args__ = (UniqueConstraint("deck_id", "kurs_id", name="uq_card_deck_kurs"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    deck_id: Mapped[int] = mapped_column(ForeignKey("card_decks.id", ondelete="CASCADE"), index=True)
+    kurs_id: Mapped[int] = mapped_column(ForeignKey("kurse.id", ondelete="CASCADE"), index=True)
+
+
 class CardFolder(Base):
-    """Ordner zum Gruppieren von Kartenstapeln (wie CardVote-Ordner), pro
-    Klasse/Kurs. Verschachtelt über parent_id. Löschen eines Ordners kaskadiert
-    zu Unterordnern; die Stapel darin wandern in die Wurzel (deck.folder_id SET NULL)."""
+    """Ordner zum Gruppieren von Kartenstapeln (wie CardVote-Ordner) — seit der
+    Sammlung je LEHRKRAFT, nicht mehr je Klasse. Verschachtelt über parent_id.
+    Löschen eines Ordners kaskadiert zu Unterordnern; die Stapel darin wandern in
+    die Wurzel (deck.folder_id SET NULL)."""
     __tablename__ = "card_folders"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    class_id: Mapped[int] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), index=True)
+    # Herkunft wie beim Stapel: nullable, seit Ordner in der Sammlung entstehen.
+    class_id: Mapped[Optional[int]] = mapped_column(ForeignKey("school_classes.id", ondelete="CASCADE"), nullable=True, index=True)
     kurs_id: Mapped[Optional[int]] = mapped_column(ForeignKey("kurse.id", ondelete="SET NULL"), nullable=True, index=True)
     parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("card_folders.id", ondelete="CASCADE"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(120), default="", server_default="")

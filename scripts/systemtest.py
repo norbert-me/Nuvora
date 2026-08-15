@@ -196,6 +196,8 @@ def endpunkte(u):
             ("GET", f"/api/klassenarbeit/classes/{c}/works"),
         ],
         "karten": [
+            ("GET", "/api/karten/decks"),
+            ("GET", "/api/karten/card-folders"),
             ("GET", f"/api/karten/classes/{c}/decks"),
             ("GET", f"/api/karten/classes/{c}/all-decks"),
             ("GET", f"/api/karten/classes/{c}/decks/trash"),
@@ -261,7 +263,8 @@ def tore(u):
         "lernpfad": [("GET", "/api/lernpfad/exercises"), ("GET", "/api/lernpfad/paths")],
         "auswertung": [("GET", f"/api/noten/classes/{c}/sections"),
                        ("GET", f"/api/klassenarbeit/classes/{c}/works")],
-        "karten": [("GET", f"/api/karten/classes/{c}/decks"),
+        "karten": [("GET", "/api/karten/decks"),
+                   ("GET", f"/api/karten/classes/{c}/decks"),
                    ("GET", f"/api/karten/classes/{c}/progress")],
         "kalender": [("GET", "/api/kalender/entries"), ("GET", "/api/kalender/timetable")],
         "orga": [("GET", f"/api/orga/{c}"), ("GET", "/api/ausleihe/items"),
@@ -615,10 +618,50 @@ def inhalt_karten(api, u, spuren):
     if status < 400:
         raise AssertionError(f"falscher Token liefert HTTP {status}")
 
+    # ─── Die Sammlung: Stapel ohne Klasse, Zuweisung an einen Kurs ───
+    #
+    # Der zweite Weg zu denselben Karten, und der heikle: die Zuweisung
+    # entscheidet, was ein Kind sieht. Also beide Richtungen — zugewiesen kommt
+    # es an, zurueckgenommen ist es still.
+    frei = api.call("POST", "/api/karten/decks",
+                    {"name": f"{PRAEFIX} Sammlung"}, erwartet=(201,))
+    spuren.append(("Sammlungsstapel", lambda: (
+        api.call("DELETE", f"/api/karten/decks/{frei['id']}", erwartet=(204, 404)),
+        api.call("DELETE", f"/api/karten/decks/{frei['id']}/purge", erwartet=(204, 404)))))
+    if frei.get("kurs_ids"):
+        raise AssertionError(f"neuer Sammlungsstapel ist schon zugewiesen: {frei}")
+    api.call("POST", f"/api/karten/decks/{frei['id']}/cards",
+             {"front": "Sammlung", "back": "ja"}, erwartet=(201,))
+    api.call("POST", f"/api/karten/decks/{frei['id']}/release", {"now": True}, erwartet=(200,))
+    ohne = anonym.call("GET", f"/api/karten/lernen/{token}", erwartet=(200,))
+    if any(c["front"] == "Sammlung" for c in ohne.get("cards") or []):
+        raise AssertionError("unzugewiesener Stapel wird ausgeteilt")
+
+    zu = api.call("PUT", f"/api/karten/decks/{frei['id']}/kurse",
+                  {"kurs_ids": [u.kurs_id]}, erwartet=(200,))
+    if zu.get("kurs_ids") != [u.kurs_id]:
+        raise AssertionError(f"Zuweisung nicht gespeichert: {zu}")
+    mit = anonym.call("GET", f"/api/karten/lernen/{token}", erwartet=(200,))
+    if not any(c["front"] == "Sammlung" for c in mit.get("cards") or []):
+        raise AssertionError("zugewiesener Stapel kommt beim Kind nicht an")
+    nur_kurs = api.call("GET", f"/api/karten/decks?kurs_id={u.kurs_id}", erwartet=(200,))
+    if not any(d["id"] == frei["id"] for d in nur_kurs):
+        raise AssertionError("Kurs-Filter zeigt den zugewiesenen Stapel nicht")
+
+    api.call("PUT", f"/api/karten/decks/{frei['id']}/kurse", {"kurs_ids": []}, erwartet=(200,))
+    zurueck = anonym.call("GET", f"/api/karten/lernen/{token}", erwartet=(200,))
+    if any(c["front"] == "Sammlung" for c in zurueck.get("cards") or []):
+        raise AssertionError("zurueckgenommene Zuweisung teilt weiter aus")
+    if not any(d["id"] == frei["id"] for d in api.call("GET", "/api/karten/decks", erwartet=(200,))):
+        raise AssertionError("Stapel ist aus der Sammlung verschwunden statt nur unzugewiesen")
+    api.call("DELETE", f"/api/karten/decks/{frei['id']}", erwartet=(204,))
+    api.call("DELETE", f"/api/karten/decks/{frei['id']}/purge", erwartet=(204,))
+
     return ("Stapel freigegeben, E-Kind sieht 2 von 3 Karten (G-Karte gefiltert), "
             "G-Kind alle 3, ohne Anmeldung gelernt, Fortschritt 0 -> 1 von 2 "
             f"(Detailsicht bestaetigt reps=1), falsche Karte in {frist:.0f} Minuten "
-            "wieder faellig, falscher Token abgewiesen")
+            "wieder faellig, falscher Token abgewiesen; Sammlungsstapel erst nach "
+            "Kurs-Zuweisung sichtbar und nach Ruecknahme wieder still")
 
 
 def inhalt_kalender(api, u, spuren):

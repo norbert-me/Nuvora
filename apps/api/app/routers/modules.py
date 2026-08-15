@@ -105,14 +105,18 @@ REGISTRY: List[ModuleDef] = [
         group="unterricht",
         name="Karteikarten",
         description=(
-            "Karteikarten mit Spaced Repetition. Die Lernenden üben ohne Konto "
-            "per QR-Code; ihren Reifegrad siehst du im Modul. Optional an ein "
-            "Thema gebunden (der Kalender schaltet den Stapel am Tag frei); die "
-            "Meisterung als Notenspalte übernehmbar. Zugangs-Codes druckst du als "
-            "PDF aus der Klasse (ein QR je Kind); schaltest du das Modul ab, "
-            "liefern sie nichts mehr. E/G lässt sich am Stapel und "
-            "an der einzelnen Karte setzen — ein gemeinsamer Satz mit einzelnen "
-            "Anforderungskarten braucht so keinen zweiten Stapel."
+            "Karteikarten mit Spaced Repetition. Alle Stapel liegen in EINER "
+            "Sammlung und werden einem oder mehreren Kursen zugewiesen — ein "
+            "Stapel ohne Zuweisung ist angelegt, aber für niemanden ausgerollt. "
+            "Die Lernenden üben ohne Konto per QR-Code; ihren Reifegrad siehst "
+            "du im Modul. Optional an ein Thema gebunden (der Kalender schaltet "
+            "den Stapel am Tag frei); die Meisterung als Notenspalte "
+            "übernehmbar. Zugangs-Codes druckst du als PDF aus der Klasse (ein "
+            "QR je Kind); schaltest du das Modul ab, liefern sie nichts mehr. "
+            "E/G lässt sich am Stapel und an der einzelnen Karte setzen — ein "
+            "gemeinsamer Satz mit einzelnen Anforderungskarten braucht so keinen "
+            "zweiten Stapel; arbeitet der Kurs mit E/G, ist eine neue Karte "
+            "Grundstoff (G), bis du sie auf E schaltest."
         ),
         path="/karten",
         stage="stable",

@@ -53,6 +53,13 @@ export default function Karten() {
   // classId = Repräsentant-Klasse für die FK, kursId = Teilkurs (für die Decks).
   const [subsetKurs, setSubsetKurs] = useState(null);
   const [subsetKurse, setSubsetKurse] = useState([]);
+  // Alle Kurse der Lehrkraft: die Stapel-Sammlung wird ihnen zugewiesen, und
+  // der Kurs sagt auch, ob mit E/G gearbeitet wird (niveau_aktiv).
+  const [kurse, setKurse] = useState([]);
+  // Filter der Sammlung: null = alle Stapel, sonst „nur Stapel dieses Kurses".
+  // Bewusst ein Filter und keine Voraussetzung mehr — die Stapel liegen in der
+  // Sammlung, nicht in einer Klasse.
+  const [filterKurs, setFilterKurs] = useState(null);
   const [decks, setDecks] = useState([]);
   const [progress, setProgress] = useState([]);
   const [tokens, setTokens] = useState(null);
@@ -116,12 +123,12 @@ export default function Karten() {
   // verschluckt, ist schlimmer als der Wettlauf.
   const ladenrDecks = useRef(0);
   const ladenrFolders = useRef(0);
-  const loadDecks = (id) => {
-    if (!id) return;
+  // Die ganze Sammlung, wahlweise auf einen Kurs gefiltert.
+  const loadDecks = () => {
     const meine = ++ladenrDecks.current;
     setLoadingDecks(true);
-    return fetch(`${API}/classes/${id}/decks${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => {
-      if (meine === ladenrDecks.current) setDecks(d);
+    return fetch(`${API}/decks${filterKurs ? `?kurs_id=${filterKurs}` : ""}`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+      if (meine === ladenrDecks.current) setDecks(Array.isArray(d) ? d : []);
     }).catch(() => {}).finally(() => { setLoadingDecks(false); decksLoadedOnce.current = true; });
   };
   // Ordner (wie CardVote) zum Gruppieren der Stapel — pro Klasse/Kurs.
@@ -131,14 +138,15 @@ export default function Karten() {
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [addMode, setAddMode] = useState(null); // null | "deck" | "folder"
   const [addName, setAddName] = useState("");
-  const loadFolders = (id) => {
-    if (!id) return;
+  const loadFolders = () => {
     const meine = ++ladenrFolders.current;
-    fetch(`${API}/classes/${id}/card-folders${kq}`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+    fetch(`${API}/card-folders`).then((r) => (r.ok ? r.json() : [])).then((d) => {
       if (meine === ladenrFolders.current) setCardFolders(Array.isArray(d) ? d : []);
     }).catch(() => {});
   };
-  useEffect(() => { loadDecks(classId); loadFolders(classId); setCurrentCardFolder(null); }, [classId, kursId]);
+  // Die Sammlung haengt an keiner Klasse mehr — neu geladen wird nur, wenn sich
+  // der Kurs-Filter aendert.
+  useEffect(() => { loadDecks(); loadFolders(); setCurrentCardFolder(null); }, [filterKurs]);
   // Deep-Link ?deck=<id> (aus dem Kalender): in den Ordner des Stapels springen,
   // der Stapel klappt sich per autoOpen einmalig auf und scrollt hin.
   const [autoDeck, setAutoDeck] = useState(Number(params.get("deck")) || null);
@@ -159,7 +167,7 @@ export default function Karten() {
   const folderById = () => Object.fromEntries(cardFolders.map((f) => [f.id, f]));
   const isAncestor = (aId, bId) => { const m = folderById(); let cur = m[bId]?.parent_id ?? null; while (cur != null) { if (cur === aId) return true; cur = m[cur]?.parent_id ?? null; } return false; };
   const canDropInto = (dragId, targetId) => dragId != null && targetId !== dragId && !isAncestor(dragId, targetId) && ((folderById()[dragId]?.parent_id ?? null) !== (targetId ?? null));
-  const moveFolderTo = async (fId, parentId) => { const f = folderById()[fId]; if (!f) return; await sende(`${API}/card-folders/${fId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: f.name, parent_id: parentId }) }, t("karten.moveFolder")); loadFolders(classId); };
+  const moveFolderTo = async (fId, parentId) => { const f = folderById()[fId]; if (!f) return; await sende(`${API}/card-folders/${fId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: f.name, parent_id: parentId }) }, t("karten.moveFolder")); loadFolders(); };
   // Generisch: gilt ein Ablegen auf targetId (Ordner oder Wurzel)? Für Ordner mit
   // Zyklus-Schutz, für Stapel wenn er nicht schon dort liegt.
   const canDrop = (targetId) => {
@@ -195,30 +203,31 @@ export default function Karten() {
     if (ov && ov.id === targetId && ov.side === "below") to += 1;
     if (from < to) to -= 1;
     const neu = [...ids]; neu.splice(to, 0, neu.splice(from, 1)[0]);
-    await fetch(`${API}/classes/${classId}/decks/reorder${kq}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: neu }) }).catch(() => {});
-    loadDecks(classId);
+    await fetch(`${API}/decks/reorder`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: neu }) }).catch(() => {});
+    loadDecks();
   };
   const folderPath = (fid) => { const byId = Object.fromEntries(cardFolders.map((f) => [f.id, f])); const path = []; let cur = fid; while (cur != null && byId[cur]) { path.unshift(byId[cur]); cur = byId[cur].parent_id ?? null; } return path; };
-  const createFolder = async (name) => { if (!name || !name.trim() || !classId) return; await sende(`${API}/classes/${classId}/card-folders${kq}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), parent_id: currentCardFolder }) }, t("karten.newFolderItem")); loadFolders(classId); };
+  const createFolder = async (name) => { if (!name || !name.trim()) return; await sende(`${API}/card-folders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), parent_id: currentCardFolder }) }, t("karten.newFolderItem")); loadFolders(); };
   // askPrompt nimmt ein Optionen-Objekt, keinen zweiten Text: der bisherige Name
   // gehoert unter „initial", sonst startet das Feld leer und die Lehrkraft muss
   // ihn abtippen (oder speichert versehentlich einen leeren Ordnernamen).
-  const renameFolder = async (f) => { const n = await askPrompt(t("karten.renameFolder"), { initial: f.name }); if (n == null || !n.trim()) return; await sende(`${API}/card-folders/${f.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n.trim(), parent_id: f.parent_id ?? null }) }, t("karten.renameFolder")); loadFolders(classId); };
-  const deleteFolder = async (f) => { if (!await askConfirm(t("karten.delFolderConfirm"))) return; await sende(`${API}/card-folders/${f.id}`, { method: "DELETE" }, t("common.delete")); if (currentCardFolder === f.id) setCurrentCardFolder(f.parent_id ?? null); loadFolders(classId); loadDecks(classId); };
+  const renameFolder = async (f) => { const n = await askPrompt(t("karten.renameFolder"), { initial: f.name }); if (n == null || !n.trim()) return; await sende(`${API}/card-folders/${f.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n.trim(), parent_id: f.parent_id ?? null }) }, t("karten.renameFolder")); loadFolders(); };
+  const deleteFolder = async (f) => { if (!await askConfirm(t("karten.delFolderConfirm"))) return; await sende(`${API}/card-folders/${f.id}`, { method: "DELETE" }, t("common.delete")); if (currentCardFolder === f.id) setCurrentCardFolder(f.parent_id ?? null); loadFolders(); loadDecks(); };
   // Der Stapel wandert optisch sofort; ohne Meldung sah eine abgelehnte
   // Verschiebung so aus, als wäre er beim Ziehen verlorengegangen.
-  const moveDeck = async (deck, folderId) => { await sende(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", folder_id: folderId }) }, t("karten.moveDeck")); loadDecks(classId); };
+  const moveDeck = async (deck, folderId) => { await sende(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", folder_id: folderId }) }, t("karten.moveDeck")); loadDecks(); };
   // Aus dem „+"-Menü gewählten Typ anlegen (Stapel im aktuellen Ordner / Ordner).
   const commitAdd = async () => {
     const name = addName.trim(); if (!name) return;
-    if (addMode === "deck") { await call(() => fetch(`${API}/classes/${classId}/decks${kq}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, folder_id: currentCardFolder }) })); }
+    // Ohne Kurs-Filter entsteht der Stapel unzugewiesen — erlaubt, er ist dann
+    // nur noch nicht ausgerollt. Mit Filter erbt er genau diesen Kurs.
+    if (addMode === "deck") { await call(() => fetch(`${API}/decks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, folder_id: currentCardFolder, kurs_ids: filterKurs ? [filterKurs] : [] }) })); }
     else if (addMode === "folder") { await createFolder(name); }
     setAddName(""); setAddMode(null);
   };
   // Seitenweiter Import: eine JSON/CSV-Datei wird zu einem NEUEN Stapel im
   // aktuellen Ordner (wie CardVote-Import). Name aus JSON, sonst Dateiname.
   const importDeck = () => {
-    if (!classId) return;
     const input = document.createElement("input");
     input.type = "file"; input.accept = ".json,.csv,.tsv,.txt";
     input.onchange = async (e) => {
@@ -228,11 +237,11 @@ export default function Karten() {
       try { const j = JSON.parse(text); if (j && j.name) name = String(j.name); } catch { /* CSV */ }
       const cards = parseCards(text);
       if (!cards.length) { showAlert(t("karten.importEmpty")); return; }
-      const r = await fetch(`${API}/classes/${classId}/decks${kq}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, folder_id: currentCardFolder }) }).catch(() => null);
+      const r = await fetch(`${API}/decks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, folder_id: currentCardFolder, kurs_ids: filterKurs ? [filterKurs] : [] }) }).catch(() => null);
       if (!r || !r.ok) return;
       const deck = await r.json();
       await sende(`${API}/decks/${deck.id}/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cards }) }, t("common.import"));
-      loadDecks(classId);
+      loadDecks();
     };
     input.click();
   };
@@ -241,7 +250,7 @@ export default function Karten() {
     setError("");
     const res = await fn();
     if (!res.ok) { const b = await res.json().catch(() => ({})); setError(typeof b.detail === "string" ? b.detail : t("common.notWork")); return false; }
-    await loadDecks(classId);
+    await loadDecks();
     return true;
   };
 
@@ -264,12 +273,20 @@ export default function Karten() {
     if (view === "qr") loadTokens();
   }, [view, classId, kursId, subsetKurs]);
 
-  // Teilkurse (nur solche mit einzeln hinzugefügten SuS).
+  // Kurse: fuer den Filter, die Zuweisung UND die Frage, ob mit E/G gearbeitet
+  // wird. Teilkurse sind daraus die mit einzeln hinzugefuegten SuS.
   useEffect(() => {
     fetch("/api/kurse").then((r) => (r.ok ? r.json() : [])).then((d) => {
-      setSubsetKurse((Array.isArray(d) ? d : []).filter((k) => (k.member_count || 0) > 0));
+      const list = Array.isArray(d) ? d : [];
+      setKurse(list);
+      setSubsetKurse(list.filter((k) => (k.member_count || 0) > 0));
     }).catch(() => {});
   }, []);
+
+  // Name je Kurs und „arbeitet dieser Stapel mit E/G?" — ein Stapel kann in
+  // mehreren Kursen liegen; sobald EINER Niveaus fuehrt, gilt die G-Vorgabe.
+  const kursName = (id) => kurse.find((k) => k.id === id)?.name || "";
+  const deckNiveauAktiv = (deck) => (deck.kurs_ids || []).some((id) => kurse.find((k) => k.id === id)?.niveau_aktiv);
 
   if (classes.length === 0) {
     return (
@@ -284,8 +301,22 @@ export default function Karten() {
   return (
     <div style={{ ...pageApp }}>
       <Werkzeugleiste style={{ marginBottom: 16 }} links={<>
-        <span data-tour="karten-class" style={{ display: "inline-flex" }}><KursKlasseSelect value={subsetKurs ? null : classId} kursValue={wantKurs} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); setTokens(null); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} /></span>
-        {subsetKurse.length > 0 && (
+        {/* In der Sammlung ist der Kurs ein FILTER, keine Voraussetzung: die
+            Stapel liegen alle da, die Auswahl blendet nur ein. Fortschritt und
+            Zugangs-Codes brauchen dagegen weiter eine Klasse (ihre SuS). */}
+        {view === "cards" ? (
+          <label data-tour="karten-class" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)" }}>
+            {t("karten.filterKurs")}
+            <select value={filterKurs || ""} style={selectStyle}
+              onChange={(e) => setFilterKurs(e.target.value ? Number(e.target.value) : null)}>
+              <option value="">{t("karten.filterAlle")}</option>
+              {kurse.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
+            </select>
+          </label>
+        ) : (
+          <span data-tour="karten-class" style={{ display: "inline-flex" }}><KursKlasseSelect value={subsetKurs ? null : classId} kursValue={wantKurs} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); setTokens(null); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} /></span>
+        )}
+        {view !== "cards" && subsetKurse.length > 0 && (
           <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)" }}>
             {t("noten.teilkurs")}
             {/* Gleiche Hoehe und Form wie die Klassenauswahl daneben (selectStyle). */}
@@ -383,7 +414,7 @@ export default function Karten() {
 
           {loadingDecks && !decksLoadedOnce.current ? <Skeleton rows={3} height={60} />
             : (decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).length === 0 && cardFolders.filter((f) => (f.parent_id ?? null) === currentCardFolder).length === 0) ? <Empty title={t("karten.noDecks")} hint={t("karten.noDecksHint")} /> : null}
-          {decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} onDragStartDeck={() => setDragDeckId(d.id)} onDragEndDeck={endDrag} dragging={dragDeckId === d.id} autoOpen={autoDeck === d.id} onAutoOpened={() => setAutoDeck(null)} onReorderOver={(e) => onDeckDragOver(e, d.id)} onReorderDrop={() => dropDeck(d.id)} dropSide={deckDrop && deckDrop.id === d.id ? deckDrop.side : null} />)}
+          {decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} kurse={kurse} kursName={kursName} niveauAktiv={deckNiveauAktiv(d)} onZuweisen={loadDecks} onDragStartDeck={() => setDragDeckId(d.id)} onDragEndDeck={endDrag} dragging={dragDeckId === d.id} autoOpen={autoDeck === d.id} onAutoOpened={() => setAutoDeck(null)} onReorderOver={(e) => onDeckDragOver(e, d.id)} onReorderDrop={() => dropDeck(d.id)} dropSide={deckDrop && deckDrop.id === d.id ? deckDrop.side : null} />)}
         </>
       )}
 
@@ -555,8 +586,9 @@ function StudentDetail({ detail, t, onClose }) {
   );
 }
 
-function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onMove, onDragStartDeck, onDragEndDeck, dragging = false, autoOpen = false, onAutoOpened, onReorderOver, onReorderDrop, dropSide = null }) {
+function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onMove, kurse = [], kursName = () => "", niveauAktiv = false, onZuweisen, onDragStartDeck, onDragEndDeck, dragging = false, autoOpen = false, onAutoOpened, onReorderOver, onReorderDrop, dropSide = null }) {
   const [planDate, setPlanDate] = useState("");
+  const [zuweisen, setZuweisen] = useState(false);   // Dialog „welchen Kursen?"
   const [publishing, setPublishing] = useState(false);
   const [importing, setImporting] = useState(false);
   // Standard eingeklappt: nur Kopf zeigen; ausgeklappt kommen Einstellungen,
@@ -644,6 +676,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   const topicLabel = (tp) => themen.label(tp);
   const release = (payload) => call(() => fetch(`${API}/decks/${deck.id}/release`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }));
 
+  const zugewiesen = deck.kurs_ids || [];
   const now = Date.now();
   const rel = deck.released_at ? new Date(deck.released_at).getTime() : null;
   const status = rel === null ? "entwurf" : rel > now ? "geplant" : "aus";
@@ -690,8 +723,16 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           </>
         )}
         {status !== "entwurf" && <span style={{ ...chipStyle, background: badge.bg, color: badge.col }}>{badge.text}</span>}
+        {/* Wem gilt dieser Stapel? Ohne Zuweisung ist er angelegt, aber fuer
+            niemanden ausgerollt — das muss man sehen, nicht suchen muessen. */}
+        <button onClick={() => setZuweisen(true)} title={t("karten.assignKurse")}
+          style={{ ...chipStyle, border: "none", cursor: "pointer",
+            ...(zugewiesen.length ? null : { background: C.warning + "1f", color: C.warning }) }}>
+          {zugewiesen.length ? zugewiesen.map(kursName).filter(Boolean).join(", ") : t("karten.noKurs")}
+        </button>
         </>}
         mehr={collapsed ? [] : [
+          { key: "kurse", label: t("karten.assignKurse"), icon: ICONS.users, onClick: () => setZuweisen(true) },
           deck.cards.length > 0 && { key: "export", label: t("karten.export"), icon: ICONS.export, onClick: exportDeck },
           { key: "import", label: t("karten.import"), icon: ICONS.import, onClick: () => setImporting(true) },
           deck.cards.length > 0 && { key: "publish", label: t("karten.publish"), icon: ICONS.share, onClick: () => setPublishing(true) },
@@ -736,6 +777,13 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           })}
         </Popover>
       </>)}
+      {zuweisen && <KursZuweisungModal deck={deck} kurse={kurse} t={t}
+        onClose={() => setZuweisen(false)}
+        onSave={async (ids) => {
+          await sende(`${API}/decks/${deck.id}/kurse`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kurs_ids: ids }) }, t("karten.assignKurse"));
+          setZuweisen(false);
+          onZuweisen && onZuweisen();
+        }} />}
       {publishing && <PublishModal name={deck.name || t("karten.deck")} onClose={() => setPublishing(false)}
         onPublish={(description) => fetch(`/api/marketplace/publish/deck`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deck_id: deck.id, description }) }).catch(() => null)} />}
 
@@ -782,7 +830,10 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           <span style={{ flex: 1, minWidth: 0 }}><strong><Latex>{c.front}</Latex></strong> <span style={{ color: "var(--text3)" }}>→ <Latex>{c.back}</Latex></span></span>
           {/* Direkt in der Zeile umschaltbar — dasselbe Bauteil wie bei einer
               CardVote-Frage und beim Kursteilnehmer. */}
-          <NiveauToggle wert={c.niveau || ""} size={22} title={t("karten.cardNiveauHint")}
+          {/* Arbeitet der Kurs mit E/G, gibt es kein „gilt fuer alle" mehr:
+              eine Karte ist Grundstoff (G) oder Anforderung (E). Ohne aktives
+              Niveau bleibt der dritte Zustand. */}
+          <NiveauToggle wert={c.niveau || ""} size={22} mitLeer={!niveauAktiv} title={t("karten.cardNiveauHint")}
             onChange={(v) => saveEditCard(c.id, c.front, c.back, v)} />
           {c.has_back_image && <AuthImage src={`${API}/cards/${c.id}/image/back`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: CONTROL_R, border: "1px solid var(--border2)", flexShrink: 0 }} />}
           <button onClick={() => setEditCard(c.id)} className="icon-btn" style={iconBtn} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>
@@ -795,21 +846,51 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
       })}
       {editCard != null && cards.find((c) => c.id === editCard) && (
         <CardEditModal card={cards.find((c) => c.id === editCard)} imgVer={imgVer} onUpload={uploadCardImg} onRemove={removeCardImg}
-          onSave={saveEditCard} onClose={() => setEditCard(null)} t={t} />
+          mitLeer={!niveauAktiv} onSave={saveEditCard} onClose={() => setEditCard(null)} t={t} />
       )}
       <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <button onClick={() => setNewOpen(true)} style={{ ...btnPrimary, padding: "8px 16px", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon d={ICONS.plus} size={15} color="var(--bg)" /> {t("karten.newCard")}</button>
       </div>
       </>)}
       {newOpen && (
-        <CardEditModal card={{ id: null, front: "", back: "", has_front_image: false, has_back_image: false }} imgVer={imgVer}
-          onSave={(_id, f, b, n) => createCard(f, b, n)} onClose={() => setNewOpen(false)} t={t} />
+        // Karteikarten sind G, solange nicht anders gesagt — aber nur, wo der
+        // Kurs mit E/G arbeitet. Sonst startet die neue Karte neutral.
+        <CardEditModal card={{ id: null, front: "", back: "", niveau: niveauAktiv ? "G" : "", has_front_image: false, has_back_image: false }} imgVer={imgVer}
+          mitLeer={!niveauAktiv} onSave={(_id, f, b, n) => createCard(f, b, n)} onClose={() => setNewOpen(false)} t={t} />
       )}
       {studying && <StudyModal cards={cards} deckName={deck.name || t("karten.deck")} t={t} onClose={() => setStudying(false)} />}
       {importing && <ImportModal deckName={deck.name || t("karten.deck")} t={t}
         onClose={() => setImporting(false)}
         onImport={async (cards) => call(() => fetch(`${API}/decks/${deck.id}/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cards }) }))} />}
     </div>
+  );
+}
+
+// Welchen Kursen gilt dieser Stapel? Häkchenliste der eigenen Kurse — ein
+// Stapel darf in mehreren liegen und in keinem (dann ist er nur nicht
+// ausgerollt). Die Klasse spielt hier keine Rolle mehr.
+function KursZuweisungModal({ deck, kurse, t, onClose, onSave }) {
+  const [ids, setIds] = useState(() => new Set(deck.kurs_ids || []));
+  const [busy, setBusy] = useState(false);
+  const um = (id) => setIds((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  return (
+    <UiModal onClose={onClose} width={440} label={t("karten.assignKurse")}>
+      <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{t("karten.assignKurse")}</h3>
+      <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 12px" }}>{t("karten.assignHint")}</p>
+      {kurse.length === 0 ? (
+        <p style={{ fontSize: 14, color: "var(--text3)" }}>{t("karten.noKurseYet")}</p>
+      ) : kurse.map((k) => (
+        <label key={k.id} style={{ ...menuRow, cursor: "pointer" }}>
+          <input type="checkbox" checked={ids.has(k.id)} onChange={() => um(k.id)} />
+          {k.name}
+        </label>
+      ))}
+      {ids.size === 0 && <p style={{ fontSize: 12, color: C.warning, marginTop: 8 }}>{t("karten.noKursWarn")}</p>}
+      <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+        <button disabled={busy} onClick={() => { setBusy(true); onSave([...ids]); }} style={btnPrimary}>{t("common.save")}</button>
+        <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
+      </div>
+    </UiModal>
   );
 }
 
@@ -880,7 +961,7 @@ function StudyModal({ cards, deckName, t, onClose }) {
 }
 
 // Karte bearbeiten im Popup: Vorder-/Rückseite als Text + Bild-Upload je Seite.
-function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t }) {
+function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t, mitLeer = true }) {
   const [front, setFront] = useState(card.front || "");
   const [back, setBack] = useState(card.back || "");
   const [niveau, setNiveau] = useState(card.niveau || "");
@@ -943,7 +1024,7 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t })
             wirkt zusammen — eine E-Karte in einem G-Stapel sieht niemand. */}
         <div style={lbl}>{t("karten.cardNiveau")}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <NiveauToggle wert={niveau} onChange={setNiveau} title={t("karten.cardNiveauHint")} />
+          <NiveauToggle wert={niveau} mitLeer={mitLeer} onChange={setNiveau} title={t("karten.cardNiveauHint")} />
           <span style={{ fontSize: 12, color: "var(--text3)" }}>
             {niveau === "E" ? t("karten.niveauE") : niveau === "G" ? t("karten.niveauG") : t("karten.niveauAll")}
           </span>

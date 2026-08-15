@@ -850,10 +850,31 @@ def probe_karten(api, u):
     api.call("GET", f"/api/karten/classes/{u.class_id}/decks", erwartet=(200,))
     api.call("POST", f"/api/karten/classes/{u.class_id}/tokens", erwartet=(200, 201))
     api.call("GET", f"/api/karten/classes/{u.class_id}/progress", erwartet=(200,))
+
+    # Die Sammlung: ein Stapel OHNE Klasse, danach einem Kurs zugewiesen. Das
+    # ist der Weg, den die Oberflaeche heute geht — ohne Probe wuesste niemand,
+    # ob er nach dem Deploy noch traegt.
+    sammlung = api.call("POST", "/api/karten/decks",
+                        {"name": f"{PRAEFIX} Sammlung"}, erwartet=(201,))
+    api.call("GET", "/api/karten/decks", erwartet=(200,))
+    api.call("GET", "/api/karten/card-folders", erwartet=(200,))
+    kurs_id = None
+    for k in api.call("GET", "/api/kurse", erwartet=(200,)) or []:
+        if any(c.get("id") == u.class_id for c in (k.get("classes") or [])):
+            kurs_id = k["id"]
+            break
+    if kurs_id is not None:
+        zu = api.call("PUT", f"/api/karten/decks/{sammlung['id']}/kurse",
+                      {"kurs_ids": [kurs_id]}, erwartet=(200,))
+        if zu.get("kurs_ids") != [kurs_id]:
+            raise AssertionError(f"Zuweisung nicht gespeichert: {zu}")
+    api.call("DELETE", f"/api/karten/decks/{sammlung['id']}", erwartet=(204,))
+    api.call("DELETE", f"/api/karten/decks/{sammlung['id']}/purge", erwartet=(204,))
+
     api.call("DELETE", f"/api/karten/cards/{karte['id']}", erwartet=(204,))
     api.call("DELETE", f"/api/karten/decks/{stapel['id']}", erwartet=(204,))
     api.call("DELETE", f"/api/karten/decks/{stapel['id']}/purge", erwartet=(204,))
-    return "Stapel, Karte, Schueler-Zugaenge, Fortschritt"
+    return "Stapel, Karte, Schueler-Zugaenge, Fortschritt, Sammlung + Kurs-Zuweisung"
 
 
 def probe_kalender(api, u):

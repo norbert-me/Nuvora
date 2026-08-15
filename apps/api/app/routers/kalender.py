@@ -229,9 +229,17 @@ async def _release_matching_decks(db: AsyncSession, user: User, e: CalendarEntry
     )
     if e.class_id:
         from .kurse import class_kurs_ids
+        from sqlalchemy import and_ as _and, exists as _exists
+        from ..models import CardDeckKurs
         kurse = list(await class_kurs_ids(db, e.class_id))
         if kurse:
-            q = q.where(or_(CardDeck.kurs_id.in_(kurse), CardDeck.class_id == e.class_id))
+            # Zugewiesene Stapel zaehlen mit: seit der Sammlung ist die Zuweisung
+            # der Weg, und ein Stapel gehoert dann keiner Klasse mehr. Bewusst
+            # ueber das MODELL statt ueber eine Funktion aus karten.py — Module
+            # haengen nicht voneinander ab (Regel 3), Tabellen teilen sie sich.
+            zugewiesen = _exists().where(_and(CardDeckKurs.deck_id == CardDeck.id,
+                                              CardDeckKurs.kurs_id.in_(kurse)))
+            q = q.where(or_(zugewiesen, CardDeck.kurs_id.in_(kurse), CardDeck.class_id == e.class_id))
         else:
             q = q.where(CardDeck.class_id == e.class_id)
     matched = (await db.execute(q.order_by(CardDeck.id))).scalars().all()

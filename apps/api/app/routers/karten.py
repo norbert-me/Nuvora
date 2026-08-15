@@ -20,7 +20,8 @@ import qrcode
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
-from sqlalchemy import select, func as sa_func, and_, or_, delete as sql_delete
+from sqlalchemy import (select, func as sa_func, and_, or_, exists as sa_exists,
+                        false as sa_false, delete as sql_delete)
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError, OperationalError
@@ -29,7 +30,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import get_db
 from ..uploads import bildtyp
 from sqlalchemy.orm import selectinload
-from ..models import Card, CardDeck, CardFolder, CardReview, SchoolClass, Student, User, Session, Scan, QuestionSetItem
+from ..models import (Card, CardDeck, CardDeckKurs, CardFolder, CardReview, Kurs,
+                      SchoolClass, Student, User, Session, Scan, QuestionSetItem)
 from .auth import get_current_user, rate_limit
 from .modules import is_active, modul_pflicht
 
@@ -183,43 +185,100 @@ async def _kurs_roster(db, user, class_id, subset_kurs=None):
     return (await db.execute(select(Student).where(Student.class_id == class_id).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
 
 
-async def _kurs_decks_where(cls, kurs_id=None):
-    """Stapel hängen am Kurs (Fach). kurs_id gesetzt = die Stapel dieses Kurses,
-    PLUS die dieser Klasse ohne Kurszuordnung; sonst nur letztere.
+# ─── Wer sieht welchen Stapel? ───
+#
+# Seit der Sammlung gibt es ZWEI Wege, und sie greifen nacheinander:
+#
+#   1. die ZUWEISUNG (card_deck_kurse) — der neue, einzige Weg fuer alles, was
+#      in der Sammlung entsteht. Ein Stapel ohne Zuweisung ist fuer niemanden
+#      ausgerollt, und genau das muss so bleiben: sonst liesse sich eine
+#      Zuweisung nie wieder zuruecknehmen.
+#   2. die HERKUNFT (class_id/kurs_id) — nur noch fuer Stapel, die ueberhaupt
+#      KEINE Zuweisung haben. Die einmalige Uebernahme beim Start gibt jedem
+#      Bestandsstapel eine; bis dahin (und in Tests, die ohne Start laufen)
+#      bleibt der alte Weg gueltig, damit kein Kind seine Karten verliert.
+#
+# Deshalb steht der alte Zweig immer unter `_ohne_zuweisung()`: beide Wege
+# gleichzeitig waeren ein Stapel, den man aus einem Kurs entfernt und der ueber
+# seine Herkunftsklasse trotzdem weiter ausgeteilt wird.
 
-    Der Zusatz ist wichtig: nicht jeder Weg, der einen Stapel anlegt, kennt
-    einen Kurs — das "Karten-Deck" zu einem schwachen Thema auf der Startseite
-    und die Übernahme aus dem Marktplatz legen ohne kurs_id an. Ohne diesen
-    Fallback wäre so ein Stapel angelegt, aber in der Kursansicht unsichtbar.
-    Die Trennung zwischen Geschwister-Klassen desselben Kurses bleibt: der
-    Fallback ist an die eigene class_id gebunden.
+
+def _zugewiesen(kurs_ids):
+    """Stapel, die EINEM dieser Kurse zugewiesen sind."""
+    ids = [k for k in (kurs_ids or []) if k is not None]
+    if not ids:
+        return sa_false()  # ohne Kurs kein Treffer
+    return sa_exists().where(and_(CardDeckKurs.deck_id == CardDeck.id, CardDeckKurs.kurs_id.in_(ids)))
+
+
+def _ohne_zuweisung():
+    """Stapel, die (noch) keinem Kurs zugewiesen sind — nur fuer sie gilt die Herkunft."""
+    return ~sa_exists().where(CardDeckKurs.deck_id == CardDeck.id)
+
+
+async def _kurse_je_deck(db, deck_ids) -> dict:
+    """{deck_id: [kurs_id, …]} — die Zuweisungen, wie die Oberflaeche sie zeigt."""
+    ids = list(deck_ids or [])
+    if not ids:
+        return {}
+    rows = (await db.execute(select(CardDeckKurs.deck_id, CardDeckKurs.kurs_id)
+                             .where(CardDeckKurs.deck_id.in_(ids)))).all()
+    out: dict = {}
+    for did, kid in rows:
+        out.setdefault(did, []).append(kid)
+    return out
+
+
+async def _kurs_decks_where(cls, kurs_id=None):
+    """Stapel dieser Klasse/dieses Kurses (Lehrkraft-Sicht der alten Wege).
+
+    kurs_id gesetzt = die dem Kurs ZUGEWIESENEN Stapel, dazu die Bestandsstapel
+    ohne Zuweisung nach der alten Regel (Herkunfts-Kurs oder eigene Klasse ohne
+    Kurs). Ohne kurs_id bleibt nur der Klassen-Fallback.
+
+    Der Fallback war schon vorher wichtig: nicht jeder Weg, der einen Stapel
+    anlegt, kennt einen Kurs — das "Karten-Deck" zu einem schwachen Thema und die
+    Übernahme aus dem Marktplatz legen ohne kurs_id an.
     """
     if kurs_id is not None:
-        return or_(CardDeck.kurs_id == kurs_id,
-                   and_(CardDeck.class_id == cls.id, CardDeck.kurs_id.is_(None)))
-    return and_(CardDeck.class_id == cls.id, CardDeck.kurs_id.is_(None))
+        alt = or_(CardDeck.kurs_id == kurs_id,
+                  and_(CardDeck.class_id == cls.id, CardDeck.kurs_id.is_(None)))
+        return or_(_zugewiesen([kurs_id]), and_(_ohne_zuweisung(), alt))
+    return and_(_ohne_zuweisung(), CardDeck.class_id == cls.id, CardDeck.kurs_id.is_(None))
 
 
 async def _class_all_decks_where(db, class_id):
-    """Alle Stapel, die zur Klasse gehören: direkt (class_id) ODER über einen Kurs,
-    in dem die Klasse liegt. Für Auswahl-Listen (z.B. Kalender-Deck-Verknüpfung),
-    die nicht auf einen bestimmten Kurs eingeschränkt sind."""
+    """Alle Stapel, die zur Klasse gehören: zugewiesen an einen ihrer Kurse ODER
+    direkt (class_id) ODER über den Herkunfts-Kurs. Für Auswahl-Listen (z.B.
+    Kalender-Deck-Verknüpfung), die nicht auf einen bestimmten Kurs eingeschränkt
+    sind — hier wird bewusst breit angeboten, ausgeteilt wird nichts."""
     from .kurse import class_kurs_ids
     kurse = list(await class_kurs_ids(db, class_id))
     if kurse:
-        return or_(CardDeck.kurs_id.in_(kurse), CardDeck.class_id == class_id)
+        return or_(_zugewiesen(kurse), CardDeck.kurs_id.in_(kurse), CardDeck.class_id == class_id)
     return CardDeck.class_id == class_id
 
 
-async def _student_deck_where(db, st):
-    """Deck-Filter fuer einen Schueler (oeffentliches Lernen): alle Stapel der
-    Kurse (Fächer), in denen seine Klasse liegt, PLUS die Teilkurse, in denen er
-    einzeln Mitglied ist (Kurse aus Teilen von Klassen) — plus Klassen-Fallback."""
+async def _student_kurs_ids(db, st) -> list:
+    """Die Kurse dieses Kindes: die seiner Klasse UND die Teilkurse, in denen es
+    einzeln Mitglied ist (Kurse aus Teilen von Klassen)."""
     from .kurse import class_kurs_ids, student_kurs_ids
-    kurse = list(set(await class_kurs_ids(db, st.class_id)) | await student_kurs_ids(db, st.id))
+    return list(set(await class_kurs_ids(db, st.class_id)) | await student_kurs_ids(db, st.id))
+
+
+async def _student_deck_where(db, st):
+    """Deck-Filter fuer einen Schueler (oeffentliches Lernen): alle Stapel, die
+    einem seiner Kurse ZUGEWIESEN sind — plus die Bestandsstapel ohne Zuweisung
+    nach der alten Regel (Herkunfts-Kurs oder eigene Klasse).
+
+    Fremde Kurse bleiben aussen vor: gefragt wird nur nach den Kursen dieses
+    Kindes, und der Herkunfts-Zweig haengt weiterhin an seiner eigenen class_id."""
+    kurse = await _student_kurs_ids(db, st)
+    alt = and_(CardDeck.class_id == st.class_id, CardDeck.kurs_id.is_(None))
     if kurse:
-        return or_(CardDeck.kurs_id.in_(kurse), and_(CardDeck.class_id == st.class_id, CardDeck.kurs_id.is_(None)))
-    return and_(CardDeck.class_id == st.class_id, CardDeck.kurs_id.is_(None))
+        alt = or_(CardDeck.kurs_id.in_(kurse), alt)
+        return or_(_zugewiesen(kurse), and_(_ohne_zuweisung(), alt))
+    return and_(_ohne_zuweisung(), alt)
 
 
 def _niveau_where(st):
@@ -269,6 +328,9 @@ class DeckIn(BaseModel):
     topic_id: Optional[int] = None
     niveau: str = ""  # "" = alle, "E"/"G" = nur dieses Niveau
     folder_id: Optional[int] = None  # Ordner (wie CardVote); NULL = Wurzel
+    # Nur beim Anlegen in der Sammlung: Kurse, fuer die der Stapel gelten soll.
+    # None = keine Angabe (nichts zuweisen), [] = ausdruecklich niemandem.
+    kurs_ids: Optional[List[int]] = None
 
 
 class CardOut(BaseModel):
@@ -284,8 +346,9 @@ class CardOut(BaseModel):
 
 class DeckOut(BaseModel):
     id: int
-    class_id: int
-    kurs_id: Optional[int] = None   # Stapel hängen am Kurs — für Deep-Link aus dem Kalender
+    class_id: Optional[int] = None  # nur noch Herkunft; Stapel der Sammlung haben keine
+    kurs_id: Optional[int] = None   # Herkunfts-Kurs (Bestand) — für Deep-Link aus dem Kalender
+    kurs_ids: List[int] = []        # die Kurse, denen der Stapel zugewiesen ist
     name: str
     topic_id: Optional[int] = None
     niveau: str = ""
@@ -295,15 +358,26 @@ class DeckOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-def _deck_out(deck) -> "DeckOut":
+def _deck_out(deck, kurs_ids=()) -> "DeckOut":
     """DeckOut mit gefilterten Karten: gelöschte (deleted_at) bleiben draußen. Das
     Relationship trägt delete-orphan — hier NICHT anfassen, nur beim Ausgeben filtern."""
     return DeckOut(
-        id=deck.id, class_id=deck.class_id, kurs_id=deck.kurs_id, name=deck.name,
+        id=deck.id, class_id=deck.class_id, kurs_id=deck.kurs_id,
+        kurs_ids=sorted(kurs_ids or []), name=deck.name,
         topic_id=deck.topic_id, niveau=deck.niveau, folder_id=deck.folder_id,
         released_at=deck.released_at,
         cards=[CardOut.model_validate(c) for c in deck.cards if c.deleted_at is None],
     )
+
+
+async def _decks_out(db, decks) -> List["DeckOut"]:
+    """Mehrere Stapel ausgeben — die Zuweisungen in EINER Abfrage dazu."""
+    zu = await _kurse_je_deck(db, [d.id for d in decks])
+    return [_deck_out(d, zu.get(d.id, [])) for d in decks]
+
+
+async def _deck_einzeln(db, deck) -> "DeckOut":
+    return _deck_out(deck, (await _kurse_je_deck(db, [deck.id])).get(deck.id, []))
 
 
 # ─── Ordner (wie CardVote) zum Gruppieren der Stapel ───
@@ -333,6 +407,26 @@ def _folder_scope(class_id, kurs_id):
     if kurs_id is not None:
         return [CardFolder.kurs_id == kurs_id]
     return [CardFolder.class_id == class_id, CardFolder.kurs_id.is_(None)]
+
+
+@router.get("/card-folders", response_model=List[CardFolderOut])
+async def list_collection_folders(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Alle Ordner der Sammlung — sie gehoeren der Lehrkraft, nicht einer Klasse.
+    Bestandsordner (mit class_id) stehen mit drin: sonst waeren ihre Stapel in der
+    Sammlung sichtbar, ihr Ordner aber nicht."""
+    rows = (await db.execute(select(CardFolder).where(CardFolder.owner_id == user.id)
+                             .order_by(CardFolder.name))).scalars().all()
+    return rows
+
+
+@router.post("/card-folders", response_model=CardFolderOut, status_code=201)
+async def create_collection_folder(body: CardFolderIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Ordner in der Sammlung anlegen — ohne Klasse."""
+    f = CardFolder(owner_id=user.id, class_id=None, kurs_id=None, name=body.name.strip(), parent_id=body.parent_id)
+    db.add(f)
+    await db.commit()
+    await db.refresh(f)
+    return f
 
 
 @router.get("/classes/{class_id}/card-folders", response_model=List[CardFolderOut])
@@ -379,7 +473,7 @@ async def list_decks(class_id: int, kurs_id: Optional[int] = None, user: User = 
         select(CardDeck).where(CardDeck.owner_id == user.id, await _kurs_decks_where(cls, kurs_id), CardDeck.deleted_at.is_(None))
         .options(selectinload(CardDeck.cards)).order_by(CardDeck.position, CardDeck.id)
     )
-    return [_deck_out(d) for d in r.scalars().all()]
+    return await _decks_out(db, r.scalars().all())
 
 
 @router.get("/classes/{class_id}/all-decks", response_model=List[DeckOut])
@@ -392,7 +486,7 @@ async def list_all_decks(class_id: int, user: User = Depends(require_module), db
         select(CardDeck).where(CardDeck.owner_id == user.id, await _class_all_decks_where(db, class_id), CardDeck.deleted_at.is_(None))
         .options(selectinload(CardDeck.cards)).order_by(CardDeck.position, CardDeck.id)
     )
-    return [_deck_out(d) for d in r.scalars().all()]
+    return await _decks_out(db, r.scalars().all())
 
 
 @router.get("/classes/{class_id}/decks/trash", response_model=List[DeckOut])
@@ -404,7 +498,7 @@ async def list_deck_trash(class_id: int, kurs_id: Optional[int] = None, user: Us
         select(CardDeck).where(CardDeck.owner_id == user.id, await _kurs_decks_where(cls, kurs_id), CardDeck.deleted_at.is_not(None))
         .options(selectinload(CardDeck.cards)).order_by(CardDeck.deleted_at.desc())
     )
-    return [_deck_out(d) for d in r.scalars().all()]
+    return await _decks_out(db, r.scalars().all())
 
 
 async def _schedule_deck_from_calendar(db: AsyncSession, user: User, deck: CardDeck) -> None:
@@ -423,11 +517,13 @@ async def _schedule_deck_from_calendar(db: AsyncSession, user: User, deck: CardD
         select(CalendarEntry).where(CalendarEntry.owner_id == user.id, CalendarEntry.topic_id == deck.topic_id)
         .order_by(CalendarEntry.date)
     )).scalars().all()
+    zugewiesen = set((await _kurse_je_deck(db, [deck.id])).get(deck.id, []))
     for e in entries:
         if e.class_id is None:
             continue
         kurse = await class_kurs_ids(db, e.class_id)
-        if e.class_id == deck.class_id or (deck.kurs_id is not None and deck.kurs_id in kurse):
+        if (e.class_id == deck.class_id or (deck.kurs_id is not None and deck.kurs_id in kurse)
+                or (zugewiesen & set(kurse))):
             deck.released_at = _tagesbeginn(e.date)  # ab Beginn des Termintags (frühester Eintrag)
             if not e.karten_deck_id:
                 e.karten_deck_id = deck.id       # Eintrag auf dieses Deck verlinken
@@ -437,6 +533,12 @@ async def _schedule_deck_from_calendar(db: AsyncSession, user: User, deck: CardD
 
 @router.post("/classes/{class_id}/decks", response_model=DeckOut, status_code=201)
 async def create_deck(class_id: int, body: DeckIn, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Stapel an einer Klasse anlegen — der alte Weg.
+
+    Bleibt fuer alles, was von aussen mit einer Klasse kommt (Marktplatz,
+    schwaches Thema, Kalender). Er legt KEINE Kurs-Zuweisung an: die Herkunft
+    reicht, solange niemand den Stapel zugewiesen hat (siehe `_ohne_zuweisung`).
+    Die Sammlung legt ueber `POST /decks` an."""
     rate_limit("karten_deck", f"u{user.id}", 100, 60, "Zu viele Stapel. Bitte kurz warten.")
     await _owned_class(db, user, class_id)  # nur die Zugriffsprüfung, wirft bei fremder Klasse
     last = (await db.execute(select(CardDeck.position).where(CardDeck.class_id == class_id).order_by(CardDeck.position.desc()))).scalars().first()
@@ -447,11 +549,163 @@ async def create_deck(class_id: int, body: DeckIn, kurs_id: Optional[int] = None
     await db.commit()
     await db.refresh(deck, ["cards"])
     await _schedule_deck_from_calendar(db, user, deck)
-    return deck
+    return await _deck_einzeln(db, deck)
+
+
+# ─── Die Sammlung: alle Stapel der Lehrkraft, Zuweisung an Kurse ───
+
+async def uebernahme_deck_kurse(db: AsyncSession) -> int:
+    """Bestand einmalig in die neue Zuweisung heben — ohne Datenverlust.
+
+    Jeder vorhandene Stapel bekommt eine Zuweisung: bevorzugt aus seinem
+    Herkunfts-Kurs (`kurs_id`), ersatzweise aus dem Kurs seiner Herkunftsklasse.
+    `class_id` bleibt stehen und wird NICHT geleert — sie ist die Spur, aus der
+    diese Rechnung stammt.
+
+    Einmalig heisst einmalig: die Marke sitzt am Konto
+    (`users.karten_kurse_initialized`), wie beim Anschluss ans Modulregister.
+    Ohne sie zauberte jeder Neustart eine von Hand entfernte Zuweisung wieder
+    herbei — und ein Stapel, den die Lehrkraft aus einem Kurs genommen hat,
+    waere am naechsten Morgen wieder ausgerollt.
+
+    Stapel im Papierkorb zaehlen mit: sonst stuenden sie nach dem
+    Wiederherstellen ohne Zuweisung da.
+    """
+    from .kurse import class_kurs_ids
+
+    konten = (await db.execute(select(User).where(
+        User.karten_kurse_initialized.is_(False)))).scalars().all()
+    if not konten:
+        return 0
+    angelegt = 0
+    for u in konten:
+        decks = (await db.execute(select(CardDeck).where(CardDeck.owner_id == u.id))).scalars().all()
+        for d in decks:
+            schon = (await db.execute(select(CardDeckKurs.id).where(
+                CardDeckKurs.deck_id == d.id))).scalars().first()
+            if schon:
+                continue
+            ziel = []
+            if d.kurs_id:
+                # Nur, wenn es den Kurs noch gibt: eine Zeile auf einen toten
+                # Kurs waere eine Zuweisung, die niemandem etwas austeilt.
+                lebt = (await db.execute(select(Kurs.id).where(
+                    Kurs.id == d.kurs_id, Kurs.deleted_at.is_(None)))).scalars().first()
+                if lebt:
+                    ziel = [d.kurs_id]
+            if not ziel and d.class_id:
+                ziel = sorted(await class_kurs_ids(db, d.class_id))
+            for k in ziel:
+                db.add(CardDeckKurs(deck_id=d.id, kurs_id=k))
+                angelegt += 1
+        u.karten_kurse_initialized = True
+    await db.commit()
+    return angelegt
+
+
+
+async def _owned_kurs_ids(db, user, kurs_ids) -> list:
+    """Kurs-IDs pruefen: jede muss dem Konto gehoeren. Sonst waere die Zuweisung
+    der Weg, einen Stapel in einen fremden Kurs zu haengen."""
+    ids = sorted({int(k) for k in (kurs_ids or [])})
+    if not ids:
+        return []
+    gefunden = set((await db.execute(select(Kurs.id).where(
+        Kurs.id.in_(ids), Kurs.owner_id == user.id))).scalars().all())
+    fehlt = [k for k in ids if k not in gefunden]
+    if fehlt:
+        raise HTTPException(404, "Kurs nicht gefunden")
+    return ids
+
+
+async def _setze_deck_kurse(db, deck_id: int, kurs_ids) -> list:
+    """Zuweisungen auf genau diese Liste bringen — als Abgleich, nicht als
+    Loeschen-und-neu-Anlegen. Es haengt nichts an der Zeile, aber die Regel gilt
+    hier wie ueberall: was bleiben soll, wird nicht erst weggeworfen."""
+    ziel = set(kurs_ids or [])
+    jetzt = set((await db.execute(select(CardDeckKurs.kurs_id).where(CardDeckKurs.deck_id == deck_id))).scalars().all())
+    for weg in jetzt - ziel:
+        await db.execute(sql_delete(CardDeckKurs).where(
+            CardDeckKurs.deck_id == deck_id, CardDeckKurs.kurs_id == weg))
+    for neu in ziel - jetzt:
+        db.add(CardDeckKurs(deck_id=deck_id, kurs_id=neu))
+    return sorted(ziel)
+
+
+@router.get("/decks", response_model=List[DeckOut])
+async def list_collection(kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Die ganze Sammlung (alle Stapel der Lehrkraft, in ihren Ordnern).
+
+    `kurs_id` filtert auf „nur Stapel dieses Kurses" — die Klasse ist dafuer
+    keine Voraussetzung mehr, sondern eine Ansichtssache."""
+    from sqlalchemy.orm import selectinload
+    where = [CardDeck.owner_id == user.id, CardDeck.deleted_at.is_(None)]
+    if kurs_id is not None:
+        await _owned_kurs_ids(db, user, [kurs_id])
+        where.append(or_(_zugewiesen([kurs_id]),
+                         and_(_ohne_zuweisung(), CardDeck.kurs_id == kurs_id)))
+    r = await db.execute(select(CardDeck).where(*where)
+                         .options(selectinload(CardDeck.cards)).order_by(CardDeck.position, CardDeck.id))
+    return await _decks_out(db, r.scalars().all())
+
+
+@router.post("/decks", response_model=DeckOut, status_code=201)
+async def create_collection_deck(body: DeckIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Stapel in der Sammlung anlegen — ohne Klasse. Zuweisung optional; ohne sie
+    ist der Stapel angelegt, aber fuer niemanden ausgerollt."""
+    rate_limit("karten_deck", f"u{user.id}", 100, 60, "Zu viele Stapel. Bitte kurz warten.")
+    kurse = await _owned_kurs_ids(db, user, body.kurs_ids)
+    last = (await db.execute(select(CardDeck.position).where(CardDeck.owner_id == user.id)
+                             .order_by(CardDeck.position.desc()))).scalars().first()
+    deck = CardDeck(class_id=None, kurs_id=None, owner_id=user.id, name=body.name.strip(),
+                    topic_id=body.topic_id, niveau=body.niveau if body.niveau in ("E", "G") else "",
+                    folder_id=body.folder_id, position=(last if last is not None else -1) + 1)
+    db.add(deck)
+    await db.flush()
+    await _setze_deck_kurse(db, deck.id, kurse)
+    await db.commit()
+    await db.refresh(deck, ["cards"])
+    await _schedule_deck_from_calendar(db, user, deck)
+    return await _deck_einzeln(db, deck)
+
+
+class DeckKurseIn(BaseModel):
+    kurs_ids: List[int] = []
+
+
+@router.get("/decks/{deck_id}/kurse")
+async def get_deck_kurse(deck_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    await _owned_deck(db, user, deck_id)
+    return {"kurs_ids": sorted((await _kurse_je_deck(db, [deck_id])).get(deck_id, []))}
+
+
+@router.put("/decks/{deck_id}/kurse")
+async def set_deck_kurse(deck_id: int, body: DeckKurseIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Zuweisung setzen (ersetzt die bisherige). Leere Liste = niemandem mehr —
+    der Stapel bleibt in der Sammlung, wird aber nicht mehr ausgeteilt."""
+    await _owned_deck(db, user, deck_id)
+    kurse = await _owned_kurs_ids(db, user, body.kurs_ids)
+    gesetzt = await _setze_deck_kurse(db, deck_id, kurse)
+    await db.commit()
+    return {"kurs_ids": gesetzt}
 
 
 class DeckReorderIn(BaseModel):
     ids: List[int]
+
+
+@router.put("/decks/reorder", status_code=204)
+async def reorder_collection(body: DeckReorderIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Reihenfolge in der Sammlung setzen (nur eigene Stapel)."""
+    rows = (await db.execute(select(CardDeck).where(CardDeck.owner_id == user.id))).scalars().all()
+    by_id = {d.id: d for d in rows}
+    pos = 0
+    for did in body.ids:
+        d = by_id.get(did)
+        if d is not None:
+            d.position = pos
+            pos += 1
+    await db.commit()
 
 
 @router.put("/classes/{class_id}/decks/reorder", status_code=204)
@@ -480,7 +734,7 @@ async def update_deck(deck_id: int, body: DeckIn, user: User = Depends(require_m
     await db.commit()
     await db.refresh(deck, ["cards"])
     await _schedule_deck_from_calendar(db, user, deck)
-    return deck
+    return await _deck_einzeln(db, deck)
 
 
 @router.delete("/decks/{deck_id}", status_code=204)
@@ -497,7 +751,7 @@ async def restore_deck(deck_id: int, user: User = Depends(require_module), db: A
     deck.deleted_at = None
     await db.commit()
     await db.refresh(deck, ["cards"])
-    return deck
+    return await _deck_einzeln(db, deck)
 
 
 @router.delete("/decks/{deck_id}/purge", status_code=204)
@@ -531,7 +785,7 @@ async def release_deck(deck_id: int, body: ReleaseIn, user: User = Depends(requi
         deck.released_at = None  # zurueckziehen
     await db.commit()
     await db.refresh(deck, ["cards"])
-    return deck
+    return await _deck_einzeln(db, deck)
 
 
 class CardIn(BaseModel):
@@ -554,13 +808,42 @@ class CardIn(BaseModel):
         return v if v in ("E", "G") else ""
 
 
+async def _deck_kurs_ids(db, deck) -> list:
+    """Alle Kurse, unter denen dieser Stapel laeuft: die Zuweisungen, der
+    Herkunfts-Kurs und (fuer Bestand ohne beides) die Kurse seiner Klasse."""
+    ids = set((await _kurse_je_deck(db, [deck.id])).get(deck.id, []))
+    if deck.kurs_id:
+        ids.add(deck.kurs_id)
+    if not ids and deck.class_id:
+        from .kurse import class_kurs_ids
+        ids |= await class_kurs_ids(db, deck.class_id)
+    return sorted(ids)
+
+
+async def _niveau_vorgabe(db, deck) -> str:
+    """Karteikarten sind G, solange nicht anders gesagt — ABER nur, wo der Kurs
+    ueberhaupt mit E/G arbeitet (`kurse.niveau_aktiv`).
+
+    Ohne aktives Niveau bleibt eine neue Karte neutral (sie gilt fuer alle);
+    mit aktivem Niveau ist sie Grundstoff und wird per Umschalter zu E. Gilt nur
+    beim ANLEGEN — Bestandskarten bleiben, was sie sind, sonst verschwaenden sie
+    ueber Nacht aus der Sicht der E-Kinder."""
+    kurse = await _deck_kurs_ids(db, deck)
+    if not kurse:
+        return ""
+    aktiv = (await db.execute(select(Kurs.id).where(
+        Kurs.id.in_(kurse), Kurs.niveau_aktiv.is_(True)))).scalars().first()
+    return "G" if aktiv else ""
+
+
 @router.post("/decks/{deck_id}/cards", response_model=CardOut, status_code=201)
 async def add_card(deck_id: int, body: CardIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     rate_limit("karten_card", f"u{user.id}", 600, 60, "Zu viele Karten. Bitte kurz warten.")
-    await _owned_deck(db, user, deck_id)
+    deck = await _owned_deck(db, user, deck_id)
     last = (await db.execute(select(Card.position).where(Card.deck_id == deck_id).order_by(Card.position.desc()))).scalars().first()
     card = Card(deck_id=deck_id, front=body.front.strip(), back=body.back.strip(),
-                niveau=body.niveau, position=(last if last is not None else -1) + 1)
+                niveau=body.niveau or await _niveau_vorgabe(db, deck),
+                position=(last if last is not None else -1) + 1)
     db.add(card)
     await db.commit()
     await db.refresh(card)
@@ -595,8 +878,11 @@ class ImportIn(BaseModel):
 async def import_cards(deck_id: int, body: ImportIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Mehrere Karten auf einmal anhaengen (CSV/Anki-Import)."""
     rate_limit("karten_import", f"u{user.id}", 20, 60, "Zu viele Importe. Bitte kurz warten.")
-    await _owned_deck(db, user, deck_id)
-    paare = [(c.front.strip(), c.back.strip(), c.niveau) for c in body.cards if c.front.strip() or c.back.strip()]
+    deck = await _owned_deck(db, user, deck_id)
+    # Dieselbe Vorgabe wie beim einzelnen Anlegen: bei aktivem Niveau ist eine
+    # importierte Karte ohne Angabe Grundstoff, nicht „fuer alle".
+    vorgabe = await _niveau_vorgabe(db, deck)
+    paare = [(c.front.strip(), c.back.strip(), c.niveau or vorgabe) for c in body.cards if c.front.strip() or c.back.strip()]
     if not paare:
         return {"added": 0}
     if len(paare) > 2000:

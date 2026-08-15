@@ -219,7 +219,11 @@ async def test_deck_created_after_entry_schedules(s):
     e = CalendarEntry(owner_id=u.id, date=datetime(2026, 9, 14, 7, tzinfo=timezone.utc), class_id=a.id, topic_id=topic.id)
     s.add(e); await s.commit()
 
-    deck = await KR.create_deck(a.id, KR.DeckIn(name="D", topic_id=topic.id), kurs_id=None, user=u, db=s)
+    # create_deck antwortet mit dem Schema (DeckOut) — der Stapel selbst kommt
+    # dafuer frisch aus der Datenbank.
+    from app.models import CardDeck as _CD
+    aus = await KR.create_deck(a.id, KR.DeckIn(name="D", topic_id=topic.id), kurs_id=None, user=u, db=s)
+    deck = await s.get(_CD, aus.id)
     await s.refresh(deck); await s.refresh(e)
     # ab Beginn des Termintags (SQLite gibt den Zeitstempel ohne Zeitzone zurueck)
     assert deck.released_at.replace(tzinfo=None) == datetime(2026, 9, 14)

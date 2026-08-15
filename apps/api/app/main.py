@@ -240,6 +240,7 @@ def _ensure_columns(sync_conn):
         ("questions", "owner_id", "INTEGER"),
         ("users", "modules_initialized", "BOOLEAN DEFAULT false NOT NULL"),
         ("users", "methoden_seeded", "BOOLEAN DEFAULT false NOT NULL"),
+        ("users", "karten_kurse_initialized", "BOOLEAN DEFAULT false NOT NULL"),
         ("users", "calendar_token", "VARCHAR(64)"),
         ("users", "calendar_rev", "INTEGER DEFAULT 0 NOT NULL"),
         ("users", "calendar_sig", "VARCHAR(64) DEFAULT '' NOT NULL"),
@@ -386,6 +387,29 @@ def _ensure_columns(sync_conn):
             # nicht wieder ueber spaeter angelegte Entwuerfe (released_at NULL).
             if (table, column) == ("card_decks", "released_at"):
                 sync_conn.execute(text("UPDATE card_decks SET released_at = now() WHERE released_at IS NULL"))
+
+    # Spalten, die von NOT NULL auf nullable wandern.
+    #
+    # Die `wanted`-Liste oben kann nur ERGAENZEN, und create_all fasst
+    # bestehende Tabellen nicht an — eine Lockerung braucht deshalb ihren
+    # eigenen Schritt. Anlass: Kartenstapel liegen jetzt in EINER Sammlung und
+    # werden Kursen zugewiesen (card_deck_kurse); Stapel und Ordner entstehen
+    # dort ohne Klasse. Die Herkunft (class_id) bleibt an den Bestandszeilen
+    # stehen und wird nicht geleert.
+    #
+    # Idempotent: DROP NOT NULL auf einer bereits nullable Spalte ist ein
+    # No-op. Nur Postgres — SQLite kann eine bestehende Spalte nicht aendern,
+    # dort entsteht die Tabelle ohnehin frisch aus dem Modell.
+    if sync_conn.dialect.name == "postgresql":
+        for table, column in (("card_decks", "class_id"), ("card_folders", "class_id")):
+            if table not in existing_tables:
+                continue
+            try:
+                with sync_conn.begin_nested():
+                    sync_conn.execute(text(f"ALTER TABLE {table} ALTER COLUMN {column} DROP NOT NULL"))
+            except Exception as e:  # noqa: BLE001 — darf den Start nicht kosten
+                print(f"[STARTUP-WARN] {table}.{column} bleibt NOT NULL: {type(e).__name__}: {e} "
+                      f"— Stapel ohne Klasse lassen sich dann nicht anlegen.", flush=True)
 
     # NULL, wo das Modell NOT NULL sagt — daran scheiterte das Zurueckspielen.
     #
@@ -770,6 +794,21 @@ async def startup():
             await db.commit()
         except Exception as e:
             print(f"[STARTUP-WARN] Kurs-Migration übersprungen: {e}", flush=True)
+
+    # Karteikarten: Bestandsstapel in die neue Kurs-Zuweisung heben (einmalig je
+    # Konto, siehe karten.uebernahme_deck_kurse). Ohne das stuenden nach dem
+    # Umbau alle Stapel als „keinem Kurs zugewiesen" da und kein Kind bekaeme
+    # noch Karten.
+    async with async_session() as db:
+        try:
+            from .routers.karten import uebernahme_deck_kurse
+            n = await uebernahme_deck_kurse(db)
+            if n:
+                print(f"[STARTUP] Karten: {n} Kurs-Zuweisung(en) aus dem Bestand uebernommen.", flush=True)
+        except Exception as e:
+            await db.rollback()
+            print(f"[STARTUP-WARN] Karten-Zuweisung nicht uebernommen: {type(e).__name__}: {e} "
+                  f"— Stapel gelten dann weiter ueber ihre Herkunftsklasse.", flush=True)
 
     # Marktplatz: kind muss zum Snapshot-Typ passen. Vor der kind-Spalte
     # veröffentlichte Karten-Decks/Einstiege trugen den Default
