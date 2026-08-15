@@ -179,6 +179,89 @@
         };
     }
 
+    // ─── Adapter, Teil 2: Kurs/Klasse, Schueler, Lernleiter ───
+    // Dieselbe Regel wie oben, nur fuer die anderen beiden Datenformen. Die
+    // Lernleiter ist im Kern (class_id, topic_id) etwas anderes als in der
+    // Oberflaeche (Kurs-Name als Text, thema/unterthema als Text). Die
+    // Uebersetzung stand frueher mitten in loadLernpfade/savePfad — dort musste
+    // sie jeder anfassen, der an der Datenform etwas aenderte. Genau das soll
+    // der Adapter verhindern, also steht sie jetzt hier bei vonKern/zuKern.
+
+    // Kurs-Name -> class_id: eine Klasse des Kurses genuegt als Kern-Referenz.
+    // Fallback ueber einen Schueler, falls der Kurs (noch) nicht geladen ist.
+    function classIdVonKurs(kursName) {
+        const k = kurseData.find(k => k.name === kursName);
+        if (k && (k.classes || [])[0]) return k.classes[0].id;
+        return (schueler.find(s => s.klasse === kursName) || {}).class_id || null;
+    }
+    // class_id -> Kurs-Name. Vier Wege, weil je nach Ladezustand mal die
+    // Schuelerliste, mal die Kursliste die Antwort hat. Ohne sie bliebe der Name
+    // leer und ein Re-Save schriebe class_id=null (#59).
+    function kursVonClassId(classId, studentId) {
+        return (schueler.find(s => s.id === studentId) || {}).klasse
+            || (schueler.find(s => s.class_id === classId) || {}).klasse
+            || (kurseData.find(k => (k.classes || []).some(c => c.id === classId)) || {}).name
+            || (kurseData.flatMap(k => k.classes || []).find(c => c.id === classId) || {}).name
+            || '';
+    }
+
+    // Kern-Schueler -> Form der Oberflaeche: die kennt nur „klasse" als Text
+    // (in Wahrheit der Kurs-Name), die class_id laeuft nur als Kern-Referenz mit.
+    function schuelerVonKern(st, classId, kursName) {
+        return {
+            _id: String(st.id), id: st.id, name: st.name, klasse: kursName, class_id: classId,
+            niveau: st.niveau || '', foerder: st.foerder || [], notizen: st.notizen || ''
+        };
+    }
+
+    // Kern-Lernleiter -> Form der Oberflaeche.
+    function ladderVonKern(l, byId) {
+        const tp = topicPfad(l.topic_id);
+        return {
+            _id: String(l.id),
+            id: l.id,                        // stabile Server-id fuer Upsert (savePfad PUTtet statt neu anzulegen)
+            topic_id: l.topic_id ?? null,    // Roh-Thema-id mitfuehren: falls topicPfad den Namen nicht aufloest, NICHT mit null ueberschreiben
+            thema: tp.thema,
+            unterthema: tp.unterthema,
+            klasse: kursVonClassId(l.class_id, ((l.assignments || [])[0] || {}).student_id),
+            class_id: l.class_id ?? null,    // autoritativ vom Ladder — nicht ueber den Namen raten
+            notizen: l.notizen || '',
+            config: l.config || null,
+            schueler: (l.assignments || []).map(a => {
+                const st = byId && byId.get(a.student_id);
+                return {
+                    _id: String(a.student_id),
+                    id: a.student_id,
+                    name: st ? st.name : '?',
+                    aufgabenIds: a.exercise_ids || []
+                };
+            })
+        };
+    }
+
+    // Oberflaechen-Lernleiter -> Kern-Body. async, weil topicId fehlende Themen
+    // im Kern anlegt. Die assignments kommen fertig herein: das Uebersetzen der
+    // Temp-ids ist Sache des Aufrufers (Sync-Stand), nicht der Datengrenze.
+    async function ladderZuKern(ll, position, assignments) {
+        // Thema aus dem Namen aufloesen; scheitert das (leer/stale topics),
+        // NICHT nullen, sondern die mitgefuehrte Roh-topic_id behalten —
+        // sonst verliert eine Lernleiter beim Re-Save ihr Thema.
+        let topic_id = await topicId(ll.thema, ll.unterthema);
+        if (!topic_id && ll.topic_id != null) topic_id = ll.topic_id;
+        // Bevorzugt die am Ladder gespeicherte class_id; Fallback ueber den
+        // Kurs-Namen (kann leer sein) oder einen zugewiesenen Schueler.
+        const class_id = (ll.class_id ?? null)
+            || classIdVonKurs(ll.klasse)
+            || (schueler.find(s => (ll.schueler || []).some(x => (x.id || parseInt(x._id)) === s.id)) || {}).class_id
+            || null;
+        return {
+            class_id, topic_id, position,
+            notizen: ll.notizen || '',
+            assignments: assignments && assignments.length ? assignments : null,
+            config: ll.config || null
+        };
+    }
+
     function load(key) {
         try { return JSON.parse(localStorage.getItem(key)) || []; }
         catch { return []; }
@@ -606,10 +689,7 @@
             const key = kn + '||' + st.name;
             if (gesehen.has(key)) return;   // Duplikat aus Geschwister-Fachklasse
             gesehen.add(key);
-            schueler.push({
-                _id: String(st.id), id: st.id, name: st.name, klasse: kn, class_id: c.id,
-                niveau: st.niveau || '', foerder: st.foerder || [], notizen: st.notizen || ''
-            });
+            schueler.push(schuelerVonKern(st, c.id, kn));
         }));
         klassen = [...new Set(klassenRaw.map(kursOf))];
         await checkKartenModul();
@@ -1751,12 +1831,8 @@
         }
         return schueler.filter(s => s.klasse === kursName);
     }
-    // Eine Klasse (class_id) des Kurses — für die Kern-Referenz beim Speichern.
-    function classIdVonKurs(kursName) {
-        const k = kurseData.find(k => k.name === kursName);
-        if (k && (k.classes || [])[0]) return k.classes[0].id;
-        return (schueler.find(s => s.klasse === kursName) || {}).class_id || null;
-    }
+    // classIdVonKurs (Kurs-Name -> class_id) steht beim Adapter oben: es ist eine
+    // Uebersetzung an der Datengrenze, kein Generator-Detail.
 
     async function refreshGeneratorDropdowns() {
         // Themen aus vorhandenen Aufgaben UND aus der Kern-Taxonomie (topics =
@@ -2298,8 +2374,11 @@
             thema: previewData[0].thema,
             unterthema: previewData[0].unterthema || '',
             klasse: document.getElementById('gen-klasse').value,
-            // class_id direkt vom Schueler mitspeichern — die Namenssuche
-            // (classIdVon) scheiterte, wenn der Kurs-Name leer war (#59: „ohne kurs").
+            // Keine Uebersetzung, sondern eine schon vorhandene Kern-Referenz
+            // mitfuehren: der Schueler traegt seine class_id bereits. Das Aufloesen
+            // ueber den Namen (classIdVonKurs, im Adapter) scheitert, wenn der
+            // Kurs-Name leer ist (#59: „ohne kurs") — deshalb hier festhalten,
+            // was sicher bekannt ist; ladderZuKern bevorzugt genau diesen Wert.
             class_id: (previewData[0].student && previewData[0].student.class_id) || null,
             // Konfig mitspeichern, damit Öffnen die Regler UND den Pflicht/Zusatz-
             // Split wiederherstellen kann (sonst ist ll.config null → alles Pflicht).
@@ -2414,9 +2493,6 @@
                 gesehen.add(ll.id); return true;
             });
 
-            // ll.klasse ist ein KURS-Name; Kern-Referenz ueber einen Schueler des Kurses.
-            const classIdVon = kurs => classIdVonKurs(kurs);
-
             // Zeigen Zuweisungen noch auf Temp-ids (neu erstellte, ungesyncte
             // Aufgaben)? Dann NUR diese wenigen Aufgaben anlegen (nicht die ganze
             // Liste syncen — das war ein 429-Sturm) und über idRemap übersetzen.
@@ -2436,17 +2512,10 @@
                     student_id: parseInt(sch.id || sch._id) || null,
                     exercise_ids: (sch.aufgabenIds || []).map(x => remap(x)).filter(istEchte).map(Number)
                 })).filter(a => a.student_id);
-                // Thema aus dem Namen aufloesen; scheitert das (leer/stale topics),
-                // NICHT nullen, sondern die mitgefuehrte Roh-topic_id behalten —
-                // sonst verliert eine Lernleiter beim Re-Save ihr Thema.
-                let topic_id = await topicId(ll.thema, ll.unterthema);
-                if (!topic_id && ll.topic_id != null) topic_id = ll.topic_id;
-                // Bevorzugt die am Ladder gespeicherte class_id; Fallback ueber den
-                // Kurs-Namen (kann leer sein) oder einen zugewiesenen Schueler.
-                const class_id = (ll.class_id ?? null)
-                    || classIdVon(ll.klasse)
-                    || (schueler.find(s => (ll.schueler || []).some(x => (x.id || parseInt(x._id)) === s.id)) || {}).class_id
-                    || null;
+                // Uebersetzung (thema/unterthema -> topic_id, Kurs-Name -> class_id)
+                // macht der Adapter; hier wird nur noch geschickt und diagnostiziert.
+                const kern = await ladderZuKern(ll, pos++, assignments);
+                const { topic_id, class_id } = kern;
                 // Diagnose: rohe aufgabenIds vs. tatsaechlich gesendete exercise_ids.
                 // rohIds=0 -> Quelle hatte keine (Import-Remap gescheitert / Generate
                 // leer). exIds<rohIds -> hier gedroppt (nicht-numerische IDs).
@@ -2460,12 +2529,7 @@
                         beispiel_ids: (ll.schueler || []).flatMap(s => (s.aufgabenIds || [])).slice(0, 5),
                     });
                 }
-                const body = JSON.stringify({
-                    class_id, topic_id, position: pos++,
-                    notizen: ll.notizen || '',
-                    assignments: assignments.length ? assignments : null,
-                    config: ll.config || null
-                });
+                const body = JSON.stringify(kern);
                 let r;
                 if (ll.id && uebrig.has(ll.id)) {
                     r = await api(`${LP}/ladders/${ll.id}`, { method: 'PUT', body });
@@ -3439,38 +3503,10 @@
                 id: p.id,
                 name: p.name,
                 aufgaben_order: [],
-                lernleitern: (p.ladders || []).slice().sort((a, b) => (a.position || 0) - (b.position || 0)).map(l => {
-                    const tp = topicPfad(l.topic_id);
-                    // Kurs-Name aus der class_id ableiten, wenn die Schuelersuche
-                    // scheitert (z.B. Schueler noch nicht geladen) — sonst waere
-                    // klasse leer und ein Re-Save schriebe class_id=null (#59).
-                    const klasseVonStud = (schueler.find(s => s.id === ((l.assignments || [])[0] || {}).student_id) || {}).klasse;
-                    const klasseVonCls = (schueler.find(s => s.class_id === l.class_id) || {}).klasse;
-                    // Weitere Fallbacks, damit der Kurs-Name in der Liste nie „undefined"/leer
-                    // ist: Kurs der class_id (kurseData) bzw. der Klassenname selbst.
-                    const kursVonKurse = (kurseData.find(k => (k.classes || []).some(c => c.id === l.class_id)) || {}).name;
-                    const klasseVonName = (kurseData.flatMap(k => k.classes || []).find(c => c.id === l.class_id) || {}).name;
-                    return {
-                        _id: String(l.id),
-                        id: l.id,                        // stabile Server-id fuer Upsert (savePfad PUTtet statt neu anzulegen)
-                        topic_id: l.topic_id ?? null,    // Roh-Thema-id mitfuehren: falls topicPfad den Namen nicht aufloest, NICHT mit null ueberschreiben
-                        thema: tp.thema,
-                        unterthema: tp.unterthema,
-                        klasse: klasseVonStud || klasseVonCls || kursVonKurse || klasseVonName || '',
-                        class_id: l.class_id ?? null,   // autoritativ vom Ladder — nicht ueber den Namen raten
-                        notizen: l.notizen || '',
-                        config: l.config || null,
-                        schueler: (l.assignments || []).map(a => {
-                            const st = byId.get(a.student_id);
-                            return {
-                                _id: String(a.student_id),
-                                id: a.student_id,
-                                name: st ? st.name : '?',
-                                aufgabenIds: a.exercise_ids || []
-                            };
-                        })
-                    };
-                })
+                // Uebersetzung Kern -> Oberflaeche steckt im Adapter (ladderVonKern).
+                lernleitern: (p.ladders || []).slice()
+                    .sort((a, b) => (a.position || 0) - (b.position || 0))
+                    .map(l => ladderVonKern(l, byId))
             }));
         } catch(e) { lernpfade = []; }
         renderLernpfade();
