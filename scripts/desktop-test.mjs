@@ -121,6 +121,10 @@ const istEgal = (text) => EGAL.some((r) => r.test(text)) || istEgalerHost(text);
 const istDrosselung = (text) => /\b429\b|Too Many Requests/i.test(text);
 const PAUSE_429 = 4000;
 const FRIST_SEITE = 60000;
+// Die Anmeldung darf laenger dauern als eine Seite: faellt sie in die
+// Login-Drosselung des Servers (5 Versuche je Minute), wartet sie die
+// Sperrfrist ab und versucht es noch einmal.
+const FRIST_ANMELDUNG = 150000;
 
 const ergebnisse = [];
 
@@ -472,25 +476,85 @@ async function anmelden(seite) {
   // navigation". Das ist kein Befund ueber die App, sondern ein Rennen — also
   // erst abwarten, bis die eigene Navigation durch ist, dann gehen, und den
   // Abbruch einmal verzeihen.
-  await seite.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
-  for (const versuch of [0, 1]) {
+  // Kurz warten, bis die App ihre eigene Start-Navigation hinter sich hat —
+  // NICHT bis das Netz ruhig ist: der Service Worker der Huelle haelt genug
+  // Verkehr, dass „networkidle" nie eintritt. Mit 60 s Frist war die ganze
+  // Zeit dieses Schritts damit verbraucht, bevor auch nur `/login` aufgerufen
+  // wurde — der Test meldete eine Zeitueberschreitung, obwohl die Maske sofort
+  // dagestanden haette. Der Wiederholungslauf unten verzeiht ohnehin, wenn ein
+  // Aufruf mitten in die App-Navigation faellt.
+  await seite.waitForLoadState("domcontentloaded", { timeout: 15000 }).catch(() => {});
+  // Warten, bis die Huelle STILLSTEHT — nicht bis das Netz ruhig ist.
+  // Beim Start laedt sie „/", die Shell schickt einen ohne Token weiter auf
+  // „/login": zwei Navigationen hintereinander. Wer mittendrin selbst
+  // navigiert oder tippt, verliert das Rennen — der Test landete dann auf „/"
+  // ohne Token und meldete das als kaputte Anmeldung.
+  let vorher = "";
+  for (let i = 0; i < 40; i++) {
+    const jetzt = seite.url();
+    if (jetzt === vorher) break;
+    vorher = jetzt;
+    await seite.waitForTimeout(500);
+  }
+  // Steht die Maske schon da, gar nicht erst navigieren: die Huelle schickt
+  // sich beim Start selbst auf /login, wenn kein Token da ist. Ein eigener
+  // Aufruf mitten hinein wird von Playwright als „interrupted by another
+  // navigation" abgebrochen — kein Befund ueber die App, nur ein Rennen.
+  const schonDa = () => /\/login\/?$/.test(new URL(seite.url()).pathname + "/");
+  for (const versuch of [0, 1, 2]) {
+    if (schonDa()) break;
     try {
-      await seite.goto(`${URL_BASIS}/login`, { waitUntil: "networkidle", timeout: 60000 });
+      // `domcontentloaded` statt `networkidle`: in der Huelle laeuft ein
+      // Service Worker, und der haelt genug Verkehr, dass „das Netz ist
+      // ruhig" nie eintritt — der Aufruf lief in sein Zeitlimit, obwohl die
+      // Maske laengst dastand. Gewartet wird deshalb auf das, worauf es
+      // ankommt: das Passwortfeld.
+      await seite.goto(`${URL_BASIS}/login`, { waitUntil: "domcontentloaded", timeout: 60000 });
+      await seite.locator("input[type=password]").first().waitFor({ state: "visible", timeout: 12000 });
       break;
     } catch (e) {
-      if (versuch || !/interrupted by another navigation/i.test(String(e))) throw e;
-      await seite.waitForTimeout(1500);
+      // Beim letzten Versuch sagen, WAS statt der Maske dastand — sonst meldet
+      // der Test nur „Timeout" und man raet, ob die Huelle, der Server oder
+      // ein Rennen schuld war.
+      if (versuch >= 2) {
+        const wo = new URL(seite.url()).pathname;
+        const text = (await seite.locator("body").innerText().catch(() => "")).slice(0, 120).replace(/\s+/g, " ");
+        return { ok: false, detail: `Anmeldemaske erscheint nicht — auf ${wo} steht: „${text}"` };
+      }
+      await seite.waitForTimeout(2000);
     }
   }
   const felder = seite.locator("input");
   if (await felder.count() < 2) return { ok: false, detail: "die Anmeldemaske erscheint gar nicht" };
-  await seite.locator("input[type=email], input[name=email]").first().fill(EMAIL, { timeout: 8000 });
-  await seite.locator("input[type=password]").first().fill(PASSWORT, { timeout: 8000 });
-  // Beschriftung in allen drei Sprachen — welche die Maske zeigt, haengt am Geraet.
-  await seite.getByRole("button", { name: /anmelden|sign in|login|iniciar/i }).first().click({ timeout: 8000 });
-  await seite.waitForTimeout(3000);
-  await tourWegklicken(seite);
-  const drin = await angemeldet(seite);
+
+  // Der Server laesst fuenf Anmeldeversuche je Minute und IP zu (auth.py,
+  // MAX_LOGIN_ATTEMPTS). Dieser Test laeuft als LETZTER einer Kette, die sich
+  // alle am selben Konto anmelden — wer davor viel geprueft hat, bekommt hier
+  // eine 429 und der Test meldete „kein Token", als waere die Huelle kaputt.
+  // Die Absage ist aber richtiges Verhalten des Servers: also einmal die
+  // Sperrfrist abwarten und wiederholen, statt das Limit zu lockern.
+  let abgewiesen = false;
+  const aufLogin = (a) => { if (a.url().includes("/api/auth/login") && a.status() === 429) abgewiesen = true; };
+  seite.on("response", aufLogin);
+
+  const versuchen = async () => {
+    abgewiesen = false;
+    await seite.locator("input[type=email], input[name=email]").first().fill(EMAIL, { timeout: 8000 });
+    await seite.locator("input[type=password]").first().fill(PASSWORT, { timeout: 8000 });
+    // Beschriftung in allen drei Sprachen — welche die Maske zeigt, haengt am Geraet.
+    await seite.getByRole("button", { name: /anmelden|sign in|login|iniciar/i }).first().click({ timeout: 8000 });
+    await seite.waitForTimeout(3000);
+    await tourWegklicken(seite);
+    return await angemeldet(seite);
+  };
+
+  let drin = await versuchen();
+  if (!drin && abgewiesen) {
+    notiere("Anmeldung", "Sperrfrist", true, "Server drosselt (429) — 65 s warten und noch einmal", "hinweis");
+    await warte(65000);
+    drin = await versuchen();
+  }
+  seite.off("response", aufLogin);
   return drin
     ? { ok: true, detail: `als ${EMAIL.replace(/(.).*(@.*)/, "$1…$2")} über das Formular` }
     : { ok: false, detail: `kein Token im localStorage — gelandet auf ${new URL(seite.url()).pathname}` };
@@ -616,7 +680,7 @@ async function lauf() {
     await fensterProbe(app, seite);
 
     // ── 2. Anmeldung ueber das echte Formular ──
-    const anmeldung = await mitFrist(anmelden(seite), FRIST_SEITE, "/login").catch((e) => ({ ok: false, detail: kurzfehler(e, 1) }));
+    const anmeldung = await mitFrist(anmelden(seite), FRIST_ANMELDUNG, "/login").catch((e) => ({ ok: false, detail: kurzfehler(e, 1) }));
     notiere("Anmeldung", "Formular", anmeldung.ok, anmeldung.detail);
     if (!anmeldung.ok) {
       notiere("Anmeldung", "Abbruch", false, "ohne Anmeldung sind die Seiten nicht prüfbar");

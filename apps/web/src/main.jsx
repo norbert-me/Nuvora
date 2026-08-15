@@ -27,6 +27,10 @@ window.fetch = function(input, init) {
     }
   }
   const isApi = url && url.startsWith("/api/");
+  // Mit WELCHEM Token ist dieser Aufruf losgelaufen? Wird unten beim 401
+  // gebraucht: eine Absage auf einen Aufruf von VOR der Anmeldung darf die
+  // frische Anmeldung nicht wieder wegwerfen.
+  const tokenBeimStart = isApi ? (lies("token") || "") : "";
   // 429 (Rate-Limit) ist meist ein kurzer Engpass: bis zu 3 Versuche mit
   // kleinem Backoff, bevor der Aufrufer den Status sieht — sonst poppen bei
   // kleinen Aussetzern staendig Fehler auf. Netzwerkfehler (throw) gehen direkt
@@ -52,10 +56,22 @@ window.fetch = function(input, init) {
     // Sliding-Renewal: schickt der Server einen frischen Token, uebernehmen.
     // So bleibt ein aktiver Nutzer angemeldet, statt nach fester Frist rauszufliegen.
     if (isApi) { try { const rt = res.headers.get("X-Refresh-Token"); if (rt) schreib("token", rt); } catch { /* egal */ } }
+    // 401 heisst „abgemeldet" — aber nur, wenn die Absage dem Token gilt, der
+    // JETZT gilt. Die Startseite feuert vor der Anmeldung mehrere Aufrufe ab;
+    // beantwortet der Server einen davon erst, nachdem die Anmeldung den Token
+    // abgelegt hat, warf dieser Zweig ihn sofort wieder weg — man landete
+    // wieder auf der Startseite, als haette die Anmeldung nicht funktioniert.
+    // In der Desktop-Huelle war das reproduzierbar (der Rundgang kam nie ueber
+    // die Anmeldung hinaus), im Browser traf es die langsame Leitung. Der
+    // 429-Wiederholer oben verzoegert Antworten zusaetzlich um bis zu einer
+    // Sekunde und vergroessert das Fenster.
     if (res.status === 401 && isApi && !url.includes("/auth/")) {
-      loesche("token");
-      loesche("user");
-      location.reload();
+      const tokenJetzt = lies("token") || "";
+      if (tokenJetzt === tokenBeimStart) {
+        loesche("token");
+        loesche("user");
+        location.reload();
+      }
     }
     return res;
   }).catch(async (err) => {
