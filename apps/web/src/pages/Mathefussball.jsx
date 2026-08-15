@@ -27,7 +27,7 @@ export default function Mathefussball() {
   const [score, setScore] = useState([0, 0]); // [A, B]
   const [task, setTask] = useState(() => gen(20, ["+", "-"]));
   const [reveal, setReveal] = useState(false);
-  const [names] = useState(["Team A", "Team B"]);
+  const names = [t("mathefussball.teamA"), t("mathefussball.teamB")];
   const [started, setStarted] = useState(false);
   const [busy, setBusy] = useState(false);   // 2-Sek-Übergang: Buttons gesperrt
   const [flash, setFlash] = useState("");    // "Tor Team A!" o.ä. während des Übergangs
@@ -92,7 +92,8 @@ export default function Mathefussball() {
 
       {!started ? (
         <div style={{ textAlign: "center", padding: "40px 16px" }}>
-          <button onClick={start} style={{ ...btnPrimary, fontSize: 20, padding: "16px 44px" }}>▶ {t("mathefussball.start")}</button>
+          {/* Platzhalter: ICONS kennt (noch) kein play — bis dahin der Pfeil. */}
+          <button onClick={start} style={{ ...btnPrimary, fontSize: 20, padding: "16px 44px", display: "inline-flex", alignItems: "center", gap: 8 }}><Icon d={ICONS.open} size={18} color="var(--bg)" /> {t("mathefussball.start")}</button>
         </div>
       ) : (<>
         {/* Aufgabe (oder Tor-Anzeige während des 2s-Übergangs) */}
@@ -105,9 +106,10 @@ export default function Mathefussball() {
 
         {/* Wer war richtig? -> Ball bewegen. Während des Übergangs gesperrt. */}
         <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", opacity: busy ? 0.5 : 1 }}>
-          <button onClick={() => correct(0)} disabled={busy} style={{ ...btnPrimary, padding: "12px 26px", fontSize: 16 }}>{names[0]} {t("mathefussball.correct")} →</button>
+          {/* Richtungspfeile: ICONS.open zeigt nach rechts, ICONS.restore nach links. */}
+          <button onClick={() => correct(0)} disabled={busy} style={{ ...btnPrimary, padding: "12px 26px", fontSize: 16, display: "inline-flex", alignItems: "center", gap: 8 }}>{names[0]} {t("mathefussball.correct")} <Icon d={ICONS.open} size={16} color="var(--bg)" /></button>
           <button onClick={skip} disabled={busy} style={{ ...btnSecondary, padding: "12px 20px" }}>{t("mathefussball.skip")}</button>
-          <button onClick={() => correct(1)} disabled={busy} style={{ ...btnPrimary, padding: "12px 26px", fontSize: 16, background: "#ff9500", borderColor: "#ff9500" }}>← {names[1]} {t("mathefussball.correct")}</button>
+          <button onClick={() => correct(1)} disabled={busy} style={{ ...btnPrimary, padding: "12px 26px", fontSize: 16, background: "#ff9500", borderColor: "#ff9500", display: "inline-flex", alignItems: "center", gap: 8 }}><Icon d={ICONS.restore} size={16} color="var(--bg)" /> {names[1]} {t("mathefussball.correct")}</button>
         </div>
       </>)}
     </div>

@@ -642,10 +642,16 @@ async function sucheProbe(kontext) {
     // Timeout. Ein Kennzeichen im Markup ist in jeder Sprache dasselbe.
     const feld = seite.locator("[data-suche='feld']").first();
     const offen = async () => (await feld.count()) > 0 && await feld.isVisible().catch(() => false);
-    for (const versuch of ["Meta+k", "Control+k", "knopf"]) {
+    // Der Knopf in der Navigation ist bewusst weg (die Leiste soll den Bereich
+    // zeigen, nicht Werkzeuge sammeln) — es bleiben das Tastenkuerzel und das
+    // Suchfeld auf der Startseite.
+    for (const versuch of ["Meta+k", "Control+k", "startseite"]) {
       if (await offen()) break;
-      if (versuch === "knopf") await seite.locator("[data-suche='knopf']").first().click({ timeout: 8000 });
-      else await seite.keyboard.press(versuch).catch(() => {});
+      if (versuch === "startseite") {
+        await seite.goto("/", { waitUntil: "networkidle", timeout: 30000 });
+        await tourWegklicken(seite);
+        await seite.locator("[data-suche='startseite']").first().click({ timeout: 8000 });
+      } else await seite.keyboard.press(versuch).catch(() => {});
       await seite.waitForTimeout(600);
     }
     await feld.waitFor({ state: "visible", timeout: 8000 });

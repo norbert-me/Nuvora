@@ -395,11 +395,11 @@ export default function Kalender() {
       const r = await fetch(`/api/kurse/${kursId}/color`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) }).catch(() => null);
       // Die Farbe steht sofort lokal; scheiterte das Speichern, war sie nach
       // dem nächsten Laden wieder weg — bisher nur in der Konsole zu sehen.
-      await pruefeAntwort(r, "Farbe speichern");
+      await pruefeAntwort(r, t("kalender.colorSave"));
     } else if (classId) {
       setClasses((prev) => { const next = prev.map((c) => (c.id === classId ? { ...c, color } : c)); put("classes", next); return next; });
       const r = await fetch(`/api/classes/${classId}/color`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ color }) }).catch(() => null);
-      await pruefeAntwort(r, "Farbe speichern");
+      await pruefeAntwort(r, t("kalender.colorSave"));
     }
   };
 
@@ -427,33 +427,35 @@ export default function Kalender() {
     ? `${mondayOf(cursor).toLocaleDateString()} – ${addDays(mondayOf(cursor), 6).toLocaleDateString()}`
     : cursor.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
+  // Stundenplan UND Freie Tage sind in die Navbar ausgelagert (?view=…) — beides
+  // Konfiguration. Werkzeugleiste und Datums-Navigator gehören nur zu den
+  // eigentlichen Kalenderansichten.
+  const kalAnsicht = view !== "timetable" && view !== "breaks" && view !== "klassenarbeit";
+
   return (
     <div style={{ ...pageApp }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
-        {/* Kein Titel — die Navbar zeigt den Bereich (auch die Konfig-Reiter). */}
-        {/* Stundenplan UND Freie Tage sind in die Navbar ausgelagert (?view=…) —
-            beides Konfiguration. Der Ansicht-Umschalter erscheint darum nur in den
-            eigentlichen Kalenderansichten, nicht in Stundenplan/Freie Tage. */}
-        {view !== "timetable" && view !== "breaks" && view !== "klassenarbeit" && (
-          <span data-tour="kal-views" style={{ display: "inline-flex" }}>
-            <Tabs value={view} onChange={setView}
-              options={[["today", t("kalender.todayView")], ["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")]]} />
-          </span>
-        )}
-        {view !== "timetable" && view !== "breaks" && view !== "klassenarbeit" && (
-          <AddButton data-tour="kal-new" onClick={() => setEditing({ date: startOfDay(new Date()) })} title={t("kalender.newEntry")} style={{ marginLeft: "auto" }} />
-        )}
-        {view !== "timetable" && view !== "breaks" && view !== "klassenarbeit" && (
-          <div style={{ position: "relative" }}>
+      {/* Kein Titel — die Navbar zeigt den Bereich (auch die Konfig-Reiter).
+          Bauform wie überall: [ Auswahl ] [ Alltag ] … [ Ansicht ] [ ⋯ ]
+          (components/Werkzeugleiste.jsx) statt einer von Hand gebauten Reihe. */}
+      {kalAnsicht && (
+        <Werkzeugleiste
+          links={(
+            <span data-tour="kal-views" style={{ display: "inline-flex" }}>
+              <Tabs value={view} onChange={setView}
+                options={[["today", t("kalender.todayView")], ["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")]]} />
+            </span>
+          )}
+          ansicht={(
+            <div style={{ position: "relative" }}>
             {/* Auge = „was anzeigen?": Ganztägige/Externe ein-/ausblenden + Farbe. */}
             <button data-tour="kal-view-menu" onClick={() => setViewMenuOpen((v) => !v)} className="icon-btn" style={{ ...toolbarIconBtn, opacity: (showAllDay && showExt) ? 1 : 0.55 }} title={t("kalender.viewMenu")} aria-label={t("kalender.viewMenu")}>
               <Icon d={ICONS.eye} size={18} />
             </button>
             {viewMenuOpen && (<>
               <div onClick={() => setViewMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-              {/* Am Knopf ausgerichtet (links), nicht am rechten Rand — der Knopf
-                  steht links, das Menü lief sonst aus dem Bild. */}
-              <Popover style={{ minWidth: 220, padding: 6 }}>
+              {/* Am rechten Rand ausgerichtet — der Knopf steht jetzt rechts in der
+                  Leiste, links ausgerichtet liefe das Menü aus dem Bild. */}
+              <Popover align="right" style={{ minWidth: 220, padding: 6 }}>
                 <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", padding: "6px 12px 4px", textTransform: "uppercase", letterSpacing: 0.4 }}>{t("kalender.showHide")}</div>
                 <label style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", boxSizing: "border-box", padding: "8px 12px", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: "pointer", borderRadius: 8 }}>
                   <input type="checkbox" checked={showAllDay} onChange={toggleAllDay} />
@@ -483,25 +485,24 @@ export default function Kalender() {
                 )}
               </Popover>
             </>)}
-          </div>
-        )}
-        {/* Seltenes im gemeinsamen Mehr-Menue (components/Werkzeugleiste.jsx) —
-            dieselbe Stelle wie auf jeder anderen Seite. */}
-        {view !== "timetable" && view !== "breaks" && view !== "klassenarbeit" && (
-          <MehrMenu eintraege={[
+            </div>
+          )}
+          mehr={[
             { key: "abo", label: t("kalender.subscribe"), icon: ICONS.share, onClick: openAbo },
             { key: "export", label: t("kalender.export"), icon: ICONS.export, onClick: exportKal },
             { key: "import", label: t("kalender.import"), icon: ICONS.import, onClick: () => dateiWaehlen(importKal) },
-          ]} />
-        )}
-      </div>
+          ]}
+        >
+          <AddButton data-tour="kal-new" onClick={() => setEditing({ date: startOfDay(new Date()) })} title={t("kalender.newEntry")} />
+        </Werkzeugleiste>
+      )}
       {view === "timetable" && (
         <Werkzeugleiste mehr={[
           { key: "export", label: t("kalender.export"), icon: ICONS.export, onClick: exportKal },
           { key: "import", label: t("kalender.import"), icon: ICONS.import, onClick: () => dateiWaehlen(importKal) },
         ]}>
           <button onClick={() => setShowTimes((v) => !v)} className="icon-btn" title={t("kalender.timesShow")} aria-label={t("kalender.timesShow")}
-            style={{ ...toolbarIconBtn, border: showTimes ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 8 }}>
+            style={{ ...toolbarIconBtn, border: showTimes ? "1px solid var(--accent)" : "1px solid var(--border2)" }}>
             <Icon d={ICONS.clock} size={18} color={showTimes ? "var(--accent)" : "var(--text2)"} />
           </button>
         </Werkzeugleiste>
@@ -509,15 +510,17 @@ export default function Kalender() {
       {/* Datums-Navigator, einheitlich mit der Anwesenheit: ‹ [Auswahl] › Heute.
           Tagesansicht = nativer Datums-Picker inline (wie Anwesenheit); Monat/Woche
           behalten den Selektor im Popover, da ein Tag-Picker dort nicht passt. */}
-      {view !== "timetable" && view !== "breaks" && view !== "klassenarbeit" && view !== "today" && (
+      {kalAnsicht && view !== "today" && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 14, position: "relative", flexWrap: "wrap" }}>
-          <button onClick={() => move(-1)} title="◀" style={{ ...dateNavBtn, fontSize: 17 }}>‹</button>
+          <button onClick={() => move(-1)} title={t("kalender.prev")} aria-label={t("kalender.prev")} style={{ ...dateNavBtn, padding: "0 12px" }}>
+            <Icon d={ICONS.open} size={14} style={{ transform: "rotate(180deg)" }} />
+          </button>
           {view === "day" ? (
             <input type="date" value={ymd(cursor)} onChange={(e) => { if (e.target.value) setCursor(startOfDay(new Date(e.target.value + "T00:00:00"))); }} style={dateNavInput} />
           ) : (
             <div style={{ position: "relative" }}>
               <button onClick={() => setJumpOpen((v) => !v)} title={t("kalender.jumpToDay")}
-                style={{ border: "none", background: "none", fontSize: 15, fontWeight: 700, color: "var(--text)", minWidth: 170, textAlign: "center", cursor: "pointer", padding: "0 8px", height: CONTROL_H, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: CONTROL_R, borderBottom: "1px dotted var(--border2)" }}>{title} <Icon d={ICONS.open} size={11} style={{ transform: "rotate(90deg)" }} /></button>
+                style={{ ...dateNavBtn, border: "none", background: "none", fontSize: 15, fontWeight: 700, color: "var(--text)", minWidth: 170, gap: 6, borderBottom: "1px dotted var(--border2)", borderRadius: CONTROL_R }}>{title} <Icon d={ICONS.open} size={11} style={{ transform: "rotate(90deg)" }} /></button>
               {jumpOpen && (<>
                 <div onClick={() => setJumpOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
                 <Popover align="center" style={{ padding: 8, display: "flex", gap: 6, alignItems: "center" }}>
@@ -544,12 +547,14 @@ export default function Kalender() {
               </>)}
             </div>
           )}
-          <button onClick={() => move(1)} title="▶" style={{ ...dateNavBtn, fontSize: 17 }}>›</button>
+          <button onClick={() => move(1)} title={t("kalender.next")} aria-label={t("kalender.next")} style={{ ...dateNavBtn, padding: "0 12px" }}>
+            <Icon d={ICONS.open} size={14} />
+          </button>
           <button onClick={() => setCursor(startOfDay(new Date()))} style={dateNavBtn}>{t("kalender.today")}</button>
         </div>
       )}
       {view === "breaks" && <BreaksPanel breaks={breaks} onAdd={addBreak} onDel={delBreak} t={t} standalone />}
-      {view === "klassenarbeit" && <ExamPanel overview={examOverview} periods={tt.periods} onAdd={addExam} onUpd={updExam} onDel={delExam} t={t} />}
+      {view === "klassenarbeit" && <ExamPanel overview={examOverview} periods={tt.periods} aktiv={aktiv} onAdd={addExam} onUpd={updExam} onDel={delExam} t={t} />}
 
       {view === "today" && (
         <HeuteView t={t} tt={tt} weekdayOf={weekdayOf} byDay={byDay} todoByDay={todoByDay} onTodo={() => nav("/notizbrett")}
@@ -586,7 +591,7 @@ export default function Kalender() {
             <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 4 }}>{t("kalender.subscribeManual")}</div>
             <div style={{ display: "flex", gap: 8 }}>
               <input readOnly value={abo.url} onFocus={(e) => e.target.select()} style={{ ...inputStyle, flex: 1, fontSize: 12 }} />
-              <button onClick={() => { navigator.clipboard?.writeText(abo.url); }} style={btnSecondary}>{t("common.copy") !== "common.copy" ? t("common.copy") : "Kopieren"}</button>
+              <button onClick={() => { navigator.clipboard?.writeText(abo.url); }} style={btnSecondary}>{t("common.copy")}</button>
             </div>
 
             {/* Force-Resync: bricht die alte Verbindung ab und erzeugt eine neue URL,
@@ -606,7 +611,7 @@ export default function Kalender() {
             </div>
 
             <div style={{ marginTop: 16, textAlign: "right" }}>
-              <button onClick={() => setAbo(null)} style={btnSecondary}>{t("common.close") !== "common.close" ? t("common.close") : "Schließen"}</button>
+              <button onClick={() => setAbo(null)} style={btnSecondary}>{t("common.close")}</button>
             </div>
         </Modal>
       )}
@@ -645,7 +650,7 @@ function ExtInfoModal({ ev, onClose, onHide, t }) {
             </button>
           )}
           <span style={{ flex: 1 }} />
-          <button onClick={onClose} style={btnSecondary}>{t("common.close") !== "common.close" ? t("common.close") : "Schließen"}</button>
+          <button onClick={onClose} style={btnSecondary}>{t("common.close")}</button>
         </div>
     </Modal>
   );
@@ -1128,7 +1133,8 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
                 {it.sub && <div style={{ fontSize: 11, color: "var(--text2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.sub}</div>}
               </button>
               {it.onCancel && <button onClick={(e) => { e.stopPropagation(); it.onCancel(); }} title={t("kalender.slotCancel")}
-                style={{ position: "absolute", top: 1, right: 1, width: 17, height: 17, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", background: "var(--card)", color: "var(--text3)", fontSize: 13, lineHeight: 1, boxShadow: "0 1px 2px rgba(0,0,0,0.15)" }}>×</button>}
+                style={{ position: "absolute", top: 1, right: 1, width: 17, height: 17, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", background: "var(--card)", color: "var(--text3)", lineHeight: 1, boxShadow: "0 1px 2px rgba(0,0,0,0.15)" }}>
+                <Icon d={ICONS.close} size={11} /></button>}
             </div>
           ))}
         </div>
@@ -1300,7 +1306,7 @@ function ExamMassnahmen({ classId, kursId = null, t }) {
 
 // Klassenarbeiten planen + Übersicht: je kommender Klassenarbeit die bis dahin
 // verbleibenden Stundenplan-Stunden (freie Tage/Ausfälle bereits abgezogen).
-function ExamPanel({ overview, periods = 6, onAdd, onUpd, onDel, t }) {
+function ExamPanel({ overview, periods = 6, aktiv = {}, onAdd, onUpd, onDel, t }) {
   const [classId, setClassId] = useState("");
   const [kursId, setKursId] = useState(null);
   const [date, setDate] = useState("");
@@ -1326,25 +1332,34 @@ function ExamPanel({ overview, periods = 6, onAdd, onUpd, onDel, t }) {
     onAdd({ class_id: Number(classId), kurs_id: kursId ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: title.trim(), period: period ? Number(period) : null });
     setDate(""); setTitle(""); setPeriod("");
   };
-  const sfld = { ...inputStyle };
-  const pSel = { ...selectStyle, padding: "8px 26px 8px 10px", fontSize: 13 };
+  // Eine Höhe, eine Form: Felder aus den gemeinsamen Bausteinen (CONTROL_H /
+  // CONTROL_R), keine eigene Polsterung je Feld.
+  const pSel = selectStyle;
+  const loeschen = async (e) => {
+    if (!(await askConfirm(t("kalender.examDeleteConfirm"), { danger: true, ok: t("common.delete") }))) return;
+    onDel(e.id);
+  };
   return (
     <div>
       <p style={{ fontSize: 13.5, color: "var(--text2)", margin: "0 0 16px" }}>{t("kalender.examsIntro")}</p>
 
-      <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, marginBottom: 18 }}>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+      {/* Anlegen in der gemeinsamen Bauform (components/Werkzeugleiste.jsx):
+          links WAS (Kurs/Klasse), daneben die Felder des Alltags. */}
+      <Werkzeugleiste
+        links={(
           <KursKlasseSelect value={classId === "" ? "" : Number(classId)} kursValue={kursId}
             onChange={(id, kid) => { setClassId(id === "" ? "" : String(id)); setKursId(id === "" ? null : (kid ?? null)); }} onKurs={setKursId} />
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ ...sfld, padding: "8px 10px" }} />
-          <select value={period} onChange={(e) => setPeriod(e.target.value)} title={t("kalender.examPeriodHint")} style={pSel}>
-            <option value="">{t("kalender.examAllDay")}</option>
-            {pOpts.map((p) => <option key={p} value={p}>{p}. {t("kalender.period")}</option>)}
-          </select>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("kalender.examTitle")} style={{ ...sfld, flex: 1, minWidth: 140, padding: "8px 10px" }} />
-          <button onClick={save} disabled={!classId || !date} style={{ ...btnPrimary, opacity: (classId && date) ? 1 : 0.5 }}>{t("common.add")}</button>
-        </div>
-      </div>
+        )}
+        style={{ marginBottom: 18 }}
+      >
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={dateNavInput} />
+        <select value={period} onChange={(e) => setPeriod(e.target.value)} title={t("kalender.examPeriodHint")} style={pSel}>
+          <option value="">{t("kalender.examAllDay")}</option>
+          {pOpts.map((p) => <option key={p} value={p}>{p}. {t("kalender.period")}</option>)}
+        </select>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("kalender.examTitle")} style={{ ...dateNavInput, flex: 1, minWidth: 140 }} />
+        <button onClick={save} disabled={!classId || !date} style={{ ...btnPrimary, height: CONTROL_H, padding: "0 16px", opacity: (classId && date) ? 1 : 0.5 }}>{t("common.add")}</button>
+      </Werkzeugleiste>
 
       {overview.length === 0 ? (
         <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("kalender.examsEmpty")}</p>
@@ -1356,15 +1371,15 @@ function ExamPanel({ overview, periods = 6, onAdd, onUpd, onDel, t }) {
               <div style={{ flex: 1, minWidth: 0, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                 <KursKlasseSelect value={eClassId === "" ? "" : Number(eClassId)} kursValue={eKursId}
                   onChange={(id, kid) => { setEClassId(id === "" ? "" : String(id)); setEKursId(id === "" ? null : (kid ?? null)); }} onKurs={setEKursId} />
-                <input type="date" value={eDate} onChange={(ev) => setEDate(ev.target.value)} style={{ ...inputStyle, padding: "6px 8px" }} />
-                <select value={ePeriod} onChange={(ev) => setEPeriod(ev.target.value)} title={t("kalender.examPeriodHint")} style={{ ...pSel, padding: "6px 24px 6px 8px" }}>
+                <input type="date" value={eDate} onChange={(ev) => setEDate(ev.target.value)} style={dateNavInput} />
+                <select value={ePeriod} onChange={(ev) => setEPeriod(ev.target.value)} title={t("kalender.examPeriodHint")} style={pSel}>
                   <option value="">{t("kalender.examAllDay")}</option>
                   {pOpts.map((p) => <option key={p} value={p}>{p}. {t("kalender.period")}</option>)}
                 </select>
-                <input value={eTitle} onChange={(ev) => setETitle(ev.target.value)} placeholder={t("kalender.examTitle")} style={{ ...inputStyle, flex: 1, minWidth: 120, padding: "6px 8px" }} />
+                <input value={eTitle} onChange={(ev) => setETitle(ev.target.value)} placeholder={t("kalender.examTitle")} style={{ ...dateNavInput, flex: 1, minWidth: 120 }} />
               </div>
-              <button onClick={() => saveEdit(e)} style={{ ...btnPrimary, padding: "5px 12px" }}>{t("common.save")}</button>
-              <button onClick={() => setEditId(null)} style={{ ...btnSecondary, padding: "5px 12px" }}>{t("common.abort")}</button>
+              <button onClick={() => saveEdit(e)} style={{ ...btnPrimary, height: CONTROL_H, padding: "0 14px" }}>{t("common.save")}</button>
+              <button onClick={() => setEditId(null)} style={{ ...btnSecondary, height: CONTROL_H, padding: "0 14px" }}>{t("common.abort")}</button>
             </>
           ) : (
             <>
@@ -1376,14 +1391,20 @@ function ExamPanel({ overview, periods = 6, onAdd, onUpd, onDel, t }) {
                 <div style={{ fontSize: 20, fontWeight: 800, color: "var(--text)" }}>{e.stunden}</div>
                 <div style={{ fontSize: 11, color: "var(--text3)" }}>{t("kalender.examStunden")}</div>
               </div>
-              {/* Auto-verknüpfte Auswertung im Modul „Klassenarbeit" öffnen. */}
-              {e.work_id && e.class_id && (
+              {/* Auto-verknüpfte Auswertung im Modul „Klassenarbeit" öffnen —
+                  nur bei aktivem Modul Auswertung (Regel 3); ohne es führte der
+                  Knopf ans ModuleGate. */}
+              {aktiv.auswertung && e.work_id && e.class_id && (
                 <Link to={`/auswertung?tab=klassenarbeit&class=${e.class_id}${e.kurs_id ? `&kurs=${e.kurs_id}` : ""}&work=${e.work_id}`} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("kalender.openExamWork")} aria-label={t("kalender.openExamWork")}>
                   <Icon d={ICONS.chart} size={16} color="var(--accent)" />
                 </Link>
               )}
               <button onClick={() => startEdit(e)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
-              <button onClick={() => onDel(e.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>
+              {/* Löschen ins Menü und mit Rückfrage: es stand direkt neben
+                  „Bearbeiten" und löschte den Termin ohne ein Wort. */}
+              <MehrMenu eintraege={[
+                { key: "del", label: t("common.delete"), icon: ICONS.trash, gefahr: true, onClick: () => loeschen(e) },
+              ]} />
             </>
           )}
          </div>
@@ -1400,7 +1421,9 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
   const [von, setVon] = useState("");
   const [bis, setBis] = useState("");
   const [label, setLabel] = useState("");
-  const fld = inputStyle;
+  // Eine Höhe, eine Form — Felder einer Leiste kommen aus dem gemeinsamen
+  // Baustein (CONTROL_H/CONTROL_R), nicht aus rohem inputStyle.
+  const fld = dateNavInput;
   const speichern = () => {
     if (!von) return;
     const ende = bis || von;
@@ -1453,24 +1476,36 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
           ihn schon der Abschnitts-h1 oben. */}
       {!standalone && <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{t("kalender.breaksTitle")}</h3>}
       <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 12px", maxWidth: 620 }}>{t("kalender.breaksHint")}</p>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
-        <label style={{ fontSize: 12, color: "var(--text2)", display: "flex", flexDirection: "column", gap: 3 }}>{t("kalender.bundesland")}
-          <select value={land} onChange={(e) => { setLand(e.target.value); localStorage.setItem("nuvora_bundesland", e.target.value); }} style={{ ...selectStyle, fontSize: 14, padding: "9px 30px 9px 12px" }}>
-            {BUNDESLAENDER.map(([k, n]) => <option key={k} value={k}>{n}</option>)}
-          </select></label>
-        <button onClick={ferienImport} disabled={importing} style={{ ...btnSecondary, opacity: importing ? 0.6 : 1 }}>{importing ? t("kalender.ferienImporting") : t("kalender.ferienImport")}</button>
-        <button onClick={feiertagImport} disabled={importing} style={{ ...btnSecondary, opacity: importing ? 0.6 : 1 }}>{t("kalender.feiertagImport")}</button>
-        <span style={{ fontSize: 11.5, color: "var(--text3)", flex: 1, minWidth: 160 }}>{t("kalender.ferienHint")}</span>
-      </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
-        <label style={{ fontSize: 12, color: "var(--text2)", display: "flex", flexDirection: "column", gap: 3 }}>{t("kalender.from")}
-          <input type="date" value={von} onChange={(e) => setVon(e.target.value)} style={fld} /></label>
-        <label style={{ fontSize: 12, color: "var(--text2)", display: "flex", flexDirection: "column", gap: 3 }}>{t("kalender.to")}
+      {/* Ferien/Feiertage sind seltene Massenaktionen — sie ersetzen bestehende
+          Zeiträume. Deshalb ins Mehr-Menü und nicht neben das Anlegen-Feld
+          (components/Werkzeugleiste.jsx). Links bleibt das Bundesland: es
+          bestimmt, WAS importiert wird. */}
+      <Werkzeugleiste
+        links={(
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text2)" }}>{t("kalender.bundesland")}
+            <select value={land} onChange={(e) => { setLand(e.target.value); localStorage.setItem("nuvora_bundesland", e.target.value); }} style={selectStyle}>
+              {BUNDESLAENDER.map(([k, n]) => <option key={k} value={k}>{n}</option>)}
+            </select></label>
+        )}
+        mehr={[
+          { key: "ferien", label: importing ? t("kalender.ferienImporting") : t("kalender.ferienImport"), icon: ICONS.import, disabled: importing, onClick: ferienImport },
+          { key: "feiertage", label: t("kalender.feiertagImport"), icon: ICONS.import, disabled: importing, onClick: feiertagImport },
+        ]}
+      >
+        <span style={{ fontSize: 11.5, color: "var(--text3)", maxWidth: 340 }}>{t("kalender.ferienHint")}</span>
+      </Werkzeugleiste>
+      <Werkzeugleiste
+        links={(
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text2)" }}>{t("kalender.from")}
+            <input type="date" value={von} onChange={(e) => setVon(e.target.value)} style={fld} /></label>
+        )}
+        style={{ marginBottom: 14 }}
+      >
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text2)" }}>{t("kalender.to")}
           <input type="date" value={bis} onChange={(e) => setBis(e.target.value)} min={von} style={fld} /></label>
-        <label style={{ fontSize: 12, color: "var(--text2)", display: "flex", flexDirection: "column", gap: 3, flex: 1, minWidth: 160 }}>{t("kalender.breakLabel")}
-          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t("kalender.breakLabelPlaceholder")} style={fld} /></label>
-        <button onClick={speichern} disabled={!von} style={{ ...btnPrimary, opacity: von ? 1 : 0.5, alignSelf: "flex-end" }}>{t("kalender.addBreak")}</button>
-      </div>
+        <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t("kalender.breakLabelPlaceholder")} aria-label={t("kalender.breakLabel")} title={t("kalender.breakLabel")} style={{ ...fld, flex: 1, minWidth: 160 }} />
+        <button onClick={speichern} disabled={!von} style={{ ...btnPrimary, height: CONTROL_H, padding: "0 16px", opacity: von ? 1 : 0.5 }}>{t("kalender.addBreak")}</button>
+      </Werkzeugleiste>
       {breaks.length === 0 ? (
         <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("kalender.noBreaks")}</p>
       ) : (

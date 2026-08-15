@@ -2,14 +2,24 @@
 // datierte Einträge erscheinen zusätzlich im Kalender (Regel 3: reine Zusatz-
 // Brücke, die Liste läuft eigenständig).
 import { useState, useEffect, useRef } from "react";
-import { pageTitle, btnPrimary, btnSecondary, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty } from "../components/Icons.jsx";
+import { pageTitle, btnPrimary, btnSecondary, inputStyle, Icon, ICONS, iconBtn, toolbarIconBtn, CONTROL_H, CONTROL_R, COLORS as C, Empty } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { sende } from "../core/melden.js";
+import { useAktiv } from "../core/modules.js";
 
 const API = "/api/todo";
 
+// Eine Höhe, eine Form für die Eingabeleiste — vorher standen Textfeld (38),
+// Icon-Knöpfe (30) und Datumsfeld (~36) mit drei Radien nebeneinander.
+const leistenFeld = { ...inputStyle, height: CONTROL_H, padding: "0 12px", fontSize: 13.5, lineHeight: 1, borderRadius: CONTROL_R };
+const leistenIconBtn = { ...toolbarIconBtn, border: "1px solid var(--border2)" };
+
 export default function Todo({ embedded } = {}) {
   const { t } = useLanguage();
+  // Regel 3: die Kalender-Brücke ist Zusatz — ohne das Modul gibt es sie nicht,
+  // also darf der Hinweis darauf auch nicht erscheinen.
+  const aktiv = useAktiv();
+  const kalenderAktiv = aktiv("kalender");
   const [items, setItems] = useState([]);
   const [text, setText] = useState("");
   const [date, setDate] = useState("");
@@ -34,7 +44,7 @@ export default function Todo({ embedded } = {}) {
   };
   // Ein abgelehnter Haken sprang nach dem load() zurueck — das sah aus, als
   // haette man danebengeklickt.
-  const toggle = async (it) => { await sende(`${API}/${it.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ done: !it.done }) }, "Aufgabe abhaken"); load(); };
+  const toggle = async (it) => { await sende(`${API}/${it.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ done: !it.done }) }, t("todo.toggle")); load(); };
   const del = async (id) => { await sende(`${API}/${id}`, { method: "DELETE" }, t("common.delete")); load(); };
   const startEdit = (it) => { setEditId(it.id); setEText(it.text); setEDate(it.due_date || ""); setETime(it.due_time || ""); };
   const saveEdit = async () => {
@@ -111,29 +121,29 @@ export default function Todo({ embedded } = {}) {
       {!embedded && <h1 style={pageTitle}>{t("todo.title")}</h1>}
 
       <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginBottom: 18 }}>
-        <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder={t("todo.placeholder")} style={{ ...inputStyle, flex: 1, minWidth: 160 }} />
+        <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder={t("todo.placeholder")} style={{ ...leistenFeld, flex: 1, minWidth: 160 }} />
         {/* Datum/Uhrzeit erst per Icon dazuschalten (Default heute bzw. nächste
             volle Stunde) — kein leeres Feld, das nach nichts aussieht. */}
         {!date ? (
-          <button onClick={() => setDate(heuteYmd())} className="icon-btn" title={t("todo.addDate")} aria-label={t("todo.addDate")} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8 }}>
+          <button onClick={() => setDate(heuteYmd())} className="icon-btn" title={t("todo.addDate")} aria-label={t("todo.addDate")} style={leistenIconBtn}>
             <Icon d={ICONS.calendar} size={18} color="var(--text2)" />
           </button>
         ) : (<>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} title={t("todo.dateHint")} style={{ ...inputStyle, padding: "9px 8px" }} />
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} title={t("todo.dateHint")} style={leistenFeld} />
           {!time ? (
-            <button onClick={() => setTime(naechsteStunde())} className="icon-btn" title={t("todo.addTime")} aria-label={t("todo.addTime")} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8 }}>
+            <button onClick={() => setTime(naechsteStunde())} className="icon-btn" title={t("todo.addTime")} aria-label={t("todo.addTime")} style={leistenIconBtn}>
               <Icon d={ICONS.clock} size={18} color="var(--text2)" />
             </button>
           ) : (
-            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} title={t("todo.timeHint")} style={{ ...inputStyle, padding: "9px 8px" }} />
+            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} title={t("todo.timeHint")} style={leistenFeld} />
           )}
-          <button onClick={() => { setDate(""); setTime(""); }} className="icon-btn" title={t("common.remove") || t("common.delete")} aria-label={t("common.remove") || t("common.delete")} style={{ ...iconBtn }}>
+          <button onClick={() => { setDate(""); setTime(""); }} className="icon-btn" title={t("common.remove") || t("common.delete")} aria-label={t("common.remove") || t("common.delete")} style={leistenIconBtn}>
             <Icon d={ICONS.close} size={15} color="var(--text3)" />
           </button>
         </>)}
-        <button onClick={add} disabled={!text.trim()} style={{ ...btnPrimary, opacity: text.trim() ? 1 : 0.5 }}>{t("common.add")}</button>
+        <button onClick={add} disabled={!text.trim()} style={{ ...btnPrimary, height: CONTROL_H, padding: "0 18px", opacity: text.trim() ? 1 : 0.5 }}>{t("common.add")}</button>
       </div>
-      <p style={{ fontSize: 12.5, color: "var(--text3)", marginTop: -10, marginBottom: 16 }}>{t("todo.calHint")}</p>
+      {kalenderAktiv && <p style={{ fontSize: 12.5, color: "var(--text3)", marginTop: -10, marginBottom: 16 }}>{t("todo.calHint")}</p>}
 
       {items.length === 0 ? (
         <Empty title={t("todo.empty")} hint={t("todo.emptyHint")} />

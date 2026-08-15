@@ -12,7 +12,7 @@ export default function ViewMenu({ items = [], title = "Ansicht" }) {
   return (
     <span style={{ position: "relative", display: "inline-flex" }}>
       <button onClick={() => setOpen((o) => !o)} className="icon-btn" title={title} aria-label={title}
-        style={{ ...toolbarIconBtn, border: (open || anyOn) ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 999, color: (open || anyOn) ? "var(--accent)" : "var(--text3)" }}>
+        style={{ ...toolbarIconBtn, border: (open || anyOn) ? "1px solid var(--accent)" : "1px solid var(--border2)", color: (open || anyOn) ? "var(--accent)" : "var(--text3)" }}>
         <Icon d={ICONS.settings} size={17} />
       </button>
       {open && (

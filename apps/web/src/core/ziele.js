@@ -23,6 +23,10 @@ export const ZIELE = [
   { pfad: "/papierkorb", key: "nav.trash", modul: null, worte: ["gelöscht", "wiederherstellen"] },
   { pfad: "/profile", key: "nav.profile", modul: null, worte: ["konto", "passwort", "sprache", "abmelden", "design"] },
   { pfad: "/marktplatz", key: "nav.marketplace", modul: null, worte: ["teilen", "veröffentlichen", "übernehmen"] },
+  // Sicherungen sind Kern, aber nur die Administration sieht den Navigationspunkt.
+  // Die Schranke sitzt im Server (_require_admin) — hier trotzdem auffindbar,
+  // damit niemand die Adresse auswendig können muss.
+  { pfad: "/backup", key: "nav.backup", modul: null, worte: ["sicherung", "backup", "datensicherung", "wiederherstellen", "dump", "administration"] },
   { pfad: "/help", key: "help.title", modul: null, worte: ["hilfe", "anleitung", "faq"] },
   { pfad: "/tutorial", key: "nav.tutorial", modul: null, worte: ["einführung", "tour", "erste schritte"] },
   { pfad: "/legal", key: "legal.title", modul: null, worte: ["impressum", "datenschutz", "dsgvo"] },
@@ -33,6 +37,8 @@ export const ZIELE = [
   { pfad: "/cardvote/session", key: "nav.session", modul: "cardvote", worte: ["abstimmung", "scannen", "beamer", "live"] },
   { pfad: "/cardvote/tests", key: "nav.tests", modul: "cardvote", worte: ["ergebnisse", "auswertung", "test"] },
   { pfad: "/cardvote/cards", key: "nav.cards", modul: "cardvote", worte: ["karten drucken", "aruco", "abstimmkarten"] },
+  { pfad: "/cardvote/scan", key: "nav.scanner", modul: "cardvote", worte: ["scannen", "scanner", "kamera", "handy", "abfotografieren", "erkennen", "aruco"] },
+  { pfad: "/cardvote/marketplace", key: "market.kindQuiz", modul: "cardvote", worte: ["marktplatz", "quiz teilen", "frageset übernehmen", "veröffentlichen", "fremde fragen"] },
 
   // ── Lernpfad ──
   { pfad: "/lernpfad?tab=aufgaben", key: "nav.exercises", modul: "lernpfad", worte: ["aufgabe", "aufgaben", "pool"] },
@@ -48,6 +54,7 @@ export const ZIELE = [
   { pfad: "/karten?tab=cards", key: "karten.tabCards", modul: "karten", worte: ["karteikarten", "stapel", "deck", "üben"] },
   { pfad: "/karten?tab=progress", key: "karten.tabProgress", modul: "karten", worte: ["fortschritt", "lernstand"] },
   { pfad: "/karten?tab=qr", key: "karten.tabQr", modul: "karten", worte: ["qr", "zugang", "code", "zettel drucken"] },
+  { pfad: "/marktplatz?area=karten&kind=karten_deck", key: "market.kindDeck", modul: "karten", worte: ["marktplatz", "stapel teilen", "deck übernehmen", "fremde karten"] },
 
   // ── Kalender ──
   { pfad: "/kalender", key: "kalender.title", modul: "kalender", worte: ["termin", "woche", "monat", "tag"] },
@@ -60,13 +67,18 @@ export const ZIELE = [
   { pfad: "/orga?tab=anwesenheit", key: "anwesenheit.title", modul: "orga", worte: ["fehlzeiten", "krank", "entschuldigt", "fehlt", "abwesend"] },
   { pfad: "/orga?tab=ausleihe", key: "ausleihe.title", modul: "orga", worte: ["ausleihe", "buch", "material", "zurückgeben"] },
   { pfad: "/orga?tab=sitzplan", key: "sitzplan.title", modul: "orga", worte: ["sitzplan", "plätze", "tische", "aufruf"] },
+  { pfad: "/orga?tab=optionen", key: "orga.tabOptions", modul: "orga", worte: ["reiter ausblenden", "einblenden", "zahnrad", "einstellungen orga", "aufräumen"] },
 
   // ── Übrige Module ──
   { pfad: "/code-detektiv/admin", key: "cd.create", modul: "code-detektiv", worte: ["rätsel", "blöcke", "programmieren"] },
   { pfad: "/code-detektiv/solo", key: "cd.solo", modul: "code-detektiv", worte: ["üben", "einzeln"] },
+  { pfad: "/code-detektiv/home?join=1", key: "cd.join", modul: "code-detektiv", worte: ["beitreten", "sitzungscode", "code eingeben", "mitmachen", "raum"] },
   { pfad: "/zufall", key: "zufall.navDraw", modul: "zufall", worte: ["ziehen", "würfeln", "wer ist dran", "zufällig"] },
   { pfad: "/zufall?tab=gruppen", key: "zufall.navGroups", modul: "zufall", worte: ["gruppen bilden", "teams", "einteilen"] },
   { pfad: "/unterrichtsplanung", key: "unterrichtsplanung.tabEinstiege", modul: "unterrichtsplanung", worte: ["einstieg", "methode", "stundenanfang"] },
+  // Die beiden gefilterten Marktplatz-Ansichten haengen am jeweiligen Modul
+  // (Regel 3): ohne Unterrichtsplanung bzw. Karten gibt es dorthin keinen Weg.
+  { pfad: "/marktplatz?area=methoden&kind=method", key: "market.kindMethod", modul: "unterrichtsplanung", worte: ["marktplatz", "methoden teilen", "einstiege übernehmen", "fremde einstiege"] },
   { pfad: "/notizbrett?tab=notizen", key: "notizbrett.tabNotes", modul: "notizbrett", worte: ["notiz", "zettel", "merken"] },
   { pfad: "/notizbrett?tab=aufgaben", key: "notizbrett.tabTodos", modul: "notizbrett", worte: ["to-do", "todo", "aufgabe", "erledigen"] },
   { pfad: "/tafel", key: "tafel.title", modul: "tafel", worte: ["tafel", "whiteboard", "anschrieb"] },

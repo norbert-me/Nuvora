@@ -111,7 +111,7 @@ export default function Kurse() {
 
       {/* Ladefehler ist NICHT dasselbe wie „noch nichts angelegt": das eine
           repariert der Server, das andere die Lehrkraft. */}
-      {ladefehler ? <LoadError message="Die Kurse konnten nicht geladen werden." onRetry={() => { load(); loadClasses(); }} />
+      {ladefehler ? <LoadError message={t("kurse.loadError")} onRetry={() => { load(); loadClasses(); }} />
         : kurse.length === 0 && <Empty title={t("kurse.emptyTitle")} hint={t("kurse.emptyHint")} />}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {kurse.map((k) => (
@@ -332,7 +332,12 @@ function MassnahmenPanel({ kursId, t }) {
               style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", padding: "2px 0", cursor: "pointer", textAlign: "left", fontSize: 13, color: "var(--text)" }}>
               <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
               <span style={{ fontSize: 12, color: n ? "var(--accent)" : "var(--text3)" }}>{n ? t("kurse.measuresCount", { n }) : t("kurse.measuresNone")}</span>
-              <span style={{ color: "var(--text3)", fontSize: 11 }}>{auf ? "▲" : "▾"}</span>
+              {/* Auf-/Zuklappen als SVG statt ▲/▾ — Unicode-Dreiecke sehen je
+                  System anders aus. TODO: `chevronUp`/`chevronDown` in ICONS,
+                  bis dahin plus/minus (auf = zuklappbar). */}
+              <span style={{ color: "var(--text3)", display: "inline-flex" }}>
+                <Icon d={auf ? ICONS.minus : ICONS.plus} size={13} />
+              </span>
             </button>
             {auf && (
               <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "6px 0 10px" }}>

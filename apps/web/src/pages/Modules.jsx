@@ -2,7 +2,7 @@
 // des Moduls bleiben im Kern liegen und sind nach dem Wiedereinschalten da.
 import { useState } from "react";
 import { useModules } from "../core/modules.js";
-import { StageBadge, Tabs, inputStyle, btnSecondary, COLORS as C, Icon, ICONS, MODULE_ICONS, iconBtn, Modal, pageApp} from "../components/Icons.jsx";
+import { StageBadge, Tabs, inputStyle, btnSecondary, COLORS as C, Icon, ICONS, MODULE_ICONS, iconBtn, Modal, pageApp, toolbarIconBtn} from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { pageTitle } from "../components/Icons.jsx";
 
@@ -95,9 +95,11 @@ export default function Modules() {
         <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("modules.sortBy")}</span>
         <Tabs value={effKey} onChange={setSortKey}
           options={[["name", t("modules.sortName")], ["status", t("modules.sortStatus")], ["popular", t("modules.sortPopular")]]} />
+        {/* Eine Hoehe, eine Form wie die Reiter daneben (CONTROL_H/CONTROL_R). */}
         <button onClick={() => setDir((d) => (d === "asc" ? "desc" : "asc"))} title={t("modules.sortDir")}
-          style={{ padding: "5px 12px", fontSize: 14, fontWeight: 700, border: "1px solid var(--border2)", borderRadius: 980, cursor: "pointer", background: "transparent", color: "var(--text2)" }}>
-          {dir === "asc" ? "↑" : "↓"}
+          className="icon-btn" aria-label={t("modules.sortDir")}
+          style={{ ...toolbarIconBtn, border: "1px solid var(--border2)", color: "var(--text2)" }}>
+          <Icon d={dir === "asc" ? ICONS.upload : ICONS.download} size={16} />
         </button>
       </div>
 
@@ -195,7 +197,9 @@ export default function Modules() {
             )}
             {!hasIllos(helpMod.key) && imgOf(helpMod) && (
               <div style={{ marginTop: 12, border: "1px dashed var(--border2)", borderRadius: 10, padding: "18px 16px", background: "var(--bg3)", textAlign: "center" }}>
-                <div style={{ fontSize: 22, marginBottom: 6, opacity: 0.5 }}>🖼️</div>
+                {/* Platzhalter fuer eine noch fehlende Abbildung. TODO: eigenes
+                    `image`-Icon in ICONS, bis dahin der Bildrahmen `fit`. */}
+                <div style={{ marginBottom: 6, opacity: 0.5, color: "var(--text3)" }}><Icon d={ICONS.fit} size={22} /></div>
                 <div style={{ fontSize: 12.5, color: "var(--text3)", lineHeight: 1.5 }}>{imgOf(helpMod)}</div>
               </div>
             )}

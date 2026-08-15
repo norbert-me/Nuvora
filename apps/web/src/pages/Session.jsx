@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { COLORS as C } from "../components/Icons.jsx";
+import { COLORS as C, Icon, ICONS, toolbarIconBtn } from "../components/Icons.jsx";
+import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { askPrompt } from "../core/dialog.jsx";
 import { useParams, useNavigate } from "react-router-dom";
 import Latex from "../components/Latex.jsx";
@@ -704,15 +705,15 @@ export default function Session() {
           marginBottom: 24, textAlign: "center",
         }}>
           <div style={{ fontSize: 36, fontWeight: 800, color: "var(--text)" }}>{overallPct}%</div>
-          <div style={{ fontSize: 14, color: "var(--text2)" }}>richtig insgesamt</div>
+          <div style={{ fontSize: 14, color: "var(--text2)" }}>{t("cv.correctOverall")}</div>
         </div>
         <table style={{ borderCollapse: "collapse", width: "100%", maxWidth: 600, fontSize: 15 }}>
           <thead>
             <tr style={{ borderBottom: "2px solid var(--border3)" }}>
               <th style={{ ...thStyle, textAlign: "left" }}>#</th>
-              <th style={{ ...thStyle, textAlign: "left" }}>Frage</th>
-              <th style={{ ...thStyle, textAlign: "center" }}>Richtig</th>
-              <th style={{ ...thStyle, textAlign: "center" }}>Zeit</th>
+              <th style={{ ...thStyle, textAlign: "left" }}>{t("cv.thQuestion")}</th>
+              <th style={{ ...thStyle, textAlign: "center" }}>{t("cv.statCorrect")}</th>
+              <th style={{ ...thStyle, textAlign: "center" }}>{t("cv.statTime")}</th>
             </tr>
           </thead>
           <tbody>
@@ -757,51 +758,43 @@ export default function Session() {
         <h2 style={{ margin: 0, fontSize: "clamp(18px, 2.5vh, 26px)", fontWeight: 700, color: "var(--text)" }}>
           {gameMode && <><SvgGamepad size={16} color="var(--text3)" />{" "}</>}{selectedClass?.name}
         </h2>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ color: "var(--text3)", fontSize: "clamp(13px, 1.8vh, 16px)", fontWeight: 600 }}>
-            {t("session.question", { i: questionIndex + 1, n: questions.length })}
-          </span>
-          <span style={{
-            background: gameMode ? "linear-gradient(135deg, #5856d6, #af52de)" : "var(--text)",
-            color: gameMode ? "#fff" : "var(--bg)", padding: "4px 12px",
-            borderRadius: 20, fontFamily: "monospace", fontWeight: 700, fontSize: 13,
-          }}>
-            {sessionCode}
-          </span>
-          <button onClick={() => window.open(`/cardvote/scan?session=${sessionCode}`, "_blank")} style={{
-            padding: "5px 10px", fontSize: 14, cursor: "pointer",
-            background: "none", color: "var(--text3)", border: "1px solid var(--border2)", borderRadius: 980,
-          }} title={t("session.openScanner")}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-          </button>
-          <button onClick={toggleMute} style={{
-            padding: "5px 10px", fontSize: 14, cursor: "pointer",
-            background: "none", color: muted ? C.danger : "var(--text3)", border: "1px solid var(--border2)", borderRadius: 980,
-          }} title={muted ? t("session.unmute") : t("session.mute")}>
-            {muted ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M23 9l-6 6M17 9l6 6"/></svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>
-            )}
+        {/* Eine Werkzeugleiste wie ueberall: was gerade laeuft (Frage, Code)
+            steht links, der eine Alltagsgriff (Ton) sichtbar, alles Seltene und
+            das gefaehrliche „Beenden" im Menue. Vorher standen hier sechs
+            Elemente nebeneinander, „Beenden" rot mittendrin. */}
+        <Werkzeugleiste
+          style={{ marginBottom: 0, flex: "0 1 auto", justifyContent: "flex-end" }}
+          links={<>
+            <span style={{ color: "var(--text3)", fontSize: "clamp(13px, 1.8vh, 16px)", fontWeight: 600 }}>
+              {t("session.question", { i: questionIndex + 1, n: questions.length })}
+            </span>
+            <span style={{
+              background: gameMode ? "linear-gradient(135deg, #5856d6, #af52de)" : "var(--text)",
+              color: gameMode ? "#fff" : "var(--bg)", padding: "4px 12px",
+              borderRadius: 20, fontFamily: "monospace", fontWeight: 700, fontSize: 13,
+            }}>
+              {sessionCode}
+            </span>
+          </>}
+          mehr={[
+            { key: "scanner", label: t("session.openScanner"), icon: ICONS.camera,
+              onClick: () => window.open(`/cardvote/scan?session=${sessionCode}`, "_blank") },
+            { key: "fullscreen", label: t("session.fullscreen"), icon: ICONS.fit,
+              onClick: () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } },
+            { key: "finish", label: t("session.finish"), icon: ICONS.close, gefahr: true, onClick: finishSession },
+          ]}
+        >
+          <button onClick={toggleMute} className="icon-btn"
+            style={{ ...toolbarIconBtn, border: "1px solid var(--border2)", color: muted ? C.danger : "var(--text3)" }}
+            title={muted ? t("session.unmute") : t("session.mute")} aria-label={muted ? t("session.unmute") : t("session.mute")}>
+            <Icon d={muted ? ICONS.soundOff : ICONS.sound} size={17} color={muted ? C.danger : undefined} />
           </button>
           {!muted && (
             <input type="range" min={0} max={1} step={0.05} value={volume}
               onChange={(e) => changeVolume(parseFloat(e.target.value))}
               title={t("session.volume")} style={{ width: 70, accentColor: "var(--accent)", cursor: "pointer" }} />
           )}
-          <button onClick={() => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }} style={{
-            padding: "5px 10px", fontSize: 14, cursor: "pointer",
-            background: "none", color: "var(--text3)", border: "1px solid var(--border2)", borderRadius: 980,
-          }} title={t("session.fullscreen")}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-          </button>
-          <button onClick={finishSession} style={{
-            padding: "5px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer",
-            background: "none", color: C.danger, border: `1px solid ${C.danger}`, borderRadius: 980,
-          }}>
-            {t("session.finish")}
-          </button>
-        </div>
+        </Werkzeugleiste>
       </div>
 
       {/* Timer bar */}
@@ -817,7 +810,7 @@ export default function Session() {
       {/* Timer + scan count */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5vh" }}>
         <span style={{ fontSize: "clamp(12px, 1.6vh, 15px)", color: "var(--text3)", fontWeight: 600 }}>
-          {scannedStudents.length} / {studentList.length} erfasst
+          {t("cv.scanned", { n: scannedStudents.length, total: studentList.length })}
         </span>
         {timeLeft !== null && (
           <span style={{

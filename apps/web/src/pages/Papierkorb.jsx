@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { useLanguage } from "../i18n/index.jsx";
 import { askConfirm } from "../core/dialog.jsx";
 import { pageTitle, pageIntro, btnSecondary, Icon, ICONS, iconBtn, COLORS as C, panelStyle, Empty, pageApp, LoadError } from "../components/Icons.jsx";
+import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { sende } from "../core/melden.js";
 
 const API = "/api";
@@ -60,17 +61,21 @@ export default function Papierkorb() {
 
   return (
     <div style={pageApp}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <h1 style={{ ...pageTitle, marginBottom: 0, flex: 1 }}>{t("trash.title")}</h1>
-        {items.length > 0 && (
-          <button onClick={leeren} disabled={busy} style={{ ...btnSecondary, color: C.danger, opacity: busy ? 0.6 : 1 }}>
-            {t("trash.empty")}
-          </button>
-        )}
-      </div>
+      <h1 style={{ ...pageTitle, marginBottom: 0 }}>{t("trash.title")}</h1>
       <p style={pageIntro}>{t("trash.intro")}</p>
 
-      {ladefehler ? <LoadError message="Der Papierkorb konnte nicht geladen werden." onRetry={load} />
+      {/* „Alles endgültig löschen" stand offen in der Kopfleiste, direkt neben
+          dem Titel — der eine Knopf der Seite, der nichts zurückholt. Er gehört
+          ins Menü: selten und gefährlich (`gefahr: true` stellt ihn ans Ende
+          und färbt ihn rot). */}
+      {items.length > 0 && (
+        <Werkzeugleiste mehr={[{
+          key: "leeren", label: t("trash.empty"), icon: ICONS.trash, gefahr: true,
+          disabled: busy, onClick: leeren,
+        }]} />
+      )}
+
+      {ladefehler ? <LoadError message={t("trash.loadError")} onRetry={load} />
         : items.length === 0 && <Empty title={t("trash.emptyTitle")} hint={t("trash.emptyHint")} />}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>

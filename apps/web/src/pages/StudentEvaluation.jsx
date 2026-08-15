@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { DownloadLink, COLORS as C, pageApp, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { DownloadLink, COLORS as C, pageApp, th as thBasis, td as tdBasis, Icon, ICONS, StatCard } from "../components/Icons.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import Themenstand from "../components/Themenstand.jsx";
+import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api";
 
 export default function StudentEvaluation() {
+  const { t } = useLanguage();
   const { classId, cardId } = useParams();
   const [data, setData] = useState(null);
 
@@ -18,13 +20,13 @@ export default function StudentEvaluation() {
 
   const { class_name, students, tests } = data;
   const student = students.find((s) => String(s.card_id) === cardId);
-  if (!student) return <p style={{ color: C.danger }}>Lernende/r nicht gefunden.</p>;
+  if (!student) return <p style={{ color: C.danger }}>{t("cv.studentNotFound")}</p>;
 
   const results = tests.map((test) => {
     const s = test.student_scores[student.card_id];
     return {
       session_id: test.session_id,
-      name: test.set_name || test.name || "Test",
+      name: test.set_name || test.name || t("cv.thTest"),
       date: test.date,
       present: s?.present || false,
       score: s?.score || 0,
@@ -47,14 +49,14 @@ export default function StudentEvaluation() {
   return (
     <div style={{ ...pageApp }}>
       <Link to={`/cardvote/class-evaluation/${classId}`} style={{ color: "var(--text3)", textDecoration: "none", fontSize: 13, fontWeight: 500 }}>
-        ← {class_name}
+        <Icon d={ICONS.arrowLeft} size={14} /> {class_name}
       </Link>
       <h2 style={{ marginTop: 12, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{student.name}</h2>
       <p style={{ color: "var(--text3)", marginBottom: 20, fontSize: 14 }}>
-        Karte #{student.card_id} · {class_name}
+        {t("cv.cardNo", { n: student.card_id })} · {class_name}
         {/* Kursniveau gehört zur Ergebnisanzeige — die Prozentwerte einer
             G-Wertung sind ohne diesen Hinweis nicht einzuordnen. */}
-        {student.niveau ? ` · ${student.niveau}-Kurs` : ""}
+        {student.niveau ? ` · ${t("cv.courseNiveau", { n: student.niveau })}` : ""}
       </p>
 
       {/* Verlauf gegen die Klasse: dieselbe Auswertung wie auf der Startseite,
@@ -64,17 +66,17 @@ export default function StudentEvaluation() {
       <Themenstand classId={classId} cardId={cardId} />
 
       <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
-        <StatCard label="Ø Gesamt" value={avgPct != null ? `${avgPct}%` : "–"} color={colorForPct(avgPct)} />
-        <StatCard label="Bester Test" value={best != null ? `${best}%` : "–"} color={C.success} />
-        <StatCard label="Schwächster" value={worst != null ? `${worst}%` : "–"} color={C.danger} />
-        <StatCard label="Median" value={median != null ? `${median}%` : "–"} />
-        <StatCard label="Teilnahmen" value={`${present.length} / ${tests.length}`} />
+        <StatCard label={t("cv.statAvgTotal")} value={avgPct != null ? `${avgPct}%` : "–"} color={colorForPct(avgPct)} />
+        <StatCard label={t("cv.statBestTest")} value={best != null ? `${best}%` : "–"} color={C.success} />
+        <StatCard label={t("cv.statWorstShort")} value={worst != null ? `${worst}%` : "–"} color={C.danger} />
+        <StatCard label={t("cv.statMedian")} value={median != null ? `${median}%` : "–"} />
+        <StatCard label={t("cv.statParticipation")} value={`${present.length} / ${tests.length}`} />
       </div>
 
       {/* Trend bar */}
       {pcts.length >= 2 && (
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text3)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>Verlauf</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text3)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>{t("cv.progress")}</div>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 80 }}>
             {present.map((r, i) => (
               <div key={r.session_id} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -93,8 +95,8 @@ export default function StudentEvaluation() {
       <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 14 }}>
         <thead>
           <tr style={{ borderBottom: "2px solid var(--border3)" }}>
-            <th style={th}>Test</th>
-            <th style={{ ...th, textAlign: "center" }}>Punkte</th>
+            <th style={th}>{t("cv.thTest")}</th>
+            <th style={{ ...th, textAlign: "center" }}>{t("cv.thPoints")}</th>
             <th style={{ ...th, textAlign: "center" }}>%</th>
           </tr>
         </thead>
@@ -113,7 +115,7 @@ export default function StudentEvaluation() {
                 ...tdStyle, textAlign: "center", fontWeight: 700,
                 color: r.pct == null ? "var(--text3)" : colorForPct(r.pct),
               }}>
-                {r.pct != null ? `${r.pct}%` : "abwesend"}
+                {r.pct != null ? `${r.pct}%` : t("cv.absent")}
               </td>
             </tr>
           ))}
@@ -121,8 +123,8 @@ export default function StudentEvaluation() {
       </table>
 
       <div style={{ marginTop: 20 }}>
-        <DownloadLink onClick={async () => { const r = await fetch(`${API}/classes/${classId}/all-tests-student-pdf/${cardId}`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `Gesamtübersicht_${student.name}.pdf`; a.click(); URL.revokeObjectURL(a.href); }}>
-          PDF herunterladen
+        <DownloadLink onClick={async () => { const r = await fetch(`${API}/classes/${classId}/all-tests-student-pdf/${cardId}`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${t("cv.pdfOverviewFile")}_${student.name}.pdf`; a.click(); URL.revokeObjectURL(a.href); }}>
+          {t("cv.downloadPdf")}
         </DownloadLink>
       </div>
     </div>
@@ -136,14 +138,7 @@ function colorForPct(pct) {
   return C.danger;
 }
 
-function StatCard({ label, value, color }) {
-  return (
-    <div style={{ padding: "10px 16px", background: "var(--bg2)", borderRadius: 12, textAlign: "center", minWidth: 80 }}>
-      <div style={{ fontSize: 22, fontWeight: 700, color: color || "var(--text)" }}>{value}</div>
-      <div style={{ fontSize: 12, color: "var(--text3)" }}>{label}</div>
-    </div>
-  );
-}
+// StatCard kommt aus Icons.jsx — die lokale Kopie war eine zweite Design-Quelle.
 
 // Aus dem Kern abgeleitet.
 const th = { ...thBasis, padding: "8px 10px", textAlign: "left", fontSize: 13, color: "var(--text3)", borderBottom: "none" };

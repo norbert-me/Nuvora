@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
-import { NiveauToggle, AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, selectStyle, Modal as UiModal, overlayGuard, modalOverlay, Empty, Skeleton, pageApp, inputStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { NiveauToggle, AddButton, Icon, ICONS, iconBtn, toolbarIconBtn, CONTROL_H, CONTROL_R, COLORS as C, btnPrimary, btnSecondary, selectStyle, Modal as UiModal, overlayGuard, modalOverlay, Empty, Skeleton, pageApp, inputStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import AuthImage from "../components/AuthImage.jsx";
@@ -158,7 +159,7 @@ export default function Karten() {
   const folderById = () => Object.fromEntries(cardFolders.map((f) => [f.id, f]));
   const isAncestor = (aId, bId) => { const m = folderById(); let cur = m[bId]?.parent_id ?? null; while (cur != null) { if (cur === aId) return true; cur = m[cur]?.parent_id ?? null; } return false; };
   const canDropInto = (dragId, targetId) => dragId != null && targetId !== dragId && !isAncestor(dragId, targetId) && ((folderById()[dragId]?.parent_id ?? null) !== (targetId ?? null));
-  const moveFolderTo = async (fId, parentId) => { const f = folderById()[fId]; if (!f) return; await sende(`${API}/card-folders/${fId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: f.name, parent_id: parentId }) }, "Ordner verschieben"); loadFolders(classId); };
+  const moveFolderTo = async (fId, parentId) => { const f = folderById()[fId]; if (!f) return; await sende(`${API}/card-folders/${fId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: f.name, parent_id: parentId }) }, t("karten.moveFolder")); loadFolders(classId); };
   // Generisch: gilt ein Ablegen auf targetId (Ordner oder Wurzel)? Für Ordner mit
   // Zyklus-Schutz, für Stapel wenn er nicht schon dort liegt.
   const canDrop = (targetId) => {
@@ -206,7 +207,7 @@ export default function Karten() {
   const deleteFolder = async (f) => { if (!await askConfirm(t("karten.delFolderConfirm"))) return; await sende(`${API}/card-folders/${f.id}`, { method: "DELETE" }, t("common.delete")); if (currentCardFolder === f.id) setCurrentCardFolder(f.parent_id ?? null); loadFolders(classId); loadDecks(classId); };
   // Der Stapel wandert optisch sofort; ohne Meldung sah eine abgelehnte
   // Verschiebung so aus, als wäre er beim Ziehen verlorengegangen.
-  const moveDeck = async (deck, folderId) => { await sende(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", folder_id: folderId }) }, "Stapel verschieben"); loadDecks(classId); };
+  const moveDeck = async (deck, folderId) => { await sende(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", folder_id: folderId }) }, t("karten.moveDeck")); loadDecks(classId); };
   // Aus dem „+"-Menü gewählten Typ anlegen (Stapel im aktuellen Ordner / Ordner).
   const commitAdd = async () => {
     const name = addName.trim(); if (!name) return;
@@ -287,7 +288,8 @@ export default function Karten() {
         {subsetKurse.length > 0 && (
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
             {t("noten.teilkurs")}
-            <select value={subsetKurs || ""} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)" }}
+            {/* Gleiche Hoehe und Form wie die Klassenauswahl daneben (selectStyle). */}
+            <select value={subsetKurs || ""} style={{ ...selectStyle, fontSize: 13 }}
               onChange={async (e) => {
                 const kid = e.target.value ? Number(e.target.value) : null;
                 setTokens(null);
@@ -334,9 +336,9 @@ export default function Karten() {
                 <input value={addName} onChange={(e) => setAddName(e.target.value)} autoFocus
                   placeholder={addMode === "deck" ? t("karten.newDeck") : t("karten.newFolder")}
                   onKeyDown={(e) => { if (e.key === "Enter") commitAdd(); if (e.key === "Escape") { setAddName(""); setAddMode(null); } }}
-                  style={{ flex: 1, maxWidth: 320, padding: "8px 12px", border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)" }} />
-                <button onClick={commitAdd} disabled={!addName.trim()} style={{ ...btnPrimary, padding: "8px 14px", opacity: addName.trim() ? 1 : 0.4 }}>{t("common.add")}</button>
-                <button onClick={() => { setAddName(""); setAddMode(null); }} style={btnSecondary}>{t("common.abort")}</button>
+                  style={{ ...leisteInput, flex: 1, maxWidth: 320 }} />
+                <button onClick={commitAdd} disabled={!addName.trim()} style={{ ...leisteBtnPrimary, opacity: addName.trim() ? 1 : 0.4 }}>{t("common.add")}</button>
+                <button onClick={() => { setAddName(""); setAddMode(null); }} style={leisteBtn}>{t("common.abort")}</button>
               </div>
             ) : (
               <div data-tour="karten-new" style={{ position: "relative" }}>
@@ -344,8 +346,8 @@ export default function Karten() {
                 {addMenuOpen && (<>
                   <div onClick={() => setAddMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
                   <Popover style={{ minWidth: 190, padding: 6 }}>
-                    <button onClick={() => { setAddMenuOpen(false); setAddMode("deck"); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "9px 12px", background: "none", border: "none", borderRadius: 8, color: "var(--text)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", textAlign: "left" }}><Icon d={ICONS.plus} size={15} /> {t("karten.newDeckItem")}</button>
-                    <button onClick={() => { setAddMenuOpen(false); setAddMode("folder"); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "9px 12px", background: "none", border: "none", borderRadius: 8, color: "var(--text)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", textAlign: "left" }}><Icon d={ICONS.plus} size={15} /> {t("karten.newFolderItem")}</button>
+                    <button onClick={() => { setAddMenuOpen(false); setAddMode("deck"); }} style={menuRow}><Icon d={ICONS.plus} size={15} /> {t("karten.newDeckItem")}</button>
+                    <button onClick={() => { setAddMenuOpen(false); setAddMode("folder"); }} style={menuRow}><Icon d={ICONS.folder} size={15} /> {t("karten.newFolderItem")}</button>
                   </Popover>
                 </>)}
               </div>
@@ -368,7 +370,7 @@ export default function Karten() {
               style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", marginBottom: 8, borderRadius: 14, background: isTarget ? "var(--accent-bg, rgba(10,132,255,0.10))" : "var(--card)", opacity: isDrag ? 0.4 : 1, cursor: "grab", border: isTarget ? "2px solid var(--accent)" : "1px solid var(--border)" }}>
               <span className="drag-handle" style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex", flexShrink: 0 }}><Icon d={ICONS.grip} size={15} /></span>
               <button onClick={() => setCurrentCardFolder(f.id)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", textAlign: "left", minWidth: 0, color: "var(--text)" }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                <Icon d={ICONS.folder} size={18} />
                 <strong style={{ fontSize: 15 }}>{f.name}{isTarget ? ` — ${t("karten.dropHere")}` : ""}</strong>
               </button>
               <button onClick={() => renameFolder(f)} className="icon-btn" style={iconBtn} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
@@ -406,7 +408,7 @@ export default function Karten() {
                 <span style={{ fontSize: 14, fontWeight: 700 }}>{t("karten.progress")}</span>
                 <span style={{ fontSize: 12.5, padding: "4px 10px", borderRadius: 980, background: "rgba(10,125,62,0.12)", color: C.success, fontWeight: 600 }}>{t("karten.thisWeek")}: {dieseWoche}/{nStud}</span>
                 {nieGelernt > 0 && <span style={{ fontSize: 12.5, padding: "4px 10px", borderRadius: 980, background: "var(--bg2)", color: "var(--text3)", fontWeight: 600 }}>{t("karten.neverLearned")}: {nieGelernt}</span>}
-                {notenAktiv && <button onClick={() => setNotenDialog(true)} style={{ ...btnSecondary, padding: "5px 12px", marginLeft: "auto" }}>{t("karten.toNoten")}</button>}
+                {notenAktiv && <button onClick={() => setNotenDialog(true)} style={{ ...leisteBtn, marginLeft: "auto" }}>{t("karten.toNoten")}</button>}
               </div>
             )}
             <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 12 }}>
@@ -648,35 +650,47 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
       onDragStart={onDragStartDeck ? (e) => { if (!dragFromHandle.current) { e.preventDefault(); return; } e.dataTransfer.effectAllowed = "move"; onDragStartDeck(); } : undefined}
       onDragEnd={onDragStartDeck ? () => { dragFromHandle.current = false; onDragEndDeck && onDragEndDeck(); } : undefined}
       onDragOver={onReorderOver} onDrop={onReorderDrop}
-      style={{ marginBottom: 14, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, opacity: dragging ? 0.4 : 1,
+      style={{ position: "relative", marginBottom: 14, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, opacity: dragging ? 0.4 : 1,
         boxShadow: dropSide === "above" ? "inset 0 3px 0 var(--accent)" : dropSide === "below" ? "inset 0 -3px 0 var(--accent)" : undefined }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: collapsed ? 0 : 10, flexWrap: "wrap" }}>
+      {/* Kopf des Stapels als Werkzeugleiste: sichtbar bleibt, was man staendig
+          braucht (Aufklappen, Name, Durchgehen) — Export, Import, Veroeffentlichen
+          und Verschieben liegen im ⋯-Menue. Vorher standen hier bis zu elf
+          Bedienelemente in einer Reihe. */}
+      <Werkzeugleiste style={{ marginBottom: collapsed ? 0 : 10 }}
+        links={<>
         {onDragStartDeck && (
           <span onMouseDown={() => { dragFromHandle.current = true; }}
             className="drag-handle" title={t("karten.moveToFolder")} style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex", flexShrink: 0, userSelect: "none" }}><Icon d={ICONS.grip} size={15} /></span>
         )}
-        <button onClick={() => setCollapsed((v) => !v)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title={collapsed ? t("topics.expand") : t("topics.collapse")}>
+        <button onClick={() => setCollapsed((v) => !v)} className="icon-btn" style={toolbarIconBtn} title={collapsed ? t("topics.expand") : t("topics.collapse")}>
           <span style={{ display: "inline-flex", transform: collapsed ? "none" : "rotate(90deg)", transition: "transform 0.15s", color: "var(--text3)" }}><Icon d={ICONS.open} size={16} /></span>
         </button>
         {renaming ? (
           <>
             <input value={nameVal} onChange={(e) => setNameVal(e.target.value)} autoFocus onBlur={(e) => { if (!e.relatedTarget || !e.relatedTarget.dataset || e.relatedTarget.dataset.keep !== "1") doRename(); }}
               onKeyDown={(e) => { if (e.key === "Enter") doRename(); if (e.key === "Escape") { setNameVal(deck.name || ""); setRenaming(false); } }}
-              style={{ fontSize: 16, fontWeight: 700, padding: "3px 8px", border: "1px solid var(--border2)", borderRadius: 8, background: "var(--bg)", color: "var(--text)" }} />
+              style={{ ...leisteInput, fontSize: 16, fontWeight: 700 }} />
             {/* Löschen erscheint erst im Bearbeiten-Modus (nicht dauerhaft im Kopf). */}
             <button data-keep="1" onMouseDown={(e) => e.preventDefault()} onClick={async () => { if (await askConfirm(t("karten.delDeck", { name: deck.name }))) call(() => fetch(`${API}/decks/${deck.id}`, { method: "DELETE" })); }}
-              className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={16} /></button>
+              className="icon-btn" style={toolbarIconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={16} /></button>
           </>
         ) : (
           <>
             <strong onClick={() => setCollapsed((v) => !v)} style={{ fontSize: 16, cursor: "pointer" }}>{deck.name || t("karten.deck")}</strong>
-            <button onClick={() => { setNameVal(deck.name || ""); setRenaming(true); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("karten.renameDeck")} aria-label={t("karten.renameDeck")}><Icon d={ICONS.edit} size={14} /></button>
+            <button onClick={() => { setNameVal(deck.name || ""); setRenaming(true); }} className="icon-btn" style={toolbarIconBtn} title={t("karten.renameDeck")} aria-label={t("karten.renameDeck")}><Icon d={ICONS.edit} size={15} /></button>
           </>
         )}
         {status !== "entwurf" && <span style={{ fontSize: 11.5, fontWeight: 600, padding: "2px 8px", borderRadius: 980, background: badge.bg, color: badge.col }}>{badge.text}</span>}
+        </>}
+        mehr={collapsed ? [] : [
+          deck.cards.length > 0 && { key: "export", label: t("karten.export"), icon: ICONS.export, onClick: exportDeck },
+          { key: "import", label: t("karten.import"), icon: ICONS.import, onClick: () => setImporting(true) },
+          deck.cards.length > 0 && { key: "publish", label: t("karten.publish"), icon: ICONS.share, onClick: () => setPublishing(true) },
+          (onMove && folders.length > 0) && { key: "move", label: t("karten.moveToFolder"), icon: ICONS.moveAll, onClick: () => setMoveOpen(true) },
+        ]}>
         {!collapsed && showTopic && (
           <select value={deck.topic_id ?? ""} onChange={(e) => setTopic(e.target.value)} title={t("karten.topicHint")}
-            style={{ ...selectStyle, fontSize: 12, padding: "4px 28px 4px 9px", maxWidth: 180 }}>
+            style={{ ...selectStyle, fontSize: 13, maxWidth: 180 }}>
             <option value="">– {t("karten.freeCards")} –</option>
             {themen.geordnet.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
           </select>
@@ -691,50 +705,36 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           </span>
         </span>
         )}
-        {!collapsed && onMove && folders.length > 0 && (
-          <div style={{ position: "relative" }}>
-            <button onClick={() => setMoveOpen((v) => !v)} className="icon-btn" style={iconBtn} title={t("karten.moveToFolder")} aria-label={t("karten.moveToFolder")}>
-              <Icon d={ICONS.move || ICONS.export} size={18} />
-            </button>
-            {moveOpen && (<>
-              <div onClick={() => setMoveOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-              <Popover style={{ minWidth: 180, maxHeight: 260, overflow: "auto", padding: 6 }}>
-                {[{ id: null, name: `– ${t("karten.rootFolder")} –` }, ...folders].map((f) => {
-                  const active = (deck.folder_id ?? null) === f.id;
-                  return (
-                    <button key={f.id ?? "root"} onClick={() => { setMoveOpen(false); if (!active) onMove(deck, f.id); }}
-                      style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "8px 12px", background: active ? "var(--bg2)" : "none", border: "none", borderRadius: 8, color: active ? "var(--text3)" : "var(--text)", fontSize: 13, fontWeight: active ? 700 : 500, cursor: active ? "default" : "pointer", textAlign: "left" }}>
-                      {f.name}{active ? " ✓" : ""}
-                    </button>
-                  );
-                })}
-              </Popover>
-            </>)}
-          </div>
-        )}
-        <span style={{ flex: 1 }} />
         <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{deck.cards.length} {t("karten.cards")}</span>
-        {!collapsed && (<>
-          {cards.length > 0 && (
-            <button onClick={() => setStudying(true)} className="icon-btn" style={iconBtn} title={t("karten.study")} aria-label={t("karten.study")}><Icon d={ICONS.eye} size={18} color="var(--accent)" /></button>
-          )}
-          {deck.cards.length > 0 && (
-            <button onClick={exportDeck} className="icon-btn" style={iconBtn} title={t("karten.export")} aria-label={t("karten.export")}><Icon d={ICONS.export} size={18} /></button>
-          )}
-          <button onClick={() => setImporting(true)} className="icon-btn" style={iconBtn} title={t("karten.import")} aria-label={t("karten.import")}><Icon d={ICONS.import} size={18} /></button>
-          {deck.cards.length > 0 && (
-            <button onClick={() => setPublishing(true)} className="icon-btn" style={iconBtn} title={t("karten.publish")} aria-label={t("karten.publish")}><Icon d={ICONS.share} size={18} color="var(--accent)" /></button>
-          )}
-        </>)}
-        {publishing && <PublishModal name={deck.name || t("karten.deck")} onClose={() => setPublishing(false)}
-          onPublish={(description) => fetch(`/api/marketplace/publish/deck`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deck_id: deck.id, description }) }).catch(() => null)} />}
-      </div>
+        {!collapsed && cards.length > 0 && (
+          <button onClick={() => setStudying(true)} className="icon-btn" style={toolbarIconBtn} title={t("karten.study")} aria-label={t("karten.study")}><Icon d={ICONS.eye} size={18} color="var(--accent)" /></button>
+        )}
+      </Werkzeugleiste>
+      {/* Ziel-Ordner zum Verschieben — aus dem ⋯-Menue geoeffnet, deshalb
+          rechtsbuendig unter der Leiste. */}
+      {moveOpen && !collapsed && onMove && (<>
+        <div onClick={() => setMoveOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+        <Popover align="right" style={{ top: CONTROL_H + 8, minWidth: 180, maxHeight: 260, overflow: "auto", padding: 6 }}>
+          {[{ id: null, name: `– ${t("karten.rootFolder")} –` }, ...folders].map((f) => {
+            const active = (deck.folder_id ?? null) === f.id;
+            return (
+              <button key={f.id ?? "root"} onClick={() => { setMoveOpen(false); if (!active) onMove(deck, f.id); }}
+                style={{ ...menuRow, fontSize: 13, background: active ? "var(--bg2)" : "none", color: active ? "var(--text3)" : "var(--text)", fontWeight: active ? 700 : 500, cursor: active ? "default" : "pointer" }}>
+                <Icon d={active ? ICONS.check : ICONS.folder} size={15} />
+                {f.name}
+              </button>
+            );
+          })}
+        </Popover>
+      </>)}
+      {publishing && <PublishModal name={deck.name || t("karten.deck")} onClose={() => setPublishing(false)}
+        onPublish={(description) => fetch(`/api/marketplace/publish/deck`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deck_id: deck.id, description }) }).catch(() => null)} />}
 
       {!collapsed && (<>
       {/* Ausrollen gebündelt in einem Untermenü: sofort, geplant, zurückziehen. */}
       {deck.cards.length > 0 && (
         <div style={{ position: "relative", display: "inline-block", marginBottom: 12 }}>
-          <button onClick={() => setRollOpen((v) => !v)} style={{ ...btnSecondary, padding: "5px 12px", display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <button onClick={() => setRollOpen((v) => !v)} style={leisteBtn}>
             {t("karten.rollout")} <Icon d={ICONS.open} size={10} style={{ transform: "rotate(90deg)" }} />
           </button>
           {rollOpen && (
@@ -747,9 +747,9 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
                     <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 4 }}>{t("karten.planLabel")}</div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       {/* Nur Datum wählen — freigeschaltet wird immer 07:00 morgens des Tages. */}
-                      <input type="date" value={planDate} onChange={(e) => setPlanDate(e.target.value)} style={{ ...inp, padding: "5px 8px", flex: 1, minWidth: 150 }} />
+                      <input type="date" value={planDate} onChange={(e) => setPlanDate(e.target.value)} style={{ ...leisteInput, flex: 1, minWidth: 150 }} />
                       <button disabled={!planDate} onClick={() => { if (planDate) { const [y, mo, d] = planDate.split("-").map(Number); setRollOpen(false); release({ released_at: new Date(y, mo - 1, d, 7, 0, 0).toISOString() }); } }}
-                        style={{ ...btnPrimary, padding: "5px 12px", opacity: planDate ? 1 : 0.4 }}>{t("karten.plan")}</button>
+                        style={{ ...leisteBtnPrimary, opacity: planDate ? 1 : 0.4 }}>{t("karten.plan")}</button>
                     </div>
                     <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 4 }}>{t("karten.planTime")}</div>
                   </div>
@@ -776,8 +776,11 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           <NiveauToggle wert={c.niveau || ""} size={22} title={t("karten.cardNiveauHint")}
             onChange={(v) => saveEditCard(c.id, c.front, c.back, v)} />
           {c.has_back_image && <AuthImage src={`${API}/cards/${c.id}/image/back`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: 5, border: "1px solid var(--border2)", flexShrink: 0 }} />}
-          <button onClick={() => setEditCard(c.id)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>
-          <button onClick={() => call(() => fetch(`${API}/cards/${c.id}`, { method: "DELETE" }))} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={14} /></button>
+          <button onClick={() => setEditCard(c.id)} className="icon-btn" style={iconBtn} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>
+          {/* Löschen stand direkt neben Bearbeiten — zwei Pixel daneben und die
+              Karte ist weg. Es liegt jetzt im ⋯-Menue, unten und rot. */}
+          <MehrMenu eintraege={[{ key: "del", label: t("common.delete"), icon: ICONS.trash, gefahr: true,
+            onClick: () => call(() => fetch(`${API}/cards/${c.id}`, { method: "DELETE" })) }]} />
         </div>
         );
       })}
@@ -801,6 +804,10 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   );
 }
 
+// EINE Zeile fuer alle Klappmenues dieser Seite (Anlegen, Verschieben,
+// Ausrollen). Es gab vier fast gleiche Fassungen — 8/9 px Polsterung, Radius
+// 7/8, Schrift 13/13.5 — die nebeneinander sichtbar auseinanderliefen.
+// Abweichungen bitte per Spread ableiten, nicht neu bauen.
 const menuRow = { display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "8px 10px", background: "none", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 13.5, color: "var(--text)", textAlign: "left" };
 
 // Lernmodus: Karten des Stapels durchgehen. Vorderseite → tippen/Leertaste
@@ -869,7 +876,7 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t })
   const [front, setFront] = useState(card.front || "");
   const [back, setBack] = useState(card.back || "");
   const [niveau, setNiveau] = useState(card.niveau || "");
-  const inpS = { padding: "8px 10px", border: "1px solid var(--border2)", borderRadius: 8, background: "var(--bg)", color: "var(--text)", fontSize: 14, width: "100%", boxSizing: "border-box", resize: "vertical" };
+  const inpS = { ...inputStyle, width: "100%", resize: "vertical" };
   const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
   // LaTeX-Schnelltasten fügen in das zuletzt fokussierte Feld ein (wie in der Anlege-Maske).
   const frontRef = useRef(null), backRef = useRef(null), activeField = useRef("front");
@@ -892,7 +899,7 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t })
     <UiModal onClose={onClose} width={480} style={{ maxHeight: "90vh", overflowY: "auto" }} label={card.id ? t("karten.editCard") : t("karten.newCard")}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, flex: 1 }}>{card.id ? t("karten.editCard") : t("karten.newCard")}</h3>
-          <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
+          <button onClick={onClose} className="icon-btn" style={toolbarIconBtn} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
         </div>
 
         {/* LaTeX-Schnelltasten (fügen ins zuletzt fokussierte Feld). */}
@@ -955,12 +962,12 @@ function CardImgCtl({ cardId, side, has, imgVer, onUpload, onRemove, t }) {
       <span style={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
         <AuthImage src={`${API}/cards/${cardId}/image/${side}`} reloadKey={imgVer}
           style={{ height: 32, width: 32, objectFit: "cover", borderRadius: 6, border: "1px solid var(--border2)" }} />
-        <button onClick={() => onRemove(cardId, side)} className="icon-btn" style={{ ...iconBtn, padding: 1 }} title={t("karten.imgRemove")} aria-label={t("karten.imgRemove")}><Icon d={ICONS.close} size={12} color={C.danger} /></button>
+        <button onClick={() => onRemove(cardId, side)} className="icon-btn" style={iconBtn} title={t("karten.imgRemove")} aria-label={t("karten.imgRemove")}><Icon d={ICONS.close} size={12} color={C.danger} /></button>
       </span>
     );
   }
   return (
-    <label className="icon-btn" style={{ ...iconBtn, padding: 3, cursor: "pointer", flexShrink: 0 }} title={`${t("karten.imgAdd")} (${side === "front" ? t("karten.front") : t("karten.back")})`}>
+    <label className="icon-btn" style={{ ...iconBtn, cursor: "pointer", flexShrink: 0 }} title={`${t("karten.imgAdd")} (${side === "front" ? t("karten.front") : t("karten.back")})`}>
       <Icon d={ICONS.upload} size={14} color="var(--text3)" />
       <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files[0]; e.target.value = ""; onUpload(cardId, side, f); }} />
     </label>

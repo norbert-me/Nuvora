@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt } from "../core/dialog.jsx";
 import Latex from "../components/Latex.jsx";
 import PublishModal from "../components/PublishModal.jsx";
-import { NiveauToggle, AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Toggle, Modal, Popover, pageApp, inputStyle as inputBasis } from "../components/Icons.jsx";
+import { NiveauToggle, AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Toggle, Modal, Popover, pageApp, inputStyle as inputBasis, selectStyle, CONTROL_H } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import TopicPicker from "../components/TopicPicker.jsx";
@@ -443,8 +443,10 @@ export default function Dashboard() {
           {verwaistOffen && (
             <>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "12px 0 8px" }}>
+                {/* Suchfeld und Auswahlfeld darunter stehen in derselben Leiste:
+                    eine Hoehe (CONTROL_H), eine Form — abgeleitet, nicht neu gebaut. */}
                 <input value={vSuche} onChange={(e) => setVSuche(e.target.value)} placeholder={t("dash.searchQ")}
-                  style={{ flex: 1, minWidth: 160, maxWidth: 280, padding: "6px 12px", border: "1px solid var(--border2)", borderRadius: 980, fontSize: 13.5, background: "var(--bg)", color: "var(--text)" }} />
+                  style={{ ...inputBasis, flex: 1, minWidth: 160, maxWidth: 280, height: CONTROL_H, padding: "0 12px", fontSize: 13.5 }} />
                 <button onClick={() => setVAuswahl(new Set(vGefiltert.map((q) => q.id)))} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13 }}>
                   {t("dash.orphansSelectAll", { n: vGefiltert.length })}
                 </button>
@@ -459,7 +461,7 @@ export default function Dashboard() {
                   Normalfall, Loeschen die Ausnahme. */}
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
                 <select value={vZiel} onChange={(e) => setVZiel(e.target.value)}
-                  style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border2)", fontSize: 13.5, background: "var(--bg)", color: "var(--text)", maxWidth: 320 }}>
+                  style={{ ...selectStyle, fontSize: 13.5, maxWidth: 320 }}>
                   <option value="">{t("dash.orphansPickSet")}</option>
                   {alleQuizze.map((qs) => <option key={qs.id} value={String(qs.id)}>{qs.label}</option>)}
                 </select>
@@ -824,7 +826,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
 
   return (
     <div>
-      <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 13, fontWeight: 500, padding: "4px 0", marginBottom: 16 }}>← Zurück</button>
+      <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 13, fontWeight: 500, padding: "4px 0", marginBottom: 16 }}>← {t("common.back")}</button>
 
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
         <input value={name} onChange={(e) => setName(e.target.value)} onBlur={saveName} onKeyDown={(e) => e.key === "Enter" && saveName()}
@@ -850,7 +852,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
         {questions.length > 3 && (
           <input
             value={qSearch} onChange={(e) => setQSearch(e.target.value)} placeholder={t("dash.searchQ")}
-            style={{ flex: 1, minWidth: 160, maxWidth: 320, padding: "7px 12px", border: "1px solid var(--border2)", borderRadius: 980, fontSize: 13.5, background: "var(--bg)", color: "var(--text)" }}
+            style={{ ...inputBasis, flex: 1, minWidth: 160, maxWidth: 320, height: CONTROL_H, padding: "0 12px", fontSize: 13.5 }}
           />
         )}
         {/* Themenfilter — nur wenn es Themen gibt: ein Filter ueber eine leere
@@ -858,7 +860,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
         {themaIdx.liste.length > 0 && (
           <>
             <select value={qThema} onChange={(e) => setQThema(e.target.value)} title={t("dash.filterTopic")}
-              style={{ padding: "6px 10px", borderRadius: 980, border: "1px solid var(--border2)", fontSize: 13.5, background: "var(--bg)", color: "var(--text)", maxWidth: 260 }}>
+              style={{ ...selectStyle, fontSize: 13.5, maxWidth: 260 }}>
               <option value="">{t("dash.allTopics")}</option>
               <option value="0">{t("dash.withoutTopic")}</option>
               {themaIdx.geordnet.map((tp) => <option key={tp.id} value={String(tp.id)}>{themaIdx.label(tp)}</option>)}

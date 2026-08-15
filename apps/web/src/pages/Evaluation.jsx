@@ -4,7 +4,8 @@ import { useAktiv } from "../core/modules.js";
 import AbschnittWahl from "../components/AbschnittWahl.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
-import { DownloadLink, Icon, ICONS, btnPrimary, btnSecondary, Modal, inputStyle, COLORS as C, Boxplot, pageApp, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { Icon, ICONS, Tabs, btnPrimary, btnSecondary, Modal, inputStyle, iconBtn, CONTROL_H, CONTROL_R, COLORS as C, Boxplot, pageApp, StatCard, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
 import { bewerte, statusOf } from "../core/scoring.js";
 
@@ -117,6 +118,18 @@ export default function Evaluation() {
     });
   }, [id]);
 
+  // Datei holen und speichern — dreimal dieselbe Zeile inline war einmal zu oft.
+  const holen = async (url, dateiname) => {
+    const r = await fetch(url);
+    if (!r.ok) return;
+    const b = await r.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(b);
+    a.download = dateiname;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
   const saveConfig = (newWeights, newScale, patch = {}) => {
     clearTimeout(saveTimer.current);
     setConfigDirty(true);
@@ -164,7 +177,7 @@ export default function Evaluation() {
     saveConfig(weights, next);
   };
 
-  if (loadError && !data) return <p style={{ color: C.danger }}>Verbindungsfehler — Server nicht erreichbar.</p>;
+  if (loadError && !data) return <p style={{ color: C.danger }}>{t("common.connectionError")}</p>;
   if (!data) return <div style={{ minHeight: "70vh" }} />;
 
   const { questions: rawQuestions = [], students: rawStudents = [], session_name } = data;
@@ -300,26 +313,26 @@ const gradeDistribution = (() => {
     const negDisc = questionStats.filter((s) => s.discrimination !== null && s.discrimination < 0);
 
     if (tooEasy.length > 0)
-      tips.push(`${tooEasy.length} Frage(n) mit >90% Richtig — erwäge schwierigere Alternativen oder höhere Gewichtung.`);
+      tips.push(t("cv.tipTooEasy", { n: tooEasy.length }));
     if (tooHard.length > 0)
-      tips.push(`${tooHard.length} Frage(n) mit ≤20% Richtig — ggf. Aufgabenstellung oder Distraktoren überarbeiten.`);
+      tips.push(t("cv.tipTooHard", { n: tooHard.length }));
     if (negDisc.length > 0)
-      tips.push(`${negDisc.length} Frage(n) mit negativer Trennschärfe — starke Lernende antworten hier häufiger falsch. Formulierung prüfen!`);
+      tips.push(t("cv.tipNegDisc", { n: negDisc.length }));
     if (lowDisc.length > 1)
-      tips.push(`${lowDisc.length} Fragen trennen kaum zwischen starken und schwachen Lernenden.`);
+      tips.push(t("cv.tipLowDisc", { n: lowDisc.length }));
 
-    if (avgPct > 85) tips.push("Durchschnitt >85% — der Test war insgesamt recht leicht.");
-    if (avgPct < 40) tips.push("Durchschnitt <40% — der Test war sehr schwer. Lernstand prüfen oder Aufgaben anpassen.");
+    if (avgPct > 85) tips.push(t("cv.tipEasyOverall"));
+    if (avgPct < 40) tips.push(t("cv.tipHardOverall"));
 
     if (sdPct < 10 && presentStudents.length >= 2)
-      tips.push(`Geringe Streuung (σ=${sdPct.toFixed(1)}%) — der Test differenziert wenig zwischen Leistungsniveaus. Mehr Aufgaben mit mittlerem Schwierigkeitsgrad einbauen.`);
+      tips.push(t("cv.tipLowSpread", { sd: sdPct.toFixed(1) }));
     else if (sdPct > 25 && presentStudents.length >= 2) {
       if (avgPct < 50)
-        tips.push(`Hohe Streuung (σ=${sdPct.toFixed(1)}%) bei niedrigem Durchschnitt — die Aufgaben sind vermutlich zu schwer. Schwierigkeitsgrad senken oder Thema erneut behandeln.`);
+        tips.push(t("cv.tipHighSpreadLow", { sd: sdPct.toFixed(1) }));
       else if (avgPct > 80)
-        tips.push(`Hohe Streuung (σ=${sdPct.toFixed(1)}%) bei hohem Durchschnitt — einzelne Lernende haben deutliche Lücken, während die Mehrheit den Stoff beherrscht. Gezielte Förderung erwägen.`);
+        tips.push(t("cv.tipHighSpreadHigh", { sd: sdPct.toFixed(1) }));
       else
-        tips.push(`Hohe Streuung (σ=${sdPct.toFixed(1)}%) — große Leistungsunterschiede. Binnendifferenzierung oder gestufte Aufgaben erwägen.`);
+        tips.push(t("cv.tipHighSpread", { sd: sdPct.toFixed(1) }));
     }
 
     // Decken- und Bodeneffekt
@@ -329,27 +342,27 @@ const gradeDistribution = (() => {
       const ceilingPct = Math.round((ceilingCount / presentStudents.length) * 100);
       const floorPct = Math.round((floorCount / presentStudents.length) * 100);
       if (ceilingPct >= 40)
-        tips.push(`Deckeneffekt: ${ceilingCount} von ${presentStudents.length} Lernenden (${ceilingPct}%) erreichen ≥95%. Der Test war zu leicht — Differenzierung nach oben nicht möglich. Schwierigere Aufgaben einbauen.`);
+        tips.push(t("cv.tipCeiling", { n: ceilingCount, total: presentStudents.length, pct: ceilingPct }));
       if (floorPct >= 40)
-        tips.push(`Bodeneffekt: ${floorCount} von ${presentStudents.length} Lernenden (${floorPct}%) erreichen ≤10%. Der Test war zu schwer — Differenzierung nach unten nicht möglich. Schwierigkeitsgrad senken oder Thema wiederholen.`);
+        tips.push(t("cv.tipFloor", { n: floorCount, total: presentStudents.length, pct: floorPct }));
     }
 
     const absentPct = students.length > 0 ? Math.round((absentStudents.length / students.length) * 100) : 0;
     if (absentPct > 30 && students.length >= 5)
-      tips.push(`${absentPct}% abwesend (${absentStudents.length}/${students.length}) — hohe Fehlquote, Nachholtermin einplanen.`);
+      tips.push(t("cv.tipAbsent", { pct: absentPct, n: absentStudents.length, total: students.length }));
 
     const onlyGuessing = questionStats.filter((s, i) => {
       if (!questions[i].correct_answer || s.answered < 3 || s.guessProb === null) return false;
       return Math.abs(s.pct / 100 - s.guessProb) < 0.1;
     });
     if (onlyGuessing.length > 0)
-      tips.push(`${onlyGuessing.length} Frage(n) nahe Ratewahrscheinlichkeit — Lernende scheinen zu raten. Thema wiederholen oder Distraktoren verbessern.`);
+      tips.push(t("cv.tipGuessing", { n: onlyGuessing.length }));
 
     const avgGrade = presentStudents.length > 0
       ? pcts.reduce((sum, p) => sum + gradeFromPct(p, gradeScale), 0) / presentStudents.length
       : 0;
     if (avgGrade >= 4.5 && avgPct >= 40)
-      tips.push(`Notenschnitt ${avgGrade.toFixed(1)} — ggf. Notenschlüssel anpassen.`);
+      tips.push(t("cv.tipGradeAvg", { avg: avgGrade.toFixed(1) }));
 
     return tips;
   })();
@@ -358,7 +371,7 @@ const gradeDistribution = (() => {
     if (d === null) return "–";
     const v = d.toFixed(2);
     const color = d >= 0.4 ? C.success : d >= 0.2 ? C.warning : C.danger;
-    const label = d >= 0.4 ? "gut" : d >= 0.2 ? "akzeptabel" : "schwach";
+    const label = d >= 0.4 ? t("cv.discGood") : d >= 0.2 ? t("cv.discOk") : t("cv.discWeak");
     return <span style={{ color }} title={label}>{v}</span>;
   };
 
@@ -372,8 +385,10 @@ const gradeDistribution = (() => {
 
     return (
       <div style={{ ...pageApp }}>
-        <button onClick={() => setSelectedQ(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 13, fontWeight: 500, padding: "4px 0", marginBottom: 16 }}>← Zurück zur Übersicht</button>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>Frage {qi + 1}</h2>
+        <button onClick={() => setSelectedQ(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 13, fontWeight: 500, padding: "4px 0", marginBottom: 16, display: "inline-flex", alignItems: "center", gap: 5 }}>
+          <Icon d={ICONS.arrowLeft} size={14} /> {t("cv.backOverview")}
+        </button>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>{t("cv.questionN", { n: qi + 1 })}</h2>
         <div style={{ fontSize: 18, color: "var(--text)", marginBottom: 20, padding: 16, background: "var(--bg2)", borderRadius: 12, lineHeight: 1.5 }}>
           <Latex>{q.text}</Latex>
         </div>
@@ -406,21 +421,21 @@ const gradeDistribution = (() => {
         </div>
 
         <div style={{ display: "flex", gap: 20, marginBottom: 20, flexWrap: "wrap" }}>
-          <StatBox label="Richtig" value={`${stat.pct}%`} color={stat.pct >= 80 ? C.success : stat.pct >= 50 ? C.warning : C.danger} />
-          <StatBox label="95%-KI" value={stat.ciLow !== null ? `${stat.ciLow}–${stat.ciHigh}%` : "–"} />
-          <StatBox label="Ratewahrsch." value={stat.guessProb !== null ? `${Math.round(stat.guessProb * 100)}%` : "–"} />
-          <StatBox label="Trennschärfe" value={stat.discrimination !== null ? stat.discrimination.toFixed(2) : "–"}
+          <StatBox label={t("cv.statCorrect")} value={`${stat.pct}%`} color={stat.pct >= 80 ? C.success : stat.pct >= 50 ? C.warning : C.danger} />
+          <StatBox label={t("cv.statCi")} value={stat.ciLow !== null ? `${stat.ciLow}–${stat.ciHigh}%` : "–"} />
+          <StatBox label={t("cv.statGuess")} value={stat.guessProb !== null ? `${Math.round(stat.guessProb * 100)}%` : "–"} />
+          <StatBox label={t("cv.statDisc")} value={stat.discrimination !== null ? stat.discrimination.toFixed(2) : "–"}
             color={stat.discrimination !== null ? (stat.discrimination >= 0.4 ? C.success : stat.discrimination >= 0.2 ? C.warning : C.danger) : undefined} />
-          <StatBox label="Std.abw." value={stat.itemSd !== null ? stat.itemSd.toFixed(2) : "–"} />
-          <StatBox label="Beantwortet" value={`${stat.answered} / ${presentStudents.length}`} />
-          <StatBox label="Gewichtung" value={`×${getWeight(q.id)}`} />
+          <StatBox label={t("cv.statSd")} value={stat.itemSd !== null ? stat.itemSd.toFixed(2) : "–"} />
+          <StatBox label={t("cv.statAnswered")} value={`${stat.answered} / ${presentStudents.length}`} />
+          <StatBox label={t("cv.statWeight")} value={`×${getWeight(q.id)}`} />
           {timesData[String(q.id)] != null && (() => {
-            const t = timesData[String(q.id)];
-            return <StatBox label="Zeit" value={`${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`} />;
+            const sek = timesData[String(q.id)];
+            return <StatBox label={t("cv.statTime")} value={`${Math.floor(sek / 60)}:${String(sek % 60).padStart(2, "0")}`} />;
           })()}
         </div>
 
-        <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>Antwortverteilung</h3>
+        <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>{t("cv.answerDistribution")}</h3>
         {allKeys.map((k) => {
           const count = stat.answerCounts[k] || 0;
           const pct = stat.answered > 0 ? (count / stat.answered) * 100 : 0;
@@ -450,61 +465,62 @@ const gradeDistribution = (() => {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <Link to="/cardvote/tests" style={{ color: "var(--text3)", textDecoration: "none", fontSize: 13, fontWeight: 500 }}>← Alle Tests</Link>
-        {notenDialog && (
-          <NotenImport
-            sessionId={Number(id)} classId={data.class_id} sessionName={data.session_name}
-            grades={presentStudents.map((st) => ({
-              card_id: st.card_id, name: st.name,
-              value: gradeMode === "tendency"
-                ? tendencyGrade(st.pct, gradeScale)
-                : Math.round(gradeFromPct(st.pct, gradeScale) * 10) / 10,
-            }))}
-            onClose={() => setNotenDialog(false)}
-          />
+      <Link to="/cardvote/tests" style={{ color: "var(--text3)", textDecoration: "none", fontSize: 13, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 5 }}>
+        <Icon d={ICONS.arrowLeft} size={14} /> {t("cv.backAllTests")}
+      </Link>
+      {notenDialog && (
+        <NotenImport
+          sessionId={Number(id)} classId={data.class_id} sessionName={data.session_name}
+          grades={presentStudents.map((st) => ({
+            card_id: st.card_id, name: st.name,
+            value: gradeMode === "tendency"
+              ? tendencyGrade(st.pct, gradeScale)
+              : Math.round(gradeFromPct(st.pct, gradeScale) * 10) / 10,
+          }))}
+          onClose={() => setNotenDialog(false)}
+        />
+      )}
+      <h2 style={{ marginTop: 8, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{session_name || t("cv.sessionFallback", { id })}</h2>
+
+      {/* Eine Werkzeugleiste wie ueberall: der eine Alltagsgriff (Note
+          uebernehmen) sichtbar, die drei Exporte im Menue. Vorher standen hier
+          fuenf Elemente nebeneinander. */}
+      <Werkzeugleiste
+        links={configDirty && <span style={{ fontSize: 11, color: saving ? C.warning : C.success }}>{saving ? t("cv.saving") : t("cv.saved")}</span>}
+        mehr={[
+          { key: "pdf", label: t("cv.exportPdf"), icon: ICONS.pdf, onClick: () => holen(`${API}/sessions/${id}/all-students-pdf`, `Auswertungen_${id}.pdf`) },
+          { key: "xlsx", label: t("cv.exportExcel"), icon: ICONS.download, onClick: () => holen(`${API}/sessions/${id}/evaluation-xlsx`, `Auswertung_${id}.xlsx`) },
+          { key: "csv", label: t("cv.exportIdoceo"), icon: ICONS.export, onClick: () => holen(`${API}/sessions/${id}/evaluation-scsv`, `CardVote_${id}.csv`) },
+        ]}
+      >
+        {/* Nur sichtbar, wenn das Notenmodul aktiv ist — sonst fuehrt der
+            Knopf ins Leere (Regel 3: CardVote haengt nicht von Noten ab). */}
+        {notenAktiv && data.class_id && (
+          <button onClick={() => setNotenDialog(true)} style={{ ...btnSecondary, height: CONTROL_H, padding: "0 14px", borderRadius: CONTROL_R, fontSize: 13, lineHeight: 1 }}>
+            {t("notenimp.button")}
+          </button>
         )}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {configDirty && <span style={{ fontSize: 11, color: saving ? C.warning : C.success }}>{saving ? "Speichern…" : "Gespeichert"}</span>}
-          {/* Nur sichtbar, wenn das Notenmodul aktiv ist — sonst fuehrt der
-              Knopf ins Leere (Regel 3: CardVote haengt nicht von Noten ab). */}
-          {notenAktiv && data.class_id && (
-            <button onClick={() => setNotenDialog(true)} style={{ ...btnSecondary, padding: "6px 14px", fontSize: 13 }}>
-              {t("notenimp.button")}
-            </button>
-          )}
-          <DownloadLink onClick={async () => { const r = await fetch(`${API}/sessions/${id}/all-students-pdf`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `Auswertungen_${id}.pdf`; a.click(); URL.revokeObjectURL(a.href); }}>
-            PDF
-          </DownloadLink>
-          <DownloadLink onClick={async () => { const r = await fetch(`${API}/sessions/${id}/evaluation-xlsx`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `Auswertung_${id}.xlsx`; a.click(); URL.revokeObjectURL(a.href); }}>
-            Excel
-          </DownloadLink>
-          <DownloadLink onClick={async () => { const r = await fetch(`${API}/sessions/${id}/evaluation-scsv`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `CardVote_${id}.csv`; a.click(); URL.revokeObjectURL(a.href); }}>
-            iDoceo
-          </DownloadLink>
-        </div>
-      </div>
-      <h2 style={{ marginTop: 8, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{session_name || `Session #${id}`}</h2>
+      </Werkzeugleiste>
 
       {(kartenAktiv || lernpfadAktiv) && data.class_id && <WeakTopics sessionId={Number(id)} classId={data.class_id} karten={kartenAktiv} lernpfad={lernpfadAktiv} t={t} />}
 
       {/* Statistik-Kacheln */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-        <Stat label="Anwesend" value={`${presentStudents.length} / ${students.length}`} />
+        <Stat label={t("cv.statPresent")} value={`${presentStudents.length} / ${students.length}`} />
         <Stat
-          label={avgMode === "pts" ? "Ø Punkte" : "Ø Prozent"}
+          label={avgMode === "pts" ? t("cv.statAvgPoints") : t("cv.statAvgPct")}
           value={avgMode === "pts" ? fmt(avgScore) : `${avgPct}%`}
           onClick={() => setAvgMode(avgMode === "pts" ? "pct" : "pts")}
           clickable
         />
         <Stat
-          label={medMode === "pts" ? "Median" : "Median %"}
+          label={medMode === "pts" ? t("cv.statMedian") : t("cv.statMedianPct")}
           value={medMode === "pts" ? fmt(medianScore) : `${medianPct}%`}
           onClick={() => setMedMode(medMode === "pts" ? "pct" : "pts")}
           clickable
         />
         <Stat
-          label={sdMode === "pts" ? "Std.abw." : "Std.abw. %"}
+          label={sdMode === "pts" ? t("cv.statSd") : t("cv.statSdPct")}
           value={sdMode === "pts" ? fmt(sd) : `${sdPct.toFixed(1)}%`}
           onClick={() => setSdMode(sdMode === "pts" ? "pct" : "pts")}
           clickable
@@ -512,13 +528,13 @@ const gradeDistribution = (() => {
         />
         {quizCi && (
           <Stat
-            label="95%-KI gesamt"
+            label={t("cv.statCiTotal")}
             value={`${quizCi.low}–${quizCi.high}%`}
             info={() => setShowCiTop(!showCiTop)}
           />
         )}
         {totalTime != null && (
-          <Stat label="Dauer" value={`${Math.floor(totalTime / 60)}:${String(totalTime % 60).padStart(2, "0")}`} />
+          <Stat label={t("cv.statDuration")} value={`${Math.floor(totalTime / 60)}:${String(totalTime % 60).padStart(2, "0")}`} />
         )}
       </div>
 
@@ -526,17 +542,14 @@ const gradeDistribution = (() => {
       {showSdInfo && (
         <div style={{ padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", fontSize: 13, color: "var(--text)", lineHeight: 1.6, marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <h4 style={{ fontSize: 15, fontWeight: 700 }}>Standardabweichung (σ)</h4>
-            <button onClick={() => setShowSdInfo(false)} style={{ width: 24, height: 24, borderRadius: 12, border: "none", background: "var(--bg2)", color: "var(--text3)", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+            <h4 style={{ fontSize: 15, fontWeight: 700 }}>{t("cv.sdTitle")}</h4>
+            <SchliessenBtn onClick={() => setShowSdInfo(false)} t={t} />
           </div>
-          <p style={{ marginBottom: 10 }}>
-            Misst, wie stark die Ergebnisse um den Durchschnitt streuen. Eine <strong>kleine</strong> σ bedeutet, dass alle ähnlich abgeschnitten haben.
-            Eine <strong>große</strong> σ zeigt große Leistungsunterschiede.
-          </p>
+          <p style={{ marginBottom: 10 }}>{t("cv.sdText")}</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.success, minWidth: 64 }}>σ &lt; 10%</span><span>Homogene Gruppe — wenig Differenzierung.</span></div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.warning, minWidth: 64 }}>10–25%</span><span>Normale Streuung — gute Differenzierung.</span></div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.danger, minWidth: 64 }}>σ &gt; 25%</span><span>Heterogen — ggf. Binnendifferenzierung prüfen.</span></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.success, minWidth: 64 }}>σ &lt; 10%</span><span>{t("cv.sdLow")}</span></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.warning, minWidth: 64 }}>10–25%</span><span>{t("cv.sdMid")}</span></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.danger, minWidth: 64 }}>σ &gt; 25%</span><span>{t("cv.sdHigh")}</span></div>
           </div>
         </div>
       )}
@@ -546,44 +559,13 @@ const gradeDistribution = (() => {
 
       {/* Notenverteilung / Boxplot toggle */}
       <div style={{ padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-          <button
-            onClick={() => setGradeView("bar")}
-            style={{
-              fontSize: 13, fontWeight: 600, padding: "5px 12px", borderRadius: 980, border: "none", cursor: "pointer",
-              background: gradeView === "bar" ? "var(--accent)" : "var(--bg2)",
-              color: gradeView === "bar" ? "#fff" : "var(--text3)",
-              transition: "all 0.2s",
-            }}
-          >Notenverteilung</button>
-          <button
-            onClick={() => setGradeView("box")}
-            style={{
-              fontSize: 13, fontWeight: 600, padding: "5px 12px", borderRadius: 980, border: "none", cursor: "pointer",
-              background: gradeView === "box" ? "var(--accent)" : "var(--bg2)",
-              color: gradeView === "box" ? "#fff" : "var(--text3)",
-              transition: "all 0.2s",
-            }}
-          >Boxplot</button>
+        {/* Reiter aus dem Kern (Tabs) statt vier nachgebauter Pillen. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+          <Tabs value={gradeView} onChange={setGradeView}
+            options={[["bar", t("cv.gradeDistribution")], ["box", t("cv.boxplot")]]} />
           {gradeView === "bar" && (
-            <div style={{ display: "flex", gap: 2, background: "var(--bg2)", borderRadius: 980, padding: 3, marginLeft: "auto" }}>
-              <button
-                onClick={() => setGradeMode("whole")}
-                style={{
-                  fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 980, border: "none", cursor: "pointer",
-                  background: gradeMode === "whole" ? "var(--card)" : "transparent",
-                  color: gradeMode === "whole" ? "var(--text)" : "var(--text3)",
-                }}
-              >Ganze Noten</button>
-              <button
-                onClick={() => setGradeMode("tendency")}
-                style={{
-                  fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 980, border: "none", cursor: "pointer",
-                  background: gradeMode === "tendency" ? "var(--card)" : "transparent",
-                  color: gradeMode === "tendency" ? "var(--text)" : "var(--text3)",
-                }}
-              >Mit Teilnoten</button>
-            </div>
+            <Tabs value={gradeMode} onChange={setGradeMode} style={{ marginLeft: "auto" }}
+              options={[["whole", t("cv.wholeGrades")], ["tendency", t("cv.tendencyGrades")]]} />
           )}
         </div>
         {gradeView === "bar" ? (
@@ -609,40 +591,37 @@ const gradeDistribution = (() => {
             // Bei E/G ist die erreichbare Punktzahl je Kind verschieden — dann
             // ist Prozent die einzige gemeinsame Achse.
             ? (niveauAktiv ? <Boxplot values={pcts} max={100} /> : <Boxplot values={scores} max={maxScore} />)
-            : <p style={{ fontSize: 13, color: "var(--text3)" }}>Mindestens 3 Ergebnisse nötig.</p>
+            : <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("cv.needThree")}</p>
         )}
       </div>
 
       {/* Notenschlüssel + Gewichtung */}
       <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+        {/* Hoehe/Form aus dem Kern (CONTROL_H/CONTROL_R). */}
         <button onClick={() => { setShowScale(!showScale); setShowWeights(false); }}
-          style={{
-            fontSize: 13, fontWeight: 500, padding: "5px 12px", borderRadius: 980, cursor: "pointer",
-            border: "1px solid var(--border2)", background: showScale ? "var(--accent)" : "var(--card)",
-            color: showScale ? "#fff" : "var(--text2)", transition: "all 0.15s",
-          }}>
-          Notenschlüssel
+          style={{ ...btnSecondary, height: CONTROL_H, padding: "0 14px", borderRadius: CONTROL_R, fontSize: 13, fontWeight: 500, lineHeight: 1,
+            background: showScale ? "var(--accent)" : "var(--card)", color: showScale ? "#fff" : "var(--text2)",
+            borderColor: showScale ? "var(--accent)" : "var(--border2)" }}>
+          {t("cv.gradeScale")}
         </button>
         <button onClick={() => { setShowWeights(!showWeights); setShowScale(false); }}
-          style={{
-            fontSize: 13, fontWeight: 500, padding: "5px 12px", borderRadius: 980, cursor: "pointer",
-            border: "1px solid var(--border2)", background: showWeights ? "var(--accent)" : "var(--card)",
-            color: showWeights ? "#fff" : "var(--text2)", transition: "all 0.15s",
-          }}>
-          Gewichtung
+          style={{ ...btnSecondary, height: CONTROL_H, padding: "0 14px", borderRadius: CONTROL_R, fontSize: 13, fontWeight: 500, lineHeight: 1,
+            background: showWeights ? "var(--accent)" : "var(--card)", color: showWeights ? "#fff" : "var(--text2)",
+            borderColor: showWeights ? "var(--accent)" : "var(--border2)" }}>
+          {t("cv.weights")}
         </button>
       </div>
 
       {showScale && (
         <div style={{ padding: 16, background: "var(--card)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 12 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>Notenschlüssel</h3>
-          <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>Mindestprozent für jede Note. Wird pro Test gespeichert.</p>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>{t("cv.gradeScale")}</h3>
+          <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>{t("cv.gradeScaleHint")}</p>
           <style>{NUM_CSS}</style>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(136px, 1fr))", gap: 8 }}>
             {[1, 2, 3, 4, 5].map((g) => (
               <div key={g} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", borderRadius: 10, background: "var(--bg3)" }}>
                 <span style={gradeBadge}>{g}</span>
-                <span style={{ fontSize: 11, color: "var(--text3)" }}>ab</span>
+                <span style={{ fontSize: 11, color: "var(--text3)" }}>{t("cv.from")}</span>
                 <input className="nice-num" type="number" min="0" max="100" step="1"
                   value={Number(gradeScale[g])} onChange={(e) => updateScale(g, e.target.value)} style={numInput} />
                 <span style={{ fontSize: 11, color: "var(--text3)" }}>%</span>
@@ -650,7 +629,7 @@ const gradeDistribution = (() => {
             ))}
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", border: "1px dashed var(--border2)", borderRadius: 10 }}>
               <span style={gradeBadge}>6</span>
-              <span style={{ fontSize: 12, color: "var(--text3)" }}>unter {gradeScale[5]}%</span>
+              <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("cv.below", { pct: gradeScale[5] })}</span>
             </div>
           </div>
         </div>
@@ -658,8 +637,8 @@ const gradeDistribution = (() => {
 
       {showWeights && (
         <div style={{ padding: 16, background: "var(--card)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 12 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>Gewichtung</h3>
-          <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>Punkte pro richtige Antwort. Standard = 1.</p>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>{t("cv.weights")}</h3>
+          <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>{t("cv.weightsHint")}</p>
           <style>{NUM_CSS}</style>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 8 }}>
             {questions.map((q, i) => (
@@ -677,8 +656,8 @@ const gradeDistribution = (() => {
       {suggestions.length > 0 && (
         <div style={{ padding: 16, background: "var(--warn-bg)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text2)", flexShrink: 0 }}><path d="M9 18h6M10 22h4M12 2a7 7 0 0 1 4 12.7V17a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1v-2.3A7 7 0 0 1 12 2z"/></svg>
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>Vorschläge</h3>
+            <Icon d={ICONS.bulb} size={18} color="var(--text2)" />
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{t("cv.suggestions")}</h3>
           </div>
           {suggestions.map((tip, i) => (
             <div key={i} style={{ fontSize: 13, color: "var(--text)", marginBottom: 6, lineHeight: 1.5, paddingLeft: 12, borderLeft: "2px solid #e5c07b" }}>
@@ -695,17 +674,8 @@ const gradeDistribution = (() => {
       {niveauAktiv && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
           <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("eval.niveauFilter")}</span>
-          {[["", t("eval.niveauAll")], ["E", "E"], ["G", "G"]].map(([wert, label]) => (
-            <button key={wert || "alle"} onClick={() => setNiveauFilter(wert)}
-              style={{
-                padding: "4px 12px", borderRadius: 980, fontSize: 12.5, cursor: "pointer",
-                border: niveauFilter === wert ? "1px solid var(--accent)" : "1px solid var(--border2)",
-                background: niveauFilter === wert ? "var(--accent-bg)" : "var(--bg)",
-                color: niveauFilter === wert ? "var(--accent)" : "var(--text2)",
-              }}>
-              {label}
-            </button>
-          ))}
+          <Tabs value={niveauFilter} onChange={setNiveauFilter}
+            options={[["", t("eval.niveauAll")], ["E", "E"], ["G", "G"]]} />
         </div>
       )}
 
@@ -713,21 +683,21 @@ const gradeDistribution = (() => {
         <table style={{ borderCollapse: "collapse", fontSize: 14, whiteSpace: "nowrap" }}>
           <thead>
             <tr>
-              <th style={th}>Name</th>
+              <th style={th}>{t("cv.thName")}</th>
               {questions.map((q, i) => (
                 <th key={q.id}
                   onClick={() => setSelectedQ(i)}
                   style={{ ...th, writingMode: "vertical-lr", textAlign: "left", maxWidth: 30, height: 120, fontSize: 12, padding: "4px 2px", cursor: "pointer", color: "var(--accent)" }}
-                  title={`${q.text} — Klicken für Details`}>
+                  title={t("cv.questionDetailHint", { text: q.text })}>
                   F{i + 1}{getWeight(q.id) !== 1 ? ` (×${getWeight(q.id)})` : ""}{niveauAktiv && (q.niveau || "") === "E" ? " · E" : ""}
                 </th>
               ))}
-              <th style={{ ...th, background: "var(--bg2)" }}>Punkte</th>
+              <th style={{ ...th, background: "var(--bg2)" }}>{t("cv.thPoints")}</th>
               <th style={{ ...th, background: "var(--bg2)" }}>%</th>
-              <th style={{ ...th, background: "var(--bg2)" }}>Note</th>
+              <th style={{ ...th, background: "var(--bg2)" }}>{t("cv.thGrade")}</th>
             </tr>
             <tr style={{ background: "var(--bg2)" }}>
-              <td style={{ ...td, fontWeight: "bold", color: "var(--text3)", fontSize: 12 }}>Lösung</td>
+              <td style={{ ...td, fontWeight: "bold", color: "var(--text3)", fontSize: 12 }}>{t("cv.thSolution")}</td>
               {questions.map((q) => (
                 <td key={q.id} style={{ ...td, textAlign: "center", fontWeight: "bold", color: "var(--text)" }}>
                   {q.correct_answer || "–"}
@@ -751,7 +721,7 @@ const gradeDistribution = (() => {
                       href="#"
                       onClick={async (e) => { e.preventDefault(); const r = await fetch(`${API}/sessions/${id}/student-pdf/${student.card_id}`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${student.name}_${id}.pdf`; a.click(); URL.revokeObjectURL(a.href); }}
                       style={{ color: "var(--text)", textDecoration: "none" }}
-                      title="PDF herunterladen"
+                      title={t("cv.downloadPdf")}
                     >
                       {student.name}{" "}
                       <Icon d={ICONS.download} size={15} color="var(--text3)" />
@@ -819,7 +789,7 @@ const gradeDistribution = (() => {
             {absentStudents.length > 0 && (
               <tr>
                 <td colSpan={questions.length + 4} style={{ ...td, paddingTop: 12, borderBottom: "none" }}>
-                  <span style={{ color: "var(--text3)", fontSize: 12, fontStyle: "italic" }}>Abwesend:</span>
+                  <span style={{ color: "var(--text3)", fontSize: 12, fontStyle: "italic" }}>{t("cv.absentLabel")}</span>
                 </td>
               </tr>
             )}
@@ -844,7 +814,7 @@ const gradeDistribution = (() => {
           </tbody>
           <tfoot>
             <tr style={{ borderTop: "2px solid var(--border3)" }}>
-              <td style={{ ...td, fontWeight: "bold", color: "var(--text3)", fontSize: 12 }}>Richtig</td>
+              <td style={{ ...td, fontWeight: "bold", color: "var(--text3)", fontSize: 12 }}>{t("cv.statCorrect")}</td>
               {questionStats.map((stat, i) => (
                 <td key={i} style={{ ...td, textAlign: "center", fontSize: 12, fontWeight: "bold", color: stat.pct >= 80 ? C.success : stat.pct >= 50 ? C.warning : C.danger }}>
                   {stat.answered > 0 ? `${stat.pct}%` : "–"}
@@ -857,7 +827,7 @@ const gradeDistribution = (() => {
             <tr>
               <td style={{ ...td, fontWeight: "bold", color: "var(--text3)", fontSize: 12 }}>
                 <span style={{ cursor: "pointer" }} onClick={() => setShowCiInfo(!showCiInfo)}>
-                  95%-KI <span style={{ color: "var(--accent)", fontSize: 11 }}>ⓘ</span>
+                  {t("cv.statCi")} <Icon d={ICONS.info} size={12} color="var(--accent)" />
                 </span>
               </td>
               {questionStats.map((stat, i) => (
@@ -872,7 +842,7 @@ const gradeDistribution = (() => {
             <tr>
               <td style={{ ...td, fontWeight: "bold", color: "var(--text3)", fontSize: 12 }}>
                 <span style={{ cursor: "pointer" }} onClick={() => setShowRateInfo(!showRateInfo)}>
-                  Ratewahrsch. <span style={{ color: "var(--accent)", fontSize: 11 }}>ⓘ</span>
+                  {t("cv.statGuess")} <Icon d={ICONS.info} size={12} color="var(--accent)" />
                 </span>
               </td>
               {questionStats.map((stat, i) => (
@@ -887,7 +857,7 @@ const gradeDistribution = (() => {
             <tr>
               <td style={{ ...td, fontWeight: "bold", color: "var(--text3)", fontSize: 12 }}>
                 <span style={{ cursor: "pointer" }} onClick={() => setShowDiscInfo(!showDiscInfo)}>
-                  Trennschärfe <span style={{ color: "var(--accent)", fontSize: 11 }}>ⓘ</span>
+                  {t("cv.statDisc")} <Icon d={ICONS.info} size={12} color="var(--accent)" />
                 </span>
               </td>
               {questionStats.map((stat, i) => (
@@ -908,39 +878,35 @@ const gradeDistribution = (() => {
       {showRateInfo && (
         <div style={{ marginTop: 12, padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <h4 style={{ fontSize: 15, fontWeight: 700 }}>Was ist die Ratewahrscheinlichkeit?</h4>
-            <button onClick={() => setShowRateInfo(false)} style={{ width: 24, height: 24, borderRadius: 12, border: "none", background: "var(--bg2)", color: "var(--text3)", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+            <h4 style={{ fontSize: 15, fontWeight: 700 }}>{t("cv.rateTitle")}</h4>
+            <SchliessenBtn onClick={() => setShowRateInfo(false)} t={t} />
           </div>
-          <p style={{ marginBottom: 10 }}>
-            Die Wahrscheinlichkeit, die richtige Antwort <strong>zufällig</strong> zu erraten — also ohne Wissen, nur durch Raten.
-          </p>
+          <p style={{ marginBottom: 10 }}>{t("cv.rateText")}</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, minWidth: 90 }}>2 Antworten</span><span>50%</span></div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, minWidth: 90 }}>3 Antworten</span><span>33%</span></div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, minWidth: 90 }}>4 Antworten</span><span>25%</span></div>
+            {[[2, "50%"], [3, "33%"], [4, "25%"]].map(([n, pct]) => (
+              <div key={n} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontWeight: 700, minWidth: 90 }}>{t("cv.nAnswers", { n })}</span><span>{pct}</span>
+              </div>
+            ))}
           </div>
-          <p style={{ fontSize: 12, color: "var(--text3)", padding: "8px 12px", background: "var(--bg2)", borderRadius: 8 }}>
-            Liegt die Richtig-Quote nahe der Ratewahrscheinlichkeit, deutet das auf Raten hin. Ein deutlich höherer Wert zeigt echtes Wissen.
-          </p>
+          <p style={{ fontSize: 12, color: "var(--text3)", padding: "8px 12px", background: "var(--bg2)", borderRadius: 8 }}>{t("cv.rateHint")}</p>
         </div>
       )}
 
       {showDiscInfo && (
         <div style={{ marginTop: 12, padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <h4 style={{ fontSize: 15, fontWeight: 700 }}>Was ist Trennschärfe?</h4>
-            <button onClick={() => setShowDiscInfo(false)} style={{ width: 24, height: 24, borderRadius: 12, border: "none", background: "var(--bg2)", color: "var(--text3)", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+            <h4 style={{ fontSize: 15, fontWeight: 700 }}>{t("cv.discTitle")}</h4>
+            <SchliessenBtn onClick={() => setShowDiscInfo(false)} t={t} />
           </div>
-          <p style={{ marginBottom: 10 }}>
-            Die Trennschärfe (punkt-biseriale Korrelation) misst, wie gut eine einzelne Frage zwischen leistungsstarken und leistungsschwachen Lernenden unterscheidet. <strong>Wertebereich:</strong> −1 bis +1
-          </p>
+          <p style={{ marginBottom: 10 }}>{t("cv.discText")}</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.success, minWidth: 72 }}>≥ 0.40</span><span>Gut — die Frage trennt zuverlässig.</span></div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.warning, minWidth: 72 }}>0.20–0.39</span><span>Akzeptabel — brauchbar, aber verbesserungsfähig.</span></div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.danger, minWidth: 72 }}>&lt; 0.20</span><span>Schwach — überarbeiten oder entfernen.</span></div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.danger, minWidth: 72 }}>Negativ</span><span>Starke Lernende antworten häufiger falsch!</span></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.success, minWidth: 72 }}>≥ 0.40</span><span>{t("cv.discRowGood")}</span></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.warning, minWidth: 72 }}>0.20–0.39</span><span>{t("cv.discRowOk")}</span></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.danger, minWidth: 72 }}>&lt; 0.20</span><span>{t("cv.discRowWeak")}</span></div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.danger, minWidth: 72 }}>{t("cv.discRowNegLabel")}</span><span>{t("cv.discRowNeg")}</span></div>
           </div>
-          <p style={{ fontSize: 12, color: "var(--text3)", padding: "8px 12px", background: "var(--bg2)", borderRadius: 8 }}>Mindestens 3 beantwortete Bögen erforderlich.</p>
+          <p style={{ fontSize: 12, color: "var(--text3)", padding: "8px 12px", background: "var(--bg2)", borderRadius: 8 }}>{t("cv.discMin")}</p>
         </div>
       )}
     </div>
@@ -950,27 +916,16 @@ const gradeDistribution = (() => {
 // KI-Erklaerung — an zwei Stellen genutzt (obere Kachel und Fragetabelle),
 // deshalb als Komponente statt doppeltem Markup.
 function CiInfoBox({ onClose }) {
+  const { t } = useLanguage();
   return (
     <div style={{ marginTop: 12, padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <h4 style={{ fontSize: 15, fontWeight: 700 }}>Was ist das 95%-Konfidenzintervall (KI)?</h4>
-        <button onClick={onClose} style={{ width: 24, height: 24, borderRadius: 12, border: "none", background: "var(--bg2)", color: "var(--text3)", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+        <h4 style={{ fontSize: 15, fontWeight: 700 }}>{t("cv.ciTitle")}</h4>
+        <SchliessenBtn onClick={onClose} t={t} />
       </div>
-      <p style={{ marginBottom: 10 }}>
-        Der Prozentwert „Richtig“ ist nur eine Stichprobe dieser einen Abfrage. Das Konfidenzintervall
-        zeigt, in welchem Bereich der <strong>wahre</strong> Anteil richtiger Antworten mit 95% Wahrscheinlichkeit
-        liegt, wenn man die Abfrage beliebig oft wiederholen könnte.
-      </p>
-      <p style={{ marginBottom: 0 }}>
-        Je <strong>weniger</strong> Antworten vorliegen, desto <strong>breiter</strong> das Intervall — bei kleinen
-        Klassen also Vorsicht bei der Interpretation einzelner Fragen. Ein enges Intervall bedeutet ein belastbares Ergebnis.
-      </p>
-      <p style={{ marginTop: 10, marginBottom: 0 }}>
-        <strong>„95%-KI gesamt“</strong> oben fasst alle Antworten dieses Tests zusammen (alle Fragen gepoolt)
-        und zeigt, wie belastbar das Gesamtergebnis des Quiz ist. Das KI <strong>pro Frage</strong> in der Tabelle
-        unten basiert nur auf den Antworten zu dieser einen Frage in diesem Test — die frageübergreifende
-        Statistik (alle jemals gegebenen Antworten) findest du beim Bearbeiten der Frage im Fragen-Bereich.
-      </p>
+      <p style={{ marginBottom: 10 }}>{t("cv.ciText1")}</p>
+      <p style={{ marginBottom: 0 }}>{t("cv.ciText2")}</p>
+      <p style={{ marginTop: 10, marginBottom: 0 }}>{t("cv.ciText3")}</p>
     </div>
   );
 }

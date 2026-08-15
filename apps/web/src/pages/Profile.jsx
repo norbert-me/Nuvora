@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { istAdmin } from "../core/admin.js";
 import { useLanguage, LANGUAGES } from "../i18n/index.jsx";
-import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, th as thBasis, td as tdBasis, badge } from "../components/Icons.jsx";
+import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, th as thBasis, td as tdBasis, badge, inputStyle as inputBasis, Icon, ICONS } from "../components/Icons.jsx";
 
 const API = "/api";
 
@@ -183,8 +183,8 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
           <button type="button" onClick={() => { setShowEmailForm(true); setEmailMsg(""); }} style={{ ...linkBtn, marginBottom: 16 }}>{t("profile.changeEmail")}</button>
         ) : (
           <form onSubmit={changeEmail} style={{ marginBottom: 16 }}>
-            <input type="email" placeholder={t("profile.newEmail")} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} style={inputStyle} required />
-            <input type="password" placeholder={t("profile.currentPw")} value={emailPw} onChange={(e) => setEmailPw(e.target.value)} style={inputStyle} required />
+            <input type="email" placeholder={t("profile.newEmail")} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} style={feldStyle} required />
+            <input type="password" placeholder={t("profile.currentPw")} value={emailPw} onChange={(e) => setEmailPw(e.target.value)} style={feldStyle} required />
             <p style={{ fontSize: 12, color: "var(--text3)", margin: "0 0 10px" }}>
               {t("profile.emailInfo")}
             </p>
@@ -204,7 +204,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
           </button>
           {showUsername && (
             <input placeholder={t("profile.usernamePlaceholder")} value={marketplaceName} onChange={(e) => setMarketplaceName(e.target.value)}
-              style={{ ...inputStyle, marginBottom: 10 }} />
+              style={{ ...feldStyle, marginBottom: 10 }} />
           )}
 
           <button type="button" onClick={() => setShowScale((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: 20, marginBottom: showScale ? 10 : 0 }}>
@@ -263,9 +263,9 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         <form onSubmit={changePw} autoComplete="on">
           <input type="hidden" name="username" autoComplete="username" value={user?.email || ""} />
           <input type="password" name="current-password" autoComplete="current-password" placeholder={t("profile.oldPw")} value={oldPw} onChange={(e) => setOldPw(e.target.value)}
-            style={inputStyle} required />
+            style={feldStyle} required />
           <input type="password" name="new-password" autoComplete="new-password" placeholder={t("profile.newPw")} value={newPw} onChange={(e) => setNewPw(e.target.value)}
-            style={inputStyle} required />
+            style={feldStyle} required />
           {msg && <div style={{ fontSize: 13, color: msg === t("profile.pwChanged") ? C.success : C.danger, marginBottom: 8 }}>{msg}</div>}
           <button type="submit" style={btnPrimary}>{t("profile.change")}</button>
         </form>
@@ -307,7 +307,9 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
               ))}
               {!setup.smtp && <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>{t("profile.setupSmtpHint")}</p>}
               {setup.smtp && !setup.contact_deliverable && <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>{t("profile.setupContactHint")}</p>}
-              {setup.contact_fallback && <p style={{ fontSize: 12, color: C.warning, marginTop: 8 }}>⚠️ {t("profile.setupContactFallback")}</p>}
+              {setup.contact_fallback && <p style={{ fontSize: 12, color: C.warning, marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                {/* TODO: eigenes `warn`-Icon in ICONS; bis dahin `info`. */}
+                <Icon d={ICONS.info} size={13} color={C.warning} />{t("profile.setupContactFallback")}</p>}
               {setup.contact_to && <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>{t("profile.setupContactTo", { to: setup.contact_to })}</p>}
             </div>
           )}
@@ -466,10 +468,13 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   );
 }
 
-const inputStyle = {
-  display: "block", width: "100%", padding: "10px 14px", marginBottom: 10,
-  border: "1px solid var(--border2)", borderRadius: 10, fontSize: 14, boxSizing: "border-box",
-  maxWidth: 340,
+// Abgeleitet, nicht neu gebaut: hiess frueher `inputStyle` und ueberschattete
+// damit den gleichnamigen Stil aus Icons.jsx — beim Lesen war nicht zu sehen,
+// welcher gilt. Formularseiten duerfen abweichen (volle Breite, Abstand nach
+// unten), aber die Grundform kommt aus der einen Quelle.
+const feldStyle = {
+  ...inputBasis,
+  display: "block", width: "100%", marginBottom: 10, maxWidth: 340,
 };
 
 

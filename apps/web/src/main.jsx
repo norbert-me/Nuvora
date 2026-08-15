@@ -715,14 +715,9 @@ function Nav({ user, onLogout }) {
           })}
         </div>
 
-        {user && (
-          <button onClick={() => setSucheOffen(true)} data-suche="knopf" title={`${t("suche.title")} (⌘K)`} aria-label={t("suche.title")}
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", marginRight: 2, border: "1px solid var(--border2)", borderRadius: 980,
-              background: "transparent", color: "var(--text3)", cursor: "pointer", fontSize: 13, flexShrink: 0 }}>
-            <Icon d={ICONS.search} size={15} color="var(--text3)" />
-            <span className="nav-suche-text">{t("suche.short")}</span>
-          </button>
-        )}
+        {/* Kein Suchknopf in der Leiste: sie soll den aktuellen Bereich zeigen,
+            nicht mit Werkzeugen zustellen. Die Suche liegt auf der Startseite
+            und ueberall auf ⌘K / Strg+K. */}
         <DarkModeToggle />
         <NavLink to={user ? "/profile" : "/login"} data-tour="profile" onClick={() => { setMenuOpen(false); if (!user) window.dispatchEvent(new Event("cardvote:reset-login-mode")); }} style={{
           padding: 6,

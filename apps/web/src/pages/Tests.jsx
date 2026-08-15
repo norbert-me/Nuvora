@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { askConfirm } from "../core/dialog.jsx";
 import { Link } from "react-router-dom";
-import { Icon, ICONS, iconBtn, COLORS as C, pageApp} from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, btnSecondary, CONTROL_H, CONTROL_R, COLORS as C, pageApp } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api";
@@ -77,11 +77,14 @@ export default function Tests() {
         <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px" }}>{t("tests.quizzes")}</div>
         <button
           onClick={() => setShowArchived(!showArchived)}
+          // Eine Hoehe, eine Form: CONTROL_H/CONTROL_R aus Icons.jsx statt
+          // eigener Polsterung — sonst steht der Knopf neben jeder anderen
+          // Leiste der App schief.
           style={{
-            padding: "6px 14px", fontSize: 13, fontWeight: 500, cursor: "pointer",
-            background: showArchived ? "var(--text)" : "var(--bg2)",
+            ...btnSecondary, height: CONTROL_H, padding: "0 14px", borderRadius: CONTROL_R,
+            fontSize: 13, fontWeight: 500, lineHeight: 1,
+            background: showArchived ? "var(--text)" : "var(--card)",
             color: showArchived ? "var(--bg)" : "var(--text2)",
-            border: "none", borderRadius: 980, transition: "all 0.15s",
           }}
         >
           {showArchived ? t("tests.showActive") : t("tests.archive")}

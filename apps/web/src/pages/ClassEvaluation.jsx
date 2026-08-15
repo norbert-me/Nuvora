@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { LoadError, COLORS as C, Boxplot, pageApp, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { LoadError, COLORS as C, Boxplot, pageApp, th as thBasis, td as tdBasis, Icon, ICONS, btnSecondary, CONTROL_H, CONTROL_R, StatCard } from "../components/Icons.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
+import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api";
 
@@ -9,6 +10,7 @@ function fmt(n) { return n % 1 === 0 ? String(n) : n.toFixed(1); }
 // Boxplot zentral aus Icons.jsx (eine Quelle, mit Markierungen + Ausreißern).
 
 export default function ClassEvaluation() {
+  const { t } = useLanguage();
   const { id } = useParams();
   // ?fw=<card_id> kommt von der Startseite: dort steht der Name, hier die
   // Begruendung im Zusammenhang der Klasse.
@@ -26,20 +28,20 @@ export default function ClassEvaluation() {
   };
   useEffect(() => { load(); }, [id]); // eslint-disable-line
 
-  if (loadError && !data) return <div style={{ padding: 20 }}><LoadError message="Auswertung konnte nicht geladen werden." onRetry={load} /></div>;
+  if (loadError && !data) return <div style={{ padding: 20 }}><LoadError message={t("cv.loadFailed")} onRetry={load} /></div>;
   if (!data) return <div style={{ minHeight: "70vh" }} />;
   // Fehler-Payload (z. B. {detail: …}) statt Auswertung: nicht am fehlenden
   // Feld abstürzen, sondern melden.
-  if (!Array.isArray(data.tests)) return <div style={{ padding: 20 }}><LoadError message="Auswertung konnte nicht geladen werden." onRetry={load} /></div>;
+  if (!Array.isArray(data.tests)) return <div style={{ padding: 20 }}><LoadError message={t("cv.loadFailed")} onRetry={load} /></div>;
 
   const { class_name, students, tests } = data;
 
   if (tests.length === 0) {
     return (
       <div style={{ ...pageApp }}>
-        <Link to="/cardvote/tests" style={backLink}>← Alle Tests</Link>
-        <h2 style={{ marginTop: 12, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>Klasse {class_name}</h2>
-        <p style={{ color: "var(--text3)" }}>Noch keine Tests für diese Klasse.</p>
+        <Link to="/cardvote/tests" style={backLink}><Icon d={ICONS.arrowLeft} size={14} /> {t("cv.backAllTests")}</Link>
+        <h2 style={{ marginTop: 12, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{t("cv.classPrefix")} {class_name}</h2>
+        <p style={{ color: "var(--text3)" }}>{t("cv.noTestsForClass")}</p>
       </div>
     );
   }
@@ -105,9 +107,9 @@ export default function ClassEvaluation() {
 
   return (
     <div>
-      <Link to="/cardvote/tests" style={backLink}>← Alle Tests</Link>
+      <Link to="/cardvote/tests" style={backLink}><Icon d={ICONS.arrowLeft} size={14} /> {t("cv.backAllTests")}</Link>
       <h2 style={{ marginTop: 12, marginBottom: 20, fontSize: 24, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.3px" }}>
-        {class_name} <span style={{ fontWeight: 400, color: "var(--text3)", fontSize: 18 }}>— Gesamtauswertung</span>
+        {class_name} <span style={{ fontWeight: 400, color: "var(--text3)", fontSize: 18 }}>— {t("cv.overallEval")}</span>
       </h2>
 
       {/* Frühwarnung: wer hängt über mehrere Tests hinweg hinterher? Steht VOR
@@ -117,27 +119,31 @@ export default function ClassEvaluation() {
 
       {/* Stat tiles */}
       <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
-        <Stat label="Tests" value={tests.length} />
-        <Stat label="Ø Gesamt" value={`${classAvgPct}%`} />
-        {med != null && <Stat label="Median" value={`${med}%`} />}
-        {best != null && <Stat label="Beste/r" value={`${best}%`} />}
-        {worst != null && <Stat label="Schwächste/r" value={`${worst}%`} />}
-        {sd > 0 && <Stat label="Std.abw." value={`${sd.toFixed(1)}%`} />}
+        <StatCard label={t("cv.statTests")} value={tests.length} />
+        <StatCard label={t("cv.statAvgTotal")} value={`${classAvgPct}%`} />
+        {med != null && <StatCard label={t("cv.statMedian")} value={`${med}%`} />}
+        {best != null && <StatCard label={t("cv.statBest")} value={`${best}%`} />}
+        {worst != null && <StatCard label={t("cv.statWorst")} value={`${worst}%`} />}
+        {sd > 0 && <StatCard label={t("cv.statSd")} value={`${sd.toFixed(1)}%`} />}
       </div>
 
       {/* Boxplot toggle */}
       {pctValues.length >= 3 && (
         <div style={{ padding: 0, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 16, overflow: "hidden" }}>
           <div style={{ display: "flex", gap: 8, padding: "12px 16px 0" }}>
+            {/* Hoehe/Form aus dem Kern (CONTROL_H/CONTROL_R) statt eigener
+                Polsterung — sonst steht der Knopf neben jeder anderen Leiste
+                der App schief. */}
             <button
               onClick={() => setChartView(chartView === "box" ? "none" : "box")}
               style={{
-                fontSize: 13, fontWeight: 600, padding: "5px 12px", borderRadius: 980, border: "none", cursor: "pointer",
-                background: chartView === "box" ? "var(--accent)" : "var(--bg2)",
-                color: chartView === "box" ? "#fff" : "var(--text3)",
-                transition: "all 0.2s",
+                ...btnSecondary, height: CONTROL_H, padding: "0 14px", borderRadius: CONTROL_R,
+                fontSize: 13, fontWeight: 600, lineHeight: 1,
+                background: chartView === "box" ? "var(--accent)" : "var(--card)",
+                color: chartView === "box" ? "#fff" : "var(--text2)",
+                borderColor: chartView === "box" ? "var(--accent)" : "var(--border2)",
               }}
-            >Boxplot</button>
+            >{t("cv.boxplot")}</button>
           </div>
           {chartView === "box" && <Boxplot values={pctValues} max={100} unit="%" />}
         </div>
@@ -147,32 +153,32 @@ export default function ClassEvaluation() {
         <table style={{ borderCollapse: "collapse", fontSize: 14, whiteSpace: "nowrap", width: "100%" }}>
           <thead>
             <tr>
-              <th style={th}>Name</th>
-              {tests.map((t, i) => {
-                const label = t.set_name || t.name || `Test ${i + 1}`;
+              <th style={th}>{t("cv.thName")}</th>
+              {tests.map((test, i) => {
+                const label = test.set_name || test.name || t("cv.testN", { n: i + 1 });
                 return (
                   <th
-                    key={t.session_id}
+                    key={test.session_id}
                     style={{ ...th, textAlign: "center", fontSize: 12, padding: "8px 6px", maxWidth: 80 }}
                   >
                     <Link
-                      to={`/cardvote/evaluation/${t.session_id}`}
+                      to={`/cardvote/evaluation/${test.session_id}`}
                       style={{ color: "var(--accent)", textDecoration: "none", whiteSpace: "normal", wordBreak: "break-word", display: "block", lineHeight: 1.3 }}
-                      title={`${t.name} (${label})`}
+                      title={`${test.name} (${label})`}
                     >
                       {label.length > 20 ? label.slice(0, 18) + "…" : label}
                     </Link>
                   </th>
                 );
               })}
-              <th style={{ ...th, background: "var(--bg2)" }}>Gesamt</th>
+              <th style={{ ...th, background: "var(--bg2)" }}>{t("cv.thTotal")}</th>
               <th style={{ ...th, background: "var(--bg2)" }}>%</th>
             </tr>
             <tr style={{ background: "var(--bg2)" }}>
-              <td style={{ ...td, fontWeight: 600, color: "var(--text3)", fontSize: 12 }}>Max</td>
-              {tests.map((t) => (
-                <td key={t.session_id} style={{ ...td, textAlign: "center", color: "var(--text3)", fontSize: 12 }}>
-                  {t.max_score}
+              <td style={{ ...td, fontWeight: 600, color: "var(--text3)", fontSize: 12 }}>{t("cv.rowMax")}</td>
+              {tests.map((test) => (
+                <td key={test.session_id} style={{ ...td, textAlign: "center", color: "var(--text3)", fontSize: 12 }}>
+                  {test.max_score}
                 </td>
               ))}
               <td style={{ ...td, textAlign: "center", color: "var(--text3)", fontSize: 12 }}>{totalMaxScore}</td>
@@ -264,12 +270,5 @@ const backLink = { color: "var(--text3)", textDecoration: "none", fontSize: 13, 
 // Aus dem Kern abgeleitet, gleiche Abweichung wie in der Auswertung.
 const th = { ...thBasis, padding: "8px 10px", borderBottom: "2px solid var(--border3)", textAlign: "left", fontSize: 13, color: "var(--text)" };
 const td = { ...tdBasis, padding: "8px 10px", textAlign: "left" };
-
-function Stat({ label, value }) {
-  return (
-    <div style={{ padding: "10px 16px", background: "var(--bg2)", borderRadius: 12, textAlign: "center", minWidth: 80 }}>
-      <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{value}</div>
-      <div style={{ fontSize: 12, color: "var(--text3)" }}>{label}</div>
-    </div>
-  );
-}
+// Kachel kommt aus Icons.jsx (StatCard) — die lokale Kopie war eine zweite
+// Design-Quelle fuer dieselbe Sache.

@@ -26,6 +26,11 @@ const SEGEL = [
 ];
 const SEGEL_CYCLE = ["", "hafen", "kueste", "meer", "welt"];
 
+// Kleine Leiste an der Flaeche: eigene, aber EINE Hoehe (28) und Form.
+const zoomBtn = { ...iconBtn, border: "1px solid var(--border2)", borderRadius: CONTROL_R,
+  width: 28, height: 28, boxSizing: "border-box", display: "inline-flex",
+  alignItems: "center", justifyContent: "center", background: "var(--bg)", color: "var(--text2)" };
+
 export default function Sitzplan() {
   const { t } = useLanguage();
   const aktiv = useAktiv();
@@ -48,7 +53,6 @@ export default function Sitzplan() {
   const [zoom, setZoom] = useState(1); // Anzeige-Zoom (Positionen bleiben unskaliert gespeichert)
   const [abwesend, setAbwesend] = useState({});
   const [aufruf, setAufruf] = useState(false);
-  const [showHint, setShowHint] = useState(false); // Erklärung per „i" ein-/ausblenden
   const [msg, setMsg] = useState("");
   const [segelOn, setSegelOn] = useState(false);   // Voreinstellung pro Kurs (siehe unten)
   const [segel, setSegel] = useState({}); // student_id → Stufe
@@ -165,9 +169,30 @@ export default function Sitzplan() {
   };
   // Vor einer Änderung den aktuellen Stand auf den Undo-Stapel legen. Eine neue
   // Aktion macht Redo ungültig (klassisches Undo/Redo).
-  const snapshot = () => { undoStack.current.push({ seats, tafel }); if (undoStack.current.length > 40) undoStack.current.shift(); setUndoLen(undoStack.current.length); redoStack.current = []; setRedoLen(0); };
-  const undo = () => { const p = undoStack.current.pop(); setUndoLen(undoStack.current.length); if (!p) return; redoStack.current.push({ seats, tafel }); setRedoLen(redoStack.current.length); setTafel(p.tafel); persist(p.seats, p.tafel); };
-  const redo = () => { const p = redoStack.current.pop(); setRedoLen(redoStack.current.length); if (!p) return; undoStack.current.push({ seats, tafel }); setUndoLen(undoStack.current.length); setTafel(p.tafel); persist(p.seats, p.tafel); };
+  // Rueckgaengig gilt nur fuer das, woran man GERADE arbeitet. Nach einer Pause
+  // weiss niemand mehr, was der Pfeil zuruecknimmt — und ein Klick verschiebt
+  // dann wortlos Tische, die man laengst absichtlich so gestellt hat. Deshalb
+  // verfaellt der Stapel nach fuenf Minuten Ruhe, und der Klassenwechsel leert
+  // ihn sofort (der Plan darunter ist ein anderer).
+  const VERFALL_MS = 5 * 60 * 1000;
+  const letzteAktion = useRef(0);
+  useEffect(() => {
+    const puls = setInterval(() => {
+      if (!undoStack.current.length && !redoStack.current.length) return;
+      if (Date.now() - letzteAktion.current < VERFALL_MS) return;
+      undoStack.current = []; redoStack.current = [];
+      setUndoLen(0); setRedoLen(0);
+    }, 30000);
+    return () => clearInterval(puls);
+  }, []);
+  useEffect(() => {
+    undoStack.current = []; redoStack.current = [];
+    setUndoLen(0); setRedoLen(0);
+  }, [classId, kursId]);
+
+  const snapshot = () => { undoStack.current.push({ seats, tafel }); if (undoStack.current.length > 40) undoStack.current.shift(); setUndoLen(undoStack.current.length); redoStack.current = []; setRedoLen(0); letzteAktion.current = Date.now(); };
+  const undo = () => { letzteAktion.current = Date.now(); const p = undoStack.current.pop(); setUndoLen(undoStack.current.length); if (!p) return; redoStack.current.push({ seats, tafel }); setRedoLen(redoStack.current.length); setTafel(p.tafel); persist(p.seats, p.tafel); };
+  const redo = () => { letzteAktion.current = Date.now(); const p = redoStack.current.pop(); setRedoLen(redoStack.current.length); if (!p) return; undoStack.current.push({ seats, tafel }); setUndoLen(undoStack.current.length); setTafel(p.tafel); persist(p.seats, p.tafel); };
   // Leerer Platz (kein Schüler): eigener String-sid + empty-Flag, versetzt abgelegt.
   const addEmpty = () => { snapshot(); const n = seats.filter((s) => s.empty).length; persist([...seats, { sid: "e" + Date.now(), x: 40 + (n % 8) * 18, y: 60 + (n % 8) * 18, rot: 0, empty: true }]); };
 
@@ -373,7 +398,6 @@ export default function Sitzplan() {
           ]} />
         )}
         mehr={[
-          { key: "hilfe", label: t("sitzplan.hintFree"), icon: ICONS.info, onClick: () => setShowHint((v) => !v) },
           { key: "export", label: t("sitzplan.export"), icon: ICONS.export, onClick: doExport },
           { key: "import", label: t("sitzplan.import"), icon: ICONS.import, onClick: () => dateiWaehlen(doImport) },
           { key: "leeren", label: t("sitzplan.clear"), icon: ICONS.trash, gefahr: true, onClick: leeren },
@@ -384,10 +408,9 @@ export default function Sitzplan() {
         <button onClick={addEmpty} style={{ ...btnSecondary, height: CONTROL_H, padding: "0 12px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("sitzplan.addEmpty")}>
           <Icon d={ICONS.plus} size={15} /> {t("sitzplan.emptySeat")}
         </button>
-        <button onClick={undo} disabled={undoLen === 0} className="icon-btn" style={{ ...toolbarIconBtn, opacity: undoLen === 0 ? 0.4 : 1 }} title={t("sitzplan.undo")} aria-label={t("sitzplan.undo")}><Icon d={ICONS.undo || ICONS.restore} size={18} /></button>
-        <button onClick={redo} disabled={redoLen === 0} className="icon-btn" style={{ ...toolbarIconBtn, opacity: redoLen === 0 ? 0.4 : 1 }} title={t("sitzplan.redo")} aria-label={t("sitzplan.redo")}><span style={{ display: "inline-flex", transform: "scaleX(-1)" }}><Icon d={ICONS.undo || ICONS.restore} size={18} /></span></button>
+        {undoLen > 0 && <button onClick={undo} className="icon-btn" style={toolbarIconBtn} title={t("sitzplan.undo")} aria-label={t("sitzplan.undo")}><Icon d={ICONS.undo || ICONS.restore} size={18} /></button>}
+        {redoLen > 0 && <button onClick={redo} className="icon-btn" style={toolbarIconBtn} title={t("sitzplan.redo")} aria-label={t("sitzplan.redo")}><span style={{ display: "inline-flex", transform: "scaleX(-1)" }}><Icon d={ICONS.undo || ICONS.restore} size={18} /></span></button>}
       </Werkzeugleiste>
-      {showHint && <p style={{ fontSize: 13, color: "var(--text3)", margin: "8px 0 14px" }}>{t("sitzplan.hintFree")}</p>}
       {segelOn && (
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", margin: "8px 0 12px", fontSize: 12.5, color: "var(--text3)" }}>
           <span>{t("sitzplan.segelLegend")}:</span>
@@ -408,12 +431,15 @@ export default function Sitzplan() {
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
             <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("sitzplan.zoom")}</span>
-            <button onClick={() => setZoom((z) => Math.max(0.5, Math.round((z - 0.1) * 10) / 10))} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: CONTROL_R, width: 28, height: 28, fontSize: 16 }}>−</button>
+            {/* Diese Leiste ist bewusst kleiner als die Haupt-Werkzeugleiste
+                (sie sitzt direkt an der Flaeche) — ABER in sich einheitlich:
+                eine Hoehe, eine Form. Vorher standen hier 28-px-Kreise neben
+                Pillen mit eigener Polsterung und ein Rechteck dazwischen. */}
+            <button onClick={() => setZoom((z) => Math.max(0.5, Math.round((z - 0.1) * 10) / 10))} style={zoomBtn} title={t("sitzplan.zoomOut")} aria-label={t("sitzplan.zoomOut")}><Icon d={ICONS.minus} size={15} /></button>
             <span style={{ fontSize: 12.5, color: "var(--text2)", minWidth: 40, textAlign: "center" }}>{Math.round(zoom * 100)}%</span>
-            <button onClick={() => setZoom((z) => Math.min(2, Math.round((z + 0.1) * 10) / 10))} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: CONTROL_R, width: 28, height: 28, fontSize: 16 }}>+</button>
-            {zoom !== 1 && <button onClick={() => setZoom(1)} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 12 }}>{t("sitzplan.zoomReset")}</button>}
-            <button onClick={fitView} className="icon-btn" style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8, width: 28, height: 28 }} title={t("sitzplan.fitHint")} aria-label={t("sitzplan.fit")}><Icon d={ICONS.fit} size={16} /></button>
-            <button onClick={anordnen} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 12 }} title={t("sitzplan.arrangeHint")}>{t("sitzplan.arrange")}</button>
+            <button onClick={() => setZoom((z) => Math.min(2, Math.round((z + 0.1) * 10) / 10))} style={zoomBtn} title={t("sitzplan.zoomIn")} aria-label={t("sitzplan.zoomIn")}><Icon d={ICONS.plus} size={15} /></button>
+            {zoom !== 1 && <button onClick={() => setZoom(1)} style={{ ...zoomBtn, width: "auto", padding: "0 12px", fontSize: 12 }}>{t("sitzplan.zoomReset")}</button>}
+            <button onClick={fitView} className="icon-btn" style={zoomBtn} title={t("sitzplan.fitHint")} aria-label={t("sitzplan.fit")}><Icon d={ICONS.fit} size={15} /></button>
           </div>
           <div ref={scrollRef} style={{ height: 520, overflow: "auto", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", marginBottom: 18 }}>
           <div ref={canvasRef} onPointerDown={onCanvasDown} onDragOver={(e) => e.preventDefault()} onDrop={onCanvasDrop}
@@ -497,6 +523,10 @@ export default function Sitzplan() {
           </div>
           </div>
 
+          {/* Sitzen alle, braucht es den Pool nicht: eine leere Flaeche mit der
+              Ueberschrift „Noch nicht platziert (0)" ist nur Platz. Sobald
+              jemand herausfaellt (neues Kind, Platz entfernt), ist er wieder da. */}
+          {pool.length > 0 && (
           <div style={{ border: "1px dashed var(--border2)", borderRadius: 12, padding: 12, minHeight: 56, background: "var(--bg2)" }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>{t("sitzplan.pool")} ({pool.length})</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -511,9 +541,9 @@ export default function Sitzplan() {
                   </div>
                 );
               })}
-              {pool.length === 0 && <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("sitzplan.allSeated")}</span>}
             </div>
           </div>
+          )}
         </>
       )}
     </div>

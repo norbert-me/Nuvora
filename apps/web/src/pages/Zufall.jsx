@@ -3,7 +3,9 @@
 // "Ohne Wiederholung" merkt sich die schon Gezogenen, bis die Klasse durch ist.
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { btnPrimary, btnSecondary, selectStyle, inputStyle, Toggle, pageApp} from "../components/Icons.jsx";
+import { btnPrimary, btnSecondary, selectStyle, inputStyle, ICONS, pageApp} from "../components/Icons.jsx";
+import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
+import ViewMenu from "../components/ViewMenu.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Portrait from "../components/Portrait.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -162,19 +164,32 @@ export default function Zufall() {
 
   return (
     <div style={{ ...pageApp }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-        <KursKlasseSelect value={classId} onChange={setClassId} />
-        {tab === "ziehen" && (
-          <select value={niveau} onChange={(e) => setNiveau(e.target.value)} title={t("zufall.niveauHint")} style={{ ...selectStyle, fontSize: 13, padding: "8px 26px 8px 10px" }}>
-            <option value="">{t("zufall.niveauAll")}</option>
-            <option value="G">{t("zufall.niveauG")}</option>
-            <option value="E">{t("zufall.niveauE")}</option>
-          </select>
-        )}
-        {tab === "ziehen" && <Toggle checked={ohneWdh} onChange={setOhneWdh} label={t("zufall.noRepeat")} />}
-        {tab === "ziehen" && <Toggle checked={gewichtet} onChange={setGewichtet} label={t("zufall.weighted")} />}
-        {anwesenheitAktiv && <Toggle checked={skipAbs} onChange={setSkipAbs} label={t("zufall.skipAbsent")} />}
-      </div>
+      {/* Eine Werkzeugleiste wie überall: vorn die Auswahl, die Schalter im
+          Zahnrad, das Gefährliche („Zieh-Gedächtnis leeren") im ⋯-Menü — nicht
+          mehr als fünfter Knopf neben „Runde zurücksetzen". */}
+      <Werkzeugleiste
+        style={{ marginBottom: 20 }}
+        links={<>
+          <KursKlasseSelect value={classId} onChange={setClassId} />
+          {tab === "ziehen" && (
+            <select value={niveau} onChange={(e) => setNiveau(e.target.value)} title={t("zufall.niveauHint")} style={selectStyle}>
+              <option value="">{t("zufall.niveauAll")}</option>
+              <option value="G">{t("zufall.niveauG")}</option>
+              <option value="E">{t("zufall.niveauE")}</option>
+            </select>
+          )}
+        </>}
+        ansicht={<ViewMenu items={[
+          ...(tab === "ziehen" ? [
+            { key: "noRepeat", label: t("zufall.noRepeat"), value: ohneWdh, onChange: setOhneWdh },
+            { key: "weighted", label: t("zufall.weighted"), value: gewichtet, onChange: setGewichtet },
+          ] : []),
+          ...(anwesenheitAktiv ? [{ key: "skipAbsent", label: t("zufall.skipAbsent"), value: skipAbs, onChange: setSkipAbs }] : []),
+        ]} />}
+        mehr={[
+          Object.keys(counts).length > 0 && { key: "forget", label: t("zufall.forget"), icon: ICONS.trash, onClick: gedaechtnisLeeren, gefahr: true },
+        ]}
+      />
 
       {tab === "gruppen" && (
         students.length === 0 ? <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("zufall.noStudents")}</p> : (
@@ -234,14 +249,10 @@ export default function Zufall() {
                 {t("zufall.progress", { done: gezogen.length, total: basis.length })}
               </span>
             )}
+            {/* Nur das Harmlose steht hier: „Zieh-Gedächtnis leeren" ist
+                destruktiv und sitzt oben im ⋯-Menü. */}
             {ohneWdh && gezogen.length > 0 && (
               <button onClick={reset} style={{ ...btnSecondary, marginLeft: "auto" }}>{t("zufall.reset")}</button>
-            )}
-            {Object.keys(counts).length > 0 && (
-              <button onClick={gedaechtnisLeeren} title={t("zufall.forgetHint")}
-                style={{ ...btnSecondary, marginLeft: ohneWdh && gezogen.length > 0 ? 0 : "auto" }}>
-                {t("zufall.forget")}
-              </button>
             )}
           </div>
         </>

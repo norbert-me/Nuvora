@@ -1,14 +1,21 @@
 // Kartenlernen für Schüler — KEIN Login, Zugriff über den Token in der URL.
 // Öffentliche Route: läuft ohne Nuvora-Konto. Der Token ist die Identität.
+//
+// Übersetzt wie jede andere Seite: der LanguageProvider liegt in main.jsx um
+// ALLE Routen, also auch um die öffentlichen. Harte deutsche Zeichenketten
+// standen hier nur, weil die Seite kein Konto braucht — die lernende Person
+// liest sie trotzdem.
 import { useState, useEffect, useCallback } from "react";
 import CardFace from "../components/CardFace.jsx";
-import { COLORS as C } from "../components/Icons.jsx";
+import { COLORS as C, Icon, ICONS, Tabs, btnPrimary, btnSecondary } from "../components/Icons.jsx";
 import { useParams } from "react-router-dom";
 import RechtsFuss from "../components/RechtsFuss.jsx";
+import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api/karten";
 
 export default function Lernen() {
+  const { t } = useLanguage();
   const { token } = useParams();
   const [data, setData] = useState(null);   // { name, cards, total }
   const [i, setI] = useState(0);
@@ -27,8 +34,8 @@ export default function Lernen() {
     fetch(`${API}/lernen/${token}${all ? "?all=1" : ""}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then((d) => { setData(d); setI(0); setFlipped(false); setDone((d.cards || []).length === 0); })
-      .catch(() => setError("Der Link ist ungültig oder abgelaufen."));
-  }, [token]);
+      .catch(() => setError(t("lernen.invalid")));
+  }, [token, t]);
   useEffect(() => { load(); }, [load]);
 
   const bewerten = async (grade) => {
@@ -42,10 +49,10 @@ export default function Lernen() {
         body: JSON.stringify({ card_id: card.card_id, grade }),
       });
       console.debug("[Karten] Review", card.card_id, "grade", grade, "→", r.status, r.ok);
-      if (!r.ok) { setError(`Speichern fehlgeschlagen (${r.status}). Bitte Seite neu laden.`); return; }
+      if (!r.ok) { setError(t("lernen.saveFailed", { status: r.status })); return; }
     } catch (e) {
       console.error("[Karten] Review-Aufruf fehlgeschlagen:", e);
-      setError("Keine Verbindung — Bewertung nicht gespeichert. Bitte erneut versuchen.");
+      setError(t("lernen.offline"));
       return;
     }
     setFlipped(false);
@@ -61,42 +68,41 @@ export default function Lernen() {
     setI(i >= queue.length || (grade === 0 && i >= queue.length - 1) ? 0 : i);
   };
 
-  if (error) return <Center><p style={{ color: C.danger }}>{error}</p></Center>;
-  if (!data) return <Center><p style={{ color: "var(--text3)" }}>Lädt…</p></Center>;
+  if (error) return <Center hinweis={t("lernen.footerHint")}><p style={{ color: C.danger }}>{error}</p></Center>;
+  if (!data) return <Center hinweis={t("lernen.footerHint")}><p style={{ color: "var(--text3)" }}>{t("common.loading")}</p></Center>;
 
   // Hat der Schüler überhaupt Karten? Ohne Karten-Modul/Stapel gibt es keine —
   // dann zeigt die Seite nur die Testergebnisse.
   const hatKarten = (data.total || 0) > 0 || (data.cards || []).length > 0 || (data.learned || 0) > 0;
   const aktiverTab = tab || (hatKarten ? "karten" : "ergebnisse");
   const tabBar = hatKarten ? (
-    <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 16 }}>
-      {[["karten", "Karten"], ["ergebnisse", "Ergebnisse"]].map(([k, l]) => (
-        <button key={k} onClick={() => setTab(k)} style={{ padding: "6px 16px", borderRadius: 980, border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, background: aktiverTab === k ? "var(--text)" : "var(--card)", color: aktiverTab === k ? "var(--bg)" : "var(--text2)" }}>{l}</button>
-      ))}
+    <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+      <Tabs value={aktiverTab} onChange={setTab}
+        options={[["karten", t("karten.tabCards")], ["ergebnisse", t("lernen.tabResults")]]} />
     </div>
   ) : null;
 
   if (aktiverTab === "ergebnisse") {
-    return <Center><div style={{ width: "100%", maxWidth: 460 }}>{tabBar}<Ergebnisse name={data.name} results={results} /></div></Center>;
+    return <Center hinweis={t("lernen.footerHint")}><div style={{ width: "100%", maxWidth: 460 }}>{tabBar}<Ergebnisse t={t} results={results} /></div></Center>;
   }
 
   if (done) {
     return (
-      <Center>
+      <Center hinweis={t("lernen.footerHint")}>
         <div style={{ textAlign: "center", width: "100%", maxWidth: 460 }}>
           {tabBar}
-          <div style={{ fontSize: 48, marginBottom: 8 }}>✓</div>
-          <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>Fertig für heute!</h2>
-          <p style={{ color: "var(--text2)", marginBottom: 20 }}>Alle fälligen Karten gelernt. Komm später wieder.</p>
+          <div style={{ marginBottom: 8 }}><Icon d={ICONS.check} size={48} color={C.success} /></div>
+          <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>{t("lernen.doneTitle")}</h2>
+          <p style={{ color: "var(--text2)", marginBottom: 20 }}>{t("lernen.doneHint")}</p>
           {data.next_due && (
             <p style={{ fontSize: 14, color: "var(--text)", marginBottom: 20 }}>
-              Nächstes Lernen: <strong>{new Date(data.next_due).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}</strong>
+              {t("lernen.nextLearning")} <strong>{new Date(data.next_due).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}</strong>
             </p>
           )}
-          <MeinFortschritt data={data} />
+          <MeinFortschritt data={data} t={t} />
           {data.total > 0 && (
-            <button onClick={() => load(true)} style={{ ...btn, marginTop: 20, background: "transparent", color: "var(--text)", border: "1px solid var(--border2)" }}>
-              Freiwillig weiterüben
+            <button onClick={() => load(true)} style={{ ...btnSecondary, marginTop: 20 }}>
+              {t("lernen.practiceMore")}
             </button>
           )}
         </div>
@@ -106,11 +112,11 @@ export default function Lernen() {
 
   const card = data.cards[i];
   return (
-    <Center>
+    <Center hinweis={t("lernen.footerHint")}>
       <div style={{ width: "100%", maxWidth: 460 }}>
         {tabBar}
         <div style={{ fontSize: 13, color: "var(--text3)", textAlign: "center", marginBottom: 12 }}>
-          {data.name} · Karte {i + 1} von {data.cards.length}
+          {data.name} · {t("lernen.cardOf", { i: i + 1, n: data.cards.length })}
         </div>
         <div onClick={() => !flipped && setFlipped(true)} style={{ cursor: flipped ? "default" : "pointer" }}>
           <CardFace
@@ -121,13 +127,13 @@ export default function Lernen() {
         </div>
 
         {!flipped ? (
-          <button onClick={() => setFlipped(true)} style={{ ...btn, width: "100%", marginTop: 16 }}>Umdrehen</button>
+          <button onClick={() => setFlipped(true)} style={{ ...btnPrimary, width: "100%", marginTop: 16 }}>{t("lernen.flip")}</button>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginTop: 16 }}>
-            <Grade label="Nochmal" color={C.danger} onClick={() => bewerten(0)} />
-            <Grade label="Schwer" color={C.warning} onClick={() => bewerten(1)} />
-            <Grade label="Gut" color={C.success} onClick={() => bewerten(2)} />
-            <Grade label="Leicht" color="#0066cc" onClick={() => bewerten(3)} />
+            <Grade label={t("lernen.gradeAgain")} color={C.danger} onClick={() => bewerten(0)} />
+            <Grade label={t("lernen.gradeHard")} color={C.warning} onClick={() => bewerten(1)} />
+            <Grade label={t("lernen.gradeGood")} color={C.success} onClick={() => bewerten(2)} />
+            <Grade label={t("lernen.gradeEasy")} color="#0066cc" onClick={() => bewerten(3)} />
           </div>
         )}
       </div>
@@ -136,24 +142,26 @@ export default function Lernen() {
 }
 
 // Eigener Fortschritt fuer die lernende Person: gelernt-Anteil und die
-// Reifegrad-Verteilung als kleiner gestapelter Balken.
+// Reifegrad-Verteilung als kleiner gestapelter Balken. Die Beschriftung kommt
+// aus der Uebersetzung, die Farbe bleibt fest (gleiche Staffelung wie in
+// Karten.jsx).
 const REIFE = [
-  ["neu", "Neu", "#cbd5e1"],
-  ["lernen", "Am Lernen", "#f59e0b"],
-  ["kurz", "Kurzfristig", "#eab308"],
-  ["mittel", "Mittelfristig", "#84cc16"],
-  ["lang", "Langfristig", C.success],
+  ["neu", "lernen.reifeNeu", "#cbd5e1"],
+  ["lernen", "lernen.reifeLernen", "#f59e0b"],
+  ["kurz", "lernen.reifeKurz", "#eab308"],
+  ["mittel", "lernen.reifeMittel", "#84cc16"],
+  ["lang", "lernen.reifeLang", C.success],
 ];
 
-function MeinFortschritt({ data }) {
+function MeinFortschritt({ data, t }) {
   const hist = data?.hist || {};
   const total = data?.total || 0;
   if (!total) return null;
   const learned = data?.learned || 0;
   return (
     <div style={{ padding: 16, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", textAlign: "left" }}>
-      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Dein Fortschritt</div>
-      <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 12 }}>{learned} von {total} Karten gelernt</div>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{t("lernen.myProgress")}</div>
+      <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 12 }}>{t("lernen.learnedOf", { n: learned, total })}</div>
       <div style={{ display: "flex", height: 12, borderRadius: 6, overflow: "hidden", marginBottom: 10 }}>
         {REIFE.map(([k, , color]) => {
           const n = hist[k] || 0;
@@ -164,7 +172,7 @@ function MeinFortschritt({ data }) {
         {REIFE.map(([k, label, color]) => (
           <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, color: "var(--text3)" }}>
             <span style={{ width: 9, height: 9, borderRadius: 3, background: color }} />
-            {label} {hist[k] || 0}
+            {t(label)} {hist[k] || 0}
           </span>
         ))}
       </div>
@@ -173,18 +181,18 @@ function MeinFortschritt({ data }) {
 }
 
 // CardVote-Testergebnisse des Schülers (öffentlich über den Token).
-function Ergebnisse({ results }) {
-  if (results === null) return <p style={{ color: "var(--text3)", textAlign: "center" }}>Lädt…</p>;
+function Ergebnisse({ results, t }) {
+  if (results === null) return <p style={{ color: "var(--text3)", textAlign: "center" }}>{t("common.loading")}</p>;
   if (!results.length) return (
     <div style={{ textAlign: "center", padding: "40px 0" }}>
-      <div style={{ fontSize: 42, marginBottom: 8 }}>📊</div>
-      <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>Noch kein Ergebnis</h2>
-      <p style={{ color: "var(--text2)" }}>Deine Testergebnisse erscheinen hier, sobald der erste Test ausgewertet wurde.</p>
+      <div style={{ marginBottom: 8 }}><Icon d={ICONS.chart} size={42} color="var(--text3)" /></div>
+      <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>{t("lernen.noResultTitle")}</h2>
+      <p style={{ color: "var(--text2)" }}>{t("lernen.noResultHint")}</p>
     </div>
   );
   return (
     <div>
-      <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, textAlign: "center" }}>Deine Ergebnisse</h2>
+      <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, textAlign: "center" }}>{t("lernen.resultsTitle")}</h2>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {results.map((r, idx) => (
           <div key={idx} style={{ padding: "12px 16px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", display: "flex", alignItems: "center", gap: 12 }}>
@@ -201,22 +209,21 @@ function Ergebnisse({ results }) {
   );
 }
 
-const Center = ({ children }) => (
+const Center = ({ children, hinweis }) => (
   <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
     <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       {children}
     </div>
     {/* Pflichtangaben auch hier: diese Seite sehen Lernende ohne Konto. */}
-    <RechtsFuss hinweis="Dein Übungsstand wird unter deinem Namen gespeichert und ist für deine Lehrkraft sichtbar." />
+    <RechtsFuss hinweis={hinweis} />
   </div>
 );
 
+// Bewertungsknopf: dieselbe Pille wie ueberall, nur die Farbe sagt, was sie tut.
 function Grade({ label, color, onClick }) {
   return (
-    <button onClick={onClick} style={{ padding: "12px 4px", borderRadius: 12, border: "none", background: color, color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+    <button onClick={onClick} style={{ ...btnPrimary, background: color, color: "#fff", width: "100%", boxSizing: "border-box", padding: "12px 4px", fontSize: 13 }}>
       {label}
     </button>
   );
 }
-
-const btn = { padding: "10px 20px", borderRadius: 980, border: "none", background: "var(--text)", color: "var(--bg)", fontWeight: 600, fontSize: 14, cursor: "pointer" };

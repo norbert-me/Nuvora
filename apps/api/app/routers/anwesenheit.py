@@ -212,7 +212,10 @@ _LABEL = {"fehlt": "Fehlt", "spaet": "Verspätet", "entsch": "Entschuldigt"}
 
 
 async def _students_of(db, class_id):
-    return (await db.execute(select(Student).where(Student.class_id == class_id).order_by(Student.position, Student.card_id))).scalars().all()
+    # id als letzter Schluessel: bei gleicher Position/Kartennummer waere die
+    # Reihenfolge sonst der Datenbank ueberlassen — und die PDF-Liste saehe bei
+    # jedem Druck anders aus.
+    return (await db.execute(select(Student).where(Student.class_id == class_id).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
 
 
 def _pdf_response(build, filename: str):

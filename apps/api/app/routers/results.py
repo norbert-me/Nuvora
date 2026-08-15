@@ -597,10 +597,13 @@ async def get_class_evaluation(class_id: int, user: User = Depends(get_current_u
     if school_class.owner_id and school_class.owner_id != user.id:
         raise HTTPException(403, "Kein Zugriff auf diese Klasse")
 
-    result = await db.execute(
-        select(Student).where(Student.id.in_([s.id for s in await _kurs_roster(db, class_id)] or [-1])).order_by(Student.name)
-    )
-    students = [{"card_id": s.card_id, "name": s.name, "niveau": s.niveau or ""} for s in result.scalars().all()]
+    # Reihenfolge ist (position, card_id, id) — nie der Name: Scan.student_id
+    # IST die Kartennummer der gedruckten ArUco-Karte. Eine nach Namen
+    # sortierte Liste laeuft der gedruckten Kartenreihe davon, sobald zwei
+    # Kinder den Anfangsbuchstaben tauschen. _kurs_roster liefert genau diese
+    # Ordnung schon — also uebernehmen statt neu sortieren.
+    students = [{"card_id": s.card_id, "name": s.name, "niveau": s.niveau or ""}
+                for s in await _kurs_roster(db, class_id)]
 
     result = await db.execute(
         select(Session).where(Session.class_id == class_id, Session.archived == False).order_by(Session.created_at)

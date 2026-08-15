@@ -6,7 +6,7 @@
 // Kern-Klassenseite; damit trug der Kern Modulwissen (Regel 3 in CLAUDE.md).
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { iconBtn, pageApp} from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, pageApp } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api";
@@ -59,9 +59,7 @@ export default function Cards() {
             </div>
             <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
               <button onClick={() => download(`${API}/classes/${cls.id}/cards-pdf`, `CardVote_${cls.name}.pdf`)} className="icon-btn" style={iconBtn} title={t("classes.printCards")} aria-label={t("classes.printCards")}>
-                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" />
-                </svg>
+                <Icon d={ICONS.print} size={19} />
               </button>
             </div>
           </div>

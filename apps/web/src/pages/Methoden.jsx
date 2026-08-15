@@ -8,6 +8,7 @@ import { undoDelete } from "../core/undo.jsx";
 import { sende } from "../core/melden.js";
 import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, Modal, inputStyle, ExportButton, Popover, LoadError} from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
+import { useAktiv } from "../core/modules.js";
 import PublishModal from "../components/PublishModal.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -117,7 +118,7 @@ export default function Methoden({ embedded } = {}) {
   };
   const moveFolder = async (id, parentId) => {
     const f = folderById(id); if (!f) return;
-    await sende(`${API}/folders/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: f.name, parent_id: parentId }) }, "Ordner verschieben");
+    await sende(`${API}/folders/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: f.name, parent_id: parentId }) }, t("methoden.moveFolder"));
     loadFolders();
   };
   const moveMethod = async (id, folderId) => {
@@ -125,7 +126,7 @@ export default function Methoden({ embedded } = {}) {
     setItems((prev) => prev.map((x) => (x.id === id ? { ...x, folder_id: folderId } : x))); // sofort
     // Ohne Meldung sah ein abgelehnter Umzug so aus, als wäre der Einstieg beim
     // Ziehen verschwunden: erst im Zielordner, nach dem load() nirgends gesucht.
-    await sende(`${API}/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: m.title, description: m.description || "", ablauf: m.ablauf || "", material: m.material || "", dauer: m.dauer ?? null, topic_id: m.topic_id ?? null, folder_id: folderId }) }, "Verschieben");
+    await sende(`${API}/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: m.title, description: m.description || "", ablauf: m.ablauf || "", material: m.material || "", dauer: m.dauer ?? null, topic_id: m.topic_id ?? null, folder_id: folderId }) }, t("common.move"));
     load();
   };
 
@@ -259,7 +260,7 @@ export default function Methoden({ embedded } = {}) {
       )}
 
       {ladefehler ? (
-        <LoadError message="Die Einstiege konnten nicht geladen werden." onRetry={() => { load(); loadFolders(); }} />
+        <LoadError message={t("methoden.loadError")} onRetry={() => { load(); loadFolders(); }} />
       ) : visible.length === 0 && subfolders.length === 0 ? (
         <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("methoden.empty")}</p>
       ) : (
@@ -286,19 +287,25 @@ export default function Methoden({ embedded } = {}) {
   );
 }
 
-const menuItem = { display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", background: "none", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 13.5, color: "var(--text)", textAlign: "left" };
-const crumbBtn = { background: "none", border: "1px solid transparent", borderRadius: 7, padding: "3px 8px", cursor: "pointer", color: "var(--text)", fontSize: 13 };
+// Aus den zentralen Stilen abgeleitet (Icons.jsx ist die einzige Design-Quelle):
+// menuItem ist ein iconBtn, der über die volle Breite links ausgerichtet ist;
+// crumbBtn ein btnSecondary ohne sichtbaren Rahmen.
+const menuItem = { ...iconBtn, display: "flex", justifyContent: "flex-start", gap: 8, width: "100%", padding: "8px 10px", borderRadius: 7, fontSize: 13.5, color: "var(--text)", textAlign: "left" };
+const crumbBtn = { ...btnSecondary, background: "none", border: "1px solid transparent", borderRadius: 7, padding: "3px 8px", fontSize: 13 };
 const crumbDrop = { borderColor: "var(--accent)", background: "var(--accent-bg, rgba(10,132,255,0.10))" };
 
 // Detail-Ansicht (Klick auf einen Einstieg): zeigt die Erklärung, mit Buttons
 // zum Bearbeiten und Teilen.
 function MethodView({ m, t, onEdit, onPublish, onClose }) {
-  // Rückrichtung: an welche Stunden (Kalendereinträge) ist dieser Einstieg gehängt?
+  // Rückrichtung: an welche Stunden (Kalendereinträge) ist dieser Einstieg
+  // gehängt? Regel 3: Zusatz-Brücke — ohne das Modul Kalender wird gar nicht
+  // erst gefragt.
+  const kalenderAktiv = useAktiv()("kalender");
   const [linked, setLinked] = useState([]);
   useEffect(() => {
-    if (!m.id) { setLinked([]); return; }
+    if (!m.id || !kalenderAktiv) { setLinked([]); return; }
     fetch(`${API}/${m.id}/kalender`).then((r) => (r.ok ? r.json() : [])).then((d) => setLinked(Array.isArray(d) ? d : [])).catch(() => {});
-  }, [m.id]);
+  }, [m.id, kalenderAktiv]);
   const sec = (label, val) => val ? (
     <div style={{ marginTop: 12 }}>
       <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3 }}>{label}</div>

@@ -4,7 +4,8 @@ import { askConfirm } from "../core/dialog.jsx";
 import { useAktiv } from "../core/modules.js";
 import { istAdmin } from "../core/admin.js";
 import { useLanguage } from "../i18n/index.jsx";
-import { Icon, ICONS, Modal, btnPrimary, btnSecondary, COLORS as C, pageApp} from "../components/Icons.jsx";
+import { Icon, ICONS, Modal, Tabs, btnPrimary, btnSecondary, inputStyle, iconBtn, CONTROL_H, CONTROL_R, COLORS as C, pageApp } from "../components/Icons.jsx";
+import { MehrMenu } from "../components/Werkzeugleiste.jsx";
 
 const API = "/api";
 
@@ -155,37 +156,25 @@ export default function Marketplace({ fixedKind }) {
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, padding: "8px 14px", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 980, fontSize: 13, color: "var(--text2)" }}>
           {t("market.filterBy")} <strong style={{ color: "var(--text)" }}>{authorFilter.name}</strong>
           <button onClick={() => setAuthorFilter(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "var(--text3)", display: "flex", alignItems: "center", padding: 2 }} title={t("market.clearFilter")}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <Icon d={ICONS.close} size={16} color="currentColor" />
           </button>
         </div>
       )}
 
       {!lockedKind && (
-      <div style={{ display: "flex", gap: 2, background: "var(--bg2)", padding: 3, borderRadius: 980, marginBottom: 14, width: "fit-content", flexWrap: "wrap" }}>
-        {[["", t("market.kindAll")], ["cardvote_questionset", t("market.kindQuiz")], ["karten_deck", t("market.kindDeck")], ["method", t("market.kindMethod")], ["lernpfad_ladder", t("market.kindLadder")]]
-          .filter(([k]) => artNutzbar(k))
-          .map(([k, label]) => (
-          <button key={k} onClick={() => setKind(k)} style={{
-            padding: "6px 14px", fontSize: 13, fontWeight: kind === k ? 600 : 400, cursor: "pointer",
-            background: kind === k ? "var(--card)" : "transparent", color: kind === k ? "var(--text)" : "var(--text2)",
-            border: "none", borderRadius: 980,
-          }}>{label}</button>
-        ))}
+      <div style={{ marginBottom: 14 }}>
+        {/* Reiter aus dem Kern (Tabs) statt Nachbau: eine Hoehe, eine Form. */}
+        <Tabs value={kind} onChange={setKind}
+          options={[["", t("market.kindAll")], ["cardvote_questionset", t("market.kindQuiz")], ["karten_deck", t("market.kindDeck")], ["method", t("market.kindMethod")], ["lernpfad_ladder", t("market.kindLadder")]]
+            .filter(([k]) => artNutzbar(k))}
+          style={{ flexWrap: "wrap", height: "auto", minHeight: CONTROL_H }} />
       </div>
       )}
 
       <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("market.searchPlaceholder")}
-          style={{ flex: 1, minWidth: 180, padding: "9px 14px", border: "1px solid var(--border2)", borderRadius: 980, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }} />
-        <div style={{ display: "flex", gap: 2, background: "var(--bg2)", padding: 3, borderRadius: 980 }}>
-          {[["newest", t("market.newest")], ["top", t("market.topRated")]].map(([k, label]) => (
-            <button key={k} onClick={() => setSort(k)} style={{
-              padding: "6px 14px", fontSize: 13, fontWeight: sort === k ? 600 : 400, cursor: "pointer",
-              background: sort === k ? "var(--card)" : "transparent", color: sort === k ? "var(--text)" : "var(--text2)",
-              border: "none", borderRadius: 980,
-            }}>{label}</button>
-          ))}
-        </div>
+          style={{ ...inputStyle, flex: 1, minWidth: 180, height: CONTROL_H, padding: "0 14px", borderRadius: CONTROL_R }} />
+        <Tabs value={sort} onChange={setSort} options={[["newest", t("market.newest")], ["top", t("market.topRated")]]} />
       </div>
 
       {loading && quizzes.length === 0 ? (
@@ -234,10 +223,10 @@ export default function Marketplace({ fixedKind }) {
                   <Link to="/modules" style={{ ...btnSecondary, padding: "7px 16px", fontSize: 13, whiteSpace: "nowrap", textDecoration: "none", color: "var(--text3)" }}
                     title={t("market.needsModuleHint")}>{t("market.needsModule")}</Link>
                 )}
+                {/* Loeschen steht NICHT neben „Uebernehmen": ein Papierkorb
+                    direkt an der Haupt-Aktion wird irgendwann getroffen. */}
                 {(user && (user.id === q.author_id || istAdmin(user))) && (
-                  <button onClick={() => remove(q.id)} title={t("market.removeTitle")} style={{ padding: 7, background: "none", border: "1px solid var(--border2)", borderRadius: 980, cursor: "pointer", color: C.danger, display: "flex", alignItems: "center" }}>
-                    <Icon d={ICONS.trash} size={15} color={C.danger} />
-                  </button>
+                  <MehrMenu eintraege={[{ key: "remove", label: t("market.removeTitle"), icon: ICONS.trash, gefahr: true, onClick: () => remove(q.id) }]} />
                 )}
               </div>
             </div>
@@ -258,8 +247,8 @@ export default function Marketplace({ fixedKind }) {
               <>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 4 }}>
                   <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--text)" }}>{preview.title}</h3>
-                  <button onClick={() => setPreview(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", padding: 4, display: "flex" }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                  <button onClick={() => setPreview(null)} className="icon-btn" style={{ ...iconBtn, color: "var(--text3)" }} title={t("common.close")} aria-label={t("common.close")}>
+                    <Icon d={ICONS.close} size={18} />
                   </button>
                 </div>
                 <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 16 }}>
@@ -317,7 +306,7 @@ export default function Marketplace({ fixedKind }) {
                           <div key={k} style={{ fontSize: 13, color: isCorrect ? C.success : "var(--text2)", fontWeight: isCorrect ? 600 : 400, display: "flex", gap: 6, minWidth: 0, alignItems: "flex-start" }}>
                             <span style={{ fontWeight: 700, flexShrink: 0 }}>{k}</span>
                             <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{(q.choices && q.choices[k]) || "–"}</span>
-                            {isCorrect && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.success} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 1, flexShrink: 0 }}><path d="M20 6L9 17l-5-5"/></svg>}
+                            {isCorrect && <Icon d={ICONS.check} size={16} color={C.success} style={{ marginTop: 1 }} />}
                           </div>
                         );
                       })}

@@ -3,7 +3,7 @@
 // Bereich aus ?area= (die Navbar haengt ihn beim Klick auf Hilfe an). Oben die
 // anderen Bereiche zum Wechseln; nur Kern plus aktive Module.
 import { Link, useSearchParams } from "react-router-dom";
-import { pageApp } from "../components/Icons.jsx";
+import { pageApp, Tabs } from "../components/Icons.jsx";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -222,21 +222,13 @@ export default function Help() {
       </p>
 
       {sichtbar.length > 1 && (
-        <div style={{ display: "flex", gap: 6, marginBottom: 22, flexWrap: "wrap" }}>
-          {sichtbar.map((k) => (
-            <button
-              key={k}
-              onClick={() => setParams({ area: k })}
-              style={{
-                padding: "6px 14px", borderRadius: 980, fontSize: 13.5, cursor: "pointer", fontWeight: 500,
-                border: area === k ? "1px solid var(--accent)" : "1px solid var(--border2)",
-                background: area === k ? "var(--accent-bg)" : "var(--card)",
-                color: area === k ? "var(--accent)" : "var(--text2)",
-              }}
-            >
-              {label(k)}
-            </button>
-          ))}
+        // Reiter kommen aus Icons.jsx — die eigenen Pillen hier sahen fast, aber
+        // nicht ganz wie die im Rest der Anwendung aus. Bei vielen aktiven
+        // Modulen wird waagerecht gescrollt statt umgebrochen: `Tabs` ist EIN
+        // Element, kein Haufen einzelner Knöpfe.
+        <div style={{ marginBottom: 22, overflowX: "auto", maxWidth: "100%" }}>
+          <Tabs value={area} onChange={(k) => setParams({ area: k })}
+            options={sichtbar.map((k) => [k, label(k)])} />
         </div>
       )}
 

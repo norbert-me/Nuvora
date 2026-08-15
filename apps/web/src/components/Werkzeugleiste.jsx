@@ -55,8 +55,7 @@ export function MehrMenu({ eintraege = [], titel = "Mehr" }) {
   return (
     <span style={{ position: "relative", display: "inline-flex" }}>
       <button onClick={() => setOffen((o) => !o)} className="icon-btn" title={titel} aria-label={titel}
-        style={{ ...toolbarIconBtn, border: "1px solid var(--border2)", borderRadius: 999,
-          color: offen ? "var(--accent)" : "var(--text3)" }}>
+        style={{ ...toolbarIconBtn, color: offen ? "var(--accent)" : "var(--text3)" }}>
         <Icon d={ICONS.more} size={17} />
       </button>
       {offen && (

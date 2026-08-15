@@ -1883,4 +1883,6 @@ export default {
   "help.core.nav": "Oben links neben „Nuvora“ steht, in welchem Modul du gerade bist. Ein Klick darauf zeigt alle zugeschalteten Module — von dort geht es direkt weiter, ohne Umweg über die Startseite. Die Reiter rechts daneben gehören immer zum aktuellen Modul.",
   "noten.term1Short": "1. HJ",
   "noten.term2Short": "2. HJ",
+  "sitzplan.zoomIn": "Größer",
+  "sitzplan.zoomOut": "Kleiner",
 };

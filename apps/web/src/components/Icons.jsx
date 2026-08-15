@@ -132,12 +132,21 @@ export const CONTROL_H = 34;
 // Rechteck mit Radius 10 (Plus) und ein Kreis (⋯) — drei Formen fuer drei
 // gleichrangige Knoepfe. Wer eine Leiste baut, nimmt beides: `CONTROL_H` und
 // `CONTROL_R`.
-export const CONTROL_R = 999;
+// Eckig mit runden Ecken (10) — nicht Kreis, nicht Pille. Nebeneinander lagen
+// zuletzt ein Rechteck, ein Kreis und ein Knopf ganz ohne Rahmen; drei Formen
+// fuer drei gleichrangige Knoepfe.
+export const CONTROL_R = 10;
 
 // Icon-Knopf in einer Werkzeugleiste: quadratisch auf Leistenhoehe. `iconBtn`
 // bleibt daneben stehen — der wird auch in Tabellenzeilen benutzt, und dort
 // waeren 34 px zu wuchtig.
-export const toolbarIconBtn = { ...iconBtn, width: CONTROL_H, height: CONTROL_H, borderRadius: CONTROL_R };
+// Icon-Knopf einer Werkzeugleiste: quadratisch auf Leistenhoehe, MIT Rahmen.
+// Der Rahmen gehoert dazu — ein Knopf ohne ihn sieht neben den anderen aus wie
+// ein vergessenes Bild.
+export const toolbarIconBtn = {
+  ...iconBtn, width: CONTROL_H, height: CONTROL_H, borderRadius: CONTROL_R,
+  border: "1px solid var(--border2)", background: "var(--bg)", boxSizing: "border-box",
+};
 
 // EINHEITLICHER Hinzufügen-Knopf: quadratisch, nur ein „+" (Akzentfarbe), das
 // Label steckt in title/aria-label. So sehen ALLE „Hinzufügen"-Aktionen gleich
@@ -155,7 +164,7 @@ export function AddButton({ onClick, title, size = CONTROL_H, style, ...rest }) 
 // immer gleiche Pille — ersetzt uneinheitliche reine Textlinks / "↓"-Zeichen.
 export const downloadBtn = {
   display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer",
-  padding: "6px 14px", border: "1px solid var(--border2)", borderRadius: 980,
+  padding: "6px 14px", border: "1px solid var(--border2)", borderRadius: CONTROL_R,
   background: "var(--card)", color: "var(--text2)", fontSize: 13, fontWeight: 500,
   textDecoration: "none", transition: "all 0.15s",
 };
@@ -176,13 +185,13 @@ export function DownloadLink({ children, style, ...props }) {
 // mal mit, mal ohne letterSpacing. Verbindlich ist ab hier diese eine Quelle.
 export const btnPrimary = {
   padding: "9px 18px", cursor: "pointer", fontSize: 14, border: "none",
-  borderRadius: 980, background: "var(--text)", color: "var(--bg)",
+  borderRadius: CONTROL_R, background: "var(--text)", color: "var(--bg)",
   fontWeight: 600, letterSpacing: "-0.1px",
 };
 
 export const btnSecondary = {
   padding: "9px 18px", cursor: "pointer", fontSize: 14,
-  border: "1px solid var(--border2)", borderRadius: 980,
+  border: "1px solid var(--border2)", borderRadius: CONTROL_R,
   background: "var(--card)", color: "var(--text)",
   fontWeight: 500, letterSpacing: "-0.1px",
 };
@@ -303,7 +312,7 @@ export const dateNavBtn = {
 };
 export const dateNavInput = {
   ...inputStyle, height: CONTROL_H, padding: "0 12px", fontSize: 13, lineHeight: 1,
-  borderRadius: 980, // Pille wie die Knoepfe daneben
+  borderRadius: CONTROL_R, // dieselbe Form wie die Knoepfe daneben
 };
 
 // Container-Karte (Listeneintrag, Modulblock).
@@ -668,7 +677,7 @@ export function Modal({ children, onClose, width = 480, style, title, titleStyle
 // Pillen-Umschalter (Tabs/Ansichten). options: [[value, label], …].
 export function Tabs({ value, onChange, options, style }) {
   return (
-    <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden",
+    <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: CONTROL_R, overflow: "hidden",
       height: CONTROL_H, boxSizing: "border-box", ...style }}>
       {options.map(([v, label]) => (
         <button key={v} onClick={() => onChange(v)} style={{

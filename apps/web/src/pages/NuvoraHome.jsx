@@ -257,7 +257,7 @@ export default function NuvoraHome({ user }) {
       {/* Sucheinstieg: nicht jeder weiss, dass die Ausleihe unter Orga sitzt.
           Klick oder ⌘K oeffnet dieselbe Suche wie die Lupe in der Navigation
           (components/Suche.jsx) — hier steht nur der Knopf dazu. */}
-      <button onClick={() => window.dispatchEvent(new Event("nuvora:suche"))}
+      <button onClick={() => window.dispatchEvent(new Event("nuvora:suche"))} data-suche="startseite"
         style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", maxWidth: 520, marginBottom: 26,
           padding: "11px 14px", border: "1px solid var(--border2)", borderRadius: 12, background: "var(--card)",
           color: "var(--text3)", cursor: "text", fontSize: 14, textAlign: "left" }}>

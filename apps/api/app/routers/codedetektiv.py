@@ -103,10 +103,19 @@ def _session_public(s: CodeSession) -> dict:
     }
 
 
+# EINE Meldung fuer jeden Grund — wortgleich mit `karten._student_by_token`.
+# Vorher stand hier „Session nicht gefunden": daran liess sich von aussen
+# ablesen, ob es den Code gibt und nur das Modul aus ist. Genau diese Auskunft
+# soll niemand bekommen — nach aussen darf nicht erkennbar sein, welche Module
+# eine Lehrkraft nutzt. Der Statuscode (404) bleibt, nur der Wortlaut ist jetzt
+# ueberall derselbe.
+ZUGANG_TOT = "Zugang nicht mehr gültig"
+
+
 async def _pruefe_modul(db: AsyncSession, s: CodeSession) -> None:
     """Sitzung nur, solange das Modul laeuft — fuer JEDEN oeffentlichen Weg."""
     if s.owner_id and not await is_active(db, s.owner_id, "code-detektiv"):
-        raise HTTPException(404, "Session nicht gefunden")
+        raise HTTPException(404, ZUGANG_TOT)
 
 
 async def _by_code(db: AsyncSession, code: str, sperren: bool = False) -> CodeSession:
@@ -134,7 +143,7 @@ async def _by_code(db: AsyncSession, code: str, sperren: bool = False) -> CodeSe
             q = q.with_for_update()
     s = (await db.execute(q)).scalar_one_or_none()
     if not s:
-        raise HTTPException(404, "Session nicht gefunden")
+        raise HTTPException(404, ZUGANG_TOT)
     # Jeder oeffentliche Weg laeuft hier durch (beitreten, spielen, melden) —
     # deshalb steht die Modulpruefung hier und nicht in jedem Endpunkt einzeln.
     await _pruefe_modul(db, s)
@@ -210,7 +219,7 @@ async def get_session(code: str, request: Request, db: AsyncSession = Depends(ge
     s = (await db.execute(select(CodeSession).where(CodeSession.code == code.upper()))).scalar_one_or_none()
     if not s:
         rate_limit("cd_code_miss", ip, 30, 60, "Zu viele Versuche. Bitte kurz warten.")
-        raise HTTPException(404, "Session nicht gefunden")
+        raise HTTPException(404, ZUGANG_TOT)
     # Modul abgeschaltet = Sitzung zu. Ein Sitzungscode steht an der Tafel und
     # laesst sich nicht einsammeln; wer das Modul abschaltet, erwartet, dass
     # ueber ihn nichts mehr zu holen ist (auch keine Namen der Mitspielenden).

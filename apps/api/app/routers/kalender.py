@@ -428,7 +428,14 @@ async def import_kalender(body: dict, user: User = Depends(require_module), db: 
 @router.get("/quiz-session")
 async def quiz_session(set_id: int, class_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Neueste CardVote-Session, die dieses Quiz für diese Klasse gelaufen ist —
-    für den Sprung „Ergebnis als Note" aus einem Kalender-Eintrag."""
+    für den Sprung „Ergebnis als Note" aus einem Kalender-Eintrag.
+
+    Regel 3: die Antwort kommt aus CardVote-Daten. Ohne aktives CardVote gibt es
+    hier nichts herauszugeben — eine leere Antwort statt einer session_id (und
+    kein 403: der Kalender laeuft ohne CardVote vollstaendig weiter, der Sprung
+    entfaellt dann einfach)."""
+    if not await is_active(db, user.id, "cardvote"):
+        return {"session_id": None}
     q = select(TestSession).where(
         TestSession.owner_id == user.id,
         TestSession.question_set_id == set_id,
