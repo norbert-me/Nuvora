@@ -156,6 +156,18 @@ def _verwaist_stmt(user: User):
     )
 
 
+def _grob(text: str) -> str:
+    """Grobe Vergleichsform eines Fragetextes: klein, Leerraum zusammengezogen.
+
+    Bewusst GROB und bewusst nur zur **Vorauswahl**: welche Fragen wirklich eine
+    Dubletten-Gruppe bilden, entscheidet allein `apps/web/src/core/dubletten.js`
+    (und nur die ist mit Tests belegt). Diese Funktion darf grosszuegig zu viel
+    finden — sie darf nur nichts uebersehen. Wer hier eine Regel verschaerft,
+    baut eine zweite Wahrheit auf, die mit der ersten auseinanderlaeuft.
+    """
+    return " ".join((text or "").split()).lower()
+
+
 async def _mit_scans(db: AsyncSession, ids: list[int]) -> set[int]:
     from ..models import Scan
     if not ids:
@@ -173,6 +185,12 @@ async def verwaiste_fragen(user: User = Depends(get_current_user), db: AsyncSess
     liegt dort ohnehin schon). Auf 160 Zeichen gekuerzt waeren zwei Fragen mit
     gleichem Anfang faelschlich gleich — und geloescht wird nach diesem
     Vergleich. Ein eigener Endpunkt dafuer waere derselbe Datensatz zweimal.
+
+    Dazu `partner`: Fragen desselben Kontos, die IN einer Sammlung stecken und
+    denselben Text haben wie eine verwaiste. Erst damit ist die Aufraeumfrage
+    beantwortbar — „diese Waise gibt es schon im Quiz X, weg damit". Partner
+    sind reine Anzeige: sie stehen nicht in `fragen`, zaehlen nicht in `anzahl`
+    und `loeschbar` und werden von der Oberflaeche nie zum Loeschen angeboten.
     """
     fragen = (await db.execute(_verwaist_stmt(user))).scalars().all()
     mit_scans = await _mit_scans(db, [q.id for q in fragen])
@@ -182,7 +200,43 @@ async def verwaiste_fragen(user: User = Depends(get_current_user), db: AsyncSess
         "fragen": [{"id": q.id, "text": q.text or "", "topic_id": q.topic_id,
                     "choices": q.choices or {}, "correct_answer": q.correct_answer,
                     "hat_ergebnisse": q.id in mit_scans} for q in fragen],
+        "partner": await _partner_fragen(db, user, fragen),
     }
+
+
+async def _partner_fragen(db: AsyncSession, user: User, verwaiste: list) -> list[dict]:
+    """Zwillinge der verwaisten Fragen, die in einer Sammlung stecken."""
+    from ..models import QuestionSet, QuestionSetItem
+    gesucht = {_grob(q.text) for q in verwaiste if _grob(q.text)}
+    if not gesucht:
+        return []
+    # Nur eigene Fragen, die in mindestens einer Sammlung sind — dieselbe
+    # Bedingung wie `_verwaist_stmt`, nur andersherum.
+    kandidaten = (await db.execute(
+        select(Question)
+        .where(Question.owner_id == user.id, Question.deleted_at.is_(None))
+        .where(select(QuestionSetItem.id)
+               .where(QuestionSetItem.question_id == Question.id).exists())
+        .order_by(Question.id)
+    )).scalars().all()
+    treffer = [q for q in kandidaten if _grob(q.text) in gesucht]
+    if not treffer:
+        return []
+    namen: dict[int, list[dict]] = {}
+    zeilen = await db.execute(
+        select(QuestionSetItem.question_id, QuestionSet.id, QuestionSet.name)
+        .join(QuestionSet, QuestionSet.id == QuestionSetItem.question_set_id)
+        .where(QuestionSetItem.question_id.in_([q.id for q in treffer]))
+    )
+    for qid, sid, name in zeilen:
+        eintraege = namen.setdefault(qid, [])
+        if not any(e["id"] == sid for e in eintraege):
+            eintraege.append({"id": sid, "name": name})
+    # `sammlungen` traegt Name UND id: der Name ist die Anzeige, die id macht
+    # ihn anklickbar (die Oberflaeche springt in die Sammlung).
+    return [{"id": q.id, "text": q.text or "", "topic_id": q.topic_id,
+             "choices": q.choices or {}, "correct_answer": q.correct_answer,
+             "sammlungen": namen.get(q.id, [])} for q in treffer]
 
 
 @router.delete("/verwaist")

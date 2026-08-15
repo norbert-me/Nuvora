@@ -1,8 +1,17 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+import pkg from "./package.json" with { type: "json" };
+
 export default defineConfig({
   plugins: [react()],
+  // Fassungsnummer im Code verfuegbar machen. Gebraucht wird sie als
+  // Frischemarke an den Lernpfad-Dateien: `style.scoped.css` und `index.html`
+  // liegen als Statik hinter einem Cache. Nach einem Deploy holte der Browser
+  // das neue `app.js` (das traegt einen Zeitstempel), behielt aber das alte
+  // CSS — sichtbar wurde das an zwei Aufklapp-Pfeilen nebeneinander: der neue
+  // aus dem frischen Skript, der alte aus der gecachten `::after`-Regel.
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   build: {
     rollupOptions: {
       output: {

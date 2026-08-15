@@ -6,7 +6,7 @@ import PublishModal from "../components/PublishModal.jsx";
 import { NiveauToggle, AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, btnSmall, Toggle, Modal, Popover,
   pageApp, pageTitle, cardStyle, panelStyle, menuRow, SHADOW, inputStyle as inputBasis, selectStyle,
   toolbarBtn, toolbarBtnPrimary, toolbarInput, StatCard, CONTROL_R, badge, chipStyle, sectionLabel } from "../components/Icons.jsx";
-import { dublettenZahlen, findeDubletten } from "../core/dubletten.js";
+import { dublettenZahlen, findeDubletten, istInSammlung } from "../core/dubletten.js";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -77,30 +77,38 @@ export default function Dashboard() {
   // Datensatz ein zweites Mal.
   const [vDup, setVDup] = useState(false);
 
-  const vBasis = (verwaist?.fragen || []).filter((q) =>
-    !vSuche.trim() || (q.text || "").toLowerCase().includes(vSuche.trim().toLowerCase()));
-  const vGruppen = vDup ? findeDubletten(vBasis) : [];
+  const vTrifft = (q) => !vSuche.trim() || (q.text || "").toLowerCase().includes(vSuche.trim().toLowerCase());
+  const vBasis = (verwaist?.fragen || []).filter(vTrifft);
+  // Zwillinge, die in einer Sammlung stecken: nur Anzeige, nie auswaehlbar.
+  // Sie beantworten die eigentliche Frage — „gibt es die schon irgendwo?".
+  const vPartner = (verwaist?.partner || []).filter(vTrifft);
+  const vGruppen = vDup ? findeDubletten([...vBasis, ...vPartner]) : [];
   const vZahlen = dublettenZahlen(vGruppen);
-  // Was die Liste gerade zeigt — flach. „Alle N auswaehlen" und das Loeschen
-  // arbeiten damit weiter unveraendert; es gibt keinen zweiten Loeschweg.
-  const vGefiltert = vDup ? vGruppen.flatMap((g) => g.fragen) : vBasis;
+  // Was die Liste gerade zeigt — flach, inklusive Partner.
+  const vAngezeigt = vDup ? vGruppen.flatMap((g) => g.fragen) : vBasis;
 
-  // Sicherheitsnetz: auswaehlbar ist nur, was wirklich in dieser Liste steht —
-  // also eine Frage OHNE Quiz — und keine Ergebnisse hat. Der Block zeigt zwar
-  // ohnehin nur quizlose Fragen, aber geloescht wird nach dieser Auswahl, und
-  // eine Pruefung an der Stelle des Loeschens ist die einzige, die haelt.
+  // Sicherheitsnetz: auswaehlbar ist nur, was wirklich in `fragen` steht — also
+  // eine Frage OHNE Quiz. Partner werden dort nie gefunden und fallen damit aus
+  // Auswahl, Zuweisung und Loeschen heraus, ohne dass es eine zweite Regel
+  // braucht. Geloescht wird zusaetzlich nur ohne Ergebnisse; die Pruefung sitzt
+  // an der Stelle des Loeschens, das ist die einzige, die haelt.
   const vFrage = (id) => (verwaist?.fragen || []).find((q) => q.id === id);
+  const vWaehlbar = (q) => !!vFrage(q.id) && !istInSammlung(q);
   const vLoeschbar = (id) => { const q = vFrage(id); return !!q && !q.hat_ergebnisse; };
+
+  // „Alle N auswaehlen" und das Loeschen arbeiten mit dieser Teilmenge weiter
+  // unveraendert; es gibt keinen zweiten Loeschweg.
+  const vGefiltert = vAngezeigt.filter(vWaehlbar);
 
   const vDupUmschalten = () => {
     const an = !vDup;
     setVDup(an);
     if (!an) return;
-    // Vorauswahl: in jeder Gruppe bleibt die aelteste (kleinste id) stehen, der
-    // Rest ist angehakt. Aendern darf das der Mensch — es ist ein Vorschlag.
+    // Vorauswahl: in jeder Gruppe bleibt eine stehen (Sammlung > Thema > aelteste),
+    // der Rest ist angehakt. Aendern darf das der Mensch — es ist ein Vorschlag.
     const vor = new Set();
-    for (const g of findeDubletten(vBasis))
-      for (const q of g.fragen) if (q.id !== g.behalten && vLoeschbar(q.id)) vor.add(q.id);
+    for (const g of findeDubletten([...vBasis, ...vPartner]))
+      for (const q of g.fragen) if (q.id !== g.behalten && vWaehlbar(q) && vLoeschbar(q.id)) vor.add(q.id);
     setVAuswahl(vor);
   };
 
@@ -117,31 +125,50 @@ export default function Dashboard() {
   const [vEdit, setVEdit] = useState(null);
 
   // Eine Zeile der Liste — flach wie gruppiert dieselbe. `behalten` markiert in
-  // einer Dubletten-Gruppe die aelteste Frage, die stehen bleiben soll.
-  const vZeile = (q, behalten) => (
-    <label key={q.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", borderBottom: "1px solid var(--border)", cursor: "pointer", lineHeight: 1.5 }}>
-      <input type="checkbox" checked={vAuswahl.has(q.id)} onChange={() => vUmschalten(q.id)} style={{ marginTop: 3 }} />
-      <span onClick={(e) => { e.preventDefault(); vOeffnen(q.id); }}
-            title={t("dash.clickEdit")}
-            style={{ flex: 1, color: "var(--text)", cursor: "pointer" }}>
-        <Latex>{q.text}</Latex>
-        {behalten && <span style={{ ...chipStyle, marginLeft: 8 }}>{t("cv.dup.keep")}</span>}
-        {/* Mit Ergebnissen wird nichts geloescht: daran haengen die
-            Auswertungen gehaltener Sitzungen. */}
-        {q.hat_ergebnisse && <span style={{ color: "var(--text3)" }}> · {t("dash.orphansKept")}</span>}
-      </span>
-    </label>
-  );
+  // einer Dubletten-Gruppe die Frage, die stehen bleiben soll. Eine Frage aus
+  // einer Sammlung (Partner) hat kein Kaestchen: sie steht hier nur als Beweis,
+  // dass es die Waise schon gibt, und darf nicht mitgeloescht werden.
+  const vZeile = (q, behalten) => {
+    const partner = istInSammlung(q);
+    return (
+      <label key={q.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", borderBottom: "1px solid var(--border)", cursor: "pointer", lineHeight: 1.5 }}>
+        {partner
+          ? <span aria-hidden style={{ width: 13, flexShrink: 0 }} />
+          : <input type="checkbox" checked={vAuswahl.has(q.id)} onChange={() => vUmschalten(q.id)} style={{ marginTop: 3 }} />}
+        <span onClick={(e) => { e.preventDefault(); vOeffnen(q.id); }}
+              title={t("dash.clickEdit")}
+              style={{ flex: 1, color: partner ? "var(--text2)" : "var(--text)", cursor: "pointer" }}>
+          <Latex>{q.text}</Latex>
+          {behalten && <span style={{ ...chipStyle, marginLeft: 8 }}>{t("cv.dup.keep")}</span>}
+          {partner && (
+            <span style={{ color: "var(--text3)" }}>
+              {" · "}{t("cv.dup.inSet", { s: q.sammlungen.map((s) => s.name).join(", ") })}
+            </span>
+          )}
+          {/* Mit Ergebnissen wird nichts geloescht: daran haengen die
+              Auswertungen gehaltener Sitzungen. */}
+          {q.hat_ergebnisse && <span style={{ color: "var(--text3)" }}> · {t("dash.orphansKept")}</span>}
+        </span>
+      </label>
+    );
+  };
 
+  // Beim Oeffnen wird mitgegeben, in welchen Sammlungen die Frage steckt — das
+  // weiss die Zeile bereits (Partner tragen es), ein zweiter Aufruf waere
+  // dieselbe Auskunft ein zweites Mal.
   const vOeffnen = async (id) => {
     const r = await fetch(`${API}/questions/${id}`);
-    if (r.ok) setVEdit(await r.json());
+    if (!r.ok) return;
+    const sammlungen = (verwaist?.partner || []).find((p) => p.id === id)?.sammlungen || [];
+    setVEdit({ ...(await r.json()), sammlungen });
   };
 
   const vSpeichern = async () => {
     if (!vEdit?.text?.trim()) return;
+    // `sammlungen` ist reine Anzeige und gehoert nicht in die Frage zurueck.
+    const { sammlungen, ...frage } = vEdit;
     const r = await fetch(`${API}/questions/${vEdit.id}`, {
-      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(vEdit),
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(frage),
     });
     if (!r.ok) return;
     setVEdit(null);
@@ -178,14 +205,34 @@ export default function Dashboard() {
     load();
   };
 
+  // Loeschen laeuft Frage fuer Frage (jede ist ein eigener weicher Loeschgang).
+  // Das dauert sichtbar — also wird es auch sichtbar: { fertig, gesamt } sperrt
+  // den Knopf und beschriftet ihn mit dem Fortschritt. `vLaeuft` ist der Riegel
+  // gegen den Doppelklick: der Zustand kommt erst nach dem Neuzeichnen an, ein
+  // zweiter Klick waere vorher schon durch.
+  const [vLoescht, setVLoescht] = useState(null);
+  const vLaeuft = useRef(false);
+
   const vAuswahlLoeschen = async () => {
+    if (vLaeuft.current) return;
     const ids = [...vAuswahl].filter(vLoeschbar);
     if (!ids.length) return;
     if (!await askConfirm(t("dash.orphansCleanAsk", { n: ids.length }), { ok: t("common.delete"), danger: true })) return;
-    for (const id of ids) await fetch(`${API}/questions/${id}`, { method: "DELETE" });
-    setVAuswahl(new Set());
-    await ladeVerwaiste();
-    load();
+    if (vLaeuft.current) return; // der Dialog stand offen — in der Zeit kann ein zweiter Lauf gestartet sein
+    vLaeuft.current = true;
+    setVLoescht({ fertig: 0, gesamt: ids.length });
+    try {
+      for (let i = 0; i < ids.length; i++) {
+        await fetch(`${API}/questions/${ids[i]}`, { method: "DELETE" });
+        setVLoescht({ fertig: i + 1, gesamt: ids.length });
+      }
+      setVAuswahl(new Set());
+      await ladeVerwaiste();
+      load();
+    } finally {
+      vLaeuft.current = false;
+      setVLoescht(null);
+    }
   };
 
   const verwaisteAufraeumen = async () => {
@@ -277,17 +324,13 @@ export default function Dashboard() {
     return null;
   };
 
-  // Deep-Link ?set=<id> (z. B. aus dem Kalender): das Fragenset in seinem Ordner
-  // öffnen. Einmalig, sobald die Ordner/Sets geladen sind.
-  const [params, setParams] = useSearchParams();
-  const [openedSet, setOpenedSet] = useState(false);
-  useEffect(() => {
-    if (openedSet) return;
-    const sid = Number(params.get("set"));
-    if (!sid) return;
-    const clear = () => { setOpenedSet(true); params.delete("set"); setParams(params, { replace: true }); };
+  // Eine Sammlung in ihrem Ordner oeffnen. Zwei Wege fuehren hierher: der
+  // Deep-Link ?set=<id> (z. B. aus dem Kalender) und der Sprung aus einer
+  // geoeffneten Frage („steckt in: …"). Beide dieselbe Bewegung, also eine
+  // Funktion — nicht zweimal durch denselben Baum laufen.
+  const sammlungOeffnen = (sid) => {
     const top = rootSets.find((s) => s.id === sid);
-    if (top) { setPath([]); setCurrentFolder(null); setEditingSet(top); clear(); return; }
+    if (top) { setPath([]); setCurrentFolder(null); setEditingSet(top); return true; }
     const walk = (nodes, trail) => {
       for (const n of nodes) {
         const s = (n.question_sets || []).find((x) => x.id === sid);
@@ -299,7 +342,20 @@ export default function Dashboard() {
       return null;
     };
     const r = walk(folders, []);
-    if (r) { setPath(r.trail); setCurrentFolder(r.folderId); setEditingSet(r.set); clear(); }
+    if (!r) return false;
+    setPath(r.trail); setCurrentFolder(r.folderId); setEditingSet(r.set);
+    return true;
+  };
+
+  // Deep-Link ?set=<id>: einmalig, sobald die Ordner/Sets geladen sind.
+  const [params, setParams] = useSearchParams();
+  const [openedSet, setOpenedSet] = useState(false);
+  useEffect(() => {
+    if (openedSet) return;
+    const sid = Number(params.get("set"));
+    if (!sid) return;
+    const clear = () => { setOpenedSet(true); params.delete("set"); setParams(params, { replace: true }); };
+    if (sammlungOeffnen(sid)) clear();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folders, rootSets]);
 
@@ -531,9 +587,16 @@ export default function Dashboard() {
                   style={{ ...toolbarBtnPrimary, opacity: (!vZiel || vAuswahl.size === 0) ? 0.5 : 1 }}>
                   {t("dash.orphansAssign", { n: vAuswahl.size })}
                 </button>
-                <button onClick={vAuswahlLoeschen} disabled={vAuswahl.size === 0}
-                  style={{ ...toolbarBtn, color: C.danger, borderColor: C.danger, opacity: vAuswahl.size === 0 ? 0.5 : 1 }}>
-                  {t("dash.orphansDeleteSel", { n: vAuswahl.size })}
+                {/* Waehrend des Loeschens gesperrt UND beschriftet: bei 200
+                    Fragen laeuft das eine Weile, und ohne Rueckmeldung klickt
+                    man ein zweites Mal. */}
+                <button onClick={vAuswahlLoeschen} disabled={vAuswahl.size === 0 || !!vLoescht}
+                  style={{ ...toolbarBtn, color: C.danger, borderColor: C.danger,
+                    opacity: (vAuswahl.size === 0 || vLoescht) ? 0.5 : 1,
+                    cursor: vLoescht ? "progress" : "pointer" }}>
+                  {vLoescht
+                    ? t("cv.dup.deleting", { i: vLoescht.fertig, n: vLoescht.gesamt })
+                    : t("dash.orphansDeleteSel", { n: vAuswahl.size })}
                 </button>
                 {verwaist.loeschbar > 0 && (
                   <button onClick={verwaisteAufraeumen} style={{ ...toolbarBtn, color: "var(--text3)" }}>
@@ -544,7 +607,7 @@ export default function Dashboard() {
               </div>
 
               <div style={{ maxHeight: 320, overflowY: "auto", border: "1px solid var(--border)", borderRadius: CONTROL_R, background: "var(--card)" }}>
-                {!vDup && vGefiltert.map((q) => vZeile(q, false))}
+                {!vDup && vAngezeigt.map((q) => vZeile(q, false))}
                 {vDup && vGruppen.map((g) => (
                   <div key={g.schluessel}>
                     {/* Kopf je Gruppe: wie viele, und WELCHE Art Dublette.
@@ -561,7 +624,7 @@ export default function Dashboard() {
                     {g.fragen.map((q) => vZeile(q, q.id === g.behalten))}
                   </div>
                 ))}
-                {vGefiltert.length === 0 && (
+                {vAngezeigt.length === 0 && (
                   <p style={{ padding: 10, margin: 0, color: "var(--text3)" }}>
                     {vDup ? t("cv.dup.none") : t("dash.noSearchHit")}
                   </p>
@@ -579,6 +642,21 @@ export default function Dashboard() {
                 <button onClick={() => setVEdit(null)} title={t("common.close")} className="icon-btn" aria-label={t("common.close")} style={iconBtn}>
                   <Icon d={ICONS.close} size={18} />
                 </button>
+              </div>
+              {/* Wo steckt die Frage? Ohne diese Zeile weiss man beim Bearbeiten
+                  nicht, ob man gerade in ein Quiz eingreift — und kommt auch
+                  nicht hin. Anklickbar: der Sprung oeffnet die Sammlung. */}
+              <div style={{ marginBottom: 12, color: "var(--text2)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={sectionLabel}>{t("cv.dup.inSetLabel")}</span>
+                {vEdit.sammlungen?.length
+                  ? vEdit.sammlungen.map((s) => (
+                      <button key={s.id} onClick={() => { setVEdit(null); sammlungOeffnen(s.id); }}
+                        title={t("cv.dup.toSet")}
+                        style={{ ...chipStyle, border: "none", cursor: "pointer", color: "var(--accent)" }}>
+                        {s.name}
+                      </button>
+                    ))
+                  : <span style={{ color: "var(--text3)" }}>{t("cv.dup.inNoSet")}</span>}
               </div>
               <QuestionForm q={vEdit} setQ={setVEdit} onUpload={vBildHochladen} choiceKeys={["A", "B", "C", "D"]} />
               <div style={{ display: "flex", gap: 8, marginTop: 12 }}>

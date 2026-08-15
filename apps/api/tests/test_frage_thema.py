@@ -132,6 +132,39 @@ async def test_verwaiste_frage_wird_gefunden_und_geloescht(s):
 
 
 @pytest.mark.asyncio
+async def test_zwilling_aus_der_sammlung_wird_mitgeliefert(s):
+    """Der Partner beantwortet die eigentliche Aufraeumfrage.
+
+    „Diese Waise gibt es schon im Quiz X" ist der Grund, sie loeschen zu
+    koennen. Also muss die Antwort den Zwilling nennen — mit seiner Sammlung,
+    aber ausserhalb von `fragen`: geloescht wird er nie.
+    """
+    u, thema, frage, quiz = await _welt(s)
+
+    waise = Question(text="  WIE gross ist   gamma?\n", question_type="mc",
+                     choices={"A": "60", "B": "70"}, correct_answer="A", owner_id=u.id)
+    fremd = Question(text="Ganz andere Frage", question_type="mc",
+                     choices={"A": "x"}, correct_answer="A", owner_id=u.id)
+    s.add_all([waise, fremd])
+    await s.commit()
+
+    stand = await Q.verwaiste_fragen(user=u, db=s)
+    assert stand["anzahl"] == 2  # Partner zaehlen nicht mit
+    assert {f["id"] for f in stand["fragen"]} == {waise.id, fremd.id}
+
+    partner = stand["partner"]
+    assert [p["id"] for p in partner] == [frage.id]
+    assert partner[0]["sammlungen"] == [{"id": quiz.id, "name": "Test"}]
+    # Grob genug: Gross-/Kleinschreibung und Leerraum trennen die beiden nicht.
+    assert partner[0]["text"] == "Wie gross ist gamma?"
+
+    # Und der Partner bleibt beim Aufraeumen selbstverstaendlich stehen.
+    weg = await Q.verwaiste_fragen_loeschen(user=u, db=s)
+    assert weg["geloescht"] == 2
+    assert await s.get(Question, frage.id) is not None
+
+
+@pytest.mark.asyncio
 async def test_frage_mit_ergebnissen_bleibt_stehen(s):
     """Die Ausnahme: an Scans haengen die Auswertungen gehaltener Sitzungen.
     Eine Frage dafuer zu loeschen, waere ein stiller Datenverlust — und der

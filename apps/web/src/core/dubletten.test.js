@@ -91,6 +91,44 @@ describe("findeDubletten", () => {
     ])).toHaveLength(0);
   });
 
+  it("behaelt den Partner aus der Sammlung, auch gegen die kleinere id", () => {
+    const g = findeDubletten([
+      f(3, "Was ist 3 + 4?", abcd("6", "7", "8", "9"), "B"),
+      { ...f(99, "Was ist 3 + 4?", abcd("6", "7", "8", "9"), "B"), sammlungen: [{ id: 5, name: "Test 1" }] },
+    ]);
+    expect(g[0].behalten).toBe(99);
+    expect(g[0].fragen[0].id).toBe(99); // die bleibende steht oben
+  });
+
+  it("behaelt ohne Partner die Frage mit Thema, auch gegen die kleinere id", () => {
+    const g = findeDubletten([
+      f(3, "Gleicher Text", abcd("", "", "", ""), "A"),
+      { ...f(40, "Gleicher Text", abcd("", "", "", ""), "A"), topic_id: 12 },
+    ]);
+    expect(g[0].behalten).toBe(40);
+  });
+
+  it("behaelt ohne Partner und ohne Thema die kleinste id", () => {
+    const g = findeDubletten([
+      f(40, "Gleicher Text", abcd("", "", "", ""), "A"),
+      f(3, "Gleicher Text", abcd("", "", "", ""), "A"),
+    ]);
+    expect(g[0].behalten).toBe(3);
+  });
+
+  it("stellt die Sammlung ueber das Thema", () => {
+    const g = findeDubletten([
+      { ...f(1, "Gleicher Text", abcd("", "", "", ""), "A"), topic_id: 7 },
+      { ...f(2, "Gleicher Text", abcd("", "", "", ""), "A"), sammlungen: [{ id: 5, name: "Test 1" }] },
+    ]);
+    expect(g[0].behalten).toBe(2);
+  });
+
+  it("zeigt keine Gruppe, in der nur Fragen aus Sammlungen stehen", () => {
+    const inSet = (id) => ({ ...f(id, "Gleicher Text", abcd("", "", "", ""), "A"), sammlungen: [{ id: 5, name: "Test 1" }] });
+    expect(findeDubletten([inSet(1), inSet(2)])).toHaveLength(0);
+  });
+
   it("meldet einzelne Fragen und leere Texte nicht", () => {
     expect(findeDubletten([f(1, "Einzeln", abcd("", "", "", ""), "A")])).toHaveLength(0);
     expect(findeDubletten([f(1, "   ", null, null), f(2, "", null, null)])).toHaveLength(0);

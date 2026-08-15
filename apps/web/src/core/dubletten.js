@@ -32,18 +32,44 @@ export function antwortSignatur(frage) {
   return `${teile.join("|")}#${String(frage?.correct_answer ?? "").trim().toUpperCase()}`;
 }
 
+/** Steckt die Frage in mindestens einer Fragensammlung? */
+export function istInSammlung(frage) {
+  return (frage?.sammlungen?.length || 0) > 0;
+}
+
+/**
+ * Rangfolge fuer „welche bleibt stehen?" — kleiner ist besser.
+ *
+ *   1. in einer Sammlung — sie ist im Unterricht in Gebrauch; loescht man sie,
+ *      fehlt sie im Quiz.
+ *   2. Thema gesetzt — sie ist eingeordnet; die Arbeit steckt schon drin.
+ *   3. kleinste id — die aelteste, an ihr haengen die aeltesten Verweise.
+ */
+export function behaltenRang(frage) {
+  return [istInSammlung(frage) ? 0 : 1, frage?.topic_id ? 0 : 1, frage?.id ?? 0];
+}
+
+function rangVergleich(a, b) {
+  const ra = behaltenRang(a), rb = behaltenRang(b);
+  for (let i = 0; i < ra.length; i++) if (ra[i] !== rb[i]) return ra[i] - rb[i];
+  return 0;
+}
+
 /**
  * Gruppen doppelter Fragen — nur Texte, die mindestens zweimal vorkommen.
  *
  * Rueckgabe je Gruppe:
- *   { schluessel, fragen: [...aufsteigend nach id], behalten: <kleinste id>,
+ *   { schluessel, fragen: [...beste zuerst], behalten: <id der besten>,
  *     gleicheAntworten: true|false }
  *
  * `gleicheAntworten` trennt die beiden Faelle, die man nicht verwechseln darf:
  * gleicher Text + gleiche Antworten ist eine sichere Dublette, gleicher Text +
  * andere Antworten muss ein Mensch ansehen (zwei Varianten derselben Aufgabe).
- * Die kleinste id ist die aelteste Frage und bleibt — an ihr haengen die
- * aeltesten Verweise.
+ *
+ * Die Liste darf **Partner** enthalten: Fragen, die in einer Sammlung stecken
+ * und deshalb gar nicht zur Auswahl stehen. Sie sind da, damit sichtbar wird,
+ * dass es die Waise „schon im Quiz X gibt". Eine Gruppe, in der NUR solche
+ * stehen, ist keine Aufraeumarbeit und faellt raus.
  */
 export function findeDubletten(fragen) {
   const nachText = new Map();
@@ -56,18 +82,20 @@ export function findeDubletten(fragen) {
   const gruppen = [];
   for (const [schluessel, liste] of nachText) {
     if (liste.length < 2) continue;
-    const sortiert = [...liste].sort((a, b) => a.id - b.id);
+    if (liste.every(istInSammlung)) continue; // nichts aufzuraeumen
+    const sortiert = [...liste].sort(rangVergleich);
     const erste = antwortSignatur(sortiert[0]);
     gruppen.push({
       schluessel,
       fragen: sortiert,
       behalten: sortiert[0].id,
+      erst: Math.min(...sortiert.map((q) => q.id)),
       gleicheAntworten: sortiert.every((q) => antwortSignatur(q) === erste),
     });
   }
   // Reihenfolge der Gruppen = Reihenfolge des ersten Auftretens. So steht das,
   // was oben in der Liste stand, auch hier oben.
-  return gruppen.sort((a, b) => a.behalten - b.behalten);
+  return gruppen.sort((a, b) => a.erst - b.erst);
 }
 
 /** Wie viele Gruppen, wie viele Fragen stecken darin? */

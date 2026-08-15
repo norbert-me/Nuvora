@@ -12,6 +12,9 @@ import { useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/index.jsx";
 
 const BASE = "/lp/";
+// Frischemarke fuer die Lernpfad-Statik (siehe vite.config.js): ohne sie holt
+// der Browser nach einem Deploy das neue Skript, aber das alte CSS.
+const FASSUNG = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
 const ORIGIN = window.location.origin;
 
 // Ein Asset (CSS/JS) einmalig ins <head> laden.
@@ -49,12 +52,12 @@ export default function LernpfadModule() {
       const host = hostRef.current;
       if (!host) return;
       // Markup der App holen und (ohne ihre <script>/<link>) einsetzen.
-      const html = await fetch(BASE + "index.html").then((r) => r.text()).catch(() => "");
+      const html = await fetch(BASE + "index.html?v=" + FASSUNG).then((r) => r.text()).catch(() => "");
       if (abgebrochen || !html) return;
       const doc = new DOMParser().parseFromString(html, "text/html");
       doc.querySelectorAll("script, link, style").forEach((n) => n.remove());
       host.innerHTML = doc.body.innerHTML;
-      await ensureAsset("css", BASE + "css/style.scoped.css");
+      await ensureAsset("css", BASE + "css/style.scoped.css?v=" + FASSUNG);
       await ensureAsset("css", BASE + "vendor/katex/katex.min.css");
       await ensureAsset("js", BASE + "vendor/katex/katex.min.js");
       await ensureAsset("js", BASE + "js/jspdf.umd.min.js");
@@ -62,7 +65,7 @@ export default function LernpfadModule() {
       // app.js jedes Mal frisch ausfuehren (IIFE, isoliert) und an die neu
       // eingesetzten Knoten binden.
       const s = document.createElement("script");
-      s.src = BASE + "js/app.js?inpage=" + Date.now();
+      s.src = BASE + "js/app.js?inpage=1&v=" + FASSUNG;
       s.dataset.lpApp = "1";
       document.body.appendChild(s);
     })();
