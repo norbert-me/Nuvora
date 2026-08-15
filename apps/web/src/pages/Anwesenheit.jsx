@@ -3,7 +3,7 @@
 // und wird nicht gespeichert. Übersicht zeigt Fehlzeiten und lässt nachtragen.
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { btnSecondary, selectStyle, Tabs, dateNavBtn, dateNavInput, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
+import { btnSecondary, selectStyle, Tabs, DatumNavigator, segmentInput, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Portrait from "../components/Portrait.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -166,12 +166,11 @@ export default function Anwesenheit() {
           {/* Tag frei wählbar (auch Vergangenheit/Ferien). Voreinstellung heute.
               Die Stunde ersetzt „ganzer Tag" — Abwesenheit wird je Stunde
               erfasst; nur wenn kein Stundenplan da ist, gilt der ganze Tag. */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-            <button onClick={() => shift(-1)} style={{ ...dateNavBtn, fontSize: 17 }}>‹</button>
-            <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} style={dateNavInput} />
-            <button onClick={() => shift(1)} style={{ ...dateNavBtn, fontSize: 17 }}>›</button>
-            <button onClick={() => setDatum(ymd(new Date()))} style={dateNavBtn}>{t("anwesenheit.today")}</button>
-          </div>
+          <DatumNavigator style={{ marginBottom: 14 }}
+            onZurueck={() => shift(-1)} labelZurueck={t("kalender.prev")}
+            onVor={() => shift(1)} labelVor={t("kalender.next")}
+            onHeute={() => setDatum(ymd(new Date()))} labelHeute={t("anwesenheit.today")}
+            mitte={<input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} style={segmentInput} />} />
           {legende}
           {istFrei ? (
             <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(184,134,11,0.12)", color: "#8a6d00", fontSize: 14, fontWeight: 600 }}>

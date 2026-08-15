@@ -2,7 +2,7 @@
 // datierte Einträge erscheinen zusätzlich im Kalender (Regel 3: reine Zusatz-
 // Brücke, die Liste läuft eigenständig).
 import { useState, useEffect, useRef } from "react";
-import { pageTitle, btnPrimary, btnSecondary, inputStyle, Icon, ICONS, iconBtn, toolbarIconBtn, CONTROL_H, CONTROL_R, COLORS as C, Empty } from "../components/Icons.jsx";
+import { pageTitle, btnPrimary, btnSecondary, inputStyle, dateNavInput, CONTROL_H, Icon, ICONS, iconBtn, toolbarIconBtn, COLORS as C, Empty } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { sende } from "../core/melden.js";
 import { useAktiv } from "../core/modules.js";
@@ -10,9 +10,9 @@ import { useAktiv } from "../core/modules.js";
 const API = "/api/todo";
 
 // Eine Höhe, eine Form für die Eingabeleiste — vorher standen Textfeld (38),
-// Icon-Knöpfe (30) und Datumsfeld (~36) mit drei Radien nebeneinander.
-const leistenFeld = { ...inputStyle, height: CONTROL_H, padding: "0 12px", fontSize: 13.5, lineHeight: 1, borderRadius: CONTROL_R };
-const leistenIconBtn = { ...toolbarIconBtn, border: "1px solid var(--border2)" };
+// Icon-Knöpfe (30) und Datumsfeld (~36) mit drei Radien nebeneinander. Beides
+// kommt aus der gemeinsamen Quelle: `dateNavInput` war hier Zeile für Zeile
+// nachgebaut, und der Rahmen steckt schon in `toolbarIconBtn`.
 
 export default function Todo({ embedded } = {}) {
   const { t } = useLanguage();
@@ -121,23 +121,23 @@ export default function Todo({ embedded } = {}) {
       {!embedded && <h1 style={pageTitle}>{t("todo.title")}</h1>}
 
       <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginBottom: 18 }}>
-        <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder={t("todo.placeholder")} style={{ ...leistenFeld, flex: 1, minWidth: 160 }} />
+        <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} placeholder={t("todo.placeholder")} style={{ ...dateNavInput, flex: 1, minWidth: 160 }} />
         {/* Datum/Uhrzeit erst per Icon dazuschalten (Default heute bzw. nächste
             volle Stunde) — kein leeres Feld, das nach nichts aussieht. */}
         {!date ? (
-          <button onClick={() => setDate(heuteYmd())} className="icon-btn" title={t("todo.addDate")} aria-label={t("todo.addDate")} style={leistenIconBtn}>
+          <button onClick={() => setDate(heuteYmd())} className="icon-btn" title={t("todo.addDate")} aria-label={t("todo.addDate")} style={toolbarIconBtn}>
             <Icon d={ICONS.calendar} size={18} color="var(--text2)" />
           </button>
         ) : (<>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} title={t("todo.dateHint")} style={leistenFeld} />
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} title={t("todo.dateHint")} style={dateNavInput} />
           {!time ? (
-            <button onClick={() => setTime(naechsteStunde())} className="icon-btn" title={t("todo.addTime")} aria-label={t("todo.addTime")} style={leistenIconBtn}>
+            <button onClick={() => setTime(naechsteStunde())} className="icon-btn" title={t("todo.addTime")} aria-label={t("todo.addTime")} style={toolbarIconBtn}>
               <Icon d={ICONS.clock} size={18} color="var(--text2)" />
             </button>
           ) : (
-            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} title={t("todo.timeHint")} style={leistenFeld} />
+            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} title={t("todo.timeHint")} style={dateNavInput} />
           )}
-          <button onClick={() => { setDate(""); setTime(""); }} className="icon-btn" title={t("common.remove") || t("common.delete")} aria-label={t("common.remove") || t("common.delete")} style={leistenIconBtn}>
+          <button onClick={() => { setDate(""); setTime(""); }} className="icon-btn" title={t("common.remove") || t("common.delete")} aria-label={t("common.remove") || t("common.delete")} style={toolbarIconBtn}>
             <Icon d={ICONS.close} size={15} color="var(--text3)" />
           </button>
         </>)}

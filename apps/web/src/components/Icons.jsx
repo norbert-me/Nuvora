@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef } from "react";
+import { Children, Fragment, useEffect, useId, useLayoutEffect, useRef } from "react";
 
 const iconSvg = { fill: "none", stroke: "var(--text3)", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" };
 
@@ -348,6 +348,77 @@ export const dateNavInput = {
   ...inputStyle, height: CONTROL_H, padding: "0 12px", fontSize: 13, lineHeight: 1,
   borderRadius: CONTROL_R, // dieselbe Form wie die Knoepfe daneben
 };
+
+// ─── Segment-Gruppe: mehrere Knoepfe, EIN Gedanke ───
+//
+// Vier Kaesten mit Luft dazwischen sind vier Dinge. Der Datums-Navigator
+// (‹ [Datum] › Heute) war genau das: sechs senkrechte Rahmenlinien fuer eine
+// einzige Frage — „welcher Tag?". Zusammengeschoben zu einer Gruppe sind es
+// zwei Linien aussen und duenne Trenner innen; das Auge liest ein Bedienelement
+// statt vier.
+//
+// `Tabs` macht das laengst richtig (ein Rahmen, Trenner innen) — hier ist
+// dieselbe Bauform, aber offen fuer beliebige Kinder statt nur fuer Reiter.
+// Die Kinder bringen KEINEN eigenen Rahmen mit: dafuer gibt es `segmentBtn`
+// und `segmentInput`.
+export function Segment({ children, style }) {
+  const kinder = Children.toArray(children).filter(Boolean);
+  return (
+    <div style={{
+      display: "inline-flex", alignItems: "stretch", height: CONTROL_H,
+      border: "1px solid var(--border2)", borderRadius: CONTROL_R,
+      background: "var(--bg)", overflow: "hidden", boxSizing: "border-box", ...style,
+    }}>
+      {kinder.map((k, i) => (
+        <Fragment key={i}>
+          {i > 0 && <span aria-hidden style={{ width: 1, background: "var(--border2)", flexShrink: 0 }} />}
+          {k}
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
+// Knopf IN einer Segment-Gruppe: kein eigener Rahmen, keine eigenen Ecken —
+// die bringt die Gruppe mit. Sonst saehe man Rundung in der Rundung.
+export const segmentBtn = {
+  ...btnSecondary, height: "100%", padding: "0 12px", fontSize: 13, lineHeight: 1,
+  border: "none", borderRadius: 0, background: "transparent",
+  display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+};
+export const segmentInput = {
+  ...inputStyle, height: "100%", padding: "0 10px", fontSize: 13, lineHeight: 1,
+  border: "none", borderRadius: 0, background: "transparent", textAlign: "center",
+};
+
+// ─── Datums-Navigator: eine Bauform fuer alle Seiten ───
+//
+// Kalender, Anwesenheit und das Notizbrett hatten dieselbe Zeile dreimal
+// nachgebaut und waren dabei auseinandergelaufen: der Kalender zeichnete die
+// Pfeile als SVG, die Anwesenheit als Textzeichen ‹ › in 17 px; der Kalender
+// ueberschrieb die Polsterung der Pfeile auf 12, „Heute" behielt 14 — daher
+// waren die Knoepfe verschieden breit.
+//
+// `mitte` ist das, was zwischen den Pfeilen steht: ein Datumsfeld
+// (`segmentInput`), ein Titel mit Sprung-Popover, was die Seite braucht.
+// „Heute" steht bewusst NEBEN der Gruppe: die Pfeile gehen einen Schritt,
+// „Heute" springt — zwei verschiedene Dinge.
+export function DatumNavigator({ onZurueck, onVor, onHeute, labelZurueck, labelVor, labelHeute, mitte, style }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", ...style }}>
+      <Segment>
+        <button onClick={onZurueck} title={labelZurueck} aria-label={labelZurueck} style={segmentBtn}>
+          <Icon d={ICONS.chevronLeft} size={15} />
+        </button>
+        {mitte}
+        <button onClick={onVor} title={labelVor} aria-label={labelVor} style={segmentBtn}>
+          <Icon d={ICONS.chevronRight} size={15} />
+        </button>
+      </Segment>
+      {onHeute && <button onClick={onHeute} style={dateNavBtn}>{labelHeute}</button>}
+    </div>
+  );
+}
 
 // Container-Karte (Listeneintrag, Modulblock).
 export const cardStyle = {

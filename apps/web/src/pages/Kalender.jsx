@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, dateNavBtn, dateNavInput, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, dateiWaehlen, pageApp, Popover} from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, dateNavInput, DatumNavigator, segmentBtn, segmentInput, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, dateiWaehlen, pageApp, Popover} from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
@@ -521,16 +521,19 @@ export default function Kalender() {
           Tagesansicht = nativer Datums-Picker inline (wie Anwesenheit); Monat/Woche
           behalten den Selektor im Popover, da ein Tag-Picker dort nicht passt. */}
       {kalAnsicht && view !== "today" && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 14, position: "relative", flexWrap: "wrap" }}>
-          <button onClick={() => move(-1)} title={t("kalender.prev")} aria-label={t("kalender.prev")} style={{ ...dateNavBtn, padding: "0 12px" }}>
-            <Icon d={ICONS.open} size={14} style={{ transform: "rotate(180deg)" }} />
-          </button>
-          {view === "day" ? (
-            <input type="date" value={ymd(cursor)} onChange={(e) => { if (e.target.value) setCursor(startOfDay(new Date(e.target.value + "T00:00:00"))); }} style={dateNavInput} />
+        <DatumNavigator style={{ justifyContent: "center", marginBottom: 14, position: "relative" }}
+          onZurueck={() => move(-1)} labelZurueck={t("kalender.prev")}
+          onVor={() => move(1)} labelVor={t("kalender.next")}
+          onHeute={() => setCursor(startOfDay(new Date()))} labelHeute={t("kalender.today")}
+          mitte={view === "day" ? (
+            <input type="date" value={ymd(cursor)} onChange={(e) => { if (e.target.value) setCursor(startOfDay(new Date(e.target.value + "T00:00:00"))); }} style={segmentInput} />
           ) : (
-            <div style={{ position: "relative" }}>
+            <div style={{ position: "relative", display: "inline-flex" }}>
+              {/* Titel mit Sprung-Popover: sitzt IN der Gruppe, traegt darum
+                  keinen eigenen Rahmen mehr (frueher rahmenlos mit gepunkteter
+                  Unterlinie — mitten zwischen zwei umrandeten Knoepfen). */}
               <button onClick={() => setJumpOpen((v) => !v)} title={t("kalender.jumpToDay")}
-                style={{ ...dateNavBtn, border: "none", background: "none", fontSize: 15, fontWeight: 700, color: "var(--text)", minWidth: 170, gap: 6, borderBottom: "1px dotted var(--border2)", borderRadius: CONTROL_R }}>{title} <Icon d={ICONS.open} size={11} style={{ transform: "rotate(90deg)" }} /></button>
+                style={{ ...segmentBtn, fontWeight: 700, color: "var(--text)", minWidth: 170, gap: 6 }}>{title} <Icon d={ICONS.chevronDown} size={11} /></button>
               {jumpOpen && (<>
                 <div onClick={() => setJumpOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
                 <Popover align="center" style={{ padding: 8, display: "flex", gap: 6, alignItems: "center" }}>
@@ -556,12 +559,7 @@ export default function Kalender() {
                 </Popover>
               </>)}
             </div>
-          )}
-          <button onClick={() => move(1)} title={t("kalender.next")} aria-label={t("kalender.next")} style={{ ...dateNavBtn, padding: "0 12px" }}>
-            <Icon d={ICONS.open} size={14} />
-          </button>
-          <button onClick={() => setCursor(startOfDay(new Date()))} style={dateNavBtn}>{t("kalender.today")}</button>
-        </div>
+          )} />
       )}
       {view === "breaks" && <BreaksPanel breaks={breaks} onAdd={addBreak} onDel={delBreak} t={t} standalone />}
       {view === "klassenarbeit" && <ExamPanel overview={examOverview} periods={tt.periods} aktiv={aktiv} onAdd={addExam} onUpd={updExam} onDel={delExam} t={t} />}
