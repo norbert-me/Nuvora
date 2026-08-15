@@ -5,6 +5,7 @@ import { Routes, Route, useParams, useNavigate } from "react-router-dom";
 import { StoreProvider, useStore } from "./data/store";
 import { CdBase } from "./base.jsx";
 import RechtsFuss from "../components/RechtsFuss.jsx";
+import { btnPrimary, cardStyle, inputStyle, pageForm, pageTitle, COLORS } from "../components/Icons.jsx";
 import PuzzlePage from "./pages/PuzzlePage";
 import PlaySession from "./pages/PlaySession";
 import { useCdText } from "./i18n.js";
@@ -41,16 +42,17 @@ function PublicJoin({ code }) {
     navigate(`/cd/${code}/play/${code}`);
   };
 
+  // Wie jede Formularseite in Nuvora: normale Flaeche, eine Karte, Shell-Tokens.
   return (
-    <div style={{ minHeight: "80vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}>
-      <form onSubmit={beitreten} style={{ background: "rgba(255,255,255,0.15)", borderRadius: 16, padding: 28, backdropFilter: "blur(10px)", color: "#fff", maxWidth: 400, width: "100%", textAlign: "center" }}>
-        <h1 style={{ fontSize: 30, fontWeight: 800, marginBottom: 6 }}>{t('cd.titel', "Code-Detektiv")}</h1>
-        <p style={{ opacity: 0.9, marginBottom: 18 }}>{t('cd.session', "Session")} <strong style={{ letterSpacing: 3 }}>{code}</strong></p>
-        {gefunden === false && <p style={{ background: "rgba(244,67,54,0.9)", borderRadius: 8, padding: "8px 12px", marginBottom: 12 }}>{t('cd.session.nicht_gefunden', "Session nicht gefunden.")}</p>}
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: "var(--bg)" }}>
+      <form onSubmit={beitreten} style={{ ...cardStyle, ...pageForm, padding: 22, textAlign: "center" }}>
+        <h1 style={pageTitle}>{t('cd.titel', "Code-Detektiv")}</h1>
+        <p style={{ color: "var(--text2)", fontSize: 14, marginBottom: 18 }}>{t('cd.session', "Session")} <strong style={{ letterSpacing: 3 }}>{code}</strong></p>
+        {gefunden === false && <p style={{ color: COLORS.danger, fontSize: 13.5, fontWeight: 600, marginBottom: 12 }}>{t('cd.session.nicht_gefunden', "Session nicht gefunden.")}</p>}
         <input type="text" placeholder={t('cd.dein_name', "Dein Name")} value={name} onChange={(e) => setName(e.target.value)} required
-          style={{ width: "100%", padding: "12px 16px", borderRadius: 8, border: "none", fontSize: 16, background: "rgba(255,255,255,0.9)", boxSizing: "border-box", marginBottom: 12 }} />
-        {error && <div style={{ background: "rgba(244,67,54,0.9)", borderRadius: 8, padding: "8px 12px", marginBottom: 12, fontSize: 14 }}>{error}</div>}
-        <button type="submit" className="btn btn-primary" style={{ width: "100%", borderRadius: 8, padding: 12, fontSize: 16 }}>{t('cd.beitreten', "Beitreten")} →</button>
+          style={{ ...inputStyle, width: "100%", marginBottom: 12 }} />
+        {error && <div style={{ color: COLORS.danger, fontSize: 13.5, fontWeight: 600, marginBottom: 12 }}>{error}</div>}
+        <button type="submit" style={{ ...btnPrimary, width: "100%" }}>{t('cd.beitreten', "Beitreten")} →</button>
       </form>
     </div>
   );

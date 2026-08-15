@@ -3,6 +3,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCdBase } from '../base.jsx';
 import { useStore } from '../data/store';
 import { IconSearch, IconGamepad, IconPuzzle } from '../components/Icons';
+import {
+  btnPrimary, btnSecondary, cardStyle, inputStyle, pageForm, pageTitle, pageIntro, COLORS,
+} from '../../components/Icons.jsx';
 import { useCdText } from '../i18n.js';
 
 export default function Home() {
@@ -44,64 +47,54 @@ export default function Home() {
     navigate(`${base}/play/${code}`);
   }
 
+  // Normale Shell-Flaeche statt Violett-Verlauf und Glaskarten: die Startseite
+  // ist eine Seite wie jede andere in Nuvora, kein eigenes Produkt.
+  const knopf = { ...btnSecondary, width: '100%', justifyContent: 'center', display: 'inline-flex', alignItems: 'center', gap: 8 };
   return (
-    <div style={{ minHeight: '68vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: 20, padding: '40px 20px' }}>
-      <div style={{ textAlign: 'center', color: '#fff', maxWidth: 500 }}>
-        <div style={{ marginBottom: 8 }}><IconSearch size={64} /></div>
-        <h1 style={{ fontSize: 42, fontWeight: 800, marginBottom: 8 }}>{t('cd.titel', 'Code-Detektiv')}</h1>
-        <p style={{ fontSize: 18, opacity: 0.9, marginBottom: 40 }}>
+    <div style={{ ...pageForm, padding: '24px 0' }}>
+      <div style={{ textAlign: 'center', marginBottom: 20 }}>
+        <IconSearch size={40} />
+        <h1 style={{ ...pageTitle, marginTop: 8 }}>{t('cd.titel', 'Code-Detektiv')}</h1>
+        <p style={{ ...pageIntro, marginBottom: 0 }}>
           {t('cd.home.claim', 'Finde die Bugs! Sortiere die Blöcke! Werde Meister-Detektiv!')}
         </p>
+      </div>
 
+      <div style={cardStyle}>
         {isInSession && (
-          <div style={{ marginBottom: 20 }}>
-            <button
-              className="btn"
-              onClick={() => navigate(`${base}/play/${activeSession.id}`)}
-              style={{ background: '#4caf50', color: '#fff', fontSize: 16, padding: '14px 40px', borderRadius: 12, fontWeight: 700, width: 280 }}
-            >
-              {t('cd.home.zurueck_session', 'Zurück zur Session {{code}}', { code: activeSession.id })}
-            </button>
-          </div>
+          <button
+            onClick={() => navigate(`${base}/play/${activeSession.id}`)}
+            style={{ ...btnPrimary, width: '100%', marginBottom: 12 }}
+          >
+            {t('cd.home.zurueck_session', 'Zurück zur Session {{code}}', { code: activeSession.id })}
+          </button>
         )}
 
         {!showJoin ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
-            <button
-              className="btn"
-              onClick={() => navigate(`${base}/admin`)}
-              style={{ background: '#fff', color: '#764ba2', fontSize: 16, padding: '14px 40px', borderRadius: 12, fontWeight: 700, width: 280 }}
-            >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button onClick={() => navigate(`${base}/admin`)} style={{ ...btnPrimary, width: '100%' }}>
               {t('cd.home.admin', 'Admin / Rätsel erstellen')}
             </button>
-            <button
-              className="btn"
-              onClick={() => setShowJoin(true)}
-              style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: 16, padding: '14px 40px', borderRadius: 12, fontWeight: 700, border: '2px solid rgba(255,255,255,0.4)', width: 280 }}
-            >
+            <button onClick={() => setShowJoin(true)} style={knopf}>
               <IconGamepad size={18} /> {t('cd.home.beitreten', 'Rätsel beitreten')}
             </button>
-            <button
-              className="btn"
-              onClick={() => navigate(`${base}/solo`)}
-              style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 16, padding: '14px 40px', borderRadius: 12, fontWeight: 700, border: '2px solid rgba(255,255,255,0.2)', width: 280 }}
-            >
+            <button onClick={() => navigate(`${base}/solo`)} style={knopf}>
               <IconPuzzle size={18} /> {t('cd.solo.titel', 'Solo üben')}
             </button>
           </div>
         ) : (
-          <form onSubmit={handleJoin} style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 16, padding: 24, backdropFilter: 'blur(10px)' }}>
-            <div style={{ marginBottom: 12 }}>
+          <form onSubmit={handleJoin}>
+            <div style={{ marginBottom: 10 }}>
               <input
                 type="text"
                 placeholder={t('cd.dein_name', 'Dein Name')}
                 value={playerName}
                 onChange={e => setPlayerName(e.target.value)}
                 required
-                style={{ width: '100%', padding: '12px 16px', borderRadius: 8, border: 'none', fontSize: 16, background: 'rgba(255,255,255,0.9)' }}
+                style={{ ...inputStyle, width: '100%' }}
               />
             </div>
-            <div style={{ marginBottom: 16 }}>
+            <div style={{ marginBottom: 14 }}>
               <input
                 type="text"
                 placeholder={t('cd.home.code_platzhalter', 'Session-Code (z.B. A3F2K1)')}
@@ -109,19 +102,19 @@ export default function Home() {
                 onChange={e => { setJoinCode(e.target.value.toUpperCase()); setError(''); }}
                 required
                 maxLength={6}
-                style={{ width: '100%', padding: '12px 16px', borderRadius: 8, border: 'none', fontSize: 20, textAlign: 'center', letterSpacing: 4, fontWeight: 700, background: 'rgba(255,255,255,0.9)' }}
+                style={{ ...inputStyle, width: '100%', fontSize: 18, textAlign: 'center', letterSpacing: 4, fontWeight: 700 }}
               />
             </div>
             {error && (
-              <div style={{ background: 'rgba(244,67,54,0.9)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 14 }}>
+              <div style={{ color: COLORS.danger, fontSize: 13.5, fontWeight: 600, marginBottom: 12 }}>
                 {error}
               </div>
             )}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button type="button" className="btn" onClick={() => { setShowJoin(false); setError(''); }} style={{ flex: 1, background: 'rgba(255,255,255,0.2)', color: '#fff', borderRadius: 8, border: 'none', padding: '12px' }}>
+              <button type="button" onClick={() => { setShowJoin(false); setError(''); }} style={{ ...btnSecondary, flex: 1 }}>
                 {t('cd.zurueck', 'Zurück')}
               </button>
-              <button type="submit" className="btn btn-primary" style={{ flex: 2, borderRadius: 8, padding: '12px', fontSize: 16 }}>
+              <button type="submit" style={{ ...btnPrimary, flex: 2 }}>
                 {t('cd.beitreten', 'Beitreten')} →
               </button>
             </div>

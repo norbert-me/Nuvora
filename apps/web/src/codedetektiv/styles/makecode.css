@@ -18,6 +18,18 @@
   /* Docking tab is positioned inside the body padding box (after the arm),
      so it only needs the notch offset, not the indent. */
   --mc-dock-left: var(--mc-notch-left);
+
+  /* Nuvora-Tokens fuer CSS. CSS kann `COLORS` aus components/Icons.jsx nicht
+     importieren — deshalb stehen die drei Werte hier EINMAL und werden von dort
+     uebernommen (danger/success/warning). Nirgends sonst in dieser Datei darf
+     eine Signalfarbe direkt hingeschrieben werden.
+     Form und Hoehe kommen ebenso aus Icons.jsx: CONTROL_H / CONTROL_R. */
+  --cd-danger: #d1350f;
+  --cd-success: #0a7d3e;
+  --cd-warning: #8a6100;
+  --cd-control-h: 34px;
+  --cd-control-r: 10px;
+  --cd-card-r: 14px;
 }
 
 .cd-scope * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -409,9 +421,9 @@
   min-height: 48px;
 }
 .cd-scope .toolbox-return-zone.over {
-  border-color: #f44336;
-  background: rgba(244,67,54,0.06);
-  color: #f44336;
+  border-color: var(--cd-danger);
+  background: color-mix(in srgb, var(--cd-danger) 8%, transparent);
+  color: var(--cd-danger);
 }
 
 /* ── Workspace layout ── */
@@ -442,7 +454,7 @@
 
 .cd-scope .block-toolbox {
   background: var(--card);
-  border-radius: 8px;
+  border-radius: var(--cd-card-r);
   border: 1px solid var(--border);
   padding: 12px;
   overflow-y: auto;
@@ -459,7 +471,7 @@
 
 .cd-scope .solution-area {
   background: var(--card);
-  border-radius: 8px;
+  border-radius: var(--cd-card-r);
   border: 1px solid var(--border);
   padding: 16px;
 }
@@ -472,8 +484,8 @@
 
 .cd-scope .drop-zone {
   min-height: 60px;
-  border: 2px dashed #ccc;
-  border-radius: 8px;
+  border: 2px dashed var(--border2);
+  border-radius: var(--cd-control-r);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -484,14 +496,17 @@
 
 /* ── Solution reveal ── */
 .cd-scope .solution-reveal {
-  background: #fff3e0;
-  border: 2px solid #ff9800;
-  border-radius: 8px;
+  background: color-mix(in srgb, var(--cd-warning) 10%, transparent);
+  border: 1px solid var(--cd-warning);
+  border-radius: var(--cd-card-r);
   padding: 16px;
   margin-top: 16px;
 }
+/* Schrift bleibt var(--text): die Signalfarben aus COLORS sind auf hellem
+   Grund gerechnet und waeren im Dunkelmodus als Text kaum lesbar. Das Signal
+   traegt der Rahmen, nicht der Buchstabe. */
 .cd-scope .solution-reveal h4 {
-  color: #e65100;
+  color: var(--text);
   font-size: 14px;
   margin-bottom: 10px;
 }
@@ -517,13 +532,16 @@
 /* ── Scoreboard ── */
 .cd-scope .scoreboard {
   background: var(--card);
-  border-radius: 8px;
+  border-radius: var(--cd-card-r);
   border: 1px solid var(--border);
   overflow: hidden;
 }
+/* Frueher ein zweiter Farbverlauf (blau nach dunkelblau). Der Rest von Nuvora
+   kennt keinen — eine Kopfzeile ist eine Flaeche. */
 .cd-scope .scoreboard-header {
-  background: linear-gradient(135deg, #1e90ff, #005a9e);
-  color: #fff;
+  background: var(--bg3);
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
   padding: 14px 20px;
   font-size: 16px;
   font-weight: 600;
@@ -531,20 +549,24 @@
 .cd-scope .scoreboard-row {
   display: flex; align-items: center;
   padding: 10px 20px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border);
   gap: 12px;
 }
+.cd-scope .scoreboard-row:last-child { border-bottom: none; }
 .cd-scope .scoreboard-row:nth-child(even) { background: var(--bg3); }
 .cd-scope .scoreboard-rank {
   width: 30px; height: 30px;
   border-radius: 50%;
-  background: #e0e0e0;
+  background: var(--bg2);
+  color: var(--text2);
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 14px;
   flex-shrink: 0;
 }
 .cd-scope .scoreboard-rank.gold { background: #ffd700; color: #7a5c00; }
-.cd-scope .scoreboard-rank.silver { background: #c0c0c0; color: var(--text2); }
+/* Gold/Silber/Bronze bleiben Medaillenfarben — sie bedeuten den Platz. Die
+   Schrift darauf ist deshalb fest dunkel bzw. hell, nicht themenabhaengig. */
+.cd-scope .scoreboard-rank.silver { background: #c0c0c0; color: #4a4a4a; }
 .cd-scope .scoreboard-rank.bronze { background: #cd7f32; color: #fff; }
 .cd-scope .scoreboard-name { flex: 1; font-weight: 500; }
 .cd-scope .scoreboard-points { font-weight: 700; color: var(--accent); font-size: 16px; }
@@ -552,13 +574,15 @@
 
 /* ── Feedback ── */
 .cd-scope .feedback-correct {
-  background: #e8f5e9; border: 2px solid #4caf50; color: #2e7d32;
-  padding: 16px 20px; border-radius: 8px; font-weight: 600; text-align: center;
+  background: color-mix(in srgb, var(--cd-success) 12%, transparent);
+  border: 1px solid var(--cd-success); color: var(--text);
+  padding: 16px 20px; border-radius: var(--cd-card-r); font-weight: 600; text-align: center;
   animation: popIn 0.3s ease;
 }
 .cd-scope .feedback-wrong {
-  background: #ffebee; border: 2px solid #f44336; color: #c62828;
-  padding: 16px 20px; border-radius: 8px; font-weight: 600; text-align: center;
+  background: color-mix(in srgb, var(--cd-danger) 12%, transparent);
+  border: 1px solid var(--cd-danger); color: var(--text);
+  padding: 16px 20px; border-radius: var(--cd-card-r); font-weight: 600; text-align: center;
   animation: shake 0.4s ease;
 }
 .cd-scope .feedback-stats {
@@ -569,36 +593,51 @@
 @keyframes popIn { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
 
-/* ── Buttons ── */
+/* ── Buttons ──
+   Frueher ein kompletter Zweitsatz (Polsterung 10/20, Radius 6, eigene
+   Signalfarben). Ab hier sind das nur noch die Marken aus Icons.jsx:
+   .btn = btnPrimary/btnSecondary-Geometrie, .btn-primary = btnPrimary,
+   .btn-outline = btnSecondary. Wer hier Masse aendert, aendert sie dort. */
 .cd-scope .btn {
-  padding: 10px 20px; border: none; border-radius: 6px;
-  font-size: 14px; font-weight: 600; cursor: pointer;
-  transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 18px; border: none; border-radius: var(--cd-control-r);
+  font-size: 14px; font-weight: 600; letter-spacing: -0.1px; cursor: pointer;
+  transition: all 0.15s; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
 }
+/* Kleine Variante = btnSmall. */
+.cd-scope .btn.btn-klein { padding: 5px 12px; font-size: 13px; }
+/* Knopf in einer Werkzeugleiste: eine Hoehe (CONTROL_H) fuer alles, was dort
+   nebeneinander steht. */
+.cd-scope .btn.btn-leiste { height: var(--cd-control-h); padding: 0 14px; font-size: 13px; line-height: 1; }
 .cd-scope .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.cd-scope .btn-primary { background: var(--accent); color: #fff; }
-.cd-scope .btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
-.cd-scope .btn-success { background: #4caf50; color: #fff; }
-.cd-scope .btn-success:hover:not(:disabled) { background: #388e3c; }
-.cd-scope .btn-danger { background: #f44336; color: #fff; }
-.cd-scope .btn-danger:hover:not(:disabled) { background: #d32f2f; }
-.cd-scope .btn-outline { background: transparent; border: 2px solid var(--accent); color: var(--accent); }
-.cd-scope .btn-outline:hover:not(:disabled) { background: rgba(30,144,255,0.08); }
+.cd-scope .btn-primary { background: var(--text); color: var(--bg); }
+.cd-scope .btn-primary:hover:not(:disabled) { opacity: 0.85; }
+.cd-scope .btn-success { background: var(--cd-success); color: #fff; }
+.cd-scope .btn-success:hover:not(:disabled) { filter: brightness(1.12); }
+.cd-scope .btn-danger { background: var(--cd-danger); color: #fff; }
+.cd-scope .btn-danger:hover:not(:disabled) { filter: brightness(1.12); }
+.cd-scope .btn-outline {
+  background: var(--card); border: 1px solid var(--border2); color: var(--text); font-weight: 500;
+}
+.cd-scope .btn-outline:hover:not(:disabled) { background: var(--bg3); }
 
 /* ── Layout ── */
 .cd-scope .app-header {
-  background: var(--card); border-bottom: 1px solid #e0e0e0;
+  background: var(--card); border-bottom: 1px solid var(--border);
   padding: 12px 24px; display: flex; align-items: center; justify-content: space-between;
 }
 .cd-scope .app-header h1 { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
 .cd-scope .page-container { max-width: 1100px; margin: 0 auto; padding: 24px; }
 
 /* ── Admin ── */
-.cd-scope .admin-form { background: var(--card); border-radius: 8px; border: 1px solid var(--border); padding: 24px; }
+.cd-scope .admin-form { background: var(--card); border-radius: var(--cd-card-r); border: 1px solid var(--border); padding: 24px; }
 .cd-scope .form-group { margin-bottom: 16px; }
 .cd-scope .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 6px; }
+/* = inputStyle aus Icons.jsx (9/12, Radius 10, eigener Grund und Text) — vorher
+   ein Zweitsatz mit 8/12 und Radius 6, und ohne Farben: im Dunkelmodus stand
+   hier ein weisses Feld. */
 .cd-scope .form-group input, .cd-scope .form-group select, .cd-scope .form-group textarea {
-  width: 100%; padding: 8px 12px; border: 1px solid var(--border2); border-radius: 6px; font-size: 14px;
+  width: 100%; padding: 9px 12px; border: 1px solid var(--border2); border-radius: var(--cd-control-r);
+  font-size: 14px; background: var(--bg); color: var(--text); box-sizing: border-box;
 }
 .cd-scope .form-group textarea { min-height: 80px; resize: vertical; }
 
@@ -608,20 +647,20 @@
 }
 
 .cd-scope .puzzle-card {
-  background: var(--card); border-radius: 8px; border: 1px solid var(--border);
-  padding: 20px; cursor: pointer; transition: all 0.15s;
+  background: var(--card); border-radius: var(--cd-card-r); border: 1px solid var(--border);
+  padding: 16px; cursor: pointer; transition: all 0.15s;
 }
 .cd-scope .puzzle-card:hover { border-color: var(--accent); box-shadow: 0 2px 12px rgba(0,0,0,0.12); }
 
 /* ── Timer ── */
 .cd-scope .timer { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
 .cd-scope .timer.counting-up { color: var(--text2); }
-.cd-scope .timer.urgent { color: #f44336; }
+.cd-scope .timer.urgent { color: var(--cd-danger); }
 
 /* ── Session player list ── */
 .cd-scope .player-list-item {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 0; border-bottom: 1px solid #f0f0f0;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
 }
 .cd-scope .player-list-item:last-child { border-bottom: none; }
 

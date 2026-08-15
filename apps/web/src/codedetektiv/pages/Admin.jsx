@@ -10,6 +10,7 @@ import {
 import { useStore } from '../data/store';
 import { CATEGORIES, BLOCK_TEMPLATES } from '../data/samplePuzzles';
 import { IconUndo, IconChevronLeft, IconChevronRight } from '../components/Icons';
+import { cardStyle, panelStyle, COLORS, Segment, segmentBtn } from '../../components/Icons.jsx';
 import {
   DraggableToolboxBlock, DraggableBlock, DragOverlayBlock,
   CollapsibleCategory,
@@ -526,17 +527,17 @@ export default function Admin() {
               {activeSessions.map(session => {
                 const currentPuzzle = state.puzzles.find(p => p.id === session.puzzleIds[session.currentPuzzleIndex]);
                 return (
-                  <div key={session.id} style={{ background: '#fff', borderRadius: 8, border: '1px solid #e0e0e0', padding: 20 }}>
+                  <div key={session.id} style={{ ...cardStyle, padding: 20 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                       <div>
                         <h3 style={{ fontSize: 18 }}>
-                          {t('cd.session', 'Session')}: <span style={{ color: '#1e90ff', letterSpacing: 2 }}>{session.id}</span>
+                          {t('cd.session', 'Session')}: <span style={{ color: 'var(--accent)', letterSpacing: 2 }}>{session.id}</span>
                         </h3>
-                        <p style={{ fontSize: 13, color: '#888' }}>
+                        <p style={{ fontSize: 13, color: 'var(--text3)' }}>
                           {t('cd.admin.session_stand', '{{n}} Rätsel, Runde {{runde}}/{{gesamt}}', { n: session.puzzleIds.length, runde: session.currentPuzzleIndex + 1, gesamt: session.puzzleIds.length })}
                           {currentPuzzle && ` - ${currentPuzzle.title}`}
                         </p>
-                        <p style={{ fontSize: 12.5, color: '#555', marginTop: 4 }}>
+                        <p style={{ fontSize: 12.5, color: 'var(--text2)', marginTop: 4 }}>
                           {t('cd.admin.beitritt_link', 'Beitreten (Schüler, ohne Login):')} <strong>{window.location.origin}/cd/{session.id}</strong>
                         </p>
                       </div>
@@ -557,13 +558,13 @@ export default function Admin() {
                         </button>
                       </div>
                     </div>
-                    <div style={{ background: '#f9f9f9', borderRadius: 8, padding: 12 }}>
-                      <h4 style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>{t('cd.spieler_n', 'Spieler ({{n}})', { n: session.players.length })}</h4>
-                      {session.players.length === 0 && <p style={{ color: '#ccc', fontSize: 13 }}>{t('cd.admin.keine_spieler', 'Noch keine Spieler')}</p>}
+                    <div style={{ ...panelStyle, padding: 12 }}>
+                      <h4 style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 8 }}>{t('cd.spieler_n', 'Spieler ({{n}})', { n: session.players.length })}</h4>
+                      {session.players.length === 0 && <p style={{ color: 'var(--text3)', fontSize: 13 }}>{t('cd.admin.keine_spieler', 'Noch keine Spieler')}</p>}
                       {session.players.map(p => (
                         <div key={p.name} className="player-list-item">
                           <span style={{ fontSize: 14 }}>{p.name}</span>
-                          <button className="btn btn-danger" style={{ fontSize: 11, padding: '2px 8px' }}
+                          <button className="btn btn-danger btn-klein"
                             onClick={() => dispatch({ type: 'REMOVE_PLAYER', sessionId: session.id, playerName: p.name })}>
                             {t('cd.admin.entfernen', 'Entfernen')}
                           </button>
@@ -582,7 +583,7 @@ export default function Admin() {
           <h2 style={{ marginBottom: 16 }}>
             {editingPuzzleId && t('cd.admin.bearbeiten_titel', 'Rätsel bearbeiten')}
             {editingPuzzleId && (
-              <button className="btn btn-outline" onClick={cancelEdit} style={{ marginLeft: 12, fontSize: 12 }}>{t('cd.abbrechen', 'Abbrechen')}</button>
+              <button className="btn btn-outline btn-klein" onClick={cancelEdit} style={{ marginLeft: 12 }}>{t('cd.abbrechen', 'Abbrechen')}</button>
             )}
           </h2>
 
@@ -592,17 +593,17 @@ export default function Admin() {
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input type="file" accept=".hex" onChange={handleImportHex} disabled={importing} />
                 {blockCount > 0 && (
-                  <button type="button" className="btn btn-outline" style={{ fontSize: 12, padding: '4px 10px' }}
+                  <button type="button" className="btn btn-outline btn-klein"
                     onClick={() => { setStacks([]); setImportInfo(''); }}>{t('cd.admin.leeren', 'Leeren')}</button>
                 )}
               </div>
-              <p style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+              <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>
                 {importing
                   ? t('cd.admin.importiert_gerade', 'Importiere...')
                   : t('cd.admin.hex_hinweis', 'Blöcke aus einer MakeCode/Calliope-Datei laden.')}
               </p>
-              {importInfo && <p style={{ fontSize: 12, color: '#2e7d32', marginTop: 4 }}>{importInfo}</p>}
-              {importError && <p style={{ fontSize: 12, color: '#f44336', marginTop: 4 }}>{importError}</p>}
+              {importInfo && <p style={{ fontSize: 12, color: COLORS.success, marginTop: 4 }}>{importInfo}</p>}
+              {importError && <p style={{ fontSize: 12, color: COLORS.danger, marginTop: 4 }}>{importError}</p>}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 3fr', gap: 12 }}>
               <div className="form-group">
@@ -655,7 +656,7 @@ export default function Admin() {
                         onChange={e => setDistractorPercent(Number(e.target.value))}
                         min={5} max={100} step={5}
                         style={{ width: 60 }} />
-                      <span style={{ fontSize: 13, color: '#666' }}>%</span>
+                      <span style={{ fontSize: 13, color: 'var(--text2)' }}>%</span>
                     </span>
                   )}
                 </div>
@@ -671,7 +672,8 @@ export default function Admin() {
                 <div className="block-toolbox">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h3>{t('cd.admin.vorlagen', 'Block-Vorlagen')}</h3>
-                    <button className="btn btn-outline" style={{ padding: '2px 6px', fontSize: 11 }}
+                    <button className="btn btn-outline btn-klein"
+                      title={t('cd.puzzle.toolbox_zu', 'Toolbox ausblenden')}
                       onClick={() => setToolboxOpen(false)}><IconChevronLeft size={12} /></button>
                   </div>
                   {Object.entries(GROUPED_TEMPLATES).map(([cat, tBlocks]) => (
@@ -689,7 +691,7 @@ export default function Admin() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {!toolboxOpen && (
-                      <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: 12 }}
+                      <button className="btn btn-outline btn-leiste"
                         onClick={() => setToolboxOpen(true)}>
                         <IconChevronRight size={12} /> {t('cd.admin.bausteine_kurz', 'Bausteine')}
                       </button>
@@ -699,13 +701,14 @@ export default function Admin() {
                       {blockCount > 0 && ` ${t('cd.bloecke_zahl', '({{n}} Blöcke)', { n: blockCount })}`}
                     </h3>
                   </div>
-                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: 12 }}
+                  {/* Ein Gedanke („wie nah?"), also EIN Bedienelement. */}
+                  <Segment>
+                    <button style={segmentBtn} title={t('cd.puzzle.groesser', 'Größer')}
                       onClick={() => setZoom(z => Math.min(3, z + 0.2))}>+</button>
-                    <span style={{ fontSize: 12, minWidth: 40, textAlign: 'center', color: '#666' }}>{Math.round(zoom * 100)}%</span>
-                    <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: 12 }}
+                    <span style={{ ...segmentBtn, minWidth: 48, cursor: 'default', color: 'var(--text2)' }}>{Math.round(zoom * 100)}%</span>
+                    <button style={segmentBtn} title={t('cd.puzzle.kleiner', 'Kleiner')}
                       onClick={() => setZoom(z => Math.max(0.25, z - 0.2))}>-</button>
-                  </div>
+                  </Segment>
                 </div>
 
                 <div
@@ -717,8 +720,8 @@ export default function Admin() {
                   style={{
                     overflow: 'auto', minHeight: 300, maxHeight: 'calc(100vh - 280px)', position: 'relative',
                     cursor: isPanning ? 'grabbing' : 'default',
-                    background: 'rgba(0,0,0,0.02)', borderRadius: 8,
-                    border: '1px dashed #d5d5d5',
+                    background: 'var(--bg2)', borderRadius: 10,
+                    border: '1px dashed var(--border2)',
                   }}
                 >
                   <div ref={contentRef} style={{
@@ -732,7 +735,7 @@ export default function Admin() {
                         <div style={{
                           position: 'absolute', top: '50%', left: '50%',
                           transform: 'translate(-50%, -50%)',
-                          color: '#aaa', fontSize: 14, pointerEvents: 'none',
+                          color: 'var(--text3)', fontSize: 14, pointerEvents: 'none',
                         }}>{t('cd.admin.ziehen_hinweis', 'Blöcke von links hierhin ziehen')}</div>
                       )}
                       {stacks.map(stack => (
@@ -769,26 +772,26 @@ export default function Admin() {
         <div className="cd-zweispaltig" style={{ display: 'grid', gap: 24, alignItems: 'start' }}>
           <div>
             <h2 style={{ marginBottom: 16 }}>{t('cd.admin.session_erstellen', 'Session erstellen')}</h2>
-            <div style={{ background: '#fff', borderRadius: 8, border: '1px solid #e0e0e0', padding: 20 }}>
-              <p style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>{t('cd.admin.session_auswahl', 'Wähle Rätsel für die Session aus:')}</p>
+            <div style={{ ...cardStyle, padding: 20 }}>
+              <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 12 }}>{t('cd.admin.session_auswahl', 'Wähle Rätsel für die Session aus:')}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
                 {state.puzzles.map(puzzle => (
                   <label key={puzzle.id} style={{
                     display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-                    borderRadius: 6, cursor: 'pointer',
-                    background: selectedPuzzles.includes(puzzle.id) ? '#e3f2fd' : '#f9f9f9',
-                    border: selectedPuzzles.includes(puzzle.id) ? '1px solid #1e90ff' : '1px solid #eee',
+                    borderRadius: 10, cursor: 'pointer',
+                    background: selectedPuzzles.includes(puzzle.id) ? 'var(--bg2)' : 'var(--bg3)',
+                    border: selectedPuzzles.includes(puzzle.id) ? '1px solid var(--accent)' : '1px solid var(--border)',
                   }}>
                     <input type="checkbox" checked={selectedPuzzles.includes(puzzle.id)}
                       onChange={() => togglePuzzleSelection(puzzle.id)} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>{puzzle.title}</div>
-                      <div style={{ fontSize: 12, color: '#888' }}>
+                      <div style={{ fontSize: 12, color: 'var(--text3)' }}>
                         {puzzle.type === 'maze' ? t('cd.typ.labyrinth', 'Labyrinth') : t('cd.typ.sortieren', 'Sortieren')}
                       </div>
                     </div>
                     {selectedPuzzles.includes(puzzle.id) && (
-                      <span style={{ fontSize: 12, color: '#1e90ff', fontWeight: 600 }}>
+                      <span style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>
                         #{selectedPuzzles.indexOf(puzzle.id) + 1}
                       </span>
                     )}
@@ -810,7 +813,7 @@ export default function Admin() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
                       <h3 style={{ fontSize: 16, fontWeight: 600 }}>{puzzle.title}</h3>
-                      <p style={{ fontSize: 13, color: '#666', marginTop: 4 }}>{puzzle.description}</p>
+                      <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 4 }}>{puzzle.description}</p>
                       <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
                         <span className="cat-badge" style={{ background: puzzle.type === 'maze' ? CATEGORIES.movement.color : CATEGORIES.basic.color }}>
                           {puzzle.type === 'maze' ? t('cd.typ.labyrinth', 'Labyrinth') : t('cd.typ.sortieren', 'Sortieren')}
@@ -818,23 +821,20 @@ export default function Admin() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <button className="btn btn-outline"
-                        onClick={e => { e.stopPropagation(); navigate(`${base}/puzzle/${puzzle.id}?mode=solo`); }}
-                        style={{ fontSize: 12, padding: '6px 12px' }}>
+                      <button className="btn btn-outline btn-klein"
+                        onClick={e => { e.stopPropagation(); navigate(`${base}/puzzle/${puzzle.id}?mode=solo`); }}>
                         {t('cd.admin.vorschau', 'Vorschau')}
                       </button>
-                      <button className="btn btn-primary"
-                        onClick={e => { e.stopPropagation(); editPuzzle(puzzle); }}
-                        style={{ fontSize: 12, padding: '6px 12px' }}>
+                      <button className="btn btn-primary btn-klein"
+                        onClick={e => { e.stopPropagation(); editPuzzle(puzzle); }}>
                         {t('cd.admin.bearbeiten', 'Bearbeiten')}
                       </button>
                       {puzzle.id.startsWith('custom-') && (
-                        <button className="btn btn-danger"
+                        <button className="btn btn-danger btn-klein"
                           onClick={e => {
                             e.stopPropagation();
                             if (confirm(t('cd.admin.loeschen_frage', 'Rätsel wirklich löschen?'))) dispatch({ type: 'DELETE_PUZZLE', puzzleId: puzzle.id });
-                          }}
-                          style={{ fontSize: 12, padding: '6px 12px' }}>
+                          }}>
                           {t('cd.admin.loeschen', 'Löschen')}
                         </button>
                       )}

@@ -22,6 +22,7 @@ import {
   IconSearch, IconBulb, IconCheck, IconX, IconClock, IconPlay,
   IconReset, IconBack, IconChevronLeft, IconChevronRight, IconParty, IconUndo,
 } from '../components/Icons';
+import { cardStyle, panelStyle, toolbarIconBtn, Segment, segmentBtn } from '../../components/Icons.jsx';
 import { useCdText } from '../i18n.js';
 
 const SHOW_SOLUTION_AFTER = 5;
@@ -95,7 +96,7 @@ function DroppableSolutionArea({ children }) {
   return (
     <div ref={setNodeRef} className="solution-stack"
       style={{ display: 'flex', flexDirection: 'column', minHeight: 160, borderRadius: 8,
-        padding: '8px 8px 56px', background: 'rgba(0,0,0,0.02)', border: '1px dashed #d5d5d5' }}>
+        padding: '8px 8px 56px', background: 'var(--bg2)', border: '1px dashed var(--border2)' }}>
       {children}
     </div>
   );
@@ -735,7 +736,7 @@ export default function PuzzlePage() {
       </div>
 
       <div className="page-container" style={{ maxWidth: '100%' }}>
-        <div style={{ background: '#e3f2fd', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 14, color: '#1565c0' }}>
+        <div style={{ ...panelStyle, marginBottom: 16, fontSize: 14, color: 'var(--text)' }}>
           <IconBulb size={16} /> {puzzle.description}
         </div>
 
@@ -750,7 +751,7 @@ export default function PuzzlePage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h3 style={{ margin: 0 }}>{t('cd.puzzle.verfuegbare_bloecke', 'Verfügbare Blöcke')}</h3>
                   <button onClick={() => setToolboxOpen(false)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#888' }}
+                    className="icon-btn" style={toolbarIconBtn}
                     title={t('cd.puzzle.toolbox_zu', 'Toolbox ausblenden')}><IconChevronLeft size={14} /></button>
                 </div>
                 {isMaze ? (
@@ -776,14 +777,14 @@ export default function PuzzlePage() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {!toolboxOpen && (
-                <button className="btn btn-outline" onClick={() => setToolboxOpen(true)}
-                  style={{ alignSelf: 'flex-start', padding: '4px 12px', fontSize: 12 }}>
+                <button className="btn btn-outline btn-leiste" onClick={() => setToolboxOpen(true)}
+                  style={{ alignSelf: 'flex-start' }}>
                   <IconChevronRight size={12} /> {t('cd.puzzle.bloecke_zeigen', 'Blöcke anzeigen')}
                 </button>
               )}
 
               {isMaze && puzzle.maze && (
-                <div style={{ background: '#fff', borderRadius: 8, border: '1px solid #e0e0e0', padding: 20, display: 'flex', justifyContent: 'center' }}>
+                <div style={{ ...cardStyle, padding: 20, display: 'flex', justifyContent: 'center' }}>
                   <MazeRunner maze={puzzle.maze} commands={mazeSolutionBlocks} running={mazeRunning} onFinish={handleMazeFinish} />
                 </div>
               )}
@@ -795,13 +796,17 @@ export default function PuzzlePage() {
                     {totalBlockCount > 0 && ` ${t('cd.bloecke_zahl', '({{n}} Blöcke)', { n: totalBlockCount })}`}
                   </h3>
                   {!isMaze && (
-                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                      <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: 12 }}
-                        onClick={() => setZoom(z => Math.min(3, z + 0.2))}>+</button>
-                      <span style={{ fontSize: 12, minWidth: 40, textAlign: 'center', color: '#666' }}>{Math.round(zoom * 100)}%</span>
-                      <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: 12 }}
-                        onClick={() => setZoom(z => Math.max(0.25, z - 0.2))}>-</button>
-                      <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: 12, marginLeft: 4 }}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      {/* Ein Gedanke („wie nah?"), also EIN Bedienelement:
+                          Segment mit duennen Trennern statt drei Kaesten. */}
+                      <Segment>
+                        <button style={segmentBtn} title={t('cd.puzzle.groesser', 'Größer')}
+                          onClick={() => setZoom(z => Math.min(3, z + 0.2))}>+</button>
+                        <span style={{ ...segmentBtn, minWidth: 48, cursor: 'default', color: 'var(--text2)' }}>{Math.round(zoom * 100)}%</span>
+                        <button style={segmentBtn} title={t('cd.puzzle.kleiner', 'Kleiner')}
+                          onClick={() => setZoom(z => Math.max(0.25, z - 0.2))}>-</button>
+                      </Segment>
+                      <button className="btn btn-outline btn-leiste"
                         onClick={fitAll}>{t('cd.puzzle.alles_zeigen', 'Alles zeigen')}</button>
                     </div>
                   )}
@@ -837,8 +842,8 @@ export default function PuzzlePage() {
                     style={{
                       overflow: 'auto', minHeight: 300, maxHeight: 'calc(100vh - 280px)', position: 'relative',
                       cursor: isPanning ? 'grabbing' : 'default',
-                      background: 'rgba(0,0,0,0.02)', borderRadius: 8,
-                      border: '1px dashed #d5d5d5',
+                      background: 'var(--bg2)', borderRadius: 10,
+                      border: '1px dashed var(--border2)',
                     }}
                   >
                     <div ref={contentRef} style={{
@@ -852,7 +857,7 @@ export default function PuzzlePage() {
                           <div style={{
                             position: 'absolute', top: '50%', left: '50%',
                             transform: 'translate(-50%, -50%)',
-                            color: '#aaa', fontSize: 14, pointerEvents: 'none',
+                            color: 'var(--text3)', fontSize: 14, pointerEvents: 'none',
                           }}>{t('cd.bloecke_hierhin', 'Blöcke hierhin ziehen')}</div>
                         )}
                         {stacks.map(stack => (

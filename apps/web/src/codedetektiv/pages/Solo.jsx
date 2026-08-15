@@ -30,13 +30,13 @@ export default function Solo() {
                 <span style={{ fontSize: 24 }}>{puzzle.type === 'maze' ? <IconMap size={24} /> : <IconPuzzle size={24} />}</span>
                 <h3 style={{ fontSize: 16, fontWeight: 600 }}>{puzzle.title}</h3>
               </div>
-              <p style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>{puzzle.description}</p>
+              <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 12 }}>{puzzle.description}</p>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <span className="cat-badge" style={{ background: puzzle.type === 'maze' ? CATEGORIES.movement.color : CATEGORIES.basic.color }}>
                   {puzzle.type === 'maze' ? t('cd.typ.labyrinth', 'Labyrinth') : t('cd.typ.sortieren', 'Sortieren')}
                 </span>
                 {Array.from({ length: puzzle.difficulty }, (_, i) => <IconStar key={i} size={14} />)}
-                <span style={{ fontSize: 12, color: '#999', marginLeft: 'auto' }}>
+                <span style={{ fontSize: 12, color: 'var(--text3)', marginLeft: 'auto' }}>
                   <IconClock size={12} /> {Math.floor(puzzle.timeLimit / 60)}:{String(puzzle.timeLimit % 60).padStart(2, '0')}
                 </span>
               </div>

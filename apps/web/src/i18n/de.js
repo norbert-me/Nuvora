@@ -2173,4 +2173,6 @@ export default {
   "cd.zeit_abgelaufen": "Zeit abgelaufen",
   "cd.zur_startseite": "Zurück zur Startseite",
   "cd.zurueck": "Zurück",
+  "cd.puzzle.groesser": "Größer",
+  "cd.puzzle.kleiner": "Kleiner",
 };

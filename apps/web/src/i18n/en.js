@@ -2187,4 +2187,6 @@ export default {
   "cd.zeit_abgelaufen": "Time is up",
   "cd.zur_startseite": "Back to the start page",
   "cd.zurueck": "Back",
+  "cd.puzzle.groesser": "Zoom in",
+  "cd.puzzle.kleiner": "Zoom out",
 };

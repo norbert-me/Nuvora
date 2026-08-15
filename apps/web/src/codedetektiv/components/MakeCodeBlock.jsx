@@ -222,7 +222,7 @@ export function GhostBlock({ block }) {
 // Komponente stehen darf (die Stelle taucht zweimal auf).
 function LeererContainer() {
   const { t } = useCdText();
-  return <div style={{ color: '#999', fontSize: 13, padding: '8px 0' }}>{t('cd.bloecke_hierhin', 'Blöcke hierhin ziehen')}</div>;
+  return <div style={{ color: 'var(--text3)', fontSize: 13, padding: '8px 0' }}>{t('cd.bloecke_hierhin', 'Blöcke hierhin ziehen')}</div>;
 }
 
 function ContainerBody({ block, children }) {

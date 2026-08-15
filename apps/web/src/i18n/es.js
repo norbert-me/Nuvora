@@ -2188,4 +2188,6 @@ export default {
   "cd.zeit_abgelaufen": "Se acabó el tiempo",
   "cd.zur_startseite": "Volver a la página de inicio",
   "cd.zurueck": "Atrás",
+  "cd.puzzle.groesser": "Acercar",
+  "cd.puzzle.kleiner": "Alejar",
 };
