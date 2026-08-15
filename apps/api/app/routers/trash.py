@@ -200,11 +200,20 @@ async def purge_item(kind: str, obj_id: int, user: User = Depends(get_current_us
     await _aktion(kind, 1)(obj_id, user, db)
 
 
+# Reihenfolge beim Leeren: Kinder vor ihren Eltern, damit die Kaskade des
+# Elternteils nicht ins Leere greift. Was hier nicht genannt ist, hängt
+# hinten dran — und genau das ist der Punkt: „leeren" war die eine Stelle, die
+# eine neue Art vergaß. Fragen und Themen standen in `_AKTIONEN` und in der
+# Liste, aber nicht in dieser Reihenfolge; sie blieben nach dem Leeren liegen,
+# und die Antwort war trotzdem 204.
+_LEER_ZUERST = ["card", "ladder", "deck", "path", "class", "kurs"]
+LEER_REIHENFOLGE = _LEER_ZUERST + [k for k in _AKTIONEN if k not in _LEER_ZUERST]
+
+
 @router.delete("", status_code=204)
 async def empty_trash(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Papierkorb leeren — alles endgültig löschen. Karten und Lernleitern
-    zuerst, damit die Kaskade ihres Elternteils nicht ins Leere greift."""
-    reihenfolge = ["card", "ladder", "deck", "path", "class", "kurs"]
+    """Papierkorb leeren — alles endgültig löschen (siehe LEER_REIHENFOLGE)."""
+    reihenfolge = LEER_REIHENFOLGE
     items = await list_trash(user, db)
     nach_art = {k: [i.id for i in items if i.kind == k] for k in reihenfolge}
     for kind in reihenfolge:

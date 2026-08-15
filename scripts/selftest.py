@@ -750,6 +750,48 @@ def teste_kern(api, b, u):
             raise AssertionError("REGISTRY leer")
         return f"{len(module)} Module im Register"
 
+    def sicherung():
+        """Der Sicherungs-Weg gehoert der Administration — und was da liegt,
+        muss heil sein.
+
+        Bewusst wird KEINE Sicherung erzeugt: `POST /api/admin/backup` legt eine
+        echte Datei in die Rotation und wirft dabei (KEEP/MAX_MB in backup.py)
+        eine echte aeltere heraus. Ein Test, der bei jedem Deploy laeuft, darf
+        die Sicherungshistorie des Betriebs nicht aufbrauchen. Geprueft wird
+        deshalb: die Tuer ist zu (ohne Anmeldung und mit einem gewoehnlichen
+        Lehrkraft-Konto), und — falls das Testkonto die Administration ist —
+        die Pruefsumme der neuesten vorhandenen Sicherung.
+        """
+        anonym = Api(api.basis, debug=api.debug)
+        for pfad, methode in (("/api/admin/backup", "GET"),
+                              ("/api/admin/backup", "POST"),
+                              ("/api/admin/backup/einstellungen", "PUT")):
+            status, _ = anonym.call(methode, pfad, {} if methode != "GET" else None, roh=True)
+            if status == 200 or status == 201:
+                raise AssertionError(f"{methode} {pfad} antwortet ohne Anmeldung mit {status} — "
+                                     "Sicherungen enthalten Art.-9-Daten")
+        status, text = api.call("GET", "/api/admin/backup", roh=True)
+        if status == 403:
+            return "nur fuer die Administration (Testkonto ist keine) — Tuer zu"
+        if status != 200:
+            raise AssertionError(f"HTTP {status}: {text[:150]}")
+        daten = json.loads(text)
+        fehlt = [f for f in ("ziel", "verzeichnis", "sicherungen", "inhalt", "nicht_enthalten")
+                 if f not in daten]
+        if fehlt:
+            raise AssertionError("Auskunft unvollstaendig: " + ", ".join(fehlt))
+        if not any(".env" in z for z in daten.get("nicht_enthalten") or []):
+            raise AssertionError("die Auskunft nennt nicht, dass .env bewusst NICHT mitgesichert "
+                                 "wird — genau das muss dranstehen")
+        liste = daten.get("sicherungen") or []
+        if not liste:
+            return "Administration: Auskunft vollstaendig, noch keine Sicherung vorhanden"
+        neueste = liste[0]["name"]
+        pruef = api.call("POST", f"/api/admin/backup/{neueste}/pruefen", erwartet=(200,))
+        if not pruef.get("ok"):
+            raise AssertionError(f"neueste Sicherung '{neueste}' ist nicht heil: {pruef}")
+        return f"{len(liste)} Sicherungen, neueste ('{neueste}') geprueft und heil"
+
     b.pruefe("Kern", "Klassen und Schueler", klassen)
     b.pruefe("Kern", "Reihenfolge", reihenfolge)
     b.pruefe("Kern", "Kurse", kurse)
@@ -761,6 +803,7 @@ def teste_kern(api, b, u):
     b.pruefe("Kern", "Themenstand", themenstand)
     b.pruefe("Kern", "Zugangs-Zettel", zugangsdruck)
     b.pruefe("Kern", "Modulregister", modulregister)
+    b.pruefe("Kern", "Sicherung", sicherung)
 
 
 # ── je Modul eine Probe: anlegen, lesen, aendern, loeschen ──
@@ -1043,6 +1086,10 @@ def teste_module(api, b, u):
 
         # Braucht aktive Module (Karten, Code-Detektiv), also hier drin.
         teste_schueler_wege(api, b, u)
+        teste_papierkorb_rundweg(api, b, u)
+        teste_archiv_zugaenge(api, b, u)
+        teste_teilmengen(api, b, u)
+        teste_art9_export(api, b, u)
         teste_fremdzugriff(api, b, u)
     finally:
         for key in zugeschaltet:
@@ -1053,6 +1100,468 @@ def teste_module(api, b, u):
         # Zurueckgestellt — der gemerkte Zustand ist verbraucht. Ohne das wuerde
         # aufraeumen.py spaeter einen veralteten Stand wiederherstellen.
         vergiss_module(api.basis)
+
+
+def teste_papierkorb_rundweg(api, b, u):
+    """Der ganze Weg durch den Papierkorb — je Art, die `list_trash` kennt.
+
+    Bisher wurde nur geprueft, dass `/api/trash` antwortet. Das sagt nichts
+    darueber, ob Geloeschtes dort ankommt, ob es zurueckkommt und ob es sich
+    endgueltig entfernen laesst. Genau daran haengt aber, ob ein Fehlgriff
+    reparabel ist — und der Papierkorb ist die einzige Stelle, an der Module
+    und Kern dieselbe Semantik teilen (`_AKTIONEN` in routers/trash.py ruft die
+    Modul-Funktionen auf, statt eigene Logik zu bauen).
+
+    Geprueft wird je Art: loeschen -> liegt im Papierkorb -> wiederherstellen ->
+    ist wieder da (an seiner eigenen Liste nachgesehen, nicht am Papierkorb) ->
+    wieder loeschen -> endgueltig weg.
+    """
+    arten = []
+
+    def anlegen():
+        kl = api.call("POST", "/api/classes", {
+            "name": f"{PRAEFIX} Papierkorb-Klasse",
+            "students": [{"card_id": 1, "name": f"{PRAEFIX} Kind"}]}, erwartet=(201,))
+        kurs = api.call("POST", "/api/kurse", {"name": f"{PRAEFIX} Papierkorb-Kurs"},
+                        erwartet=(201,))
+        thema = api.call("POST", "/api/topics", {"name": f"{PRAEFIX} Papierkorb-Thema"},
+                         erwartet=(201,))
+        frage = api.call("POST", "/api/questions", {
+            "text": f"{PRAEFIX} Papierkorb-Frage", "question_type": "mc",
+            "choices": {"A": "1", "B": "2", "C": "3", "D": "4"}, "correct_answer": "A",
+        }, erwartet=(201,))
+        pfad = api.call("POST", "/api/lernpfad/paths", {"name": f"{PRAEFIX} Papierkorb-Pfad"},
+                        erwartet=(201,))
+        leiter = api.call("POST", f"/api/lernpfad/paths/{pfad['id']}/ladders",
+                          {"class_id": u.class_id, "topic_id": u.topic_id}, erwartet=(201,))
+        stapel = api.call("POST", f"/api/karten/classes/{u.class_id}/decks",
+                          {"name": f"{PRAEFIX} Papierkorb-Stapel"}, erwartet=(201,))
+        karte = api.call("POST", f"/api/karten/decks/{stapel['id']}/cards",
+                         {"front": f"{PRAEFIX} Papierkorb-Karte", "back": "x"}, erwartet=(201,))
+
+        def lebt_in(pfad_liste, oid, schluessel="id"):
+            return lambda: any(x.get(schluessel) == oid
+                               for x in (api.call("GET", pfad_liste, erwartet=(200,)) or []))
+
+        def leiter_lebt():
+            pfade = api.call("GET", "/api/lernpfad/paths", erwartet=(200,)) or []
+            p = _finde_id(pfade, pfad["id"])
+            return any(x.get("id") == leiter["id"] for x in ((p or {}).get("ladders") or []))
+
+        arten.extend([
+            ("class", kl["id"], f"/api/classes/{kl['id']}", lebt_in("/api/classes", kl["id"])),
+            ("kurs", kurs["id"], f"/api/kurse/{kurs['id']}", lebt_in("/api/kurse", kurs["id"])),
+            ("topic", thema["id"], f"/api/topics/{thema['id']}",
+             lebt_in("/api/topics", thema["id"])),
+            ("question", frage["id"], f"/api/questions/{frage['id']}",
+             lebt_in("/api/questions", frage["id"])),
+            ("ladder", leiter["id"], f"/api/lernpfad/ladders/{leiter['id']}", leiter_lebt),
+            ("path", pfad["id"], f"/api/lernpfad/paths/{pfad['id']}",
+             lebt_in("/api/lernpfad/paths", pfad["id"])),
+            ("card", karte["id"], f"/api/karten/cards/{karte['id']}",
+             lambda: any(c.get("id") == karte["id"] for c in
+                         (_finde_id(api.call("GET", "/api/karten/decks", erwartet=(200,)),
+                                    stapel["id"]) or {}).get("cards") or [])),
+            ("deck", stapel["id"], f"/api/karten/decks/{stapel['id']}",
+             lebt_in(f"/api/karten/classes/{u.class_id}/decks", stapel["id"])),
+        ])
+        return f"{len(arten)} Arten angelegt"
+
+    def im_papierkorb(kind, oid):
+        return any(e["kind"] == kind and e["id"] == oid
+                   for e in api.call("GET", "/api/trash", erwartet=(200,)) or [])
+
+    def rundweg():
+        # Reihenfolge: Kind vor Elternteil (Karte vor Stapel, Leiter vor Pfad) —
+        # sonst nimmt die Kaskade des Elternteils das Kind mit, und der
+        # Rueckweg pruefte nichts mehr.
+        fehler = []
+        for kind, oid, weg, lebt in arten:
+            try:
+                api.call("DELETE", weg, erwartet=(204,))
+                if not im_papierkorb(kind, oid):
+                    fehler.append(f"{kind} {oid}: nach dem Loeschen nicht im Papierkorb")
+                    continue
+                api.call("POST", f"/api/trash/{kind}/{oid}/restore", erwartet=(204,))
+                if im_papierkorb(kind, oid):
+                    fehler.append(f"{kind} {oid}: liegt nach dem Wiederherstellen weiter im Papierkorb")
+                if not lebt():
+                    fehler.append(f"{kind} {oid}: wiederhergestellt, steht aber nicht in seiner Liste")
+                api.call("DELETE", weg, erwartet=(204,))
+                api.call("DELETE", f"/api/trash/{kind}/{oid}", erwartet=(204,))
+                if im_papierkorb(kind, oid):
+                    fehler.append(f"{kind} {oid}: nach dem endgueltigen Loeschen weiter im Papierkorb")
+            except Exception as e:
+                fehler.append(f"{kind} {oid}: {e}")
+        if fehler:
+            raise AssertionError("; ".join(fehler))
+        return (f"{len(arten)} Arten: loeschen, wiederfinden, zurueckholen, "
+                "endgueltig loeschen — je einmal durchgespielt")
+
+    def lebendes_bleibt():
+        """Der Papierkorb darf nur anfassen, was wirklich darin liegt.
+
+        `purge_card` prueft das deleted_at nicht selbst — ueber diesen Router
+        liess sich frueher eine LEBENDE Karte endgueltig loeschen. Die Schranke
+        sitzt in `_im_papierkorb`, und genau die wird hier probiert.
+        """
+        thema = api.call("POST", "/api/topics", {"name": f"{PRAEFIX} Lebt-noch"}, erwartet=(201,))
+        try:
+            status, _ = api.call("DELETE", f"/api/trash/topic/{thema['id']}", roh=True)
+            if status != 404:
+                raise AssertionError(f"lebendes Thema endgueltig loeschbar (HTTP {status})")
+            status, _ = api.call("POST", f"/api/trash/topic/{thema['id']}/restore", roh=True)
+            if status != 404:
+                raise AssertionError(f"lebendes Thema wiederherstellbar (HTTP {status})")
+            if not any(t["id"] == thema["id"]
+                       for t in api.call("GET", "/api/topics", erwartet=(200,))):
+                raise AssertionError("das lebende Thema ist verschwunden")
+        finally:
+            api.call("DELETE", f"/api/topics/{thema['id']}", erwartet=(204, 404))
+            api.call("DELETE", f"/api/trash/topic/{thema['id']}", erwartet=(204, 404))
+        return "was nicht im Papierkorb liegt, laesst sich weder purgen noch zurueckholen"
+
+    def leeren():
+        """„Papierkorb leeren" muss alles nehmen — auch Fragen und Themen.
+
+        Die Arten wachsen (zuletzt kamen CardVote-Fragen und Themen dazu), und
+        `empty_trash` fuehrt eine EIGENE Reihenfolge-Liste. Wer dort eine Art
+        vergisst, bekommt einen Papierkorb, der sich nicht leeren laesst — und
+        merkt es nie, weil die Antwort trotzdem 204 ist.
+        """
+        angelegt = []
+        thema = api.call("POST", "/api/topics", {"name": f"{PRAEFIX} Leeren-Thema"}, erwartet=(201,))
+        angelegt.append(("topic", thema["id"], f"/api/topics/{thema['id']}"))
+        frage = api.call("POST", "/api/questions", {
+            "text": f"{PRAEFIX} Leeren-Frage", "question_type": "mc",
+            "choices": {"A": "1", "B": "2", "C": "3", "D": "4"}, "correct_answer": "A",
+        }, erwartet=(201,))
+        angelegt.append(("question", frage["id"], f"/api/questions/{frage['id']}"))
+        stapel = api.call("POST", f"/api/karten/classes/{u.class_id}/decks",
+                          {"name": f"{PRAEFIX} Leeren-Stapel"}, erwartet=(201,))
+        angelegt.append(("deck", stapel["id"], f"/api/karten/decks/{stapel['id']}"))
+        for _kind, _oid, weg in angelegt:
+            api.call("DELETE", weg, erwartet=(204,))
+        try:
+            api.call("DELETE", "/api/trash", erwartet=(204,))
+            uebrig = [f"{k} {o}" for k, o, _w in angelegt if im_papierkorb(k, o)]
+            if uebrig:
+                raise AssertionError("nach dem Leeren liegt es immer noch da: " + ", ".join(uebrig))
+        finally:
+            for kind, oid, _weg in angelegt:
+                api.call("DELETE", f"/api/trash/{kind}/{oid}", erwartet=(204, 404))
+        return f"{len(angelegt)} Arten weich geloescht, Leeren nimmt alle"
+
+    if b.pruefe("Papierkorb", "Testdaten je Art", anlegen):
+        b.pruefe("Papierkorb", "Loeschen, zurueckholen, endgueltig loeschen", rundweg)
+    b.pruefe("Papierkorb", "Lebendes bleibt unangetastet", lebendes_bleibt)
+    b.pruefe("Papierkorb", "Leeren nimmt jede Art", leeren)
+
+
+def _finde_id(liste, oid):
+    for e in liste or []:
+        if e.get("id") == oid:
+            return e
+    return None
+
+
+def teste_archiv_zugaenge(api, b, u):
+    """Eine archivierte Klasse verstummt nach aussen — ihre Daten bleiben.
+
+    Archivieren heisst „Schuljahr vorbei", nicht „geloescht": die Klasse
+    verschwindet aus den Auswahlfeldern, und die ausgeteilten QR-Codes duerfen
+    nichts mehr herausgeben (`_student_by_token` in karten.py prueft das). Beides
+    war ungeprueft — geprueft wurde nur, dass die Klasse aus der Liste faellt.
+    """
+    anonym = Api(api.basis, debug=api.debug)
+    stapel = api.call("POST", f"/api/karten/classes/{u.class_id}/decks",
+                      {"name": f"{PRAEFIX} Archiv-Stapel"}, erwartet=(201,))
+    archiviert = False
+    try:
+        api.call("POST", f"/api/karten/decks/{stapel['id']}/cards",
+                 {"front": "ARCHIVGEHEIM", "back": "ARCHIVGEHEIM-HINTEN"}, erwartet=(201,))
+        api.call("POST", f"/api/karten/decks/{stapel['id']}/release", {"now": True},
+                 erwartet=(200,))
+        zugaenge = api.call("POST", f"/api/karten/classes/{u.class_id}/tokens",
+                            erwartet=(200, 201))
+        token = zugaenge[0]["token"]
+
+        def offen():
+            stand = anonym.call("GET", f"/api/karten/lernen/{token}", erwartet=(200,))
+            if not any(c["front"] == "ARCHIVGEHEIM" for c in stand.get("cards") or []):
+                raise AssertionError("Karte fehlt, obwohl die Klasse aktiv ist")
+            return "vor dem Archivieren: der Zettel gilt"
+
+        def stumm():
+            nonlocal archiviert
+            api.call("POST", f"/api/classes/{u.class_id}/archive", erwartet=(200,))
+            archiviert = True
+            status, text = anonym.call("GET", f"/api/karten/lernen/{token}", roh=True)
+            if status < 400:
+                raise AssertionError(f"archivierte Klasse liefert weiter aus (HTTP {status})")
+            if "ARCHIVGEHEIM" in text:
+                raise AssertionError("Karteninhalte stehen trotz Archiv in der Antwort")
+            status, _ = anonym.call("POST", f"/api/karten/lernen/{token}/review",
+                                    {"card_id": 1, "grade": 2}, roh=True)
+            if status < 400:
+                raise AssertionError(f"Schreiben ueber den Zettel einer archivierten Klasse "
+                                     f"moeglich (HTTP {status})")
+            return f"archiviert: HTTP {status}, keine Inhalte in der Antwort"
+
+        def daten_bleiben():
+            im_archiv = api.call("GET", "/api/classes?archiviert=true", erwartet=(200,))
+            eintrag = _finde_id(im_archiv, u.class_id)
+            if not eintrag:
+                raise AssertionError("archivierte Klasse fehlt im Archiv")
+            if len(eintrag.get("students") or []) != len(u.students):
+                raise AssertionError(f"{len(eintrag.get('students') or [])} Schueler im Archiv "
+                                     f"statt {len(u.students)}")
+            # Der Stapel gehoert der Klasse und muss das Archivieren ueberleben.
+            if not _finde_id(api.call("GET", "/api/karten/decks", erwartet=(200,)), stapel["id"]):
+                raise AssertionError("der Kartenstapel der Klasse ist mit dem Archiv verschwunden")
+            return f"{len(eintrag['students'])} Schueler und der Kartenstapel sind unversehrt"
+
+        def zurueck():
+            nonlocal archiviert
+            api.call("POST", f"/api/classes/{u.class_id}/archive", erwartet=(200,))
+            archiviert = False
+            stand = anonym.call("GET", f"/api/karten/lernen/{token}", erwartet=(200,))
+            if not any(c["front"] == "ARCHIVGEHEIM" for c in stand.get("cards") or []):
+                raise AssertionError("nach dem Zurueckholen gilt der Zettel nicht mehr")
+            return "aus dem Archiv zurueck: derselbe Zettel gilt wieder"
+
+        b.pruefe("Archiv", "Zugang gilt vor dem Archivieren", offen)
+        b.pruefe("Archiv", "Archivierte Klasse verstummt nach aussen", stumm)
+        b.pruefe("Archiv", "Daten bleiben vollstaendig", daten_bleiben)
+        b.pruefe("Archiv", "Zurueckholen belebt denselben Zettel", zurueck)
+    finally:
+        if archiviert:
+            try:
+                api.call("POST", f"/api/classes/{u.class_id}/archive", erwartet=(200,))
+            except Exception as e:
+                b.reste.append(f"Testklasse blieb archiviert: {e}")
+        api.call("DELETE", f"/api/karten/decks/{stapel['id']}", erwartet=(204, 404))
+        api.call("DELETE", f"/api/karten/decks/{stapel['id']}/purge", erwartet=(204, 404))
+
+
+# Marker, die NUR in den besonders schuetzenswerten Feldern stehen. Taucht einer
+# in einem Export auf, ist genau das passiert, was CLAUDE.md verbietet.
+ART9_NOTIZ = "ZZ-Art9-Notiz-Geheim"
+ART9_MASSNAHME = "ZZ-Art9-Massnahme-Geheim"
+
+
+def teste_art9_export(api, b, u):
+    """DSGVO Art. 9: foerder, massnahmen und notizen stehen in KEINEM Export.
+
+    Es gibt einen pytest dafuer, der die Funktionen prueft. Hier zaehlt die
+    laufende Installation: die Felder werden mit einem eindeutigen Marker
+    beschrieben, danach wird jeder Export- und Marktplatzweg abgerufen und die
+    Antwort danach durchsucht.
+
+    Zwei Wege sind bewusst NICHT dabei, und das ist kein Versehen:
+      * `/api/me/export` — die Selbstauskunft nach Art. 15. Sie MUSS die Daten
+        enthalten (und sagt das auch), sie geht an niemanden sonst.
+      * PDF-Ausgaben — ihre Textstroeme sind komprimiert, eine Textsuche darin
+        faende auch einen echten Verstoss nicht. Ein Test, der nie anschlagen
+        kann, ist schlechter als keiner: er sagt „geprueft", ohne zu pruefen.
+    """
+    import io
+    import zipfile
+
+    kl = api.call("GET", f"/api/classes/{u.class_id}", erwartet=(200,))
+    original = kl["students"]
+
+    def schreiben(mit_marker):
+        api.call("PUT", f"/api/classes/{u.class_id}", {
+            "name": kl["name"],
+            "students": [{
+                "card_id": s["card_id"], "name": s["name"], "niveau": s.get("niveau") or "",
+                "foerder": ["Lernen"] if mit_marker and i == 0 else None,
+                "massnahmen": ([{"art": "Zeitzuschlag", "detail": ART9_MASSNAHME, "arbeit": True}]
+                               if mit_marker and i == 0 else None),
+                "notizen": ART9_NOTIZ if mit_marker and i == 0 else "",
+            } for i, s in enumerate(original)],
+        }, erwartet=(200,))
+
+    def sweep():
+        schreiben(True)
+        # Gegenprobe: der Marker steht wirklich in der Datenbank. Ohne sie wuerde
+        # die Suche unten auch dann gruen, wenn nie etwas geschrieben wurde.
+        nach = api.call("GET", f"/api/classes/{u.class_id}", erwartet=(200,))
+        kind = nach["students"][0]
+        if kind.get("notizen") != ART9_NOTIZ:
+            raise AssertionError("der Marker steht nicht in students.notizen — "
+                                 "die Suche darunter beweist dann nichts")
+        if not any(m.get("detail") == ART9_MASSNAHME for m in kind.get("massnahmen") or []):
+            raise AssertionError("der Marker steht nicht in students.massnahmen")
+        if "Lernen" not in (kind.get("foerder") or []):
+            raise AssertionError("der Foerderschwerpunkt wurde nicht gespeichert")
+
+        # Eigene Ausgaben: hier wird auch nach den FELDNAMEN gesucht — der
+        # Foerderschwerpunkt ist ein Wort aus einem festen Katalog und taugt
+        # nicht als Marker, sein Schluessel schon.
+        wege = [
+            f"/api/export/class/{u.class_id}",
+            f"/api/noten/classes/{u.class_id}/export",
+            f"/api/klassenarbeit/classes/{u.class_id}/students",
+            f"/api/noten/classes/{u.class_id}/students",
+            f"/api/karten/classes/{u.class_id}/progress",
+            "/api/kalender/export",
+            "/api/methoden/export",
+        ]
+        # Der Marktplatz ist oeffentlich und zeigt auch fremde Eintraege. Dort
+        # wird NUR nach den eigenen Markern gesucht: ein fremder Eintrag, der
+        # zufaellig das Wort „notizen" enthaelt, waere sonst ein roter Lauf ohne
+        # Befund — und ein Test, der gelegentlich grundlos rot ist, verdirbt den
+        # gruenen.
+        gefunden = []
+        stumm = []
+        for weg in wege + ["/api/marketplace"]:
+            status, text = api.call("GET", weg, roh=True)
+            if status != 200:
+                # Nicht stillschweigend uebergehen: ein Weg, der nicht antwortet,
+                # ist ein Weg, der nicht geprueft wurde — das gehoert in den
+                # Bericht, sonst liest sich „gruen" wie „alles durchsucht".
+                stumm.append(f"{weg} ({status})")
+                continue
+            for marker in (ART9_NOTIZ, ART9_MASSNAHME):
+                if marker in text:
+                    gefunden.append(f"{weg}: {marker}")
+            if weg in wege:
+                for feld in ('"foerder"', '"massnahmen"', '"notizen"'):
+                    if feld in text:
+                        gefunden.append(f"{weg}: Feld {feld}")
+
+        # ZIP: hier hilft keine Textsuche auf der Antwort — die Eintraege sind
+        # komprimiert. Also wirklich auspacken und in den Teilen suchen.
+        status, roh = api.rohbytes(f"/api/noten/classes/{u.class_id}/export.zip")
+        teile = 0
+        if status == 200 and roh[:2] == b"PK":
+            with zipfile.ZipFile(io.BytesIO(roh)) as z:
+                for name in z.namelist():
+                    if name.lower().endswith(".pdf"):
+                        continue      # siehe Dokumentation oben
+                    teile += 1
+                    inhalt = z.read(name).decode("utf-8", "replace")
+                    for marker in (ART9_NOTIZ, ART9_MASSNAHME):
+                        if marker in inhalt:
+                            gefunden.append(f"export.zip/{name}: {marker}")
+        if gefunden:
+            raise AssertionError("besonders schuetzenswerte Daten im Export: "
+                                 + "; ".join(gefunden))
+        return (f"{len(wege) + 1 - len(stumm)} Export- und Marktplatzwege plus {teile} Teil(e) "
+                "der Noten-ZIP durchsucht — kein Foerder-, Massnahmen- oder Notizfeld darin"
+                + (f"; ohne Antwort und daher ungeprueft: {', '.join(stumm)}" if stumm else ""))
+
+    try:
+        b.pruefe("Datenschutz", "Art.-9-Daten in keinem Export", sweep)
+    finally:
+        try:
+            schreiben(False)
+        except Exception as e:
+            b.reste.append(f"Art-9-Marker nicht aus der Testklasse entfernt: {e}")
+
+
+def teste_teilmengen(api, b, u):
+    """Was ein PUT nicht mitschickt, darf es nicht loeschen.
+
+    Seit die Oberflaeche erst auf Knopfdruck speichert, schicken die Masken
+    ganze Zustaende an den Server. Das ist richtig so — aber dieselben
+    Endpunkte werden auch von kleinen Handgriffen benutzt (umbenennen,
+    verschieben), die nur einen Ausschnitt schicken. Wo der Server das als
+    „alles andere loeschen" liest, verschwinden Daten lautlos. Genau so hat
+    `eval_config` einmal die Zeitdaten einer laufenden Sitzung geloescht.
+
+    Geprueft werden die Endpunkte, die ausdruecklich teilweise arbeiten (und
+    fuer die es deshalb eine Zusicherung gibt) — nicht die Formularmasken, bei
+    denen ein leeres Feld leeren SOLL.
+    """
+    def klassenarbeit():
+        arbeit = api.call("POST", "/api/klassenarbeit/works",
+                          {"class_id": u.class_id, "name": f"{PRAEFIX} Teilmenge"},
+                          erwartet=(201,))
+        try:
+            api.call("PUT", f"/api/klassenarbeit/works/{arbeit['id']}", {
+                "tasks": [{"id": "a1", "label": "Aufgabe 1", "topic_id": u.topic_id, "max": 5}],
+                "results": {str(u.students[0]): {"a1": 3}},
+                "scale": {"1": 90, "2": 75, "3": 60, "4": 45, "5": 20, "6": 0},
+                "absent": [str(u.students[1])],
+            }, erwartet=(200,))
+            # Nur den Namen aendern — sonst nichts.
+            api.call("PUT", f"/api/klassenarbeit/works/{arbeit['id']}",
+                     {"name": f"{PRAEFIX} Teilmenge B"}, erwartet=(200,))
+            w = _finde_id(api.call("GET", f"/api/klassenarbeit/classes/{u.class_id}/works",
+                                   erwartet=(200,)), arbeit["id"])
+            if not w:
+                raise AssertionError("die Arbeit ist nach dem Umbenennen verschwunden")
+            verloren = []
+            if len(w.get("tasks") or []) != 1:
+                verloren.append(f"tasks={w.get('tasks')}")
+            if (w.get("results") or {}).get(str(u.students[0])) != {"a1": 3.0}:
+                verloren.append(f"results={w.get('results')}")
+            if not w.get("scale"):
+                verloren.append("scale leer")
+            if str(u.students[1]) not in (w.get("absent") or []):
+                verloren.append(f"absent={w.get('absent')}")
+            if verloren:
+                raise AssertionError("Umbenennen hat mitgeloescht: " + ", ".join(verloren))
+            return "Umbenennen laesst Aufgaben, Punkte, Notenschluessel und Abwesende stehen"
+        finally:
+            api.call("DELETE", f"/api/klassenarbeit/works/{arbeit['id']}", erwartet=(204, 404))
+
+    def notenabschnitt():
+        # `term` steht gar nicht in SectionIn — genau deshalb muss es haften.
+        # Wuerde es beim Bearbeiten auf die Vorgabe "1" fallen, wanderte ein
+        # Abschnitt des 2. Halbjahres beim Umbenennen ins erste.
+        block = api.call("POST", f"/api/noten/classes/{u.class_id}/sections?term=2",
+                         {"name": f"{PRAEFIX} 2. HJ", "weight": 30}, erwartet=(201,))
+        try:
+            api.call("PUT", f"/api/noten/sections/{block['id']}",
+                     {"name": f"{PRAEFIX} 2. HJ neu", "weight": 30, "position": 0},
+                     erwartet=(200,))
+            alle = api.call("GET", f"/api/noten/classes/{u.class_id}/sections?term=all",
+                            erwartet=(200,))
+            mein = _finde_id(alle, block["id"])
+            if not mein:
+                raise AssertionError("der Abschnitt ist nach dem Umbenennen verschwunden")
+            if str(mein.get("term")) != "2":
+                raise AssertionError(f"Halbjahr beim Umbenennen verloren: term={mein.get('term')}")
+            return "ein Abschnitt des 2. Halbjahres bleibt nach dem Umbenennen im 2. Halbjahr"
+        finally:
+            api.call("DELETE", f"/api/noten/sections/{block['id']}", erwartet=(204, 404))
+
+    def kartenstapel():
+        # Freigabe und Kurs-Zuweisung stehen nicht in DeckIn (bzw. werden beim
+        # Bearbeiten bewusst nicht gelesen). Ein Umbenennen darf einen
+        # ausgerollten Stapel weder zurueckziehen noch aus seinen Kursen nehmen —
+        # sonst waeren die Karten der Klasse ueber Nacht weg.
+        stapel = api.call("POST", "/api/karten/decks",
+                          {"name": f"{PRAEFIX} Teilmengen-Stapel"}, erwartet=(201,))
+        try:
+            api.call("POST", f"/api/karten/decks/{stapel['id']}/release", {"now": True},
+                     erwartet=(200,))
+            if u.kurs_id:
+                api.call("PUT", f"/api/karten/decks/{stapel['id']}/kurse",
+                         {"kurs_ids": [u.kurs_id]}, erwartet=(200,))
+            api.call("PUT", f"/api/karten/decks/{stapel['id']}",
+                     {"name": f"{PRAEFIX} Teilmengen-Stapel B"}, erwartet=(200,))
+            nach = _finde_id(api.call("GET", "/api/karten/decks", erwartet=(200,)), stapel["id"])
+            if not nach:
+                raise AssertionError("der Stapel ist nach dem Umbenennen aus der Sammlung weg")
+            if not nach.get("released_at"):
+                raise AssertionError("Umbenennen hat den Stapel wieder zum Entwurf gemacht")
+            zugewiesen = api.call("GET", f"/api/karten/decks/{stapel['id']}/kurse",
+                                  erwartet=(200,)).get("kurs_ids")
+            if u.kurs_id and zugewiesen != [u.kurs_id]:
+                raise AssertionError(f"Kurs-Zuweisung beim Umbenennen verloren: {zugewiesen}")
+            return "Umbenennen laesst Freigabe und Kurs-Zuweisung stehen"
+        finally:
+            api.call("DELETE", f"/api/karten/decks/{stapel['id']}", erwartet=(204, 404))
+            api.call("DELETE", f"/api/karten/decks/{stapel['id']}/purge", erwartet=(204, 404))
+
+    b.pruefe("Teilmengen", "Klassenarbeit umbenennen", klassenarbeit)
+    b.pruefe("Teilmengen", "Notenabschnitt umbenennen", notenabschnitt)
+    b.pruefe("Teilmengen", "Kartenstapel umbenennen", kartenstapel)
 
 
 def teste_schueler_wege(api, b, u):

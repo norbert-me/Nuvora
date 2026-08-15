@@ -2010,6 +2010,263 @@ def teste_bruecken(api, b, u, sch, spuren, cv):
     b.pruefe("Bruecken", "Karten -> Themenstand", karten_im_themenstand)
 
 
+# ───────────── 6. Fruehwarnung und Themenstand nachgerechnet ─────────────
+#
+# Beide antworteten im Test bisher nur "ohne Fehler". Das ist zu wenig: es sind
+# die zwei Sichten, aus denen eine Lehrkraft Schluesse ueber ein einzelnes Kind
+# zieht — eine falsche Zahl darin ist schlimmer als gar keine.
+#
+# Die Datengrundlage sind vier Klassenarbeiten (nicht Quizze): eine Arbeit ist
+# ein PUT mit allen Punkten aller Kinder, vier Quizze waeren siebzig Aufrufe.
+# Gerechnet wird ausschliesslich ueber die Arbeiten, indem NUR das Modul
+# Auswertung laeuft — sonst mischten die Quizze der CardVote-Probe mit und die
+# Erwartung waere nicht mehr exakt.
+
+# Punkte je Aufgabe. Anna faellt in jeder Arbeit gleich weit zurueck (damit der
+# Median eindeutig ist), aber INNERHALB der Themen verschiebt sich etwas:
+# Thema 1 bricht ein, Thema 4 holt auf, Thema 2 und 3 bleiben. Genau daran
+# laesst sich der Trend des Themenstands pruefen, ohne die Fruehwarnung zu
+# verwackeln.
+FW_MAX = 4.0                     # Maximalpunkte je Aufgabe
+FW_PUNKTE = {
+    # Thema -> je Arbeit die Punkte von (Anna, Ben, Cem)
+    "T1": [(4, 4, 3), (4, 4, 3), (0, 4, 3), (0, 4, 3)],
+    "T2": [(1, 4, 3), (1, 4, 3), (1, 4, 3), (1, 4, 3)],
+    "T3": [(1, 4, 3), (1, 4, 3), (1, 4, 3), (1, 4, 3)],
+    "T4": [(0, 4, 3), (0, 4, 3), (4, 4, 3), (4, 4, 3)],
+    # Nur in der ersten Arbeit — bleibt unter MINDEST_PUNKTE (6) und muss
+    # deshalb im Themenstand „zu wenig fuer eine Aussage" heissen.
+    "T5": [(1, 4, 3)],
+}
+FW_ARBEITEN = 4
+
+
+def teste_verlauf_gerechnet(api, b, u, sch, spuren):
+    """Vier Klassenarbeiten anlegen und beide Kern-Sichten nachrechnen."""
+    from statistics import median
+
+    sch.setze({"auswertung"})
+    z = {}
+
+    def aufbau():
+        vorhanden = api.call("GET", f"/api/klassenarbeit/classes/{u.class_id}/works",
+                             erwartet=(200,))
+        if vorhanden:
+            # Jede fremde Arbeit in derselben Klasse verschiebt das Klassenmittel,
+            # gegen das hier gerechnet wird. Lieber ehrlich abbrechen als eine
+            # Zahl vergleichen, die nichts mehr bedeutet.
+            raise AssertionError(
+                f"die Testklasse hat schon {len(vorhanden)} Klassenarbeit(en) "
+                f"({[w['name'] for w in vorhanden]}) — eine fremde Arbeit verschiebt das "
+                "Klassenmittel, gegen das hier gerechnet wird")
+        themen = {}
+        for schluessel in FW_PUNKTE:
+            t = api.call("POST", "/api/topics",
+                         {"name": f"{PRAEFIX} Verlauf {schluessel}"}, erwartet=(201,))
+            themen[schluessel] = t["id"]
+            spuren.append((f"Verlauf-Thema {schluessel}", lambda tid=t["id"]: api.call(
+                "DELETE", f"/api/topics/{tid}", erwartet=(204, 404))))
+        z["themen"] = themen
+
+        arbeiten = []
+        for i in range(FW_ARBEITEN):
+            aufgaben, ergebnisse = [], {str(sid): {} for sid in u.students}
+            for schluessel, reihe in FW_PUNKTE.items():
+                if i >= len(reihe):
+                    continue
+                aufgaben.append({"id": schluessel, "label": schluessel,
+                                 "topic_id": themen[schluessel], "max": FW_MAX})
+                for k, sid in enumerate(u.students):
+                    ergebnisse[str(sid)][schluessel] = reihe[i][k]
+            w = api.call("POST", "/api/klassenarbeit/works",
+                         {"class_id": u.class_id, "name": f"{PRAEFIX} Verlauf {i + 1}"},
+                         erwartet=(201,))
+            spuren.append((f"Verlauf-Arbeit {i + 1}", lambda wid=w["id"]: api.call(
+                "DELETE", f"/api/klassenarbeit/works/{wid}", erwartet=(204, 404))))
+            api.call("PUT", f"/api/klassenarbeit/works/{w['id']}",
+                     {"tasks": aufgaben, "results": ergebnisse}, erwartet=(200,))
+            arbeiten.append(w)
+        z["arbeiten"] = arbeiten
+        return (f"{FW_ARBEITEN} Klassenarbeiten ueber {len(themen)} Themen, "
+                f"{FW_ARBEITEN * len(u.students)} Punktezeilen")
+
+    if not b.pruefe("Verlauf", "Vier Klassenarbeiten anlegen", aufbau):
+        return
+
+    def erwartung_je_arbeit():
+        """Je Arbeit die Quote jedes Kindes und das Klassenmittel — mit
+        denselben Rundungen wie app/fruehwarnung.py (_quote rundet auf eine
+        Nachkommastelle, das Mittel ebenso)."""
+        aus = []
+        for i in range(FW_ARBEITEN):
+            quoten = []
+            for k in range(len(u.students)):
+                erreicht = sum(reihe[i][k] for reihe in FW_PUNKTE.values() if i < len(reihe))
+                moeglich = FW_MAX * sum(1 for reihe in FW_PUNKTE.values() if i < len(reihe))
+                quoten.append(round(erreicht / moeglich * 100, 1))
+            mittel = round(sum(quoten) / len(quoten), 1)
+            aus.append((quoten, mittel))
+        return aus
+
+    def fruehwarnung():
+        """Die Regel aus app/fruehwarnung.py im Test nachgerechnet.
+
+        Anna liegt in jeder Arbeit rund 33 Prozentpunkte unter der Klasse — das
+        ist die Meldung. Ben und Cem liegen darueber und duerfen NICHT gemeldet
+        werden; genau dieser Gegenbeweis fehlt sonst.
+        """
+        d = api.call("GET", f"/api/classes/{u.class_id}/fruehwarnung", erwartet=(200,))
+        if d.get("quellen", {}).get("arbeiten") != FW_ARBEITEN:
+            raise AssertionError(f"Datenlage nennt {d.get('quellen')} statt {FW_ARBEITEN} Arbeiten")
+        if len(d.get("tests") or []) != FW_ARBEITEN:
+            raise AssertionError(f"{len(d.get('tests') or [])} Erhebungen im Fenster "
+                                 f"statt {FW_ARBEITEN}")
+        erwartet = erwartung_je_arbeit()
+        abweichung = []
+        for k, card_id in enumerate(u.karten):
+            zeile = _finde(d["schueler"], card_id=card_id)
+            if not zeile:
+                raise AssertionError(f"Karte {card_id} fehlt in der Fruehwarnung")
+            abstaende = [round(quoten[k] - mittel, 1) for quoten, mittel in erwartet]
+            soll_med = round(median(abstaende), 1)
+            unter = sum(1 for x in abstaende[-5:] if x <= -15.0)   # abstand_einzeln
+            soll_status = "melden" if (soll_med <= -20.0 and unter >= 4) else "unauffaellig"
+            if zeile["status"] != soll_status:
+                abweichung.append(f"Karte {card_id}: '{zeile['status']}' statt '{soll_status}' "
+                                  f"(Abstaende {abstaende})")
+            if not gleich(zeile.get("abstand_median", -999), soll_med, 0.05):
+                abweichung.append(f"Karte {card_id}: Median {zeile.get('abstand_median')} "
+                                  f"statt {soll_med}")
+            for punkt, (quoten, mittel) in zip(zeile["kurve"], erwartet):
+                if not gleich(punkt["pct"], quoten[k], 0.05) or not gleich(punkt["klasse"], mittel, 0.05):
+                    abweichung.append(f"Karte {card_id}: Kurvenpunkt {punkt['pct']}/{punkt['klasse']} "
+                                      f"statt {quoten[k]}/{mittel}")
+                if punkt["art"] != "arbeit":
+                    abweichung.append(f"Karte {card_id}: Erhebungsart '{punkt['art']}' "
+                                      "statt 'arbeit' — es rechnet eine fremde Quelle mit")
+        gemeldet = [s["card_id"] for s in d["schueler"] if s["status"] == "melden"]
+        if gemeldet != [u.karten[0]]:
+            abweichung.append(f"gemeldet werden {gemeldet}, erwartet nur {[u.karten[0]]}")
+        if abweichung:
+            raise AssertionError("; ".join(abweichung))
+        anna = _finde(d["schueler"], card_id=u.karten[0])
+        return (f"Anna gemeldet ({anna['abstand_median']:+.1f} Prozentpunkte Median ueber "
+                f"{FW_ARBEITEN} Arbeiten), Ben und Cem unauffaellig")
+
+    b.pruefe("Verlauf", "Fruehwarnung gegen eigene Rechnung", fruehwarnung)
+
+    def zu_wenig_daten():
+        """Unter `mindest_antworten` gibt es keine Entwarnung, sondern „zu wenig
+        Daten". Geprueft an einem Kind, das nur in EINER Arbeit vorkommt: seine
+        Punkte werden aus drei Arbeiten entfernt, danach bleiben fuenf gewertete
+        Antworten — unter den zwoelf, die die Regel verlangt.
+        """
+        opfer = str(u.students[2])
+        for w in z["arbeiten"][1:]:
+            voll = _finde(api.call("GET", f"/api/klassenarbeit/classes/{u.class_id}/works",
+                                   erwartet=(200,)), id=w["id"])
+            ohne = {k: v for k, v in (voll.get("results") or {}).items() if k != opfer}
+            api.call("PUT", f"/api/klassenarbeit/works/{w['id']}", {"results": ohne},
+                     erwartet=(200,))
+        d = api.call("GET", f"/api/classes/{u.class_id}/fruehwarnung", erwartet=(200,))
+        zeile = _finde(d["schueler"], card_id=u.karten[2])
+        if zeile["status"] != "zu_wenig_daten":
+            raise AssertionError(f"Kind mit 5 Antworten gilt als '{zeile['status']}' "
+                                 "statt 'zu_wenig_daten'")
+        if zeile.get("abstand_median") is not None:
+            raise AssertionError("zu duenne Datenlage liefert trotzdem einen Median")
+        # Zurueck auf den vollen Stand — der Themenstand unten rechnet damit.
+        for i, w in enumerate(z["arbeiten"]):
+            if i == 0:
+                continue
+            ergebnisse = {}
+            for k, sid in enumerate(u.students):
+                ergebnisse[str(sid)] = {s: reihe[i][k] for s, reihe in FW_PUNKTE.items()
+                                        if i < len(reihe)}
+            api.call("PUT", f"/api/klassenarbeit/works/{w['id']}", {"results": ergebnisse},
+                     erwartet=(200,))
+        return ("fuenf gewertete Antworten ergeben „zu wenig Daten“ "
+                "und nicht „unauffaellig“")
+
+    b.pruefe("Verlauf", "Zu duenne Datenlage meldet nicht", zu_wenig_daten)
+
+    def themenstand():
+        """Gewichtet statt gemittelt — und der Trend vergleicht Haelften.
+
+        Fuer Anna: Thema 1 bricht ein (100/100/0/0 -> „ab"), Thema 4 holt auf
+        (0/0/100/100 -> „auf"), Thema 2 und 3 bleiben („gleich"). Alle vier
+        stehen bei 50 bzw. 25 Prozent, obwohl die Verlaeufe voellig verschieden
+        sind — genau deshalb muss beides geprueft werden. Thema 5 kommt nur
+        einmal vor und bleibt unter dem Mindestmass.
+        """
+        aus = api.call("GET", f"/api/classes/{u.class_id}/themenprofil"
+                              f"?student_id={u.students[0]}", erwartet=(200,))
+        if aus.get("quellen") != ["arbeit"]:
+            raise AssertionError(f"Quellen {aus.get('quellen')} statt nur ['arbeit'] — "
+                                 "es rechnet etwas mit, das die Erwartung verschiebt")
+        kind = (aus.get("schueler") or [{}])[0]
+        nach_id = {t["topic_id"]: t for t in kind.get("themen") or []}
+        abweichung = []
+        for schluessel, reihe in FW_PUNKTE.items():
+            tid = z["themen"][schluessel]
+            eintrag = nach_id.get(tid)
+            if not eintrag:
+                abweichung.append(f"{schluessel} fehlt im Themenstand")
+                continue
+            erreicht = sum(x[0] for x in reihe)
+            moeglich = FW_MAX * len(reihe)
+            genug = moeglich >= 6.0        # MINDEST_PUNKTE
+            soll_pct = round(erreicht / moeglich * 100, 1) if genug else None
+            if eintrag["genug"] != genug:
+                abweichung.append(f"{schluessel}: genug={eintrag['genug']} statt {genug}")
+            if soll_pct is None and eintrag["pct"] is not None:
+                abweichung.append(f"{schluessel}: {eintrag['pct']} % trotz "
+                                  f"{moeglich:.0f} moeglichen Punkten (Mindestmass 6)")
+            if soll_pct is not None and not gleich(eintrag["pct"], soll_pct, 0.05):
+                abweichung.append(f"{schluessel}: {eintrag['pct']} % statt {soll_pct} %")
+            if not gleich(eintrag["max"], moeglich, 0.05):
+                abweichung.append(f"{schluessel}: max={eintrag['max']} statt {moeglich}")
+            if eintrag["erhebungen"] != len(reihe):
+                abweichung.append(f"{schluessel}: {eintrag['erhebungen']} Erhebungen "
+                                  f"statt {len(reihe)}")
+            # Trend: erste gegen zweite Haelfte der Prozentwerte des Verlaufs.
+            werte = [round(x[0] / FW_MAX * 100, 1) for x in reihe]
+            soll_trend = None
+            if len(werte) >= 3:
+                h = len(werte) // 2
+                delta = round(sum(werte[h:]) / len(werte[h:]) - sum(werte[:h]) / h, 1)
+                soll_trend = "auf" if delta >= 10.0 else ("ab" if delta <= -10.0 else "gleich")
+            ist_trend = (eintrag.get("trend") or {}).get("richtung")
+            if ist_trend != soll_trend:
+                abweichung.append(f"{schluessel}: Trend '{ist_trend}' statt '{soll_trend}' "
+                                  f"(Verlauf {werte})")
+        if abweichung:
+            raise AssertionError("; ".join(abweichung))
+        return ("5 Themen: Prozente gewichtet nachgerechnet, Trend ab/auf/gleich wie erwartet, "
+                "das duenne Thema ohne Zahl")
+
+    b.pruefe("Verlauf", "Themenstand gegen eigene Rechnung", themenstand)
+
+    def ohne_modul():
+        """Beide Sichten gehoeren dem Kern: ohne Quellmodul antworten sie leer,
+        niemals mit 403 (Regel 3)."""
+        sch.setze({"zufall"})     # weder Auswertung noch CardVote noch Karten
+        fw = api.call("GET", f"/api/classes/{u.class_id}/fruehwarnung", erwartet=(200,))
+        if fw.get("schueler"):
+            raise AssertionError("Fruehwarnung meldet ohne aktives Quellmodul weiter Kinder")
+        if fw["quellen"]["auswertung"] or fw["quellen"]["cardvote"]:
+            raise AssertionError(f"Datenlage behauptet aktive Module: {fw['quellen']}")
+        ts = api.call("GET", f"/api/classes/{u.class_id}/themenprofil", erwartet=(200,))
+        if ts.get("quellen"):
+            raise AssertionError(f"Themenstand nennt Quellen ohne Modul: {ts['quellen']}")
+        if any(k.get("themen") for k in ts.get("schueler") or []):
+            raise AssertionError("Themenstand liefert ohne Quellmodul weiter Themen")
+        sch.setze({"auswertung"})
+        return "ohne Quellmodul: 200 mit leerer Antwort, kein 403"
+
+    b.pruefe("Verlauf", "Ohne Quellmodul leer statt 403", ohne_modul)
+
+
 # ─────────────────────── Ablauf ───────────────────────
 
 def main():
@@ -2073,6 +2330,11 @@ def main():
             teste_zugang_dicht(api, b, u, sch, spuren)
             cv = teste_cardvote_voll(api, b, u, sch, spuren)
             teste_noten(api, b, u, sch, spuren, cv)
+            # VOR den Bruecken: die rechnen zwar nur je Arbeit, lassen aber eine
+            # Klassenarbeit stehen (sie wird erst ganz am Ende abgeraeumt) — und
+            # eine fremde Arbeit in der Klasse verschiebt jedes Klassenmittel,
+            # gegen das hier gerechnet wird.
+            teste_verlauf_gerechnet(api, b, u, sch, spuren)
             teste_bruecken(api, b, u, sch, spuren, cv)
     finally:
         # Aufraeumen braucht alle Module (jede Loesch-Route haengt hinter ihrer

@@ -163,6 +163,35 @@ class Api:
         except ValueError:
             return text
 
+    def rohbytes(self, pfad, erwartet=None):
+        """Antwort als Bytes holen — fuer ZIP und PDF.
+
+        `call(..., roh=True)` dekodiert als UTF-8 mit "replace" und macht aus
+        einem ZIP damit Buchstabensalat. Wer in einer Sicherung oder einem
+        Export wirklich nachsehen will, was drinsteht, braucht die Bytes.
+        Rueckgabe: (status, bytes).
+        """
+        url = pfad if pfad.startswith("http") else self.basis + pfad
+        req = urllib.request.Request(url, method="GET")
+        if self.token:
+            req.add_header("Authorization", "Bearer " + self.token)
+        if self.selftest_token:
+            req.add_header("X-Selftest-Token", self.selftest_token)
+        start = time.monotonic()
+        try:
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+                status, inhalt = r.status, r.read()
+        except urllib.error.HTTPError as e:
+            status, inhalt = e.code, e.read()
+        except Exception as e:
+            self._merke("GET", pfad, 0, start, str(e))
+            raise ApiFehler("GET", pfad, 0, str(e))
+        self._merke("GET", pfad, status, start, f"{len(inhalt)} Bytes")
+        if erwartet and status not in erwartet:
+            raise ApiFehler("GET", pfad, status,
+                            inhalt[:200].decode("utf-8", "replace"))
+        return status, inhalt
+
     def upload(self, pfad, feldname, dateiname, inhalt, mime="application/octet-stream",
                felder=None, erwartet=None):
         """Datei hochladen (multipart/form-data) — fuer die Material-Ablage.
