@@ -1892,4 +1892,7 @@ export default {
   "noten.commentRow": "This row has comments",
   "help.au.commentT": "Comment on a grade",
   "help.au.comment": "Every cell can carry a comment — via the small corner at the top right. It belongs to the grade (“forgot the formula”, “ill, sat it later”) but never counts towards an average. Rows with comments carry a dot after the name.",
+  "nav.switchModule": "Switch module",
+  "help.core.navT": "Switching between modules",
+  "help.core.nav": "Top left, next to “Nuvora”, you see which module you are in. A click shows all enabled modules and takes you straight there — no detour via the start page. The tabs to the right always belong to the current module.",
 };

@@ -439,7 +439,26 @@ Kennung (ETag, `Cache-Control: private`): wer dieselbe Arbeit ein zweites Mal
 Unterschied zwischen „sofort da" und „lädt fünf Sekunden", wenn eine ganze
 Klasse am selben Schulanschluss hängt.
 
+### Immer dieselbe Werkzeugleiste
+
+Jede Seite baut ihre Leiste nach derselben Regel (`components/Werkzeugleiste.jsx`):
+
+```
+[ Auswahl ]  [ was man oft tut ]        …  [ Ansicht ⚙ ]  [ ⋯ Mehr ]
+```
+
+Links steht, **was** bearbeitet wird (Klasse, Kurs, Datum), daneben die zwei bis
+drei Handgriffe des Alltags. Alles Seltene und alles Gefährliche liegt im
+**Mehr**-Menü rechts — Löschen immer zuunterst. Vorher standen im Sitzplan elf
+Bedienelemente nebeneinander und in der Klassenmaske der Papierkorb direkt neben
+„Speichern".
+
 ### Etwas finden
+
+Oben links neben „Nuvora" steht der **Modulwechsler**: er zeigt, in welchem
+Modul man gerade ist, und führt mit einem Klick in jedes andere zugeschaltete.
+Die Reiter daneben gehören immer nur zum aktuellen Bereich — der Weg in ein
+anderes Modul führte vorher über die Startseite.
 
 Oben rechts sitzt eine Lupe, überall erreichbar mit **⌘K / Strg+K**, auf der
 Startseite zusätzlich als Suchfeld. Sie sucht in drei Töpfen: Seiten und Reiter

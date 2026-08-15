@@ -102,6 +102,7 @@ import Landing from "./pages/Landing.jsx";
 import NuvoraHome from "./pages/NuvoraHome.jsx";
 import GuidedTour, { PATH_TOUR, tourFor } from "./components/GuidedTour.jsx";
 import Suche from "./components/Suche.jsx";
+import ModulWechsler from "./components/ModulWechsler.jsx";
 import { useModules } from "./core/modules.js";
 import { istAdmin } from "./core/admin.js";
 import { DialogHost } from "./core/dialog.jsx";
@@ -681,6 +682,11 @@ function Nav({ user, onLogout }) {
             {pageTitle}
           </span>
         )}
+
+        {/* Modulwechsel direkt hier: die Reiter rechts gehoeren immer nur zum
+            aktuellen Bereich, und der Weg in ein anderes Modul fuehrte vorher
+            ueber die Startseite. */}
+        {showNav && <span className="nav-links-desktop" style={{ display: "flex", flexShrink: 0, marginLeft: 6 }}><ModulWechsler /></span>}
 
         <div data-tour="modules" className={showNav ? "nav-links-desktop" : ""} style={{ display: showNav ? "flex" : "block", gap: 2, overflow: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none", flex: 1, minWidth: 0, marginLeft: 8 }}>
           {showNav && navItems.map((item) => {

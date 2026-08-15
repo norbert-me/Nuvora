@@ -199,6 +199,26 @@ export function ExportButton({ label, onClick, style, iconOnly, ...props }) {
     </button>
   );
 }
+/**
+ * Datei-Auswahl per Aufruf statt per `<label>`.
+ *
+ * Der Import steht jetzt im „Mehr"-Menue, und ein Menueeintrag ist ein Knopf,
+ * kein Label — er kann kein verstecktes `<input type=file>` umschliessen. Also
+ * eins auf Zuruf bauen, oeffnen, wieder wegwerfen.
+ */
+export function dateiWaehlen(onFile, accept = ".json,application/json") {
+  const feld = document.createElement("input");
+  feld.type = "file";
+  feld.accept = accept;
+  feld.style.display = "none";
+  feld.addEventListener("change", () => {
+    if (feld.files[0]) onFile(feld.files[0]);
+    feld.remove();
+  });
+  document.body.appendChild(feld);
+  feld.click();
+}
+
 export function ImportButton({ label, onFile, accept = ".json,application/json", style, iconOnly, ...props }) {
   if (iconOnly)
     return (

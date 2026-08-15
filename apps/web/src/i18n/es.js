@@ -1893,4 +1893,7 @@ export default {
   "noten.commentRow": "Esta fila tiene comentarios",
   "help.au.commentT": "Comentario en la nota",
   "help.au.comment": "Cada celda puede llevar un comentario, mediante la esquina pequeña arriba a la derecha. Pertenece a la nota («olvidó la fórmula», «enfermo, recuperado»), pero nunca cuenta en una media. Las filas con comentarios llevan un punto tras el nombre.",
+  "nav.switchModule": "Cambiar de módulo",
+  "help.core.navT": "Cambiar de módulo",
+  "help.core.nav": "Arriba a la izquierda, junto a «Nuvora», ves en qué módulo estás. Un clic muestra todos los módulos activos y lleva directamente allí, sin pasar por la página de inicio. Las pestañas de al lado pertenecen siempre al módulo actual.",
 };

@@ -1878,4 +1878,7 @@ export default {
   "noten.commentRow": "In dieser Zeile gibt es Kommentare",
   "help.au.commentT": "Kommentar an der Note",
   "help.au.comment": "Jede Zelle kann einen Kommentar tragen — über die kleine Ecke oben rechts. Er gehört zur Note („Formel vergessen“, „krank, nachgeschrieben“), zählt aber nie in einen Schnitt. Zeilen mit Kommentaren tragen einen Punkt hinter dem Namen.",
+  "nav.switchModule": "Modul wechseln",
+  "help.core.navT": "Zwischen Modulen wechseln",
+  "help.core.nav": "Oben links neben „Nuvora“ steht, in welchem Modul du gerade bist. Ein Klick darauf zeigt alle zugeschalteten Module — von dort geht es direkt weiter, ohne Umweg über die Startseite. Die Reiter rechts daneben gehören immer zum aktuellen Modul.",
 };

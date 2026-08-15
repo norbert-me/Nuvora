@@ -2,10 +2,11 @@
 // drehen (z.B. schräge Tische). Gespeichert wird { seats: [{sid,x,y,rot}] }.
 // Schüler bleiben im Kern; hier nur ihre Positionen (Regel 3).
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { btnSecondary, Icon, ICONS, iconBtn, COLORS as C, Empty, ExportButton, ImportButton } from "../components/Icons.jsx";
+import { btnSecondary, Icon, ICONS, iconBtn, toolbarIconBtn, CONTROL_H, dateiWaehlen, COLORS as C, Empty } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import ViewMenu from "../components/ViewMenu.jsx";
 import Portrait from "../components/Portrait.jsx";
+import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
@@ -361,23 +362,31 @@ export default function Sitzplan() {
 
   return (
     <div style={{ maxWidth: "none" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
-        <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
-        <ViewMenu title={t("sitzplan.view")} items={[
-          ...(anwesenheitAktiv ? [{ key: "aufruf", label: t("sitzplan.rollcall"), value: aufruf, onChange: (v) => { setAufruf(v); saveView({ aufruf: v }); } }] : []),
-          { key: "segel", label: t("sitzplan.segelToggle"), hint: t("sitzplan.segelHint"), value: segelOn, onChange: (v) => { setSegelOn(v); saveView({ segel: v }); } },
-          { key: "fotos", label: t("sitzplan.photoToggle"), hint: t("sitzplan.photoHint"), value: fotosOn, onChange: (v) => { setFotosOn(v); saveView({ fotos: v }); } },
-          { key: "foerder", label: t("sitzplan.foerderToggle"), hint: t("sitzplan.foerderHint"), value: foerderOn, onChange: (v) => { setFoerderOn(v); saveView({ foerder: v }); } },
-        ]} />
-        <button onClick={() => setShowHint((v) => !v)} className="icon-btn" title={t("sitzplan.hintFree")} aria-label={t("sitzplan.hintFree")}
-          style={{ ...iconBtn, border: showHint ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 999, width: 30, height: 30, fontWeight: 700, color: showHint ? "var(--accent)" : "var(--text3)" }}>i</button>
-        <ExportButton iconOnly title={t("sitzplan.export")} onClick={doExport} style={{ marginLeft: anwesenheitAktiv ? 0 : "auto" }} />
-        <ImportButton iconOnly title={t("sitzplan.import")} onFile={doImport} />
-        <button onClick={addEmpty} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("sitzplan.addEmpty")}><Icon d={ICONS.plus} size={15} /> {t("sitzplan.emptySeat")}</button>
-        <button onClick={undo} disabled={undoLen === 0} className="icon-btn" style={{ ...iconBtn, opacity: undoLen === 0 ? 0.4 : 1 }} title={t("sitzplan.undo")} aria-label={t("sitzplan.undo")}><Icon d={ICONS.undo || ICONS.restore} size={18} /></button>
-        <button onClick={redo} disabled={redoLen === 0} className="icon-btn" style={{ ...iconBtn, opacity: redoLen === 0 ? 0.4 : 1 }} title={t("sitzplan.redo")} aria-label={t("sitzplan.redo")}><span style={{ display: "inline-flex", transform: "scaleX(-1)" }}><Icon d={ICONS.undo || ICONS.restore} size={18} /></span></button>
-        <button onClick={leeren} className="icon-btn" style={iconBtn} title={t("sitzplan.clear")} aria-label={t("sitzplan.clear")}><Icon d={ICONS.trash} color={C.danger} /></button>
-      </div>
+      <Werkzeugleiste
+        links={<KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />}
+        ansicht={(
+          <ViewMenu title={t("sitzplan.view")} items={[
+            ...(anwesenheitAktiv ? [{ key: "aufruf", label: t("sitzplan.rollcall"), value: aufruf, onChange: (v) => { setAufruf(v); saveView({ aufruf: v }); } }] : []),
+            { key: "fotos", label: t("sitzplan.photoToggle"), hint: t("sitzplan.photoHint"), value: fotosOn, onChange: (v) => { setFotosOn(v); saveView({ fotos: v }); } },
+            { key: "segel", label: t("sitzplan.segelToggle"), hint: t("sitzplan.segelHint"), value: segelOn, onChange: (v) => { setSegelOn(v); saveView({ segel: v }); } },
+            { key: "foerder", label: t("sitzplan.foerderToggle"), hint: t("sitzplan.foerderHint"), value: foerderOn, onChange: (v) => { setFoerderOn(v); saveView({ foerder: v }); } },
+          ]} />
+        )}
+        mehr={[
+          { key: "hilfe", label: t("sitzplan.hintFree"), icon: ICONS.info, onClick: () => setShowHint((v) => !v) },
+          { key: "export", label: t("sitzplan.export"), icon: ICONS.export, onClick: doExport },
+          { key: "import", label: t("sitzplan.import"), icon: ICONS.import, onClick: () => dateiWaehlen(doImport) },
+          { key: "leeren", label: t("sitzplan.clear"), icon: ICONS.trash, gefahr: true, onClick: leeren },
+        ]}>
+        {/* Sichtbar bleibt, was man im Unterricht wirklich braucht: einen Platz
+            dazulegen und das letzte Verschieben zuruecknehmen. Alles Uebrige
+            steht im Menue — vorher lag der Papierkorb direkt neben dem Plus. */}
+        <button onClick={addEmpty} style={{ ...btnSecondary, height: CONTROL_H, padding: "0 12px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("sitzplan.addEmpty")}>
+          <Icon d={ICONS.plus} size={15} /> {t("sitzplan.emptySeat")}
+        </button>
+        <button onClick={undo} disabled={undoLen === 0} className="icon-btn" style={{ ...toolbarIconBtn, opacity: undoLen === 0 ? 0.4 : 1 }} title={t("sitzplan.undo")} aria-label={t("sitzplan.undo")}><Icon d={ICONS.undo || ICONS.restore} size={18} /></button>
+        <button onClick={redo} disabled={redoLen === 0} className="icon-btn" style={{ ...toolbarIconBtn, opacity: redoLen === 0 ? 0.4 : 1 }} title={t("sitzplan.redo")} aria-label={t("sitzplan.redo")}><span style={{ display: "inline-flex", transform: "scaleX(-1)" }}><Icon d={ICONS.undo || ICONS.restore} size={18} /></span></button>
+      </Werkzeugleiste>
       {showHint && <p style={{ fontSize: 13, color: "var(--text3)", margin: "8px 0 14px" }}>{t("sitzplan.hintFree")}</p>}
       {segelOn && (
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", margin: "8px 0 12px", fontSize: 12.5, color: "var(--text3)" }}>

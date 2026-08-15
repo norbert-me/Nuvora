@@ -12,6 +12,7 @@ import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { useSearchParams } from "react-router-dom";
+import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Tabs, pageApp} from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import AuthImage from "../components/AuthImage.jsx";
@@ -448,33 +449,31 @@ export default function Classes() {
             </div>
           ); })}
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
-          <button onClick={addRow} disabled={students.length >= MAX_CARDS} style={{ ...btnSecondary, opacity: students.length >= MAX_CARDS ? 0.4 : 1 }}>{t("classes.addRow")}</button>
-          <button onClick={save} disabled={!name.trim()} style={btnPrimary}>{t("common.save")}</button>
+        {/* Dieselbe Bauform wie ueberall: links, was man staendig tut
+            (speichern, Zeile dazu), rechts im Menue das Seltene und das
+            Gefaehrliche. Vorher stand der Papierkorb direkt neben
+            „Speichern" — eine Handbreite von der Klasse entfernt. */}
+        <Werkzeugleiste
+          links={<button onClick={save} disabled={!name.trim()} style={btnPrimary}>{t("common.save")}</button>}
+          mehr={editing.id ? [
+            zugaengeMoeglich && { key: "qr", label: t("classes.qrPrint"), icon: ICONS.pdf || ICONS.export,
+                                  onClick: () => zugaengeDrucken(editing.id) },
+            { key: "archiv", label: archiv ? t("classes.unarchive") : t("classes.archive"), icon: ICONS.archive,
+              onClick: async () => {
+                await fetch(`${API}/classes/${editing.id}/archive`, { method: "POST" }).catch(() => {});
+                setEditing(null); load();
+              } },
+            { key: "loeschen", label: t("common.delete"), icon: ICONS.trash, gefahr: true,
+              onClick: () => { remove(editing.id); setEditing(null); } },
+          ] : []}>
+          <button onClick={addRow} disabled={students.length >= MAX_CARDS}
+            style={{ ...btnSecondary, opacity: students.length >= MAX_CARDS ? 0.4 : 1 }}>{t("classes.addRow")}</button>
           <button onClick={() => setEditing(null)} style={btnSecondary}>{t("common.cancel")}</button>
-          {editing.id && (
-            <button onClick={async () => {
-              await fetch(`${API}/classes/${editing.id}/archive`, { method: "POST" }).catch(() => {});
-              setEditing(null); load();
-            }} style={{ ...btnSecondary, marginLeft: "auto" }} title={t("classes.archiveHint")}>
-              {archiv ? t("classes.unarchive") : t("classes.archive")}
-            </button>
-          )}
-          {editing.id && <button onClick={() => { remove(editing.id); setEditing(null); }} className="icon-btn" style={{ ...iconBtn }} title={t("classes.delete") !== "classes.delete" ? t("classes.delete") : t("common.delete")} aria-label={t("classes.delete") !== "classes.delete" ? t("classes.delete") : t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>}
-        </div>
+        </Werkzeugleiste>
         {cardvote && (
           <p style={{ fontSize: 12, color: students.length >= MAX_CARDS ? C.danger : "var(--text3)", margin: 0 }}>
             {t("classes.limit", { max: MAX_CARDS, count: students.length })}
           </p>
-        )}
-        {/* Zugangs-Zettel drucken: je Kind ein QR-Code zum Ausschneiden. Der
-            Endpunkt legt fehlende Zugaenge selbst an — sonst druckt man leere
-            Zettel und versteht erst danach, warum. */}
-        {editing.id && zugaengeMoeglich && (
-          <button onClick={() => zugaengeDrucken(editing.id)} style={{ ...btnSecondary, marginTop: 8 }}
-            title={t("classes.qrPrintHint")}>
-            {t("classes.qrPrint")}
-          </button>
         )}
       </div>
     );
