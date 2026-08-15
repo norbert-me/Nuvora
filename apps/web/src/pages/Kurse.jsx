@@ -7,10 +7,12 @@ import { useLanguage } from "../i18n/index.jsx";
 import KursLinks from "../components/KursLinks.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { sende } from "../core/melden.js";
-import { NiveauToggle, AddButton, pageTitle, pageIntro, btnPrimary, btnSecondary, selectStyle, chipStyle, Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, Toggle, Tabs, Empty, pageApp, LoadError} from "../components/Icons.jsx";
+import { NiveauToggle, AddButton, pageTitle, pageIntro, btnPrimary, btnSecondary, btnSmall, selectStyle, chipStyle,
+  Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, toolbarInput, sectionLabel, Toggle, Tabs, Empty, pageApp, LoadError } from "../components/Icons.jsx";
+import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 
 const API = "/api";
-const editLabel = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text3)", marginBottom: 6 };
+const editLabel = { ...sectionLabel, marginBottom: 4 };
 
 export default function Kurse() {
   const { t } = useLanguage();
@@ -96,18 +98,22 @@ export default function Kurse() {
       </div>
       <p style={pageIntro}>{t("kurse.intro")}</p>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
-        <Tabs value={archiv ? "archiv" : "aktiv"} onChange={(v) => { const a = v === "archiv"; setArchiv(a); load(a); }}
-          options={[["aktiv", t("classes.active")], ["archiv", t("classes.archived")]]} />
-      </div>
-
-      {!archiv && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-          <input value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()}
-            placeholder={t("kurse.newPlaceholder")} style={{ ...inputStyle, flex: 1, minWidth: 200 }} />
-          <AddButton onClick={anlegen} title={t("kurse.add")} />
-        </div>
-      )}
+      {/* Eine Leiste statt zwei Zeilen: links die Auswahl (aktiv/Archiv),
+          daneben der eine haeufige Handgriff (neuer Kurs). Das Feld hat
+          Leistenhoehe — daneben stand der AddButton vorher vier Pixel tiefer. */}
+      <Werkzeugleiste
+        links={<Tabs value={archiv ? "archiv" : "aktiv"} onChange={(v) => { const a = v === "archiv"; setArchiv(a); load(a); }}
+          options={[["aktiv", t("classes.active")], ["archiv", t("classes.archived")]]} />}
+        style={{ marginBottom: 16 }}
+      >
+        {!archiv && (
+          <>
+            <input value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()}
+              placeholder={t("kurse.newPlaceholder")} style={{ ...toolbarInput, flex: "1 1 200px", minWidth: 0 }} />
+            <AddButton onClick={anlegen} title={t("kurse.add")} />
+          </>
+        )}
+      </Werkzeugleiste>
 
       {/* Ladefehler ist NICHT dasselbe wie „noch nichts angelegt": das eine
           repariert der Server, das andere die Lehrkraft. */}
@@ -116,15 +122,15 @@ export default function Kurse() {
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {kurse.map((k) => (
           <div key={k.id} style={cardStyle}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <strong style={{ fontSize: 15 }}>{k.name}</strong>
-              {k.schuljahr && <span style={{ ...chipStyle, fontSize: 11.5 }}>{k.schuljahr}</span>}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <strong style={{ fontSize: 16 }}>{k.name}</strong>
+              {k.schuljahr && <span style={chipStyle}>{k.schuljahr}</span>}
               <span style={{ flex: 1 }} />
               {/* Archivieren nimmt die Fach-Klassen mit: am Schuljahresende ist
                   der ganze Kurs vorbei, und eine Klasse allein in den Listen zu
                   lassen waere genau die halbe Arbeit, die man vergisst. */}
               <button onClick={async () => { await sende(`${API}/kurse/${k.id}/archive`, { method: "POST" }, t("classes.archive")); load(); }}
-                style={{ ...btnSecondary, padding: "4px 12px", fontSize: 12.5 }} title={t("classes.archiveHint")}>
+                style={{ ...btnSecondary, ...btnSmall }} title={t("classes.archiveHint")}>
                 {archiv ? t("classes.unarchive") : t("classes.archive")}
               </button>
               {!archiv && <button onClick={() => openEdit(k)} className="icon-btn" style={iconBtn} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>}
@@ -132,7 +138,7 @@ export default function Kurse() {
             {/* Zweiter Weg durch Nuvora: vom Kurs (Fach) aus in die Module.
                 Alles Verlinkte ist fachlich — deshalb hier und nicht an der Klasse. */}
             {(k.vorgaenger_name || k.nachfolger_name) && (
-              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontSize: 12.5, color: "var(--text3)", marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 13, color: "var(--text3)", marginBottom: 8 }}>
                 {k.vorgaenger_name && <span title={t("kurse.chainHint")}>← {t("kurse.previousYear")}: {k.vorgaenger_name}</span>}
                 {k.vorgaenger_name && k.nachfolger_name && <span>·</span>}
                 {k.nachfolger_name && <span title={t("kurse.chainHint")}>{t("kurse.nextYear")}: {k.nachfolger_name} →</span>}
@@ -174,12 +180,12 @@ export default function Kurse() {
                         ))}
                     </select>
                   </div>
-                  <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 4 }}>{t("kurse.chainHint")}</div>
+                  <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>{t("kurse.chainHint")}</div>
                 </div>
 
                 <div>
                   <div style={editLabel}>{t("kurse.editClasses")}</div>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                     {k.classes.map((c) => (
                       <span key={c.id} style={{ ...chipStyle, display: "inline-flex", alignItems: "center", gap: 4 }}>
                         {c.name}
@@ -190,7 +196,7 @@ export default function Kurse() {
                       </span>
                     ))}
                     {frei(k).length > 0 && (
-                      <select value="" onChange={(e) => e.target.value && addMember(k.id, Number(e.target.value))} style={{ ...selectStyle, fontSize: 12.5 }}>
+                      <select value="" onChange={(e) => e.target.value && addMember(k.id, Number(e.target.value))} style={selectStyle}>
                         <option value="">+ {t("kurse.addClass")}</option>
                         {frei(k).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
@@ -247,7 +253,7 @@ function StudentMembers({ kursId, allClasses, t }) {
   return (
     <div>
       {members.length > 0 && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
           {members.map((m) => (
             <span key={m.student_id} style={{ ...chipStyle, display: "inline-flex", alignItems: "center", gap: 4 }}>
               {m.name} <span style={{ color: "var(--text3)", fontSize: 11 }}>· {m.class_name}</span>
@@ -259,8 +265,8 @@ function StudentMembers({ kursId, allClasses, t }) {
           ))}
         </div>
       )}
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-        <select value={pickClass} onChange={(e) => setPickClass(e.target.value)} style={{ ...selectStyle, fontSize: 12.5 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <select value={pickClass} onChange={(e) => setPickClass(e.target.value)} style={selectStyle}>
           <option value="">{t("kurse.pickClass")}</option>
           {allClasses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
@@ -320,7 +326,7 @@ function MassnahmenPanel({ kursId, t }) {
   const weg = (s, i) => speichern(s.name, (s.massnahmen || []).filter((_, x) => x !== i));
 
   if (!studs) return null;
-  if (studs.length === 0) return <p style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("kurse.niveauNoStudents")}</p>;
+  if (studs.length === 0) return <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("kurse.niveauNoStudents")}</p>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       {studs.map((s) => {
@@ -332,37 +338,34 @@ function MassnahmenPanel({ kursId, t }) {
               style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", padding: "2px 0", cursor: "pointer", textAlign: "left", fontSize: 13, color: "var(--text)" }}>
               <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
               <span style={{ fontSize: 12, color: n ? "var(--accent)" : "var(--text3)" }}>{n ? t("kurse.measuresCount", { n }) : t("kurse.measuresNone")}</span>
-              {/* Auf-/Zuklappen als SVG statt ▲/▾ — Unicode-Dreiecke sehen je
-                  System anders aus. TODO: `chevronUp`/`chevronDown` in ICONS,
-                  bis dahin plus/minus (auf = zuklappbar). */}
               <span style={{ color: "var(--text3)", display: "inline-flex" }}>
-                <Icon d={auf ? ICONS.minus : ICONS.plus} size={13} />
+                <Icon d={auf ? ICONS.chevronUp : ICONS.chevronDown} size={13} />
               </span>
             </button>
             {auf && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "6px 0 10px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "8px 0 12px" }}>
                 {(s.massnahmen || []).map((m, i) => (
-                  <div key={i} style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                  <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <select value={m.art} onChange={(e) => setFeld(s, i, "art", e.target.value)}
                       title={(MASSNAHMEN.find(([w]) => w === m.art) || [])[1] || ""}
-                      style={{ ...selectStyle, padding: "6px 24px 6px 8px", fontSize: 12.5, minWidth: 170 }}>
+                      style={{ ...selectStyle, minWidth: 170 }}>
                       {MASSNAHMEN.map(([wert]) => <option key={wert} value={wert}>{wert}</option>)}
                     </select>
                     <input value={m.detail || ""} onChange={(e) => setFeld(s, i, "detail", e.target.value)}
                       placeholder={t("classes.measureDetail")} maxLength={300}
-                      style={{ ...inputStyle, flex: 1, minWidth: 140, padding: "6px 8px", fontSize: 12.5 }} />
-                    <label style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--text2)", cursor: "pointer" }}
+                      style={{ ...toolbarInput, flex: 1, minWidth: 140 }} />
+                    <label style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text2)", cursor: "pointer" }}
                       title={t("classes.measureExamHint")}>
                       <input type="checkbox" checked={!!m.arbeit} onChange={(e) => setFeld(s, i, "arbeit", e.target.checked)} style={{ margin: 0 }} />
                       {t("classes.measureExam")}
                     </label>
-                    <button onClick={() => weg(s, i)} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")} aria-label={t("common.delete")}>
+                    <button onClick={() => weg(s, i)} className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}>
                       <Icon d={ICONS.trash} size={14} color={C.danger} />
                     </button>
                   </div>
                 ))}
                 <div>
-                  <button onClick={() => hinzu(s)} style={{ ...btnSecondary, padding: "4px 11px", fontSize: 12.5 }}>{t("classes.measureAdd")}</button>
+                  <button onClick={() => hinzu(s)} style={{ ...btnSecondary, ...btnSmall }}>{t("classes.measureAdd")}</button>
                 </div>
               </div>
             )}
@@ -388,9 +391,9 @@ function NiveauPanel({ kursId, niveauAktiv = false, t }) {
     if (!(await sende(`${API}/kurse/${kursId}/niveau`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, niveau }) }, t("kurse.editLevels")))) setStuds(vorher);
   };
   if (!studs) return null;
-  if (studs.length === 0) return <p style={{ fontSize: 12.5, color: "var(--text3)", marginTop: 8 }}>{t("kurse.niveauNoStudents")}</p>;
+  if (studs.length === 0) return <p style={{ fontSize: 13, color: "var(--text3)", marginTop: 8 }}>{t("kurse.niveauNoStudents")}</p>;
   return (
-    <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6 }}>
+    <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
       {studs.map((s) => (
         <div key={s.name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
           <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>

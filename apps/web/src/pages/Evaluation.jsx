@@ -4,13 +4,14 @@ import { useAktiv } from "../core/modules.js";
 import AbschnittWahl from "../components/AbschnittWahl.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
-import { Icon, ICONS, Tabs, btnPrimary, btnSecondary, Modal, inputStyle, iconBtn, CONTROL_H, CONTROL_R, COLORS as C, Boxplot, pageApp, StatCard, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { Icon, ICONS, Tabs, ANTWORT_COLORS, btnPrimary, btnSecondary, Modal, inputStyle, iconBtn, cardStyle, chipStyle, panelStyle, toolbarBtn, CONTROL_R, COLORS as C, Boxplot, pageApp, StatCard, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
 import { bewerte, statusOf } from "../core/scoring.js";
 
 const API = "/api";
-const COLORS = { A: "#0066cc", B: "#5856d6", C: C.warning, D: C.danger };
+// Antwortfarben A–D kommen aus dem Kern (ANTWORT_COLORS) — die Kopie hier war
+// eine von dreien im Modul.
 
 function median(arr) {
   if (!arr.length) return 0;
@@ -388,24 +389,24 @@ const gradeDistribution = (() => {
         <button onClick={() => setSelectedQ(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 13, fontWeight: 500, padding: "4px 0", marginBottom: 16, display: "inline-flex", alignItems: "center", gap: 5 }}>
           <Icon d={ICONS.arrowLeft} size={14} /> {t("cv.backOverview")}
         </button>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>{t("cv.questionN", { n: qi + 1 })}</h2>
-        <div style={{ fontSize: 18, color: "var(--text)", marginBottom: 20, padding: 16, background: "var(--bg2)", borderRadius: 12, lineHeight: 1.5 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>{t("cv.questionN", { n: qi + 1 })}</h2>
+        <div style={{ fontSize: 16, color: "var(--text)", marginBottom: 24, padding: 16, background: "var(--bg2)", borderRadius: panelStyle.borderRadius, lineHeight: 1.5 }}>
           <Latex>{q.text}</Latex>
         </div>
 
         {q.image_url && (
           <div style={{ marginBottom: 16 }}>
-            <img src={q.image_url} alt="" style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 10, border: "1px solid #e5e5e5" }} />
+            <img src={q.image_url} alt="" style={{ maxWidth: "100%", maxHeight: 200, borderRadius: CONTROL_R, border: "1px solid var(--border)" }} />
           </div>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24, maxWidth: 500 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24, maxWidth: 500 }}>
           {allKeys.map((k) => {
             const isCorrect = q.correct_answer && q.correct_answer.includes(k);
             const hasChoice = choiceKeys.includes(k);
             return (
               <div key={k} style={{
-                padding: 12, borderRadius: 10, fontSize: 15,
+                padding: 12, borderRadius: CONTROL_R, fontSize: 14,
                 background: isCorrect ? "var(--success-bg)" : "var(--bg2)",
                 border: isCorrect ? `2px solid ${C.success}` : "2px solid transparent",
                 color: "var(--text)",
@@ -420,7 +421,7 @@ const gradeDistribution = (() => {
           })}
         </div>
 
-        <div style={{ display: "flex", gap: 20, marginBottom: 20, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
           <StatCard label={t("cv.statCorrect")} value={`${stat.pct}%`} color={stat.pct >= 80 ? C.success : stat.pct >= 50 ? C.warning : C.danger} />
           <StatCard label={t("cv.statCi")} value={stat.ciLow !== null ? `${stat.ciLow}–${stat.ciHigh}%` : "–"} />
           <StatCard label={t("cv.statGuess")} value={stat.guessProb !== null ? `${Math.round(stat.guessProb * 100)}%` : "–"} />
@@ -435,7 +436,7 @@ const gradeDistribution = (() => {
           })()}
         </div>
 
-        <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>{t("cv.answerDistribution")}</h3>
+        <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>{t("cv.answerDistribution")}</h3>
         {allKeys.map((k) => {
           const count = stat.answerCounts[k] || 0;
           const pct = stat.answered > 0 ? (count / stat.answered) * 100 : 0;
@@ -443,12 +444,14 @@ const gradeDistribution = (() => {
           return (
             <div key={k} style={{ display: "flex", alignItems: "center", marginBottom: 6 }}>
               <span style={{ width: 28, fontWeight: 700, fontSize: 14, color: "var(--text)" }}>{k}</span>
+              {/* Balken: der Radius rundet die Kappe der Grafik, kein
+                  Bedienelement — deshalb Zahl statt Token. */}
               <div style={{ flex: 1, height: 28, background: "var(--bg2)", borderRadius: 6, overflow: "hidden" }}>
                 <div style={{
                   height: "100%", width: `${pct}%`,
-                  background: isCorrect ? C.success : COLORS[k],
+                  background: isCorrect ? C.success : ANTWORT_COLORS[k],
                   borderRadius: 6, display: "flex", alignItems: "center", paddingLeft: 8,
-                  color: "white", fontSize: 13, fontWeight: 600, transition: "width 0.3s",
+                  color: C.aufAkzent, fontSize: 13, fontWeight: 600, transition: "width 0.3s",
                   minWidth: count > 0 ? 28 : 0, opacity: isCorrect ? 1 : 0.6,
                 }}>
                   {count > 0 && `${count} (${Math.round(pct)}%)`}
@@ -496,7 +499,7 @@ const gradeDistribution = (() => {
         {/* Nur sichtbar, wenn das Notenmodul aktiv ist — sonst fuehrt der
             Knopf ins Leere (Regel 3: CardVote haengt nicht von Noten ab). */}
         {notenAktiv && data.class_id && (
-          <button onClick={() => setNotenDialog(true)} style={{ ...btnSecondary, height: CONTROL_H, padding: "0 14px", borderRadius: CONTROL_R, fontSize: 13, lineHeight: 1 }}>
+          <button onClick={() => setNotenDialog(true)} style={toolbarBtn}>
             {t("notenimp.button")}
           </button>
         )}
@@ -505,7 +508,7 @@ const gradeDistribution = (() => {
       {(kartenAktiv || lernpfadAktiv) && data.class_id && <WeakTopics sessionId={Number(id)} classId={data.class_id} karten={kartenAktiv} lernpfad={lernpfadAktiv} t={t} />}
 
       {/* Statistik-Kacheln */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
         <Stat label={t("cv.statPresent")} value={`${presentStudents.length} / ${students.length}`} />
         <Stat
           label={avgMode === "pts" ? t("cv.statAvgPoints") : t("cv.statAvgPct")}
@@ -540,13 +543,13 @@ const gradeDistribution = (() => {
 
       {/* Std.abw. Erklärung */}
       {showSdInfo && (
-        <div style={{ padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", fontSize: 13, color: "var(--text)", lineHeight: 1.6, marginBottom: 16 }}>
+        <div style={{ ...panelStyle, padding: 16, fontSize: 13, color: "var(--text)", lineHeight: 1.6, marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <h4 style={{ fontSize: 15, fontWeight: 700 }}>{t("cv.sdTitle")}</h4>
+            <h4 style={{ fontSize: 14, fontWeight: 700 }}>{t("cv.sdTitle")}</h4>
             <SchliessenBtn onClick={() => setShowSdInfo(false)} t={t} />
           </div>
-          <p style={{ marginBottom: 10 }}>{t("cv.sdText")}</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+          <p style={{ marginBottom: 12 }}>{t("cv.sdText")}</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.success, minWidth: 64 }}>σ &lt; 10%</span><span>{t("cv.sdLow")}</span></div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.warning, minWidth: 64 }}>10–25%</span><span>{t("cv.sdMid")}</span></div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.danger, minWidth: 64 }}>σ &gt; 25%</span><span>{t("cv.sdHigh")}</span></div>
@@ -558,7 +561,7 @@ const gradeDistribution = (() => {
       {showCiTop && <CiInfoBox onClose={() => setShowCiTop(false)} />}
 
       {/* Notenverteilung / Boxplot toggle */}
-      <div style={{ padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 12 }}>
+      <div style={{ ...panelStyle, padding: 16, marginBottom: 12 }}>
         {/* Reiter aus dem Kern (Tabs) statt vier nachgebauter Pillen. */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
           <Tabs value={gradeView} onChange={setGradeView}
@@ -576,12 +579,12 @@ const gradeDistribution = (() => {
               const colorGrade = gradeMode === "tendency" ? Math.min(6, Math.round(g)) : g;
               return (
                 <div key={g} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <span style={{ fontSize: gradeMode === "tendency" ? 10 : 12, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>{count || ""}</span>
+                  <span style={{ fontSize: gradeMode === "tendency" ? 11 : 12, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>{count || ""}</span>
                   <div style={{
                     width: "100%", maxWidth: gradeMode === "tendency" ? 26 : 48, height: barH, minHeight: count > 0 ? 8 : 2,
                     background: count > 0 ? GRADE_COLORS[colorGrade] : "var(--border3)", borderRadius: "6px 6px 0 0", transition: "height 0.3s", opacity: count > 0 ? 0.85 : 0.3,
                   }} />
-                  <span style={{ fontSize: gradeMode === "tendency" ? 10 : 13, fontWeight: 600, color: "var(--text3)", marginTop: 4, whiteSpace: "nowrap" }}>{gradeMode === "tendency" ? g.toFixed(1) : g}</span>
+                  <span style={{ fontSize: gradeMode === "tendency" ? 11 : 13, fontWeight: 600, color: "var(--text3)", marginTop: 4, whiteSpace: "nowrap" }}>{gradeMode === "tendency" ? g.toFixed(1) : g}</span>
                 </div>
               );
             })}
@@ -596,30 +599,27 @@ const gradeDistribution = (() => {
       </div>
 
       {/* Notenschlüssel + Gewichtung */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
-        {/* Hoehe/Form aus dem Kern (CONTROL_H/CONTROL_R). */}
-        <button onClick={() => { setShowScale(!showScale); setShowWeights(false); }}
-          style={{ ...btnSecondary, height: CONTROL_H, padding: "0 14px", borderRadius: CONTROL_R, fontSize: 13, fontWeight: 500, lineHeight: 1,
-            background: showScale ? "var(--accent)" : "var(--card)", color: showScale ? "#fff" : "var(--text2)",
-            borderColor: showScale ? "var(--accent)" : "var(--border2)" }}>
-          {t("cv.gradeScale")}
-        </button>
-        <button onClick={() => { setShowWeights(!showWeights); setShowScale(false); }}
-          style={{ ...btnSecondary, height: CONTROL_H, padding: "0 14px", borderRadius: CONTROL_R, fontSize: 13, fontWeight: 500, lineHeight: 1,
-            background: showWeights ? "var(--accent)" : "var(--card)", color: showWeights ? "#fff" : "var(--text2)",
-            borderColor: showWeights ? "var(--accent)" : "var(--border2)" }}>
-          {t("cv.weights")}
-        </button>
-      </div>
+      {/* Notenschluessel und Gewichtung sind eine Auswahl, kein Paar loser
+          Knoepfe — also `Tabs`. Ein erneuter Klick auf den offenen Reiter
+          schliesst ihn wieder (dann ist keiner markiert). */}
+      <Werkzeugleiste style={{ marginBottom: 12 }}
+        links={
+          <Tabs
+            value={showScale ? "scale" : showWeights ? "weights" : ""}
+            onChange={(v) => { setShowScale(v === "scale" && !showScale); setShowWeights(v === "weights" && !showWeights); }}
+            options={[["scale", t("cv.gradeScale")], ["weights", t("cv.weights")]]}
+          />
+        }
+      />
 
       {showScale && (
-        <div style={{ padding: 16, background: "var(--card)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 12 }}>
+        <div style={{ ...cardStyle, marginBottom: 12 }}>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>{t("cv.gradeScale")}</h3>
           <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>{t("cv.gradeScaleHint")}</p>
           <style>{NUM_CSS}</style>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(136px, 1fr))", gap: 8 }}>
             {[1, 2, 3, 4, 5].map((g) => (
-              <div key={g} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", borderRadius: 10, background: "var(--bg3)" }}>
+              <div key={g} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: CONTROL_R, background: "var(--bg3)" }}>
                 <span style={gradeBadge}>{g}</span>
                 <span style={{ fontSize: 11, color: "var(--text3)" }}>{t("cv.from")}</span>
                 <input className="nice-num" type="number" min="0" max="100" step="1"
@@ -627,7 +627,7 @@ const gradeDistribution = (() => {
                 <span style={{ fontSize: 11, color: "var(--text3)" }}>%</span>
               </div>
             ))}
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", border: "1px dashed var(--border2)", borderRadius: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", border: "1px dashed var(--border2)", borderRadius: CONTROL_R }}>
               <span style={gradeBadge}>6</span>
               <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("cv.below", { pct: gradeScale[5] })}</span>
             </div>
@@ -636,13 +636,13 @@ const gradeDistribution = (() => {
       )}
 
       {showWeights && (
-        <div style={{ padding: 16, background: "var(--card)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 12 }}>
+        <div style={{ ...cardStyle, marginBottom: 12 }}>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>{t("cv.weights")}</h3>
           <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>{t("cv.weightsHint")}</p>
           <style>{NUM_CSS}</style>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 8 }}>
             {questions.map((q, i) => (
-              <div key={q.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 10, background: "var(--bg3)" }}>
+              <div key={q.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: CONTROL_R, background: "var(--bg3)" }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text2)", flexShrink: 0 }}>F{i + 1}</span>
                 <input className="nice-num" type="number" min="0" max="10" step="0.5"
                   value={Number(getWeight(q.id))} onChange={(e) => updateWeight(q.id, e.target.value)} style={{ ...numInput, marginLeft: "auto" }} />
@@ -654,13 +654,13 @@ const gradeDistribution = (() => {
 
       {/* Vorschläge */}
       {suggestions.length > 0 && (
-        <div style={{ padding: 16, background: "var(--warn-bg)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+        <div style={{ ...panelStyle, padding: 16, background: "var(--warn-bg)", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <Icon d={ICONS.bulb} size={18} color="var(--text2)" />
             <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{t("cv.suggestions")}</h3>
           </div>
           {suggestions.map((tip, i) => (
-            <div key={i} style={{ fontSize: 13, color: "var(--text)", marginBottom: 6, lineHeight: 1.5, paddingLeft: 12, borderLeft: "2px solid #e5c07b" }}>
+            <div key={i} style={{ fontSize: 13, color: "var(--text)", marginBottom: 8, lineHeight: 1.5, paddingLeft: 12, borderLeft: `2px solid ${C.warning}` }}>
               {tip}
             </div>
           ))}
@@ -672,11 +672,13 @@ const gradeDistribution = (() => {
       {/* Filter nach Kursniveau. Bewusst kein gemeinsames Ranking über beide
           Niveaus — die Maßstäbe sind verschieden. */}
       {niveauAktiv && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("eval.niveauFilter")}</span>
-          <Tabs value={niveauFilter} onChange={setNiveauFilter}
-            options={[["", t("eval.niveauAll")], ["E", "E"], ["G", "G"]]} />
-        </div>
+        <Werkzeugleiste style={{ marginBottom: 12 }}
+          links={<>
+            <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("eval.niveauFilter")}</span>
+            <Tabs value={niveauFilter} onChange={setNiveauFilter}
+              options={[["", t("eval.niveauAll")], ["E", "E"], ["G", "G"]]} />
+          </>}
+        />
       )}
 
       <div style={{ overflowX: "auto" }}>
@@ -729,8 +731,7 @@ const gradeDistribution = (() => {
                     {/* Kursniveau steht immer neben dem Ergebnis, nicht nur bei
                         differenzierten Quizzen — die Note ist ohne es nicht lesbar. */}
                     {student.niveau && (
-                      <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, padding: "1px 6px", borderRadius: 8, background: "var(--bg2)", color: "var(--text3)" }}
-                        title={t("eval.niveauBadgeHint")}>
+                      <span style={{ ...chipStyle, marginLeft: 8 }} title={t("eval.niveauBadgeHint")}>
                         {student.niveau}
                       </span>
                     )}
@@ -749,11 +750,11 @@ const gradeDistribution = (() => {
                         ...td,
                         textAlign: "center",
                         fontWeight: "bold",
-                        background: a.answer == null ? "#fafafa"
+                        background: a.answer == null ? "var(--bg2)"
                           : a.is_correct ? "var(--success-bg)"
                           : a.correct_answer ? "var(--danger-bg)"
-                          : "#fff",
-                        color: a.answer == null ? "#ccc"
+                          : "var(--card)",
+                        color: a.answer == null ? "var(--text3)"
                           : a.is_correct ? C.success
                           : a.correct_answer ? C.danger
                           : "var(--text)",
@@ -773,7 +774,7 @@ const gradeDistribution = (() => {
                     {student.ownMax > 0 ? `${pct}%` : "–"}
                     {/* Bonus aus richtigen E-Fragen — sichtbar, damit die Note nachvollziehbar bleibt. */}
                     {student.bonusPct > 0 && (
-                      <span style={{ display: "block", fontSize: 10.5, fontWeight: 600, color: "var(--text3)" }}
+                      <span style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--text3)" }}
                         title={t("eval.bonusHint", { n: student.eCorrect, total: student.eTotal })}>
                         +{Math.round(student.bonusPct)} E
                       </span>
@@ -876,37 +877,37 @@ const gradeDistribution = (() => {
       {showCiInfo && <CiInfoBox onClose={() => setShowCiInfo(false)} />}
 
       {showRateInfo && (
-        <div style={{ marginTop: 12, padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
+        <div style={{ ...panelStyle, marginTop: 12, padding: 16, fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <h4 style={{ fontSize: 15, fontWeight: 700 }}>{t("cv.rateTitle")}</h4>
+            <h4 style={{ fontSize: 14, fontWeight: 700 }}>{t("cv.rateTitle")}</h4>
             <SchliessenBtn onClick={() => setShowRateInfo(false)} t={t} />
           </div>
-          <p style={{ marginBottom: 10 }}>{t("cv.rateText")}</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+          <p style={{ marginBottom: 12 }}>{t("cv.rateText")}</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
             {[[2, "50%"], [3, "33%"], [4, "25%"]].map(([n, pct]) => (
               <div key={n} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontWeight: 700, minWidth: 90 }}>{t("cv.nAnswers", { n })}</span><span>{pct}</span>
               </div>
             ))}
           </div>
-          <p style={{ fontSize: 12, color: "var(--text3)", padding: "8px 12px", background: "var(--bg2)", borderRadius: 8 }}>{t("cv.rateHint")}</p>
+          <p style={{ fontSize: 12, color: "var(--text3)", padding: "8px 12px", background: "var(--bg2)", borderRadius: panelStyle.borderRadius }}>{t("cv.rateHint")}</p>
         </div>
       )}
 
       {showDiscInfo && (
-        <div style={{ marginTop: 12, padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
+        <div style={{ ...panelStyle, marginTop: 12, padding: 16, fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <h4 style={{ fontSize: 15, fontWeight: 700 }}>{t("cv.discTitle")}</h4>
+            <h4 style={{ fontSize: 14, fontWeight: 700 }}>{t("cv.discTitle")}</h4>
             <SchliessenBtn onClick={() => setShowDiscInfo(false)} t={t} />
           </div>
-          <p style={{ marginBottom: 10 }}>{t("cv.discText")}</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+          <p style={{ marginBottom: 12 }}>{t("cv.discText")}</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.success, minWidth: 72 }}>≥ 0.40</span><span>{t("cv.discRowGood")}</span></div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.warning, minWidth: 72 }}>0.20–0.39</span><span>{t("cv.discRowOk")}</span></div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.danger, minWidth: 72 }}>&lt; 0.20</span><span>{t("cv.discRowWeak")}</span></div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: C.danger, minWidth: 72 }}>{t("cv.discRowNegLabel")}</span><span>{t("cv.discRowNeg")}</span></div>
           </div>
-          <p style={{ fontSize: 12, color: "var(--text3)", padding: "8px 12px", background: "var(--bg2)", borderRadius: 8 }}>{t("cv.discMin")}</p>
+          <p style={{ fontSize: 12, color: "var(--text3)", padding: "8px 12px", background: "var(--bg2)", borderRadius: panelStyle.borderRadius }}>{t("cv.discMin")}</p>
         </div>
       )}
     </div>
@@ -918,12 +919,12 @@ const gradeDistribution = (() => {
 function CiInfoBox({ onClose }) {
   const { t } = useLanguage();
   return (
-    <div style={{ marginTop: 12, padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
+    <div style={{ ...panelStyle, marginTop: 12, padding: 16, fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <h4 style={{ fontSize: 15, fontWeight: 700 }}>{t("cv.ciTitle")}</h4>
+        <h4 style={{ fontSize: 14, fontWeight: 700 }}>{t("cv.ciTitle")}</h4>
         <SchliessenBtn onClick={onClose} t={t} />
       </div>
-      <p style={{ marginBottom: 10 }}>{t("cv.ciText1")}</p>
+      <p style={{ marginBottom: 12 }}>{t("cv.ciText1")}</p>
       <p style={{ marginBottom: 0 }}>{t("cv.ciText2")}</p>
       <p style={{ marginTop: 10, marginBottom: 0 }}>{t("cv.ciText3")}</p>
     </div>
@@ -932,7 +933,7 @@ function CiInfoBox({ onClose }) {
 
 // Zahlenfelder ohne die haesslichen nativen Spinner-Pfeile, sauber gerahmt.
 const NUM_CSS = ".nice-num::-webkit-inner-spin-button,.nice-num::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.nice-num{-moz-appearance:textfield;appearance:textfield}";
-const numInput = { ...inputStyle, width: 48, padding: "6px", fontSize: 13, borderRadius: 8, textAlign: "center" };
+const numInput = { ...inputStyle, width: 48, padding: "6px", fontSize: 13, borderRadius: CONTROL_R, textAlign: "center" };
 // Noten-Nummer schlicht, ohne Kreis/Umrandung.
 const gradeBadge = { flexShrink: 0, minWidth: 14, color: "var(--text)", fontSize: 14, fontWeight: 700, textAlign: "center" };
 
@@ -940,50 +941,37 @@ const gradeBadge = { flexShrink: 0, minWidth: 14, color: "var(--text)", fontSize
 const th = { ...thBasis, padding: "8px 10px", borderBottom: "2px solid var(--border3)", textAlign: "left", fontSize: 13, color: "var(--text)" };
 const td = { ...tdBasis, padding: "8px 10px", textAlign: "left" };
 
+// Dieselbe Kachel wie ueberall: die Optik kommt aus `StatCard` (Icons.jsx).
+// Hier kommt nur dazu, was diese Seite braucht — anklickbar (Punkte/Prozent
+// umschalten) und ein „i". Vorher stand hier eine zweite, handgebaute Kachel
+// direkt neben der importierten, mit demselben Aussehen und eigenen Werten.
 function Stat({ label, value, onClick, clickable, info }) {
   const { t } = useLanguage();
   return (
-    <div
-      onClick={onClick}
-      style={{
-        padding: "10px 16px", background: "var(--bg2)", borderRadius: 12, textAlign: "center",
-        cursor: clickable ? "pointer" : "default",
-        userSelect: "none",
-        position: "relative",
-        minWidth: 80,
-      }}
-    >
+    <div onClick={onClick}
+      style={{ position: "relative", cursor: clickable ? "pointer" : "default", userSelect: "none" }}>
+      <StatCard
+        value={value}
+        label={<>{label}{clickable && <Icon d={ICONS.swap} size={12} color="var(--text3)" />}</>}
+      />
       {info && (
         <button
           onClick={(e) => { e.stopPropagation(); info(); }}
-          style={{
-            position: "absolute", top: 4, right: 4,
-            width: 18, height: 18, borderRadius: 9, border: "none",
-            background: "var(--border3)", color: "var(--text3)",
-            fontSize: 11, fontWeight: 700, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            lineHeight: 1, padding: 0,
-          }}
+          className="icon-btn"
+          style={{ ...iconBtn, position: "absolute", top: 4, right: 4, padding: 2, borderRadius: chipStyle.borderRadius, background: "var(--border3)" }}
           title={t("cv.info")}
         ><Icon d={ICONS.info} size={12} color="var(--text3)" /></button>
       )}
-      <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{value}</div>
-      <div style={{ fontSize: 12, color: "var(--text3)", display: "inline-flex", alignItems: "center", gap: 4 }}>
-        {label}{clickable && <Icon d={ICONS.swap} size={12} color="var(--text3)" />}
-      </div>
     </div>
   );
 }
-
-// Die Kachel der Fragedetails kam aus StatCard (Icons.jsx) — die lokale Kopie
-// war eine zweite Design-Quelle fuer dieselbe Sache.
 
 // Schliessen-Kreuz der Erklaerkaesten: viermal dasselbe Inline-SVG, jetzt einmal
 // und aus ICONS.
 function SchliessenBtn({ onClick, t }) {
   return (
     <button onClick={onClick} className="icon-btn" title={t("common.close")} aria-label={t("common.close")}
-      style={{ ...iconBtn, width: 24, height: 24, borderRadius: 12, background: "var(--bg2)", color: "var(--text3)" }}>
+      style={{ ...iconBtn, padding: 4, background: "var(--bg2)", color: "var(--text3)" }}>
       <Icon d={ICONS.close} size={13} />
     </button>
   );
@@ -1016,8 +1004,8 @@ function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
 
   return (
     <Modal onClose={onClose} width={460} label={t("notenimp.title")}>
-        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t("notenimp.title")}</h3>
-        <p style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 16 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>{t("notenimp.title")}</h3>
+        <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 16 }}>
           {t("notenimp.intro", { test: sessionName ? t("notenimp.testNamed", { name: sessionName }) : t("notenimp.testThis"), n: grades.length })}
         </p>
 
@@ -1030,8 +1018,8 @@ function NotenImport({ sessionId, classId, sessionName, grades, onClose }) {
           </>
         ) : (
           <>
-            {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 10 }}>{error}</p>}
-            {(() => { const fld = { ...inputStyle, width: "100%" }; const lbl = { fontSize: 12.5, color: "var(--text2)", marginBottom: 6, marginTop: 12 }; return (
+            {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</p>}
+            {(() => { const fld = { ...inputStyle, width: "100%" }; const lbl = { fontSize: 13, color: "var(--text2)", marginBottom: 6, marginTop: 12 }; return (
               <>
                 <AbschnittWahl classId={classId} value={sectionId} onChange={setSectionId} />
 
@@ -1115,21 +1103,21 @@ function TopicAnalysis({ questions, presentStudents }) {
     : t("analyse.verdictOk");
 
   return (
-    <div style={{ padding: 16, background: "var(--card)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 16 }}>
-      <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{t("analyse.title")}</h3>
-      <p style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 12 }}>{t("analyse.intro")}</p>
+    <div style={{ ...cardStyle, marginBottom: 16 }}>
+      <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{t("analyse.title")}</h3>
+      <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 12 }}>{t("analyse.intro")}</p>
       <p style={{
-        fontSize: 13, lineHeight: 1.6, marginBottom: 12, padding: "10px 12px", borderRadius: 10,
-        background: weakRows.length > 0 ? "rgba(184,134,11,0.10)" : "rgba(10,125,62,0.08)",
-        border: `1px solid ${weakRows.length > 0 ? "rgba(184,134,11,0.35)" : "rgba(10,125,62,0.25)"}`,
+        fontSize: 13, lineHeight: 1.6, marginBottom: 12, padding: "10px 12px", borderRadius: CONTROL_R,
+        background: (weakRows.length > 0 ? C.warning : C.success) + "1a",
+        border: `1px solid ${(weakRows.length > 0 ? C.warning : C.success)}59`,
       }}>{verdict}</p>
       {rows.map((r) => {
         const weak = r.pct < 60;
         const n = exCount[r.tid] || 0;
         return (
-          <div key={r.tid} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: "1px solid var(--border)", flexWrap: "wrap" }}>
-            <span style={{ flex: 1, minWidth: 140, fontSize: 13.5, fontWeight: weak ? 600 : 400 }}>{label(r.tid)}</span>
-            <span style={{ fontSize: 13.5, fontWeight: 700, color: weak ? C.danger : C.success, width: 48, textAlign: "right" }}>{r.pct}%</span>
+          <div key={r.tid} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderTop: "1px solid var(--border)", flexWrap: "wrap" }}>
+            <span style={{ flex: 1, minWidth: 140, fontSize: 14, fontWeight: weak ? 600 : 400 }}>{label(r.tid)}</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: weak ? C.danger : C.success, width: 48, textAlign: "right" }}>{r.pct}%</span>
             {weak && (
               <span style={{ fontSize: 12, color: C.warning, display: "flex", alignItems: "center", gap: 8 }}>
                 {t("analyse.weak")}
@@ -1179,19 +1167,19 @@ function WeakTopics({ sessionId, classId, karten, lernpfad, t }) {
     if (done[key]) return <Icon d={ICONS.check} size={16} color={C.success} />;
     return (
       <button onClick={() => onClick(tp)} disabled={busy === key}
-        style={{ ...btnSecondary, height: CONTROL_H, padding: "0 12px", borderRadius: CONTROL_R, fontSize: 12.5, lineHeight: 1, opacity: busy === key ? 0.6 : 1 }}>{label}</button>
+        style={{ ...toolbarBtn, opacity: busy === key ? 0.6 : 1 }}>{label}</button>
     );
   };
 
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, marginBottom: 16 }}>
+    <div style={{ ...cardStyle, marginBottom: 16 }}>
       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{t("weak.title")}</div>
-      <div style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 12 }}>{t("weak.hint2")}</div>
+      <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 12 }}>{t("weak.hint2")}</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {schwach.map((tp) => (
-          <div key={tp.topic_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 10, flexWrap: "wrap" }}>
+          <div key={tp.topic_id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: CONTROL_R, flexWrap: "wrap" }}>
             <span style={{ flex: 1, fontWeight: 600, minWidth: 120 }}>{tp.name}</span>
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: tp.pct < 40 ? C.danger : C.warning }}>{tp.pct}%</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: tp.pct < 40 ? C.danger : C.warning }}>{tp.pct}%</span>
             {karten && <Btn tp={tp} art="karten" onClick={deckAnlegen} label={t("weak.makeDeck")} />}
             {lernpfad && <Btn tp={tp} art="lernpfad" onClick={aufgabeAnlegen} label={t("weak.makeExercise")} />}
           </div>

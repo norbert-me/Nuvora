@@ -3,7 +3,7 @@
 // "Ohne Wiederholung" merkt sich die schon Gezogenen, bis die Klasse durch ist.
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { btnPrimary, btnSecondary, selectStyle, inputStyle, ICONS, pageApp} from "../components/Icons.jsx";
+import { btnPrimary, btnSecondary, cardStyle, selectStyle, inputStyle, ICONS, pageApp } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import ViewMenu from "../components/ViewMenu.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
@@ -168,7 +168,7 @@ export default function Zufall() {
           Zahnrad, das Gefährliche („Zieh-Gedächtnis leeren") im ⋯-Menü — nicht
           mehr als fünfter Knopf neben „Runde zurücksetzen". */}
       <Werkzeugleiste
-        style={{ marginBottom: 20 }}
+        style={{ marginBottom: 16 }}
         links={<>
           <KursKlasseSelect value={classId} onChange={setClassId} />
           {tab === "ziehen" && (
@@ -205,10 +205,10 @@ export default function Zufall() {
           {groups.length > 0 && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
               {groups.map((g, i) => (
-                <div key={i} style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 14 }}>
+                <div key={i} style={{ ...cardStyle, padding: 12 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: "var(--accent)", marginBottom: 8 }}>{t("zufall.group", { n: i + 1 })} <span style={{ color: "var(--text3)", fontWeight: 400 }}>· {g.length}</span></div>
                   {g.map((s) => (
-                    <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 14, padding: "3px 0" }}>
+                    <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, padding: "3px 0" }}>
                       <Portrait student={s} size={22} />{s.name}
                     </div>
                   ))}
@@ -221,14 +221,14 @@ export default function Zufall() {
       )}
 
       {skipAbs && anwesenheitAktiv && absent.size > 0 && (
-        <p style={{ fontSize: 12.5, color: "var(--text3)", marginTop: -8, marginBottom: 16 }}>{t("zufall.absentSkipped", { n: absent.size })}</p>
+        <p style={{ fontSize: 13, color: "var(--text3)", marginTop: -8, marginBottom: 16 }}>{t("zufall.absentSkipped", { n: absent.size })}</p>
       )}
 
       {tab === "ziehen" && (students.length === 0 ? (
         <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("zufall.noStudents")}</p>
       ) : (
         <>
-          <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: "48px 24px", textAlign: "center", marginBottom: 18 }}>
+          <div style={{ ...cardStyle, padding: "48px 24px", textAlign: "center", marginBottom: 16 }}>
             {/* Gesicht zum Namen: gerade in den ersten Wochen ist das der
                 eigentliche Nutzen des Ziehens. Kein Foto hinterlegt -> die
                 Initialen, damit die Zeile nicht springt. */}
@@ -242,7 +242,7 @@ export default function Zufall() {
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <button onClick={ziehen} disabled={rollt} style={{ ...btnPrimary, fontSize: 16, padding: "12px 26px", opacity: rollt ? 0.6 : 1 }}>{t("zufall.draw")}</button>
             {ohneWdh && (
               <span style={{ fontSize: 13, color: "var(--text3)" }}>

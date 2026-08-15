@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { COLORS as C } from "../components/Icons.jsx";
+import { COLORS as C, cardStyle, btnPrimary as knopf, pageForm, SHADOW } from "../components/Icons.jsx";
 
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -19,13 +19,13 @@ export default function VerifyEmail() {
   }, [token]);
 
   return (
-    <div style={{ display: "flex", justifyContent: "center", padding: "40px 0" }}>
-      <div style={{ width: "100%", maxWidth: 380, padding: "32px 36px", background: "var(--card)", borderRadius: 20, border: "1px solid var(--border)", boxShadow: "0 4px 24px rgba(0,0,0,0.06)", textAlign: "center" }}>
+    <div style={{ ...pageForm, padding: "24px 0" }}>
+      <div style={{ ...cardStyle, padding: 24, boxShadow: SHADOW.ruhig, textAlign: "center" }}>
         <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", margin: "0 0 16px" }}>CardVote</h2>
         {state === "loading" && <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("verify.inProgress")}</p>}
         {state === "ok" && (
           <>
-            <div style={{ color: C.success, fontSize: 15, fontWeight: 600, marginBottom: 16 }}>{t("verify.ok")}</div>
+            <div style={{ color: C.success, fontSize: 16, fontWeight: 600, marginBottom: 16 }}>{t("verify.ok")}</div>
             <a href="/login" style={btnPrimary}>{t("verify.toLogin")}</a>
           </>
         )}
@@ -40,8 +40,5 @@ export default function VerifyEmail() {
   );
 }
 
-const btnPrimary = {
-  display: "inline-block", padding: "12px 24px", fontSize: 15, fontWeight: 600,
-  background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 980,
-  cursor: "pointer", textDecoration: "none",
-};
+// Bestaetigungsseite: ein einzelner Knopf inline, sonst wie ueberall.
+const btnPrimary = { ...knopf, display: "inline-block", padding: "12px 24px", fontSize: 16, textDecoration: "none" };

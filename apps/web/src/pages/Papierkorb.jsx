@@ -5,7 +5,7 @@
 import { useState, useEffect } from "react";
 import { useLanguage } from "../i18n/index.jsx";
 import { askConfirm } from "../core/dialog.jsx";
-import { pageTitle, pageIntro, btnSecondary, Icon, ICONS, iconBtn, COLORS as C, panelStyle, Empty, pageApp, LoadError } from "../components/Icons.jsx";
+import { pageTitle, pageIntro, btnSecondary, btnSmall, Icon, ICONS, iconBtn, COLORS as C, panelStyle, sectionLabel, Empty, pageApp, LoadError } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { sende } from "../core/melden.js";
 
@@ -78,20 +78,20 @@ export default function Papierkorb() {
       {ladefehler ? <LoadError message={t("trash.loadError")} onRetry={load} />
         : items.length === 0 && <Empty title={t("trash.emptyTitle")} hint={t("trash.emptyHint")} />}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {gruppen.map(({ kind, list }) => (
           <div key={kind} style={panelStyle}>
-            <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text3)", marginBottom: 8 }}>
+            <div style={{ ...sectionLabel, marginBottom: 8 }}>
               {list[0].art} ({list.length})
             </div>
             {list.map((it) => (
-              <div key={`${it.kind}-${it.id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: "1px solid var(--border)" }}>
+              <div key={`${it.kind}-${it.id}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderTop: "1px solid var(--border)" }}>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ fontWeight: 500 }}>{it.label}</span>
                   {it.context && <span style={{ fontSize: 12, color: "var(--text3)", marginLeft: 8 }}>{it.context}</span>}
                 </span>
                 <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap" }}>{t("trash.daysLeft", { n: restTage(it) })}</span>
-                <button onClick={() => restore(it)} disabled={busy} style={{ ...btnSecondary, padding: "4px 11px", fontSize: 12.5, opacity: busy ? 0.6 : 1 }}>
+                <button onClick={() => restore(it)} disabled={busy} style={{ ...btnSecondary, ...btnSmall, opacity: busy ? 0.6 : 1 }}>
                   {t("trash.restore")}
                 </button>
                 <button onClick={() => purge(it)} disabled={busy} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("trash.purge")} aria-label={t("trash.purge")}>

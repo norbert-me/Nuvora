@@ -4,7 +4,7 @@
 // getestet; hier wird nur angezeigt, was sie geliefert hat — samt der Zahlen,
 // aus denen sie entstanden ist. Eine Ampel ohne Begründung wäre ein Orakel.
 import { useEffect, useState } from "react";
-import { COLORS as C, badge } from "./Icons.jsx";
+import { COLORS as C, badge, cardStyle, chipStyle, sectionLabel, CONTROL_R } from "./Icons.jsx";
 import { useEmpfindlich } from "../core/fruehwarnung.js";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -71,12 +71,12 @@ export function FruehwarnKarte({ schueler, t, offen = false }) {
   const s = schueler;
 
   return (
-    <div style={{ border: "1px solid var(--border2)", borderRadius: 10, padding: "10px 12px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", cursor: "pointer" }}
+    <div style={{ border: "1px solid var(--border2)", borderRadius: CONTROL_R, padding: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", cursor: "pointer" }}
         onClick={() => setAuf((v) => !v)}>
         <span style={{ fontWeight: 700, fontSize: 14 }}>{s.name}</span>
         <StatusChip status={s.status} t={t} />
-        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 10 }}>
+        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8 }}>
           {s.abstand_median !== null && (
             <span style={{ fontSize: 13, fontWeight: 700, color: s.abstand_median < 0 ? C.danger : "var(--text2)" }}>
               {s.abstand_median > 0 ? "+" : ""}{Math.round(s.abstand_median)} Pp
@@ -85,12 +85,12 @@ export function FruehwarnKarte({ schueler, t, offen = false }) {
           <AbstandSpark kurve={s.kurve} />
         </span>
       </div>
-      <div style={{ fontSize: 12.5, color: "var(--text2)", marginTop: 4, lineHeight: 1.45 }}>{s.begruendung}</div>
+      <div style={{ fontSize: 13, color: "var(--text2)", marginTop: 4, lineHeight: 1.45 }}>{s.begruendung}</div>
 
       {auf && (
-        <div style={{ marginTop: 10, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+        <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
           {s.etiketten?.length > 0 && (
-            <ul style={{ margin: "0 0 10px", paddingLeft: 18, fontSize: 12.5, color: "var(--text2)", lineHeight: 1.6 }}>
+            <ul style={{ margin: "0 0 12px", paddingLeft: 18, fontSize: 13, color: "var(--text2)", lineHeight: 1.6 }}>
               {s.etiketten.map((e, i) => <li key={i}>{e.text}</li>)}
             </ul>
           )}
@@ -99,12 +99,12 @@ export function FruehwarnKarte({ schueler, t, offen = false }) {
               ins Detail muss immer etwas zeigen. */}
           {s.kurve?.length > 0 && (
             <>
-              <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>
+              <div style={{ ...sectionLabel, marginBottom: 8 }}>
                 {t("fw.byTest")}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: s.themen?.length ? 12 : 0 }}>
                 {s.kurve.map((k, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
                     <span style={{ color: "var(--text3)", width: 46, flexShrink: 0 }}>
                       {(k.datum || "").slice(0, 10).split("-").reverse().slice(0, 2).join(".")}
                     </span>
@@ -128,12 +128,12 @@ export function FruehwarnKarte({ schueler, t, offen = false }) {
           )}
           {s.themen?.length > 0 && (
             <>
-              <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>
+              <div style={{ ...sectionLabel, marginBottom: 8 }}>
                 {t("fw.byTopic")}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {s.themen.map((th) => (
-                  <div key={th.topic_id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
+                  <div key={th.topic_id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
                     <span style={{ flex: 1, color: "var(--text)" }}>{th.name || `#${th.topic_id}`}</span>
                     <span style={{ fontSize: 11, color: "var(--text3)" }}>
                       {th.altbestand ? t("fw.old") : t("fw.fresh")}
@@ -197,16 +197,16 @@ export default function FruehwarnPanel({ classId, nurKind = null, titel = true }
   if (nurKind != null && zeigen.length === 0) return null;
 
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, marginBottom: 16 }}>
+    <div style={{ ...cardStyle, marginBottom: 16 }}>
       {titel && (
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, flex: 1 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, flex: 1 }}>
             {t("fw.title")}{nurKind == null && zeigen.length > 0 ? ` (${zeigen.length})` : ""}
           </div>
           <button onClick={() => setEmpfindlich(!empfindlich)}
-            style={{ fontSize: 12, padding: "3px 10px", borderRadius: 980, cursor: "pointer",
+            style={{ ...chipStyle, cursor: "pointer", background: "var(--card)",
               border: `1px solid ${empfindlich ? "var(--accent)" : "var(--border2)"}`,
-              background: "var(--card)", color: empfindlich ? "var(--accent)" : "var(--text3)" }}
+              color: empfindlich ? "var(--accent)" : "var(--text3)" }}
             title={t("fw.sensitiveHint")}>
             {t("fw.sensitive")}
           </button>
@@ -218,7 +218,7 @@ export default function FruehwarnPanel({ classId, nurKind = null, titel = true }
         // Nicht „niemand fällt ab": bei einer einzigen Arbeit weiss das niemand.
         <div style={{ fontSize: 13, color: "var(--text3)" }}>{t("fw.tooEarly", { n: erhebungen })}</div>
       ) : zeigen.length === 0 ? (
-        <div style={{ fontSize: 13.5, color: "var(--text2)" }}>
+        <div style={{ fontSize: 14, color: "var(--text2)" }}>
           {t("fw.none")}{" "}
           <span style={{ color: "var(--text3)" }}>{t("fw.basedOn", { n: erhebungen })}</span>
         </div>
@@ -231,7 +231,7 @@ export default function FruehwarnPanel({ classId, nurKind = null, titel = true }
         </div>
       )}
       {daten.regel?.abstand && (
-        <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 10, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 12, lineHeight: 1.5 }}>
           {t("fw.rule", { abstand: daten.regel.abstand, von: daten.regel.von, bis: daten.regel.bis, min: daten.regel.mindest_antworten })}
         </div>
       )}

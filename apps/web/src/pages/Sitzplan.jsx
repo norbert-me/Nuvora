@@ -2,7 +2,7 @@
 // drehen (z.B. schräge Tische). Gespeichert wird { seats: [{sid,x,y,rot}] }.
 // Schüler bleiben im Kern; hier nur ihre Positionen (Regel 3).
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { btnSecondary, Icon, ICONS, iconBtn, toolbarIconBtn, CONTROL_H, CONTROL_R, dateiWaehlen, COLORS as C, Empty } from "../components/Icons.jsx";
+import { cardStyle, chipStyle, panelStyle, sectionLabel, Segment, segmentBtn, toolbarBtn, Icon, ICONS, toolbarIconBtn, CONTROL_R, SHADOW, dateiWaehlen, COLORS as C, Empty } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import ViewMenu from "../components/ViewMenu.jsx";
 import Portrait from "../components/Portrait.jsx";
@@ -20,16 +20,20 @@ const SEAT_W = 108, SEAT_H = 46;
 // Selbststeuerung. Reihenfolge = Klick-Kreislauf am Platz (leer → … → leer).
 const SEGEL = [
   { key: "hafen", label: "Hafen", ab: "H", color: C.danger },
+  // Fester Wert: die Stufenfarben sind eine Skala (rot → grün) wie
+  // REIFE_COLORS; für die Zwischenstufe gibt es keine Token-Farbe.
   { key: "kueste", label: "Küste", ab: "K", color: "#c026a3" },
   { key: "meer", label: "Meer", ab: "M", color: C.info },
   { key: "welt", label: "Welt", ab: "W", color: C.success },
 ];
 const SEGEL_CYCLE = ["", "hafen", "kueste", "meer", "welt"];
 
-// Kleine Leiste an der Flaeche: eigene, aber EINE Hoehe (28) und Form.
-const zoomBtn = { ...iconBtn, border: "1px solid var(--border2)", borderRadius: CONTROL_R,
-  width: 28, height: 28, boxSizing: "border-box", display: "inline-flex",
-  alignItems: "center", justifyContent: "center", background: "var(--bg)", color: "var(--text2)" };
+// Die Zoom-Leiste sitzt direkt an der Flaeche und darf niedriger sein als die
+// Haupt-Werkzeugleiste (28 statt CONTROL_H) — aber sie ist EINE Gruppe: ein
+// Rahmen aussen, duenne Trenner innen. Vorher waren es fuenf freistehende
+// Kaesten fuer eine einzige Frage („wie gross?").
+const ZOOM_H = 28;
+const zoomBtnStyle = { ...segmentBtn, padding: "0 10px", color: "var(--text2)" };
 
 export default function Sitzplan() {
   const { t } = useLanguage();
@@ -399,43 +403,42 @@ export default function Sitzplan() {
         {/* Sichtbar bleibt, was man im Unterricht wirklich braucht: einen Platz
             dazulegen und das letzte Verschieben zuruecknehmen. Alles Uebrige
             steht im Menue — vorher lag der Papierkorb direkt neben dem Plus. */}
-        <button onClick={addEmpty} style={{ ...btnSecondary, height: CONTROL_H, padding: "0 12px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("sitzplan.addEmpty")}>
+        <button onClick={addEmpty} style={toolbarBtn} title={t("sitzplan.addEmpty")}>
           <Icon d={ICONS.plus} size={15} /> {t("sitzplan.emptySeat")}
         </button>
         {undoLen > 0 && <button onClick={undo} className="icon-btn" style={toolbarIconBtn} title={t("sitzplan.undo")} aria-label={t("sitzplan.undo")}><Icon d={ICONS.undo || ICONS.restore} size={18} /></button>}
         {redoLen > 0 && <button onClick={redo} className="icon-btn" style={toolbarIconBtn} title={t("sitzplan.redo")} aria-label={t("sitzplan.redo")}><span style={{ display: "inline-flex", transform: "scaleX(-1)" }}><Icon d={ICONS.undo || ICONS.restore} size={18} /></span></button>}
       </Werkzeugleiste>
       {segelOn && (
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", margin: "8px 0 12px", fontSize: 12.5, color: "var(--text3)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", margin: "8px 0 12px", fontSize: 13, color: "var(--text3)" }}>
           <span>{t("sitzplan.segelLegend")}:</span>
           {SEGEL.map((x) => (
-            <span key={x.key} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-              <span style={{ width: 16, height: 16, borderRadius: 8, background: x.color, color: "#fff", fontSize: 10, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{x.ab}</span>
+            <span key={x.key} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              {/* Radius = halbe Kante: reine Grafik (Punkt in der Legende). */}
+              <span style={{ width: 16, height: 16, borderRadius: 8, background: x.color, color: C.aufAkzent, fontSize: 11, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{x.ab}</span>
               {x.label}
             </span>
           ))}
           <span style={{ color: "var(--text3)" }}>· {t("sitzplan.segelCycleHint")}</span>
         </div>
       )}
-      {msg && <p style={{ fontSize: 13, color: C.success, marginBottom: 10 }}>{msg}</p>}
+      {msg && <p style={{ fontSize: 13, color: C.success, marginBottom: 12 }}>{msg}</p>}
 
       {students.length === 0 ? (
         <Empty title={t("sitzplan.noStudents")} hint={t("sitzplan.noStudentsHint")} />
       ) : (
         <>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-            <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("sitzplan.zoom")}</span>
-            {/* Diese Leiste ist bewusst kleiner als die Haupt-Werkzeugleiste
-                (sie sitzt direkt an der Flaeche) — ABER in sich einheitlich:
-                eine Hoehe, eine Form. Vorher standen hier 28-px-Kreise neben
-                Pillen mit eigener Polsterung und ein Rechteck dazwischen. */}
-            <button onClick={() => setZoom((z) => Math.max(0.5, Math.round((z - 0.1) * 10) / 10))} style={zoomBtn} title={t("sitzplan.zoomOut")} aria-label={t("sitzplan.zoomOut")}><Icon d={ICONS.minus} size={15} /></button>
-            <span style={{ fontSize: 12.5, color: "var(--text2)", minWidth: 40, textAlign: "center" }}>{Math.round(zoom * 100)}%</span>
-            <button onClick={() => setZoom((z) => Math.min(2, Math.round((z + 0.1) * 10) / 10))} style={zoomBtn} title={t("sitzplan.zoomIn")} aria-label={t("sitzplan.zoomIn")}><Icon d={ICONS.plus} size={15} /></button>
-            {zoom !== 1 && <button onClick={() => setZoom(1)} style={{ ...zoomBtn, width: "auto", padding: "0 12px", fontSize: 12 }}>{t("sitzplan.zoomReset")}</button>}
-            <button onClick={fitView} className="icon-btn" style={zoomBtn} title={t("sitzplan.fitHint")} aria-label={t("sitzplan.fit")}><Icon d={ICONS.fit} size={15} /></button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("sitzplan.zoom")}</span>
+            <Segment style={{ height: ZOOM_H }}>
+              <button onClick={() => setZoom((z) => Math.max(0.5, Math.round((z - 0.1) * 10) / 10))} style={zoomBtnStyle} title={t("sitzplan.zoomOut")} aria-label={t("sitzplan.zoomOut")}><Icon d={ICONS.minus} size={15} /></button>
+              <span style={{ ...zoomBtnStyle, cursor: "default", minWidth: 46 }}>{Math.round(zoom * 100)}%</span>
+              <button onClick={() => setZoom((z) => Math.min(2, Math.round((z + 0.1) * 10) / 10))} style={zoomBtnStyle} title={t("sitzplan.zoomIn")} aria-label={t("sitzplan.zoomIn")}><Icon d={ICONS.plus} size={15} /></button>
+              {zoom !== 1 && <button onClick={() => setZoom(1)} style={zoomBtnStyle}>{t("sitzplan.zoomReset")}</button>}
+              <button onClick={fitView} style={zoomBtnStyle} title={t("sitzplan.fitHint")} aria-label={t("sitzplan.fit")}><Icon d={ICONS.fit} size={15} /></button>
+            </Segment>
           </div>
-          <div ref={scrollRef} style={{ height: 520, overflow: "auto", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", marginBottom: 18 }}>
+          <div ref={scrollRef} style={{ height: 520, overflow: "auto", border: "1px solid var(--border)", borderRadius: cardStyle.borderRadius, background: "var(--card)", marginBottom: 16 }}>
           <div ref={canvasRef} onPointerDown={onCanvasDown} onDragOver={(e) => e.preventDefault()} onDrop={onCanvasDrop}
             style={{ position: "relative", height: 760, width: "calc(100% - 40px)", minWidth: 720, margin: "0 20px", transform: `scale(${zoom})`, transformOrigin: "0 0",
               cursor: "grab",
@@ -445,14 +448,17 @@ export default function Sitzplan() {
               style={{ position: "absolute", left: tafel.x, top: tafel.y, width: TAFEL_W, height: TAFEL_H,
                 transform: `rotate(${tafel.rot || 0}deg)`, transformOrigin: "center",
                 display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
-                fontSize: 11.5, letterSpacing: "0.1em", color: "var(--text2)", textTransform: "uppercase", fontWeight: 700,
-                border: "2px solid var(--text3)", borderRadius: 6, background: "var(--bg2)",
-                cursor: "grab", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: "none", boxShadow: "0 1px 3px rgba(0,0,0,0.12)" }}
+                fontSize: 12, letterSpacing: "0.1em", color: "var(--text2)", textTransform: "uppercase", fontWeight: 700,
+                border: "2px solid var(--text3)", borderRadius: CONTROL_R, background: "var(--bg2)",
+                cursor: "grab", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: "none", boxShadow: SHADOW.ruhig }}
               title={t("sitzplan.board")}>{t("sitzplan.board")}
+              {/* Die Griffe und Punkte an den Ecken sind reine Grafik: der
+                  Radius ist immer die halbe Kante (runder Griff, runder Punkt)
+                  — deshalb hier Zahlen statt CONTROL_R. */}
               {(
                 <span onPointerDown={onTafelRotDown} title={t("sitzplan.rotate")}
                   style={{ position: "absolute", right: -9, top: -9, width: 18, height: 18, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center",
-                    background: "var(--card)", border: "1px solid var(--border2)", color: "var(--text2)", fontSize: 12, lineHeight: 1, cursor: "grab", touchAction: "none", boxShadow: "0 1px 2px rgba(0,0,0,0.15)" }}>↻</span>
+                    background: "var(--card)", border: "1px solid var(--border2)", color: "var(--text2)", fontSize: 12, lineHeight: 1, cursor: "grab", touchAction: "none", boxShadow: SHADOW.ruhig }}><Icon d={ICONS.rotate} size={11} /></span>
               )}
             </div>
             {seats.map((seat) => {
@@ -466,14 +472,15 @@ export default function Sitzplan() {
                   style={{ position: "absolute", left: seat.x, top: seat.y, width: SEAT_W, minHeight: SEAT_H,
                     transform: `rotate(${seat.rot || 0}deg)`, transformOrigin: "center",
                     display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
-                    padding: "6px 22px 6px 8px", borderRadius: 8, border: "1px solid var(--border2)",
-                    background: abs ? "var(--bg2)" : "var(--bg)", color: "var(--text)", fontSize: 12.5, fontWeight: 600,
-                    cursor: "grab", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: "none",
+                    padding: "6px 22px 6px 8px", borderRadius: CONTROL_R, border: "1px solid var(--border2)",
+                    background: abs ? "var(--bg2)" : "var(--bg)", color: "var(--text)", fontSize: 13, fontWeight: 600,
+                    cursor: "grab", boxShadow: SHADOW.ruhig, userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: "none",
                     opacity: abs ? 0.5 : 1, textDecoration: abs ? "line-through" : "none" }}>
                   {!seat.empty && fotosOn && (
-                    <Portrait student={s} size={26} style={{ marginRight: 6 }} />
+                    <Portrait student={s} size={26} style={{ marginRight: 8 }} />
                   )}
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: seat.empty ? "var(--text3)" : undefined }}>{seat.empty ? t("sitzplan.emptySeat") : s.name}</span>
+                  {/* Punkt und Eck-Griffe: Radius = halbe Kante, reine Grafik. */}
                   {abs && <span style={{ position: "absolute", top: 3, right: 24, width: 8, height: 8, borderRadius: 4, background: ABS_COL[abs] }} title={t(`anwesenheit.${abs}`)} />}
                   {!seat.empty && foerderOn && (() => {
                     const m = massn[String(seat.sid)];
@@ -483,7 +490,7 @@ export default function Sitzplan() {
                       <span title={[...(m.foerder || []), ...zeilen].join("\n")}
                         style={{ position: "absolute", left: -9, top: -9, width: 20, height: 20, borderRadius: 10,
                           display: "flex", alignItems: "center", justifyContent: "center",
-                          background: "var(--card)", border: `1px solid ${C.info}`, boxShadow: "0 1px 2px rgba(0,0,0,0.15)" }}>
+                          background: "var(--card)", border: `1px solid ${C.info}`, boxShadow: SHADOW.ruhig }}>
                         <Icon d={ICONS.bulb} size={12} color={C.warning} />
                       </span>
                     );
@@ -494,8 +501,8 @@ export default function Sitzplan() {
                       <button onPointerDown={(e) => e.stopPropagation()} onClick={() => cycleStage(seat.sid)}
                         title={st ? `SEGEL: ${st.label}` : t("sitzplan.segelSet")}
                         style={{ position: "absolute", left: -9, bottom: -9, width: 20, height: 20, borderRadius: 10, cursor: "pointer", fontSize: 11, fontWeight: 700, lineHeight: 1,
-                          display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
-                          background: st ? st.color : "var(--card)", color: st ? "#fff" : "var(--text3)",
+                          display: "flex", alignItems: "center", justifyContent: "center", boxShadow: SHADOW.ruhig,
+                          background: st ? st.color : "var(--card)", color: st ? C.aufAkzent : "var(--text3)",
                           border: st ? "none" : "1px dashed var(--border2)" }}>
                         {st ? st.ab : "+"}
                       </button>
@@ -506,7 +513,7 @@ export default function Sitzplan() {
                       {/* Dreh-Griff (Icon) an der oberen rechten Ecke: ziehen = frei drehen. */}
                       <span onPointerDown={(e) => onRotDown(e, seat)} title={t("sitzplan.rotate")}
                         style={{ position: "absolute", right: -9, top: -9, width: 18, height: 18, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center",
-                          background: "var(--card)", border: "1px solid var(--border2)", color: "var(--text2)", fontSize: 12, lineHeight: 1, cursor: "grab", touchAction: "none", boxShadow: "0 1px 2px rgba(0,0,0,0.15)" }}>↻</span>
+                          background: "var(--card)", border: "1px solid var(--border2)", color: "var(--text2)", fontSize: 12, lineHeight: 1, cursor: "grab", touchAction: "none", boxShadow: SHADOW.ruhig }}><Icon d={ICONS.rotate} size={11} /></span>
                       <button onPointerDown={(e) => e.stopPropagation()} onClick={() => entfernen(seat.sid)} title={t("sitzplan.removeSeat")}
                         style={{ position: "absolute", right: -9, bottom: -9, width: 20, height: 20, borderRadius: 10, border: "1px solid var(--border2)", background: "var(--card)", cursor: "pointer", color: C.danger, fontSize: 13, fontWeight: 700, padding: 0, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
                     </>
@@ -521,14 +528,15 @@ export default function Sitzplan() {
               Ueberschrift „Noch nicht platziert (0)" ist nur Platz. Sobald
               jemand herausfaellt (neues Kind, Platz entfernt), ist er wieder da. */}
           {pool.length > 0 && (
-          <div style={{ border: "1px dashed var(--border2)", borderRadius: 12, padding: 12, minHeight: 56, background: "var(--bg2)" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>{t("sitzplan.pool")} ({pool.length})</div>
+          <div style={{ ...panelStyle, border: "1px dashed var(--border2)", padding: 12, minHeight: 56, background: "var(--bg2)" }}>
+            <div style={{ ...sectionLabel, marginBottom: 8 }}>{t("sitzplan.pool")} ({pool.length})</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {pool.map((s) => {
                 const abs = aufruf ? abwesend[String(s.id)] : null;
                 return (
                   <div key={s.id} draggable onDragStart={(e) => e.dataTransfer.setData("text/plain", String(s.id))}
-                    style={{ padding: "7px 12px", borderRadius: 980, border: "1px solid var(--border2)", background: "var(--card)", fontSize: 13, fontWeight: 600, cursor: "grab", display: "inline-flex", alignItems: "center", gap: 6, ...(abs ? { opacity: 0.45, textDecoration: "line-through" } : {}) }}>
+                    style={{ ...chipStyle, padding: "8px 12px", border: "1px solid var(--border2)", background: "var(--card)", color: "var(--text)", fontSize: 13, cursor: "grab", display: "inline-flex", alignItems: "center", gap: 8, ...(abs ? { opacity: 0.45, textDecoration: "line-through" } : {}) }}>
+                    {/* Punkt: Radius = halbe Kante, reine Grafik. */}
                     {abs && <span style={{ width: 8, height: 8, borderRadius: 4, background: ABS_COL[abs] }} />}
                     {fotosOn && <Portrait student={s} size={22} />}
                     {s.name}

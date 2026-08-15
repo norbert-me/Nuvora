@@ -2,9 +2,9 @@
 // des Moduls bleiben im Kern liegen und sind nach dem Wiedereinschalten da.
 import { useState } from "react";
 import { useModules } from "../core/modules.js";
-import { StageBadge, Tabs, inputStyle, btnSecondary, COLORS as C, Icon, ICONS, MODULE_ICONS, iconBtn, Modal, pageApp, toolbarIconBtn} from "../components/Icons.jsx";
+import { StageBadge, Tabs, btnSecondary, COLORS as C, Icon, ICONS, MODULE_ICONS, iconBtn, Modal, pageApp,
+  cardStyle, panelStyle, badge, btnSmall, pageIntro, pageTitle, sectionLabel, toolbarInput, toolbarBtn, Segment, segmentBtn, CONTROL_R } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { pageTitle } from "../components/Icons.jsx";
 
 // Ausführlichere Erklärung je Modul für das Info-Popup in der Auswahl. Nutzt
 // die bereits vorhandenen Seiten-Intros wieder (die dort nicht mehr angezeigt
@@ -74,33 +74,35 @@ export default function Modules() {
   return (
     <div style={{ ...pageApp }}>
       <h1 style={pageTitle}>{t("modules.title")}</h1>
-      <p style={{ color: "var(--text2)", marginBottom: 24, fontSize: 14 }}>
-        Aktiviere, was du brauchst. Abschalten entfernt keine Daten — sie sind
-        nach dem Wiedereinschalten wieder da.
-      </p>
+      <p style={pageIntro}>{t("modules.intro")}</p>
 
       {error && (
         <p style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</p>
       )}
 
       {noneActive && beliebt.size > 0 && (
-        <p style={{ fontSize: 13.5, color: "var(--text2)", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", marginBottom: 16 }}>
+        <p style={{ ...panelStyle, fontSize: 13, color: "var(--text2)", marginBottom: 16 }}>
           {t("modules.startHint")}
         </p>
       )}
 
-      <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("modules.searchPlaceholder")}
-        style={{ ...inputStyle, width: "100%", marginBottom: 12 }} />
+      {/* Eine Leiste: Suchfeld, Reiter und Richtungsknopf auf CONTROL_H. Der
+          Richtungsknopf gehoert zur Sortierung — deshalb als Segment AN den
+          Reitern statt lose daneben. */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("modules.sortBy")}</span>
-        <Tabs value={effKey} onChange={setSortKey}
-          options={[["name", t("modules.sortName")], ["status", t("modules.sortStatus")], ["popular", t("modules.sortPopular")]]} />
-        {/* Eine Hoehe, eine Form wie die Reiter daneben (CONTROL_H/CONTROL_R). */}
-        <button onClick={() => setDir((d) => (d === "asc" ? "desc" : "asc"))} title={t("modules.sortDir")}
-          className="icon-btn" aria-label={t("modules.sortDir")}
-          style={{ ...toolbarIconBtn, border: "1px solid var(--border2)", color: "var(--text2)" }}>
-          <Icon d={dir === "asc" ? ICONS.upload : ICONS.download} size={16} />
-        </button>
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("modules.searchPlaceholder")}
+          style={{ ...toolbarInput, flex: "1 1 200px", minWidth: 0 }} />
+        <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("modules.sortBy")}</span>
+        <Segment>
+          {/* In der Segment-Gruppe: keine eigenen Ecken, die bringt die Gruppe mit. */}
+          <Tabs value={effKey} onChange={setSortKey} style={{ border: "none", borderRadius: 0, height: "100%" }}
+            options={[["name", t("modules.sortName")], ["status", t("modules.sortStatus")], ["popular", t("modules.sortPopular")]]} />
+          <button onClick={() => setDir((d) => (d === "asc" ? "desc" : "asc"))} title={t("modules.sortDir")}
+            className="icon-btn" aria-label={t("modules.sortDir")}
+            style={{ ...segmentBtn, color: "var(--text2)" }}>
+            <Icon d={dir === "asc" ? ICONS.arrowUp : ICONS.arrowDown} size={16} />
+          </button>
+        </Segment>
       </div>
 
       {[["unterricht", t("modules.groupUnterricht")], ["organisation", t("modules.groupOrganisation")], ["werkzeug", t("modules.groupWerkzeug")]].map(([g, label]) => {
@@ -112,20 +114,16 @@ export default function Modules() {
         const open = !!q || expanded[g];
         const mods = open ? all : all.slice(0, 2);
         return (
-        <div key={g} style={{ marginBottom: 26 }}>
-          <h2 style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", color: "var(--text3)", margin: "0 0 10px" }}>{label}</h2>
+        <div key={g} style={{ marginBottom: 24 }}>
+          <h2 style={{ ...sectionLabel, margin: "0 0 8px" }}>{label}</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {mods.map((m) => (
           <div
             key={m.key}
-            style={{
-              border: "1px solid var(--border)", borderRadius: 14, padding: 18,
-              background: "var(--surface)", display: "flex", alignItems: "flex-start",
-              gap: 16,
-            }}
+            style={{ ...cardStyle, display: "flex", alignItems: "flex-start", gap: 16 }}
           >
             {MODULE_ICONS[m.key] && (
-              <div style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center",
+              <div style={{ flexShrink: 0, width: 40, height: 40, borderRadius: CONTROL_R, display: "flex", alignItems: "center", justifyContent: "center",
                 background: "var(--bg2, var(--bg))", color: m.active ? "var(--text)" : "var(--text3)" }}>
                 <Icon d={MODULE_ICONS[m.key]} size={22} color="currentColor" />
               </div>
@@ -135,7 +133,7 @@ export default function Modules() {
                 {t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name}
                 {" "}<StageBadge stage={m.stage} title={m.stage === "beta" ? t("stage.betaHint") : t("stage.alphaHint")} />
                 {beliebt.has(m.key) && !m.active && (
-                  <span title={t("modules.popularHint", { n: m.popularity })} style={{ fontSize: 11, fontWeight: 700, color: C.success, background: "rgba(10,125,62,0.12)", padding: "2px 8px", borderRadius: 980, marginLeft: 8 }}>
+                  <span title={t("modules.popularHint", { n: m.popularity })} style={{ ...badge(C.success), marginLeft: 8 }}>
                     {t("modules.popularBadge")}
                   </span>
                 )}
@@ -145,10 +143,10 @@ export default function Modules() {
                   </span>
                 )}
               </div>
-              <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.6 }}>
+              <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.6 }}>
                 {descOf(m)}
                 {" "}
-                <button onClick={() => setHelpMod(m)} style={{ border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--accent)", fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap" }}>
+                <button onClick={() => setHelpMod(m)} style={{ border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--accent)", fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" }}>
                   {t("modules.more")} ›
                 </button>
               </div>
@@ -156,12 +154,15 @@ export default function Modules() {
             <button
               onClick={() => handle(m)}
               disabled={busy === m.key || !m.available}
+              // Der Aktivieren-Knopf bleibt in der Akzentfarbe: er ist der eine
+              // Handgriff der Seite und soll aus der Karte herausstechen. Form
+              // und Hoehe kommen trotzdem aus der Leisten-Bauform.
               style={{
-                flexShrink: 0, padding: "8px 16px", borderRadius: 980, fontSize: 13.5,
-                fontWeight: 600, cursor: m.available ? "pointer" : "not-allowed",
+                ...toolbarBtn, flexShrink: 0, fontWeight: 600,
+                cursor: m.available ? "pointer" : "not-allowed",
                 border: m.active ? "1px solid var(--border)" : "none",
                 background: m.active ? "transparent" : "var(--accent)",
-                color: m.active ? "var(--text2)" : "#fff",
+                color: m.active ? "var(--text2)" : C.aufAkzent,
                 opacity: busy === m.key || !m.available ? 0.5 : 1,
               }}
             >
@@ -172,7 +173,7 @@ export default function Modules() {
           </div>
           {all.length > 2 && !q && (
             <button onClick={() => setExpanded((p) => ({ ...p, [g]: !p[g] }))}
-              style={{ ...btnSecondary, marginTop: 10, fontSize: 13 }}>
+              style={{ ...btnSecondary, ...btnSmall, marginTop: 8 }}>
               {expanded[g] ? t("modules.showLess") : t("modules.showMore", { n: all.length - 2 })}
             </button>
           )}
@@ -182,12 +183,12 @@ export default function Modules() {
 
       {helpMod && (
         <Modal onClose={() => setHelpMod(null)} width={520} style={{ maxHeight: "86vh", overflowY: "auto" }} label={dispName(helpMod)}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, flex: 1 }}>{dispName(helpMod)}</h3>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, flex: 1 }}>{dispName(helpMod)}</h3>
               <StageBadge stage={helpMod.stage} title={helpMod.stage === "beta" ? t("stage.betaHint") : t("stage.alphaHint")} />
               <button onClick={() => setHelpMod(null)} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
             </div>
-            <p style={{ fontSize: 14.5, color: "var(--text)", lineHeight: 1.7, margin: "0 0 4px", whiteSpace: "pre-wrap" }}>{helpOf(helpMod)}</p>
+            <p style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.7, margin: "0 0 4px", whiteSpace: "pre-wrap" }}>{helpOf(helpMod)}</p>
             <ModuleIllos mkey={helpMod.key} t={t} />
             {t(`mod.${helpMod.key}.sr`) !== `mod.${helpMod.key}.sr` && (
               <Collapsible title={t("karten.srTitle")}>
@@ -196,11 +197,9 @@ export default function Modules() {
               </Collapsible>
             )}
             {!hasIllos(helpMod.key) && imgOf(helpMod) && (
-              <div style={{ marginTop: 12, border: "1px dashed var(--border2)", borderRadius: 10, padding: "18px 16px", background: "var(--bg3)", textAlign: "center" }}>
-                {/* Platzhalter fuer eine noch fehlende Abbildung. TODO: eigenes
-                    `image`-Icon in ICONS, bis dahin der Bildrahmen `fit`. */}
-                <div style={{ marginBottom: 6, opacity: 0.5, color: "var(--text3)" }}><Icon d={ICONS.fit} size={22} /></div>
-                <div style={{ fontSize: 12.5, color: "var(--text3)", lineHeight: 1.5 }}>{imgOf(helpMod)}</div>
+              <div style={{ ...panelStyle, marginTop: 12, border: "1px dashed var(--border2)", padding: 16, textAlign: "center" }}>
+                <div style={{ marginBottom: 4, opacity: 0.5, color: "var(--text3)" }}><Icon d={ICONS.image} size={22} /></div>
+                <div style={{ fontSize: 12, color: "var(--text3)", lineHeight: 1.5 }}>{imgOf(helpMod)}</div>
               </div>
             )}
             <div style={{ marginTop: 16, textAlign: "right" }}>
@@ -228,7 +227,7 @@ function ModuleIllos({ mkey, t }) {
 
 function IlloFrame({ children, caption }) {
   return (
-    <figure style={{ margin: 0, flex: "1 1 200px", minWidth: 180, background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 12, padding: "14px 14px 10px", textAlign: "center" }}>
+    <figure style={{ ...panelStyle, margin: 0, flex: "1 1 200px", minWidth: 180, padding: "12px 12px 8px", textAlign: "center" }}>
       {children}
       <figcaption style={{ fontSize: 12, color: "var(--text3)", lineHeight: 1.45, marginTop: 8 }}>{caption}</figcaption>
     </figure>
@@ -273,7 +272,7 @@ function SpacingIllo({ caption }) {
   const xs = [14, 40, 84, 152, 232];
   const labels = ["heute", "1 T", "3 T", "1 Wo", "3 Wo"];
   return (
-    <figure style={{ margin: 0, background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 14px 10px", textAlign: "center" }}>
+    <figure style={{ ...panelStyle, margin: 0, padding: "16px 12px 8px", textAlign: "center" }}>
       <svg viewBox="0 0 248 60" width="100%" height="56" style={{ display: "block" }} aria-hidden="true">
         <line x1="10" y1="30" x2="240" y2="30" stroke="var(--border2)" strokeWidth="2" />
         {xs.map((x, i) => (
@@ -291,12 +290,12 @@ function SpacingIllo({ caption }) {
 function Collapsible({ title, children }) {
   const [open, setOpen] = useState(false);
   return (
-    <div style={{ marginTop: 14, border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
-      <button onClick={() => setOpen((o) => !o)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "12px 14px", background: "var(--bg3)", border: "none", cursor: "pointer", font: "inherit", fontSize: 14.5, fontWeight: 600, color: "var(--text)", textAlign: "left" }}>
+    <div style={{ ...panelStyle, marginTop: 12, padding: 0, background: "transparent", overflow: "hidden" }}>
+      <button onClick={() => setOpen((o) => !o)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: 12, background: "var(--bg3)", border: "none", cursor: "pointer", font: "inherit", fontSize: 14, fontWeight: 600, color: "var(--text)", textAlign: "left" }}>
         <span>{title}</span>
-        <span style={{ color: "var(--text3)", display: "inline-flex", transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }}><Icon d={ICONS.open} size={12} /></span>
+        <span style={{ color: "var(--text3)", display: "inline-flex" }}><Icon d={open ? ICONS.chevronUp : ICONS.chevronDown} size={14} /></span>
       </button>
-      {open && <div style={{ padding: "12px 14px 14px" }}>{children}</div>}
+      {open && <div style={{ padding: 12 }}>{children}</div>}
     </div>
   );
 }

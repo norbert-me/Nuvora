@@ -4,8 +4,8 @@ import { askConfirm } from "../core/dialog.jsx";
 import { useAktiv } from "../core/modules.js";
 import { istAdmin } from "../core/admin.js";
 import { useLanguage } from "../i18n/index.jsx";
-import { Icon, ICONS, Modal, Tabs, btnPrimary, btnSecondary, inputStyle, iconBtn, CONTROL_H, CONTROL_R, COLORS as C, pageApp } from "../components/Icons.jsx";
-import { MehrMenu } from "../components/Werkzeugleiste.jsx";
+import { Icon, ICONS, Modal, Tabs, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, toolbarInput, iconBtn, COLORS as C, pageApp } from "../components/Icons.jsx";
+import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
 
 const API = "/api";
 
@@ -29,9 +29,12 @@ function Stars({ value, my, onRate, count, t }) {
               title={t("market.stars", { n })}
               style={{ background: "none", border: "none", padding: 0, cursor: "pointer", lineHeight: 0 }}
             >
+              {/* Roh statt <Icon>: ein Bewertungsstern muss GEFUELLT sein, und
+                  `Icon` kann nur Striche zeichnen. Die Farbe kommt trotzdem
+                  aus dem Kern. */}
               <svg width="18" height="18" viewBox="0 0 24 24"
-                fill={(hover ? n <= hover : filled) ? (my ? "#e5a000" : "var(--text2)") : "none"}
-                stroke={(my && !hover) ? "#e5a000" : "var(--text3)"} strokeWidth="1.5" strokeLinejoin="round">
+                fill={(hover ? n <= hover : filled) ? (my ? C.warning : "var(--text2)") : "none"}
+                stroke={(my && !hover) ? C.warning : "var(--text3)"} strokeWidth="1.5" strokeLinejoin="round">
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01L12 2z"/>
               </svg>
             </button>
@@ -146,14 +149,14 @@ export default function Marketplace({ fixedKind }) {
 
   return (
     <div style={{ ...pageApp }}>
-      <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 20px" }}>
+      <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 24px" }}>
         {hintBefore}<a href="/questions" style={{ color: "var(--accent)", textDecoration: "none" }}>{t("market.publishHintLink")}</a>{hintAfter}
       </p>
 
-      {msg && <div style={{ padding: "10px 14px", marginBottom: 12, background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 12, fontSize: 14, color: "var(--text)" }}>{msg}</div>}
+      {msg && <div style={{ ...panelStyle, padding: "10px 14px", marginBottom: 12, fontSize: 14, color: "var(--text)" }}>{msg}</div>}
 
       {authorFilter && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, padding: "8px 14px", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 980, fontSize: 13, color: "var(--text2)" }}>
+        <div style={{ ...panelStyle, display: "flex", alignItems: "center", gap: 8, marginBottom: 12, padding: "8px 14px", fontSize: 13, color: "var(--text2)" }}>
           {t("market.filterBy")} <strong style={{ color: "var(--text)" }}>{authorFilter.name}</strong>
           <button onClick={() => setAuthorFilter(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "var(--text3)", display: "flex", alignItems: "center", padding: 2 }} title={t("market.clearFilter")}>
             <Icon d={ICONS.close} size={16} color="currentColor" />
@@ -161,21 +164,21 @@ export default function Marketplace({ fixedKind }) {
         </div>
       )}
 
-      {!lockedKind && (
-      <div style={{ marginBottom: 14 }}>
-        {/* Reiter aus dem Kern (Tabs) statt Nachbau: eine Hoehe, eine Form. */}
-        <Tabs value={kind} onChange={setKind}
-          options={[["", t("market.kindAll")], ["cardvote_questionset", t("market.kindQuiz")], ["karten_deck", t("market.kindDeck")], ["method", t("market.kindMethod")], ["lernpfad_ladder", t("market.kindLadder")]]
-            .filter(([k]) => artNutzbar(k))}
-          style={{ flexWrap: "wrap", height: "auto", minHeight: CONTROL_H }} />
-      </div>
-      )}
-
-      <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
+      {/* Eine Leiste statt zweier Zeilen: Art, Suche und Sortierung gehoeren zu
+          derselben Frage („was will ich sehen?"). Die Reiter behalten ihre
+          Leistenhoehe — `height: auto` hat sie vorher aus der Reihe gehoben. */}
+      <Werkzeugleiste
+        style={{ marginBottom: 16 }}
+        links={!lockedKind && (
+          <Tabs value={kind} onChange={setKind}
+            options={[["", t("market.kindAll")], ["cardvote_questionset", t("market.kindQuiz")], ["karten_deck", t("market.kindDeck")], ["method", t("market.kindMethod")], ["lernpfad_ladder", t("market.kindLadder")]]
+              .filter(([k]) => artNutzbar(k))} />
+        )}
+        ansicht={<Tabs value={sort} onChange={setSort} options={[["newest", t("market.newest")], ["top", t("market.topRated")]]} />}
+      >
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("market.searchPlaceholder")}
-          style={{ ...inputStyle, flex: 1, minWidth: 180, height: CONTROL_H, padding: "0 14px", borderRadius: CONTROL_R }} />
-        <Tabs value={sort} onChange={setSort} options={[["newest", t("market.newest")], ["top", t("market.topRated")]]} />
-      </div>
+          style={{ ...toolbarInput, width: 240, maxWidth: "100%" }} />
+      </Werkzeugleiste>
 
       {loading && quizzes.length === 0 ? (
         <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("common.loading")}</p>
@@ -183,19 +186,19 @@ export default function Marketplace({ fixedKind }) {
         <p style={{ color: "var(--text3)", fontSize: 14 }}>{authorFilter ? t("market.emptyFiltered") : search ? t("market.emptySearch") : t("market.emptyNone")}</p>
       ) : (
         quizzes.map((q) => (
-          <div key={q.id} style={{ padding: "16px 18px", marginBottom: 10, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
+          <div key={q.id} style={{ ...cardStyle, padding: "16px 18px", marginBottom: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 6 }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>
                   {q.title}
                   {/* Schon in der Übersicht sichtbar: das Quiz differenziert nach E/G. */}
                   {q.niveau_aktiv && (
-                    <span style={{ marginLeft: 8, padding: "2px 8px", borderRadius: 980, fontSize: 11, fontWeight: 700, background: "var(--accent-bg)", color: "var(--accent)", verticalAlign: "middle" }}>
+                    <span style={{ ...chipStyle, marginLeft: 8, background: "var(--accent-bg)", color: "var(--accent)", verticalAlign: "middle" }}>
                       {t("market.badgeNiveau")}
                     </span>
                   )}
                   {q.minuspunkte && (
-                    <span style={{ marginLeft: 6, padding: "2px 8px", borderRadius: 980, fontSize: 11, fontWeight: 600, background: "var(--bg2)", color: "var(--text3)", verticalAlign: "middle" }}>
+                    <span style={{ ...chipStyle, marginLeft: 8, verticalAlign: "middle" }}>
                       {t("market.badgeMinus")}
                     </span>
                   )}
@@ -209,18 +212,18 @@ export default function Marketplace({ fixedKind }) {
                     </button>
                   ) : (q.author_name || t("market.unknown"))}
                   {user && istAdmin(user) && q.author_email && (
-                    <span style={{ marginLeft: 6, padding: "1px 6px", background: "var(--bg2)", borderRadius: 980, fontSize: 11 }} title={t("market.adminOnly")}>{q.author_email}</span>
+                    <span style={{ ...chipStyle, marginLeft: 8, fontWeight: 500 }} title={t("market.adminOnly")}>{q.author_email}</span>
                   )}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                <button onClick={() => openPreview(q.id)} style={{ ...btnSecondary, padding: "7px 16px", fontSize: 13, whiteSpace: "nowrap" }}>{t("market.preview")}</button>
+                <button onClick={() => openPreview(q.id)} style={{ ...btnSecondary, ...btnSmall, whiteSpace: "nowrap" }}>{t("market.preview")}</button>
                 {/* Ansehen darf jeder — uebernehmen nur, wer das Modul hat:
                     der Inhalt landet sonst in einer Oberflaeche, die fehlt. */}
                 {artNutzbar(q.kind) ? (
-                  <button onClick={() => copy(q)} style={{ ...btnPrimary, padding: "7px 16px", fontSize: 13, whiteSpace: "nowrap" }}>{t("market.adopt")}</button>
+                  <button onClick={() => copy(q)} style={{ ...btnPrimary, ...btnSmall, whiteSpace: "nowrap" }}>{t("market.adopt")}</button>
                 ) : (
-                  <Link to="/modules" style={{ ...btnSecondary, padding: "7px 16px", fontSize: 13, whiteSpace: "nowrap", textDecoration: "none", color: "var(--text3)" }}
+                  <Link to="/modules" style={{ ...btnSecondary, ...btnSmall, whiteSpace: "nowrap", textDecoration: "none", color: "var(--text3)" }}
                     title={t("market.needsModuleHint")}>{t("market.needsModule")}</Link>
                 )}
                 {/* Loeschen steht NICHT neben „Uebernehmen": ein Papierkorb
@@ -230,7 +233,7 @@ export default function Marketplace({ fixedKind }) {
                 )}
               </div>
             </div>
-            {q.description && <p style={{ fontSize: 13, color: "var(--text2)", margin: "6px 0 10px", lineHeight: 1.5 }}>{q.description}</p>}
+            {q.description && <p style={{ fontSize: 13, color: "var(--text2)", margin: "8px 0 12px", lineHeight: 1.5 }}>{q.description}</p>}
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <Stars value={q.avg_rating} my={q.my_rating} count={q.rating_count} onRate={(n) => rate(q.id, n)} t={t} />
               {q.copies > 0 && <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("market.copies", { n: q.copies })}</span>}
@@ -246,7 +249,7 @@ export default function Marketplace({ fixedKind }) {
             ) : (
               <>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 4 }}>
-                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "var(--text)" }}>{preview.title}</h3>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{preview.title}</h3>
                   <button onClick={() => setPreview(null)} className="icon-btn" style={{ ...iconBtn, color: "var(--text3)" }} title={t("common.close")} aria-label={t("common.close")}>
                     <Icon d={ICONS.close} size={18} />
                   </button>
@@ -260,33 +263,33 @@ export default function Marketplace({ fixedKind }) {
                     </button>
                   ) : preview.author_name}
                 </div>
-                {preview.description && <p style={{ fontSize: 13.5, color: "var(--text2)", margin: "0 0 12px", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{preview.description}</p>}
+                {preview.description && <p style={{ fontSize: 14, color: "var(--text2)", margin: "0 0 12px", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{preview.description}</p>}
                 {preview.cards && preview.cards.length > 0 && (
-                  <div style={{ display: "flex", gap: 10, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text3)", paddingBottom: 4 }}>
+                  <div style={{ ...sectionLabel, display: "flex", gap: 12, paddingBottom: 4 }}>
                     <span style={{ flex: 1 }}>{t("karten.front")}</span>
                     <span style={{ flex: 1 }}>{t("karten.back")}</span>
                   </div>
                 )}
                 {(preview.cards || []).map((c, i) => (
-                  <div key={i} style={{ padding: "10px 0", borderTop: "1px solid var(--border)", display: "flex", gap: 10, fontSize: 13.5 }}>
+                  <div key={i} style={{ padding: "8px 0", borderTop: "1px solid var(--border)", display: "flex", gap: 12, fontSize: 14 }}>
                     <span style={{ flex: 1, minWidth: 0, fontWeight: 600, color: "var(--text)", overflowWrap: "anywhere" }}>{c.front}</span>
                     <span style={{ flex: 1, minWidth: 0, color: "var(--text2)", overflowWrap: "anywhere" }}>{c.back}</span>
                   </div>
                 ))}
                 {preview.method && (
-                  <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, fontSize: 13.5, color: "var(--text2)" }}>
+                  <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, fontSize: 14, color: "var(--text2)" }}>
                     {preview.method.dauer != null && <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, color: C.info }}>{t("methoden.dauerBadge", { n: preview.method.dauer })}</div>}
                     <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{preview.method.description}</div>
-                    {preview.method.ablauf && <div style={{ marginTop: 10 }}><b style={{ color: "var(--text3)", fontSize: 11.5 }}>{t("methoden.ablauf")}</b><div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{preview.method.ablauf}</div></div>}
-                    {preview.method.material && <div style={{ marginTop: 10 }}><b style={{ color: "var(--text3)", fontSize: 11.5 }}>{t("methoden.material")}</b><div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{preview.method.material}</div></div>}
+                    {preview.method.ablauf && <div style={{ marginTop: 12 }}><b style={{ color: "var(--text3)", fontSize: 12 }}>{t("methoden.ablauf")}</b><div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{preview.method.ablauf}</div></div>}
+                    {preview.method.material && <div style={{ marginTop: 12 }}><b style={{ color: "var(--text3)", fontSize: 12 }}>{t("methoden.material")}</b><div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{preview.method.material}</div></div>}
                   </div>
                 )}
                 {preview.ladder && (
-                  <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, fontSize: 13.5, color: "var(--text2)" }}>
+                  <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, fontSize: 14, color: "var(--text2)" }}>
                     {preview.ladder.topic_name && <div style={{ marginBottom: 8, fontSize: 12, fontWeight: 700, color: C.info }}>{preview.ladder.topic_name}</div>}
                     {(preview.ladder.exercises || []).map((e, i) => (
                       <div key={i} style={{ padding: "8px 0", borderTop: i ? "1px solid var(--border)" : "none" }}>
-                        {e.kategorie && <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", marginRight: 6 }}>{e.kategorie}</span>}
+                        {e.kategorie && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", marginRight: 6 }}>{e.kategorie}</span>}
                         <span style={{ overflowWrap: "anywhere" }}>{e.aufgabentext}</span>
                       </div>
                     ))}
@@ -313,7 +316,7 @@ export default function Marketplace({ fixedKind }) {
                     </div>
                   </div>
                 ))}
-                <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+                <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
                   {artNutzbar(preview.kind) ? (
                     <button onClick={() => { const p = preview; setPreview(null); copy(p); }} style={{ ...btnPrimary, padding: "10px 20px" }}>{t("market.adopt")}</button>
                   ) : (
@@ -328,15 +331,15 @@ export default function Marketplace({ fixedKind }) {
 
       {copyDeckFor && (
         <Modal onClose={() => setCopyDeckFor(null)} width={400} label={t("market.chooseClass")}>
-            <h3 style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 700, color: "var(--text)" }}>{t("market.chooseClass")}</h3>
-            <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 14px" }}>{t("market.chooseClassHint", { title: copyDeckFor.title })}</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflow: "auto" }}>
+            <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{t("market.chooseClass")}</h3>
+            <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 12px" }}>{t("market.chooseClassHint", { title: copyDeckFor.title })}</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 320, overflow: "auto" }}>
               {classes.map((c) => (
                 <button key={c.id} onClick={() => copy({ id: copyDeckFor.id, title: copyDeckFor.title, kind: "karten_deck" }, c.id)}
-                  style={{ textAlign: "left", padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>{c.name}</button>
+                  style={{ ...btnSecondary, textAlign: "left", padding: "10px 12px", background: "var(--bg)" }}>{c.name}</button>
               ))}
             </div>
-            <button onClick={() => setCopyDeckFor(null)} style={{ ...btnSecondary, marginTop: 14, padding: "8px 16px", fontSize: 13.5 }}>{t("common.abort")}</button>
+            <button onClick={() => setCopyDeckFor(null)} style={{ ...btnSecondary, marginTop: 12 }}>{t("common.abort")}</button>
         </Modal>
       )}
     </div>

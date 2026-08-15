@@ -39,7 +39,7 @@ const zeitpunkt = (iso) => {
 function Zahlen({ daten, t }) {
   const tabellen = Object.entries(daten.tabellen || {});
   return (
-    <div style={{ fontSize: 12.5, color: "var(--text2)", lineHeight: 1.7 }}>
+    <div style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.7 }}>
       {t("backup.dryRunSummary", {
         rows: daten.zeilen,
         tables: tabellen.length,
@@ -47,7 +47,7 @@ function Zahlen({ daten, t }) {
       })}
       {daten.nuvora ? <> · {t("backup.dryRunVersion", { v: daten.nuvora })}</> : null}
       {daten.erzeugt ? <> · {zeitpunkt(daten.erzeugt)}</> : null}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
         {tabellen.map(([name, n]) => (
           <span key={name} style={{ ...chipStyle, whiteSpace: "nowrap" }}>{name} {n}</span>
         ))}
@@ -57,7 +57,7 @@ function Zahlen({ daten, t }) {
           Pflichtspalte, Spalte gibt es nicht mehr) — still wäre das eine
           Veränderung der Daten, von der niemand erfährt. */}
       {(daten.angepasst || []).length > 0 && (
-        <ul style={{ margin: "8px 0 0", paddingLeft: 18, color: "var(--warn, #b26a00)" }}>
+        <ul style={{ margin: "8px 0 0", paddingLeft: 18, color: C.warning }}>
           {daten.angepasst.map((z) => <li key={z}>{z}</li>)}
         </ul>
       )}
@@ -290,15 +290,15 @@ export default function Backup() {
       <p style={pageIntro}>{t("backup.intro")}</p>
 
       {meldung && (
-        <div ref={meldungRef} style={{ ...cardStyle, marginBottom: 14, borderColor: meldung.art === "ok" ? C.success : C.danger, color: meldung.art === "ok" ? C.success : C.danger, fontSize: 13.5 }}>
+        <div ref={meldungRef} style={{ ...cardStyle, marginBottom: 14, borderColor: meldung.art === "ok" ? C.success : C.danger, color: meldung.art === "ok" ? C.success : C.danger, fontSize: 14 }}>
           {meldung.text}
         </div>
       )}
 
       {/* Zustand: wann lief es zuletzt, und hat es geklappt? */}
-      <div style={{ ...panelStyle, marginBottom: 14 }}>
+      <div style={{ ...panelStyle, marginBottom: 16 }}>
         <div style={{ ...sectionLabel, marginBottom: 8 }}>{t("backup.state")}</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 18, fontSize: 13.5, color: "var(--text2)" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 16, fontSize: 14, color: "var(--text2)" }}>
           <div>
             <div style={{ color: "var(--text3)", fontSize: 12 }}>{t("backup.lastRun")}</div>
             <div style={{ color: "var(--text)" }}>
@@ -325,15 +325,15 @@ export default function Backup() {
           </div>
         </div>
         {!stand.dauerhaft && (
-          <div style={{ marginTop: 10, fontSize: 12.5, color: C.warning }}>{t("backup.notPersistent")}</div>
+          <div style={{ marginTop: 8, fontSize: 13, color: C.warning }}>{t("backup.notPersistent")}</div>
         )}
       </div>
 
       {/* Ziel und Zeitplan */}
-      <div style={{ ...panelStyle, marginBottom: 14 }}>
+      <div style={{ ...panelStyle, marginBottom: 16 }}>
         <div style={{ ...sectionLabel, marginBottom: 8 }}>{t("backup.settings")}</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
-          <label style={{ fontSize: 13, color: "var(--text2)", display: "flex", flexDirection: "column", gap: 5, minWidth: 220, flex: 1 }}>
+          <label style={{ fontSize: 13, color: "var(--text2)", display: "flex", flexDirection: "column", gap: 4, minWidth: 220, flex: 1 }}>
             {t("backup.target")}
             <select
               value={stand.ziel}
@@ -348,7 +348,7 @@ export default function Backup() {
               ))}
             </select>
           </label>
-          <label style={{ fontSize: 13, color: "var(--text2)", display: "flex", flexDirection: "column", gap: 5, minWidth: 200, flex: 1 }}>
+          <label style={{ fontSize: 13, color: "var(--text2)", display: "flex", flexDirection: "column", gap: 4, minWidth: 200, flex: 1 }}>
             {t("backup.schedule")}
             <select
               value={stand.plan}
@@ -362,7 +362,7 @@ export default function Backup() {
             </select>
           </label>
         </div>
-        <div style={{ fontSize: 12.5, color: "var(--text3)", marginTop: 10, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 10, lineHeight: 1.6 }}>
           {t("backup.retentionHint", { n: stand.aufbewahrung.anzahl, mb: stand.aufbewahrung.max_mb })}
           <br />
           {t("backup.plainHint")}
@@ -371,7 +371,7 @@ export default function Backup() {
 
       {/* Was drin ist und was nicht — damit niemand von einer Sicherung ausgeht,
           die es so nicht gibt. */}
-      <div style={{ ...panelStyle, marginBottom: 14 }}>
+      <div style={{ ...panelStyle, marginBottom: 16 }}>
         <div style={{ ...sectionLabel, marginBottom: 8 }}>{t("backup.contents")}</div>
         <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "var(--text2)", lineHeight: 1.7 }}>
           {stand.inhalt.map((i) => <li key={i}>{i}</li>)}
@@ -382,7 +382,7 @@ export default function Backup() {
       </div>
 
       {/* Liste */}
-      <div style={{ ...panelStyle, marginBottom: 14 }}>
+      <div style={{ ...panelStyle, marginBottom: 16 }}>
         <div style={{ ...sectionLabel, marginBottom: 8 }}>{t("backup.list")}</div>
         {stand.sicherungen.length === 0 ? (
           <Empty title={t("backup.emptyTitle")} hint={t("backup.emptyHint")} />
@@ -391,7 +391,7 @@ export default function Backup() {
             {stand.sicherungen.map((s) => (
               <div
                 key={s.name}
-                style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderTop: "1px solid var(--border)", flexWrap: "wrap" }}
+                style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderTop: "1px solid var(--border)", flexWrap: "wrap" }}
               >
                 <div style={{ flex: 1, minWidth: 160 }}>
                   <div style={{ fontWeight: 500, color: "var(--text)", wordBreak: "break-all" }}>{s.name}</div>
@@ -437,13 +437,13 @@ export default function Backup() {
             <div style={{ fontWeight: 600, color: pruefung.ok ? C.success : C.danger, marginBottom: 6 }}>
               {pruefung.ok ? t("backup.verifyOk") : t("backup.verifyBad")} — {pruefung.name}
             </div>
-            <div style={{ fontSize: 12.5, color: "var(--text2)", lineHeight: 1.7 }}>
+            <div style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.7 }}>
               {t("backup.verifyRows", { n: pruefung.zeilen, files: pruefung.uploads_anzahl })}
               <br />
               <span style={{ fontFamily: "monospace", wordBreak: "break-all" }}>sha256 {pruefung.sha256}</span>
             </div>
             {pruefung.fehler?.length > 0 && (
-              <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 12.5, color: C.danger }}>
+              <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 13, color: C.danger }}>
                 {pruefung.fehler.map((f) => <li key={f}>{f}</li>)}
               </ul>
             )}
@@ -465,7 +465,7 @@ export default function Backup() {
         <p style={{ fontSize: 13, color: "var(--text2)", marginTop: 0, lineHeight: 1.6 }}>
           {t("backup.restoreIntro")}
         </p>
-        <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: "var(--text2)", lineHeight: 1.8 }}>
+        <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "var(--text2)", lineHeight: 1.8 }}>
           {stand.anleitung.map((schritt) => (
             <li key={schritt} style={{ wordBreak: "break-word" }}>{schritt.replace(/^\d+\.\s*/, "")}</li>
           ))}
@@ -490,7 +490,7 @@ export default function Backup() {
               ) : dialog.probe ? (
                 <Zahlen daten={dialog.probe} t={t} />
               ) : (
-                <div style={{ color: C.danger, fontSize: 12.5 }}>{dialog.fehler}</div>
+                <div style={{ color: C.danger, fontSize: 13 }}>{dialog.fehler}</div>
               )}
             </div>
 
@@ -500,12 +500,12 @@ export default function Backup() {
             </div>
 
             {/* (d) Vorher wird automatisch gesichert. */}
-            <p style={{ marginTop: 0, fontSize: 12.5, color: "var(--text3)" }}>
+            <p style={{ marginTop: 0, fontSize: 13, color: "var(--text3)" }}>
               {t("backup.restoreNet")}
             </p>
 
             {/* (c) Das Wort abtippen. */}
-            <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 13 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13 }}>
               {t("backup.restoreType", { word: stand.bestaetigung })}
               <input
                 value={dialog.wort}
@@ -517,7 +517,7 @@ export default function Backup() {
             </label>
 
             {dialog.fehler && dialog.probe && (
-              <div style={{ color: C.danger, fontSize: 12.5, marginTop: 8 }}>{dialog.fehler}</div>
+              <div style={{ color: C.danger, fontSize: 13, marginTop: 8 }}>{dialog.fehler}</div>
             )}
 
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>

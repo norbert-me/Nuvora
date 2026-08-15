@@ -6,6 +6,7 @@
 // mehrdeutig wird ("Kürzen" gibt es unter mehreren Themen).
 import { useState, useEffect } from "react";
 import { themenIndex } from "../core/topics.js";
+import { selectStyle } from "./Icons.jsx";
 
 export default function TopicPicker({ value, onChange, style }) {
   const [topics, setTopics] = useState([]);
@@ -24,7 +25,7 @@ export default function TopicPicker({ value, onChange, style }) {
   // Ohne Themen keine leere Auswahl anbieten — das waere nur ein toter Kasten.
   if (topics.length === 0) {
     return (
-      <span style={{ fontSize: 12.5, color: "var(--text3)" }}>
+      <span style={{ fontSize: 13, color: "var(--text3)" }}>
         Kein Thema angelegt — unter <a href="/topics" style={{ color: "var(--accent)" }}>Themen</a> anlegen.
       </span>
     );
@@ -38,7 +39,7 @@ export default function TopicPicker({ value, onChange, style }) {
     <select
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
-      style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border2)", fontSize: 13, background: "var(--card)", color: "var(--text)", ...style }}
+      style={{ ...selectStyle, ...style }}
     >
       <option value="">Kein Thema</option>
       {ordered.map((t) => (

@@ -7,7 +7,7 @@
 // Notenbuch suchen, zurückkommen. Hier wird er an Ort und Stelle angelegt,
 // samt Halbjahr: sonst landet die Spalte im 2. Halbjahr im ersten.
 import { useEffect, useState } from "react";
-import { COLORS as C, btnSecondary, inputStyle, selectStyle } from "./Icons.jsx";
+import { COLORS as C, btnSecondary, btnSmall, inputStyle, selectStyle } from "./Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const feld = { ...selectStyle, width: "100%" };
@@ -63,13 +63,13 @@ export default function AbschnittWahl({ classId, kursId = null, value, onChange 
 
   if (sections === null) return null;
 
-  const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "0 0 5px" };
+  const lbl = { fontSize: 13, color: "var(--text2)", margin: "0 0 4px" };
 
   if (neu) {
     return (
       <div>
         {sections.length === 0 && (
-          <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 10px" }}>{t("notenimp.noSection")}</p>
+          <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 8px" }}>{t("notenimp.noSection")}</p>
         )}
         <div style={lbl}>{t("noten.sectionName")}</div>
         <input value={name} placeholder={t("noten.newSection")} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, width: "100%" }} />
@@ -78,11 +78,11 @@ export default function AbschnittWahl({ classId, kursId = null, value, onChange 
           <option value="1">{t("noten.term1")}</option>
           <option value="2">{t("noten.term2")}</option>
         </select>
-        {err && <p style={{ color: C.danger, fontSize: 12.5, marginTop: 8 }}>{err}</p>}
+        {err && <p style={{ color: C.danger, fontSize: 13, marginTop: 8 }}>{err}</p>}
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <button onClick={anlegen} disabled={busy} style={{ ...btnSecondary, fontSize: 13 }}>{t("noten.addSection")}</button>
+          <button onClick={anlegen} disabled={busy} style={{ ...btnSecondary, ...btnSmall }}>{t("noten.addSection")}</button>
           {sections.length > 0 && (
-            <button onClick={() => setNeu(false)} style={{ ...btnSecondary, fontSize: 13 }}>{t("common.abort")}</button>
+            <button onClick={() => setNeu(false)} style={{ ...btnSecondary, ...btnSmall }}>{t("common.abort")}</button>
           )}
         </div>
       </div>
@@ -96,7 +96,7 @@ export default function AbschnittWahl({ classId, kursId = null, value, onChange 
         <select value={value ?? ""} onChange={(e) => onChange(Number(e.target.value))} style={{ ...selectStyle, flex: 1 }}>
           {sections.map((s) => <option key={s.id} value={s.id}>{label(s)}</option>)}
         </select>
-        <button onClick={() => { setNeu(true); setName(""); }} style={{ ...btnSecondary, fontSize: 13, whiteSpace: "nowrap" }}>
+        <button onClick={() => { setNeu(true); setName(""); }} style={{ ...btnSecondary, ...btnSmall, whiteSpace: "nowrap" }}>
           {t("noten.addSection")}
         </button>
       </div>

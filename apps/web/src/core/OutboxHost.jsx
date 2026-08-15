@@ -3,6 +3,7 @@
 // nachgespielt wurde (kurzer „synchronisiert"-Hinweis).
 import { useState, useEffect, useRef } from "react";
 import { subscribe } from "./outbox.js";
+import { COLORS, Icon, ICONS, chipStyle, SHADOW } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 export function OutboxHost() {
@@ -27,11 +28,12 @@ export function OutboxHost() {
     <div style={{
       position: "fixed", bottom: 16, left: 16, zIndex: 9998,
       display: "flex", alignItems: "center", gap: 8,
-      padding: "8px 14px", borderRadius: 980, fontSize: 13, fontWeight: 600,
-      background: done ? "#0a7d3e" : "var(--card)", color: done ? "#fff" : "var(--text)",
-      border: done ? "none" : "1px solid var(--border)", boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
+      padding: "8px 12px", borderRadius: chipStyle.borderRadius, fontSize: 13, fontWeight: 600,
+      background: done ? COLORS.success : "var(--card)", color: done ? COLORS.aufAkzent : "var(--text)",
+      border: done ? "none" : "1px solid var(--border)", boxShadow: SHADOW.schwebend,
     }}>
-      {done ? <>✓ {t("outbox.synced")}</> : <>⏳ {t("outbox.pending", { n })}</>}
+      <Icon d={done ? ICONS.check : ICONS.hourglass} size={14} color="currentColor" />
+      {done ? t("outbox.synced") : t("outbox.pending", { n })}
     </div>
   );
 }

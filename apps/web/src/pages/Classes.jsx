@@ -13,7 +13,8 @@ import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { useSearchParams } from "react-router-dom";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Tabs, pageApp} from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnSecondary, btnSmall, Tabs, pageApp, pageTitle,
+  cardStyle, chipStyle, inputStyle, toolbarBtn, toolbarBtnPrimary, CONTROL_R } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import AuthImage from "../components/AuthImage.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -300,20 +301,20 @@ export default function Classes() {
       // Schmaler als eine Modulseite (die Zeilen sind 620 breit) und trotzdem
       // mittig: mit der vollen pageApp-Breite klebte das Formular am linken Rand.
       <div style={{ ...pageApp, maxWidth: 620 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{editing.id ? t("classes.editTitle") : t("classes.newTitle")}</h2>
-        <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}>
+        <h2 style={pageTitle}>{editing.id ? t("classes.editTitle") : t("classes.newTitle")}</h2>
+        <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
           {/* Klassen tragen keine Farbe — die Farbe hängt am Kurs (Fach). */}
           <input placeholder={t("classes.namePlaceholder")} value={name} onChange={(e) => setName(e.target.value)}
-            autoComplete="off" style={{ padding: "10px 14px", fontSize: 18, width: 300, border: "1px solid var(--border2)", borderRadius: 10 }} autoFocus />
+            autoComplete="off" style={{ ...inputStyle, fontSize: 16, width: 300 }} autoFocus />
         </div>
         {!editing.id && (
-          <p style={{ color: "var(--text3)", fontSize: 12.5, marginBottom: 16, maxWidth: 460 }}>{t("classes.subjectHint")}</p>
+          <p style={{ color: "var(--text3)", fontSize: 13, marginBottom: 16, maxWidth: 460 }}>{t("classes.subjectHint")}</p>
         )}
         <p style={{ color: "var(--text3)", marginBottom: 8, fontSize: 14 }}>
           {t("classes.fillHint", { filled, total: students.length })}
         </p>
         {cardvote && (
-          <p style={{ color: "var(--text3)", marginBottom: 8, fontSize: 12.5 }}>{t("classes.renumberHint")}</p>
+          <p style={{ color: "var(--text3)", marginBottom: 8, fontSize: 13 }}>{t("classes.renumberHint")}</p>
         )}
         <div style={{ marginBottom: 12 }}>
           {reihenfolge().map((idx, platz) => { const s = students[idx]; return (
@@ -342,47 +343,47 @@ export default function Classes() {
               </span>
               <input value={s.name} onChange={(e) => updateStudent(idx, e.target.value)} placeholder={t("common.name")}
                 autoComplete="off" name={`stud-${idx}`} data-lpignore="true"
-                style={{ flex: 1, padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 14, background: "var(--bg)", color: "var(--text)" }} />
+                style={{ ...inputStyle, flex: 1 }} />
               {/* E/G wird nicht mehr hier gepflegt, sondern im Kurs (betrifft die
                   Person, nicht die Fach-Klasse) — siehe Kurse.jsx. */}
               <button
                 type="button" onClick={() => setDetailsFor(detailsFor === idx ? null : idx)}
                 title={t("classes.detailsTitle")}
                 style={{
-                  width: 92, flexShrink: 0, textAlign: "center",
-                  border: "1px solid var(--border2)", background: (s.foerder?.length || s.massnahmen?.length || s.notizen || s.klassenlehrer) ? "var(--accent-bg)" : "var(--card)",
-                  color: "var(--text2)", cursor: "pointer", borderRadius: 8, padding: "6px 10px", fontSize: 12.5,
+                  ...btnSecondary, ...btnSmall, width: 92, flexShrink: 0, textAlign: "center",
+                  background: (s.foerder?.length || s.massnahmen?.length || s.notizen || s.klassenlehrer) ? "var(--accent-bg)" : "var(--card)",
+                  color: "var(--text2)", cursor: "pointer",
                 }}
               >
                 {s.foerder?.length ? t("classes.detailsN", { n: s.foerder.length }) : t("classes.details")}
               </button>
-              <button onClick={() => removeStudent(idx)} style={{ border: "none", background: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", flexShrink: 0 }} title={t("classes.removeCard")}>
+              <button onClick={() => removeStudent(idx)} className="icon-btn" style={{ ...iconBtn, flexShrink: 0 }} title={t("classes.removeCard")} aria-label={t("classes.removeCard")}>
                 <Icon d={ICONS.trash} color={C.danger} />
               </button>
             </div>
 
             {detailsFor === idx && (
-              <div style={{ margin: "0 0 12px 52px", padding: 16, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
+              <div style={{ ...cardStyle, margin: "0 0 12px 52px" }}>
                 {/* Foto der Person (personenbezogen; nie im Export). */}
                 <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>{t("classes.photo")}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                  {s.id && s.has_photo && <AuthImage src={`/api/classes/students/${s.id}/photo`} reloadKey={photoVer} style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 10, border: "1px solid var(--border2)" }} />}
+                  {s.id && s.has_photo && <AuthImage src={`/api/classes/students/${s.id}/photo`} reloadKey={photoVer} style={{ width: 56, height: 56, objectFit: "cover", borderRadius: CONTROL_R, border: "1px solid var(--border2)" }} />}
                   {s.id ? (
                     <>
-                      <label style={{ ...btnSecondary, cursor: "pointer", padding: "6px 12px", fontSize: 13 }}>
+                      <label style={{ ...btnSecondary, ...btnSmall, cursor: "pointer" }}>
                         {s.has_photo ? t("classes.photoChange") : t("classes.photoAdd")}
                         <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files[0]; e.target.value = ""; uploadPhoto(idx, s.id, f); }} />
                       </label>
-                      {s.has_photo && <button type="button" onClick={() => removePhoto(idx, s.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>}
+                      {s.has_photo && <button type="button" onClick={() => removePhoto(idx, s.id)} className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>}
                     </>
-                  ) : <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("classes.photoSaveFirst")}</span>}
+                  ) : <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("classes.photoSaveFirst")}</span>}
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>{t("classes.classTeacher")}</div>
                 <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
                   <input
                     value={s.klassenlehrer || ""} onChange={(e) => setStudentField(idx, "klassenlehrer", e.target.value)}
                     placeholder={t("classes.classTeacherPlaceholder")} maxLength={120}
-                    style={{ flex: 1, minWidth: 180, padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 13, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }}
+                    style={{ ...inputStyle, flex: 1, minWidth: 180, fontSize: 13 }}
                   />
                   {/* Bei einer echten Klasse ist die Leitung fuer alle gleich —
                       dann waere 30x tippen unsinnig. Bei einem Kurs, der Kinder
@@ -394,7 +395,7 @@ export default function Classes() {
                         if (!await askConfirm(t("classes.applyAllConfirm", { name: s.klassenlehrer, n: students.length }))) return;
                         setStudents(students.map((st) => ({ ...st, klassenlehrer: s.klassenlehrer })));
                       }}
-                      style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12.5 }}
+                      style={{ ...btnSecondary, ...btnSmall }}
                     >
                       {t("classes.applyAll")}
                     </button>
@@ -402,19 +403,20 @@ export default function Classes() {
                 </div>
 
                 <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>{t("classes.supportNeeds")}</div>
-                <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 9 }}>
+                <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8 }}>
                   Schwierigkeiten — steuern später die Differenzierung in Lernpfad.
                 </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 16 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
                   {FOERDER.map(([wert, erklaerung]) => {
                     const on = (s.foerder || []).includes(wert);
                     return (
+                      // Auswaehlbarer Chip: dieselbe runde Form wie chipStyle,
+                      // nur mit Kaestchen und Aktiv-Zustand.
                       <label
                         key={wert} title={erklaerung}
                         style={{
-                          display: "inline-flex", alignItems: "center", gap: 6,
-                          padding: "5px 11px", borderRadius: 20, fontSize: 13, cursor: "pointer",
-                          userSelect: "none",
+                          ...chipStyle, display: "inline-flex", alignItems: "center", gap: 8,
+                          padding: "4px 12px", fontSize: 13, cursor: "pointer", userSelect: "none",
                           border: on ? "1px solid var(--accent)" : "1px solid var(--border2)",
                           background: on ? "var(--accent-bg)" : "var(--bg)",
                           color: on ? "var(--accent)" : "var(--text2)",
@@ -439,9 +441,9 @@ export default function Classes() {
                   rows={2} placeholder={t("classes.notesPlaceholder")} maxLength={2000}
                   // Breite fest: nur senkrecht ziehbar, lange Wörter brechen um. Ein
                   // seitlicher Rollbalken hilft bei Notizen niemandem.
-                  style={{ width: "100%", maxWidth: "100%", padding: 8, border: "1px solid var(--border2)", borderRadius: 8, fontSize: 13, background: "var(--bg)", color: "var(--text)", resize: "vertical", boxSizing: "border-box", overflowX: "hidden", overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}
+                  style={{ ...inputStyle, width: "100%", maxWidth: "100%", fontSize: 13, resize: "vertical", overflowX: "hidden", overflowWrap: "anywhere", whiteSpace: "pre-wrap" }}
                 />
-                <p style={{ fontSize: 11.5, color: "var(--text3)", margin: "9px 0 0" }}>
+                <p style={{ fontSize: 12, color: "var(--text3)", margin: "8px 0 0" }}>
                   {t("classes.staysPrivate")}
                 </p>
               </div>
@@ -454,7 +456,7 @@ export default function Classes() {
             Gefaehrliche. Vorher stand der Papierkorb direkt neben
             „Speichern" — eine Handbreite von der Klasse entfernt. */}
         <Werkzeugleiste
-          links={<button onClick={save} disabled={!name.trim()} style={btnPrimary}>{t("common.save")}</button>}
+          links={<button onClick={save} disabled={!name.trim()} style={toolbarBtnPrimary}>{t("common.save")}</button>}
           mehr={editing.id ? [
             zugaengeMoeglich && { key: "qr", label: t("classes.qrPrint"), icon: ICONS.pdf || ICONS.export,
                                   onClick: () => zugaengeDrucken(editing.id) },
@@ -467,8 +469,8 @@ export default function Classes() {
               onClick: () => { remove(editing.id); setEditing(null); } },
           ] : []}>
           <button onClick={addRow} disabled={students.length >= MAX_CARDS}
-            style={{ ...btnSecondary, opacity: students.length >= MAX_CARDS ? 0.4 : 1 }}>{t("classes.addRow")}</button>
-          <button onClick={() => setEditing(null)} style={btnSecondary}>{t("common.cancel")}</button>
+            style={{ ...toolbarBtn, opacity: students.length >= MAX_CARDS ? 0.4 : 1 }}>{t("classes.addRow")}</button>
+          <button onClick={() => setEditing(null)} style={toolbarBtn}>{t("common.cancel")}</button>
         </Werkzeugleiste>
         {cardvote && (
           <p style={{ fontSize: 12, color: students.length >= MAX_CARDS ? C.danger : "var(--text3)", margin: 0 }}>
@@ -483,33 +485,36 @@ export default function Classes() {
 
   return (
     <div style={{ ...pageApp }}>
-      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+      <h1 style={pageTitle}>{t("nav.classes")}</h1>
+      {/* Archiv statt Papierkorb: der Papierkorb loescht nach 30 Tagen, das
+          Archiv haelt auf Dauer — alte Noten muss man Jahre spaeter noch
+          nachschlagen koennen.
+          Eine Leiste, ein Abstand: das zusaetzliche marginLeft am Import riss
+          vorher ein 16-px-Loch mitten in die Reihe. */}
+      <Werkzeugleiste
+        links={<Tabs value={archiv ? "archiv" : "aktiv"} onChange={(v) => { const a = v === "archiv"; setArchiv(a); setLoaded(false); load(a).then(() => setLoaded(true)); }}
+          options={[["aktiv", t("classes.active")], ["archiv", t("classes.archived")]]} />}
+        style={{ marginBottom: 16 }}
+      >
         {!archiv && <AddButton onClick={startNew} title={t("classes.new")} />}
-        {/* Archiv statt Papierkorb: der Papierkorb loescht nach 30 Tagen, das
-            Archiv haelt auf Dauer — alte Noten muss man Jahre spaeter noch
-            nachschlagen koennen. */}
-        <Tabs value={archiv ? "archiv" : "aktiv"} onChange={(v) => { const a = v === "archiv"; setArchiv(a); setLoaded(false); load(a).then(() => setLoaded(true)); }}
-          options={[["aktiv", t("classes.active")], ["archiv", t("classes.archived")]]} />
-        <div style={{ marginLeft: 8 }}>
-          <ImportMenu
-            importItems={[
-              { label: t("classes.importExcel"), onClick: importXlsx },
-              { label: t("classes.importJson"), onClick: importJson },
-            ]}
-            templateItems={[
-              { label: t("classes.templateExcel"), href: `${API}/import/class-template.xlsx` },
-            ]}
-          />
-        </div>
-      </div>
+        <ImportMenu
+          importItems={[
+            { label: t("classes.importExcel"), onClick: importXlsx },
+            { label: t("classes.importJson"), onClick: importJson },
+          ]}
+          templateItems={[
+            { label: t("classes.templateExcel"), href: `${API}/import/class-template.xlsx` },
+          ]}
+        />
+      </Werkzeugleiste>
 
       {!loaded && !loadError && <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("common.loading")}</p>}
       {loaded && !loadError && classes.length === 0 && <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("classes.empty")}</p>}
 
       {classes.map((cls) => (
-        <div key={cls.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", marginBottom: 10, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
+        <div key={cls.id} style={{ ...cardStyle, display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <button onClick={() => startEdit(cls)} title={t("classes.open")}
-            style={{ display: "flex", alignItems: "center", gap: 10, border: "none", background: "none", cursor: "pointer", padding: 0, textAlign: "left", flex: 1, minWidth: 0 }}>
+            style={{ display: "flex", alignItems: "center", gap: 8, border: "none", background: "none", cursor: "pointer", padding: 0, textAlign: "left", flex: 1, minWidth: 0 }}>
             <strong style={{ fontSize: 16, color: "var(--text)" }}>{cls.name}</strong>
             <span style={{ color: "var(--text3)", fontSize: 13 }}>{cls.students.length} {t("classes.learners")}</span>
           </button>

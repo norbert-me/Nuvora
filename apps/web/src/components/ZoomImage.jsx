@@ -8,6 +8,7 @@
 // Dreieckszeichnung mit Winkelangaben ist darin nicht lesbar, und ohne Zoom
 // bleibt nur „Bild ändern" und hoffen, dass es das richtige war.
 import { useEffect, useState } from "react";
+import { modalOverlay } from "./Icons.jsx";
 
 export default function ZoomImage({ src, alt = "", style, title }) {
   const [zoom, setZoom] = useState(false);
@@ -28,9 +29,9 @@ export default function ZoomImage({ src, alt = "", style, title }) {
       <img src={src} alt={alt} title={title} onClick={() => setZoom(true)}
         style={{ cursor: "zoom-in", ...style }} />
       {zoom && (
+        // Dunkler als modalOverlay: vor einem Bild soll die Seite ganz zuruecktreten.
         <div onClick={() => setZoom(false)}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.86)", display: "flex",
-            alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20, cursor: "zoom-out" }}>
+          style={{ ...modalOverlay, background: "rgba(0,0,0,0.86)", cursor: "zoom-out" }}>
           <img src={src} alt={alt}
             style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", cursor: "zoom-out" }} />
         </div>

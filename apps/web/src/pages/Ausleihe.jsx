@@ -2,7 +2,7 @@
 // Ausleiher: ein Kern-Schüler (Klasse wählen) oder ein Freitextname.
 import { useState, useEffect, useCallback } from "react";
 import { undoDelete } from "../core/undo.jsx";
-import { AddButton, btnPrimary, btnSecondary, selectStyle, Toggle, Icon, ICONS, iconBtn, COLORS as C, inputStyle, Empty } from "../components/Icons.jsx";
+import { AddButton, badge, btnPrimary, btnSecondary, cardStyle, CONTROL_R, selectStyle, Toggle, Icon, ICONS, iconBtn, COLORS as C, inputStyle, Empty } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr } from "../core/cache.js";
@@ -86,19 +86,19 @@ export default function Ausleihe() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {(nurOffene ? items.filter((it) => it.open > 0) : items).map((it) => (
-            <div key={it.id} style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px" }}>
-                <button onClick={() => oeffnen(it.id)} style={{ flex: 1, textAlign: "left", background: "none", border: "none", cursor: "pointer", color: "var(--text)", fontSize: 15, fontWeight: 600, display: "flex", alignItems: "center", gap: 10 }}>
+            <div key={it.id} style={{ ...cardStyle, padding: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px" }}>
+                <button onClick={() => oeffnen(it.id)} style={{ flex: 1, textAlign: "left", background: "none", border: "none", cursor: "pointer", color: "var(--text)", fontSize: 16, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ color: "var(--text3)", fontSize: 12 }}>{offen === it.id ? "▾" : "▸"}</span>
                   {it.name}
                 </button>
-                {it.open > 0 && <span style={{ fontSize: 12, fontWeight: 700, padding: "2px 9px", borderRadius: 980, background: "rgba(209,53,15,0.12)", color: C.danger }}>{t("ausleihe.outCount", { n: it.open })}</span>}
-                {it.overdue > 0 && <span title={t("ausleihe.overdueHint", { d: UEBERFAELLIG_TAGE })} style={{ fontSize: 12, fontWeight: 800, padding: "2px 9px", borderRadius: 980, background: C.danger, color: "#fff" }}>{t("ausleihe.overdueCount", { n: it.overdue })}</span>}
-                <button onClick={() => loeschen(it.id)} className="icon-btn" style={{ ...iconBtn, padding: 5 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
+                {it.open > 0 && <span style={badge(C.danger)}>{t("ausleihe.outCount", { n: it.open })}</span>}
+                {it.overdue > 0 && <span title={t("ausleihe.overdueHint", { d: UEBERFAELLIG_TAGE })} style={{ ...badge(C.danger), background: C.danger, color: C.aufAkzent }}>{t("ausleihe.overdueCount", { n: it.overdue })}</span>}
+                <button onClick={() => loeschen(it.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
               </div>
 
               {offen === it.id && (
-                <div style={{ borderTop: "1px solid var(--border)", padding: 14 }}>
+                <div style={{ borderTop: "1px solid var(--border)", padding: 12 }}>
                   {/* Verleihen */}
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
                     <KursKlasseSelect value={classId === "" ? "" : Number(classId)} allowNone noneLabel={`– ${t("ausleihe.freeText")} –`}
@@ -117,12 +117,12 @@ export default function Ausleihe() {
                   {offeneLoans.length === 0 ? (
                     <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 8px" }}>{t("ausleihe.noOpen")}</p>
                   ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: zurueckLoans.length ? 12 : 0 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: zurueckLoans.length ? 12 : 0 }}>
                       {offeneLoans.map((l) => {
                         const tage = tageDraussen(l.out_at);
                         const ueber = tage >= UEBERFAELLIG_TAGE;
                         return (
-                        <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", border: ueber ? `1px solid ${C.danger}` : "1px solid var(--border)", borderRadius: 8, background: ueber ? "rgba(209,53,15,0.06)" : undefined }}>
+                        <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", border: ueber ? `1px solid ${C.danger}` : "1px solid var(--border)", borderRadius: CONTROL_R, background: ueber ? "rgba(209,53,15,0.06)" : undefined }}>
                           <span style={{ flex: 1, fontWeight: 500 }}>{l.borrower}</span>
                           <span style={{ fontSize: 12, color: ueber ? C.danger : "var(--text3)", fontWeight: ueber ? 700 : 400 }}>{t("ausleihe.sinceDays", { n: tage })}</span>
                           <button onClick={() => zurueck(l.id, it.id)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13 }}>{t("ausleihe.return")}</button>
@@ -133,10 +133,10 @@ export default function Ausleihe() {
                   )}
                   {zurueckLoans.length > 0 && (
                     <details>
-                      <summary style={{ fontSize: 12.5, color: "var(--text3)", cursor: "pointer" }}>{t("ausleihe.history")} ({zurueckLoans.length})</summary>
+                      <summary style={{ fontSize: 13, color: "var(--text3)", cursor: "pointer" }}>{t("ausleihe.history")} ({zurueckLoans.length})</summary>
                       <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8 }}>
                         {zurueckLoans.map((l) => (
-                          <div key={l.id} style={{ display: "flex", gap: 10, fontSize: 12.5, color: "var(--text3)" }}>
+                          <div key={l.id} style={{ display: "flex", gap: 8, fontSize: 13, color: "var(--text3)" }}>
                             <span style={{ flex: 1 }}>{l.borrower}</span>
                             <span>{fmt(l.out_at)} – {fmt(l.returned_at)} ✓</span>
                           </div>

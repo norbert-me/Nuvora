@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { askConfirm } from "../core/dialog.jsx";
 import { Link } from "react-router-dom";
-import { Icon, ICONS, iconBtn, btnSecondary, CONTROL_H, CONTROL_R, COLORS as C, pageApp } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, cardStyle, sectionLabel, Tabs, COLORS as C, pageApp } from "../components/Icons.jsx";
+import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api";
@@ -60,12 +61,12 @@ export default function Tests() {
     <div style={{ ...pageApp }}>
       {/* Oben: je Klasse die Gesamtauswertung. Darunter die einzelnen Quiz. */}
       {classes.length > 0 && (
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text3)", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>{t("tests.byClass")}</div>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ ...sectionLabel, marginBottom: 12 }}>{t("tests.byClass")}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {classes.map((c) => (
               <Link key={c.id} to={`/cardvote/class-evaluation/${c.id}`}
-                style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 14, textDecoration: "none", color: "var(--text)" }}>
+                style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", textDecoration: "none", color: "var(--text)" }}>
                 <span style={{ fontWeight: 600, fontSize: 14 }}>{c.name}</span>
               </Link>
             ))}
@@ -73,35 +74,30 @@ export default function Tests() {
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px" }}>{t("tests.quizzes")}</div>
-        <button
-          onClick={() => setShowArchived(!showArchived)}
-          // Eine Hoehe, eine Form: CONTROL_H/CONTROL_R aus Icons.jsx statt
-          // eigener Polsterung — sonst steht der Knopf neben jeder anderen
-          // Leiste der App schief.
-          style={{
-            ...btnSecondary, height: CONTROL_H, padding: "0 14px", borderRadius: CONTROL_R,
-            fontSize: 13, fontWeight: 500, lineHeight: 1,
-            background: showArchived ? "var(--text)" : "var(--card)",
-            color: showArchived ? "var(--bg)" : "var(--text2)",
-          }}
-        >
-          {showArchived ? t("tests.showActive") : t("tests.archive")}
-        </button>
-      </div>
+      {/* Aktiv/Archiv ist ein Zwei-Zustands-Umschalter — also `Tabs`, nicht ein
+          Knopf, der seine Beschriftung wechselt. */}
+      <Werkzeugleiste
+        links={<div style={sectionLabel}>{t("tests.quizzes")}</div>}
+        ansicht={
+          <Tabs
+            value={showArchived ? "archiv" : "aktiv"}
+            onChange={(v) => setShowArchived(v === "archiv")}
+            options={[["aktiv", t("tests.showActive")], ["archiv", t("tests.archive")]]}
+          />
+        }
+        style={{ marginBottom: 16 }}
+      />
 
       {sessions.length === 0 && <p style={{ color: "var(--text3)", fontSize: 14 }}>{showArchived ? t("tests.emptyArchived") : t("tests.emptyActive")}</p>}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {sessions.map((s) => (
           <div key={s.id} style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "14px 18px", background: "var(--card)", border: "1px solid var(--border)",
-            borderRadius: 14, transition: "background 0.15s",
+            ...cardStyle, display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: 16, transition: "background 0.15s",
           }}>
             <Link to={`/cardvote/evaluation/${s.id}`} style={{ flex: 1, textDecoration: "none", minWidth: 0 }}>
-              <div style={{ fontWeight: 600, color: "var(--text)", fontSize: 15, marginBottom: 2 }}>
+              <div style={{ fontWeight: 600, color: "var(--text)", fontSize: 16, marginBottom: 2 }}>
                 {s.class_name || "–"}
                 {s.set_name && <span style={{ fontWeight: 400, color: "var(--text2)", marginLeft: 8 }}>{s.set_name}</span>}
               </div>

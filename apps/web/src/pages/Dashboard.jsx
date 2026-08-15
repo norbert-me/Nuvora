@@ -3,7 +3,10 @@ import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt } from "../core/dialog.jsx";
 import Latex from "../components/Latex.jsx";
 import PublishModal from "../components/PublishModal.jsx";
-import { NiveauToggle, AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, Toggle, Modal, Popover, pageApp, inputStyle as inputBasis, selectStyle, CONTROL_H } from "../components/Icons.jsx";
+import { NiveauToggle, AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, btnSmall, Toggle, Modal, Popover,
+  pageApp, pageTitle, cardStyle, panelStyle, menuRow, SHADOW, inputStyle as inputBasis, selectStyle,
+  toolbarBtn, toolbarBtnPrimary, toolbarInput, StatCard, CONTROL_R } from "../components/Icons.jsx";
+import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import TopicPicker from "../components/TopicPicker.jsx";
@@ -416,6 +419,7 @@ export default function Dashboard() {
 
   return (
     <div style={{ ...pageApp }}>
+      <h1 style={pageTitle}>{t("nav.questions")}</h1>
 
       <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 16, fontSize: 14 }}>
         <span onClick={() => goToPath(-1)} style={{ cursor: "pointer", color: path.length === 0 ? "var(--text)" : "var(--accent)", fontWeight: path.length === 0 ? 600 : 400 }}>
@@ -432,10 +436,10 @@ export default function Dashboard() {
       {/* Fragen ohne Quiz — nur wenn es welche gibt. Ein Hinweis, der immer da
           steht, wird nach zwei Tagen nicht mehr gelesen. */}
       {verwaist?.anzahl > 0 && (
-        <div style={{ marginBottom: 16, padding: "10px 14px", border: "1px solid var(--border2)", borderRadius: 12, background: "var(--bg2)", fontSize: 13.5, color: "var(--text2)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ ...panelStyle, marginBottom: 16, padding: 12, fontSize: 13, color: "var(--text2)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span>{t("dash.orphans", { n: verwaist.anzahl })}</span>
-            <button onClick={() => setVerwaistOffen((v) => !v)} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13 }}>
+            <button onClick={() => setVerwaistOffen((v) => !v)} style={{ ...btnSecondary, ...btnSmall }}>
               {verwaistOffen ? t("common.close") : t("dash.orphansShow")}
             </button>
           </div>
@@ -446,12 +450,12 @@ export default function Dashboard() {
                 {/* Suchfeld und Auswahlfeld darunter stehen in derselben Leiste:
                     eine Hoehe (CONTROL_H), eine Form — abgeleitet, nicht neu gebaut. */}
                 <input value={vSuche} onChange={(e) => setVSuche(e.target.value)} placeholder={t("dash.searchQ")}
-                  style={{ ...inputBasis, flex: 1, minWidth: 160, maxWidth: 280, height: CONTROL_H, padding: "0 12px", fontSize: 13.5 }} />
-                <button onClick={() => setVAuswahl(new Set(vGefiltert.map((q) => q.id)))} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13 }}>
+                  style={{ ...toolbarInput, flex: 1, minWidth: 160, maxWidth: 280 }} />
+                <button onClick={() => setVAuswahl(new Set(vGefiltert.map((q) => q.id)))} style={toolbarBtn}>
                   {t("dash.orphansSelectAll", { n: vGefiltert.length })}
                 </button>
                 {vAuswahl.size > 0 && (
-                  <button onClick={() => setVAuswahl(new Set())} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13 }}>
+                  <button onClick={() => setVAuswahl(new Set())} style={toolbarBtn}>
                     {t("dash.orphansSelectNone")}
                   </button>
                 )}
@@ -459,31 +463,31 @@ export default function Dashboard() {
 
               {/* Zuweisen steht VOR dem Loeschen — bei 400 Fragen ist das der
                   Normalfall, Loeschen die Ausnahme. */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
                 <select value={vZiel} onChange={(e) => setVZiel(e.target.value)}
-                  style={{ ...selectStyle, fontSize: 13.5, maxWidth: 320 }}>
+                  style={{ ...selectStyle, maxWidth: 320 }}>
                   <option value="">{t("dash.orphansPickSet")}</option>
                   {alleQuizze.map((qs) => <option key={qs.id} value={String(qs.id)}>{qs.label}</option>)}
                 </select>
                 <button onClick={vZuweisen} disabled={!vZiel || vAuswahl.size === 0}
-                  style={{ ...btnPrimary, padding: "5px 12px", fontSize: 13, opacity: (!vZiel || vAuswahl.size === 0) ? 0.5 : 1 }}>
+                  style={{ ...toolbarBtnPrimary, opacity: (!vZiel || vAuswahl.size === 0) ? 0.5 : 1 }}>
                   {t("dash.orphansAssign", { n: vAuswahl.size })}
                 </button>
                 <button onClick={vAuswahlLoeschen} disabled={vAuswahl.size === 0}
-                  style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13, color: C.danger, borderColor: C.danger, opacity: vAuswahl.size === 0 ? 0.5 : 1 }}>
+                  style={{ ...toolbarBtn, color: C.danger, borderColor: C.danger, opacity: vAuswahl.size === 0 ? 0.5 : 1 }}>
                   {t("dash.orphansDeleteSel", { n: vAuswahl.size })}
                 </button>
                 {verwaist.loeschbar > 0 && (
-                  <button onClick={verwaisteAufraeumen} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13, color: "var(--text3)" }}>
+                  <button onClick={verwaisteAufraeumen} style={{ ...toolbarBtn, color: "var(--text3)" }}>
                     {t("dash.orphansClean", { n: verwaist.loeschbar })}
                   </button>
                 )}
                 {vMeldung && <span style={{ color: C.success }}>{vMeldung}</span>}
               </div>
 
-              <div style={{ maxHeight: 320, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 10, background: "var(--card)" }}>
+              <div style={{ maxHeight: 320, overflowY: "auto", border: "1px solid var(--border)", borderRadius: CONTROL_R, background: "var(--card)" }}>
                 {vGefiltert.map((q) => (
-                  <label key={q.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "6px 10px", borderBottom: "1px solid var(--border)", cursor: "pointer", lineHeight: 1.5 }}>
+                  <label key={q.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", borderBottom: "1px solid var(--border)", cursor: "pointer", lineHeight: 1.5 }}>
                     <input type="checkbox" checked={vAuswahl.has(q.id)} onChange={() => vUmschalten(q.id)} style={{ marginTop: 3 }} />
                     <span onClick={(e) => { e.preventDefault(); vOeffnen(q.id); }}
                           title={t("dash.clickEdit")}
@@ -506,8 +510,8 @@ export default function Dashboard() {
             <Modal onClose={() => setVEdit(null)} width={620} label={t("dash.editQ")}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                 <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{t("dash.editQ")}</h4>
-                <button onClick={() => setVEdit(null)} title={t("common.close")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", padding: 4, display: "flex" }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                <button onClick={() => setVEdit(null)} title={t("common.close")} className="icon-btn" aria-label={t("common.close")} style={iconBtn}>
+                  <Icon d={ICONS.close} size={18} />
                 </button>
               </div>
               <QuestionForm q={vEdit} setQ={setVEdit} onUpload={vBildHochladen} choiceKeys={["A", "B", "C", "D"]} />
@@ -522,27 +526,30 @@ export default function Dashboard() {
 
       {/* Move dialog */}
       {movingFolder && (
-        <div style={{ padding: 16, marginBottom: 16, background: "#fff3cd", borderRadius: 10, border: "1px solid #ffc107" }}>
+        // Die feste Warnfarbe (#fff3cd auf #ffc107) blieb im Dunkelmodus hell
+        // und war dort ein weisser Block. Panel + Akzentrand tun dasselbe und
+        // wechseln mit dem Design mit.
+        <div style={{ ...panelStyle, padding: 16, marginBottom: 16, border: `1px solid ${C.warning}` }}>
           <strong>{t("dash.moveTo")}</strong>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
-            <button onClick={() => moveFolder(movingFolder, null)} style={btnSmall}>{t("dash.root")}</button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+            <button onClick={() => moveFolder(movingFolder, null)} style={zielBtn}>{t("dash.root")}</button>
             {moveTargets.map((f) => (
-              <button key={f.id} onClick={() => moveFolder(movingFolder, f.id)} style={btnSmall}>
+              <button key={f.id} onClick={() => moveFolder(movingFolder, f.id)} style={zielBtn}>
                 {"—".repeat(f.depth)} {f.name}
               </button>
             ))}
-            <button onClick={() => setMovingFolder(null)} style={{ ...btnSmall, color: "var(--text3)" }}>{t("common.cancel")}</button>
+            <button onClick={() => setMovingFolder(null)} style={zielBtn}>{t("common.cancel")}</button>
           </div>
         </div>
       )}
 
       <div style={{ marginBottom: 20 }}>
         {currentChildren.map((f) => (
-          <div key={f.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", marginBottom: 8, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 14, cursor: "pointer" }}>
-            <span onClick={() => renamingFolder !== f.id && openFolder(f)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <div key={f.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", ...cardStyle, marginBottom: 8, cursor: "pointer" }}>
+            <span onClick={() => renamingFolder !== f.id && openFolder(f)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
               {/* Ordner-Icon nur in der Ansicht — beim Umbenennen weg, sonst
                   überlappt es das Eingabefeld. */}
-              {renamingFolder !== f.id && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>}
+              {renamingFolder !== f.id && <Icon d={ICONS.folder} size={18} color="currentColor" />}
               {renamingFolder === f.id ? (
                 <input
                   autoFocus
@@ -551,7 +558,7 @@ export default function Dashboard() {
                   onBlur={commitRenameFolder}
                   onKeyDown={(e) => { if (e.key === "Enter") commitRenameFolder(); if (e.key === "Escape") setRenamingFolder(null); }}
                   onClick={(e) => e.stopPropagation()}
-                  style={{ fontWeight: 700, fontSize: 15, padding: "4px 10px", border: "2px solid var(--accent)", borderRadius: 8, background: "var(--input-bg)", color: "var(--text)", outline: "none", flex: 1, minWidth: 0, boxSizing: "border-box" }}
+                  style={{ ...inputBasis, fontWeight: 700, fontSize: 16, padding: "4px 10px", border: "2px solid var(--accent)", background: "var(--input-bg)", outline: "none", flex: 1, minWidth: 0 }}
                 />
               ) : (
                 <>
@@ -563,13 +570,13 @@ export default function Dashboard() {
             {/* Löschen steckt im Bearbeiten-Modus (Umbenennen), nicht als
                 dauersichtbarer Papierkorb in der Zeile. */}
             {renamingFolder !== f.id ? (
-            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
               <button onClick={(e) => { e.stopPropagation(); exportFolder(f.id, f.name); }} className="icon-btn" style={iconBtn} title={t("classes.export")} aria-label={t("classes.export")}><Icon d={ICONS.export} size={18} /></button>
               <button onClick={(e) => { e.stopPropagation(); setMovingFolder(f.id); }} className="icon-btn" style={iconBtn} title={t("dash.move")} aria-label={t("dash.move")}><Icon d={ICONS.move} size={18} /></button>
               <button onClick={(e) => { e.stopPropagation(); startRenameFolder(f.id, f.name); }} className="icon-btn" style={iconBtn} title={t("dash.rename")} aria-label={t("dash.rename")}><Icon d={ICONS.edit} size={18} /></button>
             </div>
             ) : (
-            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
               {/* onMouseDown + preventDefault: sonst schließt das Umbenennen-Feld
                   per onBlur zuerst, der Knopf verschwindet und der Klick geht
                   ins Leere — das Löschen passierte nie. */}
@@ -586,11 +593,11 @@ export default function Dashboard() {
           <h3 style={{ marginBottom: 8, fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("dash.setsHeading")}</h3>
           {currentFolder && currentSets.length === 0 && <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("dash.emptySets")}</p>}
           {currentSets.map((qs) => (
-            <div key={qs.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", marginBottom: 8, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 14, cursor: "pointer" }}>
+            <div key={qs.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", ...cardStyle, marginBottom: 8, cursor: "pointer" }}>
               <span onClick={() => setEditingSet(qs)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                 <strong style={{ color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{qs.name}</strong>
               </span>
-              <div style={{ display: "flex", gap: 6 }}>
+              <div style={{ display: "flex", gap: 4 }}>
                 <button onClick={(e) => { e.stopPropagation(); openPublish(qs); }} className="icon-btn" style={iconBtn} title={t("dash.publishTitle")} aria-label={t("dash.publishTitle")}>
                   <Icon d={ICONS.share} size={18} color="var(--accent)" />
                 </button>
@@ -602,40 +609,42 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      {/* Eine Leiste, eine Hoehe: Feld, OK, Abbrechen und der Import standen
+          vorher in drei verschiedenen Groessen nebeneinander. */}
+      <Werkzeugleiste style={{ marginBottom: 0 }}>
         {addMode ? (
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input value={addName} onChange={(e) => setAddName(e.target.value)} placeholder={addMode === "folder" ? t("dash.folderName") : t("dash.setName")} style={inputStyle} autoFocus
+          <>
+            <input value={addName} onChange={(e) => setAddName(e.target.value)} placeholder={addMode === "folder" ? t("dash.folderName") : t("dash.setName")} style={{ ...toolbarInput, minWidth: 200 }} autoFocus
               onKeyDown={(e) => { if (e.key === "Enter" && addName.trim()) { (addMode === "folder" ? createFolder(addName.trim()) : createSet(addName.trim())); setAddName(""); setAddMode(null); } if (e.key === "Escape") { setAddName(""); setAddMode(null); } }} />
-            <button onClick={() => { if (addName.trim()) { (addMode === "folder" ? createFolder(addName.trim()) : createSet(addName.trim())); setAddName(""); setAddMode(null); } }} style={btnSecondary}>OK</button>
-            <button onClick={() => { setAddName(""); setAddMode(null); }} style={btnSecondary}>×</button>
-          </div>
+            <button onClick={() => { if (addName.trim()) { (addMode === "folder" ? createFolder(addName.trim()) : createSet(addName.trim())); setAddName(""); setAddMode(null); } }} style={toolbarBtnPrimary}>OK</button>
+            <button onClick={() => { setAddName(""); setAddMode(null); }} style={toolbarBtn} title={t("common.cancel")} aria-label={t("common.cancel")}>
+              <Icon d={ICONS.close} size={15} />
+            </button>
+          </>
         ) : (
-          <div style={{ position: "relative" }}>
+          <span style={{ position: "relative", display: "inline-flex" }}>
             <AddButton onClick={() => setAddMenuOpen((v) => !v)} title={t("common.add")} />
             {addMenuOpen && (<>
               <div onClick={() => setAddMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-              <Popover style={{ minWidth: 180, padding: 6 }}>
-                <button onClick={() => { setAddMenuOpen(false); setAddMode("folder"); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "9px 12px", background: "none", border: "none", borderRadius: 8, color: "var(--text)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", textAlign: "left" }}><Icon d={ICONS.plus} size={15} /> {t("dash.newFolder")}</button>
-                <button onClick={() => { setAddMenuOpen(false); setAddMode("set"); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "9px 12px", background: "none", border: "none", borderRadius: 8, color: "var(--text)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", textAlign: "left" }}><Icon d={ICONS.plus} size={15} /> {t("dash.newSet")}</button>
+              <Popover style={{ minWidth: 180, padding: 4 }}>
+                <button onClick={() => { setAddMenuOpen(false); setAddMode("folder"); }} style={menuRow}><Icon d={ICONS.plus} size={15} /> {t("dash.newFolder")}</button>
+                <button onClick={() => { setAddMenuOpen(false); setAddMode("set"); }} style={menuRow}><Icon d={ICONS.plus} size={15} /> {t("dash.newSet")}</button>
               </Popover>
             </>)}
-          </div>
+          </span>
         )}
-        <div>
-          <ImportMenu
-            importItems={[
-              { label: t("dash.importJsonItem"), onClick: importFolder },
-              ...(currentFolder ? [{ label: t("classes.importExcel"), onClick: importXlsx }] : []),
-            ]}
-            templateItems={[
-              { label: t("classes.templateExcel"), href: `${API}/import/questions-template.xlsx` },
-              { label: t("dash.jsonExample"), href: "/beispiel-frageset.json" },
-              { label: t("dash.jsonFolderExample"), href: "/beispiel-ordner.json" },
-            ]}
-          />
-        </div>
-      </div>
+        <ImportMenu
+          importItems={[
+            { label: t("dash.importJsonItem"), onClick: importFolder },
+            ...(currentFolder ? [{ label: t("classes.importExcel"), onClick: importXlsx }] : []),
+          ]}
+          templateItems={[
+            { label: t("classes.templateExcel"), href: `${API}/import/questions-template.xlsx` },
+            { label: t("dash.jsonExample"), href: "/beispiel-frageset.json" },
+            { label: t("dash.jsonFolderExample"), href: "/beispiel-ordner.json" },
+          ]}
+        />
+      </Werkzeugleiste>
 
       {publishingSet && <PublishModal name={publishingSet.name} onClose={() => setPublishingSet(null)}
         onPublish={(description) => fetch(`${API}/marketplace/publish`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ set_id: publishingSet.id, description }) }).catch(() => null)} />}
@@ -659,18 +668,20 @@ function ImportProgress({ status }) {
   return (
     <div style={{ position: "fixed", left: 0, right: 0, bottom: 20, display: "flex", justifyContent: "center", zIndex: 300, pointerEvents: "none" }}>
       <style>{`@keyframes impIndet { 0%{left:-40%;} 100%{left:100%;} }`}</style>
-      <div style={{ width: "min(420px, 92vw)", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 14, boxShadow: "0 8px 30px rgba(0,0,0,0.18)", padding: "14px 16px" }}>
+      <div style={{ ...cardStyle, width: "min(420px, 92vw)", boxShadow: SHADOW.schwebend }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
           {stage === "done" ? (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.success} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            <Icon d={ICONS.check} size={18} color={C.success} />
           ) : stage === "error" ? (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.danger} strokeWidth="3" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <Icon d={ICONS.close} size={18} color={C.danger} />
           ) : (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="2.5" strokeLinecap="round" style={{ animation: "spin 0.9s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.2-8.5"/><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></svg>
+            <><Icon d={ICONS.spinner} size={18} color={s.color} style={{ animation: "spin 0.9s linear infinite" }} /><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></>
           )}
           <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{s.title}</span>
         </div>
         {label && <div style={{ fontSize: 12, color: stage === "error" ? C.danger : "var(--text3)", marginBottom: 8, marginLeft: 24 }}>{label}</div>}
+        {/* Reine Grafik: der Radius ist die halbe Kante (6/2) — der Balken ist
+            rund, das ist kein Bedienelement-Radius. */}
         <div style={{ position: "relative", height: 6, background: "var(--bg2)", borderRadius: 3, overflow: "hidden" }}>
           {s.bar === "indet" ? (
             <div style={{ position: "absolute", top: 0, height: "100%", width: "40%", borderRadius: 3, background: s.color, animation: "impIndet 1.1s ease-in-out infinite" }} />
@@ -683,9 +694,11 @@ function ImportProgress({ status }) {
   );
 }
 
-// Aus dem Kern abgeleitet (etwas groesser, auf Kartenfarbe).
-const inputStyle = { ...inputBasis, padding: "10px 14px", background: "var(--card)" };
-const btnSmall = { background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: "4px 10px", fontWeight: 500, color: "var(--text3)" };
+// Hiess frueher `btnSmall` und ueberschattete damit das gleichnamige Token aus
+// Icons.jsx — beim Lesen war nicht zu sehen, welcher gilt. (Das lokale
+// `inputStyle` daneben ist ganz weg: die Felder nehmen jetzt die Leisten- bzw.
+// Kern-Form.)
+const zielBtn = { ...btnSecondary, ...btnSmall, background: "none", border: "none", color: "var(--text3)" };
 
 function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQuestionsChange }) {
   const [qSearch, setQSearch] = useState("");
@@ -826,11 +839,14 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
 
   return (
     <div>
-      <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 13, fontWeight: 500, padding: "4px 0", marginBottom: 16 }}>← {t("common.back")}</button>
+      <button onClick={onBack} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 13, fontWeight: 500, padding: "4px 0", marginBottom: 16 }}>
+        <Icon d={ICONS.arrowLeft} size={14} /> {t("common.back")}
+      </button>
 
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+        {/* Der Quizname IST die Seitenueberschrift — deshalb 22 wie pageTitle. */}
         <input value={name} onChange={(e) => setName(e.target.value)} onBlur={saveName} onKeyDown={(e) => e.key === "Enter" && saveName()}
-          style={{ padding: "10px 14px", fontSize: 20, fontWeight: 700, border: "1px solid var(--border2)", borderRadius: 10, flex: 1, maxWidth: 500, color: "var(--text)" }} />
+          style={{ ...inputBasis, fontSize: 22, fontWeight: 700, flex: 1, maxWidth: 500 }} />
         {saving && <span style={{ color: "var(--text3)", fontSize: 13 }}>{t("dash.saving")}</span>}
         {onDelete && <button onClick={onDelete} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
       </div>
@@ -842,7 +858,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
         <Toggle checked={minuspunkte} onChange={toggleMinus} label={t("dash.minusToggle")} />
       </div>
       {(niveauAktiv || minuspunkte) && (
-        <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 20px", lineHeight: 1.5 }}>
+        <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 16px", lineHeight: 1.5 }}>
           {niveauAktiv && t("dash.niveauHint")}{niveauAktiv && minuspunkte ? " " : ""}{minuspunkte && t("dash.minusHint")}
         </p>
       )}
@@ -852,7 +868,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
         {questions.length > 3 && (
           <input
             value={qSearch} onChange={(e) => setQSearch(e.target.value)} placeholder={t("dash.searchQ")}
-            style={{ ...inputBasis, flex: 1, minWidth: 160, maxWidth: 320, height: CONTROL_H, padding: "0 12px", fontSize: 13.5 }}
+            style={{ ...toolbarInput, flex: 1, minWidth: 160, maxWidth: 320 }}
           />
         )}
         {/* Themenfilter — nur wenn es Themen gibt: ein Filter ueber eine leere
@@ -860,7 +876,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
         {themaIdx.liste.length > 0 && (
           <>
             <select value={qThema} onChange={(e) => setQThema(e.target.value)} title={t("dash.filterTopic")}
-              style={{ ...selectStyle, fontSize: 13.5, maxWidth: 260 }}>
+              style={{ ...selectStyle, maxWidth: 260 }}>
               <option value="">{t("dash.allTopics")}</option>
               <option value="0">{t("dash.withoutTopic")}</option>
               {themaIdx.geordnet.map((tp) => <option key={tp.id} value={String(tp.id)}>{themaIdx.label(tp)}</option>)}
@@ -893,7 +909,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
         // falsche Frage verschieben.
         const searching = term.length > 0 || qThema !== "" || qNachThema;
         if (shown.length === 0) {
-          return <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("dash.noSearchHit")}</p>;
+          return <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("dash.noSearchHit")}</p>;
         }
         return shown.map((q) => {
           const idx = base.indexOf(q);
@@ -906,8 +922,8 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
           onDrop={(e) => { if (searching) return; e.preventDefault(); const arr = dragWork.current || previewQuestions || questions; setQuestions(arr); setPreviewQuestions(null); saveSet(name, arr); dragIdx.current = null; dragWork.current = null; }}
           onDragEnd={() => { setPreviewQuestions(null); dragIdx.current = null; dragWork.current = null; }}
           style={{
-            display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", marginBottom: 6,
-            border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)",
+            ...cardStyle,
+            display: "flex", alignItems: "center", gap: 8, padding: 12, marginBottom: 4,
             cursor: searching ? "default" : "grab", transition: "transform 0.15s ease",
           }}
         >
@@ -915,11 +931,11 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
             <span style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
               <button onClick={() => moveQuestion(idx, -1)} disabled={idx === 0} title="Nach oben" aria-label="Frage nach oben"
                 style={{ border: "none", background: "none", padding: "1px 2px", color: "var(--text3)", display: "flex", lineHeight: 1, opacity: idx === 0 ? 0.25 : 1, cursor: idx === 0 ? "default" : "pointer" }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
+                <Icon d={ICONS.chevronUp} size={18} color="currentColor" />
               </button>
               <button onClick={() => moveQuestion(idx, 1)} disabled={idx === base.length - 1} title="Nach unten" aria-label="Frage nach unten"
                 style={{ border: "none", background: "none", padding: "1px 2px", color: "var(--text3)", display: "flex", lineHeight: 1, opacity: idx === base.length - 1 ? 0.25 : 1, cursor: idx === base.length - 1 ? "default" : "pointer" }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                <Icon d={ICONS.chevronDown} size={18} color="currentColor" />
               </button>
             </span>
           ) : (
@@ -931,11 +947,11 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
           )}
           <span onClick={() => setEditingQ({ ...q })} style={{ flex: 1, color: "var(--text)", cursor: "pointer" }} title={t("dash.clickEdit")}>
             <Latex>{q.text}</Latex>
-            {q.image_url && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 6, verticalAlign: "middle" }}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>}
+            {q.image_url && <Icon d={ICONS.image} size={18} color="var(--accent)" style={{ marginLeft: 4 }} />}
             {/* Das Thema an der Frage — ohne es sieht man zwei gleich
                 aussehende Fragen und weiss nicht, welche wohin gehoert. */}
             {themaIdx.liste.length > 0 && (
-              <span style={{ marginLeft: 8, fontSize: 12, color: q.topic_id ? "var(--text3)" : "var(--warn, #b26a00)" }}>
+              <span style={{ marginLeft: 8, fontSize: 12, color: q.topic_id ? "var(--text3)" : C.warning }}>
                 {q.topic_id ? themaIdx.labelFuerId(q.topic_id) : t("dash.withoutTopic")}
               </span>
             )}
@@ -955,8 +971,8 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
         <Modal onClose={() => setEditingQ(null)} width={620} label={t("dash.editQ")}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{t("dash.editQ")}</h4>
-              <button onClick={() => setEditingQ(null)} title={t("common.close")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", padding: 4, display: "flex" }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              <button onClick={() => setEditingQ(null)} title={t("common.close")} className="icon-btn" aria-label={t("common.close")} style={iconBtn}>
+                <Icon d={ICONS.close} size={18} />
               </button>
             </div>
             <QuestionForm q={editingQ} setQ={setEditingQ} onUpload={uploadImage} choiceKeys={CHOICE_KEYS} />
@@ -973,8 +989,8 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
         <Modal onClose={() => setShowAdd(false)} width={620} label={t("dash.newQ")}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{t("dash.newQ")}</h4>
-              <button onClick={() => setShowAdd(false)} title={t("common.close")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", padding: 4, display: "flex" }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              <button onClick={() => setShowAdd(false)} title={t("common.close")} className="icon-btn" aria-label={t("common.close")} style={iconBtn}>
+                <Icon d={ICONS.close} size={18} />
               </button>
             </div>
             <QuestionForm q={newQ} setQ={setNewQ} onUpload={uploadImage} choiceKeys={CHOICE_KEYS} />
@@ -1052,31 +1068,31 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
     <>
       <textarea ref={(el) => (inputRefs.current.text = el)} onFocus={() => (activeField.current = "text")} rows={2}
         placeholder={t("dash.qTextPh")} value={q.text} onChange={(e) => setQ({ ...q, text: e.target.value })}
-        style={{ padding: "10px 12px", width: "100%", marginBottom: 4, fontSize: 16, border: "1px solid var(--border2)", borderRadius: 8, boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", lineHeight: 1.4, color: "var(--text)", background: "var(--bg)" }} autoFocus />
+        style={{ ...inputBasis, width: "100%", marginBottom: 4, fontSize: 16, resize: "vertical", fontFamily: "inherit", lineHeight: 1.4 }} autoFocus />
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
         {LATEX_BUTTONS.map((b) => (
           <button key={b.label} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insertLatex(b.tex, b.cursor, b.display)}
-            style={{ padding: "3px 8px", fontSize: 13, border: "1px solid var(--border2)", borderRadius: 6, background: "var(--card)", cursor: "pointer", fontFamily: "serif", color: "var(--text)" }}>
+            style={{ ...btnSecondary, ...btnSmall, padding: "4px 8px", borderRadius: CONTROL_R, fontFamily: "serif" }}>
             {b.label}
           </button>
         ))}
         <span style={{ fontSize: 11, color: "var(--text3)", marginLeft: 4 }}>{t("dash.latexHint")}</span>
       </div>
       {q.text && q.text.includes("$") && (
-        <div style={{ padding: "8px 12px", marginBottom: 10, background: "var(--bg2)", borderRadius: 8, fontSize: 15 }}>
+        <div style={{ padding: "8px 12px", marginBottom: 8, background: "var(--bg2)", borderRadius: CONTROL_R, fontSize: 16 }}>
           <Latex>{q.text}</Latex>
         </div>
       )}
 
       {/* Image */}
-      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
-        {q.image_url && <ZoomImage src={q.image_url} title={t("dash.zoomImg")} style={{ height: 60, borderRadius: 6, border: "1px solid var(--border3)" }} />}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+        {q.image_url && <ZoomImage src={q.image_url} title={t("dash.zoomImg")} style={{ height: 60, borderRadius: CONTROL_R, border: "1px solid var(--border3)" }} />}
         <button onClick={() => onUpload((url) => setQ({ ...q, image_url: url }))} type="button" style={btnSecondary}>
           {q.image_url ? t("dash.changeImg") : t("dash.uploadImg")}
         </button>
-        {q.image_url && <button onClick={() => setQ({ ...q, image_url: null })} title={t("dash.removeImg")} style={{ display: "flex", alignItems: "center", padding: 6, background: "none", border: "1px solid var(--border2)", borderRadius: 8, cursor: "pointer" }}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
+        {q.image_url && <button onClick={() => setQ({ ...q, image_url: null })} title={t("dash.removeImg")} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: CONTROL_R }}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
         {q.image_url && (
-          <select value={q.image_layout} onChange={(e) => setQ({ ...q, image_layout: e.target.value })} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border2)", fontSize: 13 }}>
+          <select value={q.image_layout} onChange={(e) => setQ({ ...q, image_layout: e.target.value })} style={selectStyle}>
             <option value="above">{t("dash.imgAbove")}</option>
             <option value="left">{t("dash.imgLeft")}</option>
             <option value="right">{t("dash.imgRight")}</option>
@@ -1090,7 +1106,7 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
         <span style={{ fontSize: 14, color: "var(--text2)" }}>{t("dash.answers")}</span>
         {[2, 3, 4].map((n) => (
           <button key={n} onClick={() => setQ({ ...q, num_choices: n, correct_answer: n <= choiceKeys.indexOf(q.correct_answer) ? "" : q.correct_answer })}
-            style={{ padding: "4px 12px", borderRadius: 6, border: q.num_choices === n ? "2px solid #0066cc" : "1px solid var(--border2)", background: q.num_choices === n ? "var(--accent-bg)" : "var(--card)", cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
+            style={{ ...btnSecondary, ...btnSmall, borderRadius: CONTROL_R, border: q.num_choices === n ? "2px solid var(--accent)" : "1px solid var(--border2)", background: q.num_choices === n ? "var(--accent-bg)" : "var(--card)", fontWeight: 600 }}>
             {n}
           </button>
         ))}
@@ -1139,11 +1155,11 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
                     sehen aus, als lägen sie unter dem Feld. */}
                 <div onClick={toggle} style={{
                   width: 36, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-                  background: isCorrect ? C.success : "var(--border3)", color: isCorrect ? "#fff" : "var(--text3)",
-                  borderRadius: "8px 0 0 8px", cursor: "pointer", fontWeight: 700, fontSize: 14,
+                  background: isCorrect ? C.success : "var(--border3)", color: isCorrect ? C.aufAkzent : "var(--text3)",
+                  borderRadius: `${CONTROL_R}px 0 0 ${CONTROL_R}px`, cursor: "pointer", fontWeight: 700, fontSize: 14,
                   transition: "all 0.15s ease", userSelect: "none",
                 }}>{k}</div>
-                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", border: "1px solid var(--border2)", borderLeft: "none", borderRadius: "0 8px 8px 0", overflow: "hidden" }}>
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", border: "1px solid var(--border2)", borderLeft: "none", borderRadius: `0 ${CONTROL_R}px ${CONTROL_R}px 0`, overflow: "hidden" }}>
                   <textarea ref={(el) => (inputRefs.current[k] = el)} onFocus={() => (activeField.current = k)} rows={2}
                     placeholder={t("dash.answerPh", { k })} value={q.choices[k] || ""} onChange={(e) => setQ({ ...q, choices: { ...q.choices, [k]: e.target.value } })}
                     style={{ padding: "8px 12px", width: "100%", boxSizing: "border-box", border: "none", fontSize: 14, outline: "none", background: "transparent", color: "var(--text)", resize: "vertical", fontFamily: "inherit", lineHeight: 1.4 }} />
@@ -1153,8 +1169,8 @@ function QuestionForm({ q, setQ, onUpload, choiceKeys }) {
                     </div>
                   )}
                   {choiceImg && (
-                    <div style={{ padding: "4px 8px", background: "var(--bg2)", display: "flex", alignItems: "center", gap: 6 }}>
-                      <ZoomImage src={choiceImg} title={t("dash.zoomImg")} style={{ height: 40, borderRadius: 4 }} />
+                    <div style={{ padding: "4px 8px", background: "var(--bg2)", display: "flex", alignItems: "center", gap: 4 }}>
+                      <ZoomImage src={choiceImg} title={t("dash.zoomImg")} style={{ height: 40, borderRadius: CONTROL_R }} />
                       <button onClick={removeChoiceImg} title={t("dash.removeImg")} style={{ border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", padding: 2 }}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
                     </div>
                   )}
@@ -1179,17 +1195,15 @@ function InfoTip({ text }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         onBlur={() => setOpen(false)}
-        style={{
-          width: 14, height: 14, borderRadius: 7, border: "1px solid var(--text3)", background: "none",
-          color: "var(--text3)", fontSize: 10, lineHeight: "12px", cursor: "pointer", padding: 0,
-        }}
-      >i</button>
+        aria-label={text}
+        style={{ ...iconBtn, padding: 0 }}
+      ><Icon d={ICONS.info} size={14} /></button>
       {open && (
         <div style={{
           position: "absolute", bottom: "140%", left: "50%", transform: "translateX(-50%)",
-          width: 220, padding: "8px 10px", background: "var(--text)", color: "var(--bg)",
-          borderRadius: 8, fontSize: 11, lineHeight: 1.4, zIndex: 20, fontWeight: 400,
-          boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+          width: 220, padding: 8, background: "var(--text)", color: "var(--bg)",
+          borderRadius: CONTROL_R, fontSize: 11, lineHeight: 1.4, zIndex: 20, fontWeight: 400,
+          boxShadow: SHADOW.schwebend,
         }}>{text}</div>
       )}
     </span>
@@ -1205,7 +1219,7 @@ function QuestionStats({ questionId }) {
   }, [questionId]);
 
   if (!stats || stats.total_answers === 0) return (
-    <div style={{ padding: "10px 0", color: "var(--text3)", fontSize: 13 }}>{t("dash.noStats")}</div>
+    <div style={{ padding: "12px 0", color: "var(--text3)", fontSize: 13 }}>{t("dash.noStats")}</div>
   );
 
   // A–D fest, nicht aus answer_counts abgeleitet: eine Karte hat genau vier
@@ -1215,32 +1229,19 @@ function QuestionStats({ questionId }) {
       <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)", marginBottom: 8 }}>
         {t("dash.stats", { times: stats.times_used, answers: stats.total_answers })}
       </div>
-      <div style={{ display: "flex", gap: 16, marginBottom: 10, flexWrap: "wrap" }}>
-        <div style={{ background: "var(--bg2)", borderRadius: 8, padding: "6px 12px", textAlign: "center" }}>
-          <div style={{ fontSize: 18, fontWeight: 700, color: stats.pct_correct >= 80 ? C.success : stats.pct_correct >= 50 ? C.warning : C.danger }}>{stats.pct_correct}%</div>
-          <div style={{ fontSize: 11, color: "var(--text3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {t("dash.correct")}
-            <InfoTip text={t("dash.ciTip")} />
-          </div>
-          {stats.ci_low != null && (
-            <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 2 }}>{stats.ci_low}–{stats.ci_high}%</div>
-          )}
-        </div>
-        {stats.item_sd != null && (
-          <div style={{ background: "var(--bg2)", borderRadius: 8, padding: "6px 12px", textAlign: "center" }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text)" }}>{stats.item_sd.toFixed(2)}</div>
-            <div style={{ fontSize: 11, color: "var(--text3)" }}>{t("dash.sd")}</div>
-          </div>
-        )}
-        {["A", "B", "C", "D"].map((k) => {
-          const count = stats.answer_counts[k] || 0;
-          return (
-            <div key={k} style={{ background: "var(--bg2)", borderRadius: 8, padding: "6px 12px", textAlign: "center" }}>
-              <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text)" }}>{count}</div>
-              <div style={{ fontSize: 11, color: "var(--text3)" }}>{k}</div>
-            </div>
-          );
-        })}
+      {/* `StatCard` aus dem Kern statt eigener Kacheln — dieselbe Zahl soll in
+          jeder Auswertung gleich aussehen. */}
+      <div style={{ display: "flex", gap: 16, marginBottom: 12, flexWrap: "wrap" }}>
+        <StatCard
+          value={`${stats.pct_correct}%`}
+          color={stats.pct_correct >= 80 ? C.success : stats.pct_correct >= 50 ? C.warning : C.danger}
+          label={<>{t("dash.correct")}<InfoTip text={t("dash.ciTip")} /></>}
+          sub={stats.ci_low != null ? `${stats.ci_low}–${stats.ci_high}%` : undefined}
+        />
+        {stats.item_sd != null && <StatCard value={stats.item_sd.toFixed(2)} label={t("dash.sd")} />}
+        {["A", "B", "C", "D"].map((k) => (
+          <StatCard key={k} value={stats.answer_counts[k] || 0} label={k} />
+        ))}
       </div>
     </div>
   );

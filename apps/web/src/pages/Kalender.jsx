@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, dateNavInput, DatumNavigator, segmentBtn, segmentInput, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, dateiWaehlen, pageApp, Popover} from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, badge, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, COLORS as C, selectStyle, SHADOW, Tabs, td as tdCell, th, inputStyle, menuRow, toolbarInput, toolbarBtn, toolbarBtnPrimary, DatumNavigator, segmentBtn, segmentInput, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, dateiWaehlen, pageApp, Popover } from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
@@ -24,6 +24,10 @@ const BUNDESLAENDER = [
 ];
 
 const API = "/api/kalender";
+
+// Vorgabe im Farbwaehler eines externen Kalenders. Bewusst ein Hexwert: ein
+// <input type="color"> nimmt keine CSS-Variable an.
+const EXT_FARBE = "#8e8e93";
 
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -466,20 +470,20 @@ export default function Kalender() {
               {/* Am rechten Rand ausgerichtet — der Knopf steht jetzt rechts in der
                   Leiste, links ausgerichtet liefe das Menü aus dem Bild. */}
               <Popover align="right" style={{ minWidth: 220, padding: 6 }}>
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", padding: "6px 12px 4px", textTransform: "uppercase", letterSpacing: 0.4 }}>{t("kalender.showHide")}</div>
-                <label style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", boxSizing: "border-box", padding: "8px 12px", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: "pointer", borderRadius: 8 }}>
+                <div style={{ ...sectionLabel, padding: "8px 12px 4px" }}>{t("kalender.showHide")}</div>
+                <label style={{ ...menuRow, boxSizing: "border-box", fontWeight: 500 }}>
                   <input type="checkbox" checked={showAllDay} onChange={toggleAllDay} />
                   {t("kalender.allDay")}
                 </label>
                 {extEvents.length > 0 && (
-                  <label style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", boxSizing: "border-box", padding: "8px 12px", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: "pointer", borderRadius: 8 }}>
+                  <label style={{ ...menuRow, boxSizing: "border-box", fontWeight: 500 }}>
                     <input type="checkbox" checked={showExt} onChange={toggleExt} />
                     {t("kalender.extEvents")}
                   </label>
                 )}
                 {extCals.length > 0 && (
                   <button onClick={() => loadExt(true)} disabled={extBusy}
-                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", boxSizing: "border-box", padding: "8px 12px", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: extBusy ? "default" : "pointer", borderRadius: 8, background: "none", border: "none", textAlign: "left", opacity: extBusy ? 0.6 : 1 }}
+                    style={{ ...menuRow, boxSizing: "border-box", fontWeight: 500, cursor: extBusy ? "default" : "pointer", opacity: extBusy ? 0.6 : 1 }}
                     title={t("kalender.extRefreshHint")}>
                     <Icon d={ICONS.refresh} size={15} color="var(--text2)" />
                     {extBusy ? t("kalender.extRefreshing") : t("kalender.extRefresh")}
@@ -487,7 +491,7 @@ export default function Kalender() {
                 )}
                 {extHidden.length > 0 && (
                   <button onClick={() => { extHidden.forEach((k) => unhideExtEvent(k)); setViewMenuOpen(false); }}
-                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", boxSizing: "border-box", padding: "8px 12px", color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: "pointer", borderRadius: 8, background: "none", border: "none", textAlign: "left" }}
+                    style={{ ...menuRow, boxSizing: "border-box", fontWeight: 500 }}
                     title={t("kalender.extUnhideAllHint")}>
                     <Icon d={ICONS.eye} size={15} color="var(--text2)" />
                     {t("kalender.extUnhideAll", { n: extHidden.length })}
@@ -521,7 +525,7 @@ export default function Kalender() {
           Tagesansicht = nativer Datums-Picker inline (wie Anwesenheit); Monat/Woche
           behalten den Selektor im Popover, da ein Tag-Picker dort nicht passt. */}
       {kalAnsicht && view !== "today" && (
-        <DatumNavigator style={{ justifyContent: "center", marginBottom: 14, position: "relative" }}
+        <DatumNavigator style={{ justifyContent: "center", marginBottom: 16, position: "relative" }}
           onZurueck={() => move(-1)} labelZurueck={t("kalender.prev")}
           onVor={() => move(1)} labelVor={t("kalender.next")}
           onHeute={() => setCursor(startOfDay(new Date()))} labelHeute={t("kalender.today")}
@@ -538,12 +542,12 @@ export default function Kalender() {
                 <div onClick={() => setJumpOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
                 <Popover align="center" style={{ padding: 8, display: "flex", gap: 6, alignItems: "center" }}>
                   {view === "month" && (
-                    <select value={cursor.getMonth()} onChange={(e) => { setCursor(startOfDay(new Date(cursor.getFullYear(), Number(e.target.value), 1))); setJumpOpen(false); }} style={{ ...selectStyle, padding: "6px 24px 6px 8px", fontSize: 13 }}>
+                    <select value={cursor.getMonth()} onChange={(e) => { setCursor(startOfDay(new Date(cursor.getFullYear(), Number(e.target.value), 1))); setJumpOpen(false); }} style={selectStyle}>
                       {Array.from({ length: 12 }, (_, m) => <option key={m} value={m}>{new Date(2000, m, 1).toLocaleDateString(undefined, { month: "long" })}</option>)}
                     </select>
                   )}
                   {view === "week" && (
-                    <select value={isoWeek(cursor).week} onChange={(e) => { setCursor(weekValToDate(`${isoWeek(cursor).year}-W${String(e.target.value).padStart(2, "0")}`)); setJumpOpen(false); }} style={{ ...selectStyle, padding: "6px 24px 6px 8px", fontSize: 13 }}>
+                    <select value={isoWeek(cursor).week} onChange={(e) => { setCursor(weekValToDate(`${isoWeek(cursor).year}-W${String(e.target.value).padStart(2, "0")}`)); setJumpOpen(false); }} style={selectStyle}>
                       {Array.from({ length: 53 }, (_, i) => i + 1).map((w) => <option key={w} value={w}>{t("kalender.kw")} {w}</option>)}
                     </select>
                   )}
@@ -551,7 +555,7 @@ export default function Kalender() {
                     const y0 = new Date().getFullYear();
                     const cy = view === "week" ? isoWeek(cursor).week : cursor.getMonth();
                     return (
-                      <select value={cursor.getFullYear()} onChange={(e) => { const y = Number(e.target.value); setCursor(view === "week" ? weekValToDate(`${y}-W${String(cy).padStart(2, "0")}`) : startOfDay(new Date(y, cy, 1))); setJumpOpen(false); }} style={{ ...selectStyle, padding: "6px 24px 6px 8px", fontSize: 13 }}>
+                      <select value={cursor.getFullYear()} onChange={(e) => { const y = Number(e.target.value); setCursor(view === "week" ? weekValToDate(`${y}-W${String(cy).padStart(2, "0")}`) : startOfDay(new Date(y, cy, 1))); setJumpOpen(false); }} style={selectStyle}>
                         {Array.from({ length: 7 }, (_, i) => y0 - 3 + i).map((y) => <option key={y} value={y}>{y}</option>)}
                       </select>
                     );
@@ -572,12 +576,12 @@ export default function Kalender() {
 
       {view === "month" && <MonthGrid extColor={extColor} range={range} cursor={cursor} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/notizbrett")} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} kursName={kursName} slotName={slotName} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
       {view === "week" && wdhVorschlag.length > 0 && (
-        <div style={{ marginBottom: 12, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
+        <div style={{ ...cardStyle, marginBottom: 12, padding: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t("kalender.wdhTitle")}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {wdhVorschlag.map((tp) => (
               <button key={tp.topic_id} onClick={() => setEditing({ date: startOfDay(mondayOf(cursor)), title: `${t("kalender.wdhPrefix")}: ${tp.name}`, topic_id: tp.topic_id })}
-                style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 980, border: "1px solid var(--border2)", background: "var(--bg)", cursor: "pointer", fontSize: 13 }}>
+                style={{ ...chipStyle, display: "inline-flex", alignItems: "center", gap: 8, padding: "4px 12px", border: "1px solid var(--border2)", background: "var(--bg)", cursor: "pointer", fontSize: 13 }}>
                 <span style={{ fontWeight: 600 }}>{tp.name}</span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: tp.pct < 40 ? C.danger : C.warning }}>{tp.pct}%</span>
                 <span style={{ color: "var(--accent)" }}>+</span>
@@ -593,9 +597,9 @@ export default function Kalender() {
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} kursName={kursName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
       {abo && (
         <Modal onClose={() => setAbo(null)} width={500} label={t("kalender.subscribeTitle")}>
-            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>{t("kalender.subscribeTitle")}</h3>
-            <p style={{ fontSize: 13, color: "var(--text2)", marginBottom: 14, lineHeight: 1.5 }}>{t("kalender.subscribeText")}</p>
-            <a href={abo.webcal} style={{ ...btnPrimary, display: "inline-block", textDecoration: "none", marginBottom: 14 }}>{t("kalender.subscribeNow")}</a>
+            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>{t("kalender.subscribeTitle")}</h3>
+            <p style={{ fontSize: 13, color: "var(--text2)", marginBottom: 16, lineHeight: 1.5 }}>{t("kalender.subscribeText")}</p>
+            <a href={abo.webcal} style={{ ...btnPrimary, display: "inline-block", textDecoration: "none", marginBottom: 16 }}>{t("kalender.subscribeNow")}</a>
             <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 4 }}>{t("kalender.subscribeManual")}</div>
             <div style={{ display: "flex", gap: 8 }}>
               <input readOnly value={abo.url} onFocus={(e) => e.target.select()} style={{ ...inputStyle, flex: 1, fontSize: 12 }} />
@@ -612,17 +616,17 @@ export default function Kalender() {
 
             {/* Force-Resync: bricht die alte Verbindung ab und erzeugt eine neue URL,
                 damit ein haengendes Abo einmal komplett neu laedt. */}
-            <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <button onClick={resyncAbo} disabled={resyncing} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6, opacity: resyncing ? 0.6 : 1 }}>
                 <Icon d={ICONS.refresh} size={15} /> {resyncing ? t("kalender.resyncing") : t("kalender.resync")}
               </button>
-              <span style={{ fontSize: 11.5, color: "var(--text3)", flex: 1, minWidth: 180 }}>{t("kalender.resyncHint")}</span>
+              <span style={{ fontSize: 12, color: "var(--text3)", flex: 1, minWidth: 180 }}>{t("kalender.resyncHint")}</span>
             </div>
 
             {/* Andere Richtung: MEHRERE externe Kalender (ICS-URL) read-only einblenden. */}
-            <div style={{ borderTop: "1px solid var(--border)", marginTop: 18, paddingTop: 14 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 4 }}>{t("kalender.extTitle")}</div>
-              <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 10 }}>{t("kalender.extText")}</div>
+            <div style={{ borderTop: "1px solid var(--border)", marginTop: 24, paddingTop: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{t("kalender.extTitle")}</div>
+              <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8 }}>{t("kalender.extText")}</div>
               <ExtCalEditor cals={abo.cals || []} onChange={(cals) => setAbo((a) => ({ ...a, cals }))} onSave={(cals) => { saveCals(cals); setAbo((a) => ({ ...a, cals })); }} t={t} />
             </div>
 
@@ -643,16 +647,16 @@ function ExtInfoModal({ ev, onClose, onHide, t }) {
   const fmt = (iso) => { try { return new Date(iso + "T00:00:00").toLocaleDateString(); } catch { return iso; } };
   const zeitraum = ev.end && ev.end !== ev.start ? `${fmt(ev.start)} – ${fmt(ev.end)}` : fmt(ev.start || ev.date);
   const Zeile = ({ label, children }) => (
-    <div style={{ display: "flex", gap: 10, padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
-      <span style={{ width: 96, flexShrink: 0, fontSize: 12.5, color: "var(--text3)" }}>{label}</span>
-      <span style={{ fontSize: 13.5, color: "var(--text)", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{children}</span>
+    <div style={{ display: "flex", gap: 8, padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+      <span style={{ width: 96, flexShrink: 0, fontSize: 12, color: "var(--text3)" }}>{label}</span>
+      <span style={{ fontSize: 14, color: "var(--text)", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{children}</span>
     </div>
   );
   return (
     <Modal onClose={onClose} width={440} label={ev.title || t("kalender.entry")}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
           <Icon d={ICONS.link} size={14} />
-          <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, flex: 1 }}>{ev.title || "—"}</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, flex: 1 }}>{ev.title || "—"}</h3>
         </div>
         <p style={{ fontSize: 12, color: "var(--text3)", margin: "0 0 12px" }}>{t("kalender.extEventNote")}</p>
         <Zeile label={t("kalender.extDate")}>{zeitraum}</Zeile>
@@ -684,7 +688,7 @@ function ExtCalEditor({ cals, onChange, onSave, t }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {rows.map((c, i) => (
           <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <input type="color" value={c.color || "#8e8e93"} onChange={(e) => setRow(i, { color: e.target.value })}
+            <input type="color" value={c.color || EXT_FARBE} onChange={(e) => setRow(i, { color: e.target.value })}
               title={t("kalender.extColor")} style={{ width: 26, height: 26, padding: 0, border: "none", background: "none", cursor: "pointer", flexShrink: 0 }} />
             <input value={c.url || ""} onChange={(e) => setRow(i, { url: e.target.value })} placeholder="https://…/basic.ics"
               style={{ ...inputStyle, flex: 1, fontSize: 12, minWidth: 0 }} />
@@ -694,7 +698,7 @@ function ExtCalEditor({ cals, onChange, onSave, t }) {
           </div>
         ))}
       </div>
-      <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center" }}>
+      <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
         <button onClick={addRow} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}>
           <Icon d={ICONS.plus} size={14} /> {t("kalender.extAdd")}
         </button>
@@ -705,8 +709,8 @@ function ExtCalEditor({ cals, onChange, onSave, t }) {
   );
 }
 
-const cell = { border: "1px solid var(--border)", minHeight: 84, padding: 6, verticalAlign: "top", background: "var(--card)" };
-const chip = { display: "block", width: "100%", textAlign: "left", fontSize: 11.5, padding: "2px 6px", borderRadius: 6, background: "var(--accent-bg, rgba(10,132,255,0.12))", color: "var(--accent)", border: "none", cursor: "pointer", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
+const cell = { border: "1px solid var(--border)", minHeight: 84, padding: 8, verticalAlign: "top", background: "var(--card)" };
+const chip = { display: "block", width: "100%", textAlign: "left", fontSize: 12, padding: "2px 8px", borderRadius: CONTROL_R, background: "var(--accent-bg, rgba(10,132,255,0.12))", color: "var(--accent)", border: "none", cursor: "pointer", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 // Vorlage aus dem Stundenplan: gestrichelt, gedaempft — anklicken macht daraus einen Termin.
 const ghost = { ...chip, background: "transparent", color: "var(--text3)", border: "1px dashed var(--border2)" };
 
@@ -732,7 +736,7 @@ function ExtChips({ list, onOpen, extColor }) {
   if (!list || !list.length) return null;
   return list.map((ev, i) => (
     <button key={`ext-${i}`} onClick={onOpen ? (e) => { e.stopPropagation(); onOpen(ev); } : undefined} title={ev.title}
-      style={{ display: "block", width: "100%", textAlign: "left", fontSize: 11, color: colOf(ev) || "var(--text3)", background: colOf(ev) ? colOf(ev) + "1e" : "var(--bg2)", border: `1px dashed ${colOf(ev) || "var(--border2)"}`, borderRadius: 6, padding: "1px 5px", margin: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: onOpen ? "pointer" : "default" }}>{(ev.time ? ev.time + " " : "")}<Icon d={ICONS.link} size={11} /> {ev.title || "—"}</button>
+      style={{ display: "block", width: "100%", textAlign: "left", fontSize: 11, color: colOf(ev) || "var(--text3)", background: colOf(ev) ? colOf(ev) + "1e" : "var(--bg2)", border: `1px dashed ${colOf(ev) || "var(--border2)"}`, borderRadius: CONTROL_R, padding: "2px 8px", margin: "4px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: onOpen ? "pointer" : "default" }}>{(ev.time ? ev.time + " " : "")}<Icon d={ICONS.link} size={11} /> {ev.title || "—"}</button>
   ));
 }
 
@@ -742,7 +746,7 @@ function TodoChips({ list, onOpen }) {
   if (!list || !list.length) return null;
   return list.map((td) => (
     <button key={`todo-${td.id}`} onClick={onOpen ? (e) => { e.stopPropagation(); onOpen(); } : undefined} title={td.text}
-      style={{ display: "block", width: "100%", textAlign: "left", fontSize: 11, color: "var(--text)", background: "rgba(52,199,89,0.12)", border: "1px solid rgba(52,199,89,0.5)", borderRadius: 6, padding: "1px 5px", margin: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: onOpen ? "pointer" : "default", textDecoration: td.done ? "line-through" : "none", opacity: td.done ? 0.6 : 1 }}>
+      style={{ display: "block", width: "100%", textAlign: "left", fontSize: 11, color: "var(--text)", background: "rgba(52,199,89,0.12)", border: "1px solid rgba(52,199,89,0.5)", borderRadius: CONTROL_R, padding: "2px 8px", margin: "4px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: onOpen ? "pointer" : "default", textDecoration: td.done ? "line-through" : "none", opacity: td.done ? 0.6 : 1 }}>
       {(td.time ? td.time + " " : "")}✓ {td.text}
     </button>
   ));
@@ -759,10 +763,10 @@ function EntryChips({ list, className, kursName = () => "", topicName, onOpen, c
     const meta = [e.start_time || null, nameOf(e) || null].filter(Boolean).join(" · ");
     return (
       <button key={e.id} onClick={(ev) => { ev.stopPropagation(); onOpen({ ...e, date: new Date(e.date) }); }}
-        style={{ ...chip, whiteSpace: "normal", marginTop: 3, width: "100%", lineHeight: 1.25, ...(col ? { background: col + "22", color: "var(--text)", borderLeft: `3px solid ${col}` } : {}) }}
+        style={{ ...chip, whiteSpace: "normal", marginTop: 4, width: "100%", lineHeight: 1.25, ...(col ? { background: col + "22", color: "var(--text)", borderLeft: `3px solid ${col}` } : {}) }}
         title={[titel, meta].filter(Boolean).join(" — ")}>
         <span style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", fontWeight: 600 }}>{titel}</span>
-        {meta && <span style={{ display: "block", fontSize: 10.5, opacity: 0.72, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{meta}</span>}
+        {meta && <span style={{ display: "block", fontSize: 11, opacity: 0.72, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{meta}</span>}
       </button>
     );
   });
@@ -789,7 +793,7 @@ function HeuteView({ t, tt, weekdayOf, byDay, todoByDay, onTodo, className, slot
 
   return (
     <div>
-      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 14, textTransform: "capitalize" }}>{dateStr}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, textTransform: "capitalize" }}>{dateStr}</div>
       {todoByDay && todoByDay(heute).length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ ...sectionLabel, marginBottom: 6 }}>{t("todo.title")}</div>
@@ -797,7 +801,7 @@ function HeuteView({ t, tt, weekdayOf, byDay, todoByDay, onTodo, className, slot
         </div>
       )}
       {istFrei && (
-        <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(184,134,11,0.12)", color: "#8a6d00", fontSize: 13.5, fontWeight: 600, marginBottom: 14 }}>
+        <div style={{ ...panelStyle, border: "none", padding: "12px 16px", background: "rgba(184,134,11,0.12)", color: C.warning, fontSize: 14, fontWeight: 600, marginBottom: 16 }}>
           {t("kalender.freeDay")}: {istFrei.label || ""}
         </div>
       )}
@@ -807,9 +811,9 @@ function HeuteView({ t, tt, weekdayOf, byDay, todoByDay, onTodo, className, slot
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {allDay.map((e) => (
               <button key={e.id} onClick={() => onOpen({ ...e, date: new Date(e.date) })}
-                style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--accent)", background: "var(--accent-bg, rgba(10,132,255,0.10))", color: "var(--text)", cursor: "pointer" }}>
+                style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 16px", borderRadius: CONTROL_R, border: "1px solid var(--accent)", background: "var(--accent-bg, rgba(10,132,255,0.10))", color: "var(--text)", cursor: "pointer" }}>
                 <span style={{ fontSize: 14, fontWeight: 700 }}>{e.title || (e.class_id && className(e.class_id)) || topicName(e.topic_id) || t("kalender.planned")}{linked(e) ? " ↗" : ""}</span>
-                {e.notes && <span style={{ display: "block", fontSize: 12.5, color: "var(--text3)", marginTop: 2 }}>{e.notes}</span>}
+                {e.notes && <span style={{ display: "block", fontSize: 12, color: "var(--text3)", marginTop: 2 }}>{e.notes}</span>}
               </button>
             ))}
           </div>
@@ -826,10 +830,10 @@ function HeuteView({ t, tt, weekdayOf, byDay, todoByDay, onTodo, className, slot
             const eintrag = eintraege.find((e) => e.period === s.period);
             const absent = s.class_id ? (heuteAbsent[s.class_id] || 0) : 0;
             return (
-              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", border: "1px solid var(--border)", borderLeft: `4px solid ${col}`, borderRadius: 10, background: "var(--card)", flexWrap: "wrap" }}>
+              <div key={s.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderLeft: `4px solid ${col}`, flexWrap: "wrap" }}>
                 <div style={{ minWidth: 46, textAlign: "center" }}>
-                  <div style={{ fontSize: 15, fontWeight: 800 }}>{s.period}.</div>
-                  <div style={{ fontSize: 10.5, color: "var(--text3)" }}>{zeit(s.period)}</div>
+                  <div style={{ fontSize: 16, fontWeight: 800 }}>{s.period}.</div>
+                  <div style={{ fontSize: 11, color: "var(--text3)" }}>{zeit(s.period)}</div>
                 </div>
                 <div style={{ flex: 1, minWidth: 120 }}>
                   <div style={{ fontWeight: 600 }}>{slotName(s) || s.title || topicName(s.topic_id) || "—"}</div>
@@ -843,8 +847,7 @@ function HeuteView({ t, tt, weekdayOf, byDay, todoByDay, onTodo, className, slot
                   )}
                 </div>
                 {orgaAktiv && s.class_id && (
-                  <span title={t("anwesenheit.overview")} style={{ fontSize: 12.5, fontWeight: 700, padding: "3px 10px", borderRadius: 980,
-                    background: absent > 0 ? "rgba(209,53,15,0.12)" : "rgba(10,125,62,0.10)", color: absent > 0 ? C.danger : C.success }}>
+                  <span title={t("anwesenheit.overview")} style={badge(absent > 0 ? C.danger : C.success)}>
                     {absent > 0 ? t("kalender.absentN", { n: absent }) : t("kalender.allPresent")}
                   </span>
                 )}
@@ -852,7 +855,7 @@ function HeuteView({ t, tt, weekdayOf, byDay, todoByDay, onTodo, className, slot
             );
           })}
           {extras.map((e) => (
-            <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", border: "1px dashed var(--border2)", borderRadius: 10, flexWrap: "wrap" }}>
+            <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: "1px dashed var(--border2)", borderRadius: CONTROL_R, flexWrap: "wrap" }}>
               <div style={{ minWidth: 46, textAlign: "center", color: "var(--text3)", fontSize: 12 }}>—</div>
               <button onClick={() => onOpen({ ...e, date: new Date(e.date) })} style={{ ...chip, marginTop: 0, display: "inline-block", width: "auto", maxWidth: "100%" }}>
                 {e.title || (e.class_id && className(e.class_id)) || topicName(e.topic_id) || t("kalender.planned")}
@@ -881,8 +884,8 @@ function MonthGrid({ extColor, range, cursor, byDay, extByDay, todoByDay, onTodo
     <div>
       <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
         <thead><tr>
-          <th style={{ width: 34, padding: 6, fontSize: 11, color: "var(--text3)", textAlign: "center" }}>{t("kalender.kw")}</th>
-          {wdays.map((w) => <th key={w} style={{ padding: 6, fontSize: 12, color: "var(--text3)", textAlign: "left" }}>{w}</th>)}
+          <th style={{ ...th, width: 34 }}>{t("kalender.kw")}</th>
+          {wdays.map((w) => <th key={w} style={{ ...th, textAlign: "left" }}>{w}</th>)}
         </tr></thead>
         <tbody>
           {Array.from({ length: days.length / 7 }).map((_, r) => {
@@ -892,7 +895,7 @@ function MonthGrid({ extColor, range, cursor, byDay, extByDay, todoByDay, onTodo
             <tr key={r}>
               <td style={{ ...cell, padding: 0, textAlign: "center", verticalAlign: "middle", background: "var(--bg)" }}>
                 <button onClick={() => onWeekView(rowMonday)} title={t("kalender.toWeek")}
-                  style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "var(--text3)", width: "100%", height: "100%", padding: "6px 2px" }}>{kw}</button>
+                  style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "var(--text3)", width: "100%", height: "100%", padding: "8px 4px" }}>{kw}</button>
               </td>
               {days.slice(r * 7, r * 7 + 7).map((d) => {
                 const other = d.getMonth() !== cursor.getMonth();
@@ -900,7 +903,7 @@ function MonthGrid({ extColor, range, cursor, byDay, extByDay, todoByDay, onTodo
                 return (
                   <td key={ymd(d)} onClick={(e) => { if (!e.target.closest("button")) onDayView(d); }} title={t("kalender.toDay")}
                     style={{ ...cell, cursor: "pointer", opacity: other ? 0.5 : 1, verticalAlign: "top",
-                      padding: narrow ? "3px 2px" : cell.padding, minHeight: narrow ? 46 : cell.minHeight, height: narrow ? 46 : undefined,
+                      padding: narrow ? 4 : cell.padding, minHeight: narrow ? 46 : cell.minHeight, height: narrow ? 46 : undefined,
                       background: f ? "rgba(184,134,11,0.09)" : undefined, outline: ymd(d) === heute ? "2px solid var(--accent)" : "none", outlineOffset: -2 }}>
                     {narrow ? (
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
@@ -909,9 +912,9 @@ function MonthGrid({ extColor, range, cursor, byDay, extByDay, todoByDay, onTodo
                             statt ihnen — sonst verschwindet ein Termin in den
                             Ferien auch aus der schmalen Monatsansicht. */}
                         <div style={{ display: "flex", gap: 2, flexWrap: "wrap", justifyContent: "center", maxWidth: "100%" }}>
-                          {f && <span style={{ width: 5, height: 5, borderRadius: 5, background: "rgba(184,134,11,0.7)" }} />}
-                          {dotsFor(d).slice(0, 4).map((c, i) => <span key={i} style={{ width: 5, height: 5, borderRadius: 5, background: c }} />)}
-                          {dotsFor(d).length > 4 && <span style={{ fontSize: 8, color: "var(--text3)", lineHeight: "5px" }}>+{dotsFor(d).length - 4}</span>}
+                          {f && <span style={{ width: 5, height: 5, borderRadius: "50%", background: "rgba(184,134,11,0.7)" }} />}
+                          {dotsFor(d).slice(0, 4).map((c, i) => <span key={i} style={{ width: 5, height: 5, borderRadius: "50%", background: c }} />)}
+                          {dotsFor(d).length > 4 && <span style={{ fontSize: 11, color: "var(--text3)", lineHeight: 1 }}>+{dotsFor(d).length - 4}</span>}
                         </div>
                       </div>
                     ) : (<>
@@ -948,7 +951,7 @@ function WeekView({ extColor, range, byDay, extByDay, todoByDay, onTodo, slotsFo
         const f = frei && frei(d);
         return (
         <div key={ymd(d)} onClick={(e) => { if (!e.target.closest("button")) onDayView(d); }} title={t("kalender.toDay")}
-          style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 8, minHeight: 160, background: f ? "rgba(184,134,11,0.09)" : "var(--card)", minWidth: 90, cursor: "pointer" }}>
+          style={{ border: "1px solid var(--border)", borderRadius: CONTROL_R, padding: 8, minHeight: 160, background: f ? "rgba(184,134,11,0.09)" : "var(--card)", minWidth: 90, cursor: "pointer" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
             <button onClick={() => onDayView(d)} title={t("kalender.toDay")} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--text)", padding: 0 }}>{d.toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}</button>
             <button onClick={(e) => { e.stopPropagation(); onAdd(d); }} className="icon-btn" style={{ ...iconBtn, padding: 0 }}><Icon d={ICONS.plus} size={13} color="var(--accent)" /></button>
@@ -976,10 +979,10 @@ function FreiMarker({ label, t }) {
   // An diesen Tagen ist der Stundenplan bewusst ausgeblendet.
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700,
-      color: "#8a6d00", background: "rgba(184,134,11,0.16)", borderRadius: 6, padding: "3px 7px", lineHeight: 1.3,
+      color: C.warning, background: "rgba(184,134,11,0.16)", borderRadius: CONTROL_R, padding: "4px 8px", lineHeight: 1.3,
       maxWidth: "100%", boxSizing: "border-box" }}
       title={label ? `${label} — ${t("kalender.freeDay")}` : t("kalender.freeDay")}>
-      <Icon d={ICONS.sun} size={13} color="#8a6d00" />
+      <Icon d={ICONS.sun} size={13} color={C.warning} />
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label || t("kalender.free")}</span>
     </div>
   );
@@ -1069,10 +1072,10 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
     const c = col || extColor;
     return (
     <button key={key} onClick={onClick}
-      style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 14px", borderRadius: 10, cursor: "pointer",
+      style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 16px", borderRadius: CONTROL_R, cursor: "pointer",
         border: extern ? `1px dashed ${c || "var(--border2)"}` : "1px solid var(--accent)", background: extern ? (c ? c + "1e" : "var(--bg2)") : "var(--accent-bg, rgba(10,132,255,0.10))", color: "var(--text)" }}>
       <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
-      {sub && <span style={{ display: "block", fontSize: 12.5, color: "var(--text3)", marginTop: 2 }}>{sub}</span>}
+      {sub && <span style={{ display: "block", fontSize: 12, color: "var(--text3)", marginTop: 2 }}>{sub}</span>}
     </button>
     );
   };
@@ -1081,8 +1084,8 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
     <div>
       {/* Freier Tag: als Hinweis oben, nicht als Ersatz fuer den ganzen Tag. */}
       {f && (
-        <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(184,134,11,0.12)", color: "#8a6d00", fontSize: 13.5, fontWeight: 600, marginBottom: 14 }}>
-          <Icon d={ICONS.sun} size={14} color="#8a6d00" /> {f.label ? `${f.label} — ${t("kalender.free")}` : t("kalender.free")}
+        <div style={{ ...panelStyle, border: "none", padding: "12px 16px", background: "rgba(184,134,11,0.12)", color: C.warning, fontSize: 14, fontWeight: 600, marginBottom: 16 }}>
+          <Icon d={ICONS.sun} size={14} color={C.warning} /> {f.label ? `${f.label} — ${t("kalender.free")}` : t("kalender.free")}
         </div>
       )}
       {hasBanner && (
@@ -1098,11 +1101,11 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
       {/* Ausgefallene Stunden an diesem Tag: Chip mit Wiederherstellen. */}
       {cancelledFor && cancelledFor(day).length > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-          <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("kalender.cancelledLessons")}:</span>
+          <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("kalender.cancelledLessons")}:</span>
           {cancelledFor(day).map((s) => (
             <button key={s.id} onClick={() => onRestoreSlot(day, s.period)} title={t("kalender.slotRestore")}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, padding: "4px 10px", borderRadius: 980, border: "1px dashed var(--border2)", background: "var(--bg2)", color: "var(--text3)", cursor: "pointer", textDecoration: "line-through" }}>
-              {s.period}. {t("kalender.period")} {slotName(s) || s.title || ""} <span style={{ textDecoration: "none", fontWeight: 700, color: "var(--accent)" }}>↺</span>
+              style={{ ...chipStyle, display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 12px", border: "1px dashed var(--border2)", background: "var(--bg2)", color: "var(--text3)", cursor: "pointer", textDecoration: "line-through" }}>
+              {s.period}. {t("kalender.period")} {slotName(s) || s.title || ""} <Icon d={ICONS.undo} size={13} color="var(--accent)" />
             </button>
           ))}
         </div>
@@ -1118,7 +1121,7 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
 
       {/* Zeitleiste 0–24 Uhr: scrollbar, Start bei 6 Uhr (Ref setzt scrollTop). */}
       {timed.length > 0 && (
-        <div ref={scrollRef} style={{ maxHeight: "62vh", overflowY: "auto", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
+        <div ref={scrollRef} style={{ ...cardStyle, padding: 0, maxHeight: "62vh", overflowY: "auto" }}>
         <div style={{ position: "relative", height: 24 * HOUR }}
           onClick={(ev) => {
             // Klick auf freie Fläche der Zeitleiste öffnet direkt den Editor mit
@@ -1133,7 +1136,7 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
           }}>
           {Array.from({ length: 25 }, (_, h) => (
             <div key={h} style={{ position: "absolute", top: yOf(h * 60), left: 46, right: 0, borderTop: h === 0 || h === 24 ? "none" : "1px solid var(--border)" }}>
-              {h < 24 && <span style={{ position: "absolute", top: -1, left: -44, fontSize: 10.5, color: "var(--text3)" }}>{String(h).padStart(2, "0")}:00</span>}
+              {h < 24 && <span style={{ position: "absolute", top: -1, left: -44, fontSize: 11, color: "var(--text3)" }}>{String(h).padStart(2, "0")}:00</span>}
             </div>
           ))}
           {timed.map((it) => (
@@ -1142,21 +1145,21 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
               width: `calc((100% - 58px) / ${it.lanes || 1} - 3px)` }}>
               <button onClick={it.onClick} title={`${it.label}${it.sub ? " — " + it.sub : ""}`}
                 style={{ position: "absolute", inset: 0, width: "100%", height: "100%",
-                  textAlign: "left", padding: "3px 8px", borderRadius: 6, overflow: "hidden", cursor: "pointer",
+                  textAlign: "left", padding: "4px 8px", borderRadius: CONTROL_R, overflow: "hidden", cursor: "pointer",
                   border: it.dashed ? "1px dashed var(--border2)" : "none", borderLeft: `3px solid ${it.col}`,
                   background: it.dashed ? "var(--bg2)" : it.col + "22", color: "var(--text)" }}>
                 <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.label}</div>
                 {it.sub && <div style={{ fontSize: 11, color: "var(--text2)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.sub}</div>}
               </button>
               {it.onCancel && <button onClick={(e) => { e.stopPropagation(); it.onCancel(); }} title={t("kalender.slotCancel")}
-                style={{ position: "absolute", top: 1, right: 1, width: 17, height: 17, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", background: "var(--card)", color: "var(--text3)", lineHeight: 1, boxShadow: "0 1px 2px rgba(0,0,0,0.15)" }}>
+                style={{ position: "absolute", top: 1, right: 1, width: 18, height: 18, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", border: "none", cursor: "pointer", background: "var(--card)", color: "var(--text3)", lineHeight: 1, boxShadow: SHADOW.ruhig }}>
                 <Icon d={ICONS.close} size={11} /></button>}
             </div>
           ))}
         </div>
         </div>
       )}
-      {!hasBanner && timed.length === 0 && <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("kalender.empty")}</p>}
+      {!hasBanner && timed.length === 0 && <p style={{ fontSize: 14, color: "var(--text3)" }}>{t("kalender.empty")}</p>}
     </div>
   );
 }
@@ -1174,8 +1177,10 @@ function TimetableView({ tt, showTimes = false, className, slotName, slotColor, 
     arr[i] = { ...arr[i], [f]: val };
     onTimes(arr);
   };
-  const timeInput = { width: "100%", boxSizing: "border-box", border: "1px solid var(--border2)", borderRadius: 6, fontSize: 12, padding: "3px 4px", background: "var(--bg)", color: "var(--text)", marginTop: 2 };
-  const tdBase = { border: "1px solid var(--border)", padding: 0, verticalAlign: "top", background: "var(--card)" };
+  const timeInput = { width: "100%", boxSizing: "border-box", border: "1px solid var(--border2)", borderRadius: CONTROL_R, fontSize: 12, padding: 4, background: "var(--bg)", color: "var(--text)", marginTop: 4 };
+  // Zelle des Stundenplans: aus der gemeinsamen Tabellenzelle abgeleitet, nur
+  // Rahmen ringsum statt nur unten (das Raster braucht alle vier Kanten).
+  const tdBase = { ...tdCell, border: "1px solid var(--border)", padding: 0, textAlign: "left", verticalAlign: "top", background: "var(--card)" };
   // Vertikal konstant: Zeilenhoehe = Dauer * px/min. Pausen zwischen den Stunden
   // erscheinen als leere Zwischenzeile derselben Skalierung.
   const toMin = (s) => { const m = /^(\d{1,2}):(\d{2})$/.exec(s || ""); return m ? (+m[1]) * 60 + (+m[2]) : null; };
@@ -1190,8 +1195,8 @@ function TimetableView({ tt, showTimes = false, className, slotName, slotColor, 
       <div>
         <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
           <thead><tr>
-            <th style={{ width: showTimes ? 96 : 26, padding: 6, fontSize: 12, color: "var(--text3)" }}></th>
-            {wdays.map((w) => <th key={w} style={{ padding: 6, fontSize: 12, color: "var(--text3)" }}>{w}</th>)}
+            <th style={{ ...th, width: showTimes ? 96 : 26 }}></th>
+            {wdays.map((w) => <th key={w} style={th}>{w}</th>)}
           </tr></thead>
           <tbody>
             {periods.map((p) => {
@@ -1200,7 +1205,7 @@ function TimetableView({ tt, showTimes = false, className, slotName, slotColor, 
               return (
                 <Fragment key={p}>
                   <tr>
-                    <td style={{ ...tdBase, textAlign: "center", padding: showTimes ? 4 : "4px 2px", background: "transparent", border: "none", width: showTimes ? 96 : 26 }}>
+                    <td style={{ ...tdBase, textAlign: "center", padding: showTimes ? 4 : "4px 0", background: "transparent", border: "none", width: showTimes ? 96 : 26 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>{p}.</div>
                       {showTimes && (<>
                         <input type="time" defaultValue={timeVal(p - 1, "start")} onBlur={(e) => commitTime(p - 1, "start", e.target.value)} style={timeInput} title={t("kalender.start")} />
@@ -1214,7 +1219,7 @@ function TimetableView({ tt, showTimes = false, className, slotName, slotColor, 
                       return (
                         <td key={wd} style={{ ...tdBase, padding: 0, height: h }}>
                           <button onClick={() => onEdit(s ? { ...s } : { weekday: wd, period: p })} title={s ? t("kalender.editSlot") : t("kalender.addSlot")}
-                            style={{ display: "flex", alignItems: "center", justifyContent: s ? "flex-start" : "center", gap: 6, width: "100%", height: "100%", minHeight: h, textAlign: "left", padding: "6px 10px", border: "none", cursor: "pointer", boxSizing: "border-box",
+                            style={{ display: "flex", alignItems: "center", justifyContent: s ? "flex-start" : "center", gap: 6, width: "100%", height: "100%", minHeight: h, textAlign: "left", padding: "8px 12px", border: "none", cursor: "pointer", boxSizing: "border-box",
                               borderLeft: col ? `4px solid ${col}` : "4px solid transparent",
                               background: col ? col + "22" : "transparent", color: col ? "var(--text)" : "var(--text3)" }}>
                             {s ? <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label || "—"}</div>
@@ -1236,8 +1241,8 @@ function TimetableView({ tt, showTimes = false, className, slotName, slotColor, 
             <tr>
               <td style={{ padding: 6, border: "none", textAlign: "center" }}>
                 <div style={{ display: "inline-flex", gap: 4 }}>
-                  {tt.periods > 1 && <button onClick={() => onPeriods(tt.periods - 1)} title={t("kalender.removePeriod")} style={{ ...btnSecondary, padding: "3px 9px", fontSize: 14 }}>−</button>}
-                  <button onClick={() => onPeriods(tt.periods + 1)} title={t("kalender.addPeriod")} style={{ ...btnSecondary, padding: "3px 9px", fontSize: 14 }}>+</button>
+                  {tt.periods > 1 && <button onClick={() => onPeriods(tt.periods - 1)} title={t("kalender.removePeriod")} style={{ ...btnSecondary, ...btnSmall, padding: "4px 12px" }}>−</button>}
+                  <button onClick={() => onPeriods(tt.periods + 1)} title={t("kalender.addPeriod")} style={{ ...btnSecondary, ...btnSmall, padding: "4px 12px" }}>+</button>
                 </div>
               </td>
               {wdays.map((_, wd) => <td key={wd} style={{ border: "none" }} />)}
@@ -1282,14 +1287,14 @@ function ExamMassnahmen({ classId, kursId = null, t }) {
   // man den Fehler in den Daten, während der Endpunkt gar nicht antwortet.
   if (fehler) {
     return (
-      <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8, fontSize: 12.5, color: C.warning }}>
+      <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8, fontSize: 12, color: C.warning }}>
         {t("kalender.examMeasuresError")}
       </div>
     );
   }
   if (!rows.length) {
     return (
-      <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8, fontSize: 12.5, color: "var(--text3)" }}>
+      <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8, fontSize: 12, color: "var(--text3)" }}>
         {gesamt > 0 ? t("kalender.examMeasuresOtherCourse", { n: gesamt }) : t("kalender.examMeasuresNone")}{" "}
         <Link to="/kurse" style={{ color: "var(--accent)" }}>{t("kalender.examMeasuresAdd")}</Link>
       </div>
@@ -1297,17 +1302,17 @@ function ExamMassnahmen({ classId, kursId = null, t }) {
   }
   return (
     <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
-      <button onClick={() => setOffen((v) => !v)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--accent)", fontSize: 12.5, fontWeight: 600 }}>
+      <button onClick={() => setOffen((v) => !v)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--accent)", fontSize: 12, fontWeight: 600 }}>
         {t("kalender.examMeasures", { n: rows.length })}
         <Icon d={ICONS.open} size={11} style={{ transform: offen ? "rotate(-90deg)" : "rotate(90deg)", marginLeft: 4 }} />
       </button>
       {offen && (
-        <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 5 }}>
+        <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
           {rows.map((s) => (
-            <div key={s.student_id} style={{ fontSize: 12.5, color: "var(--text2)" }}>
+            <div key={s.student_id} style={{ fontSize: 12, color: "var(--text2)" }}>
               <strong style={{ color: "var(--text)" }}>{s.name}</strong>{" "}
               {s.massnahmen.map((m, i) => (
-                <span key={i} style={{ marginRight: 6 }}>
+                <span key={i} style={{ marginRight: 4 }}>
                   {m.art}{m.detail ? ` (${m.detail})` : ""}{i < s.massnahmen.length - 1 ? "," : ""}
                 </span>
               ))}
@@ -1357,7 +1362,7 @@ function ExamPanel({ overview, periods = 6, aktiv = {}, onAdd, onUpd, onDel, t }
   };
   return (
     <div>
-      <p style={{ fontSize: 13.5, color: "var(--text2)", margin: "0 0 16px" }}>{t("kalender.examsIntro")}</p>
+      <p style={{ fontSize: 14, color: "var(--text2)", margin: "0 0 16px" }}>{t("kalender.examsIntro")}</p>
 
       {/* Anlegen in der gemeinsamen Bauform (components/Werkzeugleiste.jsx):
           links WAS (Kurs/Klasse), daneben die Felder des Alltags. */}
@@ -1366,45 +1371,45 @@ function ExamPanel({ overview, periods = 6, aktiv = {}, onAdd, onUpd, onDel, t }
           <KursKlasseSelect value={classId === "" ? "" : Number(classId)} kursValue={kursId}
             onChange={(id, kid) => { setClassId(id === "" ? "" : String(id)); setKursId(id === "" ? null : (kid ?? null)); }} onKurs={setKursId} />
         )}
-        style={{ marginBottom: 18 }}
+        style={{ marginBottom: 16 }}
       >
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={dateNavInput} />
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={toolbarInput} />
         <select value={period} onChange={(e) => setPeriod(e.target.value)} title={t("kalender.examPeriodHint")} style={pSel}>
           <option value="">{t("kalender.examAllDay")}</option>
           {pOpts.map((p) => <option key={p} value={p}>{p}. {t("kalender.period")}</option>)}
         </select>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("kalender.examTitle")} style={{ ...dateNavInput, flex: 1, minWidth: 140 }} />
-        <button onClick={save} disabled={!classId || !date} style={{ ...btnPrimary, height: CONTROL_H, padding: "0 16px", opacity: (classId && date) ? 1 : 0.5 }}>{t("common.add")}</button>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("kalender.examTitle")} style={{ ...toolbarInput, flex: 1, minWidth: 140 }} />
+        <button onClick={save} disabled={!classId || !date} style={{ ...toolbarBtnPrimary, opacity: (classId && date) ? 1 : 0.5 }}>{t("common.add")}</button>
       </Werkzeugleiste>
 
       {overview.length === 0 ? (
-        <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("kalender.examsEmpty")}</p>
+        <p style={{ fontSize: 14, color: "var(--text3)" }}>{t("kalender.examsEmpty")}</p>
       ) : overview.map((e) => (
-        <div key={e.id} style={{ padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", marginBottom: 8 }}>
+        <div key={e.id} style={{ ...cardStyle, padding: 12, marginBottom: 8 }}>
          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {editId === e.id ? (
             <>
               <div style={{ flex: 1, minWidth: 0, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                 <KursKlasseSelect value={eClassId === "" ? "" : Number(eClassId)} kursValue={eKursId}
                   onChange={(id, kid) => { setEClassId(id === "" ? "" : String(id)); setEKursId(id === "" ? null : (kid ?? null)); }} onKurs={setEKursId} />
-                <input type="date" value={eDate} onChange={(ev) => setEDate(ev.target.value)} style={dateNavInput} />
+                <input type="date" value={eDate} onChange={(ev) => setEDate(ev.target.value)} style={toolbarInput} />
                 <select value={ePeriod} onChange={(ev) => setEPeriod(ev.target.value)} title={t("kalender.examPeriodHint")} style={pSel}>
                   <option value="">{t("kalender.examAllDay")}</option>
                   {pOpts.map((p) => <option key={p} value={p}>{p}. {t("kalender.period")}</option>)}
                 </select>
-                <input value={eTitle} onChange={(ev) => setETitle(ev.target.value)} placeholder={t("kalender.examTitle")} style={{ ...dateNavInput, flex: 1, minWidth: 120 }} />
+                <input value={eTitle} onChange={(ev) => setETitle(ev.target.value)} placeholder={t("kalender.examTitle")} style={{ ...toolbarInput, flex: 1, minWidth: 120 }} />
               </div>
-              <button onClick={() => saveEdit(e)} style={{ ...btnPrimary, height: CONTROL_H, padding: "0 14px" }}>{t("common.save")}</button>
-              <button onClick={() => setEditId(null)} style={{ ...btnSecondary, height: CONTROL_H, padding: "0 14px" }}>{t("common.abort")}</button>
+              <button onClick={() => saveEdit(e)} style={toolbarBtnPrimary}>{t("common.save")}</button>
+              <button onClick={() => setEditId(null)} style={toolbarBtn}>{t("common.abort")}</button>
             </>
           ) : (
             <>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 15 }}>{e.kurs || e.klasse || "—"}{e.title ? ` · ${e.title}` : ""}</div>
-                <div style={{ fontSize: 12.5, color: "var(--text3)" }}>{new Date(e.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}{e.period ? ` · ${e.period}. ${t("kalender.period")}` : ""}</div>
+                <div style={{ fontWeight: 700, fontSize: 16 }}>{e.kurs || e.klasse || "—"}{e.title ? ` · ${e.title}` : ""}</div>
+                <div style={{ fontSize: 12, color: "var(--text3)" }}>{new Date(e.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}{e.period ? ` · ${e.period}. ${t("kalender.period")}` : ""}</div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontSize: 20, fontWeight: 800, color: "var(--text)" }}>{e.stunden}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>{e.stunden}</div>
                 <div style={{ fontSize: 11, color: "var(--text3)" }}>{t("kalender.examStunden")}</div>
               </div>
               {/* Auto-verknüpfte Auswertung im Modul „Klassenarbeit" öffnen —
@@ -1439,7 +1444,7 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
   const [label, setLabel] = useState("");
   // Eine Höhe, eine Form — Felder einer Leiste kommen aus dem gemeinsamen
   // Baustein (CONTROL_H/CONTROL_R), nicht aus rohem inputStyle.
-  const fld = dateNavInput;
+  const fld = toolbarInput;
   const speichern = () => {
     if (!von) return;
     const ende = bis || von;
@@ -1487,11 +1492,11 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
     setImporting(false);
   };
   return (
-    <div style={standalone ? {} : { marginTop: 26, borderTop: "1px solid var(--border)", paddingTop: 18 }}>
+    <div style={standalone ? {} : { marginTop: 24, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
       {/* Titel nur im eingebetteten Fall (im Stundenplan) — als eigene Seite trägt
           ihn schon der Abschnitts-h1 oben. */}
-      {!standalone && <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{t("kalender.breaksTitle")}</h3>}
-      <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 12px", maxWidth: 620 }}>{t("kalender.breaksHint")}</p>
+      {!standalone && <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{t("kalender.breaksTitle")}</h3>}
+      <p style={{ fontSize: 12, color: "var(--text3)", margin: "0 0 12px", maxWidth: 620 }}>{t("kalender.breaksHint")}</p>
       {/* Ferien/Feiertage sind seltene Massenaktionen — sie ersetzen bestehende
           Zeiträume. Deshalb ins Mehr-Menü und nicht neben das Anlegen-Feld
           (components/Werkzeugleiste.jsx). Links bleibt das Bundesland: es
@@ -1508,29 +1513,29 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
           { key: "feiertage", label: t("kalender.feiertagImport"), icon: ICONS.import, disabled: importing, onClick: feiertagImport },
         ]}
       >
-        <span style={{ fontSize: 11.5, color: "var(--text3)", maxWidth: 340 }}>{t("kalender.ferienHint")}</span>
+        <span style={{ fontSize: 12, color: "var(--text3)", maxWidth: 340 }}>{t("kalender.ferienHint")}</span>
       </Werkzeugleiste>
       <Werkzeugleiste
         links={(
           <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text2)" }}>{t("kalender.from")}
             <input type="date" value={von} onChange={(e) => setVon(e.target.value)} style={fld} /></label>
         )}
-        style={{ marginBottom: 14 }}
+        style={{ marginBottom: 16 }}
       >
         <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text2)" }}>{t("kalender.to")}
           <input type="date" value={bis} onChange={(e) => setBis(e.target.value)} min={von} style={fld} /></label>
         <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t("kalender.breakLabelPlaceholder")} aria-label={t("kalender.breakLabel")} title={t("kalender.breakLabel")} style={{ ...fld, flex: 1, minWidth: 160 }} />
-        <button onClick={speichern} disabled={!von} style={{ ...btnPrimary, height: CONTROL_H, padding: "0 16px", opacity: von ? 1 : 0.5 }}>{t("kalender.addBreak")}</button>
+        <button onClick={speichern} disabled={!von} style={{ ...toolbarBtnPrimary, opacity: von ? 1 : 0.5 }}>{t("kalender.addBreak")}</button>
       </Werkzeugleiste>
       {breaks.length === 0 ? (
         <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("kalender.noBreaks")}</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {breaks.map((b) => (
-            <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--card)" }}>
-              <span style={{ fontSize: 13.5, fontWeight: 600 }}>{b.label || t("kalender.free")}</span>
-              <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{fmt(b.start_date)}{fmt(b.start_date) !== fmt(b.end_date) ? ` – ${fmt(b.end_date)}` : ""}</span>
-              <button onClick={() => onDel(b.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto", padding: 5 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>
+            <div key={b.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, padding: "8px 12px" }}>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>{b.label || t("kalender.free")}</span>
+              <span style={{ fontSize: 12, color: "var(--text3)" }}>{fmt(b.start_date)}{fmt(b.start_date) !== fmt(b.end_date) ? ` – ${fmt(b.end_date)}` : ""}</span>
+              <button onClick={() => onDel(b.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto", padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={16} color={C.danger} /></button>
             </div>
           ))}
         </div>
@@ -1548,11 +1553,11 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onClo
   useEffect(() => { setColor(clsColorOf(kursId, classId)); }, [classId, kursId]); // eslint-disable-line
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
   const sfld = { ...selectStyle, width: "100%", fontSize: 14, padding: "10px 34px 10px 12px" };
-  const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
+  const lbl = { fontSize: 12, color: "var(--text2)", margin: "12px 0 4px" };
   return (
     <Modal onClose={onClose} width={440} label={t("kalender.timetable")}>
-        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 2 }}>{t("kalender.timetable")}</h3>
-        <div style={{ fontSize: 12.5, color: "var(--text3)" }}>{wdays[slot.weekday]} · {slot.period}. {t("kalender.period")}</div>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 2 }}>{t("kalender.timetable")}</h3>
+        <div style={{ fontSize: 12, color: "var(--text3)" }}>{wdays[slot.weekday]} · {slot.period}. {t("kalender.period")}</div>
         <div style={lbl}>{t("kalender.kursOrClass")}</div>
         <KursKlasseSelect value={classId === "" ? "" : Number(classId)} kursValue={slot.kurs_id ?? null} allowNone noneLabel={`– ${t("kalender.noClass")} –`} autoFocus
           onChange={(id, kid) => { setClassId(id === "" ? "" : String(id)); setKursId(id === "" ? null : (kid ?? null)); }}
@@ -1564,12 +1569,12 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onClo
               {/* Farbe NUR lokal ändern — angewendet/gespeichert wird sie erst über
                   „Speichern" (sonst schrieb jeder Zwischenwert des Farbwählers live). */}
               <input type="color" value={color} onChange={(e) => setColor(e.target.value)}
-                style={{ width: 34, height: 28, border: "1px solid var(--border2)", borderRadius: 6, background: "none", cursor: "pointer", padding: 0 }} />
+                style={{ width: CONTROL_H, height: CONTROL_H, border: "1px solid var(--border2)", borderRadius: CONTROL_R, background: "none", cursor: "pointer", padding: 0 }} />
             </label>
             <Link to={`/classes?open=${classId}`} onClick={onClose} style={{ fontSize: 13, color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>{t("kalender.toClass")} ↗</Link>
           </div>
         )}
-        <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center" }}>
           <button onClick={() => {
             // Farbe erst beim Speichern anwenden — und nur, wenn sie sich geändert hat.
             if ((kursId || classId) && color && color !== clsColorOf(kursId, classId)) onColor && onColor(kursId, classId ? Number(classId) : null, color);
@@ -1656,7 +1661,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   }, [methodId, methods]);
   const fld = { ...inputStyle, width: "100%" };
   const sfld = { ...selectStyle, width: "100%", fontSize: 14, padding: "10px 34px 10px 12px" };
-  const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
+  const lbl = { fontSize: 12, color: "var(--text2)", margin: "12px 0 4px" };
   // Siehe core/topics.js — eine Quelle fuer Beschriftung UND Reihenfolge.
   const themen = themenIndex(topics);
   const topicLabel = (tp) => themen.label(tp);
@@ -1680,15 +1685,15 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
     puzzleId && (() => { const p = puzzles.find((x) => x.client_id === puzzleId); return { to: `/code-detektiv/puzzle/${puzzleId}?mode=solo`, label: (p && p.title) || puzzleId, kind: t("kalender.planDetektiv") }; })(),
     methodId && methName && { to: `/unterrichtsplanung?tab=einstiege&open=${methodId}`, label: methName, kind: t("kalender.method"), hideName: true },
   ].filter(Boolean);
-  const zeile = (k, v) => v ? <div style={{ display: "flex", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--border)", fontSize: 13.5 }}><span style={{ color: "var(--text3)", minWidth: 92 }}>{k}</span><span style={{ fontWeight: 500 }}>{v}</span></div> : null;
+  const zeile = (k, v) => v ? <div style={{ display: "flex", gap: 8, padding: "8px 0", borderBottom: "1px solid var(--border)", fontSize: 14 }}><span style={{ color: "var(--text3)", minWidth: 92 }}>{k}</span><span style={{ fontWeight: 500 }}>{v}</span></div> : null;
   return (
     <Modal onClose={onClose} width={460} style={{ padding: 0 }} label={!edit ? (title || clsName || t("kalender.entry")) : ((entry.id || entry.period != null) ? t("kalender.editEntry") : t("kalender.newEntry"))}>
-        <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "flex-start", gap: 12 }}>
+        <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "flex-start", gap: 12 }}>
           <div style={{ flex: 1 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 5 }}>{!edit ? (title || clsName || t("kalender.entry")) : ((entry.id || entry.period != null) ? t("kalender.editEntry") : t("kalender.newEntry"))}</h3>
+            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 5 }}>{!edit ? (title || clsName || t("kalender.entry")) : ((entry.id || entry.period != null) ? t("kalender.editEntry") : t("kalender.newEntry"))}</h3>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              {entry.period != null && <span style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 9px", borderRadius: 980, background: "var(--accent)", color: "#fff" }}>{entry.period}. {t("kalender.period")}</span>}
-              <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{new Date(entry.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>
+              {entry.period != null && <span style={{ ...chipStyle, fontWeight: 700, background: "var(--accent)", color: C.aufAkzent }}>{entry.period}. {t("kalender.period")}</span>}
+              <span style={{ fontSize: 12, color: "var(--text3)" }}>{new Date(entry.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>
             </div>
           </div>
           <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
@@ -1699,7 +1704,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
             {(clsName || topName || startTime || endTime) && (
               <div style={{ marginTop: 4 }}>
                 {clsName && (
-                  <div style={{ display: "flex", gap: 8, fontSize: 13.5, padding: "3px 0" }}>
+                  <div style={{ display: "flex", gap: 8, fontSize: 14, padding: "3px 0" }}>
                     {/* Steht dort ein Kurs (Fach), heißt die Zeile auch so — und
                         der Link führt in den Kurs, nicht in die Klasse. */}
                     <span style={{ color: "var(--text3)", minWidth: 90 }}>{kursId ? t("kurse.one") : t("nav.classes")}</span>
@@ -1714,7 +1719,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
             )}
             {aktiv.orga && classId && (
               <Link to={`/orga?tab=anwesenheit&class=${classId}&date=${ymd(new Date(entry.date))}`} onClick={onClose}
-                style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", textDecoration: "none", color: "var(--accent)", fontSize: 13.5, fontWeight: 600 }}>
+                style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", textDecoration: "none", color: "var(--accent)", fontSize: 14, fontWeight: 600 }}>
                 <Icon d={ICONS.open} size={15} color="var(--accent)" />
                 {t("kalender.toAttendance")}
               </Link>
@@ -1723,7 +1728,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
                 (nur bei aktivem Modul — Regel 3). */}
             {aktiv.auswertung && entry.work_id && classId && (
               <Link to={`/auswertung?tab=klassenarbeit&class=${classId}${kursId ? `&kurs=${kursId}` : ""}&work=${entry.work_id}`} onClick={onClose}
-                style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", textDecoration: "none", color: "var(--accent)", fontSize: 13.5, fontWeight: 600 }}>
+                style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", textDecoration: "none", color: "var(--accent)", fontSize: 14, fontWeight: 600 }}>
                 <Icon d={ICONS.chart} size={15} color="var(--accent)" />
                 {t("kalender.openExamWork")}
               </Link>
@@ -1733,17 +1738,17 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
             {entry.exam_id && classId && <ExamMassnahmen classId={Number(classId)} kursId={kursId ?? null} t={t} />}
             {aktiv.cardvote && aktiv.auswertung && entry.cardvote_set_id && classId && (
               <button onClick={alsNote}
-                style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", cursor: "pointer", color: "var(--accent)", fontSize: 13.5, fontWeight: 600, width: "100%" }}>
+                style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", cursor: "pointer", color: "var(--accent)", fontSize: 14, fontWeight: 600, width: "100%" }}>
                 <Icon d={ICONS.chart} size={15} color="var(--accent)" />
                 {t("kalender.resultAsGrade")}
               </button>
             )}
             {linkList.length > 0 && (
-              <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
                 <div style={lbl}>{t("kalender.openLinked")}</div>
                 {linkList.map((lk) => (
                   <Link key={lk.to} to={lk.to} onClick={onClose}
-                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", textDecoration: "none", color: "var(--accent)", fontSize: 13.5 }}>
+                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", textDecoration: "none", color: "var(--accent)", fontSize: 14 }}>
                     <Icon d={ICONS.open} size={15} color="var(--accent)" />
                     <span style={{ fontWeight: 600, fontSize: lk.hideName ? 13.5 : 11.5, color: lk.hideName ? "var(--accent)" : "var(--text3)" }}>{lk.kind}</span>
                     {!lk.hideName && <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lk.label}</span>}
@@ -1751,25 +1756,25 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
                 ))}
               </div>
             )}
-            {notes && <div style={{ marginTop: 14, fontSize: 13.5, whiteSpace: "pre-wrap", color: "var(--text2)" }}>{notes}</div>}
+            {notes && <div style={{ marginTop: 16, fontSize: 14, whiteSpace: "pre-wrap", color: "var(--text2)" }}>{notes}</div>}
             {verlauf.length > 0 && (
-              <div style={{ marginTop: 14 }}>
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>{t("kalender.verlauf")}</div>
+              <div style={{ marginTop: 16 }}>
+                <div style={{ ...sectionLabel, marginBottom: 8 }}>{t("kalender.verlauf")}</div>
                 {verlauf.map((p, i) => (
-                  <div key={i} style={{ display: "flex", gap: 10, padding: "6px 0", borderTop: i ? "1px solid var(--border)" : "none" }}>
+                  <div key={i} style={{ display: "flex", gap: 8, padding: "8px 0", borderTop: i ? "1px solid var(--border)" : "none" }}>
                     <div style={{ minWidth: 120, flexShrink: 0, display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 13.5, fontWeight: 600 }}>{p.phase || "—"}</span>
+                      <span style={{ fontSize: 14, fontWeight: 600 }}>{p.phase || "—"}</span>
                       {p.dauer && <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap" }}>{p.dauer} min</span>}
                     </div>
-                    <div style={{ flex: 1, fontSize: 13.5, color: "var(--text2)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{p.text}</div>
+                    <div style={{ flex: 1, fontSize: 14, color: "var(--text2)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{p.text}</div>
                   </div>
                 ))}
               </div>
             )}
-            {!clsName && !topName && !methName && !linkList.length && !notes && !verlauf.length && <p style={{ fontSize: 13.5, color: "var(--text3)", marginTop: 8 }}>{t("kalender.emptyEntry")}</p>}
+            {!clsName && !topName && !methName && !linkList.length && !notes && !verlauf.length && <p style={{ fontSize: 14, color: "var(--text3)", marginTop: 8 }}>{t("kalender.emptyEntry")}</p>}
             {/* Material an dieser Stunde — nur beim gespeicherten Eintrag. */}
-            {entry.id && <div style={{ marginTop: 14 }}><MaterialPanel entryId={entry.id} /></div>}
-            <div style={{ display: "flex", gap: 8, marginTop: 20, alignItems: "center" }}>
+            {entry.id && <div style={{ marginTop: 16 }}><MaterialPanel entryId={entry.id} /></div>}
+            <div style={{ display: "flex", gap: 8, marginTop: 24, alignItems: "center" }}>
               <button onClick={() => setEdit(true)} style={btnPrimary}>{t("common.edit")}</button>
               <button onClick={onClose} style={btnSecondary}>{t("common.close")}</button>
               {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
@@ -1812,7 +1817,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         )}
         {(aktiv.cardvote || aktiv.karten || aktiv.lernpfad) && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "18px 0 2px" }}>
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.6px", textTransform: "uppercase", color: "var(--text3)" }}>{t("kalender.planning")}</span>
+            <span style={sectionLabel}>{t("kalender.planning")}</span>
             <span style={{ flex: 1, height: 1, background: "var(--border)" }} />
           </div>
         )}
@@ -1832,7 +1837,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
               <option value="">– {t("kalender.none")} –</option>
               {[...decks].sort(byLabel((d) => d.name)).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
-            {deckId && <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 4 }}>{t("kalender.deckReleaseHint")}</div>}
+            {deckId && <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>{t("kalender.deckReleaseHint")}</div>}
           </>
         )}
         {aktiv.lernpfad && (
@@ -1866,13 +1871,13 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
           ].filter(Boolean);
           if (!links.length) return null;
           return (
-            <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
               <div style={lbl}>{t("kalender.openLinked")}</div>
               {links.map((lk) => (
                 <Link key={lk.to} to={lk.to} onClick={onClose}
-                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", textDecoration: "none", color: "var(--accent)", fontSize: 13.5 }}>
+                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", textDecoration: "none", color: "var(--accent)", fontSize: 14 }}>
                   <Icon d={ICONS.open} size={15} color="var(--accent)" />
-                  <span style={{ color: "var(--text3)", fontSize: 11.5 }}>{lk.icon}</span>
+                  <span style={{ color: "var(--text3)", fontSize: 12 }}>{lk.icon}</span>
                   <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lk.label}</span>
                 </Link>
               ))}
@@ -1887,22 +1892,22 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
           <span style={{ flex: 1 }}>{t("kalender.verlauf")}</span>
           <button onClick={addPhase} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("kalender.verlaufAdd")} aria-label={t("kalender.verlaufAdd")}><Icon d={ICONS.plus} size={15} color="var(--accent)" /></button>
         </div>
-        {verlauf.length === 0 && <div style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 4 }}>{t("kalender.verlaufEmpty")}</div>}
+        {verlauf.length === 0 && <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 4 }}>{t("kalender.verlaufEmpty")}</div>}
         {verlauf.map((p, i) => (
-          <div key={i} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 8, marginBottom: 6, background: "var(--bg)" }}>
+          <div key={i} style={{ ...panelStyle, padding: 8, marginBottom: 8, background: "var(--bg)" }}>
             <div style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center" }}>
-              <input value={p.phase} onChange={(e) => setPhase(i, "phase", e.target.value)} placeholder={t("kalender.verlaufPhase")} style={{ ...fld, flex: 1, padding: "6px 8px" }} />
-              <input type="number" min="0" value={p.dauer} onChange={(e) => setPhase(i, "dauer", e.target.value)} placeholder={t("kalender.verlaufDauer")} style={{ ...fld, width: 56, padding: "6px 8px" }} />
+              <input value={p.phase} onChange={(e) => setPhase(i, "phase", e.target.value)} placeholder={t("kalender.verlaufPhase")} style={{ ...fld, flex: 1, padding: 8 }} />
+              <input type="number" min="0" value={p.dauer} onChange={(e) => setPhase(i, "dauer", e.target.value)} placeholder={t("kalender.verlaufDauer")} style={{ ...fld, width: 56, padding: 8 }} />
               <span style={{ fontSize: 12, color: "var(--text3)", flexShrink: 0 }}>min</span>
-              <button onClick={() => movePhase(i, -1)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title="↑" disabled={i === 0}><span style={{ color: i === 0 ? "var(--text3)" : "var(--text2)" }}>↑</span></button>
-              <button onClick={() => movePhase(i, 1)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title="↓" disabled={i === verlauf.length - 1}><span style={{ color: i === verlauf.length - 1 ? "var(--text3)" : "var(--text2)" }}>↓</span></button>
-              <button onClick={() => delPhase(i)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button>
+              <button onClick={() => movePhase(i, -1)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title="↑" disabled={i === 0}><Icon d={ICONS.arrowUp} size={14} color={i === 0 ? "var(--text3)" : "var(--text2)"} /></button>
+              <button onClick={() => movePhase(i, 1)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title="↓" disabled={i === verlauf.length - 1}><Icon d={ICONS.arrowDown} size={14} color={i === verlauf.length - 1 ? "var(--text3)" : "var(--text2)"} /></button>
+              <button onClick={() => delPhase(i)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button>
             </div>
-            <textarea value={p.text} onChange={(e) => setPhase(i, "text", e.target.value)} rows={2} placeholder={t("kalender.verlaufText")} style={{ ...fld, resize: "vertical", padding: "6px 8px" }} />
+            <textarea value={p.text} onChange={(e) => setPhase(i, "text", e.target.value)} rows={2} placeholder={t("kalender.verlaufText")} style={{ ...fld, resize: "vertical", padding: 8 }} />
           </div>
         ))}
 
-        <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center" }}>
           <button onClick={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, title, notes, start_time: startTime || "", end_time: endTime || "", verlaufsplan: verlauf.filter((p) => (p.phase || p.text || p.dauer)).map((p) => ({ phase: p.phase || "", dauer: p.dauer || "", text: p.text || "" })), class_id: classId ? Number(classId) : null, kurs_id: classId ? (kursId ?? null) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })} disabled={timeInvalid} style={{ ...btnPrimary, opacity: timeInvalid ? 0.5 : 1 }}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
           {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}

@@ -108,7 +108,8 @@ import { istAdmin } from "./core/admin.js";
 import { DialogHost } from "./core/dialog.jsx";
 import { UndoHost } from "./core/undo.jsx";
 import { OutboxHost } from "./core/OutboxHost.jsx";
-import { btnPrimary, btnSecondary, btnSmall, Skeleton, Modal, pageForm, pageTitle, pageIntro } from "./components/Icons.jsx";
+import { btnPrimary, btnSecondary, btnSmall, Skeleton, Modal, pageForm, pageTitle, pageIntro,
+  COLORS as C, Icon, ICONS, iconBtn, cardStyle, chipStyle, menuRow, popoverPanel, SHADOW, CONTROL_R } from "./components/Icons.jsx";
 
 // Alle uebrigen Seiten kommen erst beim Aufruf ueber die Leitung. Vorher lag
 // jedes Modul im selben Bundle: wer nur den Kalender oeffnet, lud auch Scanner,
@@ -190,7 +191,7 @@ class LadeFehler extends React.Component {
     if (!this.state.fehler) return this.props.children;
     return (
       <div style={{ padding: "48px 16px", textAlign: "center" }}>
-        <p style={{ fontSize: 15, color: "var(--text2)", marginBottom: 16, lineHeight: 1.6 }}>
+        <p style={{ fontSize: 14, color: "var(--text2)", marginBottom: 16, lineHeight: 1.6 }}>
           Diese Seite konnte nicht geladen werden. Meist liegt es an einer neuen Version oder einer kurzen Netzstörung.
         </p>
         <button onClick={() => { try { sessionStorage.removeItem("nuvora_chunk_reload"); } catch { /* egal */ } window.location.reload(); }} style={btnPrimary}>Neu laden</button>
@@ -516,15 +517,13 @@ function ConnectionMonitor() {
   return (
     <div style={{
       position: "fixed", top: 0, left: 0, right: 0, zIndex: 200, minHeight: 34,
-      background: "#d1350f", color: "#fff",
-      display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+      background: C.danger, color: C.aufAkzent,
+      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
       padding: "6px 14px", fontSize: 13, fontWeight: 600, textAlign: "center",
-      boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
+      boxShadow: SHADOW.schwebend,
     }}>
       <style>{`@keyframes cmspin{to{transform:rotate(360deg)}}`}</style>
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" style={{ animation: "cmspin 0.9s linear infinite", flexShrink: 0 }}>
-        <path d="M21 12a9 9 0 1 1-6.2-8.5"/>
-      </svg>
+      <Icon d={ICONS.spinner} size={15} color={C.aufAkzent} style={{ animation: "cmspin 0.9s linear infinite", flexShrink: 0 }} />
       <span>{text}</span>
     </div>
   );
@@ -539,18 +538,12 @@ function DarkModeToggle() {
     schreib("darkMode", String(next));
   };
   return (
-    <button onClick={toggle} style={{
-      background: "none", border: "none", cursor: "pointer", padding: 6,
-      lineHeight: 1, borderRadius: 8, flexShrink: 0, color: "var(--text2)",
-    }} title={dark ? "Light Mode" : "Dark Mode"}>
+    <button onClick={toggle} className="icon-btn" style={{ ...iconBtn, flexShrink: 0, color: "var(--text2)" }}
+      title={dark ? "Light Mode" : "Dark Mode"}>
       {dark ? (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-        </svg>
+        <Icon d={ICONS.sun} size={20} color="currentColor" />
       ) : (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-        </svg>
+        <Icon d={ICONS.moon} size={20} color="currentColor" />
       )}
     </button>
   );
@@ -648,7 +641,7 @@ function Nav({ user, onLogout }) {
         <NavLink to="/" data-tour="home" onClick={() => setMenuOpen(false)} style={{ textDecoration: "none", flexShrink: 0 }}>
           <div style={{
             fontWeight: 700,
-            fontSize: 20,
+            fontSize: 22,
             marginRight: 8,
             color: "var(--text)",
             letterSpacing: "-0.5px",
@@ -661,22 +654,19 @@ function Nav({ user, onLogout }) {
           <button
             className="nav-burger"
             onClick={() => setMenuOpen(!menuOpen)}
-            style={{
-              display: "none", background: "none", border: "none", cursor: "pointer",
-              padding: 6, fontSize: 20, color: "var(--text)", lineHeight: 1, borderRadius: 8,
-            }}
+            style={{ ...iconBtn, display: "none", color: "var(--text)" }}
           >
             {menuOpen ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              <Icon d={ICONS.close} size={20} color="currentColor" />
             ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+              <Icon d={ICONS.menu} size={20} color="currentColor" />
             )}
           </button>
         )}
 
         {showNav && (
           <span className="nav-page-title" style={{
-            display: "none", fontSize: 15, fontWeight: 600, color: "var(--text)",
+            display: "none", fontSize: 16, fontWeight: 600, color: "var(--text)",
             flex: 1, textAlign: "center",
           }}>
             {pageTitle}
@@ -688,7 +678,7 @@ function Nav({ user, onLogout }) {
             ueber die Startseite. */}
         {showNav && <span className="nav-links-desktop" style={{ display: "flex", flexShrink: 0, marginLeft: 6 }}><ModulWechsler /></span>}
 
-        <div data-tour="modules" className={showNav ? "nav-links-desktop" : ""} style={{ display: showNav ? "flex" : "block", gap: 2, overflow: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none", flex: 1, minWidth: 0, marginLeft: 8 }}>
+        <div data-tour="modules" className={showNav ? "nav-links-desktop" : ""} style={{ display: showNav ? "flex" : "block", gap: 4, overflow: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none", flex: 1, minWidth: 0, marginLeft: 8 }}>
           {showNav && navItems.map((item) => {
             const isActive = item.active !== undefined ? item.active : location.pathname.startsWith(item.to.split("?")[0]) && !item.to.includes("?");
             return (
@@ -697,7 +687,7 @@ function Nav({ user, onLogout }) {
                 to={item.to}
                 style={{
                   padding: "6px 12px",
-                  borderRadius: 980,
+                  borderRadius: chipStyle.borderRadius,
                   textDecoration: "none",
                   fontSize: 14,
                   fontWeight: isActive ? 600 : 400,
@@ -721,7 +711,7 @@ function Nav({ user, onLogout }) {
         <DarkModeToggle />
         <NavLink to={user ? "/profile" : "/login"} data-tour="profile" onClick={() => { setMenuOpen(false); if (!user) window.dispatchEvent(new Event("cardvote:reset-login-mode")); }} style={{
           padding: 6,
-          borderRadius: 980,
+          borderRadius: chipStyle.borderRadius,
           textDecoration: "none",
           fontSize: 14,
           fontWeight: 500,
@@ -729,21 +719,25 @@ function Nav({ user, onLogout }) {
           background: "transparent",
           whiteSpace: "nowrap",
           flexShrink: 0,
-          display: "flex", alignItems: "center", gap: 6,
+          display: "flex", alignItems: "center", gap: 8,
         }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/>
-          </svg>
+          <Icon d={ICONS.user} size={22} color="currentColor" />
           <span className="nav-profile-name">{user ? t("nav.profile") : t("nav.login")}</span>
         </NavLink>
       </nav>
 
       {showNav && menuOpen && (
+        // Dasselbe Panel wie jedes andere Menue (popoverPanel), nur als volle
+        // Flaeche: die Ecken oben wuerden am Bildschirmrand nur stoeren.
         <div className="nav-mobile-menu" style={{
-          position: "fixed", top: 52, left: 0, right: 0, bottom: 0, zIndex: 99,
+          ...popoverPanel,
+          position: "fixed", top: 52, left: 0, right: 0, bottom: 0, zIndex: 99, maxWidth: "none",
+          // Kein Radius-Token, sondern gar keine Ecken: das Panel geht von Rand
+          // zu Rand, gerundete Ecken haetten dort nichts, woran sie sitzen.
+          borderRadius: "unset", border: "none", borderTop: "1px solid var(--border)",
           background: "var(--nav-bg)", backdropFilter: "saturate(180%) blur(20px)",
           WebkitBackdropFilter: "saturate(180%) blur(20px)",
-          padding: "8px 16px",
+          padding: 8,
         }}>
           {navItems.map((item) => {
             const isActive = item.active !== undefined ? item.active : location.pathname.startsWith(item.to.split("?")[0]) && !item.to.includes("?");
@@ -753,11 +747,11 @@ function Nav({ user, onLogout }) {
                 to={item.to}
                 onClick={() => setMenuOpen(false)}
                 style={{
-                  display: "block", padding: "14px 16px", borderRadius: 12,
-                  textDecoration: "none", fontSize: 17, fontWeight: isActive ? 700 : 500,
+                  ...menuRow, padding: 12, borderRadius: CONTROL_R,
+                  textDecoration: "none", fontSize: 16, fontWeight: isActive ? 700 : 500,
                   color: isActive ? "var(--text)" : "var(--text2)",
                   background: isActive ? "var(--bg2)" : "transparent",
-                  marginBottom: 2,
+                  marginBottom: 4,
                 }}
               >
                 {item.label}
@@ -822,8 +816,8 @@ function FirstRun({ user }) {
     // Der allererste Dialog einer neuen Lehrkraft — deshalb ueber dieselbe
     // Modal-Komponente wie alle anderen: Fokus faengt darin, Escape schliesst,
     // der Hintergrund scrollt nicht.
-    <Modal onClose={() => done()} width={440} title={t("onboard.title")} titleStyle={{ fontSize: 20, marginBottom: 8 }}
-      style={{ borderRadius: 20, padding: 28 }} overlayStyle={{ zIndex: 300 }}>
+    <Modal onClose={() => done()} width={440} title={t("onboard.title")} titleStyle={{ fontSize: 22, marginBottom: 8 }}
+      style={{ padding: 24 }} overlayStyle={{ zIndex: 300 }}>
       <p style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.6, marginBottom: 20 }}>{t("onboard.text")}</p>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button onClick={startGuided} style={btnPrimary}>{t("onboard.tour")}</button>
@@ -1003,9 +997,7 @@ function UpdateBanner() {
       position: "fixed", left: 16, right: 16, bottom: 16, zIndex: 250,
       maxWidth: 460, margin: "0 auto",
       display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
-      padding: "10px 14px", borderRadius: 14,
-      background: "var(--card)", border: "1px solid var(--border)",
-      boxShadow: "0 6px 24px rgba(0,0,0,0.14)",
+      ...cardStyle, padding: 12, boxShadow: SHADOW.schwebend,
       fontSize: 13, color: "var(--text2)",
     }}>
       <span style={{ flex: 1, minWidth: 160 }}>Eine neue Version steht bereit.</span>
@@ -1044,9 +1036,7 @@ function SpeicherHinweis() {
       position: "fixed", left: 16, right: 16, bottom: 16, zIndex: 260,
       maxWidth: 520, margin: "0 auto",
       display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap",
-      padding: "12px 14px", borderRadius: 14,
-      background: "var(--card)", border: "1px solid var(--border)",
-      boxShadow: "0 6px 24px rgba(0,0,0,0.14)",
+      ...cardStyle, padding: 12, boxShadow: SHADOW.schwebend,
       fontSize: 13, color: "var(--text2)", lineHeight: 1.5,
     }}>
       <span style={{ flex: 1, minWidth: 200 }}>

@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { COLORS as C, Icon, ICONS, toolbarIconBtn } from "../components/Icons.jsx";
+import {
+  ANTWORT_COLORS, COLORS as C, Icon, ICONS, PODIUM_COLORS, Tabs, chipStyle, panelStyle,
+  sectionLabel, selectStyle, th as thBasis, toolbarIconBtn, cardStyle, CONTROL_R,
+  btnPrimary as btnPrimaryKern, btnSecondary as btnSecondaryKern, btnSmall,
+} from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { askPrompt } from "../core/dialog.jsx";
 import { useParams, useNavigate } from "react-router-dom";
@@ -8,30 +12,15 @@ import { useLanguage } from "../i18n/index.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 
 const API = "/api";
-const COLORS = { A: "#0066cc", B: "#5856d6", C: C.warning, D: C.danger };
-const PODIUM_COLORS = ["#FFD700", "#C0C0C0", "#CD7F32"];
+// Antwort- und Podiumsfarben kommen aus dem Kern (ANTWORT_COLORS,
+// PODIUM_COLORS) — hier standen sie doppelt, die Podiumsfarben sogar zweimal
+// in derselben Datei.
 
-const SvgGamepad = ({ size = 16, color = "currentColor" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: "inline-block", verticalAlign: "-2px" }}>
-    <rect x="2" y="6" width="20" height="12" rx="3"/><path d="M6 12h4M8 10v4"/><circle cx="16" cy="10" r="1" fill={color} stroke="none"/><circle cx="18" cy="12" r="1" fill={color} stroke="none"/>
-  </svg>
-);
-
-const SvgTrophy = ({ size = 16, color = "currentColor" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: "inline-block", verticalAlign: "-2px" }}>
-    <path d="M6 9H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2M18 9h2a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><path d="M6 3h12v6a6 6 0 0 1-12 0V3z"/><path d="M12 15v3"/><path d="M8 21h8"/><path d="M8 21v-3h8v3"/>
-  </svg>
-);
-
-const SvgFlame = ({ size = 12, color = "#ff9500" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke="none" style={{ display: "inline-block", verticalAlign: "-1px" }}>
-    <path d="M12 2c0 4-4 6-4 10a4 4 0 0 0 8 0c0-4-4-6-4-10z"/>
-  </svg>
-);
-
+// Gamepad und Pokal kommen jetzt aus ICONS. Geblieben sind die zwei Bilder,
+// die `Icon` nicht zeichnen kann, weil sie eine FLAECHE brauchen:
+// die Flamme (Serie) und die Medaille (Platzzahl im farbigen Kreis).
 const SvgMedal = ({ place, size = 24 }) => {
-  const colors = ["#FFD700", "#C0C0C0", "#CD7F32"];
-  const c = colors[place] || colors[2];
+  const c = PODIUM_COLORS[place] || PODIUM_COLORS[2];
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ display: "inline-block", verticalAlign: "-4px" }}>
       <circle cx="12" cy="14" r="7" fill={c} opacity="0.2" stroke={c} strokeWidth="1.5"/>
@@ -407,37 +396,30 @@ export default function Session() {
           <button onClick={async () => {
             const code = await askPrompt(t("session.codePrompt"));
             if (code && code.trim()) navigate(`/cardvote/scan?session=${code.trim().replace(/\D/g, "").slice(0, 4)}`);
-          }} style={{
-            display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", fontSize: 14, fontWeight: 600, cursor: "pointer",
-            background: "var(--card)", color: "var(--text)", border: "1px solid var(--border2)", borderRadius: 980,
-          }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          }} style={{ ...btnSecondaryKern, display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 600 }}>
+            <Icon d={ICONS.camera} size={18} />
             {t("session.joinScanner")}
           </button>
         </div>
 
         {activeSessions.length > 0 && (
-          <div style={{ marginBottom: 28, padding: 20, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.8px" }}>{t("session.open")}</div>
+          <div style={{ ...panelStyle, marginBottom: 24, padding: 20 }}>
+            <div style={{ ...sectionLabel, color: "var(--accent)", marginBottom: 12 }}>{t("session.open")}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {activeSessions.map((s) => (
-                <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "var(--card)", borderRadius: 12, border: "1px solid var(--border)" }}>
+                <div key={s.id} style={{ ...panelStyle, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "var(--card)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    {s.mode === "game" && <SvgGamepad size={16} color="var(--text3)" />}
+                    {s.mode === "game" && <Icon d={ICONS.gamepad} size={16} color="var(--text3)" />}
                     <span style={{ fontWeight: 600, color: "var(--text)", fontSize: 14 }}>{s.name || `Session #${s.code}`}</span>
                   </div>
                   {s.mode === "game" ? (
-                    <button onClick={async () => { await fetch(`${API}/sessions/${s.id}/finish`, { method: "POST" }); setActiveSessions((prev) => prev.filter((x) => x.id !== s.id)); }} style={{
-                      padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
-                      background: C.danger, color: "white", border: "none", borderRadius: 980,
-                    }}>
+                    <button onClick={async () => { await fetch(`${API}/sessions/${s.id}/finish`, { method: "POST" }); setActiveSessions((prev) => prev.filter((x) => x.id !== s.id)); }}
+                      style={{ ...btnPrimaryKern, ...btnSmall, background: C.danger, color: C.aufAkzent }}>
                       {t("session.finish")}
                     </button>
                   ) : (
-                    <button onClick={() => resumeSession(s)} style={{
-                      padding: "7px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
-                      background: "var(--accent)", color: "white", border: "none", borderRadius: 980,
-                    }}>
+                    <button onClick={() => resumeSession(s)}
+                      style={{ ...btnPrimaryKern, ...btnSmall, background: "var(--accent)", color: C.aufAkzent }}>
                       {t("session.resume")}
                     </button>
                   )}
@@ -453,13 +435,13 @@ export default function Session() {
           {classes.length === 0 ? (
             <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("session.noClasses")} <a href="/classes" style={{ color: "var(--accent)" }}>{t("session.createClass")}</a></p>
           ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               {/* Kurs zuerst, dann Fach — derselbe Selektor wie überall. Für die
                   Live-Session wird eine konkrete Fach-Klasse gebraucht. */}
               <KursKlasseSelect value={selectedClass?.id ?? ""}
                 onChange={(id) => setSelectedClass(classes.find((c) => c.id === Number(id)) || null)} />
               {selectedClass && (
-                <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{(selectedClass.students || []).length} {t("classes.learners")}</span>
+                <span style={{ fontSize: 13, color: "var(--text3)" }}>{(selectedClass.students || []).length} {t("classes.learners")}</span>
               )}
             </div>
           )}
@@ -480,26 +462,11 @@ export default function Session() {
           <div style={stepCard}>
             <div style={stepLabel}>{t("session.step3")}</div>
 
-            <div style={{ display: "inline-flex", gap: 2, marginBottom: 16, background: "var(--bg2)", padding: 3, borderRadius: 980 }}>
-              <button onClick={() => setGameMode(false)} style={{
-                padding: "8px 18px", fontSize: 14, fontWeight: !gameMode ? 600 : 400, cursor: "pointer", borderRadius: 980,
-                border: "none",
-                background: !gameMode ? "var(--card)" : "transparent",
-                color: !gameMode ? "var(--text)" : "var(--text2)",
-                transition: "all 0.2s",
-              }}>
-                {t("session.test")}
-              </button>
-              <button onClick={() => setGameMode(true)} style={{
-                padding: "8px 18px", fontSize: 14, fontWeight: gameMode ? 600 : 400, cursor: "pointer", borderRadius: 980,
-                border: "none",
-                background: gameMode ? "var(--card)" : "transparent",
-                color: gameMode ? "var(--text)" : "var(--text2)",
-                transition: "all 0.2s", display: "flex", alignItems: "center", gap: 6,
-              }}>
-                {t("session.game")}
-              </button>
-            </div>
+            {/* Test/Spiel ist ein Zwei-Zustands-Umschalter — also `Tabs` aus
+                dem Kern statt eines eigenen Pillen-Nachbaus. */}
+            <Tabs value={gameMode ? "game" : "test"} onChange={(v) => setGameMode(v === "game")}
+              style={{ marginBottom: 16 }}
+              options={[["test", t("session.test")], ["game", t("session.game")]]} />
 
             {gameMode && (
               <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 12, lineHeight: 1.5 }}>
@@ -507,16 +474,15 @@ export default function Session() {
               </p>
             )}
 
-            <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 14 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer", marginBottom: 16 }}>
               <input type="checkbox" checked={showAnswers} onChange={(e) => setShowAnswers(e.target.checked)}
                 style={{ width: 18, height: 18, accentColor: "var(--accent)" }} />
               <span style={{ fontSize: 14, color: "var(--text)" }}>{t("session.showAnswers")}</span>
             </label>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
               <span style={{ fontSize: 14, color: "var(--text)" }}>{t("session.timer")}</span>
-              <select value={timerSeconds} onChange={(e) => setTimerSeconds(Number(e.target.value))}
-                style={{ padding: "6px 12px", borderRadius: 10, border: "1px solid var(--border2)", fontSize: 14, background: "var(--input-bg)", color: "var(--text)" }}>
+              <select value={timerSeconds} onChange={(e) => setTimerSeconds(Number(e.target.value))} style={selectStyle}>
                 <option value={0}>{gameMode ? t("session.unlimited") : t("session.noTimer")}</option>
                 <option value={15}>{t("session.seconds", { n: 15 })}</option>
                 <option value={30}>{t("session.seconds", { n: 30 })}</option>
@@ -544,11 +510,12 @@ export default function Session() {
   if (!started) {
     return (
       <div style={{ textAlign: "center", paddingTop: 40 }}>
-        {gameMode && <div style={{ marginBottom: 8 }}><SvgGamepad size={48} color="var(--text3)" /></div>}
+        {gameMode && <div style={{ marginBottom: 8 }}><Icon d={ICONS.gamepad} size={48} color="var(--text3)" /></div>}
         <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{[selectedClass?.name, selectedSet?.name].filter(Boolean).join(" — ")}</h2>
         <div style={{
           display: "inline-block", padding: "12px 24px",
-          background: "var(--text)", color: "var(--bg)", borderRadius: 12,
+          background: "var(--text)", color: "var(--bg)", borderRadius: CONTROL_R,
+          // 28 px bewusst: der Sitzungscode wird vom Beamer abgelesen.
           fontSize: 28, fontWeight: 700, marginBottom: 16, fontFamily: "monospace", letterSpacing: 1,
         }}>
           {sessionCode}
@@ -560,16 +527,16 @@ export default function Session() {
             {t("session.minusHint")}
           </p>
         )}
-        <p style={{ color: "var(--text2)", marginBottom: 8, fontSize: 15 }}>
+        <p style={{ color: "var(--text2)", marginBottom: 8, fontSize: 16 }}>
           {t("session.codeHint")}
         </p>
         <div style={{ marginBottom: 16 }}>
           <img src={`${API}/sessions/${sessionId}/qr`} alt="QR Code"
-            style={{ width: 160, height: 160, borderRadius: 12, border: "1px solid var(--border3)" }}
+            style={{ width: 160, height: 160, borderRadius: CONTROL_R, border: "1px solid var(--border3)" }}
             onError={(e) => { e.target.style.display = "none"; e.target.nextSibling.style.display = "none"; }} />
           <p style={{ color: "var(--text3)", fontSize: 12, marginTop: 4 }}>{t("session.qrHint")}</p>
         </div>
-        <p style={{ color: "var(--text2)", marginBottom: 24, fontSize: 15 }}>
+        <p style={{ color: "var(--text2)", marginBottom: 24, fontSize: 16 }}>
           {t("session.countsLine", { q: questions.length, s: studentList.length })}
           {gameMode && ` ${t("session.timerSuffix", { t: timerSeconds })}`}
         </p>
@@ -605,14 +572,14 @@ export default function Session() {
       if (getrennteListen) {
         return (
           <div style={{ textAlign: "center", paddingTop: 20 }}>
-            <h2 style={{ fontSize: 28, fontWeight: 800, color: "var(--text)", marginBottom: 8 }}><SvgTrophy size={26} /> {t("session.finalResult")}</h2>
-            <p style={{ color: "var(--text3)", marginBottom: 24, fontSize: 15 }}>{selectedClass?.name} — {selectedSet?.name}</p>
-            <div style={{ display: "flex", gap: 20, justifyContent: "center", flexWrap: "wrap" }}>
+            <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", marginBottom: 8 }}><Icon d={ICONS.trophy} size={26} /> {t("session.finalResult")}</h2>
+            <p style={{ color: "var(--text3)", marginBottom: 24, fontSize: 16 }}>{selectedClass?.name} — {selectedSet?.name}</p>
+            <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
               {boards.map(([niv, list]) => (
                 <div key={niv} style={{ minWidth: 260, maxWidth: 360, textAlign: "left" }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text3)", marginBottom: 8, textAlign: "center" }}>{niv}-Kurs</div>
                   {list.map((p, i) => (
-                    <div key={p.id} style={{ display: "flex", justifyContent: "space-between", padding: "10px 16px", background: i < 3 ? `${PODIUM_COLORS[i]}22` : "var(--bg2)", borderRadius: 10, marginBottom: 6 }}>
+                    <div key={p.id} style={{ display: "flex", justifyContent: "space-between", padding: "10px 16px", background: i < 3 ? `${PODIUM_COLORS[i]}22` : "var(--bg2)", borderRadius: CONTROL_R, marginBottom: 6 }}>
                       <span style={{ color: "var(--text3)", fontWeight: 600, width: 26, textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{i + 1}.</span>
                       <span style={{ flex: 1, marginLeft: 8, color: "var(--text)" }}>{p.name}</span>
                       <span style={{ fontWeight: 700, color: "var(--text)" }}>{p.points}</span>
@@ -621,7 +588,7 @@ export default function Session() {
                 </div>
               ))}
             </div>
-            <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 32 }}>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 32 }}>
               <button onClick={() => navigate(`/cardvote/evaluation/${sessionId}`)} style={{ ...btnPrimary, padding: "10px 20px" }}>{t("session.detailEval")}</button>
               <button onClick={() => navigate("/cardvote/tests")} style={{ ...btnSecondary, padding: "10px 20px" }}>{t("session.allTests")}</button>
             </div>
@@ -632,8 +599,8 @@ export default function Session() {
       const rest = leaderboard.slice(3);
       return (
         <div style={{ textAlign: "center", paddingTop: 20 }}>
-          <h2 style={{ fontSize: 32, fontWeight: 800, color: "var(--text)", marginBottom: 8 }}><SvgTrophy size={28} /> {t("session.finalResult")}</h2>
-          <p style={{ color: "var(--text3)", marginBottom: 32, fontSize: 15 }}>{selectedClass?.name} — {selectedSet?.name}</p>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", marginBottom: 8 }}><Icon d={ICONS.trophy} size={28} /> {t("session.finalResult")}</h2>
+          <p style={{ color: "var(--text3)", marginBottom: 32, fontSize: 16 }}>{selectedClass?.name} — {selectedSet?.name}</p>
           <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", gap: 16, marginBottom: 40 }}>
             {[1, 0, 2].map((rank) => {
               const p = top[rank];
@@ -642,12 +609,14 @@ export default function Session() {
               return (
                 <div key={rank} style={{ textAlign: "center", animation: "slideUp 0.5s ease" }}>
                   <div style={{ marginBottom: 8 }}><SvgMedal place={rank} size={rank === 0 ? 48 : 32} /></div>
-                  <div style={{ fontWeight: 700, fontSize: rank === 0 ? 18 : 15, color: "var(--text)", marginBottom: 4 }}>{p.name}</div>
+                  <div style={{ fontWeight: 700, fontSize: rank === 0 ? 22 : 16, color: "var(--text)", marginBottom: 4 }}>{p.name}</div>
                   <div style={{
                     width: 120, height: heights[rank], borderRadius: "16px 16px 0 0",
                     background: `linear-gradient(180deg, ${PODIUM_COLORS[rank]}, ${PODIUM_COLORS[rank]}88)`,
                     display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column",
                   }}>
+                    {/* Punktzahl auf dem Podium: grosser Zaehler fuer die
+                        Projektion, deshalb 28 fuer den ersten Platz. */}
                     <div style={{ fontSize: rank === 0 ? 28 : 22, fontWeight: 800, color: "var(--text)" }}>{p.points}</div>
                     <div style={{ fontSize: 12, color: "var(--text)", opacity: 0.7 }}>{t("session.points")}</div>
                   </div>
@@ -660,7 +629,7 @@ export default function Session() {
               {rest.map((p, i) => (
                 <div key={p.id} style={{
                   display: "flex", justifyContent: "space-between", padding: "10px 16px",
-                  background: "var(--bg2)", borderRadius: 10, marginBottom: 6,
+                  background: "var(--bg2)", borderRadius: CONTROL_R, marginBottom: 6,
                 }}>
                   <span style={{ color: "var(--text3)", fontWeight: 600 }}>#{i + 4}</span>
                   <span style={{ flex: 1, marginLeft: 12, color: "var(--text)" }}>{p.name}</span>
@@ -669,7 +638,7 @@ export default function Session() {
               ))}
             </div>
           )}
-          <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 32 }}>
+          <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 32 }}>
             <button onClick={() => navigate(`/cardvote/evaluation/${sessionId}`)} style={{ ...btnPrimary, padding: "10px 20px" }}>{t("session.detailEval")}</button>
             <button onClick={() => navigate("/cardvote/tests")} style={{ ...btnSecondary, padding: "10px 20px" }}>{t("session.allTests")}</button>
           </div>
@@ -702,14 +671,14 @@ export default function Session() {
           })()}
         </p>
         <div style={{
-          display: "inline-block", padding: "16px 32px", borderRadius: 16,
+          display: "inline-block", padding: "16px 32px", borderRadius: cardStyle.borderRadius,
           background: overallPct >= 80 ? "var(--success-bg)" : overallPct >= 50 ? "var(--warn-bg)" : "var(--danger-bg)",
           marginBottom: 24, textAlign: "center",
         }}>
-          <div style={{ fontSize: 36, fontWeight: 800, color: "var(--text)" }}>{overallPct}%</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>{overallPct}%</div>
           <div style={{ fontSize: 14, color: "var(--text2)" }}>{t("cv.correctOverall")}</div>
         </div>
-        <table style={{ borderCollapse: "collapse", width: "100%", maxWidth: 600, fontSize: 15 }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", maxWidth: 600, fontSize: 16 }}>
           <thead>
             <tr style={{ borderBottom: "2px solid var(--border3)" }}>
               <th style={{ ...thStyle, textAlign: "left" }}>#</th>
@@ -739,7 +708,7 @@ export default function Session() {
             })}
           </tbody>
         </table>
-        <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+        <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
           <button onClick={() => navigate(`/cardvote/evaluation/${sessionId}`)} style={{ ...btnPrimary, padding: "10px 20px" }}>{t("session.detailEval")}</button>
           <button onClick={() => navigate("/cardvote/tests")} style={{ ...btnSecondary, padding: "10px 20px" }}>{t("session.allTests")}</button>
         </div>
@@ -758,7 +727,7 @@ export default function Session() {
       {/* Top bar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1vh" }}>
         <h2 style={{ margin: 0, fontSize: "clamp(18px, 2.5vh, 26px)", fontWeight: 700, color: "var(--text)" }}>
-          {gameMode && <><SvgGamepad size={16} color="var(--text3)" />{" "}</>}{selectedClass?.name}
+          {gameMode && <><Icon d={ICONS.gamepad} size={16} color="var(--text3)" />{" "}</>}{selectedClass?.name}
         </h2>
         {/* Eine Werkzeugleiste wie ueberall: was gerade laeuft (Frage, Code)
             steht links, der eine Alltagsgriff (Ton) sichtbar, alles Seltene und
@@ -770,10 +739,13 @@ export default function Session() {
             <span style={{ color: "var(--text3)", fontSize: "clamp(13px, 1.8vh, 16px)", fontWeight: 600 }}>
               {t("session.question", { i: questionIndex + 1, n: questions.length })}
             </span>
+            {/* Der Sitzungscode als Chip — im Spielmodus in der Antwortfarbe B
+                (Violett) statt eines eigenen Farbverlaufs aus zwei festen
+                Hexwerten. */}
             <span style={{
-              background: gameMode ? "linear-gradient(135deg, #5856d6, #af52de)" : "var(--text)",
-              color: gameMode ? "#fff" : "var(--bg)", padding: "4px 12px",
-              borderRadius: 20, fontFamily: "monospace", fontWeight: 700, fontSize: 13,
+              ...chipStyle, fontFamily: "monospace", fontWeight: 700, fontSize: 13, padding: "4px 12px",
+              background: gameMode ? ANTWORT_COLORS.B : "var(--text)",
+              color: gameMode ? C.aufAkzent : "var(--bg)",
             }}>
               {sessionCode}
             </span>
@@ -787,7 +759,7 @@ export default function Session() {
           ]}
         >
           <button onClick={toggleMute} className="icon-btn"
-            style={{ ...toolbarIconBtn, border: "1px solid var(--border2)", color: muted ? C.danger : "var(--text3)" }}
+            style={{ ...toolbarIconBtn, color: muted ? C.danger : "var(--text3)" }}
             title={muted ? t("session.unmute") : t("session.mute")} aria-label={muted ? t("session.unmute") : t("session.mute")}>
             <Icon d={muted ? ICONS.volumeOff : ICONS.volume} size={17} color={muted ? C.danger : undefined} />
           </button>
@@ -801,6 +773,7 @@ export default function Session() {
 
       {/* Timer bar */}
       {timeLeft !== null && (
+        /* Fortschrittsbalken: Radius = halbe Hoehe (Balken-Kappe), darum Zahl. */
         <div style={{ height: 4, background: "var(--bg2)", borderRadius: 2, marginBottom: 4, overflow: "hidden" }}>
           <div style={{
             height: "100%", width: `${timerPct}%`, background: timerColor,
@@ -816,7 +789,8 @@ export default function Session() {
         </span>
         {timeLeft !== null && (
           <span style={{
-            fontSize: timeLeft <= 5 ? 28 : 18, fontWeight: 800, fontFamily: "monospace",
+            // Countdown: aus zehn Metern lesbar, in den letzten Sekunden groesser.
+            fontSize: timeLeft <= 5 ? 28 : 22, fontWeight: 800, fontFamily: "monospace",
             color: timerColor, transition: "all 0.3s",
             animation: timeLeft <= 5 && timeLeft > 0 ? "pulse 0.5s infinite" : "none",
           }}>
@@ -830,7 +804,7 @@ export default function Session() {
           {/* Question text — large, full width */}
           <div key={`q${question.id}`} style={{
             fontSize: "clamp(28px, 5.5vh, 64px)", fontWeight: 600, marginBottom: "2vh", padding: "clamp(20px, 3.5vh, 44px) clamp(24px, 3vw, 48px)",
-            background: "var(--bg2)", borderRadius: 16, color: "var(--text)", lineHeight: 1.4,
+            background: "var(--bg2)", borderRadius: cardStyle.borderRadius, color: "var(--text)", lineHeight: 1.4,
             animation: "nqIn 0.22s ease both",
           }}>
             <Latex>{question.text}</Latex>
@@ -838,7 +812,7 @@ export default function Session() {
 
           {question.image_url && (
             <div style={{ marginBottom: 20, textAlign: "center" }}>
-              <img src={question.image_url} alt="" style={{ maxWidth: "100%", maxHeight: 400, borderRadius: 12, border: "1px solid var(--border3)" }} />
+              <img src={question.image_url} alt="" style={{ maxWidth: "100%", maxHeight: 400, borderRadius: CONTROL_R, border: "1px solid var(--border3)" }} />
             </div>
           )}
 
@@ -856,8 +830,8 @@ export default function Session() {
                   <div key={`${question.id}-${key}`} style={{
                     padding: "clamp(12px, 2.5vh, 28px) clamp(16px, 2vw, 28px)",
                     background: isExtra ? "var(--bg2)" : isCorrect ? C.success : isWrong ? "var(--bg2)" : "var(--card)",
-                    color: isCorrect ? "white" : "var(--text)",
-                    borderRadius: 16,
+                    color: isCorrect ? C.aufAkzent : "var(--text)",
+                    borderRadius: cardStyle.borderRadius,
                     fontSize: "clamp(20px, 4vh, 44px)",
                     border: isExtra ? "3px dashed var(--border2)" : isCorrect ? `3px solid ${C.success}` : "3px solid var(--border3)",
                     opacity: isExtra ? 0.45 : isWrong ? 0.5 : 1,
@@ -869,12 +843,12 @@ export default function Session() {
                   }}>
                     <strong style={{ fontSize: "clamp(24px, 4.5vh, 48px)", marginRight: 10 }}>{key}</strong>
                     {isExtra ? <span style={{ fontSize: "clamp(14px, 2.5vh, 22px)", color: "var(--text3)", fontStyle: "italic" }}>{t("session.noAnswerField")}</span> : <Latex>{question.choices[key] || "–"}</Latex>}
-                    {!isExtra && question.choice_images?.[key] && <img src={question.choice_images[key]} alt="" style={{ display: "block", marginTop: 8, maxHeight: 100, borderRadius: 8 }} />}
+                    {!isExtra && question.choice_images?.[key] && <img src={question.choice_images[key]} alt="" style={{ display: "block", marginTop: 8, maxHeight: 100, borderRadius: CONTROL_R }} />}
                     {revealed && count > 0 && (
                       <span style={{
                         position: "absolute", top: 10, right: 14,
                         fontSize: 16, fontWeight: 700,
-                        color: isCorrect ? "rgba(255,255,255,0.8)" : "var(--text3)",
+                        color: isCorrect ? C.aufAkzent : "var(--text3)",
                       }}>
                         {count} ({total > 0 ? Math.round(count / total * 100) : 0}%)
                       </span>
@@ -886,7 +860,7 @@ export default function Session() {
           </div>
 
           {/* Action buttons */}
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: "1.5vh" }}>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: "1.5vh" }}>
             <button onClick={revealed ? hideResults : revealResults} style={{
               ...btnPrimary, padding: "12px 28px", fontSize: 16,
               background: revealed ? "var(--bg2)" : "var(--text)",
@@ -900,14 +874,14 @@ export default function Session() {
               </button>
             )}
             {revealed && isLastQuestion && (
-              <button onClick={finishSession} style={{ ...btnPrimary, padding: "12px 28px", fontSize: 16, background: C.danger, color: "#fff", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                {gameMode ? <><SvgTrophy size={16} color="#fff" /> {t("session.endGame")}</> : t("scanner.finishTest")}
+              <button onClick={finishSession} style={{ ...btnPrimary, padding: "12px 28px", fontSize: 16, background: C.danger, color: C.aufAkzent, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                {gameMode ? <><Icon d={ICONS.trophy} size={16} color={C.aufAkzent} /> {t("session.endGame")}</> : t("scanner.finishTest")}
               </button>
             )}
           </div>
 
           {/* Student sidebar + game leaderboard */}
-          <div style={{ display: "flex", gap: 20 }}>
+          <div style={{ display: "flex", gap: 24 }}>
             {/* Student list */}
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -922,9 +896,9 @@ export default function Session() {
                   const showColor = revealed && scanned && showAnswers;
                   return (
                     <div key={student.card_id} style={{
-                      padding: "5px 12px", borderRadius: 980, fontSize: 13,
+                      ...chipStyle, padding: "5px 12px", fontSize: 13,
                       fontWeight: scanned ? 600 : 400,
-                      background: showColor ? COLORS[answer] : scanned ? "var(--text)" : "var(--bg2)",
+                      background: showColor ? ANTWORT_COLORS[answer] : scanned ? "var(--text)" : "var(--bg2)",
                       color: scanned ? "var(--bg)" : "var(--text3)",
                       transition: "all 0.3s",
                     }}>
@@ -938,16 +912,16 @@ export default function Session() {
             {/* Game leaderboard */}
             {gameMode && showLeaderboard && leaderboard.length > 0 && (
               <div style={{ width: 240, flexShrink: 0, animation: "slideUp 0.3s ease" }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", marginBottom: 10, textAlign: "center" }}>
-                  <SvgTrophy size={16} /> {t("session.leaderboard")}
+                <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", marginBottom: 10, textAlign: "center" }}>
+                  <Icon d={ICONS.trophy} size={16} /> {t("session.leaderboard")}
                 </div>
                 {boards.map(([niv, list]) => (
                   <div key={niv || "alle"} style={{ marginBottom: boards.length > 1 ? 10 : 0 }}>
-                    {niv && <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", marginBottom: 4, textAlign: "center" }}>{niv}-Kurs</div>}
+                    {niv && <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", marginBottom: 4, textAlign: "center" }}>{niv}-Kurs</div>}
                     {list.slice(0, 8).map((p, i) => (
                   <div key={p.id} style={{
                     display: "flex", alignItems: "center", gap: 8, padding: "6px 10px",
-                    borderRadius: 8, marginBottom: 4,
+                    borderRadius: CONTROL_R, marginBottom: 4,
                     background: i < 3 ? `${PODIUM_COLORS[i]}22` : "var(--bg2)",
                   }}>
                     <span style={{ fontWeight: 800, fontSize: 13, color: i < 3 ? PODIUM_COLORS[i] : "var(--text3)", width: 22 }}>
@@ -957,7 +931,7 @@ export default function Session() {
                       {p.name}
                     </span>
                     <span style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>{p.points}</span>
-                    {p.streak >= 2 && <span style={{ fontSize: 11, color: "#ff9500" }}><SvgFlame size={11} />{p.streak}</span>}
+                    {p.streak >= 2 && <span style={{ fontSize: 11, color: C.warning }}><Icon d={ICONS.flame} size={11} color={C.warning} />{p.streak}</span>}
                   </div>
                     ))}
                   </div>
@@ -971,12 +945,16 @@ export default function Session() {
   );
 }
 
-const stepCard = { marginBottom: 20, padding: 20, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)" };
-const stepLabel = { fontSize: 12, fontWeight: 700, color: "var(--text3)", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.8px" };
-const thStyle = { padding: "8px 12px", fontSize: 13, fontWeight: 600, color: "var(--text3)" };
-const btnPrimary = { cursor: "pointer", border: "none", borderRadius: 980, background: "var(--accent)", color: "white", fontWeight: 600, fontSize: 15, padding: "12px 28px", letterSpacing: "-0.2px" };
-const btnSecondary = { cursor: "pointer", border: "1px solid var(--border2)", borderRadius: 980, background: "var(--card)", color: "var(--text)", fontSize: 15, padding: "12px 28px" };
-const btnLarge = { ...btnPrimary, padding: "14px 36px", fontSize: 16, borderRadius: 980, background: C.success };
+const stepCard = { ...panelStyle, marginBottom: 24, padding: 20 };
+const stepLabel = { ...sectionLabel, marginBottom: 12 };
+const thStyle = { ...thBasis, padding: "8px 12px", fontSize: 13, position: "static", borderBottom: "none" };
+// Die Session-Knoepfe bleiben GROSS (aus zehn Metern lesbar) — das ist die
+// bewusste Ausnahme in Icons.jsx. Ausgenommen ist aber nur die Groesse: die
+// FORM kam aus dem Kern, hier stand Radius 980 (Pille), wo ueberall sonst
+// CONTROL_R sitzt.
+const btnPrimary = { ...btnPrimaryKern, background: "var(--accent)", color: C.aufAkzent, fontSize: 16, padding: "12px 28px" };
+const btnSecondary = { ...btnSecondaryKern, fontSize: 16, padding: "12px 28px" };
+const btnLarge = { ...btnPrimary, padding: "14px 36px", background: C.success };
 
 function FolderPicker({ folders, selected, onSelect, depth = 0 }) {
   const [expanded, setExpanded] = useState({});
@@ -991,10 +969,10 @@ function FolderPicker({ folders, selected, onSelect, depth = 0 }) {
             style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", cursor: "pointer", userSelect: "none" }}
             onClick={() => toggle(f.id)}
           >
-            <span style={{ color: "var(--text3)", fontSize: 10, width: 14, textAlign: "center", transition: "transform 0.15s", transform: expanded[f.id] ? "rotate(90deg)" : "rotate(0deg)" }}>
-              {(f.children?.length > 0 || f.question_sets?.length > 0) ? "▶" : ""}
+            <span style={{ width: 14, textAlign: "center", transition: "transform 0.15s", transform: expanded[f.id] ? "rotate(90deg)" : "rotate(0deg)" }}>
+              {(f.children?.length > 0 || f.question_sets?.length > 0) ? <Icon d={ICONS.chevronRight} size={14} /> : ""}
             </span>
-            <span style={{ fontWeight: 600, color: "var(--text)", fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>{f.name}</span>
+            <span style={{ fontWeight: 600, color: "var(--text)", fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}><Icon d={ICONS.folder} size={18} />{f.name}</span>
           </div>
           {expanded[f.id] && (
             <div style={{ marginLeft: 22 }}>
@@ -1002,7 +980,7 @@ function FolderPicker({ folders, selected, onSelect, depth = 0 }) {
                 const active = selected?.id === qs.id;
                 return (
                   <div key={qs.id} onClick={() => onSelect(qs)} style={{
-                    padding: "10px 14px", marginBottom: 4, borderRadius: 10, cursor: "pointer",
+                    padding: "10px 14px", marginBottom: 4, borderRadius: CONTROL_R, cursor: "pointer",
                     border: active ? "2px solid var(--accent)" : "2px solid transparent",
                     background: active ? "var(--accent-bg)" : "var(--card)",
                     color: "var(--text)", transition: "all 0.15s", fontSize: 14,

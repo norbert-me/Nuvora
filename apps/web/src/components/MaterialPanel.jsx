@@ -5,7 +5,7 @@
 // entsprechend. Kern-Feature, kein Modul-Gate. Download laeuft ueber fetch (Bearer-Token), nicht ueber <a href>,
 // weil eine Browser-Navigation den Token nicht mitschickt.
 import { useState, useEffect } from "react";
-import { Icon, ICONS, btnSecondary, COLORS as C, Modal } from "./Icons.jsx";
+import { Icon, ICONS, btnSecondary, btnSmall, iconBtn, chipStyle, cardStyle, COLORS as C, CONTROL_R, Modal } from "./Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { askConfirm } from "../core/dialog.jsx";
@@ -105,22 +105,22 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
 
   if (nurLesen && items.length === 0) return null;
 
-  const row = { display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 13.5 };
+  const row = { display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderTop: "1px solid var(--border)", fontSize: 14 };
 
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, marginBottom: 12 }}>
-      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+    <div style={{ ...cardStyle, marginBottom: 12 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
         {titel || t("material.title")}
-        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", background: "var(--bg2)", borderRadius: 980, padding: "1px 9px" }}>{items.length}</span>
+        <span style={chipStyle}>{items.length}</span>
         {!nurLesen && (
-          <label style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12.5, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1, marginLeft: "auto" }}>
+          <label style={{ ...btnSecondary, ...btnSmall, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1, marginLeft: "auto" }}>
             {busy ? t("material.uploading") : t("material.upload")}
             <input type="file" style={{ display: "none" }} disabled={busy}
               onChange={(e) => { const f = e.target.files[0]; e.target.value = ""; upload(f); }} />
           </label>
         )}
       </div>
-      {err && <p style={{ color: C.danger, fontSize: 12.5, margin: "0 0 8px" }}>{err}</p>}
+      {err && <p style={{ color: C.danger, fontSize: 13, margin: "0 0 8px" }}>{err}</p>}
       {items.length === 0 ? (
         <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("material.empty")}</p>
       ) : items.map((m) => (
@@ -128,20 +128,20 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
           <button onClick={() => (ansehbar(m) ? ansehen(m) : download(m))}
             title={ansehbar(m) ? t("material.open") : t("material.noPreviewOther")}
             aria-label={ansehbar(m) ? t("material.open") : t("material.download")}
-            style={{ flex: 1, minWidth: 0, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", border: "none", background: "none", cursor: "pointer", color: "var(--accent)", fontWeight: 600, fontSize: 13.5, padding: 0 }}>
+            style={{ flex: 1, minWidth: 0, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", border: "none", background: "none", cursor: "pointer", color: "var(--accent)", fontWeight: 600, fontSize: 14, padding: 0 }}>
             {m.filename}
           </button>
           <span style={{ fontSize: 12, color: "var(--text3)" }}>{fmtSize(m.size)}</span>
           {/* Speichern bleibt erreichbar, auch wenn der Klick jetzt anzeigt. */}
           {ansehbar(m) && (
             <button onClick={() => download(m)} title={t("material.download")} aria-label={t("material.download")}
-              style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text3)", display: "inline-flex", padding: 2 }}>
+              style={{ ...iconBtn, color: "var(--text3)", padding: 4 }}>
               <Icon d={ICONS.download} size={15} />
             </button>
           )}
           {!nurLesen && (
             <button onClick={async () => { if (await askConfirm(t("material.delConfirm", { name: m.filename }))) remove(m); }} title={t("common.delete")} aria-label={t("common.delete")}
-              style={{ border: "none", background: "none", cursor: "pointer", color: "var(--text3)", display: "inline-flex", padding: 2 }}>
+              style={{ ...iconBtn, color: "var(--text3)", padding: 4 }}>
               <Icon d={ICONS.trash} size={15} />
             </button>
           )}
@@ -150,26 +150,26 @@ export default function MaterialPanel({ topicId = null, entryId = null, methodId
 
       {vorschau && (
         <Modal onClose={() => setVorschau(null)} width={900} label={vorschau.name}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-            <span style={{ fontSize: 15, fontWeight: 700, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{vorschau.name}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <span style={{ fontSize: 16, fontWeight: 700, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{vorschau.name}</span>
             {vorschau.url && (
               <>
                 {/* Neuer Tab als Ausweg: der eingebettete PDF-Betrachter des
                     Browsers kann in manchen Fenstergroessen unbrauchbar klein
                     werden, und manche Browser zeigen PDFs nur im Tab. */}
-                <a href={vorschau.url} target="_blank" rel="noreferrer" style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12.5, textDecoration: "none" }}>{t("material.newTab")}</a>
-                <a href={vorschau.url} download={vorschau.name} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12.5, textDecoration: "none" }}>{t("material.download")}</a>
+                <a href={vorschau.url} target="_blank" rel="noreferrer" style={{ ...btnSecondary, ...btnSmall, textDecoration: "none" }}>{t("material.newTab")}</a>
+                <a href={vorschau.url} download={vorschau.name} style={{ ...btnSecondary, ...btnSmall, textDecoration: "none" }}>{t("material.download")}</a>
               </>
             )}
           </div>
           {!vorschau.url ? (
-            <div style={{ height: "72vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text3)", fontSize: 14, border: "1px solid var(--border)", borderRadius: 8 }}>
+            <div style={{ height: "72vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text3)", fontSize: 14, border: "1px solid var(--border)", borderRadius: CONTROL_R }}>
               {vorschau.office ? t("material.converting") : t("material.loading")}
             </div>
           ) : /^image\//.test(vorschau.mime || "") ? (
             <img src={vorschau.url} alt={vorschau.name} style={{ maxWidth: "100%", maxHeight: "72vh", display: "block", margin: "0 auto" }} />
           ) : (
-            <iframe title={vorschau.name} src={vorschau.url} style={{ width: "100%", height: "72vh", border: "1px solid var(--border)", borderRadius: 8 }} />
+            <iframe title={vorschau.name} src={vorschau.url} style={{ width: "100%", height: "72vh", border: "1px solid var(--border)", borderRadius: CONTROL_R }} />
           )}
         </Modal>
       )}

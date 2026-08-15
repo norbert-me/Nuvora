@@ -1,4 +1,4 @@
-import { Modal } from "../components/Icons.jsx";
+import { CONTROL_R, Icon, ICONS, Modal, SHADOW, toolbarIconBtn } from "../components/Icons.jsx";
 // Modul Lernpfad — nativ in die Shell eingebaut (kein eigener Container mehr).
 //
 // Die erprobte Vanilla-JS-App wurde ins Web-Projekt uebernommen: ihre Statik
@@ -9,6 +9,7 @@ import { Modal } from "../components/Icons.jsx";
 // Kommunikation per window.postMessage: Theme/Tab rein, Modal/Toast/Tab raus.
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useLanguage } from "../i18n/index.jsx";
 
 const BASE = "/lp/";
 const ORIGIN = window.location.origin;
@@ -28,6 +29,7 @@ function ensureAsset(kind, href) {
 }
 
 export default function LernpfadModule() {
+  const { t } = useLanguage();
   const hostRef = useRef(null);
   const [modal, setModal] = useState(null); // { title, html }
   const [toast, setToast] = useState("");
@@ -99,15 +101,17 @@ export default function LernpfadModule() {
     <>
       {modal && (
         <Modal onClose={() => setModal(null)} width={560} label={modal.title}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-              <h3 style={{ fontSize: 17, fontWeight: 700, flex: 1, margin: 0 }}>{modal.title}</h3>
-              <button onClick={() => setModal(null)} style={{ width: 30, height: 30, borderRadius: 15, border: "none", background: "var(--bg2)", color: "var(--text3)", cursor: "pointer", fontSize: 16 }}>×</button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, flex: 1, margin: 0 }}>{modal.title}</h3>
+              <button onClick={() => setModal(null)} className="icon-btn" style={toolbarIconBtn} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={16} /></button>
             </div>
             <div dangerouslySetInnerHTML={{ __html: modal.html }} />
         </Modal>
       )}
       {toast && (
-        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 400, background: "#1e293b", color: "#fff", padding: "10px 18px", borderRadius: 10, fontSize: 14, boxShadow: "0 6px 20px rgba(0,0,0,0.3)" }}>{toast}</div>
+        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 400,
+          background: "var(--text)", color: "var(--bg)", padding: "8px 16px", borderRadius: CONTROL_R,
+          fontSize: 14, boxShadow: SHADOW.schwebend }}>{toast}</div>
       )}
       <div id="lp-app" ref={hostRef} />
     </>

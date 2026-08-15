@@ -30,13 +30,15 @@ export default function PublishModal({ name, onPublish, onClose }) {
     // Beschriftung fuer Screenreader: der Dialog traegt keine eigene Ueberschrift,
     // sondern nennt den Namen dessen, was veroeffentlicht wird.
     <Modal onClose={onClose} width={460} label={name}>
-      <h3 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700 }}>{t("publish.title")}</h3>
+      {/* Gleiche Groesse wie die eingebaute Modal-Ueberschrift (16) — der Dialog
+          rendert sie nur selbst, weil darunter noch ein Erklaertext steht. */}
+      <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700 }}>{t("publish.title")}</h3>
       <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 16px" }}>{t("publish.text", { name })}</p>
       <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)", display: "block", marginBottom: 4 }}>{t("publish.description")}</label>
       <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder={t("publish.descriptionPh")} rows={3}
         style={{ ...inputStyle, width: "100%", marginBottom: 12, resize: "vertical", fontFamily: "inherit" }} />
-      {state === "error" && <div style={{ fontSize: 13, color: C.danger, marginBottom: 10 }}>{t("publish.error")}</div>}
-      {state === "ok" && <div style={{ fontSize: 13, color: C.success, marginBottom: 10 }}>{t("publish.done")}</div>}
+      {state === "error" && <div style={{ fontSize: 13, color: C.danger, marginBottom: 8 }}>{t("publish.error")}</div>}
+      {state === "ok" && <div style={{ fontSize: 13, color: C.success, marginBottom: 8 }}>{t("publish.done")}</div>}
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={submit} disabled={state === "busy" || state === "ok"} style={{ ...btnPrimary, opacity: state === "busy" ? 0.6 : 1 }}>{t("publish.btn")}</button>
         <button onClick={onClose} style={btnSecondary}>{t("common.cancel")}</button>

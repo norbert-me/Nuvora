@@ -5,16 +5,16 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useModules, useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
-import { StageBadge, Icon, ICONS, MODULE_ICONS, iconBtn, btnSecondary, selectStyle, COLORS as C, pageApp} from "../components/Icons.jsx";
-import { pageTitle } from "../components/Icons.jsx";
+import { StageBadge, Icon, ICONS, MODULE_ICONS, iconBtn, btnSecondary, selectStyle, COLORS as C, pageApp,
+  pageTitle, cardStyle, chipStyle, badge, btnSmall, CONTROL_R, toolbarIconBtn } from "../components/Icons.jsx";
 
+// Modul-Kachel: dieselbe Karte wie überall, nur als Link (kein eigener Kasten).
+// Die frühere Eigenbau-Fassung stand auf `var(--surface)` — die Variable gibt es
+// nirgends, die Kacheln hatten dadurch gar keinen Grund.
 const card = {
+  ...cardStyle,
   display: "block",
   textDecoration: "none",
-  border: "1px solid var(--border)",
-  borderRadius: 14,
-  padding: 20,
-  background: "var(--surface)",
   color: "var(--text)",
 };
 
@@ -71,26 +71,28 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv, methodenAktiv }) {
   };
   const Btn = ({ row, art, label, onClick }) => {
     const key = `${row.class_id}:${row.topic_id}:${art}`;
-    if (done[key]) return <span style={{ fontSize: 12.5, color: C.success, fontWeight: 700 }}>✓</span>;
-    return <button onClick={onClick} disabled={busy === key} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12.5, opacity: busy === key ? 0.6 : 1 }}>{label}</button>;
+    if (done[key]) return <Icon d={ICONS.check} size={16} color={C.success} />;
+    return <button onClick={onClick} disabled={busy === key} style={{ ...btnSecondary, ...btnSmall, opacity: busy === key ? 0.6 : 1 }}>{label}</button>;
   };
 
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 18, marginBottom: 24 }}>
-      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 3 }}>{t("home.weakTitle")}</div>
-      <div style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 12 }}>{t("home.weakHint")}</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    <div style={{ ...cardStyle, marginBottom: 24 }}>
+      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{t("home.weakTitle")}</div>
+      <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 12 }}>{t("home.weakHint")}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {rows.map((row) => (
-          <div key={`${row.class_id}:${row.topic_id}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 10, flexWrap: "wrap" }}>
-            <span style={{ flex: 1, fontWeight: 600, minWidth: 130 }}>{row.name} <span style={{ fontWeight: 400, color: "var(--text3)", fontSize: 12.5 }}>· {row.klasse}</span></span>
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: row.pct < 40 ? C.danger : C.warning }}>{row.pct}%</span>
+          <div key={`${row.class_id}:${row.topic_id}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: CONTROL_R, flexWrap: "wrap" }}>
+            <span style={{ flex: 1, fontWeight: 600, minWidth: 130 }}>{row.name} <span style={{ fontWeight: 400, color: "var(--text3)", fontSize: 13 }}>· {row.klasse}</span></span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: row.pct < 40 ? C.danger : C.warning }}>{row.pct}%</span>
             {methodByTopic[row.topic_id] && (
-              <Link to="/unterrichtsplanung?tab=einstiege" title={methodByTopic[row.topic_id].title} style={{ fontSize: 12, fontWeight: 700, color: C.info, textDecoration: "none", padding: "3px 9px", borderRadius: 980, background: "rgba(37,99,235,0.12)" }}>
-                <Icon d={ICONS.bulb} size={13} /> {t("home.weakEinstieg")}
+              <Link to="/unterrichtsplanung?tab=einstiege" title={methodByTopic[row.topic_id].title} style={{ ...badge(C.info), textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <Icon d={ICONS.bulb} size={13} color={C.info} /> {t("home.weakEinstieg")}
               </Link>
             )}
             {row.geuebt ? (
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: C.success, display: "inline-flex", alignItems: "center", gap: 4 }}>✓ {t("home.weakPracticed")}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: C.success, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <Icon d={ICONS.check} size={14} color={C.success} /> {t("home.weakPracticed")}
+              </span>
             ) : (() => {
               // Fachübergreifende (klassenlose) Zeile: erst Klasse waehlen, dann
               // Karten/Lernpfad fuer genau die Klasse erzeugen. Klassenzeilen wie bisher.
@@ -100,7 +102,7 @@ function SchwacheWoche({ t, kartenAktiv, lernpfadAktiv, methodenAktiv }) {
                 {row.class_id == null && (kartenAktiv || lernpfadAktiv) && (
                   <select value={pickFor[row.topic_id] ?? ""} aria-label={t("home.weakPickClass")}
                     onChange={(e) => setPickFor((m) => ({ ...m, [row.topic_id]: e.target.value ? Number(e.target.value) : undefined }))}
-                    style={{ ...selectStyle, padding: "5px 8px", fontSize: 12.5 }}>
+                    style={{ ...selectStyle, height: 28, padding: "0 26px 0 8px", fontSize: 13 }}>
                     <option value="">{t("home.weakPickClass")}</option>
                     {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
@@ -159,37 +161,39 @@ function HeutePanel({ t, orgaAktiv }) {
   const dateStr = new Date().toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long" });
 
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 18, marginBottom: 24 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
-        <div style={{ fontSize: 15, fontWeight: 700, textTransform: "capitalize" }}>{dateStr}</div>
-        <Link to="/kalender?view=day" style={{ fontSize: 12.5, color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>{t("home.toCalendar")} ↗</Link>
+    <div style={{ ...cardStyle, marginBottom: 24 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 16, fontWeight: 700, textTransform: "capitalize" }}>{dateStr}</div>
+        <Link to="/kalender?view=day" style={{ fontSize: 13, color: "var(--accent)", textDecoration: "none", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
+          {t("home.toCalendar")} <Icon d={ICONS.open} size={12} color="var(--accent)" />
+        </Link>
       </div>
       {data.frei && (
-        <div style={{ padding: "8px 12px", borderRadius: 10, background: "rgba(184,134,11,0.12)", color: "#8a6d00", fontSize: 13, fontWeight: 600 }}>
+        <div style={{ padding: "8px 12px", borderRadius: CONTROL_R, background: C.warning + "1f", color: C.warning, fontSize: 13, fontWeight: 600 }}>
           {t("kalender.freeDay")}: {data.frei.label || ""}
         </div>
       )}
       {!data.frei && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {slots.map((s) => {
             const e = eintrag(s.period);
             // 1-Klick: mit Klasse + aktivem Orga direkt in die Anwesenheit heute.
             const to = orgaAktiv && s.class_id ? `/orga?tab=anwesenheit&class=${s.class_id}&date=${heuteYmd}` : "/kalender?view=day";
             return (
-              <Link key={s.id} to={to} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px solid var(--border)", borderLeft: `4px solid ${s.class_id ? ccolor(s.class_id) : "var(--border2)"}`, borderRadius: 10, textDecoration: "none", color: "var(--text)" }}>
+              <Link key={s.id} to={to} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px solid var(--border)", borderLeft: `4px solid ${s.class_id ? ccolor(s.class_id) : "var(--border2)"}`, borderRadius: CONTROL_R, textDecoration: "none", color: "var(--text)" }}>
                 <div style={{ minWidth: 42, textAlign: "center" }}>
                   <div style={{ fontSize: 14, fontWeight: 800 }}>{s.period}.</div>
-                  <div style={{ fontSize: 10, color: "var(--text3)" }}>{zeit(s.period)}</div>
+                  <div style={{ fontSize: 11, color: "var(--text3)" }}>{zeit(s.period)}</div>
                 </div>
                 <div style={{ flex: 1, minWidth: 100 }}>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>{cname(s.class_id) || s.title || "—"}</div>
-                  {e && <div style={{ fontSize: 12.5, color: "var(--text3)", marginTop: 2 }}>{e.title || t("kalender.planned")}</div>}
+                  {e && <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 4 }}>{e.title || t("kalender.planned")}</div>}
                 </div>
               </Link>
             );
           })}
           {extras.map((e) => (
-            <Link key={e.id} to="/kalender?view=day" style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px dashed var(--border2)", borderRadius: 10, textDecoration: "none", color: "var(--text)" }}>
+            <Link key={e.id} to="/kalender?view=day" style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", border: "1px dashed var(--border2)", borderRadius: CONTROL_R, textDecoration: "none", color: "var(--text)" }}>
               <div style={{ minWidth: 42, textAlign: "center", color: "var(--text3)", fontSize: 12 }}>—</div>
               <div style={{ fontSize: 14, fontWeight: 600 }}>{e.title || (e.class_id && cname(e.class_id)) || t("kalender.planned")}</div>
             </Link>
@@ -240,13 +244,16 @@ export default function NuvoraHome({ user }) {
 
   return (
     <div style={{ ...pageApp }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <h1 style={{ ...pageTitle, marginBottom: 0, flex: 1 }}>
           {firstName ? t("home.welcome", { name: firstName }) : t("home.welcomePlain")}
         </h1>
         {active.length > 1 && (
-          <button onClick={() => setEdit((e) => !e)} className="icon-btn" style={{ ...iconBtn, border: edit ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 10, padding: 8 }} title={t("home.arrange")} aria-label={t("home.arrange")}>
-            {edit ? <span style={{ fontSize: 13, fontWeight: 600, color: "var(--accent)", padding: "0 4px" }}>{t("common.done")}</span> : <Icon d={ICONS.edit} size={17} />}
+          <button onClick={() => setEdit((e) => !e)} className="icon-btn"
+            style={{ ...toolbarIconBtn, width: edit ? "auto" : undefined, padding: edit ? "0 12px" : 0,
+              borderColor: edit ? "var(--accent)" : "var(--border2)" }}
+            title={t("home.arrange")} aria-label={t("home.arrange")}>
+            {edit ? <span style={{ fontSize: 13, fontWeight: 600, color: "var(--accent)" }}>{t("common.done")}</span> : <Icon d={ICONS.edit} size={16} />}
           </button>
         )}
       </div>
@@ -258,27 +265,27 @@ export default function NuvoraHome({ user }) {
           Klick oder ⌘K oeffnet dieselbe Suche wie die Lupe in der Navigation
           (components/Suche.jsx) — hier steht nur der Knopf dazu. */}
       <button onClick={() => window.dispatchEvent(new Event("nuvora:suche"))} data-suche="startseite"
-        style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", maxWidth: 520, marginBottom: 26,
-          padding: "11px 14px", border: "1px solid var(--border2)", borderRadius: 12, background: "var(--card)",
+        style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", maxWidth: 520, marginBottom: 24,
+          padding: "11px 14px", border: "1px solid var(--border2)", borderRadius: CONTROL_R, background: "var(--card)",
           color: "var(--text3)", cursor: "text", fontSize: 14, textAlign: "left" }}>
         <Icon d={ICONS.search} size={16} color="var(--text3)" />
         <span style={{ flex: 1 }}>{t("suche.placeholder")}</span>
-        <kbd style={{ fontSize: 11, border: "1px solid var(--border2)", borderRadius: 6, padding: "2px 6px" }}>⌘K</kbd>
+        <kbd style={{ ...chipStyle, fontWeight: 500, border: "1px solid var(--border2)" }}>⌘K</kbd>
       </button>
 
       {active.length === 0 ? (
-        <div style={{ ...card, textAlign: "center", padding: 36 }}>
+        <div style={{ ...card, textAlign: "center", padding: 24 }}>
           <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
             {t("home.noModuleTitle")}
           </p>
-          <p style={{ color: "var(--text2)", marginBottom: 20 }}>
+          <p style={{ color: "var(--text2)", marginBottom: 16 }}>
             {t("home.noModuleText")}
           </p>
           <Link
             to="/modules"
             style={{
-              display: "inline-block", padding: "10px 18px", borderRadius: 980,
-              background: "var(--accent)", color: "#fff", textDecoration: "none",
+              display: "inline-block", padding: "10px 18px", borderRadius: CONTROL_R,
+              background: "var(--accent)", color: C.aufAkzent, textDecoration: "none",
               fontWeight: 600, fontSize: 14,
             }}
           >
@@ -289,15 +296,15 @@ export default function NuvoraHome({ user }) {
         <>
           {!edit && isOn("kalender") && <HeutePanel t={t} orgaAktiv={isOn("orga")} />}
           {!edit && isOn("cardvote") && <SchwacheWoche t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} methodenAktiv={isOn("unterrichtsplanung")} />}
-          <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
+          <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
             {(edit ? displayList : shown).map((m) => {
               // Dashboard braucht keine Erklärung (die steht unter „Module") —
               // nur großes Icon + Name. Höhe bleibt wie zuvor (tileStyle).
               const inner = (
-                <div style={{ fontSize: 17, fontWeight: 700, display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ fontSize: 16, fontWeight: 700, display: "flex", alignItems: "center", gap: 12 }}>
                   {edit && <span style={{ color: "var(--text3)", display: "inline-flex" }}><Icon d={ICONS.grip} size={16} /></span>}
                   {MODULE_ICONS[m.key] && (
-                    <span style={{ flexShrink: 0, width: 52, height: 52, borderRadius: 12, display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    <span style={{ flexShrink: 0, width: 52, height: 52, borderRadius: CONTROL_R, display: "inline-flex", alignItems: "center", justifyContent: "center",
                       background: "var(--bg2, var(--bg))", color: "var(--text)" }}>
                       <Icon d={MODULE_ICONS[m.key]} size={32} color="currentColor" />
                     </span>

@@ -1,4 +1,5 @@
 import { useRef, useEffect } from "react";
+import { COLORS } from "./Icons.jsx";
 
 // KaTeX lokal gebundelt statt CDN (DSGVO: keine IP-Uebermittlung an jsdelivr).
 // Lazy geladen: der grosse KaTeX-Chunk kommt nur ueber die Leitung, wenn
@@ -47,7 +48,7 @@ export default function Latex({ children }) {
           katex.render(vorbereiten(quelle), ziel, { displayMode, throwOnError: true });
         } catch {
           ziel.textContent = displayMode ? `$$${quelle}$$` : `$${quelle}$`;
-          ziel.style.color = "var(--danger, #d1350f)";
+          ziel.style.color = `var(--danger, ${COLORS.danger})`;
           ziel.title = "Diese Formel kann nicht dargestellt werden";
         }
       };

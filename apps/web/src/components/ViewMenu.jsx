@@ -3,7 +3,7 @@
 // gibt eine Liste Toggles rein. Optional persistiert der Aufrufer die Werte
 // (z.B. pro Kurs). Diese Komponente hält nur das Auf/Zu des Menüs.
 import { useState } from "react";
-import { Icon, ICONS, toolbarIconBtn, Toggle, Popover} from "./Icons.jsx";
+import { Icon, ICONS, toolbarIconBtn, Toggle, Popover, sectionLabel } from "./Icons.jsx";
 
 // items: [{ key, label, value, onChange, hint }]
 export default function ViewMenu({ items = [], title = "Ansicht" }) {
@@ -18,12 +18,14 @@ export default function ViewMenu({ items = [], title = "Ansicht" }) {
       {open && (
         <>
           <span onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-          <Popover align="right" style={{ zIndex: 41, top: 36, minWidth: 220, padding: 10 }}>
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "2px 4px 8px" }}>{title}</div>
+          <Popover align="right" style={{ zIndex: 41, top: 36, minWidth: 220, padding: 12 }}>
+            <div style={{ ...sectionLabel, margin: "2px 4px 8px" }}>{title}</div>
             {items.map((it) => (
               <div key={it.key} style={{ padding: "6px 4px" }}>
                 <Toggle checked={!!it.value} onChange={(v) => it.onChange(v)} label={it.label} />
-                {it.hint && <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 3, marginLeft: 46 }}>{it.hint}</div>}
+                {/* 46 = Breite des Schalters (38) + sein Abstand zum Text (8):
+                    der Hinweis soll genau unter der Beschriftung beginnen. */}
+                {it.hint && <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4, marginLeft: 46 }}>{it.hint}</div>}
               </div>
             ))}
           </Popover>

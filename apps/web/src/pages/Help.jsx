@@ -3,19 +3,19 @@
 // Bereich aus ?area= (die Navbar haengt ihn beim Klick auf Hilfe an). Oben die
 // anderen Bereiche zum Wechseln; nur Kern plus aktive Module.
 import { Link, useSearchParams } from "react-router-dom";
-import { pageApp, Tabs } from "../components/Icons.jsx";
+import { pageApp, pageTitle, cardStyle, Tabs } from "../components/Icons.jsx";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 
 const Section = ({ title, children }) => (
-  <section style={{ marginBottom: 26 }}>
+  <section style={{ marginBottom: 24 }}>
     <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", marginBottom: 8 }}>{title}</h3>
     <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.7 }}>{children}</div>
   </section>
 );
 
 const Faq = ({ q, children }) => (
-  <details style={{ marginBottom: 10, padding: "12px 16px", background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12 }}>
+  <details style={{ ...cardStyle, marginBottom: 12, padding: "12px 16px" }}>
     <summary style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", cursor: "pointer" }}>{q}</summary>
     <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.7, marginTop: 8 }}>{children}</div>
   </details>
@@ -54,7 +54,7 @@ function CardVoteHilfe({ t }) {
       <Section title={t("help.cv.whatT")}>{t("help.cv.what")}</Section>
       <Section title={t("help.cv.printT")}>{withLink(t("help.cv.print"), "/cardvote/cards", t("help.cv.cardsWord"))}</Section>
       <Section title={t("help.cv.tipsT")}>
-        <ul style={{ paddingLeft: 20, margin: 0 }}>
+        <ul style={{ paddingLeft: 16, margin: 0 }}>
           <li>{t("help.cv.tip1")}</li>
           <li>{t("help.cv.tip2")}</li>
           <li>{t("help.cv.tip3")}</li>
@@ -215,9 +215,9 @@ export default function Help() {
 
   return (
     <div style={{ ...pageApp }}>
-      <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", marginBottom: 16 }}>{t("help.title")}</h2>
+      <h2 style={{ ...pageTitle, marginBottom: 16 }}>{t("help.title")}</h2>
 
-      <p style={{ marginBottom: 20, padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", fontSize: 14 }}>
+      <p style={{ ...cardStyle, marginBottom: 24, padding: "12px 16px", fontSize: 14 }}>
         {withLink(t("help.tutorialBanner"), "/tutorial", t("help.tutorialWord"))}
       </p>
 
@@ -226,7 +226,7 @@ export default function Help() {
         // nicht ganz wie die im Rest der Anwendung aus. Bei vielen aktiven
         // Modulen wird waagerecht gescrollt statt umgebrochen: `Tabs` ist EIN
         // Element, kein Haufen einzelner Knöpfe.
-        <div style={{ marginBottom: 22, overflowX: "auto", maxWidth: "100%" }}>
+        <div style={{ marginBottom: 24, overflowX: "auto", maxWidth: "100%" }}>
           <Tabs value={area} onChange={(k) => setParams({ area: k })}
             options={sichtbar.map((k) => [k, label(k)])} />
         </div>

@@ -3,8 +3,9 @@
 // und wird nicht gespeichert. Übersicht zeigt Fehlzeiten und lässt nachtragen.
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { btnSecondary, selectStyle, Tabs, DatumNavigator, segmentInput, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
+import { badge, btnSecondary, btnSmall, cardStyle, panelStyle, selectStyle, Segment, segmentBtn, Tabs, DatumNavigator, segmentInput, toolbarBtn, toolbarIconBtn, Icon, ICONS, COLORS as C } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
+import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Portrait from "../components/Portrait.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
@@ -128,20 +129,36 @@ export default function Anwesenheit() {
   };
 
   const legende = showLegend && (
-    <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>
+    <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>
       {STATI.map((st) => (
-        <span key={st} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-          <span style={{ display: "inline-flex", width: 22, height: 20, borderRadius: 5, alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, background: COL[st] + "22", color: COL[st] }}>{t(`anwesenheit.${st}Short`)}</span>
+        <span key={st} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <span style={{ ...badge(COL[st]), minWidth: 24, textAlign: "center" }}>{t(`anwesenheit.${st}Short`)}</span>
           {t(`anwesenheit.${st}`)}
         </span>
       ))}
     </div>
   );
 
+  // Dieselbe Tastenreihe steht an zwei Stellen (Tagesliste und Verlauf). Sie war
+  // zweimal gebaut — 34x30 mit Radius 8 hier, 30x26 mit Radius 7 dort. Eine Form,
+  // und als Gruppe statt vier freistehender Kaesten: es ist EINE Entscheidung.
+  const StatusWahl = ({ wert, onWahl }) => (
+    <Segment>
+      {STATI.map((st) => (
+        <button key={st} onClick={() => onWahl(st)} title={t(`anwesenheit.${st}`)}
+          style={{ ...segmentBtn, minWidth: 34, padding: "0 8px", fontWeight: 700,
+            background: wert === st ? COL[st] + "22" : "transparent",
+            color: wert === st ? COL[st] : "var(--text3)" }}>
+          {t(`anwesenheit.${st}Short`)}
+        </button>
+      ))}
+    </Segment>
+  );
+
   return (
     <div style={{ maxWidth: "none" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
-        {stundenWahl ? (
+      <Werkzeugleiste
+        links={stundenWahl ? (
           <select value={`${stunde}:${classId}`} onChange={(e) => { const [p, c] = e.target.value.split(":").map(Number); setStunde(p); setClassId(c); }}
             style={{ ...selectStyle, minWidth: 200 }} title={t("anwesenheit.periodHint")}>
             {tagSlots.map((s) => (
@@ -153,50 +170,42 @@ export default function Anwesenheit() {
         ) : (
           <KursKlasseSelect value={classId} onChange={setClassId} />
         )}
-        <button onClick={() => setShowLegend((v) => !v)} className="icon-btn" title={t("anwesenheit.legend")} aria-label={t("anwesenheit.legend")}
-          style={{ ...iconBtn, marginLeft: "auto", border: showLegend ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 8 }}>
-          <Icon d={ICONS.info} size={16} color={showLegend ? "var(--accent)" : "var(--text2)"} />
-        </button>
-        <Tabs value={view} onChange={setView}
-          options={[["tag", t("anwesenheit.day")], ["uebersicht", t("anwesenheit.overview")]]} />
-      </div>
+        ansicht={<>
+          <button onClick={() => setShowLegend((v) => !v)} className="icon-btn" title={t("anwesenheit.legend")} aria-label={t("anwesenheit.legend")}
+            style={{ ...toolbarIconBtn, border: showLegend ? "1px solid var(--accent)" : toolbarIconBtn.border }}>
+            <Icon d={ICONS.info} size={16} color={showLegend ? "var(--accent)" : "var(--text2)"} />
+          </button>
+          <Tabs value={view} onChange={setView}
+            options={[["tag", t("anwesenheit.day")], ["uebersicht", t("anwesenheit.overview")]]} />
+        </>} />
 
       {view === "tag" ? (
         <>
           {/* Tag frei wählbar (auch Vergangenheit/Ferien). Voreinstellung heute.
               Die Stunde ersetzt „ganzer Tag" — Abwesenheit wird je Stunde
               erfasst; nur wenn kein Stundenplan da ist, gilt der ganze Tag. */}
-          <DatumNavigator style={{ marginBottom: 14 }}
+          <DatumNavigator style={{ marginBottom: 12 }}
             onZurueck={() => shift(-1)} labelZurueck={t("kalender.prev")}
             onVor={() => shift(1)} labelVor={t("kalender.next")}
             onHeute={() => setDatum(ymd(new Date()))} labelHeute={t("anwesenheit.today")}
             mitte={<input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} style={segmentInput} />} />
           {legende}
           {istFrei ? (
-            <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(184,134,11,0.12)", color: "#8a6d00", fontSize: 14, fontWeight: 600 }}>
-              <Icon d={ICONS.sun} size={14} color="#8a6d00" /> {t("anwesenheit.freeDay")}{istFrei.label ? `: ${istFrei.label}` : ""}
+            <div style={{ ...panelStyle, padding: "12px 16px", background: C.warning + "1a", border: "none", color: C.warning, fontSize: 14, fontWeight: 600 }}>
+              <Icon d={ICONS.sun} size={14} color={C.warning} /> {t("anwesenheit.freeDay")}{istFrei.label ? `: ${istFrei.label}` : ""}
             </div>
           ) : students.length === 0 ? (
             <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("anwesenheit.noStudents")}</p>
           ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {students.map((s, i) => {
               const cur = statusOf(s.id);
               return (
-                <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
+                <div key={s.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, padding: "8px 12px" }}>
                   <span style={{ color: "var(--text3)", fontSize: 12, width: 24, textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{i + 1}.</span>
                   <Portrait student={s} size={26} />
                   <span style={{ flex: 1, fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
-                  <div style={{ display: "inline-flex", gap: 4 }}>
-                    {STATI.map((st) => (
-                      <button key={st} onClick={() => setStatus(s.id, st)} title={t(`anwesenheit.${st}`)}
-                        style={{ width: 34, height: 30, borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer",
-                          border: cur === st ? `2px solid ${COL[st]}` : "1px solid var(--border2)",
-                          background: cur === st ? COL[st] + "22" : "transparent", color: cur === st ? COL[st] : "var(--text3)" }}>
-                        {t(`anwesenheit.${st}Short`)}
-                      </button>
-                    ))}
-                  </div>
+                  <StatusWahl wert={cur} onWahl={(st) => setStatus(s.id, st)} />
                 </div>
               );
             })}
@@ -205,24 +214,24 @@ export default function Anwesenheit() {
         </>
       ) : (
         <>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 8px", flexWrap: "wrap" }}>
             <p style={{ fontSize: 13, color: "var(--text3)", margin: 0, flex: 1 }}>{t("anwesenheit.overviewHint")}</p>
-            <button onClick={() => ladePdf(`${API}/${classId}/report.pdf`, `Fehlzeiten_${cls?.name || ""}.pdf`)} style={{ ...btnSecondary, padding: "6px 13px", fontSize: 13 }}>{t("anwesenheit.classPdf")}</button>
+            <button onClick={() => ladePdf(`${API}/${classId}/report.pdf`, `Fehlzeiten_${cls?.name || ""}.pdf`)} style={toolbarBtn}>{t("anwesenheit.classPdf")}</button>
           </div>
           {legende}
           {students.length === 0 && <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("anwesenheit.noStudents")}</p>}
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {students.map((s, i) => {
               const a = summe[String(s.id)] || { fehlt: 0, spaet: 0, entsch: 0 };
               const leer = !a.fehlt && !a.spaet && !a.entsch;
               const auf = offen === s.id;
               return (
-                <div key={s.id} style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
-                  <button onClick={() => oeffnen(s.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", width: "100%", background: "none", border: "none", cursor: "pointer", textAlign: "left", color: "var(--text)" }}>
+                <div key={s.id} style={{ ...cardStyle, padding: 0 }}>
+                  <button onClick={() => oeffnen(s.id)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", width: "100%", background: "none", border: "none", cursor: "pointer", textAlign: "left", color: "var(--text)" }}>
                     <span style={{ color: "var(--text3)", fontSize: 12, width: 24, textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{i + 1}.</span>
                     <span style={{ flex: 1, fontWeight: 500 }}>{s.name}</span>
                     {leer ? <span style={{ fontSize: 13, color: "var(--text3)" }}>—</span> : (
-                      <span style={{ display: "inline-flex", gap: 8, fontSize: 12.5, fontWeight: 600 }}>
+                      <span style={{ display: "inline-flex", gap: 8, fontSize: 13, fontWeight: 600 }}>
                         {a.fehlt > 0 && <span style={{ color: COL.fehlt }}>{a.fehlt}× {t("anwesenheit.fehltShort")}</span>}
                         {a.spaet > 0 && <span style={{ color: COL.spaet }}>{a.spaet}× {t("anwesenheit.spaetShort")}</span>}
                         {a.entsch > 0 && <span style={{ color: COL.entsch }}>{a.entsch}× {t("anwesenheit.entschShort")}</span>}
@@ -233,23 +242,14 @@ export default function Anwesenheit() {
                   {auf && (
                     <div style={{ borderTop: "1px solid var(--border)", padding: "8px 12px" }}>
                       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
-                        <button onClick={() => ladePdf(`${API}/${classId}/student/${s.id}/report.pdf`, `Fehlzeiten_${s.name}.pdf`)} style={{ ...btnSecondary, padding: "4px 11px", fontSize: 12 }}>{t("anwesenheit.studentPdf")}</button>
+                        <button onClick={() => ladePdf(`${API}/${classId}/student/${s.id}/report.pdf`, `Fehlzeiten_${s.name}.pdf`)} style={{ ...btnSecondary, ...btnSmall }}>{t("anwesenheit.studentPdf")}</button>
                       </div>
                       {verlauf.length === 0 ? (
-                        <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "4px 0" }}>{t("anwesenheit.noEntries")}</p>
+                        <p style={{ fontSize: 13, color: "var(--text3)", margin: "4px 0" }}>{t("anwesenheit.noEntries")}</p>
                       ) : verlauf.map((e) => (
-                        <div key={e.date} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0" }}>
+                        <div key={e.date} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0" }}>
                           <span style={{ flex: 1, fontSize: 13 }}>{new Date(e.date).toLocaleDateString()}{e.period ? ` · ${e.period}. ${t("kalender.period")}` : ""}</span>
-                          <div style={{ display: "inline-flex", gap: 4 }}>
-                            {STATI.map((st) => (
-                              <button key={st} onClick={() => verlaufAendern(s.id, e.date, st)} title={t(`anwesenheit.${st}`)}
-                                style={{ width: 30, height: 26, borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                                  border: e.status === st ? `2px solid ${COL[st]}` : "1px solid var(--border2)",
-                                  background: e.status === st ? COL[st] + "22" : "transparent", color: e.status === st ? COL[st] : "var(--text3)" }}>
-                                {t(`anwesenheit.${st}Short`)}
-                              </button>
-                            ))}
-                          </div>
+                          <StatusWahl wert={e.status} onWahl={(st) => verlaufAendern(s.id, e.date, st)} />
                         </div>
                       ))}
                     </div>

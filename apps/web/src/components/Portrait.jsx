@@ -26,6 +26,8 @@ export function initialen(name) {
  */
 export default function Portrait({ student, size = 32, zoomable = false, style }) {
   const rund = {
+    // Ausnahme von den Radius-Tokens: der Radius IST die halbe Kante — nur so
+    // wird aus dem Quadrat ein Kreis (Porträt).
     width: size, height: size, borderRadius: size / 2, flexShrink: 0,
     objectFit: "cover", border: "1px solid var(--border2)", ...style,
   };

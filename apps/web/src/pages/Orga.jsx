@@ -4,8 +4,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { undoDelete } from "../core/undo.jsx";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, th as thBase, td, Toggle, cardStyle, pageApp} from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, CONTROL_R, th as thBase, td, toolbarInput, Toggle, cardStyle, pageApp} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
+import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import Anwesenheit from "./Anwesenheit.jsx";
@@ -99,10 +100,10 @@ export default function Orga() {
           Reiter „Optionen" blendet Reiter ein/aus (Modul-Zahnrad als Seite). */}
       {tab === "optionen" ? (
         <div style={{ maxWidth: 560 }}>
-          <p style={{ color: "var(--text2)", fontSize: 14, marginBottom: 20 }}>{t("orga.optionsIntro")}</p>
+          <p style={{ color: "var(--text2)", fontSize: 14, marginBottom: 16 }}>{t("orga.optionsIntro")}</p>
           <div style={{ ...cardStyle, display: "flex", flexDirection: "column", gap: 4 }}>
             {ORGA_TABS.map((k) => (
-              <div key={k} style={{ display: "flex", alignItems: "center", padding: "10px 4px", borderBottom: "1px solid var(--border)" }}>
+              <div key={k} style={{ display: "flex", alignItems: "center", padding: "12px 4px", borderBottom: "1px solid var(--border)" }}>
                 <span style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>{tabLabel[k]}</span>
                 <Toggle checked={!hidden.includes(k)} onChange={(v) => toggleTab(k, v)} />
               </div>
@@ -110,23 +111,23 @@ export default function Orga() {
           </div>
         </div>
       ) : tab === "anwesenheit" ? <Anwesenheit /> : tab === "ausleihe" ? <Ausleihe /> : tab === "sitzplan" ? <Sitzplan /> : (<>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
-        <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
-      </div>
-
-      <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+      {/* Eine Leiste statt zweier Zeilen: links die Auswahl, daneben der eine
+          Handgriff (neuer Punkt). Das Feld hatte `inputStyle` Zeile fuer Zeile
+          nachgebaut und stand dadurch hoeher als der Plus-Knopf daneben. */}
+      <Werkzeugleiste style={{ marginBottom: 16 }}
+        links={<KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />}>
         <input value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()}
-          placeholder={t("orga.newPlaceholder")} style={{ flex: 1, minWidth: 200, padding: "9px 12px", border: "1px solid var(--border2)", borderRadius: 10, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }} />
+          placeholder={t("orga.newPlaceholder")} style={{ ...toolbarInput, flex: 1, minWidth: 200 }} />
         <AddButton onClick={anlegen} title={t("orga.add")} />
-      </div>
+      </Werkzeugleiste>
 
       {students.length === 0 ? (
         <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("orga.noStudents")}</p>
       ) : items.length === 0 ? (
         <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("orga.noItems")}</p>
       ) : (
-        <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 12 }}>
-          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13.5 }}>
+        <div style={{ ...cardStyle, padding: 0, overflowX: "auto" }}>
+          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 14 }}>
             <thead>
               <tr>
                 <th style={{ ...th, textAlign: "left", position: "sticky", left: 0, background: "var(--card)", minWidth: 140 }}>{cls?.name}</th>
@@ -135,7 +136,7 @@ export default function Orga() {
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
                       <span style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.name}</span>
                       <span style={{ fontSize: 11, fontWeight: 700, color: it.done.length === students.length ? C.success : "var(--text3)" }}>{it.done.length}/{students.length}</span>
-                      <button onClick={() => loeschen(it.id)} className="icon-btn" style={{ ...iconBtn, padding: 2 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={13} color={C.danger} /></button>
+                      <button onClick={() => loeschen(it.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={13} color={C.danger} /></button>
                     </div>
                   </th>
                 ))}
@@ -145,15 +146,15 @@ export default function Orga() {
               {students.map((s, i) => (
                 <tr key={s.id}>
                   <td style={{ ...td, textAlign: "left", position: "sticky", left: 0, background: "var(--card)", fontWeight: 500 }}>
-                    <span style={{ display: "inline-block", width: 26, textAlign: "right", color: "var(--text3)", fontWeight: 400, marginRight: 6, fontVariantNumeric: "tabular-nums" }}>{i + 1}.</span>{s.name}
+                    <span style={{ display: "inline-block", width: 26, textAlign: "right", color: "var(--text3)", fontWeight: 400, marginRight: 8, fontVariantNumeric: "tabular-nums" }}>{i + 1}.</span>{s.name}
                   </td>
                   {items.map((it) => {
                     const on = it.done.includes(s.id);
                     return (
                       <td key={it.id} style={td}>
                         <button onClick={() => toggle(it, s.id)} title={on ? t("orga.done") : t("orga.open")}
-                          style={{ width: 24, height: 24, borderRadius: 6, cursor: "pointer", fontSize: 14, fontWeight: 700,
-                            border: on ? "none" : "1px solid var(--border2)", background: on ? C.success : "transparent", color: on ? "#fff" : "transparent" }}>
+                          style={{ width: 24, height: 24, borderRadius: CONTROL_R, cursor: "pointer", fontSize: 14, fontWeight: 700,
+                            border: on ? "none" : "1px solid var(--border2)", background: on ? C.success : "transparent", color: on ? C.aufAkzent : "transparent" }}>
                           ✓
                         </button>
                       </td>

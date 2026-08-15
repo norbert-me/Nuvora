@@ -10,7 +10,7 @@
 // geholt — die Suche kostet nichts, solange sie zu ist.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { COLORS as C, Icon, ICONS, inputStyle } from "./Icons.jsx";
+import { COLORS as C, CONTROL_R, Icon, ICONS, inputStyle, menuRow, modalOverlay, modalPanel, sectionLabel, SHADOW } from "./Icons.jsx";
 import { ZIELE, passt, rang } from "../core/ziele.js";
 import { useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
@@ -79,37 +79,36 @@ export default function Suche({ offen, onClose }) {
 
   return (
     <div onClick={onClose} role="presentation"
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 4100, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "12vh 16px 16px" }}>
+      style={{ ...modalOverlay, alignItems: "flex-start", padding: "12vh 16px 16px", zIndex: 4100 }}>
       <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label={t("suche.title")}
-        style={{ width: "100%", maxWidth: 560, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 14, boxShadow: "0 18px 60px rgba(0,0,0,0.28)", overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>
-          <Icon d={ICONS.search} size={17} color="var(--text3)" />
+        style={{ ...modalPanel, maxWidth: 560, padding: 0, maxHeight: "none", overflow: "hidden", boxShadow: SHADOW.ueber }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px", borderBottom: "1px solid var(--border)" }}>
+          <Icon d={ICONS.search} size={16} color="var(--text3)" />
           {/* data-suche: der Browser-Test darf nicht am uebersetzten
               Platzhalter haengen — mit englischer Oberflaeche fand er das Feld
               nicht und klickte danach gegen den schon offenen Dialog. */}
           <input ref={feld} data-suche="feld" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={taste}
             placeholder={t("suche.placeholder")} aria-label={t("suche.title")}
-            style={{ ...inputStyle, flex: 1, border: "none", background: "none", fontSize: 15, padding: 4 }} />
-          <kbd style={{ fontSize: 11, color: "var(--text3)", border: "1px solid var(--border2)", borderRadius: 6, padding: "2px 6px" }}>esc</kbd>
+            style={{ ...inputStyle, flex: 1, border: "none", background: "none", fontSize: 16, padding: 4 }} />
+          <kbd style={{ fontSize: 11, color: "var(--text3)", border: "1px solid var(--border2)", borderRadius: CONTROL_R, padding: "2px 6px" }}>esc</kbd>
         </div>
 
-        <div style={{ maxHeight: "52vh", overflowY: "auto", padding: 6 }}>
+        <div style={{ maxHeight: "52vh", overflowY: "auto", padding: 4 }}>
           {flach.length === 0 && (
             <div style={{ padding: 16, fontSize: 13, color: "var(--text3)" }}>{t("suche.nothing")}</div>
           )}
           {treffer.map((g) => (
             <div key={g.gruppe}>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4, color: "var(--text3)", padding: "8px 10px 4px" }}>{g.gruppe}</div>
+              <div style={{ ...sectionLabel, padding: "8px 10px 4px" }}>{g.gruppe}</div>
               {g.eintraege.map((e) => {
                 lauf += 1;
                 const i = lauf;
                 return (
                   <button key={`${e.art}-${e.pfad}`} onClick={() => springe(e)} onMouseEnter={() => setWahl(i)}
-                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: "8px 10px", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14,
-                      background: i === wahl ? "var(--bg2)" : "none", color: "var(--text)" }}>
+                    style={{ ...menuRow, background: i === wahl ? "var(--bg2)" : "none" }}>
                     <Icon d={symbol[e.art]} size={15} color={i === wahl ? C.info : "var(--text3)"} />
                     <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.titel}</span>
-                    <span style={{ fontSize: 11.5, color: "var(--text3)" }}>{e.pfad.split("?")[0]}</span>
+                    <span style={{ fontSize: 12, color: "var(--text3)" }}>{e.pfad.split("?")[0]}</span>
                   </button>
                 );
               })}
@@ -117,7 +116,7 @@ export default function Suche({ offen, onClose }) {
           ))}
         </div>
 
-        <div style={{ display: "flex", gap: 12, padding: "7px 12px", borderTop: "1px solid var(--border)", fontSize: 11.5, color: "var(--text3)" }}>
+        <div style={{ display: "flex", gap: 12, padding: "8px 12px", borderTop: "1px solid var(--border)", fontSize: 12, color: "var(--text3)" }}>
           <span>↑↓ {t("suche.hintMove")}</span>
           <span>↵ {t("suche.hintOpen")}</span>
         </div>

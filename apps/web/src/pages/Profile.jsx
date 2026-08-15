@@ -2,15 +2,20 @@ import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { istAdmin } from "../core/admin.js";
 import { useLanguage, LANGUAGES } from "../i18n/index.jsx";
-import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, th as thBasis, td as tdBasis, badge, inputStyle as inputBasis, Icon, ICONS } from "../components/Icons.jsx";
+import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, pageTitle, panelStyle, popoverPanel,
+  sectionLabel, Tabs, th as thBasis, td as tdBasis, badge, iconBtn, inputStyle as inputBasis, Icon, ICONS, CONTROL_R } from "../components/Icons.jsx";
 
 const API = "/api";
 
+// Abschnittskarte des Profils. Abgeleitet statt siebenmal von Hand gebaut: das
+// Profil war die einzige Seite mit Radius 16 an einem Panel.
+const abschnitt = { ...panelStyle, padding: 24, marginBottom: 24 };
+
 const Spinner = ({ size = 14 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animation: "profspin 0.8s linear infinite", flexShrink: 0 }}>
+  <>
     <style>{`@keyframes profspin{to{transform:rotate(360deg)}}`}</style>
-    <path d="M21 12a9 9 0 1 1-6.2-8.5"/>
-  </svg>
+    <Icon d={ICONS.spinner} size={size} color="currentColor" style={{ animation: "profspin 0.8s linear infinite", flexShrink: 0 }} />
+  </>
 );
 
 // Kleiner Info-Punkt: erklaerender Text. Auf Klick UND Hover, damit er auch
@@ -18,21 +23,22 @@ const Spinner = ({ size = 14 }) => (
 const InfoDot = ({ text }) => {
   const [open, setOpen] = useState(false);
   return (
-    <span style={{ position: "relative", display: "inline-flex", marginLeft: 6, flexShrink: 0 }}>
-      <button type="button" title={text} onClick={() => setOpen((o) => !o)} onBlur={() => setTimeout(() => setOpen(false), 150)}
-        style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--border2)", background: open ? "var(--accent)" : "transparent", color: open ? "#fff" : "var(--text3)", fontSize: 10, fontWeight: 700, cursor: "pointer", padding: 0 }}>i</button>
+    <span style={{ position: "relative", display: "inline-flex", marginLeft: 4, flexShrink: 0 }}>
+      {/* Das „i" war ein handgezeichneter Kreis mit Buchstabe — dasselbe Bild
+          gibt es als ICONS.info, und es faerbt sich mit. */}
+      <button type="button" title={text} aria-label={text} onClick={() => setOpen((o) => !o)} onBlur={() => setTimeout(() => setOpen(false), 150)}
+        style={{ ...iconBtn, padding: 0 }}>
+        <Icon d={ICONS.info} size={15} color={open ? "var(--accent)" : "var(--text3)"} />
+      </button>
       {open && (
-        <span style={{ position: "absolute", top: 22, left: 0, zIndex: 30, width: 240, maxWidth: "70vw", background: "var(--card)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 10, padding: "9px 11px", fontSize: 12.5, lineHeight: 1.5, boxShadow: "0 8px 24px rgba(0,0,0,0.18)", fontWeight: 400 }}>{text}</span>
+        <span style={{ ...popoverPanel, position: "absolute", top: 22, left: 0, zIndex: 30, width: 240, maxWidth: "70vw", padding: 8, fontSize: 12, lineHeight: 1.5, fontWeight: 400 }}>{text}</span>
       )}
     </span>
   );
 };
 
-const TrashIcon = ({ size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={C.danger} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/>
-  </svg>
-);
+// Papierkorb aus der einen Icon-Quelle statt als eigenes SVG.
+const TrashIcon = ({ size = 16 }) => <Icon d={ICONS.trash} size={size} color={C.danger} />;
 
 export default function Profile({ user, onLogout, onUserUpdate }) {
   const { t, lang, setLang } = useLanguage();
@@ -157,12 +163,13 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
 
   return (
     <div style={{ ...pageForm }}>
+      <h1 style={pageTitle}>{t("nav.profile")}</h1>
 
       {/* Sprache steht im Profil, nicht mehr in der Navbar — sie wird einmal
           gesetzt, nicht im Betrieb gewechselt. */}
-      <div style={{ padding: 24, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 24, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ ...abschnitt, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 160 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{t("nav.language")}</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("nav.language")}</div>
         </div>
         <select value={lang} onChange={(e) => setLang(e.target.value)} style={{ ...selectStyle, minWidth: 160 }}>
           {Object.entries(LANGUAGES).map(([code, label]) => (
@@ -171,8 +178,8 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         </select>
       </div>
 
-      <div style={{ padding: 24, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 24 }}>
-        <div style={{ fontSize: 15, color: "var(--text3)", marginBottom: 4 }}>{t("profile.email")}</div>
+      <div style={abschnitt}>
+        <div style={{ fontSize: 14, color: "var(--text3)", marginBottom: 4 }}>{t("profile.email")}</div>
         <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>{user.email}</div>
         {pendingEmail && (
           <div style={{ fontSize: 12, color: C.warning, marginBottom: 8 }}>
@@ -197,9 +204,9 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         {emailMsg && <div style={{ fontSize: 13, color: emailMsg === t("profile.linkSent") ? C.success : C.danger, marginBottom: 16 }}>{emailMsg}</div>}
 
         <form onSubmit={saveProfile}>
-          <button type="button" onClick={() => setShowUsername((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: showUsername ? 10 : 0 }}>
-            <span style={{ fontSize: 20, color: "var(--text3)", lineHeight: 1 }}>{showUsername ? "−" : "+"}</span>
-            <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{t("profile.username")}</span>
+          <button type="button" onClick={() => setShowUsername((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: showUsername ? 8 : 0 }}>
+            <Icon d={showUsername ? ICONS.chevronUp : ICONS.chevronDown} size={15} />
+            <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("profile.username")}</span>
             <InfoDot text={t("profile.usernameHint")} />
           </button>
           {showUsername && (
@@ -207,23 +214,23 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
               style={{ ...feldStyle, marginBottom: 10 }} />
           )}
 
-          <button type="button" onClick={() => setShowScale((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: 20, marginBottom: showScale ? 10 : 0 }}>
-            <span style={{ fontSize: 20, color: "var(--text3)", lineHeight: 1 }}>{showScale ? "−" : "+"}</span>
-            <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{t("profile.gradeScale")}</span>
+          <button type="button" onClick={() => setShowScale((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: 24, marginBottom: showScale ? 8 : 0 }}>
+            <Icon d={showScale ? ICONS.chevronUp : ICONS.chevronDown} size={15} />
+            <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("profile.gradeScale")}</span>
             <InfoDot text={t("profile.gradeScaleHint")} />
           </button>
           <style>{".nice-num::-webkit-inner-spin-button,.nice-num::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.nice-num{-moz-appearance:textfield;appearance:textfield}"}</style>
           {showScale && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12, marginTop: 4 }}>
             {[1, 2, 3, 4, 5].map((g) => (
-              <div key={g} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 8px", background: "var(--card)", borderRadius: 8 }}>
+              <div key={g} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 8px", background: "var(--card)", borderRadius: CONTROL_R }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{g}</span>
                 <span style={{ fontSize: 11, color: "var(--text3)" }}>{t("profile.from")}</span>
                 <input className="nice-num"
                   type="number" min="0" max="100" step="1"
                   value={gradeScale[g]}
                   onChange={(e) => setGradeScale({ ...gradeScale, [g]: Math.max(0, Math.min(100, Number(e.target.value))) })}
-                  style={{ width: 52, padding: "6px 8px", fontSize: 13, border: "1px solid var(--border2)", borderRadius: 8, textAlign: "center", background: "var(--bg)", color: "var(--text)" }}
+                  style={{ ...inputBasis, width: 52, padding: "4px 8px", fontSize: 13, textAlign: "center" }}
                 />
                 <span style={{ fontSize: 11, color: "var(--text3)" }}>%</span>
               </div>
@@ -233,19 +240,17 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
 
           {/* Noten-Anzeige: mit Tendenz (2+/2-) oder ganze Noten — einklappbar wie
               die Abschnitte darüber. */}
-          <button type="button" onClick={() => setShowTendency((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: 20, marginBottom: showTendency ? 10 : 0 }}>
-            <span style={{ fontSize: 20, color: "var(--text3)", lineHeight: 1 }}>{showTendency ? "−" : "+"}</span>
-            <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{t("profile.gradeTendency")}</span>
+          <button type="button" onClick={() => setShowTendency((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: 24, marginBottom: showTendency ? 8 : 0 }}>
+            <Icon d={showTendency ? ICONS.chevronUp : ICONS.chevronDown} size={15} />
+            <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("profile.gradeTendency")}</span>
             <InfoDot text={t("profile.gradeTendencyHint")} />
           </button>
           {showTendency && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4, flexWrap: "wrap" }}>
-              <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden" }}>
-                {[[true, t("profile.gradeTendencyOn")], [false, t("profile.gradeTendencyOff")]].map(([v, lbl]) => (
-                  <button key={String(v)} type="button" onClick={() => setGradeTendency(v)}
-                    style={{ border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, padding: "5px 12px", background: gradeTendency === v ? "var(--accent)" : "transparent", color: gradeTendency === v ? "#fff" : "var(--text2)" }}>{lbl}</button>
-                ))}
-              </div>
+            // `Tabs` statt eines zweiten Umschalters von Hand: dieselbe
+            // Entscheidung soll ueberall gleich aussehen.
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+              <Tabs value={gradeTendency ? "an" : "aus"} onChange={(v) => setGradeTendency(v === "an")}
+                options={[["an", t("profile.gradeTendencyOn")], ["aus", t("profile.gradeTendencyOff")]]} />
             </div>
           )}
 
@@ -254,10 +259,10 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         </form>
       </div>
 
-      <div style={{ padding: 24, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 24 }}>
-        <button type="button" onClick={() => setShowPw((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: showPw ? 12 : 0 }}>
-          <span style={{ fontSize: 20, color: "var(--text3)", lineHeight: 1 }}>{showPw ? "−" : "+"}</span>
-          <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{t("profile.changePw")}</span>
+      <div style={abschnitt}>
+        <button type="button" onClick={() => setShowPw((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: showPw ? 12 : 0 }}>
+          <Icon d={showPw ? ICONS.chevronUp : ICONS.chevronDown} size={15} />
+          <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("profile.changePw")}</span>
         </button>
         {showPw && (
         <form onSubmit={changePw} autoComplete="on">
@@ -272,9 +277,9 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         )}
       </div>
 
-      <div style={{ padding: 24, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 24, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ ...abschnitt, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 180 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{t("profile.tutorialTitle")}</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("profile.tutorialTitle")}</div>
           <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 2 }}>{t("profile.tutorialHint")}</div>
         </div>
         <button type="button" onClick={() => {
@@ -284,54 +289,52 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
       </div>
 
       {isAdmin && (
-        <div style={{ marginTop: 40, marginBottom: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", letterSpacing: "0.8px", textTransform: "uppercase" }}>
+        <div style={{ marginTop: 24, marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+            <span style={sectionLabel}>
               {t("profile.admin")}
             </span>
             <div style={{ height: 1, flex: 1, background: "var(--border2)" }} />
           </div>
 
           {setup && !(setup.smtp && setup.site_json && setup.admin_email && setup.contact_deliverable) && (
-            <div style={{ padding: 24, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 16 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("profile.setup")}</div>
+            <div style={{ ...abschnitt, marginBottom: 16 }}>
+              <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("profile.setup")}</div>
               {[["smtp", t("profile.setupSmtp")], ["site_json", t("profile.setupSite")], ["admin_email", t("profile.setupAdminMail")], ["contact_deliverable", t("profile.setupContact")]].map(([k, label]) => (
-                <div key={k} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, padding: "5px 0", color: "var(--text)" }}>
-                  <span style={{ display: "inline-flex", width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center", background: setup[k] ? C.success : "var(--border3)", color: "#fff", flexShrink: 0 }}>
-                    {setup[k]
-                      ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-                      : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="3.5" strokeLinecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>}
+                <div key={k} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "4px 0", color: "var(--text)" }}>
+                  <span style={{ display: "inline-flex", flexShrink: 0 }}>
+                    <Icon d={setup[k] ? ICONS.checkCircle : ICONS.close} size={16}
+                      color={setup[k] ? C.success : "var(--text3)"} />
                   </span>
                   <span style={{ color: setup[k] ? "var(--text)" : C.warning }}>{label}</span>
                 </div>
               ))}
               {!setup.smtp && <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>{t("profile.setupSmtpHint")}</p>}
               {setup.smtp && !setup.contact_deliverable && <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>{t("profile.setupContactHint")}</p>}
-              {setup.contact_fallback && <p style={{ fontSize: 12, color: C.warning, marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                {/* TODO: eigenes `warn`-Icon in ICONS; bis dahin `info`. */}
-                <Icon d={ICONS.info} size={13} color={C.warning} />{t("profile.setupContactFallback")}</p>}
+              {setup.contact_fallback && <p style={{ fontSize: 12, color: C.warning, marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
+                <Icon d={ICONS.warn} size={13} color={C.warning} />{t("profile.setupContactFallback")}</p>}
               {setup.contact_to && <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>{t("profile.setupContactTo", { to: setup.contact_to })}</p>}
             </div>
           )}
 
-          <div style={{ padding: 24, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 16 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("profile.version")}</div>
+          <div style={{ ...abschnitt, marginBottom: 16 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("profile.version")}</div>
             {versionLoading ? (
               <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text3)" }}>
                 <Spinner /> {t("profile.checking")}
               </div>
             ) : versionInfo ? (
-              <div style={{ display: "flex", gap: 32, flexWrap: "wrap", alignItems: "flex-start" }}>
+              <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 14, color: "var(--text)" }}>{t("profile.installed")} <strong>v{versionInfo.current}</strong></span>
                     {!versionInfo.update_available && (
-                      <svg title={t("profile.upToDate")} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.success} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                      <Icon d={ICONS.checkCircle} size={16} color={C.success} />
                     )}
                   </div>
                   {versionInfo.update_available && (
-                    <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--bg2)", border: "1px solid var(--border2)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v10M12 12l4-4M12 12l-4-4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+                    <div style={{ marginTop: 12, padding: 12, background: "var(--bg2)", border: "1px solid var(--border2)", borderRadius: CONTROL_R, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <Icon d={ICONS.download} size={18} color="var(--text)" />
                       <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{t("profile.updateAvailable")} v{versionInfo.latest}</span>
                       <a href={versionInfo.repo_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 600, color: "var(--accent)" }}>{t("profile.toGithub")}</a>
                     </div>
@@ -340,16 +343,8 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                 {versionInfo.channels && (
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("profile.channel")}</span>
-                    <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden" }}>
-                      {versionInfo.channels.map((ch) => (
-                        <button key={ch} onClick={() => changeChannel(ch)}
-                          style={{
-                            padding: "4px 12px", fontSize: 12.5, fontWeight: 600, border: "none", cursor: "pointer",
-                            background: versionInfo.channel === ch ? "var(--accent)" : "transparent",
-                            color: versionInfo.channel === ch ? "#fff" : "var(--text2)",
-                          }}>{t(`profile.channel.${ch}`)}</button>
-                      ))}
-                    </div>
+                    <Tabs value={versionInfo.channel} onChange={changeChannel}
+                      options={versionInfo.channels.map((ch) => [ch, t(`profile.channel.${ch}`)])} />
                     <InfoDot text={t(`profile.channelHint.${versionInfo.channel}`)} />
                   </div>
                 )}
@@ -359,8 +354,8 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             )}
           </div>
 
-          <div style={{ padding: 24, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)" }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("profile.accounts")}</div>
+          <div style={{ ...abschnitt, marginBottom: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("profile.accounts")}</div>
             {adminUsersLoading ? (
               <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text3)" }}>
                 <Spinner /> {t("profile.accountsLoading")}
@@ -416,7 +411,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                                   setAdminMsg(t("profile.deleted", { email: u.email }));
                                 }
                               }}
-                              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 6, background: "none", border: `1px solid ${C.danger}`, borderRadius: 8, cursor: "pointer" }}
+                              style={{ ...iconBtn, border: `1px solid `, borderRadius: CONTROL_R }}
                             ><TrashIcon size={15} /></button>
                           )}
                         </td>
@@ -431,7 +426,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <button onClick={async () => {
           const res = await fetch(`${API}/me/export`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
           if (!res || !res.ok) { showAlert(t("profile.exportError")); return; }
@@ -460,7 +455,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             const data = await res.json();
             showAlert(data.detail || t("login.genericError"));
           }
-        }} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: C.danger, fontSize: 13, cursor: "pointer" }}>
+        }} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", color: C.danger, fontSize: 13, cursor: "pointer" }}>
           <TrashIcon size={14} /> {t("profile.deleteUser")}
         </button>
       </div>

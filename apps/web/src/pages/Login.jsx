@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { COLORS as C } from "../components/Icons.jsx";
+import { COLORS as C, cardStyle, inputStyle as feld, btnPrimary as knopf, pageForm, SHADOW } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { schreib, schreibJson } from "../core/speicher.js";
 
@@ -90,8 +90,8 @@ export default function Login({ onLogin }) {
   const subtitle = mode === "login" ? t("login.signIn") : mode === "register" ? t("login.createAccount") : t("login.resetPassword");
 
   return (
-    <div style={{ display: "flex", justifyContent: "center", padding: "40px 0" }}>
-      <div style={{ width: "100%", maxWidth: 380, padding: "32px 36px", background: "var(--card)", borderRadius: 20, border: "1px solid var(--border)", boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
+    <div style={{ ...pageForm, padding: "24px 0" }}>
+      <div style={{ ...cardStyle, padding: 24, boxShadow: SHADOW.ruhig }}>
         <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", textAlign: "center", margin: "0 0 4px" }}>CardVote</h2>
         <p style={{ color: "var(--text3)", fontSize: 14, textAlign: "center", marginBottom: 24, marginTop: 4 }}>
           {subtitle}
@@ -130,17 +130,11 @@ export default function Login({ onLogin }) {
   );
 }
 
-const inputStyle = {
-  display: "block", width: "100%", padding: "12px 14px", marginBottom: 12,
-  border: "1px solid var(--border2)", borderRadius: 10, fontSize: 15, boxSizing: "border-box",
-  background: "var(--bg)", color: "var(--text)",
-};
+// Formularseite: Felder und Knopf ueber die volle Breite — abgeleitet aus der
+// Design-Quelle, damit Rahmen, Ecken und Farben dieselben sind wie ueberall.
+const inputStyle = { ...feld, display: "block", width: "100%", marginBottom: 12 };
 
-const btnPrimary = {
-  width: "100%", padding: "12px", fontSize: 15, fontWeight: 600,
-  background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 980,
-  cursor: "pointer", letterSpacing: "-0.2px",
-};
+const btnPrimary = { ...knopf, width: "100%", padding: 12, fontSize: 16 };
 
 const linkBtn = {
   background: "none", border: "none", color: "var(--accent)", fontSize: 14,

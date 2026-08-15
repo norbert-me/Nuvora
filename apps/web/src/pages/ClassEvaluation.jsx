@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { LoadError, COLORS as C, Boxplot, pageApp, th as thBasis, td as tdBasis, Icon, ICONS, btnSecondary, CONTROL_H, CONTROL_R, StatCard } from "../components/Icons.jsx";
+import { LoadError, COLORS as C, Boxplot, pageApp, th as thBasis, td as tdBasis, Icon, ICONS, chipStyle, panelStyle, Toggle, StatCard } from "../components/Icons.jsx";
+import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -108,8 +109,8 @@ export default function ClassEvaluation() {
   return (
     <div>
       <Link to="/cardvote/tests" style={backLink}><Icon d={ICONS.arrowLeft} size={14} /> {t("cv.backAllTests")}</Link>
-      <h2 style={{ marginTop: 12, marginBottom: 20, fontSize: 24, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.3px" }}>
-        {class_name} <span style={{ fontWeight: 400, color: "var(--text3)", fontSize: 18 }}>— {t("cv.overallEval")}</span>
+      <h2 style={{ marginTop: 12, marginBottom: 24, fontSize: 22, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.3px" }}>
+        {class_name} <span style={{ fontWeight: 400, color: "var(--text3)", fontSize: 16 }}>— {t("cv.overallEval")}</span>
       </h2>
 
       {/* Frühwarnung: wer hängt über mehrere Tests hinweg hinterher? Steht VOR
@@ -118,7 +119,7 @@ export default function ClassEvaluation() {
       <FruehwarnPanel classId={id} nurKind={suche.get("fw")} />
 
       {/* Stat tiles */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
         <StatCard label={t("cv.statTests")} value={tests.length} />
         <StatCard label={t("cv.statAvgTotal")} value={`${classAvgPct}%`} />
         {med != null && <StatCard label={t("cv.statMedian")} value={`${med}%`} />}
@@ -129,22 +130,21 @@ export default function ClassEvaluation() {
 
       {/* Boxplot toggle */}
       {pctValues.length >= 3 && (
-        <div style={{ padding: 0, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 16, overflow: "hidden" }}>
-          <div style={{ display: "flex", gap: 8, padding: "12px 16px 0" }}>
-            {/* Hoehe/Form aus dem Kern (CONTROL_H/CONTROL_R) statt eigener
-                Polsterung — sonst steht der Knopf neben jeder anderen Leiste
-                der App schief. */}
-            <button
-              onClick={() => setChartView(chartView === "box" ? "none" : "box")}
-              style={{
-                ...btnSecondary, height: CONTROL_H, padding: "0 14px", borderRadius: CONTROL_R,
-                fontSize: 13, fontWeight: 600, lineHeight: 1,
-                background: chartView === "box" ? "var(--accent)" : "var(--card)",
-                color: chartView === "box" ? "#fff" : "var(--text2)",
-                borderColor: chartView === "box" ? "var(--accent)" : "var(--border2)",
-              }}
-            >{t("cv.boxplot")}</button>
-          </div>
+        <div style={{ ...panelStyle, padding: 0, marginBottom: 16, overflow: "hidden" }}>
+          {/* Ein Zwei-Zustands-Umschalter, also der Schalter aus dem Kern —
+              vorher ein Knopf, der seinen Zustand nur ueber die Farbe zeigte.
+              (`Tabs` braeuchte ein zweites Etikett „Aus"; das Wort gibt es im
+              Woerterbuch nicht.) */}
+          <Werkzeugleiste
+            style={{ padding: "12px 16px 0", marginBottom: 0 }}
+            links={
+              <Toggle
+                checked={chartView === "box"}
+                onChange={(an) => setChartView(an ? "box" : "none")}
+                label={t("cv.boxplot")}
+              />
+            }
+          />
           {chartView === "box" && <Boxplot values={pctValues} max={100} unit="%" />}
         </div>
       )}
@@ -199,9 +199,7 @@ export default function ClassEvaluation() {
                   ) : student.name}
                   {/* Kursniveau steht immer neben dem Ergebnis. */}
                   {student.niveau && (
-                    <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, padding: "1px 6px", borderRadius: 8, background: "var(--bg2)", color: "var(--text3)" }}>
-                      {student.niveau}
-                    </span>
+                    <span style={{ ...chipStyle, marginLeft: 8 }}>{student.niveau}</span>
                   )}
                 </td>
                 {student.perTest.map((pt, i) => (
@@ -260,7 +258,7 @@ function cellStyle(pt) {
 }
 
 function pctStyle(pct) {
-  if (pct == null) return { color: "#ccc", background: "var(--bg2)" };
+  if (pct == null) return { color: "var(--text3)", background: "var(--bg2)" };
   if (pct >= 80) return { background: "var(--success-bg)", color: C.success };
   if (pct >= 50) return { background: "var(--warn-bg)", color: C.warning };
   return { background: "var(--danger-bg)", color: C.danger };

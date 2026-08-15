@@ -7,7 +7,7 @@
 // liest sie trotzdem.
 import { useState, useEffect, useCallback } from "react";
 import CardFace from "../components/CardFace.jsx";
-import { COLORS as C, Icon, ICONS, Tabs, btnPrimary, btnSecondary } from "../components/Icons.jsx";
+import { COLORS as C, REIFE_COLORS, Icon, ICONS, Tabs, btnPrimary, btnSecondary, cardStyle } from "../components/Icons.jsx";
 import { useParams } from "react-router-dom";
 import RechtsFuss from "../components/RechtsFuss.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -92,16 +92,16 @@ export default function Lernen() {
         <div style={{ textAlign: "center", width: "100%", maxWidth: 460 }}>
           {tabBar}
           <div style={{ marginBottom: 8 }}><Icon d={ICONS.check} size={48} color={C.success} /></div>
-          <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>{t("lernen.doneTitle")}</h2>
-          <p style={{ color: "var(--text2)", marginBottom: 20 }}>{t("lernen.doneHint")}</p>
+          <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>{t("lernen.doneTitle")}</h2>
+          <p style={{ color: "var(--text2)", marginBottom: 16 }}>{t("lernen.doneHint")}</p>
           {data.next_due && (
-            <p style={{ fontSize: 14, color: "var(--text)", marginBottom: 20 }}>
+            <p style={{ fontSize: 14, color: "var(--text)", marginBottom: 16 }}>
               {t("lernen.nextLearning")} <strong>{new Date(data.next_due).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}</strong>
             </p>
           )}
           <MeinFortschritt data={data} t={t} />
           {data.total > 0 && (
-            <button onClick={() => load(true)} style={{ ...btnSecondary, marginTop: 20 }}>
+            <button onClick={() => load(true)} style={{ ...btnSecondary, marginTop: 16 }}>
               {t("lernen.practiceMore")}
             </button>
           )}
@@ -133,7 +133,7 @@ export default function Lernen() {
             <Grade label={t("lernen.gradeAgain")} color={C.danger} onClick={() => bewerten(0)} />
             <Grade label={t("lernen.gradeHard")} color={C.warning} onClick={() => bewerten(1)} />
             <Grade label={t("lernen.gradeGood")} color={C.success} onClick={() => bewerten(2)} />
-            <Grade label={t("lernen.gradeEasy")} color="#0066cc" onClick={() => bewerten(3)} />
+            <Grade label={t("lernen.gradeEasy")} color={C.info} onClick={() => bewerten(3)} />
           </div>
         )}
       </div>
@@ -143,14 +143,14 @@ export default function Lernen() {
 
 // Eigener Fortschritt fuer die lernende Person: gelernt-Anteil und die
 // Reifegrad-Verteilung als kleiner gestapelter Balken. Die Beschriftung kommt
-// aus der Uebersetzung, die Farbe bleibt fest (gleiche Staffelung wie in
-// Karten.jsx).
+// aus der Uebersetzung, die Farbe aus REIFE_COLORS (Icons.jsx) — dieselbe
+// Staffelung wie in der Lehrer-Ansicht.
 const REIFE = [
-  ["neu", "lernen.reifeNeu", "#cbd5e1"],
-  ["lernen", "lernen.reifeLernen", "#f59e0b"],
-  ["kurz", "lernen.reifeKurz", "#eab308"],
-  ["mittel", "lernen.reifeMittel", "#84cc16"],
-  ["lang", "lernen.reifeLang", C.success],
+  ["neu", "lernen.reifeNeu"],
+  ["lernen", "lernen.reifeLernen"],
+  ["kurz", "lernen.reifeKurz"],
+  ["mittel", "lernen.reifeMittel"],
+  ["lang", "lernen.reifeLang"],
 ];
 
 function MeinFortschritt({ data, t }) {
@@ -159,19 +159,21 @@ function MeinFortschritt({ data, t }) {
   if (!total) return null;
   const learned = data?.learned || 0;
   return (
-    <div style={{ padding: 16, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", textAlign: "left" }}>
+    <div style={{ ...cardStyle, textAlign: "left" }}>
       <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{t("lernen.myProgress")}</div>
       <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 12 }}>{t("lernen.learnedOf", { n: learned, total })}</div>
-      <div style={{ display: "flex", height: 12, borderRadius: 6, overflow: "hidden", marginBottom: 10 }}>
-        {REIFE.map(([k, , color]) => {
+      {/* Balken und Punkt sind reine Grafik: der Radius ist jeweils die halbe
+          Kante (12/2 bzw. 8/2), also ein rundes Ende, kein Bedienelement. */}
+      <div style={{ display: "flex", height: 12, borderRadius: 6, overflow: "hidden", marginBottom: 8 }}>
+        {REIFE.map(([k]) => {
           const n = hist[k] || 0;
-          return n > 0 ? <div key={k} style={{ width: `${(n / total) * 100}%`, background: color }} title={`${n}`} /> : null;
+          return n > 0 ? <div key={k} style={{ width: `${(n / total) * 100}%`, background: REIFE_COLORS[k] }} title={`${n}`} /> : null;
         })}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 12px" }}>
-        {REIFE.map(([k, label, color]) => (
-          <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, color: "var(--text3)" }}>
-            <span style={{ width: 9, height: 9, borderRadius: 3, background: color }} />
+        {REIFE.map(([k, label]) => (
+          <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text3)" }}>
+            <span style={{ width: 8, height: 8, borderRadius: 4, background: REIFE_COLORS[k] }} />
             {t(label)} {hist[k] || 0}
           </span>
         ))}
@@ -186,21 +188,21 @@ function Ergebnisse({ results, t }) {
   if (!results.length) return (
     <div style={{ textAlign: "center", padding: "40px 0" }}>
       <div style={{ marginBottom: 8 }}><Icon d={ICONS.chart} size={42} color="var(--text3)" /></div>
-      <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>{t("lernen.noResultTitle")}</h2>
+      <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>{t("lernen.noResultTitle")}</h2>
       <p style={{ color: "var(--text2)" }}>{t("lernen.noResultHint")}</p>
     </div>
   );
   return (
     <div>
-      <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, textAlign: "center" }}>{t("lernen.resultsTitle")}</h2>
+      <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 12, textAlign: "center" }}>{t("lernen.resultsTitle")}</h2>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {results.map((r, idx) => (
-          <div key={idx} style={{ padding: "12px 16px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", display: "flex", alignItems: "center", gap: 12 }}>
+          <div key={idx} style={{ ...cardStyle, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
               <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.date ? new Date(r.date).toLocaleDateString() : ""}</div>
             </div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: r.pct >= 50 ? C.success : C.danger }}>{r.pct}%</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: r.pct >= 50 ? C.success : C.danger }}>{r.pct}%</div>
             <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.score}/{r.total}</div>
           </div>
         ))}
@@ -211,7 +213,7 @@ function Ergebnisse({ results, t }) {
 
 const Center = ({ children, hinweis }) => (
   <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--bg)" }}>
-    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       {children}
     </div>
     {/* Pflichtangaben auch hier: diese Seite sehen Lernende ohne Konto. */}
@@ -222,7 +224,7 @@ const Center = ({ children, hinweis }) => (
 // Bewertungsknopf: dieselbe Pille wie ueberall, nur die Farbe sagt, was sie tut.
 function Grade({ label, color, onClick }) {
   return (
-    <button onClick={onClick} style={{ ...btnPrimary, background: color, color: "#fff", width: "100%", boxSizing: "border-box", padding: "12px 4px", fontSize: 13 }}>
+    <button onClick={onClick} style={{ ...btnPrimary, background: color, color: C.aufAkzent, width: "100%", boxSizing: "border-box", padding: "12px 4px", fontSize: 13 }}>
       {label}
     </button>
   );

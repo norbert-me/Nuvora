@@ -5,7 +5,7 @@
 //   const txt = await askPrompt("Kurze Beschreibung:");
 // <DialogHost/> wird einmal in der Shell gemountet.
 import { useState, useEffect, useId } from "react";
-import { Modal } from "../components/Icons.jsx";
+import { Modal, btnPrimary, btnSecondary, inputStyle, COLORS as C } from "../components/Icons.jsx";
 
 let _push = null;               // vom Host registriert
 const _queue = [];              // bevor der Host bereit ist
@@ -67,19 +67,18 @@ export function DialogHost() {
   // key: jede Nachfrage ist ein eigener Dialog (Fokus neu setzen und zurueckgeben).
   return (
     <Modal key={cur.id} onClose={abbrechen} width={380} labelledby={titelId} overlayStyle={{ zIndex: 3000 }}>
-      <div id={titelId} style={{ fontSize: 15, lineHeight: 1.5, marginBottom: cur.kind === "prompt" ? 12 : 18, whiteSpace: "pre-wrap" }}>{cur.message}</div>
+      <div id={titelId} style={{ fontSize: 16, lineHeight: 1.5, marginBottom: cur.kind === "prompt" ? 12 : 16, whiteSpace: "pre-wrap" }}>{cur.message}</div>
       {cur.kind === "prompt" && (
         <input autoFocus value={val} onChange={(e) => setVal(e.target.value)} placeholder={cur.placeholder}
           onKeyDown={(e) => { if (e.key === "Enter") bestaetigen(); }}
-          style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--border2)", borderRadius: 10, fontSize: 14, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box", marginBottom: 16 }} />
+          style={{ ...inputStyle, width: "100%", marginBottom: 16 }} />
       )}
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
         {cur.kind !== "alert" && (
-          <button onClick={abbrechen} style={{ padding: "8px 16px", borderRadius: 980, border: "1px solid var(--border2)", background: "var(--card)", color: "var(--text2)", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>{cur.cancel || "Abbrechen"}</button>
+          <button onClick={abbrechen} style={btnSecondary}>{cur.cancel || "Abbrechen"}</button>
         )}
         <button autoFocus={cur.kind !== "prompt"} onClick={bestaetigen}
-          style={{ padding: "8px 18px", borderRadius: 980, border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer",
-            background: cur.danger ? "#d1350f" : "var(--text)", color: cur.danger ? "#fff" : "var(--bg)" }}>{okLabel}</button>
+          style={{ ...btnPrimary, ...(cur.danger ? { background: C.danger, color: C.aufAkzent } : null) }}>{okLabel}</button>
       </div>
     </Modal>
   );

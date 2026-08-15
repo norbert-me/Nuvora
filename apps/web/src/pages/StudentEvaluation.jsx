@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { DownloadLink, COLORS as C, pageApp, th as thBasis, td as tdBasis, Icon, ICONS, StatCard } from "../components/Icons.jsx";
+import { DownloadLink, COLORS as C, pageApp, pageTitle, th as thBasis, td as tdBasis, Icon, ICONS, sectionLabel, StatCard } from "../components/Icons.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import Themenstand from "../components/Themenstand.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -51,8 +51,8 @@ export default function StudentEvaluation() {
       <Link to={`/cardvote/class-evaluation/${classId}`} style={{ color: "var(--text3)", textDecoration: "none", fontSize: 13, fontWeight: 500 }}>
         <Icon d={ICONS.arrowLeft} size={14} /> {class_name}
       </Link>
-      <h2 style={{ marginTop: 12, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{student.name}</h2>
-      <p style={{ color: "var(--text3)", marginBottom: 20, fontSize: 14 }}>
+      <h2 style={{ ...pageTitle, marginTop: 12 }}>{student.name}</h2>
+      <p style={{ color: "var(--text3)", marginBottom: 24, fontSize: 14 }}>
         {t("cv.cardNo", { n: student.card_id })} · {class_name}
         {/* Kursniveau gehört zur Ergebnisanzeige — die Prozentwerte einer
             G-Wertung sind ohne diesen Hinweis nicht einzuordnen. */}
@@ -65,7 +65,7 @@ export default function StudentEvaluation() {
       {/* Themenstand dieses Kindes: was sitzt, was nicht, und wird es besser? */}
       <Themenstand classId={classId} cardId={cardId} />
 
-      <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
         <StatCard label={t("cv.statAvgTotal")} value={avgPct != null ? `${avgPct}%` : "–"} color={colorForPct(avgPct)} />
         <StatCard label={t("cv.statBestTest")} value={best != null ? `${best}%` : "–"} color={C.success} />
         <StatCard label={t("cv.statWorstShort")} value={worst != null ? `${worst}%` : "–"} color={C.danger} />
@@ -76,7 +76,7 @@ export default function StudentEvaluation() {
       {/* Trend bar */}
       {pcts.length >= 2 && (
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text3)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>{t("cv.progress")}</div>
+          <div style={{ ...sectionLabel, marginBottom: 8 }}>{t("cv.progress")}</div>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 80 }}>
             {present.map((r, i) => (
               <div key={r.session_id} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -84,6 +84,7 @@ export default function StudentEvaluation() {
                 <div style={{
                   width: "100%", maxWidth: 40,
                   height: `${Math.max(r.pct * 0.7, 4)}px`,
+                  // Balkenkappe: reine Grafik, kein Bedienelement.
                   background: colorForPct(r.pct), borderRadius: 4, transition: "height 0.3s",
                 }} />
               </div>
@@ -122,7 +123,7 @@ export default function StudentEvaluation() {
         </tbody>
       </table>
 
-      <div style={{ marginTop: 20 }}>
+      <div style={{ marginTop: 24 }}>
         <DownloadLink onClick={async () => { const r = await fetch(`${API}/classes/${classId}/all-tests-student-pdf/${cardId}`); if (!r.ok) return; const b = await r.blob(); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = `${t("cv.pdfOverviewFile")}_${student.name}.pdf`; a.click(); URL.revokeObjectURL(a.href); }}>
           {t("cv.downloadPdf")}
         </DownloadLink>
@@ -140,6 +141,8 @@ function colorForPct(pct) {
 
 // StatCard kommt aus Icons.jsx — die lokale Kopie war eine zweite Design-Quelle.
 
-// Aus dem Kern abgeleitet.
-const th = { ...thBasis, padding: "8px 10px", textAlign: "left", fontSize: 13, color: "var(--text3)", borderBottom: "none" };
-const tdStyle = { ...tdBasis, padding: 10, textAlign: "left" };
+// Aus dem Kern abgeleitet — wortgleich mit der Klassen-Auswertung, damit
+// dieselbe Tabelle nicht zweimal verschieden aussieht (der Strich unter dem
+// Kopf sitzt hier an der Zeile).
+const th = { ...thBasis, padding: "8px 10px", textAlign: "left", fontSize: 13, color: "var(--text)", borderBottom: "none" };
+const tdStyle = { ...tdBasis, padding: "8px 10px", textAlign: "left" };

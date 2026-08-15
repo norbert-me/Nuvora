@@ -1,11 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { COLORS as C, btnPrimary, pageApp} from "../components/Icons.jsx";
+import {
+  ANTWORT_COLORS, COLORS as C, Icon, ICONS, btnPrimary, chipStyle, panelStyle,
+  toolbarBtn, toolbarBtnPrimary, pageApp,
+} from "../components/Icons.jsx";
+import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useSearchParams } from "react-router-dom";
 import { useLanguage } from "../i18n/index.jsx";
 import { lies } from "../core/speicher.js";
 
 const API = "/api";
-const ANSWER_COLORS = { A: "#0066cc", B: "#5856d6", C: C.warning, D: C.danger };
+// Antwortfarben kommen aus dem Kern (ANTWORT_COLORS) — die Kopie hier war die
+// dritte im Modul, und eine Aenderung traf nur zwei davon.
 
 export default function Scanner() {
   const { t } = useLanguage();
@@ -182,7 +187,7 @@ export default function Scanner() {
       const pts = card.corners.map(([nx, ny]) => [offX + nx * drawW, offY + ny * drawH]);
       const student = classStudentsRef.current.find((s) => s.card_id === card.marker_id);
       const label = student ? `${student.name}: ${card.answer}` : `#${card.marker_id}: ${card.answer}`;
-      const color = ANSWER_COLORS[card.answer] || "#0066cc";
+      const color = ANTWORT_COLORS[card.answer] || ANTWORT_COLORS.A;
 
       ctx.strokeStyle = color;
       ctx.lineWidth = 3;
@@ -380,10 +385,10 @@ export default function Scanner() {
 
       {/* Testende-Hinweis */}
       {!scanning && sessionFinished && (
-        <div style={{ padding: 20, background: "var(--bg3)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 12, textAlign: "center" }}>
+        <div style={{ ...panelStyle, padding: 24, marginBottom: 12, textAlign: "center" }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>{t("scanner.finishedTitle")}</div>
-          <p style={{ fontSize: 14, color: "var(--text3)", margin: "0 0 14px" }}>{t("scanner.finishedHint")}</p>
-          <button onClick={() => { setSessionFinished(false); setLastCards([]); }} style={{ ...btnPrimary, padding: "10px 24px" }}>
+          <p style={{ fontSize: 14, color: "var(--text3)", margin: "0 0 16px" }}>{t("scanner.finishedHint")}</p>
+          <button onClick={() => { setSessionFinished(false); setLastCards([]); }} style={btnPrimary}>
             {t("scanner.newSession")}
           </button>
         </div>
@@ -391,8 +396,8 @@ export default function Scanner() {
 
       {/* Elegante Code-Eingabe */}
       {!scanning ? (!sessionFinished &&
-        <div style={{ padding: "28px 20px", background: "var(--bg3)", borderRadius: 20, border: "1px solid var(--border)", marginBottom: 12, textAlign: "center" }}>
-          <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text3)", display: "block", marginBottom: 14 }}>{t("scanner.sessionCode")}</label>
+        <div style={{ ...panelStyle, padding: "24px 16px", marginBottom: 12, textAlign: "center" }}>
+          <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text3)", display: "block", marginBottom: 16 }}>{t("scanner.sessionCode")}</label>
           <input
             type="text"
             inputMode="numeric"
@@ -402,6 +407,9 @@ export default function Scanner() {
             placeholder="0000"
             style={{
               padding: "6px 0", width: "100%", maxWidth: 240, margin: "0 auto", display: "block",
+              // Bewusst gross: der vierstellige Sitzungscode ist die einzige
+              // Eingabe der Seite und wird im Klassenraum vorgelesen und am
+              // Handy eingetippt — eine Ziffernanzeige, kein Fliesstext.
               fontSize: 44, fontWeight: 700, fontFamily: "ui-monospace, monospace", letterSpacing: "0.4em",
               textAlign: "center", border: "none", borderBottom: "2px solid var(--border2)",
               background: "transparent", color: "var(--text)", boxSizing: "border-box", outline: "none",
@@ -411,16 +419,16 @@ export default function Scanner() {
           <button
             onClick={toggleScanning}
             disabled={sessionId.length < 4}
-            style={{ ...btnPrimary, marginTop: 22, width: "100%", maxWidth: 240, padding: "13px 24px", fontSize: 15,
+            style={{ ...btnPrimary, marginTop: 24, width: "100%", maxWidth: 240, padding: "12px 24px",
               cursor: sessionId.length >= 4 ? "pointer" : "default", opacity: sessionId.length >= 4 ? 1 : 0.35 }}
           >
             {t("scanner.join")}
           </button>
-          <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 14 }}>
+          <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 16 }}>
             {t("scanner.cameraHint")}
           </p>
           {status && (
-            <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 6 }}>{status}</div>
+            <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 8 }}>{status}</div>
           )}
         </div>
       ) : (
@@ -435,16 +443,16 @@ export default function Scanner() {
                   if (!s) return null;
                   return (
                     <span key={`recent-${id}`} style={{
-                      flexShrink: 0, fontSize: 12, color: "#fff", background: C.success, padding: "2px 8px",
-                      borderRadius: 980, fontWeight: 600, animation: "scanFlash 0.8s ease-out forwards",
+                      ...chipStyle, flexShrink: 0, color: C.aufAkzent, background: C.success,
+                      animation: "scanFlash 0.8s ease-out forwards",
                     }}>
-                      {s.name} <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign: "-1px"}}><path d="M20 6L9 17l-5-5"/></svg>
+                      {s.name} <Icon d={ICONS.check} size={14} color={C.aufAkzent} />
                     </span>
                   );
                 })}
                 {unscanned.length > 0 && <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: "var(--text3)" }}>{t("scanner.missing")}</span>}
                 {unscanned.map((s) => (
-                  <span key={s.card_id} style={{ flexShrink: 0, fontSize: 12, color: "var(--text3)", background: "var(--bg2)", padding: "2px 8px", borderRadius: 980, border: "1px solid var(--border3)" }}>
+                  <span key={s.card_id} style={{ ...chipStyle, flexShrink: 0, background: "var(--bg2)", color: "var(--text3)", border: "1px solid var(--border3)" }}>
                     {s.name}
                   </span>
                 ))}
@@ -456,27 +464,32 @@ export default function Scanner() {
           )}
           {classStudents.length > 0 && unscanned.length === 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 6, padding: "0 4px" }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: C.success }}>{t("scanner.allCaptured", { count: classStudents.length })} <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.success} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign: "-1px"}}><path d="M20 6L9 17l-5-5"/></svg></span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: C.success }}>{t("scanner.allCaptured", { count: classStudents.length })} <Icon d={ICONS.check} size={16} color={C.success} /></span>
             </div>
           )}
         </>
       )}
 
       {sessionError && (
-        <div style={{ padding: "10px 16px", marginBottom: 8, background: C.incorrectBg, borderRadius: 12, fontSize: 14, fontWeight: 500, color: C.danger }}>
+        <div style={{ ...panelStyle, padding: "12px 16px", marginBottom: 8, background: C.incorrectBg, border: "none", fontSize: 14, fontWeight: 500, color: C.danger }}>
           {sessionError}
         </div>
       )}
 
       {sessionInfo && showInfo && (
-        <div style={{ padding: "10px 14px", marginBottom: 8, background: "#e8f0fe", borderRadius: 12, fontSize: 13, color: "var(--text)" }}>
+        // Farben aus dem Theme: das feste Hellblau (#e8f0fe) mit dunkler Schrift
+        // war im Dunkelmodus ein weisser Balken.
+        <div style={{ ...panelStyle, padding: "12px 16px", marginBottom: 8, background: "var(--accent-bg)", fontSize: 13, color: "var(--text)" }}>
           <strong>{sessionInfo.class_name || `Session #${sessionInfo.id}`}</strong>
-          {sessionInfo.set_name && <span style={{ color: "#6e6e73" }}> · {sessionInfo.set_name}</span>}
+          {sessionInfo.set_name && <span style={{ color: "var(--text3)" }}> · {sessionInfo.set_name}</span>}
         </div>
       )}
 
       {/* Video — nur während des Scannens sichtbar */}
-      <div style={{ position: "relative", marginBottom: 8, borderRadius: 12, overflow: "hidden", background: "#000", display: scanning ? "block" : "none" }}>
+      {/* Schwarz bleibt schwarz: das ist die Filmflaeche hinter dem Kamerabild,
+          kein Flaechen-Farbton der Oberflaeche — sie sieht in beiden Designs
+          gleich aus. Die Ecken kommen aus dem Panel-Token. */}
+      <div style={{ position: "relative", marginBottom: 8, borderRadius: panelStyle.borderRadius, overflow: "hidden", background: "#000", display: scanning ? "block" : "none" }}>
         <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", maxHeight: "60vh", display: "block", objectFit: "contain" }} />
         <canvas ref={overlayRef} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none" }} />
       </div>
@@ -485,56 +498,49 @@ export default function Scanner() {
 
       {/* Fernsteuerung: spiegelt den Host-Zustand */}
       {scanning && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 8, padding: "0 4px" }}>
-          <button onClick={() => sendRemote(hostRevealed ? "hide" : "reveal")} style={{
-            flex: 1, padding: "12px 14px", fontSize: 14, fontWeight: 600, cursor: "pointer",
-            background: hostRevealed ? "var(--bg2)" : "var(--text)", color: hostRevealed ? "var(--text)" : "var(--bg)",
-            border: "none", borderRadius: 12,
-          }}>
+        // Eine Hoehe, eine Form: die Fernsteuerung stand vorher mit 40 px hohen
+        // Knoepfen (Radius 12) ueber einer Leiste mit 30 px hohen Pillen.
+        <Werkzeugleiste style={{ marginBottom: 8, padding: "0 4px", flexWrap: "nowrap" }}>
+          <button onClick={() => sendRemote(hostRevealed ? "hide" : "reveal")}
+            style={hostRevealed ? { ...toolbarBtn, flex: 1 } : { ...toolbarBtnPrimary, flex: 1 }}>
             {hostRevealed ? t("scanner.hide") : t("scanner.reveal")}
           </button>
           {hostRevealed && (
             hostIsLast ? (
-              <button onClick={() => sendRemote("finish")} style={{
-                flex: 1, padding: "12px 14px", fontSize: 14, fontWeight: 600, cursor: "pointer",
-                background: C.danger, color: "white", border: "none", borderRadius: 12,
-              }}>
+              <button onClick={() => sendRemote("finish")}
+                style={{ ...toolbarBtnPrimary, flex: 1, background: C.danger, color: C.aufAkzent }}>
                 {t("scanner.finishTest")}
               </button>
             ) : (
-              <button onClick={() => sendRemote("next")} style={{
-                flex: 1, padding: "12px 14px", fontSize: 14, fontWeight: 600, cursor: "pointer",
-                background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 12,
-              }}>
+              <button onClick={() => sendRemote("next")} style={{ ...toolbarBtnPrimary, flex: 1 }}>
                 {t("scanner.next")}
               </button>
             )
           )}
-        </div>
+        </Werkzeugleiste>
       )}
 
       {/* Debug + Stopp unter dem Video */}
       {scanning && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginBottom: 8, padding: "0 4px" }}>
-          <label style={{ cursor: "pointer", fontSize: 13, color: "var(--text3)", display: "flex", alignItems: "center", gap: 4 }}>
-            <input type="checkbox" checked={debug} onChange={(e) => setDebug(e.target.checked)} style={{ accentColor: "#0066cc" }} />
-            {t("scanner.detectShow")}
-          </label>
-          <button
-            onClick={toggleScanning}
-            style={{
-              padding: "6px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
-              background: C.danger, color: "white", border: "none", borderRadius: 980,
-            }}
-          >
-            {t("scanner.stop")}
-          </button>
-        </div>
+        <Werkzeugleiste
+          style={{ marginBottom: 8, padding: "0 4px" }}
+          links={
+            <label style={{ cursor: "pointer", fontSize: 13, color: "var(--text3)", display: "flex", alignItems: "center", gap: 4 }}>
+              <input type="checkbox" checked={debug} onChange={(e) => setDebug(e.target.checked)} style={{ accentColor: ANTWORT_COLORS.A }} />
+              {t("scanner.detectShow")}
+            </label>
+          }
+          ansicht={
+            <button onClick={toggleScanning} style={{ ...toolbarBtnPrimary, background: C.danger, color: C.aufAkzent }}>
+              {t("scanner.stop")}
+            </button>
+          }
+        />
       )}
 
       {/* Fallback: Karten ohne Klasse */}
       {classStudents.length === 0 && lastCards.length > 0 && (
-        <div style={{ padding: 12, background: "var(--bg3)", borderRadius: 12, border: "1px solid var(--border)" }}>
+        <div style={panelStyle}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{t("scanner.captured", { count: lastCards.length })}</span>
             <button onClick={() => setLastCards([])} style={{ fontSize: 12, color: "var(--text3)", background: "none", border: "none", cursor: "pointer" }}>{t("scanner.clear")}</button>
@@ -544,8 +550,8 @@ export default function Scanner() {
               .sort((a, b) => a.marker_id - b.marker_id)
               .map((card) => (
                 <div key={card.marker_id} style={{
-                  padding: "3px 8px", borderRadius: 980, fontSize: 12, fontWeight: 600,
-                  background: debug ? ANSWER_COLORS[card.answer] : "#0066cc", color: "white",
+                  ...chipStyle,
+                  background: debug ? ANTWORT_COLORS[card.answer] : ANTWORT_COLORS.A, color: C.aufAkzent,
                 }}>
                   #{card.marker_id}{debug ? ` → ${card.answer}` : ""}
                 </div>

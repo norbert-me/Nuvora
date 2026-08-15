@@ -15,7 +15,7 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
-import { Icon, ICONS, MODULE_ICONS, Popover } from "./Icons.jsx";
+import { Icon, ICONS, MODULE_ICONS, Popover, CONTROL_R, menuRow, sectionLabel } from "./Icons.jsx";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -42,14 +42,8 @@ export default function ModulWechsler() {
   const aktiv = (modules || []).filter((m) => m.active && m.available);
   const hier = aktiv.find((m) => location.pathname.startsWith(m.path));
 
-  const zeile = {
-    display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "7px 10px",
-    borderRadius: 8, textDecoration: "none", fontSize: 13.5, color: "var(--text)",
-  };
-  const gruppenkopf = {
-    fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5,
-    color: "var(--text3)", padding: "9px 10px 3px",
-  };
+  const zeile = { ...menuRow, textDecoration: "none" };
+  const gruppenkopf = { ...sectionLabel, padding: "8px 10px 4px" };
 
   const eintrag = (to, label, icon, an) => (
     <NavLink key={to} to={to} data-modulziel={to} onClick={() => setOffen(false)}
@@ -66,7 +60,7 @@ export default function ModulWechsler() {
       <button onClick={() => setOffen((o) => !o)} data-modulwechsler
         title={t("nav.switchModule")} aria-label={t("nav.switchModule")} aria-expanded={offen}
         style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24,
-          marginRight: 4, border: "none", borderRadius: 999, background: offen ? "var(--bg2)" : "transparent",
+          marginRight: 4, border: "none", borderRadius: CONTROL_R, background: offen ? "var(--bg2)" : "transparent",
           color: "var(--text3)", cursor: "pointer", padding: 0 }}>
         <Icon d={ICONS.open} size={11} color="var(--text3)" style={{ transform: "rotate(90deg)" }} />
       </button>

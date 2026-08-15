@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { btnPrimary, cardStyle } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const featureIcons = [
@@ -50,7 +51,7 @@ export default function Landing() {
       <style>{`
         .landing-hero { text-align: center; padding: 60px 24px 40px; }
         .landing-features { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 0 24px 48px; max-width: 860px; margin: 0 auto; }
-        .landing-feature { padding: 28px 24px; background: var(--card); border-radius: 16; border: 1px solid var(--border); }
+        .landing-feature { padding: 24px; background: var(--card); border-radius: 14px; border: 1px solid var(--border); }
         .landing-cta { text-align: center; padding: 0 24px 60px; }
         @media (max-width: 640px) {
           .landing-hero { padding: 40px 16px 28px; }
@@ -60,22 +61,22 @@ export default function Landing() {
       `}</style>
 
       <div className="landing-hero">
-        <h1 style={{ fontSize: 36, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.5px", margin: "0 0 12px" }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.5px", margin: "0 0 12px" }}>
           {t("landing.title")}
         </h1>
-        <p style={{ fontSize: 18, color: "var(--text2)", lineHeight: 1.6, margin: "0 0 8px", maxWidth: 520, marginLeft: "auto", marginRight: "auto" }}>
+        <p style={{ fontSize: 16, color: "var(--text2)", lineHeight: 1.6, margin: "0 0 8px", maxWidth: 520, marginLeft: "auto", marginRight: "auto" }}>
           {t("landing.subtitle")}
         </p>
-        <p style={{ fontSize: 15, color: "var(--text3)", lineHeight: 1.6, margin: "0 auto", maxWidth: 520 }}>
+        <p style={{ fontSize: 14, color: "var(--text3)", lineHeight: 1.6, margin: "0 auto", maxWidth: 520 }}>
           {t("landing.description")}
         </p>
       </div>
 
       <div className="landing-features">
         {features.map((f, i) => (
-          <div key={i} style={{ padding: "28px 24px", background: "var(--card)", borderRadius: 16, border: "1px solid var(--border)" }}>
-            <div style={{ marginBottom: 14 }}>{f.icon}</div>
-            <h3 style={{ fontSize: 17, fontWeight: 600, color: "var(--text)", margin: "0 0 8px" }}>{f.title}</h3>
+          <div key={i} style={{ ...cardStyle, padding: 24 }}>
+            <div style={{ marginBottom: 16 }}>{f.icon}</div>
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", margin: "0 0 8px" }}>{f.title}</h3>
             <p style={{ fontSize: 14, color: "var(--text3)", lineHeight: 1.6, margin: 0 }}>{f.desc}</p>
           </div>
         ))}
@@ -83,9 +84,8 @@ export default function Landing() {
 
       <div className="landing-cta">
         <Link to="/login" style={{
-          display: "inline-block", padding: "14px 36px", fontSize: 16, fontWeight: 600,
-          background: "var(--text)", color: "var(--bg)", border: "none", borderRadius: 980,
-          textDecoration: "none", letterSpacing: "-0.2px",
+          ...btnPrimary, display: "inline-block", padding: "12px 24px", fontSize: 16,
+          textDecoration: "none",
         }}>
           {t("landing.cta")}
         </Link>

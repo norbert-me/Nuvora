@@ -2,21 +2,22 @@
 // Jedes Feld ist verschiebbar, in der Größe änderbar und hat eine Schriftgröße.
 // Reiner Client; der Stand liegt lokal (localStorage), damit er den Reload übersteht.
 import { useState, useRef, useEffect } from "react";
-import { btnPrimary, btnSecondary, Icon, ICONS, iconBtn, toolbarIconBtn, CONTROL_H, COLORS as C, pageFull } from "../components/Icons.jsx";
+import { btnSecondary, cardStyle, CONTROL_R, Icon, ICONS, iconBtn, popoverPanel, toolbarBtn, toolbarBtnPrimary, toolbarIconBtn, COLORS as C, pageFull, SHADOW } from "../components/Icons.jsx";
+import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const KEY = "nuvora_tafel_v1";
+// Stiftfarben der Tafel. Bewusst feste Werte wie ANTWORT_COLORS: die Farbe IST
+// die Wahl der Lehrkraft und darf nicht mit dem Design-Theme wandern.
 const COLORS = ["#111827", "#2563eb", "#dc2626", "#16a34a", "#d97706", "#7c3aed"];
 // Feste Referenzfläche (16:9). Alle Element-Koordinaten liegen in diesem Raum;
 // die Anzeige skaliert per transform an die tatsächliche Breite.
 const REF_W = 1600, REF_H = 900;
 
-// Knopf in der schwebenden Steuerleiste: gleiche Höhe und Form wie jedes andere
-// Bedienelement einer Leiste (CONTROL_H), abgeleitet aus btnSecondary.
-const leistenBtn = {
-  ...btnSecondary, height: CONTROL_H, padding: "0 12px", fontSize: 13, lineHeight: 1, fontWeight: 700,
-  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 4,
-};
+// Knopf in der schwebenden Steuerleiste. Nur das Gewicht weicht ab (die Leiste
+// liegt ueber der Tafel und muss aus der Entfernung lesbar sein) — Hoehe, Form
+// und Groesse kommen aus `toolbarBtn`.
+const leistenBtn = { ...toolbarBtn, padding: "0 12px", fontWeight: 700, gap: 4 };
 
 // Alt-Stände lagen in ungefähren Pixeln eines ~1000px breiten Boards. Einmalig
 // in den REF-Raum hochskalieren (Faktor ~1.6), danach _ref markiert.
@@ -61,7 +62,8 @@ export default function Tafel() {
   const clampY = (y, h) => Math.max(0, Math.min(REF_H - h, y));
   const add = () => {
     const w = 460, h = 150;
-    const it = { id: uid(), type: "text", x: (REF_W - w) / 2, y: 120, w, h, text: "", fontSize: 48, color: "#111827", _ref: true };
+    // fontSize 48 ist ein Wert im REF-Raum der Tafel (Inhalt, keine Bedienung).
+    const it = { id: uid(), type: "text", x: (REF_W - w) / 2, y: 120, w, h, text: "", fontSize: 48, color: COLORS[0], _ref: true };
     setItems((p) => [...p, it]); setSel(it.id);
   };
   const addTimer = () => {
@@ -109,33 +111,37 @@ export default function Tafel() {
   return (
     <div style={{ ...pageFull }}>
       <style>{`@keyframes tafelFlash{0%,100%{background:transparent}50%{background:rgba(220,38,38,0.55)}}.tafel-flash{animation:tafelFlash .5s steps(1) 6}`}</style>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+      <Werkzeugleiste>
         <span style={{ flex: 1 }} />
-        <button onClick={add} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} color="#fff" /> {t("tafel.add")}</button>
-        <button onClick={addTimer} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} /> {t("tafel.addTimer")}</button>
-        <button onClick={() => setFs((v) => !v)} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }} title={t("tafel.fullscreen")}><Icon d={fs ? ICONS.close : ICONS.fit} size={16} /> {fs ? t("common.close") : t("tafel.fullscreen")}</button>
-      </div>
+        <button onClick={add} style={toolbarBtnPrimary}><Icon d={ICONS.plus} size={15} color="var(--bg)" /> {t("tafel.add")}</button>
+        <button onClick={addTimer} style={toolbarBtn}><Icon d={ICONS.plus} size={15} /> {t("tafel.addTimer")}</button>
+        <button onClick={() => setFs((v) => !v)} style={toolbarBtn} title={t("tafel.fullscreen")}><Icon d={fs ? ICONS.close : ICONS.fit} size={16} /> {fs ? t("common.close") : t("tafel.fullscreen")}</button>
+      </Werkzeugleiste>
 
       {/* Tafel-Fläche: äußerer Rahmen misst die Breite, das innere Board hat feste
           Referenzgröße und wird per transform:scale eingepasst. Die Steuerleiste
           schwebt am gewählten Element (kein fester Balken oben). */}
       <div ref={outerRef} onPointerDown={() => setSel(null)}
-        style={{ position: "relative", width: "100%", height: scale * REF_H, border: "1px solid var(--border)", borderRadius: fs ? 0 : 12, background: "var(--card)", overflow: "hidden",
+        style={{ position: "relative", width: "100%", height: scale * REF_H, border: "1px solid var(--border)", borderRadius: fs ? 0 : cardStyle.borderRadius, background: "var(--card)", overflow: "hidden",
           ...(fs ? { position: "fixed", inset: 0, width: "100vw", height: "100vh", zIndex: 9999 } : {}) }}>
         {fs && (
-          <button onClick={() => setFs(false)} style={{ position: "absolute", top: 10, right: 10, zIndex: 20, ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <button onClick={() => setFs(false)} style={{ ...toolbarBtn, position: "absolute", top: 12, right: 12, zIndex: 20 }}>
             <Icon d={ICONS.close} size={16} /> {t("common.close")}
           </button>
         )}
         <div style={{ position: "absolute", top: 0, left: 0, width: REF_W, height: REF_H, transform: `scale(${scale})`, transformOrigin: "top left" }}>
           {items.length === 0 && (
+            /* Schriftgroessen INNERHALB der Tafelflaeche stehen im REF-Raum
+               (1600x900) und werden mit der Flaeche herunterskaliert — auf dem
+               Bildschirm bleiben davon rund 60 %. Sie folgen deshalb bewusst
+               nicht der Schriftleiter der Bedienoberflaeche. */
             <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text3)", fontSize: 28, pointerEvents: "none" }}>{t("tafel.empty")}</div>
           )}
           {items.map((it) => (
             <div key={it.id} onPointerDown={(e) => { e.stopPropagation(); select(it.id); }}
               style={{ position: "absolute", left: it.x, top: it.y, width: it.w, height: it.h,
                 border: sel === it.id ? "3px solid var(--accent)" : "2px dashed transparent",
-                borderRadius: 10, boxSizing: "border-box", background: sel === it.id ? "rgba(10,132,255,0.04)" : "transparent" }}>
+                borderRadius: CONTROL_R, boxSizing: "border-box", background: sel === it.id ? "rgba(10,132,255,0.04)" : "transparent" }}>
               {it.type === "timer" ? (
                 <TafelTimer item={it} onPatch={(o) => patch(it.id, o)} t={t} />
               ) : (
@@ -146,7 +152,7 @@ export default function Tafel() {
               {/* Größen-Griff unten rechts (groß genug fürs Handy) */}
               <div onPointerDown={(e) => onDown(e, it.id, "resize")}
                 style={{ position: "absolute", right: -3, bottom: -3, width: 44, height: 44, cursor: "nwse-resize", display: sel === it.id ? "block" : "none",
-                  borderRight: "7px solid var(--accent)", borderBottom: "7px solid var(--accent)", borderBottomRightRadius: 10 }} />
+                  borderRight: "7px solid var(--accent)", borderBottom: "7px solid var(--accent)", borderBottomRightRadius: CONTROL_R }} />
             </div>
           ))}
         </div>
@@ -158,7 +164,7 @@ export default function Tafel() {
           const top = ey - 52 >= 4 ? ey - 52 : ey + eh + 8; // sonst unter das Element
           return (
             <div onPointerDown={(e) => e.stopPropagation()}
-              style={{ position: "absolute", left: Math.max(4, ex), top, zIndex: 10, display: "flex", alignItems: "center", gap: 6, padding: "6px 8px", border: "1px solid var(--border2)", borderRadius: 10, background: "var(--card)", boxShadow: "0 6px 20px rgba(0,0,0,0.16)", flexWrap: "wrap", maxWidth: "94%" }}>
+              style={{ ...popoverPanel, position: "absolute", left: Math.max(4, ex), top, zIndex: 10, display: "flex", alignItems: "center", gap: 4, padding: "6px 8px", boxShadow: SHADOW.schwebend, flexWrap: "wrap", maxWidth: "94%" }}>
               {/* Verschieben-Griff (in Bildschirmpixeln — auf dem Handy gut greifbar) */}
               <button onPointerDown={(e) => onDown(e, selItem.id, "move")} className="icon-btn" style={{ ...toolbarIconBtn, border: "1px solid var(--border2)", cursor: "grab", touchAction: "none" }} title={t("tafel.move") || ""} aria-label={t("tafel.move") || ""}>
                 <Icon d={ICONS.moveAll} size={18} color="var(--text2)" />
@@ -170,7 +176,7 @@ export default function Tafel() {
                 {fontPop && (<>
                   {COLORS.map((c) => (
                     <button key={c} onClick={() => patch(selItem.id, { color: c })} title={t("tafel.color")}
-                      style={{ width: 22, height: 22, borderRadius: 6, background: c, border: selItem.color === c ? "2px solid var(--accent)" : "1px solid var(--border2)", cursor: "pointer" }} />
+                      style={{ width: 22, height: 22, borderRadius: CONTROL_R, background: c, border: selItem.color === c ? "2px solid var(--accent)" : "1px solid var(--border2)", cursor: "pointer" }} />
                   ))}
                   <button onClick={() => bumpFont(-2)} style={leistenBtn} title={t("tafel.textSmaller")} aria-label={t("tafel.textSmaller")}>A<Icon d={ICONS.minus} size={13} color="var(--text2)" /></button>
                   <span style={{ fontSize: 13, minWidth: 40, textAlign: "center", fontWeight: 600 }}>{selItem.fontSize}</span>
@@ -178,9 +184,8 @@ export default function Tafel() {
                 </>)}
               </>)}
               {selItem.type === "timer" && (
-                <button onClick={() => patch(selItem.id, { muted: !selItem.muted })} style={{ ...leistenBtn, gap: 6, fontWeight: 500 }}>
-                  {/* Platzhalter: ICONS kennt (noch) kein Lautsprecher-Paar. */}
-                  <Icon d={selItem.muted ? ICONS.ban : ICONS.circle} size={15} color="var(--text2)" />
+                <button onClick={() => patch(selItem.id, { muted: !selItem.muted })} style={{ ...leistenBtn, gap: 4, fontWeight: 500 }}>
+                  <Icon d={selItem.muted ? ICONS.volumeOff : ICONS.volume} size={15} color="var(--text2)" />
                   {selItem.muted ? t("tafel.soundOff") : t("tafel.soundOn")}
                 </button>
               )}
@@ -190,7 +195,7 @@ export default function Tafel() {
           );
         })()}
       </div>
-      <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 10 }}>{t("tafel.hint")}</p>
+      <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>{t("tafel.hint")}</p>
     </div>
   );
 }
@@ -229,28 +234,30 @@ function TafelTimer({ item, onPatch, t }) {
   const bump = (d) => onPatch({ minutes: Math.max(1, Math.min(180, (item.minutes || 5) + d)) });
   const bh = item.h || 150;
   return (
-    <div className={flash ? "tafel-flash" : ""} style={{ width: "100%", height: "100%", boxSizing: "border-box", borderRadius: 8, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, padding: "22px 12px 16px" }}>
-      <div style={{ fontSize: Math.max(28, Math.min(bh * 0.42, item.w * 0.32)), fontWeight: 800, lineHeight: 1, fontVariantNumeric: "tabular-nums", color: done ? "#dc2626" : "var(--text)" }}>{fmt(remaining)}</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", justifyContent: "center" }}>
+    <div className={flash ? "tafel-flash" : ""} style={{ width: "100%", height: "100%", boxSizing: "border-box", borderRadius: CONTROL_R, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, padding: "22px 12px 16px" }}>
+      <div style={{ fontSize: Math.max(28, Math.min(bh * 0.42, item.w * 0.32)), fontWeight: 800, lineHeight: 1, fontVariantNumeric: "tabular-nums", color: done ? C.danger : "var(--text)" }}>{fmt(remaining)}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
         <button onClick={() => bump(-1)} style={{ ...miniBtn }} title={t("tafel.timerLess")} aria-label={t("tafel.timerLess")}><Icon d={ICONS.minus} size={30} color="var(--text)" /></button>
+        {/* 30 px im REF-Raum der Tafel (~18 px auf dem Bildschirm) — Inhalt der
+            Projektionsflaeche, nicht der Bedienoberflaeche. */}
         <span style={{ fontSize: 30, color: "var(--text2)", minWidth: 120, textAlign: "center", fontWeight: 600 }}>{item.minutes || 5} {t("tafel.min")}</span>
         <button onClick={() => bump(1)} style={{ ...miniBtn }} title={t("tafel.timerMore")} aria-label={t("tafel.timerMore")}><Icon d={ICONS.plus} size={30} color="var(--text)" /></button>
       </div>
-      <div style={{ display: "flex", gap: 14 }}>
-        {/* Platzhalter: ICONS kennt (noch) kein play/pause — bis dahin Pfeil bzw. Balken. */}
+      <div style={{ display: "flex", gap: 12 }}>
         {!running
-          ? <button onClick={() => { if (!done) setRunning(true); }} disabled={done} style={{ ...miniBtn, opacity: done ? 0.5 : 1 }} title={t("tafel.timerStart")} aria-label={t("tafel.timerStart")}><Icon d={ICONS.open} size={30} color="var(--text)" /></button>
-          : <button onClick={() => setRunning(false)} style={{ ...miniBtn }} title={t("tafel.timerPause")} aria-label={t("tafel.timerPause")}><Icon d={ICONS.minus} size={30} color="var(--text)" /></button>}
+          ? <button onClick={() => { if (!done) setRunning(true); }} disabled={done} style={{ ...miniBtn, opacity: done ? 0.5 : 1 }} title={t("tafel.timerStart")} aria-label={t("tafel.timerStart")}><Icon d={ICONS.play} size={30} color="var(--text)" /></button>
+          : <button onClick={() => setRunning(false)} style={{ ...miniBtn }} title={t("tafel.timerPause")} aria-label={t("tafel.timerPause")}><Icon d={ICONS.pause} size={30} color="var(--text)" /></button>}
         <button onClick={() => { setRunning(false); setRemaining(total); }} style={{ ...miniBtn }} title={t("tafel.timerReset")} aria-label={t("tafel.timerReset")}><Icon d={ICONS.refresh} size={30} color="var(--text)" /></button>
       </div>
     </div>
   );
 }
 
-// Timer-Knopf auf der Tafelfläche: bewusst groß (er wird vom Beamer aus bedient),
-// aber aus btnSecondary abgeleitet statt frei erfunden.
+// Timer-Knopf auf der Tafelfläche: bewusst groß (er steht im REF-Raum der
+// Tafel und wird mit ihr herunterskaliert), aber aus btnSecondary abgeleitet
+// statt frei erfunden.
 const miniBtn = {
   ...btnSecondary, padding: "8px 22px", fontSize: 32, lineHeight: 1,
-  border: "2px solid var(--border2)", borderRadius: 12, background: "var(--bg)",
+  border: "2px solid var(--border2)", borderRadius: CONTROL_R, background: "var(--bg)",
   display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700,
 };

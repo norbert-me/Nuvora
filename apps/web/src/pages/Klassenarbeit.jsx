@@ -4,7 +4,8 @@
 // und gezielte Wiederholung (Karten des schwachen Themas wieder fällig).
 import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import { useSearchParams } from "react-router-dom";
-import { btnPrimary, btnSecondary, selectStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, Modal, Boxplot, StatCard, Tabs, pageApp} from "../components/Icons.jsx";
+import { badge, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, CONTROL_R, panelStyle, selectStyle, inputStyle, Segment, segmentBtn, th as thBase, td as tdBase, toolbarBtn, toolbarIconBtn, Icon, ICONS, iconBtn, COLORS as C, Empty, Modal, Boxplot, StatCard, Tabs, pageApp} from "../components/Icons.jsx";
+import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
 import Themenstand from "../components/Themenstand.jsx";
@@ -47,18 +48,19 @@ function StatRow({ row, t, expandable, open, onToggle, small }) {
   const dc = row.disc == null ? "var(--text3)" : row.disc >= 0.4 ? C.success : row.disc >= 0.2 ? C.warning : C.danger;
   const rat = small ? null : schluss(row, t);
   return (
-    <div onClick={expandable ? onToggle : undefined} style={{ padding: small ? "6px 9px" : "8px 10px", borderRadius: 8, background: small ? "var(--bg3)" : "var(--bg2)", marginBottom: 5, cursor: expandable ? "pointer" : "default" }}>
+    <div onClick={expandable ? onToggle : undefined} style={{ padding: small ? "6px 9px" : "8px 10px", borderRadius: panelStyle.borderRadius, background: small ? "var(--bg3)" : "var(--bg2)", marginBottom: 4, cursor: expandable ? "pointer" : "default" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {expandable && <span style={{ display: "inline-flex", color: "var(--text3)", transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}><Icon d={ICONS.open} size={12} /></span>}
-        <span style={{ flex: 1, fontSize: small ? 12.5 : 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: small ? "var(--text2)" : "var(--text)" }}>{small ? `${t("klassenarbeit.part")} ${row.label}` : row.label}</span>
-        <span style={{ fontSize: 11.5, color: "var(--text3)", whiteSpace: "nowrap" }}>⌀ {String(row.avgP).replace(".", ",")}/{row.max}</span>
+        <span style={{ flex: 1, fontSize: small ? 12 : 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: small ? "var(--text2)" : "var(--text)" }}>{small ? `${t("klassenarbeit.part")} ${row.label}` : row.label}</span>
+        <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap" }}>⌀ {String(row.avgP).replace(".", ",")}/{row.max}</span>
         <span style={{ fontSize: 13, fontWeight: 800, color: col, minWidth: 40, textAlign: "right" }}>{row.pct}%</span>
       </div>
-      <div style={{ marginTop: 5, height: 8, background: "var(--card)", borderRadius: 5, overflow: "hidden" }}>
+      {/* Balken: Radius = halbe Hoehe (Balken-Kappe), reine Grafik. */}
+      <div style={{ marginTop: 4, height: 8, background: "var(--card)", borderRadius: 5, overflow: "hidden" }}>
         <span style={{ display: "block", width: `${row.pct}%`, height: "100%", background: col, borderRadius: 5 }} />
       </div>
       {(row.disc != null || row.ciLow != null || row.nullAnteil != null) && (
-        <div style={{ display: "flex", gap: 14, fontSize: 11, color: "var(--text3)", marginTop: 5, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 14, fontSize: 11, color: "var(--text3)", marginTop: 4, flexWrap: "wrap" }}>
           {row.disc != null && <span title={t("klassenarbeit.discHint")}>{t("klassenarbeit.disc")}: <b style={{ color: dc }}>{row.disc.toFixed(2).replace(".", ",")}</b></span>}
           {row.ciLow != null && <span title={t("klassenarbeit.ciHint")}>{t("klassenarbeit.ci")}: <b style={{ color: "var(--text2)" }}>{row.ciLow}–{row.ciHigh}%</b></span>}
           {row.nullAnteil != null && <span title={t("klassenarbeit.cmpEmptyHint")}>{t("klassenarbeit.cmpEmpty")}: <b style={{ color: row.nullAnteil >= 40 ? C.danger : "var(--text2)" }}>{row.nullAnteil}%</b></span>}
@@ -67,8 +69,8 @@ function StatRow({ row, t, expandable, open, onToggle, small }) {
       )}
       {/* Der Schluss aus den Zahlen — nicht nur die Zahlen. */}
       {rat && (
-        <div style={{ marginTop: 6, fontSize: 12, lineHeight: 1.45, padding: "6px 8px", borderRadius: 6,
-          background: rat.art === "aufgabe" ? "rgba(209,53,15,0.08)" : rat.art === "stoff" ? "rgba(138,97,0,0.10)" : "var(--card)",
+        <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.45, padding: "6px 8px", borderRadius: panelStyle.borderRadius,
+          background: rat.art === "aufgabe" ? C.danger + "14" : rat.art === "stoff" ? C.warning + "1a" : "var(--card)",
           color: rat.art === "leicht" ? "var(--text3)" : "var(--text2)" }}>
           {rat.text}
         </div>
@@ -454,13 +456,16 @@ export default function Klassenarbeit() {
     else showAlert(t("common.notWork"));
   };
 
-  const th = { padding: "6px 8px", borderBottom: "2px solid var(--border)", fontSize: 11.5, color: "var(--text2)", fontWeight: 600 };
-  const td = { padding: 0, borderBottom: "1px solid var(--border)", textAlign: "center" };
+  // Aus den zentralen Tabellenstilen abgeleitet, nicht daneben neu gebaut: nur
+  // die kraeftigere Kopf-Trennlinie und die polsterlose Zelle (die Eingabefelder
+  // fuellen sie selbst) weichen ab.
+  const th = { ...thBase, padding: "6px 8px", borderBottom: "2px solid var(--border)" };
+  const td = { ...tdBase, padding: 0 };
 
   const hasRoster = classId != null || subsetKurs != null;
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <span data-tour="ka-class" style={{ display: "inline-flex" }}><KursKlasseSelect value={subsetKurs ? "" : classId} kursValue={subsetKurs ? null : kursId} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} /></span>
         {subsetKurse.length > 0 && (
           <select value={subsetKurs || ""} onChange={(e) => setSubsetKurs(e.target.value ? Number(e.target.value) : null)} style={{ ...selectStyle, fontSize: 13 }} title={t("klassenarbeit.subsetHint")}>
@@ -478,16 +483,22 @@ export default function Klassenarbeit() {
       {/* Auswahlzeile nur, wenn es schon Arbeiten gibt — sonst führt allein die
           Leerzustand-Karte zum Anlegen (kein doppeltes „keine Arbeit"). */}
       {hasRoster && works.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-          <select value={work?.id || ""} onChange={(e) => setWork(works.find((w) => String(w.id) === e.target.value) || null)} style={{ ...selectStyle, minWidth: 180 }}>
-            {works.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-          </select>
-          <button data-tour="ka-new" onClick={neueArbeit} style={btnSecondary}>{t("klassenarbeit.new")}</button>
+        /* Eine Leiste, eine Hoehe: das Auswahlfeld (34), „Neu" und das Kopieren
+           standen vorher als 34 / ~38 / ~30 nebeneinander, jedes mit eigenem
+           Radius. Das Loeschen sass ungeschuetzt neben dem Kopieren — es gehoert
+           ins Mehr-Menue, wo Gefaehrliches selbst nach unten sortiert. */
+        <Werkzeugleiste style={{ marginBottom: 16 }}
+          links={(
+            <select value={work?.id || ""} onChange={(e) => setWork(works.find((w) => String(w.id) === e.target.value) || null)} style={{ ...selectStyle, minWidth: 180 }}>
+              {works.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+            </select>
+          )}
+          mehr={work ? [{ key: "loeschen", label: t("common.delete"), icon: ICONS.trash, gefahr: true, onClick: loeschen }] : []}>
+          <button data-tour="ka-new" onClick={neueArbeit} style={toolbarBtn}>{t("klassenarbeit.new")}</button>
           {/* Parallelklassen schreiben dieselbe Arbeit — sie zweimal einzutippen
               ist dieselbe Arbeit zweimal. */}
-          {work && <button onClick={() => setKopieOffen(true)} className="icon-btn" style={iconBtn} title={t("klassenarbeit.copyTo")} aria-label={t("klassenarbeit.copyTo")}><Icon d={ICONS.duplicate} /></button>}
-          {work && <button onClick={loeschen} className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} /></button>}
-        </div>
+          {work && <button onClick={() => setKopieOffen(true)} className="icon-btn" style={toolbarIconBtn} title={t("klassenarbeit.copyTo")} aria-label={t("klassenarbeit.copyTo")}><Icon d={ICONS.duplicate} /></button>}
+        </Werkzeugleiste>
       )}
 
       {hasRoster && work && students.length > 0 && (
@@ -516,7 +527,7 @@ export default function Klassenarbeit() {
             {(work.tasks || []).map((task, i) => {
               const hasParts = !!(task.parts && task.parts.length);
               return (
-              <div key={task.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "8px 10px", background: "var(--card)" }}>
+              <div key={task.id} style={{ border: "1px solid var(--border)", borderRadius: CONTROL_R, padding: "8px 10px", background: "var(--card)" }}>
                 {/* Eine Zeile, solange die Breite reicht: Name und Thema teilen
                     sich den Platz, alles Weitere behält seine Größe. Der
                     Themen-Select wuchs vorher mit dem längsten Optionstext
@@ -528,7 +539,7 @@ export default function Klassenarbeit() {
                   <span style={{ fontSize: 12, color: "var(--text3)", width: 24, textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{i + 1}.</span>
                   <input value={task.label} onChange={(e) => setTask(task.id, { label: e.target.value })} placeholder={t("klassenarbeit.taskOptional", { n: i + 1 })} title={t("klassenarbeit.taskOptionalHint")} style={{ ...inputStyle, fontSize: 13, padding: "7px 9px", flex: "1 1 150px", minWidth: 0 }} />
                   <select value={task.topic_id || ""} onChange={(e) => setTask(task.id, { topic_id: e.target.value ? Number(e.target.value) : null })}
-                    style={{ ...selectStyle, fontSize: 12.5, padding: "7px 9px", flex: "1 1 180px", minWidth: 0, maxWidth: 340 }}>
+                    style={{ ...selectStyle, fontSize: 13, padding: "7px 9px", flex: "1 1 180px", minWidth: 0, maxWidth: 340 }}>
                     <option value="">{t("klassenarbeit.topicNone")}</option>
                     {themen.geordnet.map((tp) => <option key={tp.id} value={tp.id}>{themen.label(tp)}</option>)}
                   </select>
@@ -576,7 +587,7 @@ export default function Klassenarbeit() {
                      „Wiederholung schwach" statt „Runden schwach". */
                   <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8, paddingLeft: 26 }}>
                     {units(task).map((u) => (
-                      <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", background: "var(--bg2)", borderRadius: 8, padding: "4px 6px" }}>
+                      <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", background: "var(--bg2)", borderRadius: CONTROL_R, padding: "4px 6px" }}>
                         <input value={u.label} onChange={(e) => setPart(task.id, u.id, { label: e.target.value })} title={t("klassenarbeit.partLabel")} style={{ ...inputStyle, fontSize: 12, padding: "4px 4px", width: 34, textAlign: "center" }} />
                         <select value={u.topic_id || ""} onChange={(e) => setPart(task.id, u.id, { topic_id: e.target.value ? Number(e.target.value) : null })}
                           title={t("klassenarbeit.partTopicHint")} style={{ ...selectStyle, fontSize: 12, padding: "5px 7px", flex: 1, minWidth: 120 }}>
@@ -593,11 +604,11 @@ export default function Klassenarbeit() {
               );
             })}
           </div>
-          <button onClick={addTask} style={{ ...btnSecondary, marginBottom: 18 }}>+ {t("klassenarbeit.addTask")}</button>
+          <button onClick={addTask} style={{ ...btnSecondary, marginBottom: 16 }}>+ {t("klassenarbeit.addTask")}</button>
 
           {/* 2) Punkte-Raster: Zeilen = Schüler, Spalten = Aufgaben (0..max). */}
           {(work.tasks || []).length > 0 && (
-            <div style={{ overflowX: "auto", overscrollBehaviorX: "contain", border: "1px solid var(--border)", borderRadius: 12 }}>
+            <div style={{ overflowX: "auto", overscrollBehaviorX: "contain", border: "1px solid var(--border)", borderRadius: panelStyle.borderRadius }}>
               <table style={{ borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr>
@@ -612,10 +623,10 @@ export default function Klassenarbeit() {
                     {(work.tasks || []).flatMap((tk) => {
                       const sub = units(tk).length > 1;   // echte Teilaufgaben
                       const cols = units(tk).map((u, j) => (
-                        <th key={u.id} style={{ ...th, minWidth: 44, fontWeight: 500, borderLeft: j === 0 ? "1px solid var(--border)" : undefined }}>{u.label || ""}<div style={{ fontSize: 10, color: "var(--text3)", fontWeight: 400 }}>/{unitMax(u)}</div></th>
+                        <th key={u.id} style={{ ...th, minWidth: 44, fontWeight: 500, borderLeft: j === 0 ? "1px solid var(--border)" : undefined }}>{u.label || ""}<div style={{ fontSize: 11, color: "var(--text3)", fontWeight: 400 }}>/{unitMax(u)}</div></th>
                       ));
                       // Summe der Teilaufgaben je Aufgabe (nur wenn es Teile gibt).
-                      if (sub) cols.push(<th key={tk.id + "-sum"} style={{ ...th, minWidth: 46, fontWeight: 700, background: "var(--bg2)" }}>Σ<div style={{ fontSize: 10, color: "var(--text3)", fontWeight: 400 }}>/{taskMax(tk)}</div></th>);
+                      if (sub) cols.push(<th key={tk.id + "-sum"} style={{ ...th, minWidth: 46, fontWeight: 700, background: "var(--bg2)" }}>Σ<div style={{ fontSize: 11, color: "var(--text3)", fontWeight: 400 }}>/{taskMax(tk)}</div></th>);
                       return cols;
                     })}
                   </tr>
@@ -672,7 +683,7 @@ export default function Klassenarbeit() {
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap", alignItems: "center" }}>
             {notenAktiv && (work.tasks || []).length > 0 && <button onClick={() => setNotenModal(true)} style={btnPrimary}>{t("klassenarbeit.toNoten")}</button>}
             {(kartenAktiv || lernpfadAktiv) && <button onClick={wiederholen} disabled={busy} style={{ ...btnSecondary, opacity: busy ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.restore} size={15} /> {t("klassenarbeit.remediate")}</button>}
             {(work.tasks || []).length > 0 && (
@@ -681,7 +692,7 @@ export default function Klassenarbeit() {
             )}
           </div>
           {scaleOpen && (work.tasks || []).length > 0 && (
-            <div style={{ marginTop: 10, border: "1px solid var(--border)", borderRadius: 12, padding: "12px 14px", background: "var(--card)" }}>
+            <div style={{ marginTop: 12, border: "1px solid var(--border)", borderRadius: panelStyle.borderRadius, padding: "12px 14px", background: "var(--card)" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 13, fontWeight: 700 }}>{t("klassenarbeit.scaleTitle")}</span>
                 <span style={{ fontSize: 12, color: (work.scale && Object.keys(work.scale).length) ? C.warning : "var(--text3)" }}>
@@ -699,7 +710,7 @@ export default function Klassenarbeit() {
                 ))}
                 <span style={{ fontSize: 12, color: "var(--text3)" }}>% {t("klassenarbeit.scaleUnit")}</span>
                 {(work.scale && Object.keys(work.scale).length) ? (
-                  <button onClick={() => setWorkScale({})} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12.5 }}>{t("klassenarbeit.scaleReset")}</button>
+                  <button onClick={() => setWorkScale({})} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13 }}>{t("klassenarbeit.scaleReset")}</button>
                 ) : null}
               </div>
             </div>
@@ -708,20 +719,21 @@ export default function Klassenarbeit() {
           </>)}
 
           {analyse && (analyse.topics.length > 0 || analyse.students.length > 0 || analyse.perUnit.length > 0 || analyse.noten.n > 0) && (
-            <div style={{ marginTop: 18, border: "1px solid var(--border)", borderRadius: 12, padding: 16, background: "var(--card)" }}>
+            <div style={{ marginTop: 16, border: "1px solid var(--border)", borderRadius: panelStyle.borderRadius, padding: 16, background: "var(--card)" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, borderBottom: "1px solid var(--border)", paddingBottom: 10 }}>
-                <span style={{ fontSize: 15, fontWeight: 800 }}>{t("klassenarbeit.analysisTitle")}</span>
+                <span style={{ fontSize: 16, fontWeight: 800 }}>{t("klassenarbeit.analysisTitle")}</span>
                 <button onClick={() => setHideIndividual((v) => !v)} title={t("klassenarbeit.presentHint")}
-                  style={{ border: "1px solid var(--border)", background: hideIndividual ? "var(--accent)" : "transparent", color: hideIndividual ? "#fff" : "var(--text2)", borderRadius: 8, padding: "5px 11px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <Icon d={ICONS.eye} size={15} color={hideIndividual ? "#fff" : "var(--text2)"} /> {t("klassenarbeit.presentMode")}
+                  style={{ ...toolbarBtn, background: hideIndividual ? "var(--accent)" : "transparent", color: hideIndividual ? C.aufAkzent : "var(--text2)" }}>
+                  <Icon d={ICONS.eye} size={15} color={hideIndividual ? C.aufAkzent : "var(--text2)"} /> {t("klassenarbeit.presentMode")}
                 </button>
               </div>
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{t("klassenarbeit.byTopic")}</div>
-              {analyse.topics.length === 0 ? <p style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("klassenarbeit.noTopics")}</p> : analyse.topics.map((tp) => (
+              {analyse.topics.length === 0 ? <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("klassenarbeit.noTopics")}</p> : analyse.topics.map((tp) => (
                 <div key={tp.topic_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 0" }}>
                   <span style={{ flex: 1, fontSize: 13 }}>{tp.label}</span>
+                  {/* Balken: Radius = halbe Hoehe (Balken-Kappe), reine Grafik. */}
                   <span style={{ width: 120, height: 8, background: "var(--bg2)", borderRadius: 4, overflow: "hidden" }}><span style={{ display: "block", width: `${tp.pct}%`, height: "100%", background: tp.pct < 50 ? C.danger : tp.pct < 75 ? C.warning : C.success }} /></span>
-                  <span style={{ fontSize: 12.5, fontWeight: 700, minWidth: 38, textAlign: "right" }}>{tp.pct}%</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, minWidth: 38, textAlign: "right" }}>{tp.pct}%</span>
                 </div>
               ))}
               {/* Frueher stand hier je Kind eine Zeile mit allen Themen als
@@ -734,8 +746,8 @@ export default function Klassenarbeit() {
                 <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8 }}>{t("klassenarbeit.weakHint")}</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {analyse.weakGroups.map((g) => (
-                    <div key={g.label} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "8px 10px" }}>
-                      <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+                    <div key={g.label} style={{ border: "1px solid var(--border)", borderRadius: CONTROL_R, padding: "8px 10px" }}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
                         <span style={{ fontSize: 13, fontWeight: 700, flex: 1 }}>{g.label}</span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: g.anteil >= 50 ? C.danger : C.warning }}>
                           {t("klassenarbeit.weakCount", { n: g.namen.length, all: analyse.gradedCount })}
@@ -743,7 +755,7 @@ export default function Klassenarbeit() {
                       </div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                         {g.namen.map((n) => (
-                          <span key={n} style={{ fontSize: 12, padding: "2px 8px", borderRadius: 980, background: "var(--bg2)", color: "var(--text2)" }}>{n}</span>
+                          <span key={n} style={{ ...chipStyle, fontWeight: 500, background: "var(--bg2)" }}>{n}</span>
                         ))}
                       </div>
                     </div>
@@ -763,7 +775,7 @@ export default function Klassenarbeit() {
                     <div key={tk.id}>
                       <StatRow row={tk} t={t} expandable={parts.length > 0} open={open} onToggle={toggle} />
                       {open && parts.length > 0 && (
-                        <div style={{ marginLeft: 18, marginBottom: 5 }}>
+                        <div style={{ marginLeft: 16, marginBottom: 4 }}>
                           {parts.map((u) => <StatRow key={u.id} row={u} t={t} small />)}
                         </div>
                       )}
@@ -786,7 +798,7 @@ export default function Klassenarbeit() {
                   {analyse.noten.ciLow != null && <StatCard label={t("klassenarbeit.ci")} value={`${analyse.noten.ciLow}–${analyse.noten.ciHigh}%`} />}
                 </div>
                 {/* „Auswertung verstehen": Kennzahlen erklärt + konkrete Handlungshinweise. */}
-                <button onClick={() => setInfoOpen((v) => !v)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12.5, marginBottom: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <button onClick={() => setInfoOpen((v) => !v)} style={{ ...btnSecondary, padding: "5px 12px", fontSize: 13, marginBottom: 12, display: "inline-flex", alignItems: "center", gap: 6 }}>
                   <span style={{ display: "inline-flex", transform: infoOpen ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}><Icon d={ICONS.open} size={12} /></span>
                   {t("klassenarbeit.explain")}
                 </button>
@@ -796,10 +808,10 @@ export default function Klassenarbeit() {
                   const weak = analyse.topics.filter((tp) => tp.pct < 50).map((tp) => tp.label);
                   const lowDisc = analyse.perTask.filter((tk) => tk.disc != null && tk.disc < 0.2);
                   const Item = ({ term, children }) => (
-                    <li style={{ marginBottom: 7 }}><b style={{ color: "var(--text)" }}>{term}:</b> <span style={{ color: "var(--text2)" }}>{children}</span></li>
+                    <li style={{ marginBottom: 8 }}><b style={{ color: "var(--text)" }}>{term}:</b> <span style={{ color: "var(--text2)" }}>{children}</span></li>
                   );
                   return (
-                    <div style={{ padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 12, fontSize: 13, lineHeight: 1.55 }}>
+                    <div style={{ padding: 16, background: "var(--bg3)", borderRadius: cardStyle.borderRadius, border: "1px solid var(--border)", marginBottom: 12, fontSize: 13, lineHeight: 1.55 }}>
                       <ul style={{ margin: 0, paddingLeft: 18 }}>
                         <Item term={t("klassenarbeit.avgGrade") + " / " + t("klassenarbeit.median")}>{t("klassenarbeit.explainAvg")}</Item>
                         {sd != null && (
@@ -814,10 +826,10 @@ export default function Klassenarbeit() {
                         <Item term={t("klassenarbeit.disc")}>{t("klassenarbeit.explainDisc")}</Item>
                       </ul>
                       {(weak.length > 0 || lowDisc.length > 0) && (
-                        <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
-                          <div style={{ fontWeight: 700, marginBottom: 5 }}>{t("klassenarbeit.explainActions")}</div>
+                        <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+                          <div style={{ fontWeight: 700, marginBottom: 4 }}>{t("klassenarbeit.explainActions")}</div>
                           <ul style={{ margin: 0, paddingLeft: 18 }}>
-                            {weak.length > 0 && <li style={{ marginBottom: 5, color: "var(--text2)" }}>{t("klassenarbeit.explainWeak", { topics: weak.join(", ") })}</li>}
+                            {weak.length > 0 && <li style={{ marginBottom: 4, color: "var(--text2)" }}>{t("klassenarbeit.explainWeak", { topics: weak.join(", ") })}</li>}
                             {lowDisc.length > 0 && <li style={{ color: "var(--text2)" }}>{t("klassenarbeit.explainLowDisc", { n: lowDisc.length })}</li>}
                           </ul>
                         </div>
@@ -826,22 +838,21 @@ export default function Klassenarbeit() {
                   );
                 })()}
                 {/* Verteilung / Boxplot — Panel + Pillen-Umschalter wie CardVote. */}
-                <div style={{ padding: 16, background: "var(--bg3)", borderRadius: 14, border: "1px solid var(--border)" }}>
+                <div style={{ padding: 16, background: "var(--bg3)", borderRadius: cardStyle.borderRadius, border: "1px solid var(--border)" }}>
+                  {/* Zweimal dieselbe Frage („welche Ansicht?"), also zweimal
+                      dieselbe Form. Links standen vorher zwei Einzelpillen
+                      (r980), rechts eine Gruppe mit r8 — nebeneinander sah das
+                      aus wie zwei verschiedene Bedienarten. */}
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-                    {[["bar", t("klassenarbeit.distGrades")], ["box", t("klassenarbeit.distBox")]].map(([m, lbl]) => (
-                      <button key={m} onClick={() => setDistMode(m)} style={{ fontSize: 13, fontWeight: 600, padding: "5px 12px", borderRadius: 980, border: "none", cursor: "pointer", background: distMode === m ? "var(--accent)" : "var(--bg2)", color: distMode === m ? "#fff" : "var(--text3)", transition: "all 0.2s" }}>{lbl}</button>
-                    ))}
+                    <Tabs value={distMode} onChange={setDistMode}
+                      options={[["bar", t("klassenarbeit.distGrades")], ["box", t("klassenarbeit.distBox")]]} />
                     {/* Sekundär-Umschalter: Balken = Noten/Teilnoten, Boxplot = %/Noten. */}
-                    <div style={{ display: "inline-flex", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden", marginLeft: "auto" }}>
-                      {(distMode === "bar"
+                    <Tabs style={{ marginLeft: "auto" }}
+                      value={distMode === "bar" ? barMode : boxMode}
+                      onChange={distMode === "bar" ? setBarMode : setBoxMode}
+                      options={distMode === "bar"
                         ? [["whole", t("klassenarbeit.distWhole")], ["fine", t("klassenarbeit.distFine")]]
-                        : [["pct", "%"], ["note", t("klassenarbeit.grade")]]
-                      ).map(([m, lbl]) => {
-                        const active = distMode === "bar" ? barMode === m : boxMode === m;
-                        const set = distMode === "bar" ? setBarMode : setBoxMode;
-                        return <button key={m} onClick={() => set(m)} style={{ border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, padding: "5px 10px", background: active ? "var(--accent)" : "transparent", color: active ? "#fff" : "var(--text2)" }}>{lbl}</button>;
-                      })}
-                    </div>
+                        : [["pct", "%"], ["note", t("klassenarbeit.grade")]]} />
                   </div>
                   {distMode === "bar" ? (() => {
                     const data = barMode === "fine"
@@ -852,9 +863,10 @@ export default function Klassenarbeit() {
                       <div style={{ display: "flex", alignItems: "flex-end", gap: barMode === "fine" ? 3 : 6, height: 105 }}>
                         {data.map((d, i) => (
                           <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                            {/* Saeule: Radius rundet nur die Kappe der Grafik. */}
                             <div style={{ width: barMode === "fine" ? "80%" : "60%", height: `${Math.max(3, (d.count / mxc) * 75)}px`, background: d.grade <= 2 ? C.success : d.grade <= 4 ? C.warning : C.danger, borderRadius: 3 }} title={`${d.count}`} />
                             <span style={{ fontSize: 11, color: "var(--text3)" }}>{d.count}</span>
-                            <span style={{ fontSize: barMode === "fine" ? 9.5 : 11, fontWeight: 700 }}>{d.label}</span>
+                            <span style={{ fontSize: 11, fontWeight: 700 }}>{d.label}</span>
                           </div>
                         ))}
                       </div>
@@ -925,16 +937,16 @@ function NotenUebernahme({ t, classId, kursId, students, work, scale = DEFAULT_S
     if (res && res.ok) onClose();
     else { const b = res ? await res.json().catch(() => ({})) : {}; setErr(typeof b.detail === "string" ? b.detail : t("common.notWork")); }
   };
-  const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
+  const lbl = { fontSize: 13, color: "var(--text2)", margin: "12px 0 5px" };
   return (
     <Modal onClose={onClose} width={440} label={t("klassenarbeit.toNoten")}>
-        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t("klassenarbeit.toNoten")}</h3>
-        <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 12px" }}>{t("klassenarbeit.toNotenHint", { n: grades.length })}</p>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{t("klassenarbeit.toNoten")}</h3>
+        <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 12px" }}>{t("klassenarbeit.toNotenHint", { n: grades.length })}</p>
         <AbschnittWahl classId={classId} kursId={kursId} value={sectionId} onChange={setSectionId} />
         <div style={lbl}>{t("noten.columnName")}</div>
         <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, width: "100%" }} />
-        {err && <p style={{ color: C.danger, fontSize: 12.5, marginTop: 10 }}>{err}</p>}
-        <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+        {err && <p style={{ color: C.danger, fontSize: 13, marginTop: 12 }}>{err}</p>}
+        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
           <button onClick={submit} disabled={busy || grades.length === 0 || !sectionId} style={{ ...btnPrimary, opacity: busy || !sectionId ? 0.6 : 1 }}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
         </div>
@@ -1056,8 +1068,11 @@ export function KlassenarbeitVergleich() {
     return null;
   };
 
-  const kopf = { fontSize: 11, color: "var(--text3)", fontWeight: 600, padding: "8px 10px", textAlign: "right", whiteSpace: "nowrap" };
-  const zelle = { fontSize: 13, padding: "8px 10px", textAlign: "right", whiteSpace: "nowrap", borderTop: "1px solid var(--border)" };
+  // Dritte Tabellenform in derselben Datei — jetzt aus derselben Quelle wie die
+  // beiden anderen abgeleitet. Rechtsbuendig, weil hier nur Zahlen stehen; die
+  // Trennlinie sitzt oben statt unten (Vergleichsliste ohne Kopf-Abschluss).
+  const kopf = { ...thBase, fontSize: 11, padding: "8px 10px", textAlign: "right", borderBottom: "none" };
+  const zelle = { ...tdBase, fontSize: 13, padding: "8px 10px", textAlign: "right", whiteSpace: "nowrap", borderBottom: "none", borderTop: "1px solid var(--border)" };
 
   return (
     <div style={{ ...pageApp, padding: "0 16px 40px" }}>
@@ -1075,14 +1090,14 @@ export function KlassenarbeitVergleich() {
           will nachsehen, was da gefragt war. Nur ansehen — hochgeladen und
           geloescht wird bei der Arbeit, nicht hier. */}
       {workId && (
-        <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", marginTop: 14 }}>
+        <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", marginTop: 16 }}>
           <MaterialPanel workId={workId} rolle="arbeit" titel={t("klassenarbeit.fileWork")} nurLesen />
           <MaterialPanel workId={workId} rolle="erwartung" titel={t("klassenarbeit.fileExpect")} nurLesen />
         </div>
       )}
 
       {classId && (
-        <div style={{ marginTop: 14 }}>
+        <div style={{ marginTop: 16 }}>
           <Tabs value={sicht} onChange={setSicht} options={[
             ["klassen", t("klassenarbeit.cmpClasses")],
             ["aufgaben", t("klassenarbeit.cmpTasks")],
@@ -1096,7 +1111,7 @@ export function KlassenarbeitVergleich() {
         klassen.length === 0 ? (
           <div style={{ marginTop: 24 }}><Empty title={t("klassenarbeit.compareEmpty")} /></div>
         ) : (
-          <div style={{ marginTop: 16, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", overflowX: "auto" }}>
+          <div style={{ marginTop: 16, border: "1px solid var(--border)", borderRadius: cardStyle.borderRadius, background: "var(--card)", overflowX: "auto" }}>
             <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 620 }}>
               <thead>
                 <tr>
@@ -1137,7 +1152,7 @@ export function KlassenarbeitVergleich() {
         inhaltlich.length === 0 ? (
           <div style={{ marginTop: 24 }}><Empty title={t("klassenarbeit.compareEmpty")} /></div>
         ) : (
-          <div style={{ marginTop: 16, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", overflowX: "auto" }}>
+          <div style={{ marginTop: 16, border: "1px solid var(--border)", borderRadius: cardStyle.borderRadius, background: "var(--card)", overflowX: "auto" }}>
             <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 640 }}>
               <thead>
                 <tr>
@@ -1160,7 +1175,7 @@ export function KlassenarbeitVergleich() {
                         <td style={{ ...zelle, textAlign: "left", fontWeight: 600 }}>
                           {r.label}
                           {r.max ? <span style={{ color: "var(--text3)", fontWeight: 400 }}> /{String(r.max).replace(".", ",")}</span> : null}
-                          {hinweis && <span title={hinweis} style={{ marginLeft: 6, color: C.warning, fontWeight: 700 }}>!</span>}
+                          {hinweis && <span title={hinweis} style={{ marginLeft: 8, color: C.warning, fontWeight: 700 }}>!</span>}
                         </td>
                         {r.werte.map((v, k) => (
                           <td key={k} style={{ ...zelle, fontWeight: 600, color: v == null ? "var(--text3)" : v < 50 ? C.danger : v < 75 ? C.warning : C.success }}>
@@ -1180,7 +1195,7 @@ export function KlassenarbeitVergleich() {
                       {auf && (
                         <tr>
                           <td colSpan={klassen.length + (klassen.length > 1 ? 4 : 3)} style={{ padding: "0 10px 12px", borderTop: "none", background: "var(--bg2)" }}>
-                            {hinweis && <div style={{ fontSize: 12.5, color: C.warning, padding: "8px 0 4px", fontWeight: 600 }}>{hinweis}</div>}
+                            {hinweis && <div style={{ fontSize: 13, color: C.warning, padding: "8px 0 4px", fontWeight: 600 }}>{hinweis}</div>}
                             <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}>
                               <thead>
                                 <tr>
@@ -1230,7 +1245,7 @@ export function KlassenarbeitVergleich() {
         verlauf.length === 0 ? (
           <div style={{ marginTop: 24 }}><Empty title={t("klassenarbeit.compareEmpty")} /></div>
         ) : (
-          <div style={{ marginTop: 16, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", overflowX: "auto" }}>
+          <div style={{ marginTop: 16, border: "1px solid var(--border)", borderRadius: cardStyle.borderRadius, background: "var(--card)", overflowX: "auto" }}>
             <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 620 }}>
               <thead>
                 <tr>
@@ -1281,17 +1296,17 @@ function KopieModal({ work, onClose, onCopy, t }) {
 
   return (
     <Modal onClose={onClose} width={420} label={t("klassenarbeit.copyTo")}>
-      <h3 style={{ fontSize: 17, fontWeight: 700, margin: "0 0 6px" }}>{t("klassenarbeit.copyTo")}</h3>
-      <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 12px", lineHeight: 1.5 }}>{t("klassenarbeit.copyHint")}</p>
+      <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 6px" }}>{t("klassenarbeit.copyTo")}</h3>
+      <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 12px", lineHeight: 1.5 }}>{t("klassenarbeit.copyHint")}</p>
 
-      <div style={{ fontSize: 12.5, color: "var(--text2)", margin: "0 0 5px" }}>{t("klassenarbeit.copyTarget")}</div>
+      <div style={{ fontSize: 13, color: "var(--text2)", margin: "0 0 5px" }}>{t("klassenarbeit.copyTarget")}</div>
       <KursKlasseSelect value={classId} kursValue={kursId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
 
-      <div style={{ fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" }}>{t("klassenarbeit.copyName")}</div>
+      <div style={{ fontSize: 13, color: "var(--text2)", margin: "12px 0 5px" }}>{t("klassenarbeit.copyName")}</div>
       <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, width: "100%" }} />
 
-      {fehler && <p style={{ color: C.danger, fontSize: 12.5, margin: "10px 0 0" }}>{fehler}</p>}
-      <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+      {fehler && <p style={{ color: C.danger, fontSize: 13, margin: "10px 0 0" }}>{fehler}</p>}
+      <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
         <button onClick={los} disabled={!classId || busy} style={{ ...btnPrimary, opacity: !classId || busy ? 0.5 : 1 }}>{t("klassenarbeit.copyGo")}</button>
         <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
       </div>

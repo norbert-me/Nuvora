@@ -6,7 +6,7 @@
 // wieder, weil der Fortschritt im Konto-Browser gemerkt wird.
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Icon, ICONS, btnPrimary, btnSecondary, pageTitle, COLORS as C, pageApp} from "../components/Icons.jsx";
+import { Icon, ICONS, btnPrimary, btnSecondary, cardStyle, pageTitle, COLORS as C, pageApp} from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const STORAGE_KEY = "nuvora_tutorial_done";
@@ -53,7 +53,7 @@ export default function Tutorial() {
           <button onClick={neu} style={{ marginLeft: "auto", ...btnSecondary }}>{t("tut.restart")}</button>
         )}
       </div>
-      <p style={{ color: "var(--text2)", marginBottom: 14, fontSize: 14 }}>
+      <p style={{ color: "var(--text2)", marginBottom: 16, fontSize: 14 }}>
 {t("tut.intro")}
       </p>
       <button onClick={() => window.dispatchEvent(new Event("nuvora:start-tour"))}
@@ -63,18 +63,19 @@ export default function Tutorial() {
         const auf = offen === b.key;
         const erledigt = !!done[b.key];
         return (
-          <div key={b.key} style={{ marginBottom: 10, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", overflow: "hidden" }}>
+          <div key={b.key} style={{ ...cardStyle, padding: 0, marginBottom: 12, overflow: "hidden" }}>
             <button
               onClick={() => setOffen(auf ? null : b.key)}
               style={{
-                display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 16px",
+                display: "flex", alignItems: "center", gap: 12, width: "100%", padding: 16,
                 background: "none", border: "none", cursor: "pointer", textAlign: "left", color: "var(--text)",
               }}
             >
               <span style={{
+                // Zahlenkreis: der Radius ist die halbe Kante (26/2).
                 width: 26, height: 26, borderRadius: 13, flexShrink: 0, fontSize: 13, fontWeight: 700,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                background: erledigt ? C.success : "var(--bg)", color: erledigt ? "#fff" : "var(--text3)",
+                background: erledigt ? C.success : "var(--bg)", color: erledigt ? C.aufAkzent : "var(--text3)",
                 border: erledigt ? "none" : "1px solid var(--border2)",
               }}>
                 {erledigt ? "✓" : i + 1}
@@ -83,9 +84,11 @@ export default function Tutorial() {
               <span style={{ color: "var(--text3)", display: "inline-flex", transform: auf ? "rotate(90deg)" : "none" }}><Icon d={ICONS.open} size={12} /></span>
             </button>
 
+            {/* 54 links ist kein Abstand, sondern eine Flucht: 16 Polsterung
+                + 26 Zahlenkreis + 12 Luecke — der Text steht unter dem Titel. */}
             {auf && (
               <div style={{ padding: "0 16px 16px 54px" }}>
-                <ul style={{ margin: "0 0 14px", paddingLeft: 18, color: "var(--text2)", fontSize: 14, lineHeight: 1.75 }}>
+                <ul style={{ margin: "0 0 16px", paddingLeft: 16, color: "var(--text2)", fontSize: 14, lineHeight: 1.75 }}>
 {[1,2,3,4,5,6,7].map((k) => { const key = `tut.${kb(b)}.${k}`; const v = t(key); return v === key ? null : <li key={k}>{v}</li>; })}
                 </ul>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

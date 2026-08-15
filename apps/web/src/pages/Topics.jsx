@@ -5,7 +5,9 @@
 import { useState, useEffect } from "react";
 import { askConfirm } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, Empty, Skeleton, Modal, pageApp} from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, pageIntro,
+  Empty, Skeleton, Modal, pageApp, cardStyle, panelStyle, inputStyle, sectionLabel,
+  toolbarBtn, toolbarBtnPrimary, toolbarInput, CONTROL_R } from "../components/Icons.jsx";
 import { peek, put } from "../core/cache.js";
 import AutoTextarea from "../components/AutoTextarea.jsx";
 import { Link } from "react-router-dom";
@@ -142,10 +144,13 @@ export default function Topics() {
       onDragEnd={isRoot ? () => { setDragId(null); setDragOver(null); } : undefined}
       onDrop={isRoot ? () => dropRoot(tp.id) : undefined}
       style={{
-        display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
-        padding: isChild ? "8px 12px" : "12px 14px",
-        marginLeft: depth * 28, marginBottom: 6,
-        border: "1px solid var(--border)", borderRadius: isChild ? 10 : 14,
+        // Thema = Karte (cardStyle), Unterthema = flachere Zeile mit
+        // Bedien-Radius — der Unterschied traegt die Schachtelung.
+        ...cardStyle,
+        display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+        padding: isChild ? "8px 12px" : 12,
+        marginLeft: depth * 28, marginBottom: 4,
+        borderRadius: isChild ? CONTROL_R : cardStyle.borderRadius,
         background: isChild ? "var(--bg)" : "var(--card)",
         cursor: isRoot ? "grab" : "default",
         opacity: dragId === tp.id ? 0.4 : 1,
@@ -168,7 +173,7 @@ export default function Topics() {
           {/* Klick auf den Namen öffnet das Detail-Popup (Notiz + Inhalte). Das
               Auf-/Zuklappen der Unterthemen bleibt am Pfeil-Button links. */}
           <span onClick={() => openPopup(tp)} title={t("topics.openDetails")}
-            style={{ flex: 1, fontWeight: isChild ? 400 : 600, fontSize: isChild ? 14 : 15.5, color: "var(--text)", cursor: "pointer" }}>
+            style={{ flex: 1, fontWeight: isChild ? 400 : 600, fontSize: isChild ? 14 : 16, color: "var(--text)", cursor: "pointer" }}>
             {tp.name}
             {subCount > 0 && <span style={{ fontSize: 12, fontWeight: 400, color: "var(--text3)", marginLeft: 8 }}>{t("topics.subCount", { n: subCount })}</span>}
           </span>
@@ -199,18 +204,18 @@ export default function Topics() {
   // Ein Knoten samt Kindern, rekursiv bis MAX_DEPTH. Das „Hinzufügen"-Formular
   // hängt unter dem jeweiligen Elternknoten (auf jeder Ebene außer der letzten).
   const renderNode = (tp, depth) => (
-    <div key={tp.id} style={depth === 0 ? { marginBottom: 10 } : undefined}>
+    <div key={tp.id} style={depth === 0 ? { marginBottom: 12 } : undefined}>
       {row(tp, depth)}
       {expanded.has(tp.id) && depth < MAX_DEPTH && childrenOf(tp.id).map((c) => renderNode(c, depth + 1))}
       {addingUnder === tp.id && depth < MAX_DEPTH && (
-        <form onSubmit={(e) => submitChild(e, tp.id)} style={{ display: "flex", gap: 8, marginLeft: (depth + 1) * 28, marginBottom: 6 }}>
+        <form onSubmit={(e) => submitChild(e, tp.id)} style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: (depth + 1) * 28, marginBottom: 4 }}>
           <input
             value={childName} onChange={(e) => setChildName(e.target.value)} autoFocus
             placeholder={t("topics.subPlaceholder")}
-            style={{ flex: 1, padding: 7, border: "1px solid var(--border2)", borderRadius: 8, background: "var(--bg)", color: "var(--text)" }}
+            style={{ ...toolbarInput, flex: 1 }}
           />
-          <button type="submit" style={btnPrimary}>{t("common.add")}</button>
-          <button type="button" onClick={() => setAddingUnder(null)} style={btnSecondary}>{t("common.abort")}</button>
+          <button type="submit" style={toolbarBtnPrimary}>{t("common.add")}</button>
+          <button type="button" onClick={() => setAddingUnder(null)} style={toolbarBtn}>{t("common.abort")}</button>
         </form>
       )}
     </div>
@@ -219,25 +224,25 @@ export default function Topics() {
   return (
     <div style={{ ...pageApp }}>
       <h1 style={pageTitle}>{t("topics.title")}</h1>
-      <p style={{ color: "var(--text2)", marginBottom: 22, fontSize: 14 }}>
-        {t("topics.intro")}
-      </p>
+      <p style={pageIntro}>{t("topics.intro")}</p>
 
       {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</p>}
 
       {!showRootForm ? (
-        <AddButton onClick={() => setShowRootForm(true)} title={t("topics.addTopic")} style={{ marginBottom: 22 }} />
+        <AddButton onClick={() => setShowRootForm(true)} title={t("topics.addTopic")} style={{ marginBottom: 24 }} />
       ) : (
-        <form onSubmit={submitRoot} style={{ display: "flex", gap: 8, marginBottom: 22 }}>
+        // Leisten-Masse (CONTROL_H), damit die Zeile beim Umschalten vom
+        // AddButton aufs Formular nicht in der Hoehe springt.
+        <form onSubmit={submitRoot} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
           <input
             value={newRoot} onChange={(e) => setNewRoot(e.target.value)} placeholder={t("topics.newPlaceholder")} autoFocus
             onKeyDown={(e) => { if (e.key === "Escape") { setShowRootForm(false); setNewRoot(""); } }}
-            style={{ flex: 1, maxWidth: 340, padding: "9px 12px", border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)" }}
+            style={{ ...toolbarInput, flex: 1, maxWidth: 340 }}
           />
-          <button type="submit" disabled={!newRoot.trim()} style={{ ...btnPrimary, opacity: newRoot.trim() ? 1 : 0.4 }}>
+          <button type="submit" disabled={!newRoot.trim()} style={{ ...toolbarBtnPrimary, opacity: newRoot.trim() ? 1 : 0.4 }}>
             {t("common.add")}
           </button>
-          <button type="button" onClick={() => { setShowRootForm(false); setNewRoot(""); }} style={btnSecondary}>
+          <button type="button" onClick={() => { setShowRootForm(false); setNewRoot(""); }} style={toolbarBtn}>
             {t("common.abort")}
           </button>
         </form>
@@ -291,22 +296,22 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
     ...(usage.lernpfad || []).map((l) => l.class_id),
   ].filter(Boolean))].map((id) => classes[id]).filter(Boolean) : [];
 
-  const secTitle = { fontSize: 11.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", margin: "12px 0 4px" };
-  const line = { fontSize: 13.5, color: "var(--text2)", padding: "3px 0", lineHeight: 1.4 };
+  const secTitle = { ...sectionLabel, margin: "12px 0 4px" };
+  const line = { fontSize: 13, color: "var(--text2)", padding: "4px 0", lineHeight: 1.4 };
   // Dieselben Ziele wie auf der Themenseite (core/themaLinks.js). Ohne Ziel
   // bleibt die Zeile Text — ein Link, der nichts tut, ist schlimmer als keiner.
   const Zeile = ({ to, children }) => (to ? (
     <Link to={to} style={{ ...line, display: "block", color: "var(--text)", textDecoration: "none" }}
           onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
           onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text)")}>
-      {children} <span style={{ color: "var(--accent)" }}>↗</span>
+      {children} <Icon d={ICONS.open} size={12} color="var(--accent)" />
     </Link>
   ) : <div style={line}>{children}</div>);
 
   return (
     <Modal onClose={onClose} width={520} style={{ maxHeight: "86vh", overflowY: "auto" }} label={tp.parent_name ? `${tp.parent_name} / ${name}` : name}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-          <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, flex: 1 }}>{tp.parent_name ? `${tp.parent_name} / ${name}` : name}</h3>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, flex: 1 }}>{tp.parent_name ? `${tp.parent_name} / ${name}` : name}</h3>
           {/* Ein Edit-Icon für Titel UND Notiz. */}
           {!editNote && <button onClick={() => { setTitleVal(name); setNoteVal(notes); setZielGVal(zielG); setZielEVal(zielE); setVorausVal(voraus); setEditNote(true); }} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={16} /></button>}
           <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
@@ -316,21 +321,21 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
           <div>
             <div style={secTitle}>{t("common.rename")}</div>
             <input value={titleVal} onChange={(e) => setTitleVal(e.target.value)} autoFocus maxLength={120}
-              style={{ width: "100%", boxSizing: "border-box", padding: 10, border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)", fontSize: 15, fontWeight: 600 }} />
+              style={{ ...inputStyle, width: "100%", fontSize: 16, fontWeight: 600 }} />
             <div style={secTitle}>{t("topics.notes")}</div>
             <AutoTextarea value={noteVal} onChange={(e) => setNoteVal(e.target.value.slice(0, 500))} rows={2} maxLength={500}
               placeholder={t("topics.notesPlaceholder")}
-              style={{ width: "100%", boxSizing: "border-box", padding: 10, border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)", fontSize: 14, lineHeight: 1.5, resize: "vertical" }} />
+              style={{ ...inputStyle, width: "100%", lineHeight: 1.5, resize: "vertical" }} />
             {[["v", t("topics.voraus"), t("topics.vorausPlaceholder"), vorausVal, setVorausVal],
               ["g", t("topics.zielG"), t("topics.zielGPlaceholder"), zielGVal, setZielGVal],
               ["e", t("topics.zielE"), t("topics.zielEPlaceholder"), zielEVal, setZielEVal]].map(([k, label, ph, wert, setzen]) => (
               <div key={k}>
                 <div style={secTitle}>{label}</div>
                 <AutoTextarea value={wert} onChange={(e) => setzen(e.target.value.slice(0, 500))} rows={2} maxLength={500} placeholder={ph}
-                  style={{ width: "100%", boxSizing: "border-box", padding: 10, border: "1px solid var(--border2)", borderRadius: 10, background: "var(--bg)", color: "var(--text)", fontSize: 14, lineHeight: 1.5, resize: "vertical" }} />
+                  style={{ ...inputStyle, width: "100%", lineHeight: 1.5, resize: "vertical" }} />
               </div>
             ))}
-            <div style={{ display: "flex", gap: 8, marginTop: 6, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
               <button onClick={saveEdit} style={btnPrimary}>{t("common.save")}</button>
               <button onClick={() => setEditNote(false)} style={btnSecondary}>{t("common.abort")}</button>
               <span style={{ marginLeft: "auto", fontSize: 12, color: noteVal.length >= 500 ? C.danger : "var(--text3)" }}>{noteVal.length}/500</span>
@@ -340,17 +345,17 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
           <div style={secTitle}>{t("topics.notes")}</div>
           <div style={{ fontSize: 14, color: notes ? "var(--text2)" : "var(--text3)", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{notes || t("topics.notesEmpty")}</div>
           {voraus && (
-            <div style={{ marginTop: 10, padding: "8px 10px", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 }}>{t("topics.voraus")}</div>
-              <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{voraus}</div>
+            <div style={{ ...panelStyle, marginTop: 12, padding: "8px 12px" }}>
+              <div style={{ ...sectionLabel, marginBottom: 4 }}>{t("topics.voraus")}</div>
+              <div style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{voraus}</div>
             </div>
           )}
           {(zielG || zielE) && (
-            <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
               {[[t("topics.zielG"), zielG], [t("topics.zielE"), zielE]].filter(([, v]) => v).map(([label, v]) => (
-                <div key={label} style={{ flex: "1 1 200px", minWidth: 180, padding: "8px 10px", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 }}>{label}</div>
-                  <div style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{v}</div>
+                <div key={label} style={{ ...panelStyle, flex: "1 1 200px", minWidth: 180, padding: "8px 12px" }}>
+                  <div style={{ ...sectionLabel, marginBottom: 4 }}>{label}</div>
+                  <div style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{v}</div>
                 </div>
               ))}
             </div>
@@ -358,8 +363,8 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
         </>)}
 
         {/* Ausklappbar: Klassen + Inhalte zum Thema. */}
-        <button onClick={() => setOpen((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginTop: 16, padding: "10px 12px", background: "var(--bg3, var(--bg))", border: "1px solid var(--border)", borderRadius: 10, cursor: "pointer", color: "var(--text)", fontSize: 14, fontWeight: 600, textAlign: "left" }}>
-          <span style={{ display: "inline-flex", transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s", color: "var(--text3)" }}><Icon d={ICONS.open} size={15} /></span>
+        <button onClick={() => setOpen((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginTop: 16, padding: "8px 12px", background: "var(--bg3)", border: "1px solid var(--border)", borderRadius: CONTROL_R, cursor: "pointer", color: "var(--text)", fontSize: 14, fontWeight: 600, textAlign: "left" }}>
+          <span style={{ display: "inline-flex", color: "var(--text3)" }}><Icon d={open ? ICONS.chevronUp : ICONS.chevronDown} size={15} /></span>
           {t("topics.detailsToggle")}
         </button>
         {open && (
@@ -369,7 +374,7 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
                 <div style={secTitle}>{t("nav.classes")}</div>
                 {klassenNamen.length ? <div style={line}>{klassenNamen.join(", ")}</div> : <div style={{ ...line, color: "var(--text3)" }}>{t("topics.noClasses")}</div>}
 
-                {(usage.cardvote?.length > 0) && (<><div style={secTitle}>CardVote</div>{usage.cardvote.map((q) => <Zeile key={q.id} to={themaZiel.cardvote(q)}>{q.text || `#${q.id}`}<span style={{ fontSize: 12, color: q.set_id ? "var(--text3)" : "var(--warn, #b26a00)" }}> · {q.set_id ? q.set_name : t("thema.noSet")}</span></Zeile>)}</>)}
+                {(usage.cardvote?.length > 0) && (<><div style={secTitle}>CardVote</div>{usage.cardvote.map((q) => <Zeile key={q.id} to={themaZiel.cardvote(q)}>{q.text || `#${q.id}`}<span style={{ fontSize: 12, color: q.set_id ? "var(--text3)" : C.warning }}> · {q.set_id ? q.set_name : t("thema.noSet")}</span></Zeile>)}</>)}
                 {(usage.karten?.length > 0) && (<><div style={secTitle}>{t("nav.cards2")}</div>{usage.karten.map((d) => <Zeile key={d.id} to={themaZiel.karten(d)}>{d.name}{classes[d.class_id] ? ` · ${classes[d.class_id]}` : ""}{d.released ? "" : ` · ${t("topics.draft")}`}</Zeile>)}</>)}
                 {(usage.lernpfad?.length > 0) && (<><div style={secTitle}>Lernpfad</div>{usage.lernpfad.map((l) => <Zeile key={l.id} to={themaZiel.lernpfad(l)}>{l.path || "—"}{classes[l.class_id] ? ` · ${classes[l.class_id]}` : ""}</Zeile>)}</>)}
                 {(usage.kalender?.length > 0) && (<><div style={secTitle}>Kalender</div>{usage.kalender.map((e) => <Zeile key={e.id} to={themaZiel.kalender(e)}>{e.date ? `${new Date(e.date).toLocaleDateString()} · ` : ""}{e.title || "—"}{classes[e.class_id] ? ` · ${classes[e.class_id]}` : ""}</Zeile>)}</>)}

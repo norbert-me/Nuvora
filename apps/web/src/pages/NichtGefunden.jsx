@@ -9,7 +9,7 @@
 // um, wenn es die Seite gibt, das Modul aber nicht aktiviert ist. Hier geht es
 // um Adressen, die es ueberhaupt nicht gibt.
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { pageForm, pageTitle, pageIntro, btnPrimary, btnSecondary, panelStyle, Icon, ICONS } from "../components/Icons.jsx";
+import { pageForm, pageTitle, pageIntro, btnPrimary, btnSecondary, panelStyle, sectionLabel, Icon, ICONS } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModules, MODUL_KEYS } from "../core/modules.js";
 
@@ -25,8 +25,8 @@ function ModulHinweis({ modulKey }) {
   // Aktiv (oder unbekannt): dann liegt es nicht am Modul, sondern an der Adresse.
   if (!mod || mod.active) return null;
   return (
-    <div style={{ ...panelStyle, marginTop: 22, textAlign: "left" }}>
-      <p style={{ fontSize: 13.5, color: "var(--text2)", lineHeight: 1.6, margin: "0 0 12px" }}>
+    <div style={{ ...panelStyle, marginTop: 24, textAlign: "left" }}>
+      <p style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.6, margin: "0 0 12px" }}>
         {t("notfound.moduleHint", { modul: mod.name })}
       </p>
       <Link to="/modules" style={{ ...btnSecondary, display: "inline-block", textDecoration: "none" }}>
@@ -52,18 +52,19 @@ export default function NichtGefunden({ user }) {
   return (
     <div style={{ ...pageForm, textAlign: "center", padding: "24px 0 8px" }}>
       <div style={{
-        width: 56, height: 56, borderRadius: 28, margin: "0 auto 18px",
+        // Reine Grafik: der Radius ist die halbe Kante (56/2) — ein Kreis.
+        width: 56, height: 56, borderRadius: 28, margin: "0 auto 16px",
         display: "flex", alignItems: "center", justifyContent: "center",
         background: "var(--bg3)", border: "1px solid var(--border)",
       }}>
         <Icon d={ICONS.ban} size={26} color="var(--text3)" />
       </div>
 
-      <h1 style={{ ...pageTitle, marginBottom: 10 }}>{t("notfound.title")}</h1>
-      <p style={{ ...pageIntro, marginBottom: 18 }}>{t("notfound.intro")}</p>
+      <h1 style={{ ...pageTitle, marginBottom: 12 }}>{t("notfound.title")}</h1>
+      <p style={{ ...pageIntro, marginBottom: 16 }}>{t("notfound.intro")}</p>
 
-      <div style={{ ...panelStyle, textAlign: "left", marginBottom: 22 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+      <div style={{ ...panelStyle, textAlign: "left", marginBottom: 24 }}>
+        <div style={{ ...sectionLabel, marginBottom: 8 }}>
           {t("notfound.address")}
         </div>
         {/* Lange Adressen duerfen umbrechen, sonst schiebt eine 404 auf dem

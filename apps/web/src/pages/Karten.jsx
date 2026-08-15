@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
-import { NiveauToggle, AddButton, Icon, ICONS, iconBtn, toolbarIconBtn, CONTROL_H, CONTROL_R, COLORS as C, btnPrimary, btnSecondary, selectStyle, Modal as UiModal, overlayGuard, modalOverlay, Empty, Skeleton, pageApp, inputStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { NiveauToggle, AddButton, Icon, ICONS, iconBtn, toolbarIconBtn, toolbarBtn, toolbarBtnPrimary, toolbarInput, menuRow, CONTROL_H, CONTROL_R, COLORS as C, REIFE_COLORS, btnPrimary, btnSecondary, btnSmall, selectStyle, Modal as UiModal, overlayGuard, modalOverlay, modalPanel, Empty, Skeleton, pageApp, inputStyle, cardStyle, panelStyle, chipStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
@@ -283,13 +283,13 @@ export default function Karten() {
 
   return (
     <div style={{ ...pageApp }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
+      <Werkzeugleiste style={{ marginBottom: 16 }} links={<>
         <span data-tour="karten-class" style={{ display: "inline-flex" }}><KursKlasseSelect value={subsetKurs ? null : classId} kursValue={wantKurs} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); setTokens(null); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} /></span>
         {subsetKurse.length > 0 && (
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)" }}>
             {t("noten.teilkurs")}
             {/* Gleiche Hoehe und Form wie die Klassenauswahl daneben (selectStyle). */}
-            <select value={subsetKurs || ""} style={{ ...selectStyle, fontSize: 13 }}
+            <select value={subsetKurs || ""} style={selectStyle}
               onChange={async (e) => {
                 const kid = e.target.value ? Number(e.target.value) : null;
                 setTokens(null);
@@ -304,48 +304,49 @@ export default function Karten() {
             </select>
           </label>
         )}
-      </div>
+      </>} />
 
-      {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 10 }}>{error}</p>}
+      {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 8 }}>{error}</p>}
 
       {view === "cards" && (
         <>
-          {/* Breadcrumb: Wurzel › Ordner › Unterordner */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 12, fontSize: 13.5 }}>
-            <button onClick={() => setCurrentCardFolder(null)}
-              onDragOver={(e) => { if (canDrop(null)) { e.preventDefault(); if (dropTarget !== null) setDropTarget(null); } }}
-              onDragLeave={() => setDropTarget((cur) => (cur === null ? undefined : cur))}
-              onDrop={(e) => { e.preventDefault(); if (canDrop(null)) doDrop(null); endDrag(); }}
-              style={{ background: dropTarget === null && canDrop(null) ? "var(--accent-bg, rgba(10,132,255,0.12))" : "none", border: dropTarget === null && canDrop(null) ? "1px solid var(--accent)" : "1px solid transparent", borderRadius: 8, cursor: "pointer", color: currentCardFolder == null ? "var(--text)" : "var(--accent)", fontWeight: 600, padding: "2px 6px" }}>{t("karten.allDecks")}</button>
-            {folderPath(currentCardFolder).map((f, i, arr) => (
-              <span key={f.id} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <span style={{ color: "var(--text3)" }}>›</span>
-                <button onClick={() => setCurrentCardFolder(f.id)}
-                  onDragOver={(e) => { if (canDrop(f.id)) { e.preventDefault(); if (dropTarget !== f.id) setDropTarget(f.id); } }}
-                  onDragLeave={() => setDropTarget((cur) => (cur === f.id ? undefined : cur))}
-                  onDrop={(e) => { e.preventDefault(); if (canDrop(f.id)) doDrop(f.id); endDrag(); }}
-                  style={{ background: dropTarget === f.id && canDrop(f.id) ? "var(--accent-bg, rgba(10,132,255,0.12))" : "none", border: dropTarget === f.id && canDrop(f.id) ? "1px solid var(--accent)" : "1px solid transparent", borderRadius: 8, cursor: "pointer", color: i === arr.length - 1 ? "var(--text)" : "var(--accent)", fontWeight: 600, padding: "2px 6px" }}>{f.name}</button>
-              </span>
-            ))}
-          </div>
-
-          {/* Ein „+" mit Untermenü: Stapel oder Ordner (im aktuellen Ordner). */}
-          <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
+          {/* Brotkrume und Anlegen sind EINE Leiste: „wo bin ich" und „was lege
+              ich hier an" gehoeren zusammen — vorher standen sie in zwei Zeilen
+              untereinander, jede mit eigenen Massen. */}
+          <Werkzeugleiste style={{ marginBottom: 16 }} links={
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+              <button onClick={() => setCurrentCardFolder(null)}
+                onDragOver={(e) => { if (canDrop(null)) { e.preventDefault(); if (dropTarget !== null) setDropTarget(null); } }}
+                onDragLeave={() => setDropTarget((cur) => (cur === null ? undefined : cur))}
+                onDrop={(e) => { e.preventDefault(); if (canDrop(null)) doDrop(null); endDrag(); }}
+                style={krumeBtn(dropTarget === null && canDrop(null), currentCardFolder == null)}>{t("karten.allDecks")}</button>
+              {folderPath(currentCardFolder).map((f, i, arr) => (
+                <span key={f.id} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ color: "var(--text3)" }}>›</span>
+                  <button onClick={() => setCurrentCardFolder(f.id)}
+                    onDragOver={(e) => { if (canDrop(f.id)) { e.preventDefault(); if (dropTarget !== f.id) setDropTarget(f.id); } }}
+                    onDragLeave={() => setDropTarget((cur) => (cur === f.id ? undefined : cur))}
+                    onDrop={(e) => { e.preventDefault(); if (canDrop(f.id)) doDrop(f.id); endDrag(); }}
+                    style={krumeBtn(dropTarget === f.id && canDrop(f.id), i === arr.length - 1)}>{f.name}</button>
+                </span>
+              ))}
+            </span>
+          }>
             {addMode ? (
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, minWidth: 240 }}>
+              <>
                 <input value={addName} onChange={(e) => setAddName(e.target.value)} autoFocus
                   placeholder={addMode === "deck" ? t("karten.newDeck") : t("karten.newFolder")}
                   onKeyDown={(e) => { if (e.key === "Enter") commitAdd(); if (e.key === "Escape") { setAddName(""); setAddMode(null); } }}
-                  style={{ ...leisteInput, flex: 1, maxWidth: 320 }} />
-                <button onClick={commitAdd} disabled={!addName.trim()} style={{ ...leisteBtnPrimary, opacity: addName.trim() ? 1 : 0.4 }}>{t("common.add")}</button>
-                <button onClick={() => { setAddName(""); setAddMode(null); }} style={leisteBtn}>{t("common.abort")}</button>
-              </div>
+                  style={{ ...toolbarInput, flex: 1, minWidth: 160, maxWidth: 320 }} />
+                <button onClick={commitAdd} disabled={!addName.trim()} style={{ ...toolbarBtnPrimary, opacity: addName.trim() ? 1 : 0.4 }}>{t("common.add")}</button>
+                <button onClick={() => { setAddName(""); setAddMode(null); }} style={toolbarBtn}>{t("common.abort")}</button>
+              </>
             ) : (
-              <div data-tour="karten-new" style={{ position: "relative" }}>
+              <div data-tour="karten-new" style={{ position: "relative", display: "inline-flex" }}>
                 <AddButton onClick={() => setAddMenuOpen((v) => !v)} title={t("common.add")} />
                 {addMenuOpen && (<>
                   <div onClick={() => setAddMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-                  <Popover style={{ minWidth: 190, padding: 6 }}>
+                  <Popover style={{ minWidth: 190, padding: 4 }}>
                     <button onClick={() => { setAddMenuOpen(false); setAddMode("deck"); }} style={menuRow}><Icon d={ICONS.plus} size={15} /> {t("karten.newDeckItem")}</button>
                     <button onClick={() => { setAddMenuOpen(false); setAddMode("folder"); }} style={menuRow}><Icon d={ICONS.folder} size={15} /> {t("karten.newFolderItem")}</button>
                   </Popover>
@@ -354,7 +355,7 @@ export default function Karten() {
             )}
             <ImportMenu importItems={[{ label: t("karten.importDeck"), onClick: importDeck }]}
               templateItems={[{ label: t("karten.jsonTemplate"), href: "/beispiel-karten.json" }]} />
-          </div>
+          </Werkzeugleiste>
 
           {/* Unterordner des aktuellen Ordners — per Drag&Drop verschiebbar. */}
           {cardFolders.filter((f) => (f.parent_id ?? null) === currentCardFolder).map((f) => {
@@ -367,11 +368,12 @@ export default function Karten() {
               onDragOver={(e) => { if (canDrop(f.id)) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (dropTarget !== f.id) setDropTarget(f.id); } }}
               onDragLeave={() => setDropTarget((cur) => (cur === f.id ? undefined : cur))}
               onDrop={(e) => { e.preventDefault(); if (canDrop(f.id)) doDrop(f.id); endDrag(); }}
-              style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", marginBottom: 8, borderRadius: 14, background: isTarget ? "var(--accent-bg, rgba(10,132,255,0.10))" : "var(--card)", opacity: isDrag ? 0.4 : 1, cursor: "grab", border: isTarget ? "2px solid var(--accent)" : "1px solid var(--border)" }}>
+              style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", marginBottom: 8, opacity: isDrag ? 0.4 : 1, cursor: "grab",
+                ...(isTarget ? { background: "var(--accent-bg, rgba(10,132,255,0.10))", border: "1px solid var(--accent)" } : null) }}>
               <span className="drag-handle" style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex", flexShrink: 0 }}><Icon d={ICONS.grip} size={15} /></span>
-              <button onClick={() => setCurrentCardFolder(f.id)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", textAlign: "left", minWidth: 0, color: "var(--text)" }}>
+              <button onClick={() => setCurrentCardFolder(f.id)} style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", textAlign: "left", minWidth: 0, color: "var(--text)" }}>
                 <Icon d={ICONS.folder} size={18} />
-                <strong style={{ fontSize: 15 }}>{f.name}{isTarget ? ` — ${t("karten.dropHere")}` : ""}</strong>
+                <strong style={{ fontSize: 16 }}>{f.name}{isTarget ? ` — ${t("karten.dropHere")}` : ""}</strong>
               </button>
               <button onClick={() => renameFolder(f)} className="icon-btn" style={iconBtn} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
               <button onClick={() => deleteFolder(f)} className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
@@ -402,17 +404,17 @@ export default function Karten() {
         return (
           <>
             {!gesamtIrgendwo ? (
-              <p style={{ fontSize: 13.5, color: "var(--text3)", marginBottom: 16 }}>{t("karten.noRolledOut")}</p>
+              <p style={{ fontSize: 14, color: "var(--text3)", marginBottom: 16 }}>{t("karten.noRolledOut")}</p>
             ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
                 <span style={{ fontSize: 14, fontWeight: 700 }}>{t("karten.progress")}</span>
-                <span style={{ fontSize: 12.5, padding: "4px 10px", borderRadius: 980, background: "rgba(10,125,62,0.12)", color: C.success, fontWeight: 600 }}>{t("karten.thisWeek")}: {dieseWoche}/{nStud}</span>
-                {nieGelernt > 0 && <span style={{ fontSize: 12.5, padding: "4px 10px", borderRadius: 980, background: "var(--bg2)", color: "var(--text3)", fontWeight: 600 }}>{t("karten.neverLearned")}: {nieGelernt}</span>}
-                {notenAktiv && <button onClick={() => setNotenDialog(true)} style={{ ...leisteBtn, marginLeft: "auto" }}>{t("karten.toNoten")}</button>}
+                <span style={{ ...chipStyle, background: C.success + "1f", color: C.success }}>{t("karten.thisWeek")}: {dieseWoche}/{nStud}</span>
+                {nieGelernt > 0 && <span style={chipStyle}>{t("karten.neverLearned")}: {nieGelernt}</span>}
+                {notenAktiv && <button onClick={() => setNotenDialog(true)} style={{ ...toolbarBtn, marginLeft: "auto" }}>{t("karten.toNoten")}</button>}
               </div>
             )}
-            <div style={{ overflowX: "auto", border: "1px solid var(--border)", borderRadius: 12 }}>
-              <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13.5 }}>
+            <div style={{ ...cardStyle, padding: 0, overflowX: "auto" }}>
+              <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 14 }}>
                 <thead><tr>
                   <th style={{ ...th, textAlign: "left" }}>{t("common.name")}</th>
                   <th style={{ ...th, textAlign: "left", minWidth: 120 }}>{t("karten.maturity")}</th>
@@ -424,12 +426,12 @@ export default function Karten() {
                   {progress.map((p) => (
                     <tr key={p.student_id}>
                       <td style={{ ...td, textAlign: "left" }}>
-                        <button onClick={() => openDetail(p)} style={{ border: "none", background: "none", color: "var(--accent)", cursor: "pointer", fontWeight: 600, fontSize: 13.5, padding: 0, textAlign: "left" }}>{p.name}</button>
+                        <button onClick={() => openDetail(p)} style={{ border: "none", background: "none", color: "var(--accent)", cursor: "pointer", fontWeight: 600, fontSize: 14, padding: 4, textAlign: "left" }}>{p.name}</button>
                       </td>
                       <td style={{ ...td, textAlign: "left" }}><ReifeBar hist={p.hist} /></td>
                       <td style={td}>{p.reviewed}{p.total ? ` / ${p.total}` : ""}</td>
                       <td style={{ ...td, color: p.due ? C.warning : "var(--text3)" }}>{p.due || "—"}</td>
-                      <td style={{ ...td, color: "var(--text3)", fontSize: 12.5 }}>{p.last_reviewed ? new Date(p.last_reviewed).toLocaleDateString() : "—"}</td>
+                      <td style={{ ...td, color: "var(--text3)", fontSize: 13 }}>{p.last_reviewed ? new Date(p.last_reviewed).toLocaleDateString() : "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -441,18 +443,22 @@ export default function Karten() {
 
       {view === "qr" && (
         <div>
-          <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 14 }}>{t("karten.qrHint")}</p>
-          <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-            <button onClick={() => window.print()} style={btnSecondary}>{t("karten.print")}</button>
-            {/* Ein weitergegebener Link zeigt dauerhaft Lernstand und
-                Testergebnisse eines Kindes. Neu vergeben macht ihn ungueltig. */}
-            <button onClick={rotateTokens} style={btnSecondary} title={t("karten.rotateHint")}>
-              {t("karten.rotate")}
-            </button>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 14 }}>
+          <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 12 }}>{t("karten.qrHint")}</p>
+          {/* Drucken ist der Alltag, „neu vergeben" die Ausnahme mit Folgen:
+              ein weitergegebener Link zeigt dauerhaft Lernstand und
+              Testergebnisse eines Kindes, neu vergeben macht jeden Ausdruck
+              ungueltig. Deshalb steht es im ⋯-Menue. */}
+          <Werkzeugleiste style={{ marginBottom: 16 }}
+            mehr={[{ key: "rotate", label: t("karten.rotate"), icon: ICONS.refresh, gefahr: true, onClick: rotateTokens }]}>
+            <button onClick={() => window.print()} style={toolbarBtn}><Icon d={ICONS.print} size={15} /> {t("karten.print")}</button>
+          </Werkzeugleiste>
+          {/* Feste Papierfarben statt Theme-Variablen: diese Kaertchen werden
+              ausgedruckt und ausgeschnitten. Papier ist immer weiss, die
+              Schrift immer schwarz — im dunklen Design waeren sie sonst am
+              Bildschirm richtig und auf dem Blatt unbrauchbar. */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
             {(tokens || []).map((s) => (
-              <div key={s.student_id} style={{ textAlign: "center", border: "1px solid var(--border)", borderRadius: 12, padding: 12, background: "#fff" }}>
+              <div key={s.student_id} style={{ ...panelStyle, textAlign: "center", padding: 12, background: "#fff" }}>
                 <img src={`${API}/qr/${s.token}.png?base=${encodeURIComponent(window.location.origin)}`} alt="" width={120} height={120} style={{ display: "block", margin: "0 auto 6px" }} />
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#111" }}>{s.name}</div>
                 <div style={{ fontSize: 11, color: "#666" }}>#{s.card_id}</div>
@@ -498,13 +504,13 @@ function NotenBrueckeModal({ t, classId, kursId, progress, scale, onClose }) {
 
   return (
     <UiModal onClose={onClose} width={440} label={t("karten.toNoten")}>
-        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{t("karten.toNoten")}</h3>
-        <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 14px" }}>{t("karten.masteryHint", { n: grades.length })}</p>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{t("karten.toNoten")}</h3>
+        <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 16px" }}>{t("karten.masteryHint", { n: grades.length })}</p>
         <AbschnittWahl classId={classId} kursId={kursId} value={sectionId} onChange={setSectionId} />
-        <div style={{ fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" }}>{t("noten.columnName")}</div>
+        <div style={{ fontSize: 13, color: "var(--text2)", margin: "12px 0 4px" }}>{t("noten.columnName")}</div>
         <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, width: "100%" }} />
-        {err && <p style={{ color: C.danger, fontSize: 12.5, marginTop: 10 }}>{err}</p>}
-        <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+        {err && <p style={{ color: C.danger, fontSize: 13, marginTop: 8 }}>{err}</p>}
+        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
           <button onClick={submit} disabled={busy || grades.length === 0 || !sectionId} style={{ ...btnPrimary, opacity: busy || grades.length === 0 || !sectionId ? 0.6 : 1 }}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
         </div>
@@ -529,16 +535,16 @@ function StudentDetail({ detail, t, onClose }) {
   const rows = Object.entries(sets);
   return (
     <UiModal onClose={onClose} width={520} label={student.name}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-          <h3 style={{ fontSize: 17, fontWeight: 700, flex: 1 }}>{student.name}</h3>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, flex: 1 }}>{student.name}</h3>
           <button onClick={onClose} className="icon-btn" style={iconBtn} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={16} /></button>
         </div>
-        <div style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 16 }}>{student.reviewed} / {student.total} {t("karten.reviewed").toLowerCase()} · {student.due || 0} {t("karten.due").toLowerCase()}</div>
+        <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 16 }}>{student.reviewed} / {student.total} {t("karten.reviewed").toLowerCase()} · {student.due || 0} {t("karten.due").toLowerCase()}</div>
         {rows.length === 0 ? (
-          <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("karten.noRolledOut")}</p>
+          <p style={{ fontSize: 14, color: "var(--text3)" }}>{t("karten.noRolledOut")}</p>
         ) : rows.map(([name, s]) => (
-          <div key={name} style={{ marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+          <div key={name} style={{ marginBottom: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
               <span style={{ fontSize: 14, fontWeight: 600 }}>{name}</span>
               <span style={{ fontSize: 12, color: "var(--text3)" }}>{s.learned} / {s.total} {t("karten.reviewed").toLowerCase()}</span>
             </div>
@@ -641,8 +647,8 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   const now = Date.now();
   const rel = deck.released_at ? new Date(deck.released_at).getTime() : null;
   const status = rel === null ? "entwurf" : rel > now ? "geplant" : "aus";
-  const badge = status === "aus" ? { text: t("karten.rolledOut"), bg: "rgba(10,125,62,0.12)", col: C.success }
-    : status === "geplant" ? { text: t("karten.plannedFor", { date: new Date(deck.released_at).toLocaleString() }), bg: "rgba(184,134,11,0.12)", col: C.warning }
+  const badge = status === "aus" ? { text: t("karten.rolledOut"), bg: C.success + "1f", col: C.success }
+    : status === "geplant" ? { text: t("karten.plannedFor", { date: new Date(deck.released_at).toLocaleString() }), bg: C.warning + "1f", col: C.warning }
     : { text: t("karten.draft"), bg: "var(--bg3)", col: "var(--text3)" };
 
   return (
@@ -650,8 +656,11 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
       onDragStart={onDragStartDeck ? (e) => { if (!dragFromHandle.current) { e.preventDefault(); return; } e.dataTransfer.effectAllowed = "move"; onDragStartDeck(); } : undefined}
       onDragEnd={onDragStartDeck ? () => { dragFromHandle.current = false; onDragEndDeck && onDragEndDeck(); } : undefined}
       onDragOver={onReorderOver} onDrop={onReorderDrop}
-      style={{ position: "relative", marginBottom: 14, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, opacity: dragging ? 0.4 : 1,
-        boxShadow: dropSide === "above" ? "inset 0 3px 0 var(--accent)" : dropSide === "below" ? "inset 0 -3px 0 var(--accent)" : undefined }}>
+      style={{ ...cardStyle, position: "relative", marginBottom: 12, opacity: dragging ? 0.4 : 1,
+        // Kein Schatten, sondern die Einfuege-Marke: eine Linie oben oder unten,
+        // die zeigt, wo der Stapel landet. EINE Staerke (MARKE) fuer Stapel und
+        // Karten — vorher waren es 3 px hier und 2 px eine Ebene tiefer.
+        boxShadow: dropSide === "above" ? `inset 0 ${MARKE}px 0 var(--accent)` : dropSide === "below" ? `inset 0 -${MARKE}px 0 var(--accent)` : undefined }}>
       {/* Kopf des Stapels als Werkzeugleiste: sichtbar bleibt, was man staendig
           braucht (Aufklappen, Name, Durchgehen) — Export, Import, Veroeffentlichen
           und Verschieben liegen im ⋯-Menue. Vorher standen hier bis zu elf
@@ -669,7 +678,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           <>
             <input value={nameVal} onChange={(e) => setNameVal(e.target.value)} autoFocus onBlur={(e) => { if (!e.relatedTarget || !e.relatedTarget.dataset || e.relatedTarget.dataset.keep !== "1") doRename(); }}
               onKeyDown={(e) => { if (e.key === "Enter") doRename(); if (e.key === "Escape") { setNameVal(deck.name || ""); setRenaming(false); } }}
-              style={{ ...leisteInput, fontSize: 16, fontWeight: 700 }} />
+              style={{ ...toolbarInput, fontSize: 16, fontWeight: 700 }} />
             {/* Löschen erscheint erst im Bearbeiten-Modus (nicht dauerhaft im Kopf). */}
             <button data-keep="1" onMouseDown={(e) => e.preventDefault()} onClick={async () => { if (await askConfirm(t("karten.delDeck", { name: deck.name }))) call(() => fetch(`${API}/decks/${deck.id}`, { method: "DELETE" })); }}
               className="icon-btn" style={toolbarIconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} color={C.danger} size={16} /></button>
@@ -680,7 +689,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
             <button onClick={() => { setNameVal(deck.name || ""); setRenaming(true); }} className="icon-btn" style={toolbarIconBtn} title={t("karten.renameDeck")} aria-label={t("karten.renameDeck")}><Icon d={ICONS.edit} size={15} /></button>
           </>
         )}
-        {status !== "entwurf" && <span style={{ fontSize: 11.5, fontWeight: 600, padding: "2px 8px", borderRadius: 980, background: badge.bg, color: badge.col }}>{badge.text}</span>}
+        {status !== "entwurf" && <span style={{ ...chipStyle, background: badge.bg, color: badge.col }}>{badge.text}</span>}
         </>}
         mehr={collapsed ? [] : [
           deck.cards.length > 0 && { key: "export", label: t("karten.export"), icon: ICONS.export, onClick: exportDeck },
@@ -698,14 +707,14 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         {/* Niveau-Stapel: "E"/"G" wird automatisch nur an Schueler des jeweiligen
             Niveaus verteilt, "" an alle. Kein manuelles Zuweisen noetig. */}
         {!collapsed && (
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }} title={t("karten.niveauHint")}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }} title={t("karten.niveauHint")}>
           <NiveauToggle wert={deck.niveau || ""} size={24} onChange={setNiveau} title={t("karten.niveauHint")} />
           <span style={{ fontSize: 12, color: "var(--text3)" }}>
             {deck.niveau === "E" ? t("karten.niveauE") : deck.niveau === "G" ? t("karten.niveauG") : t("karten.niveauAll")}
           </span>
         </span>
         )}
-        <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{deck.cards.length} {t("karten.cards")}</span>
+        <span style={{ fontSize: 13, color: "var(--text3)" }}>{deck.cards.length} {t("karten.cards")}</span>
         {!collapsed && cards.length > 0 && (
           <button onClick={() => setStudying(true)} className="icon-btn" style={toolbarIconBtn} title={t("karten.study")} aria-label={t("karten.study")}><Icon d={ICONS.eye} size={18} color="var(--accent)" /></button>
         )}
@@ -714,7 +723,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           rechtsbuendig unter der Leiste. */}
       {moveOpen && !collapsed && onMove && (<>
         <div onClick={() => setMoveOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-        <Popover align="right" style={{ top: CONTROL_H + 24, right: 16, minWidth: 180, maxHeight: 260, overflow: "auto", padding: 6 }}>
+        <Popover align="right" style={{ top: CONTROL_H + 24, right: 16, minWidth: 180, maxHeight: 260, overflow: "auto", padding: 8 }}>
           {[{ id: null, name: `– ${t("karten.rootFolder")} –` }, ...folders].map((f) => {
             const active = (deck.folder_id ?? null) === f.id;
             return (
@@ -734,7 +743,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
       {/* Ausrollen gebündelt in einem Untermenü: sofort, geplant, zurückziehen. */}
       {deck.cards.length > 0 && (
         <div style={{ position: "relative", display: "inline-block", marginBottom: 12 }}>
-          <button onClick={() => setRollOpen((v) => !v)} style={leisteBtn}>
+          <button onClick={() => setRollOpen((v) => !v)} style={toolbarBtn}>
             {t("karten.rollout")} <Icon d={ICONS.open} size={10} style={{ transform: "rotate(90deg)" }} />
           </button>
           {rollOpen && (
@@ -745,11 +754,11 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
                 {status !== "aus" && (
                   <div style={{ padding: "8px 10px" }}>
                     <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 4 }}>{t("karten.planLabel")}</div>
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                       {/* Nur Datum wählen — freigeschaltet wird immer 07:00 morgens des Tages. */}
-                      <input type="date" value={planDate} onChange={(e) => setPlanDate(e.target.value)} style={{ ...leisteInput, flex: 1, minWidth: 150 }} />
+                      <input type="date" value={planDate} onChange={(e) => setPlanDate(e.target.value)} style={{ ...toolbarInput, flex: 1, minWidth: 150 }} />
                       <button disabled={!planDate} onClick={() => { if (planDate) { const [y, mo, d] = planDate.split("-").map(Number); setRollOpen(false); release({ released_at: new Date(y, mo - 1, d, 7, 0, 0).toISOString() }); } }}
-                        style={{ ...leisteBtnPrimary, opacity: planDate ? 1 : 0.4 }}>{t("karten.plan")}</button>
+                        style={{ ...toolbarBtnPrimary, opacity: planDate ? 1 : 0.4 }}>{t("karten.plan")}</button>
                     </div>
                     <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 4 }}>{t("karten.planTime")}</div>
                   </div>
@@ -764,18 +773,18 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         const over = dragCard != null && cardDrop && cardDrop.id === c.id;
         return (
         <div key={c.id} onDragOver={(e) => onCardDragOver(e, c.id)} onDrop={() => dropCard(c.id)}
-          style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 13.5,
+          style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderTop: "1px solid var(--border)", fontSize: 14,
             opacity: dragCard === c.id ? 0.4 : 1,
-            boxShadow: over && cardDrop.side === "above" ? "inset 0 2px 0 var(--accent)" : over && cardDrop.side === "below" ? "inset 0 -2px 0 var(--accent)" : undefined }}>
+            boxShadow: over && cardDrop.side === "above" ? `inset 0 ${MARKE}px 0 var(--accent)` : over && cardDrop.side === "below" ? `inset 0 -${MARKE}px 0 var(--accent)` : undefined }}>
           <span draggable onDragStart={(e) => { e.stopPropagation(); e.dataTransfer.effectAllowed = "move"; setDragCard(c.id); }} onDragEnd={() => { setDragCard(null); setCardDrop(null); }}
             className="drag-handle" title={t("karten.reorderHint")} style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex", flexShrink: 0, userSelect: "none" }}><Icon d={ICONS.grip} size={14} /></span>
-          {c.has_front_image && <AuthImage src={`${API}/cards/${c.id}/image/front`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: 5, border: "1px solid var(--border2)", flexShrink: 0 }} />}
+          {c.has_front_image && <AuthImage src={`${API}/cards/${c.id}/image/front`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: CONTROL_R, border: "1px solid var(--border2)", flexShrink: 0 }} />}
           <span style={{ flex: 1, minWidth: 0 }}><strong><Latex>{c.front}</Latex></strong> <span style={{ color: "var(--text3)" }}>→ <Latex>{c.back}</Latex></span></span>
           {/* Direkt in der Zeile umschaltbar — dasselbe Bauteil wie bei einer
               CardVote-Frage und beim Kursteilnehmer. */}
           <NiveauToggle wert={c.niveau || ""} size={22} title={t("karten.cardNiveauHint")}
             onChange={(v) => saveEditCard(c.id, c.front, c.back, v)} />
-          {c.has_back_image && <AuthImage src={`${API}/cards/${c.id}/image/back`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: 5, border: "1px solid var(--border2)", flexShrink: 0 }} />}
+          {c.has_back_image && <AuthImage src={`${API}/cards/${c.id}/image/back`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: CONTROL_R, border: "1px solid var(--border2)", flexShrink: 0 }} />}
           <button onClick={() => setEditCard(c.id)} className="icon-btn" style={iconBtn} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>
           {/* Löschen stand direkt neben Bearbeiten — zwei Pixel daneben und die
               Karte ist weg. Es liegt jetzt im ⋯-Menue, unten und rot. */}
@@ -788,8 +797,8 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         <CardEditModal card={cards.find((c) => c.id === editCard)} imgVer={imgVer} onUpload={uploadCardImg} onRemove={removeCardImg}
           onSave={saveEditCard} onClose={() => setEditCard(null)} t={t} />
       )}
-      <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <button onClick={() => setNewOpen(true)} style={{ ...btnPrimary, padding: "8px 16px", display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.plus} size={15} color="#fff" /> {t("karten.newCard")}</button>
+      <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <button onClick={() => setNewOpen(true)} style={{ ...btnPrimary, padding: "8px 16px", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon d={ICONS.plus} size={15} color="var(--bg)" /> {t("karten.newCard")}</button>
       </div>
       </>)}
       {newOpen && (
@@ -803,12 +812,6 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
     </div>
   );
 }
-
-// EINE Zeile fuer alle Klappmenues dieser Seite (Anlegen, Verschieben,
-// Ausrollen). Es gab vier fast gleiche Fassungen — 8/9 px Polsterung, Radius
-// 7/8, Schrift 13/13.5 — die nebeneinander sichtbar auseinanderliefen.
-// Abweichungen bitte per Spread ableiten, nicht neu bauen.
-const menuRow = { display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "8px 10px", background: "none", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 13.5, color: "var(--text)", textAlign: "left" };
 
 // Lernmodus: Karten des Stapels durchgehen. Vorderseite → tippen/Leertaste
 // deckt die Rückseite auf → weiter. Nur zum Anschauen, speichert nichts.
@@ -836,34 +839,39 @@ function StudyModal({ cards, deckName, t, onClose }) {
   const done = pos + 1;
   return (
     <div style={{ ...modalOverlay, background: "rgba(0,0,0,0.72)" }} {...overlayGuard(onClose)}>
-      <div style={{ width: "100%", maxWidth: 640, display: "flex", flexDirection: "column", gap: 14 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#fff" }}>
-          <strong style={{ fontSize: 15 }}>{deckName}</strong>
+      <div style={{ width: "100%", maxWidth: 640, display: "flex", flexDirection: "column", gap: 12 }}>
+        {/* Der Lernmodus liegt auf einem dunklen Vorhang (rgba(0,0,0,0.72)) —
+            weisse Schrift gilt hier in beiden Designs, das ist keine
+            vergessene Theme-Variable. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#fff" }}>
+          <strong style={{ fontSize: 16 }}>{deckName}</strong>
           <span style={{ fontSize: 13, opacity: 0.7 }}>{done} / {cards.length}</span>
           <span style={{ flex: 1 }} />
           <button onClick={() => { setOrder(shuffle(cards.map((_, i) => i))); setPos(0); setFlipped(false); }} className="icon-btn" style={{ ...iconBtn, color: "#fff" }} title={t("zufall.reroll")} aria-label={t("zufall.reroll")}><Icon d={ICONS.shuffle} size={18} color="#fff" /></button>
           <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, color: "#fff" }} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} color="#fff" /></button>
         </div>
         {/* Fortschrittsbalken */}
-        <div style={{ height: 4, borderRadius: 3, background: "rgba(255,255,255,0.18)", overflow: "hidden" }}>
+        {/* Reine Grafik: der Radius ist die halbe Kante (4/2) — eine runde
+            Balkenkappe, kein Bedienelement. */}
+        <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.18)", overflow: "hidden" }}>
           <div style={{ height: "100%", width: `${(done / cards.length) * 100}%`, background: "var(--accent)", transition: "width .2s" }} />
         </div>
         {/* Karte: klick dreht */}
         <div onClick={flip}
-          style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 18, minHeight: 300, padding: "40px 28px",
-            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18, cursor: "pointer", textAlign: "center" }}>
-          <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: flipped ? "var(--accent)" : "var(--text3)" }}>
+          style={{ ...modalPanel, boxShadow: "none", maxHeight: "none", minHeight: 300, padding: 24,
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, cursor: "pointer", textAlign: "center" }}>
+          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: flipped ? "var(--accent)" : "var(--text3)" }}>
             {flipped ? t("karten.back") : t("karten.front")}
           </span>
-          {img && <AuthImage src={`${API}/cards/${c.id}/image/${img}`} style={{ maxHeight: 200, maxWidth: "100%", objectFit: "contain", borderRadius: 10 }} />}
-          <div style={{ fontSize: 24, fontWeight: 600, lineHeight: 1.4 }}><Latex>{txt}</Latex></div>
-          {!flipped && <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("karten.tapToFlip")}</span>}
+          {img && <AuthImage src={`${API}/cards/${c.id}/image/${img}`} style={{ maxHeight: 200, maxWidth: "100%", objectFit: "contain", borderRadius: CONTROL_R }} />}
+          <div style={{ fontSize: 22, fontWeight: 600, lineHeight: 1.4 }}><Latex>{txt}</Latex></div>
+          {!flipped && <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("karten.tapToFlip")}</span>}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={() => go(-1)} disabled={pos === 0} style={{ ...btnSecondary, opacity: pos === 0 ? 0.4 : 1 }}>← {t("karten.prev")}</button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button onClick={() => go(-1)} disabled={pos === 0} style={{ ...btnSecondary, opacity: pos === 0 ? 0.4 : 1, display: "inline-flex", alignItems: "center", gap: 4 }}><Icon d={ICONS.arrowLeft} size={14} /> {t("karten.prev")}</button>
           <button onClick={flip} style={{ ...btnSecondary, flex: 1 }}>{flipped ? t("karten.showFront") : t("karten.reveal")}</button>
           {pos + 1 < cards.length
-            ? <button onClick={() => go(1)} style={{ ...btnPrimary }}>{t("karten.next")} →</button>
+            ? <button onClick={() => go(1)} style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 4 }}>{t("karten.next")} <Icon d={ICONS.arrowRight} size={14} color="var(--bg)" /></button>
             : <button onClick={onClose} style={{ ...btnPrimary }}>{t("karten.finish")}</button>}
         </div>
       </div>
@@ -877,7 +885,7 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t })
   const [back, setBack] = useState(card.back || "");
   const [niveau, setNiveau] = useState(card.niveau || "");
   const inpS = { ...inputStyle, width: "100%", resize: "vertical" };
-  const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
+  const lbl = { fontSize: 13, color: "var(--text2)", margin: "12px 0 4px" };
   // LaTeX-Schnelltasten fügen in das zuletzt fokussierte Feld ein (wie in der Anlege-Maske).
   const frontRef = useRef(null), backRef = useRef(null), activeField = useRef("front");
   const insertLatex = (tex, offset) => {
@@ -897,8 +905,8 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t })
   };
   return (
     <UiModal onClose={onClose} width={480} style={{ maxHeight: "90vh", overflowY: "auto" }} label={card.id ? t("karten.editCard") : t("karten.newCard")}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-          <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0, flex: 1 }}>{card.id ? t("karten.editCard") : t("karten.newCard")}</h3>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, flex: 1 }}>{card.id ? t("karten.editCard") : t("karten.newCard")}</h3>
           <button onClick={onClose} className="icon-btn" style={toolbarIconBtn} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
         </div>
 
@@ -906,7 +914,7 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t })
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", margin: "4px 0 6px" }}>
           {LATEX_BUTTONS.map((b) => (
             <button key={b.label} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insertLatex(b.tex, b.cursor)}
-              style={{ padding: "3px 8px", fontSize: 13, border: "1px solid var(--border2)", borderRadius: 6, background: "var(--card)", cursor: "pointer", fontFamily: "serif", color: "var(--text)" }}>{b.label}</button>
+              style={{ ...btnSecondary, ...btnSmall, fontFamily: "serif" }}>{b.label}</button>
           ))}
           <span style={{ fontSize: 11, color: "var(--text3)", marginLeft: 4 }}>{t("karten.latexHint")}</span>
         </div>
@@ -914,7 +922,7 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t })
         <div style={lbl}>{t("karten.front")}</div>
         <textarea ref={frontRef} onFocus={() => (activeField.current = "front")} value={front} onChange={(e) => setFront(e.target.value)} rows={2} style={inpS} />
         {card.id && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
             <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("karten.imgFront")}</span>
             <CardImgCtl cardId={card.id} side="front" has={card.has_front_image} imgVer={imgVer} onUpload={onUpload} onRemove={onRemove} t={t} />
           </div>
@@ -923,12 +931,12 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t })
         <div style={lbl}>{t("karten.back")}</div>
         <textarea ref={backRef} onFocus={() => (activeField.current = "back")} value={back} onChange={(e) => setBack(e.target.value)} rows={2} style={inpS} />
         {card.id ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
             <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("karten.imgBack")}</span>
             <CardImgCtl cardId={card.id} side="back" has={card.has_back_image} imgVer={imgVer} onUpload={onUpload} onRemove={onRemove} t={t} />
           </div>
         ) : (
-          <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 6 }}>{t("karten.imgAfterSave")}</div>
+          <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>{t("karten.imgAfterSave")}</div>
         )}
 
         {/* E/G je Karte. Der Stapel kann zusätzlich ein Niveau tragen; beides
@@ -942,12 +950,12 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t })
         </div>
 
         {(front.includes("$") || back.includes("$")) && (
-          <div style={{ marginTop: 12, padding: "8px 12px", background: "var(--bg2)", borderRadius: 8, fontSize: 14 }}>
+          <div style={{ ...panelStyle, marginTop: 12, padding: "8px 12px", background: "var(--bg2)", fontSize: 14 }}>
             <Latex>{front}</Latex> <span style={{ color: "var(--text3)" }}>→ <Latex>{back}</Latex></span>
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center" }}>
           <button onClick={() => onSave(card.id, front.trim(), back.trim(), niveau)} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
         </div>
@@ -959,9 +967,9 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t })
 function CardImgCtl({ cardId, side, has, imgVer, onUpload, onRemove, t }) {
   if (has) {
     return (
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 1, flexShrink: 0 }}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
         <AuthImage src={`${API}/cards/${cardId}/image/${side}`} reloadKey={imgVer}
-          style={{ height: 32, width: 32, objectFit: "cover", borderRadius: 6, border: "1px solid var(--border2)" }} />
+          style={{ height: 32, width: 32, objectFit: "cover", borderRadius: CONTROL_R, border: "1px solid var(--border2)" }} />
         <button onClick={() => onRemove(cardId, side)} className="icon-btn" style={iconBtn} title={t("karten.imgRemove")} aria-label={t("karten.imgRemove")}><Icon d={ICONS.close} size={12} color={C.danger} /></button>
       </span>
     );
@@ -1031,15 +1039,15 @@ function ImportModal({ deckName, onClose, onImport, t }) {
   };
   return (
     <UiModal onClose={onClose} width={560} label={t("karten.importTitle", { name: deckName })}>
-        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>{t("karten.importTitle", { name: deckName })}</h3>
-        <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 12px" }}>{t("karten.importHint")}</p>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{t("karten.importTitle", { name: deckName })}</h3>
+        <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 12px" }}>{t("karten.importHint")}</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
           <input type="file" accept=".csv,.tsv,.txt,.json" onChange={onFile} style={{ fontSize: 13 }} />
-          <a href="/beispiel-karten.json" download style={{ fontSize: 12.5, color: "var(--accent)" }}>{t("karten.jsonTemplate")}</a>
+          <a href="/beispiel-karten.json" download style={{ fontSize: 13, color: "var(--accent)" }}>{t("karten.jsonTemplate")}</a>
         </div>
         <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={t("karten.importPlaceholder")} rows={8}
           style={{ ...inp, width: "100%", boxSizing: "border-box", fontFamily: "monospace", fontSize: 13, resize: "vertical" }} />
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
           <button onClick={doImport} disabled={!parsed.length || busy} style={{ ...btnPrimary, opacity: (parsed.length && !busy) ? 1 : 0.4 }}>
             {busy ? t("karten.importing") : t("karten.importCount", { n: parsed.length })}
           </button>
@@ -1049,13 +1057,14 @@ function ImportModal({ deckName, onClose, onImport, t }) {
   );
 }
 
-// Reifegrade fuer das Histogramm — gleiche Staffelung wie in Lernen.jsx.
+// Reifegrade fuer das Histogramm. Die Farben kommen aus REIFE_COLORS (Icons.jsx) —
+// dieselbe Karte muss hier und auf der Schuelerseite gleich eingefaerbt sein.
 const REIFE = [
-  ["neu", "Neu", "#cbd5e1"],
-  ["lernen", "Am Lernen", "#f59e0b"],
-  ["kurz", "Kurzfristig", "#eab308"],
-  ["mittel", "Mittelfristig", "#84cc16"],
-  ["lang", "Langfristig", C.success],
+  ["neu", "Neu"],
+  ["lernen", "Am Lernen"],
+  ["kurz", "Kurzfristig"],
+  ["mittel", "Mittelfristig"],
+  ["lang", "Langfristig"],
 ];
 
 // Gestapelter Reifegrad-Balken aus einem hist-Objekt {neu,lernen,...}.
@@ -1064,21 +1073,28 @@ function ReifeBar({ hist, height = 10 }) {
   if (!total) return <span style={{ fontSize: 12, color: "var(--text3)" }}>—</span>;
   return (
     <div style={{ display: "flex", height, borderRadius: height / 2, overflow: "hidden", minWidth: 80 }} title={REIFE.map(([k, l]) => `${l}: ${hist[k] || 0}`).join(" · ")}>
-      {REIFE.map(([k, , color]) => {
+      {REIFE.map(([k]) => {
         const n = hist?.[k] || 0;
-        return n > 0 ? <div key={k} style={{ width: `${(n / total) * 100}%`, background: color }} /> : null;
+        return n > 0 ? <div key={k} style={{ width: `${(n / total) * 100}%`, background: REIFE_COLORS[k] }} /> : null;
       })}
     </div>
   );
 }
 
 const inp = { ...inputStyle };
-// Bedienelemente einer Leiste: eine Hoehe (CONTROL_H) und eine Form (CONTROL_R)
-// aus Icons.jsx statt eigener Polsterungen. Vorher standen in derselben Zeile
-// 8-px-, 5-px- und 6-px-Knoepfe neben einem 9-px-Eingabefeld.
-const leisteBtn = { ...btnSecondary, height: CONTROL_H, borderRadius: CONTROL_R, padding: "0 14px", fontSize: 13, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 };
-const leisteBtnPrimary = { ...btnPrimary, height: CONTROL_H, borderRadius: CONTROL_R, padding: "0 16px", fontSize: 13, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 };
-const leisteInput = { ...inputStyle, height: CONTROL_H, borderRadius: CONTROL_R, padding: "0 12px", fontSize: 13 };
+// Einfuege-Marke beim Ziehen (kein Schatten): eine Linie ober- oder unterhalb
+// der Zielzeile. EINE Staerke fuer Stapel und Karten.
+const MARKE = 3;
+// Stufe der Brotkrume. Sie steht in einer Werkzeugleiste, also gilt auch hier
+// CONTROL_H/CONTROL_R; der Rahmen ist nur beim Ziehen sichtbar (Ablege-Ziel),
+// bleibt aber immer reserviert, damit nichts springt.
+const krumeBtn = (ziel, aktuell) => ({
+  height: CONTROL_H, borderRadius: CONTROL_R, padding: "0 8px", fontSize: 13, fontWeight: 600,
+  display: "inline-flex", alignItems: "center", cursor: "pointer", boxSizing: "border-box",
+  background: ziel ? "var(--accent-bg, rgba(10,132,255,0.12))" : "none",
+  border: `1px solid ${ziel ? "var(--accent)" : "transparent"}`,
+  color: aktuell ? "var(--text)" : "var(--accent)",
+});
 // Aus dem Kern abgeleitet: nur Innenabstand und Kopflinie weichen ab.
 const th = { ...thBasis, padding: "8px 10px", borderBottom: "2px solid var(--border)" };
 const td = { ...tdBasis, padding: "7px 10px" };

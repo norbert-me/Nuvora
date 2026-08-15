@@ -12,7 +12,7 @@ import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { Icon, ICONS, iconBtn, toolbarIconBtn, COLORS as C, btnPrimary, btnSecondary, Modal as UiModal, popoverPanel, Empty, Skeleton, inputStyle, Popover, Tabs, Toggle, nichtZiehen, dateiWaehlen, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, toolbarBtn, toolbarBtnPrimary, toolbarIconBtn, toolbarInput, selectStyle, cardStyle, chipStyle, panelStyle, CONTROL_R, SHADOW, COLORS as C, btnPrimary, btnSecondary, Modal as UiModal, popoverPanel, Empty, Skeleton, inputStyle, Popover, Tabs, Toggle, nichtZiehen, dateiWaehlen, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { MehrMenu } from "../components/Werkzeugleiste.jsx";
@@ -477,15 +477,15 @@ export default function Noten() {
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
-        <label data-tour="noten-class" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+        <label data-tour="noten-class" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)" }}>
           {t("nav.classes")}
           <KursKlasseSelect value={subsetKurs ? null : classId} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} />
         </label>
         {subsetKurse.length > 0 && (
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)" }}>
             {t("noten.teilkurs")}
-            <select value={subsetKurs || ""} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text)" }}
+            <select value={subsetKurs || ""} style={selectStyle}
               onChange={async (e) => {
                 const kid = e.target.value ? Number(e.target.value) : null;
                 if (!kid) { setSubsetKurs(null); return; }
@@ -521,7 +521,7 @@ export default function Noten() {
           <div style={{ display: "flex", gap: 8, marginLeft: "auto", alignItems: "center" }}>
             <button data-tour="noten-add" onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}
               className="icon-btn"
-              style={{ ...toolbarIconBtn, border: "1px solid var(--border2)" }}>
+              style={toolbarIconBtn}>
               <Icon d={ICONS.plus} size={20} color="var(--accent)" />
             </button>
             <MehrMenu eintraege={[
@@ -536,7 +536,7 @@ export default function Noten() {
         )}
       </div>
 
-      {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 10 }}>{error}</p>}
+      {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</p>}
 
       {neuAbschnitt && (
         <Modal title={t("noten.addSection")} onClose={() => setNeuAbschnitt(false)}>
@@ -565,19 +565,20 @@ export default function Noten() {
           <Modal title={t("noten.colStatsTitle", { name: statsCol.name })} onClose={() => setStatsCol(null)}>
             {!st ? <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("noten.colNoGrades")}</p> : (
               <div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 18 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
                   {[[t("noten.colAvg"), de1(st.avg)], [t("noten.colMedian"), de1(st.median)], [t("noten.colBest"), de1(st.min)], [t("noten.colWorst"), de1(st.max)]].map(([lbl, val], i) => (
-                    <div key={i} style={{ padding: "10px 12px", borderRadius: 10, background: "var(--bg2)" }}>
-                      <div style={{ fontSize: 11.5, color: "var(--text3)" }}>{lbl}</div>
-                      {val !== "" && <div style={{ fontSize: 20, fontWeight: 800 }}>{val}</div>}
+                    <div key={i} style={{ padding: "10px 12px", borderRadius: CONTROL_R, background: "var(--bg2)" }}>
+                      <div style={{ fontSize: 12, color: "var(--text3)" }}>{lbl}</div>
+                      {val !== "" && <div style={{ fontSize: 22, fontWeight: 800 }}>{val}</div>}
                     </div>
                   ))}
                 </div>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text3)", marginBottom: 8 }}>{t("noten.colDist")}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text3)", marginBottom: 8 }}>{t("noten.colDist")}</div>
                 <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 100 }}>
                   {st.dist.map((d) => (
                     <div key={d.g} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                       <div style={{ fontSize: 11, color: "var(--text3)" }}>{d.n || ""}</div>
+                      {/* Saeule: Radius rundet nur die Kappe der Grafik. */}
                       <div style={{ width: "100%", height: `${(d.n / maxN) * 70}px`, minHeight: d.n ? 3 : 0, background: "var(--accent)", borderRadius: 4 }} />
                       <div style={{ fontSize: 12, fontWeight: 700 }}>{d.g}</div>
                     </div>
@@ -618,7 +619,7 @@ export default function Noten() {
         // Noch keine Abschnitte: nur der Hinweis, NICHT die SuS-Liste (die kommt
         // erst mit einer Bewertungsstruktur — eine nackte Namensliste ohne Spalten
         // verwirrt mehr als sie hilft).
-        <div style={{ marginBottom: 14 }}><Empty title={t("noten.noSections")} hint={t("noten.noSectionsHint")} /></div>
+        <div style={{ marginBottom: 16 }}><Empty title={t("noten.noSections")} hint={t("noten.noSectionsHint")} /></div>
       ) : (
         // Eigener Scrollrahmen statt Seiten-Scroll: nur so kann der Kopf
         // wirklich stehen bleiben (ein Vorfahre mit overflow ist der Bezug fuer
@@ -626,16 +627,16 @@ export default function Noten() {
         // --tabellenkopf-top: 0 heisst „kleb am Rahmen, nicht unter der Navbar";
         // --kopf2 ist die gemessene Hoehe der ersten Kopfzeile, damit die zweite
         // darunter einrastet statt darauf.
-        <div ref={rahmenRef} style={{ overflow: "auto", maxHeight: "calc(100vh - 210px)", border: "1px solid var(--border)", borderRadius: 12, WebkitOverflowScrolling: "touch",
+        <div ref={rahmenRef} style={{ overflow: "auto", maxHeight: "calc(100vh - 210px)", border: "1px solid var(--border)", borderRadius: panelStyle.borderRadius, WebkitOverflowScrolling: "touch",
           "--tabellenkopf-top": "0px" }}>
           {/* borderCollapse: separate — mit „collapse" gehoeren die Rahmen der
               Tabelle, nicht den Zellen, und ein `position: sticky` an einer
               Kopfzelle bleibt in Chrome wirkungslos: der Kopf scrollte trotz
               aller Angaben weg. */}
-          <table style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: 13.5, minWidth: "100%" }}>
+          <table style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: 14, minWidth: "100%" }}>
             <thead>
               <tr ref={kopf1Ref}>
-                <th style={{ ...th, ...stickyLh, whiteSpace: "nowrap", textAlign: "left", fontWeight: 400, fontSize: 12.5, color: gewichtSumme === 100 ? "var(--text3)" : C.warning }}>
+                <th style={{ ...th, ...stickyLh, whiteSpace: "nowrap", textAlign: "left", fontWeight: 400, fontSize: 13, color: gewichtSumme === 100 ? "var(--text3)" : C.warning }}>
                   {gewichtSumme !== 100 ? t("noten.weightNot100", { n: gewichtSumme }) : t("noten.weightSum", { n: gewichtSumme })}
                 </th>
                 {sections.map((sec) => {
@@ -752,15 +753,16 @@ export default function Noten() {
                       {/* Nummer in fester Breite, rechtsbuendig: sonst faengt
                           „10. Jamiro" weiter rechts an als „7. Selina" und die
                           Namensspalte franst aus. */}
-                      <span style={{ display: "inline-block", width: 26, textAlign: "right", color: "var(--text3)", fontWeight: 400, marginRight: 6, fontVariantNumeric: "tabular-nums" }}>{si + 1}.</span>{s.name}
+                      <span style={{ display: "inline-block", width: 26, textAlign: "right", color: "var(--text3)", fontWeight: 400, marginRight: 8, fontVariantNumeric: "tabular-nums" }}>{si + 1}.</span>{s.name}
                       {/* Zeile mit Kommentaren: ein Punkt genuegt — die Zelle
                           selbst zeigt, wo er sitzt. */}
                       {entries.some((e) => e.student_id === s.student_id && e.kind === "grade" && (e.note || "").trim()) && (
-                        <span title={t("noten.commentRow")} style={{ display: "inline-block", width: 6, height: 6, borderRadius: 3, background: C.warning, marginLeft: 6, verticalAlign: "middle" }} />
+                        /* Punkt: Radius = halbe Kante, reine Grafik. */
+                        <span title={t("noten.commentRow")} style={{ display: "inline-block", width: 6, height: 6, borderRadius: 3, background: C.warning, marginLeft: 8, verticalAlign: "middle" }} />
                       )}
                       {(() => { const tr = trendFor(s.student_id); return tr && tr !== "flat" ? (
                         <span title={t(tr === "up" ? "noten.trendUp" : "noten.trendDown")}
-                          style={{ marginLeft: 6, fontSize: 12, fontWeight: 700, color: tr === "up" ? C.success : C.danger }}>
+                          style={{ marginLeft: 8, fontSize: 12, fontWeight: 700, color: tr === "up" ? C.success : C.danger }}>
                           <Icon d={ICONS.open} size={11} style={{ transform: tr === "up" ? "rotate(-90deg)" : "rotate(90deg)" }} />
                         </span>
                       ) : null; })()}
@@ -814,7 +816,7 @@ export default function Noten() {
                                   }} />
                               : (<div style={{ position: "relative" }}>
                                   <button onClick={() => setZelle(id)}
-                                    style={{ width: "100%", minHeight: 32, border: "none", background: "none", cursor: "text", color: "var(--text)", fontSize: 13.5, fontWeight: noten.length ? 600 : 400 }}>
+                                    style={{ width: "100%", minHeight: 32, border: "none", background: "none", cursor: "text", color: "var(--text)", fontSize: 14, fontWeight: noten.length ? 600 : 400 }}>
                                     {s.per_category[String(c.id)] !== undefined ? de(s.per_category[String(c.id)]) : <span style={{ color: "var(--border2)" }}>·</span>}
                                   </button>
                                   {/* Ecke oben rechts. Die Trefferflaeche ist 20 px
@@ -832,7 +834,7 @@ export default function Noten() {
                                       opacity: kommentarVon(s.student_id, c.id) ? 1 : 0 }}>
                                     <span style={{ display: "block", width: 0, height: 0, pointerEvents: "none",
                                       borderTop: `9px solid ${kommentarVon(s.student_id, c.id) ? C.warning : "var(--border2)"}`,
-                                      borderLeft: "9px solid transparent", marginLeft: 11 }} />
+                                      borderLeft: "9px solid transparent", marginLeft: 12 }} />
                                   </button>
                                 </div>)}
                           </td>
@@ -851,12 +853,12 @@ export default function Noten() {
                       onCancel={() => setZelle(null)}
                       onReset={() => overrideReset(s.student_id, null)} />
                     {s.total_override == null && s.weighted !== null && s.unweighted_fallback && (
-                      <div style={{ fontWeight: 400, fontSize: 10, color: C.warning }}>{t("noten.unweighted")}</div>
+                      <div style={{ fontWeight: 400, fontSize: 11, color: C.warning }}>{t("noten.unweighted")}</div>
                     )}
                   </td>
                   <td style={td}>
                     <button onClick={() => setBeobFuer(s.student_id)} title={t("noten.obsHeading")}
-                      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", background: "none", cursor: "pointer", color: s.observations ? "var(--accent)" : "var(--text3)", fontSize: 12.5, padding: 4 }}>
+                      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", background: "none", cursor: "pointer", color: s.observations ? "var(--accent)" : "var(--text3)", fontSize: 13, padding: 4 }}>
                       {s.observations || <Icon d={ICONS.plus} size={14} />}
                     </button>
                   </td>
@@ -867,7 +869,7 @@ export default function Noten() {
         </div>
       )}
 
-      <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 10, lineHeight: 1.6 }}>
+      <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 12, lineHeight: 1.6 }}>
         {t("noten.cellHint", { a: "2", b: "2,3" })} {t("noten.clickStudent")}
       </p>
 
@@ -938,7 +940,7 @@ function Zelle({ onSave, onCancel, onTab, onEnter, onPfeil, initial = "" }) {
         }
       }}
       placeholder="2,3"
-      style={{ width: "100%", minHeight: 32, border: "2px solid var(--accent)", borderRadius: 4, background: "var(--input-bg, var(--bg))", color: "var(--text)", textAlign: "center", fontSize: 13.5, padding: 0, boxSizing: "border-box" }} />
+      style={{ width: "100%", minHeight: 32, border: "2px solid var(--accent)", borderRadius: CONTROL_R, background: "var(--input-bg, var(--bg))", color: "var(--text)", textAlign: "center", fontSize: 14, padding: 0, boxSizing: "border-box" }} />
   );
 }
 
@@ -950,7 +952,7 @@ function NoteZelle({ t, editing, onEdit, value, isOverride, onSave, onCancel, on
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2, minHeight: 32 }}>
       <button onClick={onEdit} title={t("noten.overrideHint")}
-        style={{ border: "none", background: "none", cursor: "pointer", color: isOverride ? "var(--accent)" : "var(--text)", fontWeight: bold ? 700 : 600, fontSize: 13.5, padding: "0 2px" }}>
+        style={{ border: "none", background: "none", cursor: "pointer", color: isOverride ? "var(--accent)" : "var(--text)", fontWeight: bold ? 700 : 600, fontSize: 14, padding: "0 2px" }}>
         {value != null ? de(value) : <span style={{ color: "var(--border2)" }}>·</span>}
       </button>
       {isOverride && (
@@ -977,13 +979,13 @@ function NotenStatistik({ noten, t }) {
   const dist = [1, 2, 3, 4, 5, 6].map((g) => noten.filter((v) => Math.round(v) === g).length);
   const maxD = Math.max(...dist, 1);
   const tile = (label, value) => (
-    <div style={{ flex: "1 1 90px", minWidth: 80, padding: "10px 12px", background: "var(--bg2)", borderRadius: 10, textAlign: "center" }}>
-      <div style={{ fontSize: 20, fontWeight: 800, color: "var(--text)" }}>{value}</div>
-      <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 2 }}>{label}</div>
+    <div style={{ flex: "1 1 90px", minWidth: 80, padding: "10px 12px", background: "var(--bg2)", borderRadius: CONTROL_R, textAlign: "center" }}>
+      <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>{value}</div>
+      <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>{label}</div>
     </div>
   );
   return (
-    <div style={{ padding: 16, background: "var(--card)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 14 }}>
+    <div style={{ padding: 16, background: "var(--card)", borderRadius: cardStyle.borderRadius, border: "1px solid var(--border)", marginBottom: 16 }}>
       <button onClick={() => setOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
         <Icon d={open ? ICONS.minus : ICONS.plus} size={14} />
         <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>{t("noten.statTitle")}</span>
@@ -1067,9 +1069,9 @@ function CodeSessionImport({ t, classId, kursId, sections, onClose, onDone }) {
 
   if (unmatched) return (
     <div>
-      <p style={{ fontSize: 13.5, color: "var(--text2)", marginBottom: 10 }}>{t("noten.fromCdDone", { n: unmatched.length })}</p>
+      <p style={{ fontSize: 14, color: "var(--text2)", marginBottom: 12 }}>{t("noten.fromCdDone", { n: unmatched.length })}</p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
-        {unmatched.map((n) => <span key={n} style={{ fontSize: 12.5, padding: "3px 9px", borderRadius: 980, background: "var(--bg2)", color: "var(--text3)" }}>{n}</span>)}
+        {unmatched.map((n) => <span key={n} style={{ ...chipStyle, fontSize: 13, padding: "3px 9px", background: "var(--bg2)", color: "var(--text3)" }}>{n}</span>)}
       </div>
       <button onClick={onDone} style={btnPrimary}>{t("common.ok")}</button>
     </div>
@@ -1077,11 +1079,11 @@ function CodeSessionImport({ t, classId, kursId, sections, onClose, onDone }) {
 
   if (list === null) return <p style={{ fontSize: 13, color: "var(--text3)" }}>…</p>;
   if (list.length === 0) return (
-    <div><p style={{ fontSize: 13.5, color: "var(--text2)" }}>{t("noten.fromCdEmpty")}</p>
+    <div><p style={{ fontSize: 14, color: "var(--text2)" }}>{t("noten.fromCdEmpty")}</p>
       <button onClick={onClose} style={{ ...btnSecondary, marginTop: 12 }}>{t("common.abort")}</button></div>
   );
 
-  const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
+  const lbl = { fontSize: 13, color: "var(--text2)", margin: "12px 0 5px" };
   return (
     <div>
       <div style={{ ...lbl, marginTop: 0 }}>{t("noten.fromCdSession")}</div>
@@ -1094,8 +1096,8 @@ function CodeSessionImport({ t, classId, kursId, sections, onClose, onDone }) {
       </select>
       <div style={lbl}>{t("noten.columnName")}</div>
       <input value={name} onChange={(e) => setName(e.target.value)} style={inp} />
-      {err && <p style={{ color: C.danger, fontSize: 12.5, marginTop: 10 }}>{err}</p>}
-      <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+      {err && <p style={{ color: C.danger, fontSize: 13, marginTop: 12 }}>{err}</p>}
+      <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
         <button onClick={submit} disabled={busy} style={{ ...btnPrimary, opacity: busy ? 0.6 : 1 }}>{t("common.save")}</button>
         <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
       </div>
@@ -1161,26 +1163,26 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
       <Popover align="center" onClick={(e) => e.stopPropagation()} style={{ zIndex: 10, top: 26, minWidth: 210, padding: 12, textAlign: "left", fontWeight: 400 }}>
         <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 8 }}>{t("noten.colCreated")}: {angelegt}</div>
         {/* Auswertung: schlichter Details-Knopf, öffnet das zentrale Modal. */}
-        <button onClick={() => { onStats(); onClose(); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 10, padding: "7px 9px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer" }}>
+        <button onClick={() => { onStats(); onClose(); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 12, padding: "7px 9px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer" }}>
           <Icon d={ICONS.chart} size={14} color="var(--accent)" />{t("noten.colDetails")}
         </button>
-        <button onClick={() => { onCompare(cat); onClose(); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 10, padding: "7px 9px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer" }}>
+        <button onClick={() => { onCompare(cat); onClose(); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", marginBottom: 12, padding: "7px 9px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg2)", color: "var(--text)", cursor: "pointer" }}>
           <Icon d={ICONS.chart} size={14} color={C.info} />{t("noten.compare")}
         </button>
-        <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 10 }}>
+        <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 12 }}>
           <input value={name} onChange={(e) => setName(e.target.value)} autoFocus
             placeholder={datumKurz(datum) || t("noten.colName")}
             onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") onClose(); }}
-            style={{ ...inp, fontSize: 12, padding: 5 }} />
+            style={{ ...toolbarInput, width: "100%" }} />
         </div>
-        <div style={{ marginBottom: 10 }}>
+        <div style={{ marginBottom: 12 }}>
           <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 4 }}>{t("noten.colDate")}</div>
-          <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} style={{ ...inp, fontSize: 12, padding: 5 }} />
+          <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} style={{ ...toolbarInput, width: "100%" }} />
         </div>
         {topics.length > 0 && (
-          <div style={{ marginBottom: 10 }}>
+          <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 4 }}>{t("noten.colTopic")}</div>
-            <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={{ ...inp, fontSize: 12, padding: 5 }}>
+            <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
               <option value="">{t("noten.colTopicNone")}</option>
               {themen.geordnet.map((tp) => <option key={tp.id} value={tp.id}>{themen.label(tp)}</option>)}
             </select>
@@ -1188,29 +1190,29 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
         )}
         {cat.topic_id && kartenAktiv && (
           <button onClick={() => { onNachhol(cat); onClose(); }}
-            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 10, padding: "7px 9px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: C.warning, cursor: "pointer" }}>
+            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 12, padding: "7px 9px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", color: C.warning, cursor: "pointer" }}>
             <Icon d={ICONS.bulb} size={14} /> {t("noten.nachhol")}
           </button>
         )}
         {cat.source_session_id && cvAktiv && (
           <Link to={`/cardvote/evaluation/${cat.source_session_id}`} onClick={onClose}
-            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 10, padding: "6px 8px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--accent)", textDecoration: "none", boxSizing: "border-box" }}>
+            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 12, padding: "6px 8px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--accent)", textDecoration: "none", boxSizing: "border-box" }}>
             <Icon d={ICONS.chart} size={14} color="var(--accent)" />{t("noten.fromCardvote")}
           </Link>
         )}
         {!cat.source_session_id && cat.source_kind === "karten" && kartenAktiv && (
           <Link to={`/karten?tab=progress&class=${classId}`} onClick={onClose}
-            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 10, padding: "6px 8px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: C.success, textDecoration: "none", boxSizing: "border-box" }}>
+            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 12, padding: "6px 8px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", color: C.success, textDecoration: "none", boxSizing: "border-box" }}>
             <Icon d={ICONS.chart} size={14} color={C.success} />{t("noten.fromKarten")}
           </Link>
         )}
         {cat.source_kind === "codedetektiv" && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 10, padding: "6px 8px", fontSize: 12.5, fontWeight: 600, borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text3)", boxSizing: "border-box" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginBottom: 12, padding: "6px 8px", fontSize: 13, fontWeight: 600, borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", color: "var(--text3)", boxSizing: "border-box" }}>
             <Icon d={ICONS.chart} size={14} color="var(--text3)" />{t("noten.fromCd")}
           </div>
         )}
         {onToggleDivider && (
-          <button onClick={onToggleDivider} style={{ width: "100%", marginBottom: 10, padding: "6px 8px", fontSize: 12, fontWeight: 600, borderRadius: 8, cursor: "pointer", border: `1px solid ${dividerOn ? "var(--accent)" : "var(--border2)"}`, background: dividerOn ? "var(--accent)" : "transparent", color: dividerOn ? "#fff" : "var(--text2)" }}>
+          <button onClick={onToggleDivider} style={{ width: "100%", marginBottom: 12, padding: "6px 8px", fontSize: 12, fontWeight: 600, borderRadius: CONTROL_R, cursor: "pointer", border: `1px solid ${dividerOn ? "var(--accent)" : "var(--border2)"}`, background: dividerOn ? "var(--accent)" : "transparent", color: dividerOn ? C.aufAkzent : "var(--text2)" }}>
             {dividerOn ? t("noten.dividerOff") : t("noten.dividerOn")}
           </button>
         )}
@@ -1251,10 +1253,10 @@ function ColForm({ t, onSave, onCancel, initial = "", vorschlag = "", initialDat
           und taugt nicht mehr als Kennzeichen fuer den Browser-Test. */}
       <input data-spalte="name" value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder={vorschlag || t("noten.colName")}
         onKeyDown={(e) => { if (e.key === "Enter") nimm(); if (e.key === "Escape") onCancel(); }}
-        style={{ ...inp, fontSize: 14, padding: "9px 11px", flex: 1, minWidth: 120 }} />
+        style={{ ...toolbarInput, flex: 1, minWidth: 120 }} />
       <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} title={t("noten.colDate")} aria-label={t("noten.colDate")}
-        style={{ ...inp, fontSize: 13, padding: "8px 10px" }} />
-      <button onClick={nimm} style={{ ...btnPrimary }}>OK</button>
+        style={toolbarInput} />
+      <button onClick={nimm} style={toolbarBtnPrimary}>OK</button>
       <button onClick={onCancel} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.abort")} aria-label={t("common.abort")}><Icon d={ICONS.close} size={20} /></button>
     </div>
   );
@@ -1273,38 +1275,38 @@ function CompareModal({ t, cat, onClose }) {
   const de1 = (n) => (n == null ? "—" : String(Math.round(n * 100) / 100).replace(".", ","));
   return (
     <UiModal onClose={onClose} width={520} label={`${t("noten.compare")}: ${cat.name}`}>
-        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>{t("noten.compare")}: {cat.name}</h3>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{t("noten.compare")}: {cat.name}</h3>
         {err ? <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("common.notWork")}</p> : !data ? <p style={{ fontSize: 13, color: "var(--text3)" }}>…</p> : (
           <>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text3)", margin: "12px 0 8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>{t("noten.compareClasses")}</div>
-            {data.classes.length <= 1 && <p style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 8 }}>{t("noten.compareNoClasses")}</p>}
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text3)", margin: "12px 0 8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>{t("noten.compareClasses")}</div>
+            {data.classes.length <= 1 && <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 8 }}>{t("noten.compareNoClasses")}</p>}
             {data.classes.map((c, i) => {
               const max = Math.max(...c.dist, 1);
               return (
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderTop: i ? "1px solid var(--border)" : "none" }}>
                   <span style={{ flex: 1, minWidth: 90, fontSize: 13, fontWeight: c.is_self ? 700 : 500, color: c.is_self ? "var(--accent)" : "var(--text)" }}>{c.class_name}{c.is_self ? " ●" : ""}</span>
                   <span style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 30 }}>
-                    {c.dist.map((n, g) => <span key={g} title={`${g + 1}: ${n}`} style={{ width: 9, height: Math.max(2, (n / max) * 30), background: GRADE_COL[g], borderRadius: 2, opacity: n ? 1 : 0.25 }} />)}
+                    {c.dist.map((n, g) => <span key={g} title={`${g + 1}: ${n}`} style={{ width: 9, height: Math.max(2, (n / max) * 30), background: GRADE_COL[g], borderRadius: 2 /* Saeulen-Kappe: reine Grafik */, opacity: n ? 1 : 0.25 }} />)}
                   </span>
                   <span style={{ fontSize: 13, fontWeight: 700, minWidth: 54, textAlign: "right" }}>⌀ {de1(c.avg)}</span>
-                  <span style={{ fontSize: 11.5, color: "var(--text3)", minWidth: 30, textAlign: "right" }}>n={c.n}</span>
+                  <span style={{ fontSize: 12, color: "var(--text3)", minWidth: 30, textAlign: "right" }}>n={c.n}</span>
                 </div>
               );
             })}
             {data.over_time.length > 1 && (<>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text3)", margin: "18px 0 8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>{t("noten.compareOverTime")}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text3)", margin: "18px 0 8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>{t("noten.compareOverTime")}</div>
               <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 90, paddingTop: 6 }}>
                 {data.over_time.map((o, i) => (
                   <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                     {/* Balken: niedrigere (bessere) Note = höher. Skala 1..6 → 6-avg. */}
-                    <div title={`⌀ ${de1(o.avg)}`} style={{ width: "70%", height: `${Math.max(4, ((6 - o.avg) / 5) * 66)}px`, background: o.is_self ? "var(--accent)" : "var(--border3)", borderRadius: 3 }} />
+                    <div title={`⌀ ${de1(o.avg)}`} style={{ width: "70%", height: `${Math.max(4, ((6 - o.avg) / 5) * 66)}px`, background: o.is_self ? "var(--accent)" : "var(--border3)", borderRadius: 3 /* Saeulen-Kappe: reine Grafik */ }} />
                     <span style={{ fontSize: 11, fontWeight: 700 }}>{de1(o.avg)}</span>
-                    <span style={{ fontSize: 10.5, color: "var(--text3)", maxWidth: 60, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.name}</span>
+                    <span style={{ fontSize: 11, color: "var(--text3)", maxWidth: 60, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.name}</span>
                   </div>
                 ))}
               </div>
             </>)}
-            <p style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 14 }}>{t("noten.compareHint")}</p>
+            <p style={{ fontSize: 12, color: "var(--text3)", marginTop: 16 }}>{t("noten.compareHint")}</p>
           </>
         )}
         <div style={{ marginTop: 16 }}><button onClick={onClose} style={btnSecondary}>{t("common.close")}</button></div>
@@ -1387,11 +1389,11 @@ function GradeChart({ series, t, titel, hinweis, rechts }) {
   const line = pts.map((p, i) => `${i ? "L" : "M"}${p.cx.toFixed(1)},${p.cy.toFixed(1)}`).join(" ");
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 2 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
         <div style={{ fontSize: 13, fontWeight: 700, flex: 1 }}>{titel || t("noten.verlauf")}</div>
         {rechts}
       </div>
-      {hinweis && <div style={{ fontSize: 11.5, color: "var(--text3)", marginBottom: 6 }}>{hinweis}</div>}
+      {hinweis && <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8 }}>{hinweis}</div>}
       <div style={{ position: "relative" }}>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }} role="img" aria-label={t("noten.verlauf")}
         onMouseLeave={() => setZeigt(null)}>
@@ -1424,14 +1426,14 @@ function GradeChart({ series, t, titel, hinweis, rechts }) {
           <div style={{ position: "absolute", left: `${links}%`, top: `${(p.cy / H) * 100}%`,
             transform: `translate(${links > 70 ? "-100%" : links < 30 ? "0" : "-50%"}, calc(-100% - 10px))`,
             background: "var(--text)", color: "var(--bg)", fontSize: 12, lineHeight: 1.45,
-            padding: "6px 9px", borderRadius: 8, whiteSpace: "pre", pointerEvents: "none",
-            boxShadow: "0 4px 14px rgba(0,0,0,0.25)", zIndex: 5 }}>
+            padding: "6px 9px", borderRadius: popoverPanel.borderRadius, whiteSpace: "pre", pointerEvents: "none",
+            boxShadow: SHADOW.schwebend, zIndex: 5 }}>
             {zeigt.text}
           </div>
         );
       })()}
       </div>
-      <div style={{ fontSize: 11, color: "var(--text3)", textAlign: "right", marginTop: 2 }}>{t("noten.verlaufAxis")}</div>
+      <div style={{ fontSize: 11, color: "var(--text3)", textAlign: "right", marginTop: 4 }}>{t("noten.verlaufAxis")}</div>
     </div>
   );
 }
@@ -1442,7 +1444,7 @@ function KommentarForm({ t, initial = "", onSave, onCancel }) {
   const [text, setText] = useState(initial);
   return (
     <div onClick={(e) => e.stopPropagation()}>
-      <p style={{ fontSize: 12.5, color: "var(--text3)", margin: "0 0 8px" }}>{t("noten.commentHint")}</p>
+      <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 8px" }}>{t("noten.commentHint")}</p>
       <textarea value={text} onChange={(e) => setText(e.target.value)} autoFocus rows={4} maxLength={2000}
         placeholder={t("noten.commentPlaceholder")}
         onKeyDown={(e) => { if (e.key === "Escape") onCancel(); }}
@@ -1522,13 +1524,13 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, o
     <UiModal onClose={onClose} width={460} label={student.name}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
           <div style={{ flex: 1 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 2 }}>{student.name}</h3>
-            <p style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 16 }}>{className}</p>
+            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{student.name}</h3>
+            <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 16 }}>{className}</p>
           </div>
           {onZeugnis && <button onClick={onZeugnis} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 13, whiteSpace: "nowrap" }} title={t("noten.zeugnisHint")}>{t("noten.zeugnis")}</button>}
         </div>
 
-        <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "6px 14px", fontSize: 13.5, marginBottom: 18 }}>
+        <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "6px 14px", fontSize: 14, marginBottom: 16 }}>
           {/* Nur zeigen, was es gibt: eine Zeile „Kurs —" behauptet eine
               E/G-Einteilung, die in diesem Fach gar nicht gefuehrt wird. */}
           {student.niveau && (<>
@@ -1551,14 +1553,14 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, o
             /* Umschalter Schnitt/Einzelnoten — der Schnitt beantwortet „wo
                stehe ich?", die Einzelnoten „woran lag es?". */
             <Toggle checked={modus === "einzeln"} onChange={(v) => setModus(v ? "einzeln" : "schnitt")}
-              label={<span style={{ fontSize: 12.5, color: "var(--text2)" }}>{t("noten.verlaufSingleToggle")}</span>} />
+              label={<span style={{ fontSize: 13, color: "var(--text2)" }}>{t("noten.verlaufSingleToggle")}</span>} />
           )} />
 
         <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t("noten.gradesBySection")}</div>
         {sections.length === 0 || !summary ? (
           <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("noten.noGrades")}</p>
         ) : (
-          <div style={{ marginBottom: 14 }}>
+          <div style={{ marginBottom: 16 }}>
             {/* Die Liste IST die Auswahl fuer die Kurve darueber — ein zweiter
                 Chip-Streifen daneben waere dieselbe Sache zweimal. Bereiche mit
                 weniger als zwei Noten bleiben unklickbar: aus einem Punkt wird
@@ -1570,8 +1572,8 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, o
               return (
                 <div key={sec.id} onClick={() => klickbar && setBereich(an ? "gesamt" : sec.id)}
                   title={klickbar ? t("noten.verlaufPick") : undefined}
-                  style={{ display: "flex", justifyContent: "space-between", padding: "5px 6px", borderBottom: "1px solid var(--border)", fontSize: 13.5,
-                    cursor: klickbar ? "pointer" : "default", borderRadius: 6,
+                  style={{ display: "flex", justifyContent: "space-between", padding: "5px 6px", borderBottom: "1px solid var(--border)", fontSize: 14,
+                    cursor: klickbar ? "pointer" : "default", borderRadius: CONTROL_R,
                     background: an ? "var(--bg2)" : "transparent",
                     boxShadow: an ? "inset 3px 0 0 var(--accent)" : undefined }}>
                   {/* Prozente rechtsbuendig in fester Spalte: sonst enden „5 %"
@@ -1587,7 +1589,7 @@ function StudentInfo({ t, student, summary, sections, entries = [], className, o
             })}
             <div onClick={() => setBereich("gesamt")} title={t("noten.verlaufPick")}
               style={{ display: "flex", justifyContent: "space-between", padding: "8px 6px 4px", fontSize: 14, fontWeight: 700,
-                cursor: "pointer", borderRadius: 6, background: bereich === "gesamt" ? "var(--bg2)" : "transparent",
+                cursor: "pointer", borderRadius: CONTROL_R, background: bereich === "gesamt" ? "var(--bg2)" : "transparent",
                 boxShadow: bereich === "gesamt" ? "inset 3px 0 0 var(--accent)" : undefined }}>
               <span>{t("noten.total")}</span>
               <span>{summary.weighted !== null ? de(summary.weighted) : "·"}{summary.unweighted_fallback ? ` (${t("noten.unweighted")})` : ""}</span>
@@ -1606,30 +1608,30 @@ function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete })
   const [note, setNote] = useState("");
   return (
     <UiModal onClose={onClose} width={460} label={student?.name}>
-        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>{student?.name}</h3>
-        <p style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 16 }}>{t("noten.obsSub")}</p>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{student?.name}</h3>
+        <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 16 }}>{t("noten.obsSub")}</p>
         {cats.length === 0 ? (
-          <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("noten.needColumnFirst")}</p>
+          <p style={{ fontSize: 14, color: "var(--text3)" }}>{t("noten.needColumnFirst")}</p>
         ) : (
           <>
-            <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
               <select value={catId ?? ""} onChange={(e) => setCatId(Number(e.target.value))} style={{ ...inp, flex: 1, minWidth: 140 }}>
                 {cats.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
               </select>
               {[[1, "+"], [0, "·"], [-1, "−"]].map(([v, label]) => (
-                <button key={v} onClick={() => setTendency(v)} style={{ width: 38, cursor: "pointer", fontSize: 15, borderRadius: 8, fontWeight: 700, border: tendency === v ? "1px solid var(--accent)" : "1px solid var(--border2)", background: tendency === v ? "var(--accent-bg)" : "var(--card)", color: tendency === v ? "var(--accent)" : "var(--text2)" }}>{label}</button>
+                <button key={v} onClick={() => setTendency(v)} style={{ width: 38, cursor: "pointer", fontSize: 16, borderRadius: CONTROL_R, fontWeight: 700, border: tendency === v ? "1px solid var(--accent)" : "1px solid var(--border2)", background: tendency === v ? "var(--accent-bg)" : "var(--card)", color: tendency === v ? "var(--accent)" : "var(--text2)" }}>{label}</button>
               ))}
             </div>
             <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={2000} placeholder={t("noten.obsPlaceholder")}
               onKeyDown={(e) => { if (e.key === "Enter" && catId) { onSave({ category_id: catId, student_id: student.student_id, kind: "observation", tendency, note }); setNote(""); } }}
-              style={{ ...inp, marginBottom: 10 }} />
-            <button onClick={() => { onSave({ category_id: catId, student_id: student.student_id, kind: "observation", tendency, note }); setNote(""); }} disabled={!catId} style={{ ...btnPrimary, opacity: catId ? 1 : 0.4, marginBottom: 18 }}>{t("noten.note")}</button>
+              style={{ ...inp, marginBottom: 12 }} />
+            <button onClick={() => { onSave({ category_id: catId, student_id: student.student_id, kind: "observation", tendency, note }); setNote(""); }} disabled={!catId} style={{ ...btnPrimary, opacity: catId ? 1 : 0.4, marginBottom: 16 }}>{t("noten.note")}</button>
           </>
         )}
         {entries.map((e) => {
           const k = cats.find((c) => c.id === e.category_id);
           return (
-            <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 12.5 }}>
+            <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderTop: "1px solid var(--border)", fontSize: 13 }}>
               <span style={{ width: 62, color: "var(--text3)" }}>{new Date(e.date).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" })}</span>
               <span style={{ width: 14, fontWeight: 700, color: e.tendency > 0 ? C.success : e.tendency < 0 ? C.danger : "var(--text3)" }}>{e.tendency > 0 ? "+" : e.tendency < 0 ? "−" : "·"}</span>
               <span style={{ flex: 1, minWidth: 0 }}><span style={{ color: "var(--text3)" }}>{k?.name}: </span>{e.note}</span>
@@ -1637,7 +1639,7 @@ function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete })
             </div>
           );
         })}
-        <button onClick={onClose} style={{ ...btnSecondary, marginTop: 14 }}>{t("noten.close")}</button>
+        <button onClick={onClose} style={{ ...btnSecondary, marginTop: 16 }}>{t("noten.close")}</button>
     </UiModal>
   );
 }
@@ -1653,14 +1655,14 @@ function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo }
   const { rahmenRef, kopf1Ref, th2 } = useKlebenderKopf();
   const sec1 = sections.filter((s) => s.term === "1");
   const sec2 = sections.filter((s) => s.term === "2");
-  if (rows.length === 0) return <p style={{ fontSize: 13.5, color: "var(--text3)", marginTop: 8 }}>{t("noten.noStudents")}</p>;
-  const grp = { ...th, borderLeft: "2px solid var(--border3)", fontSize: 12.5 };
+  if (rows.length === 0) return <p style={{ fontSize: 14, color: "var(--text3)", marginTop: 8 }}>{t("noten.noStudents")}</p>;
+  const grp = { ...th, borderLeft: "2px solid var(--border3)", fontSize: 13 };
   const secCols = (secs) => secs.map((s, i) => (
     <th key={s.id} style={{ ...th2, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", minWidth: 56, fontWeight: 500 }}>{s.name}</th>
   ));
   return (
-    <div ref={rahmenRef} style={{ overflow: "auto", maxHeight: "calc(100vh - 210px)", border: "1px solid var(--border)", borderRadius: 12, WebkitOverflowScrolling: "touch", "--tabellenkopf-top": "0px" }}>
-      <table style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: 13.5, minWidth: "100%" }}>
+    <div ref={rahmenRef} style={{ overflow: "auto", maxHeight: "calc(100vh - 210px)", border: "1px solid var(--border)", borderRadius: panelStyle.borderRadius, WebkitOverflowScrolling: "touch", "--tabellenkopf-top": "0px" }}>
+      <table style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: 14, minWidth: "100%" }}>
         <thead>
           <tr ref={kopf1Ref}>
             <th style={{ ...th, ...stickyLh, whiteSpace: "nowrap" }}></th>
@@ -1682,7 +1684,7 @@ function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo }
               <td style={{ ...td, ...stickyL, textAlign: "left", padding: 0 }}>
                 <button onClick={() => onInfo(r.student_id)} title={t("noten.studentInfo")}
                   style={{ width: "100%", textAlign: "left", padding: "6px 8px", border: "none", background: "none", color: "var(--text)", fontWeight: 500, cursor: "pointer" }}>
-                  <span style={{ color: "var(--text3)", fontWeight: 400, marginRight: 6 }}>{ri + 1}.</span>{r.name}
+                  <span style={{ color: "var(--text3)", fontWeight: 400, marginRight: 8 }}>{ri + 1}.</span>{r.name}
                 </button>
               </td>
               {sec1.map((s, i) => (

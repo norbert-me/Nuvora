@@ -9,20 +9,25 @@
 // Arbeit, nicht für drei Aufgaben daraus. Die Note steht klein daneben, als
 // Orientierung — die Zeugnisnote bleibt eine pädagogische Entscheidung.
 import { useEffect, useState } from "react";
-import { COLORS as C, Icon, ICONS, selectStyle } from "./Icons.jsx";
+import { COLORS as C, Icon, ICONS, selectStyle, cardStyle, CONTROL_R } from "./Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
+
+// Reine Grafik, kein Bedienelement: der Fortschrittsbalken bekommt seine
+// Rundung aus der halben Hoehe, damit die Kappen rund sind. Deshalb hier eine
+// Zahl statt CONTROL_R — der Balken soll keine Knopf-Ecken haben.
+const BALKEN_H = 8;
 
 const farbe = (pct) => (pct == null ? "var(--text3)" : pct < 50 ? C.danger : pct < 75 ? C.warning : C.success);
 
 function TrendPfeil({ trend, t }) {
   if (!trend) return <span style={{ fontSize: 11, color: "var(--text3)" }}>{t("themen.noTrend")}</span>;
   if (trend.richtung === "gleich") {
-    return <span style={{ fontSize: 11.5, color: "var(--text3)" }}>{t("themen.trendFlat")}</span>;
+    return <span style={{ fontSize: 11, color: "var(--text3)" }}>{t("themen.trendFlat")}</span>;
   }
   const auf = trend.richtung === "auf";
   return (
     <span title={t(auf ? "themen.trendUpHint" : "themen.trendDownHint", { v: Math.abs(trend.delta) })}
-      style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11.5, fontWeight: 700, color: auf ? C.success : C.danger }}>
+      style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, fontWeight: 700, color: auf ? C.success : C.danger }}>
       <Icon d={ICONS.open} size={11} color={auf ? C.success : C.danger}
         style={{ transform: auf ? "rotate(-90deg)" : "rotate(90deg)" }} />
       {trend.delta > 0 ? "+" : ""}{Math.round(trend.delta)} Pp
@@ -36,34 +41,34 @@ export function ThemenstandKind({ kind, t, offenDefault = false }) {
   if (!kind.themen.length) return <div style={{ fontSize: 13, color: "var(--text3)" }}>{t("themen.none")}</div>;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {kind.themen.map((th) => {
         const auf = offen === th.topic_id;
         return (
-          <div key={th.topic_id} style={{ border: "1px solid var(--border2)", borderRadius: 10, padding: "8px 10px" }}>
-            <div onClick={() => setOffen(auf ? null : th.topic_id)} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", cursor: "pointer" }}>
+          <div key={th.topic_id} style={{ border: "1px solid var(--border2)", borderRadius: CONTROL_R, padding: "8px 12px" }}>
+            <div onClick={() => setOffen(auf ? null : th.topic_id)} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", cursor: "pointer" }}>
               <span style={{ flex: 1, minWidth: 140, fontSize: 13, fontWeight: 600 }}>{th.name || `#${th.topic_id}`}</span>
               {th.genug ? (<>
-                <span style={{ width: 110, height: 8, background: "var(--bg2)", borderRadius: 4, overflow: "hidden", flexShrink: 0 }}>
+                <span style={{ width: 110, height: BALKEN_H, background: "var(--bg2)", borderRadius: BALKEN_H / 2, overflow: "hidden", flexShrink: 0 }}>
                   <span style={{ display: "block", width: `${th.pct}%`, height: "100%", background: farbe(th.pct) }} />
                 </span>
                 <span style={{ fontSize: 13, fontWeight: 800, color: farbe(th.pct), minWidth: 44, textAlign: "right" }}>{Math.round(th.pct)}%</span>
                 {/* Note klein und beschriftet: sie ist eine Orientierung, keine Zensur. */}
                 {th.note != null && (
-                  <span title={t("themen.gradeHint")} style={{ fontSize: 11.5, color: "var(--text3)", minWidth: 62, textAlign: "right" }}>
+                  <span title={t("themen.gradeHint")} style={{ fontSize: 11, color: "var(--text3)", minWidth: 62, textAlign: "right" }}>
                     {t("themen.gradeShort")} {String(th.note).replace(".", ",")}
                   </span>
                 )}
                 <TrendPfeil trend={th.trend} t={t} />
               </>) : (
-                <span style={{ fontSize: 11.5, color: "var(--text3)" }}>
+                <span style={{ fontSize: 11, color: "var(--text3)" }}>
                   {t("themen.tooThin", { p: String(th.max).replace(".", ",") })}
                 </span>
               )}
             </div>
 
             {auf && (
-              <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
+              <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
                 {th.verlauf.map((v, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
                     <span style={{ color: "var(--text3)", width: 62, flexShrink: 0 }}>{(v.datum || "").slice(0, 10).split("-").reverse().slice(0, 2).join(".")}</span>
@@ -116,10 +121,10 @@ export default function Themenstand({ classId, studentId = null, cardId = null, 
   if (!kind || !kinder.some((k) => k.themen.length)) return null;
 
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 16, marginBottom: 16 }}>
+    <div style={{ ...cardStyle, marginBottom: 16 }}>
       {titel && (
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, flex: 1 }}>{t("themen.title")}</div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, flex: 1 }}>{t("themen.title")}</div>
           {studentId == null && cardId == null && kinder.length > 1 && (
             <select value={wahl || ""} onChange={(e) => setWahl(Number(e.target.value))} style={{ ...selectStyle, fontSize: 13 }}>
               {kinder.map((k) => <option key={k.student_id} value={k.student_id}>{k.name}</option>)}
@@ -127,7 +132,7 @@ export default function Themenstand({ classId, studentId = null, cardId = null, 
           )}
         </div>
       )}
-      <div style={{ fontSize: 12.5, color: "var(--text3)", marginBottom: 10, lineHeight: 1.5 }}>{t("themen.hint")}</div>
+      <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 12, lineHeight: 1.5 }}>{t("themen.hint")}</div>
       <ThemenstandKind kind={kind} t={t} />
     </div>
   );

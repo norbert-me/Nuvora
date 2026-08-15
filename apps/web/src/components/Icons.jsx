@@ -111,6 +111,16 @@ export const ICONS = {
   arrowLeft: ["M16 10H4", "M9 5l-5 5 5 5"],
   arrowRight: ["M4 10h12", "M11 5l5 5-5 5"],
   check: ["M4 10.5l4 4 8-9"],
+  flame: ["M10 2c0 3.3-3.3 5-3.3 8.3a3.3 3.3 0 006.6 0C13.3 7 10 5.3 10 2z"],
+  // Offener Kreisbogen — dreht sich als Endlos-Animation sauber. `refresh`
+  // (Doppelpfeil-Kreislauf) sieht dabei aus, als haenge er.
+  spinner: ["M17.5 10a7.5 7.5 0 1 1-5.2-7.1"],
+  // Drehen (Griff an Tisch und Tafel). Nicht `refresh` — das meint neu laden.
+  rotate: ["M15.5 8A6 6 0 1 0 16 11", "M15.5 3.5V8H11"],
+  menu: ["M3 6h14", "M3 10h14", "M3 14h14"],
+  moon: ["M16 12.2A6.5 6.5 0 017.8 4a6.5 6.5 0 108.2 8.2z"],
+  // EINE Person (Profil). `users` ist die Gruppe und waere hier das falsche Bild.
+  user: ["M10 4a3 3 0 100 6 3 3 0 000-6z", "M4 17c0-3 2.7-4.6 6-4.6s6 1.6 6 4.6"],
   // Aus dem Code-Detektiv hochgezogen: die Regel ist eine Design-Quelle, und
   // ein Modul mit eigenem Icon-Satz ist der Anfang von zwei Saetzen.
   puzzle: ["M4 4h3.6a1.6 1.6 0 013.2 0H14v3.6a1.6 1.6 0 000 3.2V16h-3.2a1.6 1.6 0 00-3.2 0H4v-3.4a1.6 1.6 0 000-3.2V4z"],
@@ -303,7 +313,7 @@ export const selectStyle = {
   // daneben.
   height: CONTROL_H, padding: "0 30px 0 12px", borderRadius: CONTROL_R, border: "1px solid var(--border2)",
   background: `var(--bg) url("${caretSvg}") no-repeat right 9px center`,
-  color: "var(--text)", fontSize: 13.5, cursor: "pointer", lineHeight: 1.3, boxSizing: "border-box",
+  color: "var(--text)", fontSize: 13, cursor: "pointer", lineHeight: 1.3, boxSizing: "border-box",
 };
 
 export const pageTitle = { fontSize: 22, fontWeight: 700, color: "var(--text)", marginBottom: 8 };
@@ -319,6 +329,24 @@ export const COLORS = {
   info: "#2563eb",       // Akzent-/Info-Blau (Badges, „entschuldigt", Standard-Klassenfarbe)
   correctBg: "#d4edda",
   incorrectBg: "#fde2d9",
+  // Text auf der Akzentflaeche. Stand neunmal als "#fff" inline; als Token
+  // laesst sich das an einer Stelle korrigieren, wenn der Akzent heller wird.
+  aufAkzent: "#fff",
+};
+
+// Antwortfarben A-D (CardVote: Balken, Beamer, Scanner). Lagen dreimal getrennt
+// im Code — bei einer Aenderung war die Legende danach eine andere Farbe als
+// das Diagramm.
+export const ANTWORT_COLORS = { A: "#0066cc", B: "#5856d6", C: COLORS.warning, D: COLORS.danger };
+
+// Podium. Die Farbe IST der Platz, darum feste Werte und keine Variablen.
+export const PODIUM_COLORS = ["#FFD700", "#C0C0C0", "#CD7F32"];
+
+// Reifegrade der Karteikarten (Lehrer-Histogramm und Schuelerseite). Stand
+// zweimal wortgleich da — auseinandergelaufen waere dieselbe Karte auf beiden
+// Seiten verschieden eingefaerbt.
+export const REIFE_COLORS = {
+  neu: "#cbd5e1", lernen: "#f59e0b", kurz: "#eab308", mittel: "#84cc16", lang: COLORS.success,
 };
 
 // ─── Gemeinsame Bausteine (EINE Quelle fürs Modul-Design) ───
@@ -340,13 +368,40 @@ export const inputStyle = {
 // innere Hoehe mit, die sich ueber padding nicht sauber angleichen laesst.
 // Hoehe kommt aus CONTROL_H (oben) — der Navigator ist eine Werkzeugleiste wie
 // jede andere und soll nicht seine eigene Groesse mitbringen.
-export const dateNavBtn = {
+export const toolbarBtn = {
   ...btnSecondary, height: CONTROL_H, padding: "0 14px", fontSize: 13, lineHeight: 1,
-  display: "inline-flex", alignItems: "center", justifyContent: "center",
+  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
 };
-export const dateNavInput = {
+export const toolbarBtnPrimary = {
+  ...btnPrimary, height: CONTROL_H, padding: "0 16px", fontSize: 13, lineHeight: 1,
+  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+};
+export const toolbarInput = {
   ...inputStyle, height: CONTROL_H, padding: "0 12px", fontSize: 13, lineHeight: 1,
   borderRadius: CONTROL_R, // dieselbe Form wie die Knoepfe daneben
+};
+// Die alten Namen bleiben — der Datums-Navigator war nie etwas Eigenes, nur
+// derselbe Baustein unter dem Namen einer einzigen Seite. Genau deshalb hat
+// ihn `Karten.jsx` noch einmal als `leisteBtn`/`leisteInput` erfunden.
+export const dateNavBtn = toolbarBtn;
+export const dateNavInput = toolbarInput;
+
+// Zeile in einem Menue (MehrMenu, Verschieben-Menue, Brotkrumen-Menue). Stand
+// dreimal im Code, mit drei Radien (8/7/7).
+export const menuRow = {
+  display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "8px 10px",
+  border: "none", background: "none", cursor: "pointer", fontSize: 13, textAlign: "left",
+  color: "var(--text)", borderRadius: 8,
+};
+
+// ─── Schatten: drei, nicht zweiundzwanzig ───
+// Es gab rund 22 verschiedene Formeln im Produkt. Ein Schatten sagt „wie weit
+// liegt das ueber der Seite" — dafuer reichen drei Stufen, und mehr kann das
+// Auge ohnehin nicht unterscheiden.
+export const SHADOW = {
+  ruhig: "0 1px 2px rgba(0,0,0,0.06)",       // liegt auf der Seite (Karte, Schalter)
+  schwebend: "0 8px 24px rgba(0,0,0,0.18)",  // Popover, Menue, Toast
+  ueber: "0 20px 50px rgba(0,0,0,0.3)",      // Modal — der ganze Bildschirm liegt darunter
 };
 
 // ─── Segment-Gruppe: mehrere Knoepfe, EIN Gedanke ───
@@ -834,7 +889,7 @@ export function Empty({ title, hint, action, onAction }) {
   return (
     <div style={{ textAlign: "center", padding: "36px 20px", border: "1px dashed var(--border2)", borderRadius: 14, background: "var(--bg2)" }}>
       <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", marginBottom: hint ? 6 : 0 }}>{title}</div>
-      {hint && <div style={{ fontSize: 13.5, color: "var(--text2)", marginBottom: action ? 16 : 0, maxWidth: 420, marginLeft: "auto", marginRight: "auto", lineHeight: 1.5 }}>{hint}</div>}
+      {hint && <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: action ? 16 : 0, maxWidth: 420, marginLeft: "auto", marginRight: "auto", lineHeight: 1.5 }}>{hint}</div>}
       {action && onAction && <button onClick={onAction} style={btnPrimary}>{action}</button>}
     </div>
   );

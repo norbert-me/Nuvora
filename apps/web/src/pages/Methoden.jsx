@@ -1,12 +1,13 @@
 // Modul Einstiege — Sammlung von Ideen fuer den Unterrichtseinstieg.
 // Je Einstieg: Idee (Text), Ablauf mit Material, Materialliste, ca. Dauer.
 // Wiederverwendbar; im Kalender einer Stunde zuweisbar.
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { askConfirm } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { sende } from "../core/melden.js";
-import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, pageTitle, COLORS as C, Modal, inputStyle, ExportButton, Popover, LoadError} from "../components/Icons.jsx";
+import { AddButton, badge, cardStyle, CONTROL_H, CONTROL_R, dateiWaehlen, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, menuRow, pageTitle, sectionLabel, toolbarBtn, toolbarBtnPrimary, toolbarInput, COLORS as C, Modal, inputStyle, Popover, LoadError} from "../components/Icons.jsx";
+import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { themenIndex } from "../core/topics.js";
 import { useAktiv } from "../core/modules.js";
 import PublishModal from "../components/PublishModal.jsx";
@@ -26,8 +27,6 @@ export default function Methoden({ embedded } = {}) {
   const [error, setError] = useState("");
   const [topics, setTopics] = useState([]);
   const [addOpen, setAddOpen] = useState(false);
-  const [impOpen, setImpOpen] = useState(false); // Import-Menü (Importieren/Vorlage)
-  const fileRef = useRef(null);
   const [newFolder, setNewFolder] = useState(false); // Ordner-Anlege-Eingabe offen?
   const [folderName, setFolderName] = useState("");
   const [renamingFolder, setRenamingFolder] = useState(null); // Ordner-id im Inline-Umbenennen
@@ -170,36 +169,27 @@ export default function Methoden({ embedded } = {}) {
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-        {!embedded && <h1 style={pageTitle}>{t("methoden.title")}</h1>}
-        <span style={{ flex: 1 }} />
-        <ExportButton iconOnly title={t("common.export")} onClick={doExport} />
-        <div style={{ position: "relative" }}>
-          <button onClick={() => setImpOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn }} title={t("common.import")} aria-label={t("common.import")}><Icon d={ICONS.import} size={18} /></button>
-          {impOpen && (
-            <>
-              <div onClick={() => setImpOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
-              <Popover align="right" style={{ zIndex: 21, padding: 4, minWidth: 180 }}>
-                <button onClick={() => { setImpOpen(false); fileRef.current?.click(); }} style={menuItem}><Icon d={ICONS.import} size={14} /> {t("methoden.importFile")}</button>
-                <a href="/beispiel-einstiege.json" download onClick={() => setImpOpen(false)} style={{ ...menuItem, textDecoration: "none" }}><Icon d={ICONS.download} size={14} /> {t("methoden.jsonTemplate")}</a>
-              </Popover>
-            </>
-          )}
-          <input ref={fileRef} type="file" accept=".json,application/json" style={{ display: "none" }} onChange={(e) => { if (e.target.files[0]) doImport(e.target.files[0]); e.target.value = ""; }} />
-        </div>
-        <div style={{ position: "relative" }}>
+      {!embedded && <h1 style={pageTitle}>{t("methoden.title")}</h1>}
+      {/* Eine Leiste statt dreier freistehender Knoepfe: der haeufige Handgriff
+          (Neu) steht links, Export/Import/Vorlage liegen im Mehr-Menue. */}
+      <Werkzeugleiste style={{ marginBottom: 8 }} mehr={[
+        { key: "export", label: t("common.export"), icon: ICONS.export, onClick: doExport },
+        { key: "import", label: t("methoden.importFile"), icon: ICONS.import, onClick: () => dateiWaehlen(doImport) },
+        { key: "vorlage", label: t("methoden.jsonTemplate"), icon: ICONS.download, onClick: () => { const a = document.createElement("a"); a.href = "/beispiel-einstiege.json"; a.download = "beispiel-einstiege.json"; a.click(); } },
+      ]}>
+        <div style={{ position: "relative", display: "inline-flex" }}>
           <AddButton onClick={() => setAddOpen((v) => !v)} title={t("methoden.new")} />
           {addOpen && (
             <>
               <div onClick={() => setAddOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
-              <Popover align="right" style={{ zIndex: 21, padding: 4, minWidth: 150 }}>
-                <button onClick={() => { setAddOpen(false); setEdit({}); }} style={menuItem}><Icon d={ICONS.plus} size={14} /> {t("methoden.new")}</button>
-                <button onClick={() => { setAddOpen(false); setNewFolder(true); setFolderName(""); }} style={menuItem}><Icon d={ICONS.folder} size={14} /> {t("methoden.newFolder")}</button>
+              <Popover style={{ zIndex: 21, top: CONTROL_H + 2, padding: 4, minWidth: 150 }}>
+                <button onClick={() => { setAddOpen(false); setEdit({}); }} style={menuRow}><Icon d={ICONS.plus} size={14} /> {t("methoden.new")}</button>
+                <button onClick={() => { setAddOpen(false); setNewFolder(true); setFolderName(""); }} style={menuRow}><Icon d={ICONS.folder} size={14} /> {t("methoden.newFolder")}</button>
               </Popover>
             </>
           )}
         </div>
-      </div>
+      </Werkzeugleiste>
 
       {/* Breadcrumb: Wurzel + Pfad. Jeder Teil ist Drop-Ziel zum Hochschieben. */}
       <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", marginBottom: 12, fontSize: 13 }}>
@@ -214,20 +204,20 @@ export default function Methoden({ embedded } = {}) {
         ))}
       </div>
 
-      {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 10 }}>{error}</p>}
+      {error && <p style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</p>}
 
       {newFolder && (
         <div style={{ display: "flex", gap: 8, marginBottom: 12, maxWidth: 360 }}>
           <input value={folderName} autoFocus placeholder={t("methoden.folderName")} onChange={(e) => setFolderName(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") createFolder(); if (e.key === "Escape") setNewFolder(false); }}
-            style={{ ...inputStyle, flex: 1 }} />
-          <button onClick={createFolder} style={btnPrimary}>{t("common.save")}</button>
-          <button onClick={() => setNewFolder(false)} style={btnSecondary}>{t("common.abort")}</button>
+            style={{ ...toolbarInput, flex: 1 }} />
+          <button onClick={createFolder} style={toolbarBtnPrimary}>{t("common.save")}</button>
+          <button onClick={() => setNewFolder(false)} style={toolbarBtn}>{t("common.abort")}</button>
         </div>
       )}
 
       {subfolders.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10, marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12, marginBottom: 16 }}>
           {subfolders.map((f) => {
             const count = items.filter((m) => m.folder_id === f.id).length + childFolders(f.id).length;
             const over = dropTarget === f.id && canDrop(f.id);
@@ -235,14 +225,14 @@ export default function Methoden({ embedded } = {}) {
             return (
               <div key={f.id} draggable={!renaming} onDragStart={() => setDrag({ kind: "folder", id: f.id })} onDragEnd={endDrag} {...dropProps(f.id)}
                 onClick={renaming ? undefined : () => setCurrent(f.id)}
-                style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 14px", border: `1px solid ${over ? "var(--accent)" : "var(--border)"}`, borderRadius: 12, background: over ? "var(--accent-bg, rgba(10,132,255,0.10))" : "var(--card)", cursor: renaming ? "default" : "pointer" }}>
+                style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, padding: 12, border: `1px solid ${over ? "var(--accent)" : "var(--border)"}`, background: over ? "var(--accent-bg, rgba(10,132,255,0.10))" : "var(--card)", cursor: renaming ? "default" : "pointer" }}>
                 {renaming ? (
                   <>
                     <input value={renameVal} autoFocus onClick={(e) => e.stopPropagation()} onChange={(e) => setRenameVal(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter") commitRename(f); if (e.key === "Escape") setRenamingFolder(null); }}
                       onBlur={() => commitRename(f)}
-                      style={{ ...inputStyle, flex: 1, minWidth: 0, padding: "6px 8px" }} />
-                    <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); deleteFolder(f); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
+                      style={{ ...toolbarInput, flex: 1, minWidth: 0 }} />
+                    <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); deleteFolder(f); }} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
                   </>
                 ) : (
                   <>
@@ -250,7 +240,7 @@ export default function Methoden({ embedded } = {}) {
                     <Icon d={ICONS.folder} size={18} color="var(--accent)" />
                     <span style={{ fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
                     <span style={{ fontSize: 12, color: "var(--text3)" }}>{count}</span>
-                    <button onClick={(e) => { e.stopPropagation(); startRename(f); }} className="icon-btn" style={{ ...iconBtn, padding: 3 }} title={t("common.rename")} aria-label={t("common.rename")}><Icon d={ICONS.edit} size={13} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); startRename(f); }} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.rename")} aria-label={t("common.rename")}><Icon d={ICONS.edit} size={13} /></button>
                   </>
                 )}
               </div>
@@ -262,13 +252,13 @@ export default function Methoden({ embedded } = {}) {
       {ladefehler ? (
         <LoadError message={t("methoden.loadError")} onRetry={() => { load(); loadFolders(); }} />
       ) : visible.length === 0 && subfolders.length === 0 ? (
-        <p style={{ fontSize: 13.5, color: "var(--text3)" }}>{t("methoden.empty")}</p>
+        <p style={{ fontSize: 14, color: "var(--text3)" }}>{t("methoden.empty")}</p>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
           {visible.map((m) => (
             <div key={m.id} draggable onDragStart={() => setDrag({ kind: "method", id: m.id })} onDragEnd={endDrag}
               onClick={() => setViewing(m)}
-              style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "12px 14px", minHeight: 58, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", cursor: "pointer", opacity: drag && drag.kind === "method" && drag.id === m.id ? 0.5 : 1 }}>
+              style={{ ...cardStyle, display: "flex", alignItems: "flex-start", gap: 8, padding: 12, minHeight: 58, cursor: "pointer", opacity: drag && drag.kind === "method" && drag.id === m.id ? 0.5 : 1 }}>
               <span style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex" }} title={t("methoden.dragHint")}><Icon d={ICONS.grip} size={14} /></span>
               <span style={{ fontWeight: 600, flex: 1, minWidth: 0, lineHeight: 1.35, wordBreak: "break-word" }}>{m.title}</span>
             </div>
@@ -288,10 +278,9 @@ export default function Methoden({ embedded } = {}) {
 }
 
 // Aus den zentralen Stilen abgeleitet (Icons.jsx ist die einzige Design-Quelle):
-// menuItem ist ein iconBtn, der über die volle Breite links ausgerichtet ist;
-// crumbBtn ein btnSecondary ohne sichtbaren Rahmen.
-const menuItem = { ...iconBtn, display: "flex", justifyContent: "flex-start", gap: 8, width: "100%", padding: "8px 10px", borderRadius: 7, fontSize: 13.5, color: "var(--text)", textAlign: "left" };
-const crumbBtn = { ...btnSecondary, background: "none", border: "1px solid transparent", borderRadius: 7, padding: "3px 8px", fontSize: 13 };
+// crumbBtn ist ein btnSecondary ohne sichtbaren Rahmen — dieselbe Form (CONTROL_R)
+// wie alles andere Bedienbare. Das Menue der Brotkrumen ist `menuRow`.
+const crumbBtn = { ...btnSecondary, background: "none", border: "1px solid transparent", borderRadius: CONTROL_R, padding: "4px 8px", fontSize: 13 };
 const crumbDrop = { borderColor: "var(--accent)", background: "var(--accent-bg, rgba(10,132,255,0.10))" };
 
 // Detail-Ansicht (Klick auf einen Einstieg): zeigt die Erklärung, mit Buttons
@@ -308,28 +297,28 @@ function MethodView({ m, t, onEdit, onPublish, onClose }) {
   }, [m.id, kalenderAktiv]);
   const sec = (label, val) => val ? (
     <div style={{ marginTop: 12 }}>
-      <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3 }}>{label}</div>
+      <div style={{ ...sectionLabel, marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{val}</div>
     </div>
   ) : null;
   return (
     <Modal onClose={onClose} width={520} style={{ maxHeight: "86vh", overflowY: "auto" }} label={m.title}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-          <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, flex: 1 }}>{m.title}</h3>
-          {m.dauer != null && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 9px", borderRadius: 980, background: "rgba(37,99,235,0.12)", color: C.info }}>{t("methoden.dauerBadge", { n: m.dauer })}</span>}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, flex: 1 }}>{m.title}</h3>
+          {m.dauer != null && <span style={badge(C.info)}>{t("methoden.dauerBadge", { n: m.dauer })}</span>}
           <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
         </div>
         {sec(t("methoden.idee"), m.description)}
         {sec(t("methoden.ablauf"), m.ablauf)}
         {sec(t("methoden.material"), m.material)}
-        {m.id && <div style={{ marginTop: 14 }}><MaterialPanel methodId={m.id} /></div>}
+        {m.id && <div style={{ marginTop: 16 }}><MaterialPanel methodId={m.id} /></div>}
         {linked.length > 0 && (
-          <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 5 }}>{t("methoden.linkedLessons")}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ marginTop: 16 }}>
+            <div style={{ ...sectionLabel, marginBottom: 4 }}>{t("methoden.linkedLessons")}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {linked.map((e) => (
                 <Link key={e.id} to={`/kalender?view=day&date=${e.date.slice(0, 10)}`} onClick={onClose}
-                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 11px", borderRadius: 8, border: "1px solid var(--border2)", background: "var(--bg)", textDecoration: "none", color: "var(--accent)", fontSize: 13.5 }}>
+                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: CONTROL_R, border: "1px solid var(--border2)", background: "var(--bg)", textDecoration: "none", color: "var(--accent)", fontSize: 14 }}>
                   <Icon d={ICONS.calendar || ICONS.open} size={15} color="var(--accent)" />
                   <span style={{ fontWeight: 600 }}>{new Date(e.date).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</span>
                   {e.period ? <span style={{ color: "var(--text3)" }}>· {e.period}. {t("kalender.period")}</span> : null}
@@ -339,7 +328,7 @@ function MethodView({ m, t, onEdit, onPublish, onClose }) {
             </div>
           </div>
         )}
-        <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center" }}>
           <button onClick={onEdit} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={18} /></button>
           <button onClick={onPublish} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("methoden.publish")} aria-label={t("methoden.publish")}><Icon d={ICONS.share} size={18} color="var(--accent)" /></button>
         </div>
@@ -362,7 +351,7 @@ function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
   const topicLabel = (tp) => themen.label(tp);
   const topicsSorted = themen.geordnet;
   const fld = { ...inputStyle, width: "100%" };
-  const lbl = { fontSize: 12.5, color: "var(--text2)", margin: "12px 0 5px" };
+  const lbl = { fontSize: 13, color: "var(--text2)", margin: "12px 0 4px" };
   const submit = () => {
     // Fehlender Titel wird direkt in der Maske gemeldet, nicht als Seitenfehler
     // hinter dem Modal.
@@ -374,8 +363,8 @@ function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
   // (Datenverlust). e.currentTarget ist das Overlay.
   return (
     <Modal onClose={onClose} width={480} style={{ maxHeight: "90vh", overflowY: "auto" }} label={m.id ? t("methoden.edit") : t("methoden.new")}>
-        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 6 }}>{m.id ? t("methoden.edit") : t("methoden.new")}</h3>
-        <div style={{ display: "flex", gap: 10 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{m.id ? t("methoden.edit") : t("methoden.new")}</h3>
+        <div style={{ display: "flex", gap: 12 }}>
           <div style={{ flex: 1 }}>
             <div style={{ ...lbl, marginTop: 0 }}>{t("methoden.titleField")}</div>
             <input value={title} onChange={(e) => { setTitle(e.target.value); if (titleErr) setTitleErr(false); }} autoFocus style={{ ...fld, ...(titleErr ? { borderColor: C.danger } : {}) }} />
@@ -402,8 +391,8 @@ function MethodModal({ m, topics = [], onSave, onDelete, onClose, t }) {
           </>
         )}
         {/* Datei-Upload nur beim gespeicherten Einstieg (braucht die id). */}
-        {m.id && <div style={{ marginTop: 14 }}><MaterialPanel methodId={m.id} /></div>}
-        <div style={{ display: "flex", gap: 8, marginTop: 18, alignItems: "center" }}>
+        {m.id && <div style={{ marginTop: 16 }}><MaterialPanel methodId={m.id} /></div>}
+        <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center" }}>
           <button onClick={submit} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
           {m.id && <button onClick={() => onDelete(m.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto", padding: 6 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={20} color={C.danger} /></button>}

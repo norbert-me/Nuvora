@@ -3,27 +3,28 @@
 // öffnet es groß (Lightbox). imageUrl muss direkt in <img src> nutzbar sein
 // (SuS: Token-URL; Lehrkraft: über AuthImage ein Object-URL).
 import { useState } from "react";
+import { cardStyle, CONTROL_R, modalOverlay } from "./Icons.jsx";
 
 export default function CardFace({ imageUrl = null, text = "" }) {
   const [zoom, setZoom] = useState(false);
   return (
-    <div style={{ width: "100%", height: 300, display: "flex", flexDirection: "column",
-      border: "1px solid var(--border)", borderRadius: 18, background: "var(--card)", overflow: "hidden" }}>
+    <div style={{ ...cardStyle, width: "100%", height: 300, display: "flex", flexDirection: "column",
+      padding: 0, overflow: "hidden" }}>
       {imageUrl && (
         <div style={{ flex: "0 0 150px", display: "flex", alignItems: "center", justifyContent: "center",
-          padding: 10, borderBottom: "1px solid var(--border)", background: "var(--bg2, var(--bg))" }}>
+          padding: 12, borderBottom: "1px solid var(--border)", background: "var(--bg2, var(--bg))" }}>
           <img src={imageUrl} alt="" onClick={(e) => { e.stopPropagation(); setZoom(true); }}
-            style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain", cursor: "zoom-in", borderRadius: 8 }} />
+            style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain", cursor: "zoom-in", borderRadius: CONTROL_R }} />
         </div>
       )}
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
-        padding: 20, fontSize: 19, lineHeight: 1.5, whiteSpace: "pre-wrap", overflow: "auto", minHeight: 0 }}>
+        padding: 16, fontSize: 16, lineHeight: 1.5, whiteSpace: "pre-wrap", overflow: "auto", minHeight: 0 }}>
         {text}
       </div>
       {zoom && imageUrl && (
+        // Dunkler als modalOverlay: vor einem Bild soll die Seite ganz zuruecktreten.
         <div onClick={(e) => { e.stopPropagation(); setZoom(false); }}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.86)", display: "flex", alignItems: "center",
-            justifyContent: "center", zIndex: 1000, padding: 20, cursor: "zoom-out" }}>
+          style={{ ...modalOverlay, background: "rgba(0,0,0,0.86)", cursor: "zoom-out" }}>
           <img src={imageUrl} alt="" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
         </div>
       )}

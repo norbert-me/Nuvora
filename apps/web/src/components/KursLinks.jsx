@@ -15,7 +15,7 @@
 // mehrere Fach-Klassen, wählt man oben, für welche der Sprung gilt.
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Icon, ICONS, COLORS as C } from "./Icons.jsx";
+import { Icon, ICONS, COLORS as C, chipStyle, sectionLabel } from "./Icons.jsx";
 import { rememberClass } from "../core/cache.js";
 import { useModules } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
@@ -69,15 +69,15 @@ export default function KursLinks({ kurs }) {
 
   return (
     <div style={{ marginBottom: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 7 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text3)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+        <span style={sectionLabel}>
           {t("kursLinks.title")}
         </span>
         {/* Mehrere Fach-Klassen im Kurs: für welche gilt der Sprung? */}
         {klassen.length > 1 && klassen.map((c) => (
           <button key={c.id} onClick={() => setClassId(c.id)}
             style={{
-              padding: "2px 10px", borderRadius: 980, fontSize: 12, cursor: "pointer",
+              ...chipStyle, cursor: "pointer",
               border: classId === c.id ? "1px solid var(--accent)" : "1px solid var(--border2)",
               background: classId === c.id ? "var(--accent-bg)" : "var(--bg)",
               color: classId === c.id ? "var(--accent)" : "var(--text2)",
@@ -86,15 +86,15 @@ export default function KursLinks({ kurs }) {
           </button>
         ))}
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         {ziele.map((z) => (
           <Link
             key={z.to}
             to={z.to}
             onClick={() => rememberClass(classId)}
             style={{
-              display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px",
-              borderRadius: 980, border: "1px solid var(--border2)", background: "var(--bg)",
+              ...chipStyle, display: "inline-flex", alignItems: "center", gap: 4, padding: "6px 12px",
+              border: "1px solid var(--border2)", background: "var(--bg)",
               color: "var(--text2)", textDecoration: "none", fontSize: 13, fontWeight: 500,
             }}
           >

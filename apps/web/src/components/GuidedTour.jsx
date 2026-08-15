@@ -4,7 +4,7 @@
 // Karte (Begrüßung/Abschluss). Ziel-Elemente werden über data-tour="<key>"
 // gefunden; fehlt eines, wird der Schritt zentriert gezeigt.
 import { useState, useEffect, useLayoutEffect, useCallback } from "react";
-import { btnPrimary, btnSecondary } from "./Icons.jsx";
+import { btnPrimary, btnSecondary, btnSmall, cardStyle, panelStyle, SHADOW } from "./Icons.jsx";
 
 export default function GuidedTour({ steps, onDone, t }) {
   const [i, setI] = useState(0);
@@ -44,7 +44,9 @@ export default function GuidedTour({ steps, onDone, t }) {
     position: "fixed",
     top: rect.top - pad, left: rect.left - pad,
     width: rect.width + pad * 2, height: rect.height + pad * 2,
-    borderRadius: 12,
+    borderRadius: panelStyle.borderRadius,
+    // Kein SHADOW-Token: das ist kein Schatten, sondern der Abdunkler ringsum —
+    // ein Rahmen von 9999 px, der alles ausserhalb des Ziels verdeckt.
     boxShadow: "0 0 0 9999px rgba(0,0,0,0.62)",
     zIndex: 4000, pointerEvents: "none", transition: "all 0.2s ease",
   };
@@ -68,15 +70,15 @@ export default function GuidedTour({ steps, onDone, t }) {
       {/* Voller Abdunkler, wenn kein Ziel; sonst macht die box-shadow das Loch. */}
       {!rect && <div onClick={onDone} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.62)", zIndex: 4000 }} />}
       {rect && <div style={hole} />}
-      <div style={{ ...tip, zIndex: 4001, background: "var(--card)", border: "1px solid var(--border2)", borderRadius: 14, padding: 18, boxShadow: "0 12px 40px rgba(0,0,0,0.3)" }}>
-        <div style={{ fontSize: 11.5, color: "var(--text3)", fontWeight: 700, marginBottom: 6 }}>{i + 1} / {steps.length}</div>
-        <h3 style={{ fontSize: 17, fontWeight: 700, margin: "0 0 6px", color: "var(--text)" }}>{t(step.titleKey)}</h3>
-        <p style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--text2)", margin: "0 0 16px" }}>{t(step.textKey)}</p>
+      <div style={{ ...cardStyle, ...tip, zIndex: 4001, boxShadow: SHADOW.schwebend }}>
+        <div style={{ fontSize: 12, color: "var(--text3)", fontWeight: 700, marginBottom: 4 }}>{i + 1} / {steps.length}</div>
+        <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 4px", color: "var(--text)" }}>{t(step.titleKey)}</h3>
+        <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--text2)", margin: "0 0 16px" }}>{t(step.textKey)}</p>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <button onClick={onDone} style={{ ...btnSecondary, fontSize: 13, padding: "6px 12px" }}>{t("tour.skip")}</button>
+          <button onClick={onDone} style={{ ...btnSecondary, ...btnSmall }}>{t("tour.skip")}</button>
           <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-            {i > 0 && <button onClick={back} style={{ ...btnSecondary, fontSize: 13, padding: "6px 12px" }}>{t("tour.back")}</button>}
-            <button onClick={next} style={{ ...btnPrimary, fontSize: 13, padding: "6px 14px" }}>{last ? t("tour.done") : t("tour.next")}</button>
+            {i > 0 && <button onClick={back} style={{ ...btnSecondary, ...btnSmall }}>{t("tour.back")}</button>}
+            <button onClick={next} style={{ ...btnPrimary, ...btnSmall }}>{last ? t("tour.done") : t("tour.next")}</button>
           </div>
         </div>
       </div>

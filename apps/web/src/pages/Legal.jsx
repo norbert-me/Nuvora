@@ -1,8 +1,14 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { COLORS as C, pageApp } from "../components/Icons.jsx";
+import { COLORS as C, pageApp, pageTitle, panelStyle } from "../components/Icons.jsx";
 
-const FALLBACK = { betreiber: "[Name eintragen]", strasse: "[Straße]", plz_ort: "[PLZ Ort]", email: "kontakt@example.com" };
+// Rechtstext, kein Werkzeug: die Seite hat nur zwei Überschriftenstufen und
+// braucht sie vierzehnmal. Einmal aus der Schrift-Leiter abgeleitet statt an
+// jeder Stelle eine eigene Größe zu setzen (dort standen 17er).
+const h2Style = { ...pageTitle, marginBottom: 24 };
+const h3Style = { fontSize: 16, fontWeight: 600, marginBottom: 8 };
+
+const FALLBACK ={ betreiber: "[Name eintragen]", strasse: "[Straße]", plz_ort: "[PLZ Ort]", email: "kontakt@example.com" };
 
 export default function Legal() {
   const [cfg, setCfg] = useState(FALLBACK);
@@ -20,7 +26,7 @@ export default function Legal() {
     <div style={{ ...pageApp, lineHeight: 1.7, color: "var(--text)" }}>
       {/* Entwicklungsstatus: die Anwendung ist im Aufbau (Alpha/Beta). Realer
           Hinweis, weil echte Daten betroffen sind. */}
-      <div style={{ marginBottom: 28, padding: "14px 16px", border: `1px solid ${C.warning}`, borderRadius: 12, background: "rgba(184,134,11,0.10)", fontSize: 13.5 }}>
+      <div style={{ ...panelStyle, marginBottom: 24, border: `1px solid ${C.warning}`, background: C.warning + "1a", fontSize: 14 }}>
         <strong>Hinweis zum Entwicklungsstand.</strong> Nuvora befindet sich in
         aktiver Entwicklung (Alpha/Beta). Es besteht <strong>kein Anspruch auf
         die erstellten Daten</strong>: im Zuge der Weiterentwicklung können Daten
@@ -29,7 +35,7 @@ export default function Legal() {
         des Systems auf.
       </div>
 
-      <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 24 }}>Impressum</h2>
+      <h2 style={{ ...h2Style }}>Impressum</h2>
 
       <section style={{ marginBottom: 32 }}>
         <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 12 }}>Angaben gemäß § 5 DDG (ehem. TMG)</p>
@@ -59,10 +65,10 @@ export default function Legal() {
         </p>
       </section>
 
-      <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 24 }}>Datenschutzerklärung</h2>
+      <h2 style={{ ...h2Style }}>Datenschutzerklärung</h2>
 
       <section style={{ marginBottom: 32 }}>
-        <h3 style={{ fontSize: 17, fontWeight: 600, marginBottom: 8 }}>1. Verantwortlicher</h3>
+        <h3 style={{ ...h3Style }}>1. Verantwortlicher</h3>
         <p>
           Verantwortlicher im Sinne der Datenschutz-Grundverordnung (DSGVO) und anderer nationaler
           Datenschutzgesetze sowie sonstiger datenschutzrechtlicher Bestimmungen ist:
@@ -74,7 +80,7 @@ export default function Legal() {
           E-Mail: <a href={mailto} style={{ color: "var(--accent)" }}>{email}</a>
         </p>
 
-        <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>2. Allgemeines zur Datenverarbeitung</h3>
+        <h3 style={{ ...h3Style, marginTop: 24 }}>2. Allgemeines zur Datenverarbeitung</h3>
         <p>
           Nuvora ist ein selbstgehosteter Werkzeugkasten für Lehrkräfte mit zuschaltbaren Modulen
           (u.&nbsp;a. Abstimmungen, Karteikarten, Noten, Kalender). Die Verarbeitung personenbezogener
@@ -82,7 +88,7 @@ export default function Legal() {
           Weitergabe an Dritte statt.
         </p>
 
-        <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>3. Rechtsgrundlagen</h3>
+        <h3 style={{ ...h3Style, marginTop: 24 }}>3. Rechtsgrundlagen</h3>
         <p>
           Die Verarbeitung personenbezogener Daten erfolgt auf folgenden Rechtsgrundlagen:
         </p>
@@ -92,7 +98,7 @@ export default function Legal() {
           <li><strong>Art. 6 Abs. 1 lit. a DSGVO</strong> — Einwilligung: Soweit die nutzende Lehrkraft bzw. Schule Daten von Lernenden eingibt, ist diese für die Einholung einer ggf. erforderlichen Einwilligung der Betroffenen (bzw. der Erziehungsberechtigten) selbst verantwortlich.</li>
         </ul>
 
-        <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>4. Art der verarbeiteten Daten</h3>
+        <h3 style={{ ...h3Style, marginTop: 24 }}>4. Art der verarbeiteten Daten</h3>
         <ul style={{ paddingLeft: 20 }}>
           <li><strong>Nutzungsdaten der Lehrkraft:</strong> E-Mail-Adresse, Name, Passwort (als gesalzener Hash gespeichert, nicht im Klartext).</li>
           <li><strong>Daten der Lernenden:</strong> Name und zugewiesene Kartennummer, eingegeben durch die Lehrkraft. Optional E-/G-Kurs, Klassenleitung sowie – soweit von der Lehrkraft erfasst – Förderschwerpunkte und Notizen.</li>
@@ -104,7 +110,7 @@ export default function Legal() {
           <li><strong>Technische Zugriffsdaten:</strong> IP-Adresse (kurzfristig im Arbeitsspeicher für Brute-Force-Schutz, nicht dauerhaft gespeichert).</li>
         </ul>
 
-        <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>5. Speicherung und Speicherort</h3>
+        <h3 style={{ ...h3Style, marginTop: 24 }}>5. Speicherung und Speicherort</h3>
         <p>
           Alle Daten werden ausschließlich auf dem Server des Verantwortlichen gespeichert.
           Ausgenommen ist der Versand von E-Mails (Bestätigung der Registrierung, Passwort-Reset,
@@ -114,7 +120,7 @@ export default function Legal() {
           Die Datenübertragung zwischen Browser und Server ist durch HTTPS (TLS) verschlüsselt.
         </p>
 
-        <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>6. Speicherdauer und Löschung</h3>
+        <h3 style={{ ...h3Style, marginTop: 24 }}>6. Speicherdauer und Löschung</h3>
         <p>
           Daten der Lernenden und Abstimmungsergebnisse werden gespeichert, solange die zugehörige
           Klasse bzw. Session in der Anwendung existiert. Die Lehrkraft kann Klassen, Sessions und
@@ -133,7 +139,7 @@ export default function Legal() {
           jederzeit neu vergeben; bisherige Links werden damit sofort ungültig.
         </p>
 
-        <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>7. Cookies und Tracking</h3>
+        <h3 style={{ ...h3Style, marginTop: 24 }}>7. Cookies und Tracking</h3>
         <p>
           Nuvora verwendet <strong>keine Cookies</strong> und <strong>keine Tracking-Dienste</strong>.
           Die Authentifizierung erfolgt über ein Token, das ausschließlich im lokalen Speicher
@@ -151,7 +157,7 @@ export default function Legal() {
           geladen und somit keine IP-Adressen an Dritte übermittelt.
         </p>
 
-        <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>8. Rechte der betroffenen Personen</h3>
+        <h3 style={{ ...h3Style, marginTop: 24 }}>8. Rechte der betroffenen Personen</h3>
         <p>
           Betroffene Personen (bzw. deren Erziehungsberechtigte) haben gemäß DSGVO folgende Rechte:
         </p>
@@ -167,7 +173,7 @@ export default function Legal() {
           Zur Ausübung dieser Rechte wenden Sie sich an <a href={mailto} style={{ color: "var(--accent)" }}>{email}</a>.
         </p>
 
-        <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>9. Beschwerderecht bei einer Aufsichtsbehörde</h3>
+        <h3 style={{ ...h3Style, marginTop: 24 }}>9. Beschwerderecht bei einer Aufsichtsbehörde</h3>
         <p>
           Betroffene Personen haben das Recht, sich bei einer Datenschutz-Aufsichtsbehörde über
           die Verarbeitung ihrer personenbezogenen Daten zu beschweren. Eine Liste der
@@ -177,7 +183,7 @@ export default function Legal() {
           </a>.
         </p>
 
-        <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>10. Wer ist für die Daten der Lernenden verantwortlich?</h3>
+        <h3 style={{ ...h3Style, marginTop: 24 }}>10. Wer ist für die Daten der Lernenden verantwortlich?</h3>
         <p>
           Für die Daten der Schülerinnen und Schüler (Namen, Kartennummern, Modul-Daten wie
           Abstimmungsergebnisse, Noten, Lernfortschritt, Anwesenheit)
@@ -195,7 +201,7 @@ export default function Legal() {
           <li>die datenschutzkonforme Nutzung und rechtzeitige Löschung der Daten nach Schuljahres- bzw. Klassenende.</li>
         </ul>
 
-        <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>11. Sicherheit</h3>
+        <h3 style={{ ...h3Style, marginTop: 24 }}>11. Sicherheit</h3>
         <p>
           Passwörter werden mit PBKDF2 (SHA-256, 100.000 Iterationen) gehasht und gesalzen gespeichert.
           Die Kommunikation ist durchgehend TLS-verschlüsselt. Der Zugriff auf Daten ist durch
@@ -203,7 +209,7 @@ export default function Legal() {
           die eigenen Klassen, Fragen und Sessions.
         </p>
 
-        <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>12. Keine Gewährleistung der Bereitstellung</h3>
+        <h3 style={{ ...h3Style, marginTop: 24 }}>12. Keine Gewährleistung der Bereitstellung</h3>
         <p>
           Nuvora wird unentgeltlich und ohne Anspruch auf ständige Verfügbarkeit, Fehlerfreiheit
           oder Weiterführung bereitgestellt. Es besteht <strong>kein Rechtsanspruch auf die
@@ -212,7 +218,7 @@ export default function Legal() {
           eigene Sicherungen wichtiger Daten (z.&nbsp;B. Auswertungen, Exporte) vornehmen.
         </p>
 
-        <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>13. Marktplatz — Haftungsausschluss für fremde Inhalte</h3>
+        <h3 style={{ ...h3Style, marginTop: 24 }}>13. Marktplatz — Haftungsausschluss für fremde Inhalte</h3>
         <p>
           Über den Marktplatz können Nutzende eigene Fragensets veröffentlichen, die von anderen
           Nutzenden übernommen werden können. Diese Inhalte stammen von Dritten (anderen
@@ -224,7 +230,7 @@ export default function Legal() {
           stehen oben im Impressum.
         </p>
 
-        <h3 style={{ fontSize: 17, fontWeight: 600, marginTop: 24, marginBottom: 8 }}>14. Entfernung von Inhalten und Konten</h3>
+        <h3 style={{ ...h3Style, marginTop: 24 }}>14. Entfernung von Inhalten und Konten</h3>
         <p>
           Der Betreiber behält sich vor, veröffentlichte Marktplatz-Inhalte, einzelne Daten oder
           ganze Konten <strong>jederzeit und ohne vorherige Ankündigung oder Angabe von Gründen

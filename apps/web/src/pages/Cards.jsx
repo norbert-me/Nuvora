@@ -6,7 +6,7 @@
 // Kern-Klassenseite; damit trug der Kern Modulwissen (Regel 3 in CLAUDE.md).
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Icon, ICONS, iconBtn, pageApp } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, cardStyle, sectionLabel, pageApp } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api";
@@ -39,7 +39,7 @@ export default function Cards() {
 
   return (
     <div style={{ ...pageApp }}>
-      <p style={{ color: "var(--text2)", marginBottom: 20, fontSize: 14 }}>
+      <p style={{ color: "var(--text2)", marginBottom: 24, fontSize: 14 }}>
         {t("cards.intro").split("{{link}}")[0]}<Link to="/classes" style={{ color: "var(--accent)" }}>{t("nav.classes")}</Link>{t("cards.intro").split("{{link}}")[1]}
       </p>
 
@@ -52,8 +52,8 @@ export default function Cards() {
 
       {(() => {
         const row = (cls) => (
-          <div key={cls.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", marginBottom: 10, border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div key={cls.id} style={{ ...cardStyle, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", marginBottom: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <strong style={{ fontSize: 16, color: "var(--text)" }}>{cls.name}</strong>
               <span style={{ color: "var(--text3)", fontSize: 13 }}>{cls.students.length} {t("classes.learners")}</span>
             </div>
@@ -73,7 +73,7 @@ export default function Cards() {
         if (rest.length) groups.push({ name: null, list: rest });
         return groups.map((g, gi) => (
           <div key={gi}>
-            {g.name && g.list.length > 1 && <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text3)", margin: "6px 0 6px" }}>{g.name}</div>}
+            {g.name && g.list.length > 1 && <div style={{ ...sectionLabel, margin: "8px 0" }}>{g.name}</div>}
             {g.list.map(row)}
           </div>
         ));
