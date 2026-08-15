@@ -2295,4 +2295,8 @@ export default {
   "karten.noKurs": "not assigned to a course",
   "karten.noKurseYet": "No courses yet — create one first.",
   "karten.noKursWarn": "Without a course nobody sees this deck.",
+  "karten.delCardConfirm": "Delete this card? It goes to the trash.",
+  "karten.latexTable": "Insert table",
+  "karten.latexRow": "Row +",
+  "karten.latexCol": "Column +",
 };

@@ -2296,4 +2296,8 @@ export default {
   "karten.noKurs": "sin curso asignado",
   "karten.noKurseYet": "Aún no hay cursos: crea uno primero.",
   "karten.noKursWarn": "Sin un curso nadie ve este mazo.",
+  "karten.delCardConfirm": "¿Eliminar esta tarjeta? Irá a la papelera.",
+  "karten.latexTable": "Insertar tabla",
+  "karten.latexRow": "Fila +",
+  "karten.latexCol": "Columna +",
 };

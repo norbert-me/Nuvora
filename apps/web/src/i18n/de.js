@@ -2281,4 +2281,8 @@ export default {
   "karten.noKurs": "keinem Kurs zugewiesen",
   "karten.noKurseYet": "Noch keine Kurse — lege zuerst einen an.",
   "karten.noKursWarn": "Ohne Kurs sieht diesen Stapel niemand.",
+  "karten.delCardConfirm": "Diese Karte löschen? Sie liegt danach im Papierkorb.",
+  "karten.latexTable": "Tabelle einfügen",
+  "karten.latexRow": "Zeile +",
+  "karten.latexCol": "Spalte +",
 };

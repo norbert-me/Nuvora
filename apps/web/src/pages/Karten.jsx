@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
 import { NiveauToggle, AddButton, Icon, ICONS, iconBtn, toolbarIconBtn, toolbarBtn, toolbarBtnPrimary, toolbarInput, menuRow, CONTROL_H, CONTROL_R, COLORS as C, REIFE_COLORS, btnPrimary, btnSecondary, btnSmall, selectStyle, Modal as UiModal, overlayGuard, modalOverlay, modalPanel, Empty, Skeleton, pageApp, inputStyle, cardStyle, panelStyle, chipStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
-import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
+import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import AuthImage from "../components/AuthImage.jsx";
@@ -16,6 +16,7 @@ import PublishModal from "../components/PublishModal.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import Latex from "../components/Latex.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
+import { TABELLE_GERUEST, zeileAnhaengen, spalteAnhaengen } from "../core/latextabelle.js";
 import { sende } from "../core/melden.js";
 
 // LaTeX-Schnelltasten (wie im CardVote-Editor): fügt Formeln ins fokussierte Feld.
@@ -824,29 +825,34 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderTop: "1px solid var(--border)", fontSize: 14,
             opacity: dragCard === c.id ? 0.4 : 1,
             boxShadow: over && cardDrop.side === "above" ? `inset 0 ${MARKE}px 0 var(--accent)` : over && cardDrop.side === "below" ? `inset 0 -${MARKE}px 0 var(--accent)` : undefined }}>
+          {/* Dieselbe Zeile wie bei einer CardVote-Frage (Dashboard.jsx): Griff,
+              Niveau-Zeichen, Text — und rechts EIN Symbol. Vorher standen hier
+              vier Knoepfe nebeneinander, zwei davon Bildvorschauen; in einer
+              Liste, durch die man scrollt und zieht, ist das eine Reihe von
+              Fallen. Das Bild meldet sich jetzt wie dort als Zeichen im Text. */}
           <span draggable onDragStart={(e) => { e.stopPropagation(); e.dataTransfer.effectAllowed = "move"; setDragCard(c.id); }} onDragEnd={() => { setDragCard(null); setCardDrop(null); }}
-            className="drag-handle" title={t("karten.reorderHint")} style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex", flexShrink: 0, userSelect: "none" }}><Icon d={ICONS.grip} size={14} /></span>
-          {c.has_front_image && <AuthImage src={`${API}/cards/${c.id}/image/front`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: CONTROL_R, border: "1px solid var(--border2)", flexShrink: 0 }} />}
-          <span style={{ flex: 1, minWidth: 0 }}><strong><Latex>{c.front}</Latex></strong> <span style={{ color: "var(--text3)" }}>→ <Latex>{c.back}</Latex></span></span>
-          {/* Direkt in der Zeile umschaltbar — dasselbe Bauteil wie bei einer
-              CardVote-Frage und beim Kursteilnehmer. */}
-          {/* Arbeitet der Kurs mit E/G, gibt es kein „gilt fuer alle" mehr:
-              eine Karte ist Grundstoff (G) oder Anforderung (E). Ohne aktives
-              Niveau bleibt der dritte Zustand. */}
-          <NiveauToggle wert={c.niveau || ""} size={22} mitLeer={!niveauAktiv} title={t("karten.cardNiveauHint")}
+            className="drag-handle" title={t("karten.reorderHint")} style={{ color: "var(--text3)", width: 20, display: "inline-flex", justifyContent: "center", cursor: "grab", flexShrink: 0, userSelect: "none" }}><Icon d={ICONS.grip} size={15} /></span>
+          {/* Der EINZIGE Weg, das Niveau zu setzen — im Bearbeiten-Dialog gibt
+              es ihn bewusst nicht mehr. Arbeitet der Kurs mit E/G, faellt der
+              dritte Zustand („gilt fuer alle") weg. */}
+          <NiveauToggle wert={c.niveau || ""} mitLeer={!niveauAktiv} title={t("karten.cardNiveauHint")}
             onChange={(v) => saveEditCard(c.id, c.front, c.back, v)} />
-          {c.has_back_image && <AuthImage src={`${API}/cards/${c.id}/image/back`} reloadKey={imgVer} style={{ height: 26, width: 26, objectFit: "cover", borderRadius: CONTROL_R, border: "1px solid var(--border2)", flexShrink: 0 }} />}
-          <button onClick={() => setEditCard(c.id)} className="icon-btn" style={iconBtn} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={14} /></button>
-          {/* Löschen stand direkt neben Bearbeiten — zwei Pixel daneben und die
-              Karte ist weg. Es liegt jetzt im ⋯-Menue, unten und rot. */}
-          <MehrMenu eintraege={[{ key: "del", label: t("common.delete"), icon: ICONS.trash, gefahr: true,
-            onClick: () => call(() => fetch(`${API}/cards/${c.id}`, { method: "DELETE" })) }]} />
+          <span onClick={() => setEditCard(c.id)} title={t("common.edit")} style={{ flex: 1, minWidth: 0, cursor: "pointer" }}>
+            <strong><Latex>{c.front}</Latex></strong> <span style={{ color: "var(--text3)" }}>→ <Latex>{c.back}</Latex></span>
+            {(c.has_front_image || c.has_back_image) && <Icon d={ICONS.image} size={18} color="var(--accent)" style={{ marginLeft: 4 }} />}
+          </span>
+          <button onClick={() => setEditCard(c.id)} className="icon-btn" style={iconBtn} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={18} /></button>
         </div>
         );
       })}
       {editCard != null && cards.find((c) => c.id === editCard) && (
         <CardEditModal card={cards.find((c) => c.id === editCard)} imgVer={imgVer} onUpload={uploadCardImg} onRemove={removeCardImg}
-          mitLeer={!niveauAktiv} onSave={saveEditCard} onClose={() => setEditCard(null)} t={t} />
+          onDelete={async (id) => {
+            if (!await askConfirm(t("karten.delCardConfirm"))) return;
+            setEditCard(null);
+            call(() => fetch(`${API}/cards/${id}`, { method: "DELETE" }));
+          }}
+          onSave={saveEditCard} onClose={() => setEditCard(null)} t={t} />
       )}
       <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <button onClick={() => setNewOpen(true)} style={{ ...btnPrimary, padding: "8px 16px", display: "inline-flex", alignItems: "center", gap: 4 }}><Icon d={ICONS.plus} size={15} color="var(--bg)" /> {t("karten.newCard")}</button>
@@ -856,7 +862,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         // Karteikarten sind G, solange nicht anders gesagt — aber nur, wo der
         // Kurs mit E/G arbeitet. Sonst startet die neue Karte neutral.
         <CardEditModal card={{ id: null, front: "", back: "", niveau: niveauAktiv ? "G" : "", has_front_image: false, has_back_image: false }} imgVer={imgVer}
-          mitLeer={!niveauAktiv} onSave={(_id, f, b, n) => createCard(f, b, n)} onClose={() => setNewOpen(false)} t={t} />
+          onSave={(_id, f, b, n) => createCard(f, b, n)} onClose={() => setNewOpen(false)} t={t} />
       )}
       {studying && <StudyModal cards={cards} deckName={deck.name || t("karten.deck")} t={t} onClose={() => setStudying(false)} />}
       {importing && <ImportModal deckName={deck.name || t("karten.deck")} t={t}
@@ -961,10 +967,13 @@ function StudyModal({ cards, deckName, t, onClose }) {
 }
 
 // Karte bearbeiten im Popup: Vorder-/Rückseite als Text + Bild-Upload je Seite.
-function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t, mitLeer = true }) {
+function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onDelete, onClose, t }) {
   const [front, setFront] = useState(card.front || "");
   const [back, setBack] = useState(card.back || "");
-  const [niveau, setNiveau] = useState(card.niveau || "");
+  // Das Niveau wird an der ZEILE umgeschaltet, nicht hier. Es reist nur mit,
+  // damit ein Speichern es nicht zurueckstellt — zwei Wege zu derselben Sache
+  // enden damit, dass einer weniger kann als der andere.
+  const niveau = card.niveau || "";
   const inpS = { ...inputStyle, width: "100%", resize: "vertical" };
   const lbl = { fontSize: 13, color: "var(--text2)", margin: "12px 0 4px" };
   // LaTeX-Schnelltasten fügen in das zuletzt fokussierte Feld ein (wie in der Anlege-Maske).
@@ -984,6 +993,30 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t, m
     setter(before + wrapped + val.slice(end));
     setTimeout(() => { const pos = start + wrapped.length + (offset || 0); input.focus(); input.setSelectionRange(pos, pos); }, 0);
   };
+  // Tabellen-Tasten. Sie schreiben ihr eigenes `$$…$$` — die Automatik von
+  // insertLatex passt hier nicht, eine Tabelle ist abgesetzter Formelsatz.
+  const tabelle = (art) => {
+    const isBack = activeField.current === "back";
+    const input = isBack ? backRef.current : frontRef.current;
+    const val = isBack ? back : front;
+    const setter = isBack ? setBack : setFront;
+    if (!input) return;
+    const start = input.selectionStart || 0, end = input.selectionEnd || 0;
+    let neu, pos;
+    if (art === "neu") {
+      neu = val.slice(0, start) + TABELLE_GERUEST + val.slice(end);
+      pos = start + TABELLE_GERUEST.indexOf("\\hline ") + "\\hline ".length;  // erste Zelle
+    } else {
+      const r = art === "zeile" ? zeileAnhaengen(val, start) : spalteAnhaengen(val, start);
+      if (!r) return;
+      neu = r.text; pos = r.pos;
+    }
+    setter(neu);
+    setTimeout(() => { input.focus(); input.setSelectionRange(pos, pos); }, 0);
+  };
+  // Zeile/Spalte nur zeigen, wo es etwas zu erweitern gibt — sonst stünden zwei
+  // Tasten herum, die nichts tun.
+  const hatTabelle = /\\begin\{(array|tabular)\}/.test(`${front}\n${back}`);
   return (
     <UiModal onClose={onClose} width={480} style={{ maxHeight: "90vh", overflowY: "auto" }} label={card.id ? t("karten.editCard") : t("karten.newCard")}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
@@ -997,6 +1030,15 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t, m
             <button key={b.label} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insertLatex(b.tex, b.cursor)}
               style={{ ...btnSecondary, ...btnSmall, fontFamily: "serif" }}>{b.label}</button>
           ))}
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => tabelle("neu")}
+            title={t("karten.latexTable")} aria-label={t("karten.latexTable")}
+            style={{ ...btnSecondary, ...btnSmall, fontFamily: "serif" }}>⊞</button>
+          {hatTabelle && (<>
+            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => tabelle("zeile")}
+              style={{ ...btnSecondary, ...btnSmall }}>{t("karten.latexRow")}</button>
+            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => tabelle("spalte")}
+              style={{ ...btnSecondary, ...btnSmall }}>{t("karten.latexCol")}</button>
+          </>)}
           <span style={{ fontSize: 11, color: "var(--text3)", marginLeft: 4 }}>{t("karten.latexHint")}</span>
         </div>
 
@@ -1020,16 +1062,6 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t, m
           <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>{t("karten.imgAfterSave")}</div>
         )}
 
-        {/* E/G je Karte. Der Stapel kann zusätzlich ein Niveau tragen; beides
-            wirkt zusammen — eine E-Karte in einem G-Stapel sieht niemand. */}
-        <div style={lbl}>{t("karten.cardNiveau")}</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <NiveauToggle wert={niveau} mitLeer={mitLeer} onChange={setNiveau} title={t("karten.cardNiveauHint")} />
-          <span style={{ fontSize: 12, color: "var(--text3)" }}>
-            {niveau === "E" ? t("karten.niveauE") : niveau === "G" ? t("karten.niveauG") : t("karten.niveauAll")}
-          </span>
-        </div>
-
         {(front.includes("$") || back.includes("$")) && (
           <div style={{ ...panelStyle, marginTop: 12, padding: "8px 12px", background: "var(--bg2)", fontSize: 14 }}>
             <Latex>{front}</Latex> <span style={{ color: "var(--text3)" }}>→ <Latex>{back}</Latex></span>
@@ -1039,6 +1071,15 @@ function CardEditModal({ card, imgVer, onUpload, onRemove, onSave, onClose, t, m
         <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center" }}>
           <button onClick={() => onSave(card.id, front.trim(), back.trim(), niveau)} style={btnPrimary}>{t("common.save")}</button>
           <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
+          {/* Loeschen liegt hier statt in der Zeile: dort lag der Papierkorb
+              beim Ziehen und Scrollen unter dem Finger. Ganz rechts, in
+              Gefahrenfarbe, mit Rueckfrage. */}
+          {card.id && onDelete && (
+            <button onClick={() => onDelete(card.id)}
+              style={{ ...btnSecondary, marginLeft: "auto", color: C.danger, display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <Icon d={ICONS.trash} size={15} color={C.danger} /> {t("common.delete")}
+            </button>
+          )}
         </div>
     </UiModal>
   );
@@ -1051,7 +1092,9 @@ function CardImgCtl({ cardId, side, has, imgVer, onUpload, onRemove, t }) {
       <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
         <AuthImage src={`${API}/cards/${cardId}/image/${side}`} reloadKey={imgVer}
           style={{ height: 32, width: 32, objectFit: "cover", borderRadius: CONTROL_R, border: "1px solid var(--border2)" }} />
-        <button onClick={() => onRemove(cardId, side)} className="icon-btn" style={iconBtn} title={t("karten.imgRemove")} aria-label={t("karten.imgRemove")}><Icon d={ICONS.close} size={12} color={C.danger} /></button>
+        {/* Muelleimer, kein Minus: „−" liest sich wie „kleiner machen", nicht
+            wie „weg". Ueberall dasselbe Bild fuers Loeschen. */}
+        <button onClick={() => onRemove(cardId, side)} className="icon-btn" style={iconBtn} title={t("karten.imgRemove")} aria-label={t("karten.imgRemove")}><Icon d={ICONS.trash} size={14} color={C.danger} /></button>
       </span>
     );
   }

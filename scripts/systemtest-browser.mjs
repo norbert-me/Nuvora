@@ -592,7 +592,9 @@ const bedienung = (td) => [
       await seite.getByText(`${MARKE_UI}-Frage`, { exact: false }).first().waitFor({ timeout: 15000 });
       // Zurueck zur Liste — dort muss das Frageset stehen, und dort wird gleich
       // auch geprueft, ob es das Neuladen uebersteht.
-      await seite.getByRole("button", { name: "← Zurück" }).first().click({ timeout: 8000 });
+      // „Zurueck" traegt seit dem Icon-Aufraeumen ein SVG statt des Zeichens
+      // „←" — der zugaengliche Name ist damit nur noch das Wort.
+      await seite.getByRole("button", { name: /Zurück/ }).first().click({ timeout: 8000 });
       await seite.getByText(MARKE_UI, { exact: true }).first().waitFor({ timeout: 15000 });
     },
     // Ein Frageset hat in der Liste KEINEN Loeschknopf — der sitzt im Kopf des
