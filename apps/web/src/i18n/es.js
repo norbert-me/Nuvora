@@ -1896,4 +1896,6 @@ export default {
   "nav.switchModule": "Cambiar de módulo",
   "help.core.navT": "Cambiar de módulo",
   "help.core.nav": "Arriba a la izquierda, junto a «Nuvora», ves en qué módulo estás. Un clic muestra todos los módulos activos y lleva directamente allí, sin pasar por la página de inicio. Las pestañas de al lado pertenecen siempre al módulo actual.",
+  "noten.term1Short": "1.º sem.",
+  "noten.term2Short": "2.º sem.",
 };

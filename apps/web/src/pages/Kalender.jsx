@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, dateNavBtn, dateNavInput, toolbarIconBtn, CONTROL_H, Modal, dateiWaehlen, pageApp, Popover} from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, dateNavBtn, dateNavInput, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, dateiWaehlen, pageApp, Popover} from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
@@ -517,7 +517,7 @@ export default function Kalender() {
           ) : (
             <div style={{ position: "relative" }}>
               <button onClick={() => setJumpOpen((v) => !v)} title={t("kalender.jumpToDay")}
-                style={{ border: "none", background: "none", fontSize: 15, fontWeight: 700, color: "var(--text)", minWidth: 170, textAlign: "center", cursor: "pointer", padding: "0 8px", height: CONTROL_H, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 8, borderBottom: "1px dotted var(--border2)" }}>{title} <Icon d={ICONS.open} size={11} style={{ transform: "rotate(90deg)" }} /></button>
+                style={{ border: "none", background: "none", fontSize: 15, fontWeight: 700, color: "var(--text)", minWidth: 170, textAlign: "center", cursor: "pointer", padding: "0 8px", height: CONTROL_H, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: CONTROL_R, borderBottom: "1px dotted var(--border2)" }}>{title} <Icon d={ICONS.open} size={11} style={{ transform: "rotate(90deg)" }} /></button>
               {jumpOpen && (<>
                 <div onClick={() => setJumpOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
                 <Popover align="center" style={{ padding: 8, display: "flex", gap: 6, alignItems: "center" }}>

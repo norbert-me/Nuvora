@@ -1895,4 +1895,6 @@ export default {
   "nav.switchModule": "Switch module",
   "help.core.navT": "Switching between modules",
   "help.core.nav": "Top left, next to “Nuvora”, you see which module you are in. A click shows all enabled modules and takes you straight there — no detour via the start page. The tabs to the right always belong to the current module.",
+  "noten.term1Short": "1st term",
+  "noten.term2Short": "2nd term",
 };

@@ -12,7 +12,7 @@ import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { Icon, ICONS, iconBtn, toolbarIconBtn, chipStyle, COLORS as C, btnPrimary, btnSecondary, Modal as UiModal, popoverPanel, Empty, Skeleton, inputStyle, Popover, Toggle, nichtZiehen, dateiWaehlen, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, toolbarIconBtn, chipStyle, COLORS as C, btnPrimary, btnSecondary, Modal as UiModal, popoverPanel, Empty, Skeleton, inputStyle, Popover, Tabs, Toggle, nichtZiehen, dateiWaehlen, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { MehrMenu } from "../components/Werkzeugleiste.jsx";
@@ -497,20 +497,18 @@ export default function Noten() {
             </select>
           </label>
         )}
-        <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden" }} title={t("noten.term")}>
-          {[["1", t("noten.term1")], ["2", t("noten.term2")], ["year", t("noten.year")]].map(([v, label]) => (
-            <button key={v} onClick={() => setTerm(v)}
-              style={{ padding: "6px 14px", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
-                background: term === v ? "var(--accent)" : "transparent", color: term === v ? "#fff" : "var(--text2)" }}>{label}</button>
-          ))}
-        </div>
-        <div style={{ display: "inline-flex", border: "1px solid var(--border2)", borderRadius: 980, overflow: "hidden" }} title={t("noten.aggHint")}>
-          {[["mean", t("noten.aggMean")], ["median", t("noten.aggMedian")]].map(([m, label]) => (
-            <button key={m} onClick={() => setAggPersist(m)}
-              style={{ padding: "6px 14px", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer",
-                background: agg === m ? "var(--accent)" : "transparent", color: agg === m ? "#fff" : "var(--text2)" }}>{label}</button>
-          ))}
-        </div>
+        {/* Kurze Beschriftungen („1. HJ"), damit die ganze Leiste in EINE Zeile
+            passt — sonst rutschen Plus und Mehr in eine zweite. Die lange Form
+            steht im title. Beide Umschalter kommen aus `Tabs` (Icons.jsx):
+            gleiche Hoehe, gleiche Form wie alles andere in der Leiste. */}
+        <span title={t("noten.term")}>
+          <Tabs value={term} onChange={setTerm}
+            options={[["1", t("noten.term1Short")], ["2", t("noten.term2Short")], ["year", t("noten.year")]]} />
+        </span>
+        <span title={t("noten.aggHint")}>
+          <Tabs value={agg} onChange={setAggPersist}
+            options={[["mean", t("noten.aggMean")], ["median", t("noten.aggMedian")]]} />
+        </span>
         {/* Sichtbar bleibt der Handgriff, den man staendig braucht: ein neuer
             Abschnitt. Export, Zeugnis, Import und die Code-Detektiv-Uebernahme
             stehen im Mehr-Menue — dieselbe Stelle wie auf jeder anderen Seite
@@ -520,7 +518,7 @@ export default function Noten() {
           <div style={{ display: "flex", gap: 8, marginLeft: "auto", alignItems: "center" }}>
             <button data-tour="noten-add" onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}
               className="icon-btn"
-              style={{ ...toolbarIconBtn, border: "1px solid var(--border2)", borderRadius: 10 }}>
+              style={{ ...toolbarIconBtn, border: "1px solid var(--border2)" }}>
               <Icon d={ICONS.plus} size={20} color="var(--accent)" />
             </button>
             <MehrMenu eintraege={[

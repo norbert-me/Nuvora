@@ -2,7 +2,7 @@
 // drehen (z.B. schräge Tische). Gespeichert wird { seats: [{sid,x,y,rot}] }.
 // Schüler bleiben im Kern; hier nur ihre Positionen (Regel 3).
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { btnSecondary, Icon, ICONS, iconBtn, toolbarIconBtn, CONTROL_H, dateiWaehlen, COLORS as C, Empty } from "../components/Icons.jsx";
+import { btnSecondary, Icon, ICONS, iconBtn, toolbarIconBtn, CONTROL_H, CONTROL_R, dateiWaehlen, COLORS as C, Empty } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import ViewMenu from "../components/ViewMenu.jsx";
 import Portrait from "../components/Portrait.jsx";
@@ -408,9 +408,9 @@ export default function Sitzplan() {
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
             <span style={{ fontSize: 12.5, color: "var(--text3)" }}>{t("sitzplan.zoom")}</span>
-            <button onClick={() => setZoom((z) => Math.max(0.5, Math.round((z - 0.1) * 10) / 10))} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8, width: 28, height: 28, fontSize: 16 }}>−</button>
+            <button onClick={() => setZoom((z) => Math.max(0.5, Math.round((z - 0.1) * 10) / 10))} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: CONTROL_R, width: 28, height: 28, fontSize: 16 }}>−</button>
             <span style={{ fontSize: 12.5, color: "var(--text2)", minWidth: 40, textAlign: "center" }}>{Math.round(zoom * 100)}%</span>
-            <button onClick={() => setZoom((z) => Math.min(2, Math.round((z + 0.1) * 10) / 10))} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8, width: 28, height: 28, fontSize: 16 }}>+</button>
+            <button onClick={() => setZoom((z) => Math.min(2, Math.round((z + 0.1) * 10) / 10))} style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: CONTROL_R, width: 28, height: 28, fontSize: 16 }}>+</button>
             {zoom !== 1 && <button onClick={() => setZoom(1)} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 12 }}>{t("sitzplan.zoomReset")}</button>}
             <button onClick={fitView} className="icon-btn" style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: 8, width: 28, height: 28 }} title={t("sitzplan.fitHint")} aria-label={t("sitzplan.fit")}><Icon d={ICONS.fit} size={16} /></button>
             <button onClick={anordnen} style={{ ...btnSecondary, padding: "4px 10px", fontSize: 12 }} title={t("sitzplan.arrangeHint")}>{t("sitzplan.arrange")}</button>

@@ -385,6 +385,9 @@ async function lauf(motor) {
     // ── Globale Suche ──
     await sucheProbe(kontext);
 
+    // ── Werkzeugleisten: eine Hoehe, eine Form ──
+    await leistenProbe(kontext);
+
     // ── Modulwechsel aus der Navigation ──
     await modulwechselProbe(kontext);
 
@@ -515,6 +518,64 @@ async function speicherAnmeldung(kontext) {
     return await mitFrist(tun(), FRIST_SEITE, "/login");
   } catch (e) {
     return { ok: false, detail: String(e.message || e).split("\n")[0].slice(0, 160) };
+  } finally {
+    await seite.close().catch(() => {});
+  }
+}
+
+/**
+ * Alle Bedienelemente einer Werkzeugleiste sind gleich hoch und gleich geformt.
+ *
+ * Das stand als Regel im Code (CONTROL_H / CONTROL_R in Icons.jsx) und wurde
+ * trotzdem immer wieder gebrochen: nebeneinander standen zuletzt eine Pille,
+ * ein Rechteck mit Radius 10 und ein Kreis, dazu ein Auswahlfeld, das vier
+ * Pixel hoeher war als die Reiter. Auffallen kann das nur, wer misst — also
+ * misst es der Test: fuer jede Leiste die Hoehen ihrer direkten Kinder.
+ *
+ * Geprueft wird nicht der exakte Wert (eine Leiste darf auch mal 30 px hoch
+ * sein), sondern die GLEICHHEIT innerhalb einer Leiste. Genau das ist das, was
+ * man sieht.
+ */
+async function leistenProbe(kontext) {
+  const seiten = [["/auswertung?tab=noten", "Notenbuch"], ["/orga?tab=sitzplan", "Sitzplan"],
+                  ["/kalender", "Kalender"], ["/karten", "Karteikarten"]];
+  const { seite } = await neueSeite(kontext);
+  const schief = [];
+  try {
+    for (const [pfad, name] of seiten) {
+      await seite.goto(pfad, { waitUntil: "networkidle", timeout: 30000 });
+      await tourWegklicken(seite);
+      await seite.waitForTimeout(900);
+      const befund = await seite.evaluate(() => {
+        // Die erste Reihe unter der Navigation, die mehrere Bedienelemente
+        // nebeneinander traegt — das ist die Werkzeugleiste der Seite.
+        const reihen = [...document.querySelectorAll("div")].filter((d) => {
+          const st = getComputedStyle(d);
+          if (st.display !== "flex" || st.flexDirection === "column") return false;
+          const kinder = [...d.children].filter((k) => k.getBoundingClientRect().height > 0);
+          const bedien = kinder.filter((k) => k.matches("button, select, input, span, label, div")
+            && k.querySelectorAll("button, select, input").length + (k.matches("button, select, input") ? 1 : 0) > 0);
+          return bedien.length >= 3 && d.getBoundingClientRect().top < 400;
+        });
+        if (!reihen.length) return null;
+        const leiste = reihen[0];
+        const hoehen = [...leiste.children]
+          .map((k) => ({ text: (k.textContent || "").trim().slice(0, 14) || k.tagName,
+                         h: Math.round(k.getBoundingClientRect().height) }))
+          .filter((x) => x.h > 0);
+        return hoehen;
+      });
+      if (!befund || befund.length < 2) continue;
+      const werte = befund.map((x) => x.h);
+      const spanne = Math.max(...werte) - Math.min(...werte);
+      if (spanne > 2) {
+        schief.push(`${name}: ${befund.map((x) => `${x.text}=${x.h}`).join(", ")}`);
+      }
+    }
+    notiere("Bedienung", "Werkzeugleisten: eine Hoehe", schief.length === 0,
+      schief.length ? schief.join(" | ") : `${seiten.length} Leisten geprueft, alle Elemente gleich hoch`);
+  } catch (e) {
+    notiere("Bedienung", "Werkzeugleisten: eine Hoehe", false, kurzfehler(e));
   } finally {
     await seite.close().catch(() => {});
   }
