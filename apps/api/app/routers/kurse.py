@@ -338,7 +338,11 @@ async def _own_student(db, user, student_id) -> Student:
 
 @router.get("/{kurs_id}/members")
 async def list_student_members(kurs_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Einzeln hinzugefügte SuS des Kurses (mit Herkunftsklasse)."""
+    """Einzeln hinzugefügte SuS des Kurses (mit Herkunftsklasse).
+
+    Hier ausnahmsweise nach Namen: das ist kein Roster, sondern die Verwaltung
+    der Mitglieder — eine Wolke aus mehreren Klassen, in der man eine Person
+    sucht. position gilt je Klasse und würde quer über Klassen nichts ordnen."""
     await _owned_kurs(db, user, kurs_id)
     sids = (await db.execute(select(KursStudent.student_id).where(KursStudent.kurs_id == kurs_id))).scalars().all()
     if not sids:
@@ -380,7 +384,7 @@ async def kurs_students(kurs_id: int, user: User = Depends(get_current_user), db
     sids = list(await member_student_ids(db, kurs_id))
     if not sids:
         return []
-    studs = (await db.execute(select(Student).where(Student.id.in_(sids)).order_by(Student.card_id, Student.id))).scalars().all()
+    studs = (await db.execute(select(Student).where(Student.id.in_(sids)).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
     out = {}
     for s in studs:
         n = s.name.strip()
@@ -445,7 +449,7 @@ async def kurs_massnahmen(kurs_id: int, user: User = Depends(get_current_user), 
     sids = list(await member_student_ids(db, kurs_id))
     if not sids:
         return []
-    studs = (await db.execute(select(Student).where(Student.id.in_(sids)).order_by(Student.card_id, Student.id))).scalars().all()
+    studs = (await db.execute(select(Student).where(Student.id.in_(sids)).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
     out = {}
     for s in studs:
         n = s.name.strip()

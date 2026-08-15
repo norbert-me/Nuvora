@@ -379,7 +379,9 @@ export default function Session() {
     const studs = classes.filter((c) => sib.has(c.id)).flatMap((c) => c.students || []);
     const canon = {};
     studs.forEach((s) => { const n = s.name.trim(); if (!(n in canon)) canon[n] = s; });
-    return Object.values(canon).sort((a, b) => a.card_id - b.card_id);
+    // Klassenreihenfolge ist position; card_id ist die Nummer der gedruckten
+    // Karte und taugt nicht als Reihenfolge, sobald umsortiert wurde.
+    return Object.values(canon).sort((a, b) => (a.position || 0) - (b.position || 0) || a.card_id - b.card_id || a.id - b.id);
   };
   const studentList = kursRoster(selectedClass);
   const studentMap = Object.fromEntries(studentList.map((s) => [s.card_id, s.name]));

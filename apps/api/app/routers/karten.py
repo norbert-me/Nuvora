@@ -165,18 +165,22 @@ async def _kurs_roster(db, user, class_id, subset_kurs=None):
     Karten-Fortschritt aber je Fach gefuehrt).
 
     Mit subset_kurs: der Roster eines Teilkurses (Kurse aus Teilen von Klassen) —
-    die einzeln hinzugefügten SuS, auch aus fremden Klassen (dedupliziert)."""
+    die einzeln hinzugefügten SuS, auch aus fremden Klassen (dedupliziert).
+
+    Sortiert wird nach position — card_id ist die Nummer der gedruckten
+    ArUco-Karte, keine Reihenfolge: nach ihr sortiert stünde die Liste hier
+    anders als überall sonst, sobald die Lehrkraft umsortiert hat."""
     if subset_kurs is not None:
         from .kurse import member_student_ids
         sids = list(await member_student_ids(db, subset_kurs))
         if not sids:
             return []
-        studs = (await db.execute(select(Student).where(Student.id.in_(sids)).order_by(Student.card_id, Student.id))).scalars().all()
+        studs = (await db.execute(select(Student).where(Student.id.in_(sids)).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
         canon = {}
         for s in studs:
             canon.setdefault(s.name.strip(), s)
         return sorted(canon.values(), key=lambda s: (s.position or 0, s.card_id, s.id))
-    return (await db.execute(select(Student).where(Student.class_id == class_id).order_by(Student.card_id, Student.id))).scalars().all()
+    return (await db.execute(select(Student).where(Student.class_id == class_id).order_by(Student.position, Student.card_id, Student.id))).scalars().all()
 
 
 async def _kurs_decks_where(cls, kurs_id=None):

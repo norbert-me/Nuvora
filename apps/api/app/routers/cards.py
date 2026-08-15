@@ -72,7 +72,9 @@ async def class_cards_pdf(class_id: int, user: User = Depends(get_current_user),
     canon = {}
     for s in all_studs:
         canon.setdefault(s.name.strip(), s)
-    students = sorted(canon.values(), key=lambda s: s.card_id)
+    # Die Bögen kommen in Klassenreihenfolge aus dem Drucker — also position,
+    # nicht card_id: die steht nur AUF der Karte und ist keine Reihenfolge.
+    students = sorted(canon.values(), key=lambda s: (s.position or 0, s.card_id, s.id))
     if not students:
         raise HTTPException(400, "Keine Lernenden in der Klasse")
 

@@ -84,7 +84,10 @@ export default function Sitzplan() {
     const all = classes.filter((c) => sib.has(c.id)).flatMap((c) => c.students || []);
     const canon = {};
     all.forEach((s) => { const n = s.name.trim(); if (!(n in canon)) canon[n] = s; });
-    return Object.values(canon).sort((a, b) => a.card_id - b.card_id);
+    // Nach position, nicht nach card_id: die Kartennummer steht auf dem
+    // gedruckten ArUco-Bogen und aendert sich nie — die Reihenfolge der Klasse
+    // schon. Sonst stuende die Namensliste hier anders als unter /classes.
+    return Object.values(canon).sort((a, b) => (a.position || 0) - (b.position || 0) || a.card_id - b.card_id || a.id - b.id);
   }, [cls, classes, kurse]);
   const byId = (id) => students.find((s) => s.id === id);
 

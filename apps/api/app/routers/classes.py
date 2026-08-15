@@ -127,6 +127,10 @@ def _massnahmen(s: "StudentIn"):
 class StudentOut(BaseModel):
     id: int
     card_id: int
+    # Die Reihenfolge muss mit raus: die Oberfläche mischt SuS mehrerer
+    # Fach-Klassen zu einem Kurs-Roster und muss danach neu sortieren können.
+    # Ohne position bliebe ihr nur card_id — die Nummer der gedruckten Karte.
+    position: int = 0
     name: str
     niveau: str = ""
     foerder: Optional[List[str]] = None
@@ -135,6 +139,13 @@ class StudentOut(BaseModel):
     klassenlehrer: str = ""
     has_photo: bool = False
     model_config = {"from_attributes": True}
+
+    @field_validator("position", mode="before")
+    @classmethod
+    def pos_default(cls, v):
+        # Bestandszeilen aus der Zeit vor der Spalte koennen None liefern —
+        # daraus wird 0, sonst kippt die ganze Klassenantwort wegen einer Null.
+        return v or 0
 
 
 # Farbpalette fuer Klassen — gut unterscheidbar, in Hell/Dunkel lesbar.
@@ -284,7 +295,8 @@ async def list_massnahmen(
     from .kurse import sibling_class_ids
     sib = await sibling_class_ids(db, class_id)
     rows = (await db.execute(
-        select(Student).where(Student.class_id.in_(sib or [class_id])).order_by(Student.position, Student.card_id)
+        select(Student).where(Student.class_id.in_(sib or [class_id]))
+        .order_by(Student.position, Student.card_id, Student.id)
     )).scalars().all()
     gesehen = set()
     out = []

@@ -700,7 +700,10 @@ async def evaluation_xlsx(session_id: int, user: User = Depends(get_current_user
     students = []
     if session.class_id:
         result = await db.execute(
-            select(Student).where(Student.class_id == session.class_id).order_by(Student.name)
+            # Klassenreihenfolge wie auf dem Bildschirm: position. card_id ist
+            # die Nummer der gedruckten ArUco-Karte, keine Reihenfolge.
+            select(Student).where(Student.class_id == session.class_id)
+            .order_by(Student.position, Student.card_id, Student.id)
         )
         students = result.scalars().all()
 
@@ -796,7 +799,10 @@ async def evaluation_scsv(session_id: int, user: User = Depends(get_current_user
     students = []
     if session.class_id:
         result = await db.execute(
-            select(Student).where(Student.class_id == session.class_id).order_by(Student.name)
+            # Klassenreihenfolge wie auf dem Bildschirm: position. card_id ist
+            # die Nummer der gedruckten ArUco-Karte, keine Reihenfolge.
+            select(Student).where(Student.class_id == session.class_id)
+            .order_by(Student.position, Student.card_id, Student.id)
         )
         students = result.scalars().all()
 
@@ -1046,7 +1052,10 @@ async def all_students_pdf(session_id: int, user: User = Depends(get_current_use
     students = []
     if session.class_id:
         result = await db.execute(
-            select(Student).where(Student.class_id == session.class_id).order_by(Student.name)
+            # Klassenreihenfolge wie auf dem Bildschirm: position. card_id ist
+            # die Nummer der gedruckten ArUco-Karte, keine Reihenfolge.
+            select(Student).where(Student.class_id == session.class_id)
+            .order_by(Student.position, Student.card_id, Student.id)
         )
         students = [{"card_id": s.card_id, "name": s.name, "niveau": s.niveau or ""} for s in result.scalars().all()]
 
