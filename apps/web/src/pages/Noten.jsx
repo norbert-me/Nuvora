@@ -104,23 +104,11 @@ export default function Noten() {
     return n;
   });
   const [menuSec, setMenuSec] = useState(null);   // Abschnitt mit offenem Menue
-  // Zweite Kopfzeile: klebt um die Hoehe der ersten tiefer (siehe --kopf2).
-  const th2 = { ...th, top: "var(--kopf2, 0px)" };
   // Der Kopf hat ZWEI Zeilen (Abschnitte, dann Spalten). Beide kleben; die
   // zweite braucht die Hoehe der ersten als Abstand, sonst liegen sie
   // uebereinander. Gemessen statt geraten: die erste Zeile ist je nach Inhalt
   // unterschiedlich hoch.
-  const rahmenRef = useRef(null);
-  const kopf1Ref = useRef(null);
-  useLayoutEffect(() => {
-    const zeile = kopf1Ref.current, rahmen = rahmenRef.current;
-    if (!zeile || !rahmen) return undefined;
-    const mess = () => rahmen.style.setProperty("--kopf2", `${Math.round(zeile.getBoundingClientRect().height)}px`);
-    mess();
-    const beob = new ResizeObserver(mess);
-    beob.observe(zeile);
-    return () => beob.disconnect();
-  });
+  const { rahmenRef, kopf1Ref, th2 } = useKlebenderKopf();
   const [dragId, setDragId] = useState(null);
   // Vorschau beim Ziehen: auf welchem Abschnitt, und links oder rechts einfuegen.
   const [dragOver, setDragOver] = useState(null); // { id, side: "left"|"right" }
@@ -1300,6 +1288,32 @@ function CompareModal({ t, cat, onClose }) {
   );
 }
 
+/**
+ * Zweizeiliger Tabellenkopf, der beim Scrollen stehen bleibt.
+ *
+ * `position: sticky` braucht einen Scroll-Container als Bezug — deshalb der
+ * eigene Rahmen. Und die ZWEITE Kopfzeile muss um die Hoehe der ersten tiefer
+ * kleben, sonst liegen beide aufeinander und die erste Datenzeile schiebt sich
+ * darunter. Die Hoehe wird gemessen, nicht geraten: sie haengt am Inhalt.
+ *
+ * Beide Tabellen der Seite (Halbjahr und Jahr) nutzen denselben Haken — die
+ * Jahresansicht hatte den Mechanismus zuerst nicht und sah genau so kaputt aus.
+ */
+function useKlebenderKopf() {
+  const rahmenRef = useRef(null);
+  const kopf1Ref = useRef(null);
+  useLayoutEffect(() => {
+    const zeile = kopf1Ref.current, rahmen = rahmenRef.current;
+    if (!zeile || !rahmen) return undefined;
+    const mess = () => rahmen.style.setProperty("--kopf2", `${Math.round(zeile.getBoundingClientRect().height)}px`);
+    mess();
+    const beob = new ResizeObserver(mess);
+    beob.observe(zeile);
+    return () => beob.disconnect();
+  });
+  return { rahmenRef, kopf1Ref, th2: { ...th, top: "var(--kopf2, 0px)" } };
+}
+
 // Notenverlauf: eine Linie über die Kategorien in Zeitreihenfolge. Deutsche Noten
 // 1 (oben, best) bis 6 (unten). Einzelne Serie -> keine Legende, Titel benennt sie.
 //
@@ -1579,29 +1593,34 @@ function Beobachtungen({ t, student, cats, entries, onClose, onSave, onDelete })
 // und die Jahresnote (Mittel der beiden, per Klick ueberschreibbar).
 function YearTable({ t, data, cls, onSet, onReset, editing, setEditing, onInfo }) {
   const { sections = [], rows = [] } = data || {};
+  // Derselbe Kopf-Mechanismus wie in der Halbjahres-Tabelle: eigener
+  // Scrollrahmen, zweite Kopfzeile klebt um die gemessene Hoehe der ersten
+  // tiefer. Ohne das lagen beide Zeilen aufeinander und die erste Schuelerzeile
+  // schob sich darunter — genau das war in der Jahresansicht zu sehen.
+  const { rahmenRef, kopf1Ref, th2 } = useKlebenderKopf();
   const sec1 = sections.filter((s) => s.term === "1");
   const sec2 = sections.filter((s) => s.term === "2");
   if (rows.length === 0) return <p style={{ fontSize: 13.5, color: "var(--text3)", marginTop: 8 }}>{t("noten.noStudents")}</p>;
   const grp = { ...th, borderLeft: "2px solid var(--border3)", fontSize: 12.5 };
   const secCols = (secs) => secs.map((s, i) => (
-    <th key={s.id} style={{ ...th, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", minWidth: 56, fontWeight: 500 }}>{s.name}</th>
+    <th key={s.id} style={{ ...th2, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", minWidth: 56, fontWeight: 500 }}>{s.name}</th>
   ));
   return (
-    <div style={{ overflowX: "auto", overflowY: "visible", border: "1px solid var(--border)", borderRadius: 12, WebkitOverflowScrolling: "touch" }}>
-      <table style={{ borderCollapse: "collapse", fontSize: 13.5, minWidth: "100%" }}>
+    <div ref={rahmenRef} style={{ overflow: "auto", maxHeight: "calc(100vh - 210px)", border: "1px solid var(--border)", borderRadius: 12, WebkitOverflowScrolling: "touch", "--tabellenkopf-top": "0px" }}>
+      <table style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: 13.5, minWidth: "100%" }}>
         <thead>
-          <tr>
+          <tr ref={kopf1Ref}>
             <th style={{ ...th, ...stickyLh, whiteSpace: "nowrap" }}></th>
             <th colSpan={sec1.length + 1} style={grp}>{t("noten.term1")}</th>
             <th colSpan={sec2.length + 1} style={grp}>{t("noten.term2")}</th>
             <th rowSpan={2} style={{ ...grp, fontWeight: 700 }}>{t("noten.yearGrade")}</th>
           </tr>
           <tr>
-            <th style={{ ...th, ...stickyLh, textAlign: "left" }}>{cls?.name}</th>
+            <th style={{ ...th2, ...stickyLh, textAlign: "left" }}>{cls?.name}</th>
             {secCols(sec1)}
-            <th style={{ ...th, borderLeft: "1px solid var(--border)", fontWeight: 700 }}>{t("noten.termGrade")}</th>
+            <th style={{ ...th2, borderLeft: "1px solid var(--border)", fontWeight: 700 }}>{t("noten.termGrade")}</th>
             {secCols(sec2)}
-            <th style={{ ...th, borderLeft: "1px solid var(--border)", fontWeight: 700 }}>{t("noten.termGrade")}</th>
+            <th style={{ ...th2, borderLeft: "1px solid var(--border)", fontWeight: 700 }}>{t("noten.termGrade")}</th>
           </tr>
         </thead>
         <tbody>
