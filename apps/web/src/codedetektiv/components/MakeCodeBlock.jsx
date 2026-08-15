@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
+import { useCdText } from '../i18n.js';
 
 const stopEvt = e => { e.stopPropagation(); };
 
@@ -217,6 +218,13 @@ export function GhostBlock({ block }) {
   );
 }
 
+// Hinweis im leeren Container — eigene Komponente, weil der Hook nur in einer
+// Komponente stehen darf (die Stelle taucht zweimal auf).
+function LeererContainer() {
+  const { t } = useCdText();
+  return <div style={{ color: '#999', fontSize: 13, padding: '8px 0' }}>{t('cd.bloecke_hierhin', 'Blöcke hierhin ziehen')}</div>;
+}
+
 function ContainerBody({ block, children }) {
   const { setNodeRef } = useDroppable({ id: `dropzone-${block.id}`, data: { containerId: block.id } });
   return (
@@ -253,7 +261,7 @@ export function SortableBlock({ block, onFieldChange, dropTarget, ghostBlock }) 
         </div>
         <ContainerBody block={block}>
           {childNodes.length > 0 ? childNodes : (
-            <div style={{ color: '#999', fontSize: 13, padding: '8px 0' }}>Blöcke hierhin ziehen</div>
+            <LeererContainer />
           )}
         </ContainerBody>
         <div className="mc-block-footer" />
@@ -290,7 +298,7 @@ export function DraggableBlock({ block, onFieldChange }) {
             ? block.children.map(child => (
                 <DraggableBlock key={child.id} block={child} onFieldChange={onFieldChange} />
               ))
-            : <div style={{ color: '#999', fontSize: 13, padding: '8px 0' }}>Blöcke hierhin ziehen</div>
+            : <LeererContainer />
           }
         </ContainerBody>
         <div className="mc-block-footer" />

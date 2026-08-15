@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { IconStar, IconParty } from './Icons';
+import { useCdText } from '../i18n.js';
 
 const DIRECTIONS = {
   right: [0, 1],
@@ -14,6 +15,7 @@ const TURN_LEFT = { right: 'up', up: 'left', left: 'down', down: 'right' };
 const DIR_EMOJI = { right: '▶', down: '▼', left: '◀', up: '▲' };
 
 export function MazeRunner({ maze, commands, running, onFinish }) {
+  const { t } = useCdText();
   const [pos, setPos] = useState(maze.start);
   const [dir, setDir] = useState(maze.direction);
   const [visited, setVisited] = useState([maze.start]);
@@ -44,7 +46,7 @@ export function MazeRunner({ maze, commands, running, onFinish }) {
           setSuccess(true);
           onFinish?.(true);
         } else {
-          setError('Die Figur hat das Ziel nicht erreicht!');
+          setError(t('cd.maze.ziel_verfehlt', 'Die Figur hat das Ziel nicht erreicht!'));
           onFinish?.(false);
         }
         return;
@@ -61,7 +63,7 @@ export function MazeRunner({ maze, commands, running, onFinish }) {
           maze.grid[newRow][newCol] === 1
         ) {
           clearInterval(timerRef.current);
-          setError('Bumm! Gegen die Wand gelaufen!');
+          setError(t('cd.maze.wand', 'Bumm! Gegen die Wand gelaufen!'));
           onFinish?.(false);
           return;
         }
@@ -112,7 +114,7 @@ export function MazeRunner({ maze, commands, running, onFinish }) {
         )}
       </div>
       {error && <div className="feedback-wrong" style={{ marginTop: 12 }}>{error}</div>}
-      {success && <div className="feedback-correct" style={{ marginTop: 12 }}><IconParty size={18} /> Geschafft! Ziel erreicht!</div>}
+      {success && <div className="feedback-correct" style={{ marginTop: 12 }}><IconParty size={18} /> {t('cd.maze.geschafft', 'Geschafft! Ziel erreicht!')}</div>}
     </div>
   );
 }

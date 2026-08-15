@@ -3,8 +3,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCdBase } from '../base.jsx';
 import { useStore } from '../data/store';
 import { IconSearch, IconGamepad, IconPuzzle } from '../components/Icons';
+import { useCdText } from '../i18n.js';
 
 export default function Home() {
+  const { t } = useCdText();
   const navigate = useNavigate();
   const base = useCdBase();
   const [params] = useSearchParams();
@@ -31,7 +33,12 @@ export default function Home() {
     const r = await fetch(`/api/codedetektiv/sessions/${code}/join`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
     }).catch(() => null);
-    if (!r || !r.ok) { setError(r && r.status === 404 ? 'Session nicht gefunden!' : 'Beitreten nicht möglich.'); return; }
+    if (!r || !r.ok) {
+      setError(r && r.status === 404
+        ? t('cd.session.nicht_gefunden', 'Session nicht gefunden.')
+        : t('cd.session.beitritt_fehler', 'Beitreten nicht möglich.'));
+      return;
+    }
     dispatch({ type: 'SET_USER', user: { name, role: 'player' } });
     dispatch({ type: 'SET_CURRENT_SESSION', code });
     navigate(`${base}/play/${code}`);
@@ -41,9 +48,9 @@ export default function Home() {
     <div style={{ minHeight: '68vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: 20, padding: '40px 20px' }}>
       <div style={{ textAlign: 'center', color: '#fff', maxWidth: 500 }}>
         <div style={{ marginBottom: 8 }}><IconSearch size={64} /></div>
-        <h1 style={{ fontSize: 42, fontWeight: 800, marginBottom: 8 }}>Code-Detektiv</h1>
+        <h1 style={{ fontSize: 42, fontWeight: 800, marginBottom: 8 }}>{t('cd.titel', 'Code-Detektiv')}</h1>
         <p style={{ fontSize: 18, opacity: 0.9, marginBottom: 40 }}>
-          Finde die Bugs! Sortiere die Blöcke! Werde Meister-Detektiv!
+          {t('cd.home.claim', 'Finde die Bugs! Sortiere die Blöcke! Werde Meister-Detektiv!')}
         </p>
 
         {isInSession && (
@@ -53,7 +60,7 @@ export default function Home() {
               onClick={() => navigate(`${base}/play/${activeSession.id}`)}
               style={{ background: '#4caf50', color: '#fff', fontSize: 16, padding: '14px 40px', borderRadius: 12, fontWeight: 700, width: 280 }}
             >
-              Zurück zur Session {activeSession.id}
+              {t('cd.home.zurueck_session', 'Zurück zur Session {{code}}', { code: activeSession.id })}
             </button>
           </div>
         )}
@@ -65,21 +72,21 @@ export default function Home() {
               onClick={() => navigate(`${base}/admin`)}
               style={{ background: '#fff', color: '#764ba2', fontSize: 16, padding: '14px 40px', borderRadius: 12, fontWeight: 700, width: 280 }}
             >
-              Admin / Rätsel erstellen
+              {t('cd.home.admin', 'Admin / Rätsel erstellen')}
             </button>
             <button
               className="btn"
               onClick={() => setShowJoin(true)}
               style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: 16, padding: '14px 40px', borderRadius: 12, fontWeight: 700, border: '2px solid rgba(255,255,255,0.4)', width: 280 }}
             >
-              <IconGamepad size={18} /> Rätsel beitreten
+              <IconGamepad size={18} /> {t('cd.home.beitreten', 'Rätsel beitreten')}
             </button>
             <button
               className="btn"
               onClick={() => navigate(`${base}/solo`)}
               style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 16, padding: '14px 40px', borderRadius: 12, fontWeight: 700, border: '2px solid rgba(255,255,255,0.2)', width: 280 }}
             >
-              <IconPuzzle size={18} /> Solo üben
+              <IconPuzzle size={18} /> {t('cd.solo.titel', 'Solo üben')}
             </button>
           </div>
         ) : (
@@ -87,7 +94,7 @@ export default function Home() {
             <div style={{ marginBottom: 12 }}>
               <input
                 type="text"
-                placeholder="Dein Name"
+                placeholder={t('cd.dein_name', 'Dein Name')}
                 value={playerName}
                 onChange={e => setPlayerName(e.target.value)}
                 required
@@ -97,7 +104,7 @@ export default function Home() {
             <div style={{ marginBottom: 16 }}>
               <input
                 type="text"
-                placeholder="Session-Code (z.B. A3F2K1)"
+                placeholder={t('cd.home.code_platzhalter', 'Session-Code (z.B. A3F2K1)')}
                 value={joinCode}
                 onChange={e => { setJoinCode(e.target.value.toUpperCase()); setError(''); }}
                 required
@@ -112,10 +119,10 @@ export default function Home() {
             )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="button" className="btn" onClick={() => { setShowJoin(false); setError(''); }} style={{ flex: 1, background: 'rgba(255,255,255,0.2)', color: '#fff', borderRadius: 8, border: 'none', padding: '12px' }}>
-                Zurück
+                {t('cd.zurueck', 'Zurück')}
               </button>
               <button type="submit" className="btn btn-primary" style={{ flex: 2, borderRadius: 8, padding: '12px', fontSize: 16 }}>
-                Beitreten →
+                {t('cd.beitreten', 'Beitreten')} →
               </button>
             </div>
           </form>

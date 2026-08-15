@@ -22,6 +22,7 @@ import {
   IconSearch, IconBulb, IconCheck, IconX, IconClock, IconPlay,
   IconReset, IconBack, IconChevronLeft, IconChevronRight, IconParty, IconUndo,
 } from '../components/Icons';
+import { useCdText } from '../i18n.js';
 
 const SHOW_SOLUTION_AFTER = 5;
 const SNAP_DISTANCE = 60;
@@ -101,15 +102,17 @@ function DroppableSolutionArea({ children }) {
 }
 
 function DroppableToolboxReturn({ active }) {
+  const { t } = useCdText();
   const { setNodeRef, isOver } = useDroppable({ id: 'toolbox-return' });
   return (
     <div ref={setNodeRef} className={`toolbox-return-zone ${active ? 'active' : ''} ${isOver ? 'over' : ''}`}>
-      {active ? <><IconUndo size={14} /> Block entfernen</> : ''}
+      {active ? <><IconUndo size={14} /> {t('cd.block_entfernen', 'Block entfernen')}</> : ''}
     </div>
   );
 }
 
 export default function PuzzlePage() {
+  const { t } = useCdText();
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('session');
@@ -324,7 +327,7 @@ export default function PuzzlePage() {
     });
   }
 
-  if (!puzzle) return <div className="page-container">Rätsel nicht gefunden.</div>;
+  if (!puzzle) return <div className="page-container">{t('cd.raetsel_fehlt', 'Rätsel nicht gefunden.')}</div>;
 
   // ── Field changes (stacks or maze) ──
 
@@ -717,7 +720,7 @@ export default function PuzzlePage() {
       {countdown !== null && (
         <div className="countdown-overlay">
           <div className="countdown-number" key={countdown}>
-            {countdown > 0 ? countdown : 'Los!'}
+            {countdown > 0 ? countdown : t('cd.los', 'Los!')}
           </div>
         </div>
       )}
@@ -727,7 +730,7 @@ export default function PuzzlePage() {
           {hasTimeLimit
             ? <Timer seconds={puzzle.timeLimit} running={timerRunning} onTimeUp={handleTimeUp} />
             : <Timer seconds={0} running={timerRunning} countUp />}
-          {isSolo && <button className="btn btn-outline" onClick={() => navigate(-1)}><IconBack size={14} /> Zurück</button>}
+          {isSolo && <button className="btn btn-outline" onClick={() => navigate(-1)}><IconBack size={14} /> {t('cd.zurueck', 'Zurück')}</button>}
         </div>
       </div>
 
@@ -745,10 +748,10 @@ export default function PuzzlePage() {
             {toolboxOpen && (
               <div className="block-toolbox">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ margin: 0 }}>Verfügbare Blöcke</h3>
+                  <h3 style={{ margin: 0 }}>{t('cd.puzzle.verfuegbare_bloecke', 'Verfügbare Blöcke')}</h3>
                   <button onClick={() => setToolboxOpen(false)}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#888' }}
-                    title="Toolbox ausblenden"><IconChevronLeft size={14} /></button>
+                    title={t('cd.puzzle.toolbox_zu', 'Toolbox ausblenden')}><IconChevronLeft size={14} /></button>
                 </div>
                 {isMaze ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
@@ -775,7 +778,7 @@ export default function PuzzlePage() {
               {!toolboxOpen && (
                 <button className="btn btn-outline" onClick={() => setToolboxOpen(true)}
                   style={{ alignSelf: 'flex-start', padding: '4px 12px', fontSize: 12 }}>
-                  <IconChevronRight size={12} /> Blöcke anzeigen
+                  <IconChevronRight size={12} /> {t('cd.puzzle.bloecke_zeigen', 'Blöcke anzeigen')}
                 </button>
               )}
 
@@ -787,7 +790,10 @@ export default function PuzzlePage() {
 
               <div className="solution-area">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
-                  <h3 style={{ margin: 0 }}>Deine Lösung {totalBlockCount > 0 && `(${totalBlockCount} Blöcke)`}</h3>
+                  <h3 style={{ margin: 0 }}>
+                    {t('cd.puzzle.deine_loesung', 'Deine Lösung')}
+                    {totalBlockCount > 0 && ` ${t('cd.bloecke_zahl', '({{n}} Blöcke)', { n: totalBlockCount })}`}
+                  </h3>
                   {!isMaze && (
                     <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                       <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: 12 }}
@@ -796,7 +802,7 @@ export default function PuzzlePage() {
                       <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: 12 }}
                         onClick={() => setZoom(z => Math.max(0.25, z - 0.2))}>-</button>
                       <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: 12, marginLeft: 4 }}
-                        onClick={fitAll}>Alles zeigen</button>
+                        onClick={fitAll}>{t('cd.puzzle.alles_zeigen', 'Alles zeigen')}</button>
                     </div>
                   )}
                 </div>
@@ -808,7 +814,7 @@ export default function PuzzlePage() {
                       {(() => {
                         const ghostAt = activeBlock && dropTarget && dropTarget.parentId == null ? dropTarget.index : null;
                         if (mazeSolutionBlocks.length === 0 && ghostAt == null) {
-                          return <div className="drop-zone">Ziehe Blöcke von links hierhin</div>;
+                          return <div className="drop-zone">{t('cd.puzzle.ziehen_links', 'Ziehe Blöcke von links hierhin')}</div>;
                         }
                         const nodes = mazeSolutionBlocks.map(block => (
                           <SortableBlock key={block.id} block={block}
@@ -847,7 +853,7 @@ export default function PuzzlePage() {
                             position: 'absolute', top: '50%', left: '50%',
                             transform: 'translate(-50%, -50%)',
                             color: '#aaa', fontSize: 14, pointerEvents: 'none',
-                          }}>Blöcke hierhin ziehen</div>
+                          }}>{t('cd.bloecke_hierhin', 'Blöcke hierhin ziehen')}</div>
                         )}
                         {stacks.map(stack => (
                           <StackZone key={stack.id} stack={stack}>
@@ -865,47 +871,49 @@ export default function PuzzlePage() {
                 <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
                   <button className="btn btn-success" onClick={checkSolution}
                     disabled={totalBlockCount === 0 || solved || mazeRunning}>
-                    {isMaze ? <><IconPlay size={14} /> Ausführen</> : <><IconCheck size={14} /> Prüfen</>}
+                    {isMaze ? <><IconPlay size={14} /> {t('cd.puzzle.ausfuehren', 'Ausführen')}</> : <><IconCheck size={14} /> {t('cd.puzzle.pruefen', 'Prüfen')}</>}
                   </button>
                   <button className="btn btn-outline" onClick={reset} disabled={solved || mazeRunning}>
-                    <IconReset size={14} /> Zurücksetzen
+                    <IconReset size={14} /> {t('cd.puzzle.zuruecksetzen', 'Zurücksetzen')}
                   </button>
                   {solved && isSolo && (
-                    <button className="btn btn-primary" onClick={() => navigate(`${base}/solo`)}>Nächstes Rätsel →</button>
+                    <button className="btn btn-primary" onClick={() => navigate(`${base}/solo`)}>{t('cd.puzzle.naechstes_raetsel', 'Nächstes Rätsel')} →</button>
                   )}
                   {solved && sessionId && (
-                    <button className="btn btn-primary" onClick={() => navigate(`${base}/play/${sessionId}`)}>Zurück zur Session →</button>
+                    <button className="btn btn-primary" onClick={() => navigate(`${base}/play/${sessionId}`)}>{t('cd.puzzle.zurueck_session', 'Zurück zur Session')} →</button>
                   )}
                   {feedback === 'timeout' && sessionId && (
-                    <button className="btn btn-primary" onClick={() => navigate(`${base}/play/${sessionId}`)}>Zurück zur Session →</button>
+                    <button className="btn btn-primary" onClick={() => navigate(`${base}/play/${sessionId}`)}>{t('cd.puzzle.zurueck_session', 'Zurück zur Session')} →</button>
                   )}
                 </div>
 
                 {feedback === 'correct' && (
                   <div className="feedback-correct" style={{ marginTop: 16 }}>
-                    <IconParty size={20} /> Richtig!
+                    <IconParty size={20} /> {t('cd.puzzle.richtig', 'Richtig!')}
                     <div className="feedback-stats">
-                      <span><IconClock size={14} /> Zeit: {formatTime(elapsed)}</span>
-                      <span><IconReset size={14} /> {attempts} {attempts === 1 ? 'Versuch' : 'Versuche'}</span>
+                      <span><IconClock size={14} /> {t('cd.zeit', 'Zeit')}: {formatTime(elapsed)}</span>
+                      <span><IconReset size={14} /> {attempts} {attempts === 1 ? t('cd.versuch', 'Versuch') : t('cd.versuche', 'Versuche')}</span>
                     </div>
                   </div>
                 )}
                 {feedback === 'wrong' && (
                   <div className="feedback-wrong" style={{ marginTop: 16 }}>
-                    <IconX size={16} /> Noch nicht richtig. Versuch es nochmal!
+                    <IconX size={16} /> {t('cd.puzzle.falsch', 'Noch nicht richtig. Versuch es nochmal!')}
                     {isSolo && !showSolution && attempts >= 3 && (
                       <div style={{ fontSize: 12, marginTop: 4, fontWeight: 400 }}>
-                        Noch {SHOW_SOLUTION_AFTER - attempts} {SHOW_SOLUTION_AFTER - attempts === 1 ? 'Versuch' : 'Versuche'} bis zur Lösung
+                        {SHOW_SOLUTION_AFTER - attempts === 1
+                          ? t('cd.puzzle.noch_ein_versuch', 'Noch 1 Versuch bis zur Lösung')
+                          : t('cd.puzzle.noch_versuche', 'Noch {{n}} Versuche bis zur Lösung', { n: SHOW_SOLUTION_AFTER - attempts })}
                       </div>
                     )}
                   </div>
                 )}
                 {feedback === 'timeout' && (
-                  <div className="feedback-wrong" style={{ marginTop: 16 }}><IconClock size={16} /> Zeit abgelaufen!</div>
+                  <div className="feedback-wrong" style={{ marginTop: 16 }}><IconClock size={16} /> {t('cd.puzzle.zeit_um', 'Zeit abgelaufen!')}</div>
                 )}
                 {showSolution && isSolo && (
                   <div className="solution-reveal">
-                    <h4><IconBulb size={16} /> Lösung:</h4>
+                    <h4><IconBulb size={16} /> {t('cd.puzzle.loesung', 'Lösung')}:</h4>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       {puzzle.solution.map(block => <StaticBlock key={block.id} block={block} />)}
                     </div>

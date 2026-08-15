@@ -15,6 +15,7 @@ import {
   CollapsibleCategory,
 } from '../components/MakeCodeBlock';
 import { importPuzzleFromHex } from '../data/makecodeImport';
+import { useCdText } from '../i18n.js';
 
 function groupByCategory(templates) {
   const groups = {};
@@ -59,10 +60,11 @@ function StackZone({ stack, children }) {
 }
 
 function DroppableReturnZone({ active }) {
+  const { t } = useCdText();
   const { setNodeRef, isOver } = useDroppable({ id: 'editor-return' });
   return (
     <div ref={setNodeRef} className={`toolbox-return-zone ${active ? 'active' : ''} ${isOver ? 'over' : ''}`}>
-      {active ? <><IconUndo size={14} /> Block entfernen</> : ''}
+      {active ? <><IconUndo size={14} /> {t('cd.block_entfernen', 'Block entfernen')}</> : ''}
     </div>
   );
 }
@@ -89,6 +91,7 @@ function editorCollision(args) {
 }
 
 export default function Admin() {
+  const { t } = useCdText();
   const navigate = useNavigate();
   const base = useCdBase();
   const { state, dispatch } = useStore();
@@ -203,17 +206,18 @@ export default function Admin() {
     setImporting(true);
     try {
       const text = await file.text();
-      const { title: t, solution } = await importPuzzleFromHex(text);
-      setTitle(t);
+      const { title: titelNeu, solution } = await importPuzzleFromHex(text);
+      setTitle(titelNeu);
       setType('sort');
       setStacks([{
         id: `stk-import-${Date.now()}`,
         x: 50, y: 50,
         blocks: solution,
       }]);
-      setImportInfo(`Importiert: "${t}" (${solution.length} Blöcke aus ${file.name})`);
+      setImportInfo(t('cd.admin.import_ok', 'Importiert: "{{titel}}" ({{n}} Blöcke aus {{datei}})',
+        { titel: titelNeu, n: solution.length, datei: file.name }));
     } catch (err) {
-      setImportError(err.message || 'Import fehlgeschlagen.');
+      setImportError(err.message || t('cd.admin.import_fehler', 'Import fehlgeschlagen.'));
     } finally {
       setImporting(false);
     }
@@ -254,7 +258,7 @@ export default function Admin() {
     const sorted = [...stacks].sort((a, b) => a.x - b.x || a.y - b.y);
     const allBlocks = sorted.flatMap(s => s.blocks);
     if (!title.trim() || allBlocks.length === 0) {
-      alert('Titel und mindestens ein Block sind nötig!');
+      alert(t('cd.admin.fehlt_titel', 'Titel und mindestens ein Block sind nötig!'));
       return;
     }
     const strip = b => {
@@ -276,7 +280,9 @@ export default function Admin() {
       distractors: allBlocks.filter(b => b.isDistractor).map(strip),
     };
     dispatch({ type: editingPuzzleId ? 'UPDATE_PUZZLE' : 'ADD_PUZZLE', puzzle });
-    alert(editingPuzzleId ? 'Rätsel aktualisiert!' : 'Rätsel gespeichert!');
+    alert(editingPuzzleId
+      ? t('cd.admin.aktualisiert', 'Rätsel aktualisiert!')
+      : t('cd.admin.gespeichert', 'Rätsel gespeichert!'));
     setEditingPuzzleId(null);
     setTitle('');
     setTopicId('');
@@ -499,7 +505,7 @@ export default function Admin() {
 
   function createSession() {
     if (selectedPuzzles.length === 0) {
-      alert('Wähle mindestens ein Rätsel aus!');
+      alert(t('cd.admin.waehle_raetsel', 'Wähle mindestens ein Rätsel aus!'));
       return;
     }
     dispatch({ type: 'CREATE_SESSION', puzzleIds: selectedPuzzles });
@@ -515,7 +521,7 @@ export default function Admin() {
       <div className="page-container" style={{ maxWidth: '100%' }}>
         {activeSessions.length > 0 && (
           <div style={{ marginBottom: 32 }}>
-            <h2 style={{ marginBottom: 16 }}>Aktive Sessions</h2>
+            <h2 style={{ marginBottom: 16 }}>{t('cd.admin.aktive_sessions', 'Aktive Sessions')}</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {activeSessions.map(session => {
                 const currentPuzzle = state.puzzles.find(p => p.id === session.puzzleIds[session.currentPuzzleIndex]);
@@ -524,42 +530,42 @@ export default function Admin() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                       <div>
                         <h3 style={{ fontSize: 18 }}>
-                          Session: <span style={{ color: '#1e90ff', letterSpacing: 2 }}>{session.id}</span>
+                          {t('cd.session', 'Session')}: <span style={{ color: '#1e90ff', letterSpacing: 2 }}>{session.id}</span>
                         </h3>
                         <p style={{ fontSize: 13, color: '#888' }}>
-                          {session.puzzleIds.length} Rätsel, Runde {session.currentPuzzleIndex + 1}/{session.puzzleIds.length}
+                          {t('cd.admin.session_stand', '{{n}} Rätsel, Runde {{runde}}/{{gesamt}}', { n: session.puzzleIds.length, runde: session.currentPuzzleIndex + 1, gesamt: session.puzzleIds.length })}
                           {currentPuzzle && ` - ${currentPuzzle.title}`}
                         </p>
                         <p style={{ fontSize: 12.5, color: '#555', marginTop: 4 }}>
-                          Beitreten (Schüler, ohne Login): <strong>{window.location.origin}/cd/{session.id}</strong>
+                          {t('cd.admin.beitritt_link', 'Beitreten (Schüler, ohne Login):')} <strong>{window.location.origin}/cd/{session.id}</strong>
                         </p>
                       </div>
                       <div style={{ display: 'flex', gap: 8 }}>
                         {!session.started && (
                           <button className="btn btn-success"
                             onClick={() => dispatch({ type: 'START_SESSION', sessionId: session.id })}>
-                            Starten
+                            {t('cd.admin.starten', 'Starten')}
                           </button>
                         )}
                         <button className="btn btn-primary" onClick={() => navigate(`${base}/play/${session.id}`)}>
-                          Ansehen
+                          {t('cd.admin.ansehen', 'Ansehen')}
                         </button>
                         <button className="btn btn-danger" onClick={() => {
-                          if (confirm('Session wirklich beenden?')) dispatch({ type: 'END_SESSION', sessionId: session.id });
+                          if (confirm(t('cd.admin.beenden_frage', 'Session wirklich beenden?'))) dispatch({ type: 'END_SESSION', sessionId: session.id });
                         }}>
-                          Beenden
+                          {t('cd.admin.beenden', 'Beenden')}
                         </button>
                       </div>
                     </div>
                     <div style={{ background: '#f9f9f9', borderRadius: 8, padding: 12 }}>
-                      <h4 style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>Spieler ({session.players.length})</h4>
-                      {session.players.length === 0 && <p style={{ color: '#ccc', fontSize: 13 }}>Noch keine Spieler</p>}
+                      <h4 style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>{t('cd.spieler_n', 'Spieler ({{n}})', { n: session.players.length })}</h4>
+                      {session.players.length === 0 && <p style={{ color: '#ccc', fontSize: 13 }}>{t('cd.admin.keine_spieler', 'Noch keine Spieler')}</p>}
                       {session.players.map(p => (
                         <div key={p.name} className="player-list-item">
                           <span style={{ fontSize: 14 }}>{p.name}</span>
                           <button className="btn btn-danger" style={{ fontSize: 11, padding: '2px 8px' }}
                             onClick={() => dispatch({ type: 'REMOVE_PLAYER', sessionId: session.id, playerName: p.name })}>
-                            Entfernen
+                            {t('cd.admin.entfernen', 'Entfernen')}
                           </button>
                         </div>
                       ))}
@@ -574,72 +580,74 @@ export default function Admin() {
         {/* Puzzle Editor */}
         <div style={{ marginBottom: 32 }}>
           <h2 style={{ marginBottom: 16 }}>
-            {editingPuzzleId && 'Rätsel bearbeiten'}
+            {editingPuzzleId && t('cd.admin.bearbeiten_titel', 'Rätsel bearbeiten')}
             {editingPuzzleId && (
-              <button className="btn btn-outline" onClick={cancelEdit} style={{ marginLeft: 12, fontSize: 12 }}>Abbrechen</button>
+              <button className="btn btn-outline" onClick={cancelEdit} style={{ marginLeft: 12, fontSize: 12 }}>{t('cd.abbrechen', 'Abbrechen')}</button>
             )}
           </h2>
 
           <div className="admin-form" style={{ marginBottom: 16 }}>
             <div className="form-group">
-              <label>MakeCode .hex importieren</label>
+              <label>{t('cd.admin.hex_label', 'MakeCode .hex importieren')}</label>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input type="file" accept=".hex" onChange={handleImportHex} disabled={importing} />
                 {blockCount > 0 && (
                   <button type="button" className="btn btn-outline" style={{ fontSize: 12, padding: '4px 10px' }}
-                    onClick={() => { setStacks([]); setImportInfo(''); }}>Leeren</button>
+                    onClick={() => { setStacks([]); setImportInfo(''); }}>{t('cd.admin.leeren', 'Leeren')}</button>
                 )}
               </div>
               <p style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
-                {importing ? 'Importiere...' : 'Blöcke aus einer MakeCode/Calliope-Datei laden.'}
+                {importing
+                  ? t('cd.admin.importiert_gerade', 'Importiere...')
+                  : t('cd.admin.hex_hinweis', 'Blöcke aus einer MakeCode/Calliope-Datei laden.')}
               </p>
               {importInfo && <p style={{ fontSize: 12, color: '#2e7d32', marginTop: 4 }}>{importInfo}</p>}
               {importError && <p style={{ fontSize: 12, color: '#f44336', marginTop: 4 }}>{importError}</p>}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 3fr', gap: 12 }}>
               <div className="form-group">
-                <label>Titel</label>
-                <input value={title} onChange={e => setTitle(e.target.value)} placeholder="z.B. LED blinken lassen" />
+                <label>{t('cd.admin.titel', 'Titel')}</label>
+                <input value={title} onChange={e => setTitle(e.target.value)} placeholder={t('cd.admin.titel_platzhalter', 'z.B. LED blinken lassen')} />
               </div>
               <div className="form-group">
-                <label>Beschreibung / Aufgabe</label>
-                <input value={description} onChange={e => setDescription(e.target.value)} placeholder="Was sollen die SuS tun?" />
+                <label>{t('cd.admin.beschreibung', 'Beschreibung / Aufgabe')}</label>
+                <input value={description} onChange={e => setDescription(e.target.value)} placeholder={t('cd.admin.beschreibung_platzhalter', 'Was sollen die SuS tun?')} />
               </div>
             </div>
             <div className="form-group">
-              <label>Thema (Nuvora) — optional</label>
+              <label>{t('cd.admin.thema', 'Thema (Nuvora) — optional')}</label>
               <select value={topicId} onChange={e => setTopicId(e.target.value)}>
-                <option value="">– kein Thema –</option>
+                <option value="">{t('cd.admin.kein_thema', '– kein Thema –')}</option>
                 {themen.geordnet.map(tp => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
               </select>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 2fr', gap: 12 }}>
               <div className="form-group">
-                <label>Typ</label>
+                <label>{t('cd.admin.typ', 'Typ')}</label>
                 <select value={type} onChange={e => setType(e.target.value)}>
-                  <option value="sort">Sortieren</option>
-                  <option value="maze">Labyrinth</option>
+                  <option value="sort">{t('cd.typ.sortieren', 'Sortieren')}</option>
+                  <option value="maze">{t('cd.typ.labyrinth', 'Labyrinth')}</option>
                 </select>
               </div>
               <div className="form-group">
-                <label>Schwierigkeit</label>
+                <label>{t('cd.admin.schwierigkeit', 'Schwierigkeit')}</label>
                 <select value={difficulty} onChange={e => setDifficulty(Number(e.target.value))}>
-                  <option value={1}>Leicht</option>
-                  <option value={2}>Mittel</option>
-                  <option value={3}>Schwer</option>
+                  <option value={1}>{t('cd.admin.leicht', 'Leicht')}</option>
+                  <option value={2}>{t('cd.admin.mittel', 'Mittel')}</option>
+                  <option value={3}>{t('cd.admin.schwer', 'Schwer')}</option>
                 </select>
               </div>
               <div className="form-group">
-                <label>Zeitlimit (Sek.)</label>
+                <label>{t('cd.admin.zeitlimit', 'Zeitlimit (Sek.)')}</label>
                 <input type="number" value={timeLimit} onChange={e => setTimeLimit(Number(e.target.value))} min={30} step={30} />
               </div>
               <div className="form-group">
-                <label>Angezeigte Bausteine</label>
+                <label>{t('cd.admin.bausteine', 'Angezeigte Bausteine')}</label>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <select value={distractorMode} onChange={e => setDistractorMode(e.target.value)} style={{ flex: 1 }}>
-                    <option value="none">Nur benötigte</option>
-                    <option value="percent">Benötigte + Störer</option>
-                    <option value="all">Alle Bausteine</option>
+                    <option value="none">{t('cd.admin.nur_noetig', 'Nur benötigte')}</option>
+                    <option value="percent">{t('cd.admin.mit_stoerern', 'Benötigte + Störer')}</option>
+                    <option value="all">{t('cd.admin.alle_bausteine', 'Alle Bausteine')}</option>
                   </select>
                   {distractorMode === 'percent' && (
                     <span style={{ display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
@@ -662,7 +670,7 @@ export default function Admin() {
               {toolboxOpen && (
                 <div className="block-toolbox">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3>Block-Vorlagen</h3>
+                    <h3>{t('cd.admin.vorlagen', 'Block-Vorlagen')}</h3>
                     <button className="btn btn-outline" style={{ padding: '2px 6px', fontSize: 11 }}
                       onClick={() => setToolboxOpen(false)}><IconChevronLeft size={12} /></button>
                   </div>
@@ -683,11 +691,12 @@ export default function Admin() {
                     {!toolboxOpen && (
                       <button className="btn btn-outline" style={{ padding: '4px 8px', fontSize: 12 }}
                         onClick={() => setToolboxOpen(true)}>
-                        <IconChevronRight size={12} /> Bausteine
+                        <IconChevronRight size={12} /> {t('cd.admin.bausteine_kurz', 'Bausteine')}
                       </button>
                     )}
                     <h3 style={{ margin: 0 }}>
-                      Lösung {blockCount > 0 && `(${blockCount} Blöcke)`}
+                      {t('cd.admin.loesung', 'Lösung')}
+                      {blockCount > 0 && ` ${t('cd.bloecke_zahl', '({{n}} Blöcke)', { n: blockCount })}`}
                     </h3>
                   </div>
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
@@ -724,7 +733,7 @@ export default function Admin() {
                           position: 'absolute', top: '50%', left: '50%',
                           transform: 'translate(-50%, -50%)',
                           color: '#aaa', fontSize: 14, pointerEvents: 'none',
-                        }}>Blöcke von links hierhin ziehen</div>
+                        }}>{t('cd.admin.ziehen_hinweis', 'Blöcke von links hierhin ziehen')}</div>
                       )}
                       {stacks.map(stack => (
                         <StackZone key={stack.id} stack={stack}>
@@ -740,7 +749,9 @@ export default function Admin() {
                 </div>
 
                 <button className="btn btn-success" onClick={savePuzzle} style={{ width: '100%', marginTop: 16 }}>
-                  {editingPuzzleId ? 'Änderungen speichern' : 'Rätsel speichern'}
+                  {editingPuzzleId
+                    ? t('cd.admin.speichern_aenderung', 'Änderungen speichern')
+                    : t('cd.admin.speichern', 'Rätsel speichern')}
                 </button>
               </div>
             </div>
@@ -757,9 +768,9 @@ export default function Admin() {
         {/* Session + Puzzle List */}
         <div className="cd-zweispaltig" style={{ display: 'grid', gap: 24, alignItems: 'start' }}>
           <div>
-            <h2 style={{ marginBottom: 16 }}>Session erstellen</h2>
+            <h2 style={{ marginBottom: 16 }}>{t('cd.admin.session_erstellen', 'Session erstellen')}</h2>
             <div style={{ background: '#fff', borderRadius: 8, border: '1px solid #e0e0e0', padding: 20 }}>
-              <p style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>Wähle Rätsel für die Session aus:</p>
+              <p style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>{t('cd.admin.session_auswahl', 'Wähle Rätsel für die Session aus:')}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
                 {state.puzzles.map(puzzle => (
                   <label key={puzzle.id} style={{
@@ -773,7 +784,7 @@ export default function Admin() {
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>{puzzle.title}</div>
                       <div style={{ fontSize: 12, color: '#888' }}>
-                        {puzzle.type === 'maze' ? 'Labyrinth' : 'Sortieren'}
+                        {puzzle.type === 'maze' ? t('cd.typ.labyrinth', 'Labyrinth') : t('cd.typ.sortieren', 'Sortieren')}
                       </div>
                     </div>
                     {selectedPuzzles.includes(puzzle.id) && (
@@ -786,13 +797,13 @@ export default function Admin() {
               </div>
               <button className="btn btn-primary" onClick={createSession}
                 disabled={selectedPuzzles.length === 0} style={{ width: '100%' }}>
-                Session erstellen ({selectedPuzzles.length} Rätsel)
+                {t('cd.admin.session_erstellen_n', 'Session erstellen ({{n}} Rätsel)', { n: selectedPuzzles.length })}
               </button>
             </div>
           </div>
 
           <div>
-            <h2 style={{ marginBottom: 16 }}>Vorhandene Rätsel</h2>
+            <h2 style={{ marginBottom: 16 }}>{t('cd.admin.vorhandene', 'Vorhandene Rätsel')}</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {state.puzzles.map(puzzle => (
                 <div key={puzzle.id} className="puzzle-card" onClick={() => navigate(`${base}/puzzle/${puzzle.id}?mode=solo`)}>
@@ -802,7 +813,7 @@ export default function Admin() {
                       <p style={{ fontSize: 13, color: '#666', marginTop: 4 }}>{puzzle.description}</p>
                       <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
                         <span className="cat-badge" style={{ background: puzzle.type === 'maze' ? CATEGORIES.movement.color : CATEGORIES.basic.color }}>
-                          {puzzle.type === 'maze' ? 'Labyrinth' : 'Sortieren'}
+                          {puzzle.type === 'maze' ? t('cd.typ.labyrinth', 'Labyrinth') : t('cd.typ.sortieren', 'Sortieren')}
                         </span>
                       </div>
                     </div>
@@ -810,21 +821,21 @@ export default function Admin() {
                       <button className="btn btn-outline"
                         onClick={e => { e.stopPropagation(); navigate(`${base}/puzzle/${puzzle.id}?mode=solo`); }}
                         style={{ fontSize: 12, padding: '6px 12px' }}>
-                        Vorschau
+                        {t('cd.admin.vorschau', 'Vorschau')}
                       </button>
                       <button className="btn btn-primary"
                         onClick={e => { e.stopPropagation(); editPuzzle(puzzle); }}
                         style={{ fontSize: 12, padding: '6px 12px' }}>
-                        Bearbeiten
+                        {t('cd.admin.bearbeiten', 'Bearbeiten')}
                       </button>
                       {puzzle.id.startsWith('custom-') && (
                         <button className="btn btn-danger"
                           onClick={e => {
                             e.stopPropagation();
-                            if (confirm('Rätsel wirklich löschen?')) dispatch({ type: 'DELETE_PUZZLE', puzzleId: puzzle.id });
+                            if (confirm(t('cd.admin.loeschen_frage', 'Rätsel wirklich löschen?'))) dispatch({ type: 'DELETE_PUZZLE', puzzleId: puzzle.id });
                           }}
                           style={{ fontSize: 12, padding: '6px 12px' }}>
-                          Löschen
+                          {t('cd.admin.loeschen', 'Löschen')}
                         </button>
                       )}
                     </div>

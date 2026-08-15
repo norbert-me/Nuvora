@@ -6,8 +6,10 @@ import {
   IconX, IconTrophy, IconHourglass, IconPuzzle, IconPlay,
   IconCheckCircle, IconClock, IconBack,
 } from '../components/Icons';
+import { useCdText } from '../i18n.js';
 
 export default function PlaySession() {
+  const { t } = useCdText();
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const base = useCdBase();
@@ -53,11 +55,11 @@ export default function PlaySession() {
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f5' }}>
         <div style={{ textAlign: 'center', maxWidth: 400 }}>
           <div style={{ marginBottom: 16 }}><IconX size={48} /></div>
-          <h2 style={{ marginBottom: 8 }}>Session nicht gefunden</h2>
+          <h2 style={{ marginBottom: 8 }}>{t('cd.session.nicht_gefunden_kurz', 'Session nicht gefunden')}</h2>
           <p style={{ color: '#666', marginBottom: 24 }}>
-            Der Code <strong>{sessionId}</strong> existiert nicht.
+            {t('cd.session.code_unbekannt', 'Der Code {{code}} existiert nicht.', { code: sessionId })}
           </p>
-          <button className="btn btn-primary" onClick={() => navigate(base)}><IconBack size={14} /> Zurück zur Startseite</button>
+          <button className="btn btn-primary" onClick={() => navigate(base)}><IconBack size={14} /> {t('cd.zur_startseite', 'Zurück zur Startseite')}</button>
         </div>
       </div>
     );
@@ -69,12 +71,12 @@ export default function PlaySession() {
         <div style={{ maxWidth: 600, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
             <IconTrophy size={64} />
-            <h1 style={{ fontSize: 28, marginTop: 8 }}>Endergebnis</h1>
-            <p style={{ color: '#666' }}>Session {session.id}</p>
+            <h1 style={{ fontSize: 28, marginTop: 8 }}>{t('cd.play.endergebnis', 'Endergebnis')}</h1>
+            <p style={{ color: '#666' }}>{t('cd.session', 'Session')} {session.id}</p>
           </div>
-          <Scoreboard scores={totalScores} label="Gesamtpunkte" showTotal />
+          <Scoreboard scores={totalScores} label={t('cd.play.gesamtpunkte', 'Gesamtpunkte')} showTotal t={t} />
           <div style={{ textAlign: 'center', marginTop: 24 }}>
-            <button className="btn btn-primary" onClick={() => navigate(base)}><IconBack size={14} /> Zurück zur Startseite</button>
+            <button className="btn btn-primary" onClick={() => navigate(base)}><IconBack size={14} /> {t('cd.zur_startseite', 'Zurück zur Startseite')}</button>
           </div>
         </div>
       </div>
@@ -86,25 +88,25 @@ export default function PlaySession() {
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f5' }}>
         <div style={{ textAlign: 'center', maxWidth: 450 }}>
           <div style={{ marginBottom: 16 }}><IconHourglass size={48} /></div>
-          <h2 style={{ marginBottom: 8 }}>Warte auf Start...</h2>
+          <h2 style={{ marginBottom: 8 }}>{t('cd.play.warte_start', 'Warte auf Start...')}</h2>
           <p style={{ color: '#666', marginBottom: 8 }}>
-            Session <strong>{session.id}</strong>
+            {t('cd.session', 'Session')} <strong>{session.id}</strong>
           </p>
           <p style={{ color: '#888', fontSize: 13, marginBottom: 24 }}>
-            {session.puzzleIds.length} Rätsel in dieser Session
+            {t('cd.play.raetsel_anzahl', '{{n}} Rätsel in dieser Session', { n: session.puzzleIds.length })}
           </p>
           <div style={{ background: '#fff', borderRadius: 12, padding: 20, border: '1px solid #e0e0e0', textAlign: 'left' }}>
-            <h3 style={{ fontSize: 14, color: '#888', marginBottom: 12 }}>Spieler ({session.players.length})</h3>
+            <h3 style={{ fontSize: 14, color: '#888', marginBottom: 12 }}>{t('cd.spieler_n', 'Spieler ({{n}})', { n: session.players.length })}</h3>
             {session.players.length === 0 && (
-              <p style={{ color: '#aaa', fontSize: 13 }}>Noch keine Spieler beigetreten</p>
+              <p style={{ color: '#aaa', fontSize: 13 }}>{t('cd.play.keine_spieler', 'Noch keine Spieler beigetreten')}</p>
             )}
             {session.players.map((p, i) => (
               <div key={i} style={{ padding: '8px 0', borderBottom: i < session.players.length - 1 ? '1px solid #f0f0f0' : 'none', fontSize: 15 }}>
-                {p.name} {p.name === playerName && <span style={{ color: '#1e90ff' }}>(Du)</span>}
+                {p.name} {p.name === playerName && <span style={{ color: '#1e90ff' }}>{t('cd.play.du', '(Du)')}</span>}
               </div>
             ))}
           </div>
-          <p style={{ marginTop: 16, fontSize: 13, color: '#999' }}>Der Admin startet das Rätsel gleich...</p>
+          <p style={{ marginTop: 16, fontSize: 13, color: '#999' }}>{t('cd.play.admin_startet', 'Der Admin startet das Rätsel gleich...')}</p>
         </div>
       </div>
     );
@@ -115,9 +117,9 @@ export default function PlaySession() {
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f5' }}>
         <div style={{ textAlign: 'center', maxWidth: 400 }}>
           <div style={{ marginBottom: 16 }}><IconX size={48} /></div>
-          <h2 style={{ marginBottom: 8 }}>Session läuft bereits</h2>
-          <p style={{ color: '#666', marginBottom: 24 }}>Du kannst dieser Session nicht mehr beitreten.</p>
-          <button className="btn btn-primary" onClick={() => navigate(base)}><IconBack size={14} /> Zurück zur Startseite</button>
+          <h2 style={{ marginBottom: 8 }}>{t('cd.play.laeuft', 'Session läuft bereits')}</h2>
+          <p style={{ color: '#666', marginBottom: 24 }}>{t('cd.play.kein_beitritt', 'Du kannst dieser Session nicht mehr beitreten.')}</p>
+          <button className="btn btn-primary" onClick={() => navigate(base)}><IconBack size={14} /> {t('cd.zur_startseite', 'Zurück zur Startseite')}</button>
         </div>
       </div>
     );
@@ -128,7 +130,7 @@ export default function PlaySession() {
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f5' }}>
         <div style={{ textAlign: 'center', maxWidth: 400 }}>
           <div style={{ marginBottom: 16 }}><IconPuzzle size={48} /></div>
-          <h2 style={{ marginBottom: 8 }}>Runde {session.currentPuzzleIndex + 1} von {session.puzzleIds.length}</h2>
+          <h2 style={{ marginBottom: 8 }}>{t('cd.play.runde_von', 'Runde {{n}} von {{gesamt}}', { n: session.currentPuzzleIndex + 1, gesamt: session.puzzleIds.length })}</h2>
           <p style={{ color: '#666', marginBottom: 8 }}>{currentPuzzle.title}</p>
           <p style={{ color: '#888', fontSize: 13, marginBottom: 24 }}>{currentPuzzle.description}</p>
           <button
@@ -136,7 +138,7 @@ export default function PlaySession() {
             style={{ fontSize: 18, padding: '14px 40px' }}
             onClick={() => navigate(`${base}/puzzle/${currentPuzzleId}?session=${sessionId}`)}
           >
-            <IconPlay size={16} /> Rätsel starten
+            <IconPlay size={16} /> {t('cd.play.raetsel_starten', 'Rätsel starten')}
           </button>
         </div>
       </div>
@@ -152,15 +154,15 @@ export default function PlaySession() {
         <div style={{ textAlign: 'center', maxWidth: 450 }}>
           <div style={{ marginBottom: 16 }}>{myResult.solved ? <IconCheckCircle size={48} /> : <IconClock size={48} />}</div>
           <h2 style={{ marginBottom: 8 }}>
-            {myResult.solved ? 'Geschafft!' : 'Zeit abgelaufen'}
+            {myResult.solved ? t('cd.geschafft', 'Geschafft!') : t('cd.zeit_abgelaufen', 'Zeit abgelaufen')}
           </h2>
           {myResult.solved && (
             <p style={{ color: '#666', marginBottom: 16 }}>
-              {myResult.attempts} {myResult.attempts === 1 ? 'Versuch' : 'Versuche'} - {formatTime(myResult.time)}
+              {myResult.attempts} {myResult.attempts === 1 ? t('cd.versuch', 'Versuch') : t('cd.versuche', 'Versuche')} - {formatTime(myResult.time)}
             </p>
           )}
           <p style={{ color: '#888', marginBottom: 24 }}>
-            Warte auf die anderen Spieler... ({solvedCount}/{session.players.length} fertig)
+            {t('cd.play.warte_andere', 'Warte auf die anderen Spieler... ({{fertig}}/{{gesamt}} fertig)', { fertig: solvedCount, gesamt: session.players.length })}
           </p>
           <div style={{ background: '#fff', borderRadius: 12, padding: 16, border: '1px solid #e0e0e0' }}>
             {session.players.map((p, i) => {
@@ -169,7 +171,7 @@ export default function PlaySession() {
                 <div key={i} className="player-list-item">
                   <span>{p.name}</span>
                   <span style={{ fontSize: 13, color: pr ? (pr.solved ? '#4caf50' : '#f44336') : '#999' }}>
-                    {pr ? (pr.solved ? <><IconCheckCircle size={14} /> Fertig</> : <><IconClock size={14} /> Zeit abgelaufen</>) : <><IconHourglass size={14} /> Löst noch...</>}
+                    {pr ? (pr.solved ? <><IconCheckCircle size={14} /> {t('cd.play.fertig', 'Fertig')}</> : <><IconClock size={14} /> {t('cd.zeit_abgelaufen', 'Zeit abgelaufen')}</>) : <><IconHourglass size={14} /> {t('cd.play.loest_noch', 'Löst noch...')}</>}
                   </span>
                 </div>
               );
@@ -186,15 +188,15 @@ export default function PlaySession() {
       <div style={{ minHeight: '100vh', background: '#f5f5f5', padding: 24 }}>
         <div style={{ maxWidth: 600, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 24 }}>
-            <h2>Runde {session.currentPuzzleIndex + 1} abgeschlossen!</h2>
+            <h2>{t('cd.play.runde_fertig', 'Runde {{n}} abgeschlossen!', { n: session.currentPuzzleIndex + 1 })}</h2>
             <p style={{ color: '#666' }}>{currentPuzzle?.title}</p>
           </div>
 
-          <Scoreboard scores={roundResults} label="Runden-Ergebnis" />
+          <Scoreboard scores={roundResults} label={t('cd.play.runden_ergebnis', 'Runden-Ergebnis')} t={t} />
 
           {totalScores.length > 0 && session.currentPuzzleIndex > 0 && (
             <div style={{ marginTop: 24 }}>
-              <Scoreboard scores={totalScores} label="Gesamtwertung" showTotal />
+              <Scoreboard scores={totalScores} label={t('cd.play.gesamtwertung', 'Gesamtwertung')} showTotal t={t} />
             </div>
           )}
 
@@ -206,7 +208,7 @@ export default function PlaySession() {
                   style={{ fontSize: 16, padding: '12px 32px' }}
                   onClick={() => dispatch({ type: 'END_SESSION', sessionId: session.id })}
                 >
-                  <IconTrophy size={18} /> Session beenden
+                  <IconTrophy size={18} /> {t('cd.play.session_beenden', 'Session beenden')}
                 </button>
               ) : (
                 <button
@@ -214,7 +216,7 @@ export default function PlaySession() {
                   style={{ fontSize: 16, padding: '12px 32px' }}
                   onClick={() => dispatch({ type: 'ADVANCE_PUZZLE', sessionId: session.id })}
                 >
-                  <IconPlay size={14} /> Nächstes Rätsel ({session.currentPuzzleIndex + 2}/{session.puzzleIds.length})
+                  <IconPlay size={14} /> {t('cd.play.naechstes_raetsel_n', 'Nächstes Rätsel ({{n}}/{{gesamt}})', { n: session.currentPuzzleIndex + 2, gesamt: session.puzzleIds.length })}
                 </button>
               )}
             </div>
@@ -222,7 +224,7 @@ export default function PlaySession() {
 
           {!isAdmin && (
             <p style={{ textAlign: 'center', marginTop: 24, color: '#888' }}>
-              {isLast ? 'Warte auf Endergebnis...' : 'Warte auf nächstes Rätsel...'}
+              {isLast ? t('cd.play.warte_ende', 'Warte auf Endergebnis...') : t('cd.play.warte_naechstes', 'Warte auf nächstes Rätsel...')}
             </p>
           )}
         </div>
@@ -233,13 +235,13 @@ export default function PlaySession() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f5' }}>
       <div style={{ textAlign: 'center' }}>
-        <p style={{ color: '#888' }}>Lade...</p>
+        <p style={{ color: '#888' }}>{t('cd.laden', 'Lade...')}</p>
       </div>
     </div>
   );
 }
 
-function Scoreboard({ scores, label, showTotal }) {
+function Scoreboard({ scores, label, showTotal, t }) {
   return (
     <div className="scoreboard">
       <div className="scoreboard-header">{label}</div>
@@ -251,11 +253,11 @@ function Scoreboard({ scores, label, showTotal }) {
           <div className="scoreboard-name">{s.playerName}</div>
           {!showTotal && s.solved !== undefined && (
             <div className="scoreboard-detail">
-              {s.solved ? `${s.attempts}x - ${formatTime(s.time)}` : 'nicht gelöst'}
+              {s.solved ? `${s.attempts}x - ${formatTime(s.time)}` : t('cd.play.nicht_geloest', 'nicht gelöst')}
             </div>
           )}
           <div className="scoreboard-points">
-            {showTotal ? s.totalPoints : s.points || 0} Pkt
+            {showTotal ? s.totalPoints : s.points || 0} {t('cd.punkte_kurz', 'Pkt')}
           </div>
         </div>
       ))}
