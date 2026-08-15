@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, dateNavBtn, dateNavInput, toolbarIconBtn, CONTROL_H, Modal, ExportButton, ImportButton, pageApp, Popover} from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, sectionLabel, COLORS as C, selectStyle, Tabs, inputStyle, dateNavBtn, dateNavInput, toolbarIconBtn, CONTROL_H, Modal, dateiWaehlen, pageApp, Popover} from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
+import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, put } from "../core/cache.js";
 import { undoDelete } from "../core/undo.jsx";
@@ -78,7 +79,6 @@ export default function Kalender() {
   // Startdatum optional per ?date=YYYY-MM-DD (Deep-Link, z.B. aus den Einstiegen).
   const [cursor, setCursor] = useState(() => { const p = params.get("date"); return p && /^\d{4}-\d{2}-\d{2}$/.test(p) ? startOfDay(new Date(p + "T00:00:00")) : startOfDay(new Date()); });
   const [abo, setAbo] = useState(null); // Abo-URLs { url, webcal }
-  const [moreOpen, setMoreOpen] = useState(false); // „⋯"-Menü (Teilen/Abonnieren)
   const [viewMenuOpen, setViewMenuOpen] = useState(false); // „Auge"-Menü (was ein-/ausblenden)
   const [showAllDay, setShowAllDay] = useState(() => { try { return localStorage.getItem("kal_allday") !== "0"; } catch { return true; } });
   const toggleAllDay = () => setShowAllDay((v) => { const n = !v; try { localStorage.setItem("kal_allday", n ? "1" : "0"); } catch { /* egal */ } return n; });
@@ -485,32 +485,26 @@ export default function Kalender() {
             </>)}
           </div>
         )}
+        {/* Seltenes im gemeinsamen Mehr-Menue (components/Werkzeugleiste.jsx) —
+            dieselbe Stelle wie auf jeder anderen Seite. */}
         {view !== "timetable" && view !== "breaks" && view !== "klassenarbeit" && (
-          <div style={{ position: "relative" }}>
-            <button onClick={() => setMoreOpen((v) => !v)} className="icon-btn" style={toolbarIconBtn} title={t("common.more") !== "common.more" ? t("common.more") : "Mehr"} aria-label={t("common.more") !== "common.more" ? t("common.more") : "Mehr"}>
-              <Icon d={ICONS.more} size={18} />
-            </button>
-            {moreOpen && (<>
-              <div onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-              <Popover style={{ minWidth: 200, padding: 6 }}>
-                <button onClick={() => { setMoreOpen(false); openAbo(); }} title={t("kalender.subscribeHint")}
-                  style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "8px 12px", background: "none", border: "none", borderRadius: 8, color: "var(--text)", fontSize: 13, fontWeight: 500, cursor: "pointer", textAlign: "left" }}>
-                  <Icon d={ICONS.share} size={15} /> {t("kalender.subscribe")}
-                </button>
-              </Popover>
-            </>)}
-          </div>
+          <MehrMenu eintraege={[
+            { key: "abo", label: t("kalender.subscribe"), icon: ICONS.share, onClick: openAbo },
+            { key: "export", label: t("kalender.export"), icon: ICONS.export, onClick: exportKal },
+            { key: "import", label: t("kalender.import"), icon: ICONS.import, onClick: () => dateiWaehlen(importKal) },
+          ]} />
         )}
       </div>
       {view === "timetable" && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
-          <ExportButton iconOnly title={t("kalender.export")} onClick={exportKal} />
-          <ImportButton iconOnly title={t("kalender.import")} onFile={importKal} />
+        <Werkzeugleiste mehr={[
+          { key: "export", label: t("kalender.export"), icon: ICONS.export, onClick: exportKal },
+          { key: "import", label: t("kalender.import"), icon: ICONS.import, onClick: () => dateiWaehlen(importKal) },
+        ]}>
           <button onClick={() => setShowTimes((v) => !v)} className="icon-btn" title={t("kalender.timesShow")} aria-label={t("kalender.timesShow")}
-            style={{ ...iconBtn, border: showTimes ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 8 }}>
+            style={{ ...toolbarIconBtn, border: showTimes ? "1px solid var(--accent)" : "1px solid var(--border2)", borderRadius: 8 }}>
             <Icon d={ICONS.clock} size={18} color={showTimes ? "var(--accent)" : "var(--text2)"} />
           </button>
-        </div>
+        </Werkzeugleiste>
       )}
       {/* Datums-Navigator, einheitlich mit der Anwesenheit: ‹ [Auswahl] › Heute.
           Tagesansicht = nativer Datums-Picker inline (wie Anwesenheit); Monat/Woche

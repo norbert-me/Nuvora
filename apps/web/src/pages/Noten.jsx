@@ -12,9 +12,10 @@ import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { Icon, ICONS, iconBtn, toolbarIconBtn, chipStyle, COLORS as C, btnPrimary, btnSecondary, Modal as UiModal, popoverPanel, Empty, Skeleton, ImportButton, inputStyle, Popover, Toggle, nichtZiehen, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, toolbarIconBtn, chipStyle, COLORS as C, btnPrimary, btnSecondary, Modal as UiModal, popoverPanel, Empty, Skeleton, inputStyle, Popover, Toggle, nichtZiehen, dateiWaehlen, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
+import { MehrMenu } from "../components/Werkzeugleiste.jsx";
 import { useAktiv } from "../core/modules.js";
 import { datumKurz } from "../core/grades.js";
 import { useLanguage } from "../i18n/index.jsx";
@@ -52,7 +53,6 @@ function StickyMitte({ children, style }) {
 }
 
 // Zeile im Export-Dropdown (Icon + Text, linksbündig).
-const expRow = { display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box", padding: "8px 10px", background: "none", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 13.5, color: "var(--text)", textAlign: "left" };
 
 function parseNote(text) {
   const n = parseFloat(String(text).replace(",", "."));
@@ -94,7 +94,6 @@ export default function Noten() {
   const cdAktiv = aktiv("code-detektiv");
   const kartenAktiv = aktiv("karten");
   const [cdDialog, setCdDialog] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false); // Export-Dropdown
   const [topics, setTopics] = useState([]); // Kern-Themen: Spalte einem Thema zuordnen (Nachholbedarf)
   useEffect(() => { fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
   // Wie mehrere Einzelnoten zusammengefasst werden: Mittel oder Median. Merkt
@@ -512,28 +511,26 @@ export default function Noten() {
                 background: agg === m ? "var(--accent)" : "transparent", color: agg === m ? "#fff" : "var(--text2)" }}>{label}</button>
           ))}
         </div>
+        {/* Sichtbar bleibt der Handgriff, den man staendig braucht: ein neuer
+            Abschnitt. Export, Zeugnis, Import und die Code-Detektiv-Uebernahme
+            stehen im Mehr-Menue — dieselbe Stelle wie auf jeder anderen Seite
+            (components/Werkzeugleiste.jsx). Statt zweier eigener Klappmenues
+            nebeneinander gibt es jetzt eins. */}
         {term !== "year" && classId && (
           <div style={{ display: "flex", gap: 8, marginLeft: "auto", alignItems: "center" }}>
-            <div style={{ position: "relative" }}>
-              <button onClick={() => setExportOpen((v) => !v)} className="icon-btn" style={{ ...iconBtn, display: "inline-flex", alignItems: "center", gap: 2 }} title={t("noten.export")} aria-label={t("noten.export")}>
-                <Icon d={ICONS.export} size={18} /><Icon d={ICONS.open} size={9} style={{ transform: "rotate(90deg)" }} />
-              </button>
-              {exportOpen && (<>
-                <div onClick={() => setExportOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-                <Popover align="right" style={{ minWidth: 220, padding: 6 }}>
-                  <button onClick={() => { setExportOpen(false); doExport(); }} style={expRow}><Icon d={ICONS.export} size={15} /> {t("noten.exportBundle")}</button>
-                  <button onClick={() => { setExportOpen(false); doExportJson(); }} style={expRow}><Icon d={ICONS.export} size={15} /> {t("noten.exportData")}</button>
-                  <button onClick={() => { setExportOpen(false); doZeugnis(); }} style={expRow}><Icon d={ICONS.pdf || ICONS.export} size={15} /> {t("noten.zeugnis")}</button>
-                </Popover>
-              </>)}
-            </div>
-            <ImportButton iconOnly title={t("noten.import")} onFile={doImport} />
-            {cdAktiv && sections.length > 0 && <button onClick={() => setCdDialog(true)} style={btnSecondary} title={t("noten.fromCdHint")}>{t("noten.fromCd")}</button>}
             <button data-tour="noten-add" onClick={() => setNeuAbschnitt(true)} title={t("noten.addSection")} aria-label={t("noten.addSection")}
               className="icon-btn"
               style={{ ...toolbarIconBtn, border: "1px solid var(--border2)", borderRadius: 10 }}>
               <Icon d={ICONS.plus} size={20} color="var(--accent)" />
             </button>
+            <MehrMenu eintraege={[
+              { key: "bundle", label: t("noten.exportBundle"), icon: ICONS.export, onClick: doExport },
+              { key: "daten", label: t("noten.exportData"), icon: ICONS.export, onClick: doExportJson },
+              { key: "zeugnis", label: t("noten.zeugnis"), icon: ICONS.pdf || ICONS.export, onClick: doZeugnis },
+              { key: "import", label: t("noten.import"), icon: ICONS.import, onClick: () => dateiWaehlen(doImport) },
+              (cdAktiv && sections.length > 0)
+                && { key: "cd", label: t("noten.fromCd"), icon: ICONS.chart, onClick: () => setCdDialog(true) },
+            ]} />
           </div>
         )}
       </div>
