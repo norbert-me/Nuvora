@@ -528,7 +528,7 @@ def inhalt_scan_roh(api, u, spuren):
 
 
 def inhalt_karten(api, u, spuren):
-    """Der volle Weg: Stapel und zwei Karten anlegen, freigeben, Zugang holen,
+    """Der volle Weg: Stapel und drei Karten anlegen, freigeben, Zugang holen,
     OHNE Anmeldung lernen, antworten — und danach als Lehrkraft nachsehen, ob
     der Fortschritt wirklich gestiegen ist."""
     anonym = Api(api.basis, debug=api.debug)
@@ -540,15 +540,32 @@ def inhalt_karten(api, u, spuren):
     spuren.append(("Kartenstapel", lambda: (
         api.call("DELETE", f"/api/karten/decks/{stapel['id']}", erwartet=(204, 404)),
         api.call("DELETE", f"/api/karten/decks/{stapel['id']}/purge", erwartet=(204, 404)))))
-    k1 = api.call("POST", f"/api/karten/decks/{stapel['id']}/cards",
-                  {"front": "3+4", "back": "7"}, erwartet=(201,))
-    k2 = api.call("POST", f"/api/karten/decks/{stapel['id']}/cards",
-                  {"front": "5*6", "back": "30"}, erwartet=(201,))
-    # Dritte Karte NUR fuer G: dasselbe Prinzip wie bei CardVote, aber je Karte
-    # statt je Stapel. Das erste Testkind ist E, das zweite G — die Karte darf
-    # also genau bei einem der beiden auftauchen.
-    api.call("POST", f"/api/karten/decks/{stapel['id']}/cards",
-             {"front": "G-Karte", "back": "nur G", "niveau": "G"}, erwartet=(201,))
+    # Karte OHNE Angabe. Mit eingeschalteter Differenzierung ist eine neue Karte
+    # Grundstoff: der Server MUSS "G" daraus machen (siehe _niveau_vorgabe in
+    # karten.py). Angabelose Karten gibt es nur noch im Bestand — dass hier
+    # nichts Neutrales mehr entsteht, ist die eigentliche Zusicherung und wird
+    # deshalb gleich zurueckgelesen statt nur ueber die Sichtbarkeit erschlossen.
+    kg1 = api.call("POST", f"/api/karten/decks/{stapel['id']}/cards",
+                   {"front": "3+4", "back": "7"}, erwartet=(201,))
+    # Karte ausdruecklich fuer E …
+    ke = api.call("POST", f"/api/karten/decks/{stapel['id']}/cards",
+                  {"front": "5*6", "back": "30", "niveau": "E"}, erwartet=(201,))
+    # … und eine ausdruecklich fuer G. Dasselbe Prinzip wie bei CardVote, aber je
+    # Karte statt je Stapel. Das erste Testkind ist E, das zweite G.
+    kg2 = api.call("POST", f"/api/karten/decks/{stapel['id']}/cards",
+                   {"front": "G-Karte", "back": "nur G", "niveau": "G"}, erwartet=(201,))
+
+    # Zurueckgelesen, nicht der Antwort des Anlegens geglaubt: was in der
+    # Datenbank steht, entscheidet spaeter darueber, wer die Karte sieht.
+    deck_gelesen = _finde(api.call("GET", f"/api/karten/classes/{u.class_id}/decks", erwartet=(200,)),
+                          id=stapel["id"])
+    niveaus = {c["front"]: c.get("niveau") for c in (deck_gelesen or {}).get("cards") or []}
+    if niveaus.get("3+4") != "G":
+        raise AssertionError("Karte ohne Angabe kam als "
+                             f"{niveaus.get('3+4')!r} an statt als 'G' "
+                             "(mit niveau_aktiv ist Grundstoff die Vorgabe)")
+    if niveaus.get("5*6") != "E" or niveaus.get("G-Karte") != "G":
+        raise AssertionError(f"ausdrueckliche Niveaus nicht gespeichert: {niveaus}")
 
     # Vor der Freigabe darf ein Kind nichts sehen — sonst waeren Entwuerfe oeffentlich.
     zugaenge = api.call("POST", f"/api/karten/classes/{u.class_id}/tokens", erwartet=(200, 201))
@@ -562,33 +579,40 @@ def inhalt_karten(api, u, spuren):
 
     api.call("POST", f"/api/karten/decks/{stapel['id']}/release", {"now": True}, erwartet=(200,))
     sitzung = anonym.call("GET", f"/api/karten/lernen/{token}", erwartet=(200,))
-    if sitzung.get("total") != 2 or len(sitzung.get("cards") or []) != 2:
-        raise AssertionError(f"Kind sieht {sitzung.get('total')} Karten statt 2")
+    # Das E-Kind bekommt GENAU die E-Karte. Dass es die beiden G-Karten NICHT
+    # sieht, ist die Zusicherung, kein Nebeneffekt: die angabelose Karte ist
+    # oben serverseitig zu "G" geworden und damit fuer ein E-Kind unsichtbar.
+    if sitzung.get("total") != 1 or len(sitzung.get("cards") or []) != 1:
+        raise AssertionError(f"E-Kind sieht {sitzung.get('total')} Karten statt 1")
     vorderseiten = {c["front"] for c in sitzung["cards"]}
-    if vorderseiten != {"3+4", "5*6"}:
-        raise AssertionError(f"falsche Karten ausgeliefert: {vorderseiten}")
+    if vorderseiten != {"5*6"}:
+        raise AssertionError(f"falsche Karten ans E-Kind ausgeliefert: {vorderseiten}")
 
-    # Gegenprobe: dasselbe Deck, ein G-Kind — es MUSS die G-Karte zusaetzlich
-    # bekommen. Ohne diese Richtung wuerde ein Filter, der einfach alles
-    # wegwirft, unbemerkt durchgehen.
+    # Gegenprobe: dasselbe Deck, ein G-Kind — es MUSS genau die beiden G-Karten
+    # bekommen und die E-Karte nicht. Ohne diese Richtung wuerde ein Filter, der
+    # einfach alles wegwirft, unbemerkt durchgehen.
     token_g = _finde(zugaenge, student_id=u.students[1])
     if not token_g:
         raise AssertionError("kein Zugang fuer das zweite Kind erzeugt")
-    sitzung_g = anonym.call("GET", f"/api/karten/lernen/{token_g['token']}", erwartet=(200,))
+    token_g = token_g["token"]
+    sitzung_g = anonym.call("GET", f"/api/karten/lernen/{token_g}", erwartet=(200,))
     fronts_g = {c["front"] for c in sitzung_g.get("cards") or []}
-    if fronts_g != {"3+4", "5*6", "G-Karte"}:
-        raise AssertionError(f"G-Kind sieht {fronts_g} statt aller drei Karten")
-    if sitzung_g.get("total") != 3:
-        raise AssertionError(f"G-Kind zaehlt {sitzung_g.get('total')} Karten statt 3")
+    if fronts_g != {"3+4", "G-Karte"}:
+        raise AssertionError(f"G-Kind sieht {fronts_g} statt der beiden G-Karten")
+    if sitzung_g.get("total") != 2:
+        raise AssertionError(f"G-Kind zaehlt {sitzung_g.get('total')} Karten statt 2")
 
+    # Gelernt wird ab hier mit dem G-Kind: es hat zwei Karten, und nur mit zweien
+    # laesst sich "eine richtig, eine falsch" ueberhaupt zeigen. Jede Karte, die
+    # hier angefasst wird, gehoert diesem Kind auch wirklich.
     vorher = _finde(api.call("GET", f"/api/karten/classes/{u.class_id}/progress", erwartet=(200,)),
-                    student_id=u.students[0])
-    anonym.call("POST", f"/api/karten/lernen/{token}/review",
-                {"card_id": k1["id"], "grade": 3}, erwartet=(200,))
-    anonym.call("POST", f"/api/karten/lernen/{token}/review",
-                {"card_id": k2["id"], "grade": 0}, erwartet=(200,))
+                    student_id=u.students[1])
+    anonym.call("POST", f"/api/karten/lernen/{token_g}/review",
+                {"card_id": kg1["id"], "grade": 3}, erwartet=(200,))
+    anonym.call("POST", f"/api/karten/lernen/{token_g}/review",
+                {"card_id": kg2["id"], "grade": 0}, erwartet=(200,))
     nachher = _finde(api.call("GET", f"/api/karten/classes/{u.class_id}/progress", erwartet=(200,)),
-                     student_id=u.students[0])
+                     student_id=u.students[1])
     if nachher["total"] != 2:
         raise AssertionError(f"Fortschritt zaehlt {nachher['total']} Karten statt 2")
     if nachher["reviewed"] <= (vorher or {}).get("reviewed", 0):
@@ -603,7 +627,7 @@ def inhalt_karten(api, u, spuren):
         raise AssertionError(f"{nachher['due']} faellige Karten statt 0")
     # Die falsche Karte darf aber nicht verschwinden — sie muss kurz darauf
     # wiederkommen, sonst waere "nochmal" ein Loeschknopf.
-    stand = anonym.call("GET", f"/api/karten/lernen/{token}", erwartet=(200,))
+    stand = anonym.call("GET", f"/api/karten/lernen/{token_g}", erwartet=(200,))
     if not stand.get("next_due"):
         raise AssertionError("keine naechste Faelligkeit — die falsche Karte kommt nie wieder")
     frist = _minuten_bis(stand["next_due"])
@@ -611,11 +635,20 @@ def inhalt_karten(api, u, spuren):
         raise AssertionError(f"falsche Karte erst in {frist:.0f} Minuten wieder faellig "
                              "(erwartet: rund 10)")
     # Die Detailsicht muss dasselbe sagen wie die Uebersicht.
-    detail = api.call("GET", f"/api/karten/classes/{u.class_id}/students/{u.students[0]}/cards",
+    detail = api.call("GET", f"/api/karten/classes/{u.class_id}/students/{u.students[1]}/cards",
                       erwartet=(200,))
-    eine = _finde(detail, card_id=k1["id"])
+    eine = _finde(detail, card_id=kg1["id"])
     if not eine or eine["reps"] != 1:
         raise AssertionError(f"Detailsicht zeigt {eine} statt reps=1")
+    # Und sie zeigt nur, was dem Kind gehoert: die E-Karte darf in den Zahlen des
+    # G-Kindes nicht auftauchen — sonst haette es dauerhaft Rueckstand fuer eine
+    # Karte, die es nie zu sehen bekommt.
+    if _finde(detail, card_id=ke["id"]):
+        raise AssertionError("E-Karte steht in der Detailsicht des G-Kindes")
+    e_fortschritt = _finde(api.call("GET", f"/api/karten/classes/{u.class_id}/progress", erwartet=(200,)),
+                           student_id=u.students[0])
+    if (e_fortschritt or {}).get("total") != 1:
+        raise AssertionError(f"Fortschritt des E-Kindes zaehlt {e_fortschritt} statt 1 Karte")
     # Gegenprobe zum Schalter: ausgeschaltet zaehlt das Karten-Niveau nicht
     # mehr, das E-Kind bekommt auch die G-Karte. Ohne diese Richtung koennte der
     # Filter einfach immer greifen und niemandem fiele es auf.
@@ -671,8 +704,9 @@ def inhalt_karten(api, u, spuren):
     api.call("DELETE", f"/api/karten/decks/{frei['id']}", erwartet=(204,))
     api.call("DELETE", f"/api/karten/decks/{frei['id']}/purge", erwartet=(204,))
 
-    return ("Stapel freigegeben, E-Kind sieht 2 von 3 Karten (G-Karte gefiltert), "
-            "G-Kind alle 3, ohne Anmeldung gelernt, Fortschritt 0 -> 1 von 2 "
+    return ("Stapel freigegeben, Karte ohne Angabe kommt als G an, E-Kind sieht "
+            "genau die E-Karte, G-Kind genau die beiden G-Karten, "
+            "ohne Anmeldung gelernt, Fortschritt 0 -> 1 von 2 "
             f"(Detailsicht bestaetigt reps=1), falsche Karte in {frist:.0f} Minuten "
             "wieder faellig, falscher Token abgewiesen; Niveau-Schalter aus = alle "
             "sehen alles; Sammlungsstapel erst nach Kurs-Zuweisung sichtbar und "
@@ -1907,12 +1941,25 @@ def teste_bruecken(api, b, u, sch, spuren, cv):
         Nachgerechnet wird dabei der Fehler, der schon einmal drinsteckte: drei
         Karten, jede dreimal verpatzt (SM-2: reps faellt auf 0, lapses steigt).
         Wer nach reps > 0 filtert, sieht hier NICHTS statt 0 %.
+
+        Dafuer braucht die Probe ein EIGENES Thema: der Themenstand zaehlt
+        richtigerweise alles zusammen, was zu einem Thema vorliegt — und die
+        Karten-Probe weiter oben hat auf u.topic_id schon einen Stapel bespielt.
+        Auf dem gemeinsamen Thema waeren die Zahlen darum nicht mehr exakt
+        vorhersagbar, und genau die exakten Zahlen sind der Sinn dieser Probe.
         """
         sch.setze({"karten"})
         anonym = Api(api.basis, debug=api.debug)
+        thema = api.call("POST", "/api/topics", {"name": f"{PRAEFIX} Themenstand-Thema"},
+                         erwartet=(201,))
+        topic_id = thema["id"]
         deck = api.call("POST", f"/api/karten/classes/{u.class_id}/decks",
-                        {"name": f"{PRAEFIX} Themenstand-Stapel", "topic_id": u.topic_id},
+                        {"name": f"{PRAEFIX} Themenstand-Stapel", "topic_id": topic_id},
                         erwartet=(201,))
+        # Thema NACH dem Stapel abraeumen (Stapel zuerst eingetragen heisst:
+        # zuletzt abgeraeumt) — sonst bliebe das Thema als Rest im Bericht.
+        spuren.append(("Themenstand-Thema", lambda: api.call(
+            "DELETE", f"/api/topics/{topic_id}", erwartet=(204, 404))))
         spuren.append(("Themenstand-Stapel", lambda: (
             api.call("DELETE", f"/api/karten/decks/{deck['id']}", erwartet=(204, 404)),
             api.call("DELETE", f"/api/karten/decks/{deck['id']}/purge", erwartet=(204, 404)))))
@@ -1931,7 +1978,7 @@ def teste_bruecken(api, b, u, sch, spuren, cv):
             kind = _finde(antwort.get("schueler") or [], student_id=u.students[0])
             if kind is None:
                 raise AssertionError(f"Kind {u.students[0]} fehlt im Themenstand: {antwort}")
-            return next((t for t in (kind.get("themen") or []) if t["topic_id"] == u.topic_id), None)
+            return next((t for t in (kind.get("themen") or []) if t["topic_id"] == topic_id), None)
 
         mit = api.call("GET", f"/api/classes/{u.class_id}/themenprofil"
                               f"?student_id={u.students[0]}", erwartet=(200,))
@@ -1940,8 +1987,12 @@ def teste_bruecken(api, b, u, sch, spuren, cv):
         th = thema_von(mit)
         if not th or not (th.get("karten") or {}).get("versuche"):
             raise AssertionError(f"verpatzte Karten fehlen im Themenstand: {th}")
-        if th["karten"]["karten"] < 3 or th["karten"]["treffer"] != 0:
-            raise AssertionError(f"Kartenzahlen falsch (reps>0-Falle?): {th['karten']}")
+        # Genau, nicht "mindestens": auf einem eigenen Thema liegen exakt drei
+        # Karten mit je drei verpatzten Versuchen und keinem Treffer. Eine
+        # Ungleichung wuerde hier jede Verrechnung durchwinken.
+        if (th["karten"]["karten"], th["karten"]["versuche"], th["karten"]["treffer"]) != (3, 9.0, 0.0):
+            raise AssertionError(f"Kartenzahlen falsch (reps>0-Falle?): {th['karten']} "
+                                 "(erwartet 3 Karten, 9 Versuche, 0 Treffer)")
         if th["pct"] != 0.0 or "karten" not in th["quellen"]:
             raise AssertionError(f"dreimal verpatzt ergibt nicht 0 %: {th}")
 
