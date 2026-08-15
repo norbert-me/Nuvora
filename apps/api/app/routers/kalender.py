@@ -965,10 +965,53 @@ def _ics_escape(s: str) -> str:
             .replace("\r\n", r"\n").replace("\r", r"\n").replace("\n", r"\n"))
 
 
+def _ics_falten(zeile: str) -> str:
+    """Lange Zeile nach RFC 5545 umbrechen: hoechstens 75 Oktette je Zeile, die
+    Fortsetzung beginnt mit einem Leerzeichen. Gezaehlt wird in Oktetten, nicht
+    in Zeichen — ein Umlaut sind zwei Oktette, und ein Umbruch mitten in einem
+    UTF-8-Zeichen macht die Zeile fuer den Client unlesbar.
+
+    Warum ueberhaupt: eine ungefaltete Zeile ist ein Formfehler; strenge Leser
+    verwerfen dann das ganze VEVENT statt nur den langen Titel."""
+    roh = zeile.encode("utf-8")
+    if len(roh) <= 75:
+        return zeile
+    teile, rest = [], roh
+    grenze = 75
+    while len(rest) > grenze:
+        schnitt = grenze
+        # Nicht mitten in ein Mehrbyte-Zeichen schneiden (Folgebytes sind 10xxxxxx).
+        while schnitt > 1 and (rest[schnitt] & 0xC0) == 0x80:
+            schnitt -= 1
+        teile.append(rest[:schnitt].decode("utf-8"))
+        rest = rest[schnitt:]
+        grenze = 74  # Fortsetzungszeilen tragen ein fuehrendes Leerzeichen
+    teile.append(rest.decode("utf-8"))
+    return "\r\n ".join(teile)
+
+
 @router.get("/feed/{token}.ics")
 async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
     """ICS-Feed eines Kontos (Token statt Login). Kalender-Eintraege als
-    Ganztags-Events, freie Zeitraeume (Ferien) als mehrtaegige Events."""
+    Ganztags-Events, freie Zeitraeume (Ferien) als mehrtaegige Events.
+
+    **Ganztags heisst: DTEND ist EXKLUSIV** (RFC 5545). Ein einzelner Tag ist
+    `DTSTART;VALUE=DATE:20260303` + `DTEND;VALUE=DATE:20260304` — das `+1` ist
+    kein Zuschlag, sondern der erste Tag NACH dem Termin. Genau hier entstehen
+    beide Fehlerbilder aus dem Kalender des Nutzers: ein fehlendes `+1` macht
+    aus dem Tag einen Termin der Laenge null (Apple zeigt ihn dann an einem
+    beliebigen Tag oder gar nicht), ein doppeltes `+1` zieht ihn ueber mehrere
+    Tage. Bei GETAKTETEN Terminen (mit Uhrzeit) gilt das nicht: dort ist DTEND
+    der echte Endzeitpunkt am selben Tag, ein `+1 Tag` waere dort der Fehler.
+
+    Die Zeilen unten sind nach dieser Regel nachgerechnet und stimmen. Das
+    stehengebliebene Fehlerbild kommt aus dem Cache des Clients: Apple merkt
+    sich Art und Dauer eines Ereignisses **pro UID** und uebernimmt eine
+    Korrektur nicht, wenn UID und Titel gleich bleiben (fuer die Stundenplan-
+    Stunden war das schon einmal so — siehe der `-t`-Marker weiter unten).
+    Darum tragen Eintraege und freie Zeitraeume jetzt einen Formmarker in der
+    UID und ein `SEQUENCE`/`LAST-MODIFIED`: damit ersetzt der Client die alten,
+    falsch gezogenen Kopien einmalig durch die richtigen."""
     from datetime import date, timedelta
     u = (await db.execute(select(User).where(User.calendar_token == token))).scalar_one_or_none()
     if not u:
@@ -1008,15 +1051,21 @@ async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
             a = _hm(tm.get("start")) if isinstance(tm, dict) else None
             b2 = _hm(tm.get("end")) if isinstance(tm, dict) else None
         if a and b2:
+            # Getaktet: DTEND ist der echte Endzeitpunkt AM SELBEN TAG — hier
+            # waere ein "+1 Tag" der Fehler, der den Termin ueber Nacht zoege.
             dtstart = f"DTSTART:{d8(day)}T{a}"
             dtend = f"DTEND:{d8(day)}T{b2}"
         else:
+            # Ganztaegig: DTEND ist exklusiv, also der Folgetag. Ein einzelner
+            # Tag braucht genau EIN "+1" — nicht keins und nicht zwei.
             dtstart = f"DTSTART;VALUE=DATE:{d8(day)}"
             dtend = f"DTEND;VALUE=DATE:{d8(day + timedelta(days=1))}"
         lines += [
             "BEGIN:VEVENT",
-            f"UID:nuvora-entry-{e.id}@nuvora",
+            f"UID:nuvora-entry-{e.id}-{FORM_MARKER}@nuvora",
             f"DTSTAMP:{now}",
+            f"LAST-MODIFIED:{now}",
+            "SEQUENCE:1",
             dtstart,
             dtend,
             f"SUMMARY:{_ics_escape(title)}",
@@ -1027,11 +1076,20 @@ async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
     for b in breaks:
         s = b.start_date.date() if hasattr(b.start_date, "date") else b.start_date
         en = b.end_date.date() if hasattr(b.end_date, "date") else b.end_date
+        # Ein verdrehter Zeitraum (Ende vor Anfang, z.B. aus einer alten Datei)
+        # ergaebe DTEND <= DTSTART — der Client zeigt so ein Ereignis gar nicht
+        # oder an einem einzelnen Tag. Lieber auf den Anfangstag klemmen.
+        if en < s:
+            en = s
         lines += [
             "BEGIN:VEVENT",
-            f"UID:nuvora-break-{b.id}@nuvora",
+            f"UID:nuvora-break-{b.id}-{FORM_MARKER}@nuvora",
             f"DTSTAMP:{now}",
+            f"LAST-MODIFIED:{now}",
+            "SEQUENCE:1",
             f"DTSTART;VALUE=DATE:{d8(s)}",
+            # Letzter Ferientag + 1: DTEND ist exklusiv, sonst fehlte der
+            # letzte Tag der Ferien im abonnierten Kalender.
             f"DTEND;VALUE=DATE:{d8(en + timedelta(days=1))}",
             f"SUMMARY:{_ics_escape(b.label or 'Unterrichtsfrei')}",
             "END:VEVENT",

@@ -714,7 +714,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           rechtsbuendig unter der Leiste. */}
       {moveOpen && !collapsed && onMove && (<>
         <div onClick={() => setMoveOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-        <Popover align="right" style={{ top: CONTROL_H + 8, minWidth: 180, maxHeight: 260, overflow: "auto", padding: 6 }}>
+        <Popover align="right" style={{ top: CONTROL_H + 24, right: 16, minWidth: 180, maxHeight: 260, overflow: "auto", padding: 6 }}>
           {[{ id: null, name: `– ${t("karten.rootFolder")} –` }, ...folders].map((f) => {
             const active = (deck.folder_id ?? null) === f.id;
             return (
@@ -1073,6 +1073,12 @@ function ReifeBar({ hist, height = 10 }) {
 }
 
 const inp = { ...inputStyle };
+// Bedienelemente einer Leiste: eine Hoehe (CONTROL_H) und eine Form (CONTROL_R)
+// aus Icons.jsx statt eigener Polsterungen. Vorher standen in derselben Zeile
+// 8-px-, 5-px- und 6-px-Knoepfe neben einem 9-px-Eingabefeld.
+const leisteBtn = { ...btnSecondary, height: CONTROL_H, borderRadius: CONTROL_R, padding: "0 14px", fontSize: 13, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 };
+const leisteBtnPrimary = { ...btnPrimary, height: CONTROL_H, borderRadius: CONTROL_R, padding: "0 16px", fontSize: 13, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 };
+const leisteInput = { ...inputStyle, height: CONTROL_H, borderRadius: CONTROL_R, padding: "0 12px", fontSize: 13 };
 // Aus dem Kern abgeleitet: nur Innenabstand und Kopflinie weichen ab.
 const th = { ...thBasis, padding: "8px 10px", borderBottom: "2px solid var(--border)" };
 const td = { ...tdBasis, padding: "7px 10px" };

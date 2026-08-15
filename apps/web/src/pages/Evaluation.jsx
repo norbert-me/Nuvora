@@ -421,17 +421,17 @@ const gradeDistribution = (() => {
         </div>
 
         <div style={{ display: "flex", gap: 20, marginBottom: 20, flexWrap: "wrap" }}>
-          <StatBox label={t("cv.statCorrect")} value={`${stat.pct}%`} color={stat.pct >= 80 ? C.success : stat.pct >= 50 ? C.warning : C.danger} />
-          <StatBox label={t("cv.statCi")} value={stat.ciLow !== null ? `${stat.ciLow}–${stat.ciHigh}%` : "–"} />
-          <StatBox label={t("cv.statGuess")} value={stat.guessProb !== null ? `${Math.round(stat.guessProb * 100)}%` : "–"} />
-          <StatBox label={t("cv.statDisc")} value={stat.discrimination !== null ? stat.discrimination.toFixed(2) : "–"}
+          <StatCard label={t("cv.statCorrect")} value={`${stat.pct}%`} color={stat.pct >= 80 ? C.success : stat.pct >= 50 ? C.warning : C.danger} />
+          <StatCard label={t("cv.statCi")} value={stat.ciLow !== null ? `${stat.ciLow}–${stat.ciHigh}%` : "–"} />
+          <StatCard label={t("cv.statGuess")} value={stat.guessProb !== null ? `${Math.round(stat.guessProb * 100)}%` : "–"} />
+          <StatCard label={t("cv.statDisc")} value={stat.discrimination !== null ? stat.discrimination.toFixed(2) : "–"}
             color={stat.discrimination !== null ? (stat.discrimination >= 0.4 ? C.success : stat.discrimination >= 0.2 ? C.warning : C.danger) : undefined} />
-          <StatBox label={t("cv.statSd")} value={stat.itemSd !== null ? stat.itemSd.toFixed(2) : "–"} />
-          <StatBox label={t("cv.statAnswered")} value={`${stat.answered} / ${presentStudents.length}`} />
-          <StatBox label={t("cv.statWeight")} value={`×${getWeight(q.id)}`} />
+          <StatCard label={t("cv.statSd")} value={stat.itemSd !== null ? stat.itemSd.toFixed(2) : "–"} />
+          <StatCard label={t("cv.statAnswered")} value={`${stat.answered} / ${presentStudents.length}`} />
+          <StatCard label={t("cv.statWeight")} value={`×${getWeight(q.id)}`} />
           {timesData[String(q.id)] != null && (() => {
             const sek = timesData[String(q.id)];
-            return <StatBox label={t("cv.statTime")} value={`${Math.floor(sek / 60)}:${String(sek % 60).padStart(2, "0")}`} />;
+            return <StatCard label={t("cv.statTime")} value={`${Math.floor(sek / 60)}:${String(sek % 60).padStart(2, "0")}`} />;
           })()}
         </div>
 
@@ -932,7 +932,7 @@ function CiInfoBox({ onClose }) {
 
 // Zahlenfelder ohne die haesslichen nativen Spinner-Pfeile, sauber gerahmt.
 const NUM_CSS = ".nice-num::-webkit-inner-spin-button,.nice-num::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.nice-num{-moz-appearance:textfield;appearance:textfield}";
-const numInput = { width: 48, padding: "6px 6px", fontSize: 13, border: "1px solid var(--border2)", borderRadius: 8, textAlign: "center", background: "var(--bg)", color: "var(--text)" };
+const numInput = { ...inputStyle, width: 48, padding: "6px", fontSize: 13, borderRadius: 8, textAlign: "center" };
 // Noten-Nummer schlicht, ohne Kreis/Umrandung.
 const gradeBadge = { flexShrink: 0, minWidth: 14, color: "var(--text)", fontSize: 14, fontWeight: 700, textAlign: "center" };
 
@@ -941,6 +941,7 @@ const th = { ...thBasis, padding: "8px 10px", borderBottom: "2px solid var(--bor
 const td = { ...tdBasis, padding: "8px 10px", textAlign: "left" };
 
 function Stat({ label, value, onClick, clickable, info }) {
+  const { t } = useLanguage();
   return (
     <div
       onClick={onClick}
@@ -963,21 +964,28 @@ function Stat({ label, value, onClick, clickable, info }) {
             display: "flex", alignItems: "center", justifyContent: "center",
             lineHeight: 1, padding: 0,
           }}
-          title="Info"
-        >i</button>
+          title={t("cv.info")}
+        ><Icon d={ICONS.info} size={12} color="var(--text3)" /></button>
       )}
       <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{value}</div>
-      <div style={{ fontSize: 12, color: "var(--text3)" }}>{label}{clickable && " ⇄"}</div>
+      <div style={{ fontSize: 12, color: "var(--text3)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+        {label}{clickable && <Icon d={ICONS.swap} size={12} color="var(--text3)" />}
+      </div>
     </div>
   );
 }
 
-function StatBox({ label, value, color }) {
+// Die Kachel der Fragedetails kam aus StatCard (Icons.jsx) — die lokale Kopie
+// war eine zweite Design-Quelle fuer dieselbe Sache.
+
+// Schliessen-Kreuz der Erklaerkaesten: viermal dasselbe Inline-SVG, jetzt einmal
+// und aus ICONS.
+function SchliessenBtn({ onClick, t }) {
   return (
-    <div style={{ padding: "10px 16px", background: "var(--bg2)", borderRadius: 10, textAlign: "center", minWidth: 100 }}>
-      <div style={{ fontSize: 24, fontWeight: 800, color: color || "#1d1d1f" }}>{value}</div>
-      <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>{label}</div>
-    </div>
+    <button onClick={onClick} className="icon-btn" title={t("common.close")} aria-label={t("common.close")}
+      style={{ ...iconBtn, width: 24, height: 24, borderRadius: 12, background: "var(--bg2)", color: "var(--text3)" }}>
+      <Icon d={ICONS.close} size={13} />
+    </button>
   );
 }
 
@@ -1168,10 +1176,10 @@ function WeakTopics({ sessionId, classId, karten, lernpfad, t }) {
 
   const Btn = ({ tp, art, onClick, label }) => {
     const key = `${tp.topic_id}:${art}`;
-    if (done[key]) return <span style={{ fontSize: 12.5, color: C.success, fontWeight: 600 }}>✓</span>;
+    if (done[key]) return <Icon d={ICONS.check} size={16} color={C.success} />;
     return (
       <button onClick={() => onClick(tp)} disabled={busy === key}
-        style={{ ...btnSecondary, padding: "5px 12px", fontSize: 12.5, opacity: busy === key ? 0.6 : 1 }}>{label}</button>
+        style={{ ...btnSecondary, height: CONTROL_H, padding: "0 12px", borderRadius: CONTROL_R, fontSize: 12.5, lineHeight: 1, opacity: busy === key ? 0.6 : 1 }}>{label}</button>
     );
   };
 

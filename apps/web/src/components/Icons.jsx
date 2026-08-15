@@ -103,6 +103,25 @@ export const ICONS = {
           "M13.5 8.6a2 2 0 100-4", "M14 12.6c1.9.2 3 1.5 3 3.4"],
   tag: ["M10.6 3H16a1 1 0 011 1v5.4a1 1 0 01-.3.7l-6.6 6.6a1 1 0 01-1.4 0l-5.4-5.4a1 1 0 010-1.4l6.6-6.6a1 1 0 01.7-.3z",
         "M13.4 6.6h.01"],
+  // Nachgetragen, weil Seiten sonst Unicode-Zeichen oder Emoji als Bedien-
+  // Symbol benutzt haben (↑ ↓ ▲ ▾ ⚠️ 🖼️ ▶ ❚❚ 🔇 🔊). Alles hier, damit es
+  // genau eine Quelle gibt.
+  arrowUp: ["M10 16V4", "M5 9l5-5 5 5"],
+  arrowDown: ["M10 4v12", "M5 11l5 5 5-5"],
+  arrowLeft: ["M16 10H4", "M9 5l-5 5 5 5"],
+  arrowRight: ["M4 10h12", "M11 5l5 5-5 5"],
+  chevronUp: ["M5 12.5l5-5 5 5"],
+  chevronLeft: ["M12.5 5l-5 5 5 5"],
+  chevronRight: ["M7.5 5l5 5-5 5"],
+  chevronDown: ["M5 7.5l5 5 5-5"],
+  image: ["M3.5 4.5h13v11h-13z", "M3.5 12.5l3.5-3.5 3 3 2.5-2.5 4 4", "M7 8h.01"],
+  warn: ["M10 3.2L2.8 16h14.4L10 3.2z", "M10 8.2v3.4", "M10 13.6h.01"],
+  play: ["M6.5 4.5l8 5.5-8 5.5z"],
+  pause: ["M7.5 4.5v11", "M12.5 4.5v11"],
+  volume: ["M4 8v4h3l3.5 3V5L7 8H4z", "M13.5 7.5a3.5 3.5 0 010 5", "M15.8 5.4a6.5 6.5 0 010 9.2"],
+  volumeOff: ["M4 8v4h3l3.5 3V5L7 8H4z", "M13.5 8l4 4", "M17.5 8l-4 4"],
+  textSmaller: ["M3 15L7 5l4 10", "M4.3 12h5.4", "M13 10h4"],
+  textLarger: ["M3 15L7 5l4 10", "M4.3 12h5.4", "M13 10h4", "M15 8v4"],
   settings: ["M10 7.6a2.4 2.4 0 100 4.8 2.4 2.4 0 000-4.8z",
     "M10 2v2.2M10 15.8V18M2 10h2.2M15.8 10H18M4.4 4.4l1.6 1.6M14 14l1.6 1.6M15.6 4.4L14 6M6 14l-1.6 1.6"],
 };
