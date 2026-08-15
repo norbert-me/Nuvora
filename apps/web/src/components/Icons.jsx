@@ -422,7 +422,11 @@ export function Segment({ children, style }) {
     <div style={{
       display: "inline-flex", alignItems: "stretch", height: CONTROL_H,
       border: "1px solid var(--border2)", borderRadius: CONTROL_R,
-      background: "var(--bg)", overflow: "hidden", boxSizing: "border-box", ...style,
+      // KEIN `overflow: hidden`: das schnitt jedes Popover ab, das ein Kind
+      // aufmacht — im Kalender war der Sprung-Waehler fuer Monat und Woche
+      // damit unsichtbar. Die Kinder sind ohnehin rahmen- und hintergrundlos,
+      // es gibt also nichts, was ueber die runden Ecken laufen koennte.
+      background: "var(--bg)", boxSizing: "border-box", ...style,
     }}>
       {kinder.map((k, i) => (
         <Fragment key={i}>

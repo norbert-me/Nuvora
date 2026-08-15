@@ -970,7 +970,6 @@ export default {
   "kalender.extLocation": "Location",
   "kalender.extDesc": "Description",
   "kalender.today": "Today",
-  "kalender.todayView": "Today",
   "kalender.todayEmpty": "No timetable periods or entries for today.",
   "kalender.planned": "Planned",
   "kalender.planNow": "+ plan",

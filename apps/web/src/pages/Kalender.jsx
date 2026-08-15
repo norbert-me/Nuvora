@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, badge, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, COLORS as C, selectStyle, SHADOW, Tabs, td as tdCell, th, inputStyle, menuRow, toolbarInput, toolbarBtn, toolbarBtnPrimary, DatumNavigator, segmentBtn, segmentInput, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, dateiWaehlen, pageApp, Popover } from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, badge, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, COLORS as C, selectStyle, SHADOW, Tabs, td as tdCell, th, inputStyle, menuRow, toolbarInput, toolbarBtn, toolbarBtnPrimary, DatumNavigator, segmentBtn, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, dateiWaehlen, pageApp, Popover } from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
@@ -80,7 +80,9 @@ export default function Kalender() {
   // Ansicht in der URL (?view=), damit der Stundenplan aus dem Navbar-Menü
   // ansteuerbar ist. Ohne Parameter = Monat. Andere Query-Params bleiben.
   const [params, setParams] = useSearchParams();
-  const view = params.get("view") || "month";
+  // „today" gibt es als Ansicht nicht mehr — alte Lesezeichen und Deep-Links
+  // landen auf dem Tag, statt auf einer leeren Seite.
+  const view = (params.get("view") === "today" ? "day" : params.get("view")) || "month";
   const setView = (v) => setParams((p) => { const n = new URLSearchParams(p); if (v === "month") n.delete("view"); else n.set("view", v); return n; }, { replace: true });
   // Startdatum optional per ?date=YYYY-MM-DD (Deep-Link, z.B. aus den Einstiegen).
   const [cursor, setCursor] = useState(() => { const p = params.get("date"); return p && /^\d{4}-\d{2}-\d{2}$/.test(p) ? startOfDay(new Date(p + "T00:00:00")) : startOfDay(new Date()); });
@@ -161,7 +163,6 @@ export default function Kalender() {
   useEffect(() => { if (view === "klassenarbeit") loadExams(); /* eslint-disable-next-line */ }, [view]);
   const [wdhVorschlag, setWdhVorschlag] = useState([]); // schwache Themen der Vorwoche
   const [slotEdit, setSlotEdit] = useState(null); // { weekday, period, ...slot } oder null
-  const [heuteAbsent, setHeuteAbsent] = useState({}); // class_id -> Anzahl Fehlende heute
   const [extInfo, setExtInfo] = useState(null); // angeklickter externer (abonnierter) Termin
   const [jumpOpen, setJumpOpen] = useState(false); // Datums-Sprung-Popover (Klick aufs Datum)
 
@@ -238,19 +239,6 @@ export default function Kalender() {
   // Ist der Tag unterrichtsfrei (in einem Ferien-/Feiertags-Zeitraum)?
   const frei = (d) => breaks.find((b) => ymd(d) >= ymd(new Date(b.start_date)) && ymd(d) <= ymd(new Date(b.end_date)));
 
-  // „Heute"-Ansicht: Fehlende je heute unterrichteter Klasse laden (Anwesenheit
-  // liegt im Modul Orga). Bündelt den Tag über alle Module.
-  useEffect(() => {
-    if (view !== "today" || !aktiv.orga) { setHeuteAbsent({}); return; }
-    const heute = startOfDay(new Date());
-    const cids = [...new Set(tt.slots.filter((s) => s.weekday === weekdayOf(heute) && slotActiveOn(s, heute) && s.class_id).map((s) => s.class_id))];
-    if (!cids.length) { setHeuteAbsent({}); return; }
-    const iso = new Date(ymd(heute) + "T00:00:00").toISOString();
-    Promise.all(cids.map((cid) => fetch(`/api/anwesenheit/${cid}?date=${iso}`).then((r) => (r.ok ? r.json() : {})).then((d) => {
-      const n = Object.values(d || {}).filter((v) => v.status && v.status !== "da").length;
-      return [cid, n];
-    }).catch(() => [cid, 0]))).then((pairs) => setHeuteAbsent(Object.fromEntries(pairs)));
-  }, [view, aktiv.orga, tt.slots]);
   const addBreak = async (b) => {
     const res = await fetch(`${API}/breaks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }).catch(() => null);
     if (res && res.ok) loadBreaks();
@@ -457,8 +445,12 @@ export default function Kalender() {
         <Werkzeugleiste
           links={(
             <span data-tour="kal-views" style={{ display: "inline-flex" }}>
-              <Tabs value={view} onChange={setView}
-                options={[["today", t("kalender.todayView")], ["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")]]} />
+              {/* Kein eigener Reiter „Heute" mehr: er zeigte dasselbe wie der
+                  Tag, nur an einem anderen Ort. Ein Klick auf „Tag" springt
+                  jetzt auf heute — das war ohnehin der Grund, warum man ihn
+                  angetippt hat. */}
+              <Tabs value={view} onChange={(v) => { if (v === "day") setCursor(startOfDay(new Date())); setView(v); }}
+                options={[["month", t("kalender.month")], ["week", t("kalender.week")], ["day", t("kalender.day")]]} />
             </span>
           )}
           ansicht={(
@@ -523,17 +515,18 @@ export default function Kalender() {
           </button>
         </Werkzeugleiste>
       )}
-      {/* Datums-Navigator, einheitlich mit der Anwesenheit: ‹ [Auswahl] › Heute.
-          Tagesansicht = nativer Datums-Picker inline (wie Anwesenheit); Monat/Woche
-          behalten den Selektor im Popover, da ein Tag-Picker dort nicht passt. */}
+      {/* Datums-Navigator: ‹ [Auswahl] › Heute — in ALLEN Ansichten dieselbe
+          Form. Der Tag zeigte frueher ein nacktes Datumsfeld, Woche und Monat
+          einen fetten Titel mit Pfeil; nebeneinander sah das aus wie zwei
+          verschiedene Bedienelemente. Jetzt ueberall der Titel mit Pfeil, und
+          was im Waehler steht, richtet sich nach der Ansicht: beim Tag ein
+          Datumsfeld, sonst Monat/Woche und Jahr. */}
       {kalAnsicht && view !== "today" && (
         <DatumNavigator style={{ justifyContent: "center", marginBottom: 16, position: "relative" }}
           onZurueck={() => move(-1)} labelZurueck={t("kalender.prev")}
           onVor={() => move(1)} labelVor={t("kalender.next")}
           onHeute={() => setCursor(startOfDay(new Date()))} labelHeute={t("kalender.today")}
-          mitte={view === "day" ? (
-            <input type="date" value={ymd(cursor)} onChange={(e) => { if (e.target.value) setCursor(startOfDay(new Date(e.target.value + "T00:00:00"))); }} style={segmentInput} />
-          ) : (
+          mitte={(
             <div style={{ position: "relative", display: "inline-flex" }}>
               {/* Titel mit Sprung-Popover: sitzt IN der Gruppe, traegt darum
                   keinen eigenen Rahmen mehr (frueher rahmenlos mit gepunkteter
@@ -542,7 +535,11 @@ export default function Kalender() {
                 style={{ ...segmentBtn, fontWeight: 700, color: "var(--text)", minWidth: 170, gap: 6 }}>{title} <Icon d={ICONS.chevronDown} size={11} /></button>
               {jumpOpen && (<>
                 <div onClick={() => setJumpOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-                <Popover align="center" style={{ padding: 8, display: "flex", gap: 6, alignItems: "center" }}>
+                <Popover align="center" style={{ padding: 8, display: "flex", gap: 8, alignItems: "center" }}>
+                  {view === "day" && (
+                    <input type="date" value={ymd(cursor)} autoFocus style={selectStyle}
+                      onChange={(e) => { if (e.target.value) { setCursor(startOfDay(new Date(e.target.value + "T00:00:00"))); setJumpOpen(false); } }} />
+                  )}
                   {view === "month" && (
                     <select value={cursor.getMonth()} onChange={(e) => { setCursor(startOfDay(new Date(cursor.getFullYear(), Number(e.target.value), 1))); setJumpOpen(false); }} style={selectStyle}>
                       {Array.from({ length: 12 }, (_, m) => <option key={m} value={m}>{new Date(2000, m, 1).toLocaleDateString(undefined, { month: "long" })}</option>)}
@@ -553,7 +550,7 @@ export default function Kalender() {
                       {Array.from({ length: 53 }, (_, i) => i + 1).map((w) => <option key={w} value={w}>{t("kalender.kw")} {w}</option>)}
                     </select>
                   )}
-                  {(() => {
+                  {view !== "day" && (() => {
                     const y0 = new Date().getFullYear();
                     const cy = view === "week" ? isoWeek(cursor).week : cursor.getMonth();
                     return (
@@ -569,12 +566,6 @@ export default function Kalender() {
       )}
       {view === "breaks" && <BreaksPanel breaks={breaks} onAdd={addBreak} onDel={delBreak} t={t} standalone />}
       {view === "klassenarbeit" && <ExamPanel overview={examOverview} periods={tt.periods} aktiv={aktiv} onAdd={addExam} onUpd={updExam} onDel={delExam} t={t} />}
-
-      {view === "today" && (
-        <HeuteView t={t} tt={tt} weekdayOf={weekdayOf} byDay={byDay} todoByDay={todoByDay} onTodo={() => nav("/notizbrett")}
-          className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} frei={frei}
-          heuteAbsent={heuteAbsent} orgaAktiv={!!aktiv.orga} onOpen={setEditing} onSlot={fromSlot} />
-      )}
 
       {view === "month" && <MonthGrid extColor={extColor} range={range} cursor={cursor} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/notizbrett")} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} kursName={kursName} slotName={slotName} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
       {view === "week" && wdhVorschlag.length > 0 && (
@@ -774,101 +765,6 @@ function EntryChips({ list, className, kursName = () => "", topicName, onOpen, c
   });
 }
 
-// „Heute" — der Tag über alle Module gebündelt: Stunde, Uhrzeit, Klasse, das
-// geplante Objekt (Deck/Quiz/Lernleiter/Einstieg) und wie viele heute fehlen.
-function HeuteView({ t, tt, weekdayOf, byDay, todoByDay, onTodo, className, slotName, slotColor, classColor, topicName, frei, heuteAbsent, orgaAktiv, onOpen, onSlot }) {
-  const heute = startOfDay(new Date());
-  const istFrei = frei(heute);
-  // An freien Tagen faellt der Stundenplan weg — Termine und ganztaegige
-  // Eintraege bleiben. Vorher raeumte ein Ferientag die ganze Ansicht leer.
-  const slots = istFrei ? [] : (tt.slots || []).filter((s) => s.weekday === weekdayOf(heute) && slotActiveOn(s, heute)).sort((a, b) => a.period - b.period);
-  const eintraege = byDay(heute);
-  const zeit = (period) => { const w = (tt.times || [])[period - 1]; return w && (w.start || w.end) ? `${w.start || ""}–${w.end || ""}` : ""; };
-  // Zeilen: pro Stundenplan-Slot; Ganztägige (ohne Stunde) als Banner oben,
-  // Einträge mit fremder Stunde (period ohne Slot) unten in der Achse.
-  const belegtePerioden = new Set(slots.map((s) => s.period));
-  const allDay = eintraege.filter((e) => e.period == null);
-  const extras = eintraege.filter((e) => e.period != null && !belegtePerioden.has(e.period));
-  const linked = (e) => e.cardvote_set_id || e.karten_deck_id || e.lernpfad_ladder_id || e.method_id || e.codedetektiv_puzzle;
-
-  const dateStr = heute.toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long" });
-
-  return (
-    <div>
-      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, textTransform: "capitalize" }}>{dateStr}</div>
-      {todoByDay && todoByDay(heute).length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ ...sectionLabel, marginBottom: 6 }}>{t("todo.title")}</div>
-          <TodoChips list={todoByDay(heute)} onOpen={onTodo} />
-        </div>
-      )}
-      {istFrei && (
-        <div style={{ ...panelStyle, border: "none", padding: "12px 16px", background: "rgba(184,134,11,0.12)", color: C.warning, fontSize: 14, fontWeight: 600, marginBottom: 16 }}>
-          {t("kalender.freeDay")}: {istFrei.label || ""}
-        </div>
-      )}
-      {allDay.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ ...sectionLabel, marginBottom: 6 }}>{t("kalender.allDay")}</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {allDay.map((e) => (
-              <button key={e.id} onClick={() => onOpen({ ...e, date: new Date(e.date) })}
-                style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 16px", borderRadius: CONTROL_R, border: "1px solid var(--accent)", background: "var(--accent-bg, rgba(10,132,255,0.10))", color: "var(--text)", cursor: "pointer" }}>
-                <span style={{ fontSize: 14, fontWeight: 700 }}>{e.title || (e.class_id && className(e.class_id)) || topicName(e.topic_id) || t("kalender.planned")}{linked(e) ? " ↗" : ""}</span>
-                {e.notes && <span style={{ display: "block", fontSize: 12, color: "var(--text3)", marginTop: 2 }}>{e.notes}</span>}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      {/* An freien Tagen ist `slots` leer (siehe oben) — die Zeilen unten zeigen
-          dann nur noch die Eintraege des Tages. */}
-      {!istFrei && slots.length === 0 && extras.length === 0 && allDay.length === 0 ? (
-        <p style={{ color: "var(--text3)", fontSize: 14 }}>{t("kalender.todayEmpty")}</p>
-      ) : slots.length === 0 && extras.length === 0 ? null : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {slots.map((s) => {
-            const col = s.class_id || s.kurs_id ? slotColor(s) : "var(--border2)";
-            const eintrag = eintraege.find((e) => e.period === s.period);
-            const absent = s.class_id ? (heuteAbsent[s.class_id] || 0) : 0;
-            return (
-              <div key={s.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderLeft: `4px solid ${col}`, flexWrap: "wrap" }}>
-                <div style={{ minWidth: 46, textAlign: "center" }}>
-                  <div style={{ fontSize: 16, fontWeight: 800 }}>{s.period}.</div>
-                  <div style={{ fontSize: 11, color: "var(--text3)" }}>{zeit(s.period)}</div>
-                </div>
-                <div style={{ flex: 1, minWidth: 120 }}>
-                  <div style={{ fontWeight: 600 }}>{slotName(s) || s.title || topicName(s.topic_id) || "—"}</div>
-                  {eintrag ? (
-                    <button onClick={() => onOpen({ ...eintrag, date: new Date(eintrag.date) })} style={{ ...chip, marginTop: 4, display: "inline-block", width: "auto", maxWidth: "100%" }}>
-                      {eintrag.title || topicName(eintrag.topic_id) || t("kalender.planned")}
-                      {(eintrag.cardvote_set_id || eintrag.karten_deck_id || eintrag.lernpfad_ladder_id || eintrag.method_id || eintrag.codedetektiv_puzzle) ? " ↗" : ""}
-                    </button>
-                  ) : (
-                    <button onClick={() => onSlot(heute, s)} style={{ ...ghost, marginTop: 4, display: "inline-block", width: "auto" }}>{t("kalender.planNow")}</button>
-                  )}
-                </div>
-                {orgaAktiv && s.class_id && (
-                  <span title={t("anwesenheit.overview")} style={badge(absent > 0 ? C.danger : C.success)}>
-                    {absent > 0 ? t("kalender.absentN", { n: absent }) : t("kalender.allPresent")}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-          {extras.map((e) => (
-            <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", border: "1px dashed var(--border2)", borderRadius: CONTROL_R, flexWrap: "wrap" }}>
-              <div style={{ minWidth: 46, textAlign: "center", color: "var(--text3)", fontSize: 12 }}>—</div>
-              <button onClick={() => onOpen({ ...e, date: new Date(e.date) })} style={{ ...chip, marginTop: 0, display: "inline-block", width: "auto", maxWidth: "100%" }}>
-                {e.title || (e.class_id && className(e.class_id)) || topicName(e.topic_id) || t("kalender.planned")}
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function MonthGrid({ extColor, range, cursor, byDay, extByDay, todoByDay, onTodo, slotsFor, onSlot, frei, className, kursName, slotName, topicName, classColor, onAdd, onOpen, onExt, onDayView, onWeekView, t }) {
   const days = [];
@@ -1462,6 +1358,8 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
   const [von, setVon] = useState("");
   const [bis, setBis] = useState("");
   const [label, setLabel] = useState("");
+  const [neuOffen, setNeuOffen] = useState(false);
+  const [landOffen, setLandOffen] = useState(false);
   // Eine Höhe, eine Form — Felder einer Leiste kommen aus dem gemeinsamen
   // Baustein (CONTROL_H/CONTROL_R), nicht aus rohem inputStyle.
   const fld = toolbarInput;
@@ -1517,36 +1415,51 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
           ihn schon der Abschnitts-h1 oben. */}
       {!standalone && <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{t("kalender.breaksTitle")}</h3>}
       <p style={{ fontSize: 12, color: "var(--text3)", margin: "0 0 12px", maxWidth: 620 }}>{t("kalender.breaksHint")}</p>
-      {/* Ferien/Feiertage sind seltene Massenaktionen — sie ersetzen bestehende
-          Zeiträume. Deshalb ins Mehr-Menü und nicht neben das Anlegen-Feld
-          (components/Werkzeugleiste.jsx). Links bleibt das Bundesland: es
-          bestimmt, WAS importiert wird. */}
+      {/* Eine Leiste statt zweier: das Anlegen ist ein Plus mit Dialog wie
+          ueberall sonst, statt drei Feldern und einem Knopf, die dauerhaft
+          herumstehen. Bundesland und die beiden Import-Aktionen sind seltene
+          Einstellungen — sie liegen im Mehr-Menue. Das Bundesland bestimmt nur,
+          WAS importiert wird; man setzt es einmal und nie wieder. */}
       <Werkzeugleiste
-        links={(
-          <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text2)" }}>{t("kalender.bundesland")}
-            <select value={land} onChange={(e) => { setLand(e.target.value); localStorage.setItem("nuvora_bundesland", e.target.value); }} style={selectStyle}>
-              {BUNDESLAENDER.map(([k, n]) => <option key={k} value={k}>{n}</option>)}
-            </select></label>
-        )}
+        style={{ marginBottom: 16 }}
         mehr={[
+          { key: "land", label: `${t("kalender.bundesland")}: ${(BUNDESLAENDER.find(([k]) => k === land) || [])[1] || land}`, icon: ICONS.settings, onClick: () => setLandOffen(true) },
           { key: "ferien", label: importing ? t("kalender.ferienImporting") : t("kalender.ferienImport"), icon: ICONS.import, disabled: importing, onClick: ferienImport },
           { key: "feiertage", label: t("kalender.feiertagImport"), icon: ICONS.import, disabled: importing, onClick: feiertagImport },
         ]}
       >
-        <span style={{ fontSize: 12, color: "var(--text3)", maxWidth: 340 }}>{t("kalender.ferienHint")}</span>
+        <AddButton onClick={() => { setVon(""); setBis(""); setLabel(""); setNeuOffen(true); }} title={t("kalender.addBreak")} />
       </Werkzeugleiste>
-      <Werkzeugleiste
-        links={(
-          <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text2)" }}>{t("kalender.from")}
-            <input type="date" value={von} onChange={(e) => setVon(e.target.value)} style={fld} /></label>
-        )}
-        style={{ marginBottom: 16 }}
-      >
-        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text2)" }}>{t("kalender.to")}
-          <input type="date" value={bis} onChange={(e) => setBis(e.target.value)} min={von} style={fld} /></label>
-        <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t("kalender.breakLabelPlaceholder")} aria-label={t("kalender.breakLabel")} title={t("kalender.breakLabel")} style={{ ...fld, flex: 1, minWidth: 160 }} />
-        <button onClick={speichern} disabled={!von} style={{ ...toolbarBtnPrimary, opacity: von ? 1 : 0.5 }}>{t("kalender.addBreak")}</button>
-      </Werkzeugleiste>
+
+      {neuOffen && (
+        <Modal onClose={() => setNeuOffen(false)} width={420} label={t("kalender.addBreak")} title={t("kalender.addBreak")}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "var(--text2)" }}>{t("kalender.from")}
+              <input type="date" value={von} onChange={(e) => setVon(e.target.value)} autoFocus style={fld} /></label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "var(--text2)" }}>{t("kalender.to")}
+              <input type="date" value={bis} onChange={(e) => setBis(e.target.value)} min={von} style={fld} /></label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "var(--text2)" }}>{t("kalender.breakLabel")}
+              <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t("kalender.breakLabelPlaceholder")} style={fld} /></label>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
+              <button onClick={() => { speichern(); setNeuOffen(false); }} disabled={!von} style={{ ...btnPrimary, opacity: von ? 1 : 0.5 }}>{t("common.add")}</button>
+              <button onClick={() => setNeuOffen(false)} style={btnSecondary}>{t("common.abort")}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {landOffen && (
+        <Modal onClose={() => setLandOffen(false)} width={380} label={t("kalender.bundesland")} title={t("kalender.bundesland")}>
+          <p style={{ fontSize: 12, color: "var(--text3)", margin: "0 0 12px" }}>{t("kalender.ferienHint")}</p>
+          <select value={land} onChange={(e) => { setLand(e.target.value); localStorage.setItem("nuvora_bundesland", e.target.value); }}
+            style={{ ...selectStyle, width: "100%" }}>
+            {BUNDESLAENDER.map(([k, n]) => <option key={k} value={k}>{n}</option>)}
+          </select>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+            <button onClick={() => setLandOffen(false)} style={btnSecondary}>{t("common.close")}</button>
+          </div>
+        </Modal>
+      )}
       {breaks.length === 0 ? (
         <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("kalender.noBreaks")}</p>
       ) : (

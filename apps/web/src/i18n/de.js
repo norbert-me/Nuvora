@@ -962,7 +962,6 @@ export default {
   "kalender.extLocation": "Ort",
   "kalender.extDesc": "Beschreibung",
   "kalender.today": "Heute",
-  "kalender.todayView": "Heute",
   "kalender.todayEmpty": "Heute keine Stunden im Stundenplan und keine Einträge.",
   "kalender.planned": "Geplant",
   "kalender.planNow": "+ planen",
