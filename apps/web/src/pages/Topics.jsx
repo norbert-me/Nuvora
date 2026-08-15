@@ -170,9 +170,13 @@ export default function Topics() {
       ) : null}
       {(
         <>
-          {/* Klick auf den Namen öffnet das Detail-Popup (Notiz + Inhalte). Das
-              Auf-/Zuklappen der Unterthemen bleibt am Pfeil-Button links. */}
-          <span onClick={() => openPopup(tp)} title={t("topics.openDetails")}
+          {/* Klick auf den Namen klappt die Unterthemen auf — das ist, was man
+              an einem Thema fast immer will. Erst wo es keine gibt, oeffnet er
+              die Details; die erreicht man sonst ueber das Stift-Symbol rechts.
+              Vorher fuehrte jeder Klick ins Popup, und die Liste darunter kam
+              nur ueber den schmalen Pfeil links. */}
+          <span onClick={() => (subCount > 0 ? toggleExpand(tp.id) : openPopup(tp))}
+            title={subCount > 0 ? (expanded.has(tp.id) ? t("topics.collapse") : t("topics.expand")) : t("topics.openDetails")}
             style={{ flex: 1, fontWeight: isChild ? 400 : 600, fontSize: isChild ? 14 : 16, color: "var(--text)", cursor: "pointer" }}>
             {tp.name}
             {subCount > 0 && <span style={{ fontSize: 12, fontWeight: 400, color: "var(--text3)", marginLeft: 8 }}>{t("topics.subCount", { n: subCount })}</span>}
@@ -187,11 +191,14 @@ export default function Topics() {
               <Icon d={ICONS.plus} size={16} color="var(--accent)" />
             </button>
           )}
-          {/* Kein Umbenennen-Icon in der Zeile — weder bei Themen noch bei
-              Unterthemen. Der Klick auf den Namen oeffnet das Detail-Popup, und
-              dort sitzt das Umbenennen zusammen mit Notiz, Zielen und
-              Voraussetzungen. Zwei Wege zu derselben Sache haben die Zeile nur
-              vollgestellt, und der eine konnte weniger als der andere. */}
+          {/* Details (Umbenennen, Notiz, Ziele, Voraussetzungen) sitzen hinter
+              EINEM Symbol — nicht verteilt auf mehrere Zeilen-Icons. Seit der
+              Namensklick die Unterthemen aufklappt, braucht es diesen Weg auch
+              bei Themen, die welche haben. */}
+          <button onClick={() => openPopup(tp)} className="icon-btn" style={iconBtn}
+            title={t("topics.openDetails")} aria-label={t("topics.openDetails")}>
+            <Icon d={ICONS.edit} size={16} />
+          </button>
           <button onClick={() => remove(tp)} className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}>
             <Icon d={ICONS.trash} color={C.danger} />
           </button>
