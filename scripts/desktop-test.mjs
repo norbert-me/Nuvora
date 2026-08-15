@@ -496,10 +496,33 @@ async function anmelden(seite) {
     : { ok: false, detail: `kein Token im localStorage — gelandet auf ${new URL(seite.url()).pathname}` };
 }
 
+/**
+ * `evaluate`, das eine laufende Navigation ueberlebt.
+ *
+ * Die Huelle navigiert beim Start und nach der Anmeldung selbst. Faellt ein
+ * `evaluate` genau hinein, ist der Ausfuehrungskontext weg („Execution context
+ * was destroyed") — und weil der Fehler bis nach oben durchschlaegt, endete der
+ * GANZE Desktop-Lauf mit einer einzigen Zeile. Das ist ein Rennen, kein Befund:
+ * also abwarten und ein zweites Mal versuchen.
+ */
+async function ruhigEvaluate(seite, fn, arg, standard = null) {
+  for (const versuch of [0, 1, 2]) {
+    try {
+      return await seite.evaluate(fn, arg);
+    } catch (e) {
+      if (!/Execution context was destroyed|Target closed|navigation/i.test(String(e))) throw e;
+      if (versuch === 2) return standard;
+      await seite.waitForLoadState("domcontentloaded", { timeout: 15000 }).catch(() => {});
+      await seite.waitForTimeout(800);
+    }
+  }
+  return standard;
+}
+
 /** Steckt ein Anmelde-Token im Speicher der App? */
-const angemeldet = (seite) => seite.evaluate(() => {
+const angemeldet = (seite) => ruhigEvaluate(seite, () => {
   try { return !!localStorage.getItem("token"); } catch { return false; }
-});
+}, undefined, false);
 
 // ───────────────────────── Der Lauf ────────────────────────────────────────
 
@@ -695,7 +718,7 @@ async function erststartProbe() {
       `„${titel}", ${feld} Adressfeld, ${knopf} Knopf`);
     // Die schmale Bruecke aus preload.js muss stehen — ohne sie kann die
     // Lehrkraft die Adresse eintragen, aber nichts passiert.
-    const bruecke = await seite.evaluate(() => typeof window.nuvora?.setUrl);
+    const bruecke = await ruhigEvaluate(seite, () => typeof window.nuvora?.setUrl, undefined, "undefined");
     notiere("Erststart", "Brücke zum Hauptprozess", bruecke === "function", `window.nuvora.setUrl ist ${bruecke}`);
   } catch (e) {
     notiere("Erststart", "Start ohne Adresse", false, kurzfehler(e, 1));
@@ -743,7 +766,7 @@ async function fensterProbe(app, seite) {
     shell.openExternal = (u) => { global.__extern.push(u); return Promise.resolve(); };
   });
   const vorher = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length);
-  await seite.evaluate(() => { try { window.open("https://beispiel.invalid/fremd", "_blank"); } catch { /* geblockt ist auch gut */ } });
+  await ruhigEvaluate(seite, () => { try { window.open("https://beispiel.invalid/fremd", "_blank"); } catch { /* geblockt ist auch gut */ } });
   await warte(1000);
   const nachher = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length);
   notiere("Fenster", "window.open öffnet kein zweites Fenster", nachher === vorher,

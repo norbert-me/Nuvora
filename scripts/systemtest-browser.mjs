@@ -316,9 +316,17 @@ const verbindungen = (td) => [
     // Vorbedingung noch nicht auf dem Schirm war. Also ausdruecklich auf den
     // Abschnitt warten — und wenn DER ausbleibt, sagt die Meldung genau das,
     // statt auf die Bruecke zu zeigen.
+    //
+    // Seit der Vereinheitlichung der Werkzeugleisten liegt der Knopf im
+    // „Mehr"-Menue (components/Werkzeugleiste.jsx) — sichtbar wird er also erst
+    // nach einem Klick darauf. Das gehoert in die Vorbereitung, nicht in die
+    // Suche: die Verbindung ist da, sie steht nur eine Ebene tiefer. Ohne das
+    // meldete der Lauf „tote Bruecke", obwohl nichts kaputt war.
     vorbereiten: async (seite) => {
       await seite.locator("th").filter({ hasText: `${MARKE}-Abschnitt` }).first()
         .waitFor({ state: "visible", timeout: 10000 });
+      await seite.locator("[title='Mehr']").first().click({ timeout: 8000 }).catch(() => {});
+      await seite.waitForTimeout(300);
     },
     allein: ["auswertung"],
     zusammen: ["auswertung", "code-detektiv"],
