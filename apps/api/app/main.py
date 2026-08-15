@@ -558,7 +558,7 @@ async def startup():
         await conn.run_sync(_ensure_columns)
         await conn.run_sync(_check_module_tables)
 
-    from sqlalchemy import select, text
+    from sqlalchemy import func, select, text
     from .models import User
     from .routers.auth import _hash_pw
     from .database import async_session
@@ -596,53 +596,31 @@ async def startup():
     # Schuljahr aus dem Kursnamen uebernehmen — einmalig und idempotent.
     # Bestandskurse heissen „6.5 Mathematik (2025-2026)", weil es bis jetzt kein
     # Feld dafuer gab. Der Name bleibt unangetastet; gesetzt wird nur, was leer
-    # ist, damit eine spaetere Korrektur von Hand nicht wieder ueberschrieben
-    # wird. Die Regex steht bewusst hier und nicht im Router: sie laeuft einmal
-    # beim Start, nicht bei jeder Anfrage.
+    # ist, damit eine spaetere Korrektur von Hand nicht ueberschrieben wird.
+    #
+    # In PYTHON, nicht in SQL: der erste Versuch stand als `text()` mit einem
+    # regulaeren Ausdruck da, und SQLAlchemy las darin `(?:20)` als
+    # Bind-Parameter „:20" — der Start brach ab, der Container blieb unhealthy.
+    # Die Regel gibt es ohnehin schon einmal (kurse.schuljahr_aus_name), samt
+    # Test; zweimal dieselbe Regel waere auch ohne den Unfall falsch gewesen.
     async with async_session() as db:
-        await db.execute(text(r"""
-            UPDATE kurse
-               SET schuljahr = substring(name from '(20\d{2})\s*[-/]\s*(?:20)?\d{2}')
-                             || '/' || right(substring(name from '20\d{2}\s*[-/]\s*((?:20)?\d{2})'), 2)
-             WHERE coalesce(schuljahr, '') = ''
-               AND name ~ '20\d{2}\s*[-/]\s*(20)?\d{2}'
-        """))
-        await db.commit()
+        from .models import Kurs
+        from .routers.kurse import schuljahr_aus_name
 
-    # Anwesenheit ist ins Modul „Orga & Anwesenheit" aufgegangen. Wer Anwesenheit
-    # aktiv hatte, bekommt orga aktiv (sonst verschwindet der Zugang); die alten
-    # anwesenheit-Zeilen fallen weg. Idempotent.
-    async with async_session() as db:
-        await db.execute(text("""
-            INSERT INTO user_modules (user_id, module_key)
-            SELECT DISTINCT user_id, 'orga' FROM user_modules WHERE module_key = 'anwesenheit'
-            ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
-        """))
-        await db.execute(text("DELETE FROM user_modules WHERE module_key = 'anwesenheit'"))
-        # Material-Ausleihe ebenso ins Modul „Orga" aufgegangen.
-        await db.execute(text("""
-            INSERT INTO user_modules (user_id, module_key)
-            SELECT DISTINCT user_id, 'orga' FROM user_modules WHERE module_key = 'ausleihe'
-            ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
-        """))
-        await db.execute(text("DELETE FROM user_modules WHERE module_key = 'ausleihe'"))
-        # Sitzplan ebenso ins Modul „Orga" aufgegangen (4. Tab).
-        await db.execute(text("""
-            INSERT INTO user_modules (user_id, module_key)
-            SELECT DISTINCT user_id, 'orga' FROM user_modules WHERE module_key = 'sitzplan'
-            ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
-        """))
-        await db.execute(text("DELETE FROM user_modules WHERE module_key = 'sitzplan'"))
-        # Todo + Notizblock sind ins Modul „Notizbrett" (2 Reiter) aufgegangen.
-        # Wer eins von beiden aktiv hatte, bekommt notizbrett; die Daten (todos,
-        # notepad_notes) bleiben unverändert. Idempotent.
-        await db.execute(text("""
-            INSERT INTO user_modules (user_id, module_key)
-            SELECT DISTINCT user_id, 'notizbrett' FROM user_modules WHERE module_key IN ('todo', 'notizblock')
-            ON CONFLICT ON CONSTRAINT uq_user_module DO NOTHING
-        """))
-        await db.execute(text("DELETE FROM user_modules WHERE module_key IN ('todo', 'notizblock')"))
-        # Beobachtungen und Klassenleitung gibt es nicht mehr als Module: die
+        offen = (await db.execute(
+            select(Kurs).where(func.coalesce(Kurs.schuljahr, "") == "")
+        )).scalars().all()
+        gesetzt = 0
+        for k in offen:
+            jahr = schuljahr_aus_name(k.name)
+            if jahr:
+                k.schuljahr = jahr
+                gesetzt += 1
+        if gesetzt:
+            await db.commit()
+            print(f"[STARTUP] Schuljahr aus dem Namen uebernommen: {gesetzt} Kurs(e).", flush=True)
+
+    # Beobachtungen und Klassenleitung gibt es nicht mehr als Module: die
         # Beobachtung ist als Kommentar an der Notenzelle aufgegangen, wo sie
         # hingehoert. Die Zuschaltungen fallen weg, sonst stehen sie ewig in
         # user_modules und tauchen bei jedem REGISTRY-Abgleich als Unbekannte
