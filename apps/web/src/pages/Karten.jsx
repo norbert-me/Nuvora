@@ -10,7 +10,6 @@ import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Themenstand from "../components/Themenstand.jsx";
 import AuthImage from "../components/AuthImage.jsx";
-import AbschnittWahl from "../components/AbschnittWahl.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
 import { swr } from "../core/cache.js";
@@ -49,7 +48,6 @@ export default function Karten() {
   const [subsetKurse, setSubsetKurse] = useState([]);
   // Alle Kurse der Lehrkraft: die Stapel-Sammlung wird ihnen zugewiesen, und
   // der Kurs sagt auch, ob mit E/G gearbeitet wird (niveau_aktiv).
-  const [kurse, setKurse] = useState([]);
   // Filter der Sammlung: null = alle Stapel, sonst „nur Stapel dieses Kurses".
   // Bewusst ein Filter und keine Voraussetzung mehr — die Stapel liegen in der
   // Sammlung, nicht in einer Klasse.
@@ -273,8 +271,10 @@ export default function Karten() {
   // wird. Teilkurse sind daraus die mit einzeln hinzugefuegten SuS.
   useEffect(() => {
     hol("/api/kurse").then((d) => {
+      // Nur noch die Teilkurse werden gebraucht: seit die Zuordnung ueber die
+      // Stunde laeuft, gibt es keinen Kurs-Filter mehr, der die volle Liste
+      // braeuchte.
       const list = Array.isArray(d) ? d : [];
-      setKurse(list);
       setSubsetKurse(list.filter((k) => (k.member_count || 0) > 0));
     });
   }, []);

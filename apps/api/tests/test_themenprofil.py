@@ -247,7 +247,7 @@ async def test_g_kind_bekommt_keine_e_karten_angerechnet(s):
     Rueckstand angerechnet bekommen (weder als faellig noch als Versuch)."""
     u, cls, thema, e_kind, g_kind, deck = await _aufbau(s, niveau_aktiv=True)
     frei = await _karte(s, deck, pos=0)
-    nur_e = await _karte(s, deck, niveau="E", pos=1)
+    await _karte(s, deck, niveau="E", pos=1)
     # Die freie Karte sitzt beim E-Kind (naechster Termin in der Zukunft).
     _rev(s, e_kind, frei, reps=1, lapses=0, due=datetime.now(timezone.utc) + timedelta(days=5))
     await s.commit()

@@ -112,8 +112,8 @@ async def test_sammlung_zeigt_alles_und_filtert_nach_kurs(s):
     u = await _lehrkraft(s)
     k1, _, _ = await _kurs_mit_klasse(s, u, "Mathe", "t1")
     k2, _, _ = await _kurs_mit_klasse(s, u, "Lernzeit", "t2")
-    a = await _sammlungsstapel(s, u, name="A", kurs_ids=[k1.id])
-    b = await _sammlungsstapel(s, u, name="B", kurs_ids=[k2.id])
+    await _sammlungsstapel(s, u, name="A", kurs_ids=[k1.id])
+    await _sammlungsstapel(s, u, name="B", kurs_ids=[k2.id])
     c = await _sammlungsstapel(s, u, name="C")   # keinem Kurs zugewiesen
 
     alle = await K.list_collection(user=u, db=s)

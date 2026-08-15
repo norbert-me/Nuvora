@@ -7,7 +7,7 @@ import { askConfirm } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { alsJson, hol, sende } from "../core/melden.js";
 import { useAblegeZiel } from "../core/ziehsortieren.js";
-import { AddButton, badge, cardStyle, CONTROL_H, CONTROL_R, dateiWaehlen, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, menuRow, pageTitle, sectionLabel, toolbarBtn, toolbarBtnPrimary, toolbarInput, COLORS as C, Modal, inputStyle, Popover, LoadError} from "../components/Icons.jsx";
+import { AddButton, badge, cardStyle, CONTROL_H, CONTROL_R, dateiWaehlen, Icon, ICONS, iconBtn, btnSecondary, menuRow, pageTitle, sectionLabel, toolbarBtn, toolbarBtnPrimary, toolbarInput, COLORS as C, Modal, inputStyle, Popover, LoadError} from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";

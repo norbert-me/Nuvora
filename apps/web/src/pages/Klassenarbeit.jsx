@@ -13,7 +13,6 @@ import MaterialPanel from "../components/MaterialPanel.jsx";
 import Themenstand from "../components/Themenstand.jsx";
 import { themenIndex, useThemen } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
-import AbschnittWahl from "../components/AbschnittWahl.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
