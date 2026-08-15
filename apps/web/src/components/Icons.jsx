@@ -190,6 +190,12 @@ export const CONTROL_R = 10;
 export const toolbarIconBtn = {
   ...iconBtn, width: CONTROL_H, height: CONTROL_H, borderRadius: CONTROL_R,
   border: "1px solid var(--border2)", background: "var(--bg)", boxSizing: "border-box",
+  // Ein Icon-Knopf ist quadratisch — und bleibt es. Ohne `flexShrink: 0` quetscht
+  // ihn eine enge Zeile zusammen (auf schmalen Geraeten aus 34 mal 34 ein
+  // 19 mal 36 grosses Oval), und ohne `alignSelf` zieht ihn ein Elternteil mit
+  // `align-items: stretch` in die Laenge. `AddButton` hatte das laengst, die
+  // uebrigen Icon-Knoepfe nicht.
+  flexShrink: 0, alignSelf: "center",
 };
 
 // EINHEITLICHER Hinzufügen-Knopf: quadratisch, nur ein „+" (Akzentfarbe), das

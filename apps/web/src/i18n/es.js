@@ -570,7 +570,6 @@ export default {
   "topics.noContent": "Aún sin contenidos para este tema.",
   "topics.draft": "Borrador",
   "topics.addSub": "+ Subtema",
-  "topics.questionCount": "{{n}} pregunta(s)",
   "topics.delConfirm": "¿Eliminar «{{name}}»?",
   "topics.delSubs": "{{n}} subtema(s) se eliminan también.",
   "topics.delQuestions": "{{n}} pregunta(s) pierden el tema; las preguntas se conservan.",

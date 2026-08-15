@@ -571,7 +571,6 @@ export default {
   "topics.noContent": "Noch keine Inhalte zu diesem Thema.",
   "topics.draft": "Entwurf",
   "topics.addSub": "+ Unterthema",
-  "topics.questionCount": "{{n}} Frage(n)",
   "topics.delConfirm": "„{{name}}“ löschen?",
   "topics.delSubs": "{{n}} Unterthema/-themen wandert mit in den Papierkorb.",
   "topics.delQuestions": "{{n}} Frage(n) behält ihr Thema — beides liegt 30 Tage im Papierkorb.",

@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useModules, useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
-import { StageBadge, Icon, ICONS, MODULE_ICONS, btnSecondary, selectStyle, COLORS as C, pageApp, pageTitle, cardStyle, chipStyle, badge, btnSmall, CONTROL_R, toolbarIconBtn } from "../components/Icons.jsx";
+import { StageBadge, Icon, ICONS, MODULE_ICONS, btnSecondary, selectStyle, COLORS as C, pageApp, pageTitle, cardStyle, chipStyle, badge, btnSmall, CONTROL_H, CONTROL_R, toolbarIconBtn } from "../components/Icons.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { alsJson, hol } from "../core/melden.js";
 import { ymd } from "../core/datum.js";
@@ -266,7 +266,10 @@ export default function NuvoraHome({ user }) {
             if (edit) kacheln.verwerfen();
             setEdit((e) => !e);
           }} className="icon-btn"
-            style={{ ...toolbarIconBtn, width: edit ? "auto" : undefined, padding: edit ? "0 12px" : 0,
+            // `width: undefined` LOESCHT die Breite aus dem Baustein — React
+            // laesst undefined weg, der Knopf hatte danach gar keine und schrumpfte
+            // auf den Inhalt (19 statt 34 Pixel breit, dabei 36 hoch: ein Oval).
+            style={{ ...toolbarIconBtn, width: edit ? "auto" : CONTROL_H, padding: edit ? "0 12px" : 0,
               borderColor: edit ? "var(--accent)" : "var(--border2)" }}
             title={t("home.arrange")} aria-label={t("home.arrange")}>
             {edit ? <span style={{ fontSize: 13, fontWeight: 600, color: "var(--accent)" }}>{t("common.done")}</span> : <Icon d={ICONS.edit} size={16} />}

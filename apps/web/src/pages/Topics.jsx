@@ -182,11 +182,6 @@ export default function Topics() {
             {tp.name}
             {subCount > 0 && <span style={{ fontSize: 12, fontWeight: 400, color: "var(--text3)", marginLeft: 8 }}>{t("topics.subCount", { n: subCount })}</span>}
           </span>
-          {tp.question_count > 0 && (
-            <span style={{ fontSize: 12, color: "var(--text3)" }}>
-              {t("topics.questionCount", { n: tp.question_count })}
-            </span>
-          )}
           {canHaveKids && (
             <button onClick={() => { setAddingUnder(tp.id); setChildName(""); setExpanded((p) => new Set(p).add(tp.id)); }} className="icon-btn" style={iconBtn} title={t("topics.addSub")} aria-label={t("topics.addSub")}>
               <Icon d={ICONS.plus} size={16} color="var(--accent)" />

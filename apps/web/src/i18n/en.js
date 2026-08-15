@@ -569,7 +569,6 @@ export default {
   "topics.noContent": "No contents for this topic yet.",
   "topics.draft": "Draft",
   "topics.addSub": "+ Subtopic",
-  "topics.questionCount": "{{n}} question(s)",
   "topics.delConfirm": "Delete “{{name}}”?",
   "topics.delSubs": "{{n}} subtopic(s) go with it.",
   "topics.delQuestions": "{{n}} question(s) lose the topic — the questions themselves stay.",
