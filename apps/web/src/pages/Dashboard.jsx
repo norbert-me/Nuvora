@@ -1092,13 +1092,12 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
           <span onClick={() => setEditingQ({ ...q })} style={{ flex: 1, color: "var(--text)", cursor: "pointer" }} title={t("dash.clickEdit")}>
             <Latex>{q.text}</Latex>
             {q.image_url && <Icon d={ICONS.image} size={18} color="var(--accent)" style={{ marginLeft: 4 }} />}
-            {/* Das Thema an der Frage — ohne es sieht man zwei gleich
-                aussehende Fragen und weiss nicht, welche wohin gehoert. */}
-            {themaIdx.liste.length > 0 && (
-              <span style={{ marginLeft: 8, fontSize: 12, color: q.topic_id ? "var(--text3)" : C.warning }}>
-                {q.topic_id ? themaIdx.labelFuerId(q.topic_id) : t("dash.withoutTopic")}
-              </span>
-            )}
+            {/* Das Thema steht NICHT mehr in der Zeile, sondern im Editor. Es
+                stand hinter jeder Frage — bei Fragen ohne Thema als gelbes
+                „Ohne Thema", bei den anderen als voller Pfad („Mathe 7.1
+                Rechnen mit Bruechen / 1 Vervielfachen und Teilen"). Das war
+                laenger als die Frage selbst und hat die Liste unlesbar gemacht,
+                obwohl man beim Durchsehen die FRAGE sucht. */}
           </span>
           <button onClick={() => removeQuestion(idx)} style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
         </div>
