@@ -4,6 +4,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { cardStyle, chipStyle, panelStyle, sectionLabel, Segment, segmentBtn, toolbarBtn, Icon, ICONS, toolbarIconBtn, CONTROL_R, SHADOW, dateiWaehlen, COLORS as C, Empty } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
+import { useEntwurf } from "../components/Speichern.jsx";
+import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import ViewMenu from "../components/ViewMenu.jsx";
 import Portrait from "../components/Portrait.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
@@ -45,21 +47,23 @@ export default function Sitzplan() {
   const [kursId, setKursId] = useState(null); // Sitzplan hängt am Kurs (Fach)
   // Aus dem Kurs verlinkt (?class=&kurs=): dann diesen Inhalt zeigen.
   useUrlClass(setClassId, setKursId);
-  const [seats, setSeats] = useState([]); // [{sid,x,y,rot}] — sid=String mit empty:true = leerer Platz
+  // Serverstand (Basis) und Arbeitskopie sind getrennt: gezogen, gedreht und
+  // gelöscht wird im Entwurf, geschrieben erst mit „Speichern".
+  const [gSeats, setGSeats] = useState([]); // [{sid,x,y,rot}] — sid=String mit empty:true = leerer Platz
   // Rückgängig: vor jeder Geste (Ziehen, Drehen, Löschen, Anordnen, Import,
   // Leeren, leerer Platz) den Stand sichern; Undo stellt ihn wieder her.
   const undoStack = useRef([]);
   const [undoLen, setUndoLen] = useState(0);
   const redoStack = useRef([]);
   const [redoLen, setRedoLen] = useState(0);
-  const [tafel, setTafel] = useState({ x: 200, y: 8 }); // bewegliche Tafel
+  const [gTafel, setGTafel] = useState({ x: 200, y: 8 }); // bewegliche Tafel
   const tafelRef = useRef(null);
   const [zoom, setZoom] = useState(1); // Anzeige-Zoom (Positionen bleiben unskaliert gespeichert)
   const [abwesend, setAbwesend] = useState({});
   const [aufruf, setAufruf] = useState(false);
   const [msg, setMsg] = useState("");
   const [segelOn, setSegelOn] = useState(false);   // Voreinstellung pro Kurs (siehe unten)
-  const [segel, setSegel] = useState({}); // student_id → Stufe
+  const [gSegel, setGSegel] = useState({}); // student_id → Stufe
   const [fotosOn, setFotosOn] = useState(true);     // Gesichter am Platz (an)
   const [foerderOn, setFoerderOn] = useState(false); // Maßnahmen am Platz (aus)
   const [massn, setMassn] = useState({});  // student_id → {foerder, massnahmen}
@@ -103,29 +107,60 @@ export default function Sitzplan() {
   // persist() auf den Kurs zurueck. Das ist kein Anzeigefehler, das ueberschreibt
   // einen echten Sitzplan. Nur die juengste Antwort darf also schreiben.
   const ladenr = useRef(0);
+  // Frische Serverdaten (anderer Kurs) beenden den Entwurf.
+  const frisch = useRef(false);
   const load = useCallback((id) => {
     if (!id) return;
     const meine = ++ladenr.current;
     fetch(`${API}/${id}${kursId != null ? `?kurs_id=${kursId}` : ""}`).then((r) => (r.ok ? r.json() : null)).then((d) => {
       if (meine !== ladenr.current) return;
-      if (!d) { setSeats([]); return; }
-      setTafel(d.tafel && typeof d.tafel.x === "number" ? d.tafel : { x: 200, y: 8 });
+      frisch.current = true;
+      if (!d) { setGSeats([]); return; }
+      setGTafel(d.tafel && typeof d.tafel.x === "number" ? d.tafel : { x: 200, y: 8 });
       // Altes Raster (cells) einmalig in freie Positionen umrechnen.
-      if (Array.isArray(d.seats)) { setSeats(d.seats); return; }
+      if (Array.isArray(d.seats)) { setGSeats(d.seats); return; }
       if (Array.isArray(d.cells)) {
         const cols = d.cols || 6;
         const migr = [];
         d.cells.forEach((sid, i) => { if (sid != null) migr.push({ sid, x: 20 + (i % cols) * (SEAT_W + 14), y: 20 + Math.floor(i / cols) * (SEAT_H + 18), rot: 0 }); });
-        setSeats(migr);
-      } else setSeats([]);
+        setGSeats(migr);
+      } else setGSeats([]);
     }).catch(() => {});
   }, [kursId]);
   useEffect(() => { load(classId); }, [classId, kursId, load]);
 
+  // ── Ein Entwurf für den ganzen Plan ──
+  // Plätze, Tafel und SEGEL-Stufen liegen in EINER Arbeitskopie mit EINER
+  // Leiste: es ist ein Bild, nicht dreißig Einzelentscheidungen. Nichts davon
+  // geht zum Server, bevor jemand speichert.
+  const basis = useMemo(() => ({ seats: gSeats, tafel: gTafel, segel: gSegel }), [gSeats, gTafel, gSegel]);
+  const e = useEntwurf(basis, async (wert) => {
+    if (!classId) return false;
+    const r = await fetch(`${API}/${classId}${kursQ}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seats: wert.seats, tafel: wert.tafel }) }).catch(() => null);
+    if (!r || !r.ok) { setMsg(t("common.notWork")); return false; }
+    // SEGEL hängt an einem eigenen Endpunkt (je Kind eine Stufe) — nur die
+    // geänderten schreiben.
+    const keys = new Set([...Object.keys(gSegel), ...Object.keys(wert.segel)]);
+    for (const k of keys) {
+      if ((gSegel[k] || "") === (wert.segel[k] || "")) continue;
+      await fetch(`${API}/${classId}/segel${kursQ}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ student_id: Number(k), stage: wert.segel[k] || "" }) }).catch(() => {});
+    }
+    setGSeats(wert.seats); setGTafel(wert.tafel); setGSegel(wert.segel);
+    return true;
+  });
+  useEffect(() => { if (frisch.current) { frisch.current = false; e.verwerfen(); } });
+  const seats = e.wert.seats;
+  const tafel = e.wert.tafel;
+  const segel = e.wert.segel;
+  const setSeats = (fn) => e.setz((v) => ({ seats: typeof fn === "function" ? fn(v.seats) : fn }));
+  const setTafel = (fn) => e.setz((v) => ({ tafel: typeof fn === "function" ? fn(v.tafel) : fn }));
+  // Kurswechsel mit offenem Plan: nachfragen statt still verwerfen.
+  const wechseln = (fn) => { if (e.geaendert && !window.confirm(t("speichern.verlassen"))) return; fn(); };
+
   // SEGEL-Stufen je SuS laden (pro Kurs). Toggle in localStorage merken.
   useEffect(() => {
-    if (!classId) { setSegel({}); return; }
-    fetch(`${API}/${classId}/segel${kursQ}`).then((r) => (r.ok ? r.json() : {})).then((d) => setSegel(d || {})).catch(() => {});
+    if (!classId) { setGSegel({}); return; }
+    fetch(`${API}/${classId}/segel${kursQ}`).then((r) => (r.ok ? r.json() : {})).then((d) => { frisch.current = true; setGSegel(d || {}); }).catch(() => {});
   }, [classId, kursId]);
   // „Ansicht"-Voreinstellung PRO KURS (Fallback Klasse): welche Zusatz-Anzeigen
   // an sind. Beim Kurswechsel neu laden — so merkt sich jeder Kurs seine Ansicht.
@@ -139,10 +174,11 @@ export default function Sitzplan() {
     if (!viewKey) return;
     try { const cur = JSON.parse(localStorage.getItem(`sitzplan_view_${viewKey}`) || "{}"); localStorage.setItem(`sitzplan_view_${viewKey}`, JSON.stringify({ ...cur, ...patch })); } catch {}
   };
-  const setStage = (sid, stage) => {
-    setSegel((m) => { const n = { ...m }; if (stage) n[String(sid)] = stage; else delete n[String(sid)]; return n; });
-    if (classId) fetch(`${API}/${classId}/segel${kursQ}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ student_id: sid, stage }) }).catch(() => {});
-  };
+  const setStage = (sid, stage) => e.setz((v) => {
+    const n = { ...v.segel };
+    if (stage) n[String(sid)] = stage; else delete n[String(sid)];
+    return { segel: n };
+  });
   const cycleStage = (sid) => {
     const cur = segel[String(sid)] || "";
     setStage(sid, SEGEL_CYCLE[(SEGEL_CYCLE.indexOf(cur) + 1) % SEGEL_CYCLE.length]);
@@ -170,10 +206,10 @@ export default function Sitzplan() {
       .catch(() => {});
   }, [anwesenheitAktiv, aufruf, classId]);
 
-  const persist = (next, tf = tafel) => {
-    setSeats(next);
-    if (classId) fetch(`${API}/${classId}${kursQ}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seats: next, tafel: tf }) }).catch(() => {});
-  };
+  // „persist" schreibt NICHT mehr — es legt den Zug in den Entwurf. Der Name
+  // bleibt, damit jede Geste (Ziehen, Drehen, Undo, Import) weiter denselben
+  // einen Weg nimmt.
+  const persist = (next, tf = tafel) => e.setz({ seats: next, tafel: tf });
   // Vor einer Änderung den aktuellen Stand auf den Undo-Stapel legen. Eine neue
   // Aktion macht Redo ungültig (klassisches Undo/Redo).
   // Rueckgaengig gilt nur fuer das, woran man GERADE arbeitet. Nach einer Pause
@@ -224,7 +260,8 @@ export default function Sitzplan() {
   const onTafelUp = () => {
     window.removeEventListener("pointermove", onTafelMove);
     window.removeEventListener("pointerup", onTafelUp);
-    if (tafelRef.current) { tafelRef.current = null; setTafel((tf) => { persist(seats, tf); return tf; }); }
+    // Kein Schreiben mehr beim Loslassen: der Zug steht längst im Entwurf.
+    tafelRef.current = null;
   };
 
   const platziert = new Set(seats.map((s) => s.sid));
@@ -250,7 +287,7 @@ export default function Sitzplan() {
   const onUp = () => {
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
-    if (dragRef.current) { dragRef.current = null; setSeats((prev) => { persist(prev); return prev; }); }
+    dragRef.current = null;
   };
 
   const entfernen = (sid) => { snapshot(); persist(seats.filter((s) => s.sid !== sid)); };
@@ -281,7 +318,7 @@ export default function Sitzplan() {
   const onRotUp = () => {
     window.removeEventListener("pointermove", onRotMove);
     window.removeEventListener("pointerup", onRotUp);
-    if (rotRef.current) { rotRef.current = null; setSeats((prev) => { persist(prev); return prev; }); }
+    rotRef.current = null;
   };
 
   // Tafel drehen (gleicher Eck-Griff-Mechanismus).
@@ -303,7 +340,7 @@ export default function Sitzplan() {
   const onTafelRotUp = () => {
     window.removeEventListener("pointermove", onTafelRotMove);
     window.removeEventListener("pointerup", onTafelRotUp);
-    if (tafelRotRef.current) { tafelRotRef.current = null; setTafel((tf) => { persist(seats, tf); return tf; }); }
+    tafelRotRef.current = null;
   };
 
   // Pool → Fläche (HTML5-Drop; Position aus der Cursorstelle).
@@ -386,7 +423,7 @@ export default function Sitzplan() {
   return (
     <div style={{ maxWidth: "none" }}>
       <Werkzeugleiste
-        links={<KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />}
+        links={<KursKlasseSelect value={classId} onChange={(id, kid) => wechseln(() => { setClassId(id); setKursId(kid); })} onKurs={setKursId} />}
         ansicht={(
           <ViewMenu title={t("sitzplan.view")} items={[
             ...(anwesenheitAktiv ? [{ key: "aufruf", label: t("sitzplan.rollcall"), value: aufruf, onChange: (v) => { setAufruf(v); saveView({ aufruf: v }); } }] : []),
@@ -548,6 +585,7 @@ export default function Sitzplan() {
           )}
         </>
       )}
+      <SpeicherBalken entwurf={e} />
     </div>
   );
 }

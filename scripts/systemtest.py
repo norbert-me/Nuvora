@@ -1898,6 +1898,66 @@ def teste_bruecken(api, b, u, sch, spuren, cv):
 
     b.pruefe("Bruecken", "Fruehwarnung -> Beobachtung (Schueler-ID)", fruehwarnung_ids)
 
+    # ── Bruecke 8: Karten speisen den Themenstand ──
+    def karten_im_themenstand():
+        """Der Themenstand ist Kern und rechnet ueber drei Quellen. Mit dem Modul
+        Karten muss der Kartenstand mitzaehlen, ohne es darf er nicht auftauchen
+        — und der Aufruf muss trotzdem 200 liefern (kein 403, Regel 3).
+
+        Nachgerechnet wird dabei der Fehler, der schon einmal drinsteckte: drei
+        Karten, jede dreimal verpatzt (SM-2: reps faellt auf 0, lapses steigt).
+        Wer nach reps > 0 filtert, sieht hier NICHTS statt 0 %.
+        """
+        sch.setze({"karten"})
+        anonym = Api(api.basis, debug=api.debug)
+        deck = api.call("POST", f"/api/karten/classes/{u.class_id}/decks",
+                        {"name": f"{PRAEFIX} Themenstand-Stapel", "topic_id": u.topic_id},
+                        erwartet=(201,))
+        spuren.append(("Themenstand-Stapel", lambda: (
+            api.call("DELETE", f"/api/karten/decks/{deck['id']}", erwartet=(204, 404)),
+            api.call("DELETE", f"/api/karten/decks/{deck['id']}/purge", erwartet=(204, 404)))))
+        karten = [api.call("POST", f"/api/karten/decks/{deck['id']}/cards",
+                           {"front": f"{i}*9", "back": str(i * 9)}, erwartet=(201,))
+                  for i in range(1, 4)]
+        api.call("POST", f"/api/karten/decks/{deck['id']}/release", {"now": True}, erwartet=(200,))
+        token = _finde(api.call("POST", f"/api/karten/classes/{u.class_id}/tokens",
+                                erwartet=(200, 201)), student_id=u.students[0])["token"]
+        for k in karten:
+            for _ in range(3):
+                anonym.call("POST", f"/api/karten/lernen/{token}/review",
+                            {"card_id": k["id"], "grade": 0}, erwartet=(200,))
+
+        def thema_von(antwort):
+            kind = _finde(antwort.get("schueler") or [], student_id=u.students[0])
+            if kind is None:
+                raise AssertionError(f"Kind {u.students[0]} fehlt im Themenstand: {antwort}")
+            return next((t for t in (kind.get("themen") or []) if t["topic_id"] == u.topic_id), None)
+
+        mit = api.call("GET", f"/api/classes/{u.class_id}/themenprofil"
+                              f"?student_id={u.students[0]}", erwartet=(200,))
+        if "karten" not in (mit.get("quellen") or []):
+            raise AssertionError(f"Karten als Quelle nicht gemeldet: {mit.get('quellen')}")
+        th = thema_von(mit)
+        if not th or not (th.get("karten") or {}).get("versuche"):
+            raise AssertionError(f"verpatzte Karten fehlen im Themenstand: {th}")
+        if th["karten"]["karten"] < 3 or th["karten"]["treffer"] != 0:
+            raise AssertionError(f"Kartenzahlen falsch (reps>0-Falle?): {th['karten']}")
+        if th["pct"] != 0.0 or "karten" not in th["quellen"]:
+            raise AssertionError(f"dreimal verpatzt ergibt nicht 0 %: {th}")
+
+        sch.setze({"cardvote"})   # Karten aus
+        ohne = api.call("GET", f"/api/classes/{u.class_id}/themenprofil"
+                               f"?student_id={u.students[0]}", erwartet=(200,))
+        if "karten" in (ohne.get("quellen") or []):
+            raise AssertionError("Karten zaehlen ohne das Modul weiter mit")
+        leer = thema_von(ohne)
+        if leer and leer.get("karten"):
+            raise AssertionError(f"Kartenstand erscheint OHNE Modul Karten: {leer}")
+        return (f"mit Karten {th['karten']['treffer']:.0f} von "
+                f"{th['karten']['versuche']:.0f} Versuchen = 0 %, ohne Karten keine Spur")
+
+    b.pruefe("Bruecken", "Karten -> Themenstand", karten_im_themenstand)
+
 
 # ─────────────────────── Ablauf ───────────────────────
 

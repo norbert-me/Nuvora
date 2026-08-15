@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { istAdmin } from "../core/admin.js";
 import { useLanguage, LANGUAGES } from "../i18n/index.jsx";
 import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, pageTitle, panelStyle, popoverPanel,
   sectionLabel, Tabs, th as thBasis, td as tdBasis, badge, iconBtn, inputStyle as inputBasis, Icon, ICONS, CONTROL_R } from "../components/Icons.jsx";
+import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 
 const API = "/api";
 
@@ -48,11 +49,17 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   // Bestehende Werte unveraendert mitsenden — kein UI mehr dafuer, aber Backend braucht sie im Payload
   const name = user.name || "";
   const salutation = user.salutation || "Hr.";
-  const [marketplaceName, setMarketplaceName] = useState(user.marketplace_name || "");
   const [profileMsg, setProfileMsg] = useState("");
   const DEFAULT_SCALE = { 1: 87, 2: 73, 3: 59, 4: 45, 5: 20, 6: 0 };
-  const [gradeScale, setGradeScale] = useState(user.grade_scale || DEFAULT_SCALE);
-  const [gradeTendency, setGradeTendency] = useState(user.grade_tendency !== false); // Default: mit Tendenz (2+)
+  // Anzeigename, Notenschlüssel und Tendenz sind EIN Entwurf: sie hängen an
+  // demselben PUT und gehen gemeinsam hinaus.
+  const [profilBasis, setProfilBasis] = useState({
+    marketplaceName: user.marketplace_name || "",
+    gradeScale: user.grade_scale || DEFAULT_SCALE,
+    gradeTendency: user.grade_tendency !== false,   // Voreinstellung: mit Tendenz (2+)
+  });
+  const profil = useEntwurf(profilBasis, (w) => saveProfile(w));
+  const { marketplaceName, gradeScale, gradeTendency } = profil.wert;
   const [showUsername, setShowUsername] = useState(false);
   const [showScale, setShowScale] = useState(false);
   const [showTendency, setShowTendency] = useState(false);
@@ -79,34 +86,51 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     fetch(`${API}/admin/setup`).then(r => r.ok ? r.json() : null).then(setSetup).catch(() => {});
   }, [isAdmin]);
 
-  const changeChannel = async (ch) => {
-    if (ch === versionInfo?.channel) return;
+  // Der Update-Kanal ist eine Einstellung wie jede andere und wartet auf
+  // „Speichern" — vorher schaltete der Reiter beim Antippen sofort um.
+  const [kanalBasis, setKanalBasis] = useState({ channel: "" });
+  const kanal = useEntwurf(kanalBasis, async (w) => {
     setVersionLoading(true);
     await fetch(`${API}/version/channel`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ channel: ch }),
+      body: JSON.stringify({ channel: w.channel }),
     }).catch(() => {});
     const d = await fetch(`${API}/version`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
     setVersionInfo(d);
+    setKanalBasis({ channel: d?.channel || w.channel });
     setVersionLoading(false);
-  };
+  });
+  const kanalRef = useRef(null);
+  kanalRef.current = kanal;
+  // Erst wenn der Server seinen Kanal gemeldet hat, steht die Grundlage fest.
+  useEffect(() => {
+    const ch = versionInfo?.channel;
+    if (!ch || ch === kanalBasis.channel) return;
+    setKanalBasis({ channel: ch }); kanalRef.current?.setz({ channel: ch });
+  }, [versionInfo?.channel]); // eslint-disable-line
 
-  const saveProfile = async (e) => {
-    e.preventDefault();
+  // Sprache: der Anzeige-Wechsel ist selbst die Änderung — also erst mit
+  // „Speichern" umschalten, nicht beim Auswählen.
+  const [sprachBasis, setSprachBasis] = useState({ lang });
+  const sprache = useEntwurf(sprachBasis, (w) => { setLang(w.lang); setSprachBasis({ lang: w.lang }); });
+
+  const saveProfile = async (w) => {
     setProfileMsg("");
     const res = await fetch(`${API}/auth/profile`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ name, salutation, grade_scale: gradeScale, grade_tendency: gradeTendency, marketplace_name: marketplaceName }),
+      body: JSON.stringify({ name, salutation, grade_scale: w.gradeScale, grade_tendency: w.gradeTendency, marketplace_name: w.marketplaceName }),
     });
     if (res.ok) {
       const data = await res.json();
       setProfileMsg(t("profile.saved"));
+      setProfilBasis(w);
       const updated = { ...user, ...data };
       localStorage.setItem("user", JSON.stringify(updated));
       onUserUpdate?.(updated);
     } else {
       setProfileMsg(t("profile.saveError"));
+      return false;   // Entwurf bleibt offen
     }
   };
 
@@ -171,11 +195,12 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         <div style={{ flex: 1, minWidth: 160 }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("nav.language")}</div>
         </div>
-        <select value={lang} onChange={(e) => setLang(e.target.value)} style={{ ...selectStyle, minWidth: 160 }}>
+        <select value={sprache.wert.lang} onChange={(e) => sprache.setz({ lang: e.target.value })} style={{ ...selectStyle, minWidth: 160 }}>
           {Object.entries(LANGUAGES).map(([code, label]) => (
             <option key={code} value={code}>{label}</option>
           ))}
         </select>
+        <Speicherleiste entwurf={sprache} klein />
       </div>
 
       <div style={abschnitt}>
@@ -203,14 +228,17 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         )}
         {emailMsg && <div style={{ fontSize: 13, color: emailMsg === t("profile.linkSent") ? C.success : C.danger, marginBottom: 16 }}>{emailMsg}</div>}
 
-        <form onSubmit={saveProfile}>
+        {/* Bewusst kein <form>: die Knöpfe der Speicherleiste wären darin
+            Submit-Knöpfe, und „Abbrechen" schickte das Formular ab. */}
+        <div>
           <button type="button" onClick={() => setShowUsername((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: showUsername ? 8 : 0 }}>
             <Icon d={showUsername ? ICONS.chevronUp : ICONS.chevronDown} size={15} />
             <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("profile.username")}</span>
             <InfoDot text={t("profile.usernameHint")} />
           </button>
           {showUsername && (
-            <input placeholder={t("profile.usernamePlaceholder")} value={marketplaceName} onChange={(e) => setMarketplaceName(e.target.value)}
+            <input placeholder={t("profile.usernamePlaceholder")} value={marketplaceName} onChange={(e) => profil.setz({ marketplaceName: e.target.value })}
+              onKeyDown={(e) => { if (e.key === "Enter") profil.speichern(); }}
               style={{ ...feldStyle, marginBottom: 10 }} />
           )}
 
@@ -229,7 +257,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                 <input className="nice-num"
                   type="number" min="0" max="100" step="1"
                   value={gradeScale[g]}
-                  onChange={(e) => setGradeScale({ ...gradeScale, [g]: Math.max(0, Math.min(100, Number(e.target.value))) })}
+                  onChange={(e) => profil.setz({ gradeScale: { ...gradeScale, [g]: Math.max(0, Math.min(100, Number(e.target.value))) } })}
                   style={{ ...inputBasis, width: 52, padding: "4px 8px", fontSize: 13, textAlign: "center" }}
                 />
                 <span style={{ fontSize: 11, color: "var(--text3)" }}>%</span>
@@ -249,14 +277,14 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             // `Tabs` statt eines zweiten Umschalters von Hand: dieselbe
             // Entscheidung soll ueberall gleich aussehen.
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
-              <Tabs value={gradeTendency ? "an" : "aus"} onChange={(v) => setGradeTendency(v === "an")}
+              <Tabs value={gradeTendency ? "an" : "aus"} onChange={(v) => profil.setz({ gradeTendency: v === "an" })}
                 options={[["an", t("profile.gradeTendencyOn")], ["aus", t("profile.gradeTendencyOff")]]} />
             </div>
           )}
 
-          {profileMsg && <div style={{ fontSize: 13, color: profileMsg === "Gespeichert" ? C.success : C.danger, marginTop: 12, marginBottom: 8 }}>{profileMsg}</div>}
-          <button type="submit" style={{ ...btnPrimary, marginTop: 16 }}>{t("common.save")}</button>
-        </form>
+          {profileMsg && <div style={{ fontSize: 13, color: profileMsg === t("profile.saved") ? C.success : C.danger, marginTop: 12, marginBottom: 8 }}>{profileMsg}</div>}
+          <Speicherleiste entwurf={profil} immer style={{ marginTop: 16 }} />
+        </div>
       </div>
 
       <div style={abschnitt}>
@@ -343,9 +371,10 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                 {versionInfo.channels && (
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("profile.channel")}</span>
-                    <Tabs value={versionInfo.channel} onChange={changeChannel}
+                    <Tabs value={kanal.wert.channel || versionInfo.channel} onChange={(ch) => kanal.setz({ channel: ch })}
                       options={versionInfo.channels.map((ch) => [ch, t(`profile.channel.${ch}`)])} />
-                    <InfoDot text={t(`profile.channelHint.${versionInfo.channel}`)} />
+                    <InfoDot text={t(`profile.channelHint.${kanal.wert.channel || versionInfo.channel}`)} />
+                    <Speicherleiste entwurf={kanal} klein />
                   </div>
                 )}
               </div>

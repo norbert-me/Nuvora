@@ -1,12 +1,14 @@
 // Modul Kalender — Unterrichtsplanung. Tag-, Wochen- und Monatsansicht; je Tag
 // Stunden eintragen und optional Klasse + Thema (Kern-Taxonomie) zuordnen.
-import { useState, useEffect, useCallback, useRef, Fragment } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AddButton, Icon, ICONS, iconBtn, badge, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, COLORS as C, selectStyle, SHADOW, Tabs, td as tdCell, th, inputStyle, menuRow, toolbarInput, toolbarBtn, toolbarBtnPrimary, DatumNavigator, segmentBtn, segmentInput, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, dateiWaehlen, pageApp, Popover } from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
+import { useEntwurf } from "../components/Speichern.jsx";
+import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr, put } from "../core/cache.js";
 import { undoDelete } from "../core/undo.jsx";
@@ -1167,16 +1169,33 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
 function TimetableView({ tt, showTimes = false, className, slotName, slotColor, classColor, topicName, onEdit, onPeriods, onTimes, breaks = [], onAddBreak, onDelBreak, t }) {
   // Uhrzeiten-Umschalter liegt jetzt oben neben Export/Import (Prop showTimes).
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri")];
-  const periods = Array.from({ length: tt.periods }, (_, i) => i + 1);
+  // ── Ein Entwurf für Stundenzahl und Uhrzeiten ──
+  // Beides schrieb bisher sofort: die Uhrzeit beim Verlassen des Feldes, die
+  // Stundenzahl beim Klick auf + / −. Jetzt sammelt der Entwurf beides flach
+  // (`periods`, `t<i>start`, `t<i>end` — Zeichenketten und Zahlen, damit ein
+  // Neuladen die Arbeitskopie wieder einholt) und schreibt auf „Speichern".
+  const basis = useMemo(() => {
+    const o = { periods: tt.periods };
+    for (let i = 0; i < tt.periods; i++) {
+      o[`t${i}start`] = (tt.times && tt.times[i] && tt.times[i].start) || "";
+      o[`t${i}end`] = (tt.times && tt.times[i] && tt.times[i].end) || "";
+    }
+    return o;
+  }, [tt]);
+  const frisch = useRef(false);
+  const entwurf = useEntwurf(basis, async (wert) => {
+    if (wert.periods !== tt.periods) await onPeriods(wert.periods);
+    const arr = Array.from({ length: wert.periods }, (_, i) => ({ start: wert[`t${i}start`] || "", end: wert[`t${i}end`] || "" }));
+    await onTimes(arr);
+    frisch.current = true;
+  });
+  useEffect(() => { if (frisch.current) { frisch.current = false; entwurf.verwerfen(); } });
+  const anzahl = entwurf.wert.periods;
+  const periods = Array.from({ length: anzahl }, (_, i) => i + 1);
   // Editor zeigt/bearbeitet nur die AKTUELL gültige Version (valid_to == null).
   const slot = (wd, p) => tt.slots.find((s) => s.weekday === wd && s.period === p && !s.valid_to);
-  // Uhrzeiten je Stunde: onBlur speichern (wenige Felder, kein Debounce noetig).
-  const timeVal = (i, f) => (tt.times && tt.times[i] && tt.times[i][f]) || "";
-  const commitTime = (i, f, val) => {
-    const arr = periods.map((_, idx) => ({ start: timeVal(idx, "start"), end: timeVal(idx, "end") }));
-    arr[i] = { ...arr[i], [f]: val };
-    onTimes(arr);
-  };
+  const timeVal = (i, f) => entwurf.wert[`t${i}${f}`] || "";
+  const commitTime = (i, f, val) => entwurf.setz({ [`t${i}${f}`]: val });
   const timeInput = { width: "100%", boxSizing: "border-box", border: "1px solid var(--border2)", borderRadius: CONTROL_R, fontSize: 12, padding: 4, background: "var(--bg)", color: "var(--text)", marginTop: 4 };
   // Zelle des Stundenplans: aus der gemeinsamen Tabellenzelle abgeleitet, nur
   // Rahmen ringsum statt nur unten (das Raster braucht alle vier Kanten).
@@ -1192,6 +1211,7 @@ function TimetableView({ tt, showTimes = false, className, slotName, slotColor, 
       <div style={{ margin: "0 0 12px" }}>
         <p style={{ fontSize: 13, color: "var(--text3)", margin: 0, maxWidth: 620 }}>{t("kalender.timetableHint")}</p>
       </div>
+      <SpeicherBalken entwurf={entwurf} />
       <div>
         <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
           <thead><tr>
@@ -1208,8 +1228,8 @@ function TimetableView({ tt, showTimes = false, className, slotName, slotColor, 
                     <td style={{ ...tdBase, textAlign: "center", padding: showTimes ? 4 : "4px 0", background: "transparent", border: "none", width: showTimes ? 96 : 26 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>{p}.</div>
                       {showTimes && (<>
-                        <input type="time" defaultValue={timeVal(p - 1, "start")} onBlur={(e) => commitTime(p - 1, "start", e.target.value)} style={timeInput} title={t("kalender.start")} />
-                        <input type="time" defaultValue={timeVal(p - 1, "end")} onBlur={(e) => commitTime(p - 1, "end", e.target.value)} style={timeInput} title={t("kalender.end")} />
+                        <input type="time" value={timeVal(p - 1, "start")} onChange={(e) => commitTime(p - 1, "start", e.target.value)} style={timeInput} title={t("kalender.start")} />
+                        <input type="time" value={timeVal(p - 1, "end")} onChange={(e) => commitTime(p - 1, "end", e.target.value)} style={timeInput} title={t("kalender.end")} />
                       </>)}
                     </td>
                     {wdays.map((_, wd) => {
@@ -1241,8 +1261,8 @@ function TimetableView({ tt, showTimes = false, className, slotName, slotColor, 
             <tr>
               <td style={{ padding: 6, border: "none", textAlign: "center" }}>
                 <div style={{ display: "inline-flex", gap: 4 }}>
-                  {tt.periods > 1 && <button onClick={() => onPeriods(tt.periods - 1)} title={t("kalender.removePeriod")} style={{ ...btnSecondary, ...btnSmall, padding: "4px 12px" }}>−</button>}
-                  <button onClick={() => onPeriods(tt.periods + 1)} title={t("kalender.addPeriod")} style={{ ...btnSecondary, ...btnSmall, padding: "4px 12px" }}>+</button>
+                  {anzahl > 1 && <button onClick={() => entwurf.setz({ periods: anzahl - 1 })} title={t("kalender.removePeriod")} style={{ ...btnSecondary, ...btnSmall, padding: "4px 12px" }}>−</button>}
+                  <button onClick={() => entwurf.setz({ periods: anzahl + 1 })} title={t("kalender.addPeriod")} style={{ ...btnSecondary, ...btnSmall, padding: "4px 12px" }}>+</button>
                 </div>
               </td>
               {wdays.map((_, wd) => <td key={wd} style={{ border: "none" }} />)}

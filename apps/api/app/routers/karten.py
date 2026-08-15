@@ -1294,6 +1294,74 @@ async def progress(class_id: int, kurs_id: Optional[int] = None, subset_kurs: Op
     return out
 
 
+async def themen_lernstand(db: AsyncSession, user: User, class_id: int, students,
+                           jetzt: Optional[datetime] = None) -> dict:
+    """Kartenstand je Kind und Thema — die Kartenquelle des Themenstands.
+
+    Kein Endpunkt, sondern eine Auskunft für `themenprofil` (Kern). Die
+    Modul-Schranke bleibt beim Aufrufer: der prüft `is_active("karten")` und
+    fragt sonst gar nicht erst (Regel 3, je Quelle einzeln).
+
+    Gezählt wird nur, was das Kind auch bekommen hat:
+
+    - nur ausgerollte, nicht gelöschte Stapel MIT Thema (ein Entwurf ist für
+      niemanden fällig, ein Stapel ohne Thema gehört in keine Themenzeile),
+    - E/G auf beiden Ebenen (`_sichtbar_karte`) — ein G-Kind darf sich keinen
+      Rückstand an E-Karten anrechnen lassen, die es nie zu sehen bekommt,
+    - `Treffer = reps`, `Versuche = reps + lapses`. NICHT nach `reps > 0`
+      filtern: SM-2 setzt `reps` beim Fehler auf 0 zurück, `reps=0, lapses=3`
+      ist also die schwächste Karte im Stapel und genau die, um die es geht.
+
+    Fällig ist eine Karte, die noch nie dran war oder deren `due` erreicht ist —
+    dieselbe Regel wie in der Fortschrittsübersicht.
+    """
+    from ..themenprofil import KartenStand
+
+    now = jetzt or _now()
+    aus = {s.id: {} for s in students}
+    if not students:
+        return aus
+
+    karten = (await db.execute(
+        select(Card.id, Card.niveau, CardDeck.niveau, CardDeck.niveau_aktiv, CardDeck.topic_id)
+        .join(CardDeck, Card.deck_id == CardDeck.id)
+        .where(CardDeck.owner_id == user.id,
+               await _class_all_decks_where(db, class_id),
+               CardDeck.topic_id.is_not(None),
+               CardDeck.deleted_at.is_(None),
+               CardDeck.released_at.is_not(None), CardDeck.released_at <= now,
+               Card.deleted_at.is_(None))
+    )).all()
+    if not karten:
+        return aus
+
+    reviews: dict[int, dict] = {s.id: {} for s in students}
+    for r in (await db.execute(select(CardReview).where(
+            CardReview.student_id.in_([s.id for s in students])))).scalars().all():
+        if r.student_id in reviews:
+            reviews[r.student_id][r.card_id] = r
+
+    for st in students:
+        je_thema = aus[st.id]
+        eigene = reviews[st.id]
+        for cid, karten_niveau, deck_niveau, niveau_aktiv, topic_id in karten:
+            if not _sichtbar_karte(st.niveau or "", karten_niveau, deck_niveau, niveau_aktiv):
+                continue
+            stand = je_thema.setdefault(topic_id, KartenStand())
+            rev = eigene.get(cid)
+            if rev is None:
+                stand.faellig += 1
+                continue
+            treffer, patzer = rev.reps or 0, rev.lapses or 0
+            if treffer or patzer:
+                stand.karten += 1
+                stand.treffer += treffer
+                stand.versuche += treffer + patzer
+            if _utc(rev.due) <= now:
+                stand.faellig += 1
+    return aus
+
+
 class CardStat(BaseModel):
     card_id: int
     front: str

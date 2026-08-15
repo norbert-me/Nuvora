@@ -7,7 +7,7 @@
 //
 // Klick auf einen Namen öffnet alle Infos zur Person. Beobachtungen zählen nie
 // in den Schnitt — „Anstrengungsbereitschaft“ ist kein Messwert.
-import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
@@ -16,6 +16,8 @@ import { Icon, ICONS, iconBtn, toolbarBtn, toolbarBtnPrimary, toolbarIconBtn, to
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { MehrMenu } from "../components/Werkzeugleiste.jsx";
+import { useEntwurf } from "../components/Speichern.jsx";
+import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { useAktiv } from "../core/modules.js";
 import { datumKurz } from "../core/grades.js";
 import { useLanguage } from "../i18n/index.jsx";
@@ -140,73 +142,48 @@ export default function Noten() {
     const side = e.clientX < r.left + r.width / 2 ? "left" : "right";
     setDragColOver((p) => (p && p.id === catId && p.side === side ? p : { id: catId, side }));
   };
-  const spalteDrop = async (zielId, sec) => {
+  // Umsortieren ist eine Änderung wie jede andere: sie landet im Entwurf und
+  // wird mit „Speichern" geschrieben (vorher schrieb das Loslassen sofort).
+  const spalteDrop = (zielId, sec) => {
     const von = dragCol, ov = dragColOver;
     setDragCol(null); setDragColOver(null);
     if (!von || von.secId !== sec.id || von.catId === zielId) return;
-    const alt = sections;
-    const cols = (sec.categories || []).map((c) => c.id);
+    const cols = catsVon(sec).map((c) => c.id);
     const from = cols.indexOf(von.catId);
     let to = cols.indexOf(zielId);
     if (from < 0 || to < 0) return;
     if (ov && ov.id === zielId && ov.side === "right") to += 1;
     if (from < to) to -= 1;
-    const neuCols = [...(sec.categories || [])];
+    const neuCols = [...cols];
     neuCols.splice(to, 0, neuCols.splice(from, 1)[0]);
-    const neuSections = sections.map((s) => (s.id === sec.id ? { ...s, categories: neuCols } : s));
-    setSections(neuSections);
-    const res = await fetch(`${API}/sections/${sec.id}/categories/reorder`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: neuCols.map((c) => c.id) }),
-    }).catch(() => null);
-    if (!res || !res.ok) { setSections(alt); setError(t("noten.reorderFail")); }
+    entwurf.setz({ [`oc:${sec.id}`]: neuCols });
   };
 
-  // Abschnitt per Drag & Drop verschieben: optimistisch umsortieren, dann speichern.
-  const abschnittDrop = async (zielId) => {
+  // Abschnitt per Drag & Drop verschieben — ebenfalls in den Entwurf.
+  const abschnittDrop = (zielId) => {
     const von = dragId, ov = dragOver;
     setDragId(null); setDragOver(null);
     if (!von || von === zielId) return;
-    const alt = sections;
-    const ids = alt.map((s) => s.id);
+    const ids = secListe.map((x) => x.id);
     const from = ids.indexOf(von);
     let to = ids.indexOf(zielId);
     if (from < 0 || to < 0) return;
     if (ov && ov.id === zielId && ov.side === "right") to += 1;
     if (from < to) to -= 1;  // Entnahme verschiebt den Zielindex
-    const neu = [...alt];
+    const neu = [...ids];
     neu.splice(to, 0, neu.splice(from, 1)[0]);
-    setSections(neu);
-    const res = await fetch(`${API}/classes/${classId}/sections/reorder`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: neu.map((s) => s.id) }),
-    }).catch(() => null);
-    if (!res || !res.ok) { setSections(alt); setError(t("noten.reorderFail")); }
+    entwurf.setz({ os: neu });
   };
 
-  // Bereichs-/Endnote manuell setzen oder zuruecksetzen.
-  const overrideSetzen = async (studentId, sectionId, text) => {
+  // Bereichs-/Endnote manuell setzen oder zuruecksetzen — in den Entwurf.
+  const overrideSetzen = (studentId, sectionId, text) => {
     const val = parseNote(text);
     setZelle(null);
     if (val === null) return;
-    // Optimistisch: Bereichs- bzw. Endnote sofort zeigen (auch offline).
-    setSummary((prev) => prev.map((s) => {
-      if (s.student_id !== studentId) return s;
-      if (sectionId == null) return { ...s, total_override: val };
-      return { ...s, section_overrides: { ...s.section_overrides, [String(sectionId)]: val },
-               section_effective: { ...s.section_effective, [String(sectionId)]: val } };
-    }));
-    const ok = await call(() => fetch(`${API}/overrides`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ class_id: classId, kurs_id: kursId, student_id: studentId, section_id: sectionId, term, value: val }),
-    }));
-    if (ok === false) load(classId);
+    entwurf.setz({ [sectionId == null ? `to:${studentId}` : `so:${studentId}:${sectionId}`]: val });
   };
-  const overrideReset = async (studentId, sectionId) => {
-    const q = new URLSearchParams({ class_id: classId, student_id: studentId, term, ...(kursId != null ? { kurs_id: kursId } : {}) });
-    if (sectionId != null) q.set("section_id", sectionId);
-    await call(() => fetch(`${API}/overrides?${q}`, { method: "DELETE" }));
-  };
+  const overrideReset = (studentId, sectionId) =>
+    entwurf.setz({ [sectionId == null ? `to:${studentId}` : `so:${studentId}:${sectionId}`]: null });
 
   useEffect(() => {
     return swr("classes", "/api/classes", (d) => {
@@ -346,8 +323,8 @@ export default function Noten() {
   // Browser gibt den Fokus zwar weiter, aber die Zelle daneben ist ein Knopf und
   // kein Eingabefeld — man tippt ins Leere.
   const zellFolge = () => {
-    const cats = sections.filter((sec) => !collapsed.has(sec.id))
-      .flatMap((sec) => (sec.categories || []).map((c) => c.id));
+    const cats = secListe.filter((sec) => !collapsed.has(sec.id))
+      .flatMap((sec) => catsVon(sec).map((c) => c.id));
     return { cats, kinder: (summary || []).map((s) => s.student_id) };
   };
   const nachbar = (studentId, catId, rueckwaerts) => {
@@ -371,36 +348,13 @@ export default function Noten() {
     return `${kinder[nze]}:${cats[sp]}`;
   };
 
-  const noteSetzen = async (studentId, catId, text) => {
+  // Note in den Entwurf legen. Leeres Feld = Note löschen (beim Speichern);
+  // eine unlesbare Eingabe fasst nichts an.
+  const noteSetzen = (studentId, catId, text) => {
     setZelle(null);
     const wert = parseNote(text);
-    // Feld leer geraeumt = Note loeschen. Vorher blieb die alte Note stehen —
-    // ein Vertipper liess sich nur ueber Umwege wieder loswerden.
-    if (wert === null) {
-      if (String(text).trim() !== "") return;      // unlesbare Eingabe: nichts anfassen
-      const alt = notenVon(studentId, catId)[0];
-      if (!alt?.id) return;
-      setSummary((prev) => prev.map((s) => {
-        if (s.student_id !== studentId) return s;
-        const rest = { ...s.per_category };
-        delete rest[String(catId)];
-        return { ...s, per_category: rest };
-      }));
-      setEntries((prev) => prev.filter((e) => e.id !== alt.id));
-      const ok = await call(() => fetch(`${API}/entries/${alt.id}`, { method: "DELETE" }));
-      if (ok) load(classId);
-      return;
-    }
-    // Optimistisch lokal setzen, damit die Note auch offline sofort steht.
-    setSummary((prev) => prev.map((s) => s.student_id === studentId
-      ? { ...s, per_category: { ...s.per_category, [String(catId)]: wert } } : s));
-    setEntries((prev) => [...prev.filter((e) => !(e.student_id === studentId && e.category_id === catId && e.kind === "grade")),
-      { student_id: studentId, category_id: catId, kind: "grade", value: wert }]);
-    const ok = await call(() => fetch(`${API}/entries`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ category_id: catId, student_id: studentId, kind: "grade", value: wert, note: "" }),
-    }));
-    if (ok === false) load(classId); // echter Server-Fehler: Wahrheit zurückholen
+    if (wert === null && String(text).trim() !== "") return;
+    entwurf.setz({ [`n:${studentId}:${catId}`]: wert });
   };
 
   // Kommentar an einer Zelle: „Formel vergessen", „krank, nachgeschrieben".
@@ -408,21 +362,97 @@ export default function Noten() {
   // daneben. (Das frühere Modul „Beobachtungen" lag neben dem Notenbuch; jetzt
   // haengt die Bemerkung an der Zelle, zu der sie gehoert.)
   const [kommentarFuer, setKommentarFuer] = useState(null);   // {sid, cid, text}
-  const kommentarVon = (sid, cid) => (notenVon(sid, cid)[0]?.note || "");
-  const kommentarSetzen = async (sid, cid, text) => {
-    setKommentarFuer(null);
-    setEntries((prev) => {
-      const rest = prev.filter((e) => !(e.student_id === sid && e.category_id === cid && e.kind === "grade"));
-      const alt = prev.find((e) => e.student_id === sid && e.category_id === cid && e.kind === "grade");
-      if (!text.trim() && (!alt || alt.value == null)) return rest;
-      return [...rest, { ...(alt || { student_id: sid, category_id: cid, kind: "grade", value: null }), note: text.trim() }];
+  const kommentarSetzen = (sid, cid, text) => { setKommentarFuer(null); entwurf.setz({ [`k:${sid}:${cid}`]: text.trim() }); };
+
+  // ── EIN Entwurf für die ganze Tabelle ──
+  //
+  // Noten, Kommentare, gesetzte Bereichs-/Endnoten und die Reihenfolge von
+  // Abschnitten und Spalten liegen in EINER Arbeitskopie mit EINER Leiste:
+  // eine Notentabelle ist eine Maske, nicht dreihundert Einzelentscheidungen.
+  // Der Plan ist flach (`n:` Note, `k:` Kommentar, `so:`/`to:` gesetzte Note,
+  // `os`/`oc:` Reihenfolgen) — nur Zahlen, Zeichenketten und ID-Listen, damit
+  // ein Neuladen die Arbeitskopie wieder einholt.
+  const basis = useMemo(() => {
+    const o = { os: sections.map((x) => x.id) };
+    sections.forEach((sec) => {
+      o[`oc:${sec.id}`] = (sec.categories || []).map((c) => c.id);
+      (sec.categories || []).forEach((c) => {
+        summary.forEach((s) => {
+          const v = s.per_category ? s.per_category[String(c.id)] : undefined;
+          o[`n:${s.student_id}:${c.id}`] = v === undefined ? null : v;
+          o[`k:${s.student_id}:${c.id}`] = (entries.find((x) => x.student_id === s.student_id && x.category_id === c.id && x.kind === "grade")?.note) || "";
+        });
+      });
+      summary.forEach((s) => { o[`so:${s.student_id}:${sec.id}`] = s.section_overrides?.[String(sec.id)] ?? null; });
     });
-    const ok = await call(() => fetch(`${API}/entries/comment`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ category_id: cid, student_id: sid, text }),
-    }));
-    if (ok !== false) load(classId);
-  };
+    summary.forEach((s) => { o[`to:${s.student_id}`] = s.total_override ?? null; });
+    return o;
+  }, [sections, summary, entries]);
+  const frisch = useRef(false);
+  const entwurf = useEntwurf(basis, async (wert) => {
+    let ok = true;
+    const q = (extra) => new URLSearchParams({ class_id: classId, term, ...(kursId != null ? { kurs_id: kursId } : {}), ...extra });
+    for (const s of summary) {
+      for (const sec of sections) {
+        for (const c of (sec.categories || [])) {
+          const k = `n:${s.student_id}:${c.id}`;
+          if (wert[k] !== basis[k]) {
+            if (wert[k] == null) {
+              const alt = notenVon(s.student_id, c.id)[0];
+              if (alt?.id) { const r = await fetch(`${API}/entries/${alt.id}`, { method: "DELETE" }).catch(() => null); ok = !!(r && r.ok) && ok; }
+            } else {
+              const r = await fetch(`${API}/entries`, { method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ category_id: c.id, student_id: s.student_id, kind: "grade", value: wert[k], note: "" }) }).catch(() => null);
+              ok = !!(r && r.ok) && ok;
+            }
+          }
+          const kk = `k:${s.student_id}:${c.id}`;
+          if (wert[kk] !== basis[kk])
+            await fetch(`${API}/entries/comment`, { method: "PUT", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ category_id: c.id, student_id: s.student_id, text: wert[kk] }) }).catch(() => {});
+        }
+        const so = `so:${s.student_id}:${sec.id}`;
+        if (wert[so] !== basis[so]) {
+          if (wert[so] == null) await fetch(`${API}/overrides?${q({ student_id: s.student_id, section_id: sec.id })}`, { method: "DELETE" }).catch(() => {});
+          else await fetch(`${API}/overrides`, { method: "PUT", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ class_id: classId, kurs_id: kursId, student_id: s.student_id, section_id: sec.id, term, value: wert[so] }) }).catch(() => {});
+        }
+      }
+      const to = `to:${s.student_id}`;
+      if (wert[to] !== basis[to]) {
+        if (wert[to] == null) await fetch(`${API}/overrides?${q({ student_id: s.student_id })}`, { method: "DELETE" }).catch(() => {});
+        else await fetch(`${API}/overrides`, { method: "PUT", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ class_id: classId, kurs_id: kursId, student_id: s.student_id, section_id: null, term, value: wert[to] }) }).catch(() => {});
+      }
+    }
+    // Reihenfolgen zuletzt: sie ändern die Struktur, nicht die Werte.
+    if ((wert.os || []).join() !== (basis.os || []).join())
+      await fetch(`${API}/classes/${classId}/sections/reorder`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: wert.os }) }).catch(() => {});
+    for (const sec of sections) {
+      const ck = `oc:${sec.id}`;
+      if ((wert[ck] || []).join() !== (basis[ck] || []).join())
+        await fetch(`${API}/sections/${sec.id}/categories/reorder`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: wert[ck] }) }).catch(() => {});
+    }
+    if (!ok) setError(t("common.notWork"));
+    frisch.current = true;
+    await load(classId);
+    return ok;
+  });
+  // Frische Serverdaten (anderes Halbjahr, andere Klasse, nach dem Speichern)
+  // beenden die Arbeitskopie — sonst zeigte die Tabelle die alten Werte weiter.
+  useEffect(() => { if (frisch.current) { frisch.current = false; entwurf.verwerfen(); } });
+  // Wechsel mit offenen Änderungen: nachfragen statt still verwerfen.
+  const wechseln = (fn) => { if (entwurf.geaendert && !window.confirm(t("speichern.verlassen"))) return; fn(); };
+  // Anzeige liest den ENTWURF: Reihenfolge, Note, Kommentar, gesetzte Note.
+  const secListe = (entwurf.wert.os || sections.map((x) => x.id)).map((id) => sections.find((x) => x.id === id)).filter(Boolean);
+  const catsVon = (sec) => (entwurf.wert[`oc:${sec.id}`] || (sec.categories || []).map((c) => c.id))
+    .map((id) => (sec.categories || []).find((c) => c.id === id)).filter(Boolean);
+  const noteVon = (sid, cid) => entwurf.wert[`n:${sid}:${cid}`] ?? null;
+  const kommentarVon = (sid, cid) => entwurf.wert[`k:${sid}:${cid}`] || "";
+  const secNoteVon = (s, secId) => (entwurf.wert[`so:${s.student_id}:${secId}`] ?? (s.section_effective?.[String(secId)] ?? null));
+  const istSecOverride = (s, secId) => entwurf.wert[`so:${s.student_id}:${secId}`] != null;
+  const endNoteVon = (s) => (entwurf.wert[`to:${s.student_id}`] ?? s.weighted);
+  const istEndOverride = (s) => entwurf.wert[`to:${s.student_id}`] != null;
 
   const allCats = sections.flatMap((s) => s.categories || []);
   const gewichtSumme = sections.reduce((n, s) => n + (s.weight || 0), 0);
@@ -480,7 +510,7 @@ export default function Noten() {
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <label data-tour="noten-class" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)" }}>
           {t("nav.classes")}
-          <KursKlasseSelect value={subsetKurs ? null : classId} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} />
+          <KursKlasseSelect value={subsetKurs ? null : classId} onChange={(id, kid) => wechseln(() => { setSubsetKurs(null); setClassId(id); setKursId(kid); })} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} />
         </label>
         {subsetKurse.length > 0 && (
           <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)" }}>
@@ -505,7 +535,7 @@ export default function Noten() {
             steht im title. Beide Umschalter kommen aus `Tabs` (Icons.jsx):
             gleiche Hoehe, gleiche Form wie alles andere in der Leiste. */}
         <span title={t("noten.term")}>
-          <Tabs value={term} onChange={setTerm}
+          <Tabs value={term} onChange={(v) => wechseln(() => setTerm(v))}
             options={[["1", t("noten.term1Short")], ["2", t("noten.term2Short")], ["year", t("noten.year")]]} />
         </span>
         <span title={t("noten.aggHint")}>
@@ -606,7 +636,7 @@ export default function Noten() {
 
       {term === "year"
         ? (yearData.rows || []).length > 0 && <NotenStatistik noten={(yearData.rows || []).map((r) => (r.year_override != null ? r.year_override : r.year))} t={t} />
-        : sections.length > 0 && <NotenStatistik noten={(summary || []).map((s) => (s.total_override != null ? s.total_override : s.weighted))} t={t} />}
+        : sections.length > 0 && <NotenStatistik noten={(summary || []).map((s) => endNoteVon(s))} t={t} />}
 
       {loading && !loadedOnce.current && term !== "year" ? (
         <Skeleton rows={6} height={38} />
@@ -639,9 +669,9 @@ export default function Noten() {
                 <th style={{ ...th, ...stickyLh, whiteSpace: "nowrap", textAlign: "left", fontWeight: 400, fontSize: 13, color: gewichtSumme === 100 ? "var(--text3)" : C.warning }}>
                   {gewichtSumme !== 100 ? t("noten.weightNot100", { n: gewichtSumme }) : t("noten.weightSum", { n: gewichtSumme })}
                 </th>
-                {sections.map((sec) => {
+                {secListe.map((sec) => {
                   const isCol = collapsed.has(sec.id);
-                  const cols = isCol ? 0 : (sec.categories || []).length || 1;
+                  const cols = isCol ? 0 : catsVon(sec).length || 1;
                   const over = dragId && dragOver && dragOver.id === sec.id;
                   return (
                     <th key={sec.id} colSpan={cols + 1}
@@ -675,8 +705,8 @@ export default function Noten() {
               </tr>
               <tr>
                 <th style={{ ...th2, ...stickyLh, textAlign: "left" }}>{cls?.name}</th>
-                {sections.map((sec) => {
-                  const cols = sec.categories || [];
+                {secListe.map((sec) => {
+                  const cols = catsVon(sec);
                   const bereich = (
                     <th key={`sn-${sec.id}`} style={{ ...th2, borderLeft: collapsed.has(sec.id) ? "2px solid var(--border3)" : undefined, borderRight: "2px solid var(--border3)", fontWeight: 500, minWidth: 56 }} title={t("noten.sectionGradeHint")}>
                       {t("noten.sectionGrade")}
@@ -756,7 +786,7 @@ export default function Noten() {
                       <span style={{ display: "inline-block", width: 26, textAlign: "right", color: "var(--text3)", fontWeight: 400, marginRight: 8, fontVariantNumeric: "tabular-nums" }}>{si + 1}.</span>{s.name}
                       {/* Zeile mit Kommentaren: ein Punkt genuegt — die Zelle
                           selbst zeigt, wo er sitzt. */}
-                      {entries.some((e) => e.student_id === s.student_id && e.kind === "grade" && (e.note || "").trim()) && (
+                      {allCats.some((c) => kommentarVon(s.student_id, c.id).trim()) && (
                         /* Punkt: Radius = halbe Kante, reine Grafik. */
                         <span title={t("noten.commentRow")} style={{ display: "inline-block", width: 6, height: 6, borderRadius: 3, background: C.warning, marginLeft: 8, verticalAlign: "middle" }} />
                       )}
@@ -768,15 +798,15 @@ export default function Noten() {
                       ) : null; })()}
                     </button>
                   </td>
-                  {sections.map((sec) => {
-                    const cols = sec.categories || [];
+                  {secListe.map((sec) => {
+                    const cols = catsVon(sec);
                     const bereichTd = (
                       <td key={`sn-${sec.id}`} style={{ ...td, padding: 0, borderLeft: collapsed.has(sec.id) ? "2px solid var(--border3)" : undefined, borderRight: "2px solid var(--border3)", background: "var(--bg2, rgba(0,0,0,0.02))" }}>
                         <NoteZelle t={t}
                           editing={zelle === `sec:${s.student_id}:${sec.id}`}
                           onEdit={() => setZelle(`sec:${s.student_id}:${sec.id}`)}
-                          value={s.section_effective[String(sec.id)] ?? null}
-                          isOverride={s.section_overrides[String(sec.id)] !== undefined}
+                          value={secNoteVon(s, sec.id)}
+                          isOverride={istSecOverride(s, sec.id)}
                           onSave={(txt) => overrideSetzen(s.student_id, sec.id, txt)}
                           onCancel={() => setZelle(null)}
                           onReset={() => overrideReset(s.student_id, sec.id)} />
@@ -787,11 +817,11 @@ export default function Noten() {
                     return [
                       ...cols.map((c, i) => {
                         const id = `${s.student_id}:${c.id}`;
-                        const noten = notenVon(s.student_id, c.id);
+                        const wert = noteVon(s.student_id, c.id);
                         return (
                           <td key={c.id} style={{ ...td, padding: 0, width: 56, minWidth: 56, maxWidth: 56, borderLeft: i === 0 ? "2px solid var(--border3)" : "1px solid var(--border)", borderRight: dividers.includes(c.id) ? "3px solid var(--accent)" : undefined }}>
                             {zelle === id
-                              ? <Zelle initial={noten[0] ? de(noten[0].value) : ""}
+                              ? <Zelle initial={wert != null ? de(wert) : ""}
                                   onSave={(txt) => noteSetzen(s.student_id, c.id, txt)}
                                   onCancel={() => setZelle(null)}
                                   // Tab geht NACH UNTEN: man traegt eine Spalte
@@ -816,8 +846,8 @@ export default function Noten() {
                                   }} />
                               : (<div style={{ position: "relative" }}>
                                   <button onClick={() => setZelle(id)}
-                                    style={{ width: "100%", minHeight: 32, border: "none", background: "none", cursor: "text", color: "var(--text)", fontSize: 14, fontWeight: noten.length ? 600 : 400 }}>
-                                    {s.per_category[String(c.id)] !== undefined ? de(s.per_category[String(c.id)]) : <span style={{ color: "var(--border2)" }}>·</span>}
+                                    style={{ width: "100%", minHeight: 32, border: "none", background: "none", cursor: "text", color: "var(--text)", fontSize: 14, fontWeight: wert != null ? 600 : 400 }}>
+                                    {wert != null ? de(wert) : <span style={{ color: "var(--border2)" }}>·</span>}
                                   </button>
                                   {/* Ecke oben rechts. Die Trefferflaeche ist 20 px
                                       gross, das Dreieck darin nur 9 — vorher war der
@@ -847,12 +877,12 @@ export default function Noten() {
                     <NoteZelle t={t} bold
                       editing={zelle === `end:${s.student_id}`}
                       onEdit={() => setZelle(`end:${s.student_id}`)}
-                      value={s.total_override ?? s.weighted}
-                      isOverride={s.total_override != null}
+                      value={endNoteVon(s)}
+                      isOverride={istEndOverride(s)}
                       onSave={(txt) => overrideSetzen(s.student_id, null, txt)}
                       onCancel={() => setZelle(null)}
                       onReset={() => overrideReset(s.student_id, null)} />
-                    {s.total_override == null && s.weighted !== null && s.unweighted_fallback && (
+                    {!istEndOverride(s) && s.weighted !== null && s.unweighted_fallback && (
                       <div style={{ fontWeight: 400, fontSize: 11, color: C.warning }}>{t("noten.unweighted")}</div>
                     )}
                   </td>
@@ -888,6 +918,11 @@ export default function Noten() {
             onSave={(txt) => kommentarSetzen(kommentarFuer.sid, kommentarFuer.cid, txt)} />
         </Modal>
       )}
+
+      {/* Unten schwebend, damit sie beim Rollen durch die Tabelle nicht
+          verschwindet. Fixiert = ohne Einfluss auf die gemessene Kopfhöhe
+          (--kopf2/--spalte1), die hier empfindlich ist. */}
+      <SpeicherBalken entwurf={entwurf} />
 
       {infoFuer && (
         <StudentInfo t={t} student={students.find((st) => st.id === infoFuer)} summary={sumOf(infoFuer)} sections={sections} entries={entries} className={cls?.name} onZeugnis={() => doZeugnisStudent(infoFuer)} onClose={() => setInfoFuer(null)} />
@@ -1145,6 +1180,9 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
   const [name, setName] = useState(cat.name);
   const [topicId, setTopicId] = useState(cat.topic_id ?? "");
   const [datum, setDatum] = useState(cat.date || "");
+  // Auch der Quartalsstrich wartet auf „Speichern" — er schrieb bisher beim
+  // Klick, mitten in einer Maske, die sonst sammelt.
+  const [strich, setStrich] = useState(!!dividerOn);
   const angelegt = cat.created_at ? new Date(cat.created_at).toLocaleDateString("de-DE") : "—";
   // Siehe core/topics.js: Beschriftung und Reihenfolge kommen von dort, damit
   // dieselbe Auswahl ueberall gleich heisst und gleich sortiert ist.
@@ -1155,6 +1193,7 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
   const save = () => {
     const titel = name.trim() || datumKurz(datum);
     if (!titel) return;
+    if (strich !== !!dividerOn) onToggleDivider && onToggleDivider();
     onRename(titel, topicId === "" ? null : Number(topicId), datum || null);
   };
   return (
@@ -1212,8 +1251,8 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
           </div>
         )}
         {onToggleDivider && (
-          <button onClick={onToggleDivider} style={{ width: "100%", marginBottom: 12, padding: "6px 8px", fontSize: 12, fontWeight: 600, borderRadius: CONTROL_R, cursor: "pointer", border: `1px solid ${dividerOn ? "var(--accent)" : "var(--border2)"}`, background: dividerOn ? "var(--accent)" : "transparent", color: dividerOn ? C.aufAkzent : "var(--text2)" }}>
-            {dividerOn ? t("noten.dividerOff") : t("noten.dividerOn")}
+          <button onClick={() => setStrich((v) => !v)} style={{ width: "100%", marginBottom: 12, padding: "6px 8px", fontSize: 12, fontWeight: 600, borderRadius: CONTROL_R, cursor: "pointer", border: `1px solid ${strich ? "var(--accent)" : "var(--border2)"}`, background: strich ? "var(--accent)" : "transparent", color: strich ? C.aufAkzent : "var(--text2)" }}>
+            {strich ? t("noten.dividerOff") : t("noten.dividerOn")}
           </button>
         )}
         <div style={{ display: "flex", gap: 6, justifyContent: "space-between", alignItems: "center" }}>

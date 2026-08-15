@@ -1,13 +1,15 @@
 // Modul Einstiege — Sammlung von Ideen fuer den Unterrichtseinstieg.
 // Je Einstieg: Idee (Text), Ablauf mit Material, Materialliste, ca. Dauer.
 // Wiederverwendbar; im Kalender einer Stunde zuweisbar.
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { askConfirm } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { sende } from "../core/melden.js";
 import { AddButton, badge, cardStyle, CONTROL_H, CONTROL_R, dateiWaehlen, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, menuRow, pageTitle, sectionLabel, toolbarBtn, toolbarBtnPrimary, toolbarInput, COLORS as C, Modal, inputStyle, Popover, LoadError} from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
+import { useEntwurf } from "../components/Speichern.jsx";
+import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { themenIndex } from "../core/topics.js";
 import { useAktiv } from "../core/modules.js";
 import PublishModal from "../components/PublishModal.jsx";
@@ -61,11 +63,51 @@ export default function Methoden({ embedded } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
+  // ── Ein Entwurf für Umbenennen und Umsortieren ──
+  // Beides ließ sich bisher mit einem Zug bzw. einem Klick ins Nichts
+  // festschreiben. Jetzt sammelt der Entwurf, wohin ein Ordner/Einstieg soll
+  // und wie er heißt; erst „Speichern" schreibt. Flache Schlüssel
+  // (`f:<id>` Elternordner, `m:<id>` Ordner des Einstiegs, `nf:<id>` Name),
+  // damit der Vergleich mit dem Serverstand ohne Tiefenvergleich auskommt.
+  const basis = useMemo(() => {
+    const o = {};
+    folders.forEach((f) => { o[`f:${f.id}`] = f.parent_id ?? null; o[`nf:${f.id}`] = f.name; });
+    items.forEach((m) => { o[`m:${m.id}`] = m.folder_id ?? null; });
+    return o;
+  }, [folders, items]);
   const folderById = (id) => folders.find((f) => f.id === id) || null;
-  const childFolders = (pid) => folders.filter((f) => (f.parent_id ?? null) === pid).sort((a, b) => a.name.localeCompare(b.name, "de", { numeric: true }));
-  const pathTo = (id) => { const out = []; let cur = folderById(id); let guard = 0; while (cur && guard++ < 50) { out.unshift(cur); cur = cur.parent_id != null ? folderById(cur.parent_id) : null; } return out; };
+  const frisch = useRef(false);
+  const entwurf = useEntwurf(basis, async (wert) => {
+    for (const f of folders) {
+      const p = wert[`f:${f.id}`] ?? null, n = (wert[`nf:${f.id}`] || "").trim() || f.name;
+      if (p === (f.parent_id ?? null) && n === f.name) continue;
+      if (!(await sende(`${API}/folders/${f.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n, parent_id: p }) }, t("common.save")))) return false;
+    }
+    for (const m of items) {
+      const fid = wert[`m:${m.id}`] ?? null;
+      if (fid === (m.folder_id ?? null)) continue;
+      if (!(await sende(`${API}/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: m.title, description: m.description || "", ablauf: m.ablauf || "", material: m.material || "", dauer: m.dauer ?? null, topic_id: m.topic_id ?? null, folder_id: fid }) }, t("common.move")))) return false;
+    }
+    frisch.current = true;
+    loadFolders(); load();
+    return true;
+  });
+  // Nach dem Speichern (und nach jedem frischen Laden) gilt der Serverstand.
+  useEffect(() => { if (frisch.current) { frisch.current = false; entwurf.verwerfen(); } });
+  // Kennt der Entwurf den Eintrag noch nicht (gerade angelegt), gilt der
+  // Serverstand — sonst läge ein neuer Einstieg plötzlich in der Wurzel.
+  const ausEntwurf = (k, fallback) => (k in entwurf.wert ? entwurf.wert[k] : fallback);
+  const elternVon = (id) => ausEntwurf(`f:${id}`, folderById(id)?.parent_id ?? null);
+  const ordnerVon = (m) => ausEntwurf(`m:${m.id}`, m.folder_id ?? null);
+  const nameVon = (f) => ausEntwurf(`nf:${f.id}`, f.name);
+
+  // Alle Wege lesen den ENTWURF (elternVon/ordnerVon), nicht den Serverstand —
+  // sonst springt ein gezogener Ordner beim Loslassen an seinen alten Platz
+  // zurück, obwohl der Zug noch offen ist.
+  const childFolders = (pid) => folders.filter((f) => elternVon(f.id) === pid).sort((a, b) => nameVon(a).localeCompare(nameVon(b), "de", { numeric: true }));
+  const pathTo = (id) => { const out = []; let cur = folderById(id); let guard = 0; while (cur && guard++ < 50) { out.unshift(cur); const p = elternVon(cur.id); cur = p != null ? folderById(p) : null; } return out; };
   // Verhindert Zyklen: ein Ordner darf nicht in einen seiner Nachfahren wandern.
-  const isDescendant = (nodeId, maybeAncestorId) => { let cur = folderById(nodeId); let guard = 0; while (cur && guard++ < 50) { if (cur.parent_id === maybeAncestorId) return true; cur = cur.parent_id != null ? folderById(cur.parent_id) : null; } return false; };
+  const isDescendant = (nodeId, maybeAncestorId) => { let cur = folderById(nodeId); let guard = 0; while (cur && guard++ < 50) { const p = elternVon(cur.id); if (p === maybeAncestorId) return true; cur = p != null ? folderById(p) : null; } return false; };
 
   const save = async (m) => {
     setError("");
@@ -100,40 +142,31 @@ export default function Methoden({ embedded } = {}) {
     if (!(await sende(`${API}/folders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, parent_id: current }) }, t("methoden.newFolder")))) return;
     setFolderName(""); setNewFolder(false); loadFolders();
   };
-  // Inline-Umbenennen (kein Popup): die Ordnerkarte wird zum Eingabefeld.
-  const startRename = (f) => { setRenamingFolder(f.id); setRenameVal(f.name); };
-  const commitRename = async (f) => {
+  // Inline-Umbenennen (kein Popup): die Ordnerkarte wird zum Eingabefeld. Der
+  // neue Name geht in den Entwurf — geschrieben wird er mit „Speichern".
+  const startRename = (f) => { setRenamingFolder(f.id); setRenameVal(nameVon(f)); };
+  const commitRename = (f) => {
     const name = renameVal.trim();
-    if (!name || name === f.name) { setRenamingFolder(null); return; }
-    // Ohne Prüfung sprang der alte Name zurück, sobald loadFolders() lief — der
-    // klassische stille Rollback beim Umbenennen.
-    if (!(await sende(`${API}/folders/${f.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, parent_id: f.parent_id ?? null }) }, t("common.rename")))) return;
-    setRenamingFolder(null); loadFolders();
+    setRenamingFolder(null);
+    if (!name || name === nameVon(f)) return;
+    entwurf.setz({ [`nf:${f.id}`]: name });
   };
   const deleteFolder = async (f) => {
     if (!(await askConfirm(t("methoden.folderDeleteConfirm", { name: f.name })))) return;
     await sende(`${API}/folders/${f.id}`, { method: "DELETE" }, t("common.delete"));
     loadFolders(); load();
   };
-  const moveFolder = async (id, parentId) => {
-    const f = folderById(id); if (!f) return;
-    await sende(`${API}/folders/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: f.name, parent_id: parentId }) }, t("methoden.moveFolder"));
-    loadFolders();
-  };
-  const moveMethod = async (id, folderId) => {
-    const m = items.find((x) => x.id === id); if (!m) return;
-    setItems((prev) => prev.map((x) => (x.id === id ? { ...x, folder_id: folderId } : x))); // sofort
-    // Ohne Meldung sah ein abgelehnter Umzug so aus, als wäre der Einstieg beim
-    // Ziehen verschwunden: erst im Zielordner, nach dem load() nirgends gesucht.
-    await sende(`${API}/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: m.title, description: m.description || "", ablauf: m.ablauf || "", material: m.material || "", dauer: m.dauer ?? null, topic_id: m.topic_id ?? null, folder_id: folderId }) }, t("common.move"));
-    load();
-  };
+  // Verschieben ist Umsortieren, also ein Entwurf: der Zug landet erst im Plan,
+  // gespeichert wird er mit der Leiste unten.
+  const moveFolder = (id, parentId) => entwurf.setz({ [`f:${id}`]: parentId });
+  const moveMethod = (id, folderId) => entwurf.setz({ [`m:${id}`]: folderId });
 
   // Drag & Drop: Ordner oder Einstieg auf einen Ziel-Ordner (oder die Wurzel) ziehen.
   const canDrop = (targetId) => {
     if (!drag) return false;
-    if (drag.kind === "folder") return drag.id !== targetId && folderById(drag.id)?.parent_id !== targetId && !isDescendant(targetId, drag.id) && targetId !== drag.id;
-    return items.find((x) => x.id === drag.id)?.folder_id !== targetId; // Methode: nur wenn woanders
+    if (drag.kind === "folder") return drag.id !== targetId && elternVon(drag.id) !== targetId && !isDescendant(targetId, drag.id) && targetId !== drag.id;
+    const m = items.find((x) => x.id === drag.id);
+    return !!m && ordnerVon(m) !== targetId; // Methode: nur wenn woanders
   };
   const doDrop = (targetId) => {
     if (!canDrop(targetId)) { setDrag(null); setDropTarget(undefined); return; }
@@ -164,7 +197,7 @@ export default function Methoden({ embedded } = {}) {
   };
 
   const subfolders = childFolders(current);
-  const visible = items.filter((m) => (m.folder_id ?? null) === current);
+  const visible = items.filter((m) => ordnerVon(m) === current);
   const crumbs = current != null ? pathTo(current) : [];
 
   return (
@@ -199,7 +232,7 @@ export default function Methoden({ embedded } = {}) {
           <span key={f.id} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
             <span style={{ color: "var(--text3)" }}>/</span>
             <button onClick={() => setCurrent(f.id)} {...dropProps(f.id)}
-              style={{ ...crumbBtn, ...(dropTarget === f.id ? crumbDrop : {}), fontWeight: current === f.id ? 700 : 500 }}>{f.name}</button>
+              style={{ ...crumbBtn, ...(dropTarget === f.id ? crumbDrop : {}), fontWeight: current === f.id ? 700 : 500 }}>{nameVon(f)}</button>
           </span>
         ))}
       </div>
@@ -219,7 +252,7 @@ export default function Methoden({ embedded } = {}) {
       {subfolders.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12, marginBottom: 16 }}>
           {subfolders.map((f) => {
-            const count = items.filter((m) => m.folder_id === f.id).length + childFolders(f.id).length;
+            const count = items.filter((m) => ordnerVon(m) === f.id).length + childFolders(f.id).length;
             const over = dropTarget === f.id && canDrop(f.id);
             const renaming = renamingFolder === f.id;
             return (
@@ -229,7 +262,7 @@ export default function Methoden({ embedded } = {}) {
                 {renaming ? (
                   <>
                     <input value={renameVal} autoFocus onClick={(e) => e.stopPropagation()} onChange={(e) => setRenameVal(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") commitRename(f); if (e.key === "Escape") setRenamingFolder(null); }}
+                      onKeyDown={(ev) => { if (ev.key === "Enter") commitRename(f); if (ev.key === "Escape") setRenamingFolder(null); }}
                       onBlur={() => commitRename(f)}
                       style={{ ...toolbarInput, flex: 1, minWidth: 0 }} />
                     <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); deleteFolder(f); }} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
@@ -238,7 +271,7 @@ export default function Methoden({ embedded } = {}) {
                   <>
                     <span style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex" }} title={t("methoden.dragHint")}><Icon d={ICONS.grip} size={14} /></span>
                     <Icon d={ICONS.folder} size={18} color="var(--accent)" />
-                    <span style={{ fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
+                    <span style={{ fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nameVon(f)}</span>
                     <span style={{ fontSize: 12, color: "var(--text3)" }}>{count}</span>
                     <button onClick={(e) => { e.stopPropagation(); startRename(f); }} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.rename")} aria-label={t("common.rename")}><Icon d={ICONS.edit} size={13} /></button>
                   </>
@@ -271,6 +304,7 @@ export default function Methoden({ embedded } = {}) {
         onPublish={() => { setPublishing(viewing); setViewing(null); }}
         onClose={() => setViewing(null)} />}
       {edit && <MethodModal m={edit} topics={topics} onSave={save} onDelete={(id) => { remove(id); setEdit(null); }} onClose={() => setEdit(null)} t={t} />}
+      <SpeicherBalken entwurf={entwurf} />
       {publishing && <PublishModal name={publishing.title} onClose={() => setPublishing(null)}
         onPublish={(description) => fetch(`/api/marketplace/publish/method`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method_id: publishing.id, description }) }).catch(() => null)} />}
     </div>

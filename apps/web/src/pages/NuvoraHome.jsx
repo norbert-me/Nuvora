@@ -1,12 +1,13 @@
 // Nuvoras Startseite: der Rahmen, nicht ein Modul.
 // Zeigt die aktivierten Module als Einstieg. Ohne Module fuehrt sie zur
 // Modulauswahl statt eine leere Seite zu zeigen.
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useModules, useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { StageBadge, Icon, ICONS, MODULE_ICONS, iconBtn, btnSecondary, selectStyle, COLORS as C, pageApp,
   pageTitle, cardStyle, chipStyle, badge, btnSmall, CONTROL_R, toolbarIconBtn } from "../components/Icons.jsx";
+import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 
 // Modul-Kachel: dieselbe Karte wie überall, nur als Link (kein eigener Kasten).
 // Die frühere Eigenbau-Fassung stand auf `var(--surface)` — die Variable gibt es
@@ -219,8 +220,6 @@ export default function NuvoraHome({ user }) {
   const [dragKey, setDragKey] = useState(null);
   const [overKey, setOverKey] = useState(null);
 
-  if (loading) return null;
-
   const firstName = (user?.name || "").split(" ")[0];
   const name = (m) => (t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name);
   // Nach gespeicherter Reihenfolge; unbekannte (neue) Module hinten anhaengen.
@@ -229,18 +228,27 @@ export default function NuvoraHome({ user }) {
 
   const persist = (keys) => { setOrder(keys); try { localStorage.setItem(orderKey, JSON.stringify(keys)); } catch { /* egal */ } };
 
+  // Auch das Anordnen der Kacheln ist eine Änderung und wartet auf „Speichern".
+  // Die Grundlage muss über Rendergrenzen dieselbe bleiben — daher der
+  // Schlüssel aus den Modul-Namen. (Hooks stehen vor jedem frühen Return.)
+  const basisSchluessel = shown.map((m) => m.key).join(",");
+  const basisOrdnung = useMemo(() => ({ keys: basisSchluessel ? basisSchluessel.split(",") : [] }), [basisSchluessel]);
+  const kacheln = useEntwurf(basisOrdnung, (w) => { persist(w.keys); });
+
+  if (loading) return null;
+
   // Vorschau-Reihenfolge waehrend des Ziehens: die gezogene Kachel sitzt schon
   // dort, wo sie beim Loslassen landen wuerde — man sieht das Ergebnis live.
   const previewKeys = () => {
-    const keys = shown.map((m) => m.key);
+    const keys = [...kacheln.wert.keys];
     if (!dragKey || !overKey || dragKey === overKey) return keys;
     const from = keys.indexOf(dragKey), to = keys.indexOf(overKey);
     if (from < 0 || to < 0) return keys;
     keys.splice(to, 0, keys.splice(from, 1)[0]);
     return keys;
   };
-  const displayList = (dragKey && overKey ? previewKeys() : shown.map((m) => m.key)).map((k) => shown.find((m) => m.key === k));
-  const commit = () => { persist(previewKeys()); setDragKey(null); setOverKey(null); };
+  const displayList = previewKeys().map((k) => shown.find((m) => m.key === k)).filter(Boolean);
+  const commit = () => { kacheln.setz({ keys: previewKeys() }); setDragKey(null); setOverKey(null); };
 
   return (
     <div style={{ ...pageApp }}>
@@ -248,8 +256,13 @@ export default function NuvoraHome({ user }) {
         <h1 style={{ ...pageTitle, marginBottom: 0, flex: 1 }}>
           {firstName ? t("home.welcome", { name: firstName }) : t("home.welcomePlain")}
         </h1>
+        {edit && <Speicherleiste entwurf={kacheln} klein />}
         {active.length > 1 && (
-          <button onClick={() => setEdit((e) => !e)} className="icon-btn"
+          <button onClick={() => {
+            if (edit && kacheln.geaendert && !window.confirm(t("speichern.verlassen"))) return;
+            if (edit) kacheln.verwerfen();
+            setEdit((e) => !e);
+          }} className="icon-btn"
             style={{ ...toolbarIconBtn, width: edit ? "auto" : undefined, padding: edit ? "0 12px" : 0,
               borderColor: edit ? "var(--accent)" : "var(--border2)" }}
             title={t("home.arrange")} aria-label={t("home.arrange")}>

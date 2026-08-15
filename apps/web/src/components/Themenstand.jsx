@@ -19,6 +19,35 @@ const BALKEN_H = 8;
 
 const farbe = (pct) => (pct == null ? "var(--text3)" : pct < 50 ? C.danger : pct < 75 ? C.warning : C.success);
 
+// Texte, die es noch in keinem Wörterbuch gibt: die i18n-Dateien werden
+// gesammelt nachgezogen (die Schlüssel liegen mit allen drei Sprachen in
+// /tmp/nuvora-themenstand.md). `tt` nimmt die Übersetzung, sobald sie da ist,
+// und zeigt bis dahin den deutschen Satz — nie den nackten Schlüssel, genau
+// der Fehler, gegen den i18n/keys.test.js geschrieben wurde.
+const NEU = {
+  "themen.due": "{{n}} fällig",
+  "themen.cards": "Karten",
+  "themen.exams": "Arbeiten",
+  "themen.quizzes": "Quizze",
+  "themen.from": "aus {{q}}",
+  "themen.cardsDetail": "{{treffer}} von {{versuche}} Kartenversuchen ({{k}} Karten)",
+  "themen.tooThinCards": "erst {{k}} geübte Karten — zu wenig für eine Aussage",
+  "themen.hintCards": "Karteikarten zählen mit: ein Kartenversuch ist ein Punkt, Treffer sind die richtig erinnerten. Karten haben kein Datum und stehen deshalb nicht im Verlauf.",
+};
+
+function tt(t, key, vars) {
+  const s = t(key, vars);
+  if (s !== key) return s;
+  let f = NEU[key] || key;
+  for (const [k, v] of Object.entries(vars || {})) f = f.split(`{{${k}}}`).join(v);
+  return f;
+}
+
+// Woraus die Zahl entstand — die Anzeige nennt immer ihre Herkunft.
+const QUELLE_KEY = { arbeit: "themen.exams", quiz: "themen.quizzes", karten: "themen.cards" };
+const quellenText = (t, quellen) =>
+  (quellen || []).map((q) => tt(t, QUELLE_KEY[q] || q)).join(" · ");
+
 function TrendPfeil({ trend, t }) {
   if (!trend) return <span style={{ fontSize: 11, color: "var(--text3)" }}>{t("themen.noTrend")}</span>;
   if (trend.richtung === "gleich") {
@@ -62,7 +91,18 @@ export function ThemenstandKind({ kind, t, offenDefault = false }) {
                 <TrendPfeil trend={th.trend} t={t} />
               </>) : (
                 <span style={{ fontSize: 11, color: "var(--text3)" }}>
-                  {t("themen.tooThin", { p: String(th.max).replace(".", ",") })}
+                  {/* Ein Thema, das es nur in den Karten gibt, hat keine
+                      Punkte — dann sagt der Hinweis, woran es liegt. */}
+                  {th.karten && !th.max
+                    ? tt(t, "themen.tooThinCards", { k: th.karten.karten })
+                    : t("themen.tooThin", { p: String(th.max).replace(".", ",") })}
+                </span>
+              )}
+              {/* Fällige Karten: eine Zählung, keine Bewertung — deshalb steht
+                  sie auch dann da, wenn es für eine Zahl noch nicht reicht. */}
+              {th.faellig > 0 && (
+                <span style={{ fontSize: 11, fontWeight: 700, color: C.warning, whiteSpace: "nowrap" }}>
+                  {tt(t, "themen.due", { n: th.faellig })}
                 </span>
               )}
             </div>
@@ -78,6 +118,23 @@ export function ThemenstandKind({ kind, t, offenDefault = false }) {
                     <span style={{ fontWeight: 700, minWidth: 42, textAlign: "right", color: farbe(v.pct) }}>{v.pct == null ? "–" : `${Math.round(v.pct)}%`}</span>
                   </div>
                 ))}
+                {/* Karten stehen unter dem Verlauf, nicht darin: sie sind ein
+                    aufgelaufener Stand ohne Datum. */}
+                {th.karten && th.karten.versuche > 0 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                    <span style={{ color: "var(--text3)", width: 62, flexShrink: 0 }}>{tt(t, "themen.cards")}</span>
+                    <span style={{ flex: 1, minWidth: 0, color: "var(--text3)" }}>
+                      {tt(t, "themen.cardsDetail", {
+                        treffer: th.karten.treffer, versuche: th.karten.versuche, k: th.karten.karten,
+                      })}
+                    </span>
+                  </div>
+                )}
+                {th.quellen?.length > 0 && (
+                  <div style={{ fontSize: 11, color: "var(--text3)" }}>
+                    {tt(t, "themen.from", { q: quellenText(t, th.quellen) })}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -132,7 +189,12 @@ export default function Themenstand({ classId, studentId = null, cardId = null, 
           )}
         </div>
       )}
-      <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 12, lineHeight: 1.5 }}>{t("themen.hint")}</div>
+      <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 12, lineHeight: 1.5 }}>
+        {t("themen.hint")}
+        {/* Nur wenn die Karten wirklich mitgerechnet haben (Regel 3: der Server
+            liefert die Quelle nur bei aktivem Modul). */}
+        {(daten.quellen || []).includes("karten") && ` ${tt(t, "themen.hintCards")}`}
+      </div>
       <ThemenstandKind kind={kind} t={t} />
     </div>
   );

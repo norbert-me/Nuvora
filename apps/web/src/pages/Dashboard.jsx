@@ -8,6 +8,7 @@ import { NiveauToggle, AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary,
   toolbarBtn, toolbarBtnPrimary, toolbarInput, StatCard, CONTROL_R, badge, chipStyle, sectionLabel } from "../components/Icons.jsx";
 import { dublettenZahlen, findeDubletten, istInSammlung } from "../core/dubletten.js";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
+import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import TopicPicker from "../components/TopicPicker.jsx";
@@ -33,7 +34,10 @@ export default function Dashboard() {
   const [movingFolder, setMovingFolder] = useState(null);
   const [loadError, setLoadError] = useState(false);
   const [renamingFolder, setRenamingFolder] = useState(null);
-  const [renameValue, setRenameValue] = useState("");
+  // Umbenennen ist eine Aenderung wie jede andere: sie lief vorher beim
+  // Verlassen des Feldes von selbst zum Server. Jetzt haelt der Entwurf sie,
+  // bis jemand speichert.
+  const [renameBasis, setRenameBasis] = useState({ name: "" });
   const [publishingSet, setPublishingSet] = useState(null);
   // Import-Fortschritt: { stage: "reading"|"uploading"|"done"|"error", label }
   const [importStatus, setImportStatus] = useState(null);
@@ -389,20 +393,33 @@ export default function Dashboard() {
 
   const startRenameFolder = (id, oldName) => {
     setRenamingFolder(id);
-    setRenameValue(oldName);
+    setRenameBasis({ name: oldName });
   };
 
-  const commitRenameFolder = async () => {
-    if (!renamingFolder || !renameValue.trim()) { setRenamingFolder(null); return; }
-    const node = findNode(folders, renamingFolder);
-    if (!node) { setRenamingFolder(null); return; }
-    await fetch(`${API}/folders/${renamingFolder}`, {
+  const umbenennen = useEntwurf(renameBasis, async (wert) => {
+    const neu = wert.name.trim();
+    const node = renamingFolder ? findNode(folders, renamingFolder) : null;
+    if (!neu || !node) return false;
+    const r = await fetch(`${API}/folders/${renamingFolder}`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: renameValue.trim(), parent_id: node.parent_id }),
-    });
+      body: JSON.stringify({ name: neu, parent_id: node.parent_id }),
+    }).catch(() => null);
+    if (!r || !r.ok) return false;
+    setRenameBasis({ name: neu });
     setRenamingFolder(null);
     load();
-  };
+  });
+
+  // Umbenennen abbrechen: erst den Entwurf zuruecksetzen, dann das Feld
+  // schliessen — sonst bliebe die Warnung „nicht gespeichert" haengen.
+  const renameAbbrechen = () => { umbenennen.verwerfen(); setRenamingFolder(null); };
+
+  // Beim Aufklappen des Feldes die Arbeitskopie auf den Ordnernamen setzen:
+  // `useEntwurf` uebernimmt einen neuen Stand nur, wenn nichts offen ist — und
+  // gegenueber dem leeren Anfangswert sieht jeder Name wie eine offene
+  // Aenderung aus. Ohne das stuende das Feld leer und sofort auf „nicht
+  // gespeichert".
+  useEffect(() => { if (renamingFolder) umbenennen.verwerfen(); }, [renamingFolder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const exportFolder = async (id, name) => {
     const res = await fetch(`${API}/export/folder/${id}`);
@@ -697,10 +714,9 @@ export default function Dashboard() {
               {renamingFolder === f.id ? (
                 <input
                   autoFocus
-                  value={renameValue}
-                  onChange={(e) => setRenameValue(e.target.value)}
-                  onBlur={commitRenameFolder}
-                  onKeyDown={(e) => { if (e.key === "Enter") commitRenameFolder(); if (e.key === "Escape") setRenamingFolder(null); }}
+                  value={umbenennen.wert.name}
+                  onChange={(e) => umbenennen.setz({ name: e.target.value })}
+                  onKeyDown={(e) => { if (e.key === "Enter") umbenennen.speichern(); if (e.key === "Escape") renameAbbrechen(); }}
                   onClick={(e) => e.stopPropagation()}
                   style={{ ...inputBasis, fontWeight: 700, fontSize: 16, padding: "4px 10px", border: "2px solid var(--accent)", background: "var(--input-bg)", outline: "none", flex: 1, minWidth: 0 }}
                 />
@@ -720,11 +736,14 @@ export default function Dashboard() {
               <button onClick={(e) => { e.stopPropagation(); startRenameFolder(f.id, f.name); }} className="icon-btn" style={iconBtn} title={t("dash.rename")} aria-label={t("dash.rename")}><Icon d={ICONS.edit} size={18} /></button>
             </div>
             ) : (
-            <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-              {/* onMouseDown + preventDefault: sonst schließt das Umbenennen-Feld
-                  per onBlur zuerst, der Knopf verschwindet und der Klick geht
-                  ins Leere — das Löschen passierte nie. */}
-              <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); deleteFolder(f.id); }}
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0, marginLeft: 8 }} onClick={(e) => e.stopPropagation()}>
+              {/* Speichern/Abbrechen stehen jetzt hier: das Feld gibt seinen
+                  Inhalt nicht mehr beim Verlassen ab. */}
+              <Speicherleiste entwurf={umbenennen} klein />
+              {!umbenennen.geaendert && (
+                <button onClick={renameAbbrechen} style={{ ...btnSecondary, ...btnSmall }}>{t("common.cancel")}</button>
+              )}
+              <button onClick={(e) => { e.stopPropagation(); deleteFolder(f.id); }}
                 className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>
             </div>
             )}
@@ -845,6 +864,7 @@ function ImportProgress({ status }) {
 const zielBtn = { ...btnSecondary, ...btnSmall, background: "none", border: "none", color: "var(--text3)" };
 
 function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQuestionsChange }) {
+  const { t } = useLanguage();
   const [qSearch, setQSearch] = useState("");
   // Themenfilter und -sortierung der Fragenliste. Beides wirkt nur auf die
   // ANZEIGE: die gespeicherte Reihenfolge des Quiz bleibt, wie sie ist —
@@ -861,61 +881,74 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
   // dort Pfeile statt Ziehen. Desktop behaelt das Ziehen.
   const isTouch = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
 
+  // Das ganze Quiz ist EIN Entwurf: Name, Reihenfolge, die vier Schalter und
+  // das E/G je Frage. Vorher ging jeder Klick und jedes Verlassen des
+  // Namensfeldes sofort zum Server — auch das Ziehen einer Frage.
+  //
+  // Im Entwurf stehen nur einfache Werte (Text, Wahrheitswerte, Zahlenlisten):
+  // so erkennt `useEntwurf` verlaesslich, ob wirklich etwas offen ist. Die
+  // Fragen selbst liegen daneben in `qMap` — ihr Inhalt gehoert der Frage, nicht
+  // dem Quiz, und wird im Frage-Dialog gespeichert.
+  const alsEntwurf = (qs) => ({
+    name: qs.name,
+    ids: (qs.questions || []).map((q) => q.id),
+    shuffleQ: !!qs.shuffle_questions,
+    shuffleA: !!qs.shuffle_answers,
+    niveauAktiv: !!qs.niveau_aktiv,
+    minuspunkte: !!qs.minuspunkte,
+    eFragen: Object.entries(qs.niveaus || {}).filter(([, v]) => v === "E").map(([k]) => Number(k)).sort((a, b) => a - b),
+  });
+  const [gespeichert, setGespeichert] = useState(() => alsEntwurf(questionSet));
+  const [qMap, setQMap] = useState(() => Object.fromEntries((questionSet.questions || []).map((q) => [q.id, q])));
+
+  const e = useEntwurf(gespeichert, async (wert) => {
+    const res = await fetch(`${API}/question-sets/${questionSet.id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: wert.name, folder_id: questionSet.folder_id,
+        question_ids: wert.ids,
+        shuffle_questions: wert.shuffleQ,
+        shuffle_answers: wert.shuffleA,
+        niveau_aktiv: wert.niveauAktiv,
+        minuspunkte: wert.minuspunkte,
+        // Immer die VOLLE Zuordnung schicken: fehlt eine Frage im Objekt,
+        // behaelt der Server ihr altes Niveau — ein Zurueckstellen auf G waere
+        // dann wirkungslos.
+        niveaus: Object.fromEntries(wert.ids.map((qid) => [String(qid), wert.eFragen.includes(qid) ? "E" : "G"])),
+      }),
+    }).catch(() => null);
+    if (!res || !res.ok) return false;
+    setGespeichert(wert);
+    onQuestionsChange();
+  });
+
+  const { name, shuffleQ, shuffleA, niveauAktiv, minuspunkte } = e.wert;
+  // Fragen in der Reihenfolge des Entwurfs.
+  const questions = e.wert.ids.map((qid) => qMap[qid]).filter(Boolean);
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [editingQ, setEditingQ] = useState(null);
+  const EMPTY_Q = { text: "", choices: { A: "", B: "", C: "", D: "" }, correct_answer: "", num_choices: 4, image_url: null, image_layout: "above", choice_images: null, topic_id: null };
+  const [newQ, setNewQ] = useState({ ...EMPTY_Q });
+
+  const setzeReihenfolge = (arr) => e.setz({ ids: arr.map((q) => q.id) });
+
   const moveQuestion = (from, delta) => {
     const arr = [...(previewQuestions || questions)];
     const to = from + delta;
     if (to < 0 || to >= arr.length) return;
     [arr[from], arr[to]] = [arr[to], arr[from]];
-    setQuestions(arr); setPreviewQuestions(null); saveSet(name, arr);
-  };
-  const { t } = useLanguage();
-  const [name, setName] = useState(questionSet.name);
-  const [questions, setQuestions] = useState(questionSet.questions || []);
-  const [shuffleQ, setShuffleQ] = useState(questionSet.shuffle_questions || false);
-  const [shuffleA, setShuffleA] = useState(questionSet.shuffle_answers || false);
-  // E/G: alle sehen dieselben Fragen, unterschieden wird erst in der Auswertung.
-  const [niveauAktiv, setNiveauAktiv] = useState(questionSet.niveau_aktiv || false);
-  const [minuspunkte, setMinuspunkte] = useState(questionSet.minuspunkte || false);
-  const [niveaus, setNiveaus] = useState(questionSet.niveaus || {});
-  const [showAdd, setShowAdd] = useState(false);
-  const [editingQ, setEditingQ] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const EMPTY_Q = { text: "", choices: { A: "", B: "", C: "", D: "" }, correct_answer: "", num_choices: 4, image_url: null, image_layout: "above", choice_images: null, topic_id: null };
-  const [newQ, setNewQ] = useState({ ...EMPTY_Q });
-
-  const saveSet = async (updatedName, updatedQuestions, patch = {}) => {
-    setSaving(true);
-    await fetch(`${API}/question-sets/${questionSet.id}`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: updatedName, folder_id: questionSet.folder_id,
-        question_ids: updatedQuestions.map((q) => q.id),
-        shuffle_questions: shuffleQ,
-        shuffle_answers: shuffleA,
-        niveau_aktiv: niveauAktiv,
-        minuspunkte,
-        niveaus,
-        ...patch,
-      }),
-    });
-    setSaving(false);
-    onQuestionsChange();
+    setPreviewQuestions(null);
+    setzeReihenfolge(arr);
   };
 
-  const saveName = () => saveSet(name, questions);
-
-
-  const toggleShuffleQ = () => { const v = !shuffleQ; setShuffleQ(v); saveSet(name, questions, { shuffle_questions: v }); };
-  const toggleShuffleA = () => { const v = !shuffleA; setShuffleA(v); saveSet(name, questions, { shuffle_answers: v }); };
-  const toggleNiveau = () => { const v = !niveauAktiv; setNiveauAktiv(v); saveSet(name, questions, { niveau_aktiv: v }); };
-  const toggleMinus = () => { const v = !minuspunkte; setMinuspunkte(v); saveSet(name, questions, { minuspunkte: v }); };
   // Niveau einer Frage IN DIESEM Quiz umschalten. Ohne Eintrag gilt G.
-  const toggleQNiveau = (qid) => {
-    const next = { ...niveaus, [qid]: (niveaus[qid] === "E" ? "G" : "E") };
-    setNiveaus(next);
-    saveSet(name, questions, { niveaus: next });
-  };
+  const toggleQNiveau = (qid) => e.setz((v) => ({
+    eFragen: (v.eFragen.includes(qid) ? v.eFragen.filter((x) => x !== qid) : [...v.eFragen, qid]).sort((a, b) => a - b),
+  }));
 
+  // Anlegen ist ein Befehl: die Frage entsteht sofort. In DIESES Quiz gehaengt
+  // wird sie mit dem Speichern — wie jede andere Aenderung an der Liste.
   const addNewQuestion = async () => {
     if (!newQ.text.trim()) return;
     const res = await fetch(`${API}/questions`, {
@@ -923,30 +956,28 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
       body: JSON.stringify(newQ),
     });
     const q = await res.json();
-    const updated = [...questions, q];
-    setQuestions(updated);
+    setQMap((m) => ({ ...m, [q.id]: q }));
+    e.setz((v) => ({ ids: [...v.ids, q.id] }));
     setNewQ({ ...EMPTY_Q });
-    await saveSet(name, updated);
   };
 
+  // Der Frage-Dialog hat seinen eigenen Speichern-Knopf: er speichert die
+  // FRAGE. Am Quiz aendert er nichts.
   const updateExistingQuestion = async () => {
     if (!editingQ || !editingQ.text.trim()) return;
     const res = await fetch(`${API}/questions/${editingQ.id}`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(editingQ),
     });
+    if (!res.ok) return;
     const q = await res.json();
-    const updated = questions.map((x) => x.id === q.id ? q : x);
-    setQuestions(updated);
+    setQMap((m) => ({ ...m, [q.id]: q }));
     setEditingQ(null);
-    await saveSet(name, updated);
   };
 
-  const removeQuestion = async (idx) => {
-    const updated = questions.filter((_, i) => i !== idx);
-    setQuestions(updated);
-    await saveSet(name, updated);
-  };
+  // Aus dem Quiz nehmen ist eine Aenderung an der Liste, kein Loeschen der
+  // Frage — also in den Entwurf.
+  const removeQuestion = (idx) => e.setz((v) => ({ ids: v.ids.filter((_, i) => i !== idx) }));
 
   const dragIdx = useRef(null);
   const dragWork = useRef(null); // Arbeits-Reihenfolge während des Ziehens (stabil, kein State-Lag)
@@ -983,23 +1014,27 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
 
   return (
     <div>
-      <button onClick={onBack} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 13, fontWeight: 500, padding: "4px 0", marginBottom: 16 }}>
+      {/* „Zurueck" verlaesst die Maske, ohne dass sich die Adresse aendert —
+          die Warnung des Routers greift hier nicht, also fragen wir selbst. */}
+      <button onClick={() => { if (e.geaendert && !window.confirm(t("speichern.verlassen"))) return; onBack(); }}
+        style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 13, fontWeight: 500, padding: "4px 0", marginBottom: 16 }}>
         <Icon d={ICONS.arrowLeft} size={14} /> {t("common.back")}
       </button>
 
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
         {/* Der Quizname IST die Seitenueberschrift — deshalb 22 wie pageTitle. */}
-        <input value={name} onChange={(e) => setName(e.target.value)} onBlur={saveName} onKeyDown={(e) => e.key === "Enter" && saveName()}
+        <input value={name} onChange={(ev) => e.setz({ name: ev.target.value })}
           style={{ ...inputBasis, fontSize: 22, fontWeight: 700, flex: 1, maxWidth: 500 }} />
-        {saving && <span style={{ color: "var(--text3)", fontSize: 13 }}>{t("dash.saving")}</span>}
+        {/* EINE Leiste fuer die ganze Maske: Name, Reihenfolge, Schalter, E/G. */}
+        <Speicherleiste entwurf={e} klein />
         {onDelete && <button onClick={onDelete} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
       </div>
 
       <div style={{ display: "flex", gap: 24, marginBottom: 8, flexWrap: "wrap" }}>
-        <Toggle checked={shuffleQ} onChange={toggleShuffleQ} label={t("dash.shuffleQ")} />
-        <Toggle checked={shuffleA} onChange={toggleShuffleA} label={t("dash.shuffleA")} />
-        <Toggle checked={niveauAktiv} onChange={toggleNiveau} label={t("dash.niveauToggle")} />
-        <Toggle checked={minuspunkte} onChange={toggleMinus} label={t("dash.minusToggle")} />
+        <Toggle checked={shuffleQ} onChange={(v) => e.setz({ shuffleQ: v })} label={t("dash.shuffleQ")} />
+        <Toggle checked={shuffleA} onChange={(v) => e.setz({ shuffleA: v })} label={t("dash.shuffleA")} />
+        <Toggle checked={niveauAktiv} onChange={(v) => e.setz({ niveauAktiv: v })} label={t("dash.niveauToggle")} />
+        <Toggle checked={minuspunkte} onChange={(v) => e.setz({ minuspunkte: v })} label={t("dash.minusToggle")} />
       </div>
       {(niveauAktiv || minuspunkte) && (
         <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 16px", lineHeight: 1.5 }}>
@@ -1061,9 +1096,9 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
         <div
           key={q.id}
           draggable={!searching && !isTouch}
-          onDragStart={(e) => { if (searching) return; e.dataTransfer.effectAllowed = "move"; dragWork.current = [...base]; dragIdx.current = idx; }}
-          onDragOver={(e) => { if (searching || dragIdx.current == null) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (idx !== dragIdx.current) { reorderPreview(dragIdx.current, idx); dragIdx.current = idx; } }}
-          onDrop={(e) => { if (searching) return; e.preventDefault(); const arr = dragWork.current || previewQuestions || questions; setQuestions(arr); setPreviewQuestions(null); saveSet(name, arr); dragIdx.current = null; dragWork.current = null; }}
+          onDragStart={(ev) => { if (searching) return; ev.dataTransfer.effectAllowed = "move"; dragWork.current = [...base]; dragIdx.current = idx; }}
+          onDragOver={(ev) => { if (searching || dragIdx.current == null) return; ev.preventDefault(); ev.dataTransfer.dropEffect = "move"; if (idx !== dragIdx.current) { reorderPreview(dragIdx.current, idx); dragIdx.current = idx; } }}
+          onDrop={(ev) => { if (searching) return; ev.preventDefault(); const arr = dragWork.current || previewQuestions || questions; setPreviewQuestions(null); setzeReihenfolge(arr); dragIdx.current = null; dragWork.current = null; }}
           onDragEnd={() => { setPreviewQuestions(null); dragIdx.current = null; dragWork.current = null; }}
           style={{
             ...cardStyle,
@@ -1086,7 +1121,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
             <span className="drag-handle" style={{ color: "var(--text3)", width: 20, display: "inline-flex", justifyContent: "center", cursor: "grab", flexShrink: 0 }}><Icon d={ICONS.grip} size={15} /></span>
           ))}
           {niveauAktiv && (
-            <NiveauToggle wert={niveaus[q.id] === "E" ? "E" : "G"} mitLeer={false}
+            <NiveauToggle wert={e.wert.eFragen.includes(q.id) ? "E" : "G"} mitLeer={false}
               onChange={() => toggleQNiveau(q.id)} title={t("dash.niveauQHint")} />
           )}
           <span onClick={() => setEditingQ({ ...q })} style={{ flex: 1, color: "var(--text)", cursor: "pointer" }} title={t("dash.clickEdit")}>

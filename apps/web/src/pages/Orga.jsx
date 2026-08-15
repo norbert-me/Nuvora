@@ -7,6 +7,8 @@ import { undoDelete } from "../core/undo.jsx";
 import { AddButton, Icon, ICONS, iconBtn, COLORS as C, CONTROL_R, th as thBase, td, toolbarInput, Toggle, cardStyle, pageApp} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
+import { useEntwurf } from "../components/Speichern.jsx";
+import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
 import Anwesenheit from "./Anwesenheit.jsx";
@@ -61,14 +63,40 @@ export default function Orga() {
   // erst ohne Kurs, dann mit. Kommt die erste (klassenweite) Antwort als zweite
   // an, steht der falsche Stand da. Nur die juengste Antwort darf schreiben.
   const ladenr = useRef(0);
+  // Frische Serverdaten beenden den Entwurf: `useEntwurf` haelt an einer offenen
+  // Arbeitskopie fest und wuerde sonst die Haken der vorigen Klasse weiterzeigen.
+  const frisch = useRef(false);
   const load = useCallback((id) => {
     if (!id) return;
     const meine = ++ladenr.current;
     fetch(`${API}/${id}${kursId != null ? `?kurs_id=${kursId}` : ""}`).then((r) => (r.ok ? r.json() : [])).then((d) => {
-      if (meine === ladenr.current) setItems(Array.isArray(d) ? d : []);
+      if (meine === ladenr.current) { frisch.current = true; setItems(Array.isArray(d) ? d : []); }
     }).catch(() => {});
   }, [kursId]);
   useEffect(() => { load(classId); }, [classId, kursId, load]);
+
+  // ── Ein Entwurf für alle Häkchen der Tabelle ──
+  // Eine Leiste für die ganze Maske, nicht je Zelle: flacher Plan
+  // „<Punkt>:<Kind> → an/aus", damit der Vergleich mit dem Serverstand einfach
+  // bleibt und ein Neuladen die Arbeitskopie wieder einholt.
+  const basis = useMemo(() => {
+    const o = {};
+    items.forEach((it) => students.forEach((s) => { o[`${it.id}:${s.id}`] = it.done.includes(s.id); }));
+    return o;
+  }, [items, students]);
+  const e = useEntwurf(basis, async (wert) => {
+    for (const it of items) {
+      for (const s of students) {
+        const k = `${it.id}:${s.id}`;
+        if (!!wert[k] === !!basis[k]) continue;
+        await fetch(`${API}/item/${it.id}/toggle`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ student_id: s.id }) }).catch(() => {});
+      }
+    }
+    load(classId);
+  });
+  useEffect(() => { if (frisch.current) { frisch.current = false; e.verwerfen(); } });
+  // Kurs-/Klassenwechsel mit offenen Häkchen: nachfragen statt still verwerfen.
+  const wechseln = (fn) => { if (e.geaendert && !window.confirm(t("speichern.verlassen"))) return; fn(); };
 
   const anlegen = async () => {
     const name = neu.trim();
@@ -78,6 +106,7 @@ export default function Orga() {
   };
   const loeschen = (id) => {
     const it = items.find((x) => x.id === id);
+    frisch.current = true;
     setItems((prev) => prev.filter((x) => x.id !== id)); // sofort weg
     undoDelete({
       message: t("undo.deleted", { name: it?.name || "" }),
@@ -85,12 +114,8 @@ export default function Orga() {
       commit: async () => { await fetch(`${API}/item/${id}`, { method: "DELETE" }).catch(() => {}); },
     });
   };
-  const toggle = async (item, sid) => {
-    // Optimistisch, dann Server.
-    setItems((prev) => prev.map((it) => it.id === item.id
-      ? { ...it, done: it.done.includes(sid) ? it.done.filter((x) => x !== sid) : [...it.done, sid] } : it));
-    fetch(`${API}/item/${item.id}/toggle`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ student_id: sid }) }).catch(() => {});
-  };
+  // Das Häkchen sammelt nur — zum Server geht es mit „Speichern".
+  const toggle = (item, sid) => e.setz({ [`${item.id}:${sid}`]: !e.wert[`${item.id}:${sid}`] });
 
   const th = { ...thBase, verticalAlign: "bottom" };
 
@@ -115,7 +140,7 @@ export default function Orga() {
           Handgriff (neuer Punkt). Das Feld hatte `inputStyle` Zeile fuer Zeile
           nachgebaut und stand dadurch hoeher als der Plus-Knopf daneben. */}
       <Werkzeugleiste style={{ marginBottom: 16 }}
-        links={<KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />}>
+        links={<KursKlasseSelect value={classId} onChange={(id, kid) => wechseln(() => { setClassId(id); setKursId(kid); })} onKurs={setKursId} />}>
         <input value={neu} onChange={(e) => setNeu(e.target.value)} onKeyDown={(e) => e.key === "Enter" && anlegen()}
           placeholder={t("orga.newPlaceholder")} style={{ ...toolbarInput, flex: 1, minWidth: 200 }} />
         <AddButton onClick={anlegen} title={t("orga.add")} />
@@ -135,7 +160,11 @@ export default function Orga() {
                   <th key={it.id} style={{ ...th, minWidth: 90 }}>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
                       <span style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.name}</span>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: it.done.length === students.length ? C.success : "var(--text3)" }}>{it.done.length}/{students.length}</span>
+                      {/* Zähler zählt den ENTWURF mit — sonst widerspräche er
+                          den Häkchen, die man gerade gesetzt hat. */}
+                      {(() => { const n = students.filter((s) => e.wert[`${it.id}:${s.id}`]).length; return (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: n === students.length ? C.success : "var(--text3)" }}>{n}/{students.length}</span>
+                      ); })()}
                       <button onClick={() => loeschen(it.id)} className="icon-btn" style={{ ...iconBtn, padding: 4 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={13} color={C.danger} /></button>
                     </div>
                   </th>
@@ -149,7 +178,7 @@ export default function Orga() {
                     <span style={{ display: "inline-block", width: 26, textAlign: "right", color: "var(--text3)", fontWeight: 400, marginRight: 8, fontVariantNumeric: "tabular-nums" }}>{i + 1}.</span>{s.name}
                   </td>
                   {items.map((it) => {
-                    const on = it.done.includes(s.id);
+                    const on = !!e.wert[`${it.id}:${s.id}`];
                     return (
                       <td key={it.id} style={td}>
                         <button onClick={() => toggle(it, s.id)} title={on ? t("orga.done") : t("orga.open")}
@@ -166,6 +195,7 @@ export default function Orga() {
           </table>
         </div>
       )}
+      <SpeicherBalken entwurf={e} />
       </>)}
     </div>
   );

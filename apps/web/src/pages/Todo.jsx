@@ -1,9 +1,11 @@
 // Modul To-do — einfache Aufgabenliste. Ein Eintrag kann Datum + Uhrzeit tragen;
 // datierte Einträge erscheinen zusätzlich im Kalender (Regel 3: reine Zusatz-
 // Brücke, die Liste läuft eigenständig).
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { pageTitle, cardStyle, chipStyle, sectionLabel, toolbarBtn, toolbarBtnPrimary, toolbarInput, CONTROL_R, Icon, ICONS, iconBtn, toolbarIconBtn, COLORS as C, Empty } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
+import { useEntwurf } from "../components/Speichern.jsx";
+import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { sende } from "../core/melden.js";
 import { useAktiv } from "../core/modules.js";
@@ -35,6 +37,37 @@ export default function Todo({ embedded } = {}) {
   const load = () => fetch(API).then((r) => (r.ok ? r.json() : [])).then((d) => setItems(Array.isArray(d) ? d : [])).catch(() => {});
   useEffect(() => { load(); }, []);
 
+  // ── Ein Entwurf für Haken und Reihenfolge ──
+  // Nichts geht zum Server, bevor jemand speichert — auch das Häkchen nicht.
+  // Der Entwurf hält nur IDs (flach, vergleichbar): welche Aufgaben erledigt
+  // sind und in welcher Reihenfolge die offenen stehen. Ein Eintrag, den der
+  // Entwurf noch nicht kennt (gerade angelegt), behält seinen Serverstand und
+  // rutscht ans Ende — so verschluckt ein offener Entwurf keine Neuzugänge.
+  const basis = useMemo(() => ({
+    erledigt: items.filter((i) => i.done).map((i) => i.id),
+    reihenfolge: items.filter((i) => !i.done).map((i) => i.id),
+  }), [items]);
+  const nachSpeichern = useRef(false);
+  const e = useEntwurf(basis, async (wert) => {
+    for (const it of items) {
+      const soll = wert.erledigt.includes(it.id);
+      if (soll !== !!it.done) await fetch(`${API}/${it.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ done: soll }) }).catch(() => {});
+    }
+    const ids = wert.reihenfolge.filter((id) => items.some((x) => x.id === id));
+    if (ids.join() !== basis.reihenfolge.join())
+      await fetch(`${API}/reorder`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) }).catch(() => {});
+    nachSpeichern.current = true;
+    await load();
+  });
+  // Nach dem Speichern gilt der Serverstand: `useEntwurf` haelt sonst an der
+  // Arbeitskopie fest (es weiss nicht, dass sie eben geschrieben wurde) und
+  // meldete „nicht gespeichert" weiter.
+  useEffect(() => { if (nachSpeichern.current) { nachSpeichern.current = false; e.verwerfen(); } });
+
+  const istErledigt = (it) => (e.wert.erledigt.includes(it.id) ? true
+    : e.wert.reihenfolge.includes(it.id) ? false : !!it.done);
+  const platz = (it) => { const i = e.wert.reihenfolge.indexOf(it.id); return i < 0 ? Number.MAX_SAFE_INTEGER : i; };
+
   const add = async () => {
     const v = text.trim();
     if (!v) return;
@@ -43,9 +76,21 @@ export default function Todo({ embedded } = {}) {
     if (!(await sende(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: v, due_date: date || null, due_time: date ? (time || "") : "" }) }, t("common.add")))) return;
     setText(""); setDate(""); setTime(""); load();
   };
-  // Ein abgelehnter Haken sprang nach dem load() zurueck — das sah aus, als
-  // haette man danebengeklickt.
-  const toggle = async (it) => { await sende(`${API}/${it.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ done: !it.done }) }, t("todo.toggle")); load(); };
+  // Der Haken sammelt nur — geschrieben wird er mit „Speichern".
+  const toggle = (it) => {
+    const an = !istErledigt(it);
+    e.setz((v) => {
+      const erl = new Set(v.erledigt);
+      if (an) erl.add(it.id); else erl.delete(it.id);
+      return {
+        // Reihenfolge der Erledigten aus der Serverliste ableiten, nicht
+        // anhängen: sonst meldet ein Haken hin und wieder zurück „geändert".
+        erledigt: items.filter((x) => erl.has(x.id)).map((x) => x.id),
+        reihenfolge: an ? v.reihenfolge.filter((x) => x !== it.id)
+          : (v.reihenfolge.includes(it.id) ? v.reihenfolge : [...v.reihenfolge, it.id]),
+      };
+    });
+  };
   const del = async (id) => { await sende(`${API}/${id}`, { method: "DELETE" }, t("common.delete")); load(); };
   const startEdit = (it) => { setEditId(it.id); setEText(it.text); setEDate(it.due_date || ""); setETime(it.due_time || ""); };
   const saveEdit = async () => {
@@ -57,8 +102,9 @@ export default function Todo({ embedded } = {}) {
   };
 
   const fmtDate = (iso) => { try { return new Date(iso + "T00:00:00").toLocaleDateString(undefined, { day: "2-digit", month: "short" }); } catch { return iso; } };
-  const offen = items.filter((i) => !i.done);
-  const erledigt = items.filter((i) => i.done);
+  // Angezeigt wird der ENTWURF, nicht der Serverstand.
+  const offen = items.filter((i) => !istErledigt(i)).sort((a, b) => platz(a) - platz(b));
+  const erledigt = items.filter((i) => istErledigt(i));
 
   // Drag&Drop der offenen To-dos mit Live-Vorschau (stabile Arbeits-Liste im Ref,
   // damit das Ablegen genau die vorgeschaute Reihenfolge speichert).
@@ -72,14 +118,14 @@ export default function Todo({ embedded } = {}) {
     a.splice(to, 0, m);
     setPreviewOpen([...a]);
   };
-  const commitOrder = async () => {
+  // Die neue Reihenfolge geht in den Entwurf, nicht zum Server.
+  const commitOrder = () => {
     const arr = dragWork.current;
     if (!arr) return;
-    setItems((prev) => [...arr, ...prev.filter((x) => x.done)]);  // offen neu, erledigt hinten
     setPreviewOpen(null);
     const ids = arr.map((x) => x.id);
     dragIdx.current = null; dragWork.current = null;
-    await fetch(`${API}/reorder`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) }).catch(() => {});
+    e.setz({ reihenfolge: ids });
   };
   const dndFor = (idx) => ({
     draggable: editId == null,
@@ -104,8 +150,8 @@ export default function Todo({ embedded } = {}) {
     return (
       <div key={it.id} {...(dnd || {})} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", marginBottom: 8, cursor: dnd ? "grab" : "default" }}>
         {dnd && <span className="drag-handle" title={t("todo.reorderHint")} style={{ color: "var(--text3)", flexShrink: 0, display: "inline-flex", cursor: "grab" }}><Icon d={ICONS.grip} size={15} /></span>}
-        <input type="checkbox" checked={it.done} onChange={() => toggle(it)} style={{ width: 18, height: 18, cursor: "pointer", flexShrink: 0 }} />
-        <span style={{ flex: 1, minWidth: 0, fontSize: 14, textDecoration: it.done ? "line-through" : "none", color: it.done ? "var(--text3)" : "var(--text)" }}>{it.text}</span>
+        <input type="checkbox" checked={istErledigt(it)} onChange={() => toggle(it)} style={{ width: 18, height: 18, cursor: "pointer", flexShrink: 0 }} />
+        <span style={{ flex: 1, minWidth: 0, fontSize: 14, textDecoration: istErledigt(it) ? "line-through" : "none", color: istErledigt(it) ? "var(--text3)" : "var(--text)" }}>{it.text}</span>
         {it.due_date && (
           <span style={{ ...chipStyle, background: "var(--accent-bg, rgba(10,132,255,0.12))", color: "var(--accent)", flexShrink: 0, whiteSpace: "nowrap" }}>
             {fmtDate(it.due_date)}{it.due_time ? ` · ${it.due_time}` : ""}
@@ -163,6 +209,7 @@ export default function Todo({ embedded } = {}) {
           )}
         </>
       )}
+      <SpeicherBalken entwurf={e} />
     </div>
   );
 }

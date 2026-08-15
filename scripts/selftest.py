@@ -714,13 +714,22 @@ def teste_kern(api, b, u):
         # Quizze, gehoert keinem Modul und darf ohne beide leer antworten —
         # aber nie 403 oder 500.
         aus = api.call("GET", f"/api/classes/{u.class_id}/themenprofil", erwartet=(200,))
-        if "schueler" not in aus or "mindest_punkte" not in aus:
-            raise AssertionError(f"Antwort unvollstaendig: {list(aus)}")
+        fehlt = [f for f in ("schueler", "mindest_punkte", "mindest_karten", "quellen")
+                 if f not in aus]
+        if fehlt:
+            raise AssertionError(f"Antwort unvollstaendig, es fehlt: {', '.join(fehlt)}")
+        # Die Herkunft muss benannt sein und darf nur die drei bekannten Quellen
+        # nennen — eine Zahl ohne nachvollziehbare Quelle waere eine Behauptung.
+        unbekannt = set(aus["quellen"]) - {"arbeit", "quiz", "karten"}
+        if unbekannt:
+            raise AssertionError(f"unbekannte Quelle gemeldet: {sorted(unbekannt)}")
         einer = api.call("GET", f"/api/classes/{u.class_id}/themenprofil?student_id={u.students[0]}",
                          erwartet=(200,))
         if len(einer.get("schueler") or []) != 1:
             raise AssertionError("Einschraenkung auf ein Kind wirkt nicht")
-        return f"Klasse und einzelnes Kind ({aus['mindest_punkte']:.0f} Punkte Mindestmass)"
+        quellen = ", ".join(aus["quellen"]) or "keine (kein Quellmodul aktiv)"
+        return (f"Klasse und einzelnes Kind ({aus['mindest_punkte']:.0f} Punkte / "
+                f"{aus['mindest_karten']} Karten Mindestmass; Quellen: {quellen})")
 
     def zugangsdruck():
         # Der Zettel zum Ausschneiden. Geprueft wird, dass wirklich ein PDF

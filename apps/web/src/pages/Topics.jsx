@@ -2,12 +2,13 @@
 // CardVote-Fragen und (spaeter) Lernpfad-Aufgaben zeigen auf dieselben Themen —
 // erst dadurch laesst sich ein schwach ausgefallenes Thema auf passende
 // Aufgaben abbilden.
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { askConfirm } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, pageTitle, pageIntro,
+import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnSecondary, pageTitle, pageIntro,
   Empty, Skeleton, Modal, pageApp, cardStyle, panelStyle, inputStyle, sectionLabel,
   toolbarBtn, toolbarBtnPrimary, toolbarInput, CONTROL_R } from "../components/Icons.jsx";
+import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { peek, put } from "../core/cache.js";
 import AutoTextarea from "../components/AutoTextarea.jsx";
 import { Link } from "react-router-dom";
@@ -39,17 +40,20 @@ export default function Topics() {
     setDragOver((p) => (p && p.id === id && p.side === side ? p : { id, side }));
   };
 
-  const dropRoot = async (targetId) => {
+  // Umsortieren ist eine Änderung wie jede andere: sie sammelt sich im Entwurf
+  // und geht erst mit „Speichern" zum Server. Vorher lag jede losgelassene
+  // Karte sofort in der Datenbank — ein Verrutschen war nicht zurückzunehmen.
+  const dropRoot = (targetId) => {
     const von = dragId, ov = dragOver;
     setDragId(null); setDragOver(null);
     if (!von || von === targetId) return;
-    const ids = topics.filter((x) => x.parent_id === null).map((x) => x.id);
+    const ids = [...ordnung.wert.ids];
     const from = ids.indexOf(von); let to = ids.indexOf(targetId);
     if (from < 0 || to < 0) return;
     if (ov && ov.id === targetId && ov.side === "below") to += 1;
     if (from < to) to -= 1;
-    const neu = [...ids]; neu.splice(to, 0, neu.splice(from, 1)[0]);
-    await call(() => fetch(`${API}/topics/reorder`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: neu }) }));
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    ordnung.setz({ ids });
   };
 
   const load = () =>
@@ -81,6 +85,15 @@ export default function Topics() {
     }
   };
 
+  // Reihenfolge der Themen als Entwurf. Die Grundlage muss über Rendergrenzen
+  // hinweg DIESELBE bleiben (sonst ersetzt useEntwurf die Arbeitskopie bei
+  // jedem Rendern) — deshalb der Schlüssel aus den IDs.
+  const wurzelIds = topics.filter((x) => x.parent_id === null).map((x) => x.id);
+  const idSchluessel = wurzelIds.join(",");
+  const basisOrdnung = useMemo(() => ({ ids: idSchluessel ? idSchluessel.split(",").map(Number) : [] }), [idSchluessel]);
+  const ordnung = useEntwurf(basisOrdnung, (w) =>
+    call(() => fetch(`${API}/topics/reorder`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: w.ids }) })));
+
   const add = (name, parent_id) =>
     call(() => fetch(`${API}/topics`, {
       method: "POST",
@@ -109,7 +122,15 @@ export default function Topics() {
     await call(() => fetch(`${API}/topics/${tp.id}`, { method: "DELETE" }));
   };
 
-  const roots = topics.filter((t) => t.parent_id === null);
+  // Angezeigt wird die Reihenfolge des Entwurfs; was der Server inzwischen neu
+  // kennt (frisch angelegtes Thema), hängt hinten an, statt zu verschwinden.
+  const roots = (() => {
+    const wurzeln = topics.filter((x) => x.parent_id === null);
+    const nach = new Map(wurzeln.map((x) => [x.id, x]));
+    const sortiert = ordnung.wert.ids.map((id) => nach.get(id)).filter(Boolean);
+    const bekannt = new Set(sortiert.map((x) => x.id));
+    return [...sortiert, ...wurzeln.filter((x) => !bekannt.has(x.id))];
+  })();
   const childrenOf = (id) => topics.filter((t) => t.parent_id === id);
   const openPopup = (tp) => setPopup({ ...tp, parent_name: tp.parent_id ? (topics.find((x) => x.id === tp.parent_id)?.name || "") : "" });
 
@@ -258,6 +279,9 @@ export default function Topics() {
       {!loaded && <Skeleton rows={5} />}
       {loaded && roots.length === 0 && <Empty title={t("topics.empty")} hint={t("topics.emptyHint")} />}
 
+      {/* Erscheint erst, wenn wirklich etwas umsortiert wurde. */}
+      <Speicherleiste entwurf={ordnung} style={{ marginBottom: 12 }} />
+
       {roots.map((tp) => renderNode(tp, 0))}
 
       {popup && <TopicPopup tp={popup} t={t} onSaveTopic={saveTopic} onClose={() => setPopup(null)} />}
@@ -269,17 +293,25 @@ export default function Topics() {
 // einem Ausklapp-Icon — welche Klassen und welche Modul-Inhalte am Thema hängen.
 function TopicPopup({ tp, t, onSaveTopic, onClose }) {
   const [editNote, setEditNote] = useState(false);
-  const [noteVal, setNoteVal] = useState(tp.notes || "");
-  const [notes, setNotes] = useState(tp.notes || "");
-  // Anforderungen je Niveau — am Thema, weil der Inhalt zum Thema gehört.
-  const [zielG, setZielG] = useState(tp.ziel_g || "");
-  const [zielE, setZielE] = useState(tp.ziel_e || "");
-  const [zielGVal, setZielGVal] = useState(tp.ziel_g || "");
-  const [voraus, setVoraus] = useState(tp.voraussetzungen || "");
-  const [vorausVal, setVorausVal] = useState(tp.voraussetzungen || "");
-  const [zielEVal, setZielEVal] = useState(tp.ziel_e || "");
-  const [name, setName] = useState(tp.name);      // Anzeige-Titel (nach Umbenennen)
-  const [titleVal, setTitleVal] = useState(tp.name); // Titel im Edit
+  // Ein Entwurf für Titel, Notiz, Voraussetzung und beide Ziele — nicht fünf
+  // Felder mit fünf eigenen Zuständen, die einzeln verloren gehen können.
+  const [gespeichert, setGespeichert] = useState({
+    name: tp.name, notes: tp.notes || "", zielG: tp.ziel_g || "", zielE: tp.ziel_e || "", voraus: tp.voraussetzungen || "",
+  });
+  // Der Entwurf muss sich nach dem Speichern selbst nachziehen (leerer Titel
+  // behält den alten). `e` steht in seiner eigenen Rückrufkette noch nicht —
+  // deshalb über die Ref.
+  const entwurfRef = useRef(null);
+  const ent = useEntwurf(gespeichert, async (w) => {
+    const name = (w.name || "").trim() || gespeichert.name;
+    if (await onSaveTopic(tp, name, w.notes, w.zielG, w.zielE, w.voraus) === false) return false;
+    entwurfRef.current?.setz({ name });
+    setGespeichert({ ...w, name });
+    setEditNote(false);
+  });
+  entwurfRef.current = ent;
+  const { notes, zielG, zielE, voraus } = gespeichert;
+  const name = gespeichert.name;                  // Anzeige-Titel (nach Umbenennen)
   const [open, setOpen] = useState(false); // Inhalte-Bereich ausgeklappt?
   const [usage, setUsage] = useState(null);
   const [classes, setClasses] = useState({}); // id -> name
@@ -290,10 +322,11 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
     fetch("/api/classes").then((r) => (r.ok ? r.json() : [])).then((d) => setClasses(Object.fromEntries((Array.isArray(d) ? d : []).map((c) => [c.id, c.name])))).catch(() => {});
   }, [open]);
 
-  const saveEdit = async () => {
-    await onSaveTopic(tp, titleVal, noteVal, zielGVal, zielEVal, vorausVal);
-    setNotes(noteVal); setZielG(zielGVal); setZielE(zielEVal); setVoraus(vorausVal);
-    setName(titleVal.trim() || name); setEditNote(false);
+  // Der Dialog ist der zweite Weg hinaus: ohne Nachfrage wäre alles Getippte
+  // mit einem Klick auf das Kreuz weg.
+  const schliessen = () => {
+    if (ent.geaendert && !window.confirm(t("speichern.verlassen"))) return;
+    onClose();
   };
 
   // Klassen, die über Inhalte (Decks/Kalender) an diesem Thema hängen.
@@ -316,36 +349,37 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
   ) : <div style={line}>{children}</div>);
 
   return (
-    <Modal onClose={onClose} width={520} style={{ maxHeight: "86vh", overflowY: "auto" }} label={tp.parent_name ? `${tp.parent_name} / ${name}` : name}>
+    <Modal onClose={schliessen} width={520} style={{ maxHeight: "86vh", overflowY: "auto" }} label={tp.parent_name ? `${tp.parent_name} / ${name}` : name}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, flex: 1 }}>{tp.parent_name ? `${tp.parent_name} / ${name}` : name}</h3>
           {/* Ein Edit-Icon für Titel UND Notiz. */}
-          {!editNote && <button onClick={() => { setTitleVal(name); setNoteVal(notes); setZielGVal(zielG); setZielEVal(zielE); setVorausVal(voraus); setEditNote(true); }} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={16} /></button>}
-          <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
+          {!editNote && <button onClick={() => setEditNote(true)} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={16} /></button>}
+          <button onClick={schliessen} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
         </div>
 
         {editNote ? (
           <div>
             <div style={secTitle}>{t("common.rename")}</div>
-            <input value={titleVal} onChange={(e) => setTitleVal(e.target.value)} autoFocus maxLength={120}
+            <input value={ent.wert.name} onChange={(ev) => ent.setz({ name: ev.target.value })} autoFocus maxLength={120}
               style={{ ...inputStyle, width: "100%", fontSize: 16, fontWeight: 600 }} />
             <div style={secTitle}>{t("topics.notes")}</div>
-            <AutoTextarea value={noteVal} onChange={(e) => setNoteVal(e.target.value.slice(0, 500))} rows={2} maxLength={500}
+            <AutoTextarea value={ent.wert.notes} onChange={(ev) => ent.setz({ notes: ev.target.value.slice(0, 500) })} rows={2} maxLength={500}
               placeholder={t("topics.notesPlaceholder")}
               style={{ ...inputStyle, width: "100%", lineHeight: 1.5, resize: "vertical" }} />
-            {[["v", t("topics.voraus"), t("topics.vorausPlaceholder"), vorausVal, setVorausVal],
-              ["g", t("topics.zielG"), t("topics.zielGPlaceholder"), zielGVal, setZielGVal],
-              ["e", t("topics.zielE"), t("topics.zielEPlaceholder"), zielEVal, setZielEVal]].map(([k, label, ph, wert, setzen]) => (
+            {[["v", t("topics.voraus"), t("topics.vorausPlaceholder"), "voraus"],
+              ["g", t("topics.zielG"), t("topics.zielGPlaceholder"), "zielG"],
+              ["e", t("topics.zielE"), t("topics.zielEPlaceholder"), "zielE"]].map(([k, label, ph, feld]) => (
               <div key={k}>
                 <div style={secTitle}>{label}</div>
-                <AutoTextarea value={wert} onChange={(e) => setzen(e.target.value.slice(0, 500))} rows={2} maxLength={500} placeholder={ph}
+                <AutoTextarea value={ent.wert[feld]} onChange={(ev) => ent.setz({ [feld]: ev.target.value.slice(0, 500) })} rows={2} maxLength={500} placeholder={ph}
                   style={{ ...inputStyle, width: "100%", lineHeight: 1.5, resize: "vertical" }} />
               </div>
             ))}
-            <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
-              <button onClick={saveEdit} style={btnPrimary}>{t("common.save")}</button>
-              <button onClick={() => setEditNote(false)} style={btnSecondary}>{t("common.abort")}</button>
-              <span style={{ marginLeft: "auto", fontSize: 12, color: noteVal.length >= 500 ? C.danger : "var(--text3)" }}>{noteVal.length}/500</span>
+            <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <Speicherleiste entwurf={ent} immer />
+              <button onClick={() => { if (!ent.geaendert || window.confirm(t("speichern.verlassen"))) { ent.verwerfen(); setEditNote(false); } }}
+                style={btnSecondary}>{t("common.done")}</button>
+              <span style={{ marginLeft: "auto", fontSize: 12, color: ent.wert.notes.length >= 500 ? C.danger : "var(--text3)" }}>{ent.wert.notes.length}/500</span>
             </div>
           </div>
         ) : (<>

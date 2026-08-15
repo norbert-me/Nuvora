@@ -46,18 +46,21 @@ function gleich(a, b) {
 export function useEntwurf(gespeichert, speichernFn) {
   const [wert, setWert] = useState(gespeichert);
   const [laeuft, setLaeuft] = useState(false);
-  // Kommt ein neuer Stand vom Server, wird die Arbeitskopie nur dann ersetzt,
-  // wenn gerade NICHTS offen ist — sonst überschriebe ein Neuladen im
-  // Hintergrund das, was jemand gerade tippt.
-  const offenRef = useRef(false);
+  // „Hat hier jemand HINEINGEGRIFFEN?" — und nicht „unterscheiden sich die
+  // Werte?". Der Unterschied ist der Kern: Daten kommen oft erst nach dem
+  // Mounten, die Arbeitskopie startet also mit einem leeren Stand. Wer nur
+  // vergleicht, haelt diesen ersten Nachschub fuer eine offene Aenderung,
+  // uebernimmt ihn nie — und die Maske steht sofort auf „nicht gespeichert"
+  // und zeigt leere Felder. Genau das ist beim ersten Einsatz passiert.
+  const beruehrt = useRef(false);
   useEffect(() => {
-    if (!offenRef.current) setWert(gespeichert);
+    if (!beruehrt.current) setWert(gespeichert);
   }, [gespeichert]);
 
-  const geaendert = !gleich(wert, gespeichert);
-  offenRef.current = geaendert;
+  const geaendert = beruehrt.current && !gleich(wert, gespeichert);
 
   const setz = useCallback((teil) => {
+    beruehrt.current = true;
     setWert((v) => ({ ...v, ...(typeof teil === "function" ? teil(v) : teil) }));
   }, []);
 
@@ -66,13 +69,16 @@ export function useEntwurf(gespeichert, speichernFn) {
     setLaeuft(true);
     try {
       const ok = await speichernFn(wert);
+      // Nur bei Erfolg loslassen: sonst gaelte der Entwurf als uebernommen und
+      // der naechste Nachschub vom Server ueberschriebe, was nie ankam.
+      if (ok !== false) beruehrt.current = false;
       return ok !== false;
     } finally {
       setLaeuft(false);
     }
   }, [laeuft, speichernFn, wert]);
 
-  const verwerfen = useCallback(() => setWert(gespeichert), [gespeichert]);
+  const verwerfen = useCallback(() => { beruehrt.current = false; setWert(gespeichert); }, [gespeichert]);
 
   return useMemo(() => ({ wert, setz, geaendert, speichern, verwerfen, laeuft }),
     [wert, setz, geaendert, speichern, verwerfen, laeuft]);

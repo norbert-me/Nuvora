@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { askConfirm } from "../core/dialog.jsx";
 import { useAktiv } from "../core/modules.js";
@@ -6,11 +6,34 @@ import { istAdmin } from "../core/admin.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { Icon, ICONS, Modal, Tabs, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, toolbarInput, iconBtn, COLORS as C, pageApp } from "../components/Icons.jsx";
 import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
+import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 
 const API = "/api";
 
 function currentUser() {
   try { return JSON.parse(localStorage.getItem("user")); } catch { return null; }
+}
+
+/**
+ * Bewertung eines Eintrags — eine Aenderung wie jede andere, also mit
+ * Speichern. Der Entwurf haengt am EINZELNEN Eintrag: bewertet wird ein Werk,
+ * nicht die Liste, und zwei Eintraege gleichzeitig bewertet niemand.
+ */
+function Bewertung({ q, onRate, t }) {
+  // Stabile Kennung: ein bei jedem Rendern neues Objekt wuerde die Arbeitskopie
+  // in einer Schleife zuruecksetzen.
+  const gespeichert = useMemo(() => ({ stars: q.my_rating || 0 }), [q.my_rating]);
+  const e = useEntwurf(gespeichert, async (wert) => {
+    if (!wert.stars) return false;
+    return await onRate(wert.stars);
+  });
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <Stars value={q.avg_rating} my={e.wert.stars} count={q.rating_count}
+        onRate={(n) => e.setz({ stars: n })} t={t} />
+      <Speicherleiste entwurf={e} klein />
+    </div>
+  );
 }
 
 function Stars({ value, my, onRate, count, t }) {
@@ -111,11 +134,12 @@ export default function Marketplace({ fixedKind }) {
   }, [search]);
 
   const rate = async (id, stars) => {
-    setQuizzes((prev) => prev.map((q) => q.id === id ? { ...q, my_rating: stars } : q));
-    await fetch(`${API}/marketplace/${id}/rate`, {
+    const r = await fetch(`${API}/marketplace/${id}/rate`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ stars }),
-    });
+    }).catch(() => null);
+    if (!r || !r.ok) return false;
+    setQuizzes((prev) => prev.map((q) => q.id === id ? { ...q, my_rating: stars } : q));
     load();
   };
 
@@ -235,7 +259,7 @@ export default function Marketplace({ fixedKind }) {
             </div>
             {q.description && <p style={{ fontSize: 13, color: "var(--text2)", margin: "8px 0 12px", lineHeight: 1.5 }}>{q.description}</p>}
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <Stars value={q.avg_rating} my={q.my_rating} count={q.rating_count} onRate={(n) => rate(q.id, n)} t={t} />
+              <Bewertung q={q} onRate={(n) => rate(q.id, n)} t={t} />
               {q.copies > 0 && <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("market.copies", { n: q.copies })}</span>}
             </div>
           </div>

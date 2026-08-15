@@ -6,6 +6,8 @@ import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import { useSearchParams } from "react-router-dom";
 import { badge, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, CONTROL_R, panelStyle, selectStyle, inputStyle, Segment, segmentBtn, th as thBase, td as tdBase, toolbarBtn, toolbarIconBtn, Icon, ICONS, iconBtn, COLORS as C, Empty, Modal, Boxplot, StatCard, Tabs, pageApp} from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
+import { useEntwurf } from "../components/Speichern.jsx";
+import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
 import Themenstand from "../components/Themenstand.jsx";
@@ -114,10 +116,14 @@ export default function Klassenarbeit() {
   const [students, setStudents] = useState([]);
   const [topics, setTopics] = useState([]);
   const [works, setWorks] = useState([]);
-  const [work, setWork] = useState(null); // { id, name, tasks:[{id,label,topic_id}], results:{sid:[taskId]} }
+  // Serverstand der Arbeit (Basis) — die Arbeitskopie liegt im Entwurf.
+  const [savedWork, setSavedWork] = useState(null);
+  // Eine andere Arbeit (oder ein Neuladen) beendet die Arbeitskopie: `useEntwurf`
+  // haelt sonst an ihr fest und zeigte die Punkte der vorigen Arbeit weiter.
+  const frisch = useRef(false);
+  const zeigeArbeit = (w) => { frisch.current = true; setSavedWork(w); }; // { id, name, tasks:[{id,label,topic_id}], results:{sid:[taskId]} }
   const [busy, setBusy] = useState(false);
   const kq = kursId != null ? `?kurs_id=${kursId}` : "";
-  const saveTimer = useRef(null);
 
   useEffect(() => { fetch("/api/topics").then((r) => (r.ok ? r.json() : [])).then((d) => setTopics(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
   // Teilkurse (Kurse aus Teilen von Klassen = einzeln hinzugefügte SuS) laden.
@@ -145,14 +151,14 @@ export default function Klassenarbeit() {
       fetch(`${API}/kurse/${subsetKurs}/students`).then((r) => (r.ok ? r.json() : [])).then((list) => {
         const studs = Array.isArray(list) ? list : []; setStudents(studs);
         const rep = studs[0]?.class_id || null; repClass.current = rep;
-        if (rep) fetch(`${API}/classes/${rep}/works?kurs_id=${subsetKurs}`).then((r) => (r.ok ? r.json() : [])).then((d) => { const l = Array.isArray(d) ? d : []; setWorks(l); setWork(l[0] || null); }).catch(() => {});
-        else { setWorks([]); setWork(null); }
-      }).catch(() => { setStudents([]); setWorks([]); setWork(null); });
+        if (rep) fetch(`${API}/classes/${rep}/works?kurs_id=${subsetKurs}`).then((r) => (r.ok ? r.json() : [])).then((d) => { const l = Array.isArray(d) ? d : []; setWorks(l); zeigeArbeit(l[0] || null); }).catch(() => {});
+        else { setWorks([]); zeigeArbeit(null); }
+      }).catch(() => { setStudents([]); setWorks([]); zeigeArbeit(null); });
       return;
     }
     repClass.current = null;
     if (classId) rememberClass(classId);
-    if (!classId) { setStudents([]); setWorks([]); setWork(null); return; }
+    if (!classId) { setStudents([]); setWorks([]); zeigeArbeit(null); return; }
     const meine = ++ladenr.current;   // nur die jüngste Antwort darf schreiben
     fetch(`${API}/classes/${classId}/students`).then((r) => (r.ok ? r.json() : [])).then((d) => {
       if (meine === ladenr.current) setStudents(Array.isArray(d) ? d : []);
@@ -164,7 +170,7 @@ export default function Klassenarbeit() {
       // Deep-Link: gewünschte Auswertung wählen, sonst die neueste.
       const target = wantWork.current ? l.find((x) => x.id === wantWork.current) : null;
       if (target) wantWork.current = null;
-      setWork(target || l[0] || null);
+      zeigeArbeit(target || l[0] || null);
     }).catch(() => {});
   }, [classId, kursId, subsetKurs]);
 
@@ -175,16 +181,28 @@ export default function Klassenarbeit() {
   const themen = themenIndex(topics);
   const topicLabel = (id) => themen.labelFuerId(id);
 
-  // Änderung lokal + gebündelt speichern (PUT der ganzen Arbeit).
-  const persist = (next) => {
-    setWork(next);
-    clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      // scale: echtes dict = Override, sonst {} (Server setzt zurueck auf Profil).
-      const scaleOut = (next.scale && Object.keys(next.scale).length) ? next.scale : {};
-      fetch(`${API}/works/${next.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: next.name, tasks: next.tasks, results: next.results, scale: scaleOut, absent: next.absent || [] }) }).catch(() => {});
-    }, 600);
-  };
+  // ── Ein Entwurf für die ganze Arbeit ──
+  // Vorher schrieb ein Zeitgeber 600 ms nach dem letzten Tastendruck — man sah
+  // nie, ob etwas drin ist. Jetzt sammelt der Entwurf Aufgaben, Punkte,
+  // Notenschlüssel und „krank"; geschrieben wird mit der Leiste unten.
+  const entwurf = useEntwurf(savedWork, async (next) => {
+    if (!next || !next.id) return false;
+    // scale: echtes dict = Override, sonst {} (Server setzt zurueck auf Profil).
+    const scaleOut = (next.scale && Object.keys(next.scale).length) ? next.scale : {};
+    const r = await fetch(`${API}/works/${next.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: next.name, tasks: next.tasks, results: next.results, scale: scaleOut, absent: next.absent || [] }) }).catch(() => null);
+    if (!r || !r.ok) { showAlert(t("common.notWork")); return false; }
+    setSavedWork(next);
+    setWorks((ws) => ws.map((x) => (x.id === next.id ? { ...x, name: next.name } : x)));
+    return true;
+  });
+  useEffect(() => { if (frisch.current) { frisch.current = false; entwurf.verwerfen(); } });
+  const work = entwurf.wert;
+  // Der Name bleibt: jede Geste geht weiter denselben einen Weg — nur endet er
+  // jetzt im Entwurf statt beim Server.
+  const persist = (next) => entwurf.setz(next);
+  // Andere Arbeit / andere Klasse gewählt: nachfragen, sonst wäre die
+  // Arbeitskopie still weg.
+  const wechseln = (fn) => { if (entwurf.geaendert && !window.confirm(t("speichern.verlassen"))) return; fn(); };
 
   const neueArbeit = async () => {
     // Teilkurs: class_id = Referenz-Klasse (FK), kurs_id = Teilkurs (Roster kommt daraus).
@@ -196,7 +214,7 @@ export default function Klassenarbeit() {
       // rutschen Nullen in die Wertung.
       body: JSON.stringify({ class_id: cid, kurs_id: kid, name: t("klassenarbeit.newName"),
                              datum: new Date().toISOString() }) }).catch(() => null);
-    if (res && res.ok) { const w = await res.json(); setWorks((p) => [w, ...p]); setWork(w); }
+    if (res && res.ok) { const w = await res.json(); setWorks((p) => [w, ...p]); zeigeArbeit(w); }
   };
   const [kopieOffen, setKopieOffen] = useState(false);
   // Kopie in eine andere Klasse: Aufgaben, Themen, Notenschluessel und die
@@ -212,14 +230,14 @@ export default function Klassenarbeit() {
     setKopieOffen(false);
     // Direkt hinspringen: die Kopie ist das, womit weitergearbeitet wird.
     setClassId(zielClassId); setKursId(zielKursId ?? null); setSubsetKurs(null);
-    setWorks((ws) => [neu, ...ws]); setWork(neu);
+    setWorks((ws) => [neu, ...ws]); zeigeArbeit(neu);
     return true;
   };
 
   const loeschen = async () => {
     if (!work || !(await askConfirm(t("klassenarbeit.delConfirm", { name: work.name })))) return;
     await fetch(`${API}/works/${work.id}`, { method: "DELETE" }).catch(() => {});
-    setWorks((p) => p.filter((x) => x.id !== work.id)); setWork(null);
+    setWorks((p) => p.filter((x) => x.id !== work.id)); zeigeArbeit(null);
   };
 
   // Ein „Teil" (Teilaufgabe a/b/c…) ist die kleinste Wertungseinheit. Hat eine
@@ -466,9 +484,9 @@ export default function Klassenarbeit() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        <span data-tour="ka-class" style={{ display: "inline-flex" }}><KursKlasseSelect value={subsetKurs ? "" : classId} kursValue={subsetKurs ? null : kursId} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} /></span>
+        <span data-tour="ka-class" style={{ display: "inline-flex" }}><KursKlasseSelect value={subsetKurs ? "" : classId} kursValue={subsetKurs ? null : kursId} onChange={(id, kid) => wechseln(() => { setSubsetKurs(null); setClassId(id); setKursId(kid); })} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} /></span>
         {subsetKurse.length > 0 && (
-          <select value={subsetKurs || ""} onChange={(e) => setSubsetKurs(e.target.value ? Number(e.target.value) : null)} style={{ ...selectStyle, fontSize: 13 }} title={t("klassenarbeit.subsetHint")}>
+          <select value={subsetKurs || ""} onChange={(e) => { const v = e.target.value ? Number(e.target.value) : null; wechseln(() => setSubsetKurs(v)); }} style={{ ...selectStyle, fontSize: 13 }} title={t("klassenarbeit.subsetHint")}>
             <option value="">{t("klassenarbeit.subsetPick")}</option>
             {subsetKurse.map((k) => <option key={k.id} value={k.id}>{k.name} ({k.member_count})</option>)}
           </select>
@@ -489,7 +507,7 @@ export default function Klassenarbeit() {
            ins Mehr-Menue, wo Gefaehrliches selbst nach unten sortiert. */
         <Werkzeugleiste style={{ marginBottom: 16 }}
           links={(
-            <select value={work?.id || ""} onChange={(e) => setWork(works.find((w) => String(w.id) === e.target.value) || null)} style={{ ...selectStyle, minWidth: 180 }}>
+            <select value={work?.id || ""} onChange={(e) => { const w = works.find((x) => String(x.id) === e.target.value) || null; wechseln(() => zeigeArbeit(w)); }} style={{ ...selectStyle, minWidth: 180 }}>
               {works.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
           )}
@@ -507,7 +525,9 @@ export default function Klassenarbeit() {
               Aufgaben-Editor, Punkte-Raster, Aktionen. Nur die Auswertung bleibt. */}
           {!hideIndividual && (<>
           {/* Name sofort auch im Auswahl-Dropdown zeigen (nicht erst nach Reload). */}
-          <input value={work.name} onChange={(e) => { const name = e.target.value; persist({ ...work, name }); setWorks((ws) => ws.map((x) => (x.id === work.id ? { ...x, name } : x))); }} placeholder={t("klassenarbeit.newName")}
+          {/* Der Name geht in den Entwurf; im Auswahlfeld oben steht er nach dem
+              Speichern (vorher wäre dort ein Name, den es serverseitig nicht gibt). */}
+          <input value={work.name} onChange={(e) => persist({ name: e.target.value })} placeholder={t("klassenarbeit.newName")}
             style={{ ...inputStyle, fontSize: 16, fontWeight: 600, marginBottom: 12, maxWidth: 360 }} />
 
           {/* Anhänge: die Arbeit selbst und ihr Erwartungshorizont. Zwei
@@ -894,6 +914,9 @@ export default function Klassenarbeit() {
       {kopieOffen && work && (
         <KopieModal work={work} onClose={() => setKopieOffen(false)} onCopy={kopieren} t={t} />
       )}
+      {/* Unten schwebend: das Punkte-Raster ist länger als der Bildschirm, oben
+          wäre der Knopf nach der dritten Zeile weg. */}
+      <SpeicherBalken entwurf={entwurf} />
     </div>
   );
 }

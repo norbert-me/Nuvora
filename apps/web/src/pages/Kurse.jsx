@@ -1,15 +1,16 @@
 // Kurse (Lerngruppen) verwalten. Klassen im selben Kurs teilen SuS + Anwesenheit
 // (per Name); Karten/Noten bleiben pro Fach-Klasse. Eine Klasse darf in mehreren
 // Kursen sein.
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { liegtDavor, nachJahrAbsteigend } from "../core/schuljahr.js";
 import { useLanguage } from "../i18n/index.jsx";
 import KursLinks from "../components/KursLinks.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { sende } from "../core/melden.js";
-import { NiveauToggle, AddButton, pageTitle, pageIntro, btnPrimary, btnSecondary, btnSmall, selectStyle, chipStyle,
+import { NiveauToggle, AddButton, pageTitle, pageIntro, btnSecondary, btnSmall, selectStyle, chipStyle,
   Icon, ICONS, iconBtn, COLORS as C, cardStyle, inputStyle, toolbarInput, sectionLabel, Toggle, Tabs, Empty, pageApp, LoadError } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
+import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 
 const API = "/api";
 const editLabel = { ...sectionLabel, marginBottom: 4 };
@@ -21,12 +22,17 @@ export default function Kurse() {
   // Gelöschte Kurse liegen im gemeinsamen Papierkorb des Kerns (/papierkorb).
   const [neu, setNeu] = useState("");
   const [editKurs, setEditKurs] = useState(null); // aufgeklappter Bearbeiten-Bereich (Name, E/G)
-  const [editName, setEditName] = useState("");
+  // Name, Schuljahr, Vorjahr, E/G, Klassen und Archiv sind EIN Entwurf mit
+  // EINER Speicherleiste. Vorher ging jeder Handgriff für sich zum Server: der
+  // Schalter beim Umlegen, die Klasse beim Auswählen im Feld daneben.
+  //
   // Jahresfolge: Schuljahr und der Kurs des Vorjahres. Die Daten bleiben
   // getrennt (Zeugnisnoten gelten je Schuljahr) — verbunden wird nur die Kette,
   // damit „6.5 Mathe" und „7.5 Mathe" nicht als zwei fremde Gruppen dastehen.
-  const [editJahr, setEditJahr] = useState("");
-  const [editVor, setEditVor] = useState("");
+  const LEER = { name: "", jahr: "", vorgaenger: "", niveauAktiv: false, archiviert: false, klassen: [] };
+  const [kursBasis, setKursBasis] = useState(LEER);
+  const kurs = useEntwurf(kursBasis, (w) => kursSpeichern(w));
+  const kursUebernehmen = (stand) => { setKursBasis(stand); kurs.setz(stand); };
   const [alleKurse, setAlleKurse] = useState([]);   // inkl. Archiv — das Vorjahr liegt meist dort
 
   // Ein Serverfehler sah hier aus wie „noch kein Kurs angelegt" — mitsamt der
@@ -50,9 +56,16 @@ export default function Kurse() {
     setNeu(""); load();
   };
   const openEdit = (k) => {
-    if (editKurs === k.id) { setEditKurs(null); return; }
-    setEditKurs(k.id); setEditName(k.name);
-    setEditJahr(k.schuljahr || ""); setEditVor(k.vorgaenger_id ? String(k.vorgaenger_id) : "");
+    if (editKurs === k.id) {
+      if (kurs.geaendert && !window.confirm(t("speichern.verlassen"))) return;
+      kursUebernehmen(LEER); setEditKurs(null); return;
+    }
+    if (kurs.geaendert && !window.confirm(t("speichern.verlassen"))) return;
+    setEditKurs(k.id);
+    kursUebernehmen({
+      name: k.name, jahr: k.schuljahr || "", vorgaenger: k.vorgaenger_id ? String(k.vorgaenger_id) : "",
+      niveauAktiv: !!k.niveau_aktiv, archiviert: archiv, klassen: k.classes.map((c) => c.id),
+    });
     // Auswahl fuer „Vorjahr": aktive UND archivierte Kurse. Nach dem
     // Schuljahresende steht der Vorgaenger im Archiv, und genau dann braucht
     // man ihn hier.
@@ -61,23 +74,25 @@ export default function Kurse() {
       fetch(`${API}/kurse?archiviert=true`).then((r) => (r.ok ? r.json() : [])),
     ]).then(([a, b]) => setAlleKurse([...(a || []), ...(b || [])])).catch(() => {});
   };
-  const saveName = async (k) => {
-    const name = editName.trim();
-    if (!name) return;
-    // Ohne die Prüfung holte load() den alten Namen zurück: der getippte Name
-    // verschwand vor den Augen der Lehrkraft, ohne Meldung.
-    const koerper = { name, schuljahr: editJahr.trim(), vorgaenger_id: editVor ? Number(editVor) : 0 };
-    if (!(await sende(`${API}/kurse/${k.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(koerper) }, t("kurse.editName")))) return;
-    load();
+  // Ein Speichern für den ganzen Bearbeiten-Bereich: erst der Kurs selbst, dann
+  // die Klassen, die dazugekommen oder weggefallen sind, zuletzt das Archiv.
+  // Bricht ein Schritt ab, bleibt der Entwurf offen (Rückgabe false).
+  const kursSpeichern = async (w) => {
+    const k = kurse.find((x) => x.id === editKurs);
+    if (!k) return false;
+    const name = w.name.trim();
+    if (!name) return false;
+    const koerper = { name, schuljahr: w.jahr.trim(), vorgaenger_id: w.vorgaenger ? Number(w.vorgaenger) : 0, niveau_aktiv: w.niveauAktiv };
+    if (!(await sende(`${API}/kurse/${k.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(koerper) }, t("kurse.editName")))) return false;
+    for (const id of w.klassen.filter((x) => !kursBasis.klassen.includes(x)))
+      if (!(await sende(`${API}/kurse/${k.id}/classes/${id}`, { method: "POST" }, t("kurse.addClass")))) return false;
+    for (const id of kursBasis.klassen.filter((x) => !w.klassen.includes(x)))
+      if (!(await sende(`${API}/kurse/${k.id}/classes/${id}`, { method: "DELETE" }, t("kurse.unlink")))) return false;
+    if (w.archiviert !== kursBasis.archiviert
+      && !(await sende(`${API}/kurse/${k.id}/archive`, { method: "POST" }, t("classes.archive")))) return false;
+    setKursBasis(w);
+    load(); loadClasses();
   };
-  const setNiveauAktiv = async (k, val) => {
-    // Ein abgelehnter Schalter sprang wortlos zurück — das sieht aus wie ein
-    // klemmender Regler, ist aber eine Ablehnung des Servers.
-    if (!(await sende(`${API}/kurse/${k.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: k.name, niveau_aktiv: val }) }, t("kurse.editLevels")))) return;
-    load();
-  };
-  const addMember = async (kursId, classId) => { if (!(await sende(`${API}/kurse/${kursId}/classes/${classId}`, { method: "POST" }, t("kurse.addClass")))) return; load(); };
-  const removeMember = async (kursId, classId) => { if (!(await sende(`${API}/kurse/${kursId}/classes/${classId}`, { method: "DELETE" }, t("kurse.unlink")))) return; load(); };
   const delKurs = (k) => {
     // Sofort aus der Liste, 5 s Undo-Toast; erst dann wirklich löschen.
     setKurse((prev) => prev.filter((x) => x.id !== k.id));
@@ -88,8 +103,12 @@ export default function Kurse() {
     });
   };
 
-  // Klassen, die (noch) nicht in diesem Kurs sind — zum Hinzufügen.
-  const frei = (k) => { const drin = new Set(k.classes.map((c) => c.id)); return allClasses.filter((c) => !drin.has(c.id)); };
+  // Klassen, die (noch) nicht im Entwurf dieses Kurses stehen — zum Hinzufügen.
+  const frei = (ids) => { const drin = new Set(ids); return allClasses.filter((c) => !drin.has(c.id)); };
+  // Name einer Klassen-ID: erst aus dem Kurs (dort steht sie schon), sonst aus
+  // der Gesamtliste — eine gerade hinzugefügte kennt der Kurs noch nicht.
+  const klassenName = (k, id) => k.classes.find((c) => c.id === id)?.name
+    || allClasses.find((c) => c.id === id)?.name || `#${id}`;
 
   return (
     <div style={{ ...pageApp }}>
@@ -126,14 +145,11 @@ export default function Kurse() {
               <strong style={{ fontSize: 16 }}>{k.name}</strong>
               {k.schuljahr && <span style={chipStyle}>{k.schuljahr}</span>}
               <span style={{ flex: 1 }} />
-              {/* Archivieren nimmt die Fach-Klassen mit: am Schuljahresende ist
-                  der ganze Kurs vorbei, und eine Klasse allein in den Listen zu
-                  lassen waere genau die halbe Arbeit, die man vergisst. */}
-              <button onClick={async () => { await sende(`${API}/kurse/${k.id}/archive`, { method: "POST" }, t("classes.archive")); load(); }}
-                style={{ ...btnSecondary, ...btnSmall }} title={t("classes.archiveHint")}>
-                {archiv ? t("classes.unarchive") : t("classes.archive")}
-              </button>
-              {!archiv && <button onClick={() => openEdit(k)} className="icon-btn" style={iconBtn} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>}
+              {/* Archivieren steht jetzt IM Bearbeiten-Bereich und wartet dort
+                  auf „Speichern" — es ist ein Umschalten wie der E/G-Regler,
+                  kein Sofortbefehl. Der Stift auch im Archiv, sonst käme man an
+                  archivierte Kurse gar nicht mehr heran. */}
+              <button onClick={() => openEdit(k)} className="icon-btn" style={iconBtn} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={15} /></button>
             </div>
             {/* Zweiter Weg durch Nuvora: vom Kurs (Fach) aus in die Module.
                 Alles Verlinkte ist fachlich — deshalb hier und nicht an der Klasse. */}
@@ -150,21 +166,32 @@ export default function Kurse() {
                 Klassen (hinzufügen/entfernen) und E/G. */}
             {editKurs === k.id && (
               <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12, display: "flex", flexDirection: "column", gap: 16 }}>
+                {/* EINE Leiste für den ganzen Bereich — Name, Jahr, Klassen,
+                    E/G und Archiv gehen zusammen hinaus. */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <Speicherleiste entwurf={kurs} immer />
+                  <button onClick={() => kurs.setz((w) => ({ archiviert: !w.archiviert }))}
+                    style={{ ...btnSecondary, ...btnSmall, marginLeft: "auto",
+                      borderColor: kurs.wert.archiviert !== kursBasis.archiviert ? "var(--accent)" : "var(--border2)" }}
+                    title={t("classes.archiveHint")}>
+                    {kurs.wert.archiviert ? t("classes.unarchive") : t("classes.archive")}
+                  </button>
+                </div>
+
                 <div>
                   <div style={editLabel}>{t("kurse.editName")}</div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={t("kurse.renamePrompt")}
-                      onKeyDown={(e) => e.key === "Enter" && saveName(k)} style={{ ...inputStyle, flex: 1, minWidth: 160 }} />
-                    <button onClick={() => saveName(k)} style={btnPrimary}>{t("common.save")}</button>
+                    <input value={kurs.wert.name} onChange={(e) => kurs.setz({ name: e.target.value })} placeholder={t("kurse.renamePrompt")}
+                      onKeyDown={(e) => e.key === "Enter" && kurs.speichern()} style={{ ...inputStyle, flex: 1, minWidth: 160 }} />
                   </div>
                 </div>
 
                 <div>
                   <div style={editLabel}>{t("kurse.editYear")}</div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <input value={editJahr} onChange={(e) => setEditJahr(e.target.value)} placeholder="2025/26"
+                    <input value={kurs.wert.jahr} onChange={(e) => kurs.setz({ jahr: e.target.value })} placeholder="2025/26"
                       style={{ ...inputStyle, width: 120 }} />
-                    <select value={editVor} onChange={(e) => setEditVor(e.target.value)} style={{ ...selectStyle, flex: 1, minWidth: 200 }}>
+                    <select value={kurs.wert.vorgaenger} onChange={(e) => kurs.setz({ vorgaenger: e.target.value })} style={{ ...selectStyle, flex: 1, minWidth: 200 }}>
                       <option value="">{t("kurse.noPrevious")}</option>
                       {/* Nur FRUEHERE Jahrgaenge: ein Kurs aus demselben
                           Schuljahr ist nie das Vorjahr. Kurse ohne
@@ -173,7 +200,7 @@ export default function Kurse() {
                           nicht verknuepfen zu koennen. Neueste zuerst, damit
                           das direkt vorangehende Jahr oben steht. */}
                       {alleKurse
-                        .filter((x) => x.id !== k.id && liegtDavor(x.schuljahr, editJahr))
+                        .filter((x) => x.id !== k.id && liegtDavor(x.schuljahr, kurs.wert.jahr))
                         .sort((a, b) => nachJahrAbsteigend(a.schuljahr, b.schuljahr))
                         .map((x) => (
                           <option key={x.id} value={x.id}>{x.name}{x.schuljahr ? ` (${x.schuljahr})` : ""}</option>
@@ -186,19 +213,22 @@ export default function Kurse() {
                 <div>
                   <div style={editLabel}>{t("kurse.editClasses")}</div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                    {k.classes.map((c) => (
-                      <span key={c.id} style={{ ...chipStyle, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                        {c.name}
-                        <button onClick={() => removeMember(k.id, c.id)} title={t("kurse.unlink")}
+                    {/* Angezeigt wird der Entwurf, nicht der Serverstand: eine
+                        gerade gewählte Klasse steht sofort da, ist aber erst
+                        mit „Speichern" wirklich im Kurs. */}
+                    {kurs.wert.klassen.map((cid) => (
+                      <span key={cid} style={{ ...chipStyle, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        {klassenName(k, cid)}
+                        <button onClick={() => kurs.setz((w) => ({ klassen: w.klassen.filter((x) => x !== cid) }))} title={t("kurse.unlink")}
                           style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", padding: 0, display: "flex" }}>
                           <Icon d={ICONS.close} size={12} />
                         </button>
                       </span>
                     ))}
-                    {frei(k).length > 0 && (
-                      <select value="" onChange={(e) => e.target.value && addMember(k.id, Number(e.target.value))} style={selectStyle}>
+                    {frei(kurs.wert.klassen).length > 0 && (
+                      <select value="" onChange={(e) => { const id = Number(e.target.value); if (id) kurs.setz((w) => ({ klassen: [...w.klassen, id] })); }} style={selectStyle}>
                         <option value="">+ {t("kurse.addClass")}</option>
-                        {frei(k).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        {frei(kurs.wert.klassen).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
                     )}
                   </div>
@@ -215,13 +245,13 @@ export default function Kurse() {
                   <MassnahmenPanel kursId={k.id} t={t} />
                 </div>
 
-                {k.classes.length > 0 && (
+                {kurs.wert.klassen.length > 0 && (
                   <div>
                     <div style={editLabel}>{t("kurse.editLevels")}</div>
-                    <Toggle checked={!!k.niveau_aktiv} onChange={(v) => setNiveauAktiv(k, v)} label={t("kurse.niveauToggle")} />
+                    <Toggle checked={kurs.wert.niveauAktiv} onChange={(v) => kurs.setz({ niveauAktiv: v })} label={t("kurse.niveauToggle")} />
                     {/* Teilnehmerliste immer sichtbar; der E/G-Selektor je Person nur,
                         wenn der E/G-Regler an ist. */}
-                    <NiveauPanel kursId={k.id} niveauAktiv={!!k.niveau_aktiv} t={t} />
+                    <NiveauPanel kursId={k.id} niveauAktiv={kurs.wert.niveauAktiv} t={t} />
                   </div>
                 )}
                 <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
@@ -243,28 +273,52 @@ export default function Kurse() {
 function StudentMembers({ kursId, allClasses, t }) {
   const [members, setMembers] = useState([]);
   const [pickClass, setPickClass] = useState("");
-  const load = () => fetch(`${API}/kurse/${kursId}/members`).then((r) => (r.ok ? r.json() : [])).then((d) => setMembers(Array.isArray(d) ? d : [])).catch(() => {});
+  const load = () => fetch(`${API}/kurse/${kursId}/members`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+    const liste = Array.isArray(d) ? d : [];
+    setMembers(liste);
+    uebernehmen({ ids: liste.map((m) => m.student_id) });
+  }).catch(() => {});
   useEffect(() => { load(); }, [kursId]); // eslint-disable-line
-  const memberIds = new Set(members.map((m) => m.student_id));
-  const add = async (sid) => { await sende(`${API}/kurse/${kursId}/members/${sid}`, { method: "POST" }, t("kurse.editStudents")); load(); };
-  const remove = async (sid) => { await sende(`${API}/kurse/${kursId}/members/${sid}`, { method: "DELETE" }, t("kurse.unlink")); load(); };
+  // Wer im Kurs ist, sammelt sich im Entwurf: Hinzufügen und Entfernen gehen
+  // gemeinsam mit einem Speichern hinaus.
+  const [basis, setBasis] = useState({ ids: [] });
+  const e = useEntwurf(basis, async (w) => {
+    for (const sid of w.ids.filter((x) => !basis.ids.includes(x)))
+      if (!(await sende(`${API}/kurse/${kursId}/members/${sid}`, { method: "POST" }, t("kurse.editStudents")))) return false;
+    for (const sid of basis.ids.filter((x) => !w.ids.includes(x)))
+      if (!(await sende(`${API}/kurse/${kursId}/members/${sid}`, { method: "DELETE" }, t("kurse.unlink")))) return false;
+    setBasis(w);
+    load();
+  });
+  const entwurfRef = useRef(null);
+  entwurfRef.current = e;
+  const uebernehmen = (stand) => { setBasis(stand); entwurfRef.current?.setz(stand); };
+  const memberIds = new Set(e.wert.ids);
+  const add = (sid) => e.setz((w) => ({ ids: [...w.ids, sid] }));
+  const remove = (sid) => e.setz((w) => ({ ids: w.ids.filter((x) => x !== sid) }));
   const cls = allClasses.find((c) => String(c.id) === String(pickClass));
   const candidates = cls ? (cls.students || []).filter((sname) => !memberIds.has(sname.id)) : [];
+  // Name einer Person: aus der geladenen Liste, sonst aus den Klassen (frisch
+  // hinzugefügte kennt der Server noch nicht).
+  const nameVon = (sid) => members.find((m) => m.student_id === sid)
+    || allClasses.flatMap((c) => (c.students || []).map((s) => ({ student_id: s.id, name: s.name, class_name: c.name }))).find((s) => s.student_id === sid)
+    || { name: `#${sid}`, class_name: "" };
   return (
     <div>
-      {members.length > 0 && (
+      {e.wert.ids.length > 0 && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-          {members.map((m) => (
-            <span key={m.student_id} style={{ ...chipStyle, display: "inline-flex", alignItems: "center", gap: 4 }}>
+          {e.wert.ids.map((sid) => { const m = nameVon(sid); return (
+            <span key={sid} style={{ ...chipStyle, display: "inline-flex", alignItems: "center", gap: 4 }}>
               {m.name} <span style={{ color: "var(--text3)", fontSize: 11 }}>· {m.class_name}</span>
-              <button onClick={() => remove(m.student_id)} title={t("kurse.unlink")}
+              <button onClick={() => remove(sid)} title={t("kurse.unlink")}
                 style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", padding: 0, display: "flex" }}>
                 <Icon d={ICONS.close} size={12} />
               </button>
             </span>
-          ))}
+          ); })}
         </div>
       )}
+      <Speicherleiste entwurf={e} style={{ marginBottom: 8 }} klein />
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <select value={pickClass} onChange={(e) => setPickClass(e.target.value)} style={selectStyle}>
           <option value="">{t("kurse.pickClass")}</option>
@@ -302,35 +356,48 @@ const MASSNAHMEN = [
 function MassnahmenPanel({ kursId, t }) {
   const [studs, setStuds] = useState(null);
   const [offen, setOffen] = useState(null); // Name der aufgeklappten Person
+  // Vorher ging JEDER Tastendruck im Detailfeld als eigener PUT hinaus. Jetzt
+  // sammelt der Entwurf die Maßnahmen aller Personen dieses Kurses; gespeichert
+  // wird, was sich wirklich geändert hat.
+  const [basis, setBasis] = useState({ liste: {} });
+  const e = useEntwurf(basis, async (w) => {
+    for (const [name, m] of Object.entries(w.liste)) {
+      if (m === basis.liste[name]) continue;
+      if (!(await sende(`${API}/kurse/${kursId}/massnahmen`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, massnahmen: m }),
+      }, t("kurse.editMeasures")))) return false;
+    }
+    setBasis(w);
+  });
+  const entwurfRef = useRef(null);
+  entwurfRef.current = e;
   useEffect(() => {
-    fetch(`${API}/kurse/${kursId}/massnahmen`).then((r) => (r.ok ? r.json() : [])).then((d) => setStuds(Array.isArray(d) ? d : [])).catch(() => setStuds([]));
-  }, [kursId]);
+    fetch(`${API}/kurse/${kursId}/massnahmen`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+      const liste = Array.isArray(d) ? d : [];
+      setStuds(liste);
+      const stand = { liste: Object.fromEntries(liste.map((s) => [s.name, s.massnahmen || []])) };
+      setBasis(stand); entwurfRef.current?.setz(stand);
+    }).catch(() => setStuds([]));
+  }, [kursId]); // eslint-disable-line
 
-  const speichern = async (name, liste) => {
-    setStuds((prev) => prev.map((s) => (s.name === name ? { ...s, massnahmen: liste } : s)));
-    // Die Anzeige ist optimistisch: ohne Prüfung stand der Nachteilsausgleich
-    // auf dem Schirm, aber nicht in der Datenbank — und fehlte am Tag der
-    // Klassenarbeit, wo der Kalender ihn zeigen soll.
-    const ok = await sende(`${API}/kurse/${kursId}/massnahmen`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, massnahmen: liste }),
-    }, t("kurse.editMeasures"));
-    if (!ok) fetch(`${API}/kurse/${kursId}/massnahmen`).then((r) => (r.ok ? r.json() : null)).then((d) => { if (Array.isArray(d)) setStuds(d); }).catch(() => {});
-  };
+  const massnahmen = (s) => e.wert.liste[s.name] || [];
+  const setzen = (s, liste) => e.setz((w) => ({ liste: { ...w.liste, [s.name]: liste } }));
   const setFeld = (s, i, feld, wert) => {
-    const liste = [...(s.massnahmen || [])];
+    const liste = [...massnahmen(s)];
     liste[i] = { ...liste[i], [feld]: wert };
-    speichern(s.name, liste);
+    setzen(s, liste);
   };
-  const hinzu = (s) => speichern(s.name, [...(s.massnahmen || []), { art: MASSNAHMEN[0][0], detail: "", arbeit: true }]);
-  const weg = (s, i) => speichern(s.name, (s.massnahmen || []).filter((_, x) => x !== i));
+  const hinzu = (s) => setzen(s, [...massnahmen(s), { art: MASSNAHMEN[0][0], detail: "", arbeit: true }]);
+  const weg = (s, i) => setzen(s, massnahmen(s).filter((_, x) => x !== i));
 
   if (!studs) return null;
   if (studs.length === 0) return <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("kurse.niveauNoStudents")}</p>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <Speicherleiste entwurf={e} style={{ marginBottom: 4 }} klein />
       {studs.map((s) => {
-        const n = (s.massnahmen || []).length;
+        const n = massnahmen(s).length;
         const auf = offen === s.name;
         return (
           <div key={s.name} style={{ borderTop: "1px solid var(--border)", paddingTop: 6 }}>
@@ -344,7 +411,7 @@ function MassnahmenPanel({ kursId, t }) {
             </button>
             {auf && (
               <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "8px 0 12px" }}>
-                {(s.massnahmen || []).map((m, i) => (
+                {massnahmen(s).map((m, i) => (
                   <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <select value={m.art} onChange={(e) => setFeld(s, i, "art", e.target.value)}
                       title={(MASSNAHMEN.find(([w]) => w === m.art) || [])[1] || ""}
@@ -380,30 +447,45 @@ function MassnahmenPanel({ kursId, t }) {
 // Person), damit z.B. die Karteikarten-Niveaustapel überall greifen.
 function NiveauPanel({ kursId, niveauAktiv = false, t }) {
   const [studs, setStuds] = useState(null);
+  // E/G steuert die Wertung — ein still verlorenes E hieße: die Auswertung
+  // rechnet weiter mit G, und niemand merkt es bis zur Notenkonferenz. Deshalb
+  // sammelt der Entwurf die Umschaltungen und zeigt „nicht gespeichert", bis
+  // sie wirklich draußen sind.
+  const [basis, setBasis] = useState({});
+  const e = useEntwurf(basis, async (w) => {
+    for (const [name, niveau] of Object.entries(w)) {
+      if (niveau === basis[name]) continue;
+      if (!(await sende(`${API}/kurse/${kursId}/niveau`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, niveau }) }, t("kurse.editLevels")))) return false;
+    }
+    setBasis(w);
+  });
+  const entwurfRef = useRef(null);
+  entwurfRef.current = e;
   useEffect(() => {
-    fetch(`${API}/kurse/${kursId}/students`).then((r) => (r.ok ? r.json() : [])).then((d) => setStuds(Array.isArray(d) ? d : [])).catch(() => setStuds([]));
-  }, [kursId]);
-  const setNiveau = async (name, niveau) => {
-    const vorher = studs;
-    setStuds((prev) => prev.map((s) => (s.name === name ? { ...s, niveau } : s)));
-    // E/G steuert die Wertung. Ein still verlorenes E hieße: die Auswertung
-    // rechnet weiter mit G, und niemand merkt es bis zur Notenkonferenz.
-    if (!(await sende(`${API}/kurse/${kursId}/niveau`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, niveau }) }, t("kurse.editLevels")))) setStuds(vorher);
-  };
+    fetch(`${API}/kurse/${kursId}/students`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+      const liste = Array.isArray(d) ? d : [];
+      setStuds(liste);
+      const stand = Object.fromEntries(liste.map((s) => [s.name, s.niveau || ""]));
+      setBasis(stand); entwurfRef.current?.setz(stand);
+    }).catch(() => setStuds([]));
+  }, [kursId]); // eslint-disable-line
   if (!studs) return null;
   if (studs.length === 0) return <p style={{ fontSize: 13, color: "var(--text3)", marginTop: 8 }}>{t("kurse.niveauNoStudents")}</p>;
   return (
-    <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
-      {studs.map((s) => (
-        <div key={s.name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-          <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
-          {/* E/G-Selektor nur bei aktivem Regler; sonst nur der Name (Teilnehmer sichtbar). */}
-          {niveauAktiv && (
-            <NiveauToggle wert={s.niveau || ""} onChange={(v) => setNiveau(s.name, v)}
-              size={24} title={t("kurse.niveauToggle")} />
-          )}
-        </div>
-      ))}
-    </div>
+    <>
+      <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
+        {studs.map((s) => (
+          <div key={s.name} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
+            {/* E/G-Selektor nur bei aktivem Regler; sonst nur der Name (Teilnehmer sichtbar). */}
+            {niveauAktiv && (
+              <NiveauToggle wert={e.wert[s.name] || ""} onChange={(v) => e.setz({ [s.name]: v })}
+                size={24} title={t("kurse.niveauToggle")} />
+            )}
+          </div>
+        ))}
+      </div>
+      <Speicherleiste entwurf={e} style={{ marginTop: 8 }} klein />
+    </>
   );
 }

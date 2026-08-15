@@ -1,10 +1,11 @@
 // Modul Karten (Lehrer): Stapel & Karten verwalten, QR-Tokens drucken,
 // Fortschritt sehen. Schüler lernen kontenlos über den Token (siehe Lernen.jsx).
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
 import { NiveauToggle, AddButton, Toggle, Icon, ICONS, iconBtn, toolbarIconBtn, toolbarBtn, toolbarBtnPrimary, toolbarInput, menuRow, CONTROL_H, CONTROL_R, COLORS as C, REIFE_COLORS, btnPrimary, btnSecondary, btnSmall, selectStyle, Modal as UiModal, overlayGuard, modalOverlay, modalPanel, Empty, Skeleton, pageApp, inputStyle, cardStyle, panelStyle, chipStyle, Popover, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
+import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import AuthImage from "../components/AuthImage.jsx";
@@ -60,7 +61,6 @@ export default function Karten() {
   // Filter der Sammlung: null = alle Stapel, sonst „nur Stapel dieses Kurses".
   // Bewusst ein Filter und keine Voraussetzung mehr — die Stapel liegen in der
   // Sammlung, nicht in einer Klasse.
-  const [filterKurs, setFilterKurs] = useState(null);
   const [decks, setDecks] = useState([]);
   const [progress, setProgress] = useState([]);
   const [tokens, setTokens] = useState(null);
@@ -128,7 +128,7 @@ export default function Karten() {
   const loadDecks = () => {
     const meine = ++ladenrDecks.current;
     setLoadingDecks(true);
-    return fetch(`${API}/decks${filterKurs ? `?kurs_id=${filterKurs}` : ""}`).then((r) => (r.ok ? r.json() : [])).then((d) => {
+    return fetch(`${API}/decks`).then((r) => (r.ok ? r.json() : [])).then((d) => {
       if (meine === ladenrDecks.current) setDecks(Array.isArray(d) ? d : []);
     }).catch(() => {}).finally(() => { setLoadingDecks(false); decksLoadedOnce.current = true; });
   };
@@ -147,7 +147,7 @@ export default function Karten() {
   };
   // Die Sammlung haengt an keiner Klasse mehr — neu geladen wird nur, wenn sich
   // der Kurs-Filter aendert.
-  useEffect(() => { loadDecks(); loadFolders(); setCurrentCardFolder(null); }, [filterKurs]);
+  useEffect(() => { loadDecks(); loadFolders(); setCurrentCardFolder(null); }, []); // eslint-disable-line
   // Deep-Link ?deck=<id> (aus dem Kalender): in den Ordner des Stapels springen,
   // der Stapel klappt sich per autoOpen einmalig auf und scrollt hin.
   const [autoDeck, setAutoDeck] = useState(Number(params.get("deck")) || null);
@@ -193,19 +193,44 @@ export default function Karten() {
     const side = e.clientY < r.top + r.height / 2 ? "above" : "below";
     setDeckDrop((p) => (p && p.id === id && p.side === side ? p : { id, side }));
   };
-  const dropDeck = async (targetId) => {
+  // Die Reihenfolge der Stapel im aktuellen Ordner ist ein ENTWURF: das Ziehen
+  // ordnet nur die Anzeige, zum Server geht sie erst per „Speichern". Sonst
+  // aendert ein Verrutschen beim Scrollen die Sammlung, ohne dass jemand etwas
+  // bestaetigt hat.
+  const imOrdner = useMemo(
+    () => decks.filter((d) => (d.folder_id ?? null) === currentCardFolder),
+    [decks, currentCardFolder]);
+  const ordnungGespeichert = useMemo(() => ({ ids: imOrdner.map((d) => d.id) }), [imOrdner]);
+  const ordnung = useEntwurf(ordnungGespeichert, async (wert) => {
+    const r = await fetch(`${API}/decks/reorder`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: wert.ids }) }).catch(() => null);
+    if (!r || !r.ok) { setError(t("common.notWork")); return false; }
+    await loadDecks();
+  });
+  // WELCHE Stapel es gibt, sagt der Server; in welcher REIHENFOLGE sie stehen,
+  // sagt der Entwurf. Solange nichts offen ist, zieht `useEntwurf` den neuen
+  // Stand selbst nach — nur bei einer OFFENEN Umsortierung muss die Liste von
+  // Hand abgeglichen werden: ein inzwischen angelegter Stapel darf nicht
+  // unsichtbar bleiben und ein geloeschter nicht stehen. (Nicht ungefragt
+  // `setz` rufen: das gilt als „angefasst" und der Knopf bliebe stehen.)
+  useEffect(() => {
+    if (!ordnung.geaendert) return;
+    const ids = imOrdner.map((d) => d.id);
+    if (String([...ordnung.wert.ids].sort()) === String([...ids].sort())) return;
+    ordnung.setz((v) => ({ ids: [...v.ids.filter((id) => ids.includes(id)), ...ids.filter((id) => !v.ids.includes(id))] }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imOrdner]);
+  const sichtbareDecks = ordnung.wert.ids.map((id) => imOrdner.find((d) => d.id === id)).filter(Boolean);
+  const dropDeck = (targetId) => {
     const von = dragDeckId, ov = deckDrop;
     endDrag();
     if (von == null || von === targetId) return;
-    const inFolder = decks.filter((d) => (d.folder_id ?? null) === currentCardFolder);
-    const ids = inFolder.map((d) => d.id);
+    const ids = sichtbareDecks.map((d) => d.id);
     const from = ids.indexOf(von); let to = ids.indexOf(targetId);
     if (from < 0 || to < 0) return;
     if (ov && ov.id === targetId && ov.side === "below") to += 1;
     if (from < to) to -= 1;
     const neu = [...ids]; neu.splice(to, 0, neu.splice(from, 1)[0]);
-    await fetch(`${API}/decks/reorder`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: neu }) }).catch(() => {});
-    loadDecks();
+    ordnung.setz({ ids: neu });
   };
   const folderPath = (fid) => { const byId = Object.fromEntries(cardFolders.map((f) => [f.id, f])); const path = []; let cur = fid; while (cur != null && byId[cur]) { path.unshift(byId[cur]); cur = byId[cur].parent_id ?? null; } return path; };
   const createFolder = async (name) => { if (!name || !name.trim()) return; await sende(`${API}/card-folders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), parent_id: currentCardFolder }) }, t("karten.newFolderItem")); loadFolders(); };
@@ -222,7 +247,7 @@ export default function Karten() {
     const name = addName.trim(); if (!name) return;
     // Ohne Kurs-Filter entsteht der Stapel unzugewiesen — erlaubt, er ist dann
     // nur noch nicht ausgerollt. Mit Filter erbt er genau diesen Kurs.
-    if (addMode === "deck") { await call(() => fetch(`${API}/decks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, folder_id: currentCardFolder, kurs_ids: filterKurs ? [filterKurs] : [] }) })); }
+    if (addMode === "deck") { await call(() => fetch(`${API}/decks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, folder_id: currentCardFolder}) })); }
     else if (addMode === "folder") { await createFolder(name); }
     setAddName(""); setAddMode(null);
   };
@@ -238,7 +263,7 @@ export default function Karten() {
       try { const j = JSON.parse(text); if (j && j.name) name = String(j.name); } catch { /* CSV */ }
       const cards = parseCards(text);
       if (!cards.length) { showAlert(t("karten.importEmpty")); return; }
-      const r = await fetch(`${API}/decks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, folder_id: currentCardFolder, kurs_ids: filterKurs ? [filterKurs] : [] }) }).catch(() => null);
+      const r = await fetch(`${API}/decks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, folder_id: currentCardFolder}) }).catch(() => null);
       if (!r || !r.ok) return;
       const deck = await r.json();
       await sende(`${API}/decks/${deck.id}/import`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cards }) }, t("common.import"));
@@ -300,19 +325,12 @@ export default function Karten() {
   return (
     <div style={{ ...pageApp }}>
       <Werkzeugleiste style={{ marginBottom: 16 }} links={<>
-        {/* In der Sammlung ist der Kurs ein FILTER, keine Voraussetzung: die
-            Stapel liegen alle da, die Auswahl blendet nur ein. Fortschritt und
-            Zugangs-Codes brauchen dagegen weiter eine Klasse (ihre SuS). */}
-        {view === "cards" ? (
-          <label data-tour="karten-class" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)" }}>
-            {t("karten.filterKurs")}
-            <select value={filterKurs || ""} style={selectStyle}
-              onChange={(e) => setFilterKurs(e.target.value ? Number(e.target.value) : null)}>
-              <option value="">{t("karten.filterAlle")}</option>
-              {kurse.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
-            </select>
-          </label>
-        ) : (
+        {/* Kein Kurs-Filter mehr in der Sammlung: seit die Zuordnung ueber die
+            Stunde laeuft, gehoert ein Stapel keinem Kurs mehr „an" — ein Filter
+            darauf sortierte nach etwas, das die Lehrkraft gar nicht mehr setzt.
+            Fortschritt und Zugangs-Codes brauchen dagegen weiter eine Klasse
+            (ihre SuS). */}
+        {view === "cards" ? null : (
           <span data-tour="karten-class" style={{ display: "inline-flex" }}><KursKlasseSelect value={subsetKurs ? null : classId} kursValue={wantKurs} onChange={(id, kid) => { setSubsetKurs(null); setClassId(id); setKursId(kid); setTokens(null); }} onKurs={(k) => { if (!subsetKurs) setKursId(k); }} /></span>
         )}
         {view !== "cards" && subsetKurse.length > 0 && (
@@ -424,8 +442,16 @@ export default function Karten() {
           })}
 
           {loadingDecks && !decksLoadedOnce.current ? <Skeleton rows={3} height={60} />
-            : (decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).length === 0 && cardFolders.filter((f) => (f.parent_id ?? null) === currentCardFolder).length === 0) ? <Empty title={t("karten.noDecks")} hint={t("karten.noDecksHint")} /> : null}
-          {decks.filter((d) => (d.folder_id ?? null) === currentCardFolder).map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} onDragStartDeck={() => setDragDeckId(d.id)} onDragEndDeck={endDrag} dragging={dragDeckId === d.id} autoOpen={autoDeck === d.id} onAutoOpened={() => setAutoDeck(null)} onReorderOver={(e) => onDeckDragOver(e, d.id)} onReorderDrop={() => dropDeck(d.id)} dropSide={deckDrop && deckDrop.id === d.id ? deckDrop.side : null} />)}
+            : (sichtbareDecks.length === 0 && cardFolders.filter((f) => (f.parent_id ?? null) === currentCardFolder).length === 0) ? <Empty title={t("karten.noDecks")} hint={t("karten.noDecksHint")} /> : null}
+          {/* Eigene Zeile, keine Werkzeugleiste: die Leiste oben hat ihre feste
+              Hoehe, und ein Speichern-Knopf gehoert dorthin, wo die Aenderung
+              passiert ist — ueber die Liste, die gerade umsortiert wurde. */}
+          {ordnung.geaendert && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+              <Speicherleiste entwurf={ordnung} />
+            </div>
+          )}
+          {sichtbareDecks.map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} onDragStartDeck={() => setDragDeckId(d.id)} onDragEndDeck={endDrag} dragging={dragDeckId === d.id} autoOpen={autoDeck === d.id} onAutoOpened={() => setAutoDeck(null)} onReorderOver={(e) => onDeckDragOver(e, d.id)} onReorderDrop={() => dropDeck(d.id)} dropSide={deckDrop && deckDrop.id === d.id ? deckDrop.side : null} />)}
         </>
       )}
 
@@ -614,18 +640,8 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
     onAutoOpened && onAutoOpened();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpen]);
-  // Der Name als Entwurf. NICHTS speichert von selbst — auch nicht beim
-  // Verlassen des Feldes: wo sich etwas ändern lässt, gehört ein Speichern-
-  // Knopf hin, sonst weiß niemand, ob es drin ist.
-  //
-  // TODO: auf den gemeinsamen Entwurfs-Baustein aus Icons.jsx umstellen, sobald
-  // er steht (Entwurfszustand + Speicherleiste + Warnung beim Verlassen) —
-  // diese Fassung hier ist bewusst die schlichteste mögliche.
-  const [nameVal, setNameVal] = useState(deck.name || "");
   const [nameHover, setNameHover] = useState(false);
   const [nameFocus, setNameFocus] = useState(false);
-  useEffect(() => { setNameVal(deck.name || ""); }, [deck.name]);
-  const nameOffen = nameVal.trim() !== (deck.name || "").trim() && nameVal.trim() !== "";
   const [moveOpen, setMoveOpen] = useState(false); // „Verschieben"-Popover (Ziel-Ordner)
   const [rollOpen, setRollOpen] = useState(false);  // Ausrollen-Untermenü
   // Deck als Ganzes ziehbar, aber nur wenn der Zug am Griff (⠿) beginnt — sonst
@@ -635,8 +651,76 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
   // folder_id IMMER mitschicken, sonst nullt ein Speichern (Name/Thema/Niveau)
   // die Ordner-Zuordnung.
   const saveDeck = (patch) => call(() => fetch(`${API}/decks/${deck.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: deck.name, topic_id: deck.topic_id ?? null, niveau: deck.niveau || "", niveau_aktiv: !!deck.niveau_aktiv, folder_id: deck.folder_id ?? null, ...patch }) }));
-  const setTopic = (tid) => saveDeck({ topic_id: tid ? Number(tid) : null });
-  const setNiveau = (n) => saveDeck({ niveau: n });
+
+  // ─── Der ganze Stapel als EIN Entwurf ───
+  //
+  // Name, Kartenreihenfolge, das E/G-Zeichen je Karte und der Ausroll-Stand
+  // sind Aenderungen an derselben Sache — also ein Entwurf und ein Speichern-
+  // Knopf, nicht vier Wege mit vier Verhaltensweisen. Nichts davon geht zum
+  // Server, bevor jemand speichert.
+  //
+  // `niveaus` laeuft parallel zu `ordnung` (Arrays aus einfachen Werten, damit
+  // der flache Vergleich in useEntwurf greift).
+  //
+  // `ausrollen` steht als volle Sekunde (Unix-Zeit als Text), nicht als ISO-
+  // Zeichenkette: der Server gibt den Zeitpunkt mit Mikrosekunden und eigener
+  // Zonen-Schreibweise zurueck, ein Textvergleich waere danach fuer immer
+  // „geaendert" — der Speichern-Knopf ginge nie wieder weg.
+  const alsSekunde = (iso) => (iso ? String(Math.floor(new Date(iso).getTime() / 1000)) : "");
+  const gespeichert = useMemo(() => ({
+    name: deck.name || "",
+    ausrollen: alsSekunde(deck.released_at),
+    ordnung: (deck.cards || []).map((c) => c.id),
+    niveaus: (deck.cards || []).map((c) => c.niveau || ""),
+  }), [deck]);
+  const roh = (url, opt) => fetch(url, opt).then((r) => r.ok).catch(() => false);
+  const entwurf = useEntwurf(gespeichert, async (wert) => {
+    let ok = true;
+    const karten = Object.fromEntries((deck.cards || []).map((c) => [c.id, c]));
+    const altNiveau = Object.fromEntries(gespeichert.ordnung.map((id, i) => [id, gespeichert.niveaus[i]]));
+    // 1. Reihenfolge
+    const jsonPut = (body) => ({ method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (String(wert.ordnung) !== String(gespeichert.ordnung))
+      ok = (await roh(`${API}/decks/${deck.id}/cards/reorder`, jsonPut({ ids: wert.ordnung }))) && ok;
+    // 2. E/G je Karte — nur die wirklich geaenderten
+    for (let i = 0; i < wert.ordnung.length; i++) {
+      const id = wert.ordnung[i], n = wert.niveaus[i] || "";
+      const c = karten[id];
+      if (!c || (altNiveau[id] || "") === n) continue;
+      ok = (await roh(`${API}/cards/${id}`, jsonPut({ front: c.front, back: c.back, niveau: n }))) && ok;
+    }
+    // 3. Ausrollen / Zurueckziehen
+    if (wert.ausrollen !== gespeichert.ausrollen)
+      ok = (await roh(`${API}/decks/${deck.id}/release`, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(wert.ausrollen ? { released_at: new Date(Number(wert.ausrollen) * 1000).toISOString() } : {}) })) && ok;
+    // 4. Name — und zugleich das Neuladen der Liste (call meldet auch Fehler).
+    //    Leerer Name behaelt den alten, statt einen namenlosen Stapel zu bauen.
+    const okName = await saveDeck({ name: wert.name.trim() || deck.name });
+    return ok && okName;
+  });
+  // WELCHE Karten es gibt, sagt der Server (eine neue Karte, eine geloeschte);
+  // in welcher Reihenfolge und mit welchem E/G-Zeichen sie stehen, sagt der
+  // Entwurf. Nur wenn etwas OFFEN ist, muss das von Hand abgeglichen werden —
+  // sonst zoege eine neu angelegte Karte den Entwurf aus dem Tritt. Ohne
+  // offene Aenderung uebernimmt `useEntwurf` den neuen Stand selbst.
+  useEffect(() => {
+    if (!entwurf.geaendert) return;
+    const ids = (deck.cards || []).map((c) => c.id);
+    if (String([...entwurf.wert.ordnung].sort()) === String([...ids].sort())) return;
+    entwurf.setz((v) => {
+      const ord = [...v.ordnung.filter((id) => ids.includes(id)), ...ids.filter((id) => !v.ordnung.includes(id))];
+      return { ordnung: ord, niveaus: ord.map((id) => {
+        const i = v.ordnung.indexOf(id);
+        return i >= 0 ? v.niveaus[i] : ((deck.cards || []).find((c) => c.id === id)?.niveau || "");
+      }) };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deck.cards]);
+
+  // Was der Entwurf gerade zeigt (nicht, was auf dem Server liegt).
+  const kartenById = Object.fromEntries((deck.cards || []).map((c) => [c.id, c]));
+  const cards = entwurf.wert.ordnung.map((id) => kartenById[id]).filter(Boolean);
+  const niveauVon = (id) => entwurf.wert.niveaus[entwurf.wert.ordnung.indexOf(id)] || "";
   // Karten-Bilder je Seite (oben-zentral). imgVer erzwingt ein Neu-Laden der
   // Vorschau nach Upload/Löschen (gleiche URL, neuer Inhalt).
   const [imgVer, setImgVer] = useState(0);
@@ -649,8 +733,6 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
 
   // Karten innerhalb des Stapels per Drag & Drop sortieren — mit Vorschau, wo
   // die Karte landet (Linie ober-/unterhalb der Zielzeile).
-  const [cards, setCards] = useState(deck.cards);
-  useEffect(() => { setCards(deck.cards); }, [deck.cards]);
   const [dragCard, setDragCard] = useState(null);
   const [hoverCard, setHoverCard] = useState(null); // Zeile leuchtet auf: sie ist anklickbar
   const [cardDrop, setCardDrop] = useState(null); // { id, side: "above"|"below" }
@@ -673,7 +755,9 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
     const side = e.clientY < r.top + r.height / 2 ? "above" : "below";
     setCardDrop((p) => (p && p.id === id && p.side === side ? p : { id, side }));
   };
-  const dropCard = async (targetId) => {
+  // Ablegen ordnet nur den ENTWURF um (sofort sichtbar) — zum Server geht die
+  // neue Reihenfolge erst mit „Speichern".
+  const dropCard = (targetId) => {
     const von = dragCard, ov = cardDrop;
     setDragCard(null); setCardDrop(null);
     if (von == null || von === targetId) return;
@@ -683,8 +767,9 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
     if (ov && ov.id === targetId && ov.side === "below") to += 1;
     if (from < to) to -= 1;
     const neu = [...ids]; neu.splice(to, 0, neu.splice(from, 1)[0]);
-    setCards(neu.map((id) => cards.find((c) => c.id === id))); // sofortige Vorschau
-    call(() => fetch(`${API}/decks/${deck.id}/cards/reorder`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: neu }) }));
+    // Die E/G-Zeichen ziehen mit ihrer Karte um, sonst haengen sie an der
+    // Position statt an der Karte.
+    entwurf.setz((v) => ({ ordnung: neu, niveaus: neu.map((id) => v.niveaus[v.ordnung.indexOf(id)] || "") }));
   };
   const exportDeck = () => {
     const data = { type: "nuvora_karten_deck", version: 1, name: deck.name || "", cards: deck.cards.map((c) => ({ front: c.front, back: c.back, niveau: c.niveau || "" })) };
@@ -692,27 +777,22 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
     a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
     a.download = `${(deck.name || "stapel").replace(/[^\w-]+/g, "_")}.json`; a.click(); URL.revokeObjectURL(a.href);
   };
-  // Leerer Name behält den alten — nicht speichern, nicht meckern (wie bei den Themen).
-  const doRename = async () => { const n = nameVal.trim(); if (n && n !== deck.name) await saveDeck({ name: n }); };
-  const nameVerwerfen = () => setNameVal(deck.name || "");
   /** Zuklappen/Verlassen mit offenem Entwurf: fragen, nie still verwerfen. */
   const zuklappen = async () => {
-    if (nameOffen && !await askConfirm(t("karten.unsavedName"))) return;
-    nameVerwerfen();
+    if (entwurf.geaendert && !await askConfirm(t("karten.unsavedName"))) return;
+    entwurf.verwerfen();
     setCollapsed(true);
   };
   // Siehe core/topics.js — eine Quelle fuer Beschriftung UND Reihenfolge.
   const themen = themenIndex(topics);
-  const topicLabel = (tp) => themen.label(tp);
-  const release = (payload) => call(() => fetch(`${API}/decks/${deck.id}/release`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }));
+  // Ausrollen ist eine Aenderung wie jede andere: das Menue setzt nur den
+  // Entwurf, zum Server geht sie mit „Speichern".
+  const setRelease = (datum) => entwurf.setz({ ausrollen: datum ? String(Math.floor(datum.getTime() / 1000)) : "" });
 
   const zugewiesen = deck.kurs_ids || [];
   const now = Date.now();
-  const rel = deck.released_at ? new Date(deck.released_at).getTime() : null;
+  const rel = entwurf.wert.ausrollen ? Number(entwurf.wert.ausrollen) * 1000 : null;
   const status = rel === null ? "entwurf" : rel > now ? "geplant" : "aus";
-  const badge = status === "aus" ? { text: t("karten.rolledOut"), bg: C.success + "1f", col: C.success }
-    : status === "geplant" ? { text: t("karten.plannedFor", { date: new Date(deck.released_at).toLocaleString() }), bg: C.warning + "1f", col: C.warning }
-    : { text: t("karten.draft"), bg: "var(--bg3)", col: "var(--text3)" };
 
   return (
     <div ref={rootRef} draggable={!!onDragStartDeck}
@@ -744,15 +824,15 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         {collapsed ? (
           <strong onClick={() => setCollapsed(false)} style={{ fontSize: 16, cursor: "pointer" }}>{deck.name || t("karten.deck")}</strong>
         ) : (
-          <input value={nameVal} onChange={(e) => setNameVal(e.target.value)}
+          <input value={entwurf.wert.name} onChange={(e) => entwurf.setz({ name: e.target.value })}
             title={t("karten.deckName")} aria-label={t("karten.deckName")}
-            size={Math.max(6, Math.min(36, nameVal.length + 1))}
+            size={Math.max(6, Math.min(36, entwurf.wert.name.length + 1))}
             onMouseEnter={() => setNameHover(true)} onMouseLeave={() => setNameHover(false)}
             onFocus={() => setNameFocus(true)}
             onBlur={() => setNameFocus(false)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") { doRename(); e.currentTarget.blur(); }
-              if (e.key === "Escape") { nameVerwerfen(); e.currentTarget.blur(); }
+              if (e.key === "Enter") { entwurf.speichern(); e.currentTarget.blur(); }
+              if (e.key === "Escape") { entwurf.verwerfen(); e.currentTarget.blur(); }
             }}
             style={{
               ...toolbarInput, fontSize: 16, fontWeight: 700, minWidth: 80,
@@ -761,45 +841,21 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
               background: nameHover || nameFocus ? "var(--bg)" : "transparent",
             }} />
         )}
-        {/* Ein Entwurf speichert NIE von selbst — auch nicht beim Verlassen des
-            Feldes. Solange nichts abweicht, steht hier nichts; sobald etwas
-            abweicht, sieht man es und entscheidet selbst. */}
-        {!collapsed && nameOffen && (
-          <>
-            <span style={{ fontSize: 12, color: C.warning }}>{t("karten.unsaved")}</span>
-            <button onMouseDown={(e) => e.preventDefault()} onClick={doRename} style={toolbarBtnPrimary}>{t("common.save")}</button>
-            <button onMouseDown={(e) => e.preventDefault()} onClick={nameVerwerfen} style={toolbarBtn}>{t("common.abort")}</button>
-          </>
+        {/* Im Kopf steht nur noch, WELCHER Stapel das ist, und ob er draussen
+            ist. Thema, Niveau und Kartenzahl standen hier als graue Chips: das
+            Thema war abgeschnitten und damit unlesbar, das geplante Datum
+            nannte eine Uhrzeit auf die Sekunde, die niemand gesetzt hat, und
+            die Kartenzahl wollte niemand sehen. Thema und Niveau stehen in den
+            Stapel-Einstellungen, der geplante Tag im Ausrollen-Menue. */}
+        {status === "aus" && (
+          <span style={{ ...chipStyle, background: C.success + "1f", color: C.success }}>{t("karten.rolledOut")}</span>
         )}
-        {/* Angaben zum Stapel — alle in EINER Form (Chip, grau). Geändert wird
-            im ⋯: ein Auswahlfeld, ein Umschalter und ein Chip nebeneinander
-            waren drei Formen für dieselbe Art Auskunft. Farbe trägt nur, was
-            eine bedeutet: der Ausroll-Stand und die fehlende Zuweisung. */}
-        {status !== "entwurf" && <span style={{ ...chipStyle, background: badge.bg, color: badge.col }}>{badge.text}</span>}
-        {/* Nur der Warnfall steht hier. Wem der Stapel gilt, entscheidet die
-            Stunde — das steht im Kalender und muss den Kopf nicht füllen. */}
-        {!zugewiesen.length && (
-          <span style={{ ...angabeChip, background: C.warning + "1f", color: C.warning }} title={t("karten.noStundeHint")}>
-            {t("karten.noStunde")}
-          </span>
-        )}
-        {!collapsed && showTopic && deck.topic_id != null && (
-          <span style={angabeChip} title={topicLabel(themen.geordnet.find((tp) => tp.id === deck.topic_id) || {})}>
-            {topicLabel(themen.geordnet.find((tp) => tp.id === deck.topic_id) || {})}
-          </span>
-        )}
-        {/* Kein Chip für „gilt für alle" — das ist der Normalfall und braucht
-            keine Beschriftung. */}
-        {!collapsed && (deck.niveau === "E" || deck.niveau === "G") && (
-          <span style={angabeChip} title={t("karten.niveauHint")}>
-            {deck.niveau === "E" ? t("karten.niveauE") : t("karten.niveauG")}
-          </span>
-        )}
-        {/* Die Zahl interessiert erst, wenn der Stapel offen ist — in der
-            Vorschau ist sie Beiwerk. Grauer Text, kein eigener Kasten. */}
-        {!collapsed && <span style={{ fontSize: 13, color: "var(--text3)" }}>{deck.cards.length} {t("karten.cards")}</span>}
         </>}
         mehr={collapsed ? [] : [
+          // Das Auge war ein Menue mit einem einzigen Eintrag neben einem
+          // zweiten Menue — zwei Flaechen fuer anderthalb Funktionen. Der
+          // Lernmodus steht jetzt als erster Eintrag im ⋯.
+          cards.length > 0 && { key: "study", label: t("karten.study"), icon: ICONS.eye, onClick: () => setStudying(true) },
           { key: "einstellungen", label: t("karten.deckSettings"), icon: ICONS.settings, onClick: () => setEinstellungen(true) },
           deck.cards.length > 0 && { key: "export", label: t("karten.export"), icon: ICONS.export, onClick: exportDeck },
           { key: "import", label: t("karten.import"), icon: ICONS.import, onClick: () => setImporting(true) },
@@ -822,28 +878,48 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
             {rollOpen && (<>
               <div onClick={() => setRollOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 30 }} />
               <Popover style={{ zIndex: 31, padding: 8, minWidth: 240 }}>
-                {status !== "aus" && <button onClick={() => { setRollOpen(false); release({ now: true }); }} style={{ ...menuRow }}><Icon d={ICONS.upload} size={15} color="var(--accent)" /> {t("karten.rollOutNow")}</button>}
+                {/* Der Stand steht dort, wo man ihn aendert — knapp und nur mit
+                    dem Tag. Am Kopf stand dafuer eine zweite Zeile mit einer
+                    Uhrzeit auf die Sekunde. */}
+                {status === "geplant" && (
+                  <div style={{ padding: "4px 10px 8px", fontSize: 12, color: C.warning }}>
+                    {t("karten.plannedFor", { date: new Date(rel).toLocaleDateString() })}
+                  </div>
+                )}
+                {/* Ohne Stunde im Kalender erreicht der Stapel niemanden — das
+                    gehoert hierher, nicht in den Kopf. */}
+                {!zugewiesen.length && (
+                  <div style={{ padding: "4px 10px 8px", fontSize: 12, color: C.warning }} title={t("karten.noStundeHint")}>
+                    {t("karten.noStunde")}
+                  </div>
+                )}
+                {status !== "aus" && <button onClick={() => { setRollOpen(false); setRelease(new Date()); }} style={{ ...menuRow }}><Icon d={ICONS.upload} size={15} color="var(--accent)" /> {t("karten.rollOutNow")}</button>}
                 {status !== "aus" && (
                   <div style={{ padding: "8px 10px" }}>
                     <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 4 }}>{t("karten.planLabel")}</div>
                     <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                       {/* Nur Datum wählen — freigeschaltet wird immer 07:00 morgens des Tages. */}
                       <input type="date" value={planDate} onChange={(e) => setPlanDate(e.target.value)} style={{ ...toolbarInput, flex: 1, minWidth: 150 }} />
-                      <button disabled={!planDate} onClick={() => { if (planDate) { const [y, mo, d] = planDate.split("-").map(Number); setRollOpen(false); release({ released_at: new Date(y, mo - 1, d, 7, 0, 0).toISOString() }); } }}
+                      <button disabled={!planDate} onClick={() => { if (planDate) { const [y, mo, d] = planDate.split("-").map(Number); setRollOpen(false); setRelease(new Date(y, mo - 1, d, 7, 0, 0)); } }}
                         style={{ ...toolbarBtnPrimary, opacity: planDate ? 1 : 0.4 }}>{t("karten.plan")}</button>
                     </div>
                     <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 4 }}>{t("karten.planTime")}</div>
                   </div>
                 )}
-                {status !== "entwurf" && <button onClick={() => { setRollOpen(false); release({}); }} style={{ ...menuRow, color: C.danger }}><Icon d={ICONS.ban} size={15} color={C.danger} /> {t("karten.withdraw")}</button>}
+                {status !== "entwurf" && <button onClick={() => { setRollOpen(false); setRelease(null); }} style={{ ...menuRow, color: C.danger }}><Icon d={ICONS.ban} size={15} color={C.danger} /> {t("karten.withdraw")}</button>}
               </Popover>
             </>)}
           </span>
         )}
-        {!collapsed && cards.length > 0 && (
-          <button onClick={() => setStudying(true)} className="icon-btn" style={toolbarIconBtn} title={t("karten.study")} aria-label={t("karten.study")}><Icon d={ICONS.eye} size={18} /></button>
-        )}
       </Werkzeugleiste>
+      {/* Eigene Zeile statt in der Leiste: dort gilt eine feste Hoehe fuer
+          alles, und der Hinweis „nicht gespeichert" gehoert unter das, was
+          gerade geaendert wurde — Name, Reihenfolge, E/G oder Ausrollen. */}
+      {entwurf.geaendert && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+          <Speicherleiste entwurf={entwurf} />
+        </div>
+      )}
       {/* Ziel-Ordner zum Verschieben — aus dem ⋯-Menue geoeffnet, deshalb
           rechtsbuendig unter der Leiste. */}
       {moveOpen && !collapsed && onMove && (<>
@@ -863,7 +939,7 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
       </>)}
       {einstellungen && <StapelEinstellungenModal deck={deck} t={t} themen={themen} showTopic={showTopic}
         onClose={() => setEinstellungen(false)}
-        onSave={async (werte) => { await saveDeck(werte); setEinstellungen(false); }} />}
+        onSave={async (werte) => { const ok = await saveDeck(werte); if (ok) setEinstellungen(false); return ok; }} />}
       {publishing && <PublishModal name={deck.name || t("karten.deck")} onClose={() => setPublishing(false)}
         onPublish={(description) => fetch(`/api/marketplace/publish/deck`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deck_id: deck.id, description }) }).catch(() => null)} />}
 
@@ -893,12 +969,18 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
           {/* Nur wo die Differenzierung am Stapel eingeschaltet ist — sonst
               stuende ein Umschalter da, der nichts bewirkt. */}
           {deck.niveau_aktiv && (
-            <NiveauToggle wert={c.niveau || ""} mitLeer={false} title={t("karten.cardNiveauHint")}
-              onChange={(v) => saveEditCard(c.id, c.front, c.back, v)} />
+            <NiveauToggle wert={niveauVon(c.id)} mitLeer={false} title={t("karten.cardNiveauHint")}
+              onChange={(v) => entwurf.setz((s) => ({ niveaus: s.niveaus.map((n, i) => (s.ordnung[i] === c.id ? v : n)) }))} />
           )}
+          {/* Eine Zeile, dann Auslassungspunkte: lange Karten liefen ueber zwei
+              bis drei Zeilen und die Liste zerfiel. Der volle Text steht im
+              Editor (ein Klick) und im title. `display: block` ist noetig,
+              damit `nowrap` auch die von KaTeX erzeugten Knoten haelt. */}
           <span role="button" tabIndex={0} onClick={() => setEditCard(c.id)}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setEditCard(c.id); } }}
-            title={t("common.edit")} style={{ flex: 1, minWidth: 0, cursor: "pointer" }}>
+            title={`${c.front} → ${c.back}`}
+            style={{ flex: 1, minWidth: 0, cursor: "pointer", display: "block",
+              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             <strong><Latex>{c.front}</Latex></strong> <span style={{ color: "var(--text3)" }}>→ <Latex>{c.back}</Latex></span>
             {(c.has_front_image || c.has_back_image) && <Icon d={ICONS.image} size={18} color="var(--accent)" style={{ marginLeft: 4 }} />}
           </span>
@@ -906,7 +988,9 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
         );
       })}
       {editCard != null && cards.find((c) => c.id === editCard) && (
-        <CardEditModal card={cards.find((c) => c.id === editCard)} imgVer={imgVer} onUpload={uploadCardImg} onRemove={removeCardImg}
+        // Das Niveau reist aus dem Entwurf mit: sonst schriebe ein Speichern im
+        // Dialog das Zeichen zurueck, das an der Zeile gerade umgestellt wurde.
+        <CardEditModal card={{ ...cards.find((c) => c.id === editCard), niveau: niveauVon(editCard) }} imgVer={imgVer} onUpload={uploadCardImg} onRemove={removeCardImg}
           onDelete={async (id) => {
             if (!await askConfirm(t("karten.delCardConfirm"))) return;
             setEditCard(null);
@@ -937,26 +1021,30 @@ function Deck({ deck, t, call, topics = [], showTopic = false, folders = [], onM
 // Umschalter neben einem Chip: drei Formen für dieselbe Art Angabe.
 //
 // Geändert wird auch hier nur über „Speichern": kein Feld schreibt von selbst.
-// TODO: auf den gemeinsamen Entwurfs-Baustein aus Icons.jsx umstellen.
+// Derselbe Entwurfs-Baustein wie überall (components/Speichern.jsx) — inklusive
+// Warnung, wenn jemand mit offenem Entwurf die Seite verlässt.
 function StapelEinstellungenModal({ deck, t, themen, showTopic, onClose, onSave }) {
-  const [topicId, setTopicId] = useState(deck.topic_id ?? "");
-  const [niveau, setNiveau] = useState(deck.niveau || "");
-  const [niveauAktiv, setNiveauAktiv] = useState(!!deck.niveau_aktiv);
-  const offen = String(topicId) !== String(deck.topic_id ?? "") || niveau !== (deck.niveau || "")
-    || niveauAktiv !== !!deck.niveau_aktiv;
+  const gespeichert = useMemo(() => ({
+    topic_id: deck.topic_id ?? "", niveau: deck.niveau || "", niveau_aktiv: !!deck.niveau_aktiv,
+  }), [deck]);
+  const e = useEntwurf(gespeichert, (wert) => onSave({
+    topic_id: wert.topic_id ? Number(wert.topic_id) : null,
+    niveau: wert.niveau, niveau_aktiv: wert.niveau_aktiv,
+  }));
+  const topicId = e.wert.topic_id, niveau = e.wert.niveau, niveauAktiv = e.wert.niveau_aktiv;
   return (
     <UiModal onClose={onClose} width={440} label={t("karten.deckSettings")}>
       <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>{t("karten.deckSettings")}</h3>
       {showTopic && (<>
         <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 4 }}>{t("karten.topicHint")}</div>
-        <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={{ ...selectStyle, width: "100%", marginBottom: 12 }}>
+        <select value={topicId} onChange={(ev) => e.setz({ topic_id: ev.target.value })} style={{ ...selectStyle, width: "100%", marginBottom: 12 }}>
           <option value="">– {t("karten.freeCards")} –</option>
           {themen.geordnet.map((tp) => <option key={tp.id} value={tp.id}>{themen.label(tp)}</option>)}
         </select>
       </>)}
       <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 4 }}>{t("karten.niveauHint")}</div>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <NiveauToggle wert={niveau} onChange={setNiveau} title={t("karten.niveauHint")} />
+        <NiveauToggle wert={niveau} onChange={(v) => e.setz({ niveau: v })} title={t("karten.niveauHint")} />
         <span style={{ fontSize: 12, color: "var(--text3)" }}>
           {niveau === "E" ? t("karten.niveauE") : niveau === "G" ? t("karten.niveauG") : t("karten.niveauAll")}
         </span>
@@ -964,13 +1052,14 @@ function StapelEinstellungenModal({ deck, t, themen, showTopic, onClose, onSave 
       {/* E/G je Karte — zum Einschalten, wie am CardVote-Quiz. Aus heisst: das
           Niveau einzelner Karten spielt keine Rolle, alle sehen alles. */}
       <div style={{ marginTop: 16 }}>
-        <Toggle checked={niveauAktiv} onChange={setNiveauAktiv} label={t("karten.niveauAktiv")} />
+        <Toggle checked={niveauAktiv} onChange={(v) => e.setz({ niveau_aktiv: v })} label={t("karten.niveauAktiv")} />
         <p style={{ fontSize: 12, color: "var(--text3)", margin: "4px 0 0" }}>{t("karten.niveauAktivHint")}</p>
       </div>
-      {offen && <p style={{ fontSize: 12, color: C.warning, marginTop: 12 }}>{t("karten.unsaved")}</p>}
-      <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-        <button onClick={() => onSave({ topic_id: topicId ? Number(topicId) : null, niveau, niveau_aktiv: niveauAktiv })} style={btnPrimary}>{t("common.save")}</button>
-        <button onClick={onClose} style={btnSecondary}>{t("common.abort")}</button>
+      <div style={{ display: "flex", gap: 8, marginTop: 16, alignItems: "center" }}>
+        {/* `immer`: im Dialog steht der Knopf an seinem festen Platz, auch
+            solange nichts geaendert wurde — sonst waere der Dialog leer unten. */}
+        <Speicherleiste entwurf={e} immer />
+        <button onClick={onClose} style={btnSecondary}>{t("common.close")}</button>
       </div>
     </UiModal>
   );
@@ -1282,13 +1371,6 @@ function ReifeBar({ hist, height = 10 }) {
 }
 
 const inp = { ...inputStyle };
-// Angabe im Stapelkopf: EINE Form für Kurs, Thema und Niveau. Grau — Farbe
-// trägt nur, was eine Bedeutung hat (Ausroll-Stand, fehlende Zuweisung). Lange
-// Namen werden abgeschnitten statt umgebrochen; der volle Text steht im title.
-const angabeChip = {
-  ...chipStyle, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis",
-  whiteSpace: "nowrap", verticalAlign: "middle",
-};
 // Einfuege-Marke beim Ziehen (kein Schatten): eine Linie ober- oder unterhalb
 // der Zielzeile. EINE Staerke fuer Stapel und Karten.
 const MARKE = 3;

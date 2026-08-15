@@ -360,6 +360,16 @@ vorletzten, sonst wäre jede schwache Arbeit ein „Abstieg". Eine Note steht kl
 daneben, ausdrücklich als Orientierung: der Notenschlüssel gilt für eine ganze
 Arbeit, nicht für drei Aufgaben daraus.
 
+Ist das Modul Karten aktiv, zählen die **Karteikarten** als dritte Quelle mit:
+ein Kartenversuch ist ein Punkt, Treffer sind die richtig erinnerten. So sieht
+man beim Kartenlernen je Thema, wie sicher es sitzt und wie viele Karten heute
+anstehen — statt „alte" und „neue" Stapel von Hand zu führen (beim Verschieben
+zwischen Stapeln ginge der Lernstand verloren). Ein Thema, an dem erst ein oder
+zwei Karten geübt wurden, bekommt keine Zahl, sondern den Hinweis; die Zahl der
+fälligen Karten steht trotzdem da — sie zählt, sie bewertet nicht. Karten haben
+kein Datum und stehen deshalb nicht im Verlauf. Was ein Kind wegen E/G nie zu
+sehen bekommt, wird ihm auch nicht als Rückstand angerechnet.
+
 ### Reihenfolge der Lernenden
 
 Die Liste einer Klasse lässt sich per Ziehen sortieren — und diese Reihenfolge

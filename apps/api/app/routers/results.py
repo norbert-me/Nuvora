@@ -1135,8 +1135,12 @@ async def themenprofil(class_id: int, student_id: Optional[int] = None,
     # hier je THEMA statt je Erhebung aufgeschluesselt.
     je_kind: dict[int, list] = {s.id: [] for s in roster}
     karte_zu_id = {s.card_id: s.id for s in roster}
+    # Welche Quellen haben ueberhaupt mitgerechnet? Die Antwort gehoert in die
+    # Ausgabe: eine Zahl ohne ihre Herkunft ist eine Behauptung.
+    quellen: list[str] = []
 
     if await is_active(db, user.id, "auswertung"):
+        quellen.append("arbeit")
         from ..models import WorkAnalysis
         arbeiten = (await db.execute(select(WorkAnalysis).where(
             WorkAnalysis.owner_id == user.id, WorkAnalysis.class_id == class_id
@@ -1160,6 +1164,7 @@ async def themenprofil(class_id: int, student_id: Optional[int] = None,
                         art="arbeit", messungen=messungen))
 
     if await is_active(db, user.id, "cardvote"):
+        quellen.append("quiz")
         # Quizze: je Frage ein Punkt. Damit zaehlt eine Frage weniger als eine
         # grosse Aufgabe — richtig so, sie prueft auch weniger.
         tests, _ = await _fruehwarn_daten(db, user, class_id)
@@ -1182,10 +1187,18 @@ async def themenprofil(class_id: int, student_id: Optional[int] = None,
                     messungen=[tp.Messung(topic_id=tid, erreicht=e, moeglich=m)
                                for tid, (e, m) in themen.items() if m]))
 
+    # Dritte Quelle: der Kartenstand. Er hat kein Datum (aufgelaufener Zustand,
+    # keine Erhebung) und steht deshalb neben den Erhebungen, nicht in ihnen.
+    karten_je_kind: dict[int, dict] = {}
+    if await is_active(db, user.id, "karten"):
+        quellen.append("karten")
+        from .karten import themen_lernstand
+        karten_je_kind = await themen_lernstand(db, user, class_id, roster)
+
     skala = user.grade_scale or None
     aus = []
     for s in roster:
-        themen = tp.profil(je_kind.get(s.id, []))
+        themen = tp.profil(je_kind.get(s.id, []), karten_je_kind.get(s.id))
         for eintrag in themen:
             # Orientierungsnote — ausdruecklich nur, wenn genug Punkte da sind.
             eintrag["note"] = note_aus_pct(eintrag["pct"], skala) if eintrag["pct"] is not None else None
@@ -1208,4 +1221,5 @@ async def themenprofil(class_id: int, student_id: Optional[int] = None,
                              if elt and elt in namen else namen.get(e["topic_id"]))
 
     return {"class_id": class_id, "class_name": school_class.name,
-            "mindest_punkte": tp.MINDEST_PUNKTE, "schueler": aus}
+            "mindest_punkte": tp.MINDEST_PUNKTE, "mindest_karten": tp.MINDEST_KARTEN,
+            "quellen": quellen, "schueler": aus}

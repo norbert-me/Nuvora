@@ -1,11 +1,13 @@
 // Modul Anwesenheit — Anwesenheit/Fehlzeiten je Klasse und Tag.
 // Pro Schüler ein Status (da/fehlt/verspätet/entschuldigt). "da" ist Normalfall
 // und wird nicht gespeichert. Übersicht zeigt Fehlzeiten und lässt nachtragen.
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { badge, btnSecondary, btnSmall, cardStyle, panelStyle, selectStyle, Segment, segmentBtn, Tabs, DatumNavigator, segmentInput, toolbarBtn, toolbarIconBtn, Icon, ICONS, COLORS as C } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
+import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
+import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import Portrait from "../components/Portrait.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
@@ -84,12 +86,15 @@ export default function Anwesenheit() {
   const students = cls?.students || [];
 
   const isoOf = (d) => new Date(d + "T00:00:00").toISOString();
+  // Frische Serverdaten (anderer Tag, andere Klasse, andere Stunde) beenden den
+  // Entwurf — sonst zeigte die Liste die Status des vorigen Tages weiter.
+  const frisch = useRef(false);
   const loadTag = useCallback(() => {
     if (!classId) return;
     // Bei gewählter Stunde diese Stunde laden (Server belegt sie aus der
     // vorherigen vor); Stunde 0 = ganzer Tag (stärkster Status).
     const p = stunde ? `&period=${stunde}` : "";
-    fetch(`${API}/${classId}?date=${isoOf(datum)}${p}`).then((r) => (r.ok ? r.json() : {})).then((d) => setTag(d || {})).catch(() => {});
+    fetch(`${API}/${classId}?date=${isoOf(datum)}${p}`).then((r) => (r.ok ? r.json() : {})).then((d) => { frisch.current = true; setTag(d || {}); }).catch(() => {});
   }, [classId, datum, stunde]);
   const loadSumme = useCallback(() => {
     if (!classId) return;
@@ -98,13 +103,33 @@ export default function Anwesenheit() {
   useEffect(() => { loadTag(); }, [loadTag]);
   useEffect(() => { if (view === "uebersicht") { loadSumme(); setOffen(null); } }, [view, loadSumme]);
 
-  const statusOf = (sid) => tag[String(sid)]?.status || "da";
   const mark = (sid, status, dateIso, period = null) => fetch(`${API}/${classId}`, { method: "PUT", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ student_id: sid, date: dateIso, status, note: "", period }) });
-  const setStatus = (sid, status) => {
-    setTag((prev) => ({ ...prev, [String(sid)]: { status, note: prev[String(sid)]?.note || "" } }));
-    mark(sid, status, isoOf(datum), stunde || null).catch(() => {});
-  };
+
+  // ── Ein Entwurf für die ganze Tagesliste ──
+  // Bisher schrieb jeder Klick sofort. Jetzt sammelt der Entwurf „Kind → Status"
+  // (flach, damit ein Neuladen die Arbeitskopie wieder einholt), und die Leiste
+  // unten schreibt alles auf einmal. Das kostet bei der Anwesenheit einen Klick
+  // mehr am Ende der Runde — dafür ist danach sichtbar, dass es drin ist.
+  const basis = useMemo(() => {
+    const o = {};
+    students.forEach((s) => { o[String(s.id)] = tag[String(s.id)]?.status || "da"; });
+    return o;
+  }, [students, tag]);
+  const eTag = useEntwurf(basis, async (wert) => {
+    for (const s of students) {
+      const k = String(s.id);
+      if (wert[k] === basis[k]) continue;
+      await mark(s.id, wert[k], isoOf(datum), stunde || null).catch(() => {});
+    }
+    loadTag();
+  });
+  useEffect(() => { if (frisch.current) { frisch.current = false; eTag.verwerfen(); } });
+  // Klassen-/Tageswechsel mit offenen Änderungen: nachfragen statt still verwerfen.
+  const wechseln = (fn) => { if (eTag.geaendert && !window.confirm(t("speichern.verlassen"))) return; fn(); };
+
+  const statusOf = (sid) => eTag.wert[String(sid)] || tag[String(sid)]?.status || "da";
+  const setStatus = (sid, status) => eTag.setz({ [String(sid)]: status });
   const shift = (n) => { const d = new Date(datum + "T00:00:00"); d.setDate(d.getDate() + n); setDatum(ymd(d)); };
 
   // PDF-Report laden (Endpunkt ist auth-geschützt, daher fetch + Blob statt <a href>).
@@ -116,17 +141,26 @@ export default function Anwesenheit() {
     a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href);
   };
 
+  const ladeVerlauf = (sid) => fetch(`${API}/${classId}/student/${sid}`).then((r) => (r.ok ? r.json() : [])).then((d) => { frischV.current = true; setVerlauf(Array.isArray(d) ? d : []); }).catch(() => {});
   const oeffnen = (sid) => {
     if (offen === sid) { setOffen(null); return; }
-    setOffen(sid); setVerlauf([]);
-    fetch(`${API}/${classId}/student/${sid}`).then((r) => (r.ok ? r.json() : [])).then((d) => setVerlauf(Array.isArray(d) ? d : [])).catch(() => {});
+    setOffen(sid); frischV.current = true; setVerlauf([]);
+    ladeVerlauf(sid);
   };
-  const verlaufAendern = async (sid, dateIso, status) => {
-    await mark(sid, status, dateIso).catch(() => {});
-    // Verlauf + Summe neu laden.
-    fetch(`${API}/${classId}/student/${sid}`).then((r) => (r.ok ? r.json() : [])).then((d) => setVerlauf(Array.isArray(d) ? d : [])).catch(() => {});
+  // Eigener Entwurf für den aufgeklappten Verlauf (eigene Maske, eigene Leiste
+  // an Ort und Stelle): „Datum → Status", nachträglich geändert und erst mit
+  // „Speichern" geschrieben.
+  const frischV = useRef(false);
+  const basisV = useMemo(() => Object.fromEntries(verlauf.map((v) => [v.date, v.status])), [verlauf]);
+  const eV = useEntwurf(basisV, async (wert) => {
+    for (const v of verlauf) {
+      if (wert[v.date] === basisV[v.date]) continue;
+      await mark(offen, wert[v.date], v.date).catch(() => {});
+    }
+    if (offen) await ladeVerlauf(offen);
     loadSumme();
-  };
+  });
+  useEffect(() => { if (frischV.current) { frischV.current = false; eV.verwerfen(); } });
 
   const legende = showLegend && (
     <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>
@@ -159,7 +193,7 @@ export default function Anwesenheit() {
     <div style={{ maxWidth: "none" }}>
       <Werkzeugleiste
         links={stundenWahl ? (
-          <select value={`${stunde}:${classId}`} onChange={(e) => { const [p, c] = e.target.value.split(":").map(Number); setStunde(p); setClassId(c); }}
+          <select value={`${stunde}:${classId}`} onChange={(ev) => { const [p, c] = ev.target.value.split(":").map(Number); wechseln(() => { setStunde(p); setClassId(c); }); }}
             style={{ ...selectStyle, minWidth: 200 }} title={t("anwesenheit.periodHint")}>
             {tagSlots.map((s) => (
               <option key={`${s.period}:${s.class_id}`} value={`${s.period}:${s.class_id}`}>
@@ -168,7 +202,7 @@ export default function Anwesenheit() {
             ))}
           </select>
         ) : (
-          <KursKlasseSelect value={classId} onChange={setClassId} />
+          <KursKlasseSelect value={classId} onChange={(id) => wechseln(() => setClassId(id))} />
         )}
         ansicht={<>
           <button onClick={() => setShowLegend((v) => !v)} className="icon-btn" title={t("anwesenheit.legend")} aria-label={t("anwesenheit.legend")}
@@ -185,10 +219,10 @@ export default function Anwesenheit() {
               Die Stunde ersetzt „ganzer Tag" — Abwesenheit wird je Stunde
               erfasst; nur wenn kein Stundenplan da ist, gilt der ganze Tag. */}
           <DatumNavigator style={{ marginBottom: 12 }}
-            onZurueck={() => shift(-1)} labelZurueck={t("kalender.prev")}
-            onVor={() => shift(1)} labelVor={t("kalender.next")}
-            onHeute={() => setDatum(ymd(new Date()))} labelHeute={t("anwesenheit.today")}
-            mitte={<input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} style={segmentInput} />} />
+            onZurueck={() => wechseln(() => shift(-1))} labelZurueck={t("kalender.prev")}
+            onVor={() => wechseln(() => shift(1))} labelVor={t("kalender.next")}
+            onHeute={() => wechseln(() => setDatum(ymd(new Date())))} labelHeute={t("anwesenheit.today")}
+            mitte={<input type="date" value={datum} onChange={(ev) => { const v = ev.target.value; wechseln(() => setDatum(v)); }} style={segmentInput} />} />
           {legende}
           {istFrei ? (
             <div style={{ ...panelStyle, padding: "12px 16px", background: C.warning + "1a", border: "none", color: C.warning, fontSize: 14, fontWeight: 600 }}>
@@ -241,7 +275,10 @@ export default function Anwesenheit() {
                   </button>
                   {auf && (
                     <div style={{ borderTop: "1px solid var(--border)", padding: "8px 12px" }}>
-                      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
+                      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                        {/* Die Leiste steht IM aufgeklappten Verlauf: sie gehört
+                            zu dieser Maske, nicht zur Tagesliste. */}
+                        <Speicherleiste entwurf={eV} klein />
                         <button onClick={() => ladePdf(`${API}/${classId}/student/${s.id}/report.pdf`, `Fehlzeiten_${s.name}.pdf`)} style={{ ...btnSecondary, ...btnSmall }}>{t("anwesenheit.studentPdf")}</button>
                       </div>
                       {verlauf.length === 0 ? (
@@ -249,7 +286,7 @@ export default function Anwesenheit() {
                       ) : verlauf.map((e) => (
                         <div key={e.date} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0" }}>
                           <span style={{ flex: 1, fontSize: 13 }}>{new Date(e.date).toLocaleDateString()}{e.period ? ` · ${e.period}. ${t("kalender.period")}` : ""}</span>
-                          <StatusWahl wert={e.status} onWahl={(st) => verlaufAendern(s.id, e.date, st)} />
+                          <StatusWahl wert={eV.wert[e.date] || e.status} onWahl={(st) => eV.setz({ [e.date]: st })} />
                         </div>
                       ))}
                     </div>
@@ -260,6 +297,10 @@ export default function Anwesenheit() {
           </div>
         </>
       )}
+      {/* Die Leiste schwebt unten: bei dreißig Kindern rollt die Werkzeugleiste
+          längst aus dem Bild, und ein Speichern-Knopf, den man suchen muss,
+          ist keiner. */}
+      {view === "tag" && <SpeicherBalken entwurf={eTag} />}
     </div>
   );
 }

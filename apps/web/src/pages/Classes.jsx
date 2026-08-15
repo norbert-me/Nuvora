@@ -14,8 +14,9 @@ import { undoDelete } from "../core/undo.jsx";
 import { useSearchParams } from "react-router-dom";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnSecondary, btnSmall, Tabs, pageApp, pageTitle,
-  cardStyle, chipStyle, inputStyle, toolbarBtn, toolbarBtnPrimary, CONTROL_R } from "../components/Icons.jsx";
+  cardStyle, chipStyle, inputStyle, toolbarBtn, CONTROL_R } from "../components/Icons.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
+import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import AuthImage from "../components/AuthImage.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
@@ -47,6 +48,10 @@ const FOERDER = [
 
 const EMPTY_STUDENT = { card_id: 1, name: "", niveau: "", foerder: null, massnahmen: null, notizen: "", klassenlehrer: "" };
 
+// Der leere Entwurf einer Klasse. `archiviert` gehört dazu: Archivieren ist
+// eine Änderung an der Klasse wie jede andere und wartet auf „Speichern".
+const LEERE_KLASSE = { name: "", color: C.info, students: [{ ...EMPTY_STUDENT, card_id: 1 }], archiviert: false };
+
 export default function Classes() {
   const { t } = useLanguage();
   const aktiv = useAktiv();
@@ -59,9 +64,14 @@ export default function Classes() {
   const [classes, setClasses] = useState([]);
   const [editing, setEditing] = useState(null);
   const [params, setParams] = useSearchParams();
-  const [name, setName] = useState("");
-  const [color, setColor] = useState(C.info);
-  const [students, setStudents] = useState([]);
+  // EIN Entwurf für die ganze Maske: Name, Farbe, alle Zeilen der Liste und der
+  // Archiv-Zustand. Dreißig Zeilen mit dreißig Speichern-Knöpfen wären
+  // unbedienbar — offen ist die Maske, nicht das einzelne Feld.
+  const [basis, setBasis] = useState(LEERE_KLASSE);
+  const entwurf = useEntwurf(basis, (wert) => save(wert));
+  const { name, students } = entwurf.wert;
+  const setName = (v) => entwurf.setz({ name: v });
+  const setStudents = (v) => entwurf.setz((w) => ({ students: typeof v === "function" ? v(w.students) : v }));
   const [detailsFor, setDetailsFor] = useState(null);
   // Gelöschte Klassen liegen im gemeinsamen Papierkorb des Kerns (/papierkorb),
   // nicht mehr hier — jedes Modul hatte sonst seinen eigenen.
@@ -86,6 +96,8 @@ export default function Classes() {
   }, []);
 
   const MAX_CARDS = 50;
+  // Solange ein Schlüssel in i18n/* fehlt, gäbe `t` den Schlüssel selbst aus.
+  const txt = (k, fb) => (t(k) !== k ? t(k) : fb);
 
   // Der PDF-Endpunkt haengt an der Anmeldung; eine Browser-Navigation schickt
   // den Token nicht mit. Deshalb holen und als Blob speichern.
@@ -105,17 +117,18 @@ export default function Classes() {
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   };
 
+  // Grundlage UND Arbeitskopie zugleich setzen: sonst hielte useEntwurf den
+  // Entwurf der zuletzt bearbeiteten Klasse für „noch offen" und zeigte ihn in
+  // der nächsten weiter.
+  const uebernehmen = (stand) => { setBasis(stand); entwurf.setz(stand); };
+
   const startNew = () => {
     setEditing({ id: null });
-    setName("");
-    setColor(C.info);
-    setStudents([{ ...EMPTY_STUDENT, card_id: 1 }]);
+    uebernehmen({ ...LEERE_KLASSE, students: [{ ...EMPTY_STUDENT, card_id: 1 }] });
   };
 
   const startEdit = (cls) => {
     setEditing(cls);
-    setName(cls.name);
-    setColor(cls.color || C.info);
     // Reihenfolge kommt vom Server (position, dann card_id) und wird NICHT
     // ueberschrieben: sie ist genau das, was hier per Ziehen gesetzt wurde.
     // Fruehere Fassung sortierte nach card_id und nummerierte durch — damit war
@@ -126,7 +139,7 @@ export default function Classes() {
     // und notizen wuerden sonst bei jedem Speichern still verschwinden.
     const rows = [...cls.students].map((s) => ({ ...s }));
     if (rows.length === 0) rows.push({ ...EMPTY_STUDENT, card_id: 1 });
-    setStudents(rows);
+    uebernehmen({ name: cls.name, color: cls.color || C.info, students: rows, archiviert: archiv });
   };
 
   // Direktlink ?open=<id> (z.B. aus dem Stundenplan): diese Klasse aufklappen.
@@ -137,11 +150,12 @@ export default function Classes() {
     if (cls) { startEdit(cls); setParams({}, { replace: true }); }
   }, [classes, params]); // eslint-disable-line
 
-  const save = async () => {
-    const filled = students.filter((s) => s.name.trim() !== "");
+  const save = async (wert) => {
+    if (!wert.name.trim()) { showAlert(txt("classes.nameRequired", "Bitte einen Klassennamen eingeben.")); return false; }
+    const filled = wert.students.filter((s) => s.name.trim() !== "");
     const body = {
-      name,
-      color,
+      name: wert.name,
+      color: wert.color,
       // Reihenfolge = Kartennummer: der Server vergibt 1, 2, 3 … nach dieser
       // Liste und schreibt die Scans der alten Nummern mit um. Nur von hier
       // aus, nicht bei Import oder Farbwechsel.
@@ -165,8 +179,16 @@ export default function Classes() {
       let detail = "";
       try { const b = await res.json(); detail = typeof b.detail === "string" ? b.detail : JSON.stringify(b.detail); } catch { /* egal */ }
       showAlert(detail || t("common.notWork"));
-      return;
+      return false;   // Entwurf bleibt offen — nichts geht verloren
     }
+    // Archivieren wandert mit demselben Speichern hinaus. Der Endpunkt schaltet
+    // um, deshalb nur bei echter Änderung.
+    if (wert.archiviert !== basis.archiviert) {
+      const angelegt = editing.id ? null : await res.json().catch(() => null);
+      const id = editing.id || angelegt?.id;
+      if (id) await fetch(`${API}/classes/${id}/archive`, { method: "POST" }).catch(() => {});
+    }
+    uebernehmen(LEERE_KLASSE);
     setEditing(null);
     load();
   };
@@ -232,16 +254,21 @@ export default function Classes() {
   // Foto je SuS (personenbezogen, eigener Endpoint). photoVer erzwingt Neu-Laden
   // der Vorschau nach Upload/Löschen.
   const [photoVer, setPhotoVer] = useState(0);
-  const uploadPhoto = async (idx, sid, file) => {
+  // Das Foto ist ein eigener Endpunkt und mit der Dateiauswahl bereits
+  // beauftragt — es gehört deshalb NICHT in den Entwurf der Maske (sonst stünde
+  // nach einem Bild „nicht gespeichert" da, obwohl das Bild längst liegt).
+  const [fotoDa, setFotoDa] = useState({});   // student_id -> hat Foto?
+  const hatFoto = (s) => (s.id != null && s.id in fotoDa ? fotoDa[s.id] : !!s.has_photo);
+  const uploadPhoto = async (sid, file) => {
     if (!file || !sid) return;
     const fd = new FormData(); fd.append("file", file);
     const r = await fetch(`/api/classes/students/${sid}/photo`, { method: "POST", body: fd }).catch(() => null);
-    if (r && r.ok) { setStudentField(idx, "has_photo", true); setPhotoVer((v) => v + 1); }
+    if (r && r.ok) { setFotoDa((m) => ({ ...m, [sid]: true })); setPhotoVer((v) => v + 1); }
   };
-  const removePhoto = async (idx, sid) => {
+  const removePhoto = async (sid) => {
     if (!sid) return;
     await fetch(`/api/classes/students/${sid}/photo`, { method: "DELETE" }).catch(() => {});
-    setStudentField(idx, "has_photo", false); setPhotoVer((v) => v + 1);
+    setFotoDa((m) => ({ ...m, [sid]: false })); setPhotoVer((v) => v + 1);
   };
 
   // Kartennummern bleiben, wo sie sind — auch beim Loeschen. Frueher wurde hier
@@ -367,14 +394,14 @@ export default function Classes() {
                 {/* Foto der Person (personenbezogen; nie im Export). */}
                 <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 6 }}>{t("classes.photo")}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                  {s.id && s.has_photo && <AuthImage src={`/api/classes/students/${s.id}/photo`} reloadKey={photoVer} style={{ width: 56, height: 56, objectFit: "cover", borderRadius: CONTROL_R, border: "1px solid var(--border2)" }} />}
+                  {s.id && hatFoto(s) && <AuthImage src={`/api/classes/students/${s.id}/photo`} reloadKey={photoVer} style={{ width: 56, height: 56, objectFit: "cover", borderRadius: CONTROL_R, border: "1px solid var(--border2)" }} />}
                   {s.id ? (
                     <>
                       <label style={{ ...btnSecondary, ...btnSmall, cursor: "pointer" }}>
-                        {s.has_photo ? t("classes.photoChange") : t("classes.photoAdd")}
-                        <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files[0]; e.target.value = ""; uploadPhoto(idx, s.id, f); }} />
+                        {hatFoto(s) ? t("classes.photoChange") : t("classes.photoAdd")}
+                        <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files[0]; e.target.value = ""; uploadPhoto(s.id, f); }} />
                       </label>
-                      {s.has_photo && <button type="button" onClick={() => removePhoto(idx, s.id)} className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>}
+                      {hatFoto(s) && <button type="button" onClick={() => removePhoto(s.id)} className="icon-btn" style={iconBtn} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>}
                     </>
                   ) : <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("classes.photoSaveFirst")}</span>}
                 </div>
@@ -456,22 +483,32 @@ export default function Classes() {
             Gefaehrliche. Vorher stand der Papierkorb direkt neben
             „Speichern" — eine Handbreite von der Klasse entfernt. */}
         <Werkzeugleiste
-          links={<button onClick={save} disabled={!name.trim()} style={toolbarBtnPrimary}>{t("common.save")}</button>}
+          links={<Speicherleiste entwurf={entwurf} immer />}
           mehr={editing.id ? [
             zugaengeMoeglich && { key: "qr", label: t("classes.qrPrint"), icon: ICONS.pdf || ICONS.export,
                                   onClick: () => zugaengeDrucken(editing.id) },
-            { key: "archiv", label: archiv ? t("classes.unarchive") : t("classes.archive"), icon: ICONS.archive,
-              onClick: async () => {
-                await fetch(`${API}/classes/${editing.id}/archive`, { method: "POST" }).catch(() => {});
-                setEditing(null); load();
-              } },
+            // Archivieren ist ein Umschalten und wartet wie alles andere auf
+            // „Speichern" — vorher war die Klasse schon weg, während die
+            // getippten Namen daneben noch ungespeichert dastanden.
+            { key: "archiv", label: entwurf.wert.archiviert ? t("classes.unarchive") : t("classes.archive"), icon: ICONS.archive,
+              onClick: () => entwurf.setz((w) => ({ archiviert: !w.archiviert })) },
             { key: "loeschen", label: t("common.delete"), icon: ICONS.trash, gefahr: true,
-              onClick: () => { remove(editing.id); setEditing(null); } },
+              onClick: () => { remove(editing.id); uebernehmen(LEERE_KLASSE); setEditing(null); } },
           ] : []}>
           <button onClick={addRow} disabled={students.length >= MAX_CARDS}
             style={{ ...toolbarBtn, opacity: students.length >= MAX_CARDS ? 0.4 : 1 }}>{t("classes.addRow")}</button>
-          <button onClick={() => setEditing(null)} style={toolbarBtn}>{t("common.cancel")}</button>
+          <button onClick={() => {
+            if (entwurf.geaendert && !window.confirm(t("speichern.verlassen"))) return;
+            uebernehmen(LEERE_KLASSE); setEditing(null);
+          }} style={toolbarBtn}>{t("common.cancel")}</button>
         </Werkzeugleiste>
+        {/* Was das Speichern zusätzlich tun wird — sonst wäre ein
+            umgeschaltetes Archiv im Menü verborgen. */}
+        {entwurf.wert.archiviert !== basis.archiviert && (
+          <p style={{ fontSize: 13, color: C.warning, margin: "0 0 8px" }}>
+            {entwurf.wert.archiviert ? t("classes.archive") : t("classes.unarchive")}
+          </p>
+        )}
         {cardvote && (
           <p style={{ fontSize: 12, color: students.length >= MAX_CARDS ? C.danger : "var(--text3)", margin: 0 }}>
             {t("classes.limit", { max: MAX_CARDS, count: students.length })}

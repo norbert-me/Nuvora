@@ -6,6 +6,7 @@ import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
 import { Icon, ICONS, Tabs, ANTWORT_COLORS, btnPrimary, btnSecondary, Modal, inputStyle, iconBtn, cardStyle, chipStyle, panelStyle, toolbarBtn, CONTROL_R, COLORS as C, Boxplot, pageApp, StatCard, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
+import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
 import { bewerte, statusOf } from "../core/scoring.js";
 
@@ -59,8 +60,6 @@ export default function Evaluation() {
   const { id } = useParams();
   const [data, setData] = useState(null);
   const [selectedQ, setSelectedQ] = useState(null);
-  const [weights, setWeights] = useState({});
-  const [gradeScale, setGradeScale] = useState(DEFAULT_SCALE);
   const [showWeights, setShowWeights] = useState(false);
   const [showScale, setShowScale] = useState(false);
   const [showDiscInfo, setShowDiscInfo] = useState(false);
@@ -88,15 +87,43 @@ export default function Evaluation() {
   const [avgMode, setAvgMode] = useState("pts");
   const [medMode, setMedMode] = useState("pts");
   const [sdMode, setSdMode] = useState("pts");
-  // Wer krank war (aus der Wertung) bzw. trotz fehlender Abgabe gewertet wird.
-  const [krankListe, setKrankListe] = useState([]);
-  const [anwesendListe, setAnwesendListe] = useState([]);
   // Lehrer-Übersicht nach Kursniveau filtern ("" = alle).
   const [niveauFilter, setNiveauFilter] = useState("");
-  const [configDirty, setConfigDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const saveTimer = useRef(null);
+
+  // Alles, was an dieser Auswertung einstellbar ist, ist EIN Entwurf mit EINER
+  // Speicherleiste: Gewichte, Notenschluessel und die Einstufung krank/anwesend.
+  // Vorher lief jede dieser Aenderungen nach 800 ms von selbst zum Server —
+  // man sah nur ein kurzes „gespeichert" und hatte nichts in der Hand.
+  const [gespeicherteConfig, setGespeicherteConfig] = useState({
+    weights: {}, gradeScale: DEFAULT_SCALE, krank: [], anwesend: [],
+  });
+  // Was sonst noch in der Konfiguration steht (Zeiten aus der Live-Sitzung).
+  // Die PUT ersetzt sie als Ganzes — ohne diese Kopie waeren sie nach dem
+  // ersten Speichern weg.
+  const restConfig = useRef({});
+  const eConf = useEntwurf(gespeicherteConfig, async (wert) => {
+    const r = await fetch(`${API}/sessions/${id}/eval-config`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...restConfig.current,
+        weights: wert.weights, grade_scale: wert.gradeScale,
+        krank: wert.krank, anwesend: wert.anwesend,
+      }),
+    }).catch(() => null);
+    if (!r || !r.ok) return false;
+    setGespeicherteConfig(wert);
+  });
+  const { weights, gradeScale, krank: krankListe, anwesend: anwesendListe } = eConf.wert;
+
+  // Nach dem Laden die Arbeitskopie auf den geladenen Stand setzen. `useEntwurf`
+  // uebernimmt einen neuen Stand nur, wenn NICHTS offen ist — und beim ersten
+  // Laden sieht die Voreinstellung neben der geladenen Konfiguration wie eine
+  // offene Aenderung aus. Ohne diese Zeile stuende die Seite direkt nach dem
+  // Aufruf auf „nicht gespeichert" und zeigte den Notenschluessel von vorher.
+  const [ladeStand, setLadeStand] = useState(0);
+  useEffect(() => { if (ladeStand) eConf.verwerfen(); }, [ladeStand]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const timer = setTimeout(() => { if (!data) setLoadError(true); }, 15000);
@@ -106,16 +133,22 @@ export default function Evaluation() {
     ]).then(([evalData, config]) => {
       clearTimeout(timer);
       if (evalData && evalData.questions && evalData.students) setData({ ...evalData, _evalConfig: config || {} });
-      if (config && config.weights) setWeights(config.weights);
-      if (config && Array.isArray(config.krank)) setKrankListe(config.krank);
-      if (config && Array.isArray(config.anwesend)) setAnwesendListe(config.anwesend);
-      if (config && config.grade_scale) setGradeScale(config.grade_scale);
-      else {
+      const { weights: _w, grade_scale: _g, krank: _k, anwesend: _a, ...rest } = config || {};
+      restConfig.current = rest;
+      let skala = (config && config.grade_scale) || null;
+      if (!skala) {
         try {
           const user = JSON.parse(localStorage.getItem("user"));
-          if (user && user.grade_scale) setGradeScale(user.grade_scale);
+          if (user && user.grade_scale) skala = user.grade_scale;
         } catch {}
       }
+      setGespeicherteConfig({
+        weights: (config && config.weights) || {},
+        gradeScale: skala || DEFAULT_SCALE,
+        krank: (config && Array.isArray(config.krank)) ? config.krank : [],
+        anwesend: (config && Array.isArray(config.anwesend)) ? config.anwesend : [],
+      });
+      setLadeStand((n) => n + 1);
     });
   }, [id]);
 
@@ -131,38 +164,20 @@ export default function Evaluation() {
     URL.revokeObjectURL(a.href);
   };
 
-  const saveConfig = (newWeights, newScale, patch = {}) => {
-    clearTimeout(saveTimer.current);
-    setConfigDirty(true);
-    saveTimer.current = setTimeout(() => {
-      setSaving(true);
-      fetch(`${API}/sessions/${id}/eval-config`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        // krank/anwesend immer mitschicken — die Konfiguration wird als Ganzes
-        // ersetzt, ein Weglassen würde die Einstufung stillschweigend löschen.
-        body: JSON.stringify({ weights: newWeights, grade_scale: newScale, krank: krankListe, anwesend: anwesendListe, ...patch }),
-      }).then(() => { setSaving(false); setConfigDirty(false); });
-    }, 800);
-  };
-
-  // Kind zwischen „krank" (aus der Wertung) und „anwesend" (0 zählt mit) schalten.
+  // Kind zwischen „krank" (aus der Wertung) und „anwesend" (0 zählt mit)
+  // schalten — im Entwurf, gespeichert wird über die Leiste.
   const setStatus = (cardId, neu) => {
     const key = String(cardId);
     const krank = krankListe.map(String).filter((x) => x !== key);
     const anwesend = anwesendListe.map(String).filter((x) => x !== key);
     if (neu === "krank") krank.push(key); else anwesend.push(key);
-    setKrankListe(krank);
-    setAnwesendListe(anwesend);
-    saveConfig(weights, gradeScale, { krank, anwesend });
+    eConf.setz({ krank, anwesend });
   };
 
   const updateWeight = (qId, val) => {
     const num = Math.max(0, Number(String(val).replace(",", ".")));
     if (isNaN(num)) return;
-    const next = { ...weights, [qId]: num };
-    setWeights(next);
-    saveConfig(next, gradeScale);
+    eConf.setz((v) => ({ weights: { ...v.weights, [qId]: num } }));
   };
 
   const updateScale = (grade, val) => {
@@ -174,8 +189,7 @@ export default function Evaluation() {
     for (let g = grade + 1; g <= 5; g++) {
       if (next[g] > next[g - 1]) next[g] = next[g - 1];
     }
-    setGradeScale(next);
-    saveConfig(weights, next);
+    eConf.setz({ gradeScale: next });
   };
 
   if (loadError && !data) return <p style={{ color: C.danger }}>{t("common.connectionError")}</p>;
@@ -489,7 +503,7 @@ const gradeDistribution = (() => {
           uebernehmen) sichtbar, die drei Exporte im Menue. Vorher standen hier
           fuenf Elemente nebeneinander. */}
       <Werkzeugleiste
-        links={configDirty && <span style={{ fontSize: 11, color: saving ? C.warning : C.success }}>{saving ? t("cv.saving") : t("cv.saved")}</span>}
+        links={<Speicherleiste entwurf={eConf} klein />}
         mehr={[
           { key: "pdf", label: t("cv.exportPdf"), icon: ICONS.pdf, onClick: () => holen(`${API}/sessions/${id}/all-students-pdf`, `Auswertungen_${id}.pdf`) },
           { key: "xlsx", label: t("cv.exportExcel"), icon: ICONS.download, onClick: () => holen(`${API}/sessions/${id}/evaluation-xlsx`, `Auswertung_${id}.xlsx`) },
