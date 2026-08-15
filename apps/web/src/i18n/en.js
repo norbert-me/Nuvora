@@ -2275,4 +2275,12 @@ export default {
   "lp.ex.sourceTypePh": "e.g. textbook",
   "lp.ex.sourceDetailPh": "e.g. p.10 no.1",
   "lp.ex.lrsPh": "Adapted text",
+  "cv.dup.find": "Find duplicates",
+  "cv.dup.hint": "Shows only questions whose text occurs more than once — grouped, the oldest one is kept",
+  "cv.dup.count": "{{g}} groups, {{n}} questions",
+  "cv.dup.group": "{{n}}× same text",
+  "cv.dup.sameAnswers": "same answers",
+  "cv.dup.otherAnswers": "different answers — check",
+  "cv.dup.keep": "keep",
+  "cv.dup.none": "No duplicate questions found",
 };

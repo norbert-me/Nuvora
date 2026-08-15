@@ -2276,4 +2276,12 @@ export default {
   "lp.ex.sourceTypePh": "p. ej. libro de texto",
   "lp.ex.sourceDetailPh": "p. ej. pág.10 nº1",
   "lp.ex.lrsPh": "Texto adaptado",
+  "cv.dup.find": "Buscar duplicadas",
+  "cv.dup.hint": "Muestra solo las preguntas cuyo texto aparece más de una vez — agrupadas, se conserva la más antigua",
+  "cv.dup.count": "{{g}} grupos, {{n}} preguntas",
+  "cv.dup.group": "{{n}}× mismo texto",
+  "cv.dup.sameAnswers": "mismas respuestas",
+  "cv.dup.otherAnswers": "respuestas distintas — revisar",
+  "cv.dup.keep": "conservar",
+  "cv.dup.none": "No se encontraron preguntas duplicadas",
 };

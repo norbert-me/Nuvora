@@ -919,14 +919,27 @@
     display: inline-flex; align-items: center; gap: 0.35rem;
 }
 #lp-app .cfg-controls { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.85rem; }
-#lp-app .cfg-num {
-    width: 4.5rem;
-    padding: 0.35rem 0.5rem;
+/* Zahlenfeld einer Konfig-Zeile. Typ-Selektor davor, weil die Basisregel
+   `input[type="number"]` spezifischer ist als eine Klasse allein – ohne ihn
+   gewann dort width:100% und das Feld sprengte die Zeile. Höhe kommt aus
+   derselben Control-Metrik wie alle anderen Bedienelemente. */
+#lp-app input[type="number"].cfg-num {
+    width: 5rem;
+    padding: var(--control-pad-y) var(--control-pad-x);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    font-size: 0.9rem;
+    font-size: var(--control-font);
+    line-height: var(--control-line);
     text-align: center;
 }
+/* Feld und sein Hinweis stehen als Säule: „von N verfügbar" direkt darunter,
+   gleiche Breite wie das Feld, mittig – nicht versetzt daneben. */
+#lp-app .cfg-numwrap { display: inline-flex; flex-direction: column; align-items: center; gap: 0.3rem; }
+#lp-app .cfg-numwrap .cfg-hint { text-align: center; }
+/* Zeilen mit einer solchen Säule: Beschriftung oben auf Feldhöhe halten,
+   sonst rutscht sie auf die halbe Höhe des ganzen Blocks. */
+#lp-app .cfg-block-start { align-items: flex-start; }
+#lp-app .cfg-block-start .cfg-label { padding-top: var(--control-pad-y); line-height: var(--control-line); }
 #lp-app .cfg-range { width: 11rem; accent-color: var(--primary); cursor: pointer; vertical-align: middle; }
 #lp-app .cfg-range-val { min-width: 6.5rem; font-size: 0.9rem; font-weight: 600; color: var(--text); }
 #lp-app .cfg-pct { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.9rem; }
@@ -1146,9 +1159,11 @@
 /* Aufgabenübersicht: hoechstens ~8 Zeilen, dann scrollen — auch eingebettet. */
 #lp-app .aufgaben-wrap, #lp-app .aufgaben-wrap { max-height: 25rem !important; overflow-y: auto !important; }
 /* "Neue Aufgabe" ein-/ausklappbar */
-#lp-app #aufgaben-form-title { cursor: pointer; user-select: none; }
-#lp-app #aufgaben-form-title::after { content: "▾"; float: right; font-size: 0.8em; color: var(--text-muted); }
-#lp-app #aufgaben-form-title[data-collapsed="1"]::after { content: "▸"; }
+/* Kopfzeile ganz klickbar; der Pfeil (SVG aus app.js) sitzt rechts und wiegt
+   optisch so viel wie die Überschrift – das alte ▾ war ein Krümel daneben. */
+#lp-app #aufgaben-form-title { cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+#lp-app #aufgaben-form-title .collapse-chevron { display: inline-flex; align-items: center; color: var(--text-muted); flex: 0 0 auto; }
+#lp-app #aufgaben-form-title:hover .collapse-chevron { color: var(--text); }
 /* Speichern gesperrt, solange Pflichtfelder fehlen */
 #lp-app #aufgabe-submit-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 

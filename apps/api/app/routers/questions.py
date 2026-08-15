@@ -166,13 +166,21 @@ async def _mit_scans(db: AsyncSession, ids: list[int]) -> set[int]:
 
 @router.get("/verwaist")
 async def verwaiste_fragen(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Welche eigenen Fragen stecken in keinem Quiz?"""
+    """Welche eigenen Fragen stecken in keinem Quiz?
+
+    Text VOLLSTAENDIG, dazu Antworten und richtige Antwort: die Oberflaeche
+    sucht in dieser Liste nach Dubletten und rechnet das im Browser (die Liste
+    liegt dort ohnehin schon). Auf 160 Zeichen gekuerzt waeren zwei Fragen mit
+    gleichem Anfang faelschlich gleich — und geloescht wird nach diesem
+    Vergleich. Ein eigener Endpunkt dafuer waere derselbe Datensatz zweimal.
+    """
     fragen = (await db.execute(_verwaist_stmt(user))).scalars().all()
     mit_scans = await _mit_scans(db, [q.id for q in fragen])
     return {
         "anzahl": len(fragen),
         "loeschbar": sum(1 for q in fragen if q.id not in mit_scans),
-        "fragen": [{"id": q.id, "text": (q.text or "")[:160], "topic_id": q.topic_id,
+        "fragen": [{"id": q.id, "text": q.text or "", "topic_id": q.topic_id,
+                    "choices": q.choices or {}, "correct_answer": q.correct_answer,
                     "hat_ergebnisse": q.id in mit_scans} for q in fragen],
     }
 

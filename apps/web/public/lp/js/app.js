@@ -908,9 +908,17 @@
         const title = document.getElementById('aufgaben-form-title');
         const form = document.getElementById('aufgabe-form');
         if (!title || !form) return;
+        // Pfeil als SVG (derselbe Chevron-Pfad wie in Nuvoras Shell), nicht als
+        // Textzeichen: das ▾ war neben der fetten Überschrift kaum zu sehen.
+        const chevron = document.getElementById('aufgaben-form-chevron');
+        const CHEVRON = (d) => '<svg viewBox="0 0 20 20" width="22" height="22" fill="none" stroke="currentColor" '
+            + 'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + d + '"/></svg>';
+        const CHEVRON_DOWN = CHEVRON('M5 7.5l5 5 5-5');
+        const CHEVRON_UP = CHEVRON('M5 12.5l5-5 5 5');
         window.setAufgabeFormOpen = (open) => {
             form.style.display = open ? '' : 'none';
             title.dataset.collapsed = open ? '0' : '1';
+            if (chevron) chevron.innerHTML = open ? CHEVRON_UP : CHEVRON_DOWN;
         };
         title.addEventListener('click', () => window.setAufgabeFormOpen(title.dataset.collapsed === '1'));
         // Standard: eingeklappt, damit die Uebersicht oben steht.
@@ -1119,7 +1127,7 @@
     function resetAufgabeForm() {
         aufgabeForm.reset();
         document.getElementById('aufgabe-edit-id').value = '';
-        document.getElementById('aufgaben-form-title').textContent = 'Neue Aufgabe';
+        document.getElementById('aufgaben-form-title-text').textContent = 'Neue Aufgabe';
         document.getElementById('aufgabe-cancel-btn').style.display = 'none';
         document.getElementById('aufgabe-submit-btn').textContent = 'Aufgabe speichern';
         document.getElementById('edit-id-display').style.display = 'none';
@@ -1175,7 +1183,7 @@
         }
         document.getElementById('edit-id-display').style.display = '';
         document.getElementById('edit-id-label').textContent = fmtId(a.code || a.id);
-        document.getElementById('aufgaben-form-title').textContent = 'Aufgabe bearbeiten';
+        document.getElementById('aufgaben-form-title-text').textContent = 'Aufgabe bearbeiten';
         document.getElementById('aufgabe-cancel-btn').style.display = '';
         document.getElementById('aufgabe-submit-btn').textContent = 'Änderung speichern';
         if (window.setAufgabeFormOpen) window.setAufgabeFormOpen(true);
@@ -3231,11 +3239,13 @@
         // 4. Erklärungen (optional)
         if (erklCount) {
             html += `
-            <div class="cfg-block">
+            <div class="cfg-block cfg-block-start">
                 <div class="cfg-label">Erklärungen voranstellen ${info('Erklär-Seiten kommen an den Anfang der Lernleiter.')}</div>
                 <div class="cfg-controls">
-                    <input type="number" min="0" max="${erklCount}" value="${Math.min(1, erklCount)}" id="cfg-erkl" class="cfg-num">
-                    <span class="cfg-hint">von ${erklCount} verfügbar</span>
+                    <span class="cfg-numwrap">
+                        <input type="number" min="0" max="${erklCount}" value="${Math.min(1, erklCount)}" id="cfg-erkl" class="cfg-num">
+                        <span class="cfg-hint">von ${erklCount} verfügbar</span>
+                    </span>
                 </div>
             </div>`;
         }

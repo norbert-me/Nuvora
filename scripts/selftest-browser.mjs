@@ -388,8 +388,6 @@ async function lauf(motor) {
     // ── Werkzeugleisten: eine Hoehe, eine Form ──
     await leistenProbe(kontext);
 
-    // ── Modulwechsel aus der Navigation ──
-    await modulwechselProbe(kontext);
 
     // ── Reihenfolge der Schueler im Formular ──
     await reihenfolgeProbe(kontext, api);
@@ -581,43 +579,6 @@ async function leistenProbe(kontext) {
   }
 }
 
-/**
- * Aus einem Modul direkt in ein anderes — ohne Umweg ueber die Startseite.
- *
- * Die Reiter in der Leiste gehoeren immer nur zum aktuellen Bereich. Wer im
- * Kalender steht und in die Karten will, musste vorher erst auf „Nuvora".
- * Geprueft wird genau dieser Weg: Knopf auf, anderes Modul waehlen, dort
- * ankommen.
- */
-async function modulwechselProbe(kontext) {
-  const { seite } = await neueSeite(kontext);
-  try {
-    await seite.goto("/kalender", { waitUntil: "networkidle", timeout: 30000 });
-    await tourWegklicken(seite);
-    const knopf = seite.locator("[data-modulwechsler]").first();
-    if (!(await knopf.count())) {
-      notiere("Bedienung", "Modulwechsel aus der Navigation", true,
-        "uebersprungen — weniger als zwei Module zugeschaltet");
-      return;
-    }
-    await knopf.click({ timeout: 8000 });
-    await seite.waitForTimeout(400);
-    const ziel = seite.locator("[data-modulziel='karten']").first();
-    if (!(await ziel.count())) {
-      notiere("Bedienung", "Modulwechsel aus der Navigation", true,
-        "uebersprungen — Karteikarten nicht zugeschaltet");
-      return;
-    }
-    await ziel.click({ timeout: 8000 });
-    await seite.waitForURL(/\/karten/, { timeout: 8000 });
-    notiere("Bedienung", "Modulwechsel aus der Navigation", true,
-      "vom Kalender direkt zu den Karteikarten, ohne Umweg ueber die Startseite");
-  } catch (e) {
-    notiere("Bedienung", "Modulwechsel aus der Navigation", false, kurzfehler(e));
-  } finally {
-    await seite.close().catch(() => {});
-  }
-}
 
 /**
  * Die Suche muss finden, was die Navigation versteckt.

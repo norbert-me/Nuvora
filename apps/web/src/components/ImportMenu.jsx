@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useLanguage } from "../i18n/index.jsx";
-import { Icon, ICONS, menuRow, Popover, toolbarBtn } from "./Icons.jsx";
+import { Icon, ICONS, menuRow, Popover, toolbarIconBtn } from "./Icons.jsx";
 
 // item: { label, onClick } für Importieren, oder { label, href } für Vorlagen-Downloads
 function MenuRow({ item, onClose }) {
@@ -46,13 +46,15 @@ export default function ImportMenu({ importItems = [], templateItems = [] }) {
     <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
       <button
         onClick={() => setOpen((v) => !v)}
-        // Der Knopf steht immer in einer Werkzeugleiste — also dieselbe Hoehe
-        // und Form wie alles daneben, keine eigene Pille.
-        style={toolbarBtn}
+        title={t("importMenu.label")} aria-label={t("importMenu.label")} aria-expanded={open}
+        className="icon-btn"
+        // Nur das Symbol, wie bei jedem anderen Knopf einer Werkzeugleiste: die
+        // Beschriftung steht im `title`. Ein Knopf mit Text UND zwei Symbolen
+        // war dreimal so breit wie seine Nachbarn und drueckte die Leiste in
+        // die zweite Zeile.
+        style={{ ...toolbarIconBtn, color: open ? "var(--accent)" : "var(--text3)" }}
       >
-        <Icon d={ICONS.import} size={14} />
-        {t("importMenu.label")}
-        <Icon d={open ? ICONS.chevronUp : ICONS.chevronDown} size={14} />
+        <Icon d={ICONS.import} size={17} />
       </button>
 
       {open && (

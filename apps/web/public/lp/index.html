@@ -40,7 +40,10 @@
     <!-- ============ TAB: AUFGABEN ============ -->
     <section id="tab-aufgaben" class="tab-content active">
         <div class="panel">
-            <h2 id="aufgaben-form-title">Neue Aufgabe</h2>
+            <!-- Der Titeltext steht in einem eigenen Span: app.js tauscht ihn
+                 per textContent ("Aufgabe bearbeiten"), das würde ein direkt im
+                 h2 liegendes Pfeil-SVG mit wegräumen. -->
+            <h2 id="aufgaben-form-title"><span id="aufgaben-form-title-text">Neue Aufgabe</span><span class="collapse-chevron" id="aufgaben-form-chevron" aria-hidden="true"></span></h2>
             <form id="aufgabe-form">
                 <input type="hidden" id="aufgabe-edit-id">
                 <input type="hidden" id="aufgabe-id">

@@ -12,7 +12,7 @@ import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
-import { Icon, ICONS, iconBtn, toolbarBtn, toolbarBtnPrimary, toolbarIconBtn, toolbarInput, selectStyle, cardStyle, chipStyle, panelStyle, CONTROL_R, SHADOW, COLORS as C, btnPrimary, btnSecondary, Modal as UiModal, popoverPanel, Empty, Skeleton, inputStyle, Popover, Tabs, Toggle, nichtZiehen, dateiWaehlen, th as thBasis, td as tdBasis } from "../components/Icons.jsx";
+import { Icon, ICONS, iconBtn, toolbarBtn, toolbarBtnPrimary, toolbarIconBtn, toolbarInput, selectStyle, cardStyle, chipStyle, panelStyle, CONTROL_R, SHADOW, COLORS as C, btnPrimary, btnSecondary, Modal as UiModal, popoverPanel, Empty, Skeleton, inputStyle, Popover, Tabs, Toggle, nichtZiehen, dateiWaehlen, thKlebend as thBasis, td as tdBasis } from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { MehrMenu } from "../components/Werkzeugleiste.jsx";

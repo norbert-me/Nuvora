@@ -2261,4 +2261,12 @@ export default {
   "lp.ex.sourceTypePh": "z. B. schulbuch",
   "lp.ex.sourceDetailPh": "z. B. S.10 Nr.1",
   "lp.ex.lrsPh": "Angepasster Text",
+  "cv.dup.find": "Doppelte finden",
+  "cv.dup.hint": "Zeigt nur Fragen, deren Text mehrfach vorkommt — gruppiert, die älteste bleibt stehen",
+  "cv.dup.count": "{{g}} Gruppen, {{n}} Fragen",
+  "cv.dup.group": "{{n}}× gleicher Text",
+  "cv.dup.sameAnswers": "gleiche Antworten",
+  "cv.dup.otherAnswers": "andere Antworten — ansehen",
+  "cv.dup.keep": "behalten",
+  "cv.dup.none": "Keine doppelten Fragen gefunden",
 };

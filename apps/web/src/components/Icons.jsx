@@ -495,9 +495,21 @@ export const panelStyle = {
 export const th = {
   padding: "8px 6px", fontSize: 12, fontWeight: 600, color: "var(--text2)",
   borderBottom: "1px solid var(--border)", textAlign: "center", whiteSpace: "nowrap",
-  // Wohin er klebt, entscheidet die Seite: --tabellenkopf-top steht per
-  // Voreinstellung auf der Hoehe der Navigationsleiste (Seiten-Scroll) und wird
-  // von Tabellen, die in einem eigenen Rahmen scrollen, auf 0 gesetzt.
+};
+
+// Klebender Kopf — NUR fuer lange Tabellen, durch die man wirklich rollt.
+//
+// Er stand vorher am `th` selbst und galt damit fuer jede Tabelle. Bei einer
+// Tabelle mit zwei Zeilen (Kontenverwaltung im Profil) sieht das kaputt aus:
+// sobald die Karte am oberen Rand vorbeirollt, loest sich die Kopfzeile und
+// legt sich ueber die erste Datenzeile — technisch richtig, optisch ein Fehler.
+// Wo geklebt wird, entscheidet also die Tabelle.
+//
+// Wohin er klebt, sagt `--tabellenkopf-top`: Voreinstellung ist die Hoehe der
+// Navigationsleiste (Seiten-Scroll); Tabellen mit eigenem Rollrahmen setzen die
+// Variable bei sich auf 0 — dort ist der Rahmen der Bezug, nicht das Fenster.
+export const thKlebend = {
+  ...th,
   position: "sticky", top: "var(--tabellenkopf-top, 0px)",
   zIndex: 2, background: "var(--card)",
 };

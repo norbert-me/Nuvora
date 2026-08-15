@@ -5,7 +5,8 @@ import Latex from "../components/Latex.jsx";
 import PublishModal from "../components/PublishModal.jsx";
 import { NiveauToggle, AddButton, Icon, ICONS, iconBtn, COLORS as C, btnPrimary, btnSecondary, btnSmall, Toggle, Modal, Popover,
   pageApp, pageTitle, cardStyle, panelStyle, menuRow, SHADOW, inputStyle as inputBasis, selectStyle,
-  toolbarBtn, toolbarBtnPrimary, toolbarInput, StatCard, CONTROL_R } from "../components/Icons.jsx";
+  toolbarBtn, toolbarBtnPrimary, toolbarInput, StatCard, CONTROL_R, badge, chipStyle, sectionLabel } from "../components/Icons.jsx";
+import { dublettenZahlen, findeDubletten } from "../core/dubletten.js";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -70,8 +71,38 @@ export default function Dashboard() {
     return raus.sort((a, b) => a.label.localeCompare(b.label, "de", { numeric: true }));
   })();
 
-  const vGefiltert = (verwaist?.fragen || []).filter((q) =>
+  // „Doppelte finden": dieselbe Liste, nur gruppiert und auf das reduziert,
+  // was mehrfach vorkommt. Gerechnet wird im Browser — die Fragen liegen hier
+  // vollstaendig (Text, Antworten), ein eigener Endpunkt waere derselbe
+  // Datensatz ein zweites Mal.
+  const [vDup, setVDup] = useState(false);
+
+  const vBasis = (verwaist?.fragen || []).filter((q) =>
     !vSuche.trim() || (q.text || "").toLowerCase().includes(vSuche.trim().toLowerCase()));
+  const vGruppen = vDup ? findeDubletten(vBasis) : [];
+  const vZahlen = dublettenZahlen(vGruppen);
+  // Was die Liste gerade zeigt — flach. „Alle N auswaehlen" und das Loeschen
+  // arbeiten damit weiter unveraendert; es gibt keinen zweiten Loeschweg.
+  const vGefiltert = vDup ? vGruppen.flatMap((g) => g.fragen) : vBasis;
+
+  // Sicherheitsnetz: auswaehlbar ist nur, was wirklich in dieser Liste steht —
+  // also eine Frage OHNE Quiz — und keine Ergebnisse hat. Der Block zeigt zwar
+  // ohnehin nur quizlose Fragen, aber geloescht wird nach dieser Auswahl, und
+  // eine Pruefung an der Stelle des Loeschens ist die einzige, die haelt.
+  const vFrage = (id) => (verwaist?.fragen || []).find((q) => q.id === id);
+  const vLoeschbar = (id) => { const q = vFrage(id); return !!q && !q.hat_ergebnisse; };
+
+  const vDupUmschalten = () => {
+    const an = !vDup;
+    setVDup(an);
+    if (!an) return;
+    // Vorauswahl: in jeder Gruppe bleibt die aelteste (kleinste id) stehen, der
+    // Rest ist angehakt. Aendern darf das der Mensch — es ist ein Vorschlag.
+    const vor = new Set();
+    for (const g of findeDubletten(vBasis))
+      for (const q of g.fragen) if (q.id !== g.behalten && vLoeschbar(q.id)) vor.add(q.id);
+    setVAuswahl(vor);
+  };
 
   const vUmschalten = (id) => setVAuswahl((alt) => {
     const neu = new Set(alt);
@@ -84,6 +115,23 @@ export default function Dashboard() {
   // Frage gehoert. Also aufklappbar, direkt hier: eine Frage ohne Quiz hat
   // keinen anderen Ort, an dem man sie oeffnen koennte.
   const [vEdit, setVEdit] = useState(null);
+
+  // Eine Zeile der Liste — flach wie gruppiert dieselbe. `behalten` markiert in
+  // einer Dubletten-Gruppe die aelteste Frage, die stehen bleiben soll.
+  const vZeile = (q, behalten) => (
+    <label key={q.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", borderBottom: "1px solid var(--border)", cursor: "pointer", lineHeight: 1.5 }}>
+      <input type="checkbox" checked={vAuswahl.has(q.id)} onChange={() => vUmschalten(q.id)} style={{ marginTop: 3 }} />
+      <span onClick={(e) => { e.preventDefault(); vOeffnen(q.id); }}
+            title={t("dash.clickEdit")}
+            style={{ flex: 1, color: "var(--text)", cursor: "pointer" }}>
+        <Latex>{q.text}</Latex>
+        {behalten && <span style={{ ...chipStyle, marginLeft: 8 }}>{t("cv.dup.keep")}</span>}
+        {/* Mit Ergebnissen wird nichts geloescht: daran haengen die
+            Auswertungen gehaltener Sitzungen. */}
+        {q.hat_ergebnisse && <span style={{ color: "var(--text3)" }}> · {t("dash.orphansKept")}</span>}
+      </span>
+    </label>
+  );
 
   const vOeffnen = async (id) => {
     const r = await fetch(`${API}/questions/${id}`);
@@ -131,7 +179,7 @@ export default function Dashboard() {
   };
 
   const vAuswahlLoeschen = async () => {
-    const ids = [...vAuswahl].filter((id) => !(verwaist?.fragen || []).find((q) => q.id === id)?.hat_ergebnisse);
+    const ids = [...vAuswahl].filter(vLoeschbar);
     if (!ids.length) return;
     if (!await askConfirm(t("dash.orphansCleanAsk", { n: ids.length }), { ok: t("common.delete"), danger: true })) return;
     for (const id of ids) await fetch(`${API}/questions/${id}`, { method: "DELETE" });
@@ -459,6 +507,16 @@ export default function Dashboard() {
                     {t("dash.orphansSelectNone")}
                   </button>
                 )}
+                <button onClick={vDupUmschalten} aria-pressed={vDup} title={t("cv.dup.hint")}
+                  style={vDup ? toolbarBtnPrimary : toolbarBtn}>
+                  <Icon d={ICONS.duplicate} size={15} color={vDup ? "var(--bg)" : "var(--text3)"} />
+                  {t("cv.dup.find")}
+                </button>
+                {vDup && (
+                  <span style={{ color: "var(--text3)" }}>
+                    {t("cv.dup.count", { g: vZahlen.gruppen, n: vZahlen.fragen })}
+                  </span>
+                )}
               </div>
 
               {/* Zuweisen steht VOR dem Loeschen — bei 400 Fragen ist das der
@@ -486,20 +544,28 @@ export default function Dashboard() {
               </div>
 
               <div style={{ maxHeight: 320, overflowY: "auto", border: "1px solid var(--border)", borderRadius: CONTROL_R, background: "var(--card)" }}>
-                {vGefiltert.map((q) => (
-                  <label key={q.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", borderBottom: "1px solid var(--border)", cursor: "pointer", lineHeight: 1.5 }}>
-                    <input type="checkbox" checked={vAuswahl.has(q.id)} onChange={() => vUmschalten(q.id)} style={{ marginTop: 3 }} />
-                    <span onClick={(e) => { e.preventDefault(); vOeffnen(q.id); }}
-                          title={t("dash.clickEdit")}
-                          style={{ flex: 1, color: "var(--text)", cursor: "pointer" }}>
-                      <Latex>{q.text}</Latex>
-                      {/* Mit Ergebnissen wird nichts geloescht: daran haengen die
-                          Auswertungen gehaltener Sitzungen. */}
-                      {q.hat_ergebnisse && <span style={{ color: "var(--text3)" }}> · {t("dash.orphansKept")}</span>}
-                    </span>
-                  </label>
+                {!vDup && vGefiltert.map((q) => vZeile(q, false))}
+                {vDup && vGruppen.map((g) => (
+                  <div key={g.schluessel}>
+                    {/* Kopf je Gruppe: wie viele, und WELCHE Art Dublette.
+                        „gleiche Antworten" ist sicher, „andere Antworten" muss
+                        ein Mensch ansehen — zwei Kennzeichnungen, damit niemand
+                        die falsche loescht. */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+                      padding: "8px 12px", background: "var(--bg3)", borderBottom: "1px solid var(--border)" }}>
+                      <span style={sectionLabel}>{t("cv.dup.group", { n: g.fragen.length })}</span>
+                      <span style={badge(g.gleicheAntworten ? C.success : C.warning)}>
+                        {g.gleicheAntworten ? t("cv.dup.sameAnswers") : t("cv.dup.otherAnswers")}
+                      </span>
+                    </div>
+                    {g.fragen.map((q) => vZeile(q, q.id === g.behalten))}
+                  </div>
                 ))}
-                {vGefiltert.length === 0 && <p style={{ padding: 10, margin: 0, color: "var(--text3)" }}>{t("dash.noSearchHit")}</p>}
+                {vGefiltert.length === 0 && (
+                  <p style={{ padding: 10, margin: 0, color: "var(--text3)" }}>
+                    {vDup ? t("cv.dup.none") : t("dash.noSearchHit")}
+                  </p>
+                )}
               </div>
             </>
           )}
