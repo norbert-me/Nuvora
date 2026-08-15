@@ -5,7 +5,7 @@
 // Die Uebernahme ins Notenbuch filtert auf 1..6 — STILL. Der beste Schueler
 // der Klasse fiel damit aus der uebernommenen Spalte heraus, ohne Fehler.
 import { describe, it, expect } from "vitest";
-import { DEFAULT_SCALE, gradeFromPct, gradeDetailed, quantile, stdev, mitDatum } from "./grades.js";
+import { DEFAULT_SCALE, gradeFromPct, gradeDetailed, quantile, stdev, mitDatum, datumKurz } from "./grades.js";
 
 // Eigener Schluessel einer Lehrkraft (users.grade_scale). Vom Server kommt er
 // als JSON, die Schluessel sind dort Zeichenketten — genau so getestet.
@@ -180,5 +180,20 @@ describe("mitDatum", () => {
 
   it("laesst ein Datum MITTEN im Titel in Ruhe", () => {
     expect(mitDatum("Test 1.1. Wiederholung", "05.05.26")).toBe("Test 1.1. Wiederholung 05.05.26");
+  });
+});
+
+describe("datumKurz", () => {
+  it("macht aus dem ISO-Datum einen Spaltennamen", () => {
+    expect(datumKurz("2026-02-09")).toBe("09.02.26");
+    expect(datumKurz("2025-12-31")).toBe("31.12.25");
+  });
+
+  it("gibt nichts zurueck, wenn kein Datum dasteht", () => {
+    // Wichtig: der Aufrufer faellt dann auf den Vorschlag „Spalte 3" zurueck.
+    expect(datumKurz("")).toBe("");
+    expect(datumKurz(null)).toBe("");
+    expect(datumKurz("09.02.2026")).toBe("");   // schon deutsch — nicht doppelt drehen
+    expect(datumKurz("2026-2-9")).toBe("");     // unvollstaendig
   });
 });

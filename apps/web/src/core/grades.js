@@ -87,3 +87,16 @@ export function mitDatum(titel, datum) {
   const rest = String(titel || "").replace(/\s*\d{1,2}\.\d{1,2}\.\d{2,4}\s*$/, "").trim();
   return rest ? `${rest} ${datum}` : datum;
 }
+
+/**
+ * „2026-02-09" → „09.02.26".
+ *
+ * Fällt eine Notenspalte ohne Namen an, ist das Datum der Name — genau so
+ * heißen die meisten Spalten ohnehin. Kein Datum, kein Name: dann greift der
+ * Vorschlag („Spalte 3").
+ */
+export function datumKurz(iso) {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
+  const [j, m, tg] = iso.split("-");
+  return `${tg}.${m}.${j.slice(2)}`;
+}

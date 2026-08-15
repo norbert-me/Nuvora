@@ -16,6 +16,7 @@ import { Icon, ICONS, iconBtn, toolbarIconBtn, chipStyle, COLORS as C, btnPrimar
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useAktiv } from "../core/modules.js";
+import { datumKurz } from "../core/grades.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { useUrlClass } from "../core/klassenwahl.js";
 
@@ -1139,7 +1140,14 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
   // Siehe core/topics.js: Beschriftung und Reihenfolge kommen von dort, damit
   // dieselbe Auswahl ueberall gleich heisst und gleich sortiert ist.
   const themen = themenIndex(topics);
-  const save = () => name.trim() && onRename(name.trim(), topicId === "" ? null : Number(topicId), datum || null);
+  // Leerer Name ist erlaubt, WENN ein Datum dasteht: dann ist das Datum der
+  // Name („09.02.26"). Vorher tat der Knopf in dem Fall gar nichts — man loescht
+  // den Titel, tippt ein Datum und nichts passiert.
+  const save = () => {
+    const titel = name.trim() || datumKurz(datum);
+    if (!titel) return;
+    onRename(titel, topicId === "" ? null : Number(topicId), datum || null);
+  };
   return (
     <>
       <span onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 9 }} />
@@ -1154,6 +1162,7 @@ function ColMenu({ t, cat, onStats, onRename, onDelete, onClose, dividerOn, onTo
         </button>
         <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 10 }}>
           <input value={name} onChange={(e) => setName(e.target.value)} autoFocus
+            placeholder={datumKurz(datum) || t("noten.colName")}
             onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") onClose(); }}
             style={{ ...inp, fontSize: 12, padding: 5 }} />
         </div>
@@ -1217,10 +1226,12 @@ function ColForm({ t, onSave, onCancel, initial = "", vorschlag = "", initialDat
   // 02.03.2026" als Zeichenkette kann niemand sortieren oder auswerten. Der
   // Kopf zeigt weiter nur den Titel.
   const [datum, setDatum] = useState(initialDatum);
-  // Leer abschicken ist erlaubt: dann heisst die Spalte „Spalte 3" (der
-  // Vorschlag zaehlt die vorhandenen mit). Vorher passierte auf OK gar nichts
-  // — ein Knopf, der stumm bleibt, sieht aus wie ein Fehler.
-  const nimm = () => onSave(name.trim() || vorschlag || t("noten.colName"), datum || null);
+  // Leer abschicken ist erlaubt. Steht ein Datum da, IST das der Name — genau
+  // so heissen die meisten Spalten ohnehin („09.02.26"). Ohne beides gibt es
+  // „Spalte 3" (der Vorschlag zaehlt die vorhandenen mit). Vorher passierte auf
+  // OK gar nichts — ein Knopf, der stumm bleibt, sieht aus wie ein Fehler.
+  const nimm = () => onSave(name.trim() || datumKurz(datum) || vorschlag || t("noten.colName"),
+                            datum || null);
   return (
     <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center", flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
       {/* data-spalte: der Platzhalter ist jetzt der Namensvorschlag („Spalte 3")
