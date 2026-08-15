@@ -43,6 +43,16 @@ class User(Base):
     # Unratbares Token fuer den ICS-Kalender-Abo-Feed (Apple/Google abonnieren
     # per URL ohne Login). Erst bei Bedarf gesetzt.
     calendar_token: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, unique=True, index=True)
+    # Stand des Abo-Feeds. `calendar_sig` ist der Fingerabdruck des zuletzt
+    # ausgelieferten Inhalts, `calendar_rev` zaehlt hoch, sobald er sich aendert
+    # — daraus wird SEQUENCE/ETag. Ohne mitzaehlende SEQUENCE behaelt Apple pro
+    # UID stur die alte Fassung. `calendar_fetched_at` haelt fest, wann der
+    # abonnierende Kalender zuletzt geholt hat: die einzige ehrliche Antwort auf
+    # „warum steht die Aenderung noch nicht im Handy?".
+    calendar_rev: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    calendar_sig: Mapped[str] = mapped_column(String(64), default="", server_default="")
+    calendar_changed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    calendar_fetched_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     # Externer Kalender (ICS-URL, z.B. Google/Apple), den Nuvora read-only
     # einblendet — die „andere Richtung". Leer = aus. Isoliert/leicht entfernbar.
     external_ics_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

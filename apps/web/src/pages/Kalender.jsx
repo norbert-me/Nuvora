@@ -604,6 +604,14 @@ export default function Kalender() {
               <button onClick={() => { navigator.clipboard?.writeText(abo.url); }} style={btnSecondary}>{t("common.copy")}</button>
             </div>
 
+            {/* Der ehrliche Stand. Ein Abo wird vom Kalender GEHOLT — Nuvora kann
+                nichts hinschicken. Wer die Aenderung im Handy vermisst, sieht hier,
+                ob sein Kalender ueberhaupt schon einmal geholt hat. */}
+            <div style={{ marginTop: 12, fontSize: 12, color: "var(--text3)", lineHeight: 1.6 }}>
+              <div>{t("kalender.aboFetched")}: {abo.geholt ? new Date(abo.geholt).toLocaleString() : t("kalender.aboNever")}</div>
+              {abo.geaendert && <div>{t("kalender.aboChanged")}: {new Date(abo.geaendert).toLocaleString()}</div>}
+            </div>
+
             {/* Force-Resync: bricht die alte Verbindung ab und erzeugt eine neue URL,
                 damit ein haengendes Abo einmal komplett neu laedt. */}
             <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>

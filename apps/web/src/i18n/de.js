@@ -2043,4 +2043,7 @@ export default {
   "cv.ciText1": "Der Prozentwert „Richtig\" ist nur eine Stichprobe dieser einen Abfrage. Das Konfidenzintervall zeigt, in welchem Bereich der wahre Anteil richtiger Antworten mit 95% Wahrscheinlichkeit liegt, wenn man die Abfrage beliebig oft wiederholen könnte.",
   "cv.ciText2": "Je weniger Antworten vorliegen, desto breiter das Intervall — bei kleinen Klassen also Vorsicht bei der Interpretation einzelner Fragen. Ein enges Intervall bedeutet ein belastbares Ergebnis.",
   "cv.ciText3": "„95%-KI gesamt\" oben fasst alle Antworten dieses Tests zusammen (alle Fragen gepoolt) und zeigt, wie belastbar das Gesamtergebnis des Quiz ist. Das KI pro Frage in der Tabelle unten basiert nur auf den Antworten zu dieser einen Frage in diesem Test — die frageübergreifende Statistik (alle jemals gegebenen Antworten) findest du beim Bearbeiten der Frage im Fragen-Bereich.",
+  "kalender.aboFetched": "Zuletzt vom Kalender geholt",
+  "kalender.aboChanged": "Inhalt zuletzt geändert",
+  "kalender.aboNever": "noch nie",
 };

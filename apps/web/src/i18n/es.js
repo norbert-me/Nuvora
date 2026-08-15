@@ -2058,4 +2058,7 @@ export default {
   "cv.ciText1": "El porcentaje de aciertos es solo una muestra de esta ronda. El intervalo de confianza muestra en qué rango se sitúa la proporción real de aciertos con un 95 % de probabilidad si la ronda pudiera repetirse indefinidamente.",
   "cv.ciText2": "Cuantas menos respuestas haya, más ancho es el intervalo: cuidado al interpretar preguntas sueltas en clases pequeñas. Un intervalo estrecho indica un resultado sólido.",
   "cv.ciText3": "«IC 95 % total» arriba agrupa todas las respuestas de este test (todas las preguntas juntas) y muestra la solidez del resultado global. El IC por pregunta de la tabla inferior se basa solo en las respuestas a esa pregunta en este test; la estadística global de la pregunta (todas las respuestas dadas) aparece al editarla en el área de preguntas.",
+  "kalender.aboFetched": "Última descarga del calendario",
+  "kalender.aboChanged": "Contenido modificado por última vez",
+  "kalender.aboNever": "nunca",
 };

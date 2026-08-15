@@ -926,9 +926,10 @@ async def delete_slot(slot_id: int, user: User = Depends(require_module), db: As
 
 
 # ─── Kalender abonnieren (ICS-Feed fuer Apple/Google, dauerhaft) ───
+import hashlib as _hashlib
 import secrets as _secrets
 from fastapi import Request as _Request
-from fastapi.responses import PlainTextResponse as _Plain
+from fastapi.responses import PlainTextResponse as _Plain, Response as _Response
 
 
 @router.get("/subscribe")
@@ -940,7 +941,13 @@ async def subscribe_url(request: _Request, user: User = Depends(require_module),
         await db.commit()
     base = str(request.base_url).rstrip("/")  # z.B. https://host
     path = f"/api/kalender/feed/{user.calendar_token}.ics"
-    return {"url": base + path, "webcal": ("webcal://" + base.split("://", 1)[-1] + path) if "://" in base else base + path}
+    return {"url": base + path,
+            "webcal": ("webcal://" + base.split("://", 1)[-1] + path) if "://" in base else base + path,
+            # Der ehrliche Teil: wann der abonnierende Kalender zuletzt geholt
+            # hat. Ein Abo wird geholt, nicht geschickt — steht die Aenderung
+            # noch nicht im Handy, sieht man hier, ob es ueberhaupt schon da war.
+            "geholt": user.calendar_fetched_at.isoformat() if user.calendar_fetched_at else None,
+            "geaendert": user.calendar_changed_at.isoformat() if user.calendar_changed_at else None}
 
 
 @router.delete("/subscribe", status_code=204)
@@ -961,6 +968,14 @@ async def resync_subscribe(request: _Request, user: User = Depends(require_modul
     base = str(request.base_url).rstrip("/")
     path = f"/api/kalender/feed/{user.calendar_token}.ics"
     return {"url": base + path, "webcal": ("webcal://" + base.split("://", 1)[-1] + path) if "://" in base else base + path}
+
+
+def _hash_zeilen(lines: list) -> str:
+    """Fingerabdruck des Feed-Inhalts. Alles Zeitabhaengige (DTSTAMP,
+    LAST-MODIFIED, SEQUENCE) bleibt aussen vor — sonst waere jeder Abruf eine
+    „Aenderung" und die SEQUENCE liefe endlos hoch."""
+    fest = [z for z in lines if not z.startswith(("DTSTAMP:", "LAST-MODIFIED:", "SEQUENCE:"))]
+    return _hashlib.sha256("\n".join(fest).encode("utf-8")).hexdigest()[:40]
 
 
 def _ics_escape(s: str) -> str:
@@ -997,7 +1012,7 @@ def _ics_falten(zeile: str) -> str:
 
 
 @router.get("/feed/{token}.ics")
-async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
+async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depends(get_db)):
     """ICS-Feed eines Kontos (Token statt Login). Kalender-Eintraege als
     Ganztags-Events, freie Zeitraeume (Ferien) als mehrtaegige Events.
 
@@ -1041,8 +1056,11 @@ async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
     now = datetime.now().strftime("%Y%m%dT%H%M%SZ")
     # REFRESH-INTERVAL / X-PUBLISHED-TTL bitten den Client (Apple/Google), das Abo
     # häufiger neu zu laden — sonst hängt eine Änderung an Apples Standard-Takt.
+    # Die Bitte an den Client, oefter zu laden. Mehr geht nicht: ein ICS-Abo wird
+    # GEHOLT, nicht geschickt — Nuvora kann Apple nichts zurufen.
     lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Nuvora//Kalender//DE", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
-             "X-WR-CALNAME:Nuvora", "REFRESH-INTERVAL;VALUE=DURATION:PT1H", "X-PUBLISHED-TTL:PT1H"]
+             "X-WR-CALNAME:Nuvora", "REFRESH-INTERVAL;VALUE=DURATION:PT15M", "X-PUBLISHED-TTL:PT15M"]
+    seq = int(u.calendar_rev or 0)
     for e in entries:
         day = e.date.date() if hasattr(e.date, "date") else e.date
         title = e.title or (classes.get(e.class_id) or "Termin")
@@ -1071,7 +1089,7 @@ async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
             f"UID:nuvora-entry-{e.id}-{FORM_MARKER}@nuvora",
             f"DTSTAMP:{now}",
             f"LAST-MODIFIED:{now}",
-            "SEQUENCE:1",
+            f"SEQUENCE:{seq}",
             dtstart,
             dtend,
             f"SUMMARY:{_ics_escape(title)}",
@@ -1092,7 +1110,7 @@ async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
             f"UID:nuvora-break-{b.id}-{FORM_MARKER}@nuvora",
             f"DTSTAMP:{now}",
             f"LAST-MODIFIED:{now}",
-            "SEQUENCE:1",
+            f"SEQUENCE:{seq}",
             f"DTSTART;VALUE=DATE:{d8(s)}",
             # Letzter Ferientag + 1: DTEND ist exklusiv, sonst fehlte der
             # letzte Tag der Ferien im abonnierten Kalender.
@@ -1171,11 +1189,40 @@ async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
                               f"SUMMARY:{_ics_escape(title)}", "END:VEVENT"]
 
     lines.append("END:VCALENDAR")
+
+    # Hat sich inhaltlich etwas geaendert? Gemessen am Inhalt selbst, nicht an
+    # einem Zaehler, den 15 Schreib-Endpunkte pflegen muessten — einer wird
+    # immer vergessen, und dann bleibt die Aenderung im Handy unsichtbar.
+    # DTSTAMP faellt aus der Rechnung: es traegt die aktuelle Uhrzeit und wuerde
+    # jeden Abruf zu einer Aenderung machen.
+    sig = _hash_zeilen(lines)
+    if sig != (u.calendar_sig or ""):
+        u.calendar_sig = sig
+        u.calendar_rev = seq = int(u.calendar_rev or 0) + 1
+        u.calendar_changed_at = datetime.now()
+        # Die frisch gezaehlte Revision gehoert in DIESE Auslieferung, sonst
+        # bekaeme der Client die neue Fassung mit der alten SEQUENCE.
+        lines = [f"SEQUENCE:{seq}" if z.startswith("SEQUENCE:") else z for z in lines]
+    u.calendar_fetched_at = datetime.now()
+    await db.commit()
+
+    # LAST-MODIFIED sagt „wann hat sich der Termin geaendert", nicht „wann wurde
+    # der Feed geholt". Mit der Uhrzeit des Abrufs waere jeder Termin bei jedem
+    # Abruf frisch geaendert — manche Clients bauen ihn dann jedes Mal neu.
+    stand = (u.calendar_changed_at or datetime.now()).strftime("%Y%m%dT%H%M%SZ")
+    lines = [f"LAST-MODIFIED:{stand}" if z.startswith("LAST-MODIFIED:") else z for z in lines]
+
+    etag = f'W/"nuvora-{seq}"'
+    if request is not None and request.headers.get("if-none-match") == etag:
+        # Unveraendert: der Client behaelt seine Fassung. Spart bei einem Abo,
+        # das alle 15 Minuten anklopft, den ganzen Feed.
+        return _Response(status_code=304, headers={"ETag": etag, "Cache-Control": "no-cache, max-age=0"})
+
     # Gefaltet ausgeben (RFC 5545) und mit abschliessendem CRLF — beides
     # erwarten strenge Leser; ein langer Titel darf keine Zeile ueberlang machen.
     text = "\r\n".join(_ics_falten(z) for z in lines) + "\r\n"
     return _Plain(text, media_type="text/calendar; charset=utf-8",
-                  headers={"Cache-Control": "no-cache, max-age=0"})
+                  headers={"ETag": etag, "Cache-Control": "no-cache, max-age=0"})
 
 
 # ─── Externe Kalender (mehrere ICS-URLs read-only einblenden — „andere Richtung") ───
