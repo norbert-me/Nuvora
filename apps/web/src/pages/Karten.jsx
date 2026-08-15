@@ -8,6 +8,7 @@ import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { themenIndex } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
+import Themenstand from "../components/Themenstand.jsx";
 import AuthImage from "../components/AuthImage.jsx";
 import AbschnittWahl from "../components/AbschnittWahl.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -454,6 +455,11 @@ export default function Karten() {
           {sichtbareDecks.map((d) => <Deck key={d.id} deck={d} t={t} call={call} topics={topics} showTopic={kalenderAktiv} folders={cardFolders} onMove={moveDeck} onDragStartDeck={() => setDragDeckId(d.id)} onDragEndDeck={endDrag} dragging={dragDeckId === d.id} autoOpen={autoDeck === d.id} onAutoOpened={() => setAutoDeck(null)} onReorderOver={(e) => onDeckDragOver(e, d.id)} onReorderDrop={() => dropDeck(d.id)} dropSide={deckDrop && deckDrop.id === d.id ? deckDrop.side : null} />)}
         </>
       )}
+
+      {/* Themenstand: wie sicher sitzt welches Thema — dieselbe Komponente wie
+          in der Auswertung, damit es nicht zwei Rechnungen gibt. Sie holt sich
+          alles selbst und zeigt nichts, wo nichts gemessen ist. */}
+      {view === "progress" && classId && <Themenstand classId={classId} />}
 
       {view === "progress" && (() => {
         // Die Kartenzahl gilt JE KIND: der Server filtert sie nach Niveau
