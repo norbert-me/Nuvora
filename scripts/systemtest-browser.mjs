@@ -523,10 +523,12 @@ const bedienung = (td) => [
       // (`mehr={collapsed ? [] : …}`), zugeklappt gibt es dort gar keinen
       // Knopf — also erst aufklappen.
       //
-      // Der Aufklapp-Knopf traegt `topics.expand` („Unterthemen anzeigen") —
-      // eine Beschriftung aus der Themenseite, die der Kartenstapel
-      // mitbenutzt (siehe Bericht).
-      let fehler = await knopfInZeile(seite, MARKE_UI, "Unterthemen anzeigen");
+      // Der Aufklapp-Knopf traegt `karten.expandDeck` („Karten anzeigen").
+      // Er hiess einmal „Unterthemen anzeigen" — eine geliehene Beschriftung
+      // von der Themenseite, die inzwischen richtiggestellt ist. Beide Namen
+      // werden akzeptiert, damit dieser Lauf nicht an einem Wort haengt:
+      // geprueft wird das Aufklappen, nicht die Beschriftung.
+      let fehler = await knopfInZeile(seite, MARKE_UI, ["Karten anzeigen", "Show cards", "Unterthemen anzeigen"]);
       if (fehler) return fehler;
       // Aufgeklappt steht die Marke im Namensfeld statt als Text — kurz warten,
       // bis der Kopf umgebaut ist, sonst sucht der naechste Griff im alten.
@@ -961,8 +963,16 @@ async function bausteinZiehen(seite) {
 }
 
 /** Den Knopf mit diesem title/aria-label in der Zeile mit der Marke druecken. */
+/**
+ * Knopf in der Zeile mit dieser Marke anklicken.
+ *
+ * `titel` darf ein Wort ODER eine Liste sein: eine Probe soll am VERHALTEN
+ * haengen, nicht an einer Beschriftung — sonst wird sie rot, sobald jemand
+ * einen Tooltip richtigstellt.
+ */
 async function knopfInZeile(seite, marke, titel) {
   return await seite.evaluate(([m, titel]) => {
+    const namen = Array.isArray(titel) ? titel : [titel];
     const passt = (e) => (e.textContent || "").includes(m);
     const blatt = [...document.querySelectorAll("*")].find((e) => e.children.length === 0 && passt(e));
     const feld = [...document.querySelectorAll("input, textarea")].find((i) => (i.value || "").includes(m));
@@ -970,11 +980,11 @@ async function knopfInZeile(seite, marke, titel) {
     if (!el) return "kein Element mit der Marke gefunden";
     while (el && el !== document.body) {
       const knopf = [...el.querySelectorAll("button")].find(
-        (b) => b.getAttribute("title") === titel || b.getAttribute("aria-label") === titel);
+        (b) => namen.includes(b.getAttribute("title")) || namen.includes(b.getAttribute("aria-label")));
       if (knopf) { knopf.click(); return ""; }
       el = el.parentElement;
     }
-    return `kein Knopf „${titel}" in der Zeile`;
+    return `kein Knopf „${namen.join(" / ")}" in der Zeile`;
   }, [marke, titel]);
 }
 
@@ -1403,6 +1413,14 @@ async function resteAbraeumen() {
   await raeume(saetze, (o) => [`/api/question-sets/${o.id}`]);
   await raeume(await liste("/api/questions"), (o) => [`/api/questions/${o.id}`]);
   await raeume(ordner, (o) => [`/api/folders/${o.id}`]);
+
+  // ── Kartenstapel zuerst ueber die SAMMLUNG: ein ueber die Oberflaeche
+  // angelegter Stapel gehoert keiner Klasse mehr (die Zuordnung laeuft ueber
+  // die Stunde). Ueber `/classes/<id>/all-decks` allein war er unauffindbar —
+  // er blieb liegen, und der naechste Lauf meldete „geloescht, taucht nach dem
+  // Neuladen wieder auf", weil er den Rest des Vorlaufs fand.
+  await raeume(await liste("/api/karten/decks"),
+    (o) => [`/api/karten/decks/${o.id}`, `/api/karten/decks/${o.id}/purge`]);
 
   // ── Was an der Klasse haengt
   for (const k of klassen) {
