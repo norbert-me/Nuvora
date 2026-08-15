@@ -1867,4 +1867,6 @@ export default {
   "kurse.previousYear": "Vorjahr",
   "kurse.nextYear": "Folgejahr",
   "kurse.chainHint": "Dieselbe Lerngruppe im Jahr davor. Die Daten bleiben getrennt — verbunden wird nur die Reihenfolge, damit du das Vorwissen wiederfindest.",
+  "sitzplan.photoToggle": "Fotos anzeigen",
+  "sitzplan.photoHint": "Gesicht statt nur Name am Platz. Ohne hinterlegtes Foto stehen die Initialen.",
 };

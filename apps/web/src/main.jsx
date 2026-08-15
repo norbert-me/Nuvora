@@ -720,7 +720,7 @@ function Nav({ user, onLogout }) {
         </div>
 
         {user && (
-          <button onClick={() => setSucheOffen(true)} title={`${t("suche.title")} (⌘K)`} aria-label={t("suche.title")}
+          <button onClick={() => setSucheOffen(true)} data-suche="knopf" title={`${t("suche.title")} (⌘K)`} aria-label={t("suche.title")}
             style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", marginRight: 2, border: "1px solid var(--border2)", borderRadius: 980,
               background: "transparent", color: "var(--text3)", cursor: "pointer", fontSize: 13, flexShrink: 0 }}>
             <Icon d={ICONS.search} size={15} color="var(--text3)" />

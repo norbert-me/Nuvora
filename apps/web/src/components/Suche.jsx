@@ -84,7 +84,10 @@ export default function Suche({ offen, onClose }) {
         style={{ width: "100%", maxWidth: 560, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 14, boxShadow: "0 18px 60px rgba(0,0,0,0.28)", overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>
           <Icon d={ICONS.search} size={17} color="var(--text3)" />
-          <input ref={feld} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={taste}
+          {/* data-suche: der Browser-Test darf nicht am uebersetzten
+              Platzhalter haengen — mit englischer Oberflaeche fand er das Feld
+              nicht und klickte danach gegen den schon offenen Dialog. */}
+          <input ref={feld} data-suche="feld" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={taste}
             placeholder={t("suche.placeholder")} aria-label={t("suche.title")}
             style={{ ...inputStyle, flex: 1, border: "none", background: "none", fontSize: 15, padding: 4 }} />
           <kbd style={{ fontSize: 11, color: "var(--text3)", border: "1px solid var(--border2)", borderRadius: 6, padding: "2px 6px" }}>esc</kbd>

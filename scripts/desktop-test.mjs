@@ -463,7 +463,11 @@ const gleicherBefund = (a, b) => a.slice(0, 80) === b.slice(0, 80);
  * fetch, Speicher). Ein untergeschobener Token wuerde das ueberspringen.
  */
 async function anmelden(seite) {
-  await seite.goto(`${URL_BASIS}/login`, { waitUntil: "networkidle", timeout: 30000 });
+  // 60 s statt 30: der erste Aufruf faellt mit dem frisch gestarteten Server
+  // zusammen (Deploy, dann sofort die Tests) und traf einmal genau in dessen
+  // Aufwaermphase — 31 s fuer den ersten Seitenaufbau, danach lief alles. Ein
+  // Timeout, der nur die eigene Startlast misst, ist kein Befund ueber die App.
+  await seite.goto(`${URL_BASIS}/login`, { waitUntil: "networkidle", timeout: 60000 });
   const felder = seite.locator("input");
   if (await felder.count() < 2) return { ok: false, detail: "die Anmeldemaske erscheint gar nicht" };
   await seite.locator("input[type=email], input[name=email]").first().fill(EMAIL, { timeout: 8000 });

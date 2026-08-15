@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { btnSecondary, Icon, ICONS, iconBtn, COLORS as C, Empty, ExportButton, ImportButton } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import ViewMenu from "../components/ViewMenu.jsx";
+import Portrait from "../components/Portrait.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
 import { swr , lastClass, rememberClass } from "../core/cache.js";
@@ -50,6 +51,7 @@ export default function Sitzplan() {
   const [msg, setMsg] = useState("");
   const [segelOn, setSegelOn] = useState(false);   // Voreinstellung pro Kurs (siehe unten)
   const [segel, setSegel] = useState({}); // student_id → Stufe
+  const [fotosOn, setFotosOn] = useState(true);     // Gesichter am Platz (an)
   const [foerderOn, setFoerderOn] = useState(false); // Maßnahmen am Platz (aus)
   const [massn, setMassn] = useState({});  // student_id → {foerder, massnahmen}
   const canvasRef = useRef(null);
@@ -364,6 +366,7 @@ export default function Sitzplan() {
         <ViewMenu title={t("sitzplan.view")} items={[
           ...(anwesenheitAktiv ? [{ key: "aufruf", label: t("sitzplan.rollcall"), value: aufruf, onChange: (v) => { setAufruf(v); saveView({ aufruf: v }); } }] : []),
           { key: "segel", label: t("sitzplan.segelToggle"), hint: t("sitzplan.segelHint"), value: segelOn, onChange: (v) => { setSegelOn(v); saveView({ segel: v }); } },
+          { key: "fotos", label: t("sitzplan.photoToggle"), hint: t("sitzplan.photoHint"), value: fotosOn, onChange: (v) => { setFotosOn(v); saveView({ fotos: v }); } },
           { key: "foerder", label: t("sitzplan.foerderToggle"), hint: t("sitzplan.foerderHint"), value: foerderOn, onChange: (v) => { setFoerderOn(v); saveView({ foerder: v }); } },
         ]} />
         <button onClick={() => setShowHint((v) => !v)} className="icon-btn" title={t("sitzplan.hintFree")} aria-label={t("sitzplan.hintFree")}
@@ -438,6 +441,9 @@ export default function Sitzplan() {
                     background: abs ? "var(--bg2)" : "var(--bg)", color: "var(--text)", fontSize: 12.5, fontWeight: 600,
                     cursor: "grab", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: "none",
                     opacity: abs ? 0.5 : 1, textDecoration: abs ? "line-through" : "none" }}>
+                  {!seat.empty && fotosOn && (
+                    <Portrait student={s} size={26} style={{ marginRight: 6 }} />
+                  )}
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: seat.empty ? "var(--text3)" : undefined }}>{seat.empty ? t("sitzplan.emptySeat") : s.name}</span>
                   {abs && <span style={{ position: "absolute", top: 3, right: 24, width: 8, height: 8, borderRadius: 4, background: ABS_COL[abs] }} title={t(`anwesenheit.${abs}`)} />}
                   {!seat.empty && foerderOn && (() => {
@@ -491,6 +497,7 @@ export default function Sitzplan() {
                   <div key={s.id} draggable onDragStart={(e) => e.dataTransfer.setData("text/plain", String(s.id))}
                     style={{ padding: "7px 12px", borderRadius: 980, border: "1px solid var(--border2)", background: "var(--card)", fontSize: 13, fontWeight: 600, cursor: "grab", display: "inline-flex", alignItems: "center", gap: 6, ...(abs ? { opacity: 0.45, textDecoration: "line-through" } : {}) }}>
                     {abs && <span style={{ width: 8, height: 8, borderRadius: 4, background: ABS_COL[abs] }} />}
+                    {fotosOn && <Portrait student={s} size={22} />}
                     {s.name}
                   </div>
                 );

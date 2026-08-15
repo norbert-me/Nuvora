@@ -307,6 +307,8 @@ def _ensure_columns(sync_conn):
         # Kurs-Kette ueber Schuljahre (siehe Kurs in models.py).
         ("kurse", "schuljahr", "VARCHAR(9) DEFAULT '' NOT NULL"),
         ("kurse", "vorgaenger_id", "INTEGER"),
+        # Vorschaubild je Kind (siehe Student.photo_thumb).
+        ("students", "photo_thumb", "BYTEA"),
         ("attendance", "period", "INTEGER"),
         ("calendar_entries", "method_id", "INTEGER"),
         ("calendar_entries", "kurs_id", "INTEGER"),

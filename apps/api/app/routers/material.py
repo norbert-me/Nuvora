@@ -290,11 +290,14 @@ async def material_als_pdf(material_id: int, request: Request, user: User = Depe
                              .where(Material.id == material_id))).first()
     if not kopf or kopf[0] != user.id:
         raise HTTPException(404, "Material nicht gefunden")
+    # Kennung auch OHNE gebaute Ansichtsfassung: ein PDF unter der
+    # Verkleinerungsgrenze wird unveraendert durchgereicht, `pdf_data` bleibt
+    # dann leer — und genau dafuer gab es vorher nie ein 304. Die Laenge des
+    # Originals ist hier die richtige Kennung, weil genau das ausgeliefert wird.
     fertig = kopf[2] or 0
-    if fertig:
-        etag = f'"p{material_id}-{fertig}"'
-        if _unveraendert(request, etag):
-            return Response(status_code=304, headers=_cache_kopf(etag))
+    etag = f'"p{material_id}-{fertig}"' if fertig else f'"o{material_id}-{kopf[1]}"'
+    if _unveraendert(request, etag):
+        return Response(status_code=304, headers=_cache_kopf(etag))
 
     m = (await db.execute(select(Material).options(undefer(Material.pdf_data))
                           .where(Material.id == material_id))).scalar_one_or_none()
@@ -328,7 +331,10 @@ async def material_als_pdf(material_id: int, request: Request, user: User = Depe
     return Response(content=pdf, media_type="application/pdf",
                     headers={"Content-Disposition": f'inline; filename="{safe}.pdf"',
                              "X-Content-Type-Options": "nosniff",
-                             **_cache_kopf(f'"p{material_id}-{len(pdf)}"')})
+                             # Dieselbe Kennung wie oben — sonst passt der
+                             # zweite Abruf nie auf den ersten.
+                             **_cache_kopf(f'"p{material_id}-{len(pdf)}"' if m.pdf_data
+                                           else f'"o{material_id}-{m.size}"')})
 
 
 @router.delete("/{material_id}", status_code=204)

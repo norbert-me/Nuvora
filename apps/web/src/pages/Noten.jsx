@@ -774,13 +774,23 @@ export default function Noten() {
                               ? <Zelle initial={noten[0] ? de(noten[0].value) : ""}
                                   onSave={(txt) => noteSetzen(s.student_id, c.id, txt)}
                                   onCancel={() => setZelle(null)}
-                                  onTab={(txt, zurueck) => {
-                                    const ziel = nachbar(s.student_id, c.id, zurueck);
+                                  // Tab geht NACH UNTEN: man traegt eine Spalte
+                                  // am Stueck ein (eine Arbeit, Kind fuer Kind),
+                                  // nicht eine Zeile quer durch alle Spalten.
+                                  // Enter tut dasselbe; seitwaerts kommt man mit
+                                  // den Pfeiltasten oder per Klick.
+                                  onTab={(txt, hoch) => {
+                                    const ziel = darunter(s.student_id, c.id, hoch);
                                     noteSetzen(s.student_id, c.id, txt);
                                     setZelle(ziel);
                                   }}
                                   onEnter={(txt, hoch) => {
                                     const ziel = darunter(s.student_id, c.id, hoch);
+                                    noteSetzen(s.student_id, c.id, txt);
+                                    setZelle(ziel);
+                                  }}
+                                  onPfeil={(txt, zurueck) => {
+                                    const ziel = nachbar(s.student_id, c.id, zurueck);
                                     noteSetzen(s.student_id, c.id, txt);
                                     setZelle(ziel);
                                   }} />
@@ -841,7 +851,12 @@ export default function Noten() {
 
 // Eingabefeld einer Notenzelle. Nur 1–6 mit einer Nachkommastelle ist tippbar:
 // vorher liess sich „42" eintragen, und das Speichern schlug still fehl.
-function Zelle({ onSave, onCancel, onTab, onEnter, initial = "" }) {
+//
+// Bewegung: Tab und Enter gehen nach UNTEN (eine Spalte am Stueck eintragen —
+// so arbeitet man eine Arbeit ab), mit Shift jeweils nach oben. Seitwaerts geht
+// es mit den Pfeiltasten, aber erst am Rand des Feldes, damit man im Text noch
+// navigieren kann.
+function Zelle({ onSave, onCancel, onTab, onEnter, onPfeil, initial = "" }) {
   const ref = useRef(null);
   const weiter = useRef(false);   // Tab hat schon gespeichert — onBlur nicht doppelt
   useEffect(() => { ref.current?.focus(); ref.current?.select(); }, []);
@@ -865,6 +880,17 @@ function Zelle({ onSave, onCancel, onTab, onEnter, initial = "" }) {
         }
         if (e.key === "Escape") onCancel();
         if (e.key === "Tab" && onTab) { e.preventDefault(); weiter.current = true; onTab(e.target.value, e.shiftKey); }
+        // Seitwaerts nur mit den Pfeiltasten — und nur, wenn der Cursor schon am
+        // Rand des Feldes steht, sonst waere das Bewegen im Text unmoeglich.
+        if ((e.key === "ArrowRight" || e.key === "ArrowLeft") && onPfeil) {
+          const feld = e.target;
+          const amRand = e.key === "ArrowRight"
+            ? feld.selectionStart === feld.value.length
+            : feld.selectionStart === 0;
+          if (amRand && feld.selectionStart === feld.selectionEnd) {
+            e.preventDefault(); weiter.current = true; onPfeil(feld.value, e.key === "ArrowLeft");
+          }
+        }
       }}
       placeholder="2,3"
       style={{ width: "100%", minHeight: 32, border: "2px solid var(--accent)", borderRadius: 4, background: "var(--input-bg, var(--bg))", color: "var(--text)", textAlign: "center", fontSize: 13.5, padding: 0, boxSizing: "border-box" }} />
@@ -1160,7 +1186,9 @@ function ColForm({ t, onSave, onCancel, initial = "", vorschlag = "", initialDat
   const nimm = () => onSave(name.trim() || vorschlag || t("noten.colName"), datum || null);
   return (
     <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center", flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
-      <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder={vorschlag || t("noten.colName")}
+      {/* data-spalte: der Platzhalter ist jetzt der Namensvorschlag („Spalte 3")
+          und taugt nicht mehr als Kennzeichen fuer den Browser-Test. */}
+      <input data-spalte="name" value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder={vorschlag || t("noten.colName")}
         onKeyDown={(e) => { if (e.key === "Enter") nimm(); if (e.key === "Escape") onCancel(); }}
         style={{ ...inp, fontSize: 14, padding: "9px 11px", flex: 1, minWidth: 120 }} />
       <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} title={t("noten.colDate")} aria-label={t("noten.colDate")}

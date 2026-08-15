@@ -127,3 +127,29 @@ async def test_zweiter_abruf_spart_die_bytes(s):
     # Andere Kennung (Datei geaendert) -> wieder der volle Inhalt.
     dritt = await M.download_material(mid, _Anfrage('"d999-1"'), user=u, db=s)
     assert dritt.status_code == 200 and dritt.body
+
+
+@pytest.mark.asyncio
+async def test_kleines_pdf_bekommt_auch_eine_kennung(s):
+    """Auch ohne gebaute Ansichtsfassung muss der zweite Abruf 304 liefern.
+
+    Ein PDF unter der Verkleinerungsgrenze wird unverändert durchgereicht,
+    `pdf_data` bleibt leer — die erste Fassung dieser Prüfung hing die Kennung
+    aber genau daran und gab für kleine Dateien nie ein 304. Aufgefallen ist es
+    dem Selbsttest gegen die laufende Installation, nicht hier.
+    """
+    u, tp = await _setup(s)
+    # content_type mitgeben: die Ansicht entscheidet daran, ob sie das PDF
+    # durchreicht oder eine Office-Datei wandeln muss.
+    await M.upload_material(file=UploadFile(filename="klein.pdf", file=io.BytesIO(b"%PDF-1.4 klein"),
+                                            headers={"content-type": "application/pdf"}),
+                            topic_id=tp.id, entry_id=None, method_id=None, work_id=None, rolle="", user=u, db=s)
+    mid = (await s.execute(select(Material.id))).scalar_one()
+
+    erst = await M.material_als_pdf(mid, _Anfrage(), user=u, db=s)
+    assert erst.status_code == 200
+    etag = erst.headers.get("etag")
+    assert etag, "Ansicht ohne Kennung — jedes Öffnen lädt neu"
+
+    zweit = await M.material_als_pdf(mid, _Anfrage(etag), user=u, db=s)
+    assert zweit.status_code == 304 and not zweit.body

@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { btnSecondary, selectStyle, Tabs, inputStyle, dateNavBtn, dateNavInput, Icon, ICONS, iconBtn, COLORS as C } from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
+import Portrait from "../components/Portrait.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useAktiv } from "../core/modules.js";
 import { swr , lastClass } from "../core/cache.js";
@@ -185,6 +186,7 @@ export default function Anwesenheit() {
               return (
                 <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)" }}>
                   <span style={{ color: "var(--text3)", fontSize: 12, width: 24, textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{i + 1}.</span>
+                  <Portrait student={s} size={26} />
                   <span style={{ flex: 1, fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
                   <div style={{ display: "inline-flex", gap: 4 }}>
                     {STATI.map((st) => (

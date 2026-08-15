@@ -1881,4 +1881,6 @@ export default {
   "kurse.previousYear": "Previous year",
   "kurse.nextYear": "Next year",
   "kurse.chainHint": "The same group one year earlier. The data stays separate — only the order is linked, so you can find the prior knowledge.",
+  "sitzplan.photoToggle": "Show photos",
+  "sitzplan.photoHint": "A face instead of just a name on each seat. Without a photo, the initials are shown.",
 };

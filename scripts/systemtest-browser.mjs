@@ -640,7 +640,9 @@ const bedienung = (td) => [
       await abschnitt.waitFor({ state: "visible", timeout: 25000 });
       await abschnitt.locator("[title='Optionen']").first().click({ timeout: 15000 });
       await seite.getByRole("button", { name: "Spalte hinzufügen", exact: true }).first().click({ timeout: 8000 });
-      await seite.locator("input[placeholder^='Spaltenname']").first().fill(MARKE_UI, { timeout: 8000 });
+      // Ueber `data-spalte`: der Platzhalter ist inzwischen der Namensvorschlag
+      // („Spalte 3") und wechselt mit dem Inhalt der Seite.
+      await seite.locator("[data-spalte='name']").first().fill(MARKE_UI, { timeout: 8000 });
       await seite.getByRole("button", { name: "OK", exact: true }).first().click({ timeout: 8000 });
       await spaltenIndex(seite, MARKE_UI, 15000);
       // Und jetzt das, was das Notenbuch ausmacht: eine Note in die Zelle.

@@ -534,11 +534,15 @@ async function sucheProbe(kontext) {
     // Strg) und der Knopf in der Navigation. Frueher pruefte der Test direkt
     // nach dem Tastendruck, ob das Feld schon da ist — ein Rennen, das er
     // regelmaessig verlor.
-    const feld = seite.locator("input[placeholder*='suchen'], input[placeholder*='Suchen']").first();
+    // Ueber `data-suche`, nicht ueber Texte: der Platzhalter ist uebersetzt, und
+    // mit englischer Oberflaeche fand der Test das Feld nicht — klickte dann auf
+    // den Knopf, der schon hinter dem offenen Dialog lag, und lief in einen
+    // Timeout. Ein Kennzeichen im Markup ist in jeder Sprache dasselbe.
+    const feld = seite.locator("[data-suche='feld']").first();
     const offen = async () => (await feld.count()) > 0 && await feld.isVisible().catch(() => false);
     for (const versuch of ["Meta+k", "Control+k", "knopf"]) {
       if (await offen()) break;
-      if (versuch === "knopf") await seite.getByRole("button", { name: /suchen|search|buscar/i }).first().click({ timeout: 8000 });
+      if (versuch === "knopf") await seite.locator("[data-suche='knopf']").first().click({ timeout: 8000 });
       else await seite.keyboard.press(versuch).catch(() => {});
       await seite.waitForTimeout(600);
     }

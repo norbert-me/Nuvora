@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { btnPrimary, btnSecondary, selectStyle, inputStyle, Toggle, pageApp} from "../components/Icons.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
+import Portrait from "../components/Portrait.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { askConfirm } from "../core/dialog.jsx";
 import { useAktiv } from "../core/modules.js";
@@ -191,7 +192,11 @@ export default function Zufall() {
               {groups.map((g, i) => (
                 <div key={i} style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: 14 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: "var(--accent)", marginBottom: 8 }}>{t("zufall.group", { n: i + 1 })} <span style={{ color: "var(--text3)", fontWeight: 400 }}>· {g.length}</span></div>
-                  {g.map((s) => <div key={s.id} style={{ fontSize: 14, padding: "3px 0" }}>{s.name}</div>)}
+                  {g.map((s) => (
+                    <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 14, padding: "3px 0" }}>
+                      <Portrait student={s} size={22} />{s.name}
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -209,6 +214,14 @@ export default function Zufall() {
       ) : (
         <>
           <div style={{ border: "1px solid var(--border)", borderRadius: 14, background: "var(--card)", padding: "48px 24px", textAlign: "center", marginBottom: 18 }}>
+            {/* Gesicht zum Namen: gerade in den ersten Wochen ist das der
+                eigentliche Nutzen des Ziehens. Kein Foto hinterlegt -> die
+                Initialen, damit die Zeile nicht springt. */}
+            {aktuell && !rollt && (
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+                <Portrait student={aktuell} size={72} />
+              </div>
+            )}
             <div style={{ fontSize: aktuell ? 34 : 18, fontWeight: 800, color: aktuell ? "var(--text)" : "var(--text3)", opacity: rollt ? 0.6 : 1, transition: "opacity .1s", minHeight: 44 }}>
               {aktuell ? aktuell.name : t("zufall.hint")}
             </div>

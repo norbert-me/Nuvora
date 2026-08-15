@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
-from ..uploads import bildtyp
+from ..uploads import bildtyp, vorschaubild
 from ..models import SchoolClass, Student, User, Kurs, KursTag, Session
 from .auth import get_current_user, rate_limit
 
@@ -606,6 +606,10 @@ async def upload_student_photo(student_id: int, file: UploadFile = File(...),
     # eigenen Origin. Deshalb entscheiden die ersten Bytes.
     st.photo = data
     st.photo_mime = bildtyp(data)
+    # Vorschaubild gleich mitbauen (im Threadpool: Pillow rechnet, das blockiert
+    # sonst den Server). Klappt es nicht, bleibt es beim Original.
+    from starlette.concurrency import run_in_threadpool
+    st.photo_thumb = await run_in_threadpool(vorschaubild, data)
     await db.commit()
     await db.refresh(st)
     return st
@@ -616,15 +620,38 @@ async def delete_student_photo(student_id: int, user: User = Depends(get_current
     st = await _owned_student(db, user, student_id)
     st.photo = None
     st.photo_mime = ""
+    st.photo_thumb = None
     await db.commit()
     await db.refresh(st)
     return st
 
 
 @router.get("/students/{student_id}/photo")
-async def get_student_photo(student_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_student_photo(student_id: int, klein: bool = False,
+                            user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Das Foto eines Kindes. `klein=true` liefert das Vorschaubild (256 px) —
+    das nehmen Listen, Sitzplan und Ziehung, weil dort bis zu 30 Bilder auf
+    einmal gebraucht werden. Ohne den Schalter kommt das Original.
+
+    Fehlt das Vorschaubild (Foto von vor dieser Aenderung), wird es hier
+    einmalig nachgebaut und behalten — kein Wartungsskript noetig.
+    """
     await _owned_student(db, user, student_id)
-    row = (await db.execute(select(Student.photo, Student.photo_mime).where(Student.id == student_id))).first()
+    row = (await db.execute(select(Student.photo, Student.photo_mime, Student.photo_thumb)
+                            .where(Student.id == student_id))).first()
     if not row or not row[0]:
         raise HTTPException(404, "Kein Foto")
-    return Response(content=row[0], media_type=row[1] or "image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
+    daten, mime, thumb = row[0], row[1] or "image/jpeg", row[2]
+    if klein:
+        if not thumb:
+            from starlette.concurrency import run_in_threadpool
+            thumb = await run_in_threadpool(vorschaubild, daten)
+            if thumb:
+                st = await db.get(Student, student_id)
+                st.photo_thumb = thumb
+                await db.commit()
+        if thumb:
+            daten, mime = thumb, "image/jpeg"
+    return Response(content=daten, media_type=mime,
+                    headers={"Cache-Control": "private, max-age=3600",
+                             "ETag": f'"f{student_id}-{len(daten)}"'})

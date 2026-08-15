@@ -332,6 +332,11 @@ class Student(Base):
     # deferred (Listen laden es nicht); die mime-Spalte signalisiert, OB eins da ist.
     photo: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True, deferred=True)
     photo_mime: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    # Kleines Vorschaubild (256 px, JPEG) fuer Listen und den Sitzplan. Ein
+    # Klassensatz waeren sonst 30 Handyfotos zu je mehreren MB — im Schulnetz
+    # laedt das sichtbar lange. Wird beim Hochladen einmalig gebaut; das
+    # Original bleibt unangetastet.
+    photo_thumb: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True, deferred=True)
 
     school_class: Mapped[SchoolClass] = relationship(back_populates="students")
 
