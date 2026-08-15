@@ -23,6 +23,12 @@ from .modules import is_active, modul_pflicht
 router = APIRouter(prefix="/api/kalender", tags=["kalender"])
 MODULE_KEY = "kalender"
 
+# Formmarker in den ICS-UIDs. Apple/Google merken sich Art und Dauer eines
+# Ereignisses pro UID; eine Korrektur an DTSTART/DTEND kommt bei gleicher UID
+# nicht immer an. Wird an der Ausgabe der Ganztags-Events etwas berichtigt,
+# zaehlt dieser Marker hoch — dann ersetzt der Client die alten Kopien einmalig.
+FORM_MARKER = "d2"
+
 
 require_module = modul_pflicht(MODULE_KEY)
 
@@ -1151,16 +1157,24 @@ async def ics_feed(token: str, db: AsyncSession = Depends(get_db)):
                 # ERSETZT werden — sonst behaelt Apple pro UID stur den Ganztags-Typ.
                 uid = f"UID:nuvora-slot-{s.id}-{d8(day)}-t@nuvora"
                 if a and b2:
+                    # Getaktete Stunde: Anfang und Ende am selben Tag. KEIN
+                    # "+1 Tag" — DTEND ist hier ein Zeitpunkt, kein Folgetag;
+                    # ein Zuschlag machte aus jeder Stunde einen Tagestermin.
                     lines += ["BEGIN:VEVENT", uid, f"DTSTAMP:{now}",
                               f"DTSTART:{d8(day)}T{a}", f"DTEND:{d8(day)}T{b2}",
                               f"SUMMARY:{_ics_escape(title)}", "END:VEVENT"]
                 else:
+                    # Ohne hinterlegte Uhrzeit bleibt nur der Tag. Ganztaegig,
+                    # also DTEND exklusiv = Folgetag (genau ein "+1").
                     lines += ["BEGIN:VEVENT", uid, f"DTSTAMP:{now}",
                               f"DTSTART;VALUE=DATE:{d8(day)}", f"DTEND;VALUE=DATE:{d8(day + timedelta(days=1))}",
                               f"SUMMARY:{_ics_escape(title)}", "END:VEVENT"]
 
     lines.append("END:VCALENDAR")
-    return _Plain("\r\n".join(lines), media_type="text/calendar; charset=utf-8",
+    # Gefaltet ausgeben (RFC 5545) und mit abschliessendem CRLF — beides
+    # erwarten strenge Leser; ein langer Titel darf keine Zeile ueberlang machen.
+    text = "\r\n".join(_ics_falten(z) for z in lines) + "\r\n"
+    return _Plain(text, media_type="text/calendar; charset=utf-8",
                   headers={"Cache-Control": "no-cache, max-age=0"})
 
 

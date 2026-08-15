@@ -787,7 +787,7 @@ export default function Session() {
           <button onClick={toggleMute} className="icon-btn"
             style={{ ...toolbarIconBtn, border: "1px solid var(--border2)", color: muted ? C.danger : "var(--text3)" }}
             title={muted ? t("session.unmute") : t("session.mute")} aria-label={muted ? t("session.unmute") : t("session.mute")}>
-            <Icon d={muted ? ICONS.soundOff : ICONS.sound} size={17} color={muted ? C.danger : undefined} />
+            <Icon d={muted ? ICONS.volumeOff : ICONS.volume} size={17} color={muted ? C.danger : undefined} />
           </button>
           {!muted && (
             <input type="range" min={0} max={1} step={0.05} value={volume}

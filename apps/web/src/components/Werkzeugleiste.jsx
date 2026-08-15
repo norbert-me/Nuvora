@@ -19,6 +19,7 @@
 import { useState } from "react";
 
 import { COLORS as C, CONTROL_H, Icon, ICONS, Popover, toolbarIconBtn } from "./Icons.jsx";
+import { useLanguage } from "../i18n/index.jsx";
 
 /**
  * @param links     Auswahl-Elemente (Klasse, Datum …) — stehen ganz vorn
@@ -41,8 +42,10 @@ export default function Werkzeugleiste({ links, children, ansicht, mehr = [], st
 }
 
 /** Kebab-Menü mit den selteneren Aktionen. Gefährliches steht unten und rot. */
-export function MehrMenu({ eintraege = [], titel = "Mehr" }) {
+export function MehrMenu({ eintraege = [], titel }) {
+  const { t } = useLanguage();
   const [offen, setOffen] = useState(false);
+  const name = titel || t("common.more");
   if (!eintraege.length) return null;
   const zeile = {
     display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "8px 10px",
@@ -54,7 +57,7 @@ export function MehrMenu({ eintraege = [], titel = "Mehr" }) {
   const sortiert = [...eintraege].sort((a, b) => (a.gefahr ? 1 : 0) - (b.gefahr ? 1 : 0));
   return (
     <span style={{ position: "relative", display: "inline-flex" }}>
-      <button onClick={() => setOffen((o) => !o)} className="icon-btn" title={titel} aria-label={titel}
+      <button onClick={() => setOffen((o) => !o)} className="icon-btn" title={name} aria-label={name}
         style={{ ...toolbarIconBtn, color: offen ? "var(--accent)" : "var(--text3)" }}>
         <Icon d={ICONS.more} size={17} />
       </button>

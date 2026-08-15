@@ -432,6 +432,16 @@ export default function Kalender() {
   // eigentlichen Kalenderansichten.
   const kalAnsicht = view !== "timetable" && view !== "breaks" && view !== "klassenarbeit";
 
+  // Der Plus-Knopf legt im SICHTBAREN Zeitraum an, nicht immer heute: wer im
+  // März blättert und etwas einträgt, meint den März. Tag = der gezeigte Tag,
+  // Woche = Wochenanfang, Monat = Monatserster; „Heute" heißt heute.
+  const neuesDatum = () => {
+    if (view === "day") return startOfDay(cursor);
+    if (view === "week") return mondayOf(cursor);
+    if (view === "month") return startOfDay(new Date(cursor.getFullYear(), cursor.getMonth(), 1));
+    return startOfDay(new Date());
+  };
+
   return (
     <div style={{ ...pageApp }}>
       {/* Kein Titel — die Navbar zeigt den Bereich (auch die Konfig-Reiter).
@@ -493,7 +503,7 @@ export default function Kalender() {
             { key: "import", label: t("kalender.import"), icon: ICONS.import, onClick: () => dateiWaehlen(importKal) },
           ]}
         >
-          <AddButton data-tour="kal-new" onClick={() => setEditing({ date: startOfDay(new Date()) })} title={t("kalender.newEntry")} />
+          <AddButton data-tour="kal-new" onClick={() => setEditing({ date: neuesDatum() })} title={t("kalender.newEntry")} />
         </Werkzeugleiste>
       )}
       {view === "timetable" && (
