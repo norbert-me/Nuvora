@@ -65,7 +65,14 @@ window.fetch = function(input, init) {
     // die Anmeldung hinaus), im Browser traf es die langsame Leitung. Der
     // 429-Wiederholer oben verzoegert Antworten zusaetzlich um bis zu einer
     // Sekunde und vergroessert das Fenster.
-    if (res.status === 401 && isApi && !url.includes("/auth/")) {
+    // Ohne Token gibt es nichts abzumelden. Die oeffentlichen Seiten
+    // (/lernen/<token>, /cd/<code>) rufen ueber gemeinsame Bausteine auch mal
+    // eine Route, die ein Konto braucht — die 401 ist dort die richtige
+    // Antwort, kein Rausflug. Vorher lud die Seite daraufhin neu, holte
+    // dieselbe Route wieder, bekam wieder 401: eine Endlosschleife, in der die
+    // Schuelerseite auf dem Ladeskelett stehen blieb. Genau der Weg, den die
+    // Kinder nehmen.
+    if (res.status === 401 && isApi && !url.includes("/auth/") && tokenBeimStart) {
       const tokenJetzt = lies("token") || "";
       if (tokenJetzt === tokenBeimStart) {
         loesche("token");
