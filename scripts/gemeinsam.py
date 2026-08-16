@@ -281,6 +281,17 @@ class Api:
 # ─────────────────────────── Bericht ───────────────────────────
 
 class Bericht:
+    """Ein Bericht — Gruppen, Farben, Zusammenfassung, JSON.
+
+    Die Schlusszeile traegt das Wort aus `TITEL_GRUEN`/`TITEL_ROT`. Wer einen
+    eigenen Namen braucht (Systemtest, Aufraeumen), setzt die beiden Attribute
+    in einer Unterklasse — frueher lief das ueber ein Umlenken von stdout und
+    ein Ersetzen im fertigen Text, in zwei Dateien nebeneinander.
+    """
+
+    TITEL_GRUEN = "Selbsttest gruen"
+    TITEL_ROT = "Selbsttest ROT"
+
     def __init__(self):
         self.zeilen = []      # (gruppe, name, ok, schwere, detail)
         self.reste = []
@@ -334,10 +345,10 @@ class Bericht:
 
         print("\n" + "=" * 40)
         if not self.fehler:
-            print(f"  {GRUEN}Selbsttest gruen{AUS} — {len(self.zeilen)} Checks, "
+            print(f"  {GRUEN}{self.TITEL_GRUEN}{AUS} — {len(self.zeilen)} Checks, "
                   f"{len(self.warnungen)} Warnung(en).")
         else:
-            print(f"  {ROT}{FETT}Selbsttest ROT{AUS} — {len(self.fehler)} Fehler, "
+            print(f"  {ROT}{FETT}{self.TITEL_ROT}{AUS} — {len(self.fehler)} Fehler, "
                   f"{len(self.warnungen)} Warnung(en).")
             # Kurzer Bericht: Namen reichen, der Grund steht zwei Zeilen weiter
             # oben. Langer Bericht: der Befund ist laengst aus dem Bild
@@ -365,3 +376,132 @@ class Bericht:
             "checks": [{"gruppe": g, "name": n, "ok": o, "schwere": s, "detail": d}
                        for g, n, o, s, d in self.zeilen],
         }, ensure_ascii=False, indent=2)
+
+
+# ─────────────────────────── Testumgebung im Kern ───────────────────────────
+
+class Kernumgebung:
+    """Klasse, Kurs und Thema im Kern — der Boden, auf dem jedes Modul arbeitet.
+
+    Warum hier: `selftest.py` und `systemtest.py` bauen sich denselben Boden,
+    nur mit anderen Kindern (zwei ohne Niveau, drei mit E/G/G). Der Unterbau war
+    zweimal ausgeschrieben — Anlegen, Merken, rueckwaerts Abraeumen, Papierkorb
+    leeren —, und beim Aendern musste man an beide Stellen denken. Was sich
+    wirklich unterscheidet, ist allein die Schuelerliste; die gibt der Aufrufer.
+
+    Regel 1 aus CLAUDE.md steht dahinter: kein Modul besitzt Klassen oder
+    Schueler. Deshalb entstehen sie hier, im Kern, und nicht in einer Modulprobe.
+    """
+
+    def __init__(self, api, b, praefix):
+        self.api, self.b, self.praefix = api, b, praefix
+        self.class_id = self.kurs_id = self.topic_id = None
+        self.students = []      # DB-IDs
+        self.aufraeumen = []    # (Beschreibung, fn) — abgeraeumt wird rueckwaerts
+
+    def spaeter(self, was, fn):
+        self.aufraeumen.append((was, fn))
+
+    def _weg(self, prefix, oid):
+        """Weich loeschen, dann endgueltig — `purge` verweigert alles, was nicht
+        im Papierkorb liegt."""
+        if oid is None:
+            return
+        self.api.call("DELETE", f"{prefix}/{oid}", erwartet=(204, 404))
+        self.api.call("DELETE", f"{prefix}/{oid}/purge", erwartet=(204, 404))
+
+    def _grundlage(self, schueler):
+        """Klasse (mit ihrem eigenen Kurs) und Thema anlegen.
+
+        Eine neue Klasse bringt ihren Kurs von selbst mit (classes.py, 1:1) —
+        einen zweiten daneben legt hier bewusst niemand an.
+
+        Reihenfolge des Abraeumens: rueckwaerts, also Thema zuerst, dann die
+        Klasse, zuletzt ihr Kurs — sonst haengt die Klasse an einem geloeschten
+        Kurs.
+        """
+        kl = self.api.call("POST", "/api/classes", {
+            "name": f"{self.praefix} Klasse", "students": schueler,
+        }, erwartet=(201,))
+        self.class_id = kl["id"]
+        self.kurs_id = kl.get("kurs_id")
+        self.students = [s["id"] for s in kl.get("students", [])]
+
+        thema = self.api.call("POST", "/api/topics", {"name": f"{self.praefix} Thema"},
+                              erwartet=(201,))
+        self.topic_id = thema["id"]
+
+        self.spaeter(f"Kurs {self.kurs_id}", lambda: self._weg("/api/kurse", self.kurs_id))
+        self.spaeter(f"Klasse {self.class_id}", lambda: self._weg("/api/classes", self.class_id))
+        self.spaeter(f"Thema {self.topic_id}", lambda: self.api.call(
+            "DELETE", f"/api/topics/{self.topic_id}", erwartet=(204, 404)))
+        return kl
+
+    def abbauen(self):
+        for was, fn in reversed(self.aufraeumen):
+            try:
+                fn()
+            except Exception as e:
+                self.b.reste.append(f"{was}: {e}")
+        # Der Papierkorb ist im Kern — weich Geloeschtes der Module landet dort
+        # und wuerde sonst als Testmuell stehen bleiben.
+        try:
+            for eintrag in self.api.call("GET", "/api/trash", erwartet=(200,)) or []:
+                if self.praefix in str(eintrag.get("label", "")):
+                    self.api.call("DELETE", f"/api/trash/{eintrag['kind']}/{eintrag['id']}",
+                                  erwartet=(204, 404))
+        except Exception as e:
+            self.b.reste.append(f"Papierkorb: {e}")
+
+
+# ─────────────────────────── Aufruf und Anmeldung ───────────────────────────
+
+def standard_argumente(p):
+    """Die Angaben, die jedes Testskript gleich entgegennimmt.
+
+    Sechs Zeilen, die in `selftest.py` und `systemtest.py` wortgleich standen —
+    inklusive der Umgebungsvariablen, aus denen `deploy.sh` sie fuellt. Wer eine
+    siebte braucht, haengt sie am eigenen Parser an.
+    """
+    p.add_argument("--url", default=os.environ.get("SELFTEST_URL") or os.environ.get("SITE_URL"))
+    p.add_argument("--email", default=os.environ.get("SELFTEST_EMAIL"))
+    p.add_argument("--passwort", default=os.environ.get("SELFTEST_PASSWORD"))
+    p.add_argument("--token", default=os.environ.get("SELFTEST_TOKEN"),
+                   help="Geheimnis fuer die Einrichtungs-Pruefungen (sonst nur mit "
+                        "Administrationskonto)")
+    p.add_argument("--json", action="store_true", help="Ergebnis als JSON ausgeben")
+    p.add_argument("--debug", action="store_true",
+                   help="jede Anfrage mitschreiben (Status, Dauer, Fehlertext) — "
+                        "zum Suchen, wenn etwas rot ist")
+    return p
+
+
+def melde_an(api, email, passwort, url):
+    """Anmelden und den Token setzen — mit einer Auskunft, die weiterhilft.
+
+    Das Testkonto legt kein Skript an: Registrieren verlangt eine
+    E-Mail-Bestaetigung, die kein Skript ersetzen kann. Fehlt es, sagt der
+    Fehler genau das statt nur "401".
+
+    Nach dem Login wird `/api/auth/me` gelesen: erst das beweist, dass der Token
+    auch traegt, und nicht nur, dass der Server ihn ausgestellt hat.
+    """
+    status, text = api.call("POST", "/api/auth/login",
+                            {"email": email, "password": passwort}, roh=True)
+    if status == 401:
+        raise AssertionError(
+            f"Konto '{email}' gibt es nicht (oder das Passwort stimmt nicht). "
+            f"Einmalig anlegen: unter {url}/login registrieren, "
+            "E-Mail bestaetigen, dann dieselben Zugangsdaten als "
+            "SELFTEST_EMAIL/SELFTEST_PASSWORD in .deploy.env eintragen.")
+    if status == 403:
+        raise AssertionError(
+            f"Konto '{email}' existiert, aber die E-Mail ist noch nicht "
+            "bestaetigt. Bestaetigungslink aus der Mail oeffnen (ohne SMTP "
+            "kommt keine Mail an — dann SMTP_* in der .env auf dem Server setzen).")
+    if status != 200:
+        raise AssertionError(f"HTTP {status}: {text[:150]}")
+    d = json.loads(text)
+    api.token = d["token"]
+    api.call("GET", "/api/auth/me", erwartet=(200,))
+    return f"angemeldet als {d['user'].get('email')}"

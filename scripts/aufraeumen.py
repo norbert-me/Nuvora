@@ -34,8 +34,6 @@ Rueckgabewert: 0 = nichts offen, 1 = es blieb etwas liegen.
 Nur Standardbibliothek — Bericht und Api kommen aus gemeinsam.py.
 """
 import argparse
-import contextlib
-import io
 import json
 import os
 import sys
@@ -115,13 +113,8 @@ class Aufraeumbericht(Bericht):
     auf, er testet nicht.
     """
 
-    def drucke(self):
-        puffer = io.StringIO()
-        with contextlib.redirect_stdout(puffer):
-            super().drucke()
-        print(puffer.getvalue()
-              .replace("Selbsttest gruen", "Aufraeumen fertig")
-              .replace("Selbsttest ROT", "Aufraeumen unvollstaendig"), end="")
+    TITEL_GRUEN = "Aufraeumen fertig"
+    TITEL_ROT = "Aufraeumen unvollstaendig"
 
 
 # ────────────────── Funde ──────────────────

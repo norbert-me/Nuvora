@@ -32,25 +32,15 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
+import {
+  zugang, macheBericht, druckeBericht, abbruchBremse, macheFetchApi, anmeldenApi,
+  dialogeAnnehmen, tourWegklicken, mitFrist, warte, kurz,
+} from "./browser-gemeinsam.mjs";
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.resolve(HIER, "..", "apps", "desktop");
 
-const arg = (name, fallback) => {
-  const mitGleich = process.argv.find((a) => a.startsWith(`--${name}=`));
-  if (mitGleich) return mitGleich.slice(name.length + 3);
-  const i = process.argv.indexOf(`--${name}`);
-  return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
-};
-
-const URL_BASIS = (arg("url", process.env.SELFTEST_URL || process.env.SITE_URL) || "").replace(/\/$/, "");
-const EMAIL = arg("email", process.env.SELFTEST_EMAIL);
-const PASSWORT = arg("passwort", process.env.SELFTEST_PASSWORD);
-
-if (!URL_BASIS || !EMAIL || !PASSWORT) {
-  console.error("Fehler: --url, --email und --passwort noetig (oder SELFTEST_URL/SELFTEST_EMAIL/SELFTEST_PASSWORD).");
-  process.exit(2);
-}
+const { basis: URL_BASIS, email: EMAIL, passwort: PASSWORT } = zugang();
 
 // Electron liegt in apps/desktop/node_modules, Playwright in scripts/node_modules
 // — zwei getrennte Projekte, also findet Playwright die Binaerdatei nicht von
@@ -68,50 +58,21 @@ const MARKE = "ZZ-Desktop-Offline";
 const KIND_A = `${MARKE} Kind Eins`;
 const KIND_B = `${MARKE} Kind Zwei`;
 
-// ── Ausgabe (Ton und Aufbau wie scripts/selftest-browser.mjs) ──────────────
-const FARBE = process.stdout.isTTY && !process.env.NO_COLOR;
-const ROT = FARBE ? "\x1b[31m" : "";
-const GRUEN = FARBE ? "\x1b[32m" : "";
-const GRAU = FARBE ? "\x1b[90m" : "";
-const FETT = FARBE ? "\x1b[1m" : "";
-const AUS = FARBE ? "\x1b[0m" : "";
-
-const ergebnisse = [];
-const START = Date.now();
-const seit = () => `${String(Math.round((Date.now() - START) / 1000)).padStart(4)}s`;
-let letzteGruppe = null;
-const notiere = (gruppe, name, ok, detail = "") => {
-  ergebnisse.push({ gruppe, name, ok, detail });
-  if (gruppe !== letzteGruppe) {
-    console.log(`\n${FETT}── ${gruppe}${AUS}`);
-    letzteGruppe = gruppe;
-  }
-  const zeile = `${name}${detail ? `   ${detail}` : ""}`;
-  console.log(`  ${GRAU}${seit()}${AUS} ${ok ? `${GRUEN}✓${AUS} ${zeile}` : `${ROT}✗ ${zeile}${AUS}`}`);
-};
-
-const kurz = (e, n = 140) => String(e?.message || e).split("\n")[0].slice(0, n);
-const warte = (ms) => new Promise((r) => setTimeout(r, ms));
-
-/** Harte Frist um eine Zusage — ein Haenger darf den Lauf nicht verschlucken. */
-function mitFrist(zusage, ms, was) {
-  let uhr;
-  const frist = new Promise((_, ab) => {
-    uhr = setTimeout(() => ab(new Error(`Zeitüberschreitung nach ${Math.round(ms / 1000)}s (${was})`)), ms);
-  });
-  return Promise.race([zusage, frist]).finally(() => clearTimeout(uhr));
-}
+// Ausgabe: Ton und Aufbau kommen aus browser-gemeinsam.mjs — dieselbe Quelle
+// wie bei den drei anderen Tests.
+const { ergebnisse, notiere } = macheBericht();
 
 // ── API ohne Browser ───────────────────────────────────────────────────────
 let token = null;
-const api = async (pfad, methode = "GET", data) => {
-  const r = await fetch(`${URL_BASIS}${pfad}`, {
-    method: methode,
-    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(data ? { "content-type": "application/json" } : {}) },
-    ...(data ? { body: JSON.stringify(data) } : {}),
-  });
-  return r;
-};
+const { api } = macheFetchApi(URL_BASIS, () => token);
+/**
+ * JSON holen und bei jedem Nicht-2xx WERFEN.
+ *
+ * Anders als die stille Fassung in browser-gemeinsam.mjs: hier ist eine
+ * misslungene Abfrage ein Befund, der im Bericht unter „Reste" landen soll —
+ * ein `null`, das drei Zeilen weiter als „nichts gefunden" durchgeht, waere
+ * eine falsche Entwarnung.
+ */
 const apiJson = async (pfad) => {
   const r = await api(pfad);
   if (!r.ok) throw new Error(`GET ${pfad}: HTTP ${r.status}`);
@@ -146,52 +107,10 @@ async function abraeumen() {
 }
 
 // Abbruch: die Testklasse darf nicht im fremden Konto liegen bleiben.
-let abbruchLaeuft = false;
-for (const signal of ["SIGINT", "SIGTERM"]) {
-  process.on(signal, async () => {
-    if (abbruchLaeuft) process.exit(130);
-    abbruchLaeuft = true;
-    console.error(`\n${ROT}Abbruch (${signal}) — räume die Testdaten weg …${AUS}`);
-    try { await Promise.race([abraeumen(), warte(15000)]); } catch { /* gleich raus */ }
-    process.exit(130);
-  });
-}
-
-/** Einstiegs-Tour wegklicken (frisches Profil legt ein Overlay ueber alles). */
-async function tourWegklicken(seite) {
-  const knopf = seite.getByRole("button", { name: /später|spaeter|later|más tarde|mas tarde/i })
-    .or(seite.getByRole("button", { name: /überspringen|ueberspringen|skip|saltar|omitir/i })).first();
-  for (const runde of [0, 1]) {
-    try {
-      if (await knopf.isVisible({ timeout: runde ? 600 : 1200 })) await knopf.click({ timeout: 3000 });
-    } catch { /* kein Overlay — der Normalfall */ }
-    if (!runde) await seite.waitForTimeout(500);
-  }
-}
+abbruchBremse(abraeumen, "räume die Testdaten weg …");
 
 /** Sichtbarer Text des Fensters, robust auch wenn gerade nichts gerendert ist. */
 const text = (seite) => seite.evaluate(() => (document.body ? document.body.innerText : "")).catch(() => "");
-
-/**
- * Rueckfragen bestaetigen — GENAU EIN Handler je Fenster, gesetzt dort, wo das
- * Fenster entsteht.
- *
- * Warum: seit „wo sich etwas aendern laesst, gibt es einen Speichern-Knopf"
- * warnt Nuvora beim Verlassen einer Seite mit offenen Aenderungen
- * (`useVerlassenWarnung` in components/Speichern.jsx, ein `window.confirm`).
- * Playwright weist Dialoge von sich aus AB — der Test antwortet damit „Nein",
- * der Seitenwechsel bleibt haengen und alles danach laeuft in sein Zeitlimit.
- * Dieser Test liest zwar nur, aber die Warnung haengt an der Seite, nicht am
- * Vorsatz: ein Handgriff, der hier einmal dazukommt, faende sonst dieselbe
- * Falle vor.
- *
- * Und genau EINER: zwei Handler auf demselben Dialog lassen den zweiten ins
- * Leere greifen („Protocol error … No dialog is showing") und reissen den Lauf
- * ab. Wer etwas braucht, erweitert diese Funktion.
- */
-function dialogeAnnehmen(seite) {
-  seite.on("dialog", (d) => d.accept().catch(() => {}));
-}
 
 async function starteApp(url, exe, profil = null) {
   return _electron.launch({
@@ -256,19 +175,15 @@ async function main() {
   notiere("Vorbereitung", "Electron gefunden", true, path.relative(HIER, exe));
 
   // ── Anmelden (wie die Shell: Token in den localStorage) ──
-  const login = await fetch(`${URL_BASIS}/api/auth/login`, {
-    method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: EMAIL, password: PASSWORT }),
-  }).catch((e) => ({ ok: false, status: 0, _e: e }));
-  if (!login.ok) {
-    const grund = login.status === 401 ? `Konto gibt es nicht (oder falsches Passwort) — einmalig unter ${URL_BASIS}/login registrieren und E-Mail bestätigen`
-      : login.status === 403 ? "Konto ist noch nicht per E-Mail bestätigt"
-      : login.status ? `HTTP ${login.status}` : kurz(login._e);
-    notiere("Vorbereitung", "Anmeldung", false, grund);
+  let user;
+  try {
+    const angemeldet = await anmeldenApi(URL_BASIS, EMAIL, PASSWORT);
+    token = angemeldet.token;
+    user = angemeldet.user;
+  } catch (e) {
+    notiere("Vorbereitung", "Anmeldung", false, kurz(e));
     return drucke();
   }
-  const { token: t, user } = await login.json();
-  token = t;
   notiere("Vorbereitung", "Anmeldung", true, `als ${user.email}`);
 
   // ── Reste des letzten Laufs ──
@@ -609,21 +524,14 @@ async function toteAdresse(exe) {
   }
 }
 
+/**
+ * Zusammenfassung — hier BEWUSST ungebuendelt (`gruppiert: false`): der Lauf
+ * hat unter 40 Zeilen, und jeder Befund traegt eine eigene Erklaerung, die sich
+ * nicht mit einer anderen zusammenfassen laesst.
+ */
 function drucke() {
-  const fehler = ergebnisse.filter((e) => !e.ok);
-  console.log("\n" + "=".repeat(40));
-  if (!fehler.length) {
-    console.log(`  ${GRUEN}Desktop-Offline grün${AUS} — ${ergebnisse.length} Prüfungen in ${seit().trim()}.`);
-    console.log("=".repeat(40));
-    process.exit(0);
-  }
-  console.log(`  ${ROT}${FETT}Desktop-Offline ROT${AUS} — ${fehler.length} von ${ergebnisse.length} Prüfungen.`);
-  for (const f of fehler) {
-    console.log(`${ROT}  ✗ ${f.gruppe} / ${f.name}${AUS}`);
-    if (f.detail) console.log(`      ${f.detail}`);
-  }
-  console.log("=".repeat(40));
-  process.exit(1);
+  const rot = druckeBericht(ergebnisse, { titel: "Desktop-Offline", gruppiert: false });
+  process.exit(rot ? 1 : 0);
 }
 
 main();

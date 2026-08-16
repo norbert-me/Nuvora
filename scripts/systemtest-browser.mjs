@@ -29,115 +29,31 @@
  *           laeuft nicht bei jedem Deploy mit, weil das die Laufzeit verdoppelt.
  * Rueckgabewert: 0 = gruen, 1 = mindestens ein Fund.
  */
-import { chromium, webkit } from "playwright";
+import {
+  zugang, motorenWahl, MOTOREN_ALLE, macheIstEgal, macheBericht, druckeBericht,
+  bilanzJeMotor, abbruchBremse, macheKontextApi, modulZustandStellen, traegtMarke,
+  dialogeAnnehmen, beobachte, beimLaden, tourWegklicken, anmeldungHinterlegen,
+  rundgang, geduldig, mitFrist, warte, kurzfehler, drosselText,
+  FRIST_SEITE, TOUR_TAKT_KNAPP, ROT, GRUEN, FETT, AUS,
+} from "./browser-gemeinsam.mjs";
 
-const arg = (name, fallback) => {
-  // Beide Schreibweisen: `--name wert` und `--name=wert`. Ohne die zweite
-  // landet `--browser=webkit` stillschweigend als unbekanntes Argument im
-  // Nirgendwo, und der Lauf nimmt kommentarlos die Vorgabe.
-  const mitGleich = process.argv.find((a) => a.startsWith(`--${name}=`));
-  if (mitGleich) return mitGleich.slice(name.length + 3);
-  const i = process.argv.indexOf(`--${name}`);
-  return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
-};
+const { basis: URL_BASIS, email: EMAIL, passwort: PASSWORT } = zugang();
 
-const URL_BASIS = (arg("url", process.env.SELFTEST_URL || process.env.SITE_URL) || "").replace(/\/$/, "");
-const EMAIL = arg("email", process.env.SELFTEST_EMAIL);
-const PASSWORT = arg("passwort", process.env.SELFTEST_PASSWORD);
-
-if (!URL_BASIS || !EMAIL || !PASSWORT) {
-  console.error("Fehler: --url, --email und --passwort noetig (oder SELFTEST_URL/SELFTEST_EMAIL/SELFTEST_PASSWORD).");
-  process.exit(2);
-}
-
-// ── Welche Browser-Engine? ─────────────────────────────────────────────────
-//
-// Gearbeitet wird zu grossen Teilen auf iPads, also auf WebKit. Chromium bleibt
-// trotzdem die VORGABE: der Deploy ruft diesen Test bei jedem Durchlauf, und er
-// soll nicht ungefragt doppelt so lange dauern.
-const MOTOREN_ALLE = { chromium, webkit };
-const MOTOR_WAHL = String(arg("browser", process.env.SELFTEST_BROWSERS) || "chromium").toLowerCase();
-const MOTOREN = MOTOR_WAHL === "beide" ? ["chromium", "webkit"] : [MOTOR_WAHL];
-if (MOTOREN.some((m) => !MOTOREN_ALLE[m])) {
-  console.error(`Fehler: --browser kennt nur chromium, webkit oder beide (bekommen: „${MOTOR_WAHL}").`);
-  process.exit(2);
-}
-// Der Name der laufenden Engine steht in JEDER Zeile und in der
-// Zusammenfassung — sonst ist beim Fehlersuchen nicht zu erkennen, welcher Lauf
-// gemeint war.
+// Der Name der laufenden Engine steht in JEDER Zeile und in der Zusammenfassung
+// — sonst ist beim Fehlersuchen nicht zu erkennen, welcher Lauf gemeint war.
+const MOTOREN = motorenWahl();
 let MOTOR = MOTOREN[0];
 
-// Rauschen, das nichts ueber die Gesundheit der Installation sagt.
-const EGAL = [
-  /favicon/i,
-  /ResizeObserver loop/i,
-  /Download the React DevTools/i,
-  /\/api\/version/,
-];
+const istEgal = macheIstEgal();
 
-// Fremde Hosts, deren Fehler nichts ueber die Installation sagen (Marktplatz
-// und Update-Check fragen GitHub). Verglichen wird der HOSTNAME einer
-// geparsten Adresse; frueher stand hier /api\.github\.com/i — nicht verankert
-// und damit auch auf „https://nuvora.example/x/api.github.com/y" passend. Ein
-// Pruefwerkzeug, das Befunde verschluckt, meldet gruen, ohne gruen zu sein.
-const EGAL_HOSTS = new Set(["api.github.com"]);
-const istEgalerHost = (text) => {
-  for (const gefunden of String(text).match(/https?:\/\/[^\s"'<>)]+/gi) || []) {
-    try {
-      if (EGAL_HOSTS.has(new URL(gefunden).hostname.toLowerCase())) return true;
-    } catch { /* keine gueltige Adresse — dann ist es auch kein bekannter Host */ }
-  }
-  return false;
-};
-const istEgal = (text) => EGAL.some((r) => r.test(text)) || istEgalerHost(text);
+const { ergebnisse, notiere, neueGruppe } = macheBericht({
+  gruppePraefix: () => `[${MOTOR}] `,
+  zusatz: () => ({ motor: MOTOR }),
+});
 
-// HTTP 429 ist Infrastruktur, kein Anwendungsfehler: der Proxy drosselt /api/
-// (nginx.conf, `limit_req zone=api_rl`), und dieser Test klappert Dutzende
-// Seiten in Folge ab. Er darf den Lauf nicht rot faerben — aber auch nicht
-// spurlos verschwinden: die Seite wird nach einer Pause noch einmal besucht,
-// und was dann bleibt, steht als Hinweis im Bericht.
-// BEWUSST nur 429. Ein 403 oder 404 ist ein echter Befund.
-const istDrosselung = (text) => /\b429\b|Too Many Requests/i.test(text);
-const PAUSE_429 = 4000;
-// Harte Obergrenze je Seite: ein einzelner Haenger darf nicht den ganzen Lauf
-// blockieren.
-const FRIST_SEITE = 60000;
-
-const ergebnisse = [];
-
-const FARBE = process.stdout.isTTY && !process.env.NO_COLOR;
-const ROT = FARBE ? "\x1b[31m" : "";
-const GRUEN = FARBE ? "\x1b[32m" : "";
-const GRAU = FARBE ? "\x1b[90m" : "";
-const FETT = FARBE ? "\x1b[1m" : "";
-const AUS = FARBE ? "\x1b[0m" : "";
-
-// Jede Zeile erscheint SOFORT, nicht erst am Ende. Ein Lauf dauert Minuten; wer
-// nur einen stehenden Bildschirm sieht, haelt das fuer einen Haenger und bricht
-// ab. Die Laufzeit vorn zeigt zusaetzlich, wo die Zeit hingeht.
-const START = Date.now();
-const seit = () => `${String(Math.round((Date.now() - START) / 1000)).padStart(4)}s`;
-let letzteGruppe = null;
-const notiere = (gruppe, name, ok, detail = "") => {
-  ergebnisse.push({ motor: MOTOR, gruppe, name, ok, detail });
-  if (`${MOTOR}/${gruppe}` !== letzteGruppe) {
-    console.log(`\n${FETT}── [${MOTOR}] ${gruppe}${AUS}`);
-    letzteGruppe = `${MOTOR}/${gruppe}`;
-  }
-  const zeile = `${name}${detail ? `   ${detail}` : ""}`;
-  console.log(`  ${GRAU}${seit()}${AUS} ${ok ? `${GRUEN}✓${AUS} ${zeile}` : `${ROT}✗ ${zeile}${AUS}`}`);
-};
-
-/** Harte Frist um eine Zusage. Der Aufrufer schliesst die Seite im finally. */
-function mitFrist(zusage, ms, was) {
-  let uhr;
-  const frist = new Promise((_, ab) => {
-    uhr = setTimeout(() => ab(new Error(`Zeitüberschreitung nach ${Math.round(ms / 1000)}s (${was})`)), ms);
-  });
-  return Promise.race([zusage, frist]).finally(() => clearTimeout(uhr));
-}
-
-const warte = (ms) => new Promise((r) => setTimeout(r, ms));
+// Dieser Test klappert besonders viele Seiten ab — deshalb der knappe Takt bei
+// der Tour-Suche (siehe TOUR_TAKT_KNAPP).
+const tourWeg = (seite) => tourWegklicken(seite, TOUR_TAKT_KNAPP);
 
 // Marke, an der alles Angelegte erkennbar ist — und wieder wegkommt.
 const MARKE = "ZZ-Systemtest";
@@ -149,33 +65,9 @@ const MARKE_UI = `${MARKE}-UI`;
 let kontext = null;
 let token = null;
 
-/**
- * API-Aufruf mit dem Token der Lehrkraft — mit Geduld bei 429.
- *
- * Die Testfamilien laufen direkt hintereinander gegen DASSELBE Konto, und der
- * Server begrenzt das Anlegen (rate_limit in den Routern). Der Selbsttest legt
- * seine Klassen an, danach kam dieser Test und bekam „HTTP 429" — und meldete
- * 45 Pruefungen als nicht gelaufen. Das ist ein Befund ueber die Taktung der
- * Tests, nicht ueber die Seite. Also dreimal versuchen, mit wachsender Pause.
- */
-const api = async (pfad, methode = "get", data) => {
-  let r;
-  for (const warte of [0, 6000, 15000]) {
-    if (warte) await new Promise((f) => setTimeout(f, warte));
-    r = await kontext.request[methode](pfad, {
-      headers: { Authorization: `Bearer ${token}`, ...(data ? { "Content-Type": "application/json" } : {}) },
-      ...(data !== undefined ? { data } : {}),
-    });
-    if (r.status() !== 429) return r;
-  }
-  return r;
-};
-const apiJson = async (pfad, methode = "get", data) => {
-  const r = await api(pfad, methode, data);
-  if (!r.ok()) return null;
-  const text = await r.text();
-  return text ? JSON.parse(text) : null;
-};
+// HTTP-Zugang mit dem Token der Lehrkraft — mit Geduld bei 429, siehe
+// `macheKontextApi` in browser-gemeinsam.mjs.
+const { api, apiJson } = macheKontextApi(() => kontext, () => token);
 
 // ── Modul-Zustand zurueckstellen, auch ohne Browser ────────────────────────
 //
@@ -192,23 +84,10 @@ let aufgeraeumt = false;
 async function modulZustandHerstellen(ohneBericht = false) {
   if (aufgeraeumt || !token || !sollZustand) return;
   aufgeraeumt = true;
-  const kopf = { Authorization: `Bearer ${token}` };
   const soll = new Set(sollZustand.aktiv);
-  // Alle auf einmal: nach einem Strg-C zaehlt jede Zehntelsekunde (siehe die
-  // Exit-Bremse unten). Die Aufrufe haengen nicht voneinander ab.
-  await Promise.all(sollZustand.alle.map((key) =>
-    fetch(`${URL_BASIS}/api/modules/${key}/activate`,
-      { method: soll.has(key) ? "POST" : "DELETE", headers: kopf })
-      .catch(() => { /* die Nachschau unten sagt, ob es gereicht hat */ })));
-  let falsch;
-  try {
-    const liste = await (await fetch(`${URL_BASIS}/api/modules`, { headers: kopf })).json();
-    falsch = liste
-      .filter((m) => sollZustand.alle.includes(m.key) && !!m.active !== soll.has(m.key))
-      .map((m) => `${m.key} ${m.active ? "noch an" : "aus"}`);
-  } catch (e) {
-    falsch = [`Nachschau fehlgeschlagen: ${String(e.message || e).slice(0, 80)}`];
-  }
+  const { falsch } = await modulZustandStellen({
+    basis: URL_BASIS, token, keys: new Set(sollZustand.alle), aktiv: soll,
+  });
   const gut = falsch.length === 0;
   const text = gut
     ? `wie vorher (${soll.size ? [...soll].join(", ") : "kein Modul aktiv"})`
@@ -217,41 +96,8 @@ async function modulZustandHerstellen(ohneBericht = false) {
   else notiere("Aufräumen", "Modulzustand", gut, text);
 }
 
-// Playwright haengt eigene SIGINT/SIGTERM-Handler an (processLauncher:
-// `gracefullyCloseAll().then(() => process.exit(130))`). Die beenden den
-// Prozess, sobald der Browser zu ist — mitten im Aufraeumen. Genau daran ist es
-// gescheitert: nach einem Strg-C blieb das Konto verstellt. Deshalb wird bis
-// zum fertigen Aufraeumen KEIN Prozessende durchgelassen. Ein zweites Strg-C
-// bricht hart ab, und nach 20 s gibt auch die Bremse auf.
-const echterExit = process.exit.bind(process);
-let abbruchLaeuft = false;
-for (const signal of ["SIGINT", "SIGTERM"]) {
-  process.on(signal, () => {
-    if (abbruchLaeuft) return echterExit(130);
-    abbruchLaeuft = true;
-    console.error(`\n${ROT}Abbruch (${signal}) — stelle den Modul-Zustand des Kontos wieder her …${AUS}`);
-    process.exit = () => {};
-    const fertig = () => { process.exit = echterExit; echterExit(130); };
-    Promise.race([modulZustandHerstellen(true), warte(20000)]).then(fertig, fertig);
-  });
-}
-
-/**
- * Fehlertext auf ein lesbares Mass bringen.
- *
- * Playwright haengt an seine Fehlermeldungen das komplette Browser-Protokoll.
- * Kommt ein Konsolenfehler im Sekundentakt, sind das achtzig gleichlautende
- * Zeilen, die den eigentlichen Grund begraben. Erste Zeile, danach hoechstens
- * drei weitere VERSCHIEDENE, jede nur einmal und mit Zaehler.
- */
-function kurzfehler(e, zeilen = 4) {
-  const roh = String(e?.message || e).split("\n").map((z) => z.trim()).filter(Boolean);
-  const zaehl = new Map();
-  for (const z of roh) zaehl.set(z, (zaehl.get(z) || 0) + 1);
-  return [...zaehl.entries()].slice(0, zeilen)
-    .map(([z, n]) => (n > 1 ? `${z.slice(0, 160)} (${n}×)` : z.slice(0, 160)))
-    .join(" | ");
-}
+abbruchBremse(() => modulZustandHerstellen(true),
+  "stelle den Modul-Zustand des Kontos wieder her …");
 
 // ───────────────────────── Verbotene Verbindungen ─────────────────────────
 //
@@ -998,7 +844,7 @@ async function knopfInZeile(seite, marke, titel) {
 async function main() {
   for (const name of MOTOREN) {
     MOTOR = name;
-    letzteGruppe = null;
+    neueGruppe();
     aufgeraeumt = false;
     sollZustand = null;
     token = null;
@@ -1027,34 +873,14 @@ async function lauf(motor) {
     token = t;
     notiere("Anmeldung", "Login", true, `als ${user.email}`);
 
-    // `addInitScript` laeuft in JEDEM Dokument des Kontexts, auch in solchen
-    // ohne echte Herkunft: dem `about:blank`, mit dem Playwright jede neue
-    // Seite startet, in `data:`/`blob:`-Dokumenten und in sandboxed Rahmen.
-    // Dort ist localStorage gesperrt und der Zugriff wirft SecurityError — bei
-    // jedem Seitenaufruf, bis die Meldung das Protokoll flutet. Also erst die
-    // Herkunft pruefen, dann zugreifen, und beides in try/catch.
-    await kontext.addInitScript(([tok, usr]) => {
-      try {
-        if (!/^https?:$/.test(location.protocol)) return;   // about:blank, data:, blob:
-        if (!window.localStorage) return;
-        localStorage.setItem("token", tok);
-        localStorage.setItem("user", usr);
-        // Der Modul-Cache wuerde den Stand des vorigen Durchgangs zeigen — hier
-        // wird pro Durchgang umgeschaltet, also immer frisch fragen.
-        localStorage.removeItem("nuvora_cache_modules");
-        // Sprache festnageln (siehe locale oben).
-        localStorage.setItem("cardvote_lang", "de");
-        // Gefuehrte Touren vorab abhaken: die Modul-Tour startet 900 ms nach
-        // dem Seitenaufruf und legt ein Overlay ueber ALLES (z-index 4000).
-        // Genau daran scheiterte die Notenspalten-Probe — nicht an der Seite,
-        // sondern an einem Willkommensfenster. Wegklicken allein reicht nicht:
-        // die naechste Seite bringt die naechste Tour.
-        localStorage.setItem("nuvora_kerntour_done", "1");
-        // Dasselbe fuer das Willkommensfenster (eigener Merker je Konto).
-        try { localStorage.setItem(`nuvora_onboarded_${JSON.parse(usr).id}`, "1"); } catch { /* egal */ }
-        for (const id of ["kalender", "noten", "karten"]) localStorage.setItem(`nuvora_tour_${id}_done`, "1");
-      } catch { /* Dokument ohne eigene Herkunft — hier gibt es nichts zu setzen */ }
-    }, [token, JSON.stringify(user)]);
+    // Der Modul-Cache muss weg: er wuerde den Stand des vorigen Durchgangs
+    // zeigen — hier wird pro Durchgang umgeschaltet, also immer frisch fragen.
+    // Die Sprache wird festgenagelt (siehe `locale` oben), die gefuehrten
+    // Touren vorab abgehakt. Warum das alles abgesichert laeuft, steht bei
+    // `anmeldungHinterlegen` in browser-gemeinsam.mjs.
+    await anmeldungHinterlegen(kontext, token, user, {
+      modulCacheLeeren: true, extra: { cardvote_lang: "de" },
+    });
 
     module = (await apiJson("/api/modules")).filter((m) => m.available && !m.external);
     vorherAktiv = module.filter((m) => m.active).map((m) => m.key);
@@ -1344,20 +1170,16 @@ async function testdatenAufraeumen(td) {
   }
 }
 
-// Felder, unter denen ein Objekt seinen sprechenden Namen traegt — je nach
-// Modul heisst das Feld anders (wie LABEL_FELDER in scripts/aufraeumen.py).
-const LABEL_FELDER = ["name", "title", "text", "label", "front", "aufgabentext"];
-const traegtMarke = (obj) => LABEL_FELDER.some(
-  (f) => typeof obj?.[f] === "string" && obj[f].includes(MARKE));
-
 /**
  * Loeschen mit Sicherheitsnetz — genau wie `Fund.loesche` in
  * scripts/aufraeumen.py: geprueft wird UNMITTELBAR vor dem DELETE, nicht nur
  * bei der Auswahl weiter oben. Eine Klasse „7a" bleibt damit auch dann
  * unberuehrt, wenn sie neben einer „ZZ-Systemtest-Klasse" steht.
+ * (Das Netz selbst — `traegtMarke` samt Feldliste — steht in
+ * browser-gemeinsam.mjs, damit alle vier Tests dasselbe benutzen.)
  */
 async function wegDamit(eintrag, ...pfade) {
-  if (!traegtMarke(eintrag)) throw new Error("Abgebrochen: Eintrag ohne Testpräfix");
+  if (!traegtMarke(eintrag, MARKE)) throw new Error("Abgebrochen: Eintrag ohne Testpräfix");
   for (const pfad of pfade) await api(pfad, "delete");
 }
 
@@ -1385,7 +1207,7 @@ async function resteAbraeumen() {
   let weg = 0;
   const raeume = async (eintraege, pfade) => {
     for (const e of eintraege) {
-      if (!traegtMarke(e)) continue;
+      if (!traegtMarke(e, MARKE)) continue;
       await wegDamit(e, ...pfade(e));
       weg++;
     }
@@ -1477,7 +1299,7 @@ async function startseitenKacheln(module) {
   const { seite } = await neueSeite();
   const schauen = async () => {
     await seite.goto("/", { waitUntil: "networkidle", timeout: 30000 });
-    await tourWegklicken(seite);
+    await tourWeg(seite);
     const hrefs = await seite.locator("a[href^='/']").evaluateAll((as) => as.map((a) => a.getAttribute("href")));
     return [...new Set(module.filter((m) => hrefs.includes(m.path)).map((m) => m.key))];
   };
@@ -1517,7 +1339,7 @@ async function sichtbarEinmal(v, streng = true) {
   const { seite, probleme, drossel } = await neueSeite();
   const schauen = async () => {
     await seite.goto(v.pfad, { waitUntil: "networkidle", timeout: 30000 });
-    await tourWegklicken(seite);
+    await tourWeg(seite);
     const jetzt = new URL(seite.url()).pathname;
     if (jetzt === "/modules" && !v.pfad.startsWith("/modules"))
       return { ok: false, wackelig: true, detail: "ModuleGate wirft auf /modules — Modul nicht aktiv?" };
@@ -1559,7 +1381,7 @@ async function bediene(flow) {
   // wartender Locator bis in alle Ewigkeit.
   // Nach jedem Laden dasselbe: Tour weg, und wo noetig in die Unteransicht.
   const nachLaden = async () => {
-    await tourWegklicken(seite);
+    await tourWeg(seite);
     return flow.oeffnen ? await flow.oeffnen(seite) : "";
   };
   const dasteht = (warten) => (flow.dasteht ? flow.dasteht(seite) : stehtDa(seite, warten));
@@ -1636,7 +1458,7 @@ const besuche = (pfad) => geduldig(() => besucheEinmal(pfad));
 async function besucheEinmal(pfad) {
   const { seite, probleme, drossel } = await neueSeite();
   try {
-    const befund = await mitFrist(rundgang(seite, pfad, probleme), FRIST_SEITE, pfad);
+    const befund = await mitFrist(rundgang(seite, pfad, probleme, { takt: TOUR_TAKT_KNAPP }), FRIST_SEITE, pfad);
     return { ...befund, gedrosselt: drosselText(drossel) };
   } catch (e) {
     return { ok: false, detail: String(e.message || e).split("\n")[0].slice(0, 160), gedrosselt: drosselText(drossel) };
@@ -1645,197 +1467,28 @@ async function besucheEinmal(pfad) {
   }
 }
 
-async function rundgang(seite, pfad, probleme) {
-  {
-    const antwort = await seite.goto(pfad, { waitUntil: "networkidle", timeout: 30000 });
-    if (!antwort || antwort.status() >= 400) return { ok: false, detail: `HTTP ${antwort?.status()}` };
-    await tourWegklicken(seite);
-
-    const jetzt = new URL(seite.url()).pathname;
-    const drin = jetzt === pfad || jetzt.startsWith(pfad) || pfad.startsWith(jetzt);
-    let hinweis = "";
-    if (!drin) {
-      // `wackelig`: den Ruecksprung sieht sich der Aufrufer noch einmal an
-      // (siehe `geduldig`) — ein wirklich abgeschaltetes Modul faellt auch beim
-      // zweiten Versuch zurueck.
-      if (jetzt === "/modules") return { ok: false, wackelig: true, detail: "ModuleGate wirft auf /modules zurück (Modul nicht aktiv?)" };
-      if (jetzt === "/") return { ok: false, wackelig: true, detail: "landet auf der Startseite — nicht angemeldet?" };
-      hinweis = ` → ${jetzt}`;
-    }
-    const textLaenge = (await seite.locator("body").innerText()).trim().length;
-    if (textLaenge < 20) probleme.push("Seite bleibt leer (Render-Fehler?)");
-
-    return probleme.length
-      ? { ok: false, detail: probleme.slice(0, 3).join(" | ") }
-      : { ok: true, detail: `${textLaenge} Zeichen gerendert${hinweis}` };
-  }
-}
-
 /**
- * Neue Seite mit Fehler-Mitschrift.
+ * Neue Seite mit Fehler-Mitschrift; Dialoge werden bestaetigt.
  *
- * `merke` legt jeden Befund nur EINMAL ab und deckelt die Zahl: eine Seite, die
- * im Sekundentakt denselben Fehler wirft, erzeugte frueher hunderte Zeilen und
- * machte alles andere unlesbar. Drosselungen (429) laufen in einen eigenen
- * Topf und sind kein Befund.
+ * `nachsichtigBeimLaden`: ein Neuladen bricht laufende Anfragen ab — WebKit
+ * meldet das als „TypeError: Load failed", Chromium haelt still. Das ist eine
+ * Eigenheit der Engine an einer Stelle, die dieser Test SELBST verursacht (er
+ * laedt neu, waehrend die Seite noch laedt). Nur innerhalb von `beimLaden` wird
+ * es uebergangen; ein „Load failed" im Betrieb bleibt ein Befund.
  */
 async function neueSeite() {
   const seite = await kontext.newPage();
-  const probleme = [];
-  const drossel = [];
-  const merke = (text) => {
-    if (probleme.length < 12 && !probleme.includes(text)) probleme.push(text);
-  };
-  seite.on("console", (msg) => {
-    if (msg.type() !== "error") return;
-    const text = msg.text();
-    if (istEgal(text)) return;
-    if (istDrosselung(text)) drossel.push("Konsole");
-    else merke(`Konsole: ${text.slice(0, 160)}`);
-  });
-  seite.on("pageerror", (e) => {
-    const text = String(e);
-    // Ein Neuladen bricht laufende Anfragen ab. WebKit meldet das als
-    // „TypeError: Load failed" bzw. „Fetch API cannot load … due to access
-    // control checks" und — weil der Aufrufer den Fehler durchreicht
-    // (main.jsx:69) — als abgewiesene Zusage. Chromium haelt in derselben Lage
-    // still. Das ist eine Eigenheit der Engine an einer Stelle, die der Test
-    // selbst verursacht: er laedt die Seite neu, waehrend sie noch laedt.
-    // Nur DANN wird es uebergangen, sonst nicht — ein „Load failed" im Betrieb
-    // bleibt ein Befund.
-    if (seite.__laedtGerade && istAbbruchBeimLaden(text)) return;
-    merke(`Absturz: ${text.slice(0, 160)}`);
-  });
-  seite.on("response", (r) => {
-    if (r.status() === 429) { drossel.push(new URL(r.url()).pathname); return; }
-    if (r.status() >= 400 && !istEgal(r.url())) merke(`HTTP ${r.status()} ${new URL(r.url()).pathname}`);
-  });
-  // GENAU EIN Dialog-Handler je Seite, und er bestaetigt.
-  //
-  // Zwei Rueckfragen laufen hier durch: das Loeschen fragt teils per confirm()
-  // nach, und seit „wo sich etwas aendern laesst, gibt es einen
-  // Speichern-Knopf" warnt Nuvora beim Verlassen einer Seite mit offenen
-  // Aenderungen (`useVerlassenWarnung` in components/Speichern.jsx). Playwright
-  // weist Dialoge von sich aus AB — der Test antwortete damit „Nein", der
-  // Seitenwechsel blieb haengen und der Locator dahinter lief in sein
-  // Zeitlimit. Eine Lehrkraft, die weggeht, bestaetigt; also der Test auch.
-  //
-  // Kein zweiter Handler daneben: zwei auf demselben Dialog lassen den zweiten
-  // ins Leere greifen („Protocol error … No dialog is showing") und reissen den
-  // Lauf ab. Wer etwas braucht, erweitert DIESE Zeile.
-  seite.on("dialog", (d) => d.accept().catch(() => {}));
-  return { seite, probleme, drossel, merke };
+  dialogeAnnehmen(seite);
+  return { seite, ...beobachte(seite, istEgal, { nachsichtigBeimLaden: true }) };
 }
 
-/**
- * Abgebrochene Anfrage statt echtem Fehler? Die Texte, mit denen die Engines
- * einen Abbruch melden — WebKit ist hier gespraechiger als Chromium.
- */
-const istAbbruchBeimLaden = (text) =>
-  /Load failed|Fetch API cannot load|access control checks|NetworkError|operation was aborted|Failed to fetch/i.test(text);
-
-/**
- * Etwas laden und dabei wissen, DASS gerade geladen wird.
- *
- * Waehrend eines Neuladens sterben laufende Anfragen — das ist normal und
- * nichts, was eine Lehrkraft je saehe. Der Merker sagt dem Fehler-Mitschnitt
- * oben, dass er in genau diesem Fenster nachsichtig sein darf.
- */
-async function beimLaden(seite, tun) {
-  seite.__laedtGerade = true;
-  try {
-    return await tun();
-  } finally {
-    // Kurze Nachlaufzeit: die abgewiesene Zusage einer abgebrochenen Anfrage
-    // trifft manchmal erst ein, wenn das Neuladen schon als fertig gilt.
-    setTimeout(() => { seite.__laedtGerade = false; }, 500);
-  }
-}
-
-/** Was der Proxy gedrosselt hat, kurz gefasst (leer = nichts gedrosselt). */
-const drosselText = (drossel) => [...new Set(drossel)].slice(0, 3).join(", ");
-
-/**
- * Etwas an einer Seite pruefen — und noch einmal, wenn beim ersten Mal etwas
- * dazwischenkam. Zwei Gruende:
- *
- *   - Drosselung (429): Infrastruktur, siehe `istDrosselung`. Bleibt sie beim
- *     zweiten Mal, steht sie als Hinweis im Bericht — rot wird davon nichts.
- *   - Ruecksprung ans ModuleGate, OBWOHL das Modul zugeschaltet ist: scheitert
- *     der Modul-Abruf einmal, arbeitet die Shell mit leerer Modulliste weiter
- *     (core/modules.js: `_hole` behaelt bei Fehlern den Cache und meldet nichts
- *     nach) und das Gate schickt auf /modules. Ein wirklich abgeschaltetes
- *     Modul faellt auch beim zweiten Versuch zurueck — die Pruefung, ob das
- *     Gate greift, verliert also nichts.
- */
-async function geduldig(fn) {
-  const erst = await fn();
-  if (!erst.gedrosselt && !erst.wackelig) return erst;
-  await warte(erst.gedrosselt ? PAUSE_429 : 1500);
-  const zweit = await fn();
-  let hinweis = "";
-  if (erst.gedrosselt) {
-    hinweis = zweit.gedrosselt
-      ? `Hinweis: Proxy drosselt weiter (HTTP 429 auf ${zweit.gedrosselt})`
-      : `Hinweis: einmal HTTP 429 (Proxy-Drosselung auf ${erst.gedrosselt}), Wiederholung sauber`;
-  } else if (zweit.wackelig) {
-    hinweis = "auch beim zweiten Versuch";
-  }
-  return { ...zweit, hinweis, detail: [zweit.detail, hinweis].filter(Boolean).join(" · ") };
-}
-
-/** Die Einstiegs-Tour wegklicken — sonst prueft der Test nur das Overlay. */
-async function tourWegklicken(seite) {
-  // Beide Beschriftungen in EINEM Locator (`.or`): frueher wartete der Test je
-  // Runde zweimal hintereinander auf ein Overlay, das es meistens gar nicht
-  // gibt. Jetzt laeuft eine Wartezeit fuer beide, die Abdeckung bleibt gleich.
-  const knopf = seite.getByRole("button", { name: /später|spaeter|later|más tarde/i })
-    .or(seite.getByRole("button", { name: /überspringen|ueberspringen|skip|saltar|omitir/i })).first();
-  for (const runde of [0, 1]) {
-    try {
-      if (await knopf.isVisible({ timeout: runde ? 400 : 1000 })) await knopf.click({ timeout: 3000 });
-    } catch { /* kein Overlay da — der Normalfall */ }
-    if (!runde) await seite.waitForTimeout(500);
-  }
-}
-
-/**
- * Zusammenfassung. Die Einzelzeilen sind waehrend des Laufs schon erschienen
- * (siehe `notiere`), hier steht nur noch, was schiefging — NACH URSACHE
- * gebuendelt: ein Fehler, der jede Seite trifft, ist EIN Befund. Frueher
- * standen dafuer dutzende gleichlautende Zeilen und begruben alles andere.
- */
+/** Zusammenfassung — Aufbau und Buendelung siehe `druckeBericht`. */
 function drucke() {
-  const fehler = ergebnisse.filter((e) => !e.ok);
-  // Je Engine eine Zeile: „grün" ohne die Engine daneben sagt nicht, WORAUF.
-  const proMotor = MOTOREN.map((m) => {
-    const alle = ergebnisse.filter((e) => e.motor === m);
-    const rot = alle.filter((e) => !e.ok).length;
-    return `${m}: ${rot ? `${rot} von ${alle.length} rot` : `${alle.length} grün`}`;
-  }).join(" · ");
-  console.log("\n" + "=".repeat(40));
-  if (!fehler.length) {
-    console.log(`  ${GRUEN}Systemtest grün${AUS} — ${ergebnisse.length} Prüfungen in ${seit().trim()}.`);
-    console.log(`  ${GRAU}${proMotor}${AUS}`);
-    console.log("=".repeat(40));
-    return;
-  }
-  console.log(`  ${ROT}${FETT}Systemtest ROT${AUS} — ${fehler.length} von ${ergebnisse.length} Prüfungen.`);
-  console.log(`  ${GRAU}${proMotor}${AUS}`);
-  const nachGrund = new Map();
-  for (const f of fehler) {
-    // Nach Engine UND Grund buendeln: derselbe Text kann in Chromium und
-    // WebKit voellig verschiedene Ursachen haben.
-    const grund = `[${f.motor}] ${f.detail || "(ohne Detail)"}`;
-    if (!nachGrund.has(grund)) nachGrund.set(grund, []);
-    nachGrund.get(grund).push(`${f.gruppe} / ${f.name}`);
-  }
-  for (const [grund, wo] of nachGrund) {
-    const rest = wo.length > 3 ? ` (und ${wo.length - 3} weitere)` : "";
-    console.log(`${ROT}  ✗ ${wo.slice(0, 3).join(", ")}${rest}${AUS}`);
-    console.log(`      ${grund}`);
-  }
-  console.log("=".repeat(40));
+  return druckeBericht(ergebnisse, {
+    titel: "Systemtest",
+    zusatzzeile: bilanzJeMotor(ergebnisse, MOTOREN),
+    grundVon: (f) => `[${f.motor}] ${f.detail || "(ohne Detail)"}`,
+  });
 }
 
 main();

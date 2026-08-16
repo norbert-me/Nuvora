@@ -41,7 +41,9 @@ PRAEFIX = "ZZ-Selbsttest"
 # braucht sie genauso, und eine zweite Fassung des Berichts liefe
 # auseinander. Von dort importiert nichts zurueck (siehe Modulkopf).
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from gemeinsam import Api, Bericht  # noqa: E402
+from gemeinsam import (  # noqa: E402
+    Api, Bericht, Kernumgebung, melde_an, standard_argumente,
+)
 # Das Abraeumen sitzt in aufraeumen.py — dort steht das Netz (Klasse `Fund`),
 # das ausschliesslich Testpraefixe loescht. Der Import steht seit der
 # Aufteilung wieder oben: aufraeumen.py holt sein Werkzeug aus gemeinsam.py
@@ -460,69 +462,23 @@ def teste_einrichtung(api, b):
 
 # ─────────────────────────── 3. Module: Schreib-Roundtrip ───────────────────────────
 
-class Umgebung:
+class Umgebung(Kernumgebung):
     """Testdaten im Kern, auf denen alle Modul-Proben arbeiten.
 
     Eine Klasse mit zwei Schuelern und ein Kurs — genau das, was die Module
     voraussetzen duerfen (Regel: kein Modul besitzt Klassen oder Schueler).
+    Anlegen, Merken und rueckwaerts Abraeumen stehen in `Kernumgebung`
+    (gemeinsam.py); hier steht nur, WER angelegt wird.
     """
 
     def __init__(self, api, b):
-        self.api, self.b = api, b
-        self.class_id = self.kurs_id = self.topic_id = None
-        self.students = []
-        self.aufraeumen = []   # (beschreibung, fn) — in umgekehrter Reihenfolge
-
-    def spaeter(self, beschreibung, fn):
-        self.aufraeumen.append((beschreibung, fn))
-
-    def _weg(self, prefix, oid):
-        """Weich loeschen, dann endgueltig — purge verweigert alles, was nicht
-        im Papierkorb liegt."""
-        self.api.call("DELETE", f"{prefix}/{oid}", erwartet=(204, 404))
-        self.api.call("DELETE", f"{prefix}/{oid}/purge", erwartet=(204, 404))
+        super().__init__(api, b, PRAEFIX)
 
     def aufbauen(self):
-        kl = self.api.call("POST", "/api/classes", {
-            "name": f"{PRAEFIX} Klasse",
-            "students": [{"card_id": 1, "name": f"{PRAEFIX} Anna"},
-                         {"card_id": 2, "name": f"{PRAEFIX} Ben"}],
-        }, erwartet=(201,))
-        self.class_id = kl["id"]
-        self.students = [s["id"] for s in kl.get("students", [])]
-        # Jede neue Klasse bringt ihren eigenen Kurs mit (Kern, 1:1) — den nimmt
-        # der Test, statt einen zweiten anzulegen.
-        self.kurs_id = kl.get("kurs_id")
-        # Reihenfolge: erst eintragen, was zuletzt weg soll. Abgeraeumt wird
-        # rueckwaerts, also Klasse vor ihrem Kurs (sonst haengt die Klasse an
-        # einem geloeschten Kurs).
-        if self.kurs_id:
-            self.spaeter(f"Kurs {self.kurs_id}", lambda: self._weg("/api/kurse", self.kurs_id))
-        # Erst weich (Papierkorb), dann hart — purge verlangt genau diesen Weg.
-        self.spaeter(f"Klasse {self.class_id}", lambda: self._weg("/api/classes", self.class_id))
-
-        thema = self.api.call("POST", "/api/topics", {"name": f"{PRAEFIX} Thema"}, erwartet=(201,))
-        self.topic_id = thema["id"]
-        self.spaeter(f"Thema {self.topic_id}", lambda: self.api.call(
-            "DELETE", f"/api/topics/{self.topic_id}", erwartet=(204, 404)))
+        self._grundlage([{"card_id": 1, "name": f"{PRAEFIX} Anna"},
+                         {"card_id": 2, "name": f"{PRAEFIX} Ben"}])
         return f"Klasse {self.class_id}, Kurs {self.kurs_id}, Thema {self.topic_id}, " \
                f"{len(self.students)} Schueler"
-
-    def abbauen(self):
-        for beschreibung, fn in reversed(self.aufraeumen):
-            try:
-                fn()
-            except Exception as e:
-                self.b.reste.append(f"{beschreibung}: {e}")
-        # Der Papierkorb ist im Kern — weich Geloeschtes der Module landet dort
-        # und wuerde sonst als Testmuell stehen bleiben.
-        try:
-            for eintrag in self.api.call("GET", "/api/trash", erwartet=(200,)) or []:
-                if PRAEFIX in str(eintrag.get("label", "")):
-                    self.api.call("DELETE", f"/api/trash/{eintrag['kind']}/{eintrag['id']}",
-                                  erwartet=(204, 404))
-        except Exception as e:
-            self.b.reste.append(f"Papierkorb: {e}")
 
 
 def teste_kern(api, b, u):
@@ -1808,19 +1764,10 @@ def raeume_reste(api, b):
 
 
 def main():
-    p = argparse.ArgumentParser(description="Selbsttest der laufenden Nuvora-Installation")
-    p.add_argument("--url", default=os.environ.get("SELFTEST_URL") or os.environ.get("SITE_URL"))
-    p.add_argument("--email", default=os.environ.get("SELFTEST_EMAIL"))
-    p.add_argument("--passwort", default=os.environ.get("SELFTEST_PASSWORD"))
+    p = standard_argumente(
+        argparse.ArgumentParser(description="Selbsttest der laufenden Nuvora-Installation"))
     p.add_argument("--nur-system", action="store_true",
                    help="nur die Checks ohne Login (kein Schreib-Roundtrip)")
-    p.add_argument("--json", action="store_true", help="Ergebnis als JSON ausgeben")
-    p.add_argument("--token", default=os.environ.get("SELFTEST_TOKEN"),
-                   help="Geheimnis fuer die Einrichtungs-Pruefungen (sonst nur mit "
-                        "Administrationskonto)")
-    p.add_argument("--debug", action="store_true",
-                   help="jede Anfrage mitschreiben (Status, Dauer, Fehlertext) — "
-                        "zum Suchen, wenn etwas rot ist")
     args = p.parse_args()
 
     if not args.url:
@@ -1843,36 +1790,11 @@ def main():
                   detail="SELFTEST_EMAIL/SELFTEST_PASSWORD fehlen — "
                          "Module und Einrichtung ungeprueft")
     else:
-        angemeldet = False
-
-        def login():
-            nonlocal angemeldet
-            status, text = api.call("POST", "/api/auth/login",
-                                    {"email": args.email, "password": args.passwort}, roh=True)
-            # Das Testkonto legt der Selbsttest nicht selbst an: Registrieren
-            # verlangt eine E-Mail-Bestaetigung, die kein Skript ersetzen kann.
-            # Deshalb hier sagen, was zu tun ist, statt nur "401".
-            if status == 401:
-                raise AssertionError(
-                    f"Konto '{args.email}' gibt es nicht (oder das Passwort stimmt nicht). "
-                    f"Einmalig anlegen: unter {args.url}/login registrieren, "
-                    "E-Mail bestaetigen, dann dieselben Zugangsdaten als "
-                    "SELFTEST_EMAIL/SELFTEST_PASSWORD in .deploy.env eintragen.")
-            if status == 403:
-                raise AssertionError(
-                    f"Konto '{args.email}' existiert, aber die E-Mail ist noch nicht "
-                    "bestaetigt. Bestaetigungslink aus der Mail oeffnen (ohne SMTP "
-                    "kommt keine Mail an — dann SMTP_* in der .env auf dem Server setzen).")
-            if status != 200:
-                raise AssertionError(f"HTTP {status}: {text[:150]}")
-            d = json.loads(text)
-            api.token = d["token"]
-            api.call("GET", "/api/auth/me", erwartet=(200,))
-            angemeldet = True
-            return f"angemeldet als {d['user'].get('email')}"
-
-        b.pruefe("Anmeldung", "Login", login)
-        if angemeldet:
+        # Anmelden samt Auskunft, was zu tun ist, wenn das Konto fehlt: siehe
+        # `melde_an` in gemeinsam.py — der Systemtest nimmt dieselbe Funktion.
+        b.pruefe("Anmeldung", "Login",
+                 lambda: melde_an(api, args.email, args.passwort, args.url))
+        if api.token:
             teste_einrichtung(api, b)
             teste_seiten(api, b)
             # Erst aufraeumen, dann zaehlen: Reste eines abgebrochenen Laufs

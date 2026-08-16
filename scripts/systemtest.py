@@ -45,7 +45,9 @@ from datetime import datetime, timedelta, timezone
 # Berichtsform und Farben sollen an EINER Stelle gepflegt werden. gemeinsam.py
 # ist das Blatt (Client/Bericht), selftest.py und aufraeumen.py sitzen darauf.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from gemeinsam import Api, Bericht, FETT, AUS  # noqa: E402
+from gemeinsam import (  # noqa: E402
+    Api, Bericht, Kernumgebung, melde_an, standard_argumente, FETT, AUS,
+)
 from aufraeumen import merke_module, vergiss_module  # noqa: E402
 from selftest import raeume_reste  # noqa: E402
 
@@ -53,22 +55,16 @@ PRAEFIX = "ZZ-Systemtest"
 
 
 class Systembericht(Bericht):
-    """Der Bericht des Selbsttests, nur anders unterschrieben.
+    """Der Bericht aus gemeinsam.py, nur anders unterschrieben.
 
-    Gruppen, Farben, Zusammenfassung und JSON kommen unveraendert aus
-    `selftest.Bericht` — dupliziert wird nichts, nur das Wort in der Schlusszeile
-    ausgetauscht, damit im Terminal nicht "Selbsttest" ueber einem Systemtest
-    steht.
+    Gruppen, Farben, Zusammenfassung und JSON kommen unveraendert von dort —
+    dupliziert wird nichts, nur das Wort in der Schlusszeile ausgetauscht, damit
+    im Terminal nicht "Selbsttest" ueber einem Systemtest steht.
     """
 
-    def drucke(self):
-        import io
-        import contextlib
-        puffer = io.StringIO()
-        with contextlib.redirect_stdout(puffer):
-            super().drucke()
-        print(puffer.getvalue().replace("Selbsttest gruen", "Systemtest gruen")
-              .replace("Selbsttest ROT", "Systemtest ROT"), end="")
+    TITEL_GRUEN = "Systemtest gruen"
+    TITEL_ROT = "Systemtest ROT"
+
 
 # Notenschluessel wie DEFAULT_SCALE in apps/api/app/scoring.py: ab wie viel
 # Prozent welche Note. Der Test rechnet damit selbst — waeren die Werte dort
@@ -95,62 +91,27 @@ def gleich(a, b, toleranz=0.001):
 
 # ─────────────────────── Testumgebung im Kern ───────────────────────
 
-class Umgebung:
+class Umgebung(Kernumgebung):
     """Klasse mit drei Kindern (E/G/G), Kurs und Thema — der Boden, auf dem
-    jedes Modul arbeitet. Die Niveaus braucht die E/G-Wertung von CardVote."""
+    jedes Modul arbeitet. Die Niveaus braucht die E/G-Wertung von CardVote.
+
+    Anlegen, Merken und rueckwaerts Abraeumen stehen in `Kernumgebung`
+    (gemeinsam.py); hier steht nur, WER angelegt wird.
+    """
 
     def __init__(self, api, b):
-        self.api, self.b = api, b
-        self.class_id = self.kurs_id = self.topic_id = None
-        self.students = []      # DB-IDs
+        super().__init__(api, b, PRAEFIX)
         self.karten = [1, 2, 3]  # card_id (die aufgedruckte Nummer)
         self.namen = [f"{PRAEFIX} Anna", f"{PRAEFIX} Ben", f"{PRAEFIX} Cem"]
         self.niveaus = ["E", "G", "G"]
-        self.aufraeumen = []
-
-    def spaeter(self, was, fn):
-        self.aufraeumen.append((was, fn))
 
     def aufbauen(self):
-        kl = self.api.call("POST", "/api/classes", {
-            "name": f"{PRAEFIX} Klasse",
-            "students": [{"card_id": c, "name": n, "niveau": v}
-                         for c, n, v in zip(self.karten, self.namen, self.niveaus)],
-        }, erwartet=(201,))
-        self.class_id = kl["id"]
-        self.kurs_id = kl.get("kurs_id")
-        self.students = [s["id"] for s in kl.get("students", [])]
+        self._grundlage([{"card_id": c, "name": n, "niveau": v}
+                         for c, n, v in zip(self.karten, self.namen, self.niveaus)])
         if len(self.students) != 3:
             raise AssertionError(f"{len(self.students)} Schueler angelegt statt 3")
-        thema = self.api.call("POST", "/api/topics", {"name": f"{PRAEFIX} Thema"}, erwartet=(201,))
-        self.topic_id = thema["id"]
-        # Rueckwaerts abgeraeumt: Thema zuerst, Klasse und Kurs zuletzt.
-        self.spaeter("Thema", lambda: self.api.call(
-            "DELETE", f"/api/topics/{self.topic_id}", erwartet=(204, 404)))
-        self.spaeter("Kurs", lambda: self._weg("/api/kurse", self.kurs_id))
-        self.spaeter("Klasse", lambda: self._weg("/api/classes", self.class_id))
         return (f"Klasse {self.class_id}, Kurs {self.kurs_id}, Thema {self.topic_id}, "
                 f"Kinder {self.students} (Niveau E/G/G)")
-
-    def _weg(self, prefix, oid):
-        if oid is None:
-            return
-        self.api.call("DELETE", f"{prefix}/{oid}", erwartet=(204, 404))
-        self.api.call("DELETE", f"{prefix}/{oid}/purge", erwartet=(204, 404))
-
-    def abbauen(self):
-        for was, fn in reversed(self.aufraeumen):
-            try:
-                fn()
-            except Exception as e:
-                self.b.reste.append(f"{was}: {e}")
-        try:
-            for eintrag in self.api.call("GET", "/api/trash", erwartet=(200,)) or []:
-                if PRAEFIX in str(eintrag.get("label", "")):
-                    self.api.call("DELETE", f"/api/trash/{eintrag['kind']}/{eintrag['id']}",
-                                  erwartet=(204, 404))
-        except Exception as e:
-            self.b.reste.append(f"Papierkorb: {e}")
 
 
 # ─────────────────────── Was jedes Modul koennen muss ───────────────────────
@@ -2270,14 +2231,9 @@ def teste_verlauf_gerechnet(api, b, u, sch, spuren):
 # ─────────────────────── Ablauf ───────────────────────
 
 def main():
-    p = argparse.ArgumentParser(description="Systemtest: jedes Nuvora-Modul einzeln durchgespielt")
-    p.add_argument("--url", default=os.environ.get("SELFTEST_URL") or os.environ.get("SITE_URL"))
-    p.add_argument("--email", default=os.environ.get("SELFTEST_EMAIL"))
-    p.add_argument("--passwort", default=os.environ.get("SELFTEST_PASSWORD"))
-    p.add_argument("--token", default=os.environ.get("SELFTEST_TOKEN"))
+    p = standard_argumente(
+        argparse.ArgumentParser(description="Systemtest: jedes Nuvora-Modul einzeln durchgespielt"))
     p.add_argument("--modul", help="nur dieses Modul aus dem REGISTRY pruefen")
-    p.add_argument("--json", action="store_true")
-    p.add_argument("--debug", action="store_true", help="jede Anfrage mitschreiben")
     args = p.parse_args()
 
     if not args.url:
@@ -2293,13 +2249,10 @@ def main():
     if not args.json:
         print(f"{FETT}Nuvora-Systemtest{AUS} gegen {args.url}")
 
-    def login():
-        d = api.call("POST", "/api/auth/login",
-                     {"email": args.email, "password": args.passwort}, erwartet=(200,))
-        api.token = d["token"]
-        return f"angemeldet als {d['user'].get('email')}"
-
-    if not b.pruefe("Anmeldung", "Login", login):
+    # Dieselbe Anmeldung wie im Selbsttest (gemeinsam.py) — inklusive der
+    # Auskunft, was zu tun ist, wenn das Testkonto gar nicht existiert.
+    if not b.pruefe("Anmeldung", "Login",
+                    lambda: melde_an(api, args.email, args.passwort, args.url)):
         b.drucke()
         return 1
 
