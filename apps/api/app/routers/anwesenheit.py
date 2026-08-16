@@ -12,7 +12,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..besitz import klasse_oder_403
-from ..schueler import sortiert
+from ..kursmitglieder import sibling_class_ids
+from ..schueler import in_klasse, sortiert
 from ..pdfdruck import als_anhang, neue_seite
 from ..database import get_db
 from ..models import Attendance, CalendarBreak, Student, User
@@ -50,7 +51,6 @@ async def _kurs_maps(db, user, class_id):
       to_canon   – student_id (dieser Klasse) -> kanonische id
       canon_back – kanonische id -> student_id dieser Klasse (Rückabbildung fürs UI)
     """
-    from .kurse import sibling_class_ids
     sib_ids = await sibling_class_ids(db, class_id)  # Klassen, die einen Kurs teilen (inkl. self)
     kurs_studs = (await db.execute(select(Student).where(Student.class_id.in_(sib_ids)))).scalars().all()
     # Name -> kanonische (kleinste) id
@@ -143,9 +143,7 @@ async def mark(class_id: int, body: MarkIn, user: User = Depends(require_module)
     await _owned_class(db, user, class_id)
     if body.status not in _STATUS:
         raise HTTPException(400, "Unbekannter Status")
-    st = await db.get(Student, body.student_id)
-    if not st or st.class_id != class_id:
-        raise HTTPException(404, "Schüler nicht in dieser Klasse")
+    await in_klasse(db, body.student_id, class_id)
     # Auf die kanonische Person des Kurses schreiben -> kursweit geteilt.
     _canon_ids, to_canon, _back = await _kurs_maps(db, user, class_id)
     canon_id = to_canon.get(body.student_id, body.student_id)
@@ -272,9 +270,7 @@ async def class_report(class_id: int, user: User = Depends(require_module), db: 
 async def student_report(class_id: int, student_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Fehlzeiten eines Schülers als PDF: Zähler + chronologische Liste."""
     sc = await _owned_class(db, user, class_id)
-    st = await db.get(Student, student_id)
-    if not st or st.class_id != class_id:
-        raise HTTPException(404, "Schüler nicht in dieser Klasse")
+    st = await in_klasse(db, student_id, class_id)
     rows = await student_history(class_id, student_id, user=user, db=db)
     breaks = await _break_days(db, user)
     zaehler = {"fehlt": 0, "spaet": 0, "entsch": 0}

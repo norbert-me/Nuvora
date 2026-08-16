@@ -8,20 +8,9 @@ Administration, siehe `_require_admin` in main.py), nicht am Namen.
 import pytest
 import pytest_asyncio
 from fastapi import HTTPException
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from app.models import Base, User
+from app.models import User
 from app.routers import auth as A
-
-
-@pytest_asyncio.fixture
-async def s():
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    async with async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)() as sess:
-        yield sess
-    await engine.dispose()
 
 
 @pytest_asyncio.fixture

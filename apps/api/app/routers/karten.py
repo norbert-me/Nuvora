@@ -9,9 +9,7 @@ Eigenstaendig (Regel 3). Zwei Zugaenge:
 Der Fortschritt liegt am Server (CardReview) — nur so sieht die Lehrkraft ihn,
 anders als bei Anki, wo er am Geraet bleibt.
 """
-import asyncio
 import io
-import random
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
@@ -24,11 +22,13 @@ from sqlalchemy import (select, func as sa_func, and_, or_, exists as sa_exists,
                         false as sa_false, true as sa_true, delete as sql_delete)
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..besitz import eigene_klasse, eigenes
+from ..kursmitglieder import class_kurs_ids, eigener_kurs, member_student_ids, student_kurs_ids
+from ..nebenlauf import mit_wiederholung
 from ..zeit import als_utc, jetzt, tagesbeginn
+from ..themenprofil import KartenStand
 from ..pdfdruck import neue_seite
 from ..database import get_db
 from ..schueler import roster_kurs, sortiert
@@ -63,29 +63,6 @@ def _anlegen_falls_fehlt(db: AsyncSession, modell, werte: dict, schluessel: list
     """
     ins = pg_insert if db.get_bind().dialect.name == "postgresql" else sqlite_insert
     return ins(modell).values(**werte).on_conflict_do_nothing(index_elements=schluessel)
-
-
-async def _mit_wiederholung(db: AsyncSession, arbeit, versuche: int = 6):
-    """Schreibvorgang gegen gleichzeitige Schreiber absichern.
-
-    Postgres serialisiert ueber die Zeilensperre (`SELECT ... FOR UPDATE`) —
-    dort greift die Wiederholung praktisch nie. SQLite (Tests, lokale
-    Pruefinstanz) kennt keine Zeilensperre und bricht den zweiten Schreiber
-    stattdessen ab; dann wird zurueckgerollt, neu gelesen und neu gerechnet.
-
-    Bewusst je Modul kopiert statt geteilt: Module haengen nicht voneinander ab.
-    """
-    for versuch in range(versuche):
-        try:
-            return await arbeit()
-        except (IntegrityError, OperationalError):
-            await db.rollback()
-            if versuch == versuche - 1:
-                raise HTTPException(503, "Gerade zu viel los. Bitte gleich noch einmal versuchen.")
-            await asyncio.sleep(0.02 * (versuch + 1) + random.random() * 0.03)
-    # Erreichbar nur bei versuche <= 0. Ohne diese Zeile käme dort ein stilles
-    # None heraus, mit dem der Aufrufer weiterrechnet.
-    raise HTTPException(503, "Gerade zu viel los. Bitte gleich noch einmal versuchen.")
 
 
 def _token():
@@ -229,7 +206,6 @@ async def _class_all_decks_where(db, class_id):
     direkt (class_id) ODER über den Herkunfts-Kurs. Für Auswahl-Listen (z.B.
     Kalender-Deck-Verknüpfung), die nicht auf einen bestimmten Kurs eingeschränkt
     sind — hier wird bewusst breit angeboten, ausgeteilt wird nichts."""
-    from .kurse import class_kurs_ids
     kurse = list(await class_kurs_ids(db, class_id))
     if kurse:
         return or_(_zugewiesen(kurse), CardDeck.kurs_id.in_(kurse), CardDeck.class_id == class_id)
@@ -239,7 +215,6 @@ async def _class_all_decks_where(db, class_id):
 async def _student_kurs_ids(db, st) -> list:
     """Die Kurse dieses Kindes: die seiner Klasse UND die Teilkurse, in denen es
     einzeln Mitglied ist (Kurse aus Teilen von Klassen)."""
-    from .kurse import class_kurs_ids, student_kurs_ids
     return list(set(await class_kurs_ids(db, st.class_id)) | await student_kurs_ids(db, st.id))
 
 
@@ -540,7 +515,6 @@ async def _schedule_deck_from_calendar(db: AsyncSession, user: User, deck: CardD
     if not await is_active(db, user.id, "kalender"):
         return
     from ..models import CalendarEntry
-    from .kurse import class_kurs_ids
     entries = (await db.execute(
         select(CalendarEntry).where(CalendarEntry.owner_id == user.id, CalendarEntry.topic_id == deck.topic_id)
         .order_by(CalendarEntry.date)
@@ -602,7 +576,6 @@ async def uebernahme_deck_kurse(db: AsyncSession) -> int:
     Stapel im Papierkorb zaehlen mit: sonst stuenden sie nach dem
     Wiederherstellen ohne Zuweisung da.
     """
-    from .kurse import class_kurs_ids
 
     konten = (await db.execute(select(User).where(
         User.karten_kurse_initialized.is_(False)))).scalars().all()
@@ -1073,8 +1046,7 @@ async def ensure_tokens(class_id: int, subset_kurs: Optional[int] = None, user: 
     """Erzeugt fehlende Schueler-Tokens fuer den Kurs (idempotent, je Person einer)."""
     await _owned_class(db, user, class_id)
     if subset_kurs is not None:
-        from .kurse import _owned_kurs
-        await _owned_kurs(db, user, subset_kurs)
+        await eigener_kurs(db, user, subset_kurs)
     students = await _kurs_roster(db, user, class_id, subset_kurs)
     out = []
     changed = False
@@ -1104,7 +1076,6 @@ async def zugaenge_pdf(class_id: int, base: str = "", subset_kurs: Optional[int]
     from io import BytesIO
     from reportlab.lib.units import mm
     from reportlab.lib.utils import ImageReader
-    from .modules import is_active
 
     karten_an = await is_active(db, user.id, "karten")
     cardvote_an = await is_active(db, user.id, "cardvote")
@@ -1215,11 +1186,9 @@ async def rotate_tokens(class_id: int, student_id: Optional[int] = None, subset_
 async def progress(class_id: int, kurs_id: Optional[int] = None, subset_kurs: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     cls = await _owned_class(db, user, class_id)
     if subset_kurs is not None:
-        from .kurse import _owned_kurs
-        await _owned_kurs(db, user, subset_kurs)
+        await eigener_kurs(db, user, subset_kurs)
     if kurs_id is not None:
-        from .kurse import _owned_kurs
-        await _owned_kurs(db, user, kurs_id)   # kurs_id kommt aus der URL: erst pruefen, wem er gehoert
+        await eigener_kurs(db, user, kurs_id)   # kurs_id kommt aus der URL: erst pruefen, wem er gehoert
     students = await _kurs_roster(db, user, class_id, subset_kurs)
     now = _now()
     # Nur ausgerollte Stapel zaehlen — Entwuerfe verzerren den Fortschritt nicht.
@@ -1291,7 +1260,6 @@ async def themen_lernstand(db: AsyncSession, user: User, class_id: int, students
     Fällig ist eine Karte, die noch nie dran war oder deren `due` erreicht ist —
     dieselbe Regel wie in der Fortschrittsübersicht.
     """
-    from ..themenprofil import KartenStand
 
     now = jetzt or _now()
     aus = {s.id: {} for s in students}
@@ -1358,15 +1326,13 @@ async def student_cards(class_id: int, student_id: int, kurs_id: Optional[int] =
     if not st:
         raise HTTPException(404, "Schüler nicht gefunden")
     if subset_kurs is not None:
-        from .kurse import member_student_ids, _owned_kurs
-        await _owned_kurs(db, user, subset_kurs)
+        await eigener_kurs(db, user, subset_kurs)
         if student_id not in await member_student_ids(db, subset_kurs):
             raise HTTPException(404, "Schüler nicht in diesem Teilkurs")
     elif st.class_id != class_id:
         raise HTTPException(404, "Schüler nicht in dieser Klasse")
     if kurs_id is not None:
-        from .kurse import _owned_kurs
-        await _owned_kurs(db, user, kurs_id)   # sonst liest ein fremder Kurs Stapelnamen + Kartentexte aus
+        await eigener_kurs(db, user, kurs_id)   # sonst liest ein fremder Kurs Stapelnamen + Kartentexte aus
     now = _now()
     _dl = (await db.execute(select(CardDeck).where(
         CardDeck.owner_id == user.id,
@@ -1418,7 +1384,6 @@ async def _student_by_token(db: AsyncSession, token: str, modul="karten") -> Stu
     erwartet, dass ueber die verteilten Links nichts mehr zu sehen ist. Ohne
     diese Pruefung lieferten sie weiter Kartentexte und Lernstand aus.
     """
-    from .modules import is_active
 
     # EINE Meldung fuer jeden Grund. Vorher gab es drei („Kein Token",
     # „Ungültiger Token", „Zugang nicht mehr gültig") — daran liess sich von
@@ -1677,4 +1642,4 @@ async def submit_review(token: str, body: ReviewIn, db: AsyncSession = Depends(g
         await db.commit()
         return {"ok": True, "interval_days": rev.interval_days}
 
-    return await _mit_wiederholung(db, rechnen)
+    return await mit_wiederholung(db, rechnen)

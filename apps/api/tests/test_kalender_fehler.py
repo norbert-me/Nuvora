@@ -3,29 +3,12 @@ Zeitraeume, Stundenplan-Gueltigkeit ueber den Monatswechsel und das Loeschen
 eines Eintrags, an dem eine Klassenarbeit haengt.
 """
 import pytest
-import pytest_asyncio
 from datetime import date, datetime, timedelta, timezone
-from sqlalchemy import event, select
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy import select
 
-from app.models import (Base, CalendarBreak, CalendarEntry, CardDeck, ExamDate, Kurs,
+from app.models import (CalendarBreak, CalendarEntry, CardDeck, ExamDate, Kurs,
                         SchoolClass, TimetableSlot, Topic, User, UserModule)
 from app.routers import kalender as KAL
-
-
-@pytest_asyncio.fixture
-async def s():
-    e = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @event.listens_for(e.sync_engine, "connect")
-    def _fk(c, _):
-        c.execute("PRAGMA foreign_keys=ON")
-
-    async with e.begin() as c:
-        await c.run_sync(Base.metadata.create_all)
-    async with async_sessionmaker(e, class_=AsyncSession, expire_on_commit=False)() as ss:
-        yield ss
-    await e.dispose()
 
 
 async def _lehrkraft(s, mail="k@d.de", module=("kalender",), token=None):

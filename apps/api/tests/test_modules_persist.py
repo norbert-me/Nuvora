@@ -14,9 +14,6 @@ korrekt, aber nichts hielt das fest. Dieser Test tut es:
 Lauf:  cd apps/api && pip install -r requirements-dev.txt && pytest
 """
 import pytest
-import pytest_asyncio
-from sqlalchemy import event
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 from app.models import Base, User, SchoolClass, Student
 from app.routers import orga, ausleihe
@@ -25,22 +22,6 @@ from app.routers import orga, ausleihe
 # Neue Modultabellen: fehlt eine hier, ist ihr Modell nicht importiert und
 # create_all wuerde sie nie anlegen — dann speichert das Modul live nichts.
 EXPECTED_TABLES = ["orga_items", "material_items", "material_loans"]
-
-
-@pytest_asyncio.fixture
-async def session():
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    # SQLite erzwingt Fremdschluessel nur mit PRAGMA — sonst greifen Kaskaden nicht.
-    @event.listens_for(engine.sync_engine, "connect")
-    def _fk_on(dbapi_conn, _):
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    async with async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)() as s:
-        yield s
-    await engine.dispose()
 
 
 async def _seed(s):

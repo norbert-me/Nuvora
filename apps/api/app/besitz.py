@@ -17,20 +17,41 @@ from sqlalchemy import select
 from .models import SchoolClass
 
 
+async def oder_403(db, model, obj_id, user, fehlt=None, verboten=None):
+    """Datensatz holen; fremder ist 403, unbekannter 404.
+
+    Die **nachsichtige** Fassung: ein Datensatz ohne `owner_id` (Bestand aus der
+    Zeit vor der Mandantentrennung) gehoert allen und wird durchgelassen. Der
+    Gegensatz ist `eigenes` weiter unten — dort ist fremd 404, weil nach aussen
+    nicht erkennbar sein soll, ob es die ID ueberhaupt gibt.
+
+    `fehlt`/`verboten` sind die Meldungstexte. Ohne Angabe bleibt es bei den
+    nackten Statuscodes, die die Aufrufer bisher warfen — der Text ist Teil der
+    Antwort und darf sich beim Zusammenfuehren nicht aendern.
+
+    Stand als Vierzeiler rund achtzehnmal da: elfmal in `sessions.py`
+    (Statuscode ohne Text), dreimal in `results.py` und viermal in
+    `export_import.py` (mit Text) — jedes Mal fuer dieselbe Sitzung, jedes Mal
+    von Hand. Eine Zugriffsregel, die achtzehnmal dasteht, ist achtzehnmal
+    eine Gelegenheit, sie beim naechsten Endpunkt zu vergessen.
+    """
+    obj = await db.get(model, obj_id)
+    if not obj:
+        raise HTTPException(404, fehlt)
+    if obj.owner_id and obj.owner_id != user.id:
+        raise HTTPException(403, verboten)
+    return obj
+
+
 async def klasse_oder_403(db, user, class_id) -> SchoolClass:
     """Klasse holen; fremde Klasse ist 403, unbekannte 404.
 
-    Die nachsichtige Fassung: eine Klasse **ohne** owner_id (Bestand aus der
-    Zeit vor der Mandantentrennung) gehoert allen und wird durchgelassen.
     Vorher wortgleich in zufall.py, orga.py, sitzplan.py, anwesenheit.py und
-    klassenarbeit.py.
+    klassenarbeit.py. Bleibt eine eigene Funktion mit eigenem Namen: sie ist
+    der mit Abstand haeufigste Fall und traegt ihre beiden Meldungstexte.
     """
-    sc = await db.get(SchoolClass, class_id)
-    if not sc:
-        raise HTTPException(404, "Klasse nicht gefunden")
-    if sc.owner_id and sc.owner_id != user.id:
-        raise HTTPException(403, "Keine Berechtigung")
-    return sc
+    return await oder_403(db, SchoolClass, class_id, user,
+                          "Klasse nicht gefunden", "Keine Berechtigung")
 
 
 async def eigene_klasse(db, user, class_id) -> SchoolClass:

@@ -11,6 +11,7 @@ from ..schueler import sortiert
 # `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
 # der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
 from ..besitz import eigenes
+from ..kursmitglieder import member_class_ids, sibling_class_ids
 from ..database import get_db
 from ..uploads import bildtyp, vorschaubild
 from ..models import SchoolClass, Student, User, Kurs, KursTag, Session
@@ -294,7 +295,6 @@ async def list_massnahmen(
     # (Mathe 7.5, Lernzeit 7.5) noch einmal. Gepflegt wird eine Maßnahme meist
     # nur an einer davon — sonst meldet der Kalender „nichts hinterlegt",
     # obwohl es sie gibt. Gleicher Name = dieselbe Person (wie im Roster).
-    from .kurse import sibling_class_ids
     sib = await sibling_class_ids(db, class_id)
     rows = await sortiert(db, Student.class_id.in_(sib or [class_id]))
     gesehen = set()
@@ -383,7 +383,6 @@ async def _sync_siblings(db: AsyncSession, sc: SchoolClass):
     gespiegelt (Abgleich per Name). Bewusst KEIN automatisches Löschen in den
     Geschwistern — Entfernen kaskadiert (Noten/Karten) und bleibt pro Klasse
     eine bewusste Handlung. Attendance ist ohnehin schon kursweit geteilt."""
-    from .kurse import sibling_class_ids
     sib_ids = await sibling_class_ids(db, sc.id)
     sib_ids.discard(sc.id)
     if not sib_ids:
@@ -433,7 +432,6 @@ async def _renumber(db: AsyncSession, sc: SchoolClass) -> None:
     werden. Darauf weist die Oberflaeche vor dem Speichern hin.
     """
     from ..models import Scan, Session as CvSession
-    from .kurse import sibling_class_ids
 
     kinder = await sortiert(db, Student.class_id == sc.id)
     plan = {k.card_id: i + 1 for i, k in enumerate(kinder)}
@@ -568,7 +566,6 @@ async def purge_class(class_id: int, user: User = Depends(get_current_user), db:
     # einzeln zugeordnete SuS haben, bleiben unangetastet: sie wurden bewusst
     # ueber die Klasse hinaus verwendet.
     if kurs_id is not None:
-        from .kurse import member_class_ids
         from ..models import Kurs, KursStudent
         klassen = await member_class_ids(db, [kurs_id], mit_geloeschten=True)
         einzeln = (await db.execute(

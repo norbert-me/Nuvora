@@ -7,22 +7,9 @@ keinen Fremdschlüssel. An genau diesen ON-DELETE-Regeln hängen Kontolöschung
 (Art. 17) und Themenlöschung (Regel 3).
 """
 import pytest
-import pytest_asyncio
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from app.models import Base
 from app.routers.selftest import _check_schema
-
-
-@pytest_asyncio.fixture
-async def db():
-    e = create_async_engine("sqlite+aiosqlite:///:memory:")
-    async with e.begin() as c:
-        await c.run_sync(Base.metadata.create_all)
-    async with async_sessionmaker(e, class_=AsyncSession, expire_on_commit=False)() as s:
-        yield s
-    await e.dispose()
 
 
 def _fk_check(out):

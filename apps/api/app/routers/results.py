@@ -1,5 +1,3 @@
-import asyncio
-import random
 from collections import Counter
 from datetime import datetime, timedelta
 from typing import Optional
@@ -7,21 +5,27 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select, func, update as sa_update
-from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from ..besitz import oder_403
 from ..database import get_db
+from ..nebenlauf import mit_wiederholung
+from ..kursmitglieder import sibling_class_ids
 from ..schueler import roster_klasse
 from ..models import Scan, Session, SchoolClass, Student, QuestionSet, QuestionSetItem, Question, User, Topic
 from .auth import get_current_user
-from ..scoring import bewerte, status_of
+from ..scoring import bewerte, note_aus_pct, status_of
 # Punktelogik der Klassenarbeit (Teilaufgaben, Altformat, Abwesende) — die
 # Fruehwarnung rechnet sie NICHT nach, sie ruft sie auf. Kein Importring:
 # klassenarbeit.py holt nur database/models/auth/modules.
+from .anwesenheit import summary as _anwesenheit_summary
+from .karten import themen_lernstand
 from .klassenarbeit import _profile as _arbeit_profil
+from .. import fruehwarnung as fw
+from .. import themenprofil as tp
 from .. import websocket as ws
-from .modules import modul_pflicht
+from .modules import is_active, modul_pflicht
 
 CARDVOTE = Depends(modul_pflicht("cardvote"))
 
@@ -62,19 +66,11 @@ class ScanCreate(BaseModel):
 async def _mit_wiederholung(db: AsyncSession, arbeit, versuche: int = 6):
     """Schreibvorgang gegen gleichzeitige Schreiber absichern (siehe submit_scan).
 
-    Bewusst je Modul kopiert statt geteilt: Module haengen nicht voneinander ab.
+    Die Schleife steht im Kern (`nebenlauf.py`); hier bleibt nur die Meldung —
+    beim Scannen scannt man noch einmal, nicht „versucht" man noch einmal.
     """
-    for versuch in range(versuche):
-        try:
-            return await arbeit()
-        except (IntegrityError, OperationalError):
-            await db.rollback()
-            if versuch == versuche - 1:
-                raise HTTPException(503, "Gerade zu viel los. Bitte gleich noch einmal scannen.")
-            await asyncio.sleep(0.02 * (versuch + 1) + random.random() * 0.03)
-    # Erreichbar nur bei versuche <= 0. Ohne diese Zeile käme dort ein stilles
-    # None heraus, mit dem der Aufrufer weiterrechnet.
-    raise HTTPException(503, "Gerade zu viel los. Bitte gleich noch einmal scannen.")
+    return await mit_wiederholung(db, arbeit, versuche,
+                                  "Gerade zu viel los. Bitte gleich noch einmal scannen.")
 
 
 async def _set_items(db: AsyncSession, question_set_id: int, sortiert: bool = False):
@@ -189,11 +185,8 @@ async def submit_scan(body: ScanCreate, user: User = Depends(get_current_user), 
 
 @router.get("/sessions/{session_id}/results")
 async def get_results(session_id: int, question_id: Optional[int] = None, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    session = await db.get(Session, session_id)
-    if not session:
-        raise HTTPException(404, "Session nicht gefunden")
-    if session.owner_id and session.owner_id != user.id:
-        raise HTTPException(403, "Kein Zugriff auf diese Session")
+    await oder_403(db, Session, session_id, user,
+                   "Session nicht gefunden", "Kein Zugriff auf diese Session")
     query = select(Scan).where(Scan.session_id == session_id)
     if question_id:
         query = query.where(Scan.question_id == question_id)
@@ -259,11 +252,8 @@ async def list_sessions(archived: Optional[bool] = None, user: User = Depends(ge
 
 @router.get("/sessions/{session_id}/evaluation")
 async def get_evaluation(session_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    session = await db.get(Session, session_id)
-    if not session:
-        raise HTTPException(404)
-    if session.owner_id and session.owner_id != user.id:
-        raise HTTPException(403, "Kein Zugriff auf diese Session")
+    session = await oder_403(db, Session, session_id, user,
+                        verboten="Kein Zugriff auf diese Session")
 
     students = []
     if session.class_id:
@@ -360,11 +350,8 @@ async def get_evaluation(session_id: int, user: User = Depends(get_current_user)
 async def get_topic_stats(session_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Trefferquote je Thema für eine Session (Ziel 2: schwache Themen finden).
     Zählt über alle Scans richtige/gesamte Antworten je Frage-Thema."""
-    session = await db.get(Session, session_id)
-    if not session:
-        raise HTTPException(404)
-    if session.owner_id and session.owner_id != user.id:
-        raise HTTPException(403, "Kein Zugriff auf diese Session")
+    session = await oder_403(db, Session, session_id, user,
+                        verboten="Kein Zugriff auf diese Session")
     if not session.question_set_id:
         return {"class_id": session.class_id, "topics": []}
 
@@ -454,7 +441,6 @@ async def weak_topics_range(frm: datetime, to: datetime, class_id: Optional[int]
     # „wo hakt es?" reicht das, fuer eine Quote auf dem Zeugnis nicht — und die
     # steht hier auch nicht zur Debatte. Das Thema kommt vom Deck, denn Karten
     # selbst tragen keins.
-    from .modules import is_active
     if await is_active(db, user.id, "karten"):
         from ..models import Card, CardDeck, CardReview
         kq = (select(CardDeck.topic_id, CardReview.reps, CardReview.lapses)
@@ -465,7 +451,6 @@ async def weak_topics_range(frm: datetime, to: datetime, class_id: Optional[int]
                      CardReview.last_reviewed.is_not(None),
                      CardReview.last_reviewed >= frm, CardReview.last_reviewed <= to))
         if class_id is not None:
-            from .kurse import sibling_class_ids
             sib = await sibling_class_ids(db, class_id)
             kq = kq.where(Student.class_id.in_(sib or [class_id]))
         for tid, reps, lapses in (await db.execute(kq)).all():
@@ -882,7 +867,6 @@ async def _arbeiten_als_tests(db, user, class_id: int, id_zu_karte: dict):
     Zwei Fassungen derselben Rechnung liefen unweigerlich auseinander — und dann
     stuende in der Auswertung eine andere Zahl als in der Frühwarnung.
     """
-    from .. import fruehwarnung as fw
     from ..models import WorkAnalysis
 
     arbeiten = (await db.execute(
@@ -914,8 +898,6 @@ async def _arbeiten_als_tests(db, user, class_id: int, id_zu_karte: dict):
 
 async def _fruehwarn_daten(db, user, class_id: int):
     """Erhebungen einer Klasse in der Form, die app/fruehwarnung.py erwartet."""
-    from .. import fruehwarnung as fw
-    from .modules import is_active
 
     roster = await _kurs_roster(db, class_id)
     kinder = {s.card_id: s.name for s in roster}
@@ -992,7 +974,6 @@ async def _fruehwarn_quellen(db, user, class_id: int) -> dict:
     ist der unbrauchbarste Satz, den ein Werkzeug schreiben kann, waehrend die
     Lehrkraft gerade sechs Klassenarbeiten vor sich sieht.
     """
-    from .modules import is_active
     from ..models import WorkAnalysis
 
     aus = {"cardvote": await is_active(db, user.id, "cardvote"),
@@ -1022,12 +1003,10 @@ async def _fehlzeiten(db, user, class_id: int) -> dict:
     Meldung „liegt seit Wochen unter der Klasse" ohne den Zusatz „und hat in der
     Zeit sechsmal gefehlt" schickt die Lehrkraft auf die falsche Spur.
     """
-    from .modules import is_active
     if not await is_active(db, user.id, "orga"):
         return {}
     try:
-        from .anwesenheit import summary as _summary
-        return await _summary(class_id, user=user, db=db) or {}
+        return await _anwesenheit_summary(class_id, user=user, db=db) or {}
     except Exception:
         # Die Fruehwarnung darf nicht an einer Bruecke scheitern — ohne
         # Fehlzeiten ist sie schwaecher, aber nicht kaputt.
@@ -1038,7 +1017,6 @@ async def _fehlzeiten(db, user, class_id: int) -> dict:
 async def fruehwarnung_klasse(class_id: int, empfindlich: bool = False,
                               user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Vollbild für eine Klasse: je Kind Kurve, Etiketten, Themen, Begründung."""
-    from .. import fruehwarnung as fw
 
     school_class = await db.get(SchoolClass, class_id)
     if not school_class:
@@ -1104,9 +1082,6 @@ async def themenprofil(class_id: int, student_id: Optional[int] = None,
     `student_id` grenzt auf ein Kind ein (Schuelerseite); ohne ihn kommt die
     ganze Klasse (Uebersicht).
     """
-    from .. import themenprofil as tp
-    from ..scoring import note_aus_pct
-    from .modules import is_active
     from ..models import SchoolClass
 
     school_class = await db.get(SchoolClass, class_id)
@@ -1182,7 +1157,6 @@ async def themenprofil(class_id: int, student_id: Optional[int] = None,
     karten_je_kind: dict[int, dict] = {}
     if await is_active(db, user.id, "karten"):
         quellen.append("karten")
-        from .karten import themen_lernstand
         karten_je_kind = await themen_lernstand(db, user, class_id, roster)
 
     skala = user.grade_scale or None

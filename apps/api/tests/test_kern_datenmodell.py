@@ -24,16 +24,8 @@ def _engine(fk: bool = True):
     return e
 
 
-@pytest_asyncio.fixture
-async def s():
-    e = _engine()
-    async with e.begin() as c:
-        await c.run_sync(Base.metadata.create_all)
-    async with async_sessionmaker(e, class_=AsyncSession, expire_on_commit=False)() as ss:
-        yield ss
-    await e.dispose()
-
-
+# `s` (mit Fremdschluesseln) kommt aus conftest.py; hier steht nur die Fassung
+# OHNE — die ist kein Duplikat, sondern der Punkt dieses Tests.
 @pytest_asyncio.fixture
 async def s_ohne_fk():
     """Wie die gewachsene Produktions-DB: Spalten, die _ensure_columns per

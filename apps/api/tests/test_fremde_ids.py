@@ -15,31 +15,13 @@ und damit zu HTTP 500 — fuer die Lehrkraft sieht das aus, als sei der Server
 kaputt.
 """
 import pytest
-import pytest_asyncio
 from fastapi import HTTPException
-from sqlalchemy import event
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from app.models import Base, User, UserModule, SchoolClass, Student, Question, QuestionSet
+from app.models import User, UserModule, SchoolClass, Student, Question, QuestionSet
 from app.routers import folders as F
 from app.routers import sessions as S
 from app.routers import results as R
 from app.routers import noten as N
-
-
-@pytest_asyncio.fixture
-async def db():
-    e = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @event.listens_for(e.sync_engine, "connect")
-    def _fk(c, _):
-        c.execute("PRAGMA foreign_keys=ON")
-
-    async with e.begin() as c:
-        await c.run_sync(Base.metadata.create_all)
-    async with async_sessionmaker(e, class_=AsyncSession, expire_on_commit=False)() as s:
-        yield s
-    await e.dispose()
 
 
 async def _lehrkraft(db, mail):

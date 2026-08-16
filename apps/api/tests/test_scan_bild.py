@@ -23,11 +23,9 @@ import cv2
 import numpy as np
 import pytest
 from fastapi import HTTPException
-import pytest_asyncio
-from sqlalchemy import event, select
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy import select
 
-from app.models import Base, User, Question, Scan, Session as CvSession
+from app.models import User, Question, Scan, Session as CvSession
 from app.routers.scan_image import (
     detect_markers, scan_image, confirm_scans, ScanImageRequest, ConfirmScanRequest,
 )
@@ -148,20 +146,6 @@ def test_zwischenlage_kippt_an_der_kante_und_die_zuversicht_sagt_es():
 
 
 # ─── Datenbank: vom Bild zur gespeicherten Antwort ───
-
-@pytest_asyncio.fixture
-async def db():
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @event.listens_for(engine.sync_engine, "connect")
-    def _fk_an(dbapi_conn, _):
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    async with async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)() as s:
-        yield s
-    await engine.dispose()
 
 
 async def _sitzung(s):

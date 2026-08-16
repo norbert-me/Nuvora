@@ -22,6 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..besitz import eigene_klasse, eigenes, kurs_oder_klasse
+from ..scoring import note_aus_pct
+from ..kursmitglieder import eigener_kurs, member_student_ids, sibling_class_ids
 from ..felder import ohne_leer, ohne_none
 from ..pdfdruck import als_anhang, neue_seite
 from ..database import get_db
@@ -35,6 +37,8 @@ from ..models import (
 )
 from .auth import rate_limit
 from .modules import is_active, modul_pflicht
+from .anwesenheit import summary as _att_summary
+from .karten import progress as _card_progress
 
 router = APIRouter(prefix="/api/noten", tags=["noten"])
 
@@ -63,8 +67,7 @@ async def _kurs_roster(db, user, class_id, kurs_id=None):
         # Parameter kam roh aus der Adresse, und `user` wurde hier gar nicht
         # benutzt. Betroffen waren summary, year, das Zeugnis-PDF und der
         # Export, also alle Wege, die eine Namensliste ausgeben.
-        from .kurse import _owned_kurs
-        await _owned_kurs(db, user, kurs_id)
+        await eigener_kurs(db, user, kurs_id)
         return await _kanon_kurs(db, kurs_id)
     # Beide Zweige rechneten dieselbe kanonische Liste aus; sie steht jetzt in
     # app/schueler.py und wird auch von results.py und klassenarbeit.py benutzt.
@@ -73,9 +76,7 @@ async def _kurs_roster(db, user, class_id, kurs_id=None):
 
 async def _student_in_kurs(db, class_id, student_id, kurs_id=None) -> bool:
     if kurs_id is not None:
-        from .kurse import member_student_ids
         return student_id in await member_student_ids(db, kurs_id)
-    from .kurse import sibling_class_ids
     sib = await sibling_class_ids(db, class_id)
     r = await db.execute(select(Student.id).where(Student.id == student_id, Student.class_id.in_(sib)))
     return r.scalar_one_or_none() is not None
@@ -188,8 +189,7 @@ async def kurs_students(class_id: int, user: User = Depends(require_module), db:
 async def roster_kurs(kurs_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Noten-Zeilen eines Teilkurses — inkl. der EINZELN hinzugefügten SuS
     (Kurse aus Teilen von Klassen). Deduplikat per Name wie beim Klassen-Roster."""
-    from .kurse import _owned_kurs
-    await _owned_kurs(db, user, kurs_id)
+    await eigener_kurs(db, user, kurs_id)
     ordered = await _kanon_kurs(db, kurs_id)
     return [{"id": s.id, "card_id": s.card_id, "name": s.name, "class_id": s.class_id} for s in ordered]
 
@@ -453,7 +453,6 @@ async def compare_category(category_id: int, user: User = Depends(require_module
     cls_names = {c.id: c.name for c in (await db.execute(select(SchoolClass).where(SchoolClass.owner_id == user.id))).scalars().all()}
 
     # Über Klassen: gleichnamige Spalte in den Geschwister-Klassen des Kurses.
-    from .kurse import sibling_class_ids
     sib = await sibling_class_ids(db, cat.class_id) if cat.class_id else {cat.class_id}
     same = (await db.execute(
         select(GradeCategory).join(GradeSection, GradeCategory.section_id == GradeSection.id)
@@ -1037,7 +1036,6 @@ from ..scoring import DEFAULT_SCALE as _DEFAULT_SCALE  # noqa: E402
 
 def _grade_from_pct(pct: float, scale: dict) -> float:
     """Duenner Durchgriff auf scoring.note_aus_pct — die eine Notenrechnung."""
-    from ..scoring import note_aus_pct
     return note_aus_pct(pct, scale)
 
 
@@ -1376,14 +1374,12 @@ async def _zeugnis_pdf(class_id: int, term: str, agg: str, kurs_id: Optional[int
     fehl: dict = {}
     if await is_active(db, user.id, "orga"):
         try:
-            from .anwesenheit import summary as _att_summary
             fehl = await _att_summary(class_id, user=user, db=db)
         except Exception:
             fehl = {}
     karten: dict = {}
     if await is_active(db, user.id, "karten"):
         try:
-            from .karten import progress as _card_progress
             for p in await _card_progress(class_id, user=user, db=db):
                 karten[p.student_id] = {"reviewed": p.reviewed, "total": p.total}
         except Exception:

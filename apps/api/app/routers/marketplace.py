@@ -7,6 +7,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from ..austauschformat import quiz_schnappschuss
 from ..database import get_db
 from .modules import is_active
 from ..models import (
@@ -97,30 +98,13 @@ class RateBody(BaseModel):
 
 
 def _snapshot_from_items(qs: QuestionSet, items: list[QuestionSetItem]) -> dict:
-    return {
-        "type": "cardvote_questionset",
-        "version": 1,
-        "name": qs.name,
-        "shuffle_questions": qs.shuffle_questions,
-        "shuffle_answers": qs.shuffle_answers,
-        # E/G-Differenzierung und Minuspunkte gehoeren zum Quiz — ohne sie waere
-        # die uebernommene Fassung anders bewertet als das Original.
-        "niveau_aktiv": bool(qs.niveau_aktiv),
-        "minuspunkte": bool(qs.minuspunkte),
-        "questions": [
-            {
-                "text": it.question.text,
-                "choices": it.question.choices,
-                "correct_answer": it.question.correct_answer,
-                "image_url": it.question.image_url,
-                "image_layout": it.question.image_layout,
-                "num_choices": it.question.num_choices,
-                "choice_images": it.question.choice_images,
-                "niveau": it.niveau or "",
-            }
-            for it in items
-        ],
-    }
+    """Marktplatz-Abbild eines Quiz — dasselbe Format wie der Dateiexport.
+
+    Die Form steht im Kern (`austauschformat.py`) und nicht hier: sie ueberlebt
+    den Code, der sie geschrieben hat, und muss auf beiden Wegen gleich sein
+    (Regressionstest `tests/test_austauschformat.py`).
+    """
+    return quiz_schnappschuss(qs, items)
 
 
 def _snapshot_from_deck(deck: CardDeck, cards: list[Card]) -> dict:

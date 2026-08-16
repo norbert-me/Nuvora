@@ -5,27 +5,9 @@ Klassen desselben Kurses sichtbar — jede Fach-Klasse hat ihre eigenen Karten.
 (SuS werden im Kern geteilt, der Karten-Fortschritt aber je Fach gefuehrt.)
 """
 import pytest
-import pytest_asyncio
-from sqlalchemy import event
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from app.models import Base, User, SchoolClass, Student, Kurs, KursTag
+from app.models import User, SchoolClass, Student, Kurs, KursTag
 from app.routers import karten as K
-
-
-@pytest_asyncio.fixture
-async def s():
-    e = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @event.listens_for(e.sync_engine, "connect")
-    def _fk(c, _):
-        c.execute("PRAGMA foreign_keys=ON")
-
-    async with e.begin() as c:
-        await c.run_sync(Base.metadata.create_all)
-    async with async_sessionmaker(e, class_=AsyncSession, expire_on_commit=False)() as ss:
-        yield ss
-    await e.dispose()
 
 
 async def _kurs(s):

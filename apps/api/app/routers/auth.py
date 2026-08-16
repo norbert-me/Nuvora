@@ -19,6 +19,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..netz import client_ip as _client_ip
+from ..seed import seed_new_account
 from ..database import get_db
 from ..models import User, Question, MarketplaceQuiz
 from .. import mailer
@@ -529,7 +530,6 @@ async def register(body: RegisterBody, request: Request, db: AsyncSession = Depe
     # kann. Best-effort — scheitert das, ist das Konto trotzdem gueltig; eine
     # Registrierung darf nicht an einer Demo haengen.
     try:
-        from ..seed import seed_new_account
         await seed_new_account(db, user.id)
     except Exception as e:
         logger.warning("Beispielinhalt für %s konnte nicht angelegt werden: %s", user.id, e)

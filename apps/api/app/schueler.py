@@ -1,8 +1,9 @@
 """Schuelerlisten: Reihenfolge und Roster an einer Stelle.
 
-Ein Blatt wie `besitz.py`. Den Kurs-Router holt es erst **in** der Funktion,
-weil `kurse.py` selbst Router ist und der Import oben ein Ring waere — genau so
-machten es vorher die Aufrufer, jeder fuer sich.
+Ein Blatt wie `besitz.py`. Die Kurs-Mitgliedschaft kommt aus dem Blatt
+`kursmitglieder.py` und wird **oben** importiert. Frueher stand sie im
+Kurs-**Router**, und dieses Modul holte sie deshalb erst in der Funktion — ein
+Importring, den nur genau dieser Import offenhielt.
 
 Zusammengefuehrt: die **Sortierung** `(position, card_id, id)`, die rund
 achtzehnmal ausgeschrieben dastand (keine Kosmetik — `card_id` ist die Nummer
@@ -12,8 +13,10 @@ hatten und noten.py mit einem zweiten Zweig davor.
 """
 from __future__ import annotations
 
+from fastapi import HTTPException
 from sqlalchemy import select
 
+from .kursmitglieder import member_student_ids, sibling_class_ids
 from .models import Student
 
 # Die eine Reihenfolge. Immer per * entpackt: `order_by(*SORTIERUNG)`.
@@ -38,6 +41,25 @@ def kanonisch(studs) -> list[Student]:
     return sorted(canon.values(), key=_sortschluessel)
 
 
+async def in_klasse(db, student_id, class_id) -> Student:
+    """Das Kind holen — und nur, wenn es wirklich in dieser Klasse sitzt.
+
+    Der Aufrufer hat die **Klasse** schon als seine geprueft; ohne diesen
+    zweiten Schritt liesse sich ueber eine fremde `student_id` an einem eigenen
+    Klassenpfad Anwesenheit, Losung oder Checkliste eines fremden Kindes
+    schreiben. Stand wortgleich in `orga.py`, `zufall.py` und zweimal in
+    `anwesenheit.py`.
+
+    Absichtlich **nicht** kurs-weit: hier ist die Klasse gemeint, nicht die
+    Lerngruppe. Wer die Geschwisterklassen mitmeinen will, nimmt
+    `roster_klasse`.
+    """
+    st = await db.get(Student, student_id)
+    if not st or st.class_id != class_id:
+        raise HTTPException(404, "Schüler nicht in dieser Klasse")
+    return st
+
+
 async def sortiert(db, *bedingungen) -> list[Student]:
     """SuS zu beliebigen WHERE-Bedingungen, in der einen Reihenfolge."""
     return list((await db.execute(
@@ -46,7 +68,6 @@ async def sortiert(db, *bedingungen) -> list[Student]:
 
 async def roster_klasse(db, class_id) -> list[Student]:
     """Kanonische SuS des Kurses ueber die Geschwisterklassen dieser Klasse."""
-    from .routers.kurse import sibling_class_ids
     sib = await sibling_class_ids(db, class_id)
     return kanonisch(await sortiert(db, Student.class_id.in_(sib)))
 
@@ -54,7 +75,6 @@ async def roster_klasse(db, class_id) -> list[Student]:
 async def roster_kurs(db, kurs_id) -> list[Student]:
     """Kanonische SuS eines Kurses — inklusive der EINZELN hinzugefuegten
     (Kurse aus Teilen von Klassen)."""
-    from .routers.kurse import member_student_ids
     sids = list(await member_student_ids(db, kurs_id))
     if not sids:
         return []

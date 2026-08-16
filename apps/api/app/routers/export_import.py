@@ -16,6 +16,9 @@ from sqlalchemy.orm import selectinload
 from ..scoring import DEFAULT_SCALE, bewerte, status_of
 from ..schueler import sortiert
 from ..pdfdruck import als_anhang, neue_seite
+from ..austauschformat import quiz_inhalt, quiz_schnappschuss
+from ..felder import ohne_leer, ohne_none
+from ..besitz import oder_403
 from ..database import get_db
 from ..importe import geprueft
 from ..models import SchoolClass, Student, QuestionSet, QuestionSetItem, Question, Session, Scan, Folder, User
@@ -36,6 +39,8 @@ def strip_latex(text: str) -> str:
     return s.strip()
 
 from .modules import modul_pflicht
+from .folders import ensure_set_access
+from .noten import _grade_from_pct as _dezimalnote
 
 # Klassen-Export/-Import gehoeren dem Kern, Fragen/Sets/Sitzungen dem Modul.
 # Deshalb haengt die Schranke hier an der einzelnen Route, nicht am Router.
@@ -96,25 +101,6 @@ async def _session_question_dicts(db, session):
          "niveau": item.niveau or ""}
         for item in await _session_items(db, session)
     ]
-
-
-def _question_snapshot(item) -> dict:
-    """Eine Frage als Datei-Abbild (Export von Set und Ordner).
-
-    Stand wortgleich in export_question_set und _export_folder_recursive.
-    Der aehnliche Schnappschuss in marketplace.py laesst "niveau" bewusst
-    weg — Marktplatz-Fragen tragen kein E/G — und bleibt getrennt."""
-    q = item.question
-    return {
-        "niveau": item.niveau or "",
-        "text": q.text,
-        "choices": q.choices,
-        "correct_answer": q.correct_answer,
-        "image_url": q.image_url,
-        "image_layout": q.image_layout,
-        "num_choices": q.num_choices,
-        "choice_images": q.choice_images,
-    }
 
 
 def _question_from_import(qdata, owner_id) -> Question:
@@ -201,7 +187,6 @@ async def export_question_set(set_id: int, user: User = Depends(get_current_user
     qs = await db.get(QuestionSet, set_id)
     if not qs:
         raise HTTPException(404)
-    from .folders import ensure_set_access
     await ensure_set_access(db, qs, user.id)
     result = await db.execute(
         select(QuestionSetItem)
@@ -210,16 +195,7 @@ async def export_question_set(set_id: int, user: User = Depends(get_current_user
         .order_by(QuestionSetItem.position)
     )
     items = result.scalars().all()
-    return {
-        "type": "cardvote_questionset",
-        "version": 1,
-        "name": qs.name,
-        "shuffle_questions": qs.shuffle_questions,
-        "shuffle_answers": qs.shuffle_answers,
-        "niveau_aktiv": bool(qs.niveau_aktiv),
-        "minuspunkte": bool(qs.minuspunkte),
-        "questions": [_question_snapshot(item) for item in items],
-    }
+    return quiz_schnappschuss(qs, items)
 
 
 # --- Excel template for class import ---
@@ -400,15 +376,8 @@ class ImportClassBody(BaseModel):
     name: str = ""
     students: List[ImportStudent] = []
 
-    @field_validator("name", mode="before")
-    @classmethod
-    def _leer(cls, v):
-        return "" if v is None else v
-
-    @field_validator("students", mode="before")
-    @classmethod
-    def _leer_liste(cls, v):
-        return [] if v is None else v
+    _leer_text = field_validator("name", mode="before")(ohne_none(""))
+    _leer_liste = field_validator("students", mode="before")(ohne_none([]))
 
 
 class ImportQuestion(BaseModel):
@@ -422,20 +391,9 @@ class ImportQuestion(BaseModel):
     choice_images: Optional[dict] = None
     niveau: str = ""
 
-    @field_validator("text", "image_layout", "niveau", mode="before")
-    @classmethod
-    def _leer(cls, v):
-        return "" if v is None else v
-
-    @field_validator("choices", mode="before")
-    @classmethod
-    def _leer_choices(cls, v):
-        return {"A": "", "B": "", "C": "", "D": ""} if v is None else v
-
-    @field_validator("num_choices", mode="before")
-    @classmethod
-    def _leer_zahl(cls, v):
-        return 4 if v in (None, "") else v
+    _leer_text = field_validator("text", "image_layout", "niveau", mode="before")(ohne_none(""))
+    _leer_choices = field_validator("choices", mode="before")(ohne_none({"A": "", "B": "", "C": "", "D": ""}))
+    _leer_zahl = field_validator("num_choices", mode="before")(ohne_leer(4))
 
     @field_validator("image_layout")
     @classmethod
@@ -455,20 +413,10 @@ class ImportQuestionSetBody(BaseModel):
     minuspunkte: bool = False
     questions: List[ImportQuestion] = []
 
-    @field_validator("name", mode="before")
-    @classmethod
-    def _leer(cls, v):
-        return "" if v is None else v
-
-    @field_validator("shuffle_questions", "shuffle_answers", "niveau_aktiv", "minuspunkte", mode="before")
-    @classmethod
-    def _leer_flag(cls, v):
-        return False if v is None else v
-
-    @field_validator("questions", mode="before")
-    @classmethod
-    def _leer_liste(cls, v):
-        return [] if v is None else v
+    _leer_text = field_validator("name", mode="before")(ohne_none(""))
+    _leer_flag = field_validator("shuffle_questions", "shuffle_answers", "niveau_aktiv",
+                                 "minuspunkte", mode="before")(ohne_none(False))
+    _leer_liste = field_validator("questions", mode="before")(ohne_none([]))
 
 
 @router.post("/import/class")
@@ -543,16 +491,9 @@ async def _export_folder_recursive(folder_id: int, db: AsyncSession) -> dict:
             .order_by(QuestionSetItem.position)
         )
         items = items_r.scalars().all()
-        exported_sets.append({
-            "name": qs.name,
-            "shuffle_questions": qs.shuffle_questions,
-            "shuffle_answers": qs.shuffle_answers,
-            # E/G-Differenzierung gehoert zum Quiz — ohne sie waere die
-            # zurueckgespielte Fassung anders bewertet als das Original.
-            "niveau_aktiv": bool(qs.niveau_aktiv),
-            "minuspunkte": bool(qs.minuspunkte),
-            "questions": [_question_snapshot(item) for item in items],
-        })
+        # Ohne "type"/"version": die stehen einmal aussen am Ordner, nicht an
+        # jedem Quiz darin. Der Inhalt selbst ist derselbe wie beim Einzelexport.
+        exported_sets.append(quiz_inhalt(qs, items))
     children_r = await db.execute(
         select(Folder).where(Folder.parent_id == folder_id)
     )
@@ -586,20 +527,10 @@ class ImportFolderSet(BaseModel):
     minuspunkte: bool = False
     questions: List[ImportQuestion] = []
 
-    @field_validator("name", mode="before")
-    @classmethod
-    def _leer(cls, v):
-        return "" if v is None else v
-
-    @field_validator("shuffle_questions", "shuffle_answers", "niveau_aktiv", "minuspunkte", mode="before")
-    @classmethod
-    def _leer_flag(cls, v):
-        return False if v is None else v
-
-    @field_validator("questions", mode="before")
-    @classmethod
-    def _leer_liste(cls, v):
-        return [] if v is None else v
+    _leer_text = field_validator("name", mode="before")(ohne_none(""))
+    _leer_flag = field_validator("shuffle_questions", "shuffle_answers", "niveau_aktiv",
+                                 "minuspunkte", mode="before")(ohne_none(False))
+    _leer_liste = field_validator("questions", mode="before")(ohne_none([]))
 
 
 class ImportFolderBody(BaseModel):
@@ -609,20 +540,13 @@ class ImportFolderBody(BaseModel):
     question_sets: List[ImportFolderSet] = []
     children: List["ImportFolderBody"] = []
 
-    @field_validator("name", mode="before")
-    @classmethod
-    def _leer(cls, v):
-        return "" if v is None else v
+    _leer_text = field_validator("name", mode="before")(ohne_none(""))
+    _leer_liste = field_validator("question_sets", "children", mode="before")(ohne_none([]))
 
     @field_validator("name")
     @classmethod
     def _name_ok(cls, v):
         return v.strip()[:200] or "Ordner"
-
-    @field_validator("question_sets", "children", mode="before")
-    @classmethod
-    def _leer_liste(cls, v):
-        return [] if v is None else v
 
 
 ImportFolderBody.model_rebuild()
@@ -706,7 +630,6 @@ async def duplicate_question_set(set_id: int, user: User = Depends(get_current_u
     orig = result.scalar_one_or_none()
     if not orig:
         raise HTTPException(404)
-    from .folders import ensure_set_access
     await ensure_set_access(db, orig, user.id)
 
     qs = QuestionSet(
@@ -733,11 +656,8 @@ async def evaluation_xlsx(session_id: int, user: User = Depends(get_current_user
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
 
-    session = await db.get(Session, session_id)
-    if session and session.owner_id and session.owner_id != user.id:
-        raise HTTPException(403, "Kein Zugriff auf diese Session")
-    if not session:
-        raise HTTPException(404)
+    session = await oder_403(db, Session, session_id, user,
+                        verboten="Kein Zugriff auf diese Session")
 
     students = []
     if session.class_id:
@@ -806,11 +726,8 @@ async def evaluation_xlsx(session_id: int, user: User = Depends(get_current_user
 @router.get("/sessions/{session_id}/evaluation-scsv", dependencies=[CARDVOTE])
 async def evaluation_scsv(session_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Export as semicolon-separated CSV for iDoceo import."""
-    session = await db.get(Session, session_id)
-    if not session:
-        raise HTTPException(404)
-    if session.owner_id and session.owner_id != user.id:
-        raise HTTPException(403, "Kein Zugriff auf diese Session")
+    session = await oder_403(db, Session, session_id, user,
+                        verboten="Kein Zugriff auf diese Session")
 
     students = []
     if session.class_id:
@@ -895,7 +812,6 @@ def _decimal_grade(pct, scale=None):
 
     Gerechnet wird jetzt an einer Stelle; kaufmaennisch runden steht in
     scoring.py und ist dort begruendet."""
-    from .noten import _grade_from_pct as _dezimalnote
     return _dezimalnote(pct, scale or DEFAULT_SCALE)
 
 
@@ -1007,11 +923,8 @@ def _build_student_pdf_single(student, questions, scan_map, session, config, niv
 
 @router.get("/sessions/{session_id}/student-pdf/{card_id}", dependencies=[CARDVOTE])
 async def student_evaluation_pdf(session_id: int, card_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    session = await db.get(Session, session_id)
-    if not session:
-        raise HTTPException(404)
-    if session.owner_id and session.owner_id != user.id:
-        raise HTTPException(403, "Kein Zugriff auf diese Session")
+    session = await oder_403(db, Session, session_id, user,
+                        verboten="Kein Zugriff auf diese Session")
 
     student = None
     if session.class_id:
@@ -1039,11 +952,8 @@ async def student_evaluation_pdf(session_id: int, card_id: int, user: User = Dep
 
 @router.get("/sessions/{session_id}/all-students-pdf", dependencies=[CARDVOTE])
 async def all_students_pdf(session_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    session = await db.get(Session, session_id)
-    if not session:
-        raise HTTPException(404)
-    if session.owner_id and session.owner_id != user.id:
-        raise HTTPException(403, "Kein Zugriff auf diese Session")
+    session = await oder_403(db, Session, session_id, user,
+                        verboten="Kein Zugriff auf diese Session")
 
     students = []
     if session.class_id:

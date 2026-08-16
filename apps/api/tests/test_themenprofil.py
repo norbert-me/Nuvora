@@ -7,11 +7,8 @@ wenigen Punkten behauptet werden.
 from datetime import datetime, timedelta, timezone
 
 import pytest
-import pytest_asyncio
-from sqlalchemy import event
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from app.models import Base, Card, CardDeck, CardReview, SchoolClass, Student, Topic, User, UserModule
+from app.models import Card, CardDeck, CardReview, SchoolClass, Student, Topic, User, UserModule
 from app.routers import karten as K
 from app.themenprofil import (MINDEST_KARTEN, MINDEST_PUNKTE, Erhebung, KartenStand,
                               Messung, profil)
@@ -170,20 +167,6 @@ def test_ohne_karten_rechnet_alles_wie_vorher():
 
 
 # ─── Die Kartenquelle selbst: was gezaehlt wird und was nicht ───
-
-@pytest_asyncio.fixture
-async def s():
-    e = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @event.listens_for(e.sync_engine, "connect")
-    def _fk(c, _):
-        c.execute("PRAGMA foreign_keys=ON")
-
-    async with e.begin() as c:
-        await c.run_sync(Base.metadata.create_all)
-    async with async_sessionmaker(e, class_=AsyncSession, expire_on_commit=False)() as ss:
-        yield ss
-    await e.dispose()
 
 
 async def _aufbau(s, niveau_aktiv=False):

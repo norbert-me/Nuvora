@@ -10,32 +10,13 @@ die Note ueberlebt.
 Lauf:  cd apps/api && pip install -r requirements-dev.txt && pytest
 """
 import pytest
-import pytest_asyncio
-from sqlalchemy import event, select
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy import select
 
 from app.models import (
-    Base, User, SchoolClass, Student, GradeSection, GradeCategory, GradeEntry,
+    User, SchoolClass, Student, GradeSection, GradeCategory, GradeEntry,
 )
 from app.routers import classes as C
 from app.routers.classes import update_class, ClassCreate, StudentIn
-
-
-@pytest_asyncio.fixture
-async def session():
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    # SQLite erzwingt Fremdschluessel nur mit diesem PRAGMA — ohne ihn wuerde die
-    # Kaskade gar nicht greifen und der Test koennte eine Regression uebersehen.
-    @event.listens_for(engine.sync_engine, "connect")
-    def _fk_on(dbapi_conn, _):
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    async with async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)() as s:
-        yield s
-    await engine.dispose()
 
 
 async def _seed(s):

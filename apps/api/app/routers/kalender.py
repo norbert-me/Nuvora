@@ -19,6 +19,7 @@ from ..felder import ohne_leer, ohne_none
 # `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
 # der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
 from ..besitz import eigenes
+from ..kursmitglieder import class_kurs_ids
 from ..database import get_db
 from ..importe import geprueft
 from ..models import CalendarBreak, CalendarEntry, CardDeck, ExamDate, Kurs, SchoolClass, TimetableSlot, SlotCancellation, Topic, User, WorkAnalysis, Session as TestSession
@@ -144,7 +145,6 @@ async def _check_verknuepfungen(db: AsyncSession, user: User, body) -> None:
     Nachlaessigkeit.
     """
     from ..models import CardDeck, LearningLadder, Method, QuestionSet
-    from .modules import is_active
 
     # (Feld, Modul, Modell, Eigentuemer-Spalte)
     felder = (
@@ -211,7 +211,6 @@ async def _release_matching_decks(db: AsyncSession, user: User, e: CalendarEntry
     """
     if not await is_active(db, user.id, "karten"):
         return
-    from .kurse import class_kurs_ids
 
     async def _stunde_weist_zu(deck_id: int) -> None:
         """Die Stunde erzeugt die Kurs-Zuweisung des Stapels.
@@ -602,7 +601,6 @@ async def _korrektur_todo(db, user, e: ExamDate, verschieben: bool = False) -> N
     zweiter Aufruf findet ihn wieder.
     """
     from datetime import timedelta
-    from .modules import is_active
     from ..models import Todo
 
     if not await is_active(db, user.id, "notizbrett") or not e.date:

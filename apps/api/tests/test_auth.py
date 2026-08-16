@@ -9,28 +9,10 @@ also auch einen Wechsel des Hash-Verfahrens.
 import time
 
 import pytest
-import pytest_asyncio
 from fastapi import HTTPException
-from sqlalchemy import event
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from app.models import Base, User
+from app.models import User
 from app.routers import auth as A
-
-
-@pytest_asyncio.fixture
-async def s():
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @event.listens_for(engine.sync_engine, "connect")
-    def _fk_on(dbapi_conn, _):
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    async with async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)() as sess:
-        yield sess
-    await engine.dispose()
 
 
 @pytest.fixture(autouse=True)

@@ -13,28 +13,11 @@ Zwei Tests, in dieser Reihenfolge gedacht:
    Ohne den zweiten faellt die naechste neue Art genauso durch.
 """
 import pytest
-import pytest_asyncio
-from sqlalchemy import event, func, select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy import func, select
 
 from app import models as m
-from app.models import Base, SchoolClass, User
+from app.models import SchoolClass, User
 from app.routers import trash
-
-
-@pytest_asyncio.fixture
-async def session():
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @event.listens_for(engine.sync_engine, "connect")
-    def _fk(c, _):
-        c.execute("PRAGMA foreign_keys=ON")
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    async with async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)() as s:
-        yield s
-    await engine.dispose()
 
 
 def test_jede_art_wird_beim_leeren_angefasst():

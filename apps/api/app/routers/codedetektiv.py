@@ -4,18 +4,16 @@ Damit Rätsel themen-getaggt und im Kalender planbar sind, liegen die eigenen
 Rätsel der Lehrkraft im Kern (nicht mehr nur im Browser-localStorage). Die App
 arbeitet weiter mit ihrer stabilen `client_id`; upsert läuft darüber.
 """
-import asyncio
-import random
 import secrets
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select, update as sa_update
-from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
+from ..nebenlauf import mit_wiederholung
 from ..zeit import jetzt
 from ..database import get_db
 from ..models import CodePuzzle, CodeSession, Topic, User
@@ -149,24 +147,6 @@ async def _by_code(db: AsyncSession, code: str, sperren: bool = False) -> CodeSe
     return s
 
 
-async def _mit_wiederholung(db: AsyncSession, arbeit, versuche: int = 8):
-    """Siehe `_by_code`: der zweite Schreiber rollt zurueck, liest neu, rechnet neu.
-
-    Bewusst je Modul kopiert statt geteilt: Module haengen nicht voneinander ab.
-    """
-    for versuch in range(versuche):
-        try:
-            return await arbeit()
-        except (IntegrityError, OperationalError):
-            await db.rollback()
-            if versuch == versuche - 1:
-                raise HTTPException(503, "Gerade zu viel los. Bitte gleich noch einmal versuchen.")
-            await asyncio.sleep(0.02 * (versuch + 1) + random.random() * 0.03)
-    # Erreichbar nur bei versuche <= 0. Ohne diese Zeile käme dort ein stilles
-    # None heraus, mit dem der Aufrufer weiterrechnet.
-    raise HTTPException(503, "Gerade zu viel los. Bitte gleich noch einmal versuchen.")
-
-
 async def _owned_session(db: AsyncSession, user: User, code: str) -> CodeSession:
     s = await _by_code(db, code)
     if s.owner_id != user.id:
@@ -264,7 +244,7 @@ async def join_session(code: str, body: JoinIn, request: Request, db: AsyncSessi
         await db.commit()
         return _session_public(s)
 
-    return await _mit_wiederholung(db, eintragen)
+    return await mit_wiederholung(db, eintragen, versuche=8)
 
 
 class ResultIn(BaseModel):
@@ -323,7 +303,7 @@ async def submit_result(code: str, body: ResultIn, request: Request, db: AsyncSe
         await db.commit()
         return _session_public(s)
 
-    return await _mit_wiederholung(db, melden)
+    return await mit_wiederholung(db, melden, versuche=8)
 
 
 @router.post("/sessions/{code}/start")

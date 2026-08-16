@@ -6,14 +6,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .netz import client_ip
-from .database import engine
-from .models import Base
+from .kursmitglieder import schuljahr_aus_name
+from .database import engine, async_session
+from .models import AppSetting, Base, Kurs, Session as SessionModel, User
 # Admin-Pruefung und Programmfassung kommen aus app/admin.py — dem Blatt, das
 # den frueheren Ring main -> routers.backup -> main aufloest. Hier nur noch
 # hereingeholt, damit die Routen weiter unten `_require_admin` benutzen koennen.
 from .admin import _require_admin, APP_VERSION  # noqa: F401 — Routen unten
 from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizblock, trash, selftest, backup
 from . import websocket as ws
+from .routers.auth import _hash_pw, _verify_token, rate_limit, TOKEN_TTL
+from .routers.karten import uebernahme_deck_kurse
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
@@ -582,9 +585,6 @@ async def startup():
         await conn.run_sync(_check_module_tables)
 
     from sqlalchemy import func, select, text
-    from .models import User
-    from .routers.auth import _hash_pw
-    from .database import async_session
 
     # Bestandskonten (vor Cutoff) als bestätigt markieren — Neue müssen bestätigen
     async with async_session() as db:
@@ -624,11 +624,9 @@ async def startup():
     # In PYTHON, nicht in SQL: der erste Versuch stand als `text()` mit einem
     # regulaeren Ausdruck da, und SQLAlchemy las darin `(?:20)` als
     # Bind-Parameter „:20" — der Start brach ab, der Container blieb unhealthy.
-    # Die Regel gibt es ohnehin schon einmal (kurse.schuljahr_aus_name), samt
+    # Die Regel gibt es ohnehin schon einmal (kursmitglieder.schuljahr_aus_name), samt
     # Test; zweimal dieselbe Regel waere auch ohne den Unfall falsch gewesen.
     async with async_session() as db:
-        from .models import Kurs
-        from .routers.kurse import schuljahr_aus_name
 
         offen = (await db.execute(
             select(Kurs).where(func.coalesce(Kurs.schuljahr, "") == "")
@@ -708,31 +706,15 @@ async def startup():
     # ordnet neu zu. Nur Zeilen mit kurs_id IS NULL, damit es idempotent bleibt.
     async with async_session() as db:
         try:
-            await db.execute(text("""
-                WITH single AS (
-                  SELECT class_id, MIN(kurs_id) AS kurs_id FROM (
-                    SELECT class_id, kurs_id FROM kurs_tags
-                    UNION SELECT id AS class_id, kurs_id FROM school_classes WHERE kurs_id IS NOT NULL
-                  ) m GROUP BY class_id HAVING COUNT(DISTINCT kurs_id) = 1
-                )
-                UPDATE grade_sections g SET kurs_id = s.kurs_id
-                FROM single s WHERE g.class_id = s.class_id AND g.kurs_id IS NULL
-            """))
-            await db.execute(text("""
-                WITH single AS (
-                  SELECT class_id, MIN(kurs_id) AS kurs_id FROM (
-                    SELECT class_id, kurs_id FROM kurs_tags
-                    UNION SELECT id AS class_id, kurs_id FROM school_classes WHERE kurs_id IS NOT NULL
-                  ) m GROUP BY class_id HAVING COUNT(DISTINCT kurs_id) = 1
-                )
-                UPDATE grade_overrides o SET kurs_id = s.kurs_id
-                FROM single s WHERE o.class_id = s.class_id AND o.kurs_id IS NULL
-            """))
-            # Ebenso Sitzplan + Orga-Checklisten: Bestand (kurs_id NULL) an den
-            # einzigen Kurs der Klasse hängen, sonst „verschwindet" er, sobald
-            # der Selektor den Kurs mitschickt. Karten haben ihre kurs_id schon
-            # beim Anlegen bekommen (cls.kurs_id).
-            for tbl in ("seating_plans", "orga_items", "card_decks"):
+            # Dieselbe Anweisung fuer fuenf Tabellen — sie stand dreimal
+            # ausgeschrieben da (grade_sections, grade_overrides und eine
+            # Schleife ueber die restlichen drei), Wort fuer Wort gleich bis auf
+            # den Tabellennamen. Sitzplan, Orga-Checklisten und Decks muessen
+            # mit, sonst „verschwinden" sie, sobald der Selektor den Kurs
+            # mitschickt. Karten haben ihre kurs_id schon beim Anlegen bekommen
+            # (cls.kurs_id).
+            for tbl in ("grade_sections", "grade_overrides", "seating_plans",
+                        "orga_items", "card_decks"):
                 await db.execute(text(f"""
                     WITH single AS (
                       SELECT class_id, MIN(kurs_id) AS kurs_id FROM (
@@ -796,7 +778,6 @@ async def startup():
     # noch Karten.
     async with async_session() as db:
         try:
-            from .routers.karten import uebernahme_deck_kurse
             n = await uebernahme_deck_kurse(db)
             if n:
                 print(f"[STARTUP] Karten: {n} Kurs-Zuweisung(en) aus dem Bestand uebernommen.", flush=True)
@@ -875,7 +856,6 @@ async def startup():
     admin_email = os.environ.get("ADMIN_EMAIL", "")
     admin_pw = os.environ.get("ADMIN_PASSWORD", "")
     if admin_email and admin_pw:
-        from .models import AppSetting
         async with async_session() as db:
             done = await db.get(AppSetting, "admin_bootstrapped")
             if not done:
@@ -911,7 +891,6 @@ PAPIERKORB_TABELLEN = (
 async def _papierkorb_leeren(laut: bool = False):
     """Endgueltig loeschen, was laenger als 30 Tage im Papierkorb liegt."""
     from sqlalchemy import text
-    from .database import async_session
     async with async_session() as db:
         for tbl, wort in PAPIERKORB_TABELLEN:
             try:
@@ -949,7 +928,6 @@ async def _codesessions_aufraeumen():
     Tag, offen gebliebene nach sieben.
     """
     from sqlalchemy import text
-    from .database import async_session
     while True:
         try:
             async with async_session() as db:
@@ -974,7 +952,6 @@ async def _codesessions_aufraeumen():
 
 async def _cleanup_unverified_loop():
     from sqlalchemy import text
-    from .database import async_session
     while True:
         try:
             async with async_session() as db:
@@ -992,9 +969,6 @@ async def _cleanup_unverified_loop():
 
 async def _ws_is_session_owner(token: str, session_id: int) -> bool:
     """Prueft, ob das Token zur Besitzer-Person der Session gehoert (fuer Steuerbefehle)."""
-    from .routers.auth import _verify_token, TOKEN_TTL
-    from .database import async_session
-    from .models import User, Session as SessionModel
     import time as _time
     if not token:
         return False
@@ -1059,7 +1033,6 @@ async def health():
     global _health_ok_bis
     from sqlalchemy import text
     from fastapi.responses import JSONResponse
-    from .database import async_session
     # Nur das GUTE Ergebnis wird kurz gemerkt. Ein Fehler nie: faellt die
     # Datenbank aus, soll der naechste Aufruf das sofort sehen, nicht erst nach
     # Ablauf einer Frist.
@@ -1147,7 +1120,6 @@ def _fetch_latest_stable() -> str:
 
 
 async def _get_channel(db) -> str:
-    from .models import AppSetting
     row = await db.get(AppSetting, "update_channel")
     ch = row.value if row else DEFAULT_CHANNEL
     return ch if ch in CHANNELS else DEFAULT_CHANNEL
@@ -1186,7 +1158,6 @@ class ChannelBody(_BaseModel):
 
 @app.put("/api/version/channel")
 async def set_channel(body: ChannelBody, user=Depends(_require_admin), db=Depends(get_db)):
-    from .models import AppSetting
     if body.channel not in CHANNELS:
         raise HTTPException(400, "Unbekannter Kanal")
     row = await db.get(AppSetting, "update_channel")
@@ -1277,7 +1248,6 @@ def contact_recipient() -> str:
 @app.post("/api/contact")
 async def contact(body: ContactBody, request: Request):
     from . import mailer
-    from .routers.auth import rate_limit, client_ip
     rate_limit("contact", client_ip(request), 5, 3600, "Zu viele Nachrichten. Bitte später erneut versuchen.")
     to = contact_recipient()
     if not to:

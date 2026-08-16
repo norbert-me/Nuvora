@@ -13,7 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..besitz import eigenes, klasse_oder_403, kurs_oder_klasse
 from ..database import get_db
-from ..models import OrgaItem, Student, User
+from ..schueler import in_klasse
+from ..models import OrgaItem, User
 from .auth import rate_limit
 from .modules import modul_pflicht
 
@@ -106,9 +107,7 @@ async def delete_item(item_id: int, user: User = Depends(require_module), db: As
 async def toggle(item_id: int, body: ToggleIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     it = await _owned_item(db, user, item_id)
     # Nur Schüler der Klasse zulassen.
-    st = await db.get(Student, body.student_id)
-    if not st or st.class_id != it.class_id:
-        raise HTTPException(404, "Schüler nicht in dieser Klasse")
+    await in_klasse(db, body.student_id, it.class_id)
     done = list(it.done or [])
     if body.student_id in done:
         done.remove(body.student_id)

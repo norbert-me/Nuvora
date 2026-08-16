@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, RootModel, field_validator
 from sqlalchemy import select, or_, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
+from ..besitz import oder_403
 from ..database import get_db
 from ..importe import geprueft
 from ..models import Session, QuestionSetItem, SchoolClass, QuestionSet, User
@@ -66,11 +67,7 @@ async def get_active_sessions(user: User = Depends(get_current_user), db: AsyncS
 
 @router.post("/{session_id}/finish")
 async def finish_session(session_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    s = await db.get(Session, session_id)
-    if not s:
-        raise HTTPException(404)
-    if s.owner_id and s.owner_id != user.id:
-        raise HTTPException(403)
+    s = await oder_403(db, Session, session_id, user)
     s.status = "finished"
     await db.commit()
     return {"ok": True}
@@ -165,11 +162,7 @@ class QuestionMapIn(RootModel[Dict[str, Optional[str]]]):
 @router.put("/{session_id}/question-map")
 async def save_question_map(session_id: int, body: dict, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """`body: dict` in der Signatur ist Absicht — siehe app/importe.py."""
-    s = await db.get(Session, session_id)
-    if not s:
-        raise HTTPException(404)
-    if s.owner_id and s.owner_id != user.id:
-        raise HTTPException(403)
+    s = await oder_403(db, Session, session_id, user)
     s.question_map = geprueft(QuestionMapIn, body, "Loesungen").model_dump()
     await db.commit()
     return {"ok": True}
@@ -177,11 +170,7 @@ async def save_question_map(session_id: int, body: dict, user: User = Depends(ge
 
 @router.get("/{session_id}")
 async def get_session(session_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    s = await db.get(Session, session_id)
-    if not s:
-        raise HTTPException(404)
-    if s.owner_id and s.owner_id != user.id:
-        raise HTTPException(403)
+    s = await oder_403(db, Session, session_id, user)
     out = {"id": s.id, "code": s.code, "name": s.name, "class_id": s.class_id, "question_set_id": s.question_set_id, "current_question_id": s.current_question_id, "status": s.status, "archived": s.archived}
     if s.class_id:
         cls = await db.get(SchoolClass, s.class_id)
@@ -194,6 +183,10 @@ async def get_session(session_id: int, user: User = Depends(get_current_user), d
 
 @router.post("/{session_id}/next", response_model=SessionOut)
 async def next_question(session_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    # Absichtlich NICHT `oder_403` wie die uebrigen Sitzungs-Endpunkte: hier
+    # ist „Sitzung ohne Fragenset" ebenfalls 404, und diese Pruefung muss VOR
+    # der Besitzpruefung stehen. Andersherum antwortete eine fremde Sitzung
+    # ohne Fragenset mit 403 statt 404 — und verriete damit, dass es sie gibt.
     s = await db.get(Session, session_id)
     if not s or not s.question_set_id:
         raise HTTPException(404)
@@ -227,11 +220,7 @@ async def next_question(session_id: int, user: User = Depends(get_current_user),
 
 @router.post("/{session_id}/set-question")
 async def set_question(session_id: int, question_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    s = await db.get(Session, session_id)
-    if not s:
-        raise HTTPException(404)
-    if s.owner_id and s.owner_id != user.id:
-        raise HTTPException(403)
+    s = await oder_403(db, Session, session_id, user)
     # Auch die Frage gehoert geprueft: eine unbekannte ID wurde zum
     # Fremdschluesselfehler und damit zu HTTP 500.
     gehoert = (await db.execute(select(QuestionSetItem.id).where(
@@ -247,11 +236,7 @@ async def set_question(session_id: int, question_id: int, user: User = Depends(g
 
 @router.get("/{session_id}/eval-config")
 async def get_eval_config(session_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    s = await db.get(Session, session_id)
-    if not s:
-        raise HTTPException(404)
-    if s.owner_id and s.owner_id != user.id:
-        raise HTTPException(403)
+    s = await oder_403(db, Session, session_id, user)
     return s.eval_config or {}
 
 
@@ -290,11 +275,7 @@ class EvalConfigIn(BaseModel):
 @router.put("/{session_id}/eval-config")
 async def save_eval_config(session_id: int, body: dict, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """`body: dict` in der Signatur ist Absicht — siehe app/importe.py."""
-    s = await db.get(Session, session_id)
-    if not s:
-        raise HTTPException(404)
-    if s.owner_id and s.owner_id != user.id:
-        raise HTTPException(403)
+    s = await oder_403(db, Session, session_id, user)
     geprueft(EvalConfigIn, body, "Einstellungen")
     s.eval_config = body
     await db.commit()
@@ -303,11 +284,7 @@ async def save_eval_config(session_id: int, body: dict, user: User = Depends(get
 
 @router.post("/{session_id}/archive")
 async def toggle_archive(session_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    s = await db.get(Session, session_id)
-    if not s:
-        raise HTTPException(404)
-    if s.owner_id and s.owner_id != user.id:
-        raise HTTPException(403)
+    s = await oder_403(db, Session, session_id, user)
     s.archived = not s.archived
     await db.commit()
     return {"ok": True, "archived": s.archived}
@@ -315,17 +292,17 @@ async def toggle_archive(session_id: int, user: User = Depends(get_current_user)
 
 @router.delete("/{session_id}", status_code=204)
 async def delete_session(session_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    s = await db.get(Session, session_id)
-    if not s:
-        raise HTTPException(404)
-    if s.owner_id and s.owner_id != user.id:
-        raise HTTPException(403)
+    s = await oder_403(db, Session, session_id, user)
     await db.delete(s)
     await db.commit()
 
 
 @offen_router.get("/{session_id}/qr")
 async def get_session_qr(session_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+    # Ohne Besitzpruefung, und das ist die benannte Ausnahme in
+    # `tests/test_modul_schranke.py`: das QR-Bild ist der Weg IN die Sitzung
+    # und wird gezeigt, bevor jemand angemeldet ist. Es gibt nur ein Bild her,
+    # keine Inhalte.
     s = await db.get(Session, session_id)
     if not s:
         raise HTTPException(404)

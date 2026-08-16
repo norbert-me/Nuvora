@@ -7,28 +7,10 @@ liegt in einer Oberfläche, die es nicht gibt, taucht nirgends auf und ist nur
 aktiven Modul.
 """
 import pytest
-import pytest_asyncio
-from sqlalchemy import event
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from fastapi import HTTPException
 
-from app.models import Base, User, UserModule, SchoolClass, CardDeck, Card
+from app.models import User, UserModule, SchoolClass, CardDeck, Card
 from app.routers import marketplace as M
-
-
-@pytest_asyncio.fixture
-async def s():
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @event.listens_for(engine.sync_engine, "connect")
-    def _fk_on(dbapi_conn, _):
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    async with async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)() as sess:
-        yield sess
-    await engine.dispose()
 
 
 async def _stapel(s, mit_modul: bool):

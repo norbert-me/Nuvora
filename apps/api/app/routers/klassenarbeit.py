@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..besitz import eigenes, klasse_oder_403, kurs_oder_klasse
+from ..kursmitglieder import eigener_kurs
 from ..database import get_db
 # `roster_kurs` heisst hier unten schon ein Endpunkt — deshalb umbenannt
 # importiert, sonst ueberdeckt der Endpunkt den Helfer.
@@ -22,6 +23,7 @@ from ..schueler import roster_klasse, roster_kurs as _kanon_kurs
 from ..models import WorkAnalysis, Student, Topic, User
 from .auth import rate_limit
 from .modules import is_active, modul_pflicht
+from .anwesenheit import get_day as _tag
 
 router = APIRouter(prefix="/api/klassenarbeit", tags=["klassenarbeit"])
 MODULE_KEY = "auswertung"
@@ -94,8 +96,7 @@ async def roster(class_id: int, user: User = Depends(require_module), db: AsyncS
 async def roster_kurs(kurs_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """SuS eines Kurses — inkl. der EINZELN hinzugefügten (Kurse aus Teilen von
     Klassen). Deduplikat per Name wie beim Klassen-Roster."""
-    from .kurse import _owned_kurs
-    await _owned_kurs(db, user, kurs_id)
+    await eigener_kurs(db, user, kurs_id)
     return [{"id": s.id, "name": s.name, "class_id": s.class_id} for s in await _kanon_kurs(db, kurs_id)]
 
 
@@ -129,7 +130,6 @@ async def create_work(body: WorkIn, user: User = Depends(require_module), db: As
 async def _abwesende_am_tag(db, user, class_id: int, datum: Optional[str]) -> list:
     """student_ids, die an diesem Tag als fehlend erfasst sind (leer ohne Orga)."""
     from datetime import datetime as _dt
-    from .modules import is_active
 
     if not datum or not await is_active(db, user.id, "orga"):
         return []
@@ -138,7 +138,6 @@ async def _abwesende_am_tag(db, user, class_id: int, datum: Optional[str]) -> li
     except ValueError:
         return []
     try:
-        from .anwesenheit import get_day as _tag
         stand = await _tag(class_id, date=tag, period=None, user=user, db=db) or {}
     except Exception:
         return []
@@ -176,8 +175,7 @@ async def copy_work(work_id: int, body: WorkCopyIn, user: User = Depends(require
     quelle = await _owned_work(db, user, work_id)
     await _owned_class(db, user, body.class_id)
     if body.kurs_id is not None:
-        from .kurse import _owned_kurs
-        await _owned_kurs(db, user, body.kurs_id)
+        await eigener_kurs(db, user, body.kurs_id)
 
     import copy as _copy
     ziel = WorkAnalysis(

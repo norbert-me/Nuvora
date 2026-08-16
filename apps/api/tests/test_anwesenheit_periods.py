@@ -8,27 +8,10 @@ EINE Abwesenheit (Fehlzeiten-Zählung, Verlauf).
 from datetime import datetime
 
 import pytest
-import pytest_asyncio
-from sqlalchemy import event, select, func
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy import select, func
 
-from app.models import Base, User, SchoolClass, Student, Attendance
+from app.models import User, SchoolClass, Student, Attendance
 from app.routers import anwesenheit as an
-
-
-@pytest_asyncio.fixture
-async def s():
-    e = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @event.listens_for(e.sync_engine, "connect")
-    def _fk(c, _):
-        c.execute("PRAGMA foreign_keys=ON")
-
-    async with e.begin() as c:
-        await c.run_sync(Base.metadata.create_all)
-    async with async_sessionmaker(e, class_=AsyncSession, expire_on_commit=False)() as ss:
-        yield ss
-    await e.dispose()
 
 
 async def _seed(s):

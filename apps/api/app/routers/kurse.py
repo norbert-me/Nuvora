@@ -8,21 +8,32 @@ Mitgliedschaft ist many-to-many (Tabelle kurs_tags): eine Klasse kann in
 mehreren Kursen sein. Alle Mitglieder eines Kurses teilen — es gibt keinen
 Unterschied „Sharing vs. Tag" mehr.
 """
-import re
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from datetime import datetime, timezone
 
 from ..besitz import eigenes
+from ..kursmitglieder import (
+    eigener_kurs as _owned_kurs,
+    member_class_ids,
+    member_student_ids,
+    schuljahr_aus_name,
+    sibling_class_ids,
+)
 from ..schueler import sortiert
 from ..database import get_db
 from ..models import Kurs, KursTag, KursStudent, SchoolClass, Student, User
 from .auth import get_current_user
+from .classes import MASSNAHMEN_VALUES
+
+# Die Mitgliedschafts-Fragen („welche Klassen, welche SuS, welche Geschwister?")
+# stehen im Blatt `kursmitglieder.py`, nicht mehr hier — dieser Router ist die
+# HTTP-Seite davon und ruft sie wie jeder andere auch.
 
 router = APIRouter(prefix="/api/kurse", tags=["kurse"])
 
@@ -58,20 +69,6 @@ class KursOut(BaseModel):
     nachfolger_name: str = ""
 
 
-# Schuljahr aus einem Kursnamen lesen: "6.5 Mathematik (2025-2026)" -> "2025/26".
-# Bestandskurse tragen es im Namen, weil es bisher kein Feld dafuer gab; der
-# Backfill beim Start (main.py) fuellt daraus einmalig das Feld.
-_JAHR = re.compile(r"(20\d{2})\s*[-/–]\s*(20\d{2}|\d{2})")
-
-
-def schuljahr_aus_name(name: str) -> str:
-    m = _JAHR.search(name or "")
-    if not m:
-        return ""
-    von, bis = m.group(1), m.group(2)
-    return f"{von}/{bis[-2:]}"
-
-
 async def _kette_ok(db, user, kurs_id: int, vorgaenger_id: int) -> None:
     """Ein Kurs darf nicht sein eigener Vorgaenger sein — auch nicht ueber Ecken.
 
@@ -94,10 +91,6 @@ async def _kette_ok(db, user, kurs_id: int, vorgaenger_id: int) -> None:
         lauf = k.vorgaenger_id
 
 
-async def _owned_kurs(db, user, kurs_id) -> Kurs:
-    return await eigenes(db, Kurs, kurs_id, user, "Kurs nicht gefunden")
-
-
 async def _own_class(db, user, class_id) -> SchoolClass:
     # Besitz strikt wie in classes.py: eine Klasse ohne owner_id gehoert
     # niemandem und darf nicht in einen fremden Kurs wandern — ueber den Kurs
@@ -105,74 +98,6 @@ async def _own_class(db, user, class_id) -> SchoolClass:
     # allgemeine `eigenes` und NICHT `besitz.klasse_oder_403`, das eine Klasse
     # ohne owner_id durchlaesst.
     return await eigenes(db, SchoolClass, class_id, user, "Klasse nicht gefunden")
-
-
-# ─── Mitgliedschaft (wird auch von Anwesenheit/Klassen genutzt) ───
-
-async def member_class_ids(db, kurs_ids, mit_geloeschten=False) -> set:
-    """Klassen-IDs, die Mitglied eines der Kurse sind (kurs_tags ∪ altes kurs_id).
-
-    Klassen im Papierkorb zaehlen nicht mit: ihre SuS standen sonst weiter im
-    Kurs-Roster (E/G-Liste, Massnahmen, Anwesenheit) und Schreibvorgaenge
-    liefen in eine geloeschte Klasse. Die Mitgliedschaft selbst bleibt bestehen
-    — wird die Klasse wiederhergestellt, ist sie wieder dabei."""
-    if not kurs_ids:
-        return set()
-    kurs_ids = list(kurs_ids)
-    a = (await db.execute(select(KursTag.class_id).where(KursTag.kurs_id.in_(kurs_ids)))).scalars().all()
-    b = (await db.execute(select(SchoolClass.id).where(SchoolClass.kurs_id.in_(kurs_ids)))).scalars().all()
-    ids = set(a) | set(b)
-    if mit_geloeschten or not ids:
-        return ids
-    lebend = set((await db.execute(select(SchoolClass.id).where(
-        SchoolClass.id.in_(list(ids)), SchoolClass.deleted_at.is_(None)))).scalars().all())
-    return ids & lebend
-
-
-async def member_student_ids(db, kurs_id) -> set:
-    """Alle SuS-IDs eines Kurses: die aller Mitgliedsklassen UND die einzeln
-    hinzugefügten (kurs_students). So funktionieren Kurse aus Teilen von Klassen."""
-    classes = list(await member_class_ids(db, [kurs_id]))
-    ids = set()
-    if classes:
-        ids |= set((await db.execute(select(Student.id).where(Student.class_id.in_(classes)))).scalars().all())
-    einzeln = set((await db.execute(select(KursStudent.student_id).where(KursStudent.kurs_id == kurs_id))).scalars().all())
-    if einzeln:  # nur solche, deren Klasse nicht im Papierkorb liegt
-        einzeln &= set((await db.execute(
-            select(Student.id).join(SchoolClass, Student.class_id == SchoolClass.id)
-            .where(Student.id.in_(list(einzeln)), SchoolClass.deleted_at.is_(None))
-        )).scalars().all())
-    return ids | einzeln
-
-
-async def class_kurs_ids(db, class_id, only_active=True) -> set:
-    """Kurse (nicht gelöscht), in denen die Klasse Mitglied ist (kurs_tags ∪ kurs_id)."""
-    ids = set((await db.execute(select(KursTag.kurs_id).where(KursTag.class_id == class_id))).scalars().all())
-    sc = await db.get(SchoolClass, class_id)
-    if sc and sc.kurs_id:
-        ids.add(sc.kurs_id)
-    if only_active and ids:
-        alive = set((await db.execute(select(Kurs.id).where(Kurs.id.in_(list(ids)), Kurs.deleted_at.is_(None)))).scalars().all())
-        return ids & alive
-    return ids
-
-
-async def student_kurs_ids(db, student_id, only_active=True) -> set:
-    """Teilkurse (kurs_students), in denen dieser SuS EINZELN Mitglied ist —
-    Kurse aus Teilen von Klassen, unabhängig von der Klassen-Zugehörigkeit."""
-    ids = set((await db.execute(select(KursStudent.kurs_id).where(KursStudent.student_id == student_id))).scalars().all())
-    if only_active and ids:
-        alive = set((await db.execute(select(Kurs.id).where(Kurs.id.in_(list(ids)), Kurs.deleted_at.is_(None)))).scalars().all())
-        return ids & alive
-    return ids
-
-
-async def sibling_class_ids(db, class_id) -> set:
-    """Alle Klassen, die mit dieser einen Kurs teilen (inkl. sich selbst)."""
-    kurse = await class_kurs_ids(db, class_id)
-    ids = await member_class_ids(db, kurse)
-    ids.add(class_id)
-    return ids
 
 
 async def _students_of_kurs(db, kurs_id, ordered: bool = False) -> list:
@@ -228,9 +153,8 @@ async def list_kurse(archiviert: bool = False, user: User = Depends(get_current_
     kurse = (await db.execute(select(Kurs).where(
         Kurs.owner_id == user.id, Kurs.deleted_at.is_(None), zustand).order_by(Kurs.name))).scalars().all()
     by = await _classes_by_kurs(db, user, kurse)
-    from sqlalchemy import func as _f
     mc = dict((await db.execute(
-        select(KursStudent.kurs_id, _f.count(KursStudent.id))
+        select(KursStudent.kurs_id, func.count(KursStudent.id))
         .where(KursStudent.kurs_id.in_([k.id for k in kurse] or [-1])).group_by(KursStudent.kurs_id)
     )).all())
     # Namen der Nachbarn in der Jahresfolge mitgeben — auch die des Vorjahres,
@@ -255,9 +179,6 @@ async def archive_kurs(kurs_id: int, mit_klassen: bool = True, user: User = Depe
     """Kurs ins Archiv (oder zurueck). Standardmaessig ziehen seine Fach-Klassen
     mit: am Schuljahresende ist der ganze Kurs vorbei, und eine Klasse allein in
     den Listen zu lassen waere genau die halbe Arbeit, die man vergisst."""
-    from datetime import datetime, timezone
-    from ..models import SchoolClass
-
     k = await _owned_kurs(db, user, kurs_id)
     jetzt = None if k.archived_at else datetime.now(timezone.utc)
     k.archived_at = jetzt
@@ -341,7 +262,6 @@ async def add_member(kurs_id: int, class_id: int, user: User = Depends(get_curre
 @router.delete("/{kurs_id}/classes/{class_id}", status_code=204)
 async def remove_member(kurs_id: int, class_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Klasse aus diesem Kurs entfernen (bleibt in ihren anderen Kursen)."""
-    from sqlalchemy import update
     await _owned_kurs(db, user, kurs_id)
     await db.execute(delete(KursTag).where(KursTag.kurs_id == kurs_id, KursTag.class_id == class_id))
     # Auch die alte 1:1-Spalte loesen. Jede neue Klasse traegt sie auf ihren
@@ -479,7 +399,6 @@ async def set_kurs_massnahmen(kurs_id: int, body: MassnahmenIn, user: User = Dep
     """Maßnahmen einer Person IN DIESEM Kurs setzen. Einträge anderer Kurse
     bleiben unberührt; geschrieben wird auf alle Fach-Klassen-Zeilen der Person
     (gleicher Name), damit jede Ansicht dieselben Daten sieht."""
-    from .classes import MASSNAHMEN_VALUES
     await _owned_kurs(db, user, kurs_id)
     name = (body.name or "").strip()
     if not name:
@@ -517,7 +436,6 @@ async def set_kurs_massnahmen(kurs_id: int, body: MassnahmenIn, user: User = Dep
 async def delete_kurs(kurs_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """In den Papierkorb (30 Tage). Die Mitgliedschaften werden entfernt (die
     Klassen bleiben, ggf. in ihren anderen Kursen); Restore stellt sie wieder her."""
-    from sqlalchemy import update
     k = await _owned_kurs(db, user, kurs_id)
     # Auch Mitglieder im Papierkorb merken: sonst waere ihre Mitgliedschaft
     # verloren, sobald die Klasse spaeter wiederhergestellt wird.

@@ -10,29 +10,12 @@ dabei **nicht** eingeebnet werden durften:
 * und beide Fassungen sind weiter im Router zu haben, unter ihrem alten Namen.
 """
 import pytest
-import pytest_asyncio
 from fastapi import HTTPException
-from sqlalchemy import event
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from app.besitz import klasse_oder_403, eigene_klasse, eigenes, kurs_oder_klasse
+from app.besitz import klasse_oder_403, eigene_klasse, eigenes, kurs_oder_klasse, oder_403
 from app.schueler import SORTIERUNG, kanonisch, roster_klasse, roster_kurs, sortiert
-from app.models import (Base, User, SchoolClass, Student, Kurs, KursTag, Topic, OrgaItem)
-
-
-@pytest_asyncio.fixture
-async def s():
-    e = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @event.listens_for(e.sync_engine, "connect")
-    def _fk(c, _):
-        c.execute("PRAGMA foreign_keys=ON")
-
-    async with e.begin() as c:
-        await c.run_sync(Base.metadata.create_all)
-    async with async_sessionmaker(e, class_=AsyncSession, expire_on_commit=False)() as ss:
-        yield ss
-    await e.dispose()
+from app.models import (User, SchoolClass, Student, Kurs, KursTag, Topic, OrgaItem,
+                        Session)
 
 
 async def _konten(s):
@@ -193,3 +176,75 @@ def test_kanonisch_haelt_reihenfolge():
             self.name, self.position, self.card_id, self.id = name, position, card_id, id
     raus = kanonisch([S("Zoe", 3, 9, 3), S("Anna", 1, 1, 1), S("Zoe ", 3, 9, 7)])
     assert [x.name for x in raus] == ["Anna", "Zoe"]
+
+
+# ─── Die allgemeine nachsichtige Fassung (Sitzungen, Bestand ohne owner_id) ───
+
+@pytest.mark.asyncio
+async def test_oder_403_ohne_texte_bleibt_beim_nackten_statuscode(s):
+    """`sessions.py` warf `HTTPException(404)`/`(403)` ohne Text — achtzehnmal.
+
+    Der Text ist Teil der Antwort. Wer die Kopien einsammelt und dabei einen
+    Standardtext ergaenzt, aendert die Antwort fuer jeden dieser Endpunkte.
+    """
+    a, b = await _konten(s)
+    eigen = Session(code="AAA", owner_id=a.id)
+    fremd = Session(code="BBB", owner_id=b.id)
+    s.add_all([eigen, fremd])
+    await s.commit()
+
+    assert (await oder_403(s, Session, eigen.id, a)).id == eigen.id
+
+    with pytest.raises(HTTPException) as e:
+        await oder_403(s, Session, fremd.id, a)
+    # Ohne eigenen Text setzt Starlette den Standardsatz — Wort fuer Wort das,
+    # was `HTTPException(403)` vorher lieferte.
+    assert (e.value.status_code, e.value.detail) == (403, "Forbidden")
+
+    with pytest.raises(HTTPException) as e:
+        await oder_403(s, Session, 999999, a)
+    assert (e.value.status_code, e.value.detail) == (404, "Not Found")
+
+
+@pytest.mark.asyncio
+async def test_oder_403_reicht_die_texte_durch(s):
+    a, b = await _konten(s)
+    fremd = Session(code="BBB", owner_id=b.id)
+    s.add(fremd)
+    await s.commit()
+
+    with pytest.raises(HTTPException) as e:
+        await oder_403(s, Session, fremd.id, a, "weg", "verboten")
+    assert (e.value.status_code, e.value.detail) == (403, "verboten")
+
+    with pytest.raises(HTTPException) as e:
+        await oder_403(s, Session, 999999, a, "weg", "verboten")
+    assert (e.value.status_code, e.value.detail) == (404, "weg")
+
+
+@pytest.mark.asyncio
+async def test_oder_403_laesst_bestand_ohne_owner_durch(s):
+    """Eine Sitzung aus der Zeit vor der Mandantentrennung gehoert allen.
+
+    Genau das ist der Unterschied zu `eigenes` — wer ihn einebnet, sperrt
+    Bestandskonten aus ihren eigenen alten Auswertungen aus.
+    """
+    a, _ = await _konten(s)
+    alt = Session(code="CCC", owner_id=None)
+    s.add(alt)
+    await s.commit()
+    assert (await oder_403(s, Session, alt.id, a)).id == alt.id
+
+
+@pytest.mark.asyncio
+async def test_fremde_sitzung_verraet_nicht_erst_ihre_existenz(s):
+    """403 vor 404 oder 404 vor 403 — bei einer FEHLENDEN ID muss 404 kommen.
+
+    `export_import.py` prueft(e) den Besitz zuerst und die Existenz danach; die
+    uebrigen umgekehrt. Beide Reihenfolgen ergeben dieselbe Antwort, und das
+    muss so bleiben, sonst antwortet derselbe Fehler je nach Endpunkt anders.
+    """
+    a, _ = await _konten(s)
+    with pytest.raises(HTTPException) as e:
+        await oder_403(s, Session, 999999, a, verboten="Kein Zugriff auf diese Session")
+    assert e.value.status_code == 404

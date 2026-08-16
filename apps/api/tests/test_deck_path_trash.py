@@ -1,28 +1,11 @@
 """Papierkorb auch für Karten-Decks und Lernpfade: Löschen = Soft-Delete,
 wiederherstellbar, erst purge kaskadiert (Karten bzw. Lernleitern)."""
 import pytest
-import pytest_asyncio
-from sqlalchemy import event, select, func
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy import select, func
 
 from app import models as m
-from app.models import Base, User, SchoolClass
+from app.models import User, SchoolClass
 from app.routers import karten, lernpfad
-
-
-@pytest_asyncio.fixture
-async def session():
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @event.listens_for(engine.sync_engine, "connect")
-    def _fk(c, _):
-        c.execute("PRAGMA foreign_keys=ON")
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    async with async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)() as s:
-        yield s
-    await engine.dispose()
 
 
 async def _user_class(s):

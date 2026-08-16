@@ -9,12 +9,10 @@ Je Endpunkt zwei Faelle: der Normalfall darf nicht kaputtgehen, und eine kaputte
 Datei muss 400 mit Feldnamen geben, niemals 500.
 """
 import pytest
-import pytest_asyncio
 from fastapi import HTTPException
-from sqlalchemy import event, select
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy import select
 
-from app.models import (Base, CalendarEntry, Folder, GradeEntry, GradeSection, Method,
+from app.models import (CalendarEntry, Folder, GradeEntry, GradeSection, Method,
                         QuestionSet, SchoolClass, Session as TestSession, Student,
                         TimetableSlot, User, UserModule)
 from app.routers import export_import as EXP
@@ -22,21 +20,6 @@ from app.routers import kalender as KAL
 from app.routers import methoden as MET
 from app.routers import noten as NOT
 from app.routers import sessions as SES
-
-
-@pytest_asyncio.fixture
-async def s():
-    e = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @event.listens_for(e.sync_engine, "connect")
-    def _fk(c, _):
-        c.execute("PRAGMA foreign_keys=ON")
-
-    async with e.begin() as c:
-        await c.run_sync(Base.metadata.create_all)
-    async with async_sessionmaker(e, class_=AsyncSession, expire_on_commit=False)() as ss:
-        yield ss
-    await e.dispose()
 
 
 async def _lehrkraft(s, mail="l@d.de", module=("auswertung", "kalender", "unterrichtsplanung", "cardvote")):

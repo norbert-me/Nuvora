@@ -11,29 +11,12 @@ sonst ist es ein Datenleck bzw. ein DSGVO-Verstoß:
 Lauf:  cd apps/api && pip install -r requirements-dev.txt && pytest
 """
 import pytest
-import pytest_asyncio
 from fastapi import HTTPException
-from sqlalchemy import event, select, func
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy import select, func
 
 from app import models as m
-from app.models import Base, User, SchoolClass, Student
+from app.models import User, SchoolClass, Student
 from app.routers import classes, noten, karten, orga, ausleihe
-
-
-@pytest_asyncio.fixture
-async def session():
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @event.listens_for(engine.sync_engine, "connect")
-    def _fk_on(dbapi_conn, _):
-        dbapi_conn.execute("PRAGMA foreign_keys=ON")
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    async with async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)() as s:
-        yield s
-    await engine.dispose()
 
 
 async def _teacher(s, email):

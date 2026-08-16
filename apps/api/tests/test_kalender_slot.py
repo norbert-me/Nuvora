@@ -4,27 +4,9 @@ kurs_id riete die Anzeige den falschen Kurs (Bug: Kurs „mathe 7.5" gewählt,
 Plan zeigt Klassenname „7.5 LZ").
 """
 import pytest
-import pytest_asyncio
-from sqlalchemy import event
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from app.models import Base, User, SchoolClass, Kurs, KursTag
+from app.models import User, SchoolClass, Kurs, KursTag
 from app.routers import kalender as KAL
-
-
-@pytest_asyncio.fixture
-async def s():
-    e = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @event.listens_for(e.sync_engine, "connect")
-    def _fk(c, _):
-        c.execute("PRAGMA foreign_keys=ON")
-
-    async with e.begin() as c:
-        await c.run_sync(Base.metadata.create_all)
-    async with async_sessionmaker(e, class_=AsyncSession, expire_on_commit=False)() as ss:
-        yield ss
-    await e.dispose()
 
 
 def test_expand_rrule_common_cases():

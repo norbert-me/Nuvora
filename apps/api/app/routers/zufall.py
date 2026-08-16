@@ -6,14 +6,15 @@ das Frontend faire Gewichtung (lange nicht dran → höheres Gewicht) und die Re
 """
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..besitz import klasse_oder_403
 from ..database import get_db
-from ..models import Student, User, ZufallDraw
+from ..schueler import in_klasse
+from ..models import User, ZufallDraw
 from .modules import modul_pflicht
 
 router = APIRouter(prefix="/api/zufall", tags=["zufall"])
@@ -51,9 +52,7 @@ async def get_history(class_id: int, user: User = Depends(require_module), db: A
 @router.post("/{class_id}/draw")
 async def record_draw(class_id: int, body: DrawIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
-    st = await db.get(Student, body.student_id)
-    if not st or st.class_id != class_id:
-        raise HTTPException(404, "Schüler nicht in dieser Klasse")
+    await in_klasse(db, body.student_id, class_id)
     row = (await db.execute(select(ZufallDraw).where(
         ZufallDraw.owner_id == user.id, ZufallDraw.student_id == body.student_id
     ))).scalar_one_or_none()

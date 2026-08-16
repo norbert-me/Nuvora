@@ -17,28 +17,10 @@ Lernpfad heraus. Deshalb beide Haelften hier festgehalten:
 Lauf:  cd apps/api && pytest tests/test_frage_thema.py
 """
 import pytest
-import pytest_asyncio
-from sqlalchemy import event
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from app.models import Base, User, Topic, Question, QuestionSet, QuestionSetItem
+from app.models import User, Topic, Question, QuestionSet, QuestionSetItem
 from app.routers import questions as Q
 from app.routers import folders as F
-
-
-@pytest_asyncio.fixture
-async def s():
-    e = create_async_engine("sqlite+aiosqlite:///:memory:")
-
-    @event.listens_for(e.sync_engine, "connect")
-    def _fk(c, _):
-        c.execute("PRAGMA foreign_keys=ON")
-
-    async with e.begin() as c:
-        await c.run_sync(Base.metadata.create_all)
-    async with async_sessionmaker(e, class_=AsyncSession, expire_on_commit=False)() as ss:
-        yield ss
-    await e.dispose()
 
 
 async def _welt(s):
