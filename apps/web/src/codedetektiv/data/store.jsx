@@ -1,4 +1,5 @@
 import { createContext, useContext, useReducer, useEffect, useRef } from 'react';
+import { alsJson, hol } from '../../core/melden.js';
 import { samplePuzzles } from './samplePuzzles';
 
 function loadState() {
@@ -136,9 +137,23 @@ function reducer(state, action) {
 const StoreContext = createContext();
 
 const CD_API = '/api/codedetektiv/puzzles';
-const jsonHeaders = { 'Content-Type': 'application/json' };
-
 const S_API = '/api/codedetektiv/sessions';
+
+// Ein Rätsel zum Server schicken (anlegen wie ändern — der Server upsertet).
+const raetselSenden = (p) =>
+  fetch(CD_API, alsJson('PUT', { client_id: p.id, title: p.title || '', topic_id: p.topic_id ?? null, payload: p }));
+
+/**
+ * Beitreten — von der Startseite (mit Code-Eingabe) und von der öffentlichen
+ * Seite `/cd/<CODE>` aus derselbe Aufruf. Die Fehlermeldung bleibt bei der
+ * Seite: dort heißt 404 „Session nicht gefunden", hier 400 „läuft schon".
+ */
+export function sessionBeitreten(code, name) {
+  return fetch(`${S_API}/${code}/join`, alsJson('POST', { name })).catch(() => null);
+}
+
+/** Gibt es diese Session? (Öffentliche Seite prüft das vor dem Formular.) */
+export const sessionGibtEs = (code) => hol(`${S_API}/${code}`, null).then((s) => !!s);
 // Server-Session in die vom UI erwartete Form bringen.
 function mapSession(srv) {
   return {
@@ -163,15 +178,19 @@ export function StoreProvider({ children }) {
     rawDispatch({ type: 'SET_CURRENT_SESSION', code: srv.code });
   };
 
+  // Jeder Session-Aufruf antwortet mit der ganzen Session — also überall
+  // derselbe Weg: rufen, Antwort übernehmen, Fehler schlucken (das Polling
+  // holt den Stand ohnehin gleich wieder).
+  const rufen = (url, opts) =>
+    fetch(url, opts).then(r => (r.ok ? r.json() : null)).then(srv => srv && applySession(srv)).catch(() => {});
+
   // Session-Aktionen laufen jetzt serverseitig (geräteübergreifendes Beitreten).
   const dispatch = (action) => {
     const cur = stateRef.current;
     switch (action.type) {
       case 'ADD_PUZZLE':
       case 'UPDATE_PUZZLE': {
-        const p = action.puzzle;
-        fetch(CD_API, { method: 'PUT', headers: jsonHeaders,
-          body: JSON.stringify({ client_id: p.id, title: p.title || '', topic_id: p.topic_id ?? null, payload: p }) }).catch(() => {});
+        raetselSenden(action.puzzle).catch(() => {});
         return rawDispatch(action);
       }
       case 'DELETE_PUZZLE':
@@ -179,31 +198,27 @@ export function StoreProvider({ children }) {
         return rawDispatch(action);
       case 'CREATE_SESSION': {
         const puzzles = action.puzzleIds.map(id => cur.puzzles.find(p => p.id === id)).filter(Boolean);
-        fetch(S_API, { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ puzzles }) })
-          .then(r => (r.ok ? r.json() : null)).then(srv => srv && applySession(srv)).catch(() => {});
+        rufen(S_API, alsJson('POST', { puzzles }));
         return;
       }
       case 'JOIN_SESSION':
         rawDispatch({ type: 'SET_USER', user: { name: action.name, role: 'player' } });
-        fetch(`${S_API}/${action.sessionId}/join`, { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ name: action.name }) })
-          .then(r => (r.ok ? r.json() : null)).then(srv => srv && applySession(srv)).catch(() => {});
+        rufen(`${S_API}/${action.sessionId}/join`, alsJson('POST', { name: action.name }));
         return;
       case 'START_SESSION':
-        fetch(`${S_API}/${action.sessionId}/start`, { method: 'POST' }).then(r => (r.ok ? r.json() : null)).then(srv => srv && applySession(srv)).catch(() => {});
+        rufen(`${S_API}/${action.sessionId}/start`, { method: 'POST' });
         return;
       case 'END_SESSION':
-        fetch(`${S_API}/${action.sessionId}/end`, { method: 'POST' }).then(r => (r.ok ? r.json() : null)).then(srv => srv && applySession(srv)).catch(() => {});
+        rufen(`${S_API}/${action.sessionId}/end`, { method: 'POST' });
         return;
       case 'ADVANCE_PUZZLE':
-        fetch(`${S_API}/${action.sessionId}/advance`, { method: 'POST' }).then(r => (r.ok ? r.json() : null)).then(srv => srv && applySession(srv)).catch(() => {});
+        rufen(`${S_API}/${action.sessionId}/advance`, { method: 'POST' });
         return;
       case 'REMOVE_PLAYER':
-        fetch(`${S_API}/${action.sessionId}/remove`, { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ name: action.playerName }) })
-          .then(r => (r.ok ? r.json() : null)).then(srv => srv && applySession(srv)).catch(() => {});
+        rufen(`${S_API}/${action.sessionId}/remove`, alsJson('POST', { name: action.playerName }));
         return;
       case 'SUBMIT_RESULT':
-        fetch(`${S_API}/${action.sessionId}/result`, { method: 'POST', headers: jsonHeaders, body: JSON.stringify(action.result) })
-          .then(r => (r.ok ? r.json() : null)).then(srv => srv && applySession(srv)).catch(() => {});
+        rufen(`${S_API}/${action.sessionId}/result`, alsJson('POST', action.result));
         return;
       default:
         return rawDispatch(action);
@@ -244,14 +259,12 @@ export function StoreProvider({ children }) {
 
     const tick = () => {
       if (document.hidden) { plan(); return; }
-      fetch(`${S_API}/${code}`)
-        .then(r => (r.ok ? r.json() : null))
+      hol(`${S_API}/${code}`, null)
         .then(srv => {
           if (!alive || !srv) return;
           stand = { started: srv.started, ended: srv.ended };
           rawDispatch({ type: 'SYNC_SESSION', session: mapSession(srv), puzzles: srv.puzzles || [] });
         })
-        .catch(() => {})
         .finally(plan);
     };
 
@@ -267,13 +280,10 @@ export function StoreProvider({ children }) {
   // einmalig hochladen — so gehen Bestände aus dem Browser nicht verloren.
   useEffect(() => {
     const localCustoms = ((loadState() || {}).puzzles || []).filter(p => !samplePuzzles.some(sp => sp.id === p.id));
-    fetch(CD_API).then(r => (r.ok ? r.json() : [])).then(async (rows) => {
+    hol(CD_API).then(async (rows) => {
       const serverIds = new Set(rows.map(r => r.client_id));
       for (const p of localCustoms) {
-        if (!serverIds.has(p.id)) {
-          await fetch(CD_API, { method: 'PUT', headers: jsonHeaders,
-            body: JSON.stringify({ client_id: p.id, title: p.title || '', topic_id: p.topic_id ?? null, payload: p }) }).catch(() => {});
-        }
+        if (!serverIds.has(p.id)) await raetselSenden(p).catch(() => {});
       }
       const fromServer = rows.map(r => ({ ...r.payload, id: r.client_id, title: r.title, topic_id: r.topic_id }));
       const nurLokal = localCustoms.filter(p => !serverIds.has(p.id));

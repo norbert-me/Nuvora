@@ -2,7 +2,7 @@
 // den Session-Code bei (eigene Geräte). Route /cd/:code/*, kein ModuleGate.
 import { useState, useEffect } from "react";
 import { Routes, Route, useParams, useNavigate } from "react-router-dom";
-import { StoreProvider, useStore } from "./data/store";
+import { StoreProvider, useStore, sessionBeitreten, sessionGibtEs } from "./data/store";
 import { CdBase } from "./base.jsx";
 import RechtsFuss from "../components/RechtsFuss.jsx";
 import { btnPrimary, cardStyle, inputStyle, pageForm, pageTitle, COLORS } from "../components/Icons.jsx";
@@ -21,16 +21,14 @@ function PublicJoin({ code }) {
   const [gefunden, setGefunden] = useState(null); // null=prüft, true/false
 
   useEffect(() => {
-    fetch(`/api/codedetektiv/sessions/${code}`).then((r) => setGefunden(r.ok)).catch(() => setGefunden(false));
+    sessionGibtEs(code).then(setGefunden);
   }, [code]);
 
   const beitreten = async (e) => {
     e.preventDefault();
     setError("");
     const n = name.trim(); if (!n) return;
-    const r = await fetch(`/api/codedetektiv/sessions/${code}/join`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n }),
-    }).catch(() => null);
+    const r = await sessionBeitreten(code, n);
     if (!r || !r.ok) {
       setError(r && r.status === 400
         ? t('cd.public.beitritt_zu', "Beitreten nicht möglich (läuft schon oder beendet).")

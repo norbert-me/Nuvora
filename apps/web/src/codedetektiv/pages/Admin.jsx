@@ -4,17 +4,23 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useCdBase } from '../base.jsx';
 import {
-  DndContext, pointerWithin, closestCenter, PointerSensor, useSensor, useSensors,
-  DragOverlay, useDroppable, MeasuringStrategy,
+  DndContext, PointerSensor, useSensor, useSensors, DragOverlay, MeasuringStrategy,
 } from '@dnd-kit/core';
 import { useStore } from '../data/store';
 import { CATEGORIES, BLOCK_TEMPLATES } from '../data/samplePuzzles';
-import { IconUndo, IconChevronLeft, IconChevronRight } from '../components/Icons';
-import { cardStyle, panelStyle, COLORS, Segment, segmentBtn } from '../../components/Icons.jsx';
+import { IconChevronLeft, IconChevronRight } from '../components/Icons';
+import { cardStyle, panelStyle, COLORS } from '../../components/Icons.jsx';
 import {
   DraggableToolboxBlock, DraggableBlock, DragOverlayBlock,
   CollapsibleCategory,
 } from '../components/MakeCodeBlock';
+import {
+  DroppableCanvas, Leinwand, ReturnZone, StackZone, ZoomSegment,
+  findSnapStackId, leinwandAblegen, machKollision, useZoomPan,
+} from '../components/Blockflaeche.jsx';
+import {
+  countAllBlocks, findBlock, findStackByBlockId, getSubStack, updateBlockField,
+} from '../data/bloecke.js';
 import { importPuzzleFromHex } from '../data/makecodeImport';
 import { useCdText } from '../i18n.js';
 
@@ -28,68 +34,13 @@ function groupByCategory(templates) {
 }
 
 const GROUPED_TEMPLATES = groupByCategory(BLOCK_TEMPLATES);
-const SNAP_DISTANCE = 60;
 
-function isContainerType(type) {
-  return type === 'container' || type === 'event-container';
-}
-
-function isHatType(type) {
-  return type === 'event' || type === 'event-container';
-}
-
-function DroppableCanvas({ children }) {
-  const { setNodeRef } = useDroppable({ id: 'editor-canvas' });
-  return <div ref={setNodeRef} style={{ position: 'relative', width: '100%', minHeight: '100%' }}>{children}</div>;
-}
-
-function StackZone({ stack, children }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `stack-${stack.id}`, data: { stackId: stack.id } });
-  return (
-    <div ref={setNodeRef} id={`adm-stack-${stack.id}`}
-      style={{
-        position: 'absolute', left: stack.x, top: stack.y,
-        paddingBottom: 30,
-        outline: isOver ? '2px dashed rgba(30,144,255,0.4)' : 'none',
-        borderRadius: 8,
-      }}>
-      <div className="solution-stack" style={{ display: 'flex', flexDirection: 'column' }}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function DroppableReturnZone({ active }) {
-  const { t } = useCdText();
-  const { setNodeRef, isOver } = useDroppable({ id: 'editor-return' });
-  return (
-    <div ref={setNodeRef} className={`toolbox-return-zone ${active ? 'active' : ''} ${isOver ? 'over' : ''}`}>
-      {active ? <><IconUndo size={14} /> {t('cd.block_entfernen', 'Block entfernen')}</> : ''}
-    </div>
-  );
-}
-
-function editorCollision(args) {
-  const within = pointerWithin(args);
-  if (!within.length) return closestCenter(args);
-  const rank = (id) => {
-    const s = String(id);
-    if (s === 'editor-return') return 0;
-    if (s.startsWith('dropzone-')) return 1;
-    if (s.startsWith('stack-')) return 3;
-    if (s === 'editor-canvas') return 4;
-    return 2;
-  };
-  const area = (c) => {
-    const r = c.data?.droppableContainer?.rect?.current;
-    return r ? r.width * r.height : Infinity;
-  };
-  return [...within].sort((a, b) => {
-    const r = rank(a.id) - rank(b.id);
-    return r !== 0 ? r : area(a) - area(b);
-  });
-}
+// Namen der Ablegezonen. Editor und Spielseite dürfen sich nicht denselben
+// Knoten teilen — sonst zeigen zwei Flächen auf dieselbe Id.
+const CANVAS_ID = 'editor-canvas';
+const RETURN_ID = 'editor-return';
+const stackDomId = (id) => `adm-stack-${id}`;
+const editorCollision = machKollision({ canvasId: CANVAS_ID, returnId: RETURN_ID });
 
 export default function Admin() {
   const { t } = useCdText();
@@ -125,75 +76,14 @@ export default function Admin() {
   const [toolboxOpen, setToolboxOpen] = useState(true);
   const pointerRef = useRef({ x: 0, y: 0 });
 
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const panStart = useRef(null);
-  const canvasRef = useRef(null);
-  const contentRef = useRef(null);
+  const zp = useZoomPan();
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  const allBlocks = stacks.flatMap(s => flattenWithChildren(s.blocks));
-  const blockCount = allBlocks.length;
+  const blockCount = countAllBlocks(stacks.flatMap(s => s.blocks));
 
-  function getCanvasCoords() {
-    if (!canvasRef.current) return { x: 50, y: 50 };
-    const rect = canvasRef.current.getBoundingClientRect();
-    return {
-      x: (pointerRef.current.x - rect.left - pan.x) / zoom,
-      y: (pointerRef.current.y - rect.top - pan.y) / zoom,
-    };
-  }
-
-  function findSnapStackId(cx, cy, excludeBlockId) {
-    for (const stack of stacks) {
-      if (excludeBlockId && stack.blocks.some(b => b.id === excludeBlockId)) continue;
-      const el = document.getElementById(`adm-stack-${stack.id}`);
-      if (!el) continue;
-      const h = el.offsetHeight / zoom;
-      const w = el.offsetWidth / zoom;
-      const dx = cx - stack.x;
-      if (dx < -SNAP_DISTANCE || dx > w + SNAP_DISTANCE) continue;
-      if (cy >= stack.y - SNAP_DISTANCE && cy <= stack.y + h + SNAP_DISTANCE) return stack.id;
-    }
-    return null;
-  }
-
-  function findStackByBlockId(blockId) {
-    return stacks.find(s => {
-      for (const b of s.blocks) {
-        if (b.id === blockId) return true;
-        if (b.children && b.children.some(c => c.id === blockId)) return true;
-      }
-      return false;
-    });
-  }
-
-  // ── Zoom/Pan ──
-
-  function handleWheel(e) {
-    if (!e.ctrlKey && !e.metaKey) return;
-    e.preventDefault();
-    setZoom(z => Math.min(3, Math.max(0.25, z - e.deltaY * 0.002)));
-  }
-
-  function handleCanvasPointerDown(e) {
-    if (e.target !== canvasRef.current && e.target !== contentRef.current) return;
-    setIsPanning(true);
-    panStart.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
-    canvasRef.current.setPointerCapture(e.pointerId);
-  }
-
-  function handleCanvasPointerMove(e) {
-    if (!isPanning || !panStart.current) return;
-    setPan({ x: e.clientX - panStart.current.x, y: e.clientY - panStart.current.y });
-  }
-
-  function handleCanvasPointerUp() {
-    setIsPanning(false);
-    panStart.current = null;
-  }
+  const koordinaten = () => zp.koordinaten(pointerRef.current);
+  const snap = (cx, cy, ausser) => findSnapStackId(stacks, stackDomId, zp.zoom, cx, cy, ausser);
 
   // ── Import ──
 
@@ -301,24 +191,6 @@ export default function Admin() {
 
   const draggedSubStackRef = useRef([]);
 
-  function getSubStack(stack, blockId) {
-    const idx = stack.blocks.findIndex(b => b.id === blockId);
-    if (idx < 0) return [];
-    return stack.blocks.slice(idx);
-  }
-
-  function removeSubStack(blocks, startId) {
-    const idx = blocks.findIndex(b => b.id === startId);
-    if (idx < 0) return blocks;
-    return blocks.slice(0, idx);
-  }
-
-  function canAppendToStack(targetStack, blocksToAdd) {
-    if (blocksToAdd.length === 0) return false;
-    if (isHatType(blocksToAdd[0].type) && targetStack.blocks.length > 0) return false;
-    return true;
-  }
-
   function handleDragStart(event) {
     const { active } = event;
     const dtype = active.data.current?.type;
@@ -330,7 +202,7 @@ export default function Admin() {
       const block = active.data.current.block;
       setActiveBlock(block);
       setDraggingFromEditor(true);
-      const stack = findStackByBlockId(block.id);
+      const stack = findStackByBlockId(stacks, block.id);
       draggedSubStackRef.current = stack ? getSubStack(stack, block.id) : [block];
     } else {
       for (const stack of stacks) {
@@ -346,154 +218,14 @@ export default function Admin() {
   }
 
   function handleDragEnd(event) {
-    const { active, over } = event;
     const subStack = draggedSubStackRef.current;
     setActiveBlock(null);
     setDraggingFromEditor(false);
     draggedSubStackRef.current = [];
-    if (!over) return;
-
-    const dtype = active.data.current?.type;
-    const overId = String(over.id);
-
-    // Remove (sub-stack)
-    if (overId === 'editor-return') {
-      if (dtype === 'canvas-block' || !dtype) {
-        setStacks(prev => prev.map(s => {
-          const idx = s.blocks.findIndex(b => b.id === active.id);
-          if (idx < 0) return s;
-          return { ...s, blocks: s.blocks.slice(0, idx) };
-        }).filter(s => s.blocks.length > 0));
-      }
-      return;
-    }
-
-    // From toolbox
-    if (dtype === 'toolbox') {
-      const block = active.data.current.block;
-      const newBlock = {
-        ...block,
-        id: `b-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        children: isContainerType(block.type) ? [] : undefined,
-        fields: block.fields ? block.fields.map(f => ({ ...f })) : undefined,
-      };
-      const isHat = isHatType(newBlock.type);
-
-      if (overId.startsWith('stack-')) {
-        const stackId = overId.slice(6);
-        const target = stacks.find(s => s.id === stackId);
-        if (isHat && target && target.blocks.length > 0) {
-          const coords = getCanvasCoords();
-          setStacks(prev => [...prev, {
-            id: `stk-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-            x: Math.max(0, coords.x), y: Math.max(0, coords.y),
-            blocks: [newBlock],
-          }]);
-        } else {
-          setStacks(prev => prev.map(s =>
-            s.id === stackId ? { ...s, blocks: [...s.blocks, newBlock] } : s
-          ));
-        }
-      } else if (overId.startsWith('dropzone-')) {
-        if (!isHat) {
-          const containerId = overId.slice('dropzone-'.length);
-          setStacks(prev => prev.map(s => ({
-            ...s, blocks: addToContainer(s.blocks, containerId, newBlock),
-          })));
-        }
-      } else {
-        const coords = getCanvasCoords();
-        const snapId = findSnapStackId(coords.x, coords.y, null);
-        if (snapId && !isHat) {
-          const target = stacks.find(s => s.id === snapId);
-          if (target && canAppendToStack(target, [newBlock])) {
-            setStacks(prev => prev.map(s =>
-              s.id === snapId ? { ...s, blocks: [...s.blocks, newBlock] } : s
-            ));
-          } else {
-            setStacks(prev => [...prev, {
-              id: `stk-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-              x: Math.max(0, coords.x), y: Math.max(0, coords.y),
-              blocks: [newBlock],
-            }]);
-          }
-        } else {
-          setStacks(prev => [...prev, {
-            id: `stk-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-            x: Math.max(0, coords.x), y: Math.max(0, coords.y),
-            blocks: [newBlock],
-          }]);
-        }
-      }
-      return;
-    }
-
-    // Move canvas block (+ sub-stack)
-    if (dtype === 'canvas-block' || !dtype) {
-      const blockId = active.id;
-      const srcStack = findStackByBlockId(blockId);
-      if (!srcStack) return;
-      const blocksToMove = subStack.length > 0 ? subStack : [findBlock(srcStack.blocks, blockId)].filter(Boolean);
-      if (blocksToMove.length === 0) return;
-
-      const doMove = (targetStackId) => {
-        const target = stacks.find(s => s.id === targetStackId);
-        if (!target || !canAppendToStack(target, blocksToMove)) return false;
-        setStacks(prev => {
-          const updated = prev.map(s => {
-            if (s.id === srcStack.id) return { ...s, blocks: removeSubStack(s.blocks, blockId) };
-            if (s.id === targetStackId) return { ...s, blocks: [...s.blocks, ...blocksToMove] };
-            return s;
-          });
-          return updated.filter(s => s.blocks.length > 0);
-        });
-        return true;
-      };
-
-      if (overId.startsWith('stack-')) {
-        const targetStackId = overId.slice(6);
-        if (targetStackId === srcStack.id) return;
-        doMove(targetStackId);
-      } else if (overId.startsWith('dropzone-')) {
-        if (blocksToMove.length === 1 && !isHatType(blocksToMove[0].type)) {
-          const containerId = overId.slice('dropzone-'.length);
-          const block = blocksToMove[0];
-          setStacks(prev => {
-            const removed = prev.map(s => ({ ...s, blocks: removeSubStack(s.blocks, blockId) }));
-            const added = removed.map(s => ({ ...s, blocks: addToContainer(s.blocks, containerId, block) }));
-            return added.filter(s => s.blocks.length > 0);
-          });
-        }
-      } else if (overId === 'editor-canvas') {
-        const coords = getCanvasCoords();
-        const snapId = findSnapStackId(coords.x, coords.y, blockId);
-        if (snapId && snapId !== srcStack.id) {
-          if (!doMove(snapId)) {
-            setStacks(prev => {
-              const removed = prev.map(s =>
-                s.id === srcStack.id ? { ...s, blocks: removeSubStack(s.blocks, blockId) } : s
-              ).filter(s => s.blocks.length > 0);
-              return [...removed, {
-                id: `stk-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-                x: Math.max(0, coords.x), y: Math.max(0, coords.y),
-                blocks: blocksToMove,
-              }];
-            });
-          }
-        } else if (!snapId) {
-          setStacks(prev => {
-            const removed = prev.map(s =>
-              s.id === srcStack.id ? { ...s, blocks: removeSubStack(s.blocks, blockId) } : s
-            ).filter(s => s.blocks.length > 0);
-            return [...removed, {
-              id: `stk-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-              x: Math.max(0, coords.x), y: Math.max(0, coords.y),
-              blocks: blocksToMove,
-            }];
-          });
-        }
-      }
-    }
+    leinwandAblegen({
+      event, subStack, stacks, setStacks, koordinaten, snap,
+      canvasId: CANVAS_ID, returnId: RETURN_ID,
+    });
   }
 
   // ── Session ──
@@ -683,7 +415,7 @@ export default function Admin() {
                       ))}
                     </CollapsibleCategory>
                   ))}
-                  <DroppableReturnZone active={draggingFromEditor} />
+                  <ReturnZone id={RETURN_ID} active={draggingFromEditor} />
                 </div>
               )}
 
@@ -701,55 +433,29 @@ export default function Admin() {
                       {blockCount > 0 && ` ${t('cd.bloecke_zahl', '({{n}} Blöcke)', { n: blockCount })}`}
                     </h3>
                   </div>
-                  {/* Ein Gedanke („wie nah?"), also EIN Bedienelement. */}
-                  <Segment>
-                    <button style={segmentBtn} title={t('cd.puzzle.groesser', 'Größer')}
-                      onClick={() => setZoom(z => Math.min(3, z + 0.2))}>+</button>
-                    <span style={{ ...segmentBtn, minWidth: 48, cursor: 'default', color: 'var(--text2)' }}>{Math.round(zoom * 100)}%</span>
-                    <button style={segmentBtn} title={t('cd.puzzle.kleiner', 'Kleiner')}
-                      onClick={() => setZoom(z => Math.max(0.25, z - 0.2))}>-</button>
-                  </Segment>
+                  <ZoomSegment zoom={zp.zoom} setZoom={zp.setZoom} />
                 </div>
 
-                <div
-                  ref={canvasRef}
-                  onWheel={handleWheel}
-                  onPointerDown={handleCanvasPointerDown}
-                  onPointerMove={handleCanvasPointerMove}
-                  onPointerUp={handleCanvasPointerUp}
-                  style={{
-                    overflow: 'auto', minHeight: 300, maxHeight: 'calc(100vh - 280px)', position: 'relative',
-                    cursor: isPanning ? 'grabbing' : 'default',
-                    background: 'var(--bg2)', borderRadius: 10,
-                    border: '1px dashed var(--border2)',
-                  }}
-                >
-                  <div ref={contentRef} style={{
-                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                    transformOrigin: '0 0',
-                    position: 'relative',
-                    minHeight: 600,
-                  }}>
-                    <DroppableCanvas>
-                      {stacks.length === 0 && !activeBlock && (
-                        <div style={{
-                          position: 'absolute', top: '50%', left: '50%',
-                          transform: 'translate(-50%, -50%)',
-                          color: 'var(--text3)', fontSize: 14, pointerEvents: 'none',
-                        }}>{t('cd.admin.ziehen_hinweis', 'Blöcke von links hierhin ziehen')}</div>
-                      )}
-                      {stacks.map(stack => (
-                        <StackZone key={stack.id} stack={stack}>
-                          {stack.blocks.map(block => (
-                            <div key={block.id}>
-                              <DraggableBlock block={block} onFieldChange={handleFieldChange} />
-                            </div>
-                          ))}
-                        </StackZone>
-                      ))}
-                    </DroppableCanvas>
-                  </div>
-                </div>
+                <Leinwand zp={zp} inhaltStil={{ minHeight: 600 }}>
+                  <DroppableCanvas id={CANVAS_ID}>
+                    {stacks.length === 0 && !activeBlock && (
+                      <div style={{
+                        position: 'absolute', top: '50%', left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        color: 'var(--text3)', fontSize: 14, pointerEvents: 'none',
+                      }}>{t('cd.admin.ziehen_hinweis', 'Blöcke von links hierhin ziehen')}</div>
+                    )}
+                    {stacks.map(stack => (
+                      <StackZone key={stack.id} stack={stack} domId={stackDomId}>
+                        {stack.blocks.map(block => (
+                          <div key={block.id}>
+                            <DraggableBlock block={block} onFieldChange={handleFieldChange} />
+                          </div>
+                        ))}
+                      </StackZone>
+                    ))}
+                  </DroppableCanvas>
+                </Leinwand>
 
                 <button className="btn btn-success" onClick={savePuzzle} style={{ width: '100%', marginTop: 16 }}>
                   {editingPuzzleId
@@ -848,45 +554,4 @@ export default function Admin() {
       </div>
     </div>
   );
-}
-
-// ── Helpers ──
-
-function flattenWithChildren(blocks) {
-  const result = [];
-  for (const b of blocks) { result.push(b); if (b.children) result.push(...flattenWithChildren(b.children)); }
-  return result;
-}
-
-function updateBlockField(blocks, blockId, fieldKey, value) {
-  return blocks.map(b => {
-    if (b.id === blockId) return { ...b, fields: b.fields?.map(f => f.key === fieldKey ? { ...f, value } : f) };
-    if (b.children) return { ...b, children: updateBlockField(b.children, blockId, fieldKey, value) };
-    return b;
-  });
-}
-
-function findBlock(blocks, id) {
-  for (const b of blocks) {
-    if (b.id === id) return b;
-    if (b.children) { const f = findBlock(b.children, id); if (f) return f; }
-  }
-  return null;
-}
-
-function addToContainer(blocks, containerId, newBlock) {
-  return blocks.map(b => {
-    if (b.id === containerId && b.children) return { ...b, children: [...b.children, newBlock] };
-    if (b.children) return { ...b, children: addToContainer(b.children, containerId, newBlock) };
-    return b;
-  });
-}
-
-function removeBlockDeep(blocks, id) {
-  const out = [];
-  for (const b of blocks) {
-    if (b.id === id) continue;
-    out.push(b.children ? { ...b, children: removeBlockDeep(b.children, id) } : b);
-  }
-  return out;
 }

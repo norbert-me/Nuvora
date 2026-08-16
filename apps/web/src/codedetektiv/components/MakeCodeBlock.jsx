@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { useCdText } from '../i18n.js';
+import { isContainerType, isHatType } from '../data/bloecke.js';
 
 const stopEvt = e => { e.stopPropagation(); };
 
@@ -129,14 +130,6 @@ function BlockContent({ block, onFieldChange, interactive }) {
       ))}
     </span>
   );
-}
-
-function isHatType(type) {
-  return type === 'event' || type === 'event-container';
-}
-
-function isContainerType(type) {
-  return type === 'container' || type === 'event-container';
 }
 
 export function DraggableToolboxBlock({ block, dragId }) {

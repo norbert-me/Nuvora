@@ -7,6 +7,7 @@ import {
   IconCheckCircle, IconClock, IconBack,
 } from '../components/Icons';
 import { cardStyle, COLORS } from '../../components/Icons.jsx';
+import { mmss } from '../../core/datum.js';
 import { useCdText } from '../i18n.js';
 
 export default function PlaySession() {
@@ -158,7 +159,7 @@ export default function PlaySession() {
           </h2>
           {myResult.solved && (
             <p style={{ color: 'var(--text2)', marginBottom: 16 }}>
-              {myResult.attempts} {myResult.attempts === 1 ? t('cd.versuch', 'Versuch') : t('cd.versuche', 'Versuche')} - {formatTime(myResult.time)}
+              {myResult.attempts} {myResult.attempts === 1 ? t('cd.versuch', 'Versuch') : t('cd.versuche', 'Versuche')} - {mmss(myResult.time)}
             </p>
           )}
           <p style={{ color: 'var(--text3)', marginBottom: 24 }}>
@@ -251,7 +252,7 @@ function Scoreboard({ scores, label, showTotal, t }) {
           <div className="scoreboard-name">{s.playerName}</div>
           {!showTotal && s.solved !== undefined && (
             <div className="scoreboard-detail">
-              {s.solved ? `${s.attempts}x - ${formatTime(s.time)}` : t('cd.play.nicht_geloest', 'nicht gelöst')}
+              {s.solved ? `${s.attempts}x - ${mmss(s.time)}` : t('cd.play.nicht_geloest', 'nicht gelöst')}
             </div>
           )}
           <div className="scoreboard-points">
@@ -261,8 +262,4 @@ function Scoreboard({ scores, label, showTotal, t }) {
       ))}
     </div>
   );
-}
-
-function formatTime(s) {
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }

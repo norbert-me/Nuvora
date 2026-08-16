@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCdBase } from '../base.jsx';
-import { useStore } from '../data/store';
+import { useStore, sessionBeitreten } from '../data/store';
 import { IconSearch, IconGamepad, IconPuzzle } from '../components/Icons';
 import {
   btnPrimary, btnSecondary, cardStyle, inputStyle, pageForm, pageTitle, pageIntro, COLORS,
@@ -33,9 +33,7 @@ export default function Home() {
     const name = playerName.trim();
     if (!code || !name) return;
     // Serverseitig beitreten (geräteübergreifend). Fehler direkt zurückmelden.
-    const r = await fetch(`/api/codedetektiv/sessions/${code}/join`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
-    }).catch(() => null);
+    const r = await sessionBeitreten(code, name);
     if (!r || !r.ok) {
       setError(r && r.status === 404
         ? t('cd.session.nicht_gefunden', 'Session nicht gefunden.')

@@ -3,6 +3,7 @@ import { useCdBase } from '../base.jsx';
 import { useStore } from '../data/store';
 import { CATEGORIES } from '../data/samplePuzzles';
 import { IconSearch, IconPuzzle, IconMap, IconStar, IconClock, IconBack } from '../components/Icons';
+import { mmss } from '../../core/datum.js';
 import { useCdText } from '../i18n.js';
 
 export default function Solo() {
@@ -37,7 +38,7 @@ export default function Solo() {
                 </span>
                 {Array.from({ length: puzzle.difficulty }, (_, i) => <IconStar key={i} size={14} />)}
                 <span style={{ fontSize: 12, color: 'var(--text3)', marginLeft: 'auto' }}>
-                  <IconClock size={12} /> {Math.floor(puzzle.timeLimit / 60)}:{String(puzzle.timeLimit % 60).padStart(2, '0')}
+                  <IconClock size={12} /> {mmss(puzzle.timeLimit)}
                 </span>
               </div>
             </div>
