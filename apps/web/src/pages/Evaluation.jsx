@@ -4,12 +4,13 @@ import { useAktiv } from "../core/modules.js";
 import AbschnittWahl from "../components/AbschnittWahl.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
-import { ANTWORT_COLORS, Boxplot, COLORS as C, CONTROL_R, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, pageApp, panelStyle, td as tdBasis, th as thBasis, toolbarBtn } from "../components/Icons.jsx";
+import { ANTWORT_COLORS, Boxplot, COLORS as C, CONTROL_R, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, pageApp, panelStyle, quoteFarbe, quoteFlaeche, td as tdBasis, th as thBasis, toolbarBtn } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
 import { bewerte, statusOf } from "../core/scoring.js";
 import { mmss } from "../core/datum.js";
+import { median, streuung as stddev } from "../core/statistik.js";
 import { alsJson, hol } from "../core/melden.js";
 import { useThemen } from "../core/topics.js";
 
@@ -17,18 +18,9 @@ const API = "/api";
 // Antwortfarben A–D kommen aus dem Kern (ANTWORT_COLORS) — die Kopie hier war
 // eine von dreien im Modul.
 
-function median(arr) {
-  if (!arr.length) return 0;
-  const s = [...arr].sort((a, b) => a - b);
-  const mid = Math.floor(s.length / 2);
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
-}
-
-function stddev(arr) {
-  if (arr.length < 2) return 0;
-  const m = arr.reduce((a, b) => a + b, 0) / arr.length;
-  return Math.sqrt(arr.reduce((s, x) => s + (x - m) ** 2, 0) / (arr.length - 1));
-}
+// median und stddev kommen aus core/statistik.js — beide standen hier
+// zeichengleich noch einmal (und in grades.js, aufgabenstatistik.js,
+// ClassEvaluation.jsx ein weiteres Mal).
 
 const GRADE_COLORS = { 1: C.success, 2: C.success, 3: C.warning, 4: C.warning, 5: C.danger, 6: C.danger };
 // gradeFromPct + DEFAULT_SCALE liegen zentral in core/grades.js (eine Quelle,
@@ -435,7 +427,7 @@ const gradeDistribution = (() => {
         </div>
 
         <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
-          <StatCard label={t("cv.statCorrect")} value={`${stat.pct}%`} color={stat.pct >= 80 ? C.success : stat.pct >= 50 ? C.warning : C.danger} />
+          <StatCard label={t("cv.statCorrect")} value={`${stat.pct}%`} color={quoteFarbe(stat.pct)} />
           <StatCard label={t("cv.statCi")} value={stat.ciLow !== null ? `${stat.ciLow}–${stat.ciHigh}%` : "–"} />
           <StatCard label={t("cv.statGuess")} value={stat.guessProb !== null ? `${Math.round(stat.guessProb * 100)}%` : "–"} />
           <StatCard label={t("cv.statDisc")} value={stat.discrimination !== null ? stat.discrimination.toFixed(2) : "–"}
@@ -781,8 +773,7 @@ const gradeDistribution = (() => {
                   </td>
                   <td style={{
                     ...td, textAlign: "center", fontWeight: "bold",
-                    background: pct >= 80 ? "var(--success-bg)" : pct >= 50 ? "var(--warn-bg)" : "var(--danger-bg)",
-                    color: pct >= 80 ? C.success : pct >= 50 ? C.warning : C.danger,
+                    ...quoteFlaeche(pct),
                   }}>
                     {student.ownMax > 0 ? `${pct}%` : "–"}
                     {/* Bonus aus richtigen E-Fragen — sichtbar, damit die Note nachvollziehbar bleibt. */}
@@ -830,7 +821,7 @@ const gradeDistribution = (() => {
             <tr style={{ borderTop: "2px solid var(--border3)" }}>
               <td style={{ ...td, fontWeight: "bold", color: "var(--text3)", fontSize: 12 }}>{t("cv.statCorrect")}</td>
               {questionStats.map((stat, i) => (
-                <td key={i} style={{ ...td, textAlign: "center", fontSize: 12, fontWeight: "bold", color: stat.pct >= 80 ? C.success : stat.pct >= 50 ? C.warning : C.danger }}>
+                <td key={i} style={{ ...td, textAlign: "center", fontSize: 12, fontWeight: "bold", color: quoteFarbe(stat.pct) }}>
                   {stat.answered > 0 ? `${stat.pct}%` : "–"}
                 </td>
               ))}

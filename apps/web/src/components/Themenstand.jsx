@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { COLORS as C, Icon, ICONS, selectStyle, cardStyle, CONTROL_R } from "./Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { hol } from "../core/melden.js";
+import { komma } from "../core/zahl.js";
 
 // Reine Grafik, kein Bedienelement: der Fortschrittsbalken bekommt seine
 // Rundung aus der halben Hoehe, damit die Kappen rund sind. Deshalb hier eine
@@ -86,7 +87,7 @@ export function ThemenstandKind({ kind, t, offenDefault = false }) {
                 {/* Note klein und beschriftet: sie ist eine Orientierung, keine Zensur. */}
                 {th.note != null && (
                   <span title={t("themen.gradeHint")} style={{ fontSize: 11, color: "var(--text3)", minWidth: 62, textAlign: "right" }}>
-                    {t("themen.gradeShort")} {String(th.note).replace(".", ",")}
+                    {t("themen.gradeShort")} {komma(th.note)}
                   </span>
                 )}
                 <TrendPfeil trend={th.trend} t={t} />
@@ -96,7 +97,7 @@ export function ThemenstandKind({ kind, t, offenDefault = false }) {
                       Punkte — dann sagt der Hinweis, woran es liegt. */}
                   {th.karten && !th.max
                     ? tt(t, "themen.tooThinCards", { k: th.karten.karten })
-                    : t("themen.tooThin", { p: String(th.max).replace(".", ",") })}
+                    : t("themen.tooThin", { p: komma(th.max) })}
                 </span>
               )}
               {/* Fällige Karten: eine Zählung, keine Bewertung — deshalb steht
@@ -115,7 +116,7 @@ export function ThemenstandKind({ kind, t, offenDefault = false }) {
                     <span style={{ color: "var(--text3)", width: 62, flexShrink: 0 }}>{(v.datum || "").slice(0, 10).split("-").reverse().slice(0, 2).join(".")}</span>
                     <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.name}</span>
                     <span style={{ fontSize: 11, color: "var(--text3)" }}>{v.art === "quiz" ? t("themen.quiz") : t("themen.exam")}</span>
-                    <span style={{ color: "var(--text3)" }}>{String(v.punkte).replace(".", ",")}/{String(v.max).replace(".", ",")}</span>
+                    <span style={{ color: "var(--text3)" }}>{komma(v.punkte)}/{komma(v.max)}</span>
                     <span style={{ fontWeight: 700, minWidth: 42, textAlign: "right", color: farbe(v.pct) }}>{v.pct == null ? "–" : `${Math.round(v.pct)}%`}</span>
                   </div>
                 ))}

@@ -6,15 +6,12 @@
 // zu verrechnen, und am Bildschirm sieht eine falsche Korrelation genauso aus
 // wie eine richtige. Deshalb hier, mit Test (`aufgabenstatistik.test.js`).
 
-/** Arithmetisches Mittel; leere Liste = 0. */
-export const mittel = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0);
+// Mittel und Streuung sind keine Aufgaben-Kennzahlen, sondern die Grundrechnung
+// jeder Auswertung — sie liegen in `statistik.js`. Hier nur weitergereicht,
+// damit die bisherigen Aufrufstellen (und der Test) ihren Namen behalten.
+import { mittel, streuung } from "./statistik.js";
 
-/** Stichproben-Standardabweichung (n−1); unter zwei Werten gibt es keine. */
-export const streuung = (arr) => {
-  if (arr.length < 2) return 0;
-  const m = mittel(arr);
-  return Math.sqrt(arr.reduce((s, x) => s + (x - m) ** 2, 0) / (arr.length - 1));
-};
+export { mittel, streuung };
 
 /**
  * Trennschärfe: Korrelation zwischen den Punkten dieser Aufgabe und der

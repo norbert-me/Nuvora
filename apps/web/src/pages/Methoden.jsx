@@ -7,11 +7,12 @@ import { askConfirm } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { alsJson, hol, sende } from "../core/melden.js";
 import { useAblegeZiel } from "../core/ziehsortieren.js";
-import { AddButton, badge, cardStyle, CONTROL_H, CONTROL_R, dateiWaehlen, Icon, ICONS, iconBtn, btnSecondary, menuRow, pageTitle, sectionLabel, toolbarBtn, toolbarBtnPrimary, toolbarInput, COLORS as C, Modal, inputStyle, Popover, LoadError} from "../components/Icons.jsx";
+import { AddButton, badge, btnSecondary, cardStyle, COLORS as C, CONTROL_H, CONTROL_R, dateiWaehlen, DialogKopf, Icon, iconBtn, ICONS, inputStyle, LoadError, menuRow, Modal, pageTitle, Popover, sectionLabel, toolbarBtn, toolbarBtnPrimary, toolbarInput } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { themenIndex, useThemen } from "../core/topics.js";
+import { istVorfahre, kinderVon, ordnerMitId, pfadZu } from "../core/ordnerbaum.js";
 import { useAktiv } from "../core/modules.js";
 import PublishModal from "../components/PublishModal.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
@@ -75,7 +76,7 @@ export default function Methoden({ embedded } = {}) {
     items.forEach((m) => { o[`m:${m.id}`] = m.folder_id ?? null; });
     return o;
   }, [folders, items]);
-  const folderById = (id) => folders.find((f) => f.id === id) || null;
+  const folderById = (id) => ordnerMitId(folders, id);
   const frisch = useRef(false);
   const entwurf = useEntwurf(basis, async (wert) => {
     for (const f of folders) {
@@ -104,10 +105,15 @@ export default function Methoden({ embedded } = {}) {
   // Alle Wege lesen den ENTWURF (elternVon/ordnerVon), nicht den Serverstand —
   // sonst springt ein gezogener Ordner beim Loslassen an seinen alten Platz
   // zurück, obwohl der Zug noch offen ist.
-  const childFolders = (pid) => folders.filter((f) => elternVon(f.id) === pid).sort((a, b) => nameVon(a).localeCompare(nameVon(b), "de", { numeric: true }));
-  const pathTo = (id) => { const out = []; let cur = folderById(id); let guard = 0; while (cur && guard++ < 50) { out.unshift(cur); const p = elternVon(cur.id); cur = p != null ? folderById(p) : null; } return out; };
+  // Die Baum-Wege selbst stehen in core/ordnerbaum.js — Karten.jsx hatte
+  // dieselben drei Schleifen ein zweites Mal (und dort ohne Zyklus-Bremse).
+  // `eltern` reicht den ENTWURF durch, damit ein gezogener Ordner beim
+  // Loslassen nicht an seinen alten Platz zurueckspringt.
+  const eltern = (f) => elternVon(f.id);
+  const childFolders = (pid) => kinderVon(folders, pid, eltern).sort((a, b) => nameVon(a).localeCompare(nameVon(b), "de", { numeric: true }));
+  const pathTo = (id) => pfadZu(folders, id, eltern);
   // Verhindert Zyklen: ein Ordner darf nicht in einen seiner Nachfahren wandern.
-  const isDescendant = (nodeId, maybeAncestorId) => { let cur = folderById(nodeId); let guard = 0; while (cur && guard++ < 50) { const p = elternVon(cur.id); if (p === maybeAncestorId) return true; cur = p != null ? folderById(p) : null; } return false; };
+  const isDescendant = (nodeId, maybeAncestorId) => istVorfahre(folders, maybeAncestorId, nodeId, eltern);
 
   const save = async (m) => {
     setError("");
@@ -334,11 +340,9 @@ function MethodView({ m, t, onEdit, onPublish, onClose }) {
   ) : null;
   return (
     <Modal onClose={onClose} width={520} style={{ maxHeight: "86vh", overflowY: "auto" }} label={m.title}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, flex: 1 }}>{m.title}</h3>
+        <DialogKopf titel={m.title} onClose={onClose} schliessenLabel={t("common.close")} style={{ marginBottom: 4 }}>
           {m.dauer != null && <span style={badge(C.info)}>{t("methoden.dauerBadge", { n: m.dauer })}</span>}
-          <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
-        </div>
+        </DialogKopf>
         {sec(t("methoden.idee"), m.description)}
         {sec(t("methoden.ablauf"), m.ablauf)}
         {sec(t("methoden.material"), m.material)}

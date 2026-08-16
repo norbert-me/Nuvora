@@ -1,4 +1,4 @@
-import { CONTROL_R, Icon, ICONS, Modal, SHADOW, toolbarIconBtn } from "../components/Icons.jsx";
+import { CONTROL_R, DialogKopf, Modal, SHADOW } from "../components/Icons.jsx";
 // Modul Lernpfad — nativ in die Shell eingebaut (kein eigener Container mehr).
 //
 // Die erprobte Vanilla-JS-App wurde ins Web-Projekt uebernommen: ihre Statik
@@ -104,10 +104,7 @@ export default function LernpfadModule() {
     <>
       {modal && (
         <Modal onClose={() => setModal(null)} width={560} label={modal.title}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, flex: 1, margin: 0 }}>{modal.title}</h3>
-              <button onClick={() => setModal(null)} className="icon-btn" style={toolbarIconBtn} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={16} /></button>
-            </div>
+            <DialogKopf titel={modal.title} onClose={() => setModal(null)} schliessenLabel={t("common.close")} />
             <div dangerouslySetInnerHTML={{ __html: modal.html }} />
         </Modal>
       )}

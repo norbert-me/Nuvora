@@ -1,6 +1,8 @@
 // Prozent → Note. Geteilt zwischen CardVote-Auswertung und Karten-Meisterung,
 // damit beide Brücken zum Notenbuch dieselbe Skala anwenden. Die Skala liegt
 // pro Lehrkraft (users.grade_scale); ohne sie gilt DEFAULT_SCALE.
+import { quantil, streuung } from "./statistik.js";
+
 export const DEFAULT_SCALE = { 1: 87, 2: 73, 3: 59, 4: 45, 5: 20, 6: 0 };
 
 // Notenschluessel pruefen: fehlt eine Stufe oder steht Unlesbares darin, gilt
@@ -62,19 +64,12 @@ export function gradeDetailed(pct, scale) {
   return { note: "6", wert: 6, grade: 6 };
 }
 
-// Kleine Statistik-Helfer für die Kennzahlen (Notenwert-Verteilung).
-export function quantile(sortedAsc, q) {
-  const n = sortedAsc.length;
-  if (!n) return null;
-  const idx = (n - 1) * q, lo = Math.floor(idx), hi = Math.ceil(idx);
-  return sortedAsc[lo] + (sortedAsc[hi] - sortedAsc[lo]) * (idx - lo);
-}
-export function stdev(arr) {
-  const n = arr.length;
-  if (n < 2) return 0;
-  const m = arr.reduce((a, b) => a + b, 0) / n;
-  return Math.sqrt(arr.reduce((s, x) => s + (x - m) ** 2, 0) / (n - 1));
-}
+// Die Statistik-Helfer für die Kennzahlen (Notenwert-Verteilung) standen hier
+// zeichengleich noch einmal — `stdev` wie `streuung`, `quantile` wie
+// `quantileOf` im Boxplot. Eine Quelle: `statistik.js`. Die alten Namen bleiben,
+// damit die Aufrufstellen sich beim Zusammenführen nicht zugleich umbenennen.
+export const quantile = (sortedAsc, q) => quantil(sortedAsc, q);
+export const stdev = (arr) => streuung(arr);
 
 /**
  * Datum an einen Spaltentitel haengen, statt ihn zu ersetzen.

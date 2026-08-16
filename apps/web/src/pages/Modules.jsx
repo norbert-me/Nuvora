@@ -2,8 +2,7 @@
 // des Moduls bleiben im Kern liegen und sind nach dem Wiedereinschalten da.
 import { useState } from "react";
 import { useModules } from "../core/modules.js";
-import { StageBadge, Tabs, btnSecondary, COLORS as C, Icon, ICONS, MODULE_ICONS, iconBtn, Modal, pageApp,
-  cardStyle, panelStyle, badge, btnSmall, pageIntro, pageTitle, sectionLabel, toolbarInput, toolbarBtn, Segment, segmentBtn, CONTROL_R } from "../components/Icons.jsx";
+import { badge, btnSecondary, btnSmall, cardStyle, COLORS as C, CONTROL_R, DialogKopf, Icon, ICONS, Modal, MODULE_ICONS, pageApp, pageIntro, pageTitle, panelStyle, sectionLabel, Segment, segmentBtn, StageBadge, Tabs, toolbarBtn, toolbarInput } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 // Ausführlichere Erklärung je Modul für das Info-Popup in der Auswahl. Nutzt
@@ -183,11 +182,9 @@ export default function Modules() {
 
       {helpMod && (
         <Modal onClose={() => setHelpMod(null)} width={520} style={{ maxHeight: "86vh", overflowY: "auto" }} label={dispName(helpMod)}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, flex: 1 }}>{dispName(helpMod)}</h3>
+            <DialogKopf titel={dispName(helpMod)} onClose={() => setHelpMod(null)} schliessenLabel={t("common.close")}>
               <StageBadge stage={helpMod.stage} title={helpMod.stage === "beta" ? t("stage.betaHint") : t("stage.alphaHint")} />
-              <button onClick={() => setHelpMod(null)} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
-            </div>
+            </DialogKopf>
             <p style={{ fontSize: 14, color: "var(--text)", lineHeight: 1.7, margin: "0 0 4px", whiteSpace: "pre-wrap" }}>{helpOf(helpMod)}</p>
             <ModuleIllos mkey={helpMod.key} t={t} />
             {t(`mod.${helpMod.key}.sr`) !== `mod.${helpMod.key}.sr` && (

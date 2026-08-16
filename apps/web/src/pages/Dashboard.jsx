@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { askConfirm, askPrompt } from "../core/dialog.jsx";
 import Latex from "../components/Latex.jsx";
 import PublishModal from "../components/PublishModal.jsx";
-import { AddButton, COLORS as C, CONTROL_R, ICONS, Icon, Modal, NiveauToggle, Popover, SHADOW, StatCard, Toggle, badge, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, dateiWaehlen, iconBtn, inputStyle as inputBasis, menuRow, pageApp, pageTitle, panelStyle, sectionLabel, selectStyle, toolbarBtn, toolbarBtnPrimary, toolbarInput } from "../components/Icons.jsx";
+import { AddButton, badge, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, COLORS as C, CONTROL_R, dateiWaehlen, DialogKopf, Icon, iconBtn, ICONS, inputStyle as inputBasis, menuRow, Modal, NiveauToggle, pageApp, pageTitle, panelStyle, Popover, quoteFarbe, sectionLabel, selectStyle, SHADOW, StatCard, Toggle, toolbarBtn, toolbarBtnPrimary, toolbarInput } from "../components/Icons.jsx";
 import { dublettenZahlen, findeDubletten, istInSammlung } from "../core/dubletten.js";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
@@ -626,12 +626,7 @@ export default function Dashboard() {
               ist sonst nirgends zu oeffnen. */}
           {vEdit && (
             <Modal onClose={() => setVEdit(null)} width={620} label={t("dash.editQ")}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{t("dash.editQ")}</h4>
-                <button onClick={() => setVEdit(null)} title={t("common.close")} className="icon-btn" aria-label={t("common.close")} style={iconBtn}>
-                  <Icon d={ICONS.close} size={18} />
-                </button>
-              </div>
+              <DialogKopf titel={t("dash.editQ")} onClose={() => setVEdit(null)} schliessenLabel={t("common.close")} />
               {/* Wo steckt die Frage? Ohne diese Zeile weiss man beim Bearbeiten
                   nicht, ob man gerade in ein Quiz eingreift — und kommt auch
                   nicht hin. Anklickbar: der Sprung oeffnet die Sammlung. */}
@@ -1080,12 +1075,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
       {/* Frage bearbeiten — als zentriertes Popup, damit kein Scrollen nötig ist */}
       {editingQ && (
         <Modal onClose={() => setEditingQ(null)} width={620} label={t("dash.editQ")}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{t("dash.editQ")}</h4>
-              <button onClick={() => setEditingQ(null)} title={t("common.close")} className="icon-btn" aria-label={t("common.close")} style={iconBtn}>
-                <Icon d={ICONS.close} size={18} />
-              </button>
-            </div>
+            <DialogKopf titel={t("dash.editQ")} onClose={() => setEditingQ(null)} schliessenLabel={t("common.close")} />
             <QuestionForm q={editingQ} setQ={setEditingQ} onUpload={bildHochladen} choiceKeys={CHOICE_KEYS} />
             <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
               <button onClick={updateExistingQuestion} disabled={!editingQ.text.trim()} style={btnPrimary}>{t("common.save")}</button>
@@ -1098,12 +1088,7 @@ function QuestionSetEditor({ questionSet, allQuestions, onBack, onDelete, onQues
       {/* Neue Frage — ebenfalls als Popup */}
       {showAdd && (
         <Modal onClose={() => setShowAdd(false)} width={620} label={t("dash.newQ")}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{t("dash.newQ")}</h4>
-              <button onClick={() => setShowAdd(false)} title={t("common.close")} className="icon-btn" aria-label={t("common.close")} style={iconBtn}>
-                <Icon d={ICONS.close} size={18} />
-              </button>
-            </div>
+            <DialogKopf titel={t("dash.newQ")} onClose={() => setShowAdd(false)} schliessenLabel={t("common.close")} />
             <QuestionForm q={newQ} setQ={setNewQ} onUpload={bildHochladen} choiceKeys={CHOICE_KEYS} />
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={async () => { await addNewQuestion(); setShowAdd(false); }} disabled={!newQ.text.trim()} style={btnPrimary}>{t("dash.add")}</button>
@@ -1312,7 +1297,7 @@ function QuestionStats({ questionId }) {
       <div style={{ display: "flex", gap: 16, marginBottom: 12, flexWrap: "wrap" }}>
         <StatCard
           value={`${stats.pct_correct}%`}
-          color={stats.pct_correct >= 80 ? C.success : stats.pct_correct >= 50 ? C.warning : C.danger}
+          color={quoteFarbe(stats.pct_correct)}
           label={<>{t("dash.correct")}<InfoTip text={t("dash.ciTip")} /></>}
           sub={stats.ci_low != null ? `${stats.ci_low}–${stats.ci_high}%` : undefined}
         />

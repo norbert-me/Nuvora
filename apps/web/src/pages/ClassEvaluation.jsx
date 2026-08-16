@@ -1,13 +1,18 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
-import { Boxplot, COLORS as C, ICONS, Icon, LoadError, StatCard, Toggle, chipStyle, klebtLinks, pageApp, panelStyle, td as tdBasis, th as thBasis } from "../components/Icons.jsx";
+import { Boxplot, ICONS, Icon, LoadError, StatCard, Toggle, chipStyle, klebtLinks, pageApp, panelStyle, quoteFlaeche, td as tdBasis, th as thBasis } from "../components/Icons.jsx";
+import { median, mittel, streuung } from "../core/statistik.js";
+import { kommaRund, prozent } from "../core/zahl.js";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api";
 
-function fmt(n) { return n % 1 === 0 ? String(n) : n.toFixed(1); }
+// „eine Nachkommastelle, ganze Zahlen ohne Rest" — dieselbe Regel wie
+// überall sonst, deshalb aus core/zahl.js (hier ohne Komma-Umstellung, weil
+// die Zahl in einer Punktespalte neben „/" steht).
+function fmt(n) { return kommaRund(n, 1).replace(",", "."); }
 // Boxplot zentral aus Icons.jsx (eine Quelle, mit Markierungen + Ausreißern).
 
 export default function ClassEvaluation() {
@@ -69,7 +74,7 @@ export default function ClassEvaluation() {
       totalScore,
       totalPossible,
       testsPresent,
-      pct: totalPossible > 0 ? Math.round((totalScore / totalPossible) * 100) : null,
+      pct: prozent(totalScore, totalPossible, null),
     };
   });
 
@@ -95,16 +100,16 @@ export default function ClassEvaluation() {
   });
 
   const presentStudents = sorted.filter((s) => s.testsPresent > 0);
-  const classAvgPct = presentStudents.length > 0
-    ? Math.round(presentStudents.reduce((sum, s) => sum + s.pct, 0) / presentStudents.length)
-    : 0;
+  const classAvgPct = Math.round(mittel(presentStudents.map((s) => s.pct)));
 
   const pctValues = presentStudents.map((s) => s.pct).filter((p) => p != null).sort((a, b) => a - b);
-  const med = pctValues.length > 0 ? pctValues[Math.floor(pctValues.length / 2)] : null;
+  // War `pctValues[floor(n/2)]` — bei gerader Klassenstärke der OBERE der
+  // beiden mittleren Werte und damit kein Median. Rechnung jetzt aus
+  // core/statistik.js, wie in der Schülerauswertung.
+  const med = pctValues.length > 0 ? Math.round(median(pctValues)) : null;
   const best = pctValues.length > 0 ? pctValues[pctValues.length - 1] : null;
   const worst = pctValues.length > 0 ? pctValues[0] : null;
-  const mean = pctValues.length > 0 ? pctValues.reduce((a, b) => a + b, 0) / pctValues.length : 0;
-  const sd = pctValues.length > 1 ? Math.sqrt(pctValues.reduce((s, x) => s + (x - mean) ** 2, 0) / (pctValues.length - 1)) : 0;
+  const sd = streuung(pctValues);
 
   return (
     <div>
@@ -249,20 +254,15 @@ export default function ClassEvaluation() {
   );
 }
 
+// Die 80/50-Schwelle kommt aus Icons.jsx (`quoteFlaeche`) — sie stand achtmal
+// im Code, und eine verschobene Schwelle hätte dieselbe Quote hier gelb und
+// zwei Seiten weiter grün gefärbt.
 function cellStyle(pt) {
   if (!pt.present) return { color: "var(--border2)" };
-  const pct = pt.total > 0 ? (pt.score / pt.total) * 100 : 0;
-  if (pct >= 80) return { background: "var(--success-bg)", color: C.success };
-  if (pct >= 50) return { background: "var(--warn-bg)", color: C.warning };
-  return { background: "var(--danger-bg)", color: C.danger };
+  return quoteFlaeche(pt.total > 0 ? (pt.score / pt.total) * 100 : 0);
 }
 
-function pctStyle(pct) {
-  if (pct == null) return { color: "var(--text3)", background: "var(--bg2)" };
-  if (pct >= 80) return { background: "var(--success-bg)", color: C.success };
-  if (pct >= 50) return { background: "var(--warn-bg)", color: C.warning };
-  return { background: "var(--danger-bg)", color: C.danger };
-}
+const pctStyle = quoteFlaeche;
 
 const backLink = { color: "var(--text3)", textDecoration: "none", fontSize: 13, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 0", transition: "color 0.15s" };
 // Aus dem Kern abgeleitet, gleiche Abweichung wie in der Auswertung.

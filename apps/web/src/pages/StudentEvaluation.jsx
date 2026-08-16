@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { DownloadLink, COLORS as C, pageApp, pageTitle, th as thBasis, td as tdBasis, Icon, ICONS, sectionLabel, StatCard } from "../components/Icons.jsx";
+import { DownloadLink, COLORS as C, pageApp, pageTitle, th as thBasis, td as tdBasis, Icon, ICONS, quoteFarbe, sectionLabel, StatCard } from "../components/Icons.jsx";
+import { median } from "../core/statistik.js";
+import { prozent } from "../core/zahl.js";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import Themenstand from "../components/Themenstand.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -33,16 +35,18 @@ export default function StudentEvaluation() {
       total: s?.total || test.max_score,
       // pct kommt aus der Wertung am Server (E/G-Bonus, Minuspunkte); Fallback
       // für alte Datensätze: Punkte durch erreichbare Punkte.
-      pct: s?.present ? (s.pct ?? (s.total > 0 ? Math.round((s.score / s.total) * 100) : null)) : null,
+      pct: s?.present ? (s.pct ?? prozent(s.score, s.total, null)) : null,
     };
   });
 
   const present = results.filter((r) => r.present);
   const totalScore = present.reduce((s, r) => s + r.score, 0);
   const totalPossible = present.reduce((s, r) => s + r.total, 0);
-  const avgPct = totalPossible > 0 ? Math.round((totalScore / totalPossible) * 100) : null;
+  const avgPct = prozent(totalScore, totalPossible, null);
   const pcts = present.map((r) => r.pct).filter((p) => p != null).sort((a, b) => a - b);
-  const median = pcts.length > 0 ? pcts[Math.floor(pcts.length / 2)] : null;
+  // War `pcts[floor(n/2)]` — bei gerader Anzahl der OBERE der beiden mittleren
+  // Werte, nicht der Median. `median` aus core/statistik.js rechnet ihn richtig.
+  const medianPct = pcts.length > 0 ? Math.round(median(pcts)) : null;
   const best = pcts.length > 0 ? pcts[pcts.length - 1] : null;
   const worst = pcts.length > 0 ? pcts[0] : null;
 
@@ -66,10 +70,10 @@ export default function StudentEvaluation() {
       <Themenstand classId={classId} cardId={cardId} />
 
       <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
-        <StatCard label={t("cv.statAvgTotal")} value={avgPct != null ? `${avgPct}%` : "–"} color={colorForPct(avgPct)} />
+        <StatCard label={t("cv.statAvgTotal")} value={avgPct != null ? `${avgPct}%` : "–"} color={quoteFarbe(avgPct)} />
         <StatCard label={t("cv.statBestTest")} value={best != null ? `${best}%` : "–"} color={C.success} />
         <StatCard label={t("cv.statWorstShort")} value={worst != null ? `${worst}%` : "–"} color={C.danger} />
-        <StatCard label={t("cv.statMedian")} value={median != null ? `${median}%` : "–"} />
+        <StatCard label={t("cv.statMedian")} value={medianPct != null ? `${medianPct}%` : "–"} />
         <StatCard label={t("cv.statParticipation")} value={`${present.length} / ${tests.length}`} />
       </div>
 
@@ -85,7 +89,7 @@ export default function StudentEvaluation() {
                   width: "100%", maxWidth: 40,
                   height: `${Math.max(r.pct * 0.7, 4)}px`,
                   // Balkenkappe: reine Grafik, kein Bedienelement.
-                  background: colorForPct(r.pct), borderRadius: 4, transition: "height 0.3s",
+                  background: quoteFarbe(r.pct), borderRadius: 4, transition: "height 0.3s",
                 }} />
               </div>
             ))}
@@ -114,7 +118,7 @@ export default function StudentEvaluation() {
               </td>
               <td style={{
                 ...tdStyle, textAlign: "center", fontWeight: 700,
-                color: r.pct == null ? "var(--text3)" : colorForPct(r.pct),
+                color: r.pct == null ? "var(--text3)" : quoteFarbe(r.pct),
               }}>
                 {r.pct != null ? `${r.pct}%` : t("cv.absent")}
               </td>
@@ -132,12 +136,8 @@ export default function StudentEvaluation() {
   );
 }
 
-function colorForPct(pct) {
-  if (pct == null) return "var(--text3)";
-  if (pct >= 80) return C.success;
-  if (pct >= 50) return C.warning;
-  return C.danger;
-}
+// colorForPct kam aus Icons.jsx (quoteFarbe) — die 80/50-Schwelle stand
+// achtmal im Code und muss überall dieselbe sein.
 
 // StatCard kommt aus Icons.jsx — die lokale Kopie war eine zweite Design-Quelle.
 

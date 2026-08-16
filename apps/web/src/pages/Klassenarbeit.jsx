@@ -22,6 +22,7 @@ import { useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
 import { alsJson, hol } from "../core/melden.js";
 import NotenUebernahme from "../components/NotenUebernahme.jsx";
 import { konfidenzProzent, mittel, streuung, trennschaerfe } from "../core/aufgabenstatistik.js";
+import { komma, kommaRund, prozent, rund } from "../core/zahl.js";
 
 const API = "/api/klassenarbeit";
 const newId = () => "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -40,7 +41,7 @@ const newId = () => "t" + Date.now().toString(36) + Math.random().toString(36).s
 function schluss(row, t) {
   if (row.form) return null;                       // Darstellung: keine Sachaussage
   const d = row.disc, p = row.pct, n = row.nullAnteil;
-  if (d != null && d < 0.1 && p < 75) return { art: "aufgabe", text: t("klassenarbeit.tipTask", { d: d.toFixed(2).replace(".", ",") }) };
+  if (d != null && d < 0.1 && p < 75) return { art: "aufgabe", text: t("klassenarbeit.tipTask", { d: kommaRund(d, 2) }) };
   if (n != null && n >= 40 && p < 60) return { art: "aufgabe", text: t("klassenarbeit.tipEmpty", { n }) };
   if (p < 50 && (d == null || d >= 0.3)) return { art: "stoff", text: t("klassenarbeit.tipRepeat", { p }) };
   if (p >= 90 && row.vollAnteil != null && row.vollAnteil >= 70) return { art: "leicht", text: t("klassenarbeit.tipEasy", { v: row.vollAnteil }) };
@@ -56,7 +57,7 @@ function StatRow({ row, t, expandable, open, onToggle, small }) {
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {expandable && <span style={{ display: "inline-flex", color: "var(--text3)", transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}><Icon d={ICONS.open} size={12} /></span>}
         <span style={{ flex: 1, fontSize: small ? 12 : 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: small ? "var(--text2)" : "var(--text)" }}>{small ? `${t("klassenarbeit.part")} ${row.label}` : row.label}</span>
-        <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap" }}>⌀ {String(row.avgP).replace(".", ",")}/{row.max}</span>
+        <span style={{ fontSize: 12, color: "var(--text3)", whiteSpace: "nowrap" }}>⌀ {komma(row.avgP)}/{row.max}</span>
         <span style={{ fontSize: 13, fontWeight: 800, color: col, minWidth: 40, textAlign: "right" }}>{row.pct}%</span>
       </div>
       {/* Balken: Radius = halbe Hoehe (Balken-Kappe), reine Grafik. */}
@@ -65,7 +66,7 @@ function StatRow({ row, t, expandable, open, onToggle, small }) {
       </div>
       {(row.disc != null || row.ciLow != null || row.nullAnteil != null) && (
         <div style={{ display: "flex", gap: 14, fontSize: 11, color: "var(--text3)", marginTop: 4, flexWrap: "wrap" }}>
-          {row.disc != null && <span title={t("klassenarbeit.discHint")}>{t("klassenarbeit.disc")}: <b style={{ color: dc }}>{row.disc.toFixed(2).replace(".", ",")}</b></span>}
+          {row.disc != null && <span title={t("klassenarbeit.discHint")}>{t("klassenarbeit.disc")}: <b style={{ color: dc }}>{kommaRund(row.disc, 2)}</b></span>}
           {row.ciLow != null && <span title={t("klassenarbeit.ciHint")}>{t("klassenarbeit.ci")}: <b style={{ color: "var(--text2)" }}>{row.ciLow}–{row.ciHigh}%</b></span>}
           {row.nullAnteil != null && <span title={t("klassenarbeit.cmpEmptyHint")}>{t("klassenarbeit.cmpEmpty")}: <b style={{ color: row.nullAnteil >= 40 ? C.danger : "var(--text2)" }}>{row.nullAnteil}%</b></span>}
           {row.vollAnteil != null && <span title={t("klassenarbeit.cmpFullHint")}>{t("klassenarbeit.cmpFull")}: <b style={{ color: "var(--text2)" }}>{row.vollAnteil}%</b></span>}
@@ -423,7 +424,7 @@ export default function Klassenarbeit() {
     const FINE = ["1", "2+", "2", "2-", "3+", "3", "3-", "4+", "4", "4-", "5+", "5", "5-", "6"];
     const distFine = FINE.map((lbl) => ({ label: lbl, grade: parseInt(lbl), count: notes.filter((x) => x.note === lbl).length }));
     const avg = werte.length ? Math.round((werte.reduce((a, b) => a + b, 0) / werte.length) * 100) / 100 : null;
-    const r2 = (x) => Math.round(x * 100) / 100;
+    const r2 = (x) => rund(x, 2);
     const stats = werte.length ? { min: werte[0], q1: r2(quantile(werte, 0.25)), med: r2(quantile(werte, 0.5)), q3: r2(quantile(werte, 0.75)), max: werte[werte.length - 1], sd: r2(stdev(werte)) } : null;
     const minPts = [1, 2, 3, 4, 5].map((g) => ({ grade: g, pts: Math.ceil(((effScale[g] || 0) / 100) * tm) }));
     // Klassen-Kennzahlen wie CardVote: Ø-Prozent, Median-Prozent, 95%-KI, Anwesend.
@@ -636,7 +637,7 @@ export default function Klassenarbeit() {
                     // die Klassenstatistik unten rechnet sie raus. Anzeige umschaltbar:
                     // Tendenznote (2+) oder Notenwert in 0,3-Schritten (2,3).
                     const gd = (erfasst && tm) ? gradeDetailed((sum / tm) * 100, effScale) : null;
-                    const note = gd ? (gradeMode === "wert" ? String(gd.wert).replace(".", ",") : gd.note) : "";
+                    const note = gd ? (gradeMode === "wert" ? komma(gd.wert) : gd.note) : "";
                     return (
                       <tr key={s.id} style={abw ? { opacity: 0.5 } : undefined}>
                         <td style={{ ...td, ...klebtLinks, textAlign: "left", padding: "4px 8px", fontWeight: 500, whiteSpace: "nowrap" }}>
@@ -661,10 +662,10 @@ export default function Klassenarbeit() {
                                 style={{ width: 42, height: 30, border: "none", background: "transparent", textAlign: "center", fontSize: 13, color: "var(--text)" }} />
                             </td>
                           ));
-                          if (sub) { const ts = units(tk).reduce((n, u) => n + (Number(pointsOf(s.id, u.id)) || 0), 0); cells.push(<td key={tk.id + "-sum"} style={{ ...td, fontWeight: 700, background: "var(--bg2)", color: "var(--text2)" }}>{ts}</td>); }
+                          if (sub) { const ts = units(tk).reduce((n, u) => n + (Number(pointsOf(s.id, u.id)) || 0), 0); cells.push(<td key={tk.id + "-sum"} style={{ ...td, fontWeight: 700, background: "var(--bg2)", color: "var(--text2)" }}>{kommaRund(ts, 2)}</td>); }
                           return cells;
                         })}
-                        <td style={{ ...td, fontWeight: 700, borderLeft: "1px solid var(--border)", color: !erfasst ? "var(--text3)" : abw ? "var(--text3)" : (tm && sum / tm < 0.5 ? C.danger : "var(--text)") }}>{erfasst ? `${sum}/${tm}` : `–/${tm}`}{abw ? ` (${t("klassenarbeit.absentShort")})` : ""}</td>
+                        <td style={{ ...td, fontWeight: 700, borderLeft: "1px solid var(--border)", color: !erfasst ? "var(--text3)" : abw ? "var(--text3)" : (tm && sum / tm < 0.5 ? C.danger : "var(--text)") }}>{erfasst ? `${kommaRund(sum, 2)}/${tm}` : `–/${tm}`}{abw ? ` (${t("klassenarbeit.absentShort")})` : ""}</td>
                         <td style={{ ...td, fontWeight: 700, color: abw ? "var(--text3)" : "var(--text)" }}>{note}</td>
                       </tr>
                     );
@@ -788,10 +789,10 @@ export default function Klassenarbeit() {
                 {/* Statistik-Kacheln (Anwesend … 95%-KI) — wie CardVote. */}
                 <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
                   <StatCard label={t("klassenarbeit.attendance")} value={`${analyse.noten.present} / ${analyse.noten.total}`} />
-                  <StatCard label={t("klassenarbeit.avgGrade")} value={String(analyse.noten.avg).replace(".", ",")} />
+                  <StatCard label={t("klassenarbeit.avgGrade")} value={komma(analyse.noten.avg)} />
                   {analyse.noten.avgPct != null && <StatCard label={t("klassenarbeit.avgPct")} value={`${analyse.noten.avgPct}%`} />}
                   {analyse.noten.medPct != null && <StatCard label={t("klassenarbeit.median")} value={`${analyse.noten.medPct}%`} />}
-                  {analyse.noten.sdPct != null && <StatCard label={t("klassenarbeit.stdev")} value={`${String(analyse.noten.sdPct).replace(".", ",")}%`} />}
+                  {analyse.noten.sdPct != null && <StatCard label={t("klassenarbeit.stdev")} value={`${komma(analyse.noten.sdPct)}%`} />}
                   {analyse.noten.ciLow != null && <StatCard label={t("klassenarbeit.ci")} value={`${analyse.noten.ciLow}–${analyse.noten.ciHigh}%`} />}
                 </div>
                 {/* „Auswertung verstehen": Kennzahlen erklärt + konkrete Handlungshinweise. */}
@@ -812,7 +813,7 @@ export default function Klassenarbeit() {
                       <ul style={{ margin: 0, paddingLeft: 18 }}>
                         <Item term={t("klassenarbeit.avgGrade") + " / " + t("klassenarbeit.median")}>{t("klassenarbeit.explainAvg")}</Item>
                         {sd != null && (
-                          <Item term={`${t("klassenarbeit.stdev")} (${String(sd).replace(".", ",")}%)`}>
+                          <Item term={`${t("klassenarbeit.stdev")} (${komma(sd)}%)`}>
                             {t("klassenarbeit.explainSd")} {" "}
                             <b style={{ color: sdLevel === "low" ? C.warning : sdLevel === "mid" ? C.success : C.danger }}>
                               {t(`klassenarbeit.explainSd_${sdLevel}`)}
@@ -998,7 +999,8 @@ export function KlassenarbeitVergleich() {
 
   const klassen = (daten?.arbeiten || []).filter((a) => a.n > 0);
   const fmt = (x) => (x == null ? "–" : Math.round(x) + "%");
-  const nt = (x) => (x == null ? "–" : String(Math.round(x * 10) / 10).replace(".", ","));
+  // Eine Nachkommastelle, deutsch, „–" wenn es nichts gibt — aus core/zahl.js.
+  const nt = (x) => kommaRund(x, 1, "–");
   const noteVon = (pl) => { const n = pl.map((p) => gradeFromPct(p, scale)); return n.length ? n.reduce((s, x) => s + x, 0) / n.length : null; };
   const einheitLabel = (e, i) => [e.label || `${i + 1}`, e.teil].filter(Boolean).join(" ");
 
@@ -1035,7 +1037,7 @@ export function KlassenarbeitVergleich() {
   // mit dem Wert daneben, damit die Lehrkraft sie nachpruefen kann.
   const auffaellig = (g) => {
     if (!g) return null;
-    if (g.trenn != null && g.trenn < 0.1) return t("klassenarbeit.flagTrenn", { v: String(g.trenn).replace(".", ",") });
+    if (g.trenn != null && g.trenn < 0.1) return t("klassenarbeit.flagTrenn", { v: komma(g.trenn) });
     if (g.null != null && g.null >= 40 && (g.pct ?? 100) < 60) return t("klassenarbeit.flagNull", { v: g.null });
     return null;
   };
@@ -1146,7 +1148,7 @@ export function KlassenarbeitVergleich() {
                       <tr onClick={() => setOffen(auf ? null : r.i)} style={{ cursor: "pointer" }}>
                         <td style={{ ...zelle, textAlign: "left", fontWeight: 600 }}>
                           {r.label}
-                          {r.max ? <span style={{ color: "var(--text3)", fontWeight: 400 }}> /{String(r.max).replace(".", ",")}</span> : null}
+                          {r.max ? <span style={{ color: "var(--text3)", fontWeight: 400 }}> /{komma(r.max)}</span> : null}
                           {hinweis && <span title={hinweis} style={{ marginLeft: 8, color: C.warning, fontWeight: 700 }}>!</span>}
                         </td>
                         {r.werte.map((v, k) => (
@@ -1161,7 +1163,7 @@ export function KlassenarbeitVergleich() {
                         </td>
                         <td style={{ ...zelle, color: (g?.null ?? 0) >= 40 ? C.danger : "var(--text3)" }}>{g?.null == null ? "–" : `${g.null}%`}</td>
                         <td style={{ ...zelle, fontWeight: 600, color: g?.trenn == null ? "var(--text3)" : g.trenn < 0.1 ? C.danger : g.trenn < 0.2 ? C.warning : "var(--text2)" }}>
-                          {g?.trenn == null ? "–" : String(g.trenn).replace(".", ",")}
+                          {g?.trenn == null ? "–" : komma(g.trenn)}
                         </td>
                       </tr>
                       {auf && (
@@ -1186,12 +1188,12 @@ export function KlassenarbeitVergleich() {
                                   <tr key={k}>
                                     <td style={{ ...zelle, textAlign: "left", padding: "6px 8px" }}>{klassen[k]?.class_name || "?"}</td>
                                     <td style={{ ...zelle, padding: "6px 8px", color: "var(--text3)" }}>{d?.n ?? "–"}</td>
-                                    <td style={{ ...zelle, padding: "6px 8px" }}>{d?.schnitt == null ? "–" : String(d.schnitt).replace(".", ",")}</td>
+                                    <td style={{ ...zelle, padding: "6px 8px" }}>{komma(d?.schnitt, "–")}</td>
                                     <td style={{ ...zelle, padding: "6px 8px", fontWeight: 600 }}>{d?.pct == null ? "–" : `${d.pct}%`}</td>
                                     <td style={{ ...zelle, padding: "6px 8px" }}>{d?.null == null ? "–" : `${d.null}%`}</td>
                                     <td style={{ ...zelle, padding: "6px 8px" }}>{d?.voll == null ? "–" : `${d.voll}%`}</td>
-                                    <td style={{ ...zelle, padding: "6px 8px", color: "var(--text3)" }}>{d?.sd == null ? "–" : String(d.sd).replace(".", ",")}</td>
-                                    <td style={{ ...zelle, padding: "6px 8px" }}>{d?.trenn == null ? "–" : String(d.trenn).replace(".", ",")}</td>
+                                    <td style={{ ...zelle, padding: "6px 8px", color: "var(--text3)" }}>{komma(d?.sd, "–")}</td>
+                                    <td style={{ ...zelle, padding: "6px 8px" }}>{komma(d?.trenn, "–")}</td>
                                   </tr>
                                 ))}
                               </tbody>

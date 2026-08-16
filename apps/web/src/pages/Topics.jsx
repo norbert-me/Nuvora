@@ -5,9 +5,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { askConfirm } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { AddButton, Icon, ICONS, iconBtn, COLORS as C, btnSecondary, pageTitle, pageIntro,
-  Empty, Skeleton, Modal, pageApp, cardStyle, panelStyle, inputStyle, sectionLabel,
-  toolbarBtn, toolbarBtnPrimary, toolbarInput, CONTROL_R } from "../components/Icons.jsx";
+import { AddButton, btnSecondary, cardStyle, COLORS as C, CONTROL_R, DialogKopf, Empty, Icon, iconBtn, ICONS, inputStyle, Modal, pageApp, pageIntro, pageTitle, panelStyle, sectionLabel, Skeleton, toolbarBtn, toolbarBtnPrimary, toolbarInput } from "../components/Icons.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { peek, put } from "../core/cache.js";
 import AutoTextarea from "../components/AutoTextarea.jsx";
@@ -325,12 +323,11 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
 
   return (
     <Modal onClose={schliessen} width={520} style={{ maxHeight: "86vh", overflowY: "auto" }} label={tp.parent_name ? `${tp.parent_name} / ${name}` : name}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, flex: 1 }}>{tp.parent_name ? `${tp.parent_name} / ${name}` : name}</h3>
+        <DialogKopf titel={tp.parent_name ? `${tp.parent_name} / ${name}` : name} onClose={schliessen}
+          schliessenLabel={t("common.close")} style={{ marginBottom: 8 }}>
           {/* Ein Edit-Icon für Titel UND Notiz. */}
           {!editNote && <button onClick={() => setEditNote(true)} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.edit")} aria-label={t("common.edit")}><Icon d={ICONS.edit} size={16} /></button>}
-          <button onClick={schliessen} className="icon-btn" style={{ ...iconBtn, padding: 6 }} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={18} /></button>
-        </div>
+        </DialogKopf>
 
         {editNote ? (
           <div>

@@ -1,5 +1,8 @@
 import { Children, Fragment, useEffect, useId, useLayoutEffect, useRef } from "react";
 
+import { kommaRund } from "../core/zahl.js";
+import { quantil } from "../core/statistik.js";
+
 const iconSvg = { fill: "none", stroke: "var(--text3)", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" };
 
 // Icon skaliert standardmäßig mit der Schriftgröße (1em) und sitzt auf der
@@ -340,6 +343,36 @@ export const COLORS = {
   aufAkzent: "#fff",
 };
 
+// ─── Wie gut ist diese Quote? EINE Schwelle, nicht sieben ───
+//
+// „ab 80 % grün, ab 50 % gelb, darunter rot" stand achtmal ausgeschrieben im
+// Code — als Funktion (`colorForPct`, `cellStyle`, `pctStyle`) und als
+// Bedingung mitten in einem style-Objekt (Auswertung dreimal, Beamer einmal).
+// Acht Kopien einer Schwelle heißen: wer sie verschiebt, verschiebt sie an
+// sieben Stellen und übersieht die achte — und dann ist dieselbe 79 % in der
+// Klassenauswertung gelb und in der Schülerauswertung grün.
+//
+// Die Zahlen sind eine pädagogische Setzung, keine Rechnung; sie stehen
+// deshalb hier bei den Farben und nicht in `core/`.
+export const QUOTE_GUT = 80;
+export const QUOTE_MITTEL = 50;
+
+/** Schriftfarbe zu einer Trefferquote in Prozent; `null` = keine Angabe. */
+export function quoteFarbe(pct) {
+  if (pct == null) return "var(--text3)";
+  if (pct >= QUOTE_GUT) return COLORS.success;
+  if (pct >= QUOTE_MITTEL) return COLORS.warning;
+  return COLORS.danger;
+}
+
+/** Dieselbe Aussage als Tabellenzelle: getönte Fläche plus Schriftfarbe. */
+export function quoteFlaeche(pct) {
+  if (pct == null) return { background: "var(--bg2)", color: "var(--text3)" };
+  if (pct >= QUOTE_GUT) return { background: "var(--success-bg)", color: COLORS.success };
+  if (pct >= QUOTE_MITTEL) return { background: "var(--warn-bg)", color: COLORS.warning };
+  return { background: "var(--danger-bg)", color: COLORS.danger };
+}
+
 // Antwortfarben A-D (CardVote: Balken, Beamer, Scanner). Lagen dreimal getrennt
 // im Code — bei einer Aenderung war die Legende danach eine andere Farbe als
 // das Diagramm.
@@ -668,12 +701,10 @@ export function StatCard({ label, value, color, sub }) {
 // Horizontaler Boxplot mit Markierungen (Min · Q1 · Median · Q3 · Max) und
 // Ausreißern (1,5·IQR). Vorher hatte jede Auswertung ihren eigenen — CardVote,
 // Klassen-Auswertung, Klassenarbeit. Ab hier zentral: values + Skala (max).
-export function quantileOf(sorted, p) {
-  const n = sorted.length;
-  if (!n) return 0;
-  const idx = p * (n - 1), lo = Math.floor(idx), hi = Math.ceil(idx);
-  return lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
-}
+// Das Quantil selbst ist Rechnung, keine Gestaltung — es liegt in
+// `core/statistik.js` (dieselbe Formel stand als `quantile` noch einmal in
+// `core/grades.js`). Der Name bleibt, damit die Aufrufer sich nicht ändern.
+export const quantileOf = (sorted, p) => quantil(sorted, p, 0);
 export function Boxplot({ values, max = 100, label, unit = "", compact = false }) {
   if (!values || values.length < 3) return null;
   const sorted = [...values].sort((a, b) => a - b);
@@ -684,7 +715,9 @@ export function Boxplot({ values, max = 100, label, unit = "", compact = false }
   const hi = inliers.length ? inliers[inliers.length - 1] : sorted[sorted.length - 1];
   const outliers = sorted.filter((v) => v < loBound || v > hiBound);
   const pct = (v) => (max > 0 ? (v / max) * 100 : 0);
-  const fmt = (n) => (n % 1 === 0 ? String(n) : n.toFixed(1)).replace(".", ",");
+  // Eine Nachkommastelle, ganze Zahlen ohne Komma, deutsch geschrieben —
+  // dieselbe Regel wie im Notenbuch, deshalb aus `core/zahl.js`.
+  const fmt = (n) => kommaRund(n, 1);
   // Kompakt (Listenzeile im Vergleich): nur die Grafik, keine Beschriftungen.
   if (compact) {
     const mittel = sorted.reduce((a, b) => a + b, 0) / sorted.length;
@@ -709,7 +742,7 @@ export function Boxplot({ values, max = 100, label, unit = "", compact = false }
         {/* Der Mittelwert als Punkt: die Tabelle nennt ihn in der Spalte
             daneben, in der Grafik war er vorher gar nicht zu sehen — der
             Kasten zeigt die mittlere Haelfte, nicht den Schnitt. */}
-        <div title={`⌀ ${fmt(Math.round(mittel * 10) / 10)}${unit}`}
+        <div title={`⌀ ${fmt(mittel)}${unit}`}
           style={{ position: "absolute", top: 9, left: `${pct(mittel)}%`, width: 8, height: 8, borderRadius: 4,
             background: "var(--card)", border: "2px solid var(--accent)", transform: "translateX(-4px)" }} />
       </div>
@@ -863,6 +896,35 @@ export function Modal({ children, onClose, width = 480, style, title, titleStyle
         {title ? <h3 id={titelId} style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, ...titleStyle }}>{title}</h3> : null}
         {children}
       </div>
+    </div>
+  );
+}
+
+// Überschrift eines Dialogs. 16/700 — dieselbe Größe, die `Modal` für sein
+// `title` benutzt. Sie stand achtundzwanzigmal ausgeschrieben im Code.
+export const dialogTitel = { fontSize: 16, fontWeight: 700, margin: 0 };
+
+/**
+ * Kopfzeile eines Dialogs: Überschrift links, Schließkreuz rechts, dazwischen
+ * Platz für das, was diese eine Maske braucht (ein Reifegrad-Abzeichen, ein
+ * Stift, ein Zähler).
+ *
+ * `Modal` kann eine Überschrift selbst setzen (`title`) — aber nur eine nackte.
+ * Sobald ein Dialog ein Kreuz oder ein zweites Element in der Kopfzeile wollte,
+ * baute die Seite die Zeile neu: sieben Dialoge, sieben Fassungen derselben
+ * vier Zeilen. Wer `title` reicht, nimmt weiter `title`.
+ */
+export function DialogKopf({ titel, onClose, schliessenLabel = "Schließen", children, style, id }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, ...style }}>
+      <h3 id={id} style={{ ...dialogTitel, flex: 1, minWidth: 0 }}>{titel}</h3>
+      {children}
+      {onClose && (
+        <button onClick={onClose} className="icon-btn" style={{ ...iconBtn, padding: 6 }}
+          title={schliessenLabel} aria-label={schliessenLabel}>
+          <Icon d={ICONS.close} size={18} />
+        </button>
+      )}
     </div>
   );
 }

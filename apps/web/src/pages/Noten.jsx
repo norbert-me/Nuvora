@@ -11,7 +11,7 @@ import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { undoDelete } from "../core/undo.jsx";
 import { Link } from "react-router-dom";
-import { COLORS as C, CONTROL_R, Empty, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Skeleton, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
+import { COLORS as C, CONTROL_R, Empty, ICONS, Icon, Modal as UiModal, Popover, SHADOW, Skeleton, StatCard, Tabs, Toggle, btnPrimary, btnSecondary, cardStyle, chipStyle, dateiWaehlen, iconBtn, inputStyle, klebtLinks, klebtLinksOben, nichtZiehen, panelStyle, popoverPanel, selectStyle, td as tdBasis, thKlebend as thBasis, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
 import { themenIndex, useThemen } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { MehrMenu } from "../components/Werkzeugleiste.jsx";
@@ -24,6 +24,8 @@ import { useKlasseMerken, useKlassenListe, useUrlClass } from "../core/klassenwa
 import { useEinfuegen } from "../core/ziehsortieren.js";
 import { alsJson, hol } from "../core/melden.js";
 import { ymd } from "../core/datum.js";
+import { mittel } from "../core/statistik.js";
+import { komma, kommaRund, rund } from "../core/zahl.js";
 
 const API = "/api/noten";
 
@@ -61,9 +63,11 @@ function StickyMitte({ children, style }) {
 function parseNote(text) {
   const n = parseFloat(String(text).replace(",", "."));
   if (Number.isNaN(n) || n < 1 || n > 6) return null;
-  return Math.round(n * 100) / 100;
+  return rund(n, 2);
 }
-const de = (n) => (n === null || n === undefined ? "" : String(n).replace(".", ","));
+// Deutsche Schreibweise aus core/zahl.js — dieselbe Regel wie in der
+// Klassenarbeit und im Boxplot, wo sie je eigen nachgebaut war.
+const de = (n) => komma(n);
 
 export default function Noten() {
   const { t } = useLanguage();
@@ -418,7 +422,7 @@ export default function Noten() {
     const median = n % 2 ? vals[(n - 1) / 2] : (vals[n / 2 - 1] + vals[n / 2]) / 2;
     // Verteilung auf ganze Notenstufen 1–6 (2,3 zählt zu 2).
     const dist = [1, 2, 3, 4, 5, 6].map((g) => ({ g, n: vals.filter((v) => Math.floor(v) === g).length }));
-    return { n, avg: Math.round((vals.reduce((a, b) => a + b, 0) / n) * 100) / 100, median: Math.round(median * 100) / 100, min: vals[0], max: vals[n - 1], dist };
+    return { n, avg: rund(mittel(vals), 2), median: rund(median, 2), min: vals[0], max: vals[n - 1], dist };
   };
   const sumOf = (studentId) => summary.find((s) => s.student_id === studentId);
 
@@ -542,7 +546,7 @@ export default function Noten() {
 
       {statsCol && (() => {
         const st = colStats(statsCol.id);
-        const de1 = (n) => String(Math.round(n * 100) / 100).replace(".", ",");
+        const de1 = (n) => kommaRund(n, 2);
         const maxN = st ? Math.max(...st.dist.map((d) => d.n), 1) : 1;
         return (
           <Modal title={t("noten.colStatsTitle", { name: statsCol.name })} onClose={() => setStatsCol(null)}>
@@ -966,11 +970,11 @@ function NotenStatistik({ noten, t }) {
   const sd = Math.sqrt(noten.reduce((a, b) => a + (b - avg) ** 2, 0) / n);
   const dist = [1, 2, 3, 4, 5, 6].map((g) => noten.filter((v) => Math.round(v) === g).length);
   const maxD = Math.max(...dist, 1);
+  // Kachel kommt aus Icons.jsx (StatCard) — hier stand eine vierte Fassung
+  // derselben Sache (Wert gross, Beschriftung klein, getoente Flaeche). Der
+  // Umschlag traegt nur die Breitenverteilung der Zeile.
   const tile = (label, value) => (
-    <div style={{ flex: "1 1 90px", minWidth: 80, padding: "10px 12px", background: "var(--bg2)", borderRadius: CONTROL_R, textAlign: "center" }}>
-      <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>{value}</div>
-      <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>{label}</div>
-    </div>
+    <div style={{ flex: "1 1 90px", minWidth: 80 }}><StatCard label={label} value={value} /></div>
   );
   return (
     <div style={{ padding: 16, background: "var(--card)", borderRadius: cardStyle.borderRadius, border: "1px solid var(--border)", marginBottom: 16 }}>
@@ -981,9 +985,9 @@ function NotenStatistik({ noten, t }) {
       {open && (
         <div style={{ marginTop: 12 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-            {tile(t("noten.statAvg"), de(Math.round(avg * 100) / 100))}
-            {tile(t("noten.statMedian"), de(Math.round(median * 100) / 100))}
-            {tile(t("noten.statSd"), `±${(Math.round(sd * 100) / 100).toString().replace(".", ",")}`)}
+            {tile(t("noten.statAvg"), kommaRund(avg, 2))}
+            {tile(t("noten.statMedian"), kommaRund(median, 2))}
+            {tile(t("noten.statSd"), `±${kommaRund(sd, 2)}`)}
           </div>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 90 }}>
             {dist.map((c, i) => (
@@ -1260,7 +1264,7 @@ function CompareModal({ t, cat, onClose }) {
     fetch(`/api/noten/categories/${cat.id}/compare`).then((r) => (r.ok ? r.json() : Promise.reject()))
       .then(setData).catch(() => setErr(true));
   }, [cat.id]);
-  const de1 = (n) => (n == null ? "—" : String(Math.round(n * 100) / 100).replace(".", ","));
+  const de1 = (n) => kommaRund(n, 2, "—");
   return (
     <UiModal onClose={onClose} width={520} label={`${t("noten.compare")}: ${cat.name}`}>
         <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{t("noten.compare")}: {cat.name}</h3>
@@ -1356,8 +1360,8 @@ function punktText(p, t) {
     : cat.source_kind === "codedetektiv" ? t("noten.fromCd") : "";
   const zeilen = [
     [datum, cat.name].filter(Boolean).join(" · "),
-    p.einzeln != null ? `${t("noten.gradeShortLabel")}: ${de(Math.round(p.einzeln * 100) / 100)}` : null,
-    `${p.istSchnitt ? t("noten.runningAvg") : t("noten.gradeShortLabel")}: ${de(Math.round(p.value * 100) / 100)}`,
+    p.einzeln != null ? `${t("noten.gradeShortLabel")}: ${kommaRund(p.einzeln, 2)}` : null,
+    `${p.istSchnitt ? t("noten.runningAvg") : t("noten.gradeShortLabel")}: ${kommaRund(p.value, 2)}`,
     herkunft || null,
   ].filter(Boolean);
   return zeilen.join("\n");

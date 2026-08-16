@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { Link, useSearchParams } from "react-router-dom";
-import { AddButton, COLORS as C, CONTROL_H, CONTROL_R, Empty, ICONS, Icon, Modal as UiModal, NiveauToggle, Popover, REIFE_COLORS, Skeleton, Toggle, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, dateiWaehlen, iconBtn, inputStyle, menuRow, modalOverlay, modalPanel, overlayGuard, pageApp, panelStyle, selectStyle, td as tdBasis, th as thBasis, toolbarBtn, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
+import { AddButton, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, COLORS as C, CONTROL_H, CONTROL_R, dateiWaehlen, DialogKopf, Empty, Icon, iconBtn, ICONS, inputStyle, menuRow, Modal as UiModal, modalOverlay, modalPanel, NiveauToggle, overlayGuard, pageApp, panelStyle, Popover, REIFE_COLORS, selectStyle, Skeleton, td as tdBasis, th as thBasis, Toggle, toolbarBtn, toolbarBtnPrimary, toolbarIconBtn, toolbarInput } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import { themenIndex } from "../core/topics.js";
@@ -21,6 +21,7 @@ import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
 import { formelEinfuegen, LATEX_TASTEN, spalteAnhaengen, TABELLE_GERUEST, zeileAnhaengen } from "../core/latextabelle.js";
 import { alsJson, hol, sende } from "../core/melden.js";
 import { mondayOf } from "../core/datum.js";
+import { istVorfahre, ordnerMitId, pfadZu } from "../core/ordnerbaum.js";
 import { useAblegeZiel, useEinfuegen } from "../core/ziehsortieren.js";
 import NotenUebernahme from "../components/NotenUebernahme.jsx";
 
@@ -148,10 +149,13 @@ export default function Karten() {
   // ziehen. Das Ziel wird beim Ziehen hervorgehoben (Vorschau, wohin es landet).
   const [dragFolder, setDragFolder] = useState(null);
   const [dragDeckId, setDragDeckId] = useState(null); // Stapel-Drag (in Ordner verschieben)
-  const folderById = () => Object.fromEntries(cardFolders.map((f) => [f.id, f]));
-  const isAncestor = (aId, bId) => { const m = folderById(); let cur = m[bId]?.parent_id ?? null; while (cur != null) { if (cur === aId) return true; cur = m[cur]?.parent_id ?? null; } return false; };
-  const canDropInto = (dragId, targetId) => dragId != null && targetId !== dragId && !isAncestor(dragId, targetId) && ((folderById()[dragId]?.parent_id ?? null) !== (targetId ?? null));
-  const moveFolderTo = async (fId, parentId) => { const f = folderById()[fId]; if (!f) return; await sende(`${API}/card-folders/${fId}`, alsJson("PUT", { name: f.name, parent_id: parentId }), t("karten.moveFolder")); loadFolders(); };
+  // Baum-Wege aus core/ordnerbaum.js — Methoden.jsx hatte dieselben Schleifen.
+  // Die dortige Zyklus-Bremse fehlte hier: ein Ordner, der (durch kaputte
+  // Daten) sein eigener Vorfahre ist, haette diese while-Schleife nie verlassen.
+  const folderById = (id) => ordnerMitId(cardFolders, id);
+  const isAncestor = (aId, bId) => istVorfahre(cardFolders, aId, bId);
+  const canDropInto = (dragId, targetId) => dragId != null && targetId !== dragId && !isAncestor(dragId, targetId) && ((folderById(dragId)?.parent_id ?? null) !== (targetId ?? null));
+  const moveFolderTo = async (fId, parentId) => { const f = folderById(fId); if (!f) return; await sende(`${API}/card-folders/${fId}`, alsJson("PUT", { name: f.name, parent_id: parentId }), t("karten.moveFolder")); loadFolders(); };
   // Generisch: gilt ein Ablegen auf targetId (Ordner oder Wurzel)? Für Ordner mit
   // Zyklus-Schutz, für Stapel wenn er nicht schon dort liegt.
   const canDrop = (targetId) => {
@@ -206,7 +210,7 @@ export default function Karten() {
     setDragFolder(null); setDragDeckId(null); ablage.zuruecksetzen();
     if (neu) ordnung.setz({ ids: neu });
   };
-  const folderPath = (fid) => { const byId = Object.fromEntries(cardFolders.map((f) => [f.id, f])); const path = []; let cur = fid; while (cur != null && byId[cur]) { path.unshift(byId[cur]); cur = byId[cur].parent_id ?? null; } return path; };
+  const folderPath = (fid) => pfadZu(cardFolders, fid);
   const createFolder = async (name) => { if (!name || !name.trim()) return; await sende(`${API}/card-folders`, alsJson("POST", { name: name.trim(), parent_id: currentCardFolder }), t("karten.newFolderItem")); loadFolders(); };
   // askPrompt nimmt ein Optionen-Objekt, keinen zweiten Text: der bisherige Name
   // gehoert unter „initial", sonst startet das Feld leer und die Lehrkraft muss
@@ -538,10 +542,7 @@ function StudentDetail({ detail, t, onClose }) {
   const rows = Object.entries(sets);
   return (
     <UiModal onClose={onClose} width={520} label={student.name}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 700, flex: 1 }}>{student.name}</h3>
-          <button onClick={onClose} className="icon-btn" style={iconBtn} title={t("common.close")} aria-label={t("common.close")}><Icon d={ICONS.close} size={16} /></button>
-        </div>
+        <DialogKopf titel={student.name} onClose={onClose} schliessenLabel={t("common.close")} style={{ marginBottom: 8 }} />
         <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 16 }}>{student.reviewed} / {student.total} {t("karten.reviewed").toLowerCase()} · {student.due || 0} {t("karten.due").toLowerCase()}</div>
         {rows.length === 0 ? (
           <p style={{ fontSize: 14, color: "var(--text3)" }}>{t("karten.noRolledOut")}</p>
