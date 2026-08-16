@@ -60,6 +60,13 @@ function useNarrow(bp = 640) {
 }
 const weekValToDate = (s) => { const [y, w] = s.split("-W").map(Number); return addDays(mondayOf(new Date(y, 0, 4)), (w - 1) * 7); };
 
+// Auswahlfeld in einem Dialog. `selectStyle` bringt CONTROL_H (34) mit — das
+// ist die Hoehe einer WERKZEUGLEISTE. Mit 14px Schrift und 10px Polsterung oben
+// und unten braucht die Zeile aber rund 38px: der Text wurde oben und unten
+// beschnitten. Im Dialog gibt die Hoehe deshalb der Inhalt vor. Stand zweimal
+// wortgleich in dieser Datei (Termin- und Slot-Dialog).
+const dialogSelect = { ...selectStyle, width: "100%", height: "auto", fontSize: 14, padding: "10px 34px 10px 12px" };
+
 export default function Kalender() {
   const { t } = useLanguage();
   const nav = useNavigate();
@@ -877,12 +884,18 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
   const ext = extByDay ? extByDay(day) : [];
   const linked = (e) => e.cardvote_set_id || e.karten_deck_id || e.lernpfad_ladder_id || e.method_id || e.codedetektiv_puzzle;
   const pTime = (p) => { const w = (tt.times || [])[p - 1]; return w ? { s: hmToMin(w.start), e: hmToMin(w.end) } : { s: null, e: null }; };
-  // Zeitleiste 0–24 Uhr, aber scrollbar: der Blick startet standardmaessig bei
-  // 6 Uhr (nach oben scrollen fuer die Nachtstunden).
+  // Zeitleiste 0–24 Uhr, aber scrollbar. Der Blick soll da anfangen, wo der Tag
+  // anfaengt — nicht um Mitternacht.
+  //
+  // Vorher: fester Sprung auf 6 Uhr in einem Effekt, der am Datum haengt. Faellt
+  // eine Stunde aus, wechselt der Tag nicht, aber die Zeitleiste wird neu
+  // aufgebaut (der Block haengt an `timed.length`) — die neue Flaeche startet
+  // bei scrollTop 0, und der Effekt laeuft nicht noch einmal. Man sah 00:00 und
+  // musste selbst nach unten rollen. Jetzt setzt ein Rueckruf-Ref die Position
+  // JEDES MAL, wenn die Flaeche entsteht, und zwar auf die erste Stunde des
+  // Tages statt auf eine feste Uhrzeit.
   const HOUR = 40;
-  const scrollRef = useRef(null);
   const dayKey = ymd(day);
-  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 6 * HOUR; }, [dayKey]);
   // Ganztägig / ohne verortbare Uhrzeit -> Banner oben (auch externe Termine).
   // Einträge mit freier Uhrzeit gehören in die Zeitspur, nicht ins Banner.
   const ganztags = list.filter((e) => e.period == null && hmToMin(e.start_time) == null);
@@ -944,6 +957,10 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
     for (let k = cStart; k < items.length; k++) items[k].lanes = cMax + 1;
   }
 
+  // Erste belegte Minute des Tages (halbe Stunde Vorlauf), sonst 6 Uhr.
+  const ersteMinute = timed.length ? Math.max(0, Math.min(...timed.map((x) => x.start)) - 30) : 6 * 60;
+  const scrollRef = useCallback((el) => { if (el) el.scrollTop = (ersteMinute / 60) * HOUR; }, [ersteMinute]);
+
   const hasBanner = ganztags.length > 0 || extAllDay.length > 0;
   const bannerBtn = (key, title, sub, onClick, extern, col) => {
     const c = col || extColor;
@@ -996,7 +1013,7 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
         </div>
       )}
 
-      {/* Zeitleiste 0–24 Uhr: scrollbar, Start bei 6 Uhr (Ref setzt scrollTop). */}
+      {/* Zeitleiste 0–24 Uhr: scrollbar, Start bei der ersten Stunde des Tages. */}
       {timed.length > 0 && (
         <div ref={scrollRef} style={{ ...cardStyle, padding: 0, maxHeight: "62vh", overflowY: "auto" }}>
         <div style={{ position: "relative", height: 24 * HOUR }}
@@ -1461,7 +1478,6 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onClo
   const [color, setColor] = useState(clsColorOf(kursId, classId));
   useEffect(() => { setColor(clsColorOf(kursId, classId)); }, [classId, kursId]); // eslint-disable-line
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri"), t("kalender.sat"), t("kalender.sun")];
-  const sfld = { ...selectStyle, width: "100%", fontSize: 14, padding: "10px 34px 10px 12px" };
   const lbl = { fontSize: 12, color: "var(--text2)", margin: "12px 0 4px" };
   return (
     <Modal onClose={onClose} width={440} label={t("kalender.timetable")}>
@@ -1470,7 +1486,7 @@ function SlotModal({ slot, classes, kurse = [], onSave, onDelete, onColor, onClo
         <div style={lbl}>{t("kalender.kursOrClass")}</div>
         <KursKlasseSelect value={classId === "" ? "" : Number(classId)} kursValue={slot.kurs_id ?? null} allowNone noneLabel={`– ${t("kalender.noClass")} –`} autoFocus
           onChange={(id, kid) => { setClassId(id === "" ? "" : String(id)); setKursId(id === "" ? null : (kid ?? null)); }}
-          onKurs={setKursId} style={sfld} />
+          onKurs={setKursId} style={dialogSelect} />
         {classId && (
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text2)" }}>
@@ -1567,7 +1583,6 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [methodId, methods]);
   const fld = { ...inputStyle, width: "100%" };
-  const sfld = { ...selectStyle, width: "100%", fontSize: 14, padding: "10px 34px 10px 12px" };
   const lbl = { fontSize: 12, color: "var(--text2)", margin: "12px 0 4px" };
   // Siehe core/topics.js — eine Quelle fuer Beschriftung UND Reihenfolge.
   const themen = themenIndex(topics);
@@ -1707,16 +1722,16 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         </>)}
         <div style={lbl}>{t("kalender.kursOrClass")}</div>
         <KursKlasseSelect value={classId === "" ? "" : Number(classId)} kursValue={kursId} allowNone noneLabel={`– ${t("kalender.noClass")} –`}
-          onChange={(id, kid) => { setClassId(id === "" ? "" : String(id)); setKursId(id === "" ? null : (kid ?? null)); }} onKurs={setKursId} style={sfld} />
+          onChange={(id, kid) => { setClassId(id === "" ? "" : String(id)); setKursId(id === "" ? null : (kid ?? null)); }} onKurs={setKursId} style={dialogSelect} />
         <div style={lbl}>{t("kalender.topic")}</div>
-        <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={sfld}>
+        <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={dialogSelect}>
           <option value="">– {t("kalender.noTopic")} –</option>
           {themen.geordnet.map((tp) => <option key={tp.id} value={tp.id}>{topicLabel(tp)}</option>)}
         </select>
         {aktiv.unterrichtsplanung && (
           <>
             <div style={lbl}>{t("kalender.method")}</div>
-            <select value={methodId} onChange={(e) => setMethodId(e.target.value)} style={sfld}>
+            <select value={methodId} onChange={(e) => setMethodId(e.target.value)} style={dialogSelect}>
               <option value="">– {t("kalender.noMethod")} –</option>
               {[...methods].sort(byLabel((m) => m.title)).map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
             </select>
@@ -1731,7 +1746,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         {aktiv.cardvote && (
           <>
             <div style={lbl}>{t("kalender.planCardvote")}</div>
-            <select value={quizId} onChange={(e) => setQuizId(e.target.value)} style={sfld}>
+            <select value={quizId} onChange={(e) => setQuizId(e.target.value)} style={dialogSelect}>
               <option value="">– {t("kalender.none")} –</option>
               {[...quizze].sort(byLabel((q) => q.folder ? `${q.folder} / ${q.name}` : q.name)).map((q) => <option key={q.id} value={q.id}>{q.folder ? `${q.folder} / ${q.name}` : q.name}</option>)}
             </select>
@@ -1740,7 +1755,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         {aktiv.karten && (
           <>
             <div style={lbl}>{t("kalender.planKarten")}</div>
-            <select value={deckId} onChange={(e) => setDeckId(e.target.value)} style={sfld} disabled={!classId} title={!classId ? t("kalender.pickClassFirst") : undefined}>
+            <select value={deckId} onChange={(e) => setDeckId(e.target.value)} style={dialogSelect} disabled={!classId} title={!classId ? t("kalender.pickClassFirst") : undefined}>
               <option value="">– {t("kalender.none")} –</option>
               {[...decks].sort(byLabel((d) => d.name)).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
@@ -1750,7 +1765,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         {aktiv.lernpfad && (
           <>
             <div style={lbl}>{t("kalender.planLernleiter")}</div>
-            <select value={ladderId} onChange={(e) => setLadderId(e.target.value)} style={sfld}>
+            <select value={ladderId} onChange={(e) => setLadderId(e.target.value)} style={dialogSelect}>
               <option value="">– {t("kalender.none")} –</option>
               {[...ladders].sort(byLabel((l) => topicName(l.topic_id) || l.path || "")).map((l) => <option key={l.id} value={l.id}>{(topicName(l.topic_id) || l.path || t("kalender.planLernleiter"))}</option>)}
             </select>
@@ -1759,7 +1774,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         {aktiv["code-detektiv"] && (istInformatik || puzzleId) && (
           <>
             <div style={lbl}>{t("kalender.planDetektiv")}</div>
-            <select value={puzzleId} onChange={(e) => setPuzzleId(e.target.value)} style={sfld}>
+            <select value={puzzleId} onChange={(e) => setPuzzleId(e.target.value)} style={dialogSelect}>
               <option value="">– {t("kalender.none")} –</option>
               {[...puzzles].sort(byLabel((p) => p.title || p.client_id)).map((p) => <option key={p.client_id} value={p.client_id}>{p.title || p.client_id}</option>)}
             </select>
