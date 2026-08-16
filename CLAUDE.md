@@ -79,6 +79,10 @@ Der Roundtrip schreibt in das Konto aus `SELFTEST_EMAIL`/`SELFTEST_PASSWORD` (`.
 
 **Reste blockieren nichts mehr.** Bricht ein Lauf ab, liegen Testdaten und ein fremder Modul-Zustand herum — der nächste Lauf scheiterte früher schon am Aufbau (`409: Dieses Thema gibt es an dieser Stelle schon`). Beide Testfamilien räumen ihre Reste vor dem Aufbau selbst weg (`raeume_reste()` in scripts/selftest.py, `resteAbraeumen()` in den `.mjs`); `scripts/aufraeumen.py` macht dasselbe von Hand (ohne Schalter nur anzeigen, löschen erst mit `--loeschen`). Gelöscht wird ausschließlich, was ein Testpräfix trägt — die Prüfung sitzt in der Klasse `Fund` unmittelbar vor jedem DELETE, nicht nur in der Auswahl.
 
+**Die Testfamilie darf nicht doppelt laufen.** Alle Läufe benutzen dasselbe Konto aus `.deploy.env` und schalten dabei Module um (`Schalter.nur(key)` prüft, dass fremde Endpunkte 403 geben). Zwei gleichzeitige Läufe sehen sich gegenseitig beim Umschalten zu: einer schaltet ein, während der andere erwartet, dass es aus ist — die Regel-3-Proben werden grundlos rot, und es sieht aus wie ein Loch in der Schranke. `is_active` fragt bei jedem Aufruf die Datenbank, es gibt keinen Cache, in dem etwas hängen bleiben könnte. Nacheinander laufen lassen, auch weil der Server nur fünf Anmeldungen je Minute zulässt.
+
+**Der gemeinsame Unterbau der vier Browser-Läufe steht in `scripts/browser-gemeinsam.mjs`** — Zugang, Bericht, Dialog-Handler, Tour wegklicken, Anmeldung hinterlegen, Rundgang, Abbruchbremse, HTTP-Zugang, Modul-Zustand. Auch hier gilt die gerade Richtung: das Modul importiert keines der vier Skripte.
+
 **HTTP-Client und Bericht stehen in `scripts/gemeinsam.py`.** Alle Testskripte holen `Api` und `Bericht` von dort — eine Quelle, kein Nachbau. Die Richtung ist gerade und muss es bleiben: `gemeinsam.py` ← `aufraeumen.py` ← `selftest.py` ← `systemtest.py`. Wer sie umdreht, baut den Importring wieder auf, den es vorher gab (und den nur ein Import mitten in der Funktion offenhielt).
 
 
