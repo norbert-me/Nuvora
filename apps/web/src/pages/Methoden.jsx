@@ -317,7 +317,13 @@ export default function Methoden({ embedded } = {}) {
 // Aus den zentralen Stilen abgeleitet (Icons.jsx ist die einzige Design-Quelle):
 // crumbBtn ist ein btnSecondary ohne sichtbaren Rahmen — dieselbe Form (CONTROL_R)
 // wie alles andere Bedienbare. Das Menue der Brotkrumen ist `menuRow`.
-const crumbBtn = { ...btnSecondary, background: "none", border: "1px solid transparent", borderRadius: CONTROL_R, padding: "4px 8px", fontSize: 13 };
+//
+// Hoehe aus CONTROL_H statt aus der Polsterung: die Brotkrume steht in einer
+// Werkzeugleiste, und die Fassung in den Karteikarten war damit 34 hoch, diese
+// hier 26 — dieselbe Sache in zwei Groessen, je nachdem welche Seite man offen
+// hat.
+const crumbBtn = { ...btnSecondary, background: "none", border: "1px solid transparent", borderRadius: CONTROL_R,
+  height: CONTROL_H, padding: "0 8px", fontSize: 13, display: "inline-flex", alignItems: "center", boxSizing: "border-box" };
 const crumbDrop = { borderColor: "var(--accent)", background: "var(--accent-bg, rgba(10,132,255,0.10))" };
 
 // Detail-Ansicht (Klick auf einen Einstieg): zeigt die Erklärung, mit Buttons

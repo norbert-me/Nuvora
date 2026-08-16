@@ -139,18 +139,25 @@ async def test_intervall_waechst_nicht_ins_unendliche(s):
     kurs, a, b, ma, mb = await _kurs_mit_zwei_fachklassen(s, u)
     deck, karte = await _deck_mit_karte(s, u, a, kurs)
 
+    # Die Zeit VOR dem Schreiben festhalten und dagegen vergleichen. Gegen
+    # `utcnow()` zur Zusicherungszeit zu pruefen macht die Aussage von der Dauer
+    # des Testlaufs abhaengig — unter Last (mehrere Laeufe gleichzeitig) ist das
+    # eine Probe, die gelegentlich rot ist, ohne dass etwas kaputt waere.
+    vorher = datetime.utcnow()
     for _ in range(40):
         await K.submit_review("tok-a", K.ReviewIn(card_id=karte.id, grade=3), db=s)
     rev = (await s.execute(select(CardReview).where(CardReview.student_id == ma.id))).scalar_one()
     assert rev.interval_days <= K.INTERVAL_MAX_DAYS
     assert rev.ease <= K.EASE_MAX
     # SQLite gibt die Zeit ohne Zeitzone zurueck — fuer den Vergleich angleichen.
-    assert _naiv(rev.due) < datetime.utcnow() + timedelta(days=K.INTERVAL_MAX_DAYS + 1)
+    assert _naiv(rev.due) < vorher + timedelta(days=K.INTERVAL_MAX_DAYS + 1)
 
     # Ein „nochmal" setzt danach sauber zurueck (10 Minuten, kein Ueberlauf).
+    vorher = datetime.utcnow()
     await K.submit_review("tok-a", K.ReviewIn(card_id=karte.id, grade=0), db=s)
     await s.refresh(rev)
-    assert rev.reps == 0 and rev.interval_days == 0 and _naiv(rev.due) < datetime.utcnow() + timedelta(hours=1)
+    assert rev.reps == 0 and rev.interval_days == 0
+    assert vorher <= _naiv(rev.due) < vorher + timedelta(hours=1)
     assert rev.ease >= K.EASE_MIN
 
 

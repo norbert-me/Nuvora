@@ -24,7 +24,7 @@ import { useKlasseMerken, useKlassenListe, useUrlClass } from "../core/klassenwa
 import { useEinfuegen } from "../core/ziehsortieren.js";
 import { alsJson, hol } from "../core/melden.js";
 import { ymd } from "../core/datum.js";
-import { mittel } from "../core/statistik.js";
+import { median as medianVon, mittel, streuung } from "../core/statistik.js";
 import { komma, kommaRund, rund } from "../core/zahl.js";
 
 const API = "/api/noten";
@@ -964,10 +964,13 @@ function NotenStatistik({ noten, t }) {
   noten = (noten || []).filter((v) => v != null);
   if (noten.length < 2) return null;
   const n = noten.length;
-  const avg = noten.reduce((a, b) => a + b, 0) / n;
-  const sorted = [...noten].sort((a, b) => a - b);
-  const median = n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
-  const sd = Math.sqrt(noten.reduce((a, b) => a + (b - avg) ** 2, 0) / n);
+  const avg = mittel(noten);
+  // Streuung aus der gemeinsamen Quelle: sie teilt durch n−1 (Stichprobe), hier
+  // stand n (Grundgesamtheit). Dieselbe Kennzahl hatte damit je nach Seite einen
+  // anderen Wert — bei kleinen Klassen sichtbar (bei 20 Noten rund 3 % Unter-
+  // schied). Eine Klasse ist eine Stichprobe des Koennens, nicht die ganze Welt.
+  const median = medianVon(noten);
+  const sd = streuung(noten);
   const dist = [1, 2, 3, 4, 5, 6].map((g) => noten.filter((v) => Math.round(v) === g).length);
   const maxD = Math.max(...dist, 1);
   // Kachel kommt aus Icons.jsx (StatCard) — hier stand eine vierte Fassung
