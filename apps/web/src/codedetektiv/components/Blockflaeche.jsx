@@ -78,8 +78,12 @@ export function useZoomPan() {
     e.preventDefault();
     setZoom(z => Math.min(3, Math.max(0.25, z - e.deltaY * 0.002)));
   };
+  /** Auf dem freien Grund gedrückt (Rahmen, Inhalt oder die Ablegefläche)? */
+  const aufFreiemGrund = (el) =>
+    el === canvasRef.current || el === contentRef.current || el?.dataset?.cdCanvas === '1';
+
   const onPointerDown = (e) => {
-    if (e.target !== canvasRef.current && e.target !== contentRef.current) return;
+    if (!aufFreiemGrund(e.target)) return;
     setIsPanning(true);
     panStart.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
     canvasRef.current.setPointerCapture(e.pointerId);
@@ -137,10 +141,40 @@ export function findSnapStackId(stacks, domId, zoom, cx, cy, excludeBlockId) {
   return null;
 }
 
-/** Die leere Fläche selbst — nimmt Blöcke an, die nirgendwo sonst landen. */
-export function DroppableCanvas({ id, children }) {
+/**
+ * Die Fläche selbst — nimmt Blöcke an, die nirgendwo sonst landen.
+ *
+ * Sie liegt **absolut über der ganzen Inhaltsfläche** (`inset: 0`), nicht im
+ * Fluss. Hier stand `minHeight: '100%'` — eine Prozentangabe gegen ein
+ * Elternteil, das seine Höhe nur aus `min-height` bezieht, und die wird zu 0.
+ * Die Ablegezone war damit **0 px hoch**: `pointerWithin` traf sie nie, jedes
+ * Ablegen fiel auf den Notnagel `closestCenter` — und der nimmt die Zone mit
+ * dem nächsten Mittelpunkt, nicht die unter dem Zeiger. War die Fläche leer,
+ * sass ihr entartetes Rechteck oben am Rand, und ein weiter unten
+ * losgelassener Baustein landete stattdessen in der **Rückgabezone** der
+ * Werkzeugkiste: still weggeworfen, Zähler bleibt bei „Lösung". Gemessen:
+ * `over` meldete `editor-return` statt `editor-canvas`.
+ *
+ * @param leer     nichts abgelegt → den Hinweis zeigen
+ * @param hinweis  „Blöcke hierhin ziehen" (Text kommt von der Seite)
+ */
+export function DroppableCanvas({ id, leer = false, hinweis, children }) {
   const { setNodeRef } = useDroppable({ id });
-  return <div ref={setNodeRef} style={{ position: 'relative', width: '100%', minHeight: '100%' }}>{children}</div>;
+  return (
+    // `data-cd-canvas`: `useZoomPan` erkennt daran, dass ein Zeigerdruck hier
+    // die Ansicht verschieben soll — die Fläche liegt jetzt über allem, sonst
+    // wäre das Schieben der leeren Fläche mit dieser Änderung verloren.
+    <div ref={setNodeRef} data-cd-canvas="1" style={{ position: 'absolute', inset: 0 }}>
+      {leer && hinweis && (
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          color: 'var(--text3)', fontSize: 14, pointerEvents: 'none',
+        }}>{hinweis}</div>
+      )}
+      {children}
+    </div>
+  );
 }
 
 /** Ein Stapel an seiner Position. */

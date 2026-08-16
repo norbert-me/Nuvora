@@ -552,6 +552,11 @@ const bedienung = (td) => [
       await seite.locator("input[placeholder^='z.B. LED']").first().fill(MARKE_UI, { timeout: 8000 });
       const fehler = await bausteinZiehen(seite);
       if (fehler) throw new Error(fehler);
+      // Und einmal ganz leeren und neu anfangen — der Fall, an dem die Fläche
+      // stumm wurde. Am Ende liegt wieder genau ein Baustein da, das Speichern
+      // unten geht also unverändert weiter.
+      const nochmal = await flaecheLeerenUndErneutLegen(seite);
+      if (nochmal) throw new Error(nochmal);
       // Auf die Antwort des Servers warten, nicht auf die Liste: die Liste baut
       // sich beim Aufbau der Seite noch einmal aus der Server-Antwort neu
       // (store.jsx, SET_PUZZLES) — wer sie als Beweis nimmt, prueft ein Rennen.
@@ -767,6 +772,7 @@ async function tabSpringtWeiter(seite, spalte) {
  */
 async function bausteinZiehen(seite) {
   await seite.locator(".toolbox-category-header").first().click({ timeout: 8000 });
+  await editorInsBild(seite);
   const block = seite.locator(".block-toolbox .mc-block, .block-toolbox .mc-container-block").first();
   const ziel = seite.getByText("Blöcke von links hierhin ziehen").first();
   try {
@@ -798,6 +804,31 @@ async function bausteinZiehen(seite) {
   // Loslassen, die Schicht selbst geht nach ~250 ms). Ein Mensch klickt nie so
   // schnell, ein Testwerkzeug immer. Also auf den Zustand warten, nicht auf die
   // Uhr — und danach reicht EIN Klick, worauf der Aufrufer besteht.
+  return await warteAufAblegeEnde(seite);
+}
+
+/**
+ * So weit rollen, dass die Werkzeugkiste ganz im Bild steht — Bausteine oben,
+ * Rueckgabezone unten.
+ *
+ * Die Maus trifft nur, was sichtbar ist, und der Editor sitzt weit unten auf
+ * der Seite. `scrollIntoViewIfNeeded` auf die Rueckgabezone taugt nicht: es
+ * zentriert und schiebt dabei die Bausteine oben aus dem Bild. Also selbst
+ * rechnen und so wenig rollen wie noetig.
+ */
+async function editorInsBild(seite) {
+  await seite.evaluate(() => {
+    const kiste = document.querySelector(".block-toolbox");
+    if (!kiste) return;
+    const r = kiste.getBoundingClientRect();
+    const um = Math.min(Math.max(r.bottom - (window.innerHeight - 20), 0), Math.max(r.top - 20, 0));
+    if (um !== 0) window.scrollBy(0, um);
+  });
+  await seite.waitForTimeout(200);
+}
+
+/** Siehe oben: warten, bis dnd-kits schwebende Schicht wieder weg ist. */
+async function warteAufAblegeEnde(seite) {
   try {
     await seite.waitForFunction(() => ![...document.body.children].some(
       (e) => getComputedStyle(e).position === "fixed"
@@ -806,6 +837,99 @@ async function bausteinZiehen(seite) {
     return "die schwebende Ablege-Schicht von dnd-kit verschwindet nicht";
   }
   return "";
+}
+
+/** Ein Zug mit der Maus, der dnd-kits 5-px-Schwelle wirklich ueberschreitet. */
+async function ziehen(seite, von, nach) {
+  await seite.mouse.move(von.x, von.y);
+  await seite.mouse.down();
+  await seite.mouse.move(von.x + 12, von.y + 12, { steps: 4 });
+  await seite.mouse.move(nach.x, nach.y, { steps: 12 });
+  await seite.mouse.up();
+}
+
+/** Steht in der Ueberschrift eine Blockzahl — und welche? */
+const blockzahl = (seite) => seite.evaluate(() => {
+  const h = document.querySelector(".solution-area h3");
+  const m = (h?.textContent || "").match(/\((\d+)/);
+  return m ? Number(m[1]) : 0;
+});
+
+/**
+ * Die Flaeche komplett leeren — und danach MUSS sie wieder einen Baustein
+ * annehmen.
+ *
+ * Genau diese Reihenfolge war kaputt: der Knoten der Ablegeflaeche trug
+ * `min-height: 100%` gegen ein Elternteil ohne feste Hoehe, war also 0 px
+ * hoch. `pointerWithin` traf ihn nie, jedes Ablegen fiel auf den Notnagel
+ * `closestCenter`, und der nimmt die Zone mit dem naechsten Mittelpunkt: war
+ * die Flaeche leer, sass ihr entartetes Rechteck oben am Rand, und ein weiter
+ * unten losgelassener Baustein landete in der Rueckgabezone der
+ * Werkzeugkiste — still weggeworfen, der Zaehler blieb bei „Lösung".
+ *
+ * Darum wird hier NICHT auf den Hinweistext gezielt (der sass zufaellig genau
+ * auf dem entarteten Rechteck und traf deshalb immer), sondern weiter unten
+ * links in die Flaeche — dorthin, wo eine Lehrkraft ihren Block hinlegt.
+ */
+async function flaecheLeerenUndErneutLegen(seite) {
+  // 1. Den letzten Baustein wegwerfen.
+  const zone = seite.locator(".toolbox-return-zone").first();
+  await editorInsBild(seite);
+  const block = seite.locator(".solution-stack .mc-block, .solution-stack .mc-container-block").first();
+  const von = await block.boundingBox();
+  const rz = await zone.boundingBox();
+  if (!von || !rz) return "Baustein oder Rückgabezone hat keine Ausdehnung";
+  const sicht = seite.viewportSize() || { width: 1280, height: 900 };
+  if (von.y + 10 > sicht.height || rz.y + rz.height / 2 > sicht.height) {
+    return "Baustein oder Rückgabezone liegen ausserhalb des Fensters — der Zug kommt nicht an";
+  }
+  await ziehen(seite, { x: von.x + 20, y: von.y + 10 }, { x: rz.x + rz.width / 2, y: rz.y + rz.height / 2 });
+  try {
+    await seite.waitForFunction(
+      () => !/\(\d+/.test(document.querySelector(".solution-area h3")?.textContent || ""),
+      null, { timeout: 8000 });
+  } catch {
+    return "der weggeworfene Baustein liegt immer noch auf der Fläche";
+  }
+  const ende = await warteAufAblegeEnde(seite);
+  if (ende) return ende;
+
+  // 2. Wo liegt die leere Flaeche, und hat sie ueberhaupt eine Hoehe?
+  const flaeche = await seite.evaluate(() => {
+    const cd = document.querySelector("[data-cd-canvas]");
+    if (!cd) return null;
+    const r = cd.getBoundingClientRect();
+    return { x: r.x, y: r.y, w: r.width, h: r.height };
+  });
+  if (!flaeche) return "die Ablegefläche ([data-cd-canvas]) fehlt";
+  if (flaeche.h < 100) return `die leere Ablegefläche ist nur ${Math.round(flaeche.h)} px hoch — dort trifft kein Zeiger hin`;
+
+  // 3. Erneut einen Baustein legen — links unten in den SICHTBAREN Teil der
+  //    Fläche, nicht auf den Hinweistext: der sass auf dem entarteten Rechteck
+  //    und wäre auch kaputt noch getroffen worden.
+  const oben = Math.max(flaeche.y, 0);
+  const unten = Math.min(flaeche.y + flaeche.h, sicht.height);
+  if (unten - oben < 120) return "von der Ablegefläche ist zu wenig im Bild, um darauf zu zielen";
+  const ziel = {
+    x: flaeche.x + Math.min(140, flaeche.w / 3),
+    y: oben + (unten - oben) * 0.6,
+  };
+  const kiste = seite.locator(".block-toolbox .mc-block, .block-toolbox .mc-container-block").first();
+  if (!(await kiste.isVisible().catch(() => false))) {
+    await seite.locator(".toolbox-category-header").first().click({ timeout: 8000 });
+  }
+  const q = await kiste.boundingBox();
+  if (!q) return "die Werkzeugkiste gibt nach dem Leeren keinen Baustein mehr her";
+  await ziehen(seite, { x: q.x + q.width / 2, y: q.y + q.height / 2 }, ziel);
+  try {
+    await seite.waitForFunction(
+      () => /\(\d+/.test(document.querySelector(".solution-area h3")?.textContent || ""),
+      null, { timeout: 8000 });
+  } catch {
+    return "nach dem Leeren nimmt die Fläche keinen Baustein mehr an (Zähler bleibt bei „Lösung“)";
+  }
+  if ((await blockzahl(seite)) !== 1) return "nach dem Leeren liegt nicht genau ein Baustein auf der Fläche";
+  return await warteAufAblegeEnde(seite);
 }
 
 /** Den Knopf mit diesem title/aria-label in der Zeile mit der Marke druecken. */

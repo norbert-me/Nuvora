@@ -535,14 +535,9 @@ export default function PuzzlePage() {
                 ) : (
                   /* Sort: free canvas with stacks */
                   <Leinwand zp={zp} inhaltStil={{ minWidth: 800, minHeight: 500 }}>
-                    <DroppableCanvas id={CANVAS_ID}>
-                      {stacks.length === 0 && !activeBlock && (
-                        <div style={{
-                          position: 'absolute', top: '50%', left: '50%',
-                          transform: 'translate(-50%, -50%)',
-                          color: 'var(--text3)', fontSize: 14, pointerEvents: 'none',
-                        }}>{t('cd.bloecke_hierhin', 'Blöcke hierhin ziehen')}</div>
-                      )}
+                    <DroppableCanvas id={CANVAS_ID}
+                      leer={stacks.length === 0 && !activeBlock}
+                      hinweis={t('cd.bloecke_hierhin', 'Blöcke hierhin ziehen')}>
                       {stacks.map(stack => (
                         <StackZone key={stack.id} stack={stack} domId={stackDomId}>
                           {stack.blocks.map(block => (
