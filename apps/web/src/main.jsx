@@ -8,6 +8,7 @@ import "@fontsource/inter/700.css";
 import "@fontsource/inter/800.css";
 import { LanguageProvider, useLanguage } from "./i18n/index.jsx";
 import { enqueue, classify, newTmp, flush as flushOutbox } from "./core/outbox.js";
+import { vorladen } from "./core/vorladen.js";
 // Jeder Speicherzugriff im Rahmen laeuft ueber core/speicher.js: in Safaris
 // privatem Modus wirft `localStorage` schon beim Zugriff, und ein Wurf HIER
 // (im globalen fetch) haette jeden einzelnen API-Aufruf mitgerissen.
@@ -1088,9 +1089,19 @@ function App() {
     return () => { alive = false; };
   }, []); // eslint-disable-line
 
+  // Ist jemand angemeldet, einmal am Tag alle Listen im Hintergrund holen —
+  // damit die App danach auch offline mehr zeigt als leere Seiten. Absichtlich
+  // verzoegert: die Seite, die gerade geoeffnet wird, hat Vorrang.
+  useEffect(() => {
+    if (!user) return;
+    const timer = setTimeout(() => { vorladen(); }, 4000);
+    return () => clearTimeout(timer);
+  }, [user]);
+
   const logout = () => {
     loesche("token");
     loesche("user");
+    try { localStorage.removeItem("nuvora:vorgeladen"); } catch { /* egal */ }
     // Zwischengespeicherte Kerndaten des Nutzers loeschen (kein Rest fuer den
     // naechsten Login am selben Browser).
     schluessel("nuvora_cache_").forEach(loesche);

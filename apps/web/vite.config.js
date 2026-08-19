@@ -3,8 +3,30 @@ import react from "@vitejs/plugin-react";
 
 import pkg from "./package.json" with { type: "json" };
 
+// Liste aller gebauten Dateien fuer den Service-Worker.
+//
+// Warum: die Seiten sind lazy geladen (React.lazy je Route), jede liegt in
+// einem eigenen Chunk mit Inhalts-Hash im Namen. Der Service-Worker konnte
+// bisher nur cachen, was jemand vorher aufgerufen hatte — wer offline ging,
+// ohne vorher jede Seite besucht zu haben, bekam ueberall sonst ein weisses
+// Fenster. Die Namen stehen erst nach dem Build fest, also schreibt sie der
+// Build hier hin: /precache.json, eine Liste von Pfaden. Der Worker laedt sie
+// beim Installieren und legt alles auf einmal ab.
+function precacheListe() {
+  return {
+    name: "nuvora-precache-liste",
+    apply: "build",
+    generateBundle(_optionen, bundle) {
+      const dateien = Object.keys(bundle)
+        .filter((name) => /\.(js|css|woff2?|png|svg|jpe?g|webp)$/i.test(name))
+        .map((name) => "/" + name);
+      this.emitFile({ type: "asset", fileName: "precache.json", source: JSON.stringify(dateien) });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), precacheListe()],
   // Fassungsnummer im Code verfuegbar machen. Gebraucht wird sie als
   // Frischemarke an den Lernpfad-Dateien: `style.scoped.css` und `index.html`
   // liegen als Statik hinter einem Cache. Nach einem Deploy holte der Browser

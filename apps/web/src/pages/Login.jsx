@@ -88,10 +88,17 @@ export default function Login({ onLogin }) {
           {subtitle}
         </p>
 
+        {/* Die Felder tragen name/id/autoComplete, weil Passwortverwaltungen
+            (Apple Schluesselbund, iCloud) sonst gar nicht erst anbieten zu
+            speichern: ein Feld ohne autocomplete-Angabe und ohne Namen ist fuer
+            sie kein Anmeldeformular, sondern irgendein Eingabefeld. Platzhalter
+            allein reichen nicht — die liest keine Heuristik. Beim Registrieren
+            steht bewusst "new-password", sonst schlaegt der Schluesselbund das
+            alte Passwort vor, statt ein neues zu erzeugen. */}
         <form onSubmit={submit}>
-          <input type="email" placeholder={t("login.email")} value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} autoFocus required />
+          <input type="email" name="username" id="nuvora-email" autoComplete="username" aria-label={t("login.email")} placeholder={t("login.email")} value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} autoFocus required />
           {mode !== "forgot" && (
-            <input type="password" placeholder={t("login.password")} value={password} onChange={(e) => setPassword(e.target.value)} style={inputStyle} required />
+            <input type="password" name="password" id="nuvora-password" autoComplete={mode === "register" ? "new-password" : "current-password"} aria-label={t("login.password")} placeholder={t("login.password")} value={password} onChange={(e) => setPassword(e.target.value)} style={inputStyle} required />
           )}
 
           {error && <div style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</div>}

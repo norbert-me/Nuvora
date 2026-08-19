@@ -213,8 +213,8 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
           <button type="button" onClick={() => { setShowEmailForm(true); setEmailMsg(""); }} style={{ ...linkBtn, marginBottom: 16 }}>{t("profile.changeEmail")}</button>
         ) : (
           <form onSubmit={changeEmail} style={{ marginBottom: 16 }}>
-            <input type="email" placeholder={t("profile.newEmail")} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} style={feldStyle} required />
-            <input type="password" placeholder={t("profile.currentPw")} value={emailPw} onChange={(e) => setEmailPw(e.target.value)} style={feldStyle} required />
+            <input type="email" name="new-email" autoComplete="email" aria-label={t("profile.newEmail")} placeholder={t("profile.newEmail")} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} style={feldStyle} required />
+            <input type="password" name="current-password" autoComplete="current-password" aria-label={t("profile.currentPw")} placeholder={t("profile.currentPw")} value={emailPw} onChange={(e) => setEmailPw(e.target.value)} style={feldStyle} required />
             <p style={{ fontSize: 12, color: "var(--text3)", margin: "0 0 10px" }}>
               {t("profile.emailInfo")}
             </p>

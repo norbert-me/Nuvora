@@ -428,12 +428,36 @@ def teste_web_dateien(api, b):
             raise AssertionError(f"laeuft in {tage} Tagen ab — Expires neu setzen")
         return f"gueltig noch {tage} Tage"
 
+    def precache():
+        # Der Service-Worker laedt beim Installieren ALLE Seiten vor (sonst ist
+        # offline nur da, was jemand vorher angeklickt hat). Die Liste dazu
+        # erzeugt der Build (vite.config.js). Fehlt sie oder zeigt sie auf
+        # Dateien eines alten Builds, faellt das offline auf — also hier.
+        status, text = api.call("GET", "/precache.json", roh=True)
+        if status != 200:
+            raise AssertionError(f"HTTP {status} — ohne die Liste laedt der Service-Worker "
+                                 "keine Seiten vor, offline bleibt alles Unbesuchte leer")
+        try:
+            liste = json.loads(text)
+        except ValueError:
+            raise AssertionError("kein JSON — Build kaputt")
+        if not isinstance(liste, list) or len(liste) < 10:
+            raise AssertionError(f"nur {len(liste) if isinstance(liste, list) else '?'} Eintraege — "
+                                 "das kann nicht das ganze Bundle sein")
+        # Stichprobe: erste, mittlere, letzte Datei muessen wirklich da sein.
+        for pfad in (liste[0], liste[len(liste) // 2], liste[-1]):
+            st, _ = api.call("GET", pfad, roh=True)
+            if st != 200:
+                raise AssertionError(f"{pfad} gibt HTTP {st} — die Liste zeigt auf einen alten Build")
+        return f"{len(liste)} Dateien, Stichprobe erreichbar"
+
     b.pruefe("Web-Dateien", "robots.txt", robots)
     b.pruefe("Web-Dateien", "security.txt (RFC 9116)", security_txt)
     b.pruefe("Web-Dateien", "favicon.svg", datei("/favicon.svg", "Browser zeigt kein Symbol"))
     b.pruefe("Web-Dateien", "manifest.json", datei("/manifest.json", "kein Zum-Startbildschirm-Hinzufuegen"))
     b.pruefe("Web-Dateien", "icon-192.png", datei("/icon-192.png", "Symbol fuer den Startbildschirm fehlt"))
     b.pruefe("Web-Dateien", "sw.js", datei("/sw.js", "Service Worker fehlt"), schwere="warnung")
+    b.pruefe("Web-Dateien", "precache.json (Seiten vorladen)", precache, schwere="warnung")
     b.pruefe("Web-Dateien", "Unbekannte Adresse", unbekannte_seite)
     b.pruefe("Web-Dateien", "Auslieferung der Anwendung", auslieferung, schwere="warnung")
 

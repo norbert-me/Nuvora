@@ -45,8 +45,8 @@ export default function ResetPassword() {
           </div>
         ) : (
           <form onSubmit={submit}>
-            <input type="password" placeholder={t("reset.pw")} value={pw} onChange={(e) => setPw(e.target.value)} style={inputStyle} autoFocus required />
-            <input type="password" placeholder={t("reset.pw2")} value={pw2} onChange={(e) => setPw2(e.target.value)} style={inputStyle} required />
+            <input type="password" name="new-password" autoComplete="new-password" aria-label={t("reset.pw")} placeholder={t("reset.pw")} value={pw} onChange={(e) => setPw(e.target.value)} style={inputStyle} autoFocus required />
+            <input type="password" name="new-password-repeat" autoComplete="new-password" aria-label={t("reset.pw2")} placeholder={t("reset.pw2")} value={pw2} onChange={(e) => setPw2(e.target.value)} style={inputStyle} required />
             {error && <div style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</div>}
             <button type="submit" style={btnPrimary}>{t("reset.save")}</button>
             <div style={{ textAlign: "center", marginTop: 16 }}>

@@ -5,9 +5,39 @@
 // die Rückfallebene, wenn kein Netz da ist. SCHREIBEN geht offline NICHT
 // (Nicht-GET-Anfragen laufen netzwerk-only) — dafür bräuchte es eine Sync-/
 // Konflikt-Schicht, die es (noch) nicht gibt.
-const CACHE_NAME = "nuvora-v2";
-const API_CACHE = "nuvora-api-v2";
-const STATIC_ASSETS = ["/", "/index.html"];
+const CACHE_NAME = "nuvora-v3";
+const API_CACHE = "nuvora-api-v3";
+const STATIC_ASSETS = ["/", "/index.html", "/manifest.json", "/favicon.svg", "/icon-192.png", "/icon-512.png"];
+
+// Die Lernpfad-App liegt als Statik daneben und wird von LernpfadModule.jsx
+// nachgeladen — sie steckt in keinem Vite-Bundle und stuende deshalb in
+// precache.json nicht drin.
+const LERNPFAD_ASSETS = ["/lp/index.html", "/lp/style.scoped.css", "/lp/js/app.js"];
+
+// Alle Seiten beim ERSTEN Oeffnen holen, nicht erst beim ersten Besuch.
+//
+// Jede Route liegt in einem eigenen Chunk (React.lazy). Wer die App einmal
+// oeffnete und dann offline ging, hatte nur die Seiten, die er vorher
+// angeklickt hatte; alle anderen liefen ins Leere. Die Namen der Chunks
+// erzeugt der Build in /precache.json (siehe vite.config.js).
+//
+// Einzeln statt cache.addAll: addAll bricht komplett ab, sobald EINE Datei
+// nicht kommt — dann waere der Worker gar nicht installiert und die App auch
+// online gestoert. Hier darf jede Datei fuer sich scheitern.
+async function alleSeitenVorladen(cache) {
+  let liste = [];
+  try {
+    const res = await fetch("/precache.json", { cache: "no-cache" });
+    if (res.ok) liste = await res.json();
+  } catch { /* kein Netz beim Installieren: dann eben beim naechsten Mal */ }
+  const alles = [...liste, ...LERNPFAD_ASSETS];
+  await Promise.allSettled(alles.map(async (pfad) => {
+    const treffer = await cache.match(pfad);
+    if (treffer) return;                       // schon da (Deploy aendert nur die neuen Namen)
+    const res = await fetch(pfad, { cache: "no-cache" });
+    if (res.ok) await cache.put(pfad, res);
+  }));
+}
 
 // Diese GET-API-Antworten NICHT cachen: Binärdownloads (groß), reine
 // Aktions-/Diagnose-Endpunkte. Alles andere unter /api/ wird als Offline-
@@ -67,7 +97,13 @@ async function pruneOldAssets() {
 }
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS)));
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    // Die Huelle muss da sein, sonst ist die App offline gar nicht da —
+    // deshalb hier addAll (scheitert eine, ist die Installation zu Recht rot).
+    await cache.addAll(STATIC_ASSETS);
+    await alleSeitenVorladen(cache);
+  })());
   // Bewusst KEIN skipWaiting: die offene Seite laeuft mit ihren alten, jetzt
   // vom Server geloeschten Chunk-Dateien weiter. Wuerde der neue Worker sofort
   // uebernehmen und aufraeumen, liefe ein spaeter nachgeladener Seitenchunk ins
