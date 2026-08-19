@@ -318,7 +318,7 @@ aktiviert hat. Vierzehn Stück, jedes pro Lehrkraft zuschaltbar:
 | Auswertung | `/auswertung` | Drei Sichten: **Notenbuch** (eigene Spalten mit Gewichten, gewichteter Schnitt, Trend je Schüler), **Klassenarbeit** (Punkte je Aufgabe/Teilaufgabe, Thema bis auf die Teilaufgabe, Arbeit + Erwartungshorizont als Anhang, Fehlerprofil) und **Vergleich** (dieselbe Arbeit über mehrere Klassen, je Aufgabe mit Trennschärfe, Nuller-Anteil und Streuung) |
 | Unterrichtsplanung | `/unterrichtsplanung` | Einstiege sammeln: Idee, Ablauf, Material, Dauer — themen-getaggt und an Kalender-Stunden zuweisbar |
 | Code-Detektiv | `/code-detektiv` | Programmier-Rätsel: Code-Bausteine per Drag & Drop ordnen, allein oder in einer Klassen-Session (Beitritt per Code, ohne Login) |
-| Orga | `/orga` | Klassenführung in Reitern: Checklisten, Anwesenheit/Fehlzeiten (PDF-Report), Ausleihe, Sitzplan (optional SEGEL-Stufen) |
+| Orga | `/orga` | Klassenführung in Reitern: Checklisten, Anwesenheit/Fehlzeiten (PDF-Report), Ausleihe, Sitzplan (optional SEGEL-Stufen, Hervorheben von Gruppen) |
 | Zufall | `/zufall` | Zufallsschüler (fair gewichtet nach Zeit seit dem letzten Ziehen) und Zufallsgruppen |
 | Notizbrett | `/notizbrett` | Notizzettel + To-do-Liste. Datierte Aufgaben erscheinen im Kalender. Nicht an Schüler gebunden |
 | Tafel | `/tafel` | Classroom-Screen für den Beamer: frei platzierbare Textfelder, Timer. Ohne Daten |
@@ -499,7 +499,9 @@ Thema → Unterthema):
 - die Frühwarnung schreibt aus einer Meldung direkt eine Beobachtung
 - die Frühwarnung markiert Kinder mit vielen Fehltagen (Anwesenheit)
 - der Sitzplan zeigt auf Wunsch, für wen etwas vereinbart ist (Fördermaßnahmen;
-  standardmäßig aus, weil der Plan oft am Beamer hängt)
+  standardmäßig aus, weil der Plan oft am Beamer hängt) und kann Plätze färben:
+  frei markieren (nur im Browser, nur für diesen Kurs), nach Niveau E/G oder
+  nach Förderschwerpunkt — Letzteres ebenfalls aus, aus demselben Grund
 - der Elternkontakt zeigt die Fehltage des Kindes
 
 Fehlt das Gegenstück-Modul, ist die Verbindung nicht sichtbar und die API weist

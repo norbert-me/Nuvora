@@ -35,15 +35,17 @@ const SCHRIFT = new Set([11, 12, 13, 14, 16, 22]);
 //     REF-Raum 1600×900 und wird per `transform: scale` heruntergerechnet;
 //     Session 28 ist der Sitzungscode am Beamer, Scanner 44 der vierstellige
 //     Code, Mathefussball 32 der Ball im Spielfeld. Kein Fliesstext.
-//   borderRadius (32) — reine Grafik, bei der der Radius die halbe Kante ist
+//   borderRadius (33) — reine Grafik, bei der der Radius die halbe Kante ist
 //     (Balkenkappen, Punkte, Kreise, Dreh-Griffe) sowie zwei bewusste Nullen
-//     (Tabs in einer Segment-Gruppe bringen keine eigenen Ecken mit).
+//     (Tabs in einer Segment-Gruppe bringen keine eigenen Ecken mit). Der
+//     dreiunddreissigste ist der Farbpunkt in der Hervorheben-Legende des
+//     Sitzplans — derselbe Punkt wie in der SEGEL-Legende daneben.
 //
 // Sinken erlaubt, steigen nicht. Wer weiter aufraeumt, traegt die kleinere
 // Zahl hier ein — das ist die halbe Minute, die den Rueckfall verhindert.
 const GRENZE = {
   fontSize: 7,
-  borderRadius: 32,
+  borderRadius: 33,
 };
 
 function dateien(dir) {

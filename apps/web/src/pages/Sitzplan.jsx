@@ -30,6 +30,22 @@ const SEGEL = [
 ];
 const SEGEL_CYCLE = ["", "hafen", "kueste", "meer", "welt"];
 
+// ── Hervorheben ──
+// Am Beamer und im Gedraenge zwischen den Tischen sucht niemand eine Liste ab.
+// Wer gerade gemeint ist — die E-Gruppe, alle mit LRS, die drei fuer die
+// naechste Aufgabe — soll auf einen Blick zu sehen sein. Drei Arten, dieselbe
+// Anzeige: farbiger Balken am Platz plus getoenter Hintergrund.
+//
+// Die Palette ist dieselbe wie die der Klassenfarben im Kern (_CLASS_COLORS in
+// classes.py): in Hell und Dunkel lesbar und untereinander unterscheidbar.
+const HERVOR_FARBEN = ["#2563eb", "#0a7d3e", "#8a6100", "#7c3aed", "#d1350f", "#0891b2", "#db2777", "#65a30d"];
+// Freie Markierung: vier Farben reichen fuer „diese Gruppe, jene Gruppe" — bei
+// acht faengt das Raten an, welche Farbe wofuer stand.
+const MARK_CYCLE = [0, 1, 2, 3];
+// E und G bekommen feste Plaetze der Palette, damit sie in jeder Klasse
+// dieselbe Farbe haben — sonst haengt sie daran, wer zufaellig zuerst kommt.
+const NIVEAU_FARBE = { E: HERVOR_FARBEN[3], G: HERVOR_FARBEN[0] };
+
 // Die Zoom-Leiste sitzt direkt an der Flaeche und darf niedriger sein als die
 // Haupt-Werkzeugleiste (28 statt CONTROL_H) — aber sie ist EINE Gruppe: ein
 // Rahmen aussen, duenne Trenner innen. Vorher waren es fuenf freistehende
@@ -66,6 +82,15 @@ export default function Sitzplan() {
   const [gSegel, setGSegel] = useState({}); // student_id → Stufe
   const [fotosOn, setFotosOn] = useState(true);     // Gesichter am Platz (an)
   const [foerderOn, setFoerderOn] = useState(false); // Maßnahmen am Platz (aus)
+  // Hervorheben: "" | "niveau" | "foerder" | "mark" — und bei "foerder",
+  // welcher Schwerpunkt ("" = jeder bekommt seine eigene Farbe).
+  const [hervor, setHervor] = useState("");
+  const [foerderArt, setFoerderArt] = useState("");
+  // Freie Markierung: student_id → Farbnummer. Bewusst NUR im Browser und nur
+  // fuer diesen Kurs: das ist eine Notiz fuer die naechste halbe Stunde
+  // („diese vier an die Fensterreihe"), kein Merkmal des Kindes. Nichts davon
+  // geht zum Server, nichts in den Export.
+  const [marken, setMarken] = useState({});
   const [massn, setMassn] = useState({});  // student_id → {foerder, massnahmen}
   const canvasRef = useRef(null);
   const dragRef = useRef(null); // { sid, dx, dy } aktives Ziehen
@@ -95,6 +120,53 @@ export default function Sitzplan() {
     return Object.values(canon).sort((a, b) => (a.position || 0) - (b.position || 0) || a.card_id - b.card_id || a.id - b.id);
   }, [cls, classes, kurse]);
   const byId = (id) => students.find((s) => s.id === id);
+
+  // Welche Foerderschwerpunkte kommen in diesem Kurs ueberhaupt vor? Nur die
+  // stehen zur Wahl — eine Liste aller zwoelf waere zu elf Dritteln leer.
+  const vorhandeneFoerder = useMemo(() => {
+    const set = new Set();
+    students.forEach((st) => (st.foerder || []).forEach((f) => set.add(f)));
+    return [...set].sort();
+  }, [students]);
+
+  // Farbe eines Platzes — eine Stelle fuer alle drei Arten, damit Legende und
+  // Platz nie auseinanderlaufen.
+  const farbeFuer = (st) => {
+    if (!st) return null;
+    if (hervor === "mark") {
+      const i = marken[String(st.id)];
+      return i == null ? null : HERVOR_FARBEN[i];
+    }
+    if (hervor === "niveau") return NIVEAU_FARBE[st.niveau] || null;
+    if (hervor === "foerder") {
+      const eigene = st.foerder || [];
+      if (!eigene.length) return null;
+      // Ein bestimmter Schwerpunkt gewaehlt: nur der zaehlt (alle anderen
+      // bleiben unmarkiert — sonst ist die halbe Klasse bunt und nichts faellt
+      // mehr auf). Ohne Wahl: jeder Schwerpunkt seine eigene Farbe.
+      if (foerderArt) return eigene.includes(foerderArt) ? HERVOR_FARBEN[vorhandeneFoerder.indexOf(foerderArt) % HERVOR_FARBEN.length] : null;
+      return HERVOR_FARBEN[vorhandeneFoerder.indexOf(eigene[0]) % HERVOR_FARBEN.length];
+    }
+    return null;
+  };
+
+  // Legende: ohne sie ist ein farbiger Balken nur Dekoration. Zeigt genau die
+  // Gruppen, die gerade vorkommen.
+  const legende = useMemo(() => {
+    if (hervor === "niveau") {
+      return ["E", "G"].filter((n) => students.some((st) => st.niveau === n))
+        .map((n) => ({ farbe: NIVEAU_FARBE[n], text: n }));
+    }
+    if (hervor === "foerder") {
+      const arten = foerderArt ? [foerderArt] : vorhandeneFoerder;
+      return arten.map((f) => ({ farbe: HERVOR_FARBEN[vorhandeneFoerder.indexOf(f) % HERVOR_FARBEN.length], text: f }));
+    }
+    if (hervor === "mark") {
+      const benutzt = [...new Set(Object.values(marken))].sort();
+      return benutzt.map((i) => ({ farbe: HERVOR_FARBEN[i], text: `${t("sitzplan.markGroup")} ${i + 1}` }));
+    }
+    return [];
+  }, [hervor, foerderArt, students, vorhandeneFoerder, marken, t]);
 
   const kursQ = kursId != null ? `?kurs_id=${kursId}` : "";
   // Laufende Nummer je Ladevorgang. KursKlasseSelect meldet den Kurs bewusst
@@ -164,9 +236,34 @@ export default function Sitzplan() {
   const viewKey = classId ? (kursId != null ? `k${kursId}` : `c${classId}`) : null;
   useEffect(() => {
     if (!viewKey) return;
-    try { const v = JSON.parse(localStorage.getItem(`sitzplan_view_${viewKey}`) || "{}"); setSegelOn(!!v.segel); setAufruf(!!v.aufruf); }
-    catch { setSegelOn(false); setAufruf(false); }
+    try {
+      const v = JSON.parse(localStorage.getItem(`sitzplan_view_${viewKey}`) || "{}");
+      setSegelOn(!!v.segel); setAufruf(!!v.aufruf);
+      setHervor(v.hervor || ""); setFoerderArt(v.foerderArt || "");
+    } catch { setSegelOn(false); setAufruf(false); setHervor(""); setFoerderArt(""); }
+    // Markierungen haengen am selben Kurs wie die Ansicht.
+    try { setMarken(JSON.parse(localStorage.getItem(`sitzplan_mark_${viewKey}`) || "{}")); }
+    catch { setMarken({}); }
   }, [viewKey]);
+
+  // Markierung weiterschalten: leer → Farbe 1 … → leer. Wie der SEGEL-Kreislauf,
+  // damit derselbe Handgriff dasselbe tut.
+  const markSchalten = (sid) => {
+    const key = String(sid);
+    setMarken((prev) => {
+      const cur = prev[key];
+      const i = cur == null ? 0 : MARK_CYCLE.indexOf(cur) + 1;
+      const naechste = { ...prev };
+      if (i >= MARK_CYCLE.length) delete naechste[key];
+      else naechste[key] = MARK_CYCLE[i];
+      if (viewKey) { try { localStorage.setItem(`sitzplan_mark_${viewKey}`, JSON.stringify(naechste)); } catch { /* egal */ } }
+      return naechste;
+    });
+  };
+  const markenLeeren = () => {
+    setMarken({});
+    if (viewKey) { try { localStorage.removeItem(`sitzplan_mark_${viewKey}`); } catch { /* egal */ } }
+  };
   const saveView = (patch) => {
     if (!viewKey) return;
     try { const cur = JSON.parse(localStorage.getItem(`sitzplan_view_${viewKey}`) || "{}"); localStorage.setItem(`sitzplan_view_${viewKey}`, JSON.stringify({ ...cur, ...patch })); } catch {}
@@ -263,15 +360,29 @@ export default function Sitzplan() {
 
   // ── Ziehen platzierter Tische (Pointer, damit es flüssig folgt) ──
   const onSeatDown = (e, seat) => {
-    snapshot();
     e.preventDefault();
     const rect = canvasRef.current.getBoundingClientRect();
-    dragRef.current = { sid: seat.sid, dx: (e.clientX - rect.left) / zoom - seat.x, dy: (e.clientY - rect.top) / zoom - seat.y, rot: seat.rot || 0 };
+    // Der Schnappschuss fuer „Rueckgaengig" entsteht erst beim ersten
+    // WIRKLICHEN Zug (siehe onMove): ein blosser Klick auf einen Platz ist
+    // keine Aenderung und hat den Undo-Stapel vorher mit lauter gleichen
+    // Staenden gefuellt — vierzig Klicks, und das echte Verschieben davor war
+    // herausgefallen.
+    dragRef.current = {
+      sid: seat.sid, empty: !!seat.empty,
+      dx: (e.clientX - rect.left) / zoom - seat.x, dy: (e.clientY - rect.top) / zoom - seat.y,
+      rot: seat.rot || 0, sx: e.clientX, sy: e.clientY, gezogen: false,
+    };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
   };
   const onMove = (e) => {
     const d = dragRef.current; if (!d) return;
+    // Unter 4 px ist es ein Klick, kein Zug — auch ein ruhiger Finger wackelt.
+    if (!d.gezogen) {
+      if (Math.abs(e.clientX - d.sx) < 4 && Math.abs(e.clientY - d.sy) < 4) return;
+      d.gezogen = true;
+      snapshot();
+    }
     const rect = canvasRef.current.getBoundingClientRect();
     const x = Math.max(0, Math.min((e.clientX - rect.left) / zoom - d.dx, rect.width / zoom - SEAT_W));
     const y = Math.max(0, Math.min((e.clientY - rect.top) / zoom - d.dy, rect.height / zoom - SEAT_H));
@@ -281,7 +392,11 @@ export default function Sitzplan() {
   const onUp = () => {
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
+    const d = dragRef.current;
     dragRef.current = null;
+    // Im Markier-Modus ist der Klick auf den Platz der Handgriff: eine Ecke
+    // mehr waere die fuenfte an einem Tisch von 108 px Breite.
+    if (d && !d.gezogen && !d.empty && hervor === "mark") markSchalten(d.sid);
   };
 
   const entfernen = (sid) => { snapshot(); persist(seats.filter((s) => s.sid !== sid)); };
@@ -424,11 +539,27 @@ export default function Sitzplan() {
             { key: "fotos", label: t("sitzplan.photoToggle"), hint: t("sitzplan.photoHint"), value: fotosOn, onChange: (v) => { setFotosOn(v); saveView({ fotos: v }); } },
             { key: "segel", label: t("sitzplan.segelToggle"), hint: t("sitzplan.segelHint"), value: segelOn, onChange: (v) => { setSegelOn(v); saveView({ segel: v }); } },
             { key: "foerder", label: t("sitzplan.foerderToggle"), hint: t("sitzplan.foerderHint"), value: foerderOn, onChange: (v) => { setFoerderOn(v); saveView({ foerder: v }); } },
+            { key: "hervor", art: "wahl", label: t("sitzplan.hervorLabel"), hint: t(hervor === "foerder" ? "sitzplan.hervorHintFoerder" : "sitzplan.hervorHint"),
+              value: hervor, onChange: (v) => { setHervor(v); saveView({ hervor: v }); },
+              optionen: [
+                { wert: "", label: t("sitzplan.hervorAus") },
+                { wert: "mark", label: t("sitzplan.hervorMark") },
+                { wert: "niveau", label: t("sitzplan.hervorNiveau") },
+                { wert: "foerder", label: t("sitzplan.hervorFoerder") },
+              ] },
+            // Der Schwerpunkt steht nur zur Wahl, wenn danach gefaerbt wird —
+            // sonst ist es ein Auswahlfeld ohne Wirkung.
+            ...(hervor === "foerder" ? [{
+              key: "foerderArt", art: "wahl", label: t("sitzplan.hervorFoerderArt"),
+              value: foerderArt, onChange: (v) => { setFoerderArt(v); saveView({ foerderArt: v }); },
+              optionen: [{ wert: "", label: t("sitzplan.hervorFoerderAlle") }, ...vorhandeneFoerder.map((f) => ({ wert: f, label: f }))],
+            }] : []),
           ]} />
         )}
         mehr={[
           { key: "export", label: t("sitzplan.export"), icon: ICONS.export, onClick: doExport },
           { key: "import", label: t("sitzplan.import"), icon: ICONS.import, onClick: () => dateiWaehlen(doImport) },
+          Object.keys(marken).length > 0 && { key: "markLeeren", label: t("sitzplan.markClear"), icon: ICONS.close || ICONS.trash, onClick: markenLeeren },
           { key: "leeren", label: t("sitzplan.clear"), icon: ICONS.trash, gefahr: true, onClick: leeren },
         ]}>
         {/* Sichtbar bleibt, was man im Unterricht wirklich braucht: einen Platz
@@ -451,6 +582,20 @@ export default function Sitzplan() {
             </span>
           ))}
           <span style={{ color: "var(--text3)" }}>· {t("sitzplan.segelCycleHint")}</span>
+        </div>
+      )}
+      {hervor && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", margin: "8px 0 12px", fontSize: 13, color: "var(--text3)" }}>
+          <span>{t("sitzplan.hervorLegend")}:</span>
+          {legende.length === 0 && <span>{t(hervor === "mark" ? "sitzplan.markNone" : "sitzplan.hervorNichts")}</span>}
+          {legende.map((l) => (
+            <span key={l.text} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              {/* Radius = halbe Kante: reine Grafik (Punkt in der Legende). */}
+              <span style={{ width: 16, height: 16, borderRadius: 8, background: l.farbe }} />
+              {l.text}
+            </span>
+          ))}
+          {hervor === "mark" && <span>· {t("sitzplan.markHint")}</span>}
         </div>
       )}
       {msg && <p style={{ fontSize: 13, color: C.success, marginBottom: 12 }}>{msg}</p>}
@@ -496,6 +641,7 @@ export default function Sitzplan() {
               const s = byId(seat.sid);
               if (!seat.empty && !s) return null;   // verwaister Platz (Schüler gelöscht) bleibt versteckt
               const abs = aufruf ? abwesend[String(seat.sid)] : null;
+              const hf = seat.empty ? null : farbeFuer(s);
               return (
                 <div key={seat.sid} draggable={false}
                   onPointerDown={(e) => onSeatDown(e, seat)}
@@ -503,10 +649,23 @@ export default function Sitzplan() {
                   style={{ position: "absolute", left: seat.x, top: seat.y, width: SEAT_W, minHeight: SEAT_H,
                     transform: `rotate(${seat.rot || 0}deg)`, transformOrigin: "center",
                     display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
-                    padding: "6px 22px 6px 8px", borderRadius: CONTROL_R, border: "1px solid var(--border2)",
-                    background: abs ? "var(--bg2)" : "var(--bg)", color: "var(--text)", fontSize: 13, fontWeight: 600,
-                    cursor: "grab", boxShadow: SHADOW.ruhig, userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: "none",
+                    padding: "6px 22px 6px 8px", borderRadius: CONTROL_R,
+                    // Hervorgehoben: farbiger Rahmen UND getoenter Grund. Nur
+                    // der Rahmen reicht am Beamer nicht — 1 px verschwindet aus
+                    // drei Metern Abstand; nur die Toenung reicht bei
+                    // Sonnenlicht auf der Leinwand nicht.
+                    border: `1px solid ${hf || "var(--border2)"}`,
+                    background: hf ? `${hf}1f` : (abs ? "var(--bg2)" : "var(--bg)"), color: "var(--text)", fontSize: 13, fontWeight: 600,
+                    cursor: hervor === "mark" && !seat.empty ? "pointer" : "grab",
+                    boxShadow: SHADOW.ruhig, userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", touchAction: "none",
                     opacity: abs ? 0.5 : 1, textDecoration: abs ? "line-through" : "none" }}>
+                  {hf && (
+                    // Der Balken traegt die Farbe da, wo sie auch bei
+                    // uebereinanderliegenden Tischen sichtbar bleibt: an der
+                    // Kante. Radius links = Radius des Platzes.
+                    <span aria-hidden style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 5,
+                      background: hf, borderTopLeftRadius: CONTROL_R, borderBottomLeftRadius: CONTROL_R }} />
+                  )}
                   {!seat.empty && fotosOn && (
                     <Portrait student={s} size={26} style={{ marginRight: 8 }} />
                   )}
