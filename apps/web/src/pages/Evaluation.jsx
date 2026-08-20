@@ -6,6 +6,7 @@ import { useLanguage } from "../i18n/index.jsx";
 import Latex from "../components/Latex.jsx";
 import { ANTWORT_COLORS, Boxplot, COLORS as C, CONTROL_R, ICONS, Icon, Modal, StatCard, Tabs, btnPrimary, btnSecondary, cardStyle, chipStyle, iconBtn, inputStyle, klebtLinks, pageApp, panelStyle, quoteFarbe, quoteFlaeche, td as tdBasis, th as thBasis, toolbarBtn } from "../components/Icons.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
+import Rueckmeldebogen from "../components/Rueckmeldebogen.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
 import { bewerte, statusOf } from "../core/scoring.js";
@@ -114,6 +115,11 @@ export default function Evaluation() {
   // offene Aenderung aus. Ohne diese Zeile stuende die Seite direkt nach dem
   // Aufruf auf „nicht gespeichert" und zeigte den Notenschluessel von vorher.
   const [ladeStand, setLadeStand] = useState(0);
+  // Rueckmeldung je Kind (was sass, was fehlt). Eigener Aufruf statt aus der
+  // Auswertung gerechnet: die Regeln (Schwellen, Mindestzahl an Fragen, wer als
+  // krank gilt) stehen im Server (app/rueckmeldung.py) und werden vom Kind auf
+  // seiner Seite genauso gelesen — zwei Rechnungen waeren zwei Wahrheiten.
+  const [bogen, setBogen] = useState([]);
   useEffect(() => { if (ladeStand) eConf.verwerfen(); }, [ladeStand]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -121,7 +127,9 @@ export default function Evaluation() {
     Promise.all([
       fetch(`${API}/sessions/${id}/evaluation`).then((r) => r.json()),
       fetch(`${API}/sessions/${id}/eval-config`).then((r) => r.json()),
-    ]).then(([evalData, config]) => {
+      fetch(`${API}/sessions/${id}/rueckmeldung`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ]).then(([evalData, config, rm]) => {
+      setBogen(rm && Array.isArray(rm.students) ? rm.students : []);
       clearTimeout(timer);
       if (evalData && evalData.questions && evalData.students) setData({ ...evalData, _evalConfig: config || {} });
       const { weights: _w, grade_scale: _g, krank: _k, anwesend: _a, ...rest } = config || {};
@@ -508,9 +516,22 @@ const gradeDistribution = (() => {
             {t("notenimp.button")}
           </button>
         )}
+        {bogen.length > 0 && (
+          <button onClick={() => window.print()} style={toolbarBtn} title={t("bogen.printHint")}>
+            <Icon d={ICONS.print} size={15} /> {t("bogen.print")}
+          </button>
+        )}
       </Werkzeugleiste>
 
       {(kartenAktiv || lernpfadAktiv) && data.class_id && <WeakTopics sessionId={Number(id)} classId={data.class_id} karten={kartenAktiv} lernpfad={lernpfadAktiv} t={t} />}
+
+      {/* Dasselbe Blatt wie zur Klassenarbeit, nur aus dem Quiz: was sass, was
+          fehlt, je Kind eines. Der Bogen haengt per Portal am <body> und ist am
+          Bildschirm unsichtbar (siehe Druck-CSS in index.html). */}
+      {bogen.length > 0 && (
+        <Rueckmeldebogen titel={data.session_name || t("cv.evaluation")} bogen={bogen}
+          kartenAktiv={kartenAktiv} lernpfadAktiv={lernpfadAktiv} />
+      )}
 
       {/* Statistik-Kacheln */}
       <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>

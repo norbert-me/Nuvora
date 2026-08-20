@@ -1305,6 +1305,19 @@ def teste_cardvote_voll(api, b, u, sch, spuren):
             ist.append(treffer)
         if ist != soll:
             raise AssertionError(f"Trefferquote je Frage {ist} statt {soll}")
+        # Rueckmeldung je Kind: dieselbe Punktzahl wie in der Auswertung — sie
+        # steht auf dem Blatt, das ausgeteilt wird, UND auf der Schuelerseite
+        # hinter dem QR-Code. Zwei Rechnungen waeren zwei Wahrheiten.
+        rm = api.call("GET", f"/api/sessions/{zustand['sitzung']['id']}/rueckmeldung",
+                      erwartet=(200,))
+        for zeile in rm.get("students") or []:
+            aus_ausw = _finde(ausw["students"], card_id=zeile["card_id"])
+            if not aus_ausw or not gleich(aus_ausw["score"], zeile["punkte"]):
+                raise AssertionError(
+                    f"Rueckmeldung rechnet anders als die Auswertung: "
+                    f"{zeile['name']} {zeile['punkte']} statt {aus_ausw and aus_ausw['score']}")
+        if not rm.get("students"):
+            raise AssertionError("Rueckmeldung leer, obwohl gescannt wurde")
         # Zweite Quelle: die rohen Scans zaehlen dasselbe.
         roh = api.call("GET", f"/api/sessions/{zustand['sitzung']['id']}/results"
                               f"?question_id={zustand['fragen'][0]['id']}", erwartet=(200,))

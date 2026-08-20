@@ -1100,7 +1100,7 @@ export default function Klassenarbeit() {
           haengt sich per Portal an den <body> — der Rahmen hier gaebe ihr sonst
           seinen Platz im Fluss, und der Drucker zaehlte danach die Seiten. */}
       {work && analyse && analyse.bogen.length > 0 && (
-        <Rueckmeldebogen work={work} bogen={analyse.bogen}
+        <Rueckmeldebogen titel={work.name} bogen={analyse.bogen}
           fehlerLabel={(k) => t(`klassenarbeit.fehler.${k}`)}
           kartenAktiv={kartenAktiv} lernpfadAktiv={lernpfadAktiv} />
       )}

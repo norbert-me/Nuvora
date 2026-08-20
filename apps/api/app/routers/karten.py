@@ -30,6 +30,7 @@ from ..nebenlauf import mit_wiederholung
 from ..zeit import als_utc, jetzt, tagesbeginn
 from ..themenprofil import KartenStand
 from ..pdfdruck import neue_seite
+from .. import rueckmeldung
 from ..database import get_db
 from ..schueler import roster_kurs, sortiert
 from ..uploads import bildtyp
@@ -1443,8 +1444,14 @@ async def qr_png(token: str, base: str = "", db: AsyncSession = Depends(get_db))
 @router.get("/lernen/{token}/results")
 async def student_results(token: str, db: AsyncSession = Depends(get_db)):
     """Oeffentlich (Token statt Login): die CardVote-Testergebnisse dieses
-    Schuelers — je Session sein Punktestand. Nur Sessions, an denen er
-    teilgenommen hat (mindestens ein Scan). Newest first."""
+    Schuelers — je Session sein Punktestand UND seine Rueckmeldung (was sass,
+    was fehlt). Nur Sessions, an denen er teilgenommen hat. Newest first.
+
+    Gerechnet wird in app/rueckmeldung.py, also mit derselben Funktion wie die
+    Auswertung der Lehrkraft. Vorher zaehlte diese Stelle roh richtig/gesamt und
+    kannte weder E/G noch Gewichte noch Minuspunkte — das Kind sah also eine
+    andere Zahl als seine Lehrkraft, und beide hielten ihre fuer die richtige.
+    """
     # Testergebnisse gehoeren CardVote — sie bleiben also erreichbar, wenn nur
     # das Kartenmodul abgeschaltet ist, und verschwinden mit CardVote.
     st = await _student_by_token(db, token, modul="cardvote")
@@ -1453,38 +1460,17 @@ async def student_results(token: str, db: AsyncSession = Depends(get_db)):
     )).scalars().all()
     out = []
     for sess in sessions:
-        if not sess.question_set_id:
-            continue
-        items = (await db.execute(
-            select(QuestionSetItem).options(selectinload(QuestionSetItem.question))
-            .where(QuestionSetItem.question_set_id == sess.question_set_id)
-        )).scalars().all()
-        qmap = sess.question_map or {}
-        # Alle Scans der Session: nur die TATSAECHLICH gestellten Fragen zaehlen
-        # (eine Live-Session laeuft oft nur ueber einen Teil des Fragesets).
-        alle = (await db.execute(select(Scan).where(Scan.session_id == sess.id))).scalars().all()
-        gestellt = {s.question_id for s in alle}
-        if not gestellt:
-            continue
-        eigene = {s.question_id: s.answer for s in alle if s.student_id == st.card_id}
-        if not eigene:
-            continue  # nicht teilgenommen
-        score = 0
-        total = 0
-        for it in items:
-            q = it.question
-            correct = qmap.get(str(q.id), q.correct_answer)
-            if not correct or q.id not in gestellt:
-                continue
-            total += 1
-            ans = eigene.get(q.id)
-            if ans is not None and ans in correct:
-                score += 1
+        zeilen = await rueckmeldung.quiz(db, sess, nur_card_id=st.card_id)
+        if not zeilen:
+            continue                      # nicht teilgenommen oder nichts erfasst
+        r = zeilen[0]
         out.append({
             "name": sess.name or "Test",
             "date": sess.created_at.isoformat() if sess.created_at else None,
-            "score": score, "total": total,
-            "pct": round(score / total * 100) if total else 0,
+            "score": r["punkte"], "total": r["max"], "pct": r["pct"],
+            # Was das Kind aus der Zahl machen soll — ohne das ist eine Prozent-
+            # angabe nur eine Zahl. Kein Vergleich mit der Klasse.
+            "sass": r["sass"], "offen": r["offen"],
         })
     return out
 

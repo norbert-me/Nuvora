@@ -32,9 +32,11 @@ import { useLanguage } from "../i18n/index.jsx";
 // Dieselbe Überlegung wie beim Kartendruck in Karten.jsx.
 const PAPIER = { background: "#fff", color: "#111" };
 
-export default function Rueckmeldebogen({ work, bogen, fehlerLabel, kartenAktiv, lernpfadAktiv }) {
+export default function Rueckmeldebogen({ titel, bogen, fehlerLabel, kartenAktiv, lernpfadAktiv }) {
   const { t } = useLanguage();
   if (!bogen || !bogen.length) return null;
+  // fehlerLabel gibt es nur bei der Klassenarbeit (dort werden Fehlerarten
+  // erfasst). Beim Quiz fehlt es — dann bleibt der Satz dazu einfach weg.
   if (typeof document === "undefined") return null;
   return createPortal(
     <div className="druck-huelle" style={PAPIER}>
@@ -42,7 +44,7 @@ export default function Rueckmeldebogen({ work, bogen, fehlerLabel, kartenAktiv,
         <div key={b.student_id} className="druck-seite" style={{ ...PAPIER, padding: "24px 28px", maxWidth: 720 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, borderBottom: "2px solid #111", paddingBottom: 8, marginBottom: 16 }}>
             <span style={{ fontSize: 22, fontWeight: 800 }}>{b.name}</span>
-            <span style={{ fontSize: 13, color: "#444" }}>{work.name || t("klassenarbeit.title")}</span>
+            <span style={{ fontSize: 13, color: "#444" }}>{titel || t("klassenarbeit.title")}</span>
           </div>
 
           {/* Die Zahl steht oben und klein: sie ist das, was ohnehin jeder
@@ -73,7 +75,7 @@ export default function Rueckmeldebogen({ work, bogen, fehlerLabel, kartenAktiv,
           {/* Die häufigste Fehlerart als SATZ, nicht als Etikett: aus „Ansatz"
               folgt etwas anderes als aus „Flüchtigkeit", und genau dieser
               Unterschied ist der Grund, warum sie überhaupt erfasst wird. */}
-          {b.haupt && (
+          {b.haupt && fehlerLabel && (
             <p style={{ fontSize: 14, background: "#f2f2f2", borderRadius: CONTROL_R, padding: "10px 12px", marginBottom: 20 }}>
               <strong>{fehlerLabel(b.haupt)}:</strong> {t(`bogen.rat.${b.haupt}`)}
             </p>

@@ -195,13 +195,31 @@ function Ergebnisse({ results, t }) {
       <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 12, textAlign: "center" }}>{t("lernen.resultsTitle")}</h2>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {results.map((r, idx) => (
-          <div key={idx} style={{ ...cardStyle, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
-              <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.date ? new Date(r.date).toLocaleDateString() : ""}</div>
+          <div key={idx} style={{ ...cardStyle, padding: "12px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
+                <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.date ? new Date(r.date).toLocaleDateString() : ""}</div>
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: r.pct >= 50 ? C.success : C.danger }}>{r.pct}%</div>
+              <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.score}/{r.total}</div>
             </div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: r.pct >= 50 ? C.success : C.danger }}>{r.pct}%</div>
-            <div style={{ fontSize: 12, color: "var(--text3)" }}>{r.score}/{r.total}</div>
+            {/* Was aus der Zahl folgt. Ohne das ist eine Prozentangabe nur eine
+                Zahl — und die Frage „was üb ich jetzt?" beantwortet sie nicht.
+                Nur die eigenen Themen: kein Rang, kein Klassenschnitt, kein
+                fremder Name. Das Kind sieht diese Seite allein. */}
+            {(r.sass || []).length > 0 && (
+              <div style={{ fontSize: 13, marginTop: 8, color: "var(--text2)" }}>
+                <Icon d={ICONS.check} size={13} color={C.success} />{" "}
+                {t("lernen.sass")}: {r.sass.map((x) => x.label).join(", ")}
+              </div>
+            )}
+            {(r.offen || []).length > 0 && (
+              <div style={{ fontSize: 13, marginTop: 4, color: "var(--text2)" }}>
+                <Icon d={ICONS.bulb} size={13} color={C.warning} />{" "}
+                {t("lernen.offen")}: {r.offen.map((x) => x.label).join(", ")}
+              </div>
+            )}
           </div>
         ))}
       </div>

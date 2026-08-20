@@ -23,6 +23,7 @@ from .anwesenheit import summary as _anwesenheit_summary
 from .karten import themen_lernstand
 from .klassenarbeit import _profile as _arbeit_profil
 from .. import fruehwarnung as fw
+from .. import rueckmeldung
 from .. import themenprofil as tp
 from .. import websocket as ws
 from .modules import is_active, modul_pflicht
@@ -400,6 +401,20 @@ async def get_topic_stats(session_id: int, user: User = Depends(get_current_user
                     "pct": round(corr / tot * 100) if tot else 0})
     out.sort(key=lambda x: x["pct"])  # schwächste zuerst
     return {"class_id": session.class_id, "topics": out}
+
+
+@router.get("/sessions/{session_id}/rueckmeldung")
+async def get_rueckmeldung(session_id: int, user: User = Depends(get_current_user),
+                           db: AsyncSession = Depends(get_db)):
+    """Je Kind: was sass, was fehlt — Grundlage fuer das Blatt zum Austeilen.
+
+    Dieselbe Rechnung sieht das Kind auf seiner Seite hinter dem QR-Code
+    (karten.py); sie steht deshalb in app/rueckmeldung.py und nicht hier.
+    """
+    session = await oder_403(db, Session, session_id, user,
+                             verboten="Kein Zugriff auf diese Session")
+    return {"session_id": session_id, "session_name": session.name or "",
+            "students": await rueckmeldung.quiz(db, session)}
 
 
 @kern_router.get("/weak-topics")
