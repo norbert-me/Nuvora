@@ -11,6 +11,7 @@ import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import MaterialPanel from "../components/MaterialPanel.jsx";
 import Themenstand from "../components/Themenstand.jsx";
+import Rueckmeldebogen from "../components/Rueckmeldebogen.jsx";
 import { themenIndex, useThemen } from "../core/topics.js";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -512,7 +513,37 @@ export default function Klassenarbeit() {
       };
     })() : null;
 
-    return { topics: topicsOut, students: studentsOut, weakGroups, fehlerStat, gradedCount: graded.length, perTask, perUnit, noten: { avg, dist, distFine, werte, n: notes.length, notes, stats, minPts, max: tm, avgPct, medPct, sdPct, ciLow, ciHigh, present, total } };
+    // ── Rueckmeldebogen: je Kind ALLES, was auf sein Blatt gehoert ──
+    // Bewusst je Kind vollstaendig und ohne einen einzigen Vergleich mit der
+    // Klasse: das Blatt wird ausgedruckt und ausgeteilt, und was ein anderes
+    // Kind geschrieben hat, geht niemanden etwas an. Kein Rang, kein
+    // Klassenschnitt, keine fremden Namen.
+    const bogen = graded.map((s) => {
+      const sum = tasks.reduce((n, tk) => n + pt(s.id, tk), 0);
+      const pct = tm ? (sum / tm) * 100 : 0;
+      const themen = Object.entries(topicUnits).map(([tid, us]) => {
+        let e = 0, m = 0; us.forEach((u) => { e += pu(s.id, u.id); m += uMax[u.id]; });
+        return { label: topicLabel(Number(tid)), erreicht: e, max: m, pct: m ? Math.round(e / m * 100) : 0 };
+      }).sort((a2, b2) => a2.pct - b2.pct);
+      const eigene = (work.fehler || {})[String(s.id)] || {};
+      const arten = Object.entries(eigene)
+        .filter(([uid]) => uid in uMax && pu(s.id, uid) < uMax[uid])
+        .map(([, art]) => art);
+      const haeufigste = arten.length
+        ? Object.entries(zaehl(arten)).sort((a2, b2) => b2[1] - a2[1] || (a2[0] < b2[0] ? -1 : 1))[0][0]
+        : null;
+      return {
+        student_id: s.id, name: s.name, punkte: sum, max: tm, pct: Math.round(pct),
+        note: tm ? gradeFromPct(pct, effScale) : null,
+        // ≥ 75 % sass, < 50 % ist Baustelle. Dazwischen steht bewusst nichts:
+        // ein Blatt, auf dem jedes Thema kommentiert ist, liest niemand.
+        sass: themen.filter((x) => x.pct >= 75),
+        offen: themen.filter((x) => x.pct < 50),
+        haupt: haeufigste,
+      };
+    });
+
+    return { topics: topicsOut, students: studentsOut, weakGroups, fehlerStat, bogen, gradedCount: graded.length, perTask, perUnit, noten: { avg, dist, distFine, werte, n: notes.length, notes, stats, minPts, max: tm, avgPct, medPct, sdPct, ciLow, ciHigh, present, total } };
   }, [work, students, topics, scale, effScale]);
   const wiederholen = async () => {
     if (!work) return;
@@ -796,6 +827,13 @@ export default function Klassenarbeit() {
           <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap", alignItems: "center" }}>
             {notenAktiv && (work.tasks || []).length > 0 && <button onClick={() => setNotenModal(true)} style={btnPrimary}>{t("klassenarbeit.toNoten")}</button>}
             {(kartenAktiv || lernpfadAktiv) && <button onClick={wiederholen} disabled={busy} style={{ ...btnSecondary, opacity: busy ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon d={ICONS.restore} size={15} /> {t("klassenarbeit.remediate")}</button>}
+            {/* Ein Blatt je Kind. Der Ausdruck laesst den Rahmen weg (Druck-CSS
+                in index.html: `.nur-drucken` gewinnt), deshalb reicht hier
+                window.print() ohne eigenes Fenster. */}
+            {analyse && analyse.bogen.length > 0 && (
+              <button onClick={() => window.print()} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}
+                title={t("bogen.printHint")}><Icon d={ICONS.print} size={15} /> {t("bogen.print")}</button>
+            )}
             {(work.tasks || []).length > 0 && (
               <button onClick={() => setScaleOpen((v) => !v)} style={{ ...btnSecondary, marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6 }}
                 title={t("klassenarbeit.scaleHint")}>{t("klassenarbeit.scale")}{(work.scale && Object.keys(work.scale).length) ? " •" : ""}</button>
@@ -1057,6 +1095,17 @@ export default function Klassenarbeit() {
           „dieses Unterthema ueber die Zeit". Rechnet ueber alle Arbeiten und
           Quizze der Klasse — deshalb hier unter der Einzelauswertung. */}
       {hasRoster && !hideIndividual && classId && <Themenstand classId={classId} />}
+
+      {/* Am Bildschirm unsichtbar, auf dem Papier das Einzige: die Bogen
+          stehen im Baum, damit der Druck ohne zweites Fenster auskommt (ein
+          Popup blockt jeder zweite Browser weg). */}
+      {work && analyse && analyse.bogen.length > 0 && (
+        <div className="druck-huelle">
+          <Rueckmeldebogen work={work} bogen={analyse.bogen}
+            fehlerLabel={(k) => t(`klassenarbeit.fehler.${k}`)}
+            kartenAktiv={kartenAktiv} lernpfadAktiv={lernpfadAktiv} />
+        </div>
+      )}
 
       {hasRoster && work && students.length === 0 && <Empty title={t("klassenarbeit.noStudents")} />}
 

@@ -110,7 +110,34 @@
       nav > div::-webkit-scrollbar { display: none; }
       @keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
       @keyframes pulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.05); } }
-    </style>
+    
+      /* Der Rueckmeldebogen haengt im Seitenbaum, gehoert aber nur aufs Papier
+         — im Baum, weil ein zweites Fenster jeder zweite Browser wegblockt. */
+      .druck-huelle { display: none; }
+
+      /* ─── Drucken ───
+         Ein Ausdruck aus Nuvora ist immer ein Blatt fuer jemand anderen: der
+         Rueckmeldebogen fuer ein Kind, die QR-Kaertchen zum Ausschneiden.
+         Navigationsleiste, Werkzeugleisten und Fusszeile gehoeren nie darauf.
+         Traegt die Seite irgendwo `.nur-drucken`, wandert AUSSCHLIESSLICH das
+         aufs Papier; sonst bleibt es beim normalen Ausdruck der Seite.
+         visibility statt display: die Verhaeltnisse im Layout bleiben stehen,
+         damit nichts umbricht, was am Bildschirm passte. */
+      @media print {
+        .druck-huelle { display: block; }
+        body:has(.nur-drucken) * { visibility: hidden; }
+        body:has(.nur-drucken) .nur-drucken,
+        body:has(.nur-drucken) .nur-drucken * { visibility: visible; }
+        body:has(.nur-drucken) .nur-drucken {
+          position: absolute; left: 0; top: 0; width: 100%;
+          background: #fff; color: #111;
+        }
+        /* Ein Blatt je Kind — zwei Rueckmeldungen auf einem Bogen kann man
+           nicht austeilen, ohne die fremde Haelfte abzuschneiden. */
+        .druck-seite { break-after: page; page-break-after: always; }
+        .druck-seite:last-child { break-after: auto; page-break-after: auto; }
+      }
+</style>
     <!-- Dunkles Design VOR dem ersten Zeichnen setzen, sonst blitzt die helle
          Flaeche kurz auf. try/catch, weil Safari im privaten Modus schon beim
          blossen Zugriff auf localStorage eine Ausnahme wirft — die letzte
