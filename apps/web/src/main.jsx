@@ -90,19 +90,32 @@ window.fetch = function(input, init) {
     // weiter; bei Verbindung wird der Eintrag automatisch nachgespielt.
     const method = (init && init.method) || "GET";
     let bodyObj = null;
-    try { bodyObj = init && typeof init.body === "string" ? JSON.parse(init.body) : null; } catch { /* kein JSON */ }
-    const kind = isApi ? classify(method, url, bodyObj) : null;
+    // Ein Koerper, der kein JSON ist (FormData beim Datei-Upload), laesst sich
+    // nicht ablegen — dann lieber der ehrliche Netzwerkfehler als ein Puffern,
+    // das beim Nachspielen einen leeren Aufruf schickt.
+    const hatKoerper = !!(init && init.body != null);
+    let koerperOk = !hatKoerper;
+    if (hatKoerper && typeof init.body === "string") {
+      try { bodyObj = JSON.parse(init.body); koerperOk = true; } catch { koerperOk = false; }
+    }
+    const kind = isApi ? classify(method, url, bodyObj, koerperOk) : null;
     if (kind) {
       const hdr = { "Content-Type": "application/json", "X-Nuvora-Queued": "1" };
+      // Die Antwort traegt zurueck, was hingeschickt wurde. Die Seite arbeitet
+      // optimistisch damit weiter — und viele Seiten lesen aus der Antwort
+      // Felder aus, die sie gerade selbst gesendet haben (Name, Farbe, Reihung).
+      // Ein blosses {queued:true} liess genau die leer werden, bis jemand neu
+      // lud: die Karte war da, hiess aber "undefined".
+      const echo = { ...(bodyObj && typeof bodyObj === "object" && !Array.isArray(bodyObj) ? bodyObj : {}), queued: true };
       if (kind === "create") {
-        // Behelfs-ID vergeben; die Seite arbeitet optimistisch damit weiter.
-        // Beim Sync vergibt der Server die echte ID (siehe outbox.flush).
+        // Behelfs-ID vergeben; beim Sync vergibt der Server die echte ID und
+        // haengt alle wartenden Aufrufe um, die auf sie zeigen (outbox.flush).
         const tmp = newTmp();
         await enqueue(method, url, bodyObj, { kind: "create", tmp });
-        return new Response(JSON.stringify({ id: tmp, queued: true }), { status: 200, headers: hdr });
+        return new Response(JSON.stringify({ ...echo, id: tmp }), { status: 200, headers: hdr });
       }
       await enqueue(method, url, bodyObj, { kind });
-      return new Response(JSON.stringify({ queued: true }), { status: 200, headers: hdr });
+      return new Response(JSON.stringify(echo), { status: 200, headers: hdr });
     }
     throw err;
   });

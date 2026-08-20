@@ -525,7 +525,12 @@ Drei, mehr braucht es nicht:
 Fenster, Dock-Icon, kein Browser-Rahmen. **Kein eigener Server, keine eigene
 Datenbank, kein eigener Code-Pfad**; sie zeigt auf einen laufenden
 Nuvora-Server. Offline *lesen* über den Service Worker, offline *schreiben*
-noch offen. Sie ist bewusst kein Modul. Details in `apps/desktop/README.md`.
+über eine Warteschlange im Browser: Änderungen werden gepuffert und bei
+Verbindung automatisch nachgeholt. Ausgenommen bleibt, was den Server jetzt
+braucht (Anmeldung, laufende Abstimmung), was sich nicht wiederholen lässt
+(endgültig löschen, Zugänge neu vergeben) und was kein JSON ist (Bilder,
+Dateien) — was der Server beim Nachholen ablehnt, wird angezeigt statt still
+verworfen. Sie ist bewusst kein Modul. Details in `apps/desktop/README.md`.
 
 Fertig gebaut hängt sie an jedem [Release](https://github.com/norbert-me/Nuvora/releases)
 (`.dmg` für Apple Silicon und Intel), unsigniert — beim ersten Start Rechtsklick
