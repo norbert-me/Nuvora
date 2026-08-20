@@ -372,11 +372,21 @@ def inhalt_auswertung(api, u, spuren):
     api.call("PUT", f"/api/klassenarbeit/works/{arbeit['id']}", {
         "tasks": [{"id": "a1", "label": "Aufgabe 1", "topic_id": u.topic_id, "max": 4}],
         "results": {str(u.students[0]): {"a1": 1}, str(u.students[1]): {"a1": 4}},
+        # Fehlerart je Zelle: beim ersten Kind fehlen Punkte (zaehlt), beim
+        # zweiten steht die volle Punktzahl (zaehlt NICHT — die Angabe ist
+        # veraltet, wird aber nicht geloescht). Unbekannte Art fliegt raus.
+        "fehler": {str(u.students[0]): {"a1": "ansatz"},
+                   str(u.students[1]): {"a1": "rechnen"}},
     }, erwartet=(200,))
     gelesen = _finde(api.call("GET", f"/api/klassenarbeit/classes/{u.class_id}/works",
                               erwartet=(200,)), id=arbeit["id"])
     if not gelesen or (gelesen.get("tasks") or [{}])[0].get("max") != 4:
         raise AssertionError(f"Aufgabe der Klassenarbeit nicht gespeichert: {gelesen}")
+    # Die Fehlerart des Kindes mit voller Punktzahl bleibt GESPEICHERT — nur
+    # gezaehlt wird sie nicht (siehe unten). Wuerde sie beim Speichern
+    # weggeworfen, waere sie nach einer Nachkorrektur unwiederbringlich weg.
+    if (gelesen.get("fehler") or {}).get(str(u.students[1]), {}).get("a1") != "rechnen":
+        raise AssertionError(f"Fehlerart nicht gespeichert: {gelesen.get('fehler')}")
     # Die Auswertung rechnet: 1 von 4 und 4 von 4 Punkten = 5 von 8 = 63 %.
     ausw = api.call("GET", f"/api/klassenarbeit/works/{arbeit['id']}/analysis", erwartet=(200,))
     thema = _finde(ausw.get("topics"), topic_id=u.topic_id)
@@ -388,6 +398,22 @@ def inhalt_auswertung(api, u, spuren):
     schwach = _finde(ausw.get("students"), student_id=u.students[0])
     if not schwach:
         raise AssertionError("Kind mit 1 von 4 Punkten gilt nicht als schwach")
+    # Fehlerarten: genau EINE zaehlt. Das Kind mit voller Punktzahl darf nicht
+    # auftauchen (sonst zaehlt die Auswertung Fehler an geloesten Aufgaben),
+    # und die erfundene Art darf gar nicht erst gespeichert worden sein.
+    fehler = ausw.get("fehler")
+    if not fehler or fehler.get("gesamt") != {"ansatz": 1}:
+        raise AssertionError(f"Fehlerarten falsch gezaehlt: {fehler}")
+    if any(x["student_id"] == u.students[1] for x in fehler.get("students", [])):
+        raise AssertionError("Kind mit voller Punktzahl steht in den Fehlerarten")
+    # Eine erfundene Art nimmt der Server nicht an (fester Katalog wie beim
+    # Foerder-Vokabular) — sie darf nicht als neue Kategorie durchrutschen.
+    api.call("PUT", f"/api/klassenarbeit/works/{arbeit['id']}",
+             {"fehler": {str(u.students[0]): {"a1": "erfunden"}}}, erwartet=(200,))
+    nachher = _finde(api.call("GET", f"/api/klassenarbeit/classes/{u.class_id}/works",
+                              erwartet=(200,)), id=arbeit["id"])
+    if (nachher.get("fehler") or {}).get(str(u.students[0])):
+        raise AssertionError(f"Erfundene Fehlerart angenommen: {nachher.get('fehler')}")
 
     # Kopie in dieselbe Klasse (eine zweite Klasse gibt es im Test nicht): die
     # Aufgaben muessen mitkommen, die PUNKTE nicht. Eine Kopie mit fremden

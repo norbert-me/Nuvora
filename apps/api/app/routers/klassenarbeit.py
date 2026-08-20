@@ -28,6 +28,24 @@ from .anwesenheit import get_day as _tag
 router = APIRouter(prefix="/api/klassenarbeit", tags=["klassenarbeit"])
 MODULE_KEY = "auswertung"
 
+# ─── Fehlerarten ───
+#
+# Fest und kurz, aus demselben Grund wie das Foerder-Vokabular (FOERDER_VALUES
+# in classes.py): eine freie Eingabe je Zelle waere nach zwei Arbeiten ein
+# Zettelkasten aus „Rechenfehler", „rechenfehler" und „verrechnet" — und damit
+# nicht auswertbar. Fuenf Arten, weil bei zehn das Raten anfaengt, welche
+# gemeint war.
+#
+# Fachneutral gehalten: „Ansatz" ist in Mathematik der falsche Rechenweg, in
+# Deutsch die verfehlte Aufgabenstellung. Was daraus folgt, ist dasselbe.
+FEHLER_VALUES = {
+    "ansatz",       # Ansatz/Verstaendnis — neu erklaeren
+    "rechnen",      # Rechen-/Verfahrensfehler — ueben
+    "fluechtig",    # Fluechtigkeit — kontrollieren lernen
+    "darstellung",  # Weg/Begruendung fehlt — Form einfordern
+    "leer",         # nicht bearbeitet — Zeit? Verweigerung? nachfragen
+}
+
 
 require_module = modul_pflicht(MODULE_KEY)
 
@@ -61,6 +79,7 @@ class WorkPut(BaseModel):
     results: Optional[dict] = None      # {student_id: [wrong_task_id]}
     scale: Optional[dict] = None        # Notenschlüssel {"1":87,…} oder null = Profil
     absent: Optional[list] = None       # abwesende student_ids (Punkte bleiben)
+    fehler: Optional[dict] = None       # {student_id: {unit_id: Fehlerart}}
 
 
 class WorkOut(BaseModel):
@@ -73,6 +92,7 @@ class WorkOut(BaseModel):
     results: dict = {}
     scale: Optional[dict] = None
     absent: list = []
+    fehler: dict = {}
     model_config = {"from_attributes": True}
 
 
@@ -104,7 +124,7 @@ async def roster_kurs(kurs_id: int, user: User = Depends(require_module), db: As
 async def list_works(class_id: int, kurs_id: Optional[int] = None, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _owned_class(db, user, class_id)
     rows = (await db.execute(select(WorkAnalysis).where(*_keyw(user, class_id, kurs_id)).order_by(WorkAnalysis.created_at.desc()))).scalars().all()
-    return [WorkOut(id=w.id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or []) for w in rows]
+    return [WorkOut(id=w.id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {}) for w in rows]
 
 
 @router.post("/works", response_model=WorkOut, status_code=201)
@@ -204,7 +224,7 @@ async def copy_work(work_id: int, body: WorkCopyIn, user: User = Depends(require
     await db.commit()
     await db.refresh(ziel)
     return WorkOut(id=ziel.id, source_id=ziel.source_id, class_id=ziel.class_id, kurs_id=ziel.kurs_id, name=ziel.name,
-                   tasks=ziel.tasks or [], results={}, scale=ziel.scale, absent=[])
+                   tasks=ziel.tasks or [], results={}, scale=ziel.scale, absent=[], fehler={})
 
 
 @router.put("/works/{work_id}", response_model=WorkOut)
@@ -276,12 +296,28 @@ async def update_work(work_id: int, body: WorkPut, user: User = Depends(require_
             if isinstance(v, (int, float)):
                 clean[g] = max(0, min(100, float(v)))
         w.scale = clean or None
+    if body.fehler is not None:
+        # {student_id: {unit_id: Fehlerart}}. Unbekannte Arten fliegen still
+        # raus, statt die ganze Arbeit mit einem 422 abzulehnen: die Zelle ist
+        # eine Nebenangabe, und eine verlorene Korrektur waere der teurere
+        # Fehler. Unbekannte Einheiten ebenso — sie entstehen, wenn eine
+        # Teilaufgabe geloescht wird, waehrend jemand anders noch korrigiert.
+        gueltige = {uid for t in (w.tasks or []) for uid, _ in _units(t)}
+        fout = {}
+        for k, v in list(body.fehler.items())[:400]:
+            if not isinstance(v, dict):
+                continue
+            zeile = {str(uid)[:40]: str(art) for uid, art in list(v.items())[:200]
+                     if str(art) in FEHLER_VALUES and str(uid)[:40] in gueltige}
+            if zeile:
+                fout[str(k)] = zeile
+        w.fehler = fout or None
     if body.absent is not None:
         # Abwesende als eindeutige String-IDs; Punkte in results bleiben unberuehrt.
         w.absent = list({str(x)[:40] for x in body.absent[:400]}) or None
     await db.commit()
     await db.refresh(w)
-    return WorkOut(id=w.id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [])
+    return WorkOut(id=w.id, source_id=w.source_id, class_id=w.class_id, kurs_id=w.kurs_id, name=w.name, tasks=w.tasks or [], results=w.results or {}, scale=w.scale, absent=w.absent or [], fehler=w.fehler or {})
 
 
 @router.delete("/works/{work_id}", status_code=204)
@@ -373,6 +409,46 @@ def _profile(work: WorkAnalysis):
     return out, topic_tasks
 
 
+def _fehler_gezaehlt(work: WorkAnalysis):
+    """Fehlerarten, die WIRKLICH zaehlen: je Kind je Einheit, aber nur wo Punkte
+    fehlen und das Kind gewertet wird.
+
+    Warum die Pruefung hier und nicht beim Speichern: die Punkte einer Zelle
+    aendern sich noch, nachdem die Art gesetzt wurde (Nachkorrektur, Widerspruch
+    in der Rueckgabestunde). Wuerde die Art dabei geloescht, waere sie nach einem
+    Tippfehler weg; bleibt sie stehen, ohne dass jemand mitrechnet, zaehlt die
+    Auswertung Fehler an Aufgaben, die volle Punkte haben. Also: stehen lassen,
+    beim Lesen pruefen.
+
+    Liefert [(student_id_str, unit_id, art, topic_id), …].
+    """
+    umax = {}
+    utopic = {}
+    for t in (work.tasks or []):
+        for uid, mx, tid in _units_mit_thema(t):
+            umax[uid] = mx
+            utopic[uid] = tid
+    absent = {str(x) for x in (work.absent or [])}
+    results = work.results or {}
+    out = []
+    for sid, zeile in (work.fehler or {}).items():
+        if str(sid) in absent or results.get(str(sid)) == "abwesend":
+            continue
+        entry = results.get(str(sid))
+        for uid, art in (zeile or {}).items():
+            if uid not in umax:
+                continue
+            if isinstance(entry, dict):
+                v = entry.get(uid)
+                erreicht = float(v) if isinstance(v, (int, float)) else 0.0
+            else:
+                erreicht = 0.0          # Altformat/nichts erfasst: gilt als offen
+            if erreicht >= umax[uid]:
+                continue                 # volle Punkte: die Angabe ist veraltet
+            out.append((str(sid), uid, art, utopic.get(uid)))
+    return out
+
+
 @router.get("/works/{work_id}/analysis")
 async def analysis(work_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Auswertung: je Thema Trefferquote der Klasse + je SuS die schwachen Themen."""
@@ -401,7 +477,45 @@ async def analysis(work_id: int, user: User = Depends(require_module), db: Async
         schwach = [label(tid) for tid, (e, m) in pr.items() if m and e / m < 0.5]
         if schwach:
             per_student.append({"student_id": ids[sid], "name": studs.get(ids[sid], "?"), "weak": sorted(schwach)})
-    return {"topics": sorted(klass.values(), key=lambda x: x["pct"]), "students": sorted(per_student, key=lambda x: x["name"])}
+    # ── Fehlerarten ──
+    # Die Themenquote sagt, WO es klemmt; die Fehlerart sagt, WORAN — und daraus
+    # folgt Verschiedenes: „Ansatz" heisst neu erklaeren, „Fluechtigkeit" heisst
+    # kontrollieren ueben. Zusammengezaehlt wird ueber die ganze Klasse, je Thema
+    # und je Kind; ohne eine einzige Angabe bleibt der Block leer statt bei null.
+    gezaehlt = _fehler_gezaehlt(w)
+    fehler_block = None
+    if gezaehlt:
+        def zaehl(paare):
+            d = {}
+            for art in paare:
+                d[art] = d.get(art, 0) + 1
+            return d
+        gesamt = zaehl([art for _, _, art, _ in gezaehlt])
+        je_thema = {}
+        for _, _, art, tid in gezaehlt:
+            if tid:
+                je_thema.setdefault(tid, []).append(art)
+        je_kind = {}
+        for sid, _, art, _ in gezaehlt:
+            je_kind.setdefault(sid, []).append(art)
+        fehler_block = {
+            "gesamt": gesamt,
+            "topics": sorted(
+                [{"topic_id": tid, "label": label(tid), "typen": zaehl(arten), "n": len(arten)}
+                 for tid, arten in je_thema.items()],
+                key=lambda x: -x["n"]),
+            "students": sorted(
+                [{"student_id": ids[sid], "name": studs.get(ids[sid], "?"), "typen": zaehl(arten),
+                  # Die haeufigste Art des Kindes — das ist der Satz, der in die
+                  # Rueckmeldung gehoert. Bei Gleichstand die erste alphabetisch,
+                  # damit dieselbe Arbeit nicht bei jedem Aufruf anders antwortet.
+                  "haupt": sorted(zaehl(arten).items(), key=lambda kv: (-kv[1], kv[0]))[0][0]}
+                 for sid, arten in je_kind.items() if sid in ids],
+                key=lambda x: x["name"]),
+        }
+    return {"topics": sorted(klass.values(), key=lambda x: x["pct"]),
+            "students": sorted(per_student, key=lambda x: x["name"]),
+            "fehler": fehler_block}
 
 
 @router.post("/works/{work_id}/remediate")

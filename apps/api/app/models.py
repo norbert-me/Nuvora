@@ -1179,6 +1179,19 @@ class WorkAnalysis(Base):
     source_id: Mapped[Optional[int]] = mapped_column(ForeignKey("work_analyses.id", ondelete="SET NULL"), nullable=True, index=True)
     tasks: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     results: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    # Fehlerart je Wertungseinheit und Kind: {"<student_id>": {"t2": "ansatz"}}.
+    #
+    # Warum getrennt von results: die Punkte sagen WIE VIEL fehlt, die Fehlerart
+    # WORAN es lag — und daraus folgt Verschiedenes. „Ansatz" heisst neu
+    # erklaeren, „Fluechtigkeit" heisst ueben; die Themenquote unterscheidet
+    # beides nicht. Freiwillig: eine Arbeit ohne eine einzige Fehlerart ist
+    # vollstaendig auswertbar wie bisher.
+    #
+    # Nur bei Einheiten mit ABZUG sinnvoll. Steht spaeter die volle Punktzahl
+    # da, bleibt die alte Angabe zwar stehen, wird aber nicht mitgezaehlt
+    # (siehe _fehler_gezaehlt) — sonst muesste jede Punkteaenderung in eine
+    # zweite Tabelle greifen, und genau da entstehen die Geisterwerte.
+    fehler: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     # Abwesende SuS (Liste von student_id als String). Orthogonal zu results:
     # abwesend heisst „aus der Klassenstatistik rausrechnen", loescht aber die
     # erreichten Punkte NICHT — kommt der SuS zurueck, sind sie noch da.

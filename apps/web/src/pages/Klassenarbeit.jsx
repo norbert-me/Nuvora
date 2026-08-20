@@ -25,6 +25,23 @@ import { konfidenzProzent, mittel, streuung, trennschaerfe } from "../core/aufga
 import { komma, kommaRund, prozent, rund } from "../core/zahl.js";
 
 const API = "/api/klassenarbeit";
+
+// ─── Fehlerarten ───
+// Wortgleich mit FEHLER_VALUES in klassenarbeit.py — der Server nimmt nichts
+// anderes an. Reihenfolge = Klick-Kreislauf in der Zelle (leer → … → leer).
+// Die Kuerzel stehen in der Zelle, der ganze Name im Titel: das Raster ist
+// ohnehin breiter als der Bildschirm.
+const FEHLER = [
+  { key: "ansatz", ab: "A", color: C.danger },
+  { key: "rechnen", ab: "R", color: C.warning },
+  { key: "fluechtig", ab: "F", color: C.info },
+  { key: "darstellung", ab: "D", color: "#7c3aed" },
+  { key: "leer", ab: "–", color: "var(--text3)" },
+];
+const FEHLER_CYCLE = ["", ...FEHLER.map((f) => f.key)];
+// Das Kuerzel in der Zelle: abgeleitet aus chipStyle (dieselbe Pillenform wie
+// ueberall), nur schmaler — es steht unter einem 42 px breiten Zahlenfeld.
+const fehlerChip = { ...chipStyle, fontSize: 11, fontWeight: 700, padding: "1px 6px", minWidth: 20, textAlign: "center" };
 const newId = () => "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 // Eine Zeile „je Aufgabe/Teilaufgabe": Label, Ø-Punkte, farbige %-Zahl, Balken
@@ -94,6 +111,7 @@ export default function Klassenarbeit() {
   const [scale, setScale] = useState(DEFAULT_SCALE);
   useEffect(() => { try { const u = JSON.parse(localStorage.getItem("user")); if (u?.grade_scale) setScale(u.grade_scale); } catch { /* Default */ } }, []);
   const [hideIndividual, setHideIndividual] = useState(false); // #55: SuS-Ansicht — einzelne Leistungen + Noten aus
+  const [fehlerModus, setFehlerModus] = useState(false);      // Fehlerart je Zelle erfassen (aus)
   const [scaleOpen, setScaleOpen] = useState(false); // Notenschlüssel-Editor auf/zu
   const [expandedTasks, setExpandedTasks] = useState(() => new Set()); // aufgeklappte Teilaufgaben-Auswertung
   const [infoOpen, setInfoOpen] = useState(false); // „Auswertung verstehen"
@@ -189,7 +207,7 @@ export default function Klassenarbeit() {
     if (!next || !next.id) return false;
     // scale: echtes dict = Override, sonst {} (Server setzt zurueck auf Profil).
     const scaleOut = (next.scale && Object.keys(next.scale).length) ? next.scale : {};
-    const r = await fetch(`${API}/works/${next.id}`, alsJson("PUT", { name: next.name, tasks: next.tasks, results: next.results, scale: scaleOut, absent: next.absent || [] })).catch(() => null);
+    const r = await fetch(`${API}/works/${next.id}`, alsJson("PUT", { name: next.name, tasks: next.tasks, results: next.results, scale: scaleOut, absent: next.absent || [], fehler: next.fehler || {} })).catch(() => null);
     if (!r || !r.ok) { showAlert(t("common.notWork")); return false; }
     setSavedWork(next);
     setWorks((ws) => ws.map((x) => (x.id === next.id ? { ...x, name: next.name } : x)));
@@ -249,12 +267,21 @@ export default function Klassenarbeit() {
       .map(([s, m]) => (m === "abwesend" ? [s, m] : [s, Object.fromEntries(Object.entries(m || {}).filter(([k]) => !removeIds.has(String(k))))]))
       .filter(([, m]) => m === "abwesend" || Object.keys(m).length));
 
+  // Dieselbe Saeuberung fuer die Fehlerarten: verschwindet eine Teilaufgabe,
+  // darf ihre Fehlerangabe nicht als Waise stehenbleiben (der Server wirft sie
+  // beim naechsten Speichern ohnehin weg — dann aber ohne dass die Seite es
+  // zeigt, und die Auswertung waere bis zum Neuladen zu hoch).
+  const cleanFehler = (fehler, removeIds) => Object.fromEntries(
+    Object.entries(fehler || {})
+      .map(([sid, m]) => [sid, Object.fromEntries(Object.entries(m || {}).filter(([k]) => !removeIds.has(String(k))))])
+      .filter(([, m]) => Object.keys(m).length));
+
   const addTask = () => persist({ ...work, tasks: [...(work.tasks || []), { id: newId(), label: "", topic_id: null, max: 1, form: false, parts: [] }] });
   const setTask = (id, patch) => persist({ ...work, tasks: work.tasks.map((x) => (x.id === id ? { ...x, ...patch } : x)) });
   const delTask = (id) => {
     const tk = (work.tasks || []).find((x) => x.id === id);
     const ids = new Set(tk ? units(tk).map((u) => String(u.id)) : [String(id)]);
-    persist({ ...work, tasks: work.tasks.filter((x) => x.id !== id), results: cleanResults(work.results, ids) });
+    persist({ ...work, tasks: work.tasks.filter((x) => x.id !== id), results: cleanResults(work.results, ids), fehler: cleanFehler(work.fehler, ids) });
   };
   // Teilaufgaben: eine erste Teilaufgabe erbt id+max der Aufgabe (Punkte bleiben).
   const addPart = (tid) => {
@@ -270,11 +297,27 @@ export default function Klassenarbeit() {
   const delPart = (tid, pid) => {
     const tk = work.tasks.find((x) => x.id === tid); if (!tk) return;
     const parts = units(tk).filter((u) => u.id !== pid);
-    const results = cleanResults(work.results, new Set([String(pid)]));
+    const weg = new Set([String(pid)]);
+    const results = cleanResults(work.results, weg);
+    const fehler = cleanFehler(work.fehler, weg);
     // Bleibt nur ein Teil übrig: zurück zur „ohne Teile"-Form (Max an der Aufgabe).
-    if (parts.length <= 1) { const only = parts[0]; persist({ ...work, tasks: work.tasks.map((x) => (x.id === tid ? { ...x, parts: [], max: only ? unitMax(only) : 1 } : x)), results }); }
-    else persist({ ...work, tasks: work.tasks.map((x) => (x.id === tid ? { ...x, parts } : x)), results });
+    if (parts.length <= 1) { const only = parts[0]; persist({ ...work, tasks: work.tasks.map((x) => (x.id === tid ? { ...x, parts: [], max: only ? unitMax(only) : 1 } : x)), results, fehler }); }
+    else persist({ ...work, tasks: work.tasks.map((x) => (x.id === tid ? { ...x, parts } : x)), results, fehler });
   };
+  // Fehlerart je Zelle: leer → ansatz → rechnen → … → leer. Ein Klick statt
+  // eines Auswahlfelds, weil beim Korrigieren jede Zelle einmal angefasst wird
+  // und ein Dropdown je Zelle drei Handgriffe braucht statt einem.
+  const fehlerOf = (sid, uid) => ((work.fehler || {})[String(sid)] || {})[uid] || "";
+  const cycleFehler = (sid, uid) => {
+    const cur = fehlerOf(sid, uid);
+    const naechste = FEHLER_CYCLE[(FEHLER_CYCLE.indexOf(cur) + 1) % FEHLER_CYCLE.length];
+    const zeile = { ...((work.fehler || {})[String(sid)] || {}) };
+    if (naechste) zeile[uid] = naechste; else delete zeile[uid];
+    const fehler = { ...(work.fehler || {}) };
+    if (Object.keys(zeile).length) fehler[String(sid)] = zeile; else delete fehler[String(sid)];
+    persist({ ...work, fehler });
+  };
+
   const pointsOf = (sid, uid) => { const v = ((work.results || {})[String(sid)] || {})[uid]; return v == null ? "" : v; };
   const setPoints = (sid, uid, val) => {
     const row = { ...((work.results || {})[String(sid)] || {}) };
@@ -326,9 +369,10 @@ export default function Klassenarbeit() {
     // Server (_units_mit_thema in klassenarbeit.py) — beide Seiten müssen hier
     // dasselbe rechnen, sonst zeigt die Seite andere Zahlen als die Auswertung.
     const topicUnits = {};
+    const unitTopic = {};   // Einheit → Thema (fuer die Fehlerarten weiter unten)
     tasks.forEach((tk) => units(tk).forEach((u) => {
       const tid = u.topic_id || tk.topic_id;
-      if (tid) (topicUnits[tid] ||= []).push(u);
+      if (tid) { (topicUnits[tid] ||= []).push(u); unitTopic[u.id] = tid; }
     }));
     const pu = (sid, uid) => { const r = results[String(sid)]; if (!r || r === "abwesend") return 0; const v = r[uid]; return v == null ? 0 : Number(v); };
     const pt = (sid, tk) => units(tk).reduce((n, u) => n + pu(sid, u.id), 0);      // Punkte einer Aufgabe
@@ -435,7 +479,40 @@ export default function Klassenarbeit() {
     let ciLow = null, ciHigh = null;
     if (pctArr.length >= 2) { const half = 1.96 * (sdOf(pctArr) / Math.sqrt(pctArr.length)); ciLow = Math.max(0, Math.round(mean(pctArr) - half)); ciHigh = Math.min(100, Math.round(mean(pctArr) + half)); }
     const present = graded.length, total = students.length;
-    return { topics: topicsOut, students: studentsOut, weakGroups, gradedCount: graded.length, perTask, perUnit, noten: { avg, dist, distFine, werte, n: notes.length, notes, stats, minPts, max: tm, avgPct, medPct, sdPct, ciLow, ciHigh, present, total } };
+    // ── Fehlerarten ──
+    // Dieselben zwei Regeln wie im Server (_fehler_gezaehlt in
+    // klassenarbeit.py): nur gewertete Kinder, und nur Zellen, in denen
+    // wirklich Punkte fehlen. Beide Seiten muessen hier dasselbe rechnen, sonst
+    // zeigt die Seite andere Zahlen als die API.
+    const fehlerRoh = [];
+    graded.forEach((s) => {
+      const zeile = (work.fehler || {})[String(s.id)] || {};
+      Object.entries(zeile).forEach(([uid, art]) => {
+        if (!(uid in uMax)) return;
+        if (pu(s.id, uid) >= uMax[uid]) return;
+        fehlerRoh.push({ sid: s.id, name: s.name, uid, art, topic: unitTopic[uid] || null });
+      });
+    });
+    const zaehl = (arten) => arten.reduce((d, a2) => ({ ...d, [a2]: (d[a2] || 0) + 1 }), {});
+    const fehlerStat = fehlerRoh.length ? (() => {
+      const proThema = new Map();
+      fehlerRoh.forEach((f) => { if (f.topic) { if (!proThema.has(f.topic)) proThema.set(f.topic, []); proThema.get(f.topic).push(f.art); } });
+      const proKind = new Map();
+      fehlerRoh.forEach((f) => { if (!proKind.has(f.sid)) proKind.set(f.sid, { name: f.name, arten: [] }); proKind.get(f.sid).arten.push(f.art); });
+      return {
+        gesamt: zaehl(fehlerRoh.map((f) => f.art)),
+        n: fehlerRoh.length,
+        topics: [...proThema.entries()]
+          .map(([tid, arten]) => ({ label: topicLabel(Number(tid)), typen: zaehl(arten), n: arten.length }))
+          .sort((a2, b2) => b2.n - a2.n),
+        students: [...proKind.entries()]
+          .map(([sid, v]) => ({ student_id: sid, name: v.name, typen: zaehl(v.arten),
+            haupt: Object.entries(zaehl(v.arten)).sort((a2, b2) => b2[1] - a2[1] || (a2[0] < b2[0] ? -1 : 1))[0][0] }))
+          .sort((a2, b2) => (a2.name < b2.name ? -1 : 1)),
+      };
+    })() : null;
+
+    return { topics: topicsOut, students: studentsOut, weakGroups, fehlerStat, gradedCount: graded.length, perTask, perUnit, noten: { avg, dist, distFine, werte, n: notes.length, notes, stats, minPts, max: tm, avgPct, medPct, sdPct, ciLow, ciHigh, present, total } };
   }, [work, students, topics, scale, effScale]);
   const wiederholen = async () => {
     if (!work) return;
@@ -600,6 +677,29 @@ export default function Klassenarbeit() {
 
           {/* 2) Punkte-Raster: Zeilen = Schüler, Spalten = Aufgaben (0..max). */}
           {(work.tasks || []).length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+              {/* Aus, bis jemand ihn anmacht: die Fehlerart ist eine freiwillige
+                  Zusatzangabe. Wer sie nicht braucht, soll kein zweites Feld je
+                  Zelle sehen — das Raster ist ohnehin breiter als der Schirm. */}
+              <button onClick={() => setFehlerModus((v) => !v)}
+                style={{ ...toolbarBtn, background: fehlerModus ? "var(--accent)" : "transparent", color: fehlerModus ? C.aufAkzent : "var(--text2)" }}
+                title={t("klassenarbeit.fehlerHint")}>
+                <Icon d={ICONS.tag || ICONS.bulb} size={15} color={fehlerModus ? C.aufAkzent : "var(--text2)"} /> {t("klassenarbeit.fehlerMode")}
+              </button>
+              {fehlerModus && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 12, color: "var(--text3)" }}>
+                  {FEHLER.map((f) => (
+                    <span key={f.key} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <span style={{ ...fehlerChip, background: f.color, color: C.aufAkzent }}>{f.ab}</span>
+                      {t(`klassenarbeit.fehler.${f.key}`)}
+                    </span>
+                  ))}
+                  <span>· {t("klassenarbeit.fehlerCycle")}</span>
+                </span>
+              )}
+            </div>
+          )}
+          {(work.tasks || []).length > 0 && (
             <div style={{ overflowX: "auto", overscrollBehaviorX: "contain", border: "1px solid var(--border)", borderRadius: panelStyle.borderRadius }}>
               <table style={{ borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
@@ -660,6 +760,24 @@ export default function Klassenarbeit() {
                                   Klassenstatistik gerechnet, aber nicht gelöscht. */}
                               <input type="number" min="0" step="0.5" max={unitMax(u)} value={pointsOf(s.id, u.id)} onChange={(e) => setPoints(s.id, u.id, e.target.value === "" ? "" : Math.min(unitMax(u), Math.max(0, Number(e.target.value))))}
                                 style={{ width: 42, height: 30, border: "none", background: "transparent", textAlign: "center", fontSize: 13, color: "var(--text)" }} />
+                              {/* Die Fehlerart steht nur da, wo Punkte fehlen —
+                                  an einer Aufgabe mit voller Punktzahl gibt es
+                                  keinen Fehler zu benennen. Genau dieselbe
+                                  Regel rechnet der Server (_fehler_gezaehlt). */}
+                              {fehlerModus && (() => {
+                                const p = pointsOf(s.id, u.id);
+                                if (p === "" || Number(p) >= unitMax(u)) return null;
+                                const f = FEHLER.find((x) => x.key === fehlerOf(s.id, u.id));
+                                return (
+                                  <button onClick={() => cycleFehler(s.id, u.id)}
+                                    title={f ? t(`klassenarbeit.fehler.${f.key}`) : t("klassenarbeit.fehlerSet")}
+                                    style={{ ...fehlerChip, display: "block", margin: "0 auto 2px", cursor: "pointer",
+                                      background: f ? f.color : "transparent", color: f ? C.aufAkzent : "var(--text3)",
+                                      border: f ? "none" : "1px dashed var(--border2)" }}>
+                                    {f ? f.ab : "+"}
+                                  </button>
+                                );
+                              })()}
                             </td>
                           ));
                           if (sub) { const ts = units(tk).reduce((n, u) => n + (Number(pointsOf(s.id, u.id)) || 0), 0); cells.push(<td key={tk.id + "-sum"} style={{ ...td, fontWeight: 700, background: "var(--bg2)", color: "var(--text2)" }}>{kommaRund(ts, 2)}</td>); }
@@ -759,6 +877,59 @@ export default function Klassenarbeit() {
                     </div>
                   ))}
                 </div>
+              </>)}
+
+              {/* Fehlerarten: die Themenquote sagt WO es klemmt, die Fehlerart
+                  WORAN — und daraus folgt Verschiedenes. Nur da, wo jemand
+                  wirklich etwas erfasst hat; sonst stuende hier eine Tabelle
+                  aus lauter Nullen und behauptete, die Klasse mache keine
+                  Fehler. */}
+              {analyse.fehlerStat && (<>
+                <div style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 4px" }}>{t("klassenarbeit.fehlerTitle")}</div>
+                <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8 }}>
+                  {t("klassenarbeit.fehlerTitleHint", { n: analyse.fehlerStat.n })}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                  {FEHLER.filter((f) => analyse.fehlerStat.gesamt[f.key]).map((f) => (
+                    <span key={f.key} style={{ display: "inline-flex", alignItems: "center", gap: 6, border: "1px solid var(--border)", borderRadius: CONTROL_R, padding: "6px 10px" }}>
+                      <span style={{ ...fehlerChip, background: f.color, color: C.aufAkzent }}>{f.ab}</span>
+                      <span style={{ fontSize: 13 }}>{t(`klassenarbeit.fehler.${f.key}`)}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700 }}>{analyse.fehlerStat.gesamt[f.key]}×</span>
+                    </span>
+                  ))}
+                </div>
+                {/* Je Thema: „an Bruchrechnung scheitert der Ansatz, an Termen
+                    nur die Rechnung" — dieselbe Quote, zwei verschiedene
+                    Konsequenzen. */}
+                {analyse.fehlerStat.topics.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 12 }}>
+                    {analyse.fehlerStat.topics.map((r) => (
+                      <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "6px 10px", borderRadius: panelStyle.borderRadius, background: "var(--bg2)" }}>
+                        <span style={{ flex: 1, minWidth: 120, fontSize: 13, fontWeight: 600 }}>{r.label}</span>
+                        {FEHLER.filter((f) => r.typen[f.key]).map((f) => (
+                          <span key={f.key} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text2)" }}>
+                            <span style={{ ...fehlerChip, background: f.color, color: C.aufAkzent }}>{f.ab}</span>
+                            {r.typen[f.key]}
+                          </span>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!hideIndividual && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    {analyse.fehlerStat.students.map((st) => {
+                      const f = FEHLER.find((x) => x.key === st.haupt);
+                      return (
+                        <span key={st.student_id} style={{ ...chipStyle, fontWeight: 500, background: "var(--bg2)", display: "inline-flex", alignItems: "center", gap: 5 }}
+                          title={FEHLER.filter((x) => st.typen[x.key]).map((x) => `${t(`klassenarbeit.fehler.${x.key}`)}: ${st.typen[x.key]}`).join("\n")}>
+                          <span style={{ ...fehlerChip, background: f ? f.color : "var(--bg3)", color: C.aufAkzent }}>{f ? f.ab : "?"}</span>
+                          {st.name}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </>)}
 
               {/* je Aufgabe: Ø, Trefferquote + Trennschärfe/95%-KI. Hat eine Aufgabe
