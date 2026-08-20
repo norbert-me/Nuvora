@@ -111,31 +111,38 @@
       @keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
       @keyframes pulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.05); } }
     
-      /* Der Rueckmeldebogen haengt im Seitenbaum, gehoert aber nur aufs Papier
-         — im Baum, weil ein zweites Fenster jeder zweite Browser wegblockt. */
+      /* Der Rueckmeldebogen haengt NEBEN der Anwendung: React haengt ihn per
+         Portal direkt an den <body>, nicht in #root. Am Bildschirm ist er aus. */
       .druck-huelle { display: none; }
 
       /* ─── Drucken ───
-         Ein Ausdruck aus Nuvora ist immer ein Blatt fuer jemand anderen: der
-         Rueckmeldebogen fuer ein Kind, die QR-Kaertchen zum Ausschneiden.
+         Ein Ausdruck aus Nuvora ist ein Blatt fuer jemand anderen: die
+         Rueckmeldung fuer ein Kind, die QR-Kaertchen zum Ausschneiden.
          Navigationsleiste, Werkzeugleisten und Fusszeile gehoeren nie darauf.
-         Traegt die Seite irgendwo `.nur-drucken`, wandert AUSSCHLIESSLICH das
-         aufs Papier; sonst bleibt es beim normalen Ausdruck der Seite.
-         visibility statt display: die Verhaeltnisse im Layout bleiben stehen,
-         damit nichts umbricht, was am Bildschirm passte. */
+
+         Gibt es auf der Seite einen Druckbogen, wird die ganze Anwendung
+         ausgeblendet und nur er gedruckt; sonst bleibt es beim normalen
+         Ausdruck der Seite (die QR-Kaertchen etwa drucken sich als Seite).
+
+         Vorher stand hier ein visibility-Trick plus `position: absolute`. Der
+         ist genau daran gescheitert, wofuer es ihn gab: unsichtbare Elemente
+         belegen ihren Platz weiter, der Bogen lag als absolut gesetzte Insel
+         darueber, und der Drucker rechnete die Seiten nach dem unsichtbaren
+         Rest aus. Ergebnis waren leere Blaetter und Kinder, die unten auf
+         einem Blatt anfingen und oben auf dem naechsten weitergingen.
+         `display: none` auf die Anwendung loest das an der Wurzel: was nicht
+         im Fluss steht, verschiebt auch nichts. */
       @media print {
+        body:has(.druck-huelle) > #root { display: none; }
         .druck-huelle { display: block; }
-        body:has(.nur-drucken) * { visibility: hidden; }
-        body:has(.nur-drucken) .nur-drucken,
-        body:has(.nur-drucken) .nur-drucken * { visibility: visible; }
-        body:has(.nur-drucken) .nur-drucken {
-          position: absolute; left: 0; top: 0; width: 100%;
-          background: #fff; color: #111;
-        }
-        /* Ein Blatt je Kind — zwei Rueckmeldungen auf einem Bogen kann man
-           nicht austeilen, ohne die fremde Haelfte abzuschneiden. */
-        .druck-seite { break-after: page; page-break-after: always; }
-        .druck-seite:last-child { break-after: auto; page-break-after: auto; }
+
+        /* Ein Blatt je Kind. break-BEFORE statt break-after: nur so faengt
+           jedes Blatt wirklich oben an — ein `break-after` am vorherigen
+           Element ignorieren Browser, sobald es das letzte in seinem
+           Container ist. break-inside haelt zusammen, was zusammengehoert:
+           lieber eine halb leere Seite als eine zerrissene Rueckmeldung. */
+        .druck-seite { break-inside: avoid; page-break-inside: avoid; }
+        .druck-seite + .druck-seite { break-before: page; page-break-before: always; }
       }
 </style>
     <!-- Dunkles Design VOR dem ersten Zeichnen setzen, sonst blitzt die helle

@@ -81,7 +81,6 @@ export default function Sitzplan() {
   const [segelOn, setSegelOn] = useState(false);   // Voreinstellung pro Kurs (siehe unten)
   const [gSegel, setGSegel] = useState({}); // student_id → Stufe
   const [fotosOn, setFotosOn] = useState(true);     // Gesichter am Platz (an)
-  const [foerderOn, setFoerderOn] = useState(false); // Maßnahmen am Platz (aus)
   // Hervorheben: "" | "niveau" | "foerder" | "mark" — und bei "foerder",
   // welcher Schwerpunkt ("" = jeder bekommt seine eigene Farbe).
   const [hervor, setHervor] = useState("");
@@ -91,7 +90,6 @@ export default function Sitzplan() {
   // („diese vier an die Fensterreihe"), kein Merkmal des Kindes. Nichts davon
   // geht zum Server, nichts in den Export.
   const [marken, setMarken] = useState({});
-  const [massn, setMassn] = useState({});  // student_id → {foerder, massnahmen}
   const canvasRef = useRef(null);
   const dragRef = useRef(null); // { sid, dx, dy } aktives Ziehen
 
@@ -277,19 +275,6 @@ export default function Sitzplan() {
     const cur = segel[String(sid)] || "";
     setStage(sid, SEGEL_CYCLE[(SEGEL_CYCLE.indexOf(cur) + 1) % SEGEL_CYCLE.length]);
   };
-
-  // Fördermaßnahmen am Platz: die Vereinbarung steht dort, wo unterrichtet wird
-  // — sonst muss man sie sich merken. Bewusst NUR auf Wunsch geladen (Art. 9;
-  // der Sitzplan hängt oft am Beamer) und nur mit Kurs-Zuschnitt.
-  useEffect(() => {
-    if (!foerderOn || !classId) { setMassn({}); return; }
-    hol(`/api/classes/${classId}/massnahmen${kursId != null ? `?kurs_id=${kursId}` : ""}`)
-      .then((d) => {
-        const m = {};
-        (Array.isArray(d) ? d : []).forEach((x) => { m[String(x.student_id)] = x; });
-        setMassn(m);
-      });
-  }, [foerderOn, classId, kursId]);
 
   useEffect(() => {
     if (!anwesenheitAktiv || !aufruf || !classId) { setAbwesend({}); return; }
@@ -538,7 +523,6 @@ export default function Sitzplan() {
             ...(anwesenheitAktiv ? [{ key: "aufruf", label: t("sitzplan.rollcall"), value: aufruf, onChange: (v) => { setAufruf(v); saveView({ aufruf: v }); } }] : []),
             { key: "fotos", label: t("sitzplan.photoToggle"), hint: t("sitzplan.photoHint"), value: fotosOn, onChange: (v) => { setFotosOn(v); saveView({ fotos: v }); } },
             { key: "segel", label: t("sitzplan.segelToggle"), hint: t("sitzplan.segelHint"), value: segelOn, onChange: (v) => { setSegelOn(v); saveView({ segel: v }); } },
-            { key: "foerder", label: t("sitzplan.foerderToggle"), hint: t("sitzplan.foerderHint"), value: foerderOn, onChange: (v) => { setFoerderOn(v); saveView({ foerder: v }); } },
             { key: "hervor", art: "wahl", label: t("sitzplan.hervorLabel"), hint: t(hervor === "foerder" ? "sitzplan.hervorHintFoerder" : "sitzplan.hervorHint"),
               value: hervor, onChange: (v) => { setHervor(v); saveView({ hervor: v }); },
               optionen: [
@@ -672,19 +656,6 @@ export default function Sitzplan() {
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: seat.empty ? "var(--text3)" : undefined }}>{seat.empty ? t("sitzplan.emptySeat") : s.name}</span>
                   {/* Punkt und Eck-Griffe: Radius = halbe Kante, reine Grafik. */}
                   {abs && <span style={{ position: "absolute", top: 3, right: 24, width: 8, height: 8, borderRadius: 4, background: ABS_COL[abs] }} title={t(`anwesenheit.${abs}`)} />}
-                  {!seat.empty && foerderOn && (() => {
-                    const m = massn[String(seat.sid)];
-                    if (!m) return null;
-                    const zeilen = (m.massnahmen || []).map((x) => x.art + (x.detail ? `: ${x.detail}` : "") + (x.arbeit ? ` (${t("sitzplan.foerderExam")})` : ""));
-                    return (
-                      <span title={[...(m.foerder || []), ...zeilen].join("\n")}
-                        style={{ position: "absolute", left: -9, top: -9, width: 20, height: 20, borderRadius: 10,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          background: "var(--card)", border: `1px solid ${C.info}`, boxShadow: SHADOW.ruhig }}>
-                        <Icon d={ICONS.bulb} size={12} color={C.warning} />
-                      </span>
-                    );
-                  })()}
                   {!seat.empty && segelOn && (() => {
                     const st = SEGEL.find((x) => x.key === segel[String(seat.sid)]);
                     return (

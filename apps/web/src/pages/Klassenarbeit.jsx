@@ -1096,15 +1096,13 @@ export default function Klassenarbeit() {
           Quizze der Klasse — deshalb hier unter der Einzelauswertung. */}
       {hasRoster && !hideIndividual && classId && <Themenstand classId={classId} />}
 
-      {/* Am Bildschirm unsichtbar, auf dem Papier das Einzige: die Bogen
-          stehen im Baum, damit der Druck ohne zweites Fenster auskommt (ein
-          Popup blockt jeder zweite Browser weg). */}
+      {/* Am Bildschirm unsichtbar, auf dem Papier das Einzige. Die Komponente
+          haengt sich per Portal an den <body> — der Rahmen hier gaebe ihr sonst
+          seinen Platz im Fluss, und der Drucker zaehlte danach die Seiten. */}
       {work && analyse && analyse.bogen.length > 0 && (
-        <div className="druck-huelle">
-          <Rueckmeldebogen work={work} bogen={analyse.bogen}
-            fehlerLabel={(k) => t(`klassenarbeit.fehler.${k}`)}
-            kartenAktiv={kartenAktiv} lernpfadAktiv={lernpfadAktiv} />
-        </div>
+        <Rueckmeldebogen work={work} bogen={analyse.bogen}
+          fehlerLabel={(k) => t(`klassenarbeit.fehler.${k}`)}
+          kartenAktiv={kartenAktiv} lernpfadAktiv={lernpfadAktiv} />
       )}
 
       {hasRoster && work && students.length === 0 && <Empty title={t("klassenarbeit.noStudents")} />}

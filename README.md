@@ -498,10 +498,9 @@ Thema → Unterthema):
   der Termin verschoben, zieht der Zettel mit, wird er gelöscht, geht er mit
 - die Frühwarnung schreibt aus einer Meldung direkt eine Beobachtung
 - die Frühwarnung markiert Kinder mit vielen Fehltagen (Anwesenheit)
-- der Sitzplan zeigt auf Wunsch, für wen etwas vereinbart ist (Fördermaßnahmen;
-  standardmäßig aus, weil der Plan oft am Beamer hängt) und kann Plätze färben:
-  frei markieren (nur im Browser, nur für diesen Kurs), nach Niveau E/G oder
-  nach Förderschwerpunkt — Letzteres ebenfalls aus, aus demselben Grund
+- der Sitzplan kann Plätze färben: frei markieren (nur im Browser, nur für
+  diesen Kurs), nach Niveau E/G oder nach Förderschwerpunkt — Letzteres
+  standardmäßig aus, weil der Plan oft am Beamer hängt
 - der Elternkontakt zeigt die Fehltage des Kindes
 
 Fehlt das Gegenstück-Modul, ist die Verbindung nicht sichtbar und die API weist

@@ -14,6 +14,16 @@
 //     zwölf Themen kommentiert sind, liest niemand zu Ende.
 //   • Kein Urteil über das Kind. „Ansatz" heisst „nochmal erklären lassen",
 //     nicht „hat es nicht verstanden".
+//
+// Gedruckt wird ohne zweites Fenster (das blockt jeder zweite Browser weg):
+// die Bogen hängen per Portal direkt am <body>, NEBEN der Anwendung statt in
+// ihr. Am Bildschirm sind sie aus, beim Drucken verschwindet dafür #root
+// (siehe Druck-CSS in index.html). Lägen sie im Seitenbaum, müsste der Rest
+// per visibility versteckt werden — und versteckte Elemente belegen ihren
+// Platz weiter, weshalb der Drucker leere Seiten zählte und Blätter mitten
+// im Kind umbrach.
+import { createPortal } from "react-dom";
+
 import { COLORS as C, CONTROL_R, Icon, ICONS } from "./Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -25,8 +35,9 @@ const PAPIER = { background: "#fff", color: "#111" };
 export default function Rueckmeldebogen({ work, bogen, fehlerLabel, kartenAktiv, lernpfadAktiv }) {
   const { t } = useLanguage();
   if (!bogen || !bogen.length) return null;
-  return (
-    <div className="nur-drucken" style={PAPIER}>
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="druck-huelle" style={PAPIER}>
       {bogen.map((b) => (
         <div key={b.student_id} className="druck-seite" style={{ ...PAPIER, padding: "24px 28px", maxWidth: 720 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, borderBottom: "2px solid #111", paddingBottom: 8, marginBottom: 16 }}>
@@ -84,7 +95,8 @@ export default function Rueckmeldebogen({ work, bogen, fehlerLabel, kartenAktiv,
           </div>
         </div>
       ))}
-    </div>
+    </div>,
+    document.body,
   );
 }
 
