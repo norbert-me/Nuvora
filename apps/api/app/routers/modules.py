@@ -8,7 +8,7 @@ Die Liste der verfuegbaren Module steht hier im Code (REGISTRY), nicht in der
 Datenbank: ein Modul existiert nur, wenn es auch Code dazu gibt. In der DB
 steht ausschliesslich, wer was aktiviert hat.
 """
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -20,6 +20,25 @@ from ..models import User, UserModule
 from .auth import get_current_user
 
 router = APIRouter(prefix="/api/modules", tags=["modules"])
+
+
+class ModulOption(BaseModel):
+    """Ein abschaltbarer TEIL eines Moduls.
+
+    Nicht jede Schule arbeitet mit allem, was ein Modul mitbringt: SEGEL ist
+    ein Konzept einer einzelnen Schule, und wer es nicht kennt, hat im Sitzplan
+    einen Schalter und ein Kuerzel am Platz, die ihm nichts sagen. Ein ganzes
+    Modul dafuer abzuschalten waere zu grob — dann waeren auch Anwesenheit und
+    Ausleihe weg.
+
+    Ausdruecklich eine ANZEIGE-Option, keine Schranke: sie blendet aus, sie
+    sperrt nicht. Wer eine Schranke braucht, nimmt `modul_pflicht`.
+    """
+    key: str
+    name: str
+    description: str = ""
+    # Voreinstellung. an=True heisst: da, bis jemand es abschaltet.
+    an: bool = True
 
 
 class ModuleDef(BaseModel):
@@ -38,6 +57,8 @@ class ModuleDef(BaseModel):
     stage: str = "alpha"
     # Gruppe für die Modulübersicht: "unterricht" | "organisation" | "werkzeug".
     group: str = "werkzeug"
+    # Abschaltbare Teile dieses Moduls (leer = das Modul ist unteilbar).
+    optionen: List[ModulOption] = []
 
 
 REGISTRY: List[ModuleDef] = [
@@ -152,6 +173,18 @@ REGISTRY: List[ModuleDef] = [
         ),
         path="/orga",
         stage="stable",
+        optionen=[
+            ModulOption(
+                key="segel",
+                name="SEGEL-Stufen",
+                description=(
+                    "Hafen → Küste → Meer → Welt am Sitzplatz: das Helios-Konzept "
+                    "zunehmender Selbststeuerung. Kennt deine Schule es nicht, "
+                    "schalte es ab — dann verschwinden Schalter und Kürzel aus dem "
+                    "Sitzplan. Eingetragene Stufen bleiben erhalten."
+                ),
+            ),
+        ],
     ),
     ModuleDef(
         key="zufall",
@@ -224,6 +257,10 @@ _BY_KEY = {m.key: m for m in REGISTRY}
 
 class ModuleOut(ModuleDef):
     active: bool
+    # Wirksamer Stand je Option: Voreinstellung aus der REGISTRY, ueberschrieben
+    # von dem, was diese Lehrkraft eingestellt hat. Die Shell fragt nur das ab
+    # und muss die Voreinstellungen nicht ein zweites Mal kennen.
+    optionen_an: dict = {}
     # Wie viele Lehrkräfte dieses Modul aktiviert haben — Orientierung beim
     # Einstieg („was nutzen andere?"). Global, nicht personenbezogen.
     popularity: int = 0
@@ -232,6 +269,36 @@ class ModuleOut(ModuleDef):
 async def _active_keys(db: AsyncSession, user_id: int) -> set[str]:
     result = await db.execute(select(UserModule.module_key).where(UserModule.user_id == user_id))
     return set(result.scalars().all())
+
+
+def _optionen_an(mod: ModuleDef, gespeichert: Optional[dict]) -> dict:
+    """Wirksamer Stand je Option: Voreinstellung, ueberschrieben vom Gespeicherten.
+
+    Nur deklarierte Optionen kommen heraus — steht in der Datenbank noch ein
+    Schluessel aus einer Fassung, in der es die Option gab, faellt er hier
+    heraus statt als Geist weiterzuleben.
+    """
+    werte = {}
+    for opt in mod.optionen:
+        wert = (gespeichert or {}).get(opt.key)
+        werte[opt.key] = bool(wert) if isinstance(wert, bool) else opt.an
+    return werte
+
+
+async def option_an(db: AsyncSession, user_id: int, key: str, option: str) -> bool:
+    """Ist dieser TEIL eines Moduls eingeschaltet?
+
+    Fuer den Server selten noetig (es sind Anzeige-Optionen), aber vorhanden,
+    damit eine Auswertung nicht ueber etwas rechnet, das niemand sieht.
+    """
+    mod = _BY_KEY.get(key)
+    if not mod:
+        return False
+    row = (await db.execute(select(UserModule).where(
+        UserModule.user_id == user_id, UserModule.module_key == key))).scalar_one_or_none()
+    if not row:
+        return False               # Modul gar nicht aktiv
+    return _optionen_an(mod, row.optionen).get(option, False)
 
 
 async def is_active(db: AsyncSession, user_id: int, key: str) -> bool:
@@ -280,7 +347,12 @@ async def list_modules(
     counts = dict((await db.execute(
         select(UserModule.module_key, func.count()).group_by(UserModule.module_key)
     )).all())
-    return [ModuleOut(**m.model_dump(), active=m.key in active, popularity=counts.get(m.key, 0)) for m in REGISTRY]
+    # Gespeicherte Optionen in einem Rutsch (nicht je Modul eine Abfrage).
+    zeilen = {r.module_key: r.optionen for r in (await db.execute(
+        select(UserModule).where(UserModule.user_id == user.id))).scalars().all()}
+    return [ModuleOut(**m.model_dump(), active=m.key in active, popularity=counts.get(m.key, 0),
+                      optionen_an=_optionen_an(m, zeilen.get(m.key)))
+            for m in REGISTRY]
 
 
 @router.post("/{key}/activate", response_model=ModuleOut)
@@ -298,7 +370,7 @@ async def activate(
     if not await is_active(db, user.id, key):
         db.add(UserModule(user_id=user.id, module_key=key))
         await db.commit()
-    return ModuleOut(**mod.model_dump(), active=True)
+    return ModuleOut(**mod.model_dump(), active=True, optionen_an=_optionen_an(mod, None))
 
 
 @router.delete("/{key}/activate", response_model=ModuleOut)
@@ -319,4 +391,48 @@ async def deactivate(
     if row:
         await db.delete(row)
         await db.commit()
-    return ModuleOut(**mod.model_dump(), active=False)
+    return ModuleOut(**mod.model_dump(), active=False, optionen_an=_optionen_an(mod, None))
+
+
+class OptionenIn(BaseModel):
+    """{"segel": false} — nur deklarierte Schluessel, nur Wahrheitswerte."""
+    optionen: dict
+
+
+@router.put("/{key}/optionen", response_model=ModuleOut)
+async def set_optionen(
+    key: str,
+    body: OptionenIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Abschaltbare Teile eines Moduls ein- oder ausstellen.
+
+    Nur fuer ein AKTIVES Modul: eine Option an einem abgeschalteten Modul waere
+    eine Einstellung an etwas, das es fuer diese Lehrkraft nicht gibt — und
+    beim naechsten Aktivieren stuende sie unerwartet anders als beim ersten Mal.
+    """
+    mod = _BY_KEY.get(key)
+    if not mod:
+        raise HTTPException(404, "Modul unbekannt")
+    if not mod.optionen:
+        raise HTTPException(409, "Dieses Modul hat keine Optionen")
+    row = (await db.execute(select(UserModule).where(
+        UserModule.user_id == user.id, UserModule.module_key == key))).scalar_one_or_none()
+    if not row:
+        raise HTTPException(409, f"Modul {mod.name} ist nicht aktiviert")
+
+    erlaubt = {o.key for o in mod.optionen}
+    unbekannt = set(body.optionen) - erlaubt
+    if unbekannt:
+        # Ausdruecklich ein Fehler, nicht stilles Verwerfen: ein Tippfehler im
+        # Schluessel sieht sonst aus wie „gespeichert" und wirkt einfach nie.
+        raise HTTPException(400, f"Unbekannte Option: {', '.join(sorted(unbekannt))}")
+    neu = dict(row.optionen or {})
+    for k, v in body.optionen.items():
+        if not isinstance(v, bool):
+            raise HTTPException(400, f"Option {k} braucht true oder false")
+        neu[k] = v
+    row.optionen = {k: v for k, v in neu.items() if k in erlaubt} or None
+    await db.commit()
+    return ModuleOut(**mod.model_dump(), active=True, optionen_an=_optionen_an(mod, row.optionen))

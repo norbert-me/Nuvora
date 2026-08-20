@@ -261,6 +261,7 @@ def _ensure_columns(sync_conn):
         ("work_analyses", "scale", "JSON"),
         ("work_analyses", "absent", "JSON"),
         ("work_analyses", "fehler", "JSON"),   # Fehlerart je Einheit und Kind
+        ("user_modules", "optionen", "JSON"),  # Anzeige-Optionen je Modul und Lehrkraft
         ("questions", "topic_id", "INTEGER"),
         ("students", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
         ("students", "foerder", "JSON"),

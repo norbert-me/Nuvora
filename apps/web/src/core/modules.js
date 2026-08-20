@@ -77,6 +77,22 @@ export async function setModuleActive(key, active) {
   return fetchModules({ frisch: true });
 }
 
+/**
+ * Einen abschaltbaren TEIL eines Moduls ein-/ausstellen.
+ *
+ * Welche Teile es gibt, steht im Backend (REGISTRY) und kommt mit der
+ * Modulliste mit — hier wird nichts doppelt gepflegt.
+ */
+export async function setModuleOption(key, option, an) {
+  const res = await fetch(`/api/modules/${key}/optionen`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ optionen: { [option]: an } }),
+  });
+  if (!res.ok) throw new Error("Option konnte nicht geändert werden");
+  return fetchModules({ frisch: true });
+}
+
 // Bekannte Modul-Schluessel — muessen wortgleich zur REGISTRY im Backend sein
 // (apps/api/app/routers/modules.py). Ein Tippfehler hier ist besonders
 // tueckisch: die Abfrage liefert einfach immer false, das Feature verschwindet
@@ -110,6 +126,25 @@ export function useAktiv() {
 }
 
 /**
+ * Ist dieser TEIL eines Moduls eingeschaltet?
+ *
+ *   const segel = useModulOption("orga", "segel");
+ *
+ * Solange der Modulstand noch nicht da ist, gilt die Antwort `true` — sonst
+ * blitzte bei jedem Seitenaufruf kurz die abgeschaltete Fassung auf, und die
+ * Seite baute sich vor den Augen um. Ein Teil, den es geben soll, kurz zu
+ * sehen ist harmloser als einer, der springt.
+ */
+export function useModulOption(modulKey, optionKey) {
+  const { modules, bekannt } = useModules();
+  const mod = modules.find((m) => m.key === modulKey);
+  if (!bekannt || !mod) return true;
+  if (!mod.active) return false;
+  const wert = (mod.optionen_an || {})[optionKey];
+  return wert === undefined ? true : !!wert;
+}
+
+/**
  * @param {boolean} enabled  Nur laden, wenn eingeloggt — sonst antwortet die
  *                           API mit 401 und die Shell wuerde beim Ausloggen
  *                           unnoetig nachfragen.
@@ -139,9 +174,10 @@ export function useModules(enabled = true) {
   }, [enabled]);
 
   const toggle = useCallback((key, active) => setModuleActive(key, active), []);
+  const setOption = useCallback((key, option, an) => setModuleOption(key, option, an), []);
 
   return {
-    modules, active: modules.filter((m) => m.active), loading, toggle,
+    modules, active: modules.filter((m) => m.active), loading, toggle, setOption,
     // false = die Liste ist geraten, nicht gewusst. Wer daraus eine Sperre
     // ableitet (ModuleGate), darf dann nicht sperren.
     bekannt,

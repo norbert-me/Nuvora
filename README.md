@@ -307,7 +307,11 @@ Abhängigkeiten als Anhang.
 
 Das Register steht **im Code** (`apps/api/app/routers/modules.py`): ein Modul
 existiert nur, wenn es Code dazu gibt; die Datenbank merkt sich nur, wer was
-aktiviert hat. Vierzehn Stück, jedes pro Lehrkraft zuschaltbar:
+aktiviert hat. Vierzehn Stück, jedes pro Lehrkraft zuschaltbar — und wo ein
+Modul einen Teil mitbringt, den nicht jede Schule braucht, lässt der sich
+einzeln abschalten (auf der Modulseite unter „Teile dieses Moduls"; erster
+Fall: die SEGEL-Stufen im Sitzplan). Eingetragene Daten bleiben dabei erhalten,
+abgeschaltet ist die Anzeige:
 
 | Modul | Pfad | Wofür |
 | ----- | ---- | ----- |
@@ -318,7 +322,7 @@ aktiviert hat. Vierzehn Stück, jedes pro Lehrkraft zuschaltbar:
 | Auswertung | `/auswertung` | Drei Sichten: **Notenbuch** (eigene Spalten mit Gewichten, gewichteter Schnitt, Trend je Schüler), **Klassenarbeit** (Punkte je Aufgabe/Teilaufgabe, Thema bis auf die Teilaufgabe, Arbeit + Erwartungshorizont als Anhang, Fehlerprofil, optional Fehlerarten je Zelle, Rückmeldebogen je Kind zum Ausdrucken) und **Vergleich** (dieselbe Arbeit über mehrere Klassen, je Aufgabe mit Trennschärfe, Nuller-Anteil und Streuung) |
 | Unterrichtsplanung | `/unterrichtsplanung` | Einstiege sammeln: Idee, Ablauf, Material, Dauer — themen-getaggt und an Kalender-Stunden zuweisbar |
 | Code-Detektiv | `/code-detektiv` | Programmier-Rätsel: Code-Bausteine per Drag & Drop ordnen, allein oder in einer Klassen-Session (Beitritt per Code, ohne Login) |
-| Orga | `/orga` | Klassenführung in Reitern: Checklisten, Anwesenheit/Fehlzeiten (PDF-Report), Ausleihe, Sitzplan (optional SEGEL-Stufen, Hervorheben von Gruppen) |
+| Orga | `/orga` | Klassenführung in Reitern: Checklisten, Anwesenheit/Fehlzeiten (PDF-Report), Ausleihe, Sitzplan (Hervorheben von Gruppen; SEGEL-Stufen als abschaltbarer Teil) |
 | Zufall | `/zufall` | Zufallsschüler (fair gewichtet nach Zeit seit dem letzten Ziehen) und Zufallsgruppen |
 | Notizbrett | `/notizbrett` | Notizzettel + To-do-Liste. Datierte Aufgaben erscheinen im Kalender. Nicht an Schüler gebunden |
 | Tafel | `/tafel` | Classroom-Screen für den Beamer: frei platzierbare Textfelder, Timer. Ohne Daten |

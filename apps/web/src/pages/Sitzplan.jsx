@@ -10,13 +10,12 @@ import ViewMenu from "../components/ViewMenu.jsx";
 import Portrait from "../components/Portrait.jsx";
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { useAktiv } from "../core/modules.js";
+import { useModulOption } from "../core/modules.js";
 import { useKlasseMerken, useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
 import { ymd } from "../core/datum.js";
 import { alsJson, hol } from "../core/melden.js";
 
 const API = "/api/sitzplan";
-const ABS_COL = { fehlt: C.danger, spaet: C.warning, entsch: C.info };
 const SEAT_W = 108, SEAT_H = 46;
 // SEGEL-Stufen (Helios-Konzept): Boot vom Hafen bis in die Welt, zunehmende
 // Selbststeuerung. Reihenfolge = Klick-Kreislauf am Platz (leer → … → leer).
@@ -55,9 +54,12 @@ const zoomBtnStyle = { ...segmentBtn, padding: "0 10px", color: "var(--text2)" }
 
 export default function Sitzplan() {
   const { t } = useLanguage();
-  const aktiv = useAktiv();
+  // SEGEL laesst sich am Modul Orga abschalten (Modulseite → „Teile"). Nicht
+  // jede Schule kennt das Konzept; wer es nicht nutzt, hat sonst einen
+  // Schalter und ein Kuerzel am Platz, die ihm nichts sagen. Eingetragene
+  // Stufen bleiben dabei erhalten — abgeschaltet ist die ANZEIGE.
+  const segelTeil = useModulOption("orga", "segel");
   // Anwesenheit lebt im Modul „Orga" (Aufruf-Ansicht nutzt sie).
-  const anwesenheitAktiv = aktiv("orga");
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState(null);
   const [kursId, setKursId] = useState(null); // Sitzplan hängt am Kurs (Fach)
@@ -75,8 +77,6 @@ export default function Sitzplan() {
   const [gTafel, setGTafel] = useState({ x: 200, y: 8 }); // bewegliche Tafel
   const tafelRef = useRef(null);
   const [zoom, setZoom] = useState(1); // Anzeige-Zoom (Positionen bleiben unskaliert gespeichert)
-  const [abwesend, setAbwesend] = useState({});
-  const [aufruf, setAufruf] = useState(false);
   const [msg, setMsg] = useState("");
   const [segelOn, setSegelOn] = useState(false);   // Voreinstellung pro Kurs (siehe unten)
   const [gSegel, setGSegel] = useState({}); // student_id → Stufe
@@ -236,9 +236,9 @@ export default function Sitzplan() {
     if (!viewKey) return;
     try {
       const v = JSON.parse(localStorage.getItem(`sitzplan_view_${viewKey}`) || "{}");
-      setSegelOn(!!v.segel); setAufruf(!!v.aufruf);
+      setSegelOn(!!v.segel);
       setHervor(v.hervor || ""); setFoerderArt(v.foerderArt || "");
-    } catch { setSegelOn(false); setAufruf(false); setHervor(""); setFoerderArt(""); }
+    } catch { setSegelOn(false); setHervor(""); setFoerderArt(""); }
     // Markierungen haengen am selben Kurs wie die Ansicht.
     try { setMarken(JSON.parse(localStorage.getItem(`sitzplan_mark_${viewKey}`) || "{}")); }
     catch { setMarken({}); }
@@ -275,12 +275,6 @@ export default function Sitzplan() {
     const cur = segel[String(sid)] || "";
     setStage(sid, SEGEL_CYCLE[(SEGEL_CYCLE.indexOf(cur) + 1) % SEGEL_CYCLE.length]);
   };
-
-  useEffect(() => {
-    if (!anwesenheitAktiv || !aufruf || !classId) { setAbwesend({}); return; }
-    hol(`/api/anwesenheit/${classId}?date=${new Date(ymd(new Date()) + "T00:00:00").toISOString()}`, {})
-      .then((d) => { const m = {}; Object.entries(d || {}).forEach(([sid, v]) => { if (v.status && v.status !== "da") m[sid] = v.status; }); setAbwesend(m); });
-  }, [anwesenheitAktiv, aufruf, classId]);
 
   // „persist" schreibt NICHT mehr — es legt den Zug in den Entwurf. Der Name
   // bleibt, damit jede Geste (Ziehen, Drehen, Undo, Import) weiter denselben
@@ -520,9 +514,8 @@ export default function Sitzplan() {
         links={<KursKlasseSelect value={classId} onChange={(id, kid) => wechseln(() => { setClassId(id); setKursId(kid); })} onKurs={setKursId} />}
         ansicht={(
           <ViewMenu title={t("sitzplan.view")} items={[
-            ...(anwesenheitAktiv ? [{ key: "aufruf", label: t("sitzplan.rollcall"), value: aufruf, onChange: (v) => { setAufruf(v); saveView({ aufruf: v }); } }] : []),
             { key: "fotos", label: t("sitzplan.photoToggle"), hint: t("sitzplan.photoHint"), value: fotosOn, onChange: (v) => { setFotosOn(v); saveView({ fotos: v }); } },
-            { key: "segel", label: t("sitzplan.segelToggle"), hint: t("sitzplan.segelHint"), value: segelOn, onChange: (v) => { setSegelOn(v); saveView({ segel: v }); } },
+            ...(segelTeil ? [{ key: "segel", label: t("sitzplan.segelToggle"), hint: t("sitzplan.segelHint"), value: segelOn, onChange: (v) => { setSegelOn(v); saveView({ segel: v }); } }] : []),
             { key: "hervor", art: "wahl", label: t("sitzplan.hervorLabel"), hint: t(hervor === "foerder" ? "sitzplan.hervorHintFoerder" : "sitzplan.hervorHint"),
               value: hervor, onChange: (v) => { setHervor(v); saveView({ hervor: v }); },
               optionen: [
@@ -555,7 +548,7 @@ export default function Sitzplan() {
         {undoLen > 0 && <button onClick={undo} className="icon-btn" style={toolbarIconBtn} title={t("sitzplan.undo")} aria-label={t("sitzplan.undo")}><Icon d={ICONS.undo || ICONS.restore} size={18} /></button>}
         {redoLen > 0 && <button onClick={redo} className="icon-btn" style={toolbarIconBtn} title={t("sitzplan.redo")} aria-label={t("sitzplan.redo")}><span style={{ display: "inline-flex", transform: "scaleX(-1)" }}><Icon d={ICONS.undo || ICONS.restore} size={18} /></span></button>}
       </Werkzeugleiste>
-      {segelOn && (
+      {segelTeil && segelOn && (
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", margin: "8px 0 12px", fontSize: 13, color: "var(--text3)" }}>
           <span>{t("sitzplan.segelLegend")}:</span>
           {SEGEL.map((x) => (
@@ -624,7 +617,6 @@ export default function Sitzplan() {
             {seats.map((seat) => {
               const s = byId(seat.sid);
               if (!seat.empty && !s) return null;   // verwaister Platz (Schüler gelöscht) bleibt versteckt
-              const abs = aufruf ? abwesend[String(seat.sid)] : null;
               const hf = seat.empty ? null : farbeFuer(s);
               return (
                 <div key={seat.sid} draggable={false}
@@ -654,9 +646,7 @@ export default function Sitzplan() {
                     <Portrait student={s} size={26} style={{ marginRight: 8 }} />
                   )}
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: seat.empty ? "var(--text3)" : undefined }}>{seat.empty ? t("sitzplan.emptySeat") : s.name}</span>
-                  {/* Punkt und Eck-Griffe: Radius = halbe Kante, reine Grafik. */}
-                  {abs && <span style={{ position: "absolute", top: 3, right: 24, width: 8, height: 8, borderRadius: 4, background: ABS_COL[abs] }} title={t(`anwesenheit.${abs}`)} />}
-                  {!seat.empty && segelOn && (() => {
+                  {!seat.empty && segelTeil && segelOn && (() => {
                     const st = SEGEL.find((x) => x.key === segel[String(seat.sid)]);
                     return (
                       <button onPointerDown={(e) => e.stopPropagation()} onClick={() => cycleStage(seat.sid)}
@@ -692,18 +682,13 @@ export default function Sitzplan() {
           <div style={{ ...panelStyle, border: "1px dashed var(--border2)", padding: 12, minHeight: 56, background: "var(--bg2)" }}>
             <div style={{ ...sectionLabel, marginBottom: 8 }}>{t("sitzplan.pool")} ({pool.length})</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {pool.map((s) => {
-                const abs = aufruf ? abwesend[String(s.id)] : null;
-                return (
-                  <div key={s.id} draggable onDragStart={(e) => e.dataTransfer.setData("text/plain", String(s.id))}
-                    style={{ ...chipStyle, padding: "8px 12px", border: "1px solid var(--border2)", background: "var(--card)", color: "var(--text)", fontSize: 13, cursor: "grab", display: "inline-flex", alignItems: "center", gap: 8, ...(abs ? { opacity: 0.45, textDecoration: "line-through" } : {}) }}>
-                    {/* Punkt: Radius = halbe Kante, reine Grafik. */}
-                    {abs && <span style={{ width: 8, height: 8, borderRadius: 4, background: ABS_COL[abs] }} />}
-                    {fotosOn && <Portrait student={s} size={22} />}
-                    {s.name}
-                  </div>
-                );
-              })}
+              {pool.map((s) => (
+                <div key={s.id} draggable onDragStart={(e) => e.dataTransfer.setData("text/plain", String(s.id))}
+                  style={{ ...chipStyle, padding: "8px 12px", border: "1px solid var(--border2)", background: "var(--card)", color: "var(--text)", fontSize: 13, cursor: "grab", display: "inline-flex", alignItems: "center", gap: 8 }}>
+                  {fotosOn && <Portrait student={s} size={22} />}
+                  {s.name}
+                </div>
+              ))}
             </div>
           </div>
           )}

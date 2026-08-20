@@ -756,6 +756,26 @@ def inhalt_kalender(api, u, spuren):
 
 
 def inhalt_orga(api, u, spuren):
+    # Abschaltbare Teile des Moduls: SEGEL laesst sich abstellen, ohne dass die
+    # Anwesenheit oder die Ausleihe mitgehen. Nach dem Test wieder anschalten —
+    # der Lauf darf die Einstellungen des Kontos nicht veraendern.
+    def segel(an):
+        return api.call("PUT", "/api/modules/orga/optionen", {"optionen": {"segel": an}},
+                        erwartet=(200,))
+    aus = segel(False)
+    if (aus.get("optionen_an") or {}).get("segel") is not False:
+        raise AssertionError(f"Option nicht gespeichert: {aus.get('optionen_an')}")
+    gelesen = _finde(api.call("GET", "/api/modules", erwartet=(200,)), key="orga")
+    if (gelesen.get("optionen_an") or {}).get("segel") is not False:
+        raise AssertionError(f"Option kommt in der Liste nicht zurueck: {gelesen.get('optionen_an')}")
+    # Ein Tippfehler im Schluessel muss auffallen, statt als „gespeichert" zu
+    # gelten und nie zu wirken.
+    api.call("PUT", "/api/modules/orga/optionen", {"optionen": {"gibtsnicht": True}},
+             erwartet=(400,))
+    an = segel(True)
+    if (an.get("optionen_an") or {}).get("segel") is not True:
+        raise AssertionError(f"Option nicht zurueckgestellt: {an.get('optionen_an')}")
+
     posten = api.call("POST", f"/api/orga/{u.class_id}", {"name": f"{PRAEFIX} Zettel"},
                       erwartet=(201,))
     spuren.append(("Checklisten-Punkt", lambda: api.call(

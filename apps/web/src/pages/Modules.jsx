@@ -2,7 +2,7 @@
 // des Moduls bleiben im Kern liegen und sind nach dem Wiedereinschalten da.
 import { useState } from "react";
 import { useModules } from "../core/modules.js";
-import { badge, btnSecondary, btnSmall, cardStyle, COLORS as C, CONTROL_R, DialogKopf, Icon, ICONS, Modal, MODULE_ICONS, pageApp, pageIntro, pageTitle, panelStyle, sectionLabel, Segment, segmentBtn, StageBadge, Tabs, toolbarBtn, toolbarInput } from "../components/Icons.jsx";
+import { badge, btnSecondary, btnSmall, cardStyle, COLORS as C, CONTROL_R, DialogKopf, Icon, ICONS, Modal, MODULE_ICONS, pageApp, pageIntro, pageTitle, panelStyle, sectionLabel, Segment, segmentBtn, StageBadge, Tabs, Toggle, toolbarBtn, toolbarInput } from "../components/Icons.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 // Ausführlichere Erklärung je Modul für das Info-Popup in der Auswahl. Nutzt
@@ -19,7 +19,7 @@ import { askConfirm } from "../core/dialog.jsx";
 
 export default function Modules() {
   const { t } = useLanguage();
-  const { modules, loading, toggle } = useModules();
+  const { modules, loading, toggle, setOption } = useModules();
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState("");
   const [sortKey, setSortKey] = useState("popular"); // popular | name | status
@@ -149,6 +149,28 @@ export default function Modules() {
                   {t("modules.more")} ›
                 </button>
               </div>
+              {/* Abschaltbare Teile — nur bei aktivem Modul. An einem
+                  abgeschalteten waeren es Einstellungen an etwas, das es fuer
+                  diese Lehrkraft gerade nicht gibt. */}
+              {m.active && (m.optionen || []).length > 0 && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+                  <div style={{ ...sectionLabel, margin: "0 0 8px" }}>{t("modules.parts")}</div>
+                  {m.optionen.map((o) => (
+                    <div key={o.key} style={{ marginBottom: 8 }}>
+                      <Toggle
+                        checked={(m.optionen_an || {})[o.key] !== false}
+                        onChange={(v) => { setBusy(`${m.key}:${o.key}`); setOption(m.key, o.key, v).finally(() => setBusy(null)); }}
+                        label={o.name}
+                      />
+                      {o.description && (
+                        // 46 = Breite des Schalters (38) + Abstand (8), wie im
+                        // ViewMenu: der Hinweis beginnt unter der Beschriftung.
+                        <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4, marginLeft: 46 }}>{o.description}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <button
               onClick={() => handle(m)}

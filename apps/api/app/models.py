@@ -402,6 +402,19 @@ class UserModule(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     module_key: Mapped[str] = mapped_column(String(50))
     activated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Optionen dieses Moduls fuer diese Lehrkraft: {"segel": false}.
+    #
+    # WELCHE Optionen es gibt, steht wie das Modul selbst im Code (REGISTRY in
+    # routers/modules.py) — hier steht nur, was jemand davon abweichend
+    # eingestellt hat. Fehlt ein Schluessel, gilt die Voreinstellung aus der
+    # REGISTRY; NULL heisst also „alles wie vorgesehen".
+    #
+    # Es sind ANZEIGE-Optionen, keine Schranke: sie blenden einen Teil des
+    # Moduls aus, den diese Lehrkraft nicht braucht (nicht jede Schule arbeitet
+    # mit SEGEL). Die Daten dahinter bleiben und die Endpunkte antworten
+    # weiter — eine Schranke waere `modul_pflicht`, und die gehoert zum Modul,
+    # nicht zu seinen Teilen.
+    optionen: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
 
 # ─── Nuvora-Kern: Themen ───
