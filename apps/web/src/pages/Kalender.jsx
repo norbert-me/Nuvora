@@ -5,6 +5,7 @@ import { askConfirm, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, COLORS as C, selectStyle, SHADOW, Tabs, td as tdCell, th, inputStyle, menuRow, toolbarInput, toolbarBtn, toolbarBtnPrimary, DatumNavigator, segmentBtn, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, dateiWaehlen, pageApp, Popover } from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
+import ThemenWahl from "../components/ThemenWahl.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
 import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
@@ -552,7 +553,7 @@ export default function Kalender() {
           )} />
       )}
       {view === "breaks" && <BreaksPanel breaks={breaks} onAdd={addBreak} onDel={delBreak} t={t} standalone />}
-      {view === "klassenarbeit" && <ExamPanel overview={examOverview} periods={tt.periods} aktiv={aktiv} onAdd={addExam} onUpd={updExam} onDel={delExam} t={t} />}
+      {view === "klassenarbeit" && <ExamPanel overview={examOverview} periods={tt.periods} aktiv={aktiv} topics={topics} onAdd={addExam} onUpd={updExam} onDel={delExam} t={t} />}
 
       {view === "month" && <MonthGrid extColor={extColor} range={range} cursor={cursor} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/notizbrett")} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} kursName={kursName} slotName={slotName} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
       {view === "week" && wdhVorschlag.length > 0 && (
@@ -1236,12 +1237,14 @@ function ExamMassnahmen({ classId, kursId = null, t }) {
 
 // Klassenarbeiten planen + Übersicht: je kommender Klassenarbeit die bis dahin
 // verbleibenden Stundenplan-Stunden (freie Tage/Ausfälle bereits abgezogen).
-function ExamPanel({ overview, periods = 6, aktiv = {}, onAdd, onUpd, onDel, t }) {
+function ExamPanel({ overview, periods = 6, aktiv = {}, topics = [], onAdd, onUpd, onDel, t }) {
   const [classId, setClassId] = useState("");
   const [kursId, setKursId] = useState(null);
   const [date, setDate] = useState("");
   const [title, setTitle] = useState("");
   const [period, setPeriod] = useState("");   // "" = ganztägig, sonst Stundennummer
+  const [themen, setThemen] = useState([]);   // Themen der neuen Arbeit
+  const [eThemen, setEThemen] = useState([]);
   const [editId, setEditId] = useState(null);
   const [eDate, setEDate] = useState("");
   const [eTitle, setETitle] = useState("");
@@ -1249,18 +1252,18 @@ function ExamPanel({ overview, periods = 6, aktiv = {}, onAdd, onUpd, onDel, t }
   const [eKursId, setEKursId] = useState(null);
   const [ePeriod, setEPeriod] = useState("");
   const pOpts = Array.from({ length: Math.max(1, periods) }, (_, i) => i + 1);
-  const startEdit = (e) => { setEditId(e.id); setEDate(ymd(new Date(e.date))); setETitle(e.title || ""); setEClassId(e.class_id ? String(e.class_id) : ""); setEKursId(e.kurs_id ?? null); setEPeriod(e.period ? String(e.period) : ""); };
+  const startEdit = (e) => { setEditId(e.id); setEDate(ymd(new Date(e.date))); setETitle(e.title || ""); setEClassId(e.class_id ? String(e.class_id) : ""); setEKursId(e.kurs_id ?? null); setEPeriod(e.period ? String(e.period) : ""); setEThemen(e.topic_ids || []); };
   const saveEdit = (e) => {
     if (!eDate || !eClassId) return;
     const [y, m, d] = eDate.split("-").map(Number);
-    onUpd(e.id, { class_id: Number(eClassId), kurs_id: eKursId ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: eTitle.trim(), period: ePeriod ? Number(ePeriod) : null });
+    onUpd(e.id, { class_id: Number(eClassId), kurs_id: eKursId ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: eTitle.trim(), period: ePeriod ? Number(ePeriod) : null, topic_ids: eThemen });
     setEditId(null);
   };
   const save = () => {
     if (!classId || !date) return;
     const [y, m, d] = date.split("-").map(Number);
-    onAdd({ class_id: Number(classId), kurs_id: kursId ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: title.trim(), period: period ? Number(period) : null });
-    setDate(""); setTitle(""); setPeriod("");
+    onAdd({ class_id: Number(classId), kurs_id: kursId ?? null, date: new Date(y, m - 1, d, 8, 0, 0).toISOString(), title: title.trim(), period: period ? Number(period) : null, topic_ids: themen });
+    setDate(""); setTitle(""); setPeriod(""); setThemen([]);
   };
   // Eine Höhe, eine Form: Felder aus den gemeinsamen Bausteinen (CONTROL_H /
   // CONTROL_R), keine eigene Polsterung je Feld.
@@ -1288,6 +1291,10 @@ function ExamPanel({ overview, periods = 6, aktiv = {}, onAdd, onUpd, onDel, t }
           {pOpts.map((p) => <option key={p} value={p}>{p}. {t("kalender.period")}</option>)}
         </select>
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("kalender.examTitle")} style={{ ...toolbarInput, flex: 1, minWidth: 140 }} />
+        {/* Worüber wird geschrieben? Die Themen kommen aus dem Kern (Regel 3:
+            der Kalender zeigt auf sie, besitzt sie nicht). Freiwillig — ein
+            Termin ohne Themen ist ein vollständiger Termin. */}
+        <ThemenWahl topics={topics} value={themen} onChange={setThemen} />
         <button onClick={save} disabled={!classId || !date} style={{ ...toolbarBtnPrimary, opacity: (classId && date) ? 1 : 0.5 }}>{t("common.add")}</button>
       </Werkzeugleiste>
 
@@ -1307,6 +1314,7 @@ function ExamPanel({ overview, periods = 6, aktiv = {}, onAdd, onUpd, onDel, t }
                   {pOpts.map((p) => <option key={p} value={p}>{p}. {t("kalender.period")}</option>)}
                 </select>
                 <input value={eTitle} onChange={(ev) => setETitle(ev.target.value)} placeholder={t("kalender.examTitle")} style={{ ...toolbarInput, flex: 1, minWidth: 120 }} />
+                <ThemenWahl topics={topics} value={eThemen} onChange={setEThemen} />
               </div>
               <button onClick={() => saveEdit(e)} style={toolbarBtnPrimary}>{t("common.save")}</button>
               <button onClick={() => setEditId(null)} style={toolbarBtn}>{t("common.abort")}</button>
@@ -1316,6 +1324,16 @@ function ExamPanel({ overview, periods = 6, aktiv = {}, onAdd, onUpd, onDel, t }
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 16 }}>{e.kurs || e.klasse || "—"}{e.title ? ` · ${e.title}` : ""}</div>
                 <div style={{ fontSize: 12, color: "var(--text3)" }}>{new Date(e.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}{e.period ? ` · ${e.period}. ${t("kalender.period")}` : ""}</div>
+                {/* Die Themen der Arbeit: beim Vorbereiten steht damit da,
+                    worüber geschrieben wird — und beim Planen der letzten
+                    Stunden davor, was noch drankommen muss. */}
+                {(e.topics || []).length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                    {e.topics.map((tp) => (
+                      <span key={tp.id} style={{ ...chipStyle, fontWeight: 500 }}>{tp.label}</span>
+                    ))}
+                  </div>
+                )}
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
                 <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>{e.stunden}</div>

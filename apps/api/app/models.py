@@ -883,6 +883,15 @@ class ExamDate(Base):
     title: Mapped[str] = mapped_column(String(200), default="", server_default="")
     # Optional an eine Stunde des Tages gebunden (Stundennummer). NULL = ganztägig.
     period: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Worueber geschrieben wird: Themen aus dem KERN. Eine Arbeit prueft meist
+    # mehrere Unterthemen, deshalb eine Liste von topic_id.
+    #
+    # Bewusst JSON und kein Fremdschluessel: eine Verknuepfungstabelle waere die
+    # dritte Stelle, an der Themen haengen, und der Kalender BESITZT hier nichts
+    # — er zeigt nur hin. Wird ein Thema geloescht, bleibt die Nummer stehen und
+    # faellt beim Lesen heraus (wie bei den Fehlerarten der Klassenarbeit):
+    # sonst muesste jedes Loeschen im Kern in die Termine des Kalenders greifen.
+    topic_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     # Automatisch erzeugter Kalendereintrag zu diesem Termin (ganztägig oder an period).
     entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("calendar_entries.id", ondelete="SET NULL"), nullable=True, index=True)
     # Optionale Brücke zum Modul „Klassenarbeit auswerten": bei aktivem Modul wird

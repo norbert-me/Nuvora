@@ -520,12 +520,38 @@ class ExamIn(BaseModel):
     class_id: Optional[int] = None
     kurs_id: Optional[int] = None
     period: Optional[int] = None   # an eine Stunde binden; None = ganztägig
+    # Worüber wird geschrieben? Themen aus dem KERN (Regel 3: der Kalender
+    # besitzt keine Taxonomie, er zeigt auf sie). Eine Arbeit prüft meist
+    # mehrere Unterthemen, deshalb eine Liste. Leer bleiben darf sie immer —
+    # ein Termin ohne Themen ist ein vollständiger Termin.
+    topic_ids: Optional[List[int]] = None
 
 
 class ExamOut(ExamIn):
     id: int
     work_id: Optional[int] = None   # verknüpfte Auswertung im Modul „Klassenarbeit"
     model_config = {"from_attributes": True}
+
+
+async def _check_topics(db: AsyncSession, user: User, ids) -> Optional[list]:
+    """Themen auf die EIGENEN eingrenzen, Reihenfolge und Auswahl behalten.
+
+    Fremde und gelöschte IDs fliegen still heraus, statt den ganzen Termin mit
+    einem Fehler abzulehnen: die Liste ist eine Zusatzangabe, und ein Thema,
+    das jemand zwischendurch gelöscht hat, darf das Verschieben eines Termins
+    nicht blockieren. Es sind ohnehin nur Verweise — die Themen selbst liegen
+    im Kern und werden hier nie verändert.
+    """
+    if not ids:
+        return None
+    from ..models import Topic
+    eigene = {t for (t,) in (await db.execute(
+        select(Topic.id).where(Topic.owner_id == user.id, Topic.deleted_at.is_(None)))).all()}
+    gesehen = []
+    for tid in list(ids)[:20]:
+        if isinstance(tid, int) and tid in eigene and tid not in gesehen:
+            gesehen.append(tid)
+    return gesehen or None
 
 
 @router.get("/klassenarbeiten", response_model=List[ExamOut])
@@ -575,7 +601,9 @@ async def _ensure_work(db: AsyncSession, user: User, e: ExamDate) -> None:
 async def create_exam(body: ExamIn, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     await _check_class(db, user, body.class_id)
     await _check_kurs(db, user, body.kurs_id)
-    e = ExamDate(owner_id=user.id, **body.model_dump())
+    daten = body.model_dump()
+    daten["topic_ids"] = await _check_topics(db, user, daten.get("topic_ids"))
+    e = ExamDate(owner_id=user.id, **daten)
     db.add(e)
     await db.flush()
     # Kalendereintrag zum Termin: an eine Stunde (period) gebunden oder ganztägig.
@@ -622,7 +650,9 @@ async def update_exam(exam_id: int, body: ExamIn, user: User = Depends(require_m
     e = await eigenes(db, ExamDate, exam_id, user, "Klassenarbeit nicht gefunden")
     await _check_class(db, user, body.class_id)
     await _check_kurs(db, user, body.kurs_id)
-    for k, v in body.model_dump().items():
+    daten = body.model_dump()
+    daten["topic_ids"] = await _check_topics(db, user, daten.get("topic_ids"))
+    for k, v in daten.items():
         setattr(e, k, v)
     # Verknüpften Kalendereintrag mitziehen (Datum/Titel/Klasse/Kurs). Fehlt er
     # (Altbestand vor der Auto-Erzeugung), wird er hier nachgeholt.
@@ -697,6 +727,19 @@ async def exam_overview(user: User = Depends(require_module), db: AsyncSession =
     planned = (await db.execute(select(CalendarEntry).where(CalendarEntry.owner_id == user.id, CalendarEntry.period.is_not(None)))).scalars().all()
     id2cls, _ = await _class_maps(db, user)
     kurse = {k.id: k.name for k in (await db.execute(select(Kurs).where(Kurs.owner_id == user.id))).scalars().all()}
+    # Themen der Termine mit Namen versehen. Ein inzwischen geloeschtes Thema
+    # faellt hier heraus, statt als Nummer ohne Namen anzukommen — die Termine
+    # muessen davon nichts wissen.
+    from ..models import Topic
+    _themen = {t.id: t for t in (await db.execute(select(Topic).where(
+        Topic.owner_id == user.id, Topic.deleted_at.is_(None)))).scalars().all()}
+
+    def _thema_label(tid):
+        t = _themen.get(tid)
+        if not t:
+            return None
+        eltern = _themen.get(t.parent_id) if t.parent_id else None
+        return f"{eltern.name} / {t.name}" if eltern else t.name
 
     def _d(x):  # auf reines Datum reduzieren
         return x.date() if hasattr(x, "date") else x
@@ -771,6 +814,9 @@ async def exam_overview(user: User = Depends(require_module), db: AsyncSession =
             "kurs": kurse.get(ex.kurs_id) if ex.kurs_id else None,
             "klasse": id2cls.get(ex.class_id) if ex.class_id else None,
             "stunden": stunden,
+            "topic_ids": list(ex.topic_ids or []),
+            "topics": [{"id": tid, "label": _thema_label(tid)}
+                       for tid in (ex.topic_ids or []) if _thema_label(tid)],
         })
     return out
 
