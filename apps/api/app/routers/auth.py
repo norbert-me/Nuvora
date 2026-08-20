@@ -460,6 +460,12 @@ class UpdateProfileBody(BaseModel):
     grade_scale: Optional[dict] = None
     grade_tendency: Optional[bool] = None
     marketplace_name: Optional[str] = None
+    # Schuljahr: Beginn der Halbjahre und Jahresende, als "JJJJ-MM-TT" oder ""
+    # zum Loeschen. Am Konto, weil das Schuljahr fuer alle Klassen dieser
+    # Lehrkraft dasselbe ist (siehe models.User).
+    hj1_start: Optional[str] = None
+    hj2_start: Optional[str] = None
+    jahr_ende: Optional[str] = None
 
     @field_validator("name")
     @classmethod
@@ -483,6 +489,10 @@ def _user_dict(user):
         "display_name": display or user.email, "grade_scale": user.grade_scale, "grade_tendency": user.grade_tendency,
         "marketplace_name": getattr(user, "marketplace_name", "") or "",
         "pending_email": getattr(user, "pending_email", None),
+        # Schuljahr — die Shell braucht es fuer alles, was „dieses Halbjahr" sagt.
+        "hj1_start": user.hj1_start.isoformat() if getattr(user, "hj1_start", None) else "",
+        "hj2_start": user.hj2_start.isoformat() if getattr(user, "hj2_start", None) else "",
+        "jahr_ende": user.jahr_ende.isoformat() if getattr(user, "jahr_ende", None) else "",
     }
 
 
@@ -726,6 +736,22 @@ async def update_profile(body: UpdateProfileBody, user: User = Depends(get_curre
         user.grade_tendency = bool(body.grade_tendency)
     if body.marketplace_name is not None:
         user.marketplace_name = body.marketplace_name.strip()[:100]
+    # Datumsfelder: leerer Text loescht. Unlesbares wird ignoriert statt mit
+    # einem Fehler quittiert — sonst kaeme man beim Speichern des Namens nicht
+    # mehr durch, nur weil in einem Datumsfeld Unsinn steht.
+    from datetime import date as _date
+    for feld in ("hj1_start", "hj2_start", "jahr_ende"):
+        wert = getattr(body, feld)
+        if wert is None:
+            continue
+        wert = (wert or "").strip()
+        if not wert:
+            setattr(user, feld, None)
+            continue
+        try:
+            setattr(user, feld, _date.fromisoformat(wert[:10]))
+        except ValueError:
+            pass
     await db.commit()
     await db.refresh(user)
     return _user_dict(user)

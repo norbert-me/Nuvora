@@ -263,6 +263,13 @@ def _ensure_columns(sync_conn):
         ("work_analyses", "fehler", "JSON"),   # Fehlerart je Einheit und Kind
         ("user_modules", "optionen", "JSON"),  # Anzeige-Optionen je Modul und Lehrkraft
         ("exam_dates", "topic_ids", "JSON"),   # Themen der geplanten Klassenarbeit
+        ("topics", "fach", "VARCHAR(60)"),     # Fach und Jahrgang am Thema …
+        ("topics", "jahrgang", "INTEGER"),
+        ("kurse", "fach", "VARCHAR(60)"),      # … und ihr Gegenstueck am Kurs
+        ("kurse", "jahrgang", "INTEGER"),
+        ("users", "hj1_start", "DATE"),        # Schuljahr: Halbjahre + Jahresende
+        ("users", "hj2_start", "DATE"),
+        ("users", "jahr_ende", "DATE"),
         ("questions", "topic_id", "INTEGER"),
         ("students", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
         ("students", "foerder", "JSON"),

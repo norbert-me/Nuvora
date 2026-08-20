@@ -37,6 +37,12 @@ class TopicIn(BaseModel):
     ziel_e: str = ""
     # Was vorher sitzen muss (Freitext, siehe models.Topic).
     voraussetzungen: str = ""
+    # Fach und Jahrgang — nur am OBERTHEMA gepflegt, Unterthemen erben (siehe
+    # `_erbt`). Am Unterthema Geschicktes wird still verworfen, statt mit einem
+    # Fehler abgelehnt: die Oberflaeche schickt das ganze Thema zurueck, und ein
+    # 422 fuer ein Feld, das dort gar nicht bedienbar ist, waere eine Sackgasse.
+    fach: str = ""
+    jahrgang: Optional[int] = None
 
     @field_validator("name")
     @classmethod
@@ -72,10 +78,41 @@ class TopicOut(BaseModel):
     ziel_g: str = ""
     ziel_e: str = ""
     voraussetzungen: str = ""
+    # Wirksames Fach/Jahrgang: am Oberthema das eigene, am Unterthema das
+    # geerbte. Die Oberflaeche muss die Regel damit nicht ein zweites Mal kennen.
+    fach: str = ""
+    jahrgang: Optional[int] = None
     # Wie viele CardVote-Fragen haengen an diesem Thema? Macht sichtbar, was
     # ein Loeschen kostet.
     question_count: int = 0
     model_config = {"from_attributes": True}
+
+
+def _erbt(t: Topic, by_id: dict) -> tuple:
+    """Wirksames (fach, jahrgang) eines Themas.
+
+    Gepflegt wird beides am Oberthema — sonst stuende dasselbe Fach an fuenfzig
+    Unterthemen und wiche beim ersten Tippfehler ab. Ein Unterthema nimmt
+    deshalb das seines Oberthemas; ein eigener Wert daran zaehlt nicht.
+    """
+    wurzel = t
+    gesehen = set()
+    while wurzel.parent_id and wurzel.parent_id not in gesehen:
+        gesehen.add(wurzel.parent_id)
+        eltern = by_id.get(wurzel.parent_id)
+        if not eltern:
+            break            # Oberthema im Papierkorb: dann eben das eigene
+        wurzel = eltern
+    return (wurzel.fach or "", wurzel.jahrgang)
+
+
+async def _erbt_geladen(db: AsyncSession, user: User, t: Topic) -> tuple:
+    """Wie `_erbt`, holt die Oberthemen aber selbst — fuer die Antworten auf
+    Anlegen und Aendern, wo nicht ohnehin alle Themen geladen sind."""
+    if not t.parent_id:
+        return (t.fach or "", t.jahrgang)
+    alle = (await db.execute(select(Topic).where(Topic.owner_id == user.id))).scalars().all()
+    return _erbt(t, {x.id: x for x in alle})
 
 
 async def _owned(db: AsyncSession, user: User, topic_id: int) -> Topic:
@@ -143,15 +180,19 @@ async def list_topics(
         .where(Topic.owner_id == user.id, Topic.deleted_at.is_(None))
         .order_by(Topic.position, Topic.name)
     )
-    return [
-        TopicOut(
+    alle = result.scalars().all()
+    by_id = {t.id: t for t in alle}
+    out = []
+    for t in alle:
+        fach, jahrgang = _erbt(t, by_id)
+        out.append(TopicOut(
             id=t.id, name=t.name, parent_id=t.parent_id, position=t.position,
             notes=t.notes or "", ziel_g=t.ziel_g or "", ziel_e=t.ziel_e or "",
             voraussetzungen=t.voraussetzungen or "",
+            fach=fach, jahrgang=jahrgang,
             question_count=counts.get(t.id, 0),
-        )
-        for t in result.scalars().all()
-    ]
+        ))
+    return out
 
 
 @router.post("", response_model=TopicOut, status_code=201)
@@ -185,13 +226,17 @@ async def create_topic(
         position=(last.scalar_one_or_none() or 0) + 1, notes=data.notes or "",
         ziel_g=data.ziel_g or "", ziel_e=data.ziel_e or "",
         voraussetzungen=data.voraussetzungen or "",
+        # Nur am Oberthema: ein Unterthema erbt (siehe `_erbt`).
+        fach=("" if data.parent_id else (data.fach or "").strip()[:60]),
+        jahrgang=(None if data.parent_id else data.jahrgang),
     )
     db.add(topic)
     await db.commit()
     await db.refresh(topic)
+    fach, jahrgang = await _erbt_geladen(db, user, topic)
     return TopicOut(id=topic.id, name=topic.name, parent_id=topic.parent_id, position=topic.position,
                     notes=topic.notes or "", ziel_g=topic.ziel_g or "", ziel_e=topic.ziel_e or "",
-                    voraussetzungen=topic.voraussetzungen or "")
+                    voraussetzungen=topic.voraussetzungen or "", fach=fach, jahrgang=jahrgang)
 
 
 class ReorderIn(BaseModel):
@@ -307,11 +352,20 @@ async def update_topic(
     topic.ziel_g = data.ziel_g or ""
     topic.voraussetzungen = data.voraussetzungen or ""
     topic.ziel_e = data.ziel_e or ""
+    if data.parent_id is None:
+        topic.fach = (data.fach or "").strip()[:60]
+        topic.jahrgang = data.jahrgang
+    else:
+        # Unter ein Oberthema gezogen: eigene Angaben loeschen, sonst bliebe ein
+        # unsichtbarer Wert stehen, der beim Herausziehen wieder auftaucht.
+        topic.fach = ""
+        topic.jahrgang = None
     await db.commit()
     await db.refresh(topic)
+    fach, jahrgang = await _erbt_geladen(db, user, topic)
     return TopicOut(id=topic.id, name=topic.name, parent_id=topic.parent_id, position=topic.position,
                     notes=topic.notes or "", ziel_g=topic.ziel_g or "", ziel_e=topic.ziel_e or "",
-                    voraussetzungen=topic.voraussetzungen or "")
+                    voraussetzungen=topic.voraussetzungen or "", fach=fach, jahrgang=jahrgang)
 
 
 @router.delete("/{topic_id}", status_code=204)

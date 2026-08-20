@@ -43,6 +43,12 @@ class KursIn(BaseModel):
     niveau_aktiv: Optional[bool] = None
     schuljahr: Optional[str] = None      # "2025/26" — Beschriftung, kein Zeitraum
     vorgaenger_id: Optional[int] = None  # dieselbe Lerngruppe im Vorjahr (0/None = keiner)
+    # Fach und Jahrgang — das Gegenstueck zu `topics.fach`/`topics.jahrgang`.
+    # Erst dadurch ist „die Themen dieses Kurses" eine Abfrage: der NAME ist
+    # frei („Mathe 7.5", „M7b", „Mathe Gruppe rot"), und daraus einen
+    # Zusammenhang zu raten waere genau der Fehler, den die Taxonomie vermeidet.
+    fach: Optional[str] = None
+    jahrgang: Optional[int] = None
 
 
 class NiveauIn(BaseModel):
@@ -63,6 +69,8 @@ class KursOut(BaseModel):
     color: str = ""
     member_count: int = 0    # einzeln hinzugefügte SuS (Kurs aus Teilen von Klassen)
     schuljahr: str = ""
+    fach: str = ""
+    jahrgang: Optional[int] = None
     vorgaenger_id: Optional[int] = None
     vorgaenger_name: str = ""       # damit die Liste nicht je Kurs nachfragen muss
     nachfolger_id: Optional[int] = None
@@ -168,7 +176,8 @@ async def list_kurse(archiviert: bool = False, user: User = Depends(get_current_
         nachfolger[k2[2]] = (k2[0], k2[1])
     return [KursOut(id=k.id, name=k.name, classes=by.get(k.id, []), niveau_aktiv=k.niveau_aktiv,
                     color=k.color, member_count=int(mc.get(k.id, 0)),
-                    schuljahr=k.schuljahr, vorgaenger_id=k.vorgaenger_id,
+                    schuljahr=k.schuljahr, fach=k.fach or "", jahrgang=k.jahrgang,
+                    vorgaenger_id=k.vorgaenger_id,
                     vorgaenger_name=alle.get(k.vorgaenger_id, "") if k.vorgaenger_id else "",
                     nachfolger_id=(nachfolger.get(k.id) or (None, ""))[0],
                     nachfolger_name=(nachfolger.get(k.id) or (None, ""))[1]) for k in kurse]
@@ -229,9 +238,16 @@ async def rename_kurs(kurs_id: int, body: KursIn, user: User = Depends(get_curre
         if neu_id:
             await _kette_ok(db, user, k.id, neu_id)
         k.vorgaenger_id = neu_id
+    if body.fach is not None:
+        k.fach = (body.fach or "").strip()[:60]
+    if body.jahrgang is not None:
+        # 0 heisst „keine Angabe" — die Oberflaeche schickt bei geleertem Feld
+        # keine Null, sondern nichts; beides muss hier dasselbe bedeuten.
+        k.jahrgang = body.jahrgang or None
     await db.commit()
     return KursOut(id=k.id, name=k.name, classes=[], niveau_aktiv=k.niveau_aktiv, color=k.color,
-                   schuljahr=k.schuljahr, vorgaenger_id=k.vorgaenger_id)
+                   schuljahr=k.schuljahr, fach=k.fach or "", jahrgang=k.jahrgang,
+                   vorgaenger_id=k.vorgaenger_id)
 
 
 class ColorIn(BaseModel):

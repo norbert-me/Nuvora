@@ -61,6 +61,20 @@ class User(Base):
     # Mehrere externe Kalender: Liste [{url, color, name}]. Löst external_ics_url/
     # _color ab (die bleiben als Altbestand und werden beim ersten Lesen migriert).
     external_calendars: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # Schuljahr: Beginn der beiden Halbjahre und das Jahresende.
+    #
+    # Am KONTO und nicht an der Klasse: das Schuljahr ist fuer alle Klassen
+    # dieser Lehrkraft dasselbe. Je Klasse waere es dieselbe Angabe fuenfzehnmal
+    # — und beim ersten Abweichen wuesste niemand, welche stimmt. Auch nicht im
+    # Kalender: der kennt Ferien als freie ZEITRAEUME, aber ein Halbjahr ist
+    # keine Unterbrechung, sondern die Achse, auf der die Planung liegt.
+    #
+    # Gebraucht vom Stoffverteilungsplan (ohne Anfang und Ende gibt es keine
+    # Wochen, ueber die verteilt wird) und von allem, was „dieses Halbjahr"
+    # sagt, statt „die letzten N".
+    hj1_start: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    hj2_start: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    jahr_ende: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     # Ausgeblendete externe Einzel-Ereignisse: Liste von Schlüsseln "uid|YYYY-MM-DD".
     external_hidden: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     # Einstiege-Startsammlung einmalig angelegt? Danach nicht erneut seeden,
@@ -222,6 +236,12 @@ class Kurs(Base):
     # bei Kursen ohne Niveau-Differenzierung nervt sie sonst. E/G wird im Kurs
     # gepflegt (nicht je Fach-Klasse), weil es die Person betrifft.
     niveau_aktiv: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Fach und Jahrgang des Kurses — das Gegenstueck zu `topics.fach` /
+    # `topics.jahrgang`. Erst dadurch ist „die Themen dieses Kurses" eine
+    # Abfrage und kein Namensraten (der Name ist frei, „Mathe 7.5" genauso wie
+    # „M7b" oder „Mathe Gruppe rot").
+    fach: Mapped[str] = mapped_column(String(60), default="", server_default="")
+    jahrgang: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     # Farbe des Kurses (Stundenplan/Kalender). Die Fach-Klassen teilen sie sich —
     # darum am Kurs, nicht je Klasse.
     color: Mapped[str] = mapped_column(String(9), default="", server_default="")
@@ -458,6 +478,20 @@ class Topic(Base):
     # Planung ordnet ihn nur zeitlich ein.
     ziel_g: Mapped[str] = mapped_column(Text, default="", server_default="")
     ziel_e: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # Wozu gehoert das Thema — Fach und Jahrgangsstufe.
+    #
+    # Ohne diese beiden laesst sich nicht fragen „zeig mir die Themen dieses
+    # Kurses": ein Kurs hiess bisher nur „Mathe 7.5", und aus einem Namen einen
+    # Zusammenhang zu raten waere genau der Fehler, den die Themen-Taxonomie
+    # vermeiden soll. Der Stoffverteilungsplan haengt daran.
+    #
+    # Fach ist FREITEXT mit Vorschlagsliste, kein Katalog: Schulformen und
+    # Bundeslaender nennen Faecher verschieden, und eine feste Liste waere nach
+    # einem Jahr falsch. Gepflegt wird beides am OBERTHEMA; Unterthemen erben es
+    # (siehe `_erbt` in routers/topics.py) — sonst stuende dasselbe Fach an
+    # fuenfzig Unterthemen und wich beim ersten Tippfehler ab.
+    fach: Mapped[str] = mapped_column(String(60), default="", server_default="")
+    jahrgang: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     children: Mapped[list["Topic"]] = relationship(

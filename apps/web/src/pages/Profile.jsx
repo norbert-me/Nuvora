@@ -58,11 +58,16 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     marketplaceName: user.marketplace_name || "",
     gradeScale: user.grade_scale || DEFAULT_SCALE,
     gradeTendency: user.grade_tendency !== false,   // Voreinstellung: mit Tendenz (2+)
+    // Schuljahr. Am Konto und nicht an der Klasse: es ist fuer alle Klassen
+    // dieser Lehrkraft dasselbe — je Klasse waere es dieselbe Angabe
+    // fuenfzehnmal, und beim ersten Abweichen wuesste niemand, welche stimmt.
+    hj1: user.hj1_start || "", hj2: user.hj2_start || "", ende: user.jahr_ende || "",
   });
   const profil = useEntwurf(profilBasis, (w) => saveProfile(w));
-  const { marketplaceName, gradeScale, gradeTendency } = profil.wert;
+  const { marketplaceName, gradeScale, gradeTendency, hj1, hj2, ende } = profil.wert;
   const [showUsername, setShowUsername] = useState(false);
   const [showScale, setShowScale] = useState(false);
+  const [showJahr, setShowJahr] = useState(false);
   const [showTendency, setShowTendency] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [adminUsers, setAdminUsers] = useState([]);
@@ -117,7 +122,8 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     const res = await fetch(`${API}/auth/profile`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ name, salutation, grade_scale: w.gradeScale, grade_tendency: w.gradeTendency, marketplace_name: w.marketplaceName }),
+      body: JSON.stringify({ name, salutation, grade_scale: w.gradeScale, grade_tendency: w.gradeTendency, marketplace_name: w.marketplaceName,
+                             hj1_start: w.hj1 || "", hj2_start: w.hj2 || "", jahr_ende: w.ende || "" }),
     });
     if (res.ok) {
       const data = await res.json();
@@ -238,6 +244,26 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             <input placeholder={t("profile.usernamePlaceholder")} value={marketplaceName} onChange={(e) => profil.setz({ marketplaceName: e.target.value })}
               onKeyDown={(e) => { if (e.key === "Enter") profil.speichern(); }}
               style={{ ...feldStyle, marginBottom: 10 }} />
+          )}
+
+          {/* Schuljahr: die Achse, auf der die Planung liegt. Der Kalender
+              kennt Ferien als freie ZEITRAEUME — ein Halbjahr ist aber keine
+              Unterbrechung, sondern der Rahmen. */}
+          <button type="button" onClick={() => setShowJahr((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: 24, marginBottom: showJahr ? 8 : 0 }}>
+            <Icon d={showJahr ? ICONS.chevronUp : ICONS.chevronDown} size={15} />
+            <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("profile.schuljahr")}</span>
+            <InfoDot text={t("profile.schuljahrHint")} />
+          </button>
+          {showJahr && (
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12, marginTop: 4 }}>
+              {[["hj1", t("profile.hj1")], ["hj2", t("profile.hj2")], ["ende", t("profile.jahrEnde")]].map(([feld, label]) => (
+                <label key={feld} style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 12, color: "var(--text2)" }}>
+                  <span>{label}</span>
+                  <input type="date" value={profil.wert[feld] || ""} onChange={(e) => profil.setz({ [feld]: e.target.value })}
+                    style={{ ...feldStyle, width: 170, marginBottom: 0 }} />
+                </label>
+              ))}
+            </div>
           )}
 
           <button type="button" onClick={() => setShowScale((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: 24, marginBottom: showScale ? 8 : 0 }}>

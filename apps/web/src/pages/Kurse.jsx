@@ -15,6 +15,15 @@ import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 const API = "/api";
 const editLabel = { ...sectionLabel, marginBottom: 4 };
 
+// Dieselben Vorschlaege wie bei den Themen (pages/Topics.jsx) — dort steht,
+// warum es eine Liste zum Ergaenzen ist und kein Katalog.
+const FACH_VORSCHLAEGE = [
+  "Mathematik", "Deutsch", "Englisch", "Französisch", "Latein", "Spanisch",
+  "Biologie", "Chemie", "Physik", "Informatik", "Technik",
+  "Geschichte", "Erdkunde", "Politik", "Religion", "Ethik", "Philosophie",
+  "Kunst", "Musik", "Sport", "Wirtschaft", "Sachunterricht", "Lernzeit",
+];
+
 export default function Kurse() {
   const { t } = useLanguage();
   const [kurse, setKurse] = useState([]);
@@ -29,7 +38,7 @@ export default function Kurse() {
   // Jahresfolge: Schuljahr und der Kurs des Vorjahres. Die Daten bleiben
   // getrennt (Zeugnisnoten gelten je Schuljahr) — verbunden wird nur die Kette,
   // damit „6.5 Mathe" und „7.5 Mathe" nicht als zwei fremde Gruppen dastehen.
-  const LEER = { name: "", jahr: "", vorgaenger: "", niveauAktiv: false, archiviert: false, klassen: [] };
+  const LEER = { name: "", jahr: "", fach: "", jahrgang: "", vorgaenger: "", niveauAktiv: false, archiviert: false, klassen: [] };
   const [kursBasis, setKursBasis] = useState(LEER);
   const kurs = useEntwurf(kursBasis, (w) => kursSpeichern(w));
   const kursUebernehmen = (stand) => { setKursBasis(stand); kurs.setz(stand); };

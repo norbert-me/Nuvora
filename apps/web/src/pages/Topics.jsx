@@ -5,7 +5,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { askConfirm } from "../core/dialog.jsx";
 import { useLanguage } from "../i18n/index.jsx";
-import { AddButton, btnSecondary, cardStyle, COLORS as C, CONTROL_R, DialogKopf, Empty, Icon, iconBtn, ICONS, inputStyle, Modal, pageApp, pageIntro, pageTitle, panelStyle, sectionLabel, Skeleton, toolbarBtn, toolbarBtnPrimary, toolbarInput } from "../components/Icons.jsx";
+import { AddButton, btnSecondary, cardStyle, chipStyle, COLORS as C, CONTROL_R, DialogKopf, Empty, Icon, iconBtn, ICONS, inputStyle, Modal, pageApp, pageIntro, pageTitle, panelStyle, sectionLabel, Skeleton, toolbarBtn, toolbarBtnPrimary, toolbarInput } from "../components/Icons.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { peek, put } from "../core/cache.js";
 import AutoTextarea from "../components/AutoTextarea.jsx";
@@ -87,8 +87,8 @@ export default function Topics() {
   // daran ist die frueher getrennte rename()-Fassung fast gescheitert (Notiz,
   // Ziele und Voraussetzungen weg nach einem Umbenennen).
   // Titel + Notiz speichern (aus dem Detail-Popup). Leerer Titel behält den alten.
-  const saveTopic = (tp, name, notes, zielG, zielE, voraussetzungen) =>
-    call(() => fetch(`${API}/topics/${tp.id}`, alsJson("PUT", { name: (name || "").trim() || tp.name, parent_id: tp.parent_id, notes, ziel_g: zielG || "", ziel_e: zielE || "", voraussetzungen: voraussetzungen || "" })));
+  const saveTopic = (tp, name, notes, zielG, zielE, voraussetzungen, fach, jahrgang) =>
+    call(() => fetch(`${API}/topics/${tp.id}`, alsJson("PUT", { name: (name || "").trim() || tp.name, parent_id: tp.parent_id, notes, ziel_g: zielG || "", ziel_e: zielE || "", voraussetzungen: voraussetzungen || "", fach: fach || "", jahrgang: jahrgang || null })));
 
   const remove = async (tp) => {
     const kids = topics.filter((x) => x.parent_id === tp.id);
@@ -264,12 +264,21 @@ export default function Topics() {
 
 // Detail-Popup eines Themas/Unterthemas: Notiz (inline editierbar) und — hinter
 // einem Ausklapp-Icon — welche Klassen und welche Modul-Inhalte am Thema hängen.
+// Vorschlaege, kein Katalog (siehe Kommentar am Eingabefeld).
+const FACH_VORSCHLAEGE = [
+  "Mathematik", "Deutsch", "Englisch", "Französisch", "Latein", "Spanisch",
+  "Biologie", "Chemie", "Physik", "Informatik", "Technik",
+  "Geschichte", "Erdkunde", "Politik", "Religion", "Ethik", "Philosophie",
+  "Kunst", "Musik", "Sport", "Wirtschaft", "Sachunterricht", "Lernzeit",
+];
+
 function TopicPopup({ tp, t, onSaveTopic, onClose }) {
   const [editNote, setEditNote] = useState(false);
   // Ein Entwurf für Titel, Notiz, Voraussetzung und beide Ziele — nicht fünf
   // Felder mit fünf eigenen Zuständen, die einzeln verloren gehen können.
   const [gespeichert, setGespeichert] = useState({
     name: tp.name, notes: tp.notes || "", zielG: tp.ziel_g || "", zielE: tp.ziel_e || "", voraus: tp.voraussetzungen || "",
+    fach: tp.fach || "", jahrgang: tp.jahrgang || "",
   });
   // Der Entwurf muss sich nach dem Speichern selbst nachziehen (leerer Titel
   // behält den alten). `e` steht in seiner eigenen Rückrufkette noch nicht —
@@ -277,13 +286,13 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
   const entwurfRef = useRef(null);
   const ent = useEntwurf(gespeichert, async (w) => {
     const name = (w.name || "").trim() || gespeichert.name;
-    if (await onSaveTopic(tp, name, w.notes, w.zielG, w.zielE, w.voraus) === false) return false;
+    if (await onSaveTopic(tp, name, w.notes, w.zielG, w.zielE, w.voraus, w.fach, w.jahrgang ? Number(w.jahrgang) : null) === false) return false;
     entwurfRef.current?.setz({ name });
     setGespeichert({ ...w, name });
     setEditNote(false);
   });
   entwurfRef.current = ent;
-  const { notes, zielG, zielE, voraus } = gespeichert;
+  const { notes, zielG, zielE, voraus, fach, jahrgang } = gespeichert;
   const name = gespeichert.name;                  // Anzeige-Titel (nach Umbenennen)
   const [open, setOpen] = useState(false); // Inhalte-Bereich ausgeklappt?
   const [usage, setUsage] = useState(null);
@@ -334,6 +343,32 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
             <div style={secTitle}>{t("common.rename")}</div>
             <input value={ent.wert.name} onChange={(ev) => ent.setz({ name: ev.target.value })} autoFocus maxLength={120}
               style={{ ...inputStyle, width: "100%", fontSize: 16, fontWeight: 600 }} />
+            {/* Fach und Jahrgang stehen am OBERTHEMA — Unterthemen erben sie
+                (der Server pflegt die Regel, siehe _erbt in topics.py). Ein
+                zweites Eingabefeld am Unterthema hiesse: dasselbe Fach an
+                fuenfzig Stellen, und beim ersten Tippfehler weichen sie ab. */}
+            {!tp.parent_id && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <div style={{ flex: "2 1 180px" }}>
+                  <div style={secTitle}>{t("topics.fach")}</div>
+                  <input list="nuvora-faecher" value={ent.wert.fach} maxLength={60}
+                    onChange={(ev) => ent.setz({ fach: ev.target.value })}
+                    placeholder={t("topics.fachPlaceholder")} style={{ ...inputStyle, width: "100%" }} />
+                  {/* Vorschlagsliste statt Katalog: Schulformen und Bundeslaender
+                      nennen Faecher verschieden, eine feste Liste waere nach
+                      einem Jahr falsch. Eigenes bleibt trotzdem moeglich. */}
+                  <datalist id="nuvora-faecher">
+                    {FACH_VORSCHLAEGE.map((f) => <option key={f} value={f} />)}
+                  </datalist>
+                </div>
+                <div style={{ flex: "1 1 100px" }}>
+                  <div style={secTitle}>{t("topics.jahrgang")}</div>
+                  <input type="number" min="1" max="13" value={ent.wert.jahrgang}
+                    onChange={(ev) => ent.setz({ jahrgang: ev.target.value })}
+                    placeholder="—" style={{ ...inputStyle, width: "100%" }} />
+                </div>
+              </div>
+            )}
             <div style={secTitle}>{t("topics.notes")}</div>
             <AutoTextarea value={ent.wert.notes} onChange={(ev) => ent.setz({ notes: ev.target.value.slice(0, 500) })} rows={2} maxLength={500}
               placeholder={t("topics.notesPlaceholder")}
@@ -355,6 +390,12 @@ function TopicPopup({ tp, t, onSaveTopic, onClose }) {
             </div>
           </div>
         ) : (<>
+          {(fach || jahrgang) && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 4 }}>
+              {fach && <span style={chipStyle}>{fach}</span>}
+              {jahrgang ? <span style={chipStyle}>{t("topics.jahrgangN", { n: jahrgang })}</span> : null}
+            </div>
+          )}
           <div style={secTitle}>{t("topics.notes")}</div>
           <div style={{ fontSize: 14, color: notes ? "var(--text2)" : "var(--text3)", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{notes || t("topics.notesEmpty")}</div>
           {voraus && (

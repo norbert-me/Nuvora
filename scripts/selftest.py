@@ -597,10 +597,30 @@ def teste_kern(api, b, u):
 
     def themen():
         api.call("PUT", f"/api/topics/{u.topic_id}",
-                 {"name": f"{PRAEFIX} Thema", "ziel_g": "G-Ziel", "ziel_e": "E-Ziel"},
+                 {"name": f"{PRAEFIX} Thema", "ziel_g": "G-Ziel", "ziel_e": "E-Ziel",
+                  "fach": "Mathematik", "jahrgang": 7},
                  erwartet=(200,))
         api.call("GET", f"/api/topics/{u.topic_id}/usage", erwartet=(200,))
-        return "Thema mit E/G-Zielen"
+        # Fach und Jahrgang stehen am Oberthema; ein Unterthema ERBT sie. Ohne
+        # diese Regel stuende dasselbe Fach an fuenfzig Unterthemen und wiche
+        # beim ersten Tippfehler ab — und der Kursfilter griffe ins Leere.
+        unter = api.call("POST", "/api/topics",
+                         {"name": f"{PRAEFIX} Unterthema", "parent_id": u.topic_id,
+                          # Ausdruecklich mitgeschickt: am Unterthema muss es
+                          # wirkungslos bleiben, nicht heimlich gewinnen.
+                          "fach": "Deutsch", "jahrgang": 5},
+                         erwartet=(201,))
+        try:
+            liste = api.call("GET", "/api/topics", erwartet=(200,))
+            oben = next((x for x in liste if x["id"] == u.topic_id), None)
+            kind = next((x for x in liste if x["id"] == unter["id"]), None)
+            if not oben or oben.get("fach") != "Mathematik" or oben.get("jahrgang") != 7:
+                raise AssertionError(f"Fach/Jahrgang am Oberthema nicht gespeichert: {oben}")
+            if not kind or kind.get("fach") != "Mathematik" or kind.get("jahrgang") != 7:
+                raise AssertionError(f"Unterthema erbt nicht: {kind}")
+        finally:
+            api.call("DELETE", f"/api/topics/{unter['id']}", erwartet=(204, 404))
+        return "Thema mit E/G-Zielen, Fach/Jahrgang vererbt sich ans Unterthema"
 
     def archiv():
         # Archiv ist NICHT der Papierkorb: die Klasse verschwindet aus den
