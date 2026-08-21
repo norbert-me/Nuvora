@@ -614,6 +614,38 @@ const BEDIENUNG = [
     },
   },
   {
+    // Die Startseite laesst sich einrichten: Widgets an/aus, Kacheln ausblenden.
+    // Das liegt im localStorage — ein Neuladen ist also der einzige Beweis,
+    // dass es wirklich gespeichert wurde. Geprueft wird am „Heute"-Widget: es
+    // ist voreingestellt an und traegt einen Link, den man eindeutig findet.
+    name: "Startseite einrichten (Widget aus/an)",
+    pfad: "/",
+    async schritte(seite) {
+      const kalenderLink = seite.getByRole("link", { name: /zum kalender|to the calendar|al calendario/i }).first();
+      if (!(await kalenderLink.count())) return;   // Kalender nicht aktiv: nichts zu pruefen
+      const bearbeiten = seite.locator("[title='Anordnen'], [title='Arrange'], [title='Organizar']").first();
+      await bearbeiten.click({ timeout: 8000 });
+      // Der Schalter des Widgets traegt seinen Namen als Text.
+      await seite.getByRole("button", { name: /^(Heute|Today|Hoy)$/ }).first().click({ timeout: 8000 });
+      await seite.getByRole("button", { name: /^(Speichern|Save|Guardar)$/ }).first().click({ timeout: 8000 });
+      await seite.waitForTimeout(600);
+    },
+    async pruefe(seite) {
+      // Nach dem Neuladen muss das Widget WEG sein — sonst hat das Einrichten
+      // nichts gespeichert.
+      const nochDa = await seite.getByRole("link", { name: /zum kalender|to the calendar|al calendario/i }).count();
+      if (nochDa) return { ok: false, detail: "Widget nach dem Neuladen wieder da — die Einrichtung wird nicht gespeichert" };
+      // Und wieder anschalten: der Lauf darf die Startseite nicht veraendert
+      // zuruecklassen.
+      const bearbeiten = seite.locator("[title='Anordnen'], [title='Arrange'], [title='Organizar']").first();
+      await bearbeiten.click({ timeout: 8000 });
+      await seite.getByRole("button", { name: /^(Heute|Today|Hoy)$/ }).first().click({ timeout: 8000 });
+      await seite.getByRole("button", { name: /^(Speichern|Save|Guardar)$/ }).first().click({ timeout: 8000 });
+      await seite.waitForTimeout(600);
+      return { ok: true, detail: "Widget abgeschaltet, ueberlebt das Neuladen, wieder angeschaltet" };
+    },
+  },
+  {
     name: "Thema anlegen (/topics)",
     pfad: "/topics",
     async schritte(seite) {
@@ -639,6 +671,9 @@ async function bediene(kontext, flow, api) {
     // muessen (der Notizzettel: „vor dem Speichern steht dort nichts").
     await flow.schritte(seite, api);
     await seite.reload({ waitUntil: "networkidle" });
+    // Ein Handgriff, der nichts ANLEGT (die Startseite einrichten), bringt
+    // seine eigene Pruefung mit — die Marke gaebe es dort nicht.
+    if (flow.pruefe) return await flow.pruefe(seite);
     const text = await seite.locator("body").innerText();
     const drin = text.includes(MARKE) || (await seite.locator(`input[value='${MARKE}']`).count()) > 0;
     if (!drin) return { ok: false, detail: "nach dem Neuladen verschwunden — wird nicht gespeichert" };

@@ -8,6 +8,7 @@ import { useLanguage } from "../i18n/index.jsx";
 import { StageBadge, Icon, ICONS, MODULE_ICONS, btnSecondary, selectStyle, COLORS as C, pageApp, pageTitle, cardStyle, chipStyle, badge, btnSmall, CONTROL_H, CONTROL_R, toolbarIconBtn } from "../components/Icons.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { alsJson, hol } from "../core/melden.js";
+import { WIDGETS } from "../components/Widgets.jsx";
 import { ymd } from "../core/datum.js";
 
 // Modul-Kachel: dieselbe Karte wie überall, nur als Link (kein eigener Kasten).
@@ -217,8 +218,35 @@ export default function NuvoraHome({ user }) {
   // nicht, das Modul heisst unterrichtsplanung) stillschweigend false — der
   // Einstiegs-Vorschlag bei schwachen Themen war damit dauerhaft tot.
   const isOn = useAktiv();
+  // Die ganze Einrichtung der Startseite in EINEM Eintrag: Reihenfolge der
+  // Kacheln, ausgeblendete Kacheln, eingeschaltete Widgets. Drei getrennte
+  // Schluessel waeren drei Stellen, an denen ein halb gespeicherter Stand
+  // entstehen kann.
+  //
+  // Weiterhin im Browser und nicht auf dem Server: es ist eine Ansicht, kein
+  // Inhalt — wer an einem anderen Rechner arbeitet, soll dort seine eigene
+  // Anordnung haben duerfen. (Der frueher benutzte Schluessel
+  // `nuvora_modorder_*` wird einmalig uebernommen, damit niemandes Reihenfolge
+  // verloren geht.)
+  const dashKey = `nuvora_dash_${user?.id ?? "x"}`;
   const orderKey = `nuvora_modorder_${user?.id ?? "x"}`;
-  const [order, setOrder] = useState(() => { try { return JSON.parse(localStorage.getItem(orderKey)) || []; } catch { return []; } });
+  const [dash, setDash] = useState(() => {
+    try {
+      const roh = JSON.parse(localStorage.getItem(dashKey));
+      if (roh && Array.isArray(roh.order)) return { order: roh.order, hidden: roh.hidden || [], widgets: roh.widgets || null };
+    } catch { /* kaputt: Voreinstellung */ }
+    try {
+      const alt = JSON.parse(localStorage.getItem(orderKey));
+      if (Array.isArray(alt)) return { order: alt, hidden: [], widgets: null };
+    } catch { /* egal */ }
+    return { order: [], hidden: [], widgets: null };
+  });
+  // widgets === null heisst „nie etwas eingestellt": dann gelten die
+  // Voreinstellungen aus dem Register, damit sich fuer niemanden ueber Nacht
+  // die Startseite leert.
+  const widgetKeys = dash.widgets ?? WIDGETS.filter((w) => w.an).map((w) => w.key);
+  const order = dash.order;
+  const versteckt = new Set(dash.hidden || []);
   const [edit, setEdit] = useState(false);
   const [dragKey, setDragKey] = useState(null);
   const [overKey, setOverKey] = useState(null);
@@ -227,16 +255,31 @@ export default function NuvoraHome({ user }) {
   const name = (m) => (t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name);
   // Nach gespeicherter Reihenfolge; unbekannte (neue) Module hinten anhaengen.
   const rank = (k) => { const i = order.indexOf(k); return i < 0 ? 1000 + active.findIndex((m) => m.key === k) : i; };
-  const shown = [...active].sort((a, b) => rank(a.key) - rank(b.key));
+  const sortiert = [...active].sort((a, b) => rank(a.key) - rank(b.key));
+  // Ausgeblendete Kacheln sind NUR auf der Startseite weg — das Modul bleibt
+  // aktiv, die Navigation zeigt es weiter. Wer ein Modul wirklich abschalten
+  // will, tut das unter /modules; hier geht es um die eigene Startseite.
+  const shown = sortiert.filter((m) => !versteckt.has(m.key));
 
-  const persist = (keys) => { setOrder(keys); try { localStorage.setItem(orderKey, JSON.stringify(keys)); } catch { /* egal */ } };
+  const persist = (naechster) => {
+    setDash(naechster);
+    try { localStorage.setItem(dashKey, JSON.stringify(naechster)); } catch { /* egal */ }
+  };
 
   // Auch das Anordnen der Kacheln ist eine Änderung und wartet auf „Speichern".
   // Die Grundlage muss über Rendergrenzen dieselbe bleiben — daher der
   // Schlüssel aus den Modul-Namen. (Hooks stehen vor jedem frühen Return.)
-  const basisSchluessel = shown.map((m) => m.key).join(",");
-  const basisOrdnung = useMemo(() => ({ keys: basisSchluessel ? basisSchluessel.split(",") : [] }), [basisSchluessel]);
-  const kacheln = useEntwurf(basisOrdnung, (w) => { persist(w.keys); });
+  const basisSchluessel = sortiert.map((m) => m.key).join(",");
+  const basisVersteckt = (dash.hidden || []).join(",");
+  const basisWidgets = widgetKeys.join(",");
+  const basisOrdnung = useMemo(() => ({
+    keys: basisSchluessel ? basisSchluessel.split(",") : [],
+    hidden: basisVersteckt ? basisVersteckt.split(",") : [],
+    widgets: basisWidgets ? basisWidgets.split(",") : [],
+  }), [basisSchluessel, basisVersteckt, basisWidgets]);
+  const kacheln = useEntwurf(basisOrdnung, (w) => {
+    persist({ order: w.keys, hidden: w.hidden, widgets: w.widgets });
+  });
 
   if (loading) return null;
 
@@ -250,7 +293,7 @@ export default function NuvoraHome({ user }) {
     keys.splice(to, 0, keys.splice(from, 1)[0]);
     return keys;
   };
-  const displayList = previewKeys().map((k) => shown.find((m) => m.key === k)).filter(Boolean);
+  const displayList = previewKeys().map((k) => sortiert.find((m) => m.key === k)).filter(Boolean);
   const commit = () => { kacheln.setz({ keys: previewKeys() }); setDragKey(null); setOverKey(null); };
 
   return (
@@ -260,7 +303,10 @@ export default function NuvoraHome({ user }) {
           {firstName ? t("home.welcome", { name: firstName }) : t("home.welcomePlain")}
         </h1>
         {edit && <Speicherleiste entwurf={kacheln} klein />}
-        {active.length > 1 && (
+        {/* Der Knopf richtet jetzt auch die Widgets ein — er gehoert also auch
+            dorthin, wo nur ein Modul laeuft. Vorher hing er an „mehr als eine
+            Kachel", weil es nur ums Sortieren ging. */}
+        {active.length > 0 && (
           <button onClick={() => {
             if (edit && kacheln.geaendert && !window.confirm(t("speichern.verlassen"))) return;
             if (edit) kacheln.verwerfen();
@@ -313,12 +359,55 @@ export default function NuvoraHome({ user }) {
         </div>
       ) : (
         <>
-          {!edit && isOn("kalender") && <HeutePanel t={t} orgaAktiv={isOn("orga")} />}
-          {!edit && isOn("cardvote") && <SchwacheWoche t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} methodenAktiv={isOn("unterrichtsplanung")} />}
+          {/* Widgets in der Reihenfolge des Registers — ein Widget zeigt, eine
+              Kachel verlinkt. Beides je Modul frei waehlbar; genau deshalb gibt
+              es den Kalender nicht mehr zwangslaeufig doppelt. */}
+          {!edit && WIDGETS.filter((w) => kacheln.wert.widgets.includes(w.key) && isOn(w.modul)).map((w) => {
+            if (w.key === "heute") return <HeutePanel key={w.key} t={t} orgaAktiv={isOn("orga")} />;
+            if (w.key === "schwach") {
+              return <SchwacheWoche key={w.key} t={t} kartenAktiv={isOn("karten")} lernpfadAktiv={isOn("lernpfad")} methodenAktiv={isOn("unterrichtsplanung")} />;
+            }
+            const K = w.komponente;
+            return <div key={w.key} style={{ marginBottom: 16 }}><K /></div>;
+          })}
+
+          {/* Bearbeiten: was soll die Startseite zeigen? Widgets zum An- und
+              Abschalten, Kacheln zum Ausblenden — beides an derselben Stelle,
+              weil es dieselbe Frage ist. */}
+          {edit && (
+            <div style={{ ...card, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{t("home.widgets")}</div>
+              <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 12px" }}>{t("home.widgetsHint")}</p>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {WIDGETS.filter((w) => isOn(w.modul)).map((w) => {
+                  const an = kacheln.wert.widgets.includes(w.key);
+                  return (
+                    <button key={w.key}
+                      onClick={() => kacheln.setz((v) => ({
+                        widgets: an ? v.widgets.filter((x) => x !== w.key) : [...v.widgets, w.key],
+                      }))}
+                      style={{ ...chipStyle, padding: "7px 12px", cursor: "pointer", border: "1px solid",
+                        borderColor: an ? "var(--accent)" : "var(--border2)",
+                        background: an ? "var(--accent-bg)" : "var(--bg2)",
+                        color: an ? "var(--accent)" : "var(--text2)", fontWeight: 600 }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <Icon d={an ? ICONS.check : ICONS.plus} size={13} color="currentColor" />
+                        {t(w.labelKey)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {WIDGETS.every((w) => !isOn(w.modul)) && (
+                <p style={{ fontSize: 13, color: "var(--text3)", margin: 0 }}>{t("home.widgetsKeine")}</p>
+              )}
+            </div>
+          )}
           <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
             {(edit ? displayList : shown).map((m) => {
               // Dashboard braucht keine Erklärung (die steht unter „Module") —
               // nur großes Icon + Name. Höhe bleibt wie zuvor (tileStyle).
+              const aus = kacheln.wert.hidden.includes(m.key);
               const inner = (
                 <div style={{ fontSize: 16, fontWeight: 700, display: "flex", alignItems: "center", gap: 12 }}>
                   {edit && <span style={{ color: "var(--text3)", display: "inline-flex" }}><Icon d={ICONS.grip} size={16} /></span>}
@@ -334,6 +423,22 @@ export default function NuvoraHome({ user }) {
                     <StageBadge stage={m.stage} />
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{name(m)}</span>
                   </span>
+                  {/* Auge = „auf der Startseite zeigen?". Das Modul bleibt
+                      aktiv — abschalten geht unter /modules. Wer den Kalender
+                      als Widget hat, braucht die Kachel daneben nicht. */}
+                  {edit && (
+                    <button onClick={(ev) => {
+                      ev.preventDefault(); ev.stopPropagation();
+                      kacheln.setz((v) => ({
+                        hidden: aus ? v.hidden.filter((x) => x !== m.key) : [...v.hidden, m.key],
+                      }));
+                    }} className="icon-btn"
+                      style={{ ...toolbarIconBtn, marginLeft: "auto", border: "none", color: aus ? C.warning : "var(--text3)" }}
+                      title={aus ? t("home.tileShow") : t("home.tileHide")}
+                      aria-label={aus ? t("home.tileShow") : t("home.tileHide")} aria-pressed={aus}>
+                      <Icon d={aus ? ICONS.eyeOff : ICONS.eye} size={16} />
+                    </button>
+                  )}
                 </div>
               );
               const tileStyle = { ...card, minHeight: 100, boxSizing: "border-box", display: "flex", alignItems: "center" };
@@ -359,6 +464,9 @@ export default function NuvoraHome({ user }) {
                     onDrop={commit}
                     onDragEnd={() => { setDragKey(null); setOverKey(null); }}
                     style={{ ...tileStyle, cursor: "grab", borderStyle: "dashed",
+                      // Ausgeblendet: blass, aber weiter da und weiter ziehbar —
+                      // sonst muesste man zum Zurueckholen suchen, wo sie hin ist.
+                      ...(aus ? { opacity: 0.45 } : {}),
                       ...(isDragged ? { opacity: 0.35, borderColor: "var(--accent)", background: "var(--bg2)" } : {}) }}>
                     {inner}
                   </div>
