@@ -9,6 +9,7 @@ import { StageBadge, Icon, ICONS, MODULE_ICONS, btnSecondary, selectStyle, COLOR
 import { useEntwurf } from "../components/Speichern.jsx";
 import { alsJson, hol } from "../core/melden.js";
 import { WIDGETS } from "../components/Widgets.jsx";
+import { ZIELE } from "../core/ziele.js";
 import { ymd } from "../core/datum.js";
 
 // Modul-Kachel: dieselbe Karte wie überall, nur als Link (kein eigener Kasten).
@@ -253,6 +254,22 @@ export default function NuvoraHome({ user }) {
 
   const firstName = (user?.name || "").split(" ")[0];
   const name = (m) => (t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name);
+
+  // Woraus besteht das Modul? Aus derselben Liste, die auch die Suche
+  // durchsucht (core/ziele.js) — ein neuer Reiter gehoert ohnehin dort hinein
+  // und steht damit von selbst auf der Kachel. Eine zweite, handgepflegte
+  // Liste hier waere nach dem dritten Reiter veraltet.
+  //
+  // Zwei Ausnahmen: der Weg auf die Modul-Startseite selbst (er wiederholt nur
+  // den Titel darueber) und der Marktplatz (der gehoert dem Kern, das Modul
+  // verlinkt ihn nur).
+  const teile = (m) => ZIELE
+    .filter((z) => z.modul === m.key && z.pfad !== m.path && !z.pfad.startsWith("/marktplatz"))
+    // Fehlt die Uebersetzung, gibt `t` den Schluessel zurueck — dann lieber
+    // nichts zeigen als „orga.tabOptions" auf der Kachel.
+    .map((z) => ({ key: z.key, text: t(z.key) }))
+    .filter((x) => x.text && x.text !== x.key)
+    .map((x) => x.text);
   // Nach gespeicherter Reihenfolge; unbekannte (neue) Module hinten anhaengen.
   const rank = (k) => { const i = order.indexOf(k); return i < 0 ? 1000 + active.findIndex((m) => m.key === k) : i; };
   const sortiert = [...active].sort((a, b) => rank(a.key) - rank(b.key));
@@ -429,9 +446,18 @@ export default function NuvoraHome({ user }) {
                   )}
                   {/* Beta-Badge ÜBER den Namen (nicht dahinter) — läuft sonst bei
                       langen Namen aus der Karte. */}
-                  <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, minWidth: 0 }}>
+                  <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2, minWidth: 0 }}>
                     <StageBadge stage={m.stage} />
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{name(m)}</span>
+                    {/* Woraus das Modul besteht. „Orga" sagt niemandem, dass die
+                        Ausleihe darin steckt — genau deshalb gibt es die Suche.
+                        Auf der Kachel steht es jetzt gleich mit da. */}
+                    {teile(m).length > 0 && (
+                      <span style={{ fontSize: 12, fontWeight: 400, color: "var(--text3)", lineHeight: 1.4,
+                        overflow: "hidden", display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2 }}>
+                        {teile(m).join(" · ")}
+                      </span>
+                    )}
                   </span>
                   {/* Auge = „auf der Startseite zeigen?". Das Modul bleibt
                       aktiv — abschalten geht unter /modules. Wer den Kalender
