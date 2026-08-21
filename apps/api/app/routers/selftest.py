@@ -201,6 +201,17 @@ def _check_werkzeuge(out: List[Check]) -> None:
 
 
 def _check_config(out: List[Check]) -> None:
+    # Die Fassung liest `admin.APP_VERSION` aus `apps/api/VERSION`. Fehlt die
+    # Datei im Image, meldet der Server stillschweigend „0.0.0" — die Anzeige im
+    # Profil stimmt dann nicht mehr und die Update-Pruefung haelt jede
+    # Veroeffentlichung fuer neuer. Genau so war es unbemerkt ueber mehrere
+    # Fassungen hinweg; deshalb steht es jetzt hier.
+    from ..admin import APP_VERSION
+    aktuell = APP_VERSION not in ("", "0.0.0")
+    out.append(Check(gruppe="Konfiguration", name="Fassung", ok=aktuell,
+                     detail=f"v{APP_VERSION}" if aktuell else
+                            "0.0.0 — apps/api/VERSION fehlt im Image"))
+
     for var in ("TOKEN_SECRET", "DATABASE_URL"):
         wert = (os.environ.get(var) or "").strip()
         out.append(Check(gruppe="Konfiguration", name=var, ok=bool(wert),
