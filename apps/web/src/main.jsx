@@ -42,7 +42,12 @@ window.fetch = function(input, init) {
     }
     return res;
   });
+  const begonnen = isApi ? performance.now() : 0;
   return withRetry(0).then((res) => {
+    // Ins Protokoll (core/protokoll.js) — hier laeuft ohnehin jeder Aufruf
+    // durch, eine zweite Stelle gaebe es nicht. Was mitgeschrieben wird, ist
+    // dort hart begrenzt: Methode, Pfad ohne IDs, Status, Dauer. Keine Inhalte.
+    if (isApi) { try { notiereAufruf((init && init.method) || "GET", url, res.status, performance.now() - begonnen); } catch { /* egal */ } }
     // Server ist erreichbar (auch bei 4xx/5xx) → online.
     // ABER: der Service-Worker beantwortet API-Aufrufe offline aus seinem
     // Zwischenspeicher, und zwar mit HTTP 200. Die waren hier bisher nicht von
@@ -85,6 +90,7 @@ window.fetch = function(input, init) {
   }).catch(async (err) => {
     // Netzwerkfehler (Server nicht erreichbar) → offline melden.
     if (isApi) window.dispatchEvent(new CustomEvent("cardvote:offline"));
+    if (isApi) { try { notiereAufruf((init && init.method) || "GET", url, 0, performance.now() - begonnen); } catch { /* egal */ } }
     // Offline-Outbox (Phase 1): gefahrlose Writes puffern statt zu verlieren.
     // Der Aufrufer bekommt eine synthetische OK-Antwort und macht optimistisch
     // weiter; bei Verbindung wird der Eintrag automatisch nachgespielt.
@@ -144,6 +150,8 @@ import { istAdmin } from "./core/admin.js";
 import { DialogHost } from "./core/dialog.jsx";
 import { UndoHost } from "./core/undo.jsx";
 import { OutboxHost } from "./core/OutboxHost.jsx";
+import Fehlermelder from "./components/Fehlermelder.jsx";
+import { notiereAufruf, notiereSeite, protokollStarten } from "./core/protokoll.js";
 import { btnPrimary, btnSecondary, btnSmall, Skeleton, Modal, pageForm, pageTitle, pageIntro,
   COLORS as C, Icon, ICONS, iconBtn, cardStyle, chipStyle, menuRow, popoverPanel, SHADOW, CONTROL_R } from "./components/Icons.jsx";
 
@@ -1147,12 +1155,21 @@ const ROUTER = createBrowserRouter([{ path: "*", element: <Wurzel /> }]);
 
 function Wurzel() {
   const { user, setUser, logout } = React.useContext(RahmenKontext);
+  // Der Weg zur Seite ist die halbe Fehlermeldung — ohne ihn steht in jeder
+  // Meldung „ich war irgendwo und dann ging es nicht".
+  const ort = useLocation();
+  useEffect(() => { notiereSeite(ort.pathname + ort.search); }, [ort.pathname, ort.search]);
   return (
     <>
         <ConnectionMonitor />
         <DialogHost />
         <UndoHost />
         <OutboxHost />
+        {/* Angeheftet unten rechts (die Outbox sitzt links). Nur fuer
+            Angemeldete: die Meldung braucht ein Konto — das IST der
+            Spam-Schutz, und die Schuelerseiten hinter dem QR-Code sollen
+            keinen Melde-Knopf tragen. */}
+        {user && <Fehlermelder />}
         <UpdateBanner />
         <SpeicherHinweis />
         {/* Die beiden oeffentlichen Seiten liegen ausserhalb des Rahmens und
@@ -1171,6 +1188,8 @@ function Wurzel() {
     </>
   );
 }
+
+protokollStarten();
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 

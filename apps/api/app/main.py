@@ -15,7 +15,7 @@ from .models import AppSetting, Base, Kurs, Session as SessionModel, User
 from .admin import _require_admin, APP_VERSION  # noqa: F401 — Routen unten
 from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizblock, trash, selftest, backup
 from . import websocket as ws
-from .routers.auth import _hash_pw, _verify_token, rate_limit, TOKEN_TTL
+from .routers.auth import _hash_pw, _verify_token, get_current_user, rate_limit, TOKEN_TTL
 from .routers.karten import uebernahme_deck_kurse
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -1257,6 +1257,69 @@ def contact_recipient() -> str:
     if "@" not in to:
         to = (os.environ.get("SMTP_FROM") or "").strip()
     return to if "@" in to else ""
+
+
+class BugBody(_BaseModel):
+    message: str
+    log: str = ""
+    seite: str = ""
+
+
+@app.post("/api/bugreport")
+async def bugreport(body: BugBody, request: Request, user=Depends(get_current_user)):
+    """Fehlermeldung aus der Oberflaeche — mit dem Protokoll der letzten Minuten.
+
+    Nur fuer ANGEMELDETE: das ist der erste und wirksamste Spam-Schutz. Ein
+    offenes Formular an einer festen Adresse wird gefunden und zugemuellt; hier
+    braucht es ein bestaetigtes Konto, und wer eins missbraucht, ist bekannt.
+
+    Darueber hinaus drei Bremsen, weil ein Konto auch aus Versehen Unfug
+    schicken kann (ein Knopf, der klemmt, ein Skript in einer Schleife):
+
+      1. je Konto 5 Meldungen je Stunde,
+      2. zusaetzlich je IP 10 je Stunde — ein Angreifer mit zehn Konten sitzt
+         meist auf einer Leitung,
+      3. harte Laengen: alles darueber wird abgeschnitten, nicht abgelehnt —
+         eine abgeschnittene Meldung ist besser als keine.
+
+    Kopfzeilen-Injektion ist ausgeschlossen (Zeilenumbrueche raus, siehe unten);
+    der Absender der Mail bleibt SMTP_FROM, Reply-To zeigt auf das Konto.
+    """
+    from . import mailer
+
+    rate_limit("bug_user", f"u{user.id}", 5, 3600, "Zu viele Meldungen. Bitte spaeter erneut.")
+    rate_limit("bug_ip", client_ip(request), 10, 3600, "Zu viele Meldungen. Bitte spaeter erneut.")
+
+    to = contact_recipient()
+    if not to:
+        raise HTTPException(503, "Fehlermeldung derzeit nicht moeglich")
+
+    def _hdr(s: str) -> str:
+        return (s or "").replace("\r", " ").replace("\n", " ").strip()
+
+    text = (body.message or "").strip()[:3000]
+    if not text:
+        raise HTTPException(400, "Bitte beschreibe kurz, was passiert ist")
+    log = (body.log or "").strip()[:8000]
+    # Der User-Agent sagt, welcher Browser — das ist bei einer Anzeigefrage oft
+    # die halbe Antwort und steht ohnehin in jedem Request.
+    browser = _hdr(request.headers.get("user-agent", ""))[:200]
+
+    rumpf = (
+        f"Konto: {user.email} (#{user.id})\n"
+        f"Seite: {_hdr(body.seite)[:200]}\n"
+        f"Fassung: {APP_VERSION}\n"
+        f"Browser: {browser}\n\n"
+        f"{text}\n"
+    )
+    if log:
+        rumpf += f"\n--- Protokoll (vom Melder freigegeben) ---\n{log}\n"
+
+    ok = await mailer.send_email(to, f"Nuvora Fehlermeldung von {user.email}", rumpf,
+                                 reply_to=_hdr(user.email))
+    if not ok:
+        raise HTTPException(503, "Meldung konnte nicht gesendet werden")
+    return {"ok": True}
 
 
 @app.post("/api/contact")

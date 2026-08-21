@@ -99,6 +99,10 @@ export const ICONS = {
         "M10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6L16 16M16 4l-1.4 1.4M5.4 14.6L4 16"],
   // Gluehbirne = Vorschlag/Idee (Einstieg). Ersetzt 💡.
   bulb: ["M7.5 12.5a4.5 4.5 0 115 0V14h-5v-1.5z", "M8 16h4", "M8.8 17.5h2.4"],
+  // Kaefer: Koerper, Kopf, Fuehler, drei Beinpaare — das Zeichen fuer
+  // „hier stimmt etwas nicht", das jeder aus anderen Programmen kennt.
+  bug: ["M7 8a3 3 0 016 0v4a3 3 0 01-6 0V8z", "M8.2 6.2L7 5", "M11.8 6.2L13 5",
+        "M7 9H4.5", "M13 9h2.5", "M7 12H4.5", "M13 12h2.5", "M7.6 14.6L6 16", "M12.4 14.6L14 16"],
   // Zahnrad: Mittelkreis + 8 Speichen (Ansicht-/Einstellungen-Menü).
   // Lupe, Personen, Etikett — fuer die globale Suche (Seiten, Klassen, Themen).
   search: ["M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11z", "M13.2 13.2L17 17"],

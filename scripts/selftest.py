@@ -328,7 +328,13 @@ def teste_sicherheit(api, b):
                 offen.append(pfad)
         if offen:
             raise AssertionError("ohne Anmeldung erreichbar: " + ", ".join(offen))
-        return "7 Datenrouten ohne Token geprueft, alle verschlossen"
+        # Die Fehlermeldung verschickt eine Mail. Genau deshalb braucht sie ein
+        # Konto — waere sie offen, waere sie ein Versandformular fuer jeden.
+        status, _ = anonym.call("POST", "/api/bugreport", {"message": "Probe"}, roh=True)
+        if status not in (401, 403):
+            raise AssertionError(f"/api/bugreport antwortet ohne Anmeldung mit {status} — "
+                                 "ein offenes Mailformular ist ein Spam-Werkzeug")
+        return "7 Datenrouten + Fehlermeldung ohne Token geprueft, alle verschlossen"
 
     def geheime_dateien():
         gefunden = []

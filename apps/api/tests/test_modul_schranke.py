@@ -43,6 +43,9 @@ KERN = (
     "/api/export/class", "/api/import/class",
     # Serververwaltung: haengt an `_require_admin`, gehoert keinem Modul.
     "/api/mail-test", "/api/admin/",
+    # Fehlermeldung aus der Oberflaeche: braucht ein Konto (das IST der
+    # Spam-Schutz), aber kein Modul — gemeldet wird von ueberall.
+    "/api/bugreport",
 )
 
 CARDVOTE = (

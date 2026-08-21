@@ -540,6 +540,18 @@ Fertig gebaut hängt sie an jedem [Release](https://github.com/norbert-me/Nuvora
 → *Öffnen*. **Für iPhone/iPad gibt es keine App**; dort führt der Weg über
 Safari: *Teilen* → *Zum Home-Bildschirm*.
 
+### Fehler melden
+
+Unten rechts hängt in jeder angemeldeten Ansicht ein Käfer-Knopf. Er schickt
+eine kurze Meldung an die Betreiber-Adresse (`ADMIN_EMAIL`, sonst `SMTP_FROM`)
+und legt auf Wunsch das Protokoll der letzten Minuten bei: Seitenwechsel,
+fehlgeschlagene Aufrufe, Fehlermeldungen. **Keine Namen, keine Noten, keine
+Inhalte** — IDs im Pfad werden ersetzt, Antwortkörper werden nie
+mitgeschrieben, und vor dem Absenden lässt sich alles im Klartext ansehen.
+
+Gegen Missbrauch braucht die Meldung ein angemeldetes Konto; dazu kommen fünf
+Meldungen je Konto und zehn je IP-Adresse pro Stunde.
+
 ## Datenschutz
 
 Nuvora läuft auf **deinem** Server. Damit bist du im Sinne der DSGVO
