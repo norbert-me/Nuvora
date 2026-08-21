@@ -61,6 +61,7 @@ export const ZIELE = [
   { pfad: "/kalender?view=timetable", key: "kalender.timetable", modul: "kalender", worte: ["stundenplan", "stunden", "slots"] },
   { pfad: "/kalender?view=breaks", key: "kalender.breaksTab", modul: "kalender", worte: ["ferien", "feiertag", "frei"] },
   { pfad: "/kalender?view=klassenarbeit", key: "kalender.examsTab", modul: "kalender", worte: ["klassenarbeit termin", "arbeit planen"] },
+  { pfad: "/kalender?view=stoffplan", key: "stoffplan.tab", modul: "kalender", worte: ["stoffverteilung", "stoffverteilungsplan", "jahresplanung", "themen planen", "wann kommt was"] },
 
   // ── Orga ──
   { pfad: "/orga?tab=checklisten", key: "orga.tabChecklists", modul: "orga", worte: ["checkliste", "haken", "eingesammelt", "zettel"] },

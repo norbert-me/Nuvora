@@ -934,6 +934,40 @@ class ExamDate(Base):
     work_id: Mapped[Optional[int]] = mapped_column(ForeignKey("work_analyses.id", ondelete="SET NULL"), nullable=True, index=True)
 
 
+class Stoffplan(Base):
+    """Stoffverteilungsplan: welches Thema wann und wie lange, je Kurs.
+
+    Die eine Zeile ist „Thema X, Y Stunden, an Stelle Z". Alles andere rechnet
+    sich daraus: WANN ein Thema drankommt, ergibt sich aus der Reihenfolge, den
+    Soll-Stunden und dem Stundenplan (freie Tage abgezogen) — deshalb steht hier
+    kein Datum. Ein eingetragenes Datum waere nach der ersten ausgefallenen
+    Stunde falsch und muesste von Hand nachgezogen werden; genau das ist die
+    Arbeit, die der Plan abnehmen soll.
+
+    Fach und Jahrgang am Thema (topics.fach/jahrgang) schlagen VOR, welche
+    Themen zu einem Kurs passen. Diese Tabelle haelt die ENTSCHEIDUNG — was
+    wirklich geplant ist, in welcher Reihenfolge und mit wie vielen Stunden.
+
+    Haengt am Modul Kalender (dort steht der Stundenplan, ohne den es keine
+    Wochen gibt). Regel 3: reiner Zusatz — Themen und Kurse gehoeren dem Kern
+    und wissen nichts davon. Thema geloescht -> Zeile faellt mit (CASCADE), der
+    Plan ist ohne sein Thema sinnlos.
+    """
+    __tablename__ = "stoffplan"
+    __table_args__ = (UniqueConstraint("kurs_id", "topic_id", name="uq_stoffplan_kurs_topic"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    kurs_id: Mapped[int] = mapped_column(ForeignKey("kurse.id", ondelete="CASCADE"), index=True)
+    topic_id: Mapped[int] = mapped_column(ForeignKey("topics.id", ondelete="CASCADE"), index=True)
+    # Geplante Unterrichtsstunden fuer dieses Thema.
+    stunden: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Welches Halbjahr: "1" | "2" | "" (= durchgehend/ohne Zuordnung).
+    term: Mapped[str] = mapped_column(String(8), default="", server_default="")
+    notiz: Mapped[str] = mapped_column(Text, default="", server_default="")
+
+
 class CalendarBreak(Base):
     """Unterrichtsfreier Zeitraum (Ferien, beweglicher Feiertag). An Tagen
     innerhalb des Zeitraums zeigt der Kalender weder Stundenplan-Vorlagen noch

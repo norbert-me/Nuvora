@@ -764,8 +764,29 @@ def inhalt_kalender(api, u, spuren):
                  id=arbeit["id"])
     if not ueb or not [x for x in (ueb.get("topics") or []) if x.get("label")]:
         raise AssertionError(f"Themen fehlen in der Uebersicht: {ueb}")
+    # Stoffverteilungsplan: Themen mit Soll-Stunden je Kurs. Der Server rechnet
+    # daraus die Zeitraeume — hier zaehlt, dass der Plan gespeichert wird und
+    # ein fremdes Thema NICHT hineinkommt.
+    if u.kurs_id:
+        api.call("PUT", "/api/kalender/stoffplan", {
+            "kurs_id": u.kurs_id,
+            "zeilen": [{"topic_id": u.topic_id, "stunden": 3},
+                       {"topic_id": 999999999, "stunden": 5}],
+        }, erwartet=(204,))
+        spuren.append(("Stoffplan", lambda: api.call(
+            "PUT", "/api/kalender/stoffplan",
+            {"kurs_id": u.kurs_id, "zeilen": []}, erwartet=(204, 404))))
+        plan = api.call("GET", f"/api/kalender/stoffplan?kurs_id={u.kurs_id}", erwartet=(200,))
+        eigene = [z for z in plan.get("zeilen") or [] if z["topic_id"] == u.topic_id]
+        if len(eigene) != 1 or eigene[0]["stunden"] != 3:
+            raise AssertionError(f"Stoffplan nicht gespeichert: {plan.get('zeilen')}")
+        if any(z["topic_id"] == 999999999 for z in plan.get("zeilen") or []):
+            raise AssertionError("fremdes Thema im Stoffplan angenommen")
+        if "stunden_gesamt" not in plan:
+            raise AssertionError(f"Stoffplan ohne Stundenrechnung: {plan}")
+
     return ("Eintrag (6 Felder + Verlaufsplan), Slot, freier Zeitraum, "
-            "Klassenarbeit mit Themen wiedergefunden")
+            "Klassenarbeit mit Themen, Stoffplan wiedergefunden")
 
 
 def inhalt_orga(api, u, spuren):
