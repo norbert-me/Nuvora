@@ -11,7 +11,7 @@
 // nachzuziehen ist genau die Arbeit, die der Plan abnehmen soll. Wer ein Thema
 // verschiebt oder ihm eine Stunde mehr gibt, sieht sofort, was das mit allem
 // dahinter macht — bis hin zu „dafür reicht das Halbjahr nicht".
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   btnSecondary, btnSmall, cardStyle, chipStyle, COLORS as C, CONTROL_R, Empty,
@@ -60,15 +60,33 @@ export default function Stoffplan() {
   // Ein Entwurf für den ganzen Plan: Reihenfolge und Stunden sind EINE
   // Entscheidung — wer ein Thema verschiebt, verschiebt alles dahinter. Nichts
   // geht zum Server, bevor jemand speichert.
-  const basis = daten ? daten.zeilen.map((z) => ({
-    topic_id: z.topic_id, label: z.label, stunden: z.stunden, term: z.term, notiz: z.notiz,
-    start_date: z.start_date || "", end_date: z.end_date || "",
-    exam_id: z.exam_id || null, niveau: z.niveau || "",
-  })) : [];
+  //
+  // ZWEI Dinge, die hier zwingend sind und beim ersten Anlauf beide fehlten:
+  //
+  //  1. Die Grundlage muss über Rendergrenzen DIESELBE bleiben. `useEntwurf`
+  //     übernimmt sie in einem Effekt, der an ihrer Identität hängt; ein bei
+  //     jedem Render neu gebautes Array übernimmt sich also endlos selbst —
+  //     eine Endlosschleife, die die ganze Seite samt Navigation einfriert.
+  //     Deshalb der Schlüssel aus den Daten und `useMemo` (dieselbe Lösung wie
+  //     auf der Startseite).
+  //  2. Der Entwurf ist ein OBJEKT, keine Liste. `setz` mischt mit `{...v}` —
+  //     eine Liste würde dabei zu einem Objekt mit den Zahlen als Schlüsseln,
+  //     und danach ist der Plan keine Liste mehr.
+  const schluessel = daten ? JSON.stringify(daten.zeilen.map((z) => [
+    z.topic_id, z.stunden, z.term, z.notiz, z.start_date, z.end_date, z.exam_id, z.niveau, z.label,
+  ])) : "";
+  const basis = useMemo(() => ({
+    zeilen: (schluessel ? JSON.parse(schluessel) : []).map(
+      ([topic_id, stunden, term, notiz, start_date, end_date, exam_id, niveau, label]) => ({
+        topic_id, stunden, term: term || "", notiz: notiz || "",
+        start_date: start_date || "", end_date: end_date || "",
+        exam_id: exam_id || null, niveau: niveau || "", label,
+      })),
+  }), [schluessel]);
   const ent = useEntwurf(basis, async (w) => {
     const res = await fetch(`${API}/stoffplan`, alsJson("PUT", {
       kurs_id: kursId,
-      zeilen: w.map((z) => ({
+      zeilen: w.zeilen.map((z) => ({
         topic_id: z.topic_id, stunden: Number(z.stunden) || 0, term: z.term || "", notiz: z.notiz || "",
         start_date: z.start_date || "", end_date: z.end_date || "",
         exam_id: z.exam_id || null, niveau: z.niveau || "",
@@ -77,8 +95,8 @@ export default function Stoffplan() {
     if (!res || !res.ok) return false;
     load();
   });
-  const zeilen = ent.wert;
-  const setz = (fn) => ent.setz((v) => (typeof fn === "function" ? fn(v) : fn));
+  const zeilen = ent.wert.zeilen;
+  const setz = (fn) => ent.setz((v) => ({ zeilen: typeof fn === "function" ? fn(v.zeilen) : fn }));
 
   const verschieben = (i, um) => setz((v) => {
     const j = i + um;

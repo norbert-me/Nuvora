@@ -126,9 +126,26 @@ async function lauf(motor) {
     }
 
     // ── Rundgang ──
+    // Unteransichten, die NUR ueber ?view=/?tab= erreichbar sind. Sie kommen
+    // ueber die Linksuche zwar meist mit, aber eben nur „meist" — und genau in
+    // einer davon stand eine Endlosschleife im Entwurf (die Grundlage wurde bei
+    // jedem Render neu gebaut und uebernahm sich selbst), die die ganze Seite
+    // samt Navigation einfror. Ein eingefrorener Reiter faellt nur auf, wenn
+    // ihn jemand aufruft; also ruft ihn der Rundgang auf.
+    const UNTERANSICHTEN = [
+      "/kalender?view=timetable", "/kalender?view=stoffplan",
+      "/kalender?view=breaks", "/kalender?view=klassenarbeit",
+      "/auswertung?tab=klassenarbeit", "/orga?tab=sitzplan", "/orga?tab=anwesenheit",
+    ];
+    // Der Rundgang schaltet oben ALLE verfuegbaren Module zu — gefiltert wird
+    // deshalb nach `available`, nicht nach dem (inzwischen veralteten) `active`.
+    const vorhandenePfade = new Set(module.filter((m) => m.available && !m.external).map((m) => m.path));
     const seiten = [
       ...KERN_SEITEN.map((p) => ({ pfad: p, name: p })),
       ...module.filter((m) => m.available && !m.external).map((m) => ({ pfad: m.path, name: `${m.name} (${m.path})` })),
+      ...UNTERANSICHTEN
+        .filter((p) => vorhandenePfade.has(p.split("?")[0]))
+        .map((p) => ({ pfad: p, name: p })),
     ];
 
     const gefundeneLinks = new Set();
