@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { istAdmin } from "../core/admin.js";
+import { alsText, beobachte, leeren } from "../core/protokoll.js";
 import { useLanguage, LANGUAGES } from "../i18n/index.jsx";
 import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, pageTitle, panelStyle, popoverPanel,
   sectionLabel, Tabs, th as thBasis, td as tdBasis, badge, iconBtn, inputStyle as inputBasis, Icon, ICONS, CONTROL_R } from "../components/Icons.jsx";
@@ -68,6 +69,9 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   const [showUsername, setShowUsername] = useState(false);
   const [showScale, setShowScale] = useState(false);
   const [showJahr, setShowJahr] = useState(false);
+  const [logOffen, setLogOffen] = useState(false);
+  const [logAnzahl, setLogAnzahl] = useState(0);
+  useEffect(() => beobachte(setLogAnzahl), []);
   const [showTendency, setShowTendency] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [adminUsers, setAdminUsers] = useState([]);
@@ -338,6 +342,34 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
           try { localStorage.removeItem(`nuvora_onboarded_${user?.id ?? "x"}`); } catch { /* egal */ }
           window.location.href = "/";
         }} style={btnSecondary}>{t("profile.tutorialRestart")}</button>
+      </div>
+
+      {/* Protokoll dieses Browsers.
+          Es steht hier und nicht nur im Melde-Dialog, weil genau hier danach
+          gesucht wird — und weil es KEIN Server-Protokoll ist: es liegt im
+          Arbeitsspeicher dieses einen Browsers, gehoert dieser einen Person und
+          geht nirgendwohin, solange niemand eine Meldung abschickt. Deshalb
+          auch fuer alle sichtbar und nicht nur fuer die Administration: fremde
+          Protokolle kann hier ohnehin niemand sehen. */}
+      <div style={{ ...abschnitt, marginTop: 24 }}>
+        <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>{t("melder.protokoll")}</div>
+        <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 12px" }}>{t("melder.protokollHinweis")}</p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <button onClick={() => setLogOffen((v) => !v)} style={btnSecondary}>
+            {logOffen ? t("melder.logZu") : t("melder.logZeigen")} ({logAnzahl})
+          </button>
+          <button onClick={() => { navigator.clipboard?.writeText(alsText()); }} disabled={!logAnzahl}
+            style={{ ...btnSecondary, opacity: logAnzahl ? 1 : 0.5 }}>{t("melder.kopieren")}</button>
+          <button onClick={() => { leeren(); setLogAnzahl(0); }} disabled={!logAnzahl}
+            style={{ ...btnSecondary, opacity: logAnzahl ? 1 : 0.5 }}>{t("melder.leeren")}</button>
+        </div>
+        {logOffen && (
+          <pre style={{ marginTop: 12, padding: 10, borderRadius: CONTROL_R, background: "var(--bg2)",
+            maxHeight: 260, overflow: "auto", fontSize: 11, lineHeight: 1.5, color: "var(--text2)",
+            whiteSpace: "pre-wrap" }}>
+            {alsText() || t("melder.logLeer")}
+          </pre>
+        )}
       </div>
 
       {isAdmin && (

@@ -549,6 +549,12 @@ fehlgeschlagene Aufrufe, Fehlermeldungen. **Keine Namen, keine Noten, keine
 Inhalte** — IDs im Pfad werden ersetzt, Antwortkörper werden nie
 mitgeschrieben, und vor dem Absenden lässt sich alles im Klartext ansehen.
 
+Dasselbe Protokoll steht unter `/profile` dauerhaft zum Ansehen, Kopieren und
+Leeren. **Ein Server-Protokoll ist das nicht**: es lebt im Arbeitsspeicher des
+Browsers, in dem es entstanden ist. Auch die Administration kann fremde
+Sitzungen nicht einsehen — was ankommt, ist das, was jemand ausdrücklich mit
+einer Meldung schickt.
+
 Gegen Missbrauch braucht die Meldung ein angemeldetes Konto; dazu kommen fünf
 Meldungen je Konto und zehn je IP-Adresse pro Stunde.
 
