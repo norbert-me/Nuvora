@@ -644,7 +644,9 @@ const BEDIENUNG = [
       await bearbeiten.click({ timeout: 8000 });
       // Der Schalter des Widgets traegt seinen Namen als Text.
       await seite.getByRole("button", { name: /^(Heute|Today|Hoy)$/ }).first().click({ timeout: 8000 });
-      await seite.getByRole("button", { name: /^(Speichern|Save|Guardar)$/ }).first().click({ timeout: 8000 });
+      // „Fertig" ist hier der Speichern-Knopf: der Bearbeiten-Modus wird
+      // ausdruecklich verlassen, und genau dabei wird geschrieben.
+      await seite.getByRole("button", { name: /^(Fertig|Done|Hecho)$/ }).first().click({ timeout: 8000 });
       await seite.waitForTimeout(600);
     },
     async pruefe(seite) {
@@ -657,7 +659,7 @@ const BEDIENUNG = [
       const bearbeiten = seite.locator("[title='Anordnen'], [title='Arrange'], [title='Organizar']").first();
       await bearbeiten.click({ timeout: 8000 });
       await seite.getByRole("button", { name: /^(Heute|Today|Hoy)$/ }).first().click({ timeout: 8000 });
-      await seite.getByRole("button", { name: /^(Speichern|Save|Guardar)$/ }).first().click({ timeout: 8000 });
+      await seite.getByRole("button", { name: /^(Fertig|Done|Hecho)$/ }).first().click({ timeout: 8000 });
       await seite.waitForTimeout(600);
       return { ok: true, detail: "Widget abgeschaltet, ueberlebt das Neuladen, wieder angeschaltet" };
     },

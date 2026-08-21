@@ -1244,7 +1244,7 @@ export default {
   "modules.sortDir": "Cambiar dirección",
   "modules.parts": "Partes de este módulo",
   "home.arrange": "Organizar",
-  "home.arrangeHint": "Arrastra las tarjetas para reordenarlas. El ojo oculta un icono; abajo activas y desactivas widgets.",
+  "home.arrangeHint": "Arrastra las tarjetas para reordenarlas. El ojo oculta un icono; abajo activas y desactivas widgets. «Hecho» guarda.",
   "common.done": "Hecho",
   "noten.fromCardvote": "Ver resultados de CardVote",
   "noten.compare": "Comparar",

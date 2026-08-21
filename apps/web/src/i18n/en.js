@@ -1243,7 +1243,7 @@ export default {
   "modules.sortDir": "Toggle direction",
   "modules.parts": "Parts of this module",
   "home.arrange": "Arrange",
-  "home.arrangeHint": "Drag the cards to reorder them. The eye hides a tile; below you switch widgets on and off.",
+  "home.arrangeHint": "Drag the cards to reorder them. The eye hides a tile; below you switch widgets on and off. \"Done\" saves.",
   "common.done": "Done",
   "noten.fromCardvote": "To CardVote results",
   "noten.compare": "Compare",

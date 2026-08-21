@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import { useModules, useAktiv } from "../core/modules.js";
 import { useLanguage } from "../i18n/index.jsx";
 import { StageBadge, Icon, ICONS, MODULE_ICONS, btnSecondary, selectStyle, COLORS as C, pageApp, pageTitle, cardStyle, chipStyle, badge, btnSmall, CONTROL_H, CONTROL_R, toolbarIconBtn } from "../components/Icons.jsx";
-import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
+import { useEntwurf } from "../components/Speichern.jsx";
 import { alsJson, hol } from "../core/melden.js";
 import { WIDGETS } from "../components/Widgets.jsx";
 import { ymd } from "../core/datum.js";
@@ -302,15 +302,25 @@ export default function NuvoraHome({ user }) {
         <h1 style={{ ...pageTitle, marginBottom: 0, flex: 1 }}>
           {firstName ? t("home.welcome", { name: firstName }) : t("home.welcomePlain")}
         </h1>
-        {edit && <Speicherleiste entwurf={kacheln} klein />}
         {/* Der Knopf richtet jetzt auch die Widgets ein — er gehoert also auch
             dorthin, wo nur ein Modul laeuft. Vorher hing er an „mehr als eine
-            Kachel", weil es nur ums Sortieren ging. */}
+            Kachel", weil es nur ums Sortieren ging.
+
+            „Fertig" IST der Speichern-Knopf. Das ist die eine begruendete
+            Abweichung von der Regel „ueberall ein Speichern-Knopf": hier gibt
+            es einen Modus, den man ausdruecklich verlaesst — eine zweite Leiste
+            daneben haette bedeutet, dass man erst speichert und dann noch
+            einmal „fertig" sagt. Der Grund der Regel (nichts geht still
+            verloren, man behaelt die Kontrolle) bleibt erfuellt: nichts wird
+            geschrieben, bevor man den Knopf drueckt. */}
         {active.length > 0 && (
-          <button onClick={() => {
-            if (edit && kacheln.geaendert && !window.confirm(t("speichern.verlassen"))) return;
-            if (edit) kacheln.verwerfen();
-            setEdit((e) => !e);
+          <button onClick={async () => {
+            if (edit) {
+              if (kacheln.geaendert && (await kacheln.speichern()) === false) return;
+              setEdit(false);
+              return;
+            }
+            setEdit(true);
           }} className="icon-btn"
             // `width: undefined` LOESCHT die Breite aus dem Baustein — React
             // laesst undefined weg, der Knopf hatte danach gar keine und schrumpfte

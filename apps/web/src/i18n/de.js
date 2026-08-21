@@ -1229,7 +1229,7 @@ export default {
   "modules.sortDir": "Richtung wechseln",
   "modules.parts": "Teile dieses Moduls",
   "home.arrange": "Anordnen",
-  "home.arrangeHint": "Karten ziehen ordnet sie um. Mit dem Auge blendest du eine Kachel aus, unten schaltest du Widgets an und aus.",
+  "home.arrangeHint": "Karten ziehen ordnet sie um. Mit dem Auge blendest du eine Kachel aus, unten schaltest du Widgets an und aus. „Fertig“ speichert.",
   "common.done": "Fertig",
   "noten.fromCardvote": "Zur CardVote-Auswertung",
   "noten.compare": "Vergleichen",
