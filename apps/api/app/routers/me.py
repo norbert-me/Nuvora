@@ -113,6 +113,7 @@ async def export_me(user=Depends(get_current_user), db: AsyncSession = Depends(g
         "kalender_eintraege": await _rows(db, m.CalendarEntry, m.CalendarEntry.owner_id == uid),
         "kalender_freie_zeiten": await _rows(db, m.CalendarBreak, m.CalendarBreak.owner_id == uid),
         "stundenplan": await _rows(db, m.TimetableSlot, m.TimetableSlot.owner_id == uid),
+        "stoffverteilung": await _rows(db, m.Stoffplan, m.Stoffplan.owner_id == uid),
         "anwesenheit": await _rows(db, m.Attendance, m.Attendance.owner_id == uid),
         "sitzplaene": await _rows(db, m.SeatingPlan, m.SeatingPlan.owner_id == uid),
         "orga": await _rows(db, m.OrgaItem, m.OrgaItem.owner_id == uid),
