@@ -23,7 +23,7 @@ import { useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
 import { alsJson, hol } from "../core/melden.js";
 import NotenUebernahme from "../components/NotenUebernahme.jsx";
 import { konfidenzProzent, mittel, streuung, trennschaerfe } from "../core/aufgabenstatistik.js";
-import { komma, kommaRund, prozent, rund } from "../core/zahl.js";
+import { komma, kommaRund, rund } from "../core/zahl.js";
 
 const API = "/api/klassenarbeit";
 

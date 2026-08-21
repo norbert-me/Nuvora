@@ -11,7 +11,7 @@
 // fürs Zeugnis folgt, entscheidet das Notenbuch mit seinen Gewichten.
 import { useEffect, useState } from "react";
 
-import { COLORS as C, CONTROL_R, Icon, ICONS, panelStyle, sectionLabel } from "./Icons.jsx";
+import { COLORS as C, Icon, ICONS, panelStyle, sectionLabel } from "./Icons.jsx";
 import { hol } from "../core/melden.js";
 import { komma } from "../core/zahl.js";
 import { useLanguage } from "../i18n/index.jsx";

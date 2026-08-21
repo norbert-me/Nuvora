@@ -65,7 +65,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     hj1: user.hj1_start || "", hj2: user.hj2_start || "", ende: user.jahr_ende || "",
   });
   const profil = useEntwurf(profilBasis, (w) => saveProfile(w));
-  const { marketplaceName, gradeScale, gradeTendency, hj1, hj2, ende } = profil.wert;
+  const { marketplaceName, gradeScale, gradeTendency } = profil.wert;
   const [showUsername, setShowUsername] = useState(false);
   const [showScale, setShowScale] = useState(false);
   const [showJahr, setShowJahr] = useState(false);

@@ -898,7 +898,6 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
   // JEDES MAL, wenn die Flaeche entsteht, und zwar auf die erste Stunde des
   // Tages statt auf eine feste Uhrzeit.
   const HOUR = 40;
-  const dayKey = ymd(day);
   // Ganztägig / ohne verortbare Uhrzeit -> Banner oben (auch externe Termine).
   // Einträge mit freier Uhrzeit gehören in die Zeitspur, nicht ins Banner.
   const ganztags = list.filter((e) => e.period == null && hmToMin(e.start_time) == null);

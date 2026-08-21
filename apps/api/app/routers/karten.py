@@ -36,7 +36,7 @@ from ..schueler import roster_kurs, sortiert
 from ..uploads import bildtyp
 from sqlalchemy.orm import selectinload
 from ..models import (Card, CardDeck, CardDeckKurs, CardFolder, CardReview, Kurs,
-                      SchoolClass, Student, User, Session, Scan, QuestionSetItem)
+                      SchoolClass, Student, User, Session)
 from .auth import get_current_user, rate_limit
 from .modules import is_active, modul_pflicht
 

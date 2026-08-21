@@ -751,7 +751,9 @@ async def update_profile(body: UpdateProfileBody, user: User = Depends(get_curre
         try:
             setattr(user, feld, _date.fromisoformat(wert[:10]))
         except ValueError:
-            pass
+            # Unlesbares Datum still uebergehen (siehe oben): sonst kaeme man
+            # wegen eines Tippfehlers im Schuljahr nicht mehr an den Namen.
+            continue
     await db.commit()
     await db.refresh(user)
     return _user_dict(user)

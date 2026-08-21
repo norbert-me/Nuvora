@@ -12,7 +12,6 @@ import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import { useModulOption } from "../core/modules.js";
 import { useKlasseMerken, useKlassenListe, useUrlClass } from "../core/klassenwahl.js";
-import { ymd } from "../core/datum.js";
 import { alsJson, hol } from "../core/melden.js";
 
 const API = "/api/sitzplan";

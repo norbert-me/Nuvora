@@ -72,7 +72,8 @@ export default function Kurse() {
     if (kurs.geaendert && !window.confirm(t("speichern.verlassen"))) return;
     setEditKurs(k.id);
     kursUebernehmen({
-      name: k.name, jahr: k.schuljahr || "", vorgaenger: k.vorgaenger_id ? String(k.vorgaenger_id) : "",
+      name: k.name, jahr: k.schuljahr || "", fach: k.fach || "", jahrgang: k.jahrgang ? String(k.jahrgang) : "",
+      vorgaenger: k.vorgaenger_id ? String(k.vorgaenger_id) : "",
       niveauAktiv: !!k.niveau_aktiv, archiviert: archiv, klassen: k.classes.map((c) => c.id),
     });
     // Auswahl fuer „Vorjahr": aktive UND archivierte Kurse. Nach dem
@@ -91,7 +92,8 @@ export default function Kurse() {
     if (!k) return false;
     const name = w.name.trim();
     if (!name) return false;
-    const koerper = { name, schuljahr: w.jahr.trim(), vorgaenger_id: w.vorgaenger ? Number(w.vorgaenger) : 0, niveau_aktiv: w.niveauAktiv };
+    const koerper = { name, schuljahr: w.jahr.trim(), vorgaenger_id: w.vorgaenger ? Number(w.vorgaenger) : 0, niveau_aktiv: w.niveauAktiv,
+                      fach: (w.fach || "").trim(), jahrgang: w.jahrgang ? Number(w.jahrgang) : 0 };
     if (!(await sende(`${API}/kurse/${k.id}`, alsJson("PUT", koerper), t("kurse.editName")))) return false;
     for (const id of w.klassen.filter((x) => !kursBasis.klassen.includes(x)))
       if (!(await sende(`${API}/kurse/${k.id}/classes/${id}`, { method: "POST" }, t("kurse.addClass")))) return false;
@@ -153,6 +155,8 @@ export default function Kurse() {
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
               <strong style={{ fontSize: 16 }}>{k.name}</strong>
               {k.schuljahr && <span style={chipStyle}>{k.schuljahr}</span>}
+              {k.fach && <span style={chipStyle}>{k.fach}</span>}
+              {k.jahrgang ? <span style={chipStyle}>{t("topics.jahrgangN", { n: k.jahrgang })}</span> : null}
               <span style={{ flex: 1 }} />
               {/* Archivieren steht jetzt IM Bearbeiten-Bereich und wartet dort
                   auf „Speichern" — es ist ein Umschalten wie der E/G-Regler,
@@ -193,6 +197,27 @@ export default function Kurse() {
                     <input value={kurs.wert.name} onChange={(e) => kurs.setz({ name: e.target.value })} placeholder={t("kurse.renamePrompt")}
                       onKeyDown={(e) => e.key === "Enter" && kurs.speichern()} style={{ ...inputStyle, flex: 1, minWidth: 160 }} />
                   </div>
+                </div>
+
+                {/* Fach und Jahrgang: das Gegenstueck zu denselben Feldern am
+                    Thema. Erst dadurch laesst sich fragen „welche Themen
+                    gehoeren zu diesem Kurs" — der NAME ist frei und taugt nicht
+                    als Schluessel. Ohne diese beiden bleibt der
+                    Stoffverteilungsplan ohne Vorschlaege. */}
+                <div>
+                  <div style={editLabel}>{t("kurse.editFach")}</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <input list="nuvora-faecher-kurs" value={kurs.wert.fach} maxLength={60}
+                      onChange={(e) => kurs.setz({ fach: e.target.value })} placeholder={t("topics.fachPlaceholder")}
+                      style={{ ...inputStyle, flex: 1, minWidth: 160 }} />
+                    <datalist id="nuvora-faecher-kurs">
+                      {FACH_VORSCHLAEGE.map((f) => <option key={f} value={f} />)}
+                    </datalist>
+                    <input type="number" min="1" max="13" value={kurs.wert.jahrgang}
+                      onChange={(e) => kurs.setz({ jahrgang: e.target.value })} placeholder={t("topics.jahrgang")}
+                      style={{ ...inputStyle, width: 110 }} />
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>{t("kurse.fachHint")}</div>
                 </div>
 
                 <div>

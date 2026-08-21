@@ -963,7 +963,6 @@ function NotenStatistik({ noten, t }) {
   const [open, setOpen] = useState(false);
   noten = (noten || []).filter((v) => v != null);
   if (noten.length < 2) return null;
-  const n = noten.length;
   const avg = mittel(noten);
   // Streuung aus der gemeinsamen Quelle: sie teilt durch n−1 (Stichprobe), hier
   // stand n (Grundgesamtheit). Dieselbe Kennzahl hatte damit je nach Seite einen

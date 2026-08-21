@@ -27,7 +27,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import rueckmeldung
-from .models import Session, Student, WorkAnalysis
+from .models import Session, WorkAnalysis
 from .scoring import note_aus_pct
 
 
