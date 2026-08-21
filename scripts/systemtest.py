@@ -1339,6 +1339,21 @@ def teste_cardvote_voll(api, b, u, sch, spuren):
                     f"{zeile['name']} {zeile['punkte']} statt {aus_ausw and aus_ausw['score']}")
         if not rm.get("students"):
             raise AssertionError("Rueckmeldung leer, obwohl gescannt wurde")
+        # Notenverlauf: dieselbe Erhebung muss dort mit derselben Prozentzahl
+        # auftauchen. Er ist eine KERN-Sicht (kein 403 ohne Modul) und fasst
+        # Quizze und Klassenarbeiten auf einer Achse zusammen — eine dritte
+        # Rechnung waere eine dritte Wahrheit.
+        verlauf = api.call("GET", f"/api/classes/{u.class_id}/notenverlauf", erwartet=(200,))
+        sid = zustand["sitzung"]["id"]
+        if not _finde(verlauf.get("erhebungen"), quelle="cardvote", id=sid):
+            raise AssertionError("Sitzung fehlt in den Erhebungen des Notenverlaufs")
+        for sch in verlauf.get("schueler") or []:
+            im_verlauf = next((w for w in sch["werte"] if w["quelle"] == "cardvote" and w["id"] == sid), None)
+            aus_rm = _finde(rm["students"], student_id=sch["student_id"])
+            if im_verlauf and aus_rm and im_verlauf["pct"] != aus_rm["pct"]:
+                raise AssertionError(
+                    f"Notenverlauf rechnet anders als die Rueckmeldung: {sch['name']} "
+                    f"{im_verlauf['pct']} % statt {aus_rm['pct']} %")
         # Zweite Quelle: die rohen Scans zaehlen dasselbe.
         roh = api.call("GET", f"/api/sessions/{zustand['sitzung']['id']}/results"
                               f"?question_id={zustand['fragen'][0]['id']}", erwartet=(200,))

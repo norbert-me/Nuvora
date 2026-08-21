@@ -5,6 +5,7 @@ import { median } from "../core/statistik.js";
 import { prozent } from "../core/zahl.js";
 import FruehwarnPanel from "../components/Fruehwarnung.jsx";
 import Themenstand from "../components/Themenstand.jsx";
+import Notenverlauf from "../components/Notenverlauf.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 
 const API = "/api";
@@ -68,6 +69,9 @@ export default function StudentEvaluation() {
       <FruehwarnPanel classId={classId} nurKind={cardId} />
       {/* Themenstand dieses Kindes: was sitzt, was nicht, und wird es besser? */}
       <Themenstand classId={classId} cardId={cardId} />
+      {/* Der Verlauf beider Quellen auf einer Achse — die Frage „wird es
+          besser?" beantwortet keine einzelne Erhebung. */}
+      <Notenverlauf classId={classId} cardId={Number(cardId)} />
 
       <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
         <StatCard label={t("cv.statAvgTotal")} value={avgPct != null ? `${avgPct}%` : "–"} color={quoteFarbe(avgPct)} />

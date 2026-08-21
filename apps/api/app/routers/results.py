@@ -23,6 +23,7 @@ from .anwesenheit import summary as _anwesenheit_summary
 from .karten import themen_lernstand
 from .klassenarbeit import _profile as _arbeit_profil
 from .. import fruehwarnung as fw
+from .. import notenverlauf
 from .. import rueckmeldung
 from .. import themenprofil as tp
 from .. import websocket as ws
@@ -415,6 +416,30 @@ async def get_rueckmeldung(session_id: int, user: User = Depends(get_current_use
                              verboten="Kein Zugriff auf diese Session")
     return {"session_id": session_id, "session_name": session.name or "",
             "students": await rueckmeldung.quiz(db, session)}
+
+
+@kern_router.get("/classes/{class_id}/notenverlauf")
+async def notenverlauf_klasse(class_id: int, student_id: Optional[int] = None,
+                              card_id: Optional[int] = None,
+                              user: User = Depends(get_current_user),
+                              db: AsyncSession = Depends(get_db)):
+    """Verlauf der Leistungen aus CardVote-Quizzen UND Klassenarbeiten.
+
+    Kern-Sicht: je Quelle wird `is_active` geprueft (Regel 3) — nur CardVote
+    aktiv heisst nur Quizze, ohne beide eine leere Antwort statt 403. Der
+    Verlauf darf nicht verschwinden, weil ein Modul aus ist.
+    """
+    from ..models import SchoolClass
+
+    school_class = await db.get(SchoolClass, class_id)
+    if not school_class or school_class.owner_id != user.id:
+        raise HTTPException(404, "Klasse nicht gefunden")
+    return await notenverlauf.klasse(
+        db, user, class_id,
+        cardvote=await is_active(db, user.id, "cardvote"),
+        auswertung=await is_active(db, user.id, "auswertung"),
+        student_id=student_id, card_id=card_id,
+    )
 
 
 @kern_router.get("/weak-topics")
