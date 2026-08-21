@@ -864,11 +864,32 @@ class StoffplanZeile(BaseModel):
     stunden: int = 1
     term: str = ""       # "1" | "2" | "" (durchgehend)
     notiz: str = ""
+    # Fester Zeitraum ("JJJJ-MM-TT" oder ""); leer heisst „rechne es aus".
+    start_date: str = ""
+    end_date: str = ""
+    # Schliesst mit dieser Klassenarbeit ab (Termin-ID) — 0/None = keine.
+    exam_id: Optional[int] = None
+    niveau: str = ""     # "" | "G" | "E"
 
 
 class StoffplanIn(BaseModel):
     kurs_id: int
     zeilen: List[StoffplanZeile]
+
+
+def _datum(wert):
+    """"JJJJ-MM-TT" -> date, alles andere -> None.
+
+    Unlesbares gilt als „nicht gesetzt" statt als Fehler: das Feld ist eine
+    Zusatzangabe, und ein 422 mitten im Umsortieren des Plans waere die
+    schlechteste Antwort auf einen Tippfehler im Datum.
+    """
+    if not wert:
+        return None
+    try:
+        return date.fromisoformat(str(wert)[:10])
+    except ValueError:
+        return None
 
 
 def _halbjahr(user: User, term: str):
@@ -944,6 +965,19 @@ async def stoffplan(kurs_id: int, term: str = "", user: User = Depends(require_m
         if e.kurs_id == kurs_id or (e.kurs_id is None and class_id is not None and e.class_id == class_id):
             ist[e.topic_id] = ist.get(e.topic_id, 0) + 1
 
+    # Klassenarbeiten des Kurses im Zeitraum. Sie stehen NICHT nur daneben:
+    # eine Planzeile kann auf eine zeigen („dieses Thema schliesst damit ab"),
+    # und die Termine, auf die keine zeigt, sortiert die Oberflaeche nach Datum
+    # zwischen die Zeilen. Sie sind schon eingetragen — der Plan soll sie
+    # benutzen, nicht ein zweites Mal abfragen.
+    exams = (await db.execute(select(ExamDate).where(
+        ExamDate.owner_id == user.id, ExamDate.kurs_id == kurs_id).order_by(ExamDate.date))).scalars().all()
+    arbeiten = [
+        {"id": ex.id, "date": _tag(ex.date).isoformat(), "title": ex.title,
+         "topics": [label(t) for t in (ex.topic_ids or []) if label(t)]}
+        for ex in exams if start <= _tag(ex.date) < ende
+    ]
+
     # Soll-Stunden der Reihe nach auf die Termine legen. Reicht der Zeitraum
     # nicht, bleibt `bis` leer — das ist der eigentliche Befund des Plans
     # („dafuer reicht das Halbjahr nicht"), keine Panne.
@@ -956,24 +990,24 @@ async def stoffplan(kurs_id: int, term: str = "", user: User = Depends(require_m
         n = max(0, int(z.stunden or 0))
         eigene = stunden_termine[i:i + n]
         i += n
+        # Fester Zeitraum gewinnt gegen den gerechneten. Beides steht in der
+        # Antwort: die Oberflaeche zeigt das eingetragene Datum an und kann
+        # trotzdem sagen, was die Rechnung ergaebe.
+        gerechnet_von = eigene[0][0].isoformat() if eigene else None
+        gerechnet_bis = eigene[-1][0].isoformat() if eigene else None
         out.append({
             "topic_id": z.topic_id, "label": lab, "stunden": n, "term": z.term or "",
             "notiz": z.notiz or "", "ist": ist.get(z.topic_id, 0),
-            "start": eigene[0][0].isoformat() if eigene else None,
-            "ende": eigene[-1][0].isoformat() if eigene else None,
+            "niveau": z.niveau or "",
+            "start_date": z.start_date.isoformat() if z.start_date else "",
+            "end_date": z.end_date.isoformat() if z.end_date else "",
+            "start": (z.start_date.isoformat() if z.start_date else gerechnet_von),
+            "ende": (z.end_date.isoformat() if z.end_date else gerechnet_bis),
+            "fest": bool(z.start_date or z.end_date),
             # Weniger Termine als Soll-Stunden: das Halbjahr ist zu kurz.
             "passt": len(eigene) == n,
+            "exam_id": z.exam_id,
         })
-
-    # Klassenarbeiten des Kurses im Zeitraum — sie stehen als Marke zwischen den
-    # Themen, und ihre Themen sagen, was bis dahin sitzen muss.
-    arbeiten = [
-        {"id": ex.id, "date": _tag(ex.date).isoformat(), "title": ex.title,
-         "topics": [label(t) for t in (ex.topic_ids or []) if label(t)]}
-        for ex in (await db.execute(select(ExamDate).where(
-            ExamDate.owner_id == user.id, ExamDate.kurs_id == kurs_id).order_by(ExamDate.date))).scalars().all()
-        if start <= _tag(ex.date) < ende
-    ]
 
     # Was noch fehlt: Themen desselben Fachs und Jahrgangs, die nicht im Plan
     # stehen. Fach/Jahrgang schlagen VOR, dieser Plan ist die Entscheidung.
@@ -1019,6 +1053,9 @@ async def set_stoffplan(body: StoffplanIn, user: User = Depends(require_module),
     eigene = {t for (t,) in (await db.execute(select(Topic.id).where(
         Topic.owner_id == user.id, Topic.deleted_at.is_(None)))).all()}
 
+    exam_ids = {e for (e,) in (await db.execute(select(ExamDate.id).where(
+        ExamDate.owner_id == user.id, ExamDate.kurs_id == body.kurs_id))).all()}
+
     await db.execute(sa_delete(Stoffplan).where(
         Stoffplan.owner_id == user.id, Stoffplan.kurs_id == body.kurs_id))
     gesehen = set()
@@ -1031,7 +1068,13 @@ async def set_stoffplan(body: StoffplanIn, user: User = Depends(require_module),
         gesehen.add(z.topic_id)
         db.add(Stoffplan(owner_id=user.id, kurs_id=body.kurs_id, topic_id=z.topic_id,
                          stunden=max(0, min(int(z.stunden or 0), 200)), position=pos,
-                         term=(z.term or "")[:8], notiz=(z.notiz or "")[:500]))
+                         term=(z.term or "")[:8], notiz=(z.notiz or "")[:500],
+                         start_date=_datum(z.start_date), end_date=_datum(z.end_date),
+                         # Nur Termine DIESES Kurses: eine Zeile, die auf die
+                         # Arbeit einer fremden Lerngruppe zeigt, waere ein Plan,
+                         # der beim Verschieben dort mitwandert.
+                         exam_id=z.exam_id if z.exam_id in exam_ids else None,
+                         niveau=z.niveau if z.niveau in ("G", "E") else ""))
     await db.commit()
 
 

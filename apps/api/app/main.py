@@ -270,6 +270,10 @@ def _ensure_columns(sync_conn):
         ("users", "hj1_start", "DATE"),        # Schuljahr: Halbjahre + Jahresende
         ("users", "hj2_start", "DATE"),
         ("users", "jahr_ende", "DATE"),
+        ("stoffplan", "start_date", "DATE"),   # fester Zeitraum statt gerechnetem
+        ("stoffplan", "end_date", "DATE"),
+        ("stoffplan", "exam_id", "INTEGER"),   # schliesst mit dieser Klassenarbeit ab
+        ("stoffplan", "niveau", "VARCHAR(1)"),
         ("questions", "topic_id", "INTEGER"),
         ("students", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
         ("students", "foerder", "JSON"),

@@ -15,7 +15,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   btnSecondary, btnSmall, cardStyle, chipStyle, COLORS as C, CONTROL_R, Empty,
-  Icon, ICONS, inputStyle, panelStyle, sectionLabel, selectStyle, toolbarIconBtn,
+  Icon, ICONS, inputStyle, panelStyle, sectionLabel, Segment, segmentBtn, selectStyle,
+  toolbarIconBtn,
 } from "./Icons.jsx";
 import Speicherleiste, { useEntwurf } from "./Speichern.jsx";
 import Werkzeugleiste from "./Werkzeugleiste.jsx";
@@ -59,11 +60,19 @@ export default function Stoffplan() {
   // Ein Entwurf für den ganzen Plan: Reihenfolge und Stunden sind EINE
   // Entscheidung — wer ein Thema verschiebt, verschiebt alles dahinter. Nichts
   // geht zum Server, bevor jemand speichert.
-  const basis = daten ? daten.zeilen.map((z) => ({ topic_id: z.topic_id, label: z.label, stunden: z.stunden, term: z.term, notiz: z.notiz })) : [];
+  const basis = daten ? daten.zeilen.map((z) => ({
+    topic_id: z.topic_id, label: z.label, stunden: z.stunden, term: z.term, notiz: z.notiz,
+    start_date: z.start_date || "", end_date: z.end_date || "",
+    exam_id: z.exam_id || null, niveau: z.niveau || "",
+  })) : [];
   const ent = useEntwurf(basis, async (w) => {
     const res = await fetch(`${API}/stoffplan`, alsJson("PUT", {
       kurs_id: kursId,
-      zeilen: w.map((z) => ({ topic_id: z.topic_id, stunden: Number(z.stunden) || 0, term: z.term || "", notiz: z.notiz || "" })),
+      zeilen: w.map((z) => ({
+        topic_id: z.topic_id, stunden: Number(z.stunden) || 0, term: z.term || "", notiz: z.notiz || "",
+        start_date: z.start_date || "", end_date: z.end_date || "",
+        exam_id: z.exam_id || null, niveau: z.niveau || "",
+      })),
     })).catch(() => null);
     if (!res || !res.ok) return false;
     load();
@@ -79,7 +88,8 @@ export default function Stoffplan() {
     return n;
   });
   const entfernen = (i) => setz((v) => v.filter((_, k) => k !== i));
-  const dazu = (topic_id, label) => setz((v) => [...v, { topic_id, label, stunden: 4, term: "", notiz: "" }]);
+  const dazu = (topic_id, label) => setz((v) => [...v, { topic_id, label, stunden: 4, term: "", notiz: "", start_date: "", end_date: "", exam_id: null, niveau: "" }]);
+  const aendern = (i, patch) => setz((v) => v.map((x, k) => (k === i ? { ...x, ...patch } : x)));
 
   // Die errechneten Zeiträume kommen vom Server und gelten für den GESPEICHERTEN
   // Stand. Solange etwas offen ist, wäre die Anzeige daneben — deshalb steht
@@ -171,7 +181,11 @@ export default function Stoffplan() {
 
                     {/* Zeitraum: nur für den gespeicherten Stand — sonst zeigte
                         er Daten zu einer Reihenfolge, die es noch nicht gibt. */}
-                    <span style={{ minWidth: 150, fontSize: 12, color: "var(--text3)" }}>
+                    <span style={{ minWidth: 150, fontSize: 12, color: b && b.fest ? "var(--text2)" : "var(--text3)" }}
+                      title={b && b.fest ? t("stoffplan.festHint") : t("stoffplan.gerechnetHint")}>
+                      {/* Eingetragen (kraeftiger) oder gerechnet (blass) — ohne
+                          den Unterschied wuesste niemand, warum sich ein Datum
+                          beim Umsortieren verschiebt und ein anderes nicht. */}
                       {offen ? t("stoffplan.offen")
                         : b && b.start ? `${new Date(b.start).toLocaleDateString()} – ${new Date(b.ende).toLocaleDateString()}`
                         : t("stoffplan.passtNicht")}
@@ -182,18 +196,89 @@ export default function Stoffplan() {
 
                     <button onClick={() => entfernen(i)} className="icon-btn" style={{ ...toolbarIconBtn, color: C.danger }}
                       title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} /></button>
+
+                    {/* Zweite Reihe: was nicht jede Zeile braucht. Fester
+                        Zeitraum (sonst rechnet der Server), Anspruch und die
+                        Klassenarbeit, mit der das Thema abschliesst. */}
+                    <div style={{ flexBasis: "100%", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center",
+                      borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 2 }}>
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text3)" }}>
+                        {t("stoffplan.von")}
+                        <input type="date" value={z.start_date || ""} onChange={(e) => aendern(i, { start_date: e.target.value })}
+                          title={t("stoffplan.datumHint")} style={{ ...inputStyle, width: 150 }} />
+                      </label>
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text3)" }}>
+                        {t("stoffplan.bis")}
+                        <input type="date" value={z.end_date || ""} onChange={(e) => aendern(i, { end_date: e.target.value })}
+                          title={t("stoffplan.datumHint")} style={{ ...inputStyle, width: 150 }} />
+                      </label>
+
+                      {/* E/G: am PLAN, nicht am Thema — dasselbe Thema dauert
+                          im E-Kurs anders lang als im G-Kurs. */}
+                      <Segment>
+                        {[["", t("stoffplan.niveauAlle")], ["G", "G"], ["E", "E"]].map(([wert, label]) => (
+                          <button key={wert || "alle"} onClick={() => aendern(i, { niveau: wert })}
+                            style={{ ...segmentBtn, padding: "0 10px",
+                              background: (z.niveau || "") === wert ? "var(--accent)" : "transparent",
+                              color: (z.niveau || "") === wert ? C.aufAkzent : "var(--text2)" }}>
+                            {label}
+                          </button>
+                        ))}
+                      </Segment>
+
+                      {/* Klassenarbeit ja/nein — und bei ja der Termin. Die
+                          Termine sind schon eingetragen; hier wird nur gesagt,
+                          welcher zu diesem Thema gehoert. */}
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text2)" }}>
+                        <input type="checkbox" checked={!!z.exam_id}
+                          onChange={(e) => aendern(i, { exam_id: e.target.checked ? (daten.arbeiten[0]?.id ?? null) : null })} />
+                        {t("stoffplan.mitArbeit")}
+                      </label>
+                      {z.exam_id != null && (
+                        daten.arbeiten.length === 0 ? (
+                          <span style={{ fontSize: 12, color: C.warning }}>{t("stoffplan.keineArbeit")}</span>
+                        ) : (
+                          <select value={z.exam_id ?? ""} onChange={(e) => aendern(i, { exam_id: e.target.value ? Number(e.target.value) : null })}
+                            style={{ ...selectStyle, minWidth: 200 }}>
+                            {daten.arbeiten.map((a2) => (
+                              <option key={a2.id} value={a2.id}>
+                                {new Date(a2.date).toLocaleDateString()} · {a2.title || t("kalender.examTitle")}
+                              </option>
+                            ))}
+                          </select>
+                        )
+                      )}
+                    </div>
+
+                    {/* Die verknuepfte Arbeit steht DIREKT an ihrem Thema —
+                        sie ist der Schlusspunkt dieses Abschnitts, nicht ein
+                        Eintrag irgendwo weiter unten. */}
+                    {(() => {
+                      const a2 = daten.arbeiten.find((x) => x.id === z.exam_id);
+                      if (!a2) return null;
+                      return (
+                        <div style={{ flexBasis: "100%", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+                          background: "var(--bg2)", borderRadius: CONTROL_R, padding: "6px 10px", fontSize: 13 }}>
+                          <Icon d={ICONS.edit} size={13} color="var(--text3)" />
+                          <span style={{ fontWeight: 700 }}>{new Date(a2.date).toLocaleDateString()}</span>
+                          <span>{a2.title || t("kalender.examTitle")}</span>
+                          {a2.topics.map((x) => <span key={x} style={chipStyle}>{x}</span>)}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
             </div>
           )}
 
-          {/* Klassenarbeiten als Marken: sie sagen, bis wann etwas sitzen muss. */}
-          {daten.arbeiten.length > 0 && (
+          {/* Was noch an keinem Thema haengt. Verknuepfte Arbeiten stehen oben
+              bei ihrem Thema — hier bleibt, wofuer die Zuordnung noch fehlt. */}
+          {daten.arbeiten.filter((a2) => !zeilen.some((z) => z.exam_id === a2.id)).length > 0 && (
             <div style={{ marginBottom: 16 }}>
-              <div style={sectionLabel}>{t("stoffplan.arbeiten")}</div>
+              <div style={sectionLabel}>{t("stoffplan.arbeitenOffen")}</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
-                {daten.arbeiten.map((a) => (
+                {daten.arbeiten.filter((a2) => !zeilen.some((z) => z.exam_id === a2.id)).map((a) => (
                   <div key={a.id} style={{ ...panelStyle, padding: "6px 10px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                     <span style={{ fontSize: 13, fontWeight: 700 }}>{new Date(a.date).toLocaleDateString()}</span>
                     <span style={{ fontSize: 13, flex: 1, minWidth: 100 }}>{a.title || t("kalender.examTitle")}</span>

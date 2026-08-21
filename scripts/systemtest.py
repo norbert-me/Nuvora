@@ -770,7 +770,12 @@ def inhalt_kalender(api, u, spuren):
     if u.kurs_id:
         api.call("PUT", "/api/kalender/stoffplan", {
             "kurs_id": u.kurs_id,
-            "zeilen": [{"topic_id": u.topic_id, "stunden": 3},
+            # Fester Zeitraum, Anspruch und eine erfundene Klassenarbeit: das
+            # Datum muss gewinnen (statt gerechnet zu werden), das Niveau
+            # ankommen, die fremde Arbeit still herausfallen.
+            "zeilen": [{"topic_id": u.topic_id, "stunden": 3,
+                        "start_date": "2026-09-01", "end_date": "2026-09-10",
+                        "niveau": "E", "exam_id": 999999999},
                        {"topic_id": 999999999, "stunden": 5}],
         }, erwartet=(204,))
         spuren.append(("Stoffplan", lambda: api.call(
@@ -782,6 +787,13 @@ def inhalt_kalender(api, u, spuren):
             raise AssertionError(f"Stoffplan nicht gespeichert: {plan.get('zeilen')}")
         if any(z["topic_id"] == 999999999 for z in plan.get("zeilen") or []):
             raise AssertionError("fremdes Thema im Stoffplan angenommen")
+        z0 = eigene[0]
+        if z0.get("start") != "2026-09-01" or not z0.get("fest"):
+            raise AssertionError(f"fester Zeitraum wird nicht bevorzugt: {z0}")
+        if z0.get("niveau") != "E":
+            raise AssertionError(f"Anspruch nicht gespeichert: {z0}")
+        if z0.get("exam_id") is not None:
+            raise AssertionError("fremde Klassenarbeit im Stoffplan angenommen")
         if "stunden_gesamt" not in plan:
             raise AssertionError(f"Stoffplan ohne Stundenrechnung: {plan}")
 

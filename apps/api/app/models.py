@@ -966,6 +966,29 @@ class Stoffplan(Base):
     # Welches Halbjahr: "1" | "2" | "" (= durchgehend/ohne Zuordnung).
     term: Mapped[str] = mapped_column(String(8), default="", server_default="")
     notiz: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # Fester Zeitraum statt gerechnetem.
+    #
+    # Gerechnet ist die Voreinstellung und bleibt es: aus Reihenfolge,
+    # Soll-Stunden und Stundenplan ergibt sich, wann ein Thema dran ist, und das
+    # zieht sich bei jedem Ausfall von selbst nach. Manche Themen liegen aber
+    # fest — die Projektwoche, das Thema vor der Arbeit, der Termin mit der
+    # Partnerklasse. Steht hier ein Datum, gilt es; sonst rechnet der Server.
+    # Ausdruecklich beides, nicht das eine ODER das andere: ein Plan, in dem
+    # jede Zeile ein Datum braucht, ist wieder die Handarbeit von vorher.
+    start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    # Schliesst dieses Thema mit einer Klassenarbeit ab? Dann zeigt die Zeile
+    # auf den TERMIN (exam_dates) — der Termin bleibt der Ort, an dem Datum und
+    # Klasse stehen. SET NULL: wird der Termin geloescht, verliert die Zeile nur
+    # ihre Verknuepfung, nicht ihr Thema.
+    exam_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("exam_dates.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Auf welchem Anspruch wird dieses Thema geplant: "" (alle), "G" oder "E".
+    # Dieselben Buchstaben wie ueberall sonst (students.niveau, cards.niveau).
+    # Am PLAN und nicht am Thema: dasselbe Thema kann im E-Kurs vier Stunden
+    # dauern und im G-Kurs sechs — das ist eine Planungsentscheidung, keine
+    # Eigenschaft des Themas.
+    niveau: Mapped[str] = mapped_column(String(1), default="", server_default="")
 
 
 class CalendarBreak(Base):
