@@ -16,6 +16,7 @@ import { swr } from "../core/cache.js";
 import { useKlasseMerken, useKlassenListe } from "../core/klassenwahl.js";
 import PublishModal from "../components/PublishModal.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
+import VerknuepfungDialog, { themenNamen } from "../components/Verknuepfung.jsx";
 import Latex from "../components/Latex.jsx";
 import { gradeFromPct, DEFAULT_SCALE } from "../core/grades.js";
 import { formelEinfuegen, LATEX_TASTEN, spalteAnhaengen, TABELLE_GERUEST, zeileAnhaengen } from "../core/latextabelle.js";
@@ -60,6 +61,8 @@ export default function Karten() {
   const [error, setError] = useState("");
   const [detail, setDetail] = useState(null); // { student, cards } — Einzelstatistik
   const [topics, setTopics] = useState([]);
+  // Ziel eines Karten-Imports (Stapel + Thema) — gewaehlt, nicht geraten.
+  const [importZiel, setImportZiel] = useState(null);
   const aktiv = useAktiv();
   // Themen-Bindung ist nur mit Kalender sinnvoll (Auto-Freischaltung). Ohne das
   // Modul bleibt die Option aus (Regel 3: Zusatz, nie Voraussetzung).
@@ -229,20 +232,55 @@ export default function Karten() {
     else if (addMode === "folder") { await createFolder(name); }
     setAddName(""); setAddMode(null);
   };
-  // Seitenweiter Import: eine JSON/CSV-Datei wird zu einem NEUEN Stapel im
-  // aktuellen Ordner (wie CardVote-Import). Name aus JSON, sonst Dateiname.
+  // Seitenweiter Import: eine JSON/CSV-Datei wird zu einem Stapel im aktuellen
+  // Ordner. Wohin genau, entscheidet die Lehrkraft — vorher entstand immer ein
+  // neuer Stapel, auch wenn derselbe schon dalag, und ein Thema bekam er nie.
   const importDeck = () => dateiWaehlen(async (f) => {
       const text = await f.text();
       let name = f.name.replace(/\.[^.]+$/, "");
-      try { const j = JSON.parse(text); if (j && j.name) name = String(j.name); } catch { /* CSV */ }
+      let themaVorschlag = "";
+      try {
+        const j = JSON.parse(text);
+        if (j && j.name) name = String(j.name);
+        if (j && j.topic_name) themaVorschlag = String(j.topic_name);
+      } catch { /* CSV */ }
       const cards = parseCards(text);
       if (!cards.length) { showAlert(t("karten.importEmpty")); return; }
-      const r = await fetch(`${API}/decks`, alsJson("POST", { name, folder_id: currentCardFolder})).catch(() => null);
-      if (!r || !r.ok) return;
-      const deck = await r.json();
-      await sende(`${API}/decks/${deck.id}/import`, alsJson("POST", { cards }), t("common.import"));
-      loadDecks();
+      // Themen kommen sonst nur mit dem Kalender (Regel 3) — fuer die Wahl
+      // hier werden sie bei Bedarf nachgeholt.
+      const themen = topics.length ? topics : ((await hol("/api/topics")) || []);
+      setImportZiel({
+        cards,
+        zeilen: [
+          { key: "deck", label: t("verkn.stapel"), vorschlag: name,
+            optionen: decks.map((d) => ({ id: d.id, name: d.name })),
+            hinweis: t("karten.importDeckHint") },
+          { key: "topic", label: t("verkn.thema"), vorschlag: themaVorschlag,
+            leerLabel: t("karten.ohneThema"),
+            optionen: themenNamen(Array.isArray(themen) ? themen : []),
+            hinweis: t("karten.importThemaHint") },
+        ],
+      });
   }, ".json,.csv,.tsv,.txt");
+
+  /** Karten-Import, nachdem Ziel-Stapel und Thema feststehen. */
+  const importAusfuehren = async ({ cards }, werte) => {
+    setImportZiel(null);
+    let deckId = werte.deck.id;
+    if (!deckId) {
+      // Neues Thema? Erst anlegen — ein Stapel haelt eine topic_id, keinen Namen.
+      let topicId = werte.topic.id;
+      if (!topicId && werte.topic.name) {
+        const r = await fetch("/api/topics", alsJson("POST", { name: werte.topic.name, parent_id: null })).catch(() => null);
+        if (r && r.ok) topicId = (await r.json()).id;
+      }
+      const r = await fetch(`${API}/decks`, alsJson("POST", { name: werte.deck.name, folder_id: currentCardFolder, topic_id: topicId || null })).catch(() => null);
+      if (!r || !r.ok) return;
+      deckId = (await r.json()).id;
+    }
+    await sende(`${API}/decks/${deckId}/import`, alsJson("POST", { cards }), t("common.import"));
+    loadDecks();
+  };
 
   const call = async (fn) => {
     setError("");
@@ -507,6 +545,15 @@ export default function Karten() {
             ))}
           </div>
         </div>
+      )}
+
+      {importZiel && (
+        <VerknuepfungDialog
+          titel={t("karten.importTitel")}
+          zeilen={importZiel.zeilen}
+          okLabel={t("common.import")}
+          onAbbruch={() => setImportZiel(null)}
+          onFertig={(werte) => importAusfuehren(importZiel, werte)} />
       )}
 
       {detail && <StudentDetail detail={detail} t={t} onClose={() => setDetail(null)} />}

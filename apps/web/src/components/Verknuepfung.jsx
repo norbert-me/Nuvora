@@ -21,6 +21,7 @@ import {
 import { useLanguage } from "../i18n/index.jsx";
 
 export const NEU = "__neu__";
+export const LEER = "__leer__";
 
 /** Namensvergleich fürs Vorbelegen: Groß/klein und Randleerzeichen zählen nicht. */
 const gleich = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
@@ -51,7 +52,9 @@ export function themenNamen(topics) {
 
 /**
  * @param {object[]} zeilen  je Verknüpfung eine:
- *   { key, label, vorschlag, optionen: [{id, name}], nurVorhanden?, hinweis? }
+ *   { key, label, vorschlag, optionen: [{id, name}], nurVorhanden?, leerLabel?, hinweis? }
+ *   `leerLabel` fügt „ohne" als Wahl hinzu (ein Kartenstapel muss kein Thema
+ *   haben) — die Antwort ist dann { id: null, name: "" }.
  *   `nurVorhanden` lässt „neu anlegen" weg (eine Klasse legt kein Import an —
  *   sie hat Schüler, die niemand aus einer fremden Datei bekommt).
  * @param {(werte) => void} onFertig  werte: { key: { id: number|null, name: string|null } }
@@ -63,8 +66,9 @@ export default function VerknuepfungDialog({ titel, hinweis, zeilen, onAbbruch, 
     const w = {};
     for (const z of zeilen) {
       const treffer = (z.optionen || []).find((o) => gleich(o.name, z.vorschlag));
+      const ohneWahl = z.leerLabel && !z.vorschlag ? LEER : null;
       w[z.key] = {
-        wahl: treffer ? String(treffer.id) : (z.nurVorhanden ? String((z.optionen || [])[0]?.id ?? "") : NEU),
+        wahl: treffer ? String(treffer.id) : (ohneWahl || (z.nurVorhanden ? String((z.optionen || [])[0]?.id ?? "") : NEU)),
         name: z.vorschlag || "",
       };
     }
@@ -80,6 +84,7 @@ export default function VerknuepfungDialog({ titel, hinweis, zeilen, onAbbruch, 
   // oder einen nicht leeren Namen.
   const bereit = zeilen.every((z) => {
     const w = werte[z.key] || {};
+    if (w.wahl === LEER) return true;
     return w.wahl === NEU ? !!(w.name || "").trim() : !!w.wahl;
   });
 
@@ -87,7 +92,9 @@ export default function VerknuepfungDialog({ titel, hinweis, zeilen, onAbbruch, 
     const out = {};
     for (const z of zeilen) {
       const w = werte[z.key] || {};
-      out[z.key] = w.wahl === NEU
+      out[z.key] = w.wahl === LEER
+        ? { id: null, name: "" }
+        : w.wahl === NEU
         ? { id: null, name: (w.name || "").trim() }
         : { id: Number(w.wahl), name: (z.optionen || []).find((o) => String(o.id) === String(w.wahl))?.name || "" };
     }
@@ -108,6 +115,7 @@ export default function VerknuepfungDialog({ titel, hinweis, zeilen, onAbbruch, 
             </label>
             <select value={w.wahl} onChange={(e) => setz(z.key, { wahl: e.target.value })}
               style={{ ...selectStyle, width: "100%" }}>
+              {z.leerLabel && <option value={LEER}>{z.leerLabel}</option>}
               {!z.nurVorhanden && <option value={NEU}>{t("verkn.neu")}</option>}
               {(z.optionen || []).map((o) => (
                 <option key={o.id} value={String(o.id)}>{o.name}</option>
