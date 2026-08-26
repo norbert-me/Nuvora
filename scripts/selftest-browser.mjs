@@ -597,6 +597,19 @@ const MARKE = "ZZ-Selbsttest-UI";
  * Bewusst wenige, dafuer haltbare Wege: Beschriftungen aendern sich, IDs gibt
  * es kaum. Wo ein Bedienelement fehlt, ist genau das der Befund.
  */
+/** Bearbeiten-Modus der Startseite oeffnen (der Knopf heisst dort „Anordnen"). */
+async function bearbeitenAuf(seite) {
+  await seite.locator("[title='Anordnen'], [title='Arrange'], [title='Organizar']").first().click({ timeout: 8000 });
+  await seite.waitForTimeout(300);
+}
+
+/** „Fertig" — im Bearbeiten-Modus traegt derselbe Knopf diesen Namen, und er
+ *  ist dort der Speichern-Knopf. */
+async function fertig(seite) {
+  await seite.locator("[title='Fertig'], [title='Done'], [title='Hecho']").first().click({ timeout: 8000 });
+  await seite.waitForTimeout(600);
+}
+
 const BEDIENUNG = [
   {
     name: "Notizzettel anlegen und tippen (/notizbrett)",
@@ -638,29 +651,32 @@ const BEDIENUNG = [
     name: "Startseite einrichten (Widget aus/an)",
     pfad: "/",
     async schritte(seite) {
-      const kalenderLink = seite.getByRole("link", { name: /zum kalender|to the calendar|al calendario/i }).first();
-      if (!(await kalenderLink.count())) return;   // Kalender nicht aktiv: nichts zu pruefen
-      const bearbeiten = seite.locator("[title='Anordnen'], [title='Arrange'], [title='Organizar']").first();
-      await bearbeiten.click({ timeout: 8000 });
-      // Der Schalter des Widgets traegt seinen Namen als Text.
-      await seite.getByRole("button", { name: /^(Heute|Today|Hoy)$/ }).first().click({ timeout: 8000 });
-      // „Fertig" ist hier der Speichern-Knopf: der Bearbeiten-Modus wird
-      // ausdruecklich verlassen, und genau dabei wird geschrieben.
-      await seite.getByRole("button", { name: /^(Fertig|Done|Hecho)$/ }).first().click({ timeout: 8000 });
-      await seite.waitForTimeout(600);
+      // Geprueft wird der SCHALTER, nicht das Widget selbst: ob das Kalender-
+      // Widget gerade etwas anzuzeigen hat (Stunden heute), haengt an den Daten
+      // des Kontos — der Schalter ist immer da, solange das Modul laeuft.
+      // Vorher hing die Probe am Link „zum Kalender": an einem Tag ohne
+      // Stunden lief sie ins Leere und meldete trotzdem gruen.
+      await bearbeitenAuf(seite);
+      const schalter = seite.locator("[data-widget='heute']").first();
+      if (!(await schalter.count())) return;   // Kalender nicht aktiv: nichts zu pruefen
+      await schalter.click({ timeout: 8000 });
+      await fertig(seite);
     },
     async pruefe(seite) {
-      // Nach dem Neuladen muss das Widget WEG sein — sonst hat das Einrichten
-      // nichts gespeichert.
-      const nochDa = await seite.getByRole("link", { name: /zum kalender|to the calendar|al calendario/i }).count();
-      if (nochDa) return { ok: false, detail: "Widget nach dem Neuladen wieder da — die Einrichtung wird nicht gespeichert" };
-      // Und wieder anschalten: der Lauf darf die Startseite nicht veraendert
+      await bearbeitenAuf(seite);
+      const schalter = seite.locator("[data-widget='heute']").first();
+      if (!(await schalter.count())) {
+        await fertig(seite);
+        return { ok: true, detail: "Kalender nicht aktiv — nichts einzurichten" };
+      }
+      if ((await schalter.getAttribute("aria-pressed")) !== "false") {
+        await fertig(seite);
+        return { ok: false, detail: "Widget nach dem Neuladen wieder an — die Einrichtung wird nicht gespeichert" };
+      }
+      // Wieder anschalten: der Lauf darf die Startseite nicht veraendert
       // zuruecklassen.
-      const bearbeiten = seite.locator("[title='Anordnen'], [title='Arrange'], [title='Organizar']").first();
-      await bearbeiten.click({ timeout: 8000 });
-      await seite.getByRole("button", { name: /^(Heute|Today|Hoy)$/ }).first().click({ timeout: 8000 });
-      await seite.getByRole("button", { name: /^(Fertig|Done|Hecho)$/ }).first().click({ timeout: 8000 });
-      await seite.waitForTimeout(600);
+      await schalter.click({ timeout: 8000 });
+      await fertig(seite);
       return { ok: true, detail: "Widget abgeschaltet, ueberlebt das Neuladen, wieder angeschaltet" };
     },
   },

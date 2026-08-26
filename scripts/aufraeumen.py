@@ -278,15 +278,26 @@ class Sammler:
 
     def _auswertung(self):
         g = "Auswertung"
+        # Notenbloecke und Klassenarbeiten haengen am KURS, sonst an der Klasse
+        # (besitz.kurs_oder_klasse). Ohne `kurs_id` liefert der Server nur die
+        # kurslosen — genau deshalb blieben Reste eines abgebrochenen Laufs
+        # unsichtbar liegen und standen beim naechsten Mal wieder im Notenbuch.
+        # Also je Klasse einmal ohne Kurs und einmal je Kurs dieser Klasse.
+        kurse_je_klasse = {}
+        for k in self._get("/api/kurse"):
+            for ref in (k.get("classes") or []):
+                kurse_je_klasse.setdefault(ref.get("id"), []).append(k["id"])
         for cid, _name in self.klassen:
-            bloecke = self._get(f"/api/noten/classes/{cid}/sections?term=all")
-            spalten = [s for blk in bloecke for s in (blk.get("categories") or [])]
-            # Spalte vor Block: der Block nimmt seine Spalten sonst mit, und ein
-            # Block ohne Praefix darf seine Testspalte trotzdem verlieren.
-            self.nimm(g, "Notenspalte", spalten, lambda o: [f"/api/noten/categories/{o['id']}"])
-            self.nimm(g, "Notenblock", bloecke, lambda o: [f"/api/noten/sections/{o['id']}"])
-            self.nimm(g, "Klassenarbeit", self._get(f"/api/klassenarbeit/classes/{cid}/works"),
-                      lambda o: [f"/api/klassenarbeit/works/{o['id']}"])
+            for q in ["", *[f"&kurs_id={kid}" for kid in kurse_je_klasse.get(cid, [])]]:
+                bloecke = self._get(f"/api/noten/classes/{cid}/sections?term=all{q}")
+                spalten = [s for blk in bloecke for s in (blk.get("categories") or [])]
+                # Spalte vor Block: der Block nimmt seine Spalten sonst mit, und ein
+                # Block ohne Praefix darf seine Testspalte trotzdem verlieren.
+                self.nimm(g, "Notenspalte", spalten, lambda o: [f"/api/noten/categories/{o['id']}"])
+                self.nimm(g, "Notenblock", bloecke, lambda o: [f"/api/noten/sections/{o['id']}"])
+                arbeiten = self._get(f"/api/klassenarbeit/classes/{cid}/works{'?' + q[1:] if q else ''}")
+                self.nimm(g, "Klassenarbeit", arbeiten,
+                          lambda o: [f"/api/klassenarbeit/works/{o['id']}"])
 
     def _kalender(self):
         g = "Kalender"

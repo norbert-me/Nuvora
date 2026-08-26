@@ -344,7 +344,11 @@ export default function NuvoraHome({ user }) {
             // auf den Inhalt (19 statt 34 Pixel breit, dabei 36 hoch: ein Oval).
             style={{ ...toolbarIconBtn, width: edit ? "auto" : CONTROL_H, padding: edit ? "0 12px" : 0,
               borderColor: edit ? "var(--accent)" : "var(--border2)" }}
-            title={t("home.arrange")} aria-label={t("home.arrange")}>
+            // Im Bearbeiten-Modus IST dieser Knopf „Fertig" (und damit der
+            // Speichern-Knopf). Stand die Beschriftung fest auf „Anordnen",
+            // sagte er sichtbar das eine und für Screenreader das andere.
+            title={edit ? t("common.done") : t("home.arrange")}
+            aria-label={edit ? t("common.done") : t("home.arrange")}>
             {edit ? <span style={{ fontSize: 13, fontWeight: 600, color: "var(--accent)" }}>{t("common.done")}</span> : <Icon d={ICONS.edit} size={16} />}
           </button>
         )}
@@ -409,7 +413,7 @@ export default function NuvoraHome({ user }) {
                 {WIDGETS.filter((w) => isOn(w.modul)).map((w) => {
                   const an = kacheln.wert.widgets.includes(w.key);
                   return (
-                    <button key={w.key}
+                    <button key={w.key} data-widget={w.key} aria-pressed={an}
                       onClick={() => kacheln.setz((v) => ({
                         widgets: an ? v.widgets.filter((x) => x !== w.key) : [...v.widgets, w.key],
                       }))}
