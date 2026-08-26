@@ -388,6 +388,72 @@
         if (fehlgeschlagen) toast(`${fehlgeschlagen} neue Aufgabe(n) konnten nicht angelegt werden — sie fehlen in der gespeicherten Lernleiter.`);
     }
 
+    /**
+     * „Neu anlegen oder mit Vorhandenem verknuepfen?" — der Dialog dazu.
+     *
+     * Der Import einer Lernpfad-Datei haengt an zwei Dingen, die es hier schon
+     * geben kann: dem Ziel-Lernpfad und dem Thema jeder Lernleiter. Vorher
+     * entschied das die Datei allein — der Pfad wurde immer neu angelegt (Name
+     * mit „ (2)" dahinter), das Thema still erzeugt. Wer eine gepflegte
+     * Themenstruktur hat, bekam daneben eine zweite.
+     *
+     * Kein Nachbau der React-Fassung (components/Verknuepfung.jsx): die App
+     * hier hat kein Framework. Gleiche Bedienung, gleiche Vorbelegung
+     * (Namenstreffer), eigener Bauteil.
+     *
+     * zeilen: [{ key, label, vorschlag, optionen: [{id, name}], hinweis }]
+     * liefert { key: { id: <id>|null, name } } oder null bei Abbruch.
+     */
+    function verknuepfungDialog(titel, zeilen) {
+        return new Promise(resolve => {
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
+            const gleich = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+            const feld = (z, i) => {
+                const treffer = (z.optionen || []).find(o => gleich(o.name, z.vorschlag));
+                return `<div style="margin-bottom:12px">
+                    <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px">${esc(z.label)}</label>
+                    <select data-i="${i}" style="width:100%;padding:6px 8px;border-radius:10px">
+                        <option value="__neu__"${treffer ? '' : ' selected'}>Neu anlegen …</option>
+                        ${(z.optionen || []).map(o => `<option value="${escAttr(String(o.id))}"${treffer && treffer.id === o.id ? ' selected' : ''}>${esc(o.name)}</option>`).join('')}
+                    </select>
+                    <input data-neu="${i}" value="${escAttr(z.vorschlag || '')}" placeholder="Name des neuen Eintrags"
+                           style="width:100%;margin-top:6px;padding:6px 8px;border-radius:10px;${treffer ? 'display:none' : ''}">
+                    ${z.hinweis ? `<div style="font-size:12px;opacity:.7;margin-top:4px">${esc(z.hinweis)}</div>` : ''}
+                </div>`;
+            };
+            wrap.innerHTML = `<div class="card" style="background:var(--card,#fff);color:var(--text,#111);border-radius:16px;padding:20px;max-width:520px;width:100%;max-height:90vh;overflow:auto">
+                <h3 style="margin:0 0 4px;font-size:16px">${esc(titel)}</h3>
+                <p style="margin:0 0 12px;font-size:13px;opacity:.8">Diese Daten hängen an etwas, das es hier schon geben kann.</p>
+                ${zeilen.map(feld).join('')}
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+                    <button class="btn" data-x="ab">Abbrechen</button>
+                    <button class="btn primary" data-x="ok">Importieren</button>
+                </div>
+            </div>`;
+            // In-page haengt der Dialog an #lp-app, damit das gescopete CSS greift.
+            (document.getElementById('lp-app') || document.body).appendChild(wrap);
+            wrap.querySelectorAll('select').forEach(sel => sel.addEventListener('change', () => {
+                const inp = wrap.querySelector(`input[data-neu="${sel.dataset.i}"]`);
+                if (inp) inp.style.display = sel.value === '__neu__' ? '' : 'none';
+            }));
+            const schliessen = wert => { wrap.remove(); resolve(wert); };
+            wrap.addEventListener('click', e => { if (e.target === wrap) schliessen(null); });
+            wrap.querySelector('[data-x="ab"]').addEventListener('click', () => schliessen(null));
+            wrap.querySelector('[data-x="ok"]').addEventListener('click', () => {
+                const out = {};
+                zeilen.forEach((z, i) => {
+                    const sel = wrap.querySelector(`select[data-i="${i}"]`);
+                    const inp = wrap.querySelector(`input[data-neu="${i}"]`);
+                    out[z.key] = sel.value === '__neu__'
+                        ? { id: null, name: (inp.value || '').trim() }
+                        : { id: sel.value, name: (z.optionen.find(o => String(o.id) === sel.value) || {}).name || '' };
+                });
+                schliessen(out);
+            });
+        });
+    }
+
     function toast(msg) {
         // Eingebettet (iframe ODER in-page): an Nuvora geben. In-page ist
         // window.parent === window, aber ein an document.body gehängter .toast
@@ -3561,23 +3627,63 @@
         // Eine Lernleiter-Datei als 1-Leiter-Pfad wrappen.
         if (data.type === 'lernleiter') data = { type: 'lernpfad', name: data.thema || 'Importierte Lernleiter', lernleitern: [{ thema: data.thema, unterthema: data.unterthema, notizen: data.notizen, config: data.config, schueler: data.schueler }], aufgaben: data.aufgaben };
         if (!Array.isArray(data.lernleitern)) { toast('Keine Lernpfad-Datei'); return; }
-        // 1. Aufgaben anlegen (id-los → neu). Alte IDs merken fürs Umhängen.
+        // 1. Verknuepfungen erfragen — VOR dem Anlegen: in welchen Lernpfad, und unter welchem
+        //    Thema? Vorher wurde beides aus der Datei genommen — ein neuer Pfad
+        //    („Name (2)") und ein Thema, das es womoeglich schon gab.
+        const themenOptionen = topics.map(t => {
+            const p = t.parent_id ? topics.find(x => x.id === t.parent_id) : null;
+            return { id: t.id, name: p ? `${p.name} / ${t.name}` : t.name };
+        }).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+        const zeilen = [{
+            key: 'pfad', label: 'Lernpfad', vorschlag: data.name || 'Importierter Pfad',
+            optionen: lernpfade.map(p => ({ id: p._id, name: p.name })),
+            hinweis: 'Ein vorhandener Lernpfad bekommt die Lernleitern angehängt.',
+        }];
+        data.lernleitern.forEach((ll, i) => zeilen.push({
+            key: `ll${i}`,
+            label: `Thema der Lernleiter ${i + 1}${ll.thema ? ` („${ll.thema}")` : ''}`,
+            vorschlag: [ll.thema, ll.unterthema].filter(Boolean).join(' / '),
+            optionen: themenOptionen,
+            hinweis: i === 0 ? 'Ein neues Thema schreibst du als „Oberthema / Unterthema".' : '',
+        }));
+        const werte = await verknuepfungDialog('Lernpfad importieren — wohin?', zeilen);
+        if (!werte) return;   // abgebrochen: nichts angelegt
+
+        // 2. Aufgaben anlegen (id-los → neu). Alte IDs merken fürs Umhängen.
         const neu = (data.aufgaben || []).map(a => { const c = { ...a }; c.__old = String(a.id != null ? a.id : (a._id != null ? a._id : '')); delete c.id; delete c._id; return c; });
         if (neu.length) { aufgaben = [...aufgaben, ...neu]; await syncAufgaben(aufgaben); }
         const map = {}; neu.forEach(a => { if (a.__old) map[a.__old] = a.id; delete a.__old; });
-        // 2. Schüler per NAMEN aufs eigene Roster mappen (nur bei Voll-Export vorhanden).
+        // 3. Schüler per NAMEN aufs eigene Roster mappen (nur bei Voll-Export vorhanden).
         const byName = {}; schueler.forEach(s => { byName[(s.name || '').trim()] = s; });
-        let name = data.name || 'Importierter Pfad';
-        const namen = new Set(lernpfade.map(p => p.name));
-        if (namen.has(name)) { let i = 2; while (namen.has(`${name} (${i})`)) i++; name = `${name} (${i})`; }
-        const pfad = { _id: `pfad_${Date.now()}`, name, lernleitern: data.lernleitern.map((ll, i) => ({
-            _id: `ll_${Date.now()}_${i}`, thema: ll.thema || '', unterthema: ll.unterthema || '', klasse: '', notizen: ll.notizen || '', config: ll.config || null,
+
+
+        const zielPfad = werte.pfad.id ? lernpfade.find(p => p._id === werte.pfad.id) : null;
+        let name = zielPfad ? zielPfad.name : (werte.pfad.name || data.name || 'Importierter Pfad');
+        if (!zielPfad) {
+            const namen = new Set(lernpfade.map(p => p.name));
+            if (namen.has(name)) { let i = 2; while (namen.has(`${name} (${i})`)) i++; name = `${name} (${i})`; }
+        }
+        // Thema je Lernleiter aus der Antwort: der Adapter arbeitet mit Namen,
+        // „Ober / Unter" ist genau seine Form.
+        const themaFuer = i => {
+            const w = werte[`ll${i}`] || {};
+            const teile = String(w.name || '').split('/').map(x => x.trim());
+            return { thema: teile[0] || '', unterthema: teile[1] || '' };
+        };
+        const neueLeitern = data.lernleitern.map((ll, i) => ({
+            _id: `ll_${Date.now()}_${i}`, ...themaFuer(i), klasse: '', notizen: ll.notizen || '', config: ll.config || null,
             schueler: (ll.schueler || []).map(s => { const st = byName[(s.name || '').trim()]; return st ? { _id: String(st.id), id: st.id, name: st.name, aufgabenIds: (s.aufgabenIds || []).map(x => map[String(x)]).filter(Boolean) } : null; }).filter(Boolean),
-        })) };
-        const mitZuw = pfad.lernleitern.some(ll => ll.schueler.length);
+        }));
+        // Vorhandener Pfad: die neuen Lernleitern kommen dazu, die alten
+        // bleiben (savePfad raeumt weg, was fehlt — ein Ersetzen waere hier
+        // Datenverlust).
+        const pfad = zielPfad
+            ? { ...zielPfad, lernleitern: [...(zielPfad.lernleitern || []), ...neueLeitern] }
+            : { _id: `pfad_${Date.now()}`, name, lernleitern: neueLeitern };
+        const mitZuw = neueLeitern.some(ll => ll.schueler.length);
         // Diagnose/Schutz: hatte die Quelle Zuweisungen, die beim ID-Remap wegfielen?
         const quelleZuw = (data.lernleitern || []).reduce((n, ll) => n + (ll.schueler || []).reduce((m, s) => m + (s.aufgabenIds || []).length, 0), 0);
-        const importZuw = pfad.lernleitern.reduce((n, ll) => n + ll.schueler.reduce((m, s) => m + (s.aufgabenIds || []).length, 0), 0);
+        const importZuw = neueLeitern.reduce((n, ll) => n + ll.schueler.reduce((m, s) => m + (s.aufgabenIds || []).length, 0), 0);
         if (quelleZuw > 0 && importZuw < quelleZuw) {
             console.warn('Import: %d von %d Aufgaben-Zuweisungen konnten nicht zugeordnet werden (fehlende Aufgaben in der Datei / unbekannte IDs).', quelleZuw - importZuw, quelleZuw);
             if (importZuw === 0) toast('Achtung: Die zugewiesenen Aufgaben der Datei konnten nicht zugeordnet werden — Lernleiter ohne Aufgaben. (War es eine Vorlage ohne Aufgaben?)');

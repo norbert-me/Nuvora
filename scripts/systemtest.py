@@ -286,8 +286,48 @@ def inhalt_cardvote(api, u, spuren):
     # Der Scanner-Weg gehoert zu CardVote und wird sonst von keiner Probe
     # beruehrt — ein stiller Ausfall faellt erst im Unterricht auf.
     scanweg = inhalt_scan_roh(api, u, spuren)
+    importweg = _probe_import_verknuepfung(api, u, spuren)
     return ("Frage geschrieben, einzeln und in der Liste mit gleichen Werten "
-            f"wiedergefunden; {scanweg}")
+            f"wiedergefunden; {scanweg}; {importweg}")
+
+
+def _probe_import_verknuepfung(api, u, spuren):
+    """Import-Verknuepfung: der gewaehlte Ordner wird BENUTZT, nicht verdoppelt.
+
+    Der Ordner-Import legte frueher immer einen neuen Ordner an — auch wenn
+    derselbe schon dalag. Mit `in_folder=true` landet der Inhalt der Datei im
+    gewaehlten Ordner selbst. Geprueft wird unabhaengig neu gelesen: das Set
+    liegt drin, und ein zweiter Ordner mit dem Namen aus der Datei ist NICHT
+    entstanden.
+    """
+    ziel = api.call("POST", "/api/folders", {"name": f"{PRAEFIX} Zielordner"}, erwartet=(201,))
+    spuren.append(("Zielordner", lambda: api.call("DELETE", f"/api/folders/{ziel['id']}",
+                                                  erwartet=(204, 404))))
+    dateiname = f"{PRAEFIX} Ordner-aus-Datei"
+    api.call("POST", f"/api/import/folder?folder_id={ziel['id']}&in_folder=true", {
+        "type": "cardvote_folder", "name": dateiname,
+        "question_sets": [{"name": f"{PRAEFIX} Set-aus-Datei", "questions": [
+            {"text": f"{PRAEFIX} 2+2?", "choices": {"A": "3", "B": "4", "C": "5", "D": "6"},
+             "correct_answer": "B"},
+        ]}],
+        "children": [],
+    }, erwartet=(200,))
+
+    def alle_ordner(knoten):
+        for k in knoten:
+            yield k
+            yield from alle_ordner(k.get("children") or [])
+
+    baum = api.call("GET", "/api/folders", erwartet=(200,))
+    flach = list(alle_ordner(baum))
+    if any(o["name"] == dateiname for o in flach):
+        raise AssertionError("in_folder=true hat trotzdem einen zweiten Ordner angelegt")
+    drin = _finde(flach, id=ziel["id"])
+    if not drin:
+        raise AssertionError("Zielordner nach dem Import nicht mehr auffindbar")
+    if not any(q["name"] == f"{PRAEFIX} Set-aus-Datei" for q in (drin.get("question_sets") or [])):
+        raise AssertionError("das importierte Set liegt nicht im gewaehlten Ordner")
+    return "Import in vorhandenen Ordner (kein zweiter angelegt)"
 
 
 def inhalt_lernpfad(api, u, spuren):
