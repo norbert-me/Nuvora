@@ -32,6 +32,10 @@ class NoteIn(BaseModel):
 class NotePatch(BaseModel):
     title: Optional[str] = None
     content: Optional[str] = None
+    # Groesse in Pixeln (0 = automatisch). Gedeckelt, damit ein Zettel die
+    # Seite nicht sprengt — ein Wert kommt aus dem Browser und ist kein Befehl.
+    width: Optional[int] = None
+    height: Optional[int] = None
 
 
 class ReorderIn(BaseModel):
@@ -40,6 +44,7 @@ class ReorderIn(BaseModel):
 
 def _out(n: NotepadNote) -> dict:
     return {"id": n.id, "title": n.title or "", "content": n.content or "", "position": n.position,
+            "width": n.width or 0, "height": n.height or 0,
             "updated_at": n.updated_at.isoformat() if n.updated_at else None}
 
 
@@ -80,6 +85,10 @@ async def update_note(note_id: int, body: NotePatch, user: User = Depends(requir
         n.title = body.title.strip()[:200]
     if body.content is not None:
         n.content = body.content
+    if body.width is not None:
+        n.width = max(0, min(2000, int(body.width)))
+    if body.height is not None:
+        n.height = max(0, min(2000, int(body.height)))
     await db.commit()
     await db.refresh(n)
     return _out(n)

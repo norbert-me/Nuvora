@@ -1424,5 +1424,10 @@ class NotepadNote(Base):
     title: Mapped[str] = mapped_column(String(200), default="", server_default="")
     content: Mapped[str] = mapped_column(Text, default="", server_default="")
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Groesse des Zettels in Pixeln, vom Ziehen an der Ecke. 0 = wie bisher
+    # (Breite aus dem Raster, Hoehe aus dem Inhalt) — ein Zettel, den niemand
+    # angefasst hat, soll nicht ploetzlich eine feste Groesse haben.
+    width: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    height: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

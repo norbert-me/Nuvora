@@ -5,7 +5,7 @@
 // und schickte jede Umsortierung sofort. Beides ist jetzt ein Entwurf mit einem
 // Speichern-Knopf: wo sich etwas ändern lässt, entscheidet der Mensch, wann es
 // gilt — sonst fragt man sich, ob es drin ist.
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { pageTitle, btnPrimary, cardStyle, inputStyle, Icon, ICONS, iconBtn, COLORS as C, Empty, SHADOW } from "../components/Icons.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -28,17 +28,21 @@ export default function Notizblock({ embedded } = {}) {
     ids: notes.map((n) => n.id),
     titel: notes.map((n) => n.title || ""),
     texte: notes.map((n) => n.content || ""),
+    // Groesse je Zettel als "BxH" — ein String, damit der flache Vergleich in
+    // useEntwurf greift (ein Objekt je Zettel waere bei jedem Rendern neu).
+    groessen: notes.map((n) => `${n.width || 0}x${n.height || 0}`),
   }), [notes]);
   const entwurf = useEntwurf(gespeichert, async (wert) => {
     const put = (url, body) => fetch(url, alsJson("PUT", body))
       .then((r) => r.ok).catch(() => false);
     let ok = true;
     if (String(wert.ids) !== String(gespeichert.ids)) ok = (await put(`${API}/reorder`, { ids: wert.ids })) && ok;
-    const alt = Object.fromEntries(gespeichert.ids.map((id, i) => [id, [gespeichert.titel[i], gespeichert.texte[i]]]));
+    const alt = Object.fromEntries(gespeichert.ids.map((id, i) => [id, [gespeichert.titel[i], gespeichert.texte[i], gespeichert.groessen[i]]]));
     for (let i = 0; i < wert.ids.length; i++) {
       const id = wert.ids[i], a = alt[id];
-      if (!a || (a[0] === wert.titel[i] && a[1] === wert.texte[i])) continue;
-      ok = (await put(`${API}/${id}`, { title: wert.titel[i], content: wert.texte[i] })) && ok;
+      if (!a || (a[0] === wert.titel[i] && a[1] === wert.texte[i] && a[2] === wert.groessen[i])) continue;
+      const [w, h] = String(wert.groessen[i] || "0x0").split("x").map((x) => parseInt(x, 10) || 0);
+      ok = (await put(`${API}/${id}`, { title: wert.titel[i], content: wert.texte[i], width: w, height: h })) && ok;
     }
     if (!ok) return false;
     await load();
@@ -64,6 +68,7 @@ export default function Notizblock({ embedded } = {}) {
         ids: ord,
         titel: ord.map((id) => (v.ids.includes(id) ? v.titel[v.ids.indexOf(id)] : (von[id]?.title || ""))),
         texte: ord.map((id) => (v.ids.includes(id) ? v.texte[v.ids.indexOf(id)] : (von[id]?.content || ""))),
+        groessen: ord.map((id) => (v.ids.includes(id) ? v.groessen[v.ids.indexOf(id)] : `${von[id]?.width || 0}x${von[id]?.height || 0}`)),
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -81,10 +86,38 @@ export default function Notizblock({ embedded } = {}) {
   };
   const patch = (idx, feld, value) => entwurf.setz((v) => ({ [feld]: v[feld].map((x, i) => (i === idx ? value : x)) }));
 
+  // Die gezogene Groesse in den Entwurf schreiben — gespeichert wird wie alles
+  // andere per Knopf. Ein ResizeObserver je Zettel statt eines eigenen
+  // Maus-Handlers: der Browser zieht den Griff selbst (CSS `resize`), wir
+  // lesen nur das Ergebnis.
+  const beobachter = useRef(new Map());
+  const beobachteGroesse = (el, idx) => {
+    const alt = beobachter.current.get(idx);
+    if (alt) { alt.disconnect(); beobachter.current.delete(idx); }
+    if (!el || typeof ResizeObserver === "undefined") return;
+    // Die erste Meldung kommt vom Einhaengen, nicht vom Ziehen — sonst stuende
+    // die Maske sofort auf „nicht gespeichert", ohne dass jemand etwas tat.
+    let erste = true;
+    const ro = new ResizeObserver((eintraege) => {
+      const r = eintraege[0]?.contentRect;
+      if (!r) return;
+      if (erste) { erste = false; return; }
+      const w = Math.round(el.offsetWidth), h = Math.round(el.offsetHeight);
+      entwurf.setz((v) => {
+        const neu = `${w}x${h}`;
+        if (v.groessen[idx] === neu) return {};
+        return { groessen: v.groessen.map((x, i) => (i === idx ? neu : x)) };
+      });
+    });
+    ro.observe(el);
+    beobachter.current.set(idx, ro);
+  };
+  useEffect(() => () => { beobachter.current.forEach((ro) => ro.disconnect()); beobachter.current.clear(); }, []);
+
   // Angezeigt wird der Entwurf, nicht der Serverstand.
   const bekannt = Object.fromEntries(notes.map((n) => [n.id, n]));
   const view = entwurf.wert.ids
-    .map((id, i) => (bekannt[id] ? { id, title: entwurf.wert.titel[i], content: entwurf.wert.texte[i], idx: i } : null))
+    .map((id, i) => (bekannt[id] ? { id, title: entwurf.wert.titel[i], content: entwurf.wert.texte[i], groesse: entwurf.wert.groessen[i] || "0x0", idx: i } : null))
     .filter(Boolean);
 
   // Ziehen mit Live-Vorschau — dieselbe Mechanik wie bei den To-dos und den
@@ -93,7 +126,7 @@ export default function Notizblock({ embedded } = {}) {
   // per Knopf.
   const zieh = useZiehVorschau(view, (arr) => entwurf.setz((v) => {
     const pos = arr.map((n) => v.ids.indexOf(n.id));
-    return { ids: pos.map((i) => v.ids[i]), titel: pos.map((i) => v.titel[i]), texte: pos.map((i) => v.texte[i]) };
+    return { ids: pos.map((i) => v.ids[i]), titel: pos.map((i) => v.titel[i]), texte: pos.map((i) => v.texte[i]), groessen: pos.map((i) => v.groessen[i]) };
   }));
   return (
     <div style={{ maxWidth: embedded ? "none" : 900, margin: "0 auto" }}>
@@ -106,10 +139,21 @@ export default function Notizblock({ embedded } = {}) {
       {view.length === 0 ? (
         <Empty title={t("notizblock.empty")} hint={t("notizblock.emptyHint")} action={t("notizblock.new")} onAction={add} />
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
-          {zieh.sichtbar.map((n, idx) => (
+        // Flex statt Raster: ein Zettel darf eine eigene Breite haben, und in
+        // einer Rasterzelle waere sie eine Luege (die Zelle bleibt, der Zettel
+        // ragt heraus). Ohne eigene Groesse bleibt es bei den 260 px von vorher.
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-start" }}>
+          {zieh.sichtbar.map((n, idx) => {
+            const [bW, bH] = String(n.groesse || "0x0").split("x").map((x) => parseInt(x, 10) || 0);
+            return (
             <div key={n.id} {...zieh.props(idx)}
-              style={{ ...cardStyle, display: "flex", flexDirection: "column", padding: 12, boxShadow: SHADOW.ruhig }}>
+              ref={(el) => beobachteGroesse(el, n.idx)}
+              style={{ ...cardStyle, display: "flex", flexDirection: "column", padding: 12, boxShadow: SHADOW.ruhig,
+                // resize braucht overflow != visible, sonst zeichnet kein
+                // Browser den Griff.
+                resize: "both", overflow: "auto",
+                width: bW || 260, height: bH || undefined, minWidth: 200, minHeight: 140,
+                boxSizing: "border-box" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 8 }}>
                 <span className="drag-handle" title={t("notizblock.reorderHint")} style={{ color: "var(--text3)", cursor: "grab", display: "inline-flex", flexShrink: 0 }}><Icon d={ICONS.grip} size={15} /></span>
                 <input value={n.title} onChange={(e) => patch(n.idx, "titel", e.target.value)} placeholder={t("notizblock.titlePlaceholder")}
@@ -117,9 +161,10 @@ export default function Notizblock({ embedded } = {}) {
                 <button onClick={() => del(n.id)} className="icon-btn" style={{ ...iconBtn, padding: 4, flexShrink: 0 }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={15} color={C.danger} /></button>
               </div>
               <textarea value={n.content} onChange={(e) => patch(n.idx, "texte", e.target.value)} placeholder={t("notizblock.placeholder")} rows={7}
-                style={{ ...inputStyle, width: "100%", boxSizing: "border-box", resize: "vertical", fontSize: 14, lineHeight: 1.5, border: "none", background: "transparent", padding: "4px 8px" }} />
+                style={{ ...inputStyle, width: "100%", flex: 1, boxSizing: "border-box", resize: "none", fontSize: 14, lineHeight: 1.5, border: "none", background: "transparent", padding: "4px 8px" }} />
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

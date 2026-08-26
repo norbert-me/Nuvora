@@ -96,30 +96,25 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     fetch(`${API}/admin/setup`).then(r => r.ok ? r.json() : null).then(setSetup).catch(() => {});
   }, [isAdmin]);
 
-  // Der Update-Kanal ist eine Einstellung wie jede andere und wartet auf
-  // „Speichern" — vorher schaltete der Reiter beim Antippen sofort um.
-  const [kanalBasis, setKanalBasis] = useState({ channel: "" });
-  const kanal = useEntwurf(kanalBasis, async (w) => {
-    setVersionLoading(true);
-    await fetch(`${API}/version/channel`, alsJson("PUT", { channel: w.channel })).catch(() => {});
+  // Update-Kanal und Sprache sind die zwei begründeten Ausnahmen von „ohne
+  // Speichern-Knopf geht nichts": beide sind ein UMSCHALTER, kein Formular.
+  // Was sie tun, sieht man sofort (die Oberfläche wechselt die Sprache, die
+  // Versionsanzeige den Kanal) — ein „Speichern" daneben hieße, dieselbe
+  // Entscheidung zweimal zu treffen, und die Speicherleiste stand hier
+  // dauerhaft neben einem Reiter, der längst umgeschaltet aussah. Es geht dabei
+  // nichts verloren: es gibt keinen zweiten Wert, der zum ersten passen muss.
+  const [kanalBusy, setKanalBusy] = useState(false);
+  const kanalWechseln = async (ch) => {
+    if (kanalBusy || ch === versionInfo?.channel) return;
+    setKanalBusy(true); setVersionLoading(true);
+    // Sofort umschalten, damit der Reiter der Antwort nicht hinterherhinkt;
+    // was der Server meldet, gilt gleich darauf.
+    setVersionInfo((v) => (v ? { ...v, channel: ch } : v));
+    await fetch(`${API}/version/channel`, alsJson("PUT", { channel: ch })).catch(() => {});
     const d = await fetch(`${API}/version`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-    setVersionInfo(d);
-    setKanalBasis({ channel: d?.channel || w.channel });
-    setVersionLoading(false);
-  });
-  const kanalRef = useRef(null);
-  kanalRef.current = kanal;
-  // Erst wenn der Server seinen Kanal gemeldet hat, steht die Grundlage fest.
-  useEffect(() => {
-    const ch = versionInfo?.channel;
-    if (!ch || ch === kanalBasis.channel) return;
-    setKanalBasis({ channel: ch }); kanalRef.current?.setz({ channel: ch });
-  }, [versionInfo?.channel]); // eslint-disable-line
-
-  // Sprache: der Anzeige-Wechsel ist selbst die Änderung — also erst mit
-  // „Speichern" umschalten, nicht beim Auswählen.
-  const [sprachBasis, setSprachBasis] = useState({ lang });
-  const sprache = useEntwurf(sprachBasis, (w) => { setLang(w.lang); setSprachBasis({ lang: w.lang }); });
+    if (d) setVersionInfo(d);
+    setVersionLoading(false); setKanalBusy(false);
+  };
 
   const saveProfile = async (w) => {
     setProfileMsg("");
@@ -203,12 +198,11 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
         <div style={{ flex: 1, minWidth: 160 }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("nav.language")}</div>
         </div>
-        <select value={sprache.wert.lang} onChange={(e) => sprache.setz({ lang: e.target.value })} style={{ ...selectStyle, minWidth: 160 }}>
+        <select value={lang} onChange={(e) => setLang(e.target.value)} style={{ ...selectStyle, minWidth: 160 }}>
           {Object.entries(LANGUAGES).map(([code, label]) => (
             <option key={code} value={code}>{label}</option>
           ))}
         </select>
-        <Speicherleiste entwurf={sprache} klein />
       </div>
 
       <div style={abschnitt}>
@@ -427,10 +421,9 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                 {versionInfo.channels && (
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 13, color: "var(--text3)" }}>{t("profile.channel")}</span>
-                    <Tabs value={kanal.wert.channel || versionInfo.channel} onChange={(ch) => kanal.setz({ channel: ch })}
+                    <Tabs value={versionInfo.channel} onChange={kanalWechseln}
                       options={versionInfo.channels.map((ch) => [ch, t(`profile.channel.${ch}`)])} />
-                    <InfoDot text={t(`profile.channelHint.${kanal.wert.channel || versionInfo.channel}`)} />
-                    <Speicherleiste entwurf={kanal} klein />
+                    <InfoDot text={t(`profile.channelHint.${versionInfo.channel}`)} />
                   </div>
                 )}
               </div>
