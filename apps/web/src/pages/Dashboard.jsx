@@ -8,6 +8,7 @@ import { dublettenZahlen, findeDubletten, istInSammlung } from "../core/dublette
 import Werkzeugleiste from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import ImportMenu from "../components/ImportMenu.jsx";
+import VerknuepfungDialog, { flachBaum } from "../components/Verknuepfung.jsx";
 import { useLanguage } from "../i18n/index.jsx";
 import TopicPicker from "../components/TopicPicker.jsx";
 import ZoomImage from "../components/ZoomImage.jsx";
@@ -38,6 +39,8 @@ export default function Dashboard() {
   const [path, setPath] = useState([]);
   const [currentFolder, setCurrentFolder] = useState(null);
   const [editingSet, setEditingSet] = useState(null);
+  // Zielordner eines Imports — gewaehlt, nicht geraten (components/Verknuepfung.jsx).
+  const [importZiel, setImportZiel] = useState(null); // { data, text, zeilen } oder { xlsx: {...}, zeilen }
   // Ein „+" mit Untermenü (Ordner/Set) statt zwei getrennter Plus-Knöpfe.
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [addMode, setAddMode] = useState(null); // null | "folder" | "set"
@@ -424,26 +427,67 @@ export default function Dashboard() {
 
   // `dateiWaehlen` (Icons.jsx) baut den Dateidialog — fuenf Seiten hatten ihn
   // von Hand zusammengesetzt.
+  // Eine Importdatei haengt an einem Ordner. Statt sie stillschweigend in den
+  // gerade offenen zu legen (oder einen zweiten gleichnamigen anzulegen), wird
+  // gefragt — siehe components/Verknuepfung.jsx.
+  const ordnerOptionen = () => flachBaum(folders);
+
   const importFolder = () => dateiWaehlen(async (file) => {
-      setImportStatus({ stage: "reading", label: file.name });
       try {
         const text = await file.text();
         const data = JSON.parse(text);
-        if (data.type === "cardvote_folder") {
-          const count = (data.question_sets || []).length + (data.children || []).length;
-          await uploadWithProgress(`${API}/import/folder${currentFolder ? `?folder_id=${currentFolder}` : ""}`, text, { label: data.name || file.name });
-          await load();
-          finishImport(true, t("dash.impFolderDone", { count }));
-        } else if (data.type === "cardvote_questionset") {
-          const n = (data.questions || []).length;
-          await uploadWithProgress(`${API}/import/question-set`, JSON.stringify({ ...data, folder_id: currentFolder }), { label: data.name || file.name });
-          await load();
-          finishImport(true, t("dash.impSetDone", { name: data.name || "?", count: n }));
-        } else {
+        if (data.type !== "cardvote_folder" && data.type !== "cardvote_questionset") {
           finishImport(false, t("dash.impUnknown"));
+          return;
         }
+        const optionen = ordnerOptionen();
+        const offen = optionen.find((o) => String(o.id) === String(currentFolder));
+        setImportZiel({
+          data, text, dateiname: file.name,
+          zeilen: [{
+            key: "folder", label: t("verkn.ordner"), optionen,
+            // Vorbelegt: der offene Ordner, sonst der Name aus der Datei als
+            // neuer Ordner — genau das, was vorher ungefragt passierte.
+            vorschlag: offen ? offen.name : (data.name || file.name.replace(/\.json$/i, "")),
+            hinweis: data.type === "cardvote_folder" ? t("dash.impFolderHint") : undefined,
+          }],
+        });
       } catch (err) { finishImport(false, err.message || t("dash.impReadError")); }
   }, ".json");
+
+  /** Der Import selbst, nachdem der Zielordner feststeht. */
+  const importAusfuehren = async ({ data, text }, werte) => {
+    const ziel = werte.folder;
+    setImportZiel(null);
+    setImportStatus({ stage: "reading", label: data.name || "" });
+    try {
+      // "Neu anlegen" heisst bei einem Ordner-Import: den Ordner der Datei
+      // unter dem gewaehlten Namen anlegen (im gerade offenen Ordner). Bei
+      // einem einzelnen Set gibt es keinen Ordner in der Datei — dafuer wird
+      // einer angelegt und das Set hineingelegt.
+      let folderId = ziel.id;
+      if (data.type === "cardvote_folder") {
+        const count = (data.question_sets || []).length + (data.children || []).length;
+        const rumpf = ziel.id ? text : JSON.stringify({ ...data, name: ziel.name });
+        const params = new URLSearchParams();
+        if (ziel.id) { params.set("folder_id", String(ziel.id)); params.set("in_folder", "true"); }
+        else if (currentFolder) params.set("folder_id", String(currentFolder));
+        await uploadWithProgress(`${API}/import/folder${params.toString() ? `?${params}` : ""}`, rumpf, { label: data.name || "" });
+        await load();
+        finishImport(true, t("dash.impFolderDone", { count }));
+        return;
+      }
+      if (!folderId) {
+        const r = await fetch(`${API}/folders`, alsJson("POST", { name: ziel.name, parent_id: currentFolder }));
+        if (!r.ok) { finishImport(false, t("dash.impError")); return; }
+        folderId = (await r.json()).id;
+      }
+      const n = (data.questions || []).length;
+      await uploadWithProgress(`${API}/import/question-set`, JSON.stringify({ ...data, folder_id: folderId }), { label: data.name || "" });
+      await load();
+      finishImport(true, t("dash.impSetDone", { name: data.name || "?", count: n }));
+    } catch (err) { finishImport(false, err.message || t("dash.impError")); }
+  };
 
   const deleteFolder = async (id) => {
     if (!await askConfirm(t("dash.deleteFolderConfirm"))) return;
@@ -478,16 +522,34 @@ export default function Dashboard() {
   const importXlsx = async () => {
     const setName = await askPrompt(t("dash.setNamePrompt"));
     if (!setName) return;
-    dateiWaehlen(async (file) => {
-      setImportStatus({ stage: "reading", label: file.name });
+    dateiWaehlen((file) => {
+      const optionen = ordnerOptionen();
+      const offen = optionen.find((o) => String(o.id) === String(currentFolder));
+      setImportZiel({
+        xlsx: { file, setName },
+        zeilen: [{ key: "folder", label: t("verkn.ordner"), optionen, vorschlag: offen ? offen.name : setName }],
+      });
+    }, ".xlsx");
+  };
+
+  /** Excel-Import, nachdem der Zielordner feststeht. */
+  const importXlsxAusfuehren = async ({ file, setName }, werte) => {
+    const ziel = werte.folder;
+    setImportZiel(null);
+    setImportStatus({ stage: "reading", label: file.name });
+    try {
+      let folderId = ziel.id;
+      if (!folderId) {
+        const r = await fetch(`${API}/folders`, alsJson("POST", { name: ziel.name, parent_id: currentFolder }));
+        if (!r.ok) { finishImport(false, t("dash.impError")); return; }
+        folderId = (await r.json()).id;
+      }
       const form = new FormData();
       form.append("file", file);
-      try {
-        await uploadWithProgress(`${API}/import/questions-xlsx?name=${encodeURIComponent(setName)}${currentFolder ? `&folder_id=${currentFolder}` : ""}`, form, { json: false, label: file.name });
-        await load();
-        finishImport(true, t("dash.impSetDone", { name: setName, count: "…" }));
-      } catch (err) { finishImport(false, err.message || t("dash.impError")); }
-    }, ".xlsx");
+      await uploadWithProgress(`${API}/import/questions-xlsx?name=${encodeURIComponent(setName)}&folder_id=${folderId}`, form, { json: false, label: file.name });
+      await load();
+      finishImport(true, t("dash.impSetDone", { name: setName, count: "…" }));
+    } catch (err) { finishImport(false, err.message || t("dash.impError")); }
   };
 
   if (editingSet) {
@@ -780,6 +842,17 @@ export default function Dashboard() {
         onPublish={(description) => fetch(`${API}/marketplace/publish`, alsJson("POST", { set_id: publishingSet.id, description })).catch(() => null)} />}
 
       {importStatus && <ImportProgress status={importStatus} />}
+
+      {importZiel && (
+        <VerknuepfungDialog
+          titel={t("dash.impTitel")}
+          zeilen={importZiel.zeilen}
+          okLabel={t("dash.impStarten")}
+          onAbbruch={() => setImportZiel(null)}
+          onFertig={(werte) => importZiel.xlsx
+            ? importXlsxAusfuehren(importZiel.xlsx, werte)
+            : importAusfuehren(importZiel, werte)} />
+      )}
     </div>
   );
 }

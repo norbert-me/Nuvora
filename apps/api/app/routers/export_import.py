@@ -552,10 +552,21 @@ class ImportFolderBody(BaseModel):
 ImportFolderBody.model_rebuild()
 
 
-async def _import_folder_recursive(data: ImportFolderBody, parent_id, owner_id, db: AsyncSession):
-    folder = Folder(name=data.name, parent_id=parent_id, owner_id=owner_id)
-    db.add(folder)
-    await db.flush()
+async def _import_folder_recursive(data: ImportFolderBody, parent_id, owner_id, db: AsyncSession, ziel: Folder = None):
+    """Ordner der Datei anlegen — oder den Inhalt in einen vorhandenen legen.
+
+    `ziel` ist die Antwort der Lehrkraft auf „neu anlegen oder mit Vorhandenem
+    verknuepfen?": ist es gesetzt, entsteht KEIN zweiter gleichnamiger Ordner,
+    die Sets und Unterordner der Datei landen direkt darin. Nur die oberste
+    Ebene kennt das; darunter wird immer angelegt, sonst wuerde ein Import
+    fremde Unterordner zusammenlegen, die nur zufaellig gleich heissen.
+    """
+    if ziel is not None:
+        folder = ziel
+    else:
+        folder = Folder(name=data.name, parent_id=parent_id, owner_id=owner_id)
+        db.add(folder)
+        await db.flush()
     for qs_data in data.question_sets:
         qs = QuestionSet(
             name=qs_data.name,
@@ -583,7 +594,8 @@ async def _import_folder_recursive(data: ImportFolderBody, parent_id, owner_id, 
 
 
 @router.post("/import/folder", dependencies=[CARDVOTE])
-async def import_folder(body: dict, folder_id: Optional[int] = None, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+async def import_folder(body: dict, folder_id: Optional[int] = None, in_folder: bool = False,
+                        db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     """`body: dict` in der Signatur ist Absicht — siehe app/importe.py."""
     rate_limit("import", f"u{user.id}", 60, 3600, "Zu viele Importe. Bitte kurz warten.")
     if not isinstance(body, dict) or body.get("type") != "cardvote_folder":
@@ -605,6 +617,7 @@ async def import_folder(body: dict, folder_id: Optional[int] = None, db: AsyncSe
     if _count(body) > 5000:
         raise HTTPException(400, "Import zu gross (max. 5000 Fragen pro Ordner)")
 
+    ziel = None
     if folder_id is not None:
         # Ohne diese Pruefung landete der Import im Ordner eines fremden Kontos
         # — oder in keinem, und der Fremdschluessel warf einen HTTP 500.
@@ -613,7 +626,10 @@ async def import_folder(body: dict, folder_id: Optional[int] = None, db: AsyncSe
             raise HTTPException(404, "Ordner nicht gefunden")
 
     daten = geprueft(ImportFolderBody, body, "Ordnerdatei")
-    folder = await _import_folder_recursive(daten, folder_id, user.id, db)
+    # in_folder: der Inhalt kommt in den gewaehlten Ordner selbst, statt darin
+    # einen zweiten gleichnamigen anzulegen.
+    folder = await _import_folder_recursive(daten, folder_id, user.id, db,
+                                            ziel=ziel if (in_folder and ziel is not None) else None)
     await db.commit()
     return {"id": folder.id, "name": folder.name}
 
