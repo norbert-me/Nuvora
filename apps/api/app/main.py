@@ -1263,6 +1263,11 @@ class BugBody(_BaseModel):
     message: str
     log: str = ""
     seite: str = ""
+    # Technische Eckdaten des Geraets (Fenstergroesse, Browser, Netz, aktive
+    # Module) — von der Oberflaeche zusammengestellt und dort VOR dem Absenden
+    # im Klartext gezeigt. Inhaltsfrei wie das Protokoll; siehe
+    # apps/web/src/core/protokoll.js (umgebung()).
+    umgebung: str = ""
 
 
 @app.post("/api/bugreport")
@@ -1300,7 +1305,8 @@ async def bugreport(body: BugBody, request: Request, user=Depends(get_current_us
     text = (body.message or "").strip()[:3000]
     if not text:
         raise HTTPException(400, "Bitte beschreibe kurz, was passiert ist")
-    log = (body.log or "").strip()[:8000]
+    log = (body.log or "").strip()[:20000]
+    umgebung = (body.umgebung or "").strip()[:2000]
     # Der User-Agent sagt, welcher Browser — das ist bei einer Anzeigefrage oft
     # die halbe Antwort und steht ohnehin in jedem Request.
     browser = _hdr(request.headers.get("user-agent", ""))[:200]
@@ -1312,6 +1318,8 @@ async def bugreport(body: BugBody, request: Request, user=Depends(get_current_us
         f"Browser: {browser}\n\n"
         f"{text}\n"
     )
+    if umgebung:
+        rumpf += f"\n--- Umgebung (vom Melder freigegeben) ---\n{umgebung}\n"
     if log:
         rumpf += f"\n--- Protokoll (vom Melder freigegeben) ---\n{log}\n"
 

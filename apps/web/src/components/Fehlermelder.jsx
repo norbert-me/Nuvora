@@ -16,7 +16,7 @@ import {
   btnPrimary, btnSecondary, cardStyle, COLORS as C, CONTROL_R, DialogKopf, Icon, ICONS,
   inputStyle, Modal, SHADOW,
 } from "./Icons.jsx";
-import { alsText, beobachte, leeren, protokoll } from "../core/protokoll.js";
+import { alsText, beobachte, leeren, protokoll, umgebung } from "../core/protokoll.js";
 import { alsJson } from "../core/melden.js";
 import { useLanguage } from "../i18n/index.jsx";
 
@@ -25,6 +25,7 @@ export default function Fehlermelder() {
   const [offen, setOffen] = useState(false);
   const [text, setText] = useState("");
   const [mitLog, setMitLog] = useState(true);
+  const [mitUmg, setMitUmg] = useState(true);
   const [logOffen, setLogOffen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [fertig, setFertig] = useState(false);
@@ -48,6 +49,7 @@ export default function Fehlermelder() {
     const res = await fetch("/api/bugreport", alsJson("POST", {
       message: text.trim(),
       log: mitLog ? alsText() : "",
+      umgebung: mitUmg ? umgebung() : "",
       seite: window.location.pathname + window.location.search,
     })).catch(() => null);
     setBusy(false);
@@ -102,21 +104,37 @@ export default function Fehlermelder() {
                 placeholder={t("melder.platzhalter")} autoFocus
                 style={{ ...inputStyle, width: "100%", lineHeight: 1.5, resize: "vertical" }} />
 
-              <label style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 4px", fontSize: 14, color: "var(--text2)" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 0", fontSize: 14, color: "var(--text2)" }}>
                 <input type="checkbox" checked={mitLog} onChange={(e) => setMitLog(e.target.checked)} />
                 {t("melder.mitLog", { n: anzahl })}
               </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, margin: "6px 0 4px", fontSize: 14, color: "var(--text2)" }}>
+                <input type="checkbox" checked={mitUmg} onChange={(e) => setMitUmg(e.target.checked)} />
+                {t("melder.mitUmgebung")}
+              </label>
               <p style={{ fontSize: 12, color: "var(--text3)", margin: "0 0 8px" }}>{t("melder.logHinweis")}</p>
-              {anzahl > 0 && (
-                <button onClick={() => setLogOffen((v) => !v)}
-                  style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13, marginBottom: 8 }}>
-                  {logOffen ? t("melder.logZu") : t("melder.logZeigen")}
-                </button>
-              )}
+
+              {/* Datenschutz-Hinweis. Er steht hier und nicht im Kleingedruckten
+                  irgendeiner anderen Seite: mitgeschickt wird JETZT, also muss
+                  hier stehen, was mitgeht, wohin es geht und wie lange es
+                  bleibt. Der Knopf daneben zeigt es im Klartext — ein Hinweis,
+                  den man nicht nachpruefen kann, ist eine Behauptung. */}
+              <div style={{ ...cardStyle, padding: 10, margin: "0 0 8px", fontSize: 12,
+                lineHeight: 1.5, color: "var(--text2)", display: "flex", gap: 8 }}>
+                <Icon d={ICONS.info} size={14} color="var(--text3)" />
+                <span>{t("melder.datenschutz")}</span>
+              </div>
+
+              <button onClick={() => setLogOffen((v) => !v)}
+                style={{ ...btnSecondary, padding: "4px 10px", fontSize: 13, marginBottom: 8 }}>
+                {logOffen ? t("melder.logZu") : t("melder.wasGeht")}
+              </button>
               {logOffen && (
-                <pre style={{ ...cardStyle, padding: 10, maxHeight: 200, overflow: "auto", fontSize: 11,
+                <pre style={{ ...cardStyle, padding: 10, maxHeight: 240, overflow: "auto", fontSize: 11,
                   lineHeight: 1.5, color: "var(--text2)", whiteSpace: "pre-wrap", margin: "0 0 12px" }}>
-                  {alsText() || t("melder.logLeer")}
+                  {[mitUmg ? `--- ${t("melder.umgebungTitel")} ---\n${umgebung()}` : "",
+                    mitLog ? `--- ${t("melder.protokollTitel")} ---\n${alsText() || t("melder.logLeer")}` : ""]
+                    .filter(Boolean).join("\n\n") || t("melder.logLeer")}
                 </pre>
               )}
 
