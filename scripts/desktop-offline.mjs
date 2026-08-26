@@ -306,7 +306,7 @@ async function offlineProbe(exe, user, lauf, profil) {
     //
     // Die Kernfrage. Ohne ihn gibt es kein Offline-Lesen — dann ist alles
     // Weitere gegenstandslos, und der Bericht sagt genau das, samt Grund.
-    const sw = await seite.evaluate(async () => {
+    const sw = await mitFrist(seite.evaluate(async () => {
       const vorhanden = !!navigator.serviceWorker;
       let regs = -1;
       if (vorhanden) {
@@ -317,13 +317,33 @@ async function offlineProbe(exe, user, lauf, profil) {
           // faelschlich „wird NICHT gesteuert".
           for (let i = 0; i < 10 && !navigator.serviceWorker.controller; i++)
             await new Promise((r) => setTimeout(r, 500));
-          regs = (await navigator.serviceWorker.getRegistrations()).length;
+          // Auch getRegistrations() bekommt eine Frist: in einem Profil mit
+          // beschaedigter Service-Worker-Datenbank antwortet dieser Aufruf NIE
+          // — der Renderer haengt dann still, und der ganze Durchgang lief in
+          // die 5-Minuten-Frist, ohne je zu sagen, woran es lag.
+          regs = await Promise.race([
+            navigator.serviceWorker.getRegistrations().then((r) => r.length),
+            new Promise((r) => setTimeout(() => r(-2), 5000)),
+          ]);
         } catch { regs = -1; }
       }
       let namen = [];
       try { namen = await caches.keys(); } catch { namen = []; }
       return { vorhanden, secure: isSecureContext, protokoll: location.protocol, regs, namen, controller: vorhanden && !!navigator.serviceWorker.controller };
-    });
+    }), 60000, G("Service-Worker abfragen")).catch(() => null);
+
+    // Antwortet der Renderer gar nicht mehr, ist das ein BEFUND und keine
+    // Zeitueberschreitung des Testlaufs: genau so faellt ein Profil auf, dessen
+    // Service-Worker-Datenbank haengt (die App zeigt dann eine Seite, die nie
+    // fertig wird).
+    if (!sw) {
+      notiere(G("Service-Worker"), "vorhanden", false,
+        "Der Renderer antwortet nicht mehr (Abfrage nach 60 s ohne Antwort) — in diesem Profil haengt der Service-Worker-Zugriff. "
+        + "Abhilfe: die App schliessen und im Profilverzeichnis den Ordner 'Service Worker' loeschen (reiner Cache), dann neu starten.");
+      for (const w of ["Offline lesen", "Deep-Link offline", "Inhaltsdaten offline"])
+        notiere(G(w), "entfällt", false, "ohne antwortenden Renderer gegenstandslos");
+      return;
+    }
 
     if (!sw.vorhanden) {
       notiere(G("Service-Worker"), "vorhanden", false,
@@ -336,7 +356,9 @@ async function offlineProbe(exe, user, lauf, profil) {
     notiere(G("Service-Worker"), "sicherer Kontext", sw.secure,
       sw.secure ? "ja" : "nein — Chromium gibt hier keinen Worker heraus");
     notiere(G("Service-Worker"), "Registrierung aktiv", sw.regs > 0 && sw.controller,
-      sw.regs > 0 ? `${sw.regs} Registrierung(en), Seite ${sw.controller ? "wird gesteuert" : "wird NICHT gesteuert"}` : "keine Registrierung");
+      sw.regs === -2 ? "getRegistrations() antwortet nicht (5 s) — die Service-Worker-Datenbank dieses Profils haengt"
+        : sw.regs > 0 ? `${sw.regs} Registrierung(en), Seite ${sw.controller ? "wird gesteuert" : "wird NICHT gesteuert"}`
+        : "keine Registrierung");
     const nuvoraCaches = sw.namen.filter((n) => n.startsWith("nuvora"));
     notiere(G("Service-Worker"), "Nuvora-Caches angelegt", nuvoraCaches.length > 0,
       nuvoraCaches.length ? nuvoraCaches.join(", ") : `keine (gefunden: ${sw.namen.join(", ") || "gar nichts"})`);

@@ -489,7 +489,11 @@ const bedienung = (td) => [
     pfad: `/auswertung?tab=noten${klassenParam(td, "&")}`,
     async anlegen(seite) {
       // Spalten haengen an einem Abschnitt — der aus den Testdaten.
-      const abschnitt = seite.locator("th").filter({ hasText: `${MARKE}-Abschnitt` }).first();
+      // `th:visible`: liegt aus einem abgebrochenen Lauf ein gleichnamiger
+      // Abschnitt an einer ANDEREN Klasse, traf `.first()` genau den — und der
+      // ist auf dieser Seite nie sichtbar. Der Lauf lief in die volle Frist und
+      // meldete „Timeout", obwohl der richtige Abschnitt danebenstand.
+      const abschnitt = seite.locator("th:visible").filter({ hasText: `${MARKE}-Abschnitt` }).first();
       // Erst warten, bis der Abschnittskopf wirklich steht, dann klicken.
       // Vorher lief beides in EINE Frist von 15 s, und die Notenseite ist die
       // langsamste im Test (Klasse, Kurs, Abschnitte, Spalten, Noten in einem
