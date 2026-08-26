@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..austauschformat import quiz_schnappschuss
+from ..besitz import eigenes
 from ..database import get_db
 from .modules import is_active
 from ..models import (
@@ -66,8 +67,25 @@ class PublishLadderBody(BaseModel):
 
 
 class CopyBody(BaseModel):
+    """Wohin die Uebernahme haengt — die Verknuepfungen entscheidet die Lehrkraft.
+
+    Vorher legte die Uebernahme still an: das Thema per Namenstreffer (und wenn
+    keiner passte, ein neues), den Lernpfad ebenso, das Quiz immer im Ordner
+    „Marktplatz". Bei jemandem mit einer gepflegten Themenstruktur entstand so
+    ein zweites „Bruchrechnung" neben dem eigenen, ohne dass es jemand
+    bemerkte. Deshalb fragt die Oberflaeche vorher und schickt die Antwort
+    hierher: `*_id` heisst „mit diesem vorhandenen verknuepfen", `*_name` heisst
+    „neu anlegen unter diesem Namen". Fehlt beides, bleibt es beim alten
+    Verhalten (Namenstreffer, sonst neu) — aeltere Clients brechen nicht.
+    """
     # Nur fuer karten_deck noetig: Zielklasse, an die der uebernommene Stapel haengt.
     class_id: Optional[int] = None
+    topic_id: Optional[int] = None      # Lernleiter: vorhandenes Thema
+    topic_name: Optional[str] = None    # Lernleiter: neues Thema ("Ober / Unter")
+    path_id: Optional[int] = None       # Lernleiter: vorhandener Lernpfad
+    path_name: Optional[str] = None     # Lernleiter: neuer Lernpfad
+    folder_id: Optional[int] = None     # Quiz: vorhandener Ordner
+    folder_name: Optional[str] = None   # Quiz: neuer Ordner
 
 
 # Nur inhaltliche Aufgabenfelder — keine ids/owner/code, kein Schuelerbezug. Die
@@ -396,23 +414,14 @@ async def copy_quiz(quiz_id: int, body: Optional[CopyBody] = None, user: User = 
     if kind == "method":
         return await _copy_method(quiz, data, user, db)
     if kind == "lernpfad_ladder":
-        return await _copy_ladder(quiz, data, user, db)
+        return await _copy_ladder(quiz, data, body, user, db)
     questions = data.get("questions", [])
     if len(questions) > 200:
         raise HTTPException(400, "Maximal 200 Fragen pro Set")
-    # Uebernommene Quiz landen im (bei Bedarf angelegten) Ordner "Marktplatz",
-    # damit sie in der Ordner-Uebersicht sichtbar sind (Root zeigt keine ordnerlosen Sets).
-    result = await db.execute(
-        select(Folder).where(Folder.owner_id == user.id, Folder.name == "Marktplatz", Folder.parent_id.is_(None))
-    )
-    mp_folder = result.scalars().first()
-    if not mp_folder:
-        mp_folder = Folder(name="Marktplatz", owner_id=user.id, parent_id=None)
-        db.add(mp_folder)
-        await db.flush()
+    folder_id = await _ziel_ordner(db, user, body)
     qs = QuestionSet(
         name=quiz.title,
-        folder_id=mp_folder.id,
+        folder_id=folder_id,
         shuffle_questions=data.get("shuffle_questions", False),
         shuffle_answers=data.get("shuffle_answers", False),
         niveau_aktiv=bool(data.get("niveau_aktiv", False)),
@@ -437,6 +446,29 @@ async def copy_quiz(quiz_id: int, body: Optional[CopyBody] = None, user: User = 
                                niveau="E" if qdata.get("niveau") == "E" else ""))
     await db.commit()
     return {"id": qs.id, "name": qs.name}
+
+
+async def _ziel_ordner(db, user, body: Optional[CopyBody]):
+    """In welchen Ordner das uebernommene Quiz kommt.
+
+    Die Wahl der Lehrkraft geht vor (vorhandener Ordner oder ein neuer unter
+    ihrem Namen). Ohne Angabe bleibt es beim alten Verhalten: der Ordner
+    „Marktplatz" auf oberster Ebene, bei Bedarf angelegt — ein Set ohne Ordner
+    taucht in der Uebersicht nicht auf.
+    """
+    if body and body.folder_id:
+        f = await eigenes(db, Folder, body.folder_id, user, "Ordner nicht gefunden")
+        return f.id
+    name = ((body.folder_name if body else None) or "Marktplatz").strip()[:200] or "Marktplatz"
+    vorhanden = (await db.execute(
+        select(Folder).where(Folder.owner_id == user.id, Folder.name == name, Folder.parent_id.is_(None))
+    )).scalars().first()
+    if vorhanden:
+        return vorhanden.id
+    f = Folder(name=name, owner_id=user.id, parent_id=None)
+    db.add(f)
+    await db.flush()
+    return f.id
 
 
 async def _copy_deck(quiz, data, body, user, db):
@@ -498,26 +530,35 @@ async def _resolve_topic(db, user, topic_name: str):
     return await _get_or_create_topic(db, user, parts[0], None)
 
 
-async def _copy_ladder(quiz, data, user, db):
+async def _copy_ladder(quiz, data, body, user, db):
     exs = data.get("exercises", [])
     if len(exs) > 300:
         raise HTTPException(400, "Maximal 300 Aufgaben pro Lernleiter")
     if not exs:
         raise HTTPException(400, "Die Lernleiter enthält keine Aufgaben")
-    topic_id = await _resolve_topic(db, user, (data.get("topic_name") or "").strip())
+    # Thema: die Wahl der Lehrkraft geht vor. Ohne Angabe wie bisher der
+    # Namensweg (Treffer nehmen, sonst anlegen).
+    if body and body.topic_id:
+        topic_id = (await eigenes(db, Topic, body.topic_id, user, "Thema nicht gefunden")).id
+    else:
+        wunsch = ((body.topic_name if body else None) or data.get("topic_name") or "").strip()
+        topic_id = await _resolve_topic(db, user, wunsch)
     for e in exs:
         # Leere Strings statt None, damit NOT-NULL-Textspalten nicht brechen.
         fields = {k: (e.get(k) if e.get(k) is not None else ("" if k not in ("foerderschwerpunkte", "unteraufgaben") else e.get(k))) for k in _EX_FIELDS}
         if fields.get("unteraufgaben") is None:
             fields["unteraufgaben"] = 1
         db.add(Exercise(owner_id=user.id, topic_id=topic_id, **fields))
-    # Ziel-Lernpfad: gleichnamigen wiederverwenden (unique owner+name), sonst neu.
-    pname = ((data.get("path_name") or quiz.title or "Marktplatz").strip() or "Marktplatz")[:200]
-    path = (await db.execute(select(LearningPath).where(LearningPath.owner_id == user.id, LearningPath.name == pname))).scalars().first()
-    if not path:
-        path = LearningPath(name=pname, owner_id=user.id)
-        db.add(path)
-        await db.flush()
+    # Ziel-Lernpfad: gewaehlter, sonst gleichnamiger (unique owner+name), sonst neu.
+    if body and body.path_id:
+        path = await eigenes(db, LearningPath, body.path_id, user, "Lernpfad nicht gefunden")
+    else:
+        pname = (((body.path_name if body else None) or data.get("path_name") or quiz.title or "Marktplatz").strip() or "Marktplatz")[:200]
+        path = (await db.execute(select(LearningPath).where(LearningPath.owner_id == user.id, LearningPath.name == pname))).scalars().first()
+        if not path:
+            path = LearningPath(name=pname, owner_id=user.id)
+            db.add(path)
+            await db.flush()
     pos = len((await db.execute(select(LearningLadder).where(LearningLadder.path_id == path.id))).scalars().all())
     # Ohne Klasse, ohne Zuweisungen — die Aufgaben haengen am Thema, die neue
     # Lehrkraft weist sie im Lernpfad ihren eigenen SuS zu.

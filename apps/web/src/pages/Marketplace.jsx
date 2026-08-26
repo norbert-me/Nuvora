@@ -7,6 +7,7 @@ import { useLanguage } from "../i18n/index.jsx";
 import { Icon, ICONS, Modal, Tabs, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, toolbarInput, iconBtn, COLORS as C, pageApp } from "../components/Icons.jsx";
 import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
+import VerknuepfungDialog, { flachBaum, themenNamen } from "../components/Verknuepfung.jsx";
 import { alsJson, hol } from "../core/melden.js";
 
 const API = "/api";
@@ -100,7 +101,9 @@ export default function Marketplace({ fixedKind }) {
   const [msg, setMsg] = useState("");
   const [authorFilter, setAuthorFilter] = useState(null); // { id, name } oder null
   const [classes, setClasses] = useState([]);
-  const [copyDeckFor, setCopyDeckFor] = useState(null); // { id, title } — Klassenwahl fuers Deck
+  // Verknuepfungen der Uebernahme (Klasse/Thema/Lernpfad/Ordner) — gefragt
+  // statt stillschweigend angelegt, siehe components/Verknuepfung.jsx.
+  const [verkn, setVerkn] = useState(null); // { q, zeilen }
 
   useEffect(() => {
     hol("/api/classes").then((d) => setClasses(Array.isArray(d) ? d : []));
@@ -148,16 +151,64 @@ export default function Marketplace({ fixedKind }) {
     else { setPreview(null); setMsg(t("market.previewError")); }
   };
 
-  const copy = async (q, classId) => {
-    // Karten-Stapel brauchen eine Zielklasse: erst Klassenwahl oeffnen.
-    if (q.kind === "karten_deck" && !classId) {
-      if (!classes.length) { setMsg(t("market.needClass")); return; }
-      setCopyDeckFor({ id: q.id, title: q.title });
-      return;
-    }
-    const res = await fetch(`${API}/marketplace/${q.id}/copy`, alsJson("POST", classId ? { class_id: classId } : {}));
-    if (res.ok) { setMsg(t("market.added", { title: q.title })); setTimeout(() => setMsg(""), 4000); setCopyDeckFor(null); }
+  const copy = async (q, body = {}) => {
+    const res = await fetch(`${API}/marketplace/${q.id}/copy`, alsJson("POST", body));
+    if (res.ok) { setMsg(t("market.added", { title: q.title })); setTimeout(() => setMsg(""), 4000); setVerkn(null); }
     else setMsg(t("market.adoptError"));
+  };
+
+  /**
+   * Uebernahme vorbereiten: welche Verknuepfungen bringt der Eintrag mit?
+   *
+   * Die Vorschlaege kommen aus dem Eintrag selbst (Thema der Lernleiter, Titel
+   * als Pfadname), die Auswahl aus dem eigenen Konto. Geladen wird erst hier —
+   * die Liste soll dafuer nichts nachladen, und Themen/Ordner/Pfade gehoeren
+   * je nach Art zu verschiedenen Modulen (Regel 3).
+   */
+  const uebernehmen = async (q) => {
+    // Eine Methode haengt an nichts — da gibt es nichts zu fragen.
+    if (q.kind === "method") return copy(q);
+    const zeilen = [];
+    if (q.kind === "karten_deck") {
+      const cls = classes.length ? classes : (await hol("/api/classes")) || [];
+      if (!cls.length) { setMsg(t("market.needClass")); return; }
+      zeilen.push({
+        key: "class", label: t("verkn.klasse"), nurVorhanden: true,
+        hinweis: t("verkn.klasseHinweis"),
+        optionen: cls.map((c) => ({ id: c.id, name: c.name })),
+      });
+    } else if (q.kind === "lernpfad_ladder") {
+      const [detail, topics, paths] = await Promise.all([
+        hol(`/api/marketplace/${q.id}`), hol("/api/topics"), hol("/api/lernpfad/paths"),
+      ]);
+      zeilen.push({
+        key: "topic", label: t("verkn.thema"),
+        vorschlag: detail?.ladder?.topic_name || q.title,
+        optionen: themenNamen(Array.isArray(topics) ? topics : []),
+        hinweis: t("verkn.themaHinweis"),
+      });
+      zeilen.push({
+        key: "path", label: t("verkn.lernpfad"), vorschlag: q.title,
+        optionen: (Array.isArray(paths) ? paths : []).map((p) => ({ id: p.id, name: p.name })),
+      });
+    } else {
+      const baum = await hol("/api/folders");
+      zeilen.push({
+        key: "folder", label: t("verkn.ordner"), vorschlag: t("verkn.ordnerVorschlag"),
+        optionen: flachBaum(Array.isArray(baum) ? baum : []),
+      });
+    }
+    setVerkn({ q, zeilen });
+  };
+
+  /** Die Antwort des Dialogs in den Rumpf fuer /copy uebersetzen. */
+  const verknUebernehmen = (werte) => {
+    const b = {};
+    if (werte.class) b.class_id = werte.class.id;
+    if (werte.topic) { if (werte.topic.id) b.topic_id = werte.topic.id; else b.topic_name = werte.topic.name; }
+    if (werte.path) { if (werte.path.id) b.path_id = werte.path.id; else b.path_name = werte.path.name; }
+    if (werte.folder) { if (werte.folder.id) b.folder_id = werte.folder.id; else b.folder_name = werte.folder.name; }
+    copy(verkn.q, b);
   };
 
   const remove = async (id) => {
@@ -240,7 +291,7 @@ export default function Marketplace({ fixedKind }) {
                 {/* Ansehen darf jeder — uebernehmen nur, wer das Modul hat:
                     der Inhalt landet sonst in einer Oberflaeche, die fehlt. */}
                 {artNutzbar(q.kind) ? (
-                  <button onClick={() => copy(q)} style={{ ...btnPrimary, ...btnSmall, whiteSpace: "nowrap" }}>{t("market.adopt")}</button>
+                  <button onClick={() => uebernehmen(q)} style={{ ...btnPrimary, ...btnSmall, whiteSpace: "nowrap" }}>{t("market.adopt")}</button>
                 ) : (
                   <Link to="/modules" style={{ ...btnSecondary, ...btnSmall, whiteSpace: "nowrap", textDecoration: "none", color: "var(--text3)" }}
                     title={t("market.needsModuleHint")}>{t("market.needsModule")}</Link>
@@ -337,7 +388,7 @@ export default function Marketplace({ fixedKind }) {
                 ))}
                 <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
                   {artNutzbar(preview.kind) ? (
-                    <button onClick={() => { const p = preview; setPreview(null); copy(p); }} style={{ ...btnPrimary, padding: "10px 20px" }}>{t("market.adopt")}</button>
+                    <button onClick={() => { const p = preview; setPreview(null); uebernehmen(p); }} style={{ ...btnPrimary, padding: "10px 20px" }}>{t("market.adopt")}</button>
                   ) : (
                     <Link to="/modules" style={{ ...btnSecondary, padding: "10px 20px", textDecoration: "none" }}>{t("market.needsModule")}</Link>
                   )}
@@ -348,18 +399,13 @@ export default function Marketplace({ fixedKind }) {
         </Modal>
       )}
 
-      {copyDeckFor && (
-        <Modal onClose={() => setCopyDeckFor(null)} width={400} label={t("market.chooseClass")}>
-            <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{t("market.chooseClass")}</h3>
-            <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 12px" }}>{t("market.chooseClassHint", { title: copyDeckFor.title })}</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 320, overflow: "auto" }}>
-              {classes.map((c) => (
-                <button key={c.id} onClick={() => copy({ id: copyDeckFor.id, title: copyDeckFor.title, kind: "karten_deck" }, c.id)}
-                  style={{ ...btnSecondary, textAlign: "left", padding: "10px 12px", background: "var(--bg)" }}>{c.name}</button>
-              ))}
-            </div>
-            <button onClick={() => setCopyDeckFor(null)} style={{ ...btnSecondary, marginTop: 12 }}>{t("common.abort")}</button>
-        </Modal>
+      {verkn && (
+        <VerknuepfungDialog
+          titel={t("market.chooseLinks", { title: verkn.q.title })}
+          zeilen={verkn.zeilen}
+          okLabel={t("market.adopt")}
+          onAbbruch={() => setVerkn(null)}
+          onFertig={verknUebernehmen} />
       )}
     </div>
   );
