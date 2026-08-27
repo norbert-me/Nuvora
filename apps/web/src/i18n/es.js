@@ -2557,4 +2557,12 @@ export default {
   "caldav.pruefKeineAufforderung": "El servidor no pide autenticación — así ningún calendario puede iniciar sesión.",
   "caldav.pruefKeinPrincipal": "El servidor no indica ninguna cuenta.",
   "caldav.pruefPrincipalAlt": "El servidor usa una versión antigua. Actualice Nuvora.",
+
+  // ── CalDAV: tipo de cuenta «Avanzado» ──
+  "caldav.erweitert": "Apple: tipo de cuenta «Avanzado» — mostrar datos",
+  "caldav.erweitertHinweis": "Si Apple dice que no se pudo comprobar la cuenta o la contraseña, elija el tipo de cuenta «Avanzado» e introduzca estos valores. Así Apple no busca el servidor por su cuenta.",
+  "caldav.host": "Dirección del servidor",
+  "caldav.pfad": "Ruta del servidor",
+  "caldav.portZeile": "Puerto {{port}} · Usar SSL: sí",
+  "caldav.ohneSsl": "sin SSL",
 };

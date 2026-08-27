@@ -2551,4 +2551,15 @@ export default {
   "caldav.pruefKeineAufforderung": "Der Server verlangt keine Anmeldung — so kann sich kein Kalender anmelden.",
   "caldav.pruefKeinPrincipal": "Der Server nennt kein Benutzerkonto.",
   "caldav.pruefPrincipalAlt": "Der Server läuft mit einer alten Fassung. Bitte Nuvora aktualisieren.",
+
+  // ── CalDAV: Kontotyp „Erweitert" ──
+  // Unter „Manuell" benutzt macOS den eingetippten Pfad teils gar nicht,
+  // sondern sucht selbst unter /.well-known/caldav — und den fangen viele
+  // vorgeschaltete Proxys fuer Let's Encrypt selbst ab.
+  "caldav.erweitert": "Apple: Kontotyp „Erweitert“ — Angaben zeigen",
+  "caldav.erweitertHinweis": "Wenn Apple „Accountname/Passwort konnte nicht überprüft werden“ meldet, in den Einstellungen Accounttyp „Erweitert“ wählen und diese Werte eintragen. Dann sucht Apple den Server nicht selbst.",
+  "caldav.host": "Serveradresse",
+  "caldav.pfad": "Serverpfad",
+  "caldav.portZeile": "Port {{port}} · SSL verwenden: ja",
+  "caldav.ohneSsl": "ohne SSL",
 };

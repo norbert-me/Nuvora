@@ -469,6 +469,19 @@ async def liste(request: Request, db: AsyncSession = Depends(get_db),
         # zusammensetzen zu lassen ist die Stelle, an der die Einrichtung
         # scheitert — Apple sagt dazu nur „Server nicht gefunden".
         "server": str(request.base_url).rstrip("/") + "/api/caldav/",
+        # Getrennt noch einmal Host und Pfad — fuer den Kontotyp „Erweitert".
+        #
+        # Der ist nicht die Notloesung, sondern oft der einzige Weg: im
+        # Dialog „Manuell" benutzt macOS den eingetippten Pfad teilweise gar
+        # nicht, sondern sucht selbst unter /.well-known/caldav (RFC 6764) —
+        # und genau diesen Pfad fangen viele vorgeschaltete Proxys fuer
+        # Let's Encrypt selbst ab. Dann laeuft Apples Suche ins Leere, waehrend
+        # /api/caldav/ einwandfrei antwortet. Unter „Erweitert" wird der Pfad
+        # ausdruecklich gesetzt und gar nicht erst gesucht.
+        "host": request.url.hostname or "",
+        "pfad": f"/api/caldav/p/{user.id}/",
+        "port": request.url.port or (443 if request.url.scheme == "https" else 80),
+        "ssl": request.url.scheme == "https",
         "zugaenge": [{"id": r.id, "name": r.name,
                       "angelegt": r.created_at.isoformat() if r.created_at else None,
                       "zuletzt": r.last_used_at.isoformat() if r.last_used_at else None}

@@ -54,6 +54,7 @@ export default function CaldavZugaenge() {
   //
   // Basic-Kopfzeile auch beim Versuch ohne Passwort, damit kein Browser einen
   // eigenen Anmeldedialog aufmacht.
+  const [erweitert, setErweitert] = useState(false);
   const [pruefPasswort, setPruefPasswort] = useState("");
   const [befund, setBefund] = useState(null);      // {ok, text}
 
@@ -122,6 +123,29 @@ export default function CaldavZugaenge() {
         <Zeile label={t("caldav.server")} wert={daten.server} t={t} />
         <Zeile label={t("caldav.benutzer")} wert={daten.benutzer} t={t} />
         <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 6 }}>{t("caldav.passwortZeile")}</div>
+
+        {/* Der Kontotyp „Erweitert" ist bei Apple oft nicht die Notlösung,
+            sondern der einzige Weg: unter „Manuell" benutzt macOS den
+            eingetippten Pfad teils gar nicht, sondern sucht selbst unter
+            /.well-known/caldav — und den Pfad fangen viele vorgeschaltete
+            Proxys für Let's Encrypt selbst ab. Mit ausdrücklichem Serverpfad
+            sucht Apple nicht. */}
+        <button onClick={() => setErweitert((v) => !v)}
+          style={{ background: "none", border: "none", padding: 0, marginTop: 8, cursor: "pointer",
+            color: "var(--accent)", fontSize: 12, fontWeight: 600 }}>
+          {t("caldav.erweitert")}
+        </button>
+        {erweitert && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 6 }}>{t("caldav.erweitertHinweis")}</div>
+            <Zeile label={t("caldav.host")} wert={daten.host} t={t} />
+            <Zeile label={t("caldav.pfad")} wert={daten.pfad} t={t} />
+            <div style={{ fontSize: 12, color: "var(--text3)" }}>
+              {t("caldav.portZeile", { port: daten.port })}
+              {daten.ssl ? "" : ` · ${t("caldav.ohneSsl")}`}
+            </div>
+          </div>
+        )}
       </div>
 
       {frisch && (

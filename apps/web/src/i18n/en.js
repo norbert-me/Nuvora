@@ -2556,4 +2556,12 @@ export default {
   "caldav.pruefKeineAufforderung": "The server does not ask for a login — no calendar can sign in like this.",
   "caldav.pruefKeinPrincipal": "The server names no user account.",
   "caldav.pruefPrincipalAlt": "The server runs an old version. Please update Nuvora.",
+
+  // ── CalDAV: account type “Advanced” ──
+  "caldav.erweitert": "Apple: account type “Advanced” — show settings",
+  "caldav.erweitertHinweis": "If Apple says the account name or password could not be verified, choose account type “Advanced” and enter these values. Apple then stops searching for the server itself.",
+  "caldav.host": "Server address",
+  "caldav.pfad": "Server path",
+  "caldav.portZeile": "Port {{port}} · Use SSL: yes",
+  "caldav.ohneSsl": "without SSL",
 };
