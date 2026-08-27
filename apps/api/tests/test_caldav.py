@@ -325,6 +325,57 @@ async def test_einrichtungskette(welt):
 
 
 @pytest.mark.asyncio
+async def test_principal_ist_ein_principal_und_kein_kalender(welt):
+    """Woran Apple die geglueckte Anmeldung erkennt.
+
+    Der Principal muss `<D:principal/>` tragen. Gibt er sich stattdessen als
+    Kalender aus, bricht die Kontoeinrichtung mit „Accountname/Passwort konnte
+    nicht ueberprueft werden" ab — Apple sucht dort einen Principal und findet
+    keinen. Genau so ist es beim ersten Anlauf am Mac passiert.
+    """
+    r = await _ruf(welt["app"], "PROPFIND", f"/api/caldav/p/{welt['user_id']}/",
+                   kopf={"depth": 0}, body=(
+        b'<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">'
+        b"<D:prop><D:resourcetype/><D:principal-URL/><D:principal-collection-set/>"
+        b"<C:calendar-home-set/></D:prop></D:propfind>"))
+    assert r.status == 207
+    assert "<D:principal/>" in r.text
+    # Und NICHT als Kalender: sonst legt der Client die Sammlung selbst noch
+    # einmal neben dem echten Kalender an.
+    assert "<C:calendar/>" not in r.text
+    assert "principal-collection-set" in r.text and "calendar-home-set" in r.text
+
+
+@pytest.mark.asyncio
+async def test_nur_der_kalender_ist_ein_kalender(welt):
+    r = await _ruf(welt["app"], "PROPFIND", _kal(welt), kopf={"depth": 0}, body=(
+        b'<D:propfind xmlns:D="DAV:"><D:prop><D:resourcetype/></D:prop></D:propfind>'))
+    assert "<C:calendar/>" in r.text
+
+
+@pytest.mark.asyncio
+async def test_heim_listet_den_kalender(welt):
+    """Apple zaehlt die Kalender ueber ein PROPFIND mit Depth: 1 auf dem
+    calendar-home ab. Kommt dort keiner, ist das Konto leer."""
+    r = await _ruf(welt["app"], "PROPFIND", f"/api/caldav/p/{welt['user_id']}/",
+                   kopf={"depth": 1}, body=(
+        b'<D:propfind xmlns:D="DAV:"><D:prop><D:resourcetype/><D:displayname/></D:prop></D:propfind>'))
+    assert r.status == 207
+    assert _kal(welt) in r.text and "<C:calendar/>" in r.text
+
+
+@pytest.mark.asyncio
+async def test_unbekannte_eigenschaft_kommt_im_richtigen_namensraum_zurueck(welt):
+    """Ein CalDAV-Merkmal als <D:…> zurueckzumelden waere eine ANDERE
+    Eigenschaft — der Client fragt sie dann bei jedem Abgleich erneut."""
+    r = await _ruf(welt["app"], "PROPFIND", _kal(welt), kopf={"depth": 0}, body=(
+        b'<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">'
+        b"<D:prop><C:calendar-timezone/></D:prop></D:propfind>"))
+    assert "<C:calendar-timezone/>" in r.text
+    assert "404" in r.text
+
+
+@pytest.mark.asyncio
 async def test_fremder_principal_wird_abgewiesen(welt):
     """Der Zugang haengt am angemeldeten Konto, nicht am Pfad."""
     r = await _ruf(welt["app"], "PROPFIND", f"/api/caldav/p/{welt['user_id'] + 999}/kalender/",

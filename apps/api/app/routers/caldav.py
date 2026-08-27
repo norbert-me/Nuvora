@@ -169,55 +169,90 @@ async def _alle(db: AsyncSession, u: User, fenster=None):
 
 # ─── Eigenschaften ───
 
-def _props(u: User, *, sammlung: bool, href: str, etag_wert: str = "",
+def _props(u: User, *, art: str, href: str, etag_wert: str = "",
            ctag_wert: str = "", gefragt=None) -> str:
-    """Die Antwort auf ein PROPFIND fuer EINE Ressource."""
+    """Die Antwort auf ein PROPFIND fuer EINE Ressource.
+
+    `art` ist einer von vier Werten, und der Unterschied ist nicht kosmetisch —
+    Apple prueft beim Anmelden genau daran, ob es einen Kalenderserver vor sich
+    hat:
+
+    * "wurzel"    — nur ein Verzeichnis. Es sagt, wo der Principal liegt.
+    * "principal" — WER angemeldet ist. Muss `<D:principal/>` im resourcetype
+      tragen; ein Principal, der sich als Kalender ausgibt, laesst die
+      Kontoeinrichtung mit „Accountname/Passwort konnte nicht ueberprueft
+      werden" abbrechen — Apple sucht dort einen Principal und findet keinen.
+      Er ist zugleich das calendar-home (so macht es auch Radicale): die
+      Sammlung, in der die Kalender liegen.
+    * "kalender"  — DER Kalender. Nur er traegt `<C:calendar/>`.
+    * "datei"     — ein einzelner Termin.
+    """
+    ich = f"/api/caldav/p/{u.id}/"
     alle = {
-        "resourcetype": ("<D:resourcetype><D:collection/><C:calendar/></D:resourcetype>"
-                         if sammlung else "<D:resourcetype/>"),
-        "displayname": f"<D:displayname>{KALENDER_NAME}</D:displayname>",
-        "current-user-principal": f"<D:current-user-principal><D:href>/api/caldav/p/{u.id}/</D:href></D:current-user-principal>",
-        "principal-URL": f"<D:principal-URL><D:href>/api/caldav/p/{u.id}/</D:href></D:principal-URL>",
-        "owner": f"<D:owner><D:href>/api/caldav/p/{u.id}/</D:href></D:owner>",
-        "calendar-home-set": f"<C:calendar-home-set><D:href>/api/caldav/p/{u.id}/</D:href></C:calendar-home-set>",
+        "current-user-principal": f"<D:current-user-principal><D:href>{ich}</D:href></D:current-user-principal>",
+    }
+    if art == "wurzel":
+        alle["resourcetype"] = "<D:resourcetype><D:collection/></D:resourcetype>"
+        alle["displayname"] = f"<D:displayname>{KALENDER_NAME}</D:displayname>"
+    elif art == "principal":
+        # `<D:principal/>` ist der Punkt, an dem Apple erkennt, dass die
+        # Anmeldung geglueckt ist. `<C:calendar/>` darf hier NICHT stehen —
+        # sonst haelt der Client die Sammlung selbst fuer einen Kalender und
+        # legt sie neben dem echten noch einmal an.
+        alle["resourcetype"] = "<D:resourcetype><D:collection/><D:principal/></D:resourcetype>"
+        alle["displayname"] = f"<D:displayname>{_xml(u.name or KALENDER_NAME)}</D:displayname>"
+        alle["principal-URL"] = f"<D:principal-URL><D:href>{ich}</D:href></D:principal-URL>"
+        # Wo Principals ueberhaupt liegen. Apple fragt das beim Einrichten ab;
+        # fehlt es, gilt der Server manchen Fassungen als unvollstaendig.
+        alle["principal-collection-set"] = "<D:principal-collection-set><D:href>/api/caldav/</D:href></D:principal-collection-set>"
+        alle["calendar-home-set"] = f"<C:calendar-home-set><D:href>{ich}</D:href></C:calendar-home-set>"
         # Leer, aber vorhanden: fehlt sie ganz, fragt Apple sie bei jedem
-        # Abgleich erneut ab. Eine E-Mail-Adresse gehoert nicht hinein — der
-        # Kalender lädt niemanden ein.
-        "calendar-user-address-set": "<C:calendar-user-address-set/>",
+        # Abgleich erneut ab. Eine E-Mail-Adresse gehoert nicht hinein — dieser
+        # Kalender laedt niemanden ein.
+        alle["calendar-user-address-set"] = "<C:calendar-user-address-set/>"
+        alle["supported-report-set"] = _REPORTS
+    elif art == "kalender":
+        alle["resourcetype"] = "<D:resourcetype><D:collection/><C:calendar/></D:resourcetype>"
+        alle["displayname"] = f"<D:displayname>{KALENDER_NAME}</D:displayname>"
+        alle["calendar-description"] = f"<C:calendar-description>{KALENDER_NAME}</C:calendar-description>"
         # Nur Termine. Genau deshalb lehnt PUT eine VTODO ab, statt sie
         # stillschweigend wegzuwerfen.
-        "supported-calendar-component-set": '<C:supported-calendar-component-set><C:comp name="VEVENT"/></C:supported-calendar-component-set>',
-        "supported-report-set": ("<D:supported-report-set>"
-                                 "<D:supported-report><D:report><C:calendar-query/></D:report></D:supported-report>"
-                                 "<D:supported-report><D:report><C:calendar-multiget/></D:report></D:supported-report>"
-                                 "</D:supported-report-set>"),
-        "getcontenttype": "<D:getcontenttype>text/calendar; charset=utf-8; component=VEVENT</D:getcontenttype>",
-        "calendar-description": f"<C:calendar-description>{KALENDER_NAME}</C:calendar-description>",
-    }
+        alle["supported-calendar-component-set"] = '<C:supported-calendar-component-set><C:comp name="VEVENT"/></C:supported-calendar-component-set>'
+        alle["supported-report-set"] = _REPORTS
+        alle["owner"] = f"<D:owner><D:href>{ich}</D:href></D:owner>"
+    else:   # datei
+        alle["resourcetype"] = "<D:resourcetype/>"
+        alle["getcontenttype"] = "<D:getcontenttype>text/calendar; charset=utf-8; component=VEVENT</D:getcontenttype>"
+        alle["owner"] = f"<D:owner><D:href>{ich}</D:href></D:owner>"
+
     if ctag_wert:
         alle["getctag"] = f"<CS:getctag>{ctag_wert}</CS:getctag>"
     if etag_wert:
         alle["getetag"] = f"<D:getetag>{etag_wert}</D:getetag>"
-    if sammlung:
-        alle.pop("getcontenttype", None)
-    else:
-        for weg in ("resourcetype", "displayname", "calendar-home-set",
-                    "supported-calendar-component-set", "calendar-description",
-                    "supported-report-set"):
-            alle.pop(weg, None)
-        alle["resourcetype"] = "<D:resourcetype/>"
 
     if gefragt is None:
         return X.response(href, alle)
     gefunden, fehlend = {}, []
-    for _, name in gefragt:
+    for raum, name in gefragt:
         if name in alle:
             gefunden[name] = alle[name]
         else:
             # Was wir nicht fuehren, muss ausdruecklich als 404 kommen — sonst
-            # fragt der Client es bei jedem Abgleich erneut.
-            fehlend.append(f"D:{name}")
+            # fragt der Client es bei jedem Abgleich erneut. Und zwar im
+            # Namensraum, in dem GEFRAGT wurde: ein CalDAV-Merkmal als
+            # <D:…> zurueckzumelden waere eine andere Eigenschaft.
+            fehlend.append(f"{_PRAEFIX.get(raum, 'D')}:{name}")
     return X.response(href, gefunden, fehlend)
+
+
+_REPORTS = ("<D:supported-report-set>"
+            "<D:supported-report><D:report><C:calendar-query/></D:report></D:supported-report>"
+            "<D:supported-report><D:report><C:calendar-multiget/></D:report></D:supported-report>"
+            "</D:supported-report-set>")
+
+# Namensraum -> Praefix, damit eine fehlende Eigenschaft dort gemeldet wird, wo
+# nach ihr gefragt wurde.
+_PRAEFIX = {u: p for p, u in X.NS.items()}
 
 
 def _multistatus(inhalt: str) -> Response:
@@ -251,11 +286,12 @@ async def wurzel(request: Request, user_id: Optional[int] = None,
     gefragt = X.gefragte_props(X.parse_xml(await request.body()))
     tiefe = request.headers.get("depth", "0")
     href = f"/api/caldav/p/{u.id}/" if user_id is not None else "/api/caldav/"
-    antworten = [_props(u, sammlung=True, href=href, gefragt=gefragt)]
+    antworten = [_props(u, art=("principal" if user_id is not None else "wurzel"),
+                        href=href, gefragt=gefragt)]
     if tiefe != "0" and user_id is not None:
         eintraege = await _alle(db, u)
         texte = await _texte(db, u, eintraege)
-        antworten.append(_props(u, sammlung=True, href=_pfad(u.id),
+        antworten.append(_props(u, art="kalender", href=_pfad(u.id),
                                 ctag_wert=X.ctag([X.etag(t) for t in texte.values()]),
                                 gefragt=gefragt))
     return _multistatus(X.multistatus(antworten))
@@ -301,11 +337,11 @@ async def sammlung(request: Request, user_id: int, db: AsyncSession = Depends(ge
     # PROPFIND
     eintraege = await _alle(db, u)
     texte = await _texte(db, u, eintraege)
-    antworten = [_props(u, sammlung=True, href=_pfad(u.id),
+    antworten = [_props(u, art="kalender", href=_pfad(u.id),
                         ctag_wert=X.ctag([X.etag(t) for t in texte.values()]), gefragt=gefragt)]
     if request.headers.get("depth", "0") != "0":
         for e in eintraege:
-            antworten.append(_props(u, sammlung=False, href=_pfad(u.id, _dateiname(e)),
+            antworten.append(_props(u, art="datei", href=_pfad(u.id, _dateiname(e)),
                                     etag_wert=X.etag(texte[e.id]), gefragt=gefragt))
     return _multistatus(X.multistatus(antworten))
 
