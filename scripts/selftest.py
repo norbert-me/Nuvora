@@ -254,11 +254,55 @@ def teste_erreichbarkeit(api, b):
             return f"HTTP {status} nach {ziel[:60]}"
         raise AssertionError(f"http:// antwortet mit {status} statt einer Umleitung auf https")
 
+    def caldav_erkennung():
+        """Die Erkennung darf nicht auf http zurueckfallen.
+
+        Ein Kalender-Client (Apple, Outlook, Thunderbird) sucht den Server
+        unter `/.well-known/caldav` und folgt der Umleitung. Zeigt die auf
+        `http://`, waehrend er ueber https gekommen ist, bricht er ab — ohne
+        die eigentliche Anfrage je zu stellen. Im Serverlog steht dann NICHTS,
+        und die Kalender-App sagt nur „Accountname/Passwort konnte nicht
+        ueberprueft werden": ein Fehlerbild, das drei Tage in die falsche
+        Richtung zeigt, weil alles andere gruen ist.
+
+        Genau so ist es passiert — der vorgeschaltete Proxy beendet TLS, der
+        Container sah nur http und baute die Umleitung damit.
+        """
+        status, _, kopfe = _roh_mit_kopfen(api, "/.well-known/caldav")
+        if status not in (301, 302, 307, 308):
+            raise AssertionError(f"HTTP {status} statt einer Umleitung — Kalender-Apps "
+                                 f"finden den Server nicht von selbst")
+        ziel = kopfe.get("location") or ""
+        if ziel.startswith("http://") and api.basis.startswith("https://"):
+            raise AssertionError(f"Umleitung auf {ziel} — von https auf http; jeder "
+                                 f"Kalender-Client bricht hier ab")
+        return f"HTTP {status} nach {ziel[:60] or '(relativ)'}"
+
     b.pruefe("Erreichbarkeit", "TLS-Zertifikat", zertifikat)
     b.pruefe("Erreichbarkeit", "Umleitung http -> https", umleitung, schwere="warnung")
+    b.pruefe("Erreichbarkeit", "CalDAV-Erkennung (/.well-known/caldav)", caldav_erkennung)
 
 
 # Kopfzeilen, die jede Antwort tragen muss, mit dem Grund dahinter.
+def _roh_mit_kopfen(api, pfad):
+    """Eine Anfrage, die Umleitungen NICHT folgt — sonst meldet urllib immer
+    das Ziel und man sieht nie, wohin umgeleitet wurde."""
+    import urllib.error
+    import urllib.request
+
+    class _Ohne(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *a, **k):
+            return None
+
+    oeffner = urllib.request.build_opener(_Ohne)
+    anfrage = urllib.request.Request(api.basis + pfad, headers={"User-Agent": "Nuvora-Selbsttest"})
+    try:
+        with oeffner.open(anfrage, timeout=10) as r:
+            return r.status, r.read(2000).decode("utf-8", "replace"), {k.lower(): v for k, v in r.headers.items()}
+    except urllib.error.HTTPError as e:
+        return e.code, (e.read(2000) or b"").decode("utf-8", "replace"), {k.lower(): v for k, v in (e.headers or {}).items()}
+
+
 SICHERHEITS_KOPFE = [
     ("x-content-type-options", "nosniff",
      "ohne ihn raten Browser den Dateityp und fuehren notfalls Hochgeladenes aus"),

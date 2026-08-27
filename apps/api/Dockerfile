@@ -41,4 +41,14 @@ USER nuvora
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=4).status == 200 else 1)"
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# --proxy-headers: X-Forwarded-Proto/-For auswerten, statt jede Anfrage fuer
+# http zu halten. Ohne das baut die Anwendung Adressen mit falschem Schema —
+# die CalDAV-Serveradresse und die Kalender-Abo-URL standen als `http://…` in
+# der Oberflaeche, obwohl die Seite ueber https lief.
+# --forwarded-allow-ips=*: die Kopfzeilen kommen vom proxy-Container, dessen IP
+# im Docker-Netz nicht feststeht; der Standard (127.0.0.1) trifft sie nie. Das
+# ist hier vertretbar, weil NUR der proxy-Container einen Port veroeffentlicht
+# (docker-compose.yml) — die API ist von aussen nicht direkt erreichbar. Wer
+# das aendert, muss diese Zeile mit aendern.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", \
+     "--proxy-headers", "--forwarded-allow-ips", "*"]
