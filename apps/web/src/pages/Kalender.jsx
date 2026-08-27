@@ -601,12 +601,6 @@ export default function Kalender() {
             <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>{t("kalender.subscribeTitle")}</h3>
             <p style={{ fontSize: 13, color: "var(--text2)", marginBottom: 16, lineHeight: 1.5 }}>{t("kalender.subscribeText")}</p>
             <a href={abo.webcal} style={{ ...btnPrimary, display: "inline-block", textDecoration: "none", marginBottom: 16 }}>{t("kalender.subscribeNow")}</a>
-            <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 4 }}>{t("kalender.subscribeManual")}</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input readOnly value={abo.url} onFocus={(e) => e.target.select()} style={{ ...inputStyle, flex: 1, fontSize: 12 }} />
-              <button onClick={() => { navigator.clipboard?.writeText(abo.url); }} style={btnSecondary}>{t("common.copy")}</button>
-            </div>
-
             {/* Der ehrliche Stand. Ein Abo wird vom Kalender GEHOLT — Nuvora kann
                 nichts hinschicken. Wer die Aenderung im Handy vermisst, sieht hier,
                 ob sein Kalender ueberhaupt schon einmal geholt hat. */}

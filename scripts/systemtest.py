@@ -1249,17 +1249,24 @@ def teste_caldav(api, b, u, sch, spuren):
             req.add_header("Content-Type", "application/xml; charset=utf-8")
         for k, v in (kopfe or {}).items():
             req.add_header(k, v)
+        # Kopfzeilen KLEIN geschrieben zurueckgeben. Starlette legt die Namen
+        # intern klein ab, uvicorn schickt sie so ueber die Leitung — wer hier
+        # nach "DAV" oder "Content-Location" sucht, findet nichts und haelt
+        # einen gesunden Server fuer kaputt. Genau das ist beim ersten Lauf
+        # passiert (drei rote Proben, eine falsche Schreibweise).
         try:
             with urllib.request.urlopen(req, timeout=20) as r:
-                return r.status, r.read().decode("utf-8", "replace"), dict(r.headers)
+                kopf = {k.lower(): v for k, v in r.headers.items()}
+                return r.status, r.read().decode("utf-8", "replace"), kopf
         except urllib.error.HTTPError as e:
-            return e.code, (e.read() or b"").decode("utf-8", "replace"), dict(e.headers or {})
+            kopf = {k.lower(): v for k, v in (e.headers or {}).items()}
+            return e.code, (e.read() or b"").decode("utf-8", "replace"), kopf
 
     def erkennung():
         st, _, kopfe = dav("OPTIONS", "/api/caldav/")
         if st != 200:
             raise AssertionError(f"OPTIONS kommt nicht durch (HTTP {st}) — Proxy?")
-        if "calendar-access" not in (kopfe.get("DAV") or kopfe.get("Dav") or ""):
+        if "calendar-access" not in (kopfe.get("dav") or ""):
             raise AssertionError("DAV-Kopfzeile fehlt — Apple haelt das nicht fuer einen Kalender")
         return "OPTIONS mit DAV: calendar-access"
 
@@ -1267,7 +1274,7 @@ def teste_caldav(api, b, u, sch, spuren):
         st, _, kopfe = dav("PROPFIND", "/api/caldav/", mit_anmeldung=False)
         if st != 401:
             raise AssertionError(f"ohne Anmeldung HTTP {st} statt 401")
-        if "basic" not in (kopfe.get("WWW-Authenticate") or "").lower():
+        if "basic" not in (kopfe.get("www-authenticate") or "").lower():
             raise AssertionError("ohne WWW-Authenticate fragt kein Client nach Zugangsdaten")
         return "ohne Zugangsdaten 401 mit Aufforderung"
 
@@ -1299,7 +1306,12 @@ def teste_caldav(api, b, u, sch, spuren):
                            kopfe={"Content-Type": "text/calendar; charset=utf-8"})
         if st not in (200, 201, 204):
             raise AssertionError(f"PUT abgelehnt (HTTP {st})")
-        ort = kopfe.get("Content-Location") or (heim[0] + "probe.ics")
+        # Der Ort kommt vom Server: unsere Ressourcennamen tragen die ID,
+        # heissen also nicht wie die hochgeladene Datei. Ohne diese Zeile
+        # suchte die Probe den Termin unter dem falschen Namen.
+        ort = kopfe.get("content-location")
+        if not ort:
+            raise AssertionError("PUT ohne Content-Location — der Client legte den Termin doppelt an")
         heim.append(ort)
         st, text, _ = dav("GET", ort)
         if st != 200 or f"{PRAEFIX} CalDAV-Probe" not in text:

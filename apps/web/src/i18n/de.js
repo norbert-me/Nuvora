@@ -973,7 +973,6 @@ export default {
   "kalender.subscribeTitle": "Kalender abonnieren",
   "kalender.subscribeText": "Abonniere deinen Nuvora-Kalender in Apple Kalender, Google Kalender o.ä. — er aktualisiert sich automatisch, kein erneuter Download nötig.",
   "kalender.subscribeNow": "In Kalender-App öffnen",
-  "kalender.subscribeManual": "Oder diese URL im Kalender als Abo eintragen:",
   "kalender.resync": "Neu verbinden",
   "kalender.resyncing": "Setze zurück…",
   "kalender.resyncHint": "Erzeugt eine neue Abo-URL — alten Nuvora-Kalender im Gerät entfernen und die neue URL abonnieren. Lädt alles einmal frisch.",
@@ -2524,20 +2523,20 @@ export default {
   // ── CalDAV (components/CaldavZugaenge.jsx) ──
   // Das Abo darueber ist einseitig: der Kalender HOLT eine Datei und bietet gar
   // keinen „Termin hinzufuegen"-Knopf an. CalDAV kann schreiben.
-  "caldav.titel": "Termine aus Apple oder Outlook eintragen (CalDAV)",
-  "caldav.text": "Das Abo oben zeigt Ihren Kalender nur an — dort lässt sich nichts eintragen. Über CalDAV binden Sie Nuvora wie einen iCloud-Kalender ein: Termine, die Sie im Handy anlegen, ändern oder löschen, stehen danach in Nuvora.",
+  "caldav.titel": "Termine im Handy eintragen (CalDAV)",
+  "caldav.text": "Das Abo oben zeigt nur an. Über CalDAV können Sie auch eintragen.",
   "caldav.server": "Serveradresse",
   "caldav.benutzer": "Benutzername",
-  "caldav.passwortZeile": "Als Passwort nehmen Sie ein Gerätepasswort von unten — nicht Ihr Nuvora-Passwort.",
+  "caldav.passwortZeile": "Als Passwort ein Gerätepasswort von unten — nicht Ihr Nuvora-Passwort.",
   "caldav.namePlatzhalter": "Wofür? z. B. „iPhone“, „Dienst-iPad“",
   "caldav.anlegen": "Gerätepasswort anlegen",
   "caldav.neuTitel": "Neues Passwort für „{{name}}“",
-  "caldav.nurEinmal": "Notieren Sie es jetzt — es wird nur dieses eine Mal angezeigt. Danach steht bei uns nur noch eine unlesbare Prüfsumme.",
+  "caldav.nurEinmal": "Jetzt notieren — es wird nur einmal angezeigt.",
   "caldav.notiert": "Notiert",
   "caldav.zuruecknehmen": "Zurücknehmen",
   "caldav.zuletzt": "zuletzt {{wann}}",
   "caldav.nieBenutzt": "noch nie benutzt",
-  "caldav.grenzen": "In diesem Kalender liegen Ihre Kalendereinträge. Ferien und die wiederkehrenden Stundenplan-Stunden bleiben im Abo oben — sie lassen sich nicht als einzelne Termine bearbeiten, und ein Wisch im Handy dürfte sie nicht löschen. Serientermine („jeden Montag“) nimmt Nuvora nicht an, weil ein Eintrag hier zu genau einem Tag gehört.",
+  "caldav.grenzen": "Hier liegen nur Ihre Termine. Ferien und Stundenplan bleiben im Abo. Serientermine gehen nicht.",
   "help.kal.caldavT": "Termine im Handy eintragen (CalDAV)",
   "help.kal.caldav": "Der abonnierte Kalender zeigt Ihre Termine nur an — eintragen lässt sich dort nichts, das liegt am Abo-Verfahren selbst. Wer auch vom Handy aus Termine anlegen will, richtet CalDAV ein: im Kalender über ⋯ → „Kalender teilen“, dort ein Gerätepasswort anlegen und Serveradresse, Benutzername und dieses Passwort in Apple oder Outlook eintragen. Für jedes Gerät ein eigenes Passwort, damit ein verlorenes Handy einzeln ausgesperrt werden kann; Ihr Nuvora-Passwort gehört nicht ins Gerät. Ferien und Stundenplan-Stunden bleiben im Abo — sie sind keine einzelnen Termine.",
 };
