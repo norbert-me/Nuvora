@@ -2536,4 +2536,19 @@ export default {
   "caldav.grenzen": "Hier liegen nur Ihre Termine. Ferien und Stundenplan bleiben im Abo. Serientermine gehen nicht.",
   "help.kal.caldavT": "Termine im Handy eintragen (CalDAV)",
   "help.kal.caldav": "Der abonnierte Kalender zeigt Ihre Termine nur an — eintragen lässt sich dort nichts, das liegt am Abo-Verfahren selbst. Wer auch vom Handy aus Termine anlegen will, richtet CalDAV ein: im Kalender über ⋯ → „Kalender teilen“, dort ein Gerätepasswort anlegen und Serveradresse, Benutzername und dieses Passwort in Apple oder Outlook eintragen. Für jedes Gerät ein eigenes Passwort, damit ein verlorenes Handy einzeln ausgesperrt werden kann; Ihr Nuvora-Passwort gehört nicht ins Gerät. Ferien und Stundenplan-Stunden bleiben im Abo — sie sind keine einzelnen Termine.",
+
+  // ── CalDAV: Verbindung prüfen ──
+  // Ein Browser kann keinen Kalender einrichten, aber genau die Anfrage
+  // stellen, die Apple als erstes stellt — durch denselben Proxy.
+  "caldav.pruefen": "Verbindung prüfen",
+  "caldav.pruefPlatzhalter": "Gerätepasswort (optional)",
+  "caldav.pruefOhnePasswort": "Der Server antwortet als Kalenderserver. Für den vollen Test ein Gerätepasswort eintragen.",
+  "caldav.pruefGut": "Alles in Ordnung — Serveradresse, Benutzername und Gerätepasswort stimmen.",
+  "caldav.pruefPasswort": "Gerätepasswort oder Benutzername stimmt nicht. Legen Sie oben ein neues Gerätepasswort an.",
+  "caldav.pruefProxy": "Der Webserver blockiert CalDAV (HTTP {{status}}). Das liegt nicht an Nuvora, sondern am vorgeschalteten Proxy — er muss die Methode PROPFIND durchlassen.",
+  "caldav.pruefNetz": "Keine Verbindung zum Server.",
+  "caldav.pruefStatus": "Unerwartete Antwort (HTTP {{status}}).",
+  "caldav.pruefKeineAufforderung": "Der Server verlangt keine Anmeldung — so kann sich kein Kalender anmelden.",
+  "caldav.pruefKeinPrincipal": "Der Server nennt kein Benutzerkonto.",
+  "caldav.pruefPrincipalAlt": "Der Server läuft mit einer alten Fassung. Bitte Nuvora aktualisieren.",
 };

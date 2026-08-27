@@ -78,7 +78,13 @@ window.fetch = function(input, init) {
     // dieselbe Route wieder, bekam wieder 401: eine Endlosschleife, in der die
     // Schuelerseite auf dem Ladeskelett stehen blieb. Genau der Weg, den die
     // Kinder nehmen.
-    if (res.status === 401 && isApi && !url.includes("/auth/") && tokenBeimStart) {
+    // Auch der CalDAV-Weg ist ausgenommen: dort heisst 401 „kein oder falsches
+    // GERAETE-Passwort" und nie „deine Sitzung ist abgelaufen". Er meldet sich
+    // ausdruecklich mit Basic an, nicht mit dem Token der Oberflaeche — ohne
+    // diese Ausnahme wirft die Verbindungspruefung im Teilen-Dialog die
+    // Lehrkraft aus ihrem eigenen Konto und laedt die Seite neu.
+    if (res.status === 401 && isApi && !url.includes("/auth/")
+        && !url.includes("/api/caldav/") && tokenBeimStart) {
       const tokenJetzt = lies("token") || "";
       if (tokenJetzt === tokenBeimStart) {
         loesche("token");

@@ -32,6 +32,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import PlainTextResponse as _Text
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -262,8 +263,8 @@ def _multistatus(inhalt: str) -> Response:
 
 # ─── Endpunkte ───
 
-@router.api_route("/", methods=["OPTIONS", "PROPFIND"])
-@router.api_route("/p/{user_id}/", methods=["OPTIONS", "PROPFIND"])
+@router.api_route("/", methods=["OPTIONS", "PROPFIND", "GET"])
+@router.api_route("/p/{user_id}/", methods=["OPTIONS", "PROPFIND", "GET"])
 async def wurzel(request: Request, user_id: Optional[int] = None,
                  db: AsyncSession = Depends(get_db)):
     """Der Einstieg: „wer bin ich" und „wo liegt mein Kalender".
@@ -275,6 +276,20 @@ async def wurzel(request: Request, user_id: Optional[int] = None,
     if request.method == "OPTIONS":
         return Response(status_code=200, headers={
             **_DAV_KOPF, "Allow": "OPTIONS, PROPFIND, REPORT, GET, PUT, DELETE, HEAD"})
+    if request.method == "GET":
+        # Wer die Adresse in den Browser tippt, bekam bisher „Method Not
+        # Allowed" — richtig (ein Browser spricht kein CalDAV), aber es liest
+        # sich wie ein Fehler und hat genau so schon einmal zu einer falschen
+        # Fehlersuche gefuehrt. Ein Satz Klartext kostet nichts und beantwortet
+        # die Frage, die derjenige wirklich hat.
+        return _Text(
+            "Das ist der CalDAV-Zugang von Nuvora.\n\n"
+            "Diese Adresse gehoert in die Kalender-App (Apple, Outlook, "
+            "Thunderbird), nicht in den Browser — ein Browser kann CalDAV "
+            "nicht sprechen.\n\n"
+            "Serveradresse, Benutzername und ein Geraete-Passwort stehen in "
+            "Nuvora unter Kalender -> Kalender teilen.\n",
+            media_type="text/plain; charset=utf-8", headers=_DAV_KOPF)
     u, absage = await _zugang(request, db)
     if absage:
         return absage

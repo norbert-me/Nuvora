@@ -305,6 +305,19 @@ async def test_options_nennt_dav_faehigkeiten(welt):
 
 
 @pytest.mark.asyncio
+async def test_browser_bekommt_klartext_statt_405(welt):
+    """Wer die Adresse in den Browser tippt, soll erfahren, was sie ist.
+
+    „Method Not Allowed" ist technisch richtig — ein Browser spricht kein
+    CalDAV — liest sich aber wie ein Serverfehler und hat genau so schon einmal
+    eine falsche Fehlersuche ausgeloest.
+    """
+    r = await _ruf(welt["app"], "GET", "/api/caldav/", auth=False)
+    assert r.status == 200
+    assert "CalDAV" in r.text and "Kalender-App" in r.text
+
+
+@pytest.mark.asyncio
 async def test_einrichtungskette(welt):
     """Wurzel -> Principal -> Kalender. Apple geht genau diese drei Schritte."""
     r = await _ruf(welt["app"], "PROPFIND", "/api/caldav/", kopf={"depth": 0}, body=(

@@ -2544,4 +2544,17 @@ export default {
   "caldav.grenzen": "Aquí solo están sus citas. Vacaciones y horario siguen en la suscripción. Las citas periódicas no se admiten.",
   "help.kal.caldavT": "Crear citas en el móvil (CalDAV)",
   "help.kal.caldav": "El calendario suscrito solo muestra sus citas — allí no se puede añadir nada; así funciona la suscripción. Si además quiere crear citas desde el móvil, configure CalDAV: en el calendario, ⋯ → «Compartir calendario», cree allí una contraseña de dispositivo e introduzca la dirección del servidor, el nombre de usuario y esa contraseña en Apple u Outlook. Una contraseña por dispositivo, para poder bloquear un móvil perdido por separado; su contraseña de Nuvora no debe ir al dispositivo. Las vacaciones y las horas del horario permanecen en la suscripción — no son citas individuales.",
+
+  // ── CalDAV: comprobar la conexión ──
+  "caldav.pruefen": "Comprobar conexión",
+  "caldav.pruefPlatzhalter": "Contraseña de dispositivo (opcional)",
+  "caldav.pruefOhnePasswort": "El servidor responde como servidor de calendario. Introduzca una contraseña de dispositivo para la prueba completa.",
+  "caldav.pruefGut": "Todo correcto — dirección, usuario y contraseña de dispositivo son válidos.",
+  "caldav.pruefPasswort": "La contraseña de dispositivo o el usuario no son correctos. Cree arriba una nueva contraseña.",
+  "caldav.pruefProxy": "El servidor web bloquea CalDAV (HTTP {{status}}). No es cosa de Nuvora sino del proxy delantero — debe dejar pasar el método PROPFIND.",
+  "caldav.pruefNetz": "Sin conexión con el servidor.",
+  "caldav.pruefStatus": "Respuesta inesperada (HTTP {{status}}).",
+  "caldav.pruefKeineAufforderung": "El servidor no pide autenticación — así ningún calendario puede iniciar sesión.",
+  "caldav.pruefKeinPrincipal": "El servidor no indica ninguna cuenta.",
+  "caldav.pruefPrincipalAlt": "El servidor usa una versión antigua. Actualice Nuvora.",
 };
