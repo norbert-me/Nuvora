@@ -2533,7 +2533,7 @@ export default {
   "caldav.zuruecknehmen": "Zurücknehmen",
   "caldav.zuletzt": "zuletzt {{wann}}",
   "caldav.nieBenutzt": "noch nie benutzt",
-  "caldav.grenzen": "Hier liegen nur Ihre Termine. Ferien und Stundenplan bleiben im Abo. Serientermine gehen nicht.",
+  "caldav.grenzen": "Ferien bleiben im Abo oben. Eine Stunde im Handy zu löschen heißt: sie fällt an dem Tag aus. Serientermine gehen nicht.",
   "help.kal.caldavT": "Termine im Handy eintragen (CalDAV)",
   "help.kal.caldav": "Der abonnierte Kalender zeigt Ihre Termine nur an — eintragen lässt sich dort nichts, das liegt am Abo-Verfahren selbst. Wer auch vom Handy aus Termine anlegen will, richtet CalDAV ein: im Kalender über ⋯ → „Kalender teilen“, dort ein Gerätepasswort anlegen und Serveradresse, Benutzername und dieses Passwort in Apple oder Outlook eintragen. Für jedes Gerät ein eigenes Passwort, damit ein verlorenes Handy einzeln ausgesperrt werden kann; Ihr Nuvora-Passwort gehört nicht ins Gerät. Ferien und Stundenplan-Stunden bleiben im Abo — sie sind keine einzelnen Termine.",
 

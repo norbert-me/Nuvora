@@ -2540,7 +2540,7 @@ export default {
   "caldav.zuruecknehmen": "Revoke",
   "caldav.zuletzt": "last used {{wann}}",
   "caldav.nieBenutzt": "never used",
-  "caldav.grenzen": "Only your events live here. Holidays and timetable stay in the subscription. Repeating events are not supported.",
+  "caldav.grenzen": "Holidays stay in the subscription above. Deleting a lesson on your phone means it is cancelled that day. Repeating events are not supported.",
   "help.kal.caldavT": "Adding events on your phone (CalDAV)",
   "help.kal.caldav": "A subscribed calendar only shows your events — nothing can be added there; that is how subscriptions work. To create events from your phone as well, set up CalDAV: in the calendar via ⋯ → “Share calendar”, create a device password there and enter server address, user name and that password in Apple or Outlook. One password per device, so a lost phone can be locked out on its own; your Nuvora password does not belong on the device. Holidays and timetable periods stay in the subscription — they are not individual events.",
 

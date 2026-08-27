@@ -96,6 +96,39 @@ def gefragte_props(baum) -> list:
     return None
 
 
+# Was ein Client am Kalender einstellen darf. Bewusst kurz: es ist reiner
+# Anzeigekram (Farbe, Reihenfolge, Name). Alles andere wird mit 403 abgelehnt
+# statt stillschweigend geschluckt — ein „gespeichert", das nichts speichert,
+# faellt dem Nutzer erst beim naechsten Start auf.
+SETZBAR = ("calendar-color", "calendar-order", "displayname", "calendar-description")
+
+
+def proppatch_wuensche(baum):
+    """Aus einem PROPPATCH die gewuenschten Aenderungen lesen.
+
+    Rueckgabe: (setzen, loeschen) — `setzen` ist {name: text}, `loeschen` eine
+    Liste von Namen. Der Namensraum ist dabei egal: `calendar-color` gibt es
+    nur einmal, und Apple schickt es im eigenen (ICAL-)Namensraum.
+    """
+    setzen, loeschen = {}, []
+    if baum is None:
+        return setzen, loeschen
+    for teil in baum:
+        art = lokal(teil.tag)
+        if art not in ("set", "remove"):
+            continue
+        for prop in teil:
+            if lokal(prop.tag) != "prop":
+                continue
+            for feld in prop:
+                name = lokal(feld.tag)
+                if art == "set":
+                    setzen[name] = (feld.text or "").strip()[:200]
+                else:
+                    loeschen.append(name)
+    return setzen, loeschen
+
+
 def zeitfenster(baum):
     """Das `<C:time-range>` einer calendar-query, als (von, bis) oder None.
 

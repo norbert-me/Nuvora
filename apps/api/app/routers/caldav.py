@@ -39,10 +39,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import caldav as X
 from ..database import get_db
-from ..models import CaldavToken, CalendarEntry, Kurs, SchoolClass, User
+from ..models import (CaldavToken, CalendarEntry, Kurs, SchoolClass,
+                      SlotCancellation, TimetableSlot, User)
 from ..zeit import tagesbeginn
 from .auth import _hash_pw, _verify_pw, rate_limit
-from .kalender import _kurs_label
+from .kalender import _kurs_label, stundenplan_vorkommen
 from .modules import is_active, modul_pflicht
 
 router = APIRouter(prefix="/api/caldav", tags=["caldav"])
@@ -59,6 +60,11 @@ _DAV_KOPF = {
     "DAV": "1, 2, 3, calendar-access",
     "Cache-Control": "no-store",
 }
+
+
+def user_props(u: User) -> dict:
+    """Die Anzeige-Eigenschaften, die ein Client am Kalender gesetzt hat."""
+    return u.caldav_props if isinstance(u.caldav_props, dict) else {}
 
 
 def _pfad(user_id: int, name: str = "") -> str:
@@ -139,23 +145,91 @@ def _dateiname(e: CalendarEntry) -> str:
     return f"{sicher}-{e.id}.ics"
 
 
-async def _texte(db: AsyncSession, u: User, eintraege) -> dict:
+async def _texte(db: AsyncSession, user: User, eintraege) -> dict:
     """Je Eintrag das fertige .ics — mit derselben Beschriftung wie ueberall
     („Fach · Kursname"), damit der Termin im Handy nicht anders heisst als im
     Browser."""
     kurse = {k.id: k for k in (await db.execute(select(Kurs).where(
-        Kurs.owner_id == u.id, Kurs.deleted_at.is_(None)))).scalars().all()}
+        Kurs.owner_id == user.id, Kurs.deleted_at.is_(None)))).scalars().all()}
     klassen = {c.id: c for c in (await db.execute(select(SchoolClass).where(
-        SchoolClass.owner_id == u.id))).scalars().all()}
+        SchoolClass.owner_id == user.id))).scalars().all()}
+
+    # Uhrzeiten des Stundenrasters: ein Eintrag ohne eigene Uhrzeit gehoert zu
+    # einer STUNDE, und die hat eine. Ohne diesen Rueckgriff wurde aus jedem
+    # Termin, den man aus dem Stundenplan angelegt hat, im Handy ein
+    # Tagestermin — waehrend derselbe Termin im Abo-Feed korrekt getaktet
+    # ankam, weil der Feed genau diesen Rueckgriff schon macht.
+    zeiten = user.timetable_times if isinstance(user.timetable_times, list) else []
+
+    def _stundenzeit(e):
+        if e.start_time and e.end_time:
+            return e.start_time, e.end_time
+        if e.period and 0 < e.period <= len(zeiten):
+            z = zeiten[e.period - 1]
+            if isinstance(z, dict):
+                return (z.get("start") or ""), (z.get("end") or "")
+        return "", ""
 
     out = {}
     for e in eintraege:
         k = kurse.get(e.kurs_id) or kurse.get(getattr(klassen.get(e.class_id), "kurs_id", None))
         titel = e.title or _kurs_label(k) or getattr(klassen.get(e.class_id), "name", "") or "Termin"
         tag = e.date.date() if hasattr(e.date, "date") else e.date
+        von, bis = _stundenzeit(e)
         out[e.id] = X.baue_vevent(uid=_uid(e), tag=tag, titel=titel, notiz=e.notes or "",
-                                  start_time=e.start_time or "", end_time=e.end_time or "",
-                                  stand=e.created_at)
+                                  start_time=von, end_time=bis, stand=e.created_at)
+    return out
+
+
+# Wie weit der Kalender im Handy reicht, wenn der Client kein Fenster nennt.
+# Dieselbe Spanne wie im ICS-Feed — zwei verschiedene Zeitraeume waeren zwei
+# verschiedene Kalender.
+VOR_TAGEN, VORAUS_TAGEN = 30, 121
+
+
+def _slot_name(slot, tag) -> str:
+    """Dateiname einer Stundenplan-Stunde an einem Tag."""
+    return f"slot-{slot.id}-{tag.strftime('%Y%m%d')}.ics"
+
+
+def _slot_lesen(name: str):
+    """Aus dem Dateinamen (Slot-ID, Tag) — oder None, wenn es keiner ist."""
+    teile = (name or "").removesuffix(".ics").split("-")
+    if len(teile) != 3 or teile[0] != "slot" or not teile[1].isdigit():
+        return None
+    tag = X._ics_datum(teile[2])
+    return (int(teile[1]), tag) if tag else None
+
+
+async def _ressourcen(db: AsyncSession, u: User, fenster=None) -> list:
+    """Alles, was im Kalender des Handys liegt — als [{name, text}].
+
+    ZWEI Sorten, und die zweite ist der Grund, warum der Kalender im Handy
+    ueberhaupt brauchbar ist: die einzeln angelegten Eintraege UND die
+    wiederkehrenden Stundenplan-Stunden. Ohne die zweite stand im Handy nur,
+    was jemand von Hand angefasst hatte — der normale Unterricht fehlte, und
+    das ist der groesste Teil des Tages.
+
+    Welche Stunden an einem Tag wirklich anfallen, entscheidet
+    `stundenplan_vorkommen` in kalender.py — dieselbe Funktion wie im ICS-Feed.
+    """
+    eintraege = await _alle(db, u, fenster)
+    texte = await _texte(db, u, eintraege)
+    out = [{"name": _dateiname(e), "text": texte[e.id]} for e in eintraege]
+
+    heute = date.today()
+    von = (fenster[0] if fenster and fenster[0] else heute - timedelta(days=VOR_TAGEN))
+    bis = (fenster[1] if fenster and fenster[1] else heute + timedelta(days=VORAUS_TAGEN))
+    for v in await stundenplan_vorkommen(db, u, von, bis):
+        tag = v["tag"]
+        out.append({"name": _slot_name(v["slot"], tag), "text": X.baue_vevent(
+            uid=f"nuvora-slot-{v['slot'].id}-{tag.strftime('%Y%m%d')}-t@nuvora",
+            tag=tag, titel=v["titel"], start_time=v["start"], end_time=v["ende"],
+            # Fester Zeitstempel statt „jetzt": das ETag entsteht aus dem
+            # Inhalt, und ein wanderndes DTSTAMP liesse es bei jedem Abruf
+            # anders ausfallen. Der Client hielte dann jede Stunde fuer
+            # geaendert und liefe in einen Dauerabgleich.
+            stand=datetime(tag.year, tag.month, tag.day))})
     return out
 
 
@@ -213,8 +287,15 @@ def _props(u: User, *, art: str, href: str, etag_wert: str = "",
         alle["calendar-user-address-set"] = "<C:calendar-user-address-set/>"
         alle["supported-report-set"] = _REPORTS
     elif art == "kalender":
+        eigene = user_props(u)
         alle["resourcetype"] = "<D:resourcetype><D:collection/><C:calendar/></D:resourcetype>"
-        alle["displayname"] = f"<D:displayname>{KALENDER_NAME}</D:displayname>"
+        alle["displayname"] = f"<D:displayname>{_xml(eigene.get('displayname') or KALENDER_NAME)}</D:displayname>"
+        # Zurueckgeben, was der Client gesetzt hat — sonst faerbt er den
+        # Kalender bei jedem Abgleich erneut ein.
+        if eigene.get("calendar-color"):
+            alle["calendar-color"] = f"<ICAL:calendar-color>{_xml(eigene['calendar-color'])}</ICAL:calendar-color>"
+        if eigene.get("calendar-order"):
+            alle["calendar-order"] = f"<ICAL:calendar-order>{_xml(eigene['calendar-order'])}</ICAL:calendar-order>"
         alle["calendar-description"] = f"<C:calendar-description>{KALENDER_NAME}</C:calendar-description>"
         # Nur Termine. Genau deshalb lehnt PUT eine VTODO ab, statt sie
         # stillschweigend wegzuwerfen.
@@ -304,15 +385,15 @@ async def wurzel(request: Request, user_id: Optional[int] = None,
     antworten = [_props(u, art=("principal" if user_id is not None else "wurzel"),
                         href=href, gefragt=gefragt)]
     if tiefe != "0" and user_id is not None:
-        eintraege = await _alle(db, u)
-        texte = await _texte(db, u, eintraege)
+        alles = await _ressourcen(db, u)
         antworten.append(_props(u, art="kalender", href=_pfad(u.id),
-                                ctag_wert=X.ctag([X.etag(t) for t in texte.values()]),
+                                ctag_wert=X.ctag([X.etag(r["text"]) for r in alles]),
                                 gefragt=gefragt))
     return _multistatus(X.multistatus(antworten))
 
 
-@router.api_route("/p/{user_id}/" + KALENDER + "/", methods=["OPTIONS", "PROPFIND", "REPORT"])
+@router.api_route("/p/{user_id}/" + KALENDER + "/",
+                  methods=["OPTIONS", "PROPFIND", "REPORT", "PROPPATCH", "MKCALENDAR", "MKCOL"])
 async def sammlung(request: Request, user_id: int, db: AsyncSession = Depends(get_db)):
     """Der Kalender selbst: seine Eigenschaften, seine Termine, seine Abfragen."""
     if request.method == "OPTIONS":
@@ -324,40 +405,83 @@ async def sammlung(request: Request, user_id: int, db: AsyncSession = Depends(ge
     if user_id != u.id:
         return Response(status_code=403, headers=_DAV_KOPF)
 
+    if request.method in ("MKCALENDAR", "MKCOL"):
+        # Es gibt genau EINEN Kalender je Konto, und er existiert schon. 405
+        # waere hier falsch verstanden worden („Server kaputt"); eine
+        # WebDAV-Absage sagt dem Client, dass die Stelle belegt ist, und er
+        # macht danach ruhig weiter.
+        return Response(status_code=405, headers={
+            **_DAV_KOPF, "Allow": "OPTIONS, PROPFIND, PROPPATCH, REPORT"})
+
     try:
         baum = X.parse_xml(await request.body())
     except X.CaldavFehler as e:
         return Response(status_code=e.status, headers=_DAV_KOPF)
     gefragt = X.gefragte_props(baum)
 
+    if request.method == "PROPPATCH":
+        # Apple stellt nach dem Einrichten Farbe und Reihenfolge ein. Kennt der
+        # Server die Methode nicht, bricht der GANZE Abgleich ab — die
+        # Kalender-App meldet „Dies ist keine gueltige URL, die diese Anfrage
+        # unterstuetzt", und danach kommt auch keine Aenderung aus Nuvora mehr
+        # an. Es sieht aus wie ein Sync-Problem, ist aber eine fehlende Methode.
+        #
+        # Gespeichert wird wirklich (users.caldav_props), nicht nur bestaetigt:
+        # eine Farbe, die nach dem Neustart weg ist, waere eine Antwort, die
+        # nicht stimmt. Was wir nicht fuehren, bekommt ausdruecklich 403 —
+        # ebenfalls eine Antwort, mit der der Client umgehen kann.
+        setzen, loeschen = X.proppatch_wuensche(baum)
+        props = dict(user_props(u))
+        ok, abgelehnt = [], []
+        for name, wert in setzen.items():
+            if name in X.SETZBAR:
+                props[name] = wert
+                ok.append(name)
+            else:
+                abgelehnt.append(name)
+        for name in loeschen:
+            if name in X.SETZBAR:
+                props.pop(name, None)
+                ok.append(name)
+            else:
+                abgelehnt.append(name)
+        u.caldav_props = props
+        await db.commit()
+        teile = []
+        if ok:
+            teile.append("<D:propstat><D:prop>" + "".join(f"<D:{n}/>" for n in ok)
+                         + "</D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat>")
+        if abgelehnt:
+            teile.append("<D:propstat><D:prop>" + "".join(f"<D:{n}/>" for n in abgelehnt)
+                         + "</D:prop><D:status>HTTP/1.1 403 Forbidden</D:status></D:propstat>")
+        return _multistatus(X.multistatus(
+            [f"<D:response><D:href>{_pfad(u.id)}</D:href>{''.join(teile)}</D:response>"]))
+
     if request.method == "REPORT":
         art = X.lokal(baum.tag) if baum is not None else ""
         if art == "calendar-multiget":
             gewuenscht = {h.rstrip("/").rsplit("/", 1)[-1] for h in X.multiget_hrefs(baum)}
-            eintraege = [e for e in await _alle(db, u) if _dateiname(e) in gewuenscht]
+            alles = [r for r in await _ressourcen(db, u) if r["name"] in gewuenscht]
         else:
             # calendar-query. Das Zeitfenster zu beachten ist nicht Pflicht (der
             # Client filtert selbst), spart beim ersten Abgleich aber die ganze
             # Historie.
-            eintraege = await _alle(db, u, X.zeitfenster(baum))
-        texte = await _texte(db, u, eintraege)
+            alles = await _ressourcen(db, u, X.zeitfenster(baum))
         antworten = []
-        for e in eintraege:
-            text = texte[e.id]
-            props = {"getetag": f"<D:getetag>{X.etag(text)}</D:getetag>",
-                     "calendar-data": f"<C:calendar-data>{_xml(text)}</C:calendar-data>"}
-            antworten.append(X.response(_pfad(u.id, _dateiname(e)), props))
+        for r in alles:
+            props = {"getetag": f"<D:getetag>{X.etag(r['text'])}</D:getetag>",
+                     "calendar-data": f"<C:calendar-data>{_xml(r['text'])}</C:calendar-data>"}
+            antworten.append(X.response(_pfad(u.id, r["name"]), props))
         return _multistatus(X.multistatus(antworten))
 
     # PROPFIND
-    eintraege = await _alle(db, u)
-    texte = await _texte(db, u, eintraege)
+    alles = await _ressourcen(db, u)
     antworten = [_props(u, art="kalender", href=_pfad(u.id),
-                        ctag_wert=X.ctag([X.etag(t) for t in texte.values()]), gefragt=gefragt)]
+                        ctag_wert=X.ctag([X.etag(r["text"]) for r in alles]), gefragt=gefragt)]
     if request.headers.get("depth", "0") != "0":
-        for e in eintraege:
-            antworten.append(_props(u, art="datei", href=_pfad(u.id, _dateiname(e)),
-                                    etag_wert=X.etag(texte[e.id]), gefragt=gefragt))
+        for r in alles:
+            antworten.append(_props(u, art="datei", href=_pfad(u.id, r["name"]),
+                                    etag_wert=X.etag(r["text"]), gefragt=gefragt))
     return _multistatus(X.multistatus(antworten))
 
 
@@ -366,7 +490,8 @@ def _xml(text: str) -> str:
     return escape(text)
 
 
-@router.api_route("/p/{user_id}/" + KALENDER + "/{name}", methods=["GET", "PUT", "DELETE", "HEAD"])
+@router.api_route("/p/{user_id}/" + KALENDER + "/{name}",
+                  methods=["GET", "PUT", "DELETE", "HEAD", "PROPFIND", "OPTIONS"])
 async def ressource(request: Request, user_id: int, name: str,
                     db: AsyncSession = Depends(get_db)):
     """Ein einzelner Termin: lesen, anlegen/aendern, loeschen."""
@@ -376,18 +501,62 @@ async def ressource(request: Request, user_id: int, name: str,
     if user_id != u.id:
         return Response(status_code=403, headers=_DAV_KOPF)
 
+    if request.method == "OPTIONS":
+        return Response(status_code=200, headers={
+            **_DAV_KOPF, "Allow": "OPTIONS, PROPFIND, GET, PUT, DELETE, HEAD"})
+
+    # Ist die Adresse eine Stundenplan-Stunde? Die gibt es nicht als Zeile in
+    # der Datenbank — sie entsteht aus Vorlage + Tag. Lesen geht wie bei allem
+    # anderen; Schreiben und Loeschen bedeuten hier etwas Eigenes (siehe unten).
+    stunde = _slot_lesen(name)
     eintraege = await _alle(db, u)
     treffer = next((e for e in eintraege if _dateiname(e) == name), None)
+    if stunde is not None:
+        alles = await _ressourcen(db, u)
+        vorhanden = next((r for r in alles if r["name"] == name), None)
+    else:
+        vorhanden = None
+
+    if request.method == "PROPFIND":
+        # Ein Client darf auch einen EINZELNEN Termin abfragen, statt die ganze
+        # Sammlung zu holen — Apple tut das beim Nachfassen zu einem Termin,
+        # den es gerade geschrieben hat. Ohne diesen Zweig gab es dafuer 405,
+        # und die Kalender-App meldete „Dies ist keine gueltige URL".
+        text = vorhanden["text"] if vorhanden else (
+            (await _texte(db, u, [treffer]))[treffer.id] if treffer else None)
+        if text is None:
+            return Response(status_code=404, headers=_DAV_KOPF)
+        return _multistatus(X.multistatus([_props(
+            u, art="datei", href=_pfad(u.id, name), etag_wert=X.etag(text),
+            gefragt=X.gefragte_props(X.parse_xml(await request.body())))]))
 
     if request.method in ("GET", "HEAD"):
-        if not treffer:
+        text = vorhanden["text"] if vorhanden else (
+            (await _texte(db, u, [treffer]))[treffer.id] if treffer else None)
+        if text is None:
             return Response(status_code=404, headers=_DAV_KOPF)
-        text = (await _texte(db, u, [treffer]))[treffer.id]
         return Response(content="" if request.method == "HEAD" else text, status_code=200,
                         media_type="text/calendar; charset=utf-8",
                         headers={**_DAV_KOPF, "ETag": X.etag(text)})
 
     if request.method == "DELETE":
+        if stunde is not None:
+            # Eine Stundenplan-Stunde laesst sich nicht loeschen — es gibt sie
+            # als Datensatz gar nicht. Was der Nutzer meint, wenn er sie im
+            # Handy wegwischt, kennt Nuvora aber: die Stunde faellt an diesem
+            # Tag AUS. Genau das wird eingetragen (SlotCancellation) — dieselbe
+            # Wirkung wie „Stunde entfaellt" in der Weboberflaeche. Die Vorlage
+            # bleibt, naechste Woche steht sie wieder da.
+            slot_id, tag = stunde
+            if not vorhanden:
+                return Response(status_code=404, headers=_DAV_KOPF)
+            s_obj = (await db.execute(select(TimetableSlot).where(
+                TimetableSlot.id == slot_id, TimetableSlot.owner_id == u.id))).scalar_one_or_none()
+            if not s_obj:
+                return Response(status_code=404, headers=_DAV_KOPF)
+            db.add(SlotCancellation(owner_id=u.id, date=tagesbeginn(tag), period=s_obj.period))
+            await db.commit()
+            return Response(status_code=204, headers=_DAV_KOPF)
         if not treffer:
             return Response(status_code=404, headers=_DAV_KOPF)
         await db.delete(treffer)
@@ -418,6 +587,28 @@ async def ressource(request: Request, user_id: int, name: str,
             return Response(status_code=412, headers=_DAV_KOPF)
     elif if_match:
         return Response(status_code=412, headers=_DAV_KOPF)
+
+    if stunde is not None and not treffer:
+        # Aus der Vorlage wird ein echter Eintrag — genau das, was ein Klick auf
+        # die Stunde in der Weboberflaeche tut. Klasse und Kurs kommen aus der
+        # Vorlage, damit der Termin dort haengt, wo er hingehoert; Titel und
+        # Uhrzeit aus dem, was im Handy steht.
+        slot_id, tag = stunde
+        s_obj = (await db.execute(select(TimetableSlot).where(
+            TimetableSlot.id == slot_id, TimetableSlot.owner_id == u.id))).scalar_one_or_none()
+        if not s_obj:
+            return Response(status_code=404, headers=_DAV_KOPF)
+        e = CalendarEntry(owner_id=u.id, date=tagesbeginn(daten["datum"] or tag),
+                          period=s_obj.period, class_id=s_obj.class_id, kurs_id=s_obj.kurs_id,
+                          topic_id=s_obj.topic_id, title=daten["title"], notes=daten["notes"],
+                          start_time=daten["start_time"], end_time=daten["end_time"],
+                          caldav_uid=daten["uid"] or None)
+        db.add(e)
+        await db.commit()
+        await db.refresh(e)
+        text = (await _texte(db, u, [e]))[e.id]
+        return Response(status_code=201, headers={
+            **_DAV_KOPF, "ETag": X.etag(text), "Content-Location": _pfad(u.id, _dateiname(e))})
 
     if treffer:
         treffer.date = tagesbeginn(daten["datum"])

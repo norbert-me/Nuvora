@@ -95,6 +95,16 @@ class User(Base):
     # laesst sich in WebUntis jederzeit neu erzeugen; dieselbe Art Adresse wie
     # in external_calendars.
     untis_ics_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Was ein Kalender-Client am Kalender einstellt: Farbe, Reihenfolge, Name.
+    #
+    # Apple schreibt das nach dem Einrichten mit PROPPATCH — und bricht den
+    # ganzen Abgleich ab, wenn der Server die Methode nicht kennt („Dies ist
+    # keine gueltige URL, die diese Anfrage unterstuetzt"). Es waere leicht,
+    # PROPPATCH bloss mit „ja, gespeichert" zu beantworten; dann waere die
+    # Farbe nach jedem Neustart wieder weg und die Antwort eine Luege. Also
+    # wirklich ablegen: {prop: wert}, ein Sack ohne festes Schema, weil es
+    # Anzeigekram des Clients ist und keine Nuvora-Daten.
+    caldav_props: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     # Ausgeblendete externe Einzel-Ereignisse: Liste von Schlüsseln "uid|YYYY-MM-DD".
     external_hidden: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     # Einstiege-Startsammlung einmalig angelegt? Danach nicht erneut seeden,

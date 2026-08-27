@@ -35,6 +35,11 @@ from app.caldav import CaldavFehler  # noqa: E402
 TAG = date(2026, 8, 27)
 
 
+def _wann(d):
+    """Tagesbeginn in UTC — so legt der Kalender seine Eintraege ab."""
+    return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+
+
 def test_ganztags_endet_am_folgetag():
     """DTEND ist EXKLUSIV (RFC 5545) — genau ein „+1".
 
@@ -495,6 +500,195 @@ async def test_report_zeitfenster_grenzt_ein(welt):
         b'<C:time-range start="20260801T000000Z" end="20260901T000000Z"/>'
         b"</C:comp-filter></C:filter></C:calendar-query>"))
     assert "Spaet" in r.text and "Frueh" not in r.text
+
+
+@pytest.mark.asyncio
+async def test_proppatch_speichert_farbe_und_reihenfolge(welt):
+    """Apple stellt nach dem Einrichten Farbe und Reihenfolge ein.
+
+    Kennt der Server PROPPATCH nicht, bricht der GANZE Abgleich ab — die
+    Kalender-App meldet „Dies ist keine gueltige URL, die diese Anfrage
+    unterstuetzt", und danach kommt auch keine Aenderung aus Nuvora mehr an.
+    Es sieht aus wie ein Sync-Problem und ist eine fehlende Methode.
+    """
+    r = await _ruf(welt["app"], "PROPPATCH", _kal(welt), body=(
+        b'<D:propertyupdate xmlns:D="DAV:" xmlns:I="http://apple.com/ns/ical/">'
+        b"<D:set><D:prop><I:calendar-color>#FF2968FF</I:calendar-color>"
+        b"<I:calendar-order>3</I:calendar-order></D:prop></D:set></D:propertyupdate>"))
+    assert r.status == 207 and "200 OK" in r.text
+
+    # Wirklich gespeichert, nicht nur bestaetigt: eine Farbe, die nach dem
+    # Neustart weg ist, waere eine Antwort, die nicht stimmt.
+    r = await _ruf(welt["app"], "PROPFIND", _kal(welt), kopf={"depth": 0}, body=(
+        b'<D:propfind xmlns:D="DAV:" xmlns:I="http://apple.com/ns/ical/">'
+        b"<D:prop><I:calendar-color/></D:prop></D:propfind>"))
+    assert "#FF2968FF" in r.text
+
+
+@pytest.mark.asyncio
+async def test_proppatch_lehnt_fremde_eigenschaften_ab(welt):
+    """403 statt eines stillen „gespeichert". Was wir nicht führen, soll der
+    Client wissen, statt es bei jedem Abgleich neu zu versuchen."""
+    r = await _ruf(welt["app"], "PROPPATCH", _kal(welt), body=(
+        b'<D:propertyupdate xmlns:D="DAV:"><D:set><D:prop>'
+        b"<D:gibtsnicht>x</D:gibtsnicht></D:prop></D:set></D:propertyupdate>"))
+    assert r.status == 207 and "403 Forbidden" in r.text
+
+
+@pytest.mark.asyncio
+async def test_propfind_auf_einen_einzelnen_termin(welt):
+    """Apple fasst zu einem gerade geschriebenen Termin einzeln nach."""
+    put = await _ruf(welt["app"], "PUT", _kal(welt, "a.ics"),
+                     body=X.baue_vevent(uid="a@x", tag=TAG, titel="Einzeln").encode())
+    ort = put.headers["content-location"]
+    r = await _ruf(welt["app"], "PROPFIND", ort, kopf={"depth": 0}, body=(
+        b'<D:propfind xmlns:D="DAV:"><D:prop><D:getetag/></D:prop></D:propfind>'))
+    assert r.status == 207 and "<D:getetag>" in r.text
+
+
+@pytest.mark.asyncio
+async def test_geloeschter_termin_verschwindet_aus_der_liste(welt):
+    """Was in Nuvora gelöscht wird, muss im Handy verschwinden.
+
+    Der Client merkt das am ctag und holt danach die Liste neu — steht der
+    Termin dort weiter, bleibt er auf dem Gerät stehen.
+    """
+    from sqlalchemy import select
+    from app.models import CalendarEntry
+
+    await _ruf(welt["app"], "PUT", _kal(welt, "a.ics"),
+               body=X.baue_vevent(uid="a@x", tag=TAG, titel="Wieder weg").encode())
+    frage = b'<D:propfind xmlns:D="DAV:"><D:prop><D:getetag/></D:prop></D:propfind>'
+    vorher = await _ruf(welt["app"], "PROPFIND", _kal(welt), kopf={"depth": 1}, body=frage)
+    assert "<D:getetag>" in vorher.text
+
+    # Löschen wie in der Weboberfläche — nicht über CalDAV.
+    async with welt["sitzung"]() as s:
+        eintrag = (await s.execute(select(CalendarEntry))).scalars().first()
+        await s.delete(eintrag)
+        await s.commit()
+
+    nachher = await _ruf(welt["app"], "PROPFIND", _kal(welt), kopf={"depth": 1}, body=frage)
+    assert nachher.text.count("<D:getetag>") == 0
+
+
+async def _stundenplan(welt, weekday=0, period=1):
+    """Eine Stundenplan-Stunde plus Uhrzeiten anlegen (wie in der Oberfläche)."""
+    from app.models import TimetableSlot, User
+    async with welt["sitzung"]() as s:
+        u = await s.get(User, welt["user_id"])
+        u.timetable_times = [{"start": "08:00", "end": "08:45"},
+                             {"start": "08:50", "end": "09:35"}]
+        u.timetable_periods = 2
+        slot = TimetableSlot(owner_id=u.id, weekday=weekday, period=period, title="Mathe")
+        s.add(slot)
+        await s.commit()
+        return slot.id
+
+
+@pytest.mark.asyncio
+async def test_stundenplan_stunden_stehen_im_kalender(welt):
+    """Ohne sie stünde im Handy nur, was jemand von Hand angefasst hat.
+
+    Der normale Unterricht ist der größte Teil des Tages; ein Kalender, der
+    ihn nicht zeigt, ist im Gebrauch wertlos.
+    """
+    await _stundenplan(welt)
+    r = await _ruf(welt["app"], "PROPFIND", _kal(welt), kopf={"depth": 1}, body=(
+        b'<D:propfind xmlns:D="DAV:"><D:prop><D:getetag/></D:prop></D:propfind>'))
+    assert r.status == 207
+    assert "/slot-" in r.text, "keine Stundenplan-Stunde im Kalender"
+
+
+@pytest.mark.asyncio
+async def test_stunde_ist_getaktet_und_kein_tagestermin(welt):
+    """Eine Unterrichtsstunde hat eine Uhrzeit. Ohne sie steht im Handy ein
+    Tagesbalken statt einer Stunde — und der Tag sieht aus, als wäre nichts."""
+    await _stundenplan(welt)
+    r = await _ruf(welt["app"], "REPORT", _kal(welt), kopf={"depth": 1}, body=(
+        b'<C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">'
+        b"<D:prop><C:calendar-data/></D:prop><C:filter><C:comp-filter name=\"VCALENDAR\"/>"
+        b"</C:filter></C:calendar-query>"))
+    assert "DTSTART:" in r.text and "T080000" in r.text
+    assert "DTSTART;VALUE=DATE" not in r.text
+
+
+@pytest.mark.asyncio
+async def test_eintrag_aus_einer_stunde_behaelt_seine_uhrzeit(welt):
+    """Der Fehler aus dem Gebrauch: „manche zeitlichen Termine sind plötzlich
+    Tagestermine."
+
+    Ein Eintrag, der aus dem Stundenplan entstanden ist, hat keine eigene
+    Uhrzeit — er hat eine STUNDE. Ohne den Rückgriff auf deren Zeiten wurde er
+    im Handy ganztägig, während er im Abo-Feed korrekt getaktet ankam.
+    """
+    from app.models import CalendarEntry
+    await _stundenplan(welt)
+    async with welt["sitzung"]() as s:
+        s.add(CalendarEntry(owner_id=welt["user_id"], date=_wann(TAG), period=1,
+                            title="Klassenarbeit"))
+        await s.commit()
+    r = await _ruf(welt["app"], "REPORT", _kal(welt), kopf={"depth": 1}, body=(
+        b'<C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">'
+        b"<D:prop><C:calendar-data/></D:prop><C:filter><C:comp-filter name=\"VCALENDAR\"/>"
+        b"</C:filter></C:calendar-query>"))
+    assert "Klassenarbeit" in r.text
+    zeile = [z for z in r.text.split("\n") if "Klassenarbeit" in z]
+    assert "T080000" in r.text and "DTSTART;VALUE=DATE" not in r.text, zeile
+
+
+@pytest.mark.asyncio
+async def test_stunde_im_handy_loeschen_heisst_sie_faellt_aus(welt):
+    """Eine Stundenplan-Stunde gibt es als Datensatz gar nicht.
+
+    Was der Nutzer meint, wenn er sie wegwischt, kennt Nuvora aber: die Stunde
+    entfällt an diesem Tag. Die Vorlage bleibt — nächste Woche steht sie wieder
+    da.
+    """
+    from sqlalchemy import select
+    from app.models import SlotCancellation, TimetableSlot
+
+    slot_id = await _stundenplan(welt)
+    liste = await _ruf(welt["app"], "PROPFIND", _kal(welt), kopf={"depth": 1}, body=(
+        b'<D:propfind xmlns:D="DAV:"><D:prop><D:getetag/></D:prop></D:propfind>'))
+    name = liste.text.split("/slot-")[1].split("<")[0]
+    r = await _ruf(welt["app"], "DELETE", _kal(welt, "slot-" + name))
+    assert r.status == 204
+
+    async with welt["sitzung"]() as s:
+        aus = (await s.execute(select(SlotCancellation))).scalars().all()
+        assert len(aus) == 1 and aus[0].period == 1
+        # Die Vorlage steht noch: gelöscht wurde ein Tag, nicht der Stundenplan.
+        assert (await s.get(TimetableSlot, slot_id)) is not None
+
+    # Und die Stunde ist an diesem Tag aus dem Kalender verschwunden.
+    danach = await _ruf(welt["app"], "PROPFIND", _kal(welt), kopf={"depth": 1}, body=(
+        b'<D:propfind xmlns:D="DAV:"><D:prop><D:getetag/></D:prop></D:propfind>'))
+    assert ("slot-" + name) not in danach.text
+
+
+@pytest.mark.asyncio
+async def test_stunde_im_handy_bearbeiten_macht_daraus_einen_eintrag(welt):
+    """Genau das, was ein Klick auf die Stunde in der Oberfläche tut — Klasse
+    und Kurs kommen aus der Vorlage, damit der Termin dort hängt, wo er
+    hingehört."""
+    from sqlalchemy import select
+    from app.models import CalendarEntry
+
+    await _stundenplan(welt)
+    liste = await _ruf(welt["app"], "PROPFIND", _kal(welt), kopf={"depth": 1}, body=(
+        b'<D:propfind xmlns:D="DAV:"><D:prop><D:getetag/></D:prop></D:propfind>'))
+    name = "slot-" + liste.text.split("/slot-")[1].split("<")[0]
+    tag = date(int(name[-12:-8]), int(name[-8:-6]), int(name[-6:-4]))
+
+    r = await _ruf(welt["app"], "PUT", _kal(welt, name),
+                   body=X.baue_vevent(uid="apple-slot@x", tag=tag, titel="Vertretung",
+                                      start_time="08:00", end_time="08:45").encode())
+    assert r.status == 201
+    async with welt["sitzung"]() as s:
+        zeilen = (await s.execute(select(CalendarEntry))).scalars().all()
+        assert len(zeilen) == 1
+        assert zeilen[0].title == "Vertretung" and zeilen[0].period == 1
 
 
 @pytest.mark.asyncio

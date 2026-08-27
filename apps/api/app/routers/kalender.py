@@ -782,6 +782,76 @@ def _slot_active_on(s: TimetableSlot, d: date) -> bool:
     return True
 
 
+async def stundenplan_vorkommen(db: AsyncSession, user: User, start: date, ende: date) -> list:
+    """Welche Stundenplan-Stunden fallen im Zeitraum WIRKLICH an?
+
+    Der Stundenplan ist eine Vorlage, kein Terminkalender. Was daraus an einem
+    bestimmten Tag uebrig bleibt, entscheiden vier Regeln — und die stehen hier
+    an EINER Stelle, weil zwei Ausgaben sie brauchen: der ICS-Feed und der
+    CalDAV-Kalender. Als Kopie waeren sie nach der ersten Aenderung
+    auseinandergelaufen, und dann zeigte das abonnierte Handy etwas anderes als
+    das eingerichtete.
+
+    Die Regeln:
+
+    * Die Stunde muss an dem Tag gelten (`valid_from`/`valid_to` — der
+      Stundenplan wird versioniert, das Halbjahr davor bleibt stehen).
+    * Kein freier Zeitraum (Ferien, Feiertag).
+    * Kein Ausfall an genau diesem Tag in genau dieser Stunde.
+    * Kein Kalender-Eintrag an diesem Tag in dieser Stunde — dann ist die
+      Vorlage bereits zu einem echten Termin geworden, und beide zusammen
+      waeren derselbe Unterricht doppelt.
+
+    Rueckgabe je Vorkommen: {"slot", "tag", "titel", "start", "ende"} mit
+    Uhrzeiten als "HH:MM" (leer, wenn fuer die Stunde keine hinterlegt ist).
+    """
+    slots = (await db.execute(select(TimetableSlot).where(
+        TimetableSlot.owner_id == user.id))).scalars().all()
+    if not slots:
+        return []
+
+    belegt = set()
+    for e in (await db.execute(select(CalendarEntry).where(
+            CalendarEntry.owner_id == user.id, CalendarEntry.period.is_not(None)))).scalars().all():
+        belegt.add((_tag(e.date), e.period))
+    for c in (await db.execute(select(SlotCancellation).where(
+            SlotCancellation.owner_id == user.id))).scalars().all():
+        belegt.add((_tag(c.date), c.period))
+
+    frei = [(_tag(b.start_date), _tag(b.end_date)) for b in (await db.execute(
+        select(CalendarBreak).where(CalendarBreak.owner_id == user.id))).scalars().all()]
+
+    kurse = {k.id: k for k in (await db.execute(select(Kurs).where(
+        Kurs.owner_id == user.id, Kurs.deleted_at.is_(None)))).scalars().all()}
+    klassen = {c.id: c for c in (await db.execute(select(SchoolClass).where(
+        SchoolClass.owner_id == user.id))).scalars().all()}
+    zeiten = user.timetable_times if isinstance(user.timetable_times, list) else []
+
+    je_wochentag = {}
+    for s in slots:
+        je_wochentag.setdefault(s.weekday, []).append(s)
+
+    out = []
+    tag = start
+    while tag < ende:
+        if not any(von <= tag <= bis for von, bis in frei):
+            for s in sorted(je_wochentag.get(tag.weekday(), []), key=lambda x: x.period):
+                if (tag, s.period) in belegt or not _slot_active_on(s, tag):
+                    continue
+                kurs = kurse.get(s.kurs_id) or kurse.get(
+                    getattr(klassen.get(s.class_id), "kurs_id", None))
+                titel = (_kurs_label(kurs) or getattr(klassen.get(s.class_id), "name", "")
+                         or s.title or "Unterricht")
+                z = zeiten[s.period - 1] if 0 < s.period <= len(zeiten) else None
+                out.append({
+                    "slot": s, "tag": tag, "titel": titel,
+                    "start": (z or {}).get("start", "") if isinstance(z, dict) else "",
+                    "ende": (z or {}).get("end", "") if isinstance(z, dict) else "",
+                })
+        tag += timedelta(days=1)
+    return out
+
+
 @router.get("/klassenarbeiten/uebersicht")
 async def exam_overview(user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Kommende Klassenarbeiten mit den bis dahin verbleibenden Stundenplan-
@@ -1452,77 +1522,43 @@ async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depe
             "END:VEVENT",
         ]
 
-    # Wiederkehrende Stundenplan-Stunden ("ungeplante" reguläre Stunden) über ein
-    # rollierendes Fenster ausgeben, damit der abonnierte Kalender den Stundenplan
-    # zeigt, nicht nur Ad-hoc-Einträge. Ferien werden übersprungen; Stunden, für die
-    # es an dem Tag schon einen Eintrag gibt (gleiche Stunde), werden ausgelassen —
-    # genau wie die In-App-Logik die Vorlage hinter einem Eintrag ausblendet.
-    slots = (await db.execute(select(TimetableSlot).where(TimetableSlot.owner_id == u.id))).scalars().all()
-    if slots:
-        times = u.timetable_times or []
-        belegt = set()
-        for e in entries:
-            if e.period is not None:
-                d = e.date.date() if hasattr(e.date, "date") else e.date
-                belegt.add((d, e.period))
-        # Ausgefallene Stunden (Datum + Stunde) genauso ausblenden wie belegte.
-        for c in (await db.execute(select(SlotCancellation).where(SlotCancellation.owner_id == u.id))).scalars().all():
-            cd = c.date.date() if hasattr(c.date, "date") else c.date
-            belegt.add((cd, c.period))
-        frei = []
-        for b in breaks:
-            bs = b.start_date.date() if hasattr(b.start_date, "date") else b.start_date
-            be = b.end_date.date() if hasattr(b.end_date, "date") else b.end_date
-            frei.append((bs, be))
+    # Wiederkehrende Stundenplan-Stunden über ein rollierendes Fenster ausgeben,
+    # damit der abonnierte Kalender den Stundenplan zeigt und nicht nur die
+    # einzeln angelegten Termine. WELCHE Stunden an einem Tag übrig bleiben
+    # (Ferien, Ausfall, schon vorhandener Eintrag), entscheidet
+    # `stundenplan_vorkommen` — dieselbe Funktion, die auch der CalDAV-Kalender
+    # benutzt. Als Kopie wären die Regeln nach der ersten Änderung
+    # auseinandergelaufen, und das abonnierte Handy zeigte etwas anderes als das
+    # eingerichtete.
+    def hms(t):
+        try:
+            hh, mm = (t or "").split(":")[:2]
+            return f"{int(hh):02d}{int(mm):02d}00"
+        except Exception:
+            return None
 
-        def hms(t):
-            try:
-                hh, mm = (t or "").split(":")[:2]
-                return f"{int(hh):02d}{int(mm):02d}00"
-            except Exception:
-                return None
-
-        by_wd = {}
-        for s in slots:
-            by_wd.setdefault(s.weekday, []).append(s)
-        today = date.today()
-        start = today - timedelta(days=30)
-        for i in range(151):  # heute -30 .. +120 Tage
-            day = start + timedelta(days=i)
-            if any(bs <= day <= be for bs, be in frei):
-                continue
-            for s in by_wd.get(day.weekday(), []):
-                if (day, s.period) in belegt:
-                    continue
-                if not _slot_active_on(s, day):
-                    continue
-                # Auch hier „Fach · Kursname" zuerst: die Stunde traegt ihren
-                # Kurs eindeutig (s.kurs_id), der Klassenname ist der Notnagel.
-                title = (_kurs_label(kurse.get(s.kurs_id or kurs_je_klasse.get(s.class_id)))
-                         or classes.get(s.class_id) or s.title or "Unterricht")
-                tr = times[s.period - 1] if 0 <= s.period - 1 < len(times) else None
-                # Uhrzeiten liegen als {"start","end"} vor (wie im Rest der App) —
-                # nicht "from"/"to". Mit den falschen Keys war die Zeit immer None,
-                # darum landeten die Stunden im Abo als ganztägige Ereignisse.
-                a = hms(tr.get("start")) if isinstance(tr, dict) else None
-                b2 = hms(tr.get("end")) if isinstance(tr, dict) else None
-                # UID mit Zeit-Marker (-t): erzwingt bei Apple/Google, dass die
-                # frueher faelschlich ganztaegigen Slot-Events durch die getakteten
-                # ERSETZT werden — sonst behaelt Apple pro UID stur den Ganztags-Typ.
-                uid = f"UID:nuvora-slot-{s.id}-{d8(day)}-t@nuvora"
-                if a and b2:
-                    # Getaktete Stunde: Anfang und Ende am selben Tag. KEIN
-                    # "+1 Tag" — DTEND ist hier ein Zeitpunkt, kein Folgetag;
-                    # ein Zuschlag machte aus jeder Stunde einen Tagestermin.
-                    lines += ["BEGIN:VEVENT", uid, f"DTSTAMP:{now}",
-                              f"DTSTART:{d8(day)}T{a}", f"DTEND:{d8(day)}T{b2}",
-                              f"SUMMARY:{_ics_escape(title)}", "END:VEVENT"]
-                else:
-                    # Ohne hinterlegte Uhrzeit bleibt nur der Tag. Ganztaegig,
-                    # also DTEND exklusiv = Folgetag (genau ein "+1").
-                    lines += ["BEGIN:VEVENT", uid, f"DTSTAMP:{now}",
-                              f"DTSTART;VALUE=DATE:{d8(day)}", f"DTEND;VALUE=DATE:{d8(day + timedelta(days=1))}",
-                              f"SUMMARY:{_ics_escape(title)}", "END:VEVENT"]
+    heute = date.today()
+    for v in await stundenplan_vorkommen(db, u, heute - timedelta(days=30), heute + timedelta(days=121)):
+        day, s = v["tag"], v["slot"]
+        a, b2 = hms(v["start"]), hms(v["ende"])
+        # UID mit Zeit-Marker (-t): erzwingt bei Apple/Google, dass die frueher
+        # faelschlich ganztaegigen Slot-Events durch die getakteten ERSETZT
+        # werden — sonst behaelt Apple pro UID stur den Ganztags-Typ.
+        uid = f"UID:nuvora-slot-{s.id}-{d8(day)}-t@nuvora"
+        if a and b2:
+            # Getaktete Stunde: Anfang und Ende am selben Tag. KEIN "+1 Tag" —
+            # DTEND ist hier ein Zeitpunkt, kein Folgetag; ein Zuschlag machte
+            # aus jeder Stunde einen Tagestermin.
+            lines += ["BEGIN:VEVENT", uid, f"DTSTAMP:{now}",
+                      f"DTSTART:{d8(day)}T{a}", f"DTEND:{d8(day)}T{b2}",
+                      f"SUMMARY:{_ics_escape(v['titel'])}", "END:VEVENT"]
+        else:
+            # Ohne hinterlegte Uhrzeit bleibt nur der Tag. Ganztaegig, also
+            # DTEND exklusiv = Folgetag (genau ein "+1").
+            lines += ["BEGIN:VEVENT", uid, f"DTSTAMP:{now}",
+                      f"DTSTART;VALUE=DATE:{d8(day)}",
+                      f"DTEND;VALUE=DATE:{d8(day + timedelta(days=1))}",
+                      f"SUMMARY:{_ics_escape(v['titel'])}", "END:VEVENT"]
 
     lines.append("END:VCALENDAR")
 

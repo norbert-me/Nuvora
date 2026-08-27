@@ -2541,7 +2541,7 @@ export default {
   "caldav.zuruecknehmen": "Retirar",
   "caldav.zuletzt": "última vez {{wann}}",
   "caldav.nieBenutzt": "nunca usada",
-  "caldav.grenzen": "Aquí solo están sus citas. Vacaciones y horario siguen en la suscripción. Las citas periódicas no se admiten.",
+  "caldav.grenzen": "Las vacaciones siguen en la suscripción de arriba. Borrar una hora en el móvil significa que ese día no hay clase. Las citas periódicas no se admiten.",
   "help.kal.caldavT": "Crear citas en el móvil (CalDAV)",
   "help.kal.caldav": "El calendario suscrito solo muestra sus citas — allí no se puede añadir nada; así funciona la suscripción. Si además quiere crear citas desde el móvil, configure CalDAV: en el calendario, ⋯ → «Compartir calendario», cree allí una contraseña de dispositivo e introduzca la dirección del servidor, el nombre de usuario y esa contraseña en Apple u Outlook. Una contraseña por dispositivo, para poder bloquear un móvil perdido por separado; su contraseña de Nuvora no debe ir al dispositivo. Las vacaciones y las horas del horario permanecen en la suscripción — no son citas individuales.",
 
