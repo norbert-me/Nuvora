@@ -66,6 +66,7 @@ const SPERRE = [
   [/^\/api\/results/, "Scan-Ergebnisse einer laufenden Sitzung"],
   [/^\/api\/codedetektiv\/sessions/, "laufende Sitzung"],
   [/^\/api\/kalender\/(subscribe|feed|external)/, "reicht nach aussen (Abo, fremder Kalender)"],
+  [/^\/api\/kalender\/untis/, "holt live bei WebUntis — und der Abruf traegt ein Passwort, das nirgends liegen bleiben darf"],
   [/^\/api\/(selftest|mail-test)/, "Diagnose"],
   [/^\/api\/admin\//, "Betrieb"],
   [/^\/api\/backup/, "Betrieb"],

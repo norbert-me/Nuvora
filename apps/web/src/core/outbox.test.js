@@ -22,6 +22,8 @@ describe("Sperrliste", () => {
     ["/api/results/sessions/3/results", "Scan-Ergebnisse"],
     ["/api/codedetektiv/sessions/ABCD/join", "laufende Sitzung"],
     ["/api/kalender/subscribe", "reicht nach aussen"],
+    ["/api/kalender/untis/vorschau", "traegt ein Passwort"],
+    ["/api/kalender/untis/uebernehmen", "braucht den Abruf von eben"],
     ["/api/marketplace/quizzes", "Veroeffentlichung"],
     ["/api/admin/users/3", "Betrieb"],
     ["/api/backup/tag/zurueckspielen", "Betrieb"],

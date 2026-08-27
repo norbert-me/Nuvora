@@ -1729,35 +1729,12 @@ _EXT_TTL = 600  # 10 Minuten
 
 
 def _fetch_ics(url: str) -> str:
-    """Einen externen ICS-Feed holen — mit SSRF-Schutz (keine privaten IPs),
-    DNS-Rebinding-Pin und ohne Redirects. Gibt den Text zurück (max 2 MB)."""
-    import urllib.request, urllib.parse, socket, ipaddress
-    parsed = urllib.parse.urlparse(url)
-    if parsed.scheme not in ("http", "https") or not parsed.hostname:
-        return ""
-    host = parsed.hostname
-    port = parsed.port or (443 if parsed.scheme == "https" else 80)
-    infos = socket.getaddrinfo(host, port)
-    for res in infos:
-        ip = ipaddress.ip_address(res[4][0])
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
-            raise ValueError("Ziel-IP nicht erlaubt")
-    _real_gai = socket.getaddrinfo
-    def _pinned_gai(h, p, *a, **k):
-        if h == host and p == port:
-            return infos
-        return _real_gai(h, p, *a, **k)
-    class _NoRedirect(urllib.request.HTTPRedirectHandler):
-        def redirect_request(self, *a, **k):
-            return None
-    opener = urllib.request.build_opener(_NoRedirect)
-    req = urllib.request.Request(url, headers={"User-Agent": "Nuvora"})
-    socket.getaddrinfo = _pinned_gai
-    try:
-        with opener.open(req, timeout=6) as r:
-            return r.read(2_000_000).decode("utf-8", "replace")
-    finally:
-        socket.getaddrinfo = _real_gai
+    """Einen externen ICS-Feed holen. Der SSRF-Schutz (keine privaten IPs,
+    DNS-Rebinding-Pin, keine Weiterleitungen) steht in app/netz.py — an EINER
+    Stelle, weil ihn auch die Untis-Anbindung braucht und zwei Fassungen davon
+    genau eine zu viel waeren."""
+    from ..netz import hole
+    return hole(url, timeout=6, max_bytes=2_000_000)
 
 
 @router.get("/external-events")
@@ -1833,3 +1810,207 @@ async def external_events(refresh: bool = False, user: User = Depends(require_mo
     result = out[:20000]
     _EXT_CACHE[user.id] = (sig, time.time() + _EXT_TTL, result)
     return result
+
+
+# ─── WebUntis: den Stundenplan der Schule uebernehmen ───
+#
+# Warum ueberhaupt: der Wochenstundenplan steht bereits in Untis. Ihn hier ein
+# zweites Mal von Hand einzutragen ist die Arbeit, die dieses Modul abnehmen
+# soll — und beim ersten Planwechsel im Halbjahr stehen zwei Fassungen da.
+#
+# Warum als Import und nicht als Abgleich: Untis kennt Nuvoras Kurse und
+# Klassen nicht. Was von dort kommt, ist ein Vorschlag; zugeordnet und
+# uebernommen wird, was die Lehrkraft bestaetigt (derselbe Gedanke wie bei
+# jedem anderen Import: gefragt wird immer, nicht nur im Konfliktfall).
+#
+# Warum nie zurueck: der Schulstundenplan gehoert der Schulleitung.
+class UntisKonto(BaseModel):
+    server: str = ""
+    schule: str = ""
+    benutzer: str = ""
+    ics_url: str = ""
+
+
+class UntisAbrufIn(UntisKonto):
+    # "api" = JSON-RPC mit Zugangsdaten, "ics" = persoenlicher Abo-Link.
+    quelle: str = "api"
+    # Das Passwort kommt bei JEDEM Abruf mit und wird nie gespeichert (siehe
+    # den Kommentar an users.untis_server).
+    passwort: str = ""
+    # Ueber wie viele Wochen geschaut wird, um den wiederkehrenden Plan zu
+    # erkennen. Vier ist der Kompromiss: genug, damit eine einzelne Vertretung
+    # den regulaeren Unterricht nicht ueberstimmt, wenig genug, dass WebUntis
+    # nicht wegen der Menge abweist.
+    wochen: int = 4
+
+
+@router.get("/untis")
+async def untis_konto(user: User = Depends(require_module)):
+    """Die gemerkten Angaben — ohne Passwort, weil keins gespeichert wird."""
+    return {"server": user.untis_server or "", "schule": user.untis_schule or "",
+            "benutzer": user.untis_benutzer or "", "ics_url": user.untis_ics_url or ""}
+
+
+@router.put("/untis")
+async def untis_konto_setzen(body: UntisKonto, user: User = Depends(require_module),
+                             db: AsyncSession = Depends(get_db)):
+    url = (body.ics_url or "").strip().replace("webcal://", "https://", 1)
+    if url and not (url.startswith("http://") or url.startswith("https://")):
+        raise HTTPException(400, "ICS-Adresse muss mit http(s):// oder webcal:// beginnen")
+    user.untis_server = (body.server or "").strip()[:200] or None
+    user.untis_schule = (body.schule or "").strip()[:120] or None
+    user.untis_benutzer = (body.benutzer or "").strip()[:120] or None
+    user.untis_ics_url = url[:2000] or None
+    await db.commit()
+    return await untis_konto(user)
+
+
+def _untis_zeiten(user: User) -> list:
+    """Nuvoras eigenes Stundenraster als Anfangszeiten (["08:00", …]).
+
+    Ohne es liesse sich eine Untis-Uhrzeit keiner Stundennummer zuordnen: viele
+    Schulen zaehlen in Untis die Pausen als eigene Einheit mit, „3. Stunde" ist
+    dort also nicht unsere dritte.
+    """
+    return [(z or {}).get("start", "") for z in (user.timetable_times or []) if isinstance(z, dict)]
+
+
+@router.post("/untis/vorschau")
+async def untis_vorschau(body: UntisAbrufIn, user: User = Depends(require_module),
+                         db: AsyncSession = Depends(get_db)):
+    """Untis abfragen und ZEIGEN, was ein Import ergaebe — ohne zu schreiben.
+
+    Zwei Schritte statt einem, weil die Zuordnung dazwischen gehoert: Untis
+    liefert „M 7a", Nuvora kennt einen Kurs mit einem eigenen Namen. Wer das
+    ungefragt zusammenlegt, hat nach dem Import einen Plan, den niemand
+    beschlossen hat.
+    """
+    from .. import untis as U
+
+    # Der Abruf traegt ein fremdes Passwort und geht an einen fremden Server.
+    # Ohne Bremse waere das ein bequemer Weg, WebUntis-Zugaenge durchzuprobieren
+    # — mit unserer IP als Absender.
+    rate_limit("untis", f"u{user.id}", 10, 300, "Zu viele Untis-Abrufe. Bitte kurz warten.")
+
+    zeiten = _untis_zeiten(user)
+    if not zeiten:
+        raise HTTPException(400, "Erst die Uhrzeiten der Stunden eintragen — sonst "
+                                 "laesst sich eine Untis-Uhrzeit keiner Stunde zuordnen")
+
+    heute = date.today()
+    wochen = max(1, min(int(body.wochen or 4), 12))
+    von, bis = heute, heute + timedelta(weeks=wochen)
+
+    def _abrufen():
+        """Blockierender Teil — laeuft im Threadpool, damit der Server waehrend
+        eines langsamen Untis-Servers weiter antwortet."""
+        if (body.quelle or "api") == "ics":
+            url = (body.ics_url or user.untis_ics_url or "").strip()
+            if not url:
+                raise U.UntisFehler("server", "Kein ICS-Link angegeben")
+            return U.stunden_aus_ics(url, von, bis), []
+        with U.UntisSitzung(body.server or user.untis_server or "",
+                            body.schule or user.untis_schule or "",
+                            body.benutzer or user.untis_benutzer or "",
+                            body.passwort) as s:
+            return s.stundenplan(von, bis), s.ferien()
+
+    import asyncio
+    try:
+        stunden, ferien = await asyncio.get_event_loop().run_in_executor(None, _abrufen)
+    except U.UntisFehler as e:
+        # 200 mit Grund statt 4xx: „die Schule hat den Zugang nicht
+        # freigeschaltet" ist kein Bedienfehler, und die Oberflaeche soll dazu
+        # den Ausweichweg anbieten koennen, statt nur eine rote Zeile zu zeigen.
+        return {"ok": False, "grund": e.grund, "meldung": e.text[:300],
+                "ics_moeglich": bool(user.untis_ics_url or body.ics_url)}
+
+    raster = U.zu_wochenraster(stunden, zeiten)
+    # Was an einer (Wochentag, Stunde) schon bei uns steht — damit die
+    # Oberflaeche sagen kann, was ein Import ueberschriebe.
+    belegt = {}
+    for s in (await db.execute(select(TimetableSlot).where(
+            TimetableSlot.owner_id == user.id, TimetableSlot.valid_to.is_(None)))).scalars().all():
+        belegt[f"{s.weekday},{s.period}"] = {"title": s.title or "", "kurs_id": s.kurs_id,
+                                             "class_id": s.class_id}
+    return {
+        "ok": True, "quelle": body.quelle or "api",
+        "von": von.isoformat(), "bis": bis.isoformat(),
+        "stunden_gefunden": len(stunden),
+        "raster": raster, "belegt": belegt,
+        "ausfaelle": U.ausfaelle(stunden, zeiten),
+        "ferien": ferien,
+    }
+
+
+class UntisSlotIn(BaseModel):
+    weekday: int
+    period: int
+    title: str = ""
+    kurs_id: Optional[int] = None
+    class_id: Optional[int] = None
+
+
+class UntisAusfallIn(BaseModel):
+    datum: str
+    stunde: int
+
+
+class UntisFerienIn(BaseModel):
+    von: str
+    bis: str
+    name: str = ""
+
+
+class UntisUebernahmeIn(BaseModel):
+    slots: List[UntisSlotIn] = []
+    ausfaelle: List[UntisAusfallIn] = []
+    ferien: List[UntisFerienIn] = []
+
+
+@router.post("/untis/uebernehmen")
+async def untis_uebernehmen(body: UntisUebernahmeIn, user: User = Depends(require_module),
+                            db: AsyncSession = Depends(get_db)):
+    """Die BESTAETIGTEN Vorschlaege schreiben. Nichts wird geraten.
+
+    Geschrieben wird ueber dieselben Wege wie von Hand — `upsert_slot` haelt die
+    Gueltigkeitsspannen der Stundenplan-Versionen zusammen (aendern heisst: alte
+    Fassung bis gestern, neue ab heute). Ein eigener Schreibpfad haette diese
+    Regel ein zweites Mal enthalten, und die zweite Fassung waere die falsche.
+    """
+    gesetzt = 0
+    for s in body.slots[:200]:
+        if not 0 <= s.weekday <= 6 or s.period < 1:
+            continue
+        await upsert_slot(SlotIn(weekday=s.weekday, period=s.period, title=(s.title or "")[:200],
+                                 kurs_id=s.kurs_id, class_id=s.class_id, topic_id=None), user, db)
+        gesetzt += 1
+
+    entfallen = 0
+    for a in body.ausfaelle[:500]:
+        d = _datum(a.datum)
+        if not d or a.stunde < 1:
+            continue
+        wann = tagesbeginn(d)
+        da = (await db.execute(select(SlotCancellation).where(
+            SlotCancellation.owner_id == user.id, SlotCancellation.date == wann,
+            SlotCancellation.period == a.stunde))).scalar_one_or_none()
+        if not da:
+            db.add(SlotCancellation(owner_id=user.id, date=wann, period=a.stunde))
+            entfallen += 1
+
+    frei = 0
+    vorhanden = {(b.start_date.date(), b.end_date.date()) for b in (await db.execute(
+        select(CalendarBreak).where(CalendarBreak.owner_id == user.id))).scalars().all()}
+    for f in body.ferien[:100]:
+        von, bis = _datum(f.von), _datum(f.bis)
+        if not von or not bis or bis < von:
+            continue
+        if (von, bis) in vorhanden:
+            continue          # schon eingetragen — Ferien zweimal waeren zwei Balken
+        db.add(CalendarBreak(owner_id=user.id, start_date=tagesbeginn(von),
+                             end_date=tagesbeginn(bis), label=(f.name or "")[:120]))
+        frei += 1
+
+    await db.commit()
+    return {"slots": gesetzt, "ausfaelle": entfallen, "ferien": frei}

@@ -837,8 +837,36 @@ def inhalt_kalender(api, u, spuren):
         if "stunden_gesamt" not in plan:
             raise AssertionError(f"Stoffplan ohne Stundenrechnung: {plan}")
 
+    # WebUntis-Anbindung: hier wird NICHT bei Untis angefragt — kein Testlauf
+    # darf von einem fremden Server abhaengen, und ein Passwort gehoert nicht in
+    # ein Testskript. Geprueft wird das, was uns gehoert: die gemerkten Angaben
+    # gehen hin und kommen zurueck, das Passwort taucht nirgends auf, und der
+    # Abruf ohne Zeitraster wird sauber abgelehnt statt zu krachen.
+    vorher = api.call("GET", "/api/kalender/untis", erwartet=(200,))
+    if "passwort" in vorher:
+        raise AssertionError("Untis-Antwort enthaelt ein Passwortfeld")
+    spuren.append(("Untis-Angaben", lambda: api.call(
+        "PUT", "/api/kalender/untis", {k: vorher.get(k) or "" for k in
+                                       ("server", "schule", "benutzer", "ics_url")},
+        erwartet=(200, 404))))
+    api.call("PUT", "/api/kalender/untis",
+             {"server": "https://ajax.webuntis.com/WebUntis/?school=zz-selbsttest",
+              "schule": "zz-selbsttest", "benutzer": f"{PRAEFIX}-untis", "ics_url": ""},
+             erwartet=(200,))
+    zurueck = api.call("GET", "/api/kalender/untis", erwartet=(200,))
+    if zurueck.get("schule") != "zz-selbsttest" or zurueck.get("benutzer") != f"{PRAEFIX}-untis":
+        raise AssertionError(f"Untis-Angaben nicht gemerkt: {zurueck}")
+    if "passwort" in zurueck:
+        raise AssertionError("Untis-Antwort enthaelt ein Passwortfeld")
+    # Eine Adresse, die nicht nach http aussieht, muss abgelehnt werden.
+    api.call("PUT", "/api/kalender/untis", {"ics_url": "javascript:alert(1)"}, erwartet=(400,))
+    api.call("PUT", "/api/kalender/untis",
+             {"server": "https://ajax.webuntis.com/WebUntis/?school=zz-selbsttest",
+              "schule": "zz-selbsttest", "benutzer": f"{PRAEFIX}-untis", "ics_url": ""},
+             erwartet=(200,))
+
     return ("Eintrag (6 Felder + Verlaufsplan), Slot, freier Zeitraum, "
-            "Klassenarbeit mit Themen, Stoffplan wiedergefunden")
+            "Klassenarbeit mit Themen, Stoffplan wiedergefunden, Untis-Angaben")
 
 
 def inhalt_orga(api, u, spuren):

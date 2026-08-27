@@ -244,6 +244,10 @@ def _ensure_columns(sync_conn):
         ("users", "calendar_changed_at", "TIMESTAMP"),
         ("users", "calendar_fetched_at", "TIMESTAMP"),
         ("users", "external_ics_url", "TEXT"),
+        ("users", "untis_server", "VARCHAR(200)"),     # WebUntis-Anbindung (ohne Passwort)
+        ("users", "untis_schule", "VARCHAR(120)"),
+        ("users", "untis_benutzer", "VARCHAR(120)"),
+        ("users", "untis_ics_url", "TEXT"),
         ("users", "external_ics_color", "VARCHAR(9) DEFAULT '' NOT NULL"),
         ("marketplace_quizzes", "copies", "INTEGER DEFAULT 0 NOT NULL"),
         ("methods", "topic_id", "INTEGER"),

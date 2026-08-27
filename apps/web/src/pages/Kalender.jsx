@@ -9,6 +9,7 @@ import ThemenWahl from "../components/ThemenWahl.jsx";
 import Stoffplan from "../components/Stoffplan.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
+import UntisImport from "../components/UntisImport.jsx";
 import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -144,6 +145,10 @@ export default function Kalender() {
   const [editing, setEditing] = useState(null); // { date, ...entry } oder null
   const [tt, setTt] = useState({ periods: 6, slots: [] }); // Stundenplan
   const [showTimes, setShowTimes] = useState(false); // Uhrzeiten-Spalte im Stundenplan
+  // WebUntis-Import: der Stundenplan der Schule steht schon in Untis — ihn
+  // hier ein zweites Mal einzutragen ist die Arbeit, die dieses Modul
+  // abnehmen soll. Der Dialog schreibt nichts, bevor jemand bestaetigt.
+  const [untisOffen, setUntisOffen] = useState(false);
   const [breaks, setBreaks] = useState([]); // unterrichtsfreie Zeitraeume (Ferien/Feiertage)
   const [examOverview, setExamOverview] = useState([]); // Klassenarbeiten-Übersicht (kommend + Reststunden)
   const loadExams = () => hol(`${API}/klassenarbeiten/uebersicht`).then((d) => setExamOverview(Array.isArray(d) ? d : []));
@@ -495,6 +500,7 @@ export default function Kalender() {
       )}
       {view === "timetable" && (
         <Werkzeugleiste mehr={[
+          { key: "untis", label: t("untis.menu"), icon: ICONS.import, onClick: () => setUntisOffen(true) },
           { key: "export", label: t("kalender.export"), icon: ICONS.export, onClick: exportKal },
           { key: "import", label: t("kalender.import"), icon: ICONS.import, onClick: () => dateiWaehlen(importKal) },
         ]}>
@@ -575,6 +581,10 @@ export default function Kalender() {
       )}
       {view === "week" && <WeekView extColor={extColor} range={range} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/notizbrett")} slotsFor={slotsFor} frei={frei} className={className} kursName={kursName} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
       {view === "day" && <DayView extColor={extColor} day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/notizbrett")} slotsFor={slotsFor} cancelledFor={cancelledFor} onCancelSlot={cancelSlot} onRestoreSlot={restoreSlot} frei={frei} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
+      {untisOffen && (
+        <UntisImport onClose={() => setUntisOffen(false)} kurse={kurse} klassen={classes} periods={tt.periods}
+          onFertig={() => { loadTt(); loadBreaks(); loadCancels(); }} />
+      )}
       {view === "timetable" && <TimetableView tt={tt} showTimes={showTimes} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} kursName={kursName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}

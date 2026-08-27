@@ -115,6 +115,7 @@ function KalenderHilfe({ t }) {
       <Section title={t("help.kal.planT")}>{t("help.kal.plan")}</Section>
       <Section title={t("help.kal.breaksT")}>{t("help.kal.breaks")}</Section>
       <Section title={t("help.kal.syncT")}>{t("help.kal.sync")}</Section>
+      <Section title={t("help.kal.untisT")}>{t("help.kal.untis")}</Section>
       <Section title={t("help.kal.korrT")}>{t("help.kal.korr")}</Section>
     </>
   );

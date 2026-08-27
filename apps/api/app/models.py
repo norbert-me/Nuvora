@@ -75,6 +75,26 @@ class User(Base):
     hj1_start: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     hj2_start: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     jahr_ende: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    # WebUntis: woher der Stundenplan der Schule geholt wird.
+    #
+    # Das PASSWORT steht hier bewusst NICHT. Ein WebUntis-Zugang ist das
+    # Schulkonto der Lehrkraft — damit sieht man Noten, Abwesenheiten und
+    # Klassenbuecher der ganzen Schule, also deutlich mehr, als Nuvora selbst
+    # jemals haelt. Es dauerhaft zu speichern (auch verschluesselt) hiesse,
+    # dieses Risiko fuer eine Bequemlichkeit einzukaufen, die ein paar Mal im
+    # Schuljahr gebraucht wird. Das Passwort wird deshalb bei jedem Import neu
+    # eingegeben und nach dem Abruf verworfen.
+    #
+    # Server, Schulkennung und Benutzername sind harmlos und ersparen genau die
+    # Tipparbeit, die beim Wiederholen nervt.
+    untis_server: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    untis_schule: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    untis_benutzer: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    # Der Ausweichweg: der persoenliche ICS-Abo-Link aus WebUntis. Er darf
+    # gespeichert werden — er ist read-only, traegt sein eigenes Geheimnis und
+    # laesst sich in WebUntis jederzeit neu erzeugen; dieselbe Art Adresse wie
+    # in external_calendars.
+    untis_ics_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # Ausgeblendete externe Einzel-Ereignisse: Liste von Schlüsseln "uid|YYYY-MM-DD".
     external_hidden: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     # Einstiege-Startsammlung einmalig angelegt? Danach nicht erneut seeden,
