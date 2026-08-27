@@ -601,14 +601,6 @@ export default function Kalender() {
             <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>{t("kalender.subscribeTitle")}</h3>
             <p style={{ fontSize: 13, color: "var(--text2)", marginBottom: 16, lineHeight: 1.5 }}>{t("kalender.subscribeText")}</p>
             <a href={abo.webcal} style={{ ...btnPrimary, display: "inline-block", textDecoration: "none", marginBottom: 16 }}>{t("kalender.subscribeNow")}</a>
-            {/* Der ehrliche Stand. Ein Abo wird vom Kalender GEHOLT — Nuvora kann
-                nichts hinschicken. Wer die Aenderung im Handy vermisst, sieht hier,
-                ob sein Kalender ueberhaupt schon einmal geholt hat. */}
-            <div style={{ marginTop: 12, fontSize: 12, color: "var(--text3)", lineHeight: 1.6 }}>
-              <div>{t("kalender.aboFetched")}: {abo.geholt ? new Date(abo.geholt).toLocaleString() : t("kalender.aboNever")}</div>
-              {abo.geaendert && <div>{t("kalender.aboChanged")}: {new Date(abo.geaendert).toLocaleString()}</div>}
-            </div>
-
             {/* Force-Resync: bricht die alte Verbindung ab und erzeugt eine neue URL,
                 damit ein haengendes Abo einmal komplett neu laedt. */}
             <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
