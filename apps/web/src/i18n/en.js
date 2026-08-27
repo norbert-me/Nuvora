@@ -979,7 +979,6 @@ export default {
   "kalender.subscribe": "Subscribe",
   "kalender.subscribeHint": "Subscribe the calendar in Apple/Google (live)",
   "kalender.subscribeTitle": "Subscribe to calendar (read only)",
-  "kalender.subscribeText": "Subscribe to your Nuvora calendar in Apple Calendar, Google Calendar etc.",
   "kalender.subscribeNow": "Open in calendar app",
   "kalender.resync": "Reconnect",
   "kalender.resyncing": "Resetting…",
@@ -2528,10 +2527,9 @@ export default {
 
   // ── CalDAV (components/CaldavZugaenge.jsx) ──
   "caldav.titel": "Calendar both ways (CalDAV)",
-  "caldav.text": "Events you create or change on your phone end up in Nuvora too.",
   "caldav.server": "Server address",
   "caldav.benutzer": "User name",
-  "caldav.passwortZeile": "Use a device password from below — not your Nuvora password.",
+  "caldav.passwortZeile": "Password: create one below.",
   "caldav.namePlatzhalter": "What for? e.g. “iPhone”, “work iPad”",
   "caldav.anlegen": "Create device password",
   "caldav.neuTitel": "New password for “{{name}}”",
@@ -2540,7 +2538,7 @@ export default {
   "caldav.zuruecknehmen": "Revoke",
   "caldav.zuletzt": "last used {{wann}}",
   "caldav.nieBenutzt": "never used",
-  "caldav.grenzen": "Holidays stay in the subscription above. Deleting a lesson on your phone means it is cancelled that day. Repeating events are not supported.",
+  "caldav.grenzen": "Holidays stay in the subscription. Deleting a lesson on the phone cancels it that day. No repeating events.",
   "help.kal.caldavT": "Adding events on your phone (CalDAV)",
   "help.kal.caldav": "A subscribed calendar only shows your events — nothing can be added there; that is how subscriptions work. To create events from your phone as well, set up CalDAV: in the calendar via ⋯ → “Share calendar”, create a device password there and enter server address, user name and that password in Apple or Outlook. One password per device, so a lost phone can be locked out on its own; your Nuvora password does not belong on the device. Holidays and timetable periods stay in the subscription — they are not individual events.",
 
@@ -2558,7 +2556,7 @@ export default {
   "caldav.pruefPrincipalAlt": "The server runs an old version. Please update Nuvora.",
 
   // ── CalDAV: account type “Advanced” ──
-  "caldav.erweitert": "Apple: account type “Advanced” — show settings",
+  "caldav.erweitert": "Apple: account type “Advanced”",
   "caldav.erweitertHinweis": "If Apple says the account name or password could not be verified, choose account type “Advanced” and enter these values. Apple then stops searching for the server itself.",
   "caldav.host": "Server address",
   "caldav.pfad": "Server path",

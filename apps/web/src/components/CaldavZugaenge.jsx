@@ -111,10 +111,7 @@ export default function CaldavZugaenge() {
 
   return (
     <div style={{ borderTop: "1px solid var(--border)", marginTop: 24, paddingTop: 16 }}>
-      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{t("caldav.titel")}</div>
-      <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12, lineHeight: 1.5 }}>
-        {t("caldav.text")}
-      </div>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{t("caldav.titel")}</div>
 
       {/* Die drei Angaben, die ins Gerät gehören. Sie selbst zusammensetzen zu
           lassen ist die Stelle, an der die Einrichtung scheitert — Apple sagt
@@ -122,7 +119,7 @@ export default function CaldavZugaenge() {
       <div style={{ ...panelStyle, padding: 10, marginBottom: 12 }}>
         <Zeile label={t("caldav.server")} wert={daten.server} t={t} />
         <Zeile label={t("caldav.benutzer")} wert={daten.benutzer} t={t} />
-        <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 6 }}>{t("caldav.passwortZeile")}</div>
+        <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>{t("caldav.passwortZeile")}</div>
 
         {/* Der Kontotyp „Erweitert" ist bei Apple oft nicht die Notlösung,
             sondern der einzige Weg: unter „Manuell" benutzt macOS den
@@ -197,12 +194,12 @@ export default function CaldavZugaenge() {
         </button>
       </div>
 
-      <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 10, lineHeight: 1.5 }}>
+      <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8, lineHeight: 1.4 }}>
         {t("caldav.grenzen")}
       </div>
 
       {/* Wenn das Handy nicht will, sagt hier der Server, woran es liegt. */}
-      <div style={{ borderTop: "1px solid var(--border)", marginTop: 12, paddingTop: 12 }}>
+      <div style={{ borderTop: "1px solid var(--border)", marginTop: 10, paddingTop: 10 }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <input type="password" value={pruefPasswort} onChange={(e) => setPruefPasswort(e.target.value)}
             placeholder={t("caldav.pruefPlatzhalter")} name="caldav-pruef" autoComplete="off"
@@ -223,12 +220,14 @@ export default function CaldavZugaenge() {
 
 function Zeile({ label, wert, t }) {
   return (
-    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
-      <span style={{ width: 96, flexShrink: 0, fontSize: 12, color: "var(--text3)" }}>{label}</span>
+    <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4 }}>
+      <span style={{ width: 74, flexShrink: 0, fontSize: 12, color: "var(--text3)" }}>{label}</span>
       <input readOnly value={wert || ""} onFocus={(e) => e.target.select()}
         style={{ ...inputStyle, flex: 1, fontSize: 12 }} />
-      <button onClick={() => navigator.clipboard?.writeText(wert || "")}
-        style={{ ...btnSecondary, ...btnSmall, borderRadius: CONTROL_R }}>{t("common.copy")}</button>
+      <button onClick={() => navigator.clipboard?.writeText(wert || "")} className="icon-btn"
+        style={toolbarIconBtn} title={t("common.copy")} aria-label={t("common.copy")}>
+        <Icon d={ICONS.duplicate} size={15} />
+      </button>
     </div>
   );
 }

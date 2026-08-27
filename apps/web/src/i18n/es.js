@@ -980,7 +980,6 @@ export default {
   "kalender.subscribe": "Suscribir",
   "kalender.subscribeHint": "Suscribe el calendario en Apple/Google (en vivo)",
   "kalender.subscribeTitle": "Suscribirse al calendario (solo lectura)",
-  "kalender.subscribeText": "Suscríbete a tu calendario de Nuvora en Apple Calendario, Google Calendar, etc.",
   "kalender.subscribeNow": "Abrir en la app de calendario",
   "kalender.resync": "Reconectar",
   "kalender.resyncing": "Restableciendo…",
@@ -2529,10 +2528,9 @@ export default {
 
   // ── CalDAV (components/CaldavZugaenge.jsx) ──
   "caldav.titel": "Calendario en ambos sentidos (CalDAV)",
-  "caldav.text": "Las citas que cree o modifique en el móvil aparecen también en Nuvora.",
   "caldav.server": "Dirección del servidor",
   "caldav.benutzer": "Nombre de usuario",
-  "caldav.passwortZeile": "Use una contraseña de dispositivo de abajo — no la de Nuvora.",
+  "caldav.passwortZeile": "Contraseña: cree una abajo.",
   "caldav.namePlatzhalter": "¿Para qué? p. ej. «iPhone», «iPad del centro»",
   "caldav.anlegen": "Crear contraseña de dispositivo",
   "caldav.neuTitel": "Nueva contraseña para «{{name}}»",
@@ -2541,7 +2539,7 @@ export default {
   "caldav.zuruecknehmen": "Retirar",
   "caldav.zuletzt": "última vez {{wann}}",
   "caldav.nieBenutzt": "nunca usada",
-  "caldav.grenzen": "Las vacaciones siguen en la suscripción de arriba. Borrar una hora en el móvil significa que ese día no hay clase. Las citas periódicas no se admiten.",
+  "caldav.grenzen": "Las vacaciones siguen en la suscripción. Borrar una hora en el móvil la cancela ese día. Sin citas periódicas.",
   "help.kal.caldavT": "Crear citas en el móvil (CalDAV)",
   "help.kal.caldav": "El calendario suscrito solo muestra sus citas — allí no se puede añadir nada; así funciona la suscripción. Si además quiere crear citas desde el móvil, configure CalDAV: en el calendario, ⋯ → «Compartir calendario», cree allí una contraseña de dispositivo e introduzca la dirección del servidor, el nombre de usuario y esa contraseña en Apple u Outlook. Una contraseña por dispositivo, para poder bloquear un móvil perdido por separado; su contraseña de Nuvora no debe ir al dispositivo. Las vacaciones y las horas del horario permanecen en la suscripción — no son citas individuales.",
 
@@ -2559,7 +2557,7 @@ export default {
   "caldav.pruefPrincipalAlt": "El servidor usa una versión antigua. Actualice Nuvora.",
 
   // ── CalDAV: tipo de cuenta «Avanzado» ──
-  "caldav.erweitert": "Apple: tipo de cuenta «Avanzado» — mostrar datos",
+  "caldav.erweitert": "Apple: tipo de cuenta «Avanzado»",
   "caldav.erweitertHinweis": "Si Apple dice que no se pudo comprobar la cuenta o la contraseña, elija el tipo de cuenta «Avanzado» e introduzca estos valores. Así Apple no busca el servidor por su cuenta.",
   "caldav.host": "Dirección del servidor",
   "caldav.pfad": "Ruta del servidor",

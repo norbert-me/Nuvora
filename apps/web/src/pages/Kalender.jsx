@@ -598,18 +598,16 @@ export default function Kalender() {
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} kursName={kursName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
       {abo && (
         <Modal onClose={() => setAbo(null)} width={500} label={t("kalender.subscribeTitle")}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>{t("kalender.subscribeTitle")}</h3>
-            <p style={{ fontSize: 13, color: "var(--text2)", marginBottom: 16, lineHeight: 1.5 }}>{t("kalender.subscribeText")}</p>
-            <a href={abo.webcal} style={{ ...btnPrimary, display: "inline-block", textDecoration: "none", marginBottom: 16 }}>{t("kalender.subscribeNow")}</a>
-            {/* Force-Resync: bricht die alte Verbindung ab und erzeugt eine neue URL,
-                damit ein haengendes Abo einmal komplett neu laedt. */}
-            <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <button onClick={resyncAbo} disabled={resyncing} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6, opacity: resyncing ? 0.6 : 1 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 10 }}>{t("kalender.subscribeTitle")}</h3>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <a href={abo.webcal} style={{ ...btnPrimary, display: "inline-block", textDecoration: "none" }}>{t("kalender.subscribeNow")}</a>
+              {/* Der Hinweis steht im title: er wird einmal gebraucht, kostet
+                  daneben aber dauerhaft eine Zeile. */}
+              <button onClick={resyncAbo} disabled={resyncing} title={t("kalender.resyncHint")}
+                style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6, opacity: resyncing ? 0.6 : 1 }}>
                 <Icon d={ICONS.refresh} size={15} /> {resyncing ? t("kalender.resyncing") : t("kalender.resync")}
               </button>
-              <span style={{ fontSize: 12, color: "var(--text3)", flex: 1, minWidth: 180 }}>{t("kalender.resyncHint")}</span>
             </div>
-
             {/* Schreibend: CalDAV. Steht bewusst NEBEN dem Abo und nicht
                 statt seiner — das Abo zeigt alles (auch Ferien und
                 Stundenplan-Stunden) und ist mit einem Klick eingerichtet,

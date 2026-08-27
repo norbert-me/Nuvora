@@ -971,7 +971,6 @@ export default {
   "kalender.subscribe": "Abonnieren",
   "kalender.subscribeHint": "Kalender in Apple/Google abonnieren (dauerhaft)",
   "kalender.subscribeTitle": "Kalender abonnieren (nur lesen)",
-  "kalender.subscribeText": "Abonniere deinen Nuvora-Kalender in Apple Kalender, Google Kalender o.ä.",
   "kalender.subscribeNow": "In Kalender-App öffnen",
   "kalender.resync": "Neu verbinden",
   "kalender.resyncing": "Setze zurück…",
@@ -2521,10 +2520,9 @@ export default {
   // Das Abo darueber ist einseitig: der Kalender HOLT eine Datei und bietet gar
   // keinen „Termin hinzufuegen"-Knopf an. CalDAV kann schreiben.
   "caldav.titel": "Kalender in beide Richtungen (CalDAV)",
-  "caldav.text": "Termine, die Sie im Handy anlegen oder ändern, stehen danach auch in Nuvora.",
   "caldav.server": "Serveradresse",
   "caldav.benutzer": "Benutzername",
-  "caldav.passwortZeile": "Als Passwort ein Gerätepasswort von unten — nicht Ihr Nuvora-Passwort.",
+  "caldav.passwortZeile": "Passwort: eines von unten anlegen.",
   "caldav.namePlatzhalter": "Wofür? z. B. „iPhone“, „Dienst-iPad“",
   "caldav.anlegen": "Gerätepasswort anlegen",
   "caldav.neuTitel": "Neues Passwort für „{{name}}“",
@@ -2533,7 +2531,7 @@ export default {
   "caldav.zuruecknehmen": "Zurücknehmen",
   "caldav.zuletzt": "zuletzt {{wann}}",
   "caldav.nieBenutzt": "noch nie benutzt",
-  "caldav.grenzen": "Ferien bleiben im Abo oben. Eine Stunde im Handy zu löschen heißt: sie fällt an dem Tag aus. Serientermine gehen nicht.",
+  "caldav.grenzen": "Ferien bleiben im Abo. Stunde im Handy löschen = fällt an dem Tag aus. Keine Serientermine.",
   "help.kal.caldavT": "Termine im Handy eintragen (CalDAV)",
   "help.kal.caldav": "Der abonnierte Kalender zeigt Ihre Termine nur an — eintragen lässt sich dort nichts, das liegt am Abo-Verfahren selbst. Wer auch vom Handy aus Termine anlegen will, richtet CalDAV ein: im Kalender über ⋯ → „Kalender teilen“, dort ein Gerätepasswort anlegen und Serveradresse, Benutzername und dieses Passwort in Apple oder Outlook eintragen. Für jedes Gerät ein eigenes Passwort, damit ein verlorenes Handy einzeln ausgesperrt werden kann; Ihr Nuvora-Passwort gehört nicht ins Gerät. Ferien und Stundenplan-Stunden bleiben im Abo — sie sind keine einzelnen Termine.",
 
@@ -2556,7 +2554,7 @@ export default {
   // Unter „Manuell" benutzt macOS den eingetippten Pfad teils gar nicht,
   // sondern sucht selbst unter /.well-known/caldav — und den fangen viele
   // vorgeschaltete Proxys fuer Let's Encrypt selbst ab.
-  "caldav.erweitert": "Apple: Kontotyp „Erweitert“ — Angaben zeigen",
+  "caldav.erweitert": "Apple: Kontotyp „Erweitert“",
   "caldav.erweitertHinweis": "Wenn Apple „Accountname/Passwort konnte nicht überprüft werden“ meldet, in den Einstellungen Accounttyp „Erweitert“ wählen und diese Werte eintragen. Dann sucht Apple den Server nicht selbst.",
   "caldav.host": "Serveradresse",
   "caldav.pfad": "Serverpfad",
