@@ -10,6 +10,7 @@ import Stoffplan from "../components/Stoffplan.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
 import UntisImport from "../components/UntisImport.jsx";
+import CaldavZugaenge from "../components/CaldavZugaenge.jsx";
 import { kursLabel } from "../core/kurslabel.js";
 import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
@@ -622,6 +623,13 @@ export default function Kalender() {
               </button>
               <span style={{ fontSize: 12, color: "var(--text3)", flex: 1, minWidth: 180 }}>{t("kalender.resyncHint")}</span>
             </div>
+
+            {/* Schreibend: CalDAV. Steht bewusst NEBEN dem Abo und nicht
+                statt seiner — das Abo zeigt alles (auch Ferien und
+                Stundenplan-Stunden) und ist mit einem Klick eingerichtet,
+                CalDAV kann dafuer schreiben. Wer nur lesen will, braucht es
+                nicht. */}
+            <CaldavZugaenge />
 
             {/* Andere Richtung: MEHRERE externe Kalender (ICS-URL) read-only einblenden. */}
             <div style={{ borderTop: "1px solid var(--border)", marginTop: 24, paddingTop: 16 }}>

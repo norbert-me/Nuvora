@@ -23,6 +23,7 @@ describe("Sperrliste", () => {
     ["/api/codedetektiv/sessions/ABCD/join", "laufende Sitzung"],
     ["/api/kalender/subscribe", "reicht nach aussen"],
     ["/api/kalender/untis/vorschau", "traegt ein Passwort"],
+    ["/api/caldav-zugaenge", "Geraete-Passwort kommt nur einmal zurueck"],
     ["/api/kalender/untis/uebernehmen", "braucht den Abruf von eben"],
     ["/api/marketplace/quizzes", "Veroeffentlichung"],
     ["/api/admin/users/3", "Betrieb"],

@@ -770,6 +770,13 @@ class CalendarEntry(Base):
     # getakteter Termin (hat Vorrang vor der period-Uhrzeit im ICS/Tagesplan).
     start_time: Mapped[str] = mapped_column(String(5), default="", server_default="")
     end_time: Mapped[str] = mapped_column(String(5), default="", server_default="")
+    # Die UID, unter der ein CalDAV-Client (Apple, Outlook) diesen Termin
+    # kennt. Leer bei allem, was in Nuvora entstanden ist — dort wird sie aus
+    # der ID abgeleitet. Sie muss gespeichert werden, weil der Client die
+    # Ressource unter SEINER UID anlegt und spaeter unter derselben aendert;
+    # eine abgeleitete UID zurueckzugeben hiesse, dass Apple den Termin beim
+    # naechsten Abgleich als zweiten, fremden Termin ansieht.
+    caldav_uid: Mapped[Optional[str]] = mapped_column(String(200), nullable=True, index=True)
     # Verlaufsplan: einfache Phasenliste [{phase, dauer, text}] für die Stunde.
     verlaufsplan: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     # Verknuepfte Modul-Objekte (Regel 3: alle optional, ON DELETE SET NULL —
@@ -1009,6 +1016,33 @@ class Stoffplan(Base):
     # dauern und im G-Kurs sechs — das ist eine Planungsentscheidung, keine
     # Eigenschaft des Themas.
     niveau: Mapped[str] = mapped_column(String(1), default="", server_default="")
+
+
+class CaldavToken(Base):
+    """Ein Geraete-Passwort fuer den CalDAV-Zugang.
+
+    Warum nicht das Kontopasswort: Apple und Outlook speichern die Zugangsdaten
+    dauerhaft im Geraet und schicken sie bei JEDEM Abgleich mit — alle paar
+    Minuten, jahrelang, auf einem Handy, das verloren gehen kann. Wer dort sein
+    Nuvora-Passwort hinterlegt, hat es an einer Stelle liegen, die er nicht
+    mehr ueberblickt. Ein eigenes Passwort je Geraet laesst sich einzeln
+    zuruecknehmen, ohne dass jemand sein Konto umstellen muss.
+
+    Gespeichert wird nur der Hash (dasselbe PBKDF2 wie beim Kontopasswort). Den
+    Klartext sieht die Lehrkraft genau einmal, beim Anlegen — ein Passwort, das
+    sich nachtraeglich auslesen laesst, ist keins.
+
+    `last_used_at` ist kein Schmuck: erst daran sieht man, welches der vier
+    Eintraege das alte iPad war, bevor man es loescht.
+    """
+    __tablename__ = "caldav_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(80), default="", server_default="")
+    token_hash: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class CalendarBreak(Base):

@@ -112,6 +112,12 @@ async def export_me(user=Depends(get_current_user), db: AsyncSession = Depends(g
         "karten_deck_kurse": await _rows(db, m.CardDeckKurs, in_(m.CardDeckKurs, "deck_id", deck_ids)),
         "kalender_eintraege": await _rows(db, m.CalendarEntry, m.CalendarEntry.owner_id == uid),
         "kalender_freie_zeiten": await _rows(db, m.CalendarBreak, m.CalendarBreak.owner_id == uid),
+        # Geraete-Passwoerter fuer den CalDAV-Zugang: Name und Zeitstempel
+        # gehoeren in die Auskunft (Art. 15), der Hash nicht. Ein Passwort-Hash
+        # ist fuer die auskunftsuchende Person wertlos und fuer jeden, der die
+        # Datei in die Haende bekommt, ein Angriffsziel.
+        "kalender_geraete": [{k: v for k, v in z.items() if k != "token_hash"}
+                             for z in await _rows(db, m.CaldavToken, m.CaldavToken.owner_id == uid)],
         "stundenplan": await _rows(db, m.TimetableSlot, m.TimetableSlot.owner_id == uid),
         "stoffverteilung": await _rows(db, m.Stoffplan, m.Stoffplan.owner_id == uid),
         "anwesenheit": await _rows(db, m.Attendance, m.Attendance.owner_id == uid),

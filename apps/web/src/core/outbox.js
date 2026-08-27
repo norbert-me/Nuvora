@@ -67,6 +67,7 @@ const SPERRE = [
   [/^\/api\/codedetektiv\/sessions/, "laufende Sitzung"],
   [/^\/api\/kalender\/(subscribe|feed|external)/, "reicht nach aussen (Abo, fremder Kalender)"],
   [/^\/api\/kalender\/untis/, "holt live bei WebUntis — und der Abruf traegt ein Passwort, das nirgends liegen bleiben darf"],
+  [/^\/api\/caldav/, "Geraete-Passwort: der Klartext kommt genau einmal zurueck — nachgespielt entstuende ein Passwort, das niemand sieht"],
   [/^\/api\/(selftest|mail-test)/, "Diagnose"],
   [/^\/api\/admin\//, "Betrieb"],
   [/^\/api\/backup/, "Betrieb"],

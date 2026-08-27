@@ -2530,4 +2530,22 @@ export default {
   "untis.rat.unbekannt": "Si se repite, use el enlace de suscripción — funciona sin acceso habilitado.",
   "help.kal.untisT": "Horario desde WebUntis",
   "help.kal.untis": "Si su horario ya está en WebUntis, Nuvora lo consulta: en el horario, ⋯ → «Importar de WebUntis». Se importa lo que se repite durante varias semanas — una sustitución aislada no tiñe el plan. Usted asigna cada hora a un curso antes de que se escriba nada; su plan de Untis nunca se modifica. Dos vías: con sus credenciales (más detalle, pero muchos centros no han habilitado el acceso para otros programas) o con el enlace de suscripción personal de WebUntis (menos detalle, funciona siempre). La contraseña no se guarda.",
+
+  // ── CalDAV (components/CaldavZugaenge.jsx) ──
+  "caldav.titel": "Crear citas desde Apple u Outlook (CalDAV)",
+  "caldav.text": "La suscripción de arriba solo muestra su calendario — allí no se puede añadir nada. Con CalDAV conecta Nuvora como un calendario de iCloud: las citas que cree, cambie o borre en el móvil aparecen en Nuvora.",
+  "caldav.server": "Dirección del servidor",
+  "caldav.benutzer": "Nombre de usuario",
+  "caldav.passwortZeile": "Como contraseña use una contraseña de dispositivo de abajo — no su contraseña de Nuvora.",
+  "caldav.namePlatzhalter": "¿Para qué? p. ej. «iPhone», «iPad del centro»",
+  "caldav.anlegen": "Crear contraseña de dispositivo",
+  "caldav.neuTitel": "Nueva contraseña para «{{name}}»",
+  "caldav.nurEinmal": "Anótela ahora — solo se muestra esta vez. Después aquí queda únicamente una suma de comprobación ilegible.",
+  "caldav.notiert": "Anotada",
+  "caldav.zuruecknehmen": "Retirar",
+  "caldav.zuletzt": "última vez {{wann}}",
+  "caldav.nieBenutzt": "nunca usada",
+  "caldav.grenzen": "Este calendario contiene sus entradas de calendario. Las vacaciones y las horas recurrentes del horario permanecen en la suscripción de arriba — no son citas individuales, y un gesto en el móvil no debe borrarlas. Nuvora no acepta citas periódicas («cada lunes»), porque aquí una entrada pertenece exactamente a un día.",
+  "help.kal.caldavT": "Crear citas en el móvil (CalDAV)",
+  "help.kal.caldav": "El calendario suscrito solo muestra sus citas — allí no se puede añadir nada; así funciona la suscripción. Si además quiere crear citas desde el móvil, configure CalDAV: en el calendario, ⋯ → «Compartir calendario», cree allí una contraseña de dispositivo e introduzca la dirección del servidor, el nombre de usuario y esa contraseña en Apple u Outlook. Una contraseña por dispositivo, para poder bloquear un móvil perdido por separado; su contraseña de Nuvora no debe ir al dispositivo. Las vacaciones y las horas del horario permanecen en la suscripción — no son citas individuales.",
 };

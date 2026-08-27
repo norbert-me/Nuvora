@@ -13,7 +13,7 @@ from .models import AppSetting, Base, Kurs, Session as SessionModel, User
 # den frueheren Ring main -> routers.backup -> main aufloest. Hier nur noch
 # hereingeholt, damit die Routen weiter unten `_require_admin` benutzen koennen.
 from .admin import _require_admin, APP_VERSION  # noqa: F401 — Routen unten
-from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizblock, trash, selftest, backup
+from .routers import questions, sessions, results, scan_image, classes, folders, cards, export_import, auth, marketplace, modules, topics, lernpfad, noten, karten, kalender, caldav, methoden, sitzplan, anwesenheit, codedetektiv, orga, ausleihe, me, zufall, kurse, material, klassenarbeit, todos, notizblock, trash, selftest, backup
 from . import websocket as ws
 from .routers.auth import _hash_pw, _verify_token, get_current_user, rate_limit, TOKEN_TTL
 from .routers.karten import uebernahme_deck_kurse
@@ -190,6 +190,8 @@ app.include_router(noten.router)
 app.include_router(karten.router)
 app.include_router(karten.kern_router)
 app.include_router(kalender.router)
+app.include_router(caldav.router)
+app.include_router(caldav.verwaltung)
 app.include_router(methoden.router)
 app.include_router(sitzplan.router)
 app.include_router(anwesenheit.router)
@@ -248,6 +250,7 @@ def _ensure_columns(sync_conn):
         ("users", "untis_schule", "VARCHAR(120)"),
         ("users", "untis_benutzer", "VARCHAR(120)"),
         ("users", "untis_ics_url", "TEXT"),
+        ("calendar_entries", "caldav_uid", "VARCHAR(200)"),  # UID des Clients (Apple/Outlook)
         ("users", "external_ics_color", "VARCHAR(9) DEFAULT '' NOT NULL"),
         ("marketplace_quizzes", "copies", "INTEGER DEFAULT 0 NOT NULL"),
         ("methods", "topic_id", "INTEGER"),

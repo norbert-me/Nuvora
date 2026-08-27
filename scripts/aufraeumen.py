@@ -311,6 +311,13 @@ class Sammler:
                   lambda o: [f"/api/kalender/breaks/{o['id']}"])
         self.nimm(g, "Eintrag", self._get("/api/kalender/entries"),
                   lambda o: [f"/api/kalender/entries/{o['id']}"])
+        # Geraete-Passwoerter fuer CalDAV: ein abgebrochener Lauf laesst sonst
+        # einen gueltigen Zugang zum Kalender liegen. Das ist kein Rauschen,
+        # sondern ein offenes Schloss.
+        zugaenge = self._get("/api/caldav-zugaenge")
+        self.nimm(g, "CalDAV-Zugang",
+                  zugaenge.get("zugaenge", []) if isinstance(zugaenge, dict) else [],
+                  lambda o: [f"/api/caldav-zugaenge/{o['id']}"])
 
     def _orga(self):
         g = "Orga"

@@ -2520,4 +2520,24 @@ export default {
   "untis.rat.unbekannt": "Wenn es sich wiederholt, nehmen Sie den Abo-Link — der geht auch ohne freigeschalteten Zugang.",
   "help.kal.untisT": "Stundenplan aus WebUntis",
   "help.kal.untis": "Steht Ihr Stundenplan schon in WebUntis, holt Nuvora ihn: im Stundenplan über ⋯ → „Aus WebUntis übernehmen“. Übernommen wird, was sich über mehrere Wochen wiederholt — eine einzelne Vertretung färbt den Plan nicht ein. Sie ordnen jede Stunde selbst einem Kurs zu, bevor etwas geschrieben wird; Ihr Untis-Plan wird nie verändert. Zwei Wege: mit Ihren Zugangsdaten (mehr Angaben, aber viele Schulen haben den Zugang für andere Programme gar nicht freigeschaltet) oder mit dem persönlichen Abo-Link aus WebUntis (weniger Angaben, geht immer). Das Passwort wird nicht gespeichert.",
+
+  // ── CalDAV (components/CaldavZugaenge.jsx) ──
+  // Das Abo darueber ist einseitig: der Kalender HOLT eine Datei und bietet gar
+  // keinen „Termin hinzufuegen"-Knopf an. CalDAV kann schreiben.
+  "caldav.titel": "Termine aus Apple oder Outlook eintragen (CalDAV)",
+  "caldav.text": "Das Abo oben zeigt Ihren Kalender nur an — dort lässt sich nichts eintragen. Über CalDAV binden Sie Nuvora wie einen iCloud-Kalender ein: Termine, die Sie im Handy anlegen, ändern oder löschen, stehen danach in Nuvora.",
+  "caldav.server": "Serveradresse",
+  "caldav.benutzer": "Benutzername",
+  "caldav.passwortZeile": "Als Passwort nehmen Sie ein Gerätepasswort von unten — nicht Ihr Nuvora-Passwort.",
+  "caldav.namePlatzhalter": "Wofür? z. B. „iPhone“, „Dienst-iPad“",
+  "caldav.anlegen": "Gerätepasswort anlegen",
+  "caldav.neuTitel": "Neues Passwort für „{{name}}“",
+  "caldav.nurEinmal": "Notieren Sie es jetzt — es wird nur dieses eine Mal angezeigt. Danach steht bei uns nur noch eine unlesbare Prüfsumme.",
+  "caldav.notiert": "Notiert",
+  "caldav.zuruecknehmen": "Zurücknehmen",
+  "caldav.zuletzt": "zuletzt {{wann}}",
+  "caldav.nieBenutzt": "noch nie benutzt",
+  "caldav.grenzen": "In diesem Kalender liegen Ihre Kalendereinträge. Ferien und die wiederkehrenden Stundenplan-Stunden bleiben im Abo oben — sie lassen sich nicht als einzelne Termine bearbeiten, und ein Wisch im Handy dürfte sie nicht löschen. Serientermine („jeden Montag“) nimmt Nuvora nicht an, weil ein Eintrag hier zu genau einem Tag gehört.",
+  "help.kal.caldavT": "Termine im Handy eintragen (CalDAV)",
+  "help.kal.caldav": "Der abonnierte Kalender zeigt Ihre Termine nur an — eintragen lässt sich dort nichts, das liegt am Abo-Verfahren selbst. Wer auch vom Handy aus Termine anlegen will, richtet CalDAV ein: im Kalender über ⋯ → „Kalender teilen“, dort ein Gerätepasswort anlegen und Serveradresse, Benutzername und dieses Passwort in Apple oder Outlook eintragen. Für jedes Gerät ein eigenes Passwort, damit ein verlorenes Handy einzeln ausgesperrt werden kann; Ihr Nuvora-Passwort gehört nicht ins Gerät. Ferien und Stundenplan-Stunden bleiben im Abo — sie sind keine einzelnen Termine.",
 };

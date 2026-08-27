@@ -1217,6 +1217,122 @@ def teste_alleinstellung(api, b, u, sch, spuren, nur_modul=None):
                      lambda p=probe: p(api, u, spuren))
 
 
+def teste_caldav(api, b, u, sch, spuren):
+    """CalDAV an der laufenden Installation — der Weg, auf dem Apple schreibt.
+
+    Warum das eine eigene Probe braucht und nicht in den pytest-Tests aufgeht:
+    dort laeuft die Anwendung ohne Proxy. Die Frage, die nach einem Deploy
+    wirklich offen ist, lautet aber „kommt ein PROPFIND durch nginx?" — eine
+    Methode, die kein anderer Teil von Nuvora benutzt. Faellt sie durch, ist der
+    Kalender im Handy still tot, und im Log steht nur ein 405.
+
+    Von Hand mit urllib statt ueber `Api`: gebraucht werden WebDAV-Methoden, ein
+    Koerper, der kein JSON ist, und eine Basic-Anmeldung — `Api` schickt einen
+    Bearer-Token und JSON, und beides waere hier falsch.
+    """
+    import base64
+    import urllib.error
+    import urllib.request
+
+    sch.nur("kalender")
+    zugang = api.call("POST", "/api/caldav-zugaenge", {"name": f"{PRAEFIX} CalDAV"}, erwartet=(201,))
+    spuren.append(("CalDAV-Zugang", lambda: api.call(
+        "DELETE", f"/api/caldav-zugaenge/{zugang['id']}", erwartet=(204, 404))))
+    stand = api.call("GET", "/api/caldav-zugaenge", erwartet=(200,))
+    marke = base64.b64encode(f"{stand['benutzer']}:{zugang['passwort']}".encode()).decode()
+
+    def dav(methode, pfad, koerper=b"", kopfe=None, mit_anmeldung=True):
+        req = urllib.request.Request(api.basis + pfad, data=koerper or None, method=methode)
+        if mit_anmeldung:
+            req.add_header("Authorization", "Basic " + marke)
+        if koerper:
+            req.add_header("Content-Type", "application/xml; charset=utf-8")
+        for k, v in (kopfe or {}).items():
+            req.add_header(k, v)
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                return r.status, r.read().decode("utf-8", "replace"), dict(r.headers)
+        except urllib.error.HTTPError as e:
+            return e.code, (e.read() or b"").decode("utf-8", "replace"), dict(e.headers or {})
+
+    def erkennung():
+        st, _, kopfe = dav("OPTIONS", "/api/caldav/")
+        if st != 200:
+            raise AssertionError(f"OPTIONS kommt nicht durch (HTTP {st}) — Proxy?")
+        if "calendar-access" not in (kopfe.get("DAV") or kopfe.get("Dav") or ""):
+            raise AssertionError("DAV-Kopfzeile fehlt — Apple haelt das nicht fuer einen Kalender")
+        return "OPTIONS mit DAV: calendar-access"
+
+    def anmeldung():
+        st, _, kopfe = dav("PROPFIND", "/api/caldav/", mit_anmeldung=False)
+        if st != 401:
+            raise AssertionError(f"ohne Anmeldung HTTP {st} statt 401")
+        if "basic" not in (kopfe.get("WWW-Authenticate") or "").lower():
+            raise AssertionError("ohne WWW-Authenticate fragt kein Client nach Zugangsdaten")
+        return "ohne Zugangsdaten 401 mit Aufforderung"
+
+    def propfind():
+        st, text, _ = dav("PROPFIND", "/api/caldav/", kopfe={"Depth": "0"}, koerper=(
+            b'<D:propfind xmlns:D="DAV:"><D:prop><D:current-user-principal/></D:prop></D:propfind>'))
+        if st != 207:
+            raise AssertionError(f"PROPFIND kommt nicht durch (HTTP {st}) — nginx laesst die Methode fallen?")
+        if "current-user-principal" not in text:
+            raise AssertionError("PROPFIND ohne Principal — die Einrichtung braeche hier ab")
+        return "PROPFIND liefert 207 mit Principal"
+
+    heim = [None]
+
+    def schreiben():
+        st, text, _ = dav("PROPFIND", "/api/caldav/", kopfe={"Depth": "0"}, koerper=(
+            b'<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">'
+            b"<D:prop><D:current-user-principal/></D:prop></D:propfind>"))
+        import re as _re
+        m = _re.search(r"/api/caldav/p/(\d+)/", text)
+        if not m:
+            raise AssertionError("kein Principal-Pfad in der Antwort")
+        heim[0] = f"/api/caldav/p/{m.group(1)}/kalender/"
+        ics = ("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\n"
+               f"UID:{PRAEFIX}-caldav@nuvora\r\n"
+               "DTSTART;VALUE=DATE:20260901\r\nDTEND;VALUE=DATE:20260902\r\n"
+               f"SUMMARY:{PRAEFIX} CalDAV-Probe\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n").encode()
+        st, _, kopfe = dav("PUT", heim[0] + "probe.ics", ics,
+                           kopfe={"Content-Type": "text/calendar; charset=utf-8"})
+        if st not in (200, 201, 204):
+            raise AssertionError(f"PUT abgelehnt (HTTP {st})")
+        ort = kopfe.get("Content-Location") or (heim[0] + "probe.ics")
+        heim.append(ort)
+        st, text, _ = dav("GET", ort)
+        if st != 200 or f"{PRAEFIX} CalDAV-Probe" not in text:
+            raise AssertionError(f"angelegter Termin nicht wieder lesbar (HTTP {st})")
+        # Und er ist wirklich in Nuvora angekommen, nicht nur im Protokoll.
+        eintraege = api.call("GET", "/api/kalender/entries", erwartet=(200,))
+        if isinstance(eintraege, list) and not any(
+                (e.get("title") or "").startswith(PRAEFIX) for e in eintraege):
+            raise AssertionError("Termin steht nicht in den Kalender-Eintraegen")
+        st, _, _ = dav("DELETE", ort)
+        if st not in (200, 204):
+            raise AssertionError(f"DELETE abgelehnt (HTTP {st})")
+        return "PUT, GET und DELETE gehen durch — der Termin steht in Nuvora"
+
+    def ohne_modul():
+        # Wie jeder ausgeteilte Zugang: ein Geraet laesst sich nicht einsammeln.
+        sch.nur("auswertung")
+        st, text, _ = dav("PROPFIND", heim[0] or "/api/caldav/", kopfe={"Depth": "0"})
+        if st < 400:
+            raise AssertionError(f"CalDAV antwortet trotz abgeschaltetem Kalender (HTTP {st})")
+        if PRAEFIX in text:
+            raise AssertionError("Termininhalte trotz abgeschaltetem Modul in der Antwort")
+        sch.nur("kalender")
+        return "ohne Modul dicht und keine Inhalte in der Antwort"
+
+    b.pruefe("CalDAV", "Erkennung (OPTIONS)", erkennung)
+    b.pruefe("CalDAV", "Anmeldung verlangt", anmeldung)
+    b.pruefe("CalDAV", "PROPFIND durch den Proxy", propfind)
+    b.pruefe("CalDAV", "Anlegen, lesen, loeschen", schreiben)
+    b.pruefe("CalDAV", "Ohne Modul dicht", ohne_modul)
+    api.call("DELETE", f"/api/caldav-zugaenge/{zugang['id']}", erwartet=(204, 404))
+
+
 # ─────────────────────── 3. CardVote vollstaendig ───────────────────────
 
 def teste_zugang_dicht(api, b, u, sch, spuren):
@@ -2469,6 +2585,7 @@ def main():
         teste_alleinstellung(api, b, u, sch, spuren, args.modul)
         if not args.modul:
             teste_zugang_dicht(api, b, u, sch, spuren)
+            teste_caldav(api, b, u, sch, spuren)
             cv = teste_cardvote_voll(api, b, u, sch, spuren)
             teste_noten(api, b, u, sch, spuren, cv)
             # VOR den Bruecken: die rechnen zwar nur je Arbeit, lassen aber eine

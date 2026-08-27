@@ -2529,4 +2529,22 @@ export default {
   "untis.rat.unbekannt": "If it keeps happening, use the subscription link — it works without enabled access.",
   "help.kal.untisT": "Timetable from WebUntis",
   "help.kal.untis": "If your timetable already lives in WebUntis, Nuvora can fetch it: in the timetable via ⋯ → “Import from WebUntis”. What repeats over several weeks is imported — a single substitution does not colour the plan. You assign every period to a course yourself before anything is written; your Untis plan is never changed. Two routes: with your credentials (more detail, but many schools have not enabled access for other programs at all) or with the personal subscription link from WebUntis (less detail, always works). The password is not stored.",
+
+  // ── CalDAV (components/CaldavZugaenge.jsx) ──
+  "caldav.titel": "Add events from Apple or Outlook (CalDAV)",
+  "caldav.text": "The subscription above only shows your calendar — nothing can be added there. With CalDAV you connect Nuvora like an iCloud calendar: events you create, change or delete on your phone end up in Nuvora.",
+  "caldav.server": "Server address",
+  "caldav.benutzer": "User name",
+  "caldav.passwortZeile": "As the password use a device password from below — not your Nuvora password.",
+  "caldav.namePlatzhalter": "What for? e.g. “iPhone”, “work iPad”",
+  "caldav.anlegen": "Create device password",
+  "caldav.neuTitel": "New password for “{{name}}”",
+  "caldav.nurEinmal": "Write it down now — it is shown this one time only. After that we keep nothing but an unreadable checksum.",
+  "caldav.notiert": "Noted",
+  "caldav.zuruecknehmen": "Revoke",
+  "caldav.zuletzt": "last used {{wann}}",
+  "caldav.nieBenutzt": "never used",
+  "caldav.grenzen": "This calendar holds your calendar entries. Holidays and the recurring timetable periods stay in the subscription above — they are not individual events, and a swipe on the phone must not delete them. Nuvora rejects repeating events (“every Monday”), because an entry here belongs to exactly one day.",
+  "help.kal.caldavT": "Adding events on your phone (CalDAV)",
+  "help.kal.caldav": "A subscribed calendar only shows your events — nothing can be added there; that is how subscriptions work. To create events from your phone as well, set up CalDAV: in the calendar via ⋯ → “Share calendar”, create a device password there and enter server address, user name and that password in Apple or Outlook. One password per device, so a lost phone can be locked out on its own; your Nuvora password does not belong on the device. Holidays and timetable periods stay in the subscription — they are not individual events.",
 };
