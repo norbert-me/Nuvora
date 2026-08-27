@@ -1310,6 +1310,28 @@ def _ics_falten(zeile: str) -> str:
     return "\r\n ".join(teile)
 
 
+def _kurs_label(kurs) -> str:
+    """"Mathe · 7.5" — Fach zuerst, Kursname dahinter.
+
+    Gegenstueck zu `kursLabel` in apps/web/src/core/kurslabel.js und muss mit
+    ihm zusammen geaendert werden: zwei Fassungen hiessen, dass derselbe Termin
+    im Handykalender anders heisst als im Browser. Steht das Fach schon im
+    Namen ("Mathe 7.5"), waere "Mathe · Mathe 7.5" doppelt gemoppelt — viele
+    Konten benennen ihre Kurse genau so.
+    """
+    if kurs is None:
+        return ""
+    fach = (getattr(kurs, "fach", "") or "").strip()
+    name = (getattr(kurs, "name", "") or "").strip()
+    if not fach:
+        return name
+    if not name:
+        return fach
+    if fach.lower() in name.lower():
+        return name
+    return f"{fach} · {name}"
+
+
 @router.get("/feed/{token}.ics")
 async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depends(get_db)):
     """ICS-Feed eines Kontos (Token statt Login). Kalender-Eintraege als
@@ -1339,6 +1361,17 @@ async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depe
     entries = (await db.execute(select(CalendarEntry).where(CalendarEntry.owner_id == u.id).order_by(CalendarEntry.date))).scalars().all()
     breaks = (await db.execute(select(CalendarBreak).where(CalendarBreak.owner_id == u.id))).scalars().all()
     classes = {c.id: c.name for c in (await db.execute(select(SchoolClass).where(SchoolClass.owner_id == u.id))).scalars().all()}
+    # Die Kurse dazu: der Feed beschriftet einen Eintrag mit „Fach · Kursname",
+    # nicht mit dem Klassennamen. Im Handykalender steht der Termin zwischen
+    # Arztterminen und Elternabenden — „7a" sagt dort nichts, „Mathe · 7a"
+    # schon. Fach und Kursname stehen am Kurs; die Klasse kennt beides nicht.
+    kurse = {k.id: k for k in (await db.execute(select(Kurs).where(
+        Kurs.owner_id == u.id, Kurs.deleted_at.is_(None)))).scalars().all()}
+    # Welcher Kurs gehoert zu einer Klasse (fuer Eintraege ohne eigene kurs_id)?
+    kurs_je_klasse = {}
+    for c in (await db.execute(select(SchoolClass).where(SchoolClass.owner_id == u.id))).scalars().all():
+        if c.kurs_id:
+            kurs_je_klasse[c.id] = c.kurs_id
 
     def d8(d):
         return d.strftime("%Y%m%d")
@@ -1362,7 +1395,8 @@ async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depe
     seq = int(u.calendar_rev or 0)
     for e in entries:
         day = e.date.date() if hasattr(e.date, "date") else e.date
-        title = e.title or (classes.get(e.class_id) or "Termin")
+        title = e.title or _kurs_label(kurse.get(e.kurs_id or kurs_je_klasse.get(e.class_id))) \
+            or classes.get(e.class_id) or "Termin"
         # Hat der Eintrag eine Stunde und gibt es dafür Uhrzeiten im Stundenplan,
         # als getakteten Termin ausgeben (sonst als Ganztags-Termin).
         # Freie Uhrzeit am Eintrag hat Vorrang; sonst die Uhrzeit der Stunde.
@@ -1462,7 +1496,10 @@ async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depe
                     continue
                 if not _slot_active_on(s, day):
                     continue
-                title = classes.get(s.class_id) or s.title or "Unterricht"
+                # Auch hier „Fach · Kursname" zuerst: die Stunde traegt ihren
+                # Kurs eindeutig (s.kurs_id), der Klassenname ist der Notnagel.
+                title = (_kurs_label(kurse.get(s.kurs_id or kurs_je_klasse.get(s.class_id)))
+                         or classes.get(s.class_id) or s.title or "Unterricht")
                 tr = times[s.period - 1] if 0 <= s.period - 1 < len(times) else None
                 # Uhrzeiten liegen als {"start","end"} vor (wie im Rest der App) —
                 # nicht "from"/"to". Mit den falschen Keys war die Zeit immer None,

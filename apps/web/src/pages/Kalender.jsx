@@ -10,6 +10,7 @@ import Stoffplan from "../components/Stoffplan.jsx";
 import KursKlasseSelect from "../components/KursKlasseSelect.jsx";
 import Werkzeugleiste, { MehrMenu } from "../components/Werkzeugleiste.jsx";
 import UntisImport from "../components/UntisImport.jsx";
+import { kursLabel } from "../core/kurslabel.js";
 import { DialogFuss, useEntwurf } from "../components/Speichern.jsx";
 import SpeicherBalken from "../components/SpeicherBalken.jsx";
 import { useLanguage } from "../i18n/index.jsx";
@@ -344,14 +345,20 @@ export default function Kalender() {
     });
   };
 
-  // Anzeige-Name eines Slots/Eintrags: der KURS (Fach), zu dem die Klasse gehört;
-  // nur wenn keine Kurs-Zuordnung existiert, der Klassenname als Fallback.
+  // Anzeige-Name eines Slots/Eintrags: der KURS, zu dem die Klasse gehört; nur
+  // wenn keine Kurs-Zuordnung existiert, der Klassenname als Fallback.
+  //
+  // Beschriftet wird „Fach · Kursname" (core/kurslabel.js) — im Kalender kommt
+  // die Frage „was habe ich jetzt?" vor „mit wem?", und der Kursname allein
+  // beantwortet sie nicht: er ist frei gewählt („7.5", „Gruppe rot") und nennt
+  // oft gar kein Fach. Dieselbe Regel gilt im ICS-Feed, damit ein Termin im
+  // Handykalender nicht anders heißt als im Browser.
   const className = (id) => {
     const k = kurse.find((k) => (k.classes || []).some((c) => c.id === id));
-    if (k) return k.name;
+    if (k) return kursLabel(k);
     return (classes.find((c) => c.id === id) || {}).name || "";
   };
-  const kursName = (id) => (kurse.find((k) => k.id === id) || {}).name || "";
+  const kursName = (id) => kursLabel(kurse.find((k) => k.id === id));
   // Stundenplan-Label: den GEWÄHLTEN Kurs zeigen (eindeutig gespeichert), sonst
   // per className raten. Eine Klasse kann in mehreren Kursen liegen — nur kurs_id
   // weiß, welcher gemeint war.
