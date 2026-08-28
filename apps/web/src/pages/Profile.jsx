@@ -3,8 +3,8 @@ import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { istAdmin } from "../core/admin.js";
 import { alsText, beobachte, leeren } from "../core/protokoll.js";
 import { useLanguage, LANGUAGES } from "../i18n/index.jsx";
-import { btnPrimary, btnSecondary, btnSmall, selectStyle, COLORS as C, pageForm, pageTitle, panelStyle, popoverPanel,
-  sectionLabel, Tabs, th as thBasis, td as tdBasis, badge, iconBtn, inputStyle as inputBasis, Icon, ICONS, CONTROL_R } from "../components/Icons.jsx";
+import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, pageTitle, panelStyle, popoverPanel,
+  sectionLabel, Tabs, th as thBasis, td as tdBasis, iconBtn, inputStyle as inputBasis, Icon, ICONS, CONTROL_R } from "../components/Icons.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { alsJson } from "../core/melden.js";
 
@@ -449,54 +449,60 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
               <>
                 {adminMsg && <div style={{ fontSize: 13, color: adminMsg.includes("Fehler") ? C.danger : C.success, marginBottom: 10 }}>{adminMsg}</div>}
                 <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-                {/* Kein `minWidth` an der Tabelle: das erzwang auf schmalen Geräten
-                    einen waagerechten Rollbalken und schnitt die Spalte „Status"
-                    ab. Drei kurze Spalten passen in die Karte, die E-Mail bricht
-                    (`overflowWrap: anywhere` in tdStyle). Das `overflowX: auto` am
-                    Container bleibt nur als Netz — es zeigt nichts, solange nichts
-                    überläuft. */}
+                {/* Zwei Spalten, kein `minWidth`: die E-Mail nimmt den Platz,
+                    rechts stehen Kennzeichen und Handgriffe. Die Wortspalten
+                    „Rolle" und „Status" sind weggefallen — sie brachen auf dem
+                    Handy mitten im Wort um und sagten in fast jeder Zeile
+                    dasselbe. */}
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                   <thead>
                     <tr>
                       <th style={thStyle}>{t("profile.email")}</th>
-                      <th style={thStyle}>{t("profile.role")}</th>
-                      <th style={thStyle}>{t("profile.accountState")}</th>
                       <th style={thStyle}></th>
                     </tr>
                   </thead>
                   <tbody>
                     {adminUsers.map(u => (
                       <tr key={u.id}>
-                        <td style={tdStyle}>{u.email}</td>
-                        {/* Nur die Administration wird ausgezeichnet — dass alle
-                            anderen Lehrkräfte sind, ist der Normalfall und muss
-                            nicht in jeder Zeile stehen. */}
                         <td style={tdStyle}>
-                          {u.admin && <span style={badge(C.info)}>{t("profile.roleAdmin")}</span>}
-                        </td>
-                        {/* Bestätigt oder nicht — das Einzige, was hier eine Entscheidung
-                            stützt: ein unbestätigtes Konto kann sich nie anmelden. */}
-                        <td style={tdStyle}>
-                          {u.email_verified
-                            ? <span style={{ color: "var(--text3)" }}>{t("profile.verified")}</span>
-                            : <span style={badge(C.warning)}>{t("profile.unverified")}</span>}
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            {/* Nur zwei Dinge sind eine Abweichung vom Normalfall,
+                                und beide tragen ihr Wort im `title`: die
+                                Administration (Person) und ein Konto, das seine
+                                E-Mail noch nicht bestätigt hat (Uhr) — das kann
+                                sich nie anmelden. */}
+                            {/* Der Titel sitzt am span, nicht am svg: ein
+                                title-Attribut am SVG zeigt nicht jeder Browser. */}
+                            {u.admin && <span title={t("profile.roleAdmin")} style={{ display: "inline-flex" }}>
+                              <Icon d={ICONS.user} size={15} color={C.info} /></span>}
+                            {!u.email_verified && <span title={t("profile.unverified")} style={{ display: "inline-flex" }}>
+                              <Icon d={ICONS.clock} size={15} color={C.warning} /></span>}
+                            {u.email}
+                          </span>
                         </td>
                         <td style={{ ...tdStyle, textAlign: "right", whiteSpace: "nowrap" }}>
-                          {/* Ernennen und zurücknehmen. Konto 1 bleibt außen vor:
-                              ohne es käme niemand mehr an die Verwaltung. */}
-                          {!u.fest && (
+                          {/* Ernennen und zurücknehmen. Nicht am ersten Konto
+                              (ohne es käme niemand mehr an die Verwaltung) und
+                              nicht am eigenen — wer sich selbst herabstuft,
+                              steht danach vor einer Seite, die er nicht mehr
+                              öffnen darf. */}
+                          {!u.fest && u.id !== user.id && (
                             <button
+                              className="icon-btn"
+                              title={u.admin ? t("profile.roleRevoke") : t("profile.roleGrant")}
+                              aria-label={u.admin ? t("profile.roleRevoke") : t("profile.roleGrant")}
                               onClick={async () => {
                                 const res = await fetch(`${API}/auth/admin/users/${u.id}/admin`,
                                   alsJson("PUT", { admin: !u.admin }));
                                 if (res.ok) setAdminUsers(adminUsers.map((x) => (x.id === u.id ? { ...x, admin: !u.admin } : x)));
                               }}
-                              style={{ ...btnSecondary, ...btnSmall, borderRadius: CONTROL_R, marginRight: 8 }}
-                            >{u.admin ? t("profile.roleRevoke") : t("profile.roleGrant")}</button>
+                              style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: CONTROL_R, marginRight: 8 }}
+                            ><Icon d={u.admin ? ICONS.userMinus : ICONS.userPlus} size={15} /></button>
                           )}
-                          {u.id !== 1 && (
+                          {u.id !== 1 && u.id !== user.id && (
                             <button
                               title={t("profile.deleteUser")}
+                              aria-label={t("profile.deleteUser")}
                               onClick={async () => {
                                 if (!await askConfirm(t("profile.deleteUserConfirm", { email: u.email }))) return;
                                 const res = await fetch(`${API}/auth/admin/users/${u.id}`, { method: "DELETE" });
@@ -505,7 +511,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                                   setAdminMsg(t("profile.deleted", { email: u.email }));
                                 }
                               }}
-                              style={{ ...iconBtn, border: `1px solid `, borderRadius: CONTROL_R }}
+                              style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: CONTROL_R }}
                             ><TrashIcon size={15} /></button>
                           )}
                         </td>

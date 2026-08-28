@@ -128,6 +128,12 @@ export const ICONS = {
   moon: ["M16 12.2A6.5 6.5 0 017.8 4a6.5 6.5 0 108.2 8.2z"],
   // EINE Person (Profil). `users` ist die Gruppe und waere hier das falsche Bild.
   user: ["M10 4a3 3 0 100 6 3 3 0 000-6z", "M4 17c0-3 2.7-4.6 6-4.6s6 1.6 6 4.6"],
+  // Person mit Plus/Minus: jemanden ernennen bzw. die Rolle zuruecknehmen.
+  // Dieselbe Person wie oben, nur nach links gerueckt, damit das Zeichen daneben Platz hat.
+  userPlus: ["M8 4a3 3 0 100 6 3 3 0 000-6z", "M2 17c0-3 2.7-4.6 6-4.6.7 0 1.4.07 2 .2",
+             "M15 12.5v5", "M12.5 15h5"],
+  userMinus: ["M8 4a3 3 0 100 6 3 3 0 000-6z", "M2 17c0-3 2.7-4.6 6-4.6.7 0 1.4.07 2 .2",
+              "M12.5 15h5"],
   // Aus dem Code-Detektiv hochgezogen: die Regel ist eine Design-Quelle, und
   // ein Modul mit eigenem Icon-Satz ist der Anfang von zwei Saetzen.
   puzzle: ["M4 4h3.6a1.6 1.6 0 013.2 0H14v3.6a1.6 1.6 0 000 3.2V16h-3.2a1.6 1.6 0 00-3.2 0H4v-3.4a1.6 1.6 0 000-3.2V4z"],
