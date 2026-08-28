@@ -77,6 +77,11 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminMsg, setAdminMsg] = useState("");
   const [setup, setSetup] = useState(null);
+  // Die installierte Version kommt aus VERSION ("4.1.0"), die neueste als
+  // GitHub-Tag ("v4.1.0"). Ein "v" davorzuschreiben ergab deshalb einmal
+  // "v4.1.0" und einmal "vv4.1.0". Angezeigt wird die nackte Nummer — das "v"
+  // gehoert zum Tag, nicht zur Version.
+  const nummer = (s) => String(s || "").replace(/^v/i, "");
   const [versionInfo, setVersionInfo] = useState(null);
   const [versionLoading, setVersionLoading] = useState(true);
   const [adminUsersLoading, setAdminUsersLoading] = useState(true);
@@ -405,7 +410,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
               <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 14, color: "var(--text)" }}>{t("profile.installed")} <strong>v{versionInfo.current}</strong></span>
+                    <span style={{ fontSize: 14, color: "var(--text)" }}>{t("profile.installed")} <strong>{nummer(versionInfo.current)}</strong></span>
                     {!versionInfo.update_available && (
                       <Icon d={ICONS.checkCircle} size={16} color={C.success} />
                     )}
@@ -413,7 +418,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                   {versionInfo.update_available && (
                     <div style={{ marginTop: 12, padding: 12, background: "var(--bg2)", border: "1px solid var(--border2)", borderRadius: CONTROL_R, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <Icon d={ICONS.download} size={18} color="var(--text)" />
-                      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{t("profile.updateAvailable")} v{versionInfo.latest}</span>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{t("profile.updateAvailable")} {nummer(versionInfo.latest)}</span>
                       <a href={versionInfo.repo_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 600, color: "var(--accent)" }}>{t("profile.toGithub")}</a>
                     </div>
                   )}
