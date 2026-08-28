@@ -15,11 +15,12 @@ import pathlib
 
 from fastapi import Depends, HTTPException
 
+from .rollen import ist_admin
 from .routers.auth import get_current_user
 
 
 async def _require_admin(user=Depends(get_current_user)):
-    if user.id != 1:
+    if not ist_admin(user):
         raise HTTPException(403, "Nur für die Administration")
     return user
 

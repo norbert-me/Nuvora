@@ -345,3 +345,32 @@ async def test_exam_overview_calendar_overrides(s):
     s.add(CalendarEntry(owner_id=u.id, date=base + timedelta(days=1), period=3, class_id=a.id, kurs_id=kA.id, title="Extra")); await s.commit()
     assert (await K.exam_overview(user=u, db=s))[0]["stunden"] == base_cnt
     await K.delete_exam(ex.id, user=u, db=s)
+
+
+@pytest.mark.asyncio
+async def test_stundenplan_gilt_je_halbjahr(s):
+    """Ein Stundenplan gehört zu einem Halbjahr — das ist der Takt, in dem
+    Schulen ihn neu machen. Ohne Zeitraum am Slot schriebe das zweite Halbjahr
+    den Plan des ersten um, und die vergangenen Wochen sähen rückwirkend
+    anders aus."""
+    from datetime import date as _date
+    u = User(email="hj@b.de", password_hash="x", name="L",
+             hj1_start=_date(2026, 8, 10), hj2_start=_date(2027, 2, 1),
+             jahr_ende=_date(2027, 7, 10))
+    s.add(u); await s.flush()
+    a = SchoolClass(name="7a", owner_id=u.id); b = SchoolClass(name="7b", owner_id=u.id)
+    s.add_all([a, b]); await s.commit()
+
+    erst = await KAL.upsert_slot(KAL.SlotIn(weekday=0, period=1, class_id=a.id, term="1"), user=u, db=s)
+    assert str(erst.valid_from) == "2026-08-10" and str(erst.valid_to) == "2027-01-31"
+
+    zweit = await KAL.upsert_slot(KAL.SlotIn(weekday=0, period=1, class_id=b.id, term="2"), user=u, db=s)
+    assert zweit.id != erst.id
+    assert str(zweit.valid_from) == "2027-02-01" and str(zweit.valid_to) == "2027-07-10"
+
+    # Der Plan des ersten Halbjahrs bleibt, wie er war.
+    tt = await KAL.get_timetable(user=u, db=s)
+    erste = [x for x in tt["slots"] if KAL._slot_active_on(x, _date(2026, 9, 1))]
+    zweite = [x for x in tt["slots"] if KAL._slot_active_on(x, _date(2027, 3, 1))]
+    assert [x.class_id for x in erste] == [a.id]
+    assert [x.class_id for x in zweite] == [b.id]

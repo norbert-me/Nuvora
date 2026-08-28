@@ -72,6 +72,12 @@ class User(Base):
     # Gebraucht vom Stoffverteilungsplan (ohne Anfang und Ende gibt es keine
     # Wochen, ueber die verteilt wird) und von allem, was „dieses Halbjahr"
     # sagt, statt „die letzten N".
+    # Administration. Konto 1 ist es immer (es hat die Installation aufgesetzt
+    # und laesst sich nicht herabstufen — sonst koennte sich niemand mehr
+    # aussperren als alle); weitere Konten lassen sich dazu ernennen. Vorher
+    # hing die Rolle allein an der ID, und eine zweite Administration gab es
+    # nicht: bei Krankheit oder Wechsel kam niemand mehr an die Verwaltung.
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     hj1_start: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     hj2_start: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     jahr_ende: Mapped[Optional[date]] = mapped_column(Date, nullable=True)

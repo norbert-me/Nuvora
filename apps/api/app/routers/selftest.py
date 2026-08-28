@@ -23,6 +23,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..rollen import ist_admin
 from ..database import get_db
 from ..models import Base
 from .auth import get_current_user
@@ -46,7 +47,7 @@ async def _require_admin(request: Request, db: AsyncSession = Depends(get_db)):
     if token and mitgeschickt and secrets.compare_digest(token, mitgeschickt):
         return None
     user = await get_current_user(request, Response(), db)
-    if user.id != 1:
+    if not ist_admin(user):
         raise HTTPException(403, "Nur für die Administration oder mit gültigem SELFTEST_TOKEN")
     return user
 

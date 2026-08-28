@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import { askChoice, askConfirm, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, COLORS as C, selectStyle, SHADOW, Tabs, td as tdCell, th, inputStyle, menuRow, toolbarInput, toolbarBtn, toolbarBtnPrimary, DatumNavigator, segmentBtn, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, pageApp, Popover } from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, COLORS as C, selectStyle, SHADOW, Tabs, td as tdCell, th, inputStyle, menuRow, toolbarInput, toolbarBtn, toolbarBtnPrimary, DatumNavigator, Segment, segmentBtn, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, pageApp, Popover } from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
 import ThemenWahl from "../components/ThemenWahl.jsx";
 import Stoffplan from "../components/Stoffplan.jsx";
@@ -161,6 +161,16 @@ export default function Kalender() {
   const [aktiv, setAktiv] = useState({}); // { cardvote, karten, lernpfad } aktiv?
   const [editing, setEditing] = useState(null); // { date, ...entry } oder null
   const [tt, setTt] = useState({ periods: 6, slots: [] }); // Stundenplan
+  // Fuer welchen Zeitraum der Stundenplan bearbeitet wird: "1", "2", "jahr"
+  // oder "" (laufendes Halbjahr). Schulen machen den Plan je Halbjahr neu; der
+  // alte bleibt stehen (valid_from/valid_to je Stunde).
+  const [term, setTerm] = useState("");
+  const sj = (tt && tt.schuljahr) || {};
+  // Auf welchen Tag der Editor schaut. Ohne Schuljahr im Profil: heute.
+  const stichtag = (() => {
+    const d = term === "2" ? sj.hj2 : (term === "1" || term === "jahr") ? sj.hj1 : "";
+    return d ? new Date(d + "T00:00:00") : new Date();
+  })();
   const [showTimes, setShowTimes] = useState(false); // Uhrzeiten-Spalte im Stundenplan
   // WebUntis-Import: der Stundenplan der Schule steht schon in Untis — ihn
   // hier ein zweites Mal einzutragen ist die Arbeit, die dieses Modul
@@ -437,14 +447,14 @@ export default function Kalender() {
   };
 
   const saveSlot = async (s) => {
-    const body = { weekday: s.weekday, period: s.period, title: s.title || "", class_id: s.class_id || null, kurs_id: s.kurs_id ?? null, topic_id: s.topic_id || null };
+    const body = { weekday: s.weekday, period: s.period, title: s.title || "", class_id: s.class_id || null, kurs_id: s.kurs_id ?? null, topic_id: s.topic_id || null, term };
     const res = await fetch(`${API}/timetable/slot`, alsJson("PUT", body)).catch(() => null);
     // Bisher blieb die Maske bei Ablehnung einfach offen stehen — nicht von
     // „ich habe den Knopf verfehlt" zu unterscheiden.
     if (!(await pruefeAntwort(res, t("common.save")))) return;
     if (res && res.ok) { setSlotEdit(null); loadTt(); }
   };
-  const removeSlot = async (id) => { await fetch(`${API}/timetable/slot/${id}`, { method: "DELETE" }).catch(() => {}); setSlotEdit(null); loadTt(); };
+  const removeSlot = async (id) => { await fetch(`${API}/timetable/slot/${id}?term=${term}`, { method: "DELETE" }).catch(() => {}); setSlotEdit(null); loadTt(); };
   const setPeriods = async (n) => {
     const res = await fetch(`${API}/timetable/periods`, alsJson("PUT", { periods: n })).catch(() => null);
     if (res && res.ok) setTt(await res.json());
@@ -560,7 +570,16 @@ export default function Kalender() {
         </Werkzeugleiste>
       )}
       {view === "timetable" && (
-        <Werkzeugleiste>
+        <Werkzeugleiste links={sj.hj1 || sj.hj2 ? (
+          <Segment>
+            {[["", t("kalender.termNow")], ["1", t("kalender.term1")], ["2", t("kalender.term2")], ["jahr", t("kalender.termYear")]]
+              .map(([k, label]) => (
+                <button key={k || "now"} onClick={() => setTerm(k)}
+                  style={{ ...segmentBtn, fontWeight: term === k ? 700 : 500,
+                    color: term === k ? "var(--accent)" : "var(--text2)" }}>{label}</button>
+              ))}
+          </Segment>
+        ) : null}>
           <button onClick={() => setShowTimes((v) => !v)} className="icon-btn" title={t("kalender.timesShow")} aria-label={t("kalender.timesShow")}
             style={{ ...toolbarIconBtn, border: showTimes ? "1px solid var(--accent)" : "1px solid var(--border2)" }}>
             <Icon d={ICONS.clock} size={18} color={showTimes ? "var(--accent)" : "var(--text2)"} />
@@ -642,7 +661,7 @@ export default function Kalender() {
         <UntisImport onClose={() => setUntisOffen(false)} kurse={kurse} klassen={classes} periods={tt.periods}
           onFertig={() => { loadTt(); loadBreaks(); loadCancels(); }} />
       )}
-      {view === "timetable" && <TimetableView tt={tt} showTimes={showTimes} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
+      {view === "timetable" && <TimetableView tt={tt} showTimes={showTimes} stichtag={stichtag} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onEdit={setSlotEdit} onPeriods={setPeriods} onTimes={setTimes} t={t} />}
 
       {editing && <EntryModal entry={editing} classes={classes} topics={topics} methods={methods} quizze={quizze} ladders={ladders} puzzles={puzzles} aktiv={aktiv} topicName={topicName} kursName={kursName} onSave={save} onDelete={remove} onClose={() => setEditing(null)} t={t} />}
       {abo && (
@@ -1118,7 +1137,7 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
   );
 }
 
-function TimetableView({ tt, showTimes = false, className, slotName, slotColor, classColor, topicName, onEdit, onPeriods, onTimes, breaks = [], onAddBreak, onDelBreak, t }) {
+function TimetableView({ tt, showTimes = false, stichtag = null, className, slotName, slotColor, classColor, topicName, onEdit, onPeriods, onTimes, breaks = [], onAddBreak, onDelBreak, t }) {
   // Uhrzeiten-Umschalter liegt jetzt oben neben Export/Import (Prop showTimes).
   const wdays = [t("kalender.mon"), t("kalender.tue"), t("kalender.wed"), t("kalender.thu"), t("kalender.fri")];
   // ── Ein Entwurf für Stundenzahl und Uhrzeiten ──
@@ -1144,8 +1163,11 @@ function TimetableView({ tt, showTimes = false, className, slotName, slotColor, 
   useEffect(() => { if (frisch.current) { frisch.current = false; entwurf.verwerfen(); } });
   const anzahl = entwurf.wert.periods;
   const periods = Array.from({ length: anzahl }, (_, i) => i + 1);
-  // Editor zeigt/bearbeitet nur die AKTUELL gültige Version (valid_to == null).
-  const slot = (wd, p) => tt.slots.find((s) => s.weekday === wd && s.period === p && !s.valid_to);
+  // Der Editor zeigt den Plan des GEWÄHLTEN Zeitraums — nicht stur die
+  // aktuellste Fassung. Sonst zeigte die Wahl „1. Halbjahr" den Plan des
+  // zweiten und man überschriebe beim Tippen den falschen.
+  const slot = (wd, p) => tt.slots.find((s) => s.weekday === wd && s.period === p
+    && slotActiveOn(s, stichtag || new Date()));
   const timeVal = (i, f) => entwurf.wert[`t${i}${f}`] || "";
   const commitTime = (i, f, val) => entwurf.setz({ [`t${i}${f}`]: val });
   const timeInput = { width: "100%", boxSizing: "border-box", border: "1px solid var(--border2)", borderRadius: CONTROL_R, fontSize: 12, padding: 4, background: "var(--bg)", color: "var(--text)", marginTop: 4 };
@@ -1159,9 +1181,6 @@ function TimetableView({ tt, showTimes = false, className, slotName, slotColor, 
   const gapH = (p) => { const a = hmToMin(timeVal(p - 1, "end")), b = hmToMin(timeVal(p, "start")); return a != null && b != null && b > a ? (b - a) * PXMIN : 0; };
   return (
     <div>
-      <div style={{ margin: "0 0 12px" }}>
-        <p style={{ fontSize: 13, color: "var(--text3)", margin: 0, maxWidth: 620 }}>{t("kalender.timetableHint")}</p>
-      </div>
       <SpeicherBalken entwurf={entwurf} />
       <div>
         <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
@@ -1333,8 +1352,6 @@ function ExamPanel({ overview, periods = 6, aktiv = {}, topics = [], onAdd, onUp
   };
   return (
     <div>
-      <p style={{ fontSize: 14, color: "var(--text2)", margin: "0 0 16px" }}>{t("kalender.examsIntro")}</p>
-
       {/* Anlegen in der gemeinsamen Bauform (components/Werkzeugleiste.jsx):
           links WAS (Kurs/Klasse), daneben die Felder des Alltags. */}
       <Werkzeugleiste
@@ -1484,7 +1501,6 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
       {/* Titel nur im eingebetteten Fall (im Stundenplan) — als eigene Seite trägt
           ihn schon der Abschnitts-h1 oben. */}
       {!standalone && <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{t("kalender.breaksTitle")}</h3>}
-      <p style={{ fontSize: 12, color: "var(--text3)", margin: "0 0 12px", maxWidth: 620 }}>{t("kalender.breaksHint")}</p>
       {/* Eine Leiste statt zweier: das Anlegen ist ein Plus mit Dialog wie
           ueberall sonst, statt drei Feldern und einem Knopf, die dauerhaft
           herumstehen. Bundesland und die beiden Import-Aktionen sind seltene

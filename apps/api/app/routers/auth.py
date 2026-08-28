@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..netz import client_ip as _client_ip
 from ..seed import seed_new_account
+from ..rollen import ist_admin
 from ..database import get_db
 from ..models import User, Question, MarketplaceQuiz
 from .. import mailer
@@ -486,6 +487,9 @@ def _user_dict(user):
     display = f"{user.salutation} {user.name}".strip() if user.salutation else user.name
     return {
         "id": user.id, "email": user.email, "name": user.name, "salutation": user.salutation,
+        # Die Oberflaeche blendet daran den Verwaltungsbereich ein — Konto 1
+        # oder ernannt (app/rollen.py).
+        "is_admin": ist_admin(user),
         "display_name": display or user.email, "grade_scale": user.grade_scale, "grade_tendency": user.grade_tendency,
         "marketplace_name": getattr(user, "marketplace_name", "") or "",
         "pending_email": getattr(user, "pending_email", None),
@@ -780,7 +784,7 @@ async def delete_account(body: DeleteAccountBody, user: User = Depends(get_curre
 
 @router.get("/admin/users")
 async def admin_list_users(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    if user.id != 1:
+    if not ist_admin(user):
         raise HTTPException(403, "Nur Admin")
     result = await db.execute(select(User).order_by(User.id))
     # Kein `name`: der ist ein freies Anzeigefeld der Lehrkraft und stuetzt
@@ -790,13 +794,40 @@ async def admin_list_users(user: User = Depends(get_current_user), db: AsyncSess
     # Die Rolle haengt allein an der ID: Konto 1 ist die Administration
     # (siehe _require_admin in main.py) — hier einmal ausgerechnet, damit die
     # Oberflaeche die Regel nicht nachbaut.
-    return [{"id": u.id, "email": u.email, "admin": u.id == 1,
+    return [{"id": u.id, "email": u.email, "admin": ist_admin(u),
+             # Konto 1 laesst sich nicht herabstufen — die Oberflaeche zeigt
+             # dort deshalb keinen Schalter statt einen, der immer scheitert.
+             "fest": u.id == 1,
              "email_verified": u.email_verified} for u in result.scalars().all()]
+
+
+class AdminRolleIn(BaseModel):
+    admin: bool
+
+
+@router.put("/admin/users/{user_id}/admin")
+async def admin_set_role(user_id: int, body: AdminRolleIn, user: User = Depends(get_current_user),
+                         db: AsyncSession = Depends(get_db)):
+    """Eine Lehrkraft zur Administration ernennen — oder wieder zurueck.
+
+    Konto 1 bleibt aussen vor: IDs werden nicht wiederverwendet, und ohne
+    dieses Konto koennte sich eine Installation vollstaendig aussperren.
+    """
+    if not ist_admin(user):
+        raise HTTPException(403, "Nur Admin")
+    if user_id == 1:
+        raise HTTPException(400, "Das erste Konto bleibt die Administration")
+    ziel = await db.get(User, user_id)
+    if not ziel:
+        raise HTTPException(404)
+    ziel.is_admin = bool(body.admin)
+    await db.commit()
+    return {"ok": True, "admin": ziel.is_admin}
 
 
 @router.delete("/admin/users/{user_id}")
 async def admin_delete_user(user_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    if user.id != 1:
+    if not ist_admin(user):
         raise HTTPException(403, "Nur Admin")
     if user_id == 1:
         raise HTTPException(400, "Admin-Konto kann nicht gelöscht werden")

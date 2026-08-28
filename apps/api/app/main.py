@@ -275,6 +275,7 @@ def _ensure_columns(sync_conn):
         ("topics", "jahrgang", "INTEGER"),
         ("kurse", "fach", "VARCHAR(60) DEFAULT '' NOT NULL"),    # … und ihr Gegenstueck am Kurs
         ("kurse", "jahrgang", "INTEGER"),
+        ("users", "is_admin", "BOOLEAN DEFAULT FALSE NOT NULL"),
         ("users", "hj1_start", "DATE"),        # Schuljahr: Halbjahre + Jahresende
         ("users", "hj2_start", "DATE"),
         ("users", "jahr_ende", "DATE"),

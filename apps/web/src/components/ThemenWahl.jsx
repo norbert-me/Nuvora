@@ -33,7 +33,7 @@ export default function ThemenWahl({ topics, value = [], onChange, style }) {
     <span style={{ position: "relative", display: "inline-flex", ...style }}>
       <button type="button" onClick={() => setOffen((o) => !o)}
         style={{ ...toolbarBtn, color: gewaehlt.size ? "var(--text)" : "var(--text3)" }}
-        title={t("kalender.examTopicsHint")}>
+        title={t("kalender.examTopics")}>
         <Icon d={ICONS.tag} size={15} />
         {gewaehlt.size ? t("kalender.examTopicsN", { n: gewaehlt.size }) : t("kalender.examTopics")}
       </button>

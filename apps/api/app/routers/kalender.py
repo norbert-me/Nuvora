@@ -1273,6 +1273,36 @@ class SlotIn(BaseModel):
     kurs_id: Optional[int] = None   # gewaehlter Kurs (Fach) — Anzeige daraus
     title: str = ""
     topic_id: Optional[int] = None
+    # Fuer welchen Zeitraum die Stunde gilt: "1", "2", "jahr" oder leer
+    # (laufendes Halbjahr). Der Begriff statt zweier Datumsfelder — das
+    # Schuljahr steht am Konto, und zwei Stellen mit Datumsangaben liefen
+    # auseinander.
+    term: str = ""
+
+
+def _stundenplan_fenster(user: User, term: str):
+    """(ab, bis) fuer den gewaehlten Zeitraum eines Stundenplans.
+
+    Ein Stundenplan gilt fuer ein Halbjahr — das ist der Takt, in dem Schulen
+    ihn neu machen. `term` ist "1", "2", "jahr" oder leer (= laufendes
+    Halbjahr). Ohne Schuljahr im Profil bleibt es beim alten Verhalten: ab
+    heute, ohne Ende — der Plan muss benutzbar sein, bevor jemand sein
+    Schuljahr eingetragen hat.
+    """
+    heute = date.today()
+    if term == "jahr":
+        ab, bis = user.hj1_start, user.jahr_ende
+    elif term == "1":
+        # Das erste Halbjahr endet am Tag VOR dem zweiten.
+        ab = user.hj1_start
+        bis = (user.hj2_start - timedelta(days=1)) if user.hj2_start else user.jahr_ende
+    elif term == "2":
+        ab, bis = user.hj2_start, user.jahr_ende
+    else:
+        ab, bis = _halbjahr(user, "")
+        if bis and user.hj2_start and bis == user.hj2_start:
+            bis = bis - timedelta(days=1)
+    return (ab or heute), bis
 
 
 class SlotOut(SlotIn):
@@ -1286,6 +1316,10 @@ class Timetable(BaseModel):
     periods: int
     slots: List[SlotOut]
     times: list = []
+    # Das Schuljahr aus dem Profil (Halbjahre + Ende). Die Auswahl „1. HJ /
+    # 2. HJ / Jahr" braucht es, und ist es nicht eingetragen, sagt die
+    # Oberflaeche das, statt einen Zeitraum zu erfinden.
+    schuljahr: dict = {}
 
 
 class PeriodsIn(BaseModel):
@@ -1302,7 +1336,12 @@ async def get_timetable(user: User = Depends(require_module), db: AsyncSession =
         select(TimetableSlot).where(TimetableSlot.owner_id == user.id)
         .order_by(TimetableSlot.weekday, TimetableSlot.period)
     )).scalars().all()
-    return {"periods": user.timetable_periods or 6, "slots": rows, "times": user.timetable_times or []}
+    def _iso(d):
+        return d.isoformat() if d else ""
+    return {"periods": user.timetable_periods or 6, "slots": rows,
+            "times": user.timetable_times or [],
+            "schuljahr": {"hj1": _iso(user.hj1_start), "hj2": _iso(user.hj2_start),
+                          "ende": _iso(user.jahr_ende)}}
 
 
 class SlotCancelIn(BaseModel):
@@ -1362,34 +1401,42 @@ async def upsert_slot(body: SlotIn, user: User = Depends(require_module), db: As
     await _check_class(db, user, body.class_id)
     await _check_kurs(db, user, body.kurs_id)
     await _check_topic(db, user, body.topic_id)
-    today = date.today()
-    # Die AKTUELL gültige Version an (weekday, period) — nur die hat valid_to NULL.
+    # Ab wann die Änderung gilt: der Anfang des gewählten Halbjahrs, sonst
+    # heute. Rückwirkend ist das gewollt — wer im November den Plan des
+    # laufenden Halbjahrs berichtigt, meint das ganze Halbjahr, nicht „ab
+    # morgen". Der Plan des VORIGEN Halbjahrs bleibt davon unberührt.
+    ab, bis = _stundenplan_fenster(user, body.term)
+    felder = body.model_dump(exclude={"term"})
+    # Die an `ab` gültige Version an (weekday, period).
     active = (await db.execute(select(TimetableSlot).where(
         TimetableSlot.owner_id == user.id,
         TimetableSlot.weekday == body.weekday,
         TimetableSlot.period == body.period,
-        TimetableSlot.valid_to.is_(None),
+        or_(TimetableSlot.valid_to.is_(None), TimetableSlot.valid_to >= ab),
+        or_(TimetableSlot.valid_from.is_(None), TimetableSlot.valid_from <= ab),
     ).order_by(TimetableSlot.id.desc()))).scalars().first()
     same = active is not None and (
         active.class_id == body.class_id and active.kurs_id == body.kurs_id
         and (active.title or "") == (body.title or "") and active.topic_id == body.topic_id
+        and _tag(active.valid_to) == bis
     )
     if active is None:
-        # Neue Stunde: gilt ab HEUTE (nicht rückwirkend — die Vergangenheit war leer).
-        s = TimetableSlot(owner_id=user.id, valid_from=today, valid_to=None, **body.model_dump())
+        # Neue Stunde: gilt im gewählten Zeitraum (davor war nichts).
+        s = TimetableSlot(owner_id=user.id, valid_from=ab, valid_to=bis, **felder)
         db.add(s)
     elif same:
         s = active
-    elif (active.valid_from.date() if isinstance(active.valid_from, datetime) else active.valid_from) == today:
-        # Heute schon begonnen → direkt ändern, keine zusätzliche Version.
-        for k, v in body.model_dump().items():
+    elif _tag(active.valid_from) == ab:
+        # Beginnt am selben Tag → direkt ändern, keine zusätzliche Version.
+        for k, v in felder.items():
             setattr(active, k, v)
+        active.valid_to = bis
         s = active
     else:
-        # Änderung wirkt ab HEUTE: alte Version bis GESTERN einfrieren (Vergangenheit
-        # bleibt unverändert), neue Version ab heute anlegen.
-        active.valid_to = today - timedelta(days=1)
-        s = TimetableSlot(owner_id=user.id, valid_from=today, valid_to=None, **body.model_dump())
+        # Alte Version bis zum Vortag einfrieren (die Vergangenheit bleibt, wie
+        # sie war), neue Version für den gewählten Zeitraum anlegen.
+        active.valid_to = ab - timedelta(days=1)
+        s = TimetableSlot(owner_id=user.id, valid_from=ab, valid_to=bis, **felder)
         db.add(s)
     await db.commit()
     await db.refresh(s)
@@ -1397,16 +1444,17 @@ async def upsert_slot(body: SlotIn, user: User = Depends(require_module), db: As
 
 
 @router.delete("/timetable/slot/{slot_id}", status_code=204)
-async def delete_slot(slot_id: int, user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+async def delete_slot(slot_id: int, term: str = "", user: User = Depends(require_module),
+                      db: AsyncSession = Depends(get_db)):
     s = await eigenes(db, TimetableSlot, slot_id, user, "Stunde nicht gefunden")
-    today = date.today()
-    vf = s.valid_from.date() if isinstance(s.valid_from, datetime) else s.valid_from
-    if vf is not None and vf >= today:
-        # War nie in der Vergangenheit aktiv → ganz entfernen.
+    ab, _bis = _stundenplan_fenster(user, term)
+    vf = _tag(s.valid_from)
+    if vf is not None and vf >= ab:
+        # Fing erst im gewählten Zeitraum an → ganz entfernen.
         await db.delete(s)
     else:
-        # Ab HEUTE entfallen, Vergangenheit behält die Stunde.
-        s.valid_to = today - timedelta(days=1)
+        # Ab dort entfallen, davor behält der Plan die Stunde.
+        s.valid_to = ab - timedelta(days=1)
     await db.commit()
 
 

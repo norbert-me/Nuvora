@@ -3,7 +3,7 @@ import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { istAdmin } from "../core/admin.js";
 import { alsText, beobachte, leeren } from "../core/protokoll.js";
 import { useLanguage, LANGUAGES } from "../i18n/index.jsx";
-import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, pageTitle, panelStyle, popoverPanel,
+import { btnPrimary, btnSecondary, btnSmall, selectStyle, COLORS as C, pageForm, pageTitle, panelStyle, popoverPanel,
   sectionLabel, Tabs, th as thBasis, td as tdBasis, badge, iconBtn, inputStyle as inputBasis, Icon, ICONS, CONTROL_R } from "../components/Icons.jsx";
 import Speicherleiste, { useEntwurf } from "../components/Speichern.jsx";
 import { alsJson } from "../core/melden.js";
@@ -468,12 +468,11 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                     {adminUsers.map(u => (
                       <tr key={u.id}>
                         <td style={tdStyle}>{u.email}</td>
-                        {/* Rolle statt Anzeigename: die Administration ist das Konto mit
-                            id 1 (siehe _require_admin), der Name sagt darüber nichts. */}
+                        {/* Nur die Administration wird ausgezeichnet — dass alle
+                            anderen Lehrkräfte sind, ist der Normalfall und muss
+                            nicht in jeder Zeile stehen. */}
                         <td style={tdStyle}>
-                          {u.admin
-                            ? <span style={badge(C.info)}>{t("profile.roleAdmin")}</span>
-                            : <span style={{ color: "var(--text3)" }}>{t("profile.roleTeacher")}</span>}
+                          {u.admin && <span style={badge(C.info)}>{t("profile.roleAdmin")}</span>}
                         </td>
                         {/* Bestätigt oder nicht — das Einzige, was hier eine Entscheidung
                             stützt: ein unbestätigtes Konto kann sich nie anmelden. */}
@@ -482,7 +481,19 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
                             ? <span style={{ color: "var(--text3)" }}>{t("profile.verified")}</span>
                             : <span style={badge(C.warning)}>{t("profile.unverified")}</span>}
                         </td>
-                        <td style={{ ...tdStyle, textAlign: "right" }}>
+                        <td style={{ ...tdStyle, textAlign: "right", whiteSpace: "nowrap" }}>
+                          {/* Ernennen und zurücknehmen. Konto 1 bleibt außen vor:
+                              ohne es käme niemand mehr an die Verwaltung. */}
+                          {!u.fest && (
+                            <button
+                              onClick={async () => {
+                                const res = await fetch(`${API}/auth/admin/users/${u.id}/admin`,
+                                  alsJson("PUT", { admin: !u.admin }));
+                                if (res.ok) setAdminUsers(adminUsers.map((x) => (x.id === u.id ? { ...x, admin: !u.admin } : x)));
+                              }}
+                              style={{ ...btnSecondary, ...btnSmall, borderRadius: CONTROL_R, marginRight: 8 }}
+                            >{u.admin ? t("profile.roleRevoke") : t("profile.roleGrant")}</button>
+                          )}
                           {u.id !== 1 && (
                             <button
                               title={t("profile.deleteUser")}

@@ -57,3 +57,30 @@ async def test_nur_die_administration_darf_lesen(s, konten):
     with pytest.raises(HTTPException) as e:
         await A.admin_list_users(user=lehrkraft, db=s)
     assert e.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_zweite_administration_ernennen(s):
+    """Vorher hing die Rolle allein an der ID: es gab genau eine
+    Administration, und bei Krankheit oder Wechsel kam niemand mehr an sie."""
+    from app.rollen import ist_admin
+    from app.routers.auth import AdminRolleIn, admin_list_users, admin_set_role
+
+    chef = User(email="chef@b.de", password_hash="x", name="A")
+    kollege = User(email="kollege@b.de", password_hash="x", name="B")
+    s.add_all([chef, kollege])
+    await s.commit()
+    assert chef.id == 1 and not ist_admin(kollege)
+
+    await admin_set_role(kollege.id, AdminRolleIn(admin=True), user=chef, db=s)
+    assert ist_admin(kollege)
+    # Und die Ernannte darf selbst verwalten.
+    zeilen = await admin_list_users(user=kollege, db=s)
+    assert {z["id"]: z["admin"] for z in zeilen} == {chef.id: True, kollege.id: True}
+    # Konto 1 bleibt aussen vor — sonst koennte sich eine Installation
+    # vollstaendig aussperren.
+    with pytest.raises(Exception):
+        await admin_set_role(1, AdminRolleIn(admin=False), user=kollege, db=s)
+
+    await admin_set_role(kollege.id, AdminRolleIn(admin=False), user=chef, db=s)
+    assert not ist_admin(kollege)

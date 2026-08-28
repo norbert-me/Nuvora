@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from ..austauschformat import quiz_schnappschuss
 from ..besitz import eigenes
+from ..rollen import ist_admin
 from ..database import get_db
 from .modules import is_active
 from ..models import (
@@ -210,7 +211,7 @@ async def list_quizzes(
         )
     result = await db.execute(stmt)
     quizzes = result.scalars().all()
-    is_admin = user.id == 1
+    is_admin = ist_admin(user)
     author_ids = {q.author_id for q in quizzes if q.author_id}
     current_names = {}
     emails_by_id = {}
@@ -236,7 +237,7 @@ async def get_quiz(quiz_id: int, user: User = Depends(get_current_user), db: Asy
     quiz = result.scalar_one_or_none()
     if not quiz:
         raise HTTPException(404, "Quiz nicht gefunden")
-    is_admin = user.id == 1
+    is_admin = ist_admin(user)
     current_names = {}
     author_email = None
     if quiz.author_id:
@@ -595,7 +596,7 @@ async def delete_quiz(quiz_id: int, user: User = Depends(get_current_user), db: 
     quiz = await db.get(MarketplaceQuiz, quiz_id)
     if not quiz:
         raise HTTPException(404, "Quiz nicht gefunden")
-    if quiz.author_id != user.id and user.id != 1:
+    if quiz.author_id != user.id and not ist_admin(user):
         raise HTTPException(403, "Nur die erstellende Person oder Admin darf loeschen")
     await db.delete(quiz)
     await db.commit()
