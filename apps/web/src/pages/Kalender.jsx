@@ -532,6 +532,11 @@ export default function Kalender() {
             { key: "abo", label: t("kalender.subscribe"), icon: ICONS.share, onClick: openAbo },
             { key: "export", label: t("kalender.export"), icon: ICONS.export, onClick: exportKal },
             { key: "import", label: t("kalender.import"), icon: ICONS.import, onClick: () => dateiWaehlen(importKal) },
+            // WebUntis steht hier und nicht mehr am Stundenplan: es bringt
+            // nicht nur die wiederkehrenden Stunden mit, sondern auch Ausfall
+            // und Ferien — und die gehoeren an den Kalender, nicht an die
+            // Vorlage. Am Stundenplan sah es aus, als ginge es nur um ihn.
+            { key: "untis", label: t("untis.menu"), icon: ICONS.import, onClick: () => setUntisOffen(true) },
           ]}
         >
           <AddButton data-tour="kal-new" onClick={() => setEditing({ date: neuesDatum() })} title={t("kalender.newEntry")} />
@@ -539,7 +544,6 @@ export default function Kalender() {
       )}
       {view === "timetable" && (
         <Werkzeugleiste mehr={[
-          { key: "untis", label: t("untis.menu"), icon: ICONS.import, onClick: () => setUntisOffen(true) },
           { key: "export", label: t("kalender.export"), icon: ICONS.export, onClick: exportKal },
           { key: "import", label: t("kalender.import"), icon: ICONS.import, onClick: () => dateiWaehlen(importKal) },
         ]}>
