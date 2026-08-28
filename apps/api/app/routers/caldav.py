@@ -27,7 +27,9 @@ alles andere an die Weboberflaeche. Apple sucht zuerst unter
 `/.well-known/caldav`; dafuer steht in `nginx.conf` eine Weiterleitung hierher.
 """
 import base64
+import logging
 import secrets
+from collections import deque
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
@@ -72,10 +74,108 @@ def _pfad(user_id: int, name: str = "") -> str:
     return basis + name if name else basis
 
 
+# ─── Protokoll: was das Geraet wirklich versucht hat ───
+#
+# Wenn der Kalender im Handy nicht auftaucht, sagt Apple „Accountname oder
+# Passwort konnte nicht ueberprueft werden" — egal, woran es lag. Die
+# Wahrheit steht nur an einer Stelle: hier, beim Server, der die Anfrage
+# entweder bekommen hat oder nicht.
+#
+# Frueher stand an dieser Stelle ein Knopf „Verbindung pruefen", der aus dem
+# Browser eine CalDAV-Anfrage nachstellte. Der hat ein Problem, das er nicht
+# loesen kann: er prueft, was der BROWSER erlebt — mit dessen Adresse, dessen
+# Anmeldung, dessen Proxy. Das Geraet, um das es geht, kommt darin nicht vor.
+# Ein gruener Haken hiess also nicht, dass das iPhone durchkommt, und ein roter
+# nicht, dass es das nicht tut. Das Protokoll beantwortet dieselbe Frage
+# ehrlich: es zeigt, was tatsaechlich ankam.
+#
+# **Steht hier nichts, ist das der Befund** — dann hat der Server noch keine
+# einzige Anfrage gesehen, und es liegt an der Adresse oder am vorgeschalteten
+# Proxy (der PROPFIND durchlassen muss), nicht an Nuvora.
+#
+# Im Arbeitsspeicher, nicht in der Datenbank: es ist eine Diagnose fuer die
+# naechste halbe Stunde, kein Inhalt. Nach einem Neustart ist es leer, und das
+# ist richtig so — ein Protokoll, das Wochen haelt, ist eine Datensammlung.
+_log = logging.getLogger("nuvora.caldav")
+_PROTOKOLL: dict[str, deque] = {}
+_PROTOKOLL_MAX = 25
+_PROTOKOLL_KONTEN = 200
+
+
+def _pfad_maske(pfad: str) -> str:
+    """IDs und Dateinamen aus dem Pfad nehmen.
+
+    Dieselbe Regel wie im Fehlerprotokoll der Oberflaeche: ein Protokoll darf
+    sagen, WAS versucht wurde, nicht, welcher Termin dahintersteckt — der
+    Dateiname traegt die UID des Clients.
+    """
+    teile = []
+    for stueck in (pfad or "").split("/"):
+        if stueck.isdigit():
+            teile.append("{id}")
+        elif stueck.endswith(".ics"):
+            teile.append("{termin}.ics")
+        else:
+            teile.append(stueck)
+    return "/".join(teile)
+
+
+def notiere(kennung: str, request: Request, status: int, grund: str) -> None:
+    """Einen Zugriff festhalten — und ihn ins Serverprotokoll schreiben.
+
+    Zwei Leser, ein Vorgang: die Lehrkraft sieht ihn im Teilen-Dialog, die
+    Administration in `docker compose logs api`. Ohne die zweite Haelfte
+    muesste sich jemand mit einem kaputten Zugang erst anmelden koennen, um zu
+    sehen, warum er sich nicht anmelden kann.
+    """
+    schluessel = (kennung or "").strip().lower()[:120]
+    if not schluessel:
+        return
+    if schluessel not in _PROTOKOLL and len(_PROTOKOLL) >= _PROTOKOLL_KONTEN:
+        # Notbremse gegen Zumuellen mit erfundenen Benutzernamen: der aelteste
+        # Eimer fliegt raus. Ohne die waere das Protokoll ein Weg, den Speicher
+        # des Servers von aussen zu fuellen.
+        _PROTOKOLL.pop(next(iter(_PROTOKOLL)), None)
+    eimer = _PROTOKOLL.setdefault(schluessel, deque(maxlen=_PROTOKOLL_MAX))
+    eintrag = {
+        "zeit": datetime.now(timezone.utc).isoformat(),
+        "methode": request.method,
+        "pfad": _pfad_maske(request.url.path),
+        "status": status,
+        "grund": grund,
+        # Woran man ein Geraet wiedererkennt, ohne es zu benennen: Apple und
+        # Outlook stellen sich hier vor. Gekuerzt, weil manche Clients eine
+        # halbe Zeile schicken.
+        "geraet": (request.headers.get("user-agent") or "")[:80],
+    }
+    eimer.append(eintrag)
+    _log.info("caldav %s %s -> %s (%s) fuer %s", eintrag["methode"], eintrag["pfad"],
+              status, grund, schluessel)
+
+
+def _kennung_aus(request: Request) -> str:
+    """Der Benutzername aus der Basic-Kopfzeile — auch wenn die Anmeldung
+    scheitert. Genau dann wird er gebraucht: ein Tippfehler im Benutzernamen
+    ist der haeufigste Grund, und ohne ihn stuende der Versuch nirgends."""
+    kopf = request.headers.get("authorization", "")
+    if not kopf.lower().startswith("basic "):
+        return ""
+    try:
+        roh = base64.b64decode(kopf[6:].strip()).decode("utf-8", "replace")
+    except Exception:
+        return ""
+    return roh.split(":", 1)[0] if ":" in roh else ""
+
+
 # ─── Anmeldung ───
 
 class _Unangemeldet(Exception):
-    pass
+    """Mit Grund. Der Grund ist der ganze Zweck: „401" beantwortet nicht die
+    Frage, warum das iPad seit gestern nichts mehr abgleicht."""
+
+    def __init__(self, grund: str = "keine Anmeldung mitgeschickt"):
+        super().__init__(grund)
+        self.grund = grund
 
 
 async def _anmelden(request: Request, db: AsyncSession) -> User:
@@ -88,13 +188,15 @@ async def _anmelden(request: Request, db: AsyncSession) -> User:
     """
     kopf = request.headers.get("authorization", "")
     if not kopf.lower().startswith("basic "):
-        raise _Unangemeldet()
+        # Der Normalfall beim ERSTEN Schritt: auch Apple fragt zuerst ohne
+        # Anmeldung und meldet sich erst nach der Aufforderung an.
+        raise _Unangemeldet("ohne Anmeldung angefragt")
     try:
         roh = base64.b64decode(kopf[6:].strip()).decode("utf-8", "replace")
     except Exception:
-        raise _Unangemeldet()
+        raise _Unangemeldet("Anmeldekopf unlesbar")
     if ":" not in roh:
-        raise _Unangemeldet()
+        raise _Unangemeldet("Anmeldekopf unvollstaendig")
     kennung, passwort = roh.split(":", 1)
 
     # Bremse gegen Durchprobieren: ein CalDAV-Client meldet sich oft an, aber
@@ -103,14 +205,15 @@ async def _anmelden(request: Request, db: AsyncSession) -> User:
 
     u = (await db.execute(select(User).where(User.email == kennung.strip().lower()))).scalar_one_or_none()
     if not u:
-        raise _Unangemeldet()
+        raise _Unangemeldet("Benutzername unbekannt")
     marken = (await db.execute(select(CaldavToken).where(CaldavToken.owner_id == u.id))).scalars().all()
     for m in marken:
         if _verify_pw(passwort, m.token_hash):
             m.last_used_at = datetime.now(timezone.utc)
             await db.commit()
             return u
-    raise _Unangemeldet()
+    raise _Unangemeldet("Geraete-Passwort stimmt nicht"
+                        if marken else "fuer dieses Konto gibt es kein Geraete-Passwort")
 
 
 def _fordere_anmeldung() -> Response:
@@ -119,15 +222,25 @@ def _fordere_anmeldung() -> Response:
 
 
 async def _zugang(request: Request, db: AsyncSession):
-    """(User, None) bei Erfolg, sonst (None, fertige Antwort)."""
+    """(User, None) bei Erfolg, sonst (None, fertige Antwort).
+
+    Jeder Ausgang wird protokolliert — auch der erfolgreiche. „Seit heute
+    frueh kommt nichts mehr an" ist eine Antwort, die man nur bekommt, wenn
+    auch das Gelungene dasteht.
+    """
     try:
         u = await _anmelden(request, db)
-    except _Unangemeldet:
+    except _Unangemeldet as e:
+        notiere(_kennung_aus(request), request, 401, e.grund)
         return None, _fordere_anmeldung()
     if not await is_active(db, u.id, MODULE_KEY):
         # Dieselbe Regel wie bei jedem ausgeteilten Zugang: ein Geraet laesst
         # sich nicht einsammeln, also entscheidet der Server bei jedem Aufruf.
+        notiere(u.email, request, 403, "Modul Kalender ist abgeschaltet")
         return None, Response(status_code=403, headers=_DAV_KOPF)
+    # 200 heisst hier „die Anmeldung steht" — was die Anfrage danach ergibt,
+    # steht gegebenenfalls als eigener Eintrag daneben.
+    notiere(u.email, request, 200, "angemeldet")
     return u, None
 
 
@@ -596,7 +709,9 @@ async def ressource(request: Request, user_id: int, name: str,
         daten = X.parse_vevent((await request.body()).decode("utf-8", "replace"))
     except X.CaldavFehler as e:
         # Mit Vorbedingung, damit Apple sagen kann, WAS nicht ging — ein
-        # nacktes 403 liest sich am Geraet als „keine Berechtigung".
+        # nacktes 403 liest sich am Geraet als „keine Berechtigung". Und ins
+        # Protokoll, weil das Geraet die Meldung selten zeigt.
+        notiere(u.email, request, e.status, e.text or e.precondition or "abgelehnt")
         if e.precondition:
             return Response(content=X.fehler_xml(e.precondition), status_code=e.status,
                             media_type="application/xml; charset=utf-8", headers=_DAV_KOPF)
@@ -733,6 +848,19 @@ async def liste(request: Request, db: AsyncSession = Depends(get_db),
 
 class ZugangIn(BaseModel):
     name: str = ""
+
+
+@verwaltung.get("/protokoll")
+async def protokoll(user: User = Depends(verwaltung_pflicht)):
+    """Was an CalDAV-Anfragen fuer DIESES Konto ankam — neueste zuerst.
+
+    Nur die eigenen: der Schluessel ist die eigene E-Mail-Adresse, und fremde
+    Versuche gehen niemanden etwas an. Ist die Liste leer, ist das der Befund
+    (siehe `notiere`): dann hat der Server nichts gesehen, und es liegt an der
+    Adresse oder am vorgeschalteten Proxy.
+    """
+    eintraege = list(_PROTOKOLL.get((user.email or "").strip().lower(), ()))
+    return {"eintraege": list(reversed(eintraege))}
 
 
 @verwaltung.post("", status_code=201)

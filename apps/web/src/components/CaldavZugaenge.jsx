@@ -39,68 +39,23 @@ export default function CaldavZugaenge() {
     laden();
   };
 
-  // ── Verbindung prüfen ──
-  //
-  // Der einzige Weg, „geht nicht" in eine Antwort zu verwandeln. Ein Browser
-  // kann keinen Kalender einrichten, aber er kann genau die Anfrage stellen,
-  // die Apple als erstes stellt — durch denselben Proxy, über dieselbe
-  // Adresse. Die drei Ausgänge sind drei verschiedene Baustellen:
-  //
-  //   405  → der Proxy lässt PROPFIND nicht durch (nicht der Server).
-  //   401  → Server antwortet als Kalenderserver. Ohne Passwort ist das das
-  //          erwartete Ergebnis: auch Apple fragt erst ohne und meldet sich
-  //          dann an.
-  //   207  → mit Gerätepasswort: die Anmeldung steht.
-  //
-  // Basic-Kopfzeile auch beim Versuch ohne Passwort, damit kein Browser einen
-  // eigenen Anmeldedialog aufmacht.
+  // Der Kontotyp „Erweitert" ist bei Apple oft nicht die Notlösung, sondern
+  // der einzige Weg — siehe unten am Aufklapper.
   const [erweitert, setErweitert] = useState(false);
-  const [pruefPasswort, setPruefPasswort] = useState("");
-  const [befund, setBefund] = useState(null);      // {ok, text}
 
-  const pruefen = async () => {
-    setBefund(null);
-    setLaeuft(true);
-    const basic = "Basic " + btoa(unescape(encodeURIComponent(
-      `${daten.benutzer}:${pruefPasswort || "ohne-passwort"}`)));
-    const dav = (pfad, koerper) => fetch(pfad, {
-      method: "PROPFIND",
-      headers: { Authorization: basic, "Content-Type": "application/xml", Depth: "0" },
-      body: koerper,
-    }).catch(() => null);
-
-    const wurzel = await dav("/api/caldav/",
-      '<D:propfind xmlns:D="DAV:"><D:prop><D:current-user-principal/></D:prop></D:propfind>');
-    if (!wurzel) { setLaeuft(false); setBefund({ ok: false, text: t("caldav.pruefNetz") }); return; }
-    if (wurzel.status === 405 || wurzel.status === 501) {
-      setLaeuft(false); setBefund({ ok: false, text: t("caldav.pruefProxy", { status: wurzel.status }) }); return;
-    }
-    if (wurzel.status === 401) {
-      const fordert = (wurzel.headers.get("www-authenticate") || "").toLowerCase().includes("basic");
-      setLaeuft(false);
-      setBefund(pruefPasswort
-        ? { ok: false, text: t("caldav.pruefPasswort") }
-        : { ok: fordert, text: fordert ? t("caldav.pruefOhnePasswort") : t("caldav.pruefKeineAufforderung") });
-      return;
-    }
-    if (wurzel.status !== 207) {
-      setLaeuft(false); setBefund({ ok: false, text: t("caldav.pruefStatus", { status: wurzel.status }) }); return;
-    }
-
-    // Angemeldet. Jetzt der Schritt, an dem Apple beim ersten Anlauf
-    // ausgestiegen ist: trägt der Principal auch wirklich <D:principal/>?
-    const text = await wurzel.text().catch(() => "");
-    const treffer = text.match(/\/api\/caldav\/p\/(\d+)\//);
-    if (!treffer) { setLaeuft(false); setBefund({ ok: false, text: t("caldav.pruefKeinPrincipal") }); return; }
-    const antwort = await dav(`/api/caldav/p/${treffer[1]}/`,
-      '<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">'
-      + "<D:prop><D:resourcetype/><C:calendar-home-set/></D:prop></D:propfind>");
-    const inhalt = antwort ? await antwort.text().catch(() => "") : "";
-    setLaeuft(false);
-    setBefund(inhalt.includes("principal")
-      ? { ok: true, text: t("caldav.pruefGut") }
-      : { ok: false, text: t("caldav.pruefPrincipalAlt") });
-  };
+  // ── Protokoll: was wirklich ankam ──
+  //
+  // Hier stand ein Knopf „Verbindung prüfen", der aus dem Browser eine
+  // CalDAV-Anfrage nachstellte. Der beantwortet die falsche Frage: er prüft,
+  // was der BROWSER erlebt — dessen Adresse, dessen Anmeldung, dessen Proxy.
+  // Das Gerät, um das es geht, kommt darin nicht vor; ein grüner Haken hieß
+  // nicht, dass das iPhone durchkommt. Das Protokoll zeigt stattdessen, was
+  // der Server tatsächlich gesehen hat — und wenn es leer ist, ist genau das
+  // die Antwort.
+  const [protokoll, setProtokoll] = useState(null);
+  const [offen, setOffen] = useState(false);
+  const protokollLaden = () => hol("/api/caldav-zugaenge/protokoll")
+    .then((d) => setProtokoll((d && d.eintraege) || []));
 
   const zuruecknehmen = async (id) => {
     await fetch(`/api/caldav-zugaenge/${id}`, { method: "DELETE" }).catch(() => null);
@@ -194,23 +149,35 @@ export default function CaldavZugaenge() {
         </button>
       </div>
 
-      <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8, lineHeight: 1.4 }}>
-        {t("caldav.grenzen")}
-      </div>
-
       {/* Wenn das Handy nicht will, sagt hier der Server, woran es liegt. */}
       <div style={{ borderTop: "1px solid var(--border)", marginTop: 10, paddingTop: 10 }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <input type="password" value={pruefPasswort} onChange={(e) => setPruefPasswort(e.target.value)}
-            placeholder={t("caldav.pruefPlatzhalter")} name="caldav-pruef" autoComplete="off"
-            style={{ ...inputStyle, flex: 1, minWidth: 160 }} />
-          <button onClick={pruefen} disabled={laeuft} style={{ ...btnSecondary, borderRadius: CONTROL_R, opacity: laeuft ? 0.6 : 1 }}>
-            {t("caldav.pruefen")}
-          </button>
-        </div>
-        {befund && (
-          <div style={{ marginTop: 8, fontSize: 13, color: befund.ok ? C.success : C.danger }}>
-            {befund.text}
+        <button onClick={() => { setOffen((v) => !v); if (!offen) protokollLaden(); }}
+          style={{ background: "none", border: "none", padding: 0, cursor: "pointer",
+            color: "var(--accent)", fontSize: 12, fontWeight: 600 }}>
+          {t("caldav.protokoll")}
+        </button>
+        {offen && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <button onClick={protokollLaden} style={{ ...btnSecondary, ...btnSmall, borderRadius: CONTROL_R }}>
+                {t("caldav.protokollNeu")}
+              </button>
+            </div>
+            {protokoll === null ? null : protokoll.length === 0 ? (
+              // Leer ist ein Befund, keine Leere: dann kam die Anfrage nie an.
+              <div style={{ fontSize: 12, color: C.warning, lineHeight: 1.4 }}>{t("caldav.protokollLeer")}</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {protokoll.map((e, i) => (
+                  <div key={i} style={{ display: "flex", gap: 8, fontSize: 12, alignItems: "baseline" }}>
+                    <span style={{ color: "var(--text3)", flexShrink: 0 }}>{new Date(e.zeit).toLocaleTimeString()}</span>
+                    <span style={{ fontFamily: "monospace", flexShrink: 0 }}>{e.methode}</span>
+                    <span style={{ flex: 1, minWidth: 60, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text3)" }} title={e.geraet}>{e.pfad}</span>
+                    <span style={{ flexShrink: 0, color: e.status >= 400 ? C.danger : "var(--text2)" }}>{e.grund}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

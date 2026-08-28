@@ -1033,7 +1033,6 @@ export default {
   "kalender.repeatYearly": "yearly",
   "kalender.repeatUntil": "until",
   "kalender.repeatOn": "repeats",
-  "kalender.repeatHint": "The event repeats from this day on. Single dates can be removed later.",
   "kalender.serieSaveFrage": "This event is part of a series. What should be changed?",
   "kalender.serieDelFrage": "This event is part of a series. What should be deleted?",
   "kalender.serieNurDieser": "Only this event",
@@ -2544,6 +2543,9 @@ export default {
 
   // ── CalDAV (components/CaldavZugaenge.jsx) ──
   "caldav.titel": "Calendar both ways (CalDAV)",
+  "caldav.protokoll": "What arrived? (log)",
+  "caldav.protokollNeu": "Reload",
+  "caldav.protokollLeer": "No request has arrived yet. Then it is the address on the device or the proxy in front — it has to let the PROPFIND method through.",
   "caldav.server": "Server address",
   "caldav.benutzer": "User name",
   "caldav.passwortZeile": "Password: create one below.",
@@ -2555,24 +2557,12 @@ export default {
   "caldav.zuruecknehmen": "Revoke",
   "caldav.zuletzt": "last used {{wann}}",
   "caldav.nieBenutzt": "never used",
-  "caldav.grenzen": "Holidays stay in the subscription. Deleting a lesson on the phone cancels it that day. No repeating events.",
   "help.kal.serieT": "Repeating events",
   "help.kal.serie": "An event can repeat: open the entry, expand “Advanced” and pick a rhythm (daily, weekly, every two weeks, monthly, yearly), optionally with an end date. Nuvora stores ONE series, not a hundred single dates — change the rhythm once and it applies everywhere. If a single date is cancelled or moved, Nuvora asks on save or delete whether you mean only this date or the whole series; “only this one” detaches it and leaves the other weeks alone. Series travel over CalDAV in both directions.",
   "help.kal.caldavT": "Adding events on your phone (CalDAV)",
   "help.kal.caldav": "A subscribed calendar only shows your events — nothing can be added there; that is how subscriptions work. To create events from your phone as well, set up CalDAV: in the calendar via ⋯ → “Share calendar”, create a device password there and enter server address, user name and that password in Apple or Outlook. One password per device, so a lost phone can be locked out on its own; your Nuvora password does not belong on the device. Holidays and timetable periods stay in the subscription — they are not individual events.",
 
   // ── CalDAV: connection check ──
-  "caldav.pruefen": "Check connection",
-  "caldav.pruefPlatzhalter": "Device password (optional)",
-  "caldav.pruefOhnePasswort": "The server answers as a calendar server. Enter a device password for the full test.",
-  "caldav.pruefGut": "All good — server address, user name and device password are correct.",
-  "caldav.pruefPasswort": "Device password or user name is wrong. Create a new device password above.",
-  "caldav.pruefProxy": "The web server blocks CalDAV (HTTP {{status}}). This is not Nuvora but the proxy in front of it — it has to let the PROPFIND method through.",
-  "caldav.pruefNetz": "No connection to the server.",
-  "caldav.pruefStatus": "Unexpected answer (HTTP {{status}}).",
-  "caldav.pruefKeineAufforderung": "The server does not ask for a login — no calendar can sign in like this.",
-  "caldav.pruefKeinPrincipal": "The server names no user account.",
-  "caldav.pruefPrincipalAlt": "The server runs an old version. Please update Nuvora.",
 
   // ── CalDAV: account type “Advanced” ──
   "caldav.erweitert": "Apple: account type “Advanced”",

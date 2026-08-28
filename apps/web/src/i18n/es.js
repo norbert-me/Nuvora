@@ -1034,7 +1034,6 @@ export default {
   "kalender.repeatYearly": "anual",
   "kalender.repeatUntil": "hasta",
   "kalender.repeatOn": "se repite",
-  "kalender.repeatHint": "La cita se repite a partir de este día. Se pueden quitar fechas sueltas más tarde.",
   "kalender.serieSaveFrage": "Esta cita pertenece a una serie. ¿Qué se debe cambiar?",
   "kalender.serieDelFrage": "Esta cita pertenece a una serie. ¿Qué se debe borrar?",
   "kalender.serieNurDieser": "Solo esta cita",
@@ -2545,6 +2544,9 @@ export default {
 
   // ── CalDAV (components/CaldavZugaenge.jsx) ──
   "caldav.titel": "Calendario en ambos sentidos (CalDAV)",
+  "caldav.protokoll": "¿Qué llegó? (registro)",
+  "caldav.protokollNeu": "Recargar",
+  "caldav.protokollLeer": "Todavía no ha llegado ninguna petición. Entonces es la dirección en el dispositivo o el proxy delantero — debe dejar pasar el método PROPFIND.",
   "caldav.server": "Dirección del servidor",
   "caldav.benutzer": "Nombre de usuario",
   "caldav.passwortZeile": "Contraseña: cree una abajo.",
@@ -2556,24 +2558,11 @@ export default {
   "caldav.zuruecknehmen": "Retirar",
   "caldav.zuletzt": "última vez {{wann}}",
   "caldav.nieBenutzt": "nunca usada",
-  "caldav.grenzen": "Las vacaciones siguen en la suscripción. Borrar una hora en el móvil la cancela ese día. Sin citas periódicas.",
   "help.kal.serieT": "Citas que se repiten",
   "help.kal.serie": "Una cita puede repetirse: en la entrada, abra «Avanzado» y elija el ritmo (diaria, semanal, cada dos semanas, mensual, anual), con fecha de fin si hace falta. Nuvora guarda UNA serie, no cien citas sueltas. Si una fecha se cae o se traslada, Nuvora pregunta al guardar o borrar si se refiere solo a esa fecha o a toda la serie; «solo esta» la separa y las demás semanas quedan intactas. Las series viajan por CalDAV en ambos sentidos.",
   "help.kal.caldavT": "Crear citas en el móvil (CalDAV)",
   "help.kal.caldav": "El calendario suscrito solo muestra sus citas — allí no se puede añadir nada; así funciona la suscripción. Si además quiere crear citas desde el móvil, configure CalDAV: en el calendario, ⋯ → «Compartir calendario», cree allí una contraseña de dispositivo e introduzca la dirección del servidor, el nombre de usuario y esa contraseña en Apple u Outlook. Una contraseña por dispositivo, para poder bloquear un móvil perdido por separado; su contraseña de Nuvora no debe ir al dispositivo. Las vacaciones y las horas del horario permanecen en la suscripción — no son citas individuales.",
 
-  // ── CalDAV: comprobar la conexión ──
-  "caldav.pruefen": "Comprobar conexión",
-  "caldav.pruefPlatzhalter": "Contraseña de dispositivo (opcional)",
-  "caldav.pruefOhnePasswort": "El servidor responde como servidor de calendario. Introduzca una contraseña de dispositivo para la prueba completa.",
-  "caldav.pruefGut": "Todo correcto — dirección, usuario y contraseña de dispositivo son válidos.",
-  "caldav.pruefPasswort": "La contraseña de dispositivo o el usuario no son correctos. Cree arriba una nueva contraseña.",
-  "caldav.pruefProxy": "El servidor web bloquea CalDAV (HTTP {{status}}). No es cosa de Nuvora sino del proxy delantero — debe dejar pasar el método PROPFIND.",
-  "caldav.pruefNetz": "Sin conexión con el servidor.",
-  "caldav.pruefStatus": "Respuesta inesperada (HTTP {{status}}).",
-  "caldav.pruefKeineAufforderung": "El servidor no pide autenticación — así ningún calendario puede iniciar sesión.",
-  "caldav.pruefKeinPrincipal": "El servidor no indica ninguna cuenta.",
-  "caldav.pruefPrincipalAlt": "El servidor usa una versión antigua. Actualice Nuvora.",
 
   // ── CalDAV: tipo de cuenta «Avanzado» ──
   "caldav.erweitert": "Apple: tipo de cuenta «Avanzado»",

@@ -1363,11 +1363,32 @@ def teste_caldav(api, b, u, sch, spuren):
         sch.nur("kalender")
         return "ohne Modul dicht und keine Inhalte in der Antwort"
 
+    def protokoll():
+        """Was ankam, muss nachlesbar sein.
+
+        Der Knopf „Verbindung pruefen" ist genau deshalb weggefallen: er
+        pruefte, was der BROWSER erlebt, nicht das Geraet. Das Protokoll zeigt
+        die echten Zugriffe — und wenn es leer bleibt, obwohl gerade welche
+        liefen, ist die Diagnose fuer jede kaputte Einrichtung wertlos.
+        """
+        p = api.call("GET", "/api/caldav-zugaenge/protokoll", erwartet=(200,))
+        eintraege = p.get("eintraege") or []
+        if not eintraege:
+            raise AssertionError("Protokoll leer, obwohl gerade CalDAV-Anfragen liefen")
+        if not any(e.get("grund") for e in eintraege):
+            raise AssertionError(f"Protokolleintraege ohne Grund: {eintraege[:2]}")
+        # Der Dateiname traegt die UID des Clients — im Protokoll hat sie nichts
+        # zu suchen (dieselbe Regel wie im Fehlerprotokoll der Oberflaeche).
+        if any(PRAEFIX in (e.get("pfad") or "") for e in eintraege):
+            raise AssertionError(f"Termindaten im Protokollpfad: {eintraege[:2]}")
+        return f"{len(eintraege)} Zugriffe mit Grund, Pfade ohne Termindaten"
+
     b.pruefe("CalDAV", "Erkennung (OPTIONS)", erkennung)
     b.pruefe("CalDAV", "Anmeldung verlangt", anmeldung)
     b.pruefe("CalDAV", "PROPFIND durch den Proxy", propfind)
     b.pruefe("CalDAV", "Anlegen, lesen, loeschen", schreiben)
     b.pruefe("CalDAV", "Ohne Modul dicht", ohne_modul)
+    b.pruefe("CalDAV", "Protokoll zeigt die Zugriffe", protokoll)
     api.call("DELETE", f"/api/caldav-zugaenge/{zugang['id']}", erwartet=(204, 404))
 
 

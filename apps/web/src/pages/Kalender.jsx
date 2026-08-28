@@ -1833,7 +1833,6 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
               <input type="date" value={rrBis} onChange={(e) => setRrBis(e.target.value)} style={{ ...fld, width: "auto" }} />
             </>)}
           </div>
-          {rhythmus && <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>{t("kalender.repeatHint")}</div>}
         </>)}
         <div style={lbl}>{t("kalender.topic")}</div>
         <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={dialogSelect}>

@@ -1025,7 +1025,6 @@ export default {
   "kalender.repeatYearly": "jährlich",
   "kalender.repeatUntil": "bis",
   "kalender.repeatOn": "wiederholt sich",
-  "kalender.repeatHint": "Der Termin wiederholt sich ab diesem Tag. Einzelne Termine lassen sich später herausnehmen.",
   "kalender.serieSaveFrage": "Dieser Termin gehört zu einer Serie. Was soll geändert werden?",
   "kalender.serieDelFrage": "Dieser Termin gehört zu einer Serie. Was soll gelöscht werden?",
   "kalender.serieNurDieser": "Nur diesen Termin",
@@ -2537,6 +2536,9 @@ export default {
   // Das Abo darueber ist einseitig: der Kalender HOLT eine Datei und bietet gar
   // keinen „Termin hinzufuegen"-Knopf an. CalDAV kann schreiben.
   "caldav.titel": "Kalender in beide Richtungen (CalDAV)",
+  "caldav.protokoll": "Was kam an? (Protokoll)",
+  "caldav.protokollNeu": "Neu laden",
+  "caldav.protokollLeer": "Es ist noch keine Anfrage angekommen. Dann liegt es an der Adresse im Gerät oder am vorgeschalteten Proxy — der muss die Methode PROPFIND durchlassen.",
   "caldav.server": "Serveradresse",
   "caldav.benutzer": "Benutzername",
   "caldav.passwortZeile": "Passwort: eines von unten anlegen.",
@@ -2548,26 +2550,13 @@ export default {
   "caldav.zuruecknehmen": "Zurücknehmen",
   "caldav.zuletzt": "zuletzt {{wann}}",
   "caldav.nieBenutzt": "noch nie benutzt",
-  "caldav.grenzen": "Ferien bleiben im Abo. Stunde im Handy löschen = fällt an dem Tag aus. Keine Serientermine.",
   "help.kal.serieT": "Termine, die sich wiederholen",
   "help.kal.serie": "Ein Termin kann sich wiederholen: im Eintrag unter „Erweitert“ den Rhythmus wählen (täglich, wöchentlich, alle zwei Wochen, monatlich, jährlich) und bei Bedarf ein Enddatum setzen. Gespeichert wird EINE Serie, keine hundert Einzeltermine — wer den Rhythmus später ändert, ändert ihn an einer Stelle. Fällt ein einzelner Termin aus oder wird verlegt, fragt Nuvora beim Speichern oder Löschen, ob nur dieser Termin gemeint ist oder die ganze Serie; „nur dieser“ löst ihn heraus, die übrigen Wochen bleiben stehen. Serien gehen auch über CalDAV in beide Richtungen: was Sie im Handy als Wiederholung anlegen, ist in Nuvora eine Serie.",
   "help.kal.caldavT": "Termine im Handy eintragen (CalDAV)",
   "help.kal.caldav": "Der abonnierte Kalender zeigt Ihre Termine nur an — eintragen lässt sich dort nichts, das liegt am Abo-Verfahren selbst. Wer auch vom Handy aus Termine anlegen will, richtet CalDAV ein: im Kalender über ⋯ → „Kalender teilen“, dort ein Gerätepasswort anlegen und Serveradresse, Benutzername und dieses Passwort in Apple oder Outlook eintragen. Für jedes Gerät ein eigenes Passwort, damit ein verlorenes Handy einzeln ausgesperrt werden kann; Ihr Nuvora-Passwort gehört nicht ins Gerät. Ferien und Stundenplan-Stunden bleiben im Abo — sie sind keine einzelnen Termine.",
 
-  // ── CalDAV: Verbindung prüfen ──
   // Ein Browser kann keinen Kalender einrichten, aber genau die Anfrage
   // stellen, die Apple als erstes stellt — durch denselben Proxy.
-  "caldav.pruefen": "Verbindung prüfen",
-  "caldav.pruefPlatzhalter": "Gerätepasswort (optional)",
-  "caldav.pruefOhnePasswort": "Der Server antwortet als Kalenderserver. Für den vollen Test ein Gerätepasswort eintragen.",
-  "caldav.pruefGut": "Alles in Ordnung — Serveradresse, Benutzername und Gerätepasswort stimmen.",
-  "caldav.pruefPasswort": "Gerätepasswort oder Benutzername stimmt nicht. Legen Sie oben ein neues Gerätepasswort an.",
-  "caldav.pruefProxy": "Der Webserver blockiert CalDAV (HTTP {{status}}). Das liegt nicht an Nuvora, sondern am vorgeschalteten Proxy — er muss die Methode PROPFIND durchlassen.",
-  "caldav.pruefNetz": "Keine Verbindung zum Server.",
-  "caldav.pruefStatus": "Unerwartete Antwort (HTTP {{status}}).",
-  "caldav.pruefKeineAufforderung": "Der Server verlangt keine Anmeldung — so kann sich kein Kalender anmelden.",
-  "caldav.pruefKeinPrincipal": "Der Server nennt kein Benutzerkonto.",
-  "caldav.pruefPrincipalAlt": "Der Server läuft mit einer alten Fassung. Bitte Nuvora aktualisieren.",
 
   // ── CalDAV: Kontotyp „Erweitert" ──
   // Unter „Manuell" benutzt macOS den eingetippten Pfad teils gar nicht,
