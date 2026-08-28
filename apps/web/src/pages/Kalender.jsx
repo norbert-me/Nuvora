@@ -90,6 +90,21 @@ export default function Kalender() {
   const toggleAllDay = () => setShowAllDay((v) => { const n = !v; try { localStorage.setItem("kal_allday", n ? "1" : "0"); } catch { /* egal */ } return n; });
   const [showExt, setShowExt] = useState(() => { try { return localStorage.getItem("kal_ext") !== "0"; } catch { return true; } });
   const toggleExt = () => setShowExt((v) => { const n = !v; try { localStorage.setItem("kal_ext", n ? "1" : "0"); } catch { /* egal */ } return n; });
+  // Einzelne externe Kalender ausblenden. Der Schalter darüber blendet ALLE
+  // aus; wer drei Feeds abonniert hat (Schule, Verein, Familie), will aber
+  // meistens genau einen davon loswerden. Gemerkt wird die URL, nicht die
+  // Position: eine Position verschiebt sich, sobald jemand einen Kalender
+  // ergänzt oder entfernt, und dann wäre plötzlich der falsche unsichtbar.
+  // Im Browser und nicht am Konto — es ist eine Ansicht, kein Inhalt.
+  const [extAus, setExtAus] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("kal_ext_aus") || "[]")); } catch { return new Set(); }
+  });
+  const toggleExtCal = (url) => setExtAus((v) => {
+    const n = new Set(v);
+    if (n.has(url)) n.delete(url); else n.add(url);
+    try { localStorage.setItem("kal_ext_aus", JSON.stringify([...n])); } catch { /* egal */ }
+    return n;
+  });
   // Mehrere externe Kalender (read-only): je Kalender URL + Farbe. Einzelne
   // Ereignisse lassen sich ausblenden (external_hidden, Schlüssel uid|Datum).
   const [extCals, setExtCals] = useState([]); // [{url,color,name}]
@@ -290,7 +305,7 @@ export default function Kalender() {
   const byDayV = (d) => showAllDay ? byDay(d) : byDay(d).filter((e) => !isAllDayEntry(e));
   const extByDayV = (d) => {
     if (!showExt) return [];
-    const list = extByDay(d);
+    const list = extByDay(d).filter((ev) => !extAus.has(ev.cal || ""));
     return showAllDay ? list : list.filter((ev) => hmToMin(ev.time) != null);
   };
 
@@ -480,7 +495,7 @@ export default function Kalender() {
           ansicht={(
             <div style={{ position: "relative" }}>
             {/* Auge = „was anzeigen?": Ganztägige/Externe ein-/ausblenden + Farbe. */}
-            <button data-tour="kal-view-menu" onClick={() => setViewMenuOpen((v) => !v)} className="icon-btn" style={{ ...toolbarIconBtn, opacity: (showAllDay && showExt) ? 1 : 0.55 }} title={t("kalender.viewMenu")} aria-label={t("kalender.viewMenu")}>
+            <button data-tour="kal-view-menu" onClick={() => setViewMenuOpen((v) => !v)} className="icon-btn" style={{ ...toolbarIconBtn, opacity: (showAllDay && showExt && extAus.size === 0) ? 1 : 0.55 }} title={t("kalender.viewMenu")} aria-label={t("kalender.viewMenu")}>
               <Icon d={ICONS.eye} size={18} />
             </button>
             {viewMenuOpen && (<>
@@ -499,6 +514,19 @@ export default function Kalender() {
                     {t("kalender.extEvents")}
                   </label>
                 )}
+                {/* Je Kalender einer — aber erst ab zwei: bei einem einzigen
+                    wäre es derselbe Schalter zweimal. Eingerückt und mit
+                    Farbpunkt, damit sichtbar ist, wozu sie gehören. */}
+                {showExt && extCals.length > 1 && extCals.map((c) => (
+                  <label key={c.url} style={{ ...menuRow, boxSizing: "border-box", fontWeight: 500, paddingLeft: 26 }}>
+                    <input type="checkbox" checked={!extAus.has(c.url)} onChange={() => toggleExtCal(c.url)} />
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+                      background: c.color || "var(--text3)" }} />
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {c.name || c.url.replace(/^\w+:\/\//, "").slice(0, 28)}
+                    </span>
+                  </label>
+                ))}
                 {extCals.length > 0 && (
                   <button onClick={() => loadExt(true)} disabled={extBusy}
                     style={{ ...menuRow, boxSizing: "border-box", fontWeight: 500, cursor: extBusy ? "default" : "pointer", opacity: extBusy ? 0.6 : 1 }}

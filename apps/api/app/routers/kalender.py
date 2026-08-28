@@ -1990,7 +1990,12 @@ async def external_events(refresh: bool = False, user: User = Depends(require_mo
             uid = e.get("uid") or "h" + hashlib.md5(f"{title}|{e.get('start')}".encode()).hexdigest()[:16]
             multi = bool(d1 and d1 > d0)
             last = (d1 - timedelta(days=1)) if multi else d0
+            # `cal` sagt, aus WELCHEM Feed das Ereignis kommt — sonst laesst sich
+            # ein einzelner Kalender nicht ausblenden, und die Farbe taugt dafuer
+            # nicht (zwei Kalender duerfen dieselbe haben, und einer darf gar
+            # keine).
             info = {"title": title, "time": e.get("time"), "endtime": e.get("endtime"),
+                    "cal": cal.get("url", ""),
                     "location": e.get("location", ""), "color": color, "uid": uid,
                     "description": e.get("description", ""), "start": d0.isoformat(), "end": last.isoformat()}
 
