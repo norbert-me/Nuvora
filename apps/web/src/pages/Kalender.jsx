@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import { askChoice, askConfirm, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, COLORS as C, selectStyle, SHADOW, Tabs, td as tdCell, th, inputStyle, menuRow, toolbarInput, toolbarBtn, toolbarBtnPrimary, DatumNavigator, segmentBtn, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, dateiWaehlen, pageApp, Popover } from "../components/Icons.jsx";
+import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, COLORS as C, selectStyle, SHADOW, Tabs, td as tdCell, th, inputStyle, menuRow, toolbarInput, toolbarBtn, toolbarBtnPrimary, DatumNavigator, segmentBtn, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, pageApp, Popover } from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
 import ThemenWahl from "../components/ThemenWahl.jsx";
 import Stoffplan from "../components/Stoffplan.jsx";
@@ -253,19 +253,10 @@ export default function Kalender() {
     });
   };
 
-  const exportKal = async () => {
-    const r = await fetch(`${API}/export`).catch(() => null);
-    if (!r || !r.ok) return;
-    const blob = await r.blob(); const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = "kalender.json"; a.click(); URL.revokeObjectURL(a.href);
-  };
-  const importKal = async (file) => {
-    try {
-      const data = JSON.parse(await file.text());
-      const r = await fetch(`${API}/import`, alsJson("POST", data));
-      if (r.ok) { load(); loadTt(); loadBreaks(); }
-    } catch { /* ignorieren */ }
-  };
+  // Kalender-Export/-Import gibt es in der Oberflaeche nicht mehr: eine
+  // JSON-Datei, die niemand oeffnen kann, beantwortet keine Frage, die jemand
+  // an einen Kalender stellt — dafuer gibt es das Abo (und CalDAV). Die
+  // Endpunkte bleiben: an ihnen haengt die Kontosicherung.
 
   // Sichtbarer Zeitraum je Ansicht.
   const range = (() => {
@@ -530,8 +521,6 @@ export default function Kalender() {
           )}
           mehr={[
             { key: "abo", label: t("kalender.subscribe"), icon: ICONS.share, onClick: openAbo },
-            { key: "export", label: t("kalender.export"), icon: ICONS.export, onClick: exportKal },
-            { key: "import", label: t("kalender.import"), icon: ICONS.import, onClick: () => dateiWaehlen(importKal) },
             // WebUntis steht hier und nicht mehr am Stundenplan: es bringt
             // nicht nur die wiederkehrenden Stunden mit, sondern auch Ausfall
             // und Ferien — und die gehoeren an den Kalender, nicht an die
@@ -543,10 +532,7 @@ export default function Kalender() {
         </Werkzeugleiste>
       )}
       {view === "timetable" && (
-        <Werkzeugleiste mehr={[
-          { key: "export", label: t("kalender.export"), icon: ICONS.export, onClick: exportKal },
-          { key: "import", label: t("kalender.import"), icon: ICONS.import, onClick: () => dateiWaehlen(importKal) },
-        ]}>
+        <Werkzeugleiste>
           <button onClick={() => setShowTimes((v) => !v)} className="icon-btn" title={t("kalender.timesShow")} aria-label={t("kalender.timesShow")}
             style={{ ...toolbarIconBtn, border: showTimes ? "1px solid var(--accent)" : "1px solid var(--border2)" }}>
             <Icon d={ICONS.clock} size={18} color={showTimes ? "var(--accent)" : "var(--text2)"} />
