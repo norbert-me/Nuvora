@@ -28,6 +28,15 @@ export function askPrompt(message, opts = {}) {
   return request({ kind: "prompt", message, placeholder: opts.placeholder || "", initial: opts.initial || "", ok: opts.ok, cancel: opts.cancel });
 }
 
+// Mehr als ja/nein: eine Frage mit mehreren Antworten ("nur dieser Termin" /
+// "die ganze Serie"). Als askConfirm gebaut waere die zweite Antwort der
+// Abbrechen-Knopf gewesen — und dann bedeutete Escape "die ganze Serie
+// aendern", was niemand erwartet. `optionen` ist [{key, label, danger}]; die
+// erste ist der Hauptknopf. Rueckgabe: der gewaehlte key oder null (Abbruch).
+export function askChoice(message, optionen, opts = {}) {
+  return request({ kind: "choice", message, optionen, cancel: opts.cancel });
+}
+
 export function DialogHost() {
   // Eins nach dem anderen — aber die wartenden kommen in eine Schlange. Vorher
   // wurde eine zweite Nachfrage stillschweigend weggeworfen; ihr Promise blieb
@@ -73,6 +82,19 @@ export function DialogHost() {
           onKeyDown={(e) => { if (e.key === "Enter") bestaetigen(); }}
           style={{ ...inputStyle, width: "100%", marginBottom: 16 }} />
       )}
+      {cur.kind === "choice" ? (
+        // Untereinander statt nebeneinander: die Antworten sind ganze Saetze
+        // ("Nur diesen Termin"), und drei davon in einer Zeile brechen im
+        // schmalen Fenster mitten im Wort um.
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {(cur.optionen || []).map((o, i) => (
+            <button key={o.key} autoFocus={i === 0} onClick={() => schliessen(o.key)}
+              style={{ ...(i === 0 ? btnPrimary : btnSecondary), width: "100%",
+                ...(o.danger ? { background: C.danger, color: C.aufAkzent, border: "none" } : null) }}>{o.label}</button>
+          ))}
+          <button onClick={() => schliessen(null)} style={{ ...btnSecondary, width: "100%" }}>{cur.cancel || "Abbrechen"}</button>
+        </div>
+      ) : (
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
         {cur.kind !== "alert" && (
           <button onClick={abbrechen} style={btnSecondary}>{cur.cancel || "Abbrechen"}</button>
@@ -80,6 +102,7 @@ export function DialogHost() {
         <button autoFocus={cur.kind !== "prompt"} onClick={bestaetigen}
           style={{ ...btnPrimary, ...(cur.danger ? { background: C.danger, color: C.aufAkzent } : null) }}>{okLabel}</button>
       </div>
+      )}
     </Modal>
   );
 }

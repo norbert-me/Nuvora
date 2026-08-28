@@ -74,18 +74,59 @@ def test_ganztags_rundlauf_hat_keine_uhrzeit():
     assert d["datum"] == TAG and d["start_time"] == "" and d["end_time"] == ""
 
 
-def test_serientermin_wird_abgelehnt():
-    """Nuvoras Eintrag ist EIN Tag.
+def test_serie_laeuft_rund():
+    """Eine Serie kommt an, geht wieder hinaus und bleibt dieselbe.
 
-    Eine Serie still auf ihren ersten Termin zu kuerzen hiesse: jemand traegt
-    im Handy „jeden Montag" ein und findet in Nuvora einen einzigen Montag —
-    der Verlust faellt erst Wochen spaeter auf.
+    Sie still auf ihren ersten Termin zu kuerzen hiesse: jemand traegt im Handy
+    „jeden Montag" ein und findet in Nuvora einen einzigen Montag — der Verlust
+    faellt erst Wochen spaeter auf.
     """
+    text = X.baue_vevent(uid="a@nuvora", tag=TAG, titel="AG",
+                         rrule="FREQ=WEEKLY;BYDAY=MO", exdate=["20260908"])
+    d = X.parse_vevent(text)
+    assert d["rrule"] == "FREQ=WEEKLY;BYDAY=MO" and d["exdate"] == ["20260908"]
+
+
+def test_mehrere_exdate_zeilen_bleiben_alle():
+    """EXDATE steht je geloeschtem Einzeltermin einmal im VEVENT. Behielte man
+    nur die erste, waeren alle anderen beim naechsten Abgleich wieder da."""
+    text = X.baue_vevent(uid="a@nuvora", tag=TAG, titel="AG", rrule="FREQ=WEEKLY").replace(
+        "SUMMARY:AG", "EXDATE;VALUE=DATE:20260908\r\nEXDATE;VALUE=DATE:20260915\r\nSUMMARY:AG")
+    assert X.parse_vevent(text)["exdate"] == ["20260908", "20260915"]
+
+
+def test_unbekannte_wiederholung_wird_abgelehnt():
+    """Was wir nicht aufzaehlen koennen, wird nicht halb uebernommen — sonst
+    stuende die Serie in der Datenbank und faende im Kalender nicht statt."""
     text = X.baue_vevent(uid="a@nuvora", tag=TAG, titel="AG").replace(
-        "SUMMARY:AG", "RRULE:FREQ=WEEKLY;BYDAY=MO\r\nSUMMARY:AG")
+        "SUMMARY:AG", "RRULE:FREQ=HOURLY;INTERVAL=3\r\nSUMMARY:AG")
     with pytest.raises(CaldavFehler) as e:
         X.parse_vevent(text)
     assert e.value.status == 403 and e.value.precondition == "supported-calendar-data"
+
+
+def test_rrule_pruefen_wirft_unbekanntes_raus():
+    assert X.rrule_pruefen("FREQ=WEEKLY;INTERVAL=2;BYDAY=WE,MO;WKST=SU") == "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE"
+    assert X.rrule_pruefen("FREQ=MONTHLY;BYDAY=MO") == "FREQ=MONTHLY"   # BYDAY nur woechentlich
+    assert X.rrule_pruefen("FREQ=DAILY;COUNT=5;UNTIL=20270101") == "FREQ=DAILY;UNTIL=20270101"
+    assert X.rrule_pruefen("") == "" and X.rrule_pruefen("FREQ=SECONDLY") == ""
+
+
+def test_exdate_folgt_der_form_von_dtstart():
+    """Ein DATE neben einem getakteten DTSTART ignoriert Apple stillschweigend —
+    der geloeschte Einzeltermin waere am Geraet wieder da."""
+    getaktet = X.baue_vevent(uid="a@x", tag=TAG, titel="AG", rrule="FREQ=WEEKLY",
+                             exdate=["20260908"], start_time="08:00", end_time="08:45")
+    assert "EXDATE:20260908T080000" in getaktet
+    ganztags = X.baue_vevent(uid="a@x", tag=TAG, titel="AG", rrule="FREQ=WEEKLY", exdate=["20260908"])
+    assert "EXDATE;VALUE=DATE:20260908" in ganztags
+
+
+def test_ort_laeuft_rund():
+    """Apple und Outlook fuehren den Ort. Fuehrte Nuvora ihn nicht, waere er
+    beim ersten Abgleich weg."""
+    d = X.parse_vevent(X.baue_vevent(uid="a@x", tag=TAG, titel="AG", ort="Raum 12"))
+    assert d["location"] == "Raum 12"
 
 
 def test_aufgabe_wird_abgelehnt():
@@ -455,13 +496,27 @@ async def test_if_match_verhindert_ueberschreiben(welt):
 
 
 @pytest.mark.asyncio
-async def test_serientermin_wird_mit_grund_abgelehnt(welt):
+async def test_unbekannte_wiederholung_wird_mit_grund_abgelehnt(welt):
     """Mit Vorbedingung, damit Apple sagen kann, WAS nicht ging — ein nacktes
     403 liest sich am Geraet als „keine Berechtigung"."""
     ics = X.baue_vevent(uid="apple-3@example.com", tag=TAG, titel="AG").replace(
-        "SUMMARY:AG", "RRULE:FREQ=WEEKLY\r\nSUMMARY:AG").encode()
+        "SUMMARY:AG", "RRULE:FREQ=HOURLY\r\nSUMMARY:AG").encode()
     r = await _ruf(welt["app"], "PUT", _kal(welt, "apple-3.ics"), body=ics)
     assert r.status == 403 and "supported-calendar-data" in r.text
+
+
+@pytest.mark.asyncio
+async def test_serie_wird_gespeichert(welt):
+    """Aus dem Handy angelegt, in Nuvora eine Serie — nicht ein einzelner Tag."""
+    from app.models import CalendarEntry
+    from sqlalchemy import select
+    ics = X.baue_vevent(uid="apple-4@example.com", tag=TAG, titel="AG",
+                        rrule="FREQ=WEEKLY", exdate=["20260908"], ort="Raum 12").encode()
+    r = await _ruf(welt["app"], "PUT", _kal(welt, "apple-4.ics"), body=ics)
+    assert r.status == 201
+    async with welt["sitzung"]() as s:
+        e = (await s.execute(select(CalendarEntry))).scalars().all()[-1]
+        assert e.rrule == "FREQ=WEEKLY" and e.exdate == ["20260908"] and e.location == "Raum 12"
 
 
 @pytest.mark.asyncio

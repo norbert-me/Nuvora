@@ -15,6 +15,10 @@ from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..zeit import tagesbeginn
+# RRULE ist ICS-Grammatik; die Uebersetzung liegt in app/caldav.py (ohne
+# FastAPI, ohne Datenbank, testbar ohne Server). Eine zweite Fassung hier waere
+# die, in der eine Pruefung fehlt.
+from ..caldav import rrule_pruefen
 from ..felder import ohne_leer, ohne_none
 # `eigenes` ersetzt hier den Dreizeiler „holen, owner_id vergleichen, sonst 404",
 # der in jedem Router noch einmal stand — die Regel steht jetzt in app/besitz.py.
@@ -63,6 +67,28 @@ async def _check_kurs(db: AsyncSession, user: User, kurs_id: Optional[int]) -> N
         raise HTTPException(404, "Kurs nicht gefunden")
 
 
+# ─── Wiederholungen (Serien) ───
+#
+# Eine Serie ist EIN Eintrag plus Regel, nicht hundert Zeilen. Der Grund ist
+# nicht Speicherplatz, sondern Bedienung: „jeden Montag AG" ist eine
+# Entscheidung, und wer sie aendert, will sie an einer Stelle aendern — bei
+# hundert Kopien bliebe die Haelfte stehen. Aufgezaehlt wird mit
+# `_expand_rrule` weiter unten, derselben Funktion, die schon die fremden
+# Kalender ausrollt; zwei Fassungen liefen nach der ersten Sonderregel
+# auseinander.
+
+def serien_tage(e, von: date, bis: date) -> list:
+    """An welchen Tagen im Fenster [von, bis] faellt dieser Eintrag an?
+
+    Ohne Regel ist das genau sein eigener Tag — so bleibt der Rest des Codes
+    frei von Fallunterscheidungen.
+    """
+    tag = _tag(e.date)
+    if not getattr(e, "rrule", ""):
+        return [tag] if von <= tag <= bis else []
+    return _expand_rrule(tag, e.rrule, set(e.exdate or []), von, bis)
+
+
 class PhaseItem(BaseModel):
     phase: str = ""
     dauer: str = ""
@@ -81,12 +107,21 @@ class EntryIn(BaseModel):
     period: Optional[int] = None
     start_time: str = ""   # optionale freie Uhrzeit "HH:MM"
     end_time: str = ""
+    location: str = ""     # Ort/Raum — Apple und Outlook fuehren das Feld
+    rrule: str = ""        # Wiederholung, leer = einmalig
+    exdate: List[str] = []  # ausgenommene Tage der Serie ("YYYYMMDD")
 
     @model_validator(mode="after")
     def _times_ok(self):
         # Endzeit (falls beide gesetzt) muss nach der Startzeit liegen.
         if self.start_time and self.end_time and self.end_time <= self.start_time:
             raise ValueError("Die Endzeit muss nach der Startzeit liegen")
+        # Die Regel auf das eindampfen, was wir wirklich aufzaehlen koennen —
+        # eine gespeicherte Regel, die niemand rechnet, waere eine Serie, die
+        # es nur in der Datenbank gibt.
+        self.rrule = rrule_pruefen(self.rrule)
+        self.exdate = [d for d in (self.exdate or []) if len(d) == 8 and d.isdigit()][:400]
+        self.location = (self.location or "")[:200]
         return self
     cardvote_set_id: Optional[int] = None
     karten_deck_id: Optional[int] = None
@@ -101,11 +136,18 @@ class EntryOut(EntryIn):
     # ohne die Klassenarbeitsliste nachzuladen.
     exam_id: Optional[int] = None
     work_id: Optional[int] = None
+    # Bei einer Serie: der Tag DIESES Vorkommens ("YYYY-MM-DD"). Leer bei allem
+    # Einmaligen. Die Oberflaeche braucht ihn, um beim Aendern oder Loeschen
+    # fragen zu koennen, ob nur dieser Termin gemeint ist oder die ganze Serie.
+    occ: str = ""
     model_config = {"from_attributes": True}
 
-    @field_validator("verlaufsplan", mode="before")
+    @field_validator("verlaufsplan", "exdate", mode="before")
     @classmethod
     def _vp_none(cls, v):
+        # NULL in der Datenbank heisst hier „nichts", nicht „kaputt": eine
+        # Spalte, die es vor der Migration noch nicht gab, ist bei Bestandszeilen
+        # leer und darf das Lesen nicht kippen.
         return v or []
 
 
@@ -114,8 +156,12 @@ async def list_entries(frm: Optional[datetime] = None, to: Optional[datetime] = 
                        user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
     """Eintraege, optional auf einen Zeitraum (frm..to) eingegrenzt."""
     q = select(CalendarEntry).where(CalendarEntry.owner_id == user.id)
+    # Serien bleiben immer dabei: ihr Kopf liegt am ERSTEN Termin und damit fast
+    # immer vor dem Fenster — filterte man ihn weg, waere eine seit September
+    # laufende AG im Maerz aus dem Kalender verschwunden.
+    serie = CalendarEntry.rrule != ""
     if frm is not None:
-        q = q.where(CalendarEntry.date >= frm)
+        q = q.where(or_(CalendarEntry.date >= frm, serie))
     if to is not None:
         q = q.where(CalendarEntry.date <= to)
     rows = (await db.execute(q.order_by(CalendarEntry.date))).scalars().all()
@@ -123,14 +169,36 @@ async def list_entries(frm: Optional[datetime] = None, to: Optional[datetime] = 
     exams = (await db.execute(select(ExamDate).where(
         ExamDate.owner_id == user.id, ExamDate.entry_id.is_not(None)))).scalars().all()
     by_entry = {e.entry_id: e for e in exams}
+
+    # Serien aufzaehlen — aber NUR mit Fenster. Ohne frm/to gibt es keinen
+    # Zeitraum, ueber den man sie ausrollen koennte; dann kommt die Serie als
+    # ihr eigener Datensatz zurueck (genau das brauchen Export, Aufraeumen und
+    # alles, was Eintraege loeschen will).
+    fenster = (frm is not None and to is not None)
+    von = _tag(frm) if frm is not None else None
+    bis = _tag(to) if to is not None else None
+
     out = []
     for r in rows:
-        item = EntryOut.model_validate(r)
-        ex = by_entry.get(r.id)
-        if ex:
-            item.exam_id = ex.id
-            item.work_id = ex.work_id
-        out.append(item)
+        def bau(tag=None):
+            item = EntryOut.model_validate(r)
+            if tag is not None:
+                item.date = tagesbeginn(tag)
+                item.occ = tag.strftime("%Y-%m-%d")
+            ex = by_entry.get(r.id)
+            if ex:
+                item.exam_id = ex.id
+                item.work_id = ex.work_id
+            return item
+        if fenster and r.rrule:
+            out += [bau(tag) for tag in serien_tage(r, von, bis)]
+        else:
+            out.append(bau())
+    # Nach TAG sortieren, nicht nach dem Zeitstempel: die Zeilen kommen teils
+    # mit, teils ohne Zeitzone aus der Datenbank (die aufgezaehlten Vorkommen
+    # tragen die des Tagesbeginns) — ein Vergleich der Zeitstempel bricht dann
+    # mit „can't compare offset-naive and offset-aware datetimes".
+    out.sort(key=lambda i: (_tag(i.date), i.start_time or ""))
     return out
 
 
@@ -512,6 +580,51 @@ async def delete_entry(entry_id: int, user: User = Depends(require_module), db: 
     await db.commit()
 
 
+class AusnahmeIn(BaseModel):
+    """Ein einzelner Tag einer Serie."""
+    date: datetime
+    # true = der Tag wird als eigener Eintrag herausgeloest (zum Aendern),
+    # false = er faellt ersatzlos aus (zum Loeschen).
+    loesen: bool = False
+
+
+@router.post("/entries/{entry_id}/ausnahme", response_model=Optional[EntryOut])
+async def serien_ausnahme(entry_id: int, body: AusnahmeIn,
+                          user: User = Depends(require_module), db: AsyncSession = Depends(get_db)):
+    """Einen einzelnen Termin aus einer Serie nehmen.
+
+    Zwei Faelle, ein Weg: der Tag kommt in jedem Fall auf die EXDATE-Liste, die
+    Serie selbst bleibt unangetastet. Beim **Loesen** entsteht zusaetzlich eine
+    eigenstaendige Kopie an genau diesem Tag — die laesst sich danach aendern
+    wie jeder andere Eintrag, ohne dass die uebrigen Wochen mitwandern. Ohne
+    diesen zweiten Fall gaebe es nur „alles oder gar nicht", und wer eine
+    einzelne Stunde verlegt, muesste die ganze Serie aufloesen.
+    """
+    e = await eigenes(db, CalendarEntry, entry_id, user, "Eintrag nicht gefunden")
+    if not e.rrule:
+        raise HTTPException(400, "Dieser Eintrag ist keine Serie")
+    tag = _tag(body.date)
+    marke = tag.strftime("%Y%m%d")
+    if marke not in set(e.exdate or []):
+        e.exdate = [*(e.exdate or []), marke]
+    kopie = None
+    if body.loesen:
+        felder = {k: getattr(e, k) for k in (
+            "class_id", "kurs_id", "topic_id", "method_id", "period", "title", "notes",
+            "location", "start_time", "end_time", "verlaufsplan",
+            "cardvote_set_id", "karten_deck_id", "lernpfad_ladder_id", "codedetektiv_puzzle")}
+        # Ohne caldav_uid und ohne rrule: die Kopie ist ein eigener Termin, kein
+        # zweiter Kopf derselben Serie — sonst legte der naechste Abgleich im
+        # Handy zwei Serien uebereinander.
+        kopie = CalendarEntry(owner_id=user.id, date=tagesbeginn(tag), **felder)
+        db.add(kopie)
+    await db.commit()
+    if kopie is None:
+        return None
+    await db.refresh(kopie)
+    return kopie
+
+
 # ─── Klassenarbeiten: Termine planen + Übersicht (verbleibende Stundenplan-Stunden) ───
 
 class ExamIn(BaseModel):
@@ -813,7 +926,10 @@ async def stundenplan_vorkommen(db: AsyncSession, user: User, start: date, ende:
     belegt = set()
     for e in (await db.execute(select(CalendarEntry).where(
             CalendarEntry.owner_id == user.id, CalendarEntry.period.is_not(None)))).scalars().all():
-        belegt.add((_tag(e.date), e.period))
+        # Auch eine Serie belegt ihre Stunde an JEDEM ihrer Tage — sonst stuende
+        # ab der zweiten Woche die Vorlage neben dem echten Termin.
+        for tag in serien_tage(e, start, ende):
+            belegt.add((tag, e.period))
     for c in (await db.execute(select(SlotCancellation).where(
             SlotCancellation.owner_id == user.id))).scalars().all():
         belegt.add((_tag(c.date), c.period))
@@ -1465,8 +1581,15 @@ async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depe
     seq = int(u.calendar_rev or 0)
     for e in entries:
         day = e.date.date() if hasattr(e.date, "date") else e.date
-        title = e.title or _kurs_label(kurse.get(e.kurs_id or kurs_je_klasse.get(e.class_id))) \
-            or classes.get(e.class_id) or "Termin"
+        # Der Titel im fremden Kalender ist IMMER „Fach · Kursname", wenn ein
+        # Kurs am Eintrag haengt. Im Handy steht der Termin zwischen
+        # Arztterminen; „Bruchrechnung Station 3" beantwortet dort nicht die
+        # Frage, die man an einen Kalender stellt („was habe ich jetzt, mit
+        # wem?"). Was die Lehrkraft geschrieben hat, geht deshalb nicht
+        # verloren, sondern in die Beschreibung — zusammen mit den Notizen.
+        title = _kurs_label(kurse.get(e.kurs_id or kurs_je_klasse.get(e.class_id))) \
+            or e.title or classes.get(e.class_id) or "Termin"
+        beschreibung = "\n".join(x for x in ((e.title if e.title != title else ""), e.notes or "") if x)
         # Hat der Eintrag eine Stunde und gibt es dafür Uhrzeiten im Stundenplan,
         # als getakteten Termin ausgeben (sonst als Ganztags-Termin).
         # Freie Uhrzeit am Eintrag hat Vorrang; sonst die Uhrzeit der Stunde.
@@ -1497,8 +1620,21 @@ async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depe
             dtend,
             f"SUMMARY:{_ics_escape(title)}",
         ]
-        if e.notes:
-            lines.append(f"DESCRIPTION:{_ics_escape(e.notes)}")
+        if e.rrule:
+            lines.append(f"RRULE:{e.rrule}")
+            if e.exdate:
+                # EXDATE muss zur Form von DTSTART passen: bei einem
+                # Ganztags-Termin als DATE, sonst als Zeitpunkt. Ein DATE neben
+                # einem getakteten DTSTART ignoriert Apple stillschweigend —
+                # der geloeschte Einzeltermin waere im Handy wieder da.
+                if a and b2:
+                    lines.append("EXDATE:" + ",".join(f"{d}T{a}" for d in e.exdate))
+                else:
+                    lines.append("EXDATE;VALUE=DATE:" + ",".join(e.exdate))
+        if e.location:
+            lines.append(f"LOCATION:{_ics_escape(e.location)}")
+        if beschreibung:
+            lines.append(f"DESCRIPTION:{_ics_escape(beschreibung)}")
         lines.append("END:VEVENT")
     for b in breaks:
         s = b.start_date.date() if hasattr(b.start_date, "date") else b.start_date

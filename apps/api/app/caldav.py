@@ -235,15 +235,61 @@ def _ics_zeit(wert):
     return f"{hh}:{mm}"
 
 
+_RRULE_FREQ = ("DAILY", "WEEKLY", "MONTHLY", "YEARLY")
+_RRULE_TAGE = ("MO", "TU", "WE", "TH", "FR", "SA", "SU")
+
+
+def rrule_pruefen(roh: str) -> str:
+    """Eine Wiederholregel auf das eindampfen, was Nuvora wirklich aufzaehlt.
+
+    Unbekannte Teile fliegen **raus**, statt mitgespeichert zu werden: eine
+    Regel, die keiner rechnet (BYSETPOS, WKST, BYMONTHDAY …), waere eine Serie,
+    die es nur in der Datenbank gibt — im Kalender fehlte sie, und niemand
+    saehe, warum. Rueckgabe ist die normalisierte Regel oder "" (= einmalig).
+    """
+    teile = {}
+    for kv in (roh or "").strip().upper().split(";"):
+        if "=" in kv:
+            k, v = kv.split("=", 1)
+            teile[k.strip()] = v.strip()
+    freq = teile.get("FREQ", "")
+    if freq not in _RRULE_FREQ:
+        return ""
+    out = [f"FREQ={freq}"]
+    try:
+        iv = int(teile.get("INTERVAL", "1"))
+    except ValueError:
+        iv = 1
+    if iv > 1:
+        out.append(f"INTERVAL={min(iv, 52)}")
+    if freq == "WEEKLY":
+        tage = [d for d in teile.get("BYDAY", "").split(",") if d in _RRULE_TAGE]
+        if tage:
+            out.append("BYDAY=" + ",".join(sorted(set(tage), key=_RRULE_TAGE.index)))
+    # COUNT und UNTIL schliessen einander aus (RFC 5545). Kommt beides an,
+    # gewinnt UNTIL — ein Enddatum ist die Angabe, die der Nutzer wirklich
+    # gemacht hat; COUNT setzt Apple gern zusaetzlich dazu.
+    u = teile.get("UNTIL", "")[:8]
+    if len(u) == 8 and u.isdigit():
+        out.append(f"UNTIL={u}")
+    elif teile.get("COUNT", "").isdigit():
+        out.append(f"COUNT={min(int(teile['COUNT']), 400)}")
+    return ";".join(out)
+
+
 def parse_vevent(text: str) -> dict:
     """Ein hochgeladenes .ics lesen und auf Nuvoras Felder abbilden.
 
-    Was NICHT unterstuetzt wird, wird abgelehnt statt halb uebernommen:
+    **Wiederholungen** werden uebernommen, soweit Nuvora sie aufzaehlen kann
+    (`rrule_pruefen`): FREQ taeglich/woechentlich/monatlich/jaehrlich mit
+    INTERVAL, BYDAY, COUNT/UNTIL, dazu EXDATE fuer geloeschte Einzeltermine.
+    Was darueber hinausgeht, wird **abgelehnt** statt gekuerzt — eine Serie
+    stillschweigend auf ihren ersten Termin zu kuerzen hiesse, dass jemand im
+    Handy „jeden Montag" eintraegt und in Nuvora einen einzigen Montag
+    vorfindet; der Datenverlust faellt erst Wochen spaeter auf.
 
-    * **Wiederholungen (RRULE).** Nuvoras Eintrag ist ein einzelner Tag. Eine
-      Serie stillschweigend auf ihren ersten Termin zu kuerzen hiesse, dass
-      jemand im Handy „jeden Montag" eintraegt und in Nuvora einen einzigen
-      Montag vorfindet — der Datenverlust faellt erst Wochen spaeter auf.
+    Ebenfalls abgelehnt:
+
     * **Aufgaben (VTODO) und alles andere ausser VEVENT.** Der Kalender sagt in
       seinen Eigenschaften, dass er nur VEVENT fuehrt.
     * **Mehrtaegige Termine.** Auch die gibt es bei uns nicht; ein Eintrag
@@ -255,7 +301,7 @@ def parse_vevent(text: str) -> dict:
     if "BEGIN:VTODO" in roh or "BEGIN:VJOURNAL" in roh:
         raise CaldavFehler(403, "Nur Termine", "supported-calendar-component")
 
-    felder, drin = {}, False
+    felder, drin, exdates = {}, False, []
     for zeile in roh.split("\n"):
         zeile = zeile.rstrip("\r")
         if zeile.startswith("BEGIN:VEVENT"):
@@ -267,12 +313,20 @@ def parse_vevent(text: str) -> dict:
             continue
         name, wert = zeile.split(":", 1)
         schluessel = name.split(";", 1)[0].upper()
+        if schluessel == "EXDATE":
+            # EXDATE steht mehrfach im VEVENT — je geloeschtem Einzeltermin eine
+            # Zeile. `setdefault` behielte nur den ersten, und alle anderen
+            # geloeschten Termine waeren beim naechsten Abgleich wieder da.
+            exdates += [p.strip()[:8] for p in wert.split(",") if p.strip()[:8].isdigit()]
+            continue
         felder.setdefault(schluessel, (name, wert.strip()))
 
     if not felder.get("DTSTART"):
         raise CaldavFehler(400, "Termin ohne Anfang")
-    if "RRULE" in felder:
-        raise CaldavFehler(403, "Serientermine werden nicht unterstuetzt", "supported-calendar-data")
+    roh_regel = felder.get("RRULE", (None, ""))[1]
+    regel = rrule_pruefen(roh_regel)
+    if roh_regel and not regel:
+        raise CaldavFehler(403, "Diese Wiederholung wird nicht unterstuetzt", "supported-calendar-data")
 
     _, start = felder["DTSTART"]
     tag = _ics_datum(start)
@@ -293,10 +347,14 @@ def parse_vevent(text: str) -> dict:
         "end_time": _ics_zeit(ende) if ende else "",
         "title": _ics_unescape(felder.get("SUMMARY", (None, ""))[1])[:200],
         "notes": _ics_unescape(felder.get("DESCRIPTION", (None, ""))[1])[:5000],
+        "location": _ics_unescape(felder.get("LOCATION", (None, ""))[1])[:200],
+        "rrule": regel,
+        "exdate": sorted(set(exdates))[:400] if regel else [],
     }
 
 
-def baue_vevent(*, uid: str, tag, titel: str, notiz: str = "",
+def baue_vevent(*, uid: str, tag, titel: str, notiz: str = "", ort: str = "",
+                rrule: str = "", exdate=None,
                 start_time: str = "", end_time: str = "", stand=None) -> str:
     """Einen Eintrag als vollstaendiges VCALENDAR ausgeben (eine Ressource)."""
     def d8(d):
@@ -324,6 +382,19 @@ def baue_vevent(*, uid: str, tag, titel: str, notiz: str = "",
               "CALSCALE:GREGORIAN", "BEGIN:VEVENT", f"UID:{_ics_escape(uid)}",
               f"DTSTAMP:{stempel}", f"LAST-MODIFIED:{stempel}", *zeit,
               f"SUMMARY:{_ics_escape(titel or 'Termin')}"]
+    if rrule:
+        zeilen.append(f"RRULE:{rrule}")
+        if exdate:
+            # Die Form von EXDATE muss zu DTSTART passen: bei einem getakteten
+            # Termin ein Zeitpunkt, bei einem Ganztags-Termin ein Datum. Passt
+            # sie nicht, ignoriert Apple die Zeile — und der geloeschte
+            # Einzeltermin steht am Geraet wieder da.
+            if a and b:
+                zeilen.append("EXDATE:" + ",".join(f"{d}T{a}" for d in exdate))
+            else:
+                zeilen.append("EXDATE;VALUE=DATE:" + ",".join(exdate))
+    if ort:
+        zeilen.append(f"LOCATION:{_ics_escape(ort)}")
     if notiz:
         zeilen.append(f"DESCRIPTION:{_ics_escape(notiz)}")
     zeilen += ["END:VEVENT", "END:VCALENDAR"]

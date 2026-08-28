@@ -787,6 +787,19 @@ class CalendarEntry(Base):
     # eine abgeleitete UID zurueckzugeben hiesse, dass Apple den Termin beim
     # naechsten Abgleich als zweiten, fremden Termin ansieht.
     caldav_uid: Mapped[Optional[str]] = mapped_column(String(200), nullable=True, index=True)
+    # Ort des Termins (Raum, Adresse). Kommt aus dem Handykalender und geht
+    # dorthin zurueck — Apple und Outlook fuehren das Feld, Nuvora fuehrte es
+    # bisher nicht, und beim ersten Abgleich war es weg.
+    location: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    # Wiederholung als RRULE (FREQ/INTERVAL/COUNT/UNTIL/BYDAY), leer = einmalig.
+    # Eine Serie ist EIN Datensatz plus Regel, nicht hundert Zeilen: der
+    # Wochenrhythmus ist eine Entscheidung, und wer ihn aendert, will ihn an
+    # einer Stelle aendern. Die Termine daraus rechnet `_expand_rrule` — dieselbe
+    # Funktion, die schon die fremden Kalender aufzaehlt.
+    rrule: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    # Ausgenommene Tage der Serie als ["YYYYMMDD", …] (EXDATE). Ein einzelner
+    # Termin, den jemand geloescht oder aus der Serie geloest hat.
+    exdate: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     # Verlaufsplan: einfache Phasenliste [{phase, dauer, text}] für die Stunde.
     verlaufsplan: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     # Verknuepfte Modul-Objekte (Regel 3: alle optional, ON DELETE SET NULL —

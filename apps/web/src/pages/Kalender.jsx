@@ -1,7 +1,7 @@
 // Modul Kalender — Unterrichtsplanung. Tag-, Wochen- und Monatsansicht; je Tag
 // Stunden eintragen und optional Klasse + Thema (Kern-Taxonomie) zuordnen.
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
-import { askConfirm, showAlert } from "../core/dialog.jsx";
+import { askChoice, askConfirm, showAlert } from "../core/dialog.jsx";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AddButton, Icon, ICONS, iconBtn, btnPrimary, btnSecondary, btnSmall, cardStyle, chipStyle, panelStyle, sectionLabel, COLORS as C, selectStyle, SHADOW, Tabs, td as tdCell, th, inputStyle, menuRow, toolbarInput, toolbarBtn, toolbarBtnPrimary, DatumNavigator, segmentBtn, toolbarIconBtn, CONTROL_H, CONTROL_R, Modal, dateiWaehlen, pageApp, Popover } from "../components/Icons.jsx";
 import { themenIndex } from "../core/topics.js";
@@ -321,8 +321,31 @@ export default function Kalender() {
     return () => window.removeEventListener("keydown", onKey);
   }, [view, cursor]); // eslint-disable-line
 
+  // Eine Serie beruehrt mehr als den Tag, den man vor sich hat. Deshalb wird
+  // gefragt, bevor etwas passiert — und zwar nur dann, wenn es wirklich eine
+  // Serie ist und man an einem ihrer Vorkommen steht.
+  const serienFrage = async (e, art) => {
+    if (!e.rrule || !e.occ || !e.id) return "alle";
+    return askChoice(t(art === "del" ? "kalender.serieDelFrage" : "kalender.serieSaveFrage"), [
+      { key: "einer", label: t("kalender.serieNurDieser"), danger: art === "del" },
+      { key: "alle", label: t("kalender.serieGanze"), danger: art === "del" },
+    ]);
+  };
+
   const save = async (e) => {
-    const body = { date: isoDay(e.date), title: e.title || "", notes: e.notes || "", verlaufsplan: Array.isArray(e.verlaufsplan) ? e.verlaufsplan : [], class_id: e.class_id || null, kurs_id: e.kurs_id ?? null, topic_id: e.topic_id || null, method_id: e.method_id || null, period: e.period ?? null, start_time: e.start_time || "", end_time: e.end_time || "", cardvote_set_id: e.cardvote_set_id || null, karten_deck_id: e.karten_deck_id || null, lernpfad_ladder_id: e.lernpfad_ladder_id || null, codedetektiv_puzzle: e.codedetektiv_puzzle || null };
+    const wahl = await serienFrage(e, "save");
+    if (!wahl) return;
+    if (wahl === "einer") {
+      // Diesen einen Tag aus der Serie loesen: der Server nimmt ihn auf die
+      // EXDATE-Liste und legt eine eigenstaendige Kopie an. Weiter geht es mit
+      // der Kopie — die traegt keine Regel mehr, sonst haetten wir zwei Serien.
+      const r = await fetch(`${API}/entries/${e.id}/ausnahme`, alsJson("POST", { date: isoDay(e.date), loesen: true })).catch(() => null);
+      if (!(await pruefeAntwort(r, t("common.save")))) return;
+      let kopie = null; try { kopie = await r.json(); } catch { /* egal */ }
+      if (!kopie || !kopie.id) return;
+      e = { ...e, id: kopie.id, rrule: "", exdate: [], occ: "" };
+    }
+    const body = { date: isoDay(e.date), title: e.title || "", notes: e.notes || "", location: e.location || "", rrule: e.rrule || "", exdate: Array.isArray(e.exdate) ? e.exdate : [], verlaufsplan: Array.isArray(e.verlaufsplan) ? e.verlaufsplan : [], class_id: e.class_id || null, kurs_id: e.kurs_id ?? null, topic_id: e.topic_id || null, method_id: e.method_id || null, period: e.period ?? null, start_time: e.start_time || "", end_time: e.end_time || "", cardvote_set_id: e.cardvote_set_id || null, karten_deck_id: e.karten_deck_id || null, lernpfad_ladder_id: e.lernpfad_ladder_id || null, codedetektiv_puzzle: e.codedetektiv_puzzle || null };
     const res = await fetch(e.id ? `${API}/entries/${e.id}` : `${API}/entries`, alsJson(e.id ? "PUT" : "POST", body)).catch(() => null);
     // Lehnte der Server ab, passierte bisher NICHTS: das Modal blieb offen, der
     // getippte Verlaufsplan stand noch da, und nur ein späterer Blick auf den
@@ -336,13 +359,21 @@ export default function Kalender() {
       setEditing({ ...e, ...(saved || {}), date: saved && saved.date ? new Date(saved.date) : e.date, _justSaved: Date.now() });
     }
   };
-  const remove = (id) => {
+  const remove = async (id, ev = null) => {
+    const wahl = await serienFrage(ev || { id }, "del");
+    if (!wahl) return;
+    const tag = ev && ev.date ? isoDay(ev.date) : null;
     setEditing(null);
-    setEntries((prev) => prev.filter((e) => e.id !== id)); // sofort weg
+    // Bei "nur dieser" faellt genau ein Tag weg, sonst der ganze Eintrag.
+    setEntries((prev) => prev.filter((e) => e.id !== id || (wahl === "einer" && ymd(new Date(e.date)) !== ymd(new Date(ev.date)))));
     undoDelete({
       message: t("undo.deletedGeneric"),
       undo: () => load(),
-      commit: async () => { await fetch(`${API}/entries/${id}`, { method: "DELETE" }).catch(() => {}); },
+      commit: async () => {
+        if (wahl === "einer") await fetch(`${API}/entries/${id}/ausnahme`, alsJson("POST", { date: tag, loesen: false })).catch(() => {});
+        else await fetch(`${API}/entries/${id}`, { method: "DELETE" }).catch(() => {});
+        load();
+      },
     });
   };
 
@@ -1564,6 +1595,19 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   const [deckId, setDeckId] = useState(entry.karten_deck_id || "");
   const [startTime, setStartTime] = useState(entry.start_time || "");
   const [endTime, setEndTime] = useState(entry.end_time || "");
+  const [ort, setOrt] = useState(entry.location || "");
+  // Wiederholung: aus der Regel nur das lesen, was der Dialog anbietet — Rest
+  // (etwa eine von Apple gesetzte BYDAY-Liste) bleibt unangetastet, solange
+  // niemand den Rhythmus umstellt.
+  const rrTeile = Object.fromEntries((entry.rrule || "").split(";").filter((x) => x.includes("=")).map((x) => x.split("=")));
+  const [rhythmus, setRhythmus] = useState(rrTeile.FREQ ? `${rrTeile.FREQ}${rrTeile.INTERVAL === "2" ? ":2" : ""}` : "");
+  const [rrBis, setRrBis] = useState(rrTeile.UNTIL && rrTeile.UNTIL.length === 8
+    ? `${rrTeile.UNTIL.slice(0, 4)}-${rrTeile.UNTIL.slice(4, 6)}-${rrTeile.UNTIL.slice(6, 8)}` : "");
+  const rruleBauen = () => {
+    if (!rhythmus) return "";
+    const [freq, iv] = rhythmus.split(":");
+    return [`FREQ=${freq}`, iv ? `INTERVAL=${iv}` : "", rrBis ? `UNTIL=${rrBis.replaceAll("-", "")}` : ""].filter(Boolean).join(";");
+  };
   const timeInvalid = !!(startTime && endTime && endTime <= startTime); // Ende vor/gleich Start
   const [dateVal, setDateVal] = useState(entry.date ? ymd(new Date(entry.date)) : ymd(new Date()));
   const [decks, setDecks] = useState([]); // Karten-Decks der gewaehlten Klasse
@@ -1620,6 +1664,11 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
   const istInformatik = /informatik/i.test((classId && (classes.find((c) => c.id === Number(classId)) || {}).name) || "");
   // Bestehender Eintrag oeffnet zuerst als Ansicht; neuer direkt im Bearbeiten.
   const [edit, setEdit] = useState(!entry.id);
+  // „Erweitert" startet offen, wenn dort schon etwas steht — sonst waere ein
+  // gepflegter Eintrag beim naechsten Oeffnen zur Haelfte unsichtbar.
+  const [erweitert, setErweitert] = useState(!!(entry.location || entry.rrule || entry.topic_id
+    || entry.method_id || entry.cardvote_set_id || entry.karten_deck_id || entry.lernpfad_ladder_id
+    || entry.codedetektiv_puzzle || (entry.verlaufsplan || []).length));
   // Nach dem Speichern (Parent setzt _justSaved) in die Ansicht wechseln, statt zu
   // schließen — so sieht man den gespeicherten Eintrag sofort.
   useEffect(() => { if (entry._justSaved) setEdit(false); }, [entry._justSaved]);
@@ -1651,7 +1700,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         <div style={{ padding: "6px 24px 22px" }}>
         {!edit && (
           <div>
-            {(clsName || topName || startTime || endTime) && (
+            {(clsName || topName || startTime || endTime || ort || entry.rrule) && (
               <div style={{ marginTop: 4 }}>
                 {clsName && (
                   <div style={{ display: "flex", gap: 8, fontSize: 14, padding: "3px 0" }}>
@@ -1665,6 +1714,8 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
                 {zeile(t("kalender.topic"), topName)}
                 {/* Einstieg (Methode) steht jetzt als anklickbarer Link unter „Öffnen". */}
                 {zeile(t("kalender.time"), (startTime || endTime) ? `${startTime || "?"}–${endTime || "?"}` : null)}
+                {zeile(t("kalender.place"), ort)}
+                {zeile(t("kalender.repeat"), entry.rrule ? t("kalender.repeatOn") : null)}
               </div>
             )}
             {aktiv.orga && classId && (
@@ -1727,7 +1778,7 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
             <div style={{ display: "flex", gap: 8, marginTop: 24, alignItems: "center" }}>
               <button onClick={() => setEdit(true)} style={btnPrimary}>{t("common.edit")}</button>
               <button onClick={onClose} style={btnSecondary}>{t("common.close")}</button>
-              {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
+              {entry.id && <button onClick={() => onDelete(entry.id, entry)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
             </div>
           </div>
         )}
@@ -1751,6 +1802,39 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
         <div style={lbl}>{t("kalender.kursOrClass")}</div>
         <KursKlasseSelect value={classId === "" ? "" : Number(classId)} kursValue={kursId} allowNone noneLabel={`– ${t("kalender.noClass")} –`}
           onChange={(id, kid) => { setClassId(id === "" ? "" : String(id)); setKursId(id === "" ? null : (kid ?? null)); }} onKurs={setKursId} style={dialogSelect} />
+        <div style={lbl}>{t("kalender.notes")}</div>
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...fld, resize: "vertical" }} />
+
+        {/* Alles Weitere liegt unter „Erweitert". Der Dialog hatte vierzehn
+            Felder untereinander — die vier, die man bei einem normalen Termin
+            wirklich braucht, gingen darin unter. Aufgeklappt startet er nur,
+            wenn dort schon etwas steht: sonst waere ein gepflegter Eintrag beim
+            naechsten Oeffnen halb unsichtbar. */}
+        <button onClick={() => setErweitert((v) => !v)}
+          style={{ ...btnSecondary, width: "100%", marginTop: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          {t("kalender.more")} <Icon d={erweitert ? ICONS.chevronUp : ICONS.chevronDown} size={12} />
+        </button>
+        {erweitert && (<>
+        <div style={lbl}>{t("kalender.place")}</div>
+        <input value={ort} onChange={(e) => setOrt(e.target.value)} placeholder={t("kalender.placePlaceholder")} style={fld} />
+        {entry.period == null && (<>
+          <div style={lbl}>{t("kalender.repeat")}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <select value={rhythmus} onChange={(e) => setRhythmus(e.target.value)} style={{ ...dialogSelect, width: "auto", flex: 1, minWidth: 150 }}>
+              <option value="">{t("kalender.repeatNone")}</option>
+              <option value="DAILY">{t("kalender.repeatDaily")}</option>
+              <option value="WEEKLY">{t("kalender.repeatWeekly")}</option>
+              <option value="WEEKLY:2">{t("kalender.repeatWeekly2")}</option>
+              <option value="MONTHLY">{t("kalender.repeatMonthly")}</option>
+              <option value="YEARLY">{t("kalender.repeatYearly")}</option>
+            </select>
+            {rhythmus && (<>
+              <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("kalender.repeatUntil")}</span>
+              <input type="date" value={rrBis} onChange={(e) => setRrBis(e.target.value)} style={{ ...fld, width: "auto" }} />
+            </>)}
+          </div>
+          {rhythmus && <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 4 }}>{t("kalender.repeatHint")}</div>}
+        </>)}
         <div style={lbl}>{t("kalender.topic")}</div>
         <select value={topicId} onChange={(e) => setTopicId(e.target.value)} style={dialogSelect}>
           <option value="">– {t("kalender.noTopic")} –</option>
@@ -1834,9 +1918,6 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
             </div>
           );
         })()}
-        <div style={lbl}>{t("kalender.notes")}</div>
-        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...fld, resize: "vertical" }} />
-
         {/* Verlaufsplan: einfache Phasenliste (Phase + Dauer + Freitext). */}
         <div style={{ ...lbl, display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ flex: 1 }}>{t("kalender.verlauf")}</span>
@@ -1857,8 +1938,9 @@ function EntryModal({ entry, classes, topics, methods = [], quizze = [], ladders
           </div>
         ))}
 
-        <DialogFuss onAbbrechen={onClose} aus={timeInvalid} onSpeichern={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, title, notes, start_time: startTime || "", end_time: endTime || "", verlaufsplan: verlauf.filter((p) => (p.phase || p.text || p.dauer)).map((p) => ({ phase: p.phase || "", dauer: p.dauer || "", text: p.text || "" })), class_id: classId ? Number(classId) : null, kurs_id: classId ? (kursId ?? null) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })}>
-          {entry.id && <button onClick={() => onDelete(entry.id)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
+        </>)}
+        <DialogFuss onAbbrechen={onClose} aus={timeInvalid} onSpeichern={() => onSave({ ...entry, date: entry.period == null ? (() => { const [y, m, d] = dateVal.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); })() : entry.date, title, notes, start_time: startTime || "", end_time: endTime || "", location: ort, rrule: rruleBauen(), exdate: Array.isArray(entry.exdate) ? entry.exdate : [], verlaufsplan: verlauf.filter((p) => (p.phase || p.text || p.dauer)).map((p) => ({ phase: p.phase || "", dauer: p.dauer || "", text: p.text || "" })), class_id: classId ? Number(classId) : null, kurs_id: classId ? (kursId ?? null) : null, topic_id: topicId ? Number(topicId) : null, method_id: methodId ? Number(methodId) : null, cardvote_set_id: quizId ? Number(quizId) : null, karten_deck_id: deckId ? Number(deckId) : null, lernpfad_ladder_id: ladderId ? Number(ladderId) : null, codedetektiv_puzzle: puzzleId || null })}>
+          {entry.id && <button onClick={() => onDelete(entry.id, entry)} className="icon-btn" style={{ ...iconBtn, marginLeft: "auto" }} title={t("common.delete")} aria-label={t("common.delete")}><Icon d={ICONS.trash} size={18} color={C.danger} /></button>}
         </DialogFuss>
         </>)}
         </div>

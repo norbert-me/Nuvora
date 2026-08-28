@@ -764,6 +764,32 @@ def inhalt_kalender(api, u, spuren):
     if (wieder.get("verlaufsplan") or [{}])[0].get("text") != "Blitzlicht":
         raise AssertionError(f"Verlaufsplan verloren: {wieder.get('verlaufsplan')}")
 
+    # Serie: EIN Eintrag plus Regel, aufgezaehlt ueber das Fenster. Geprueft
+    # wird, was beim Bauen dreimal schiefging — dass der Serienkopf beim
+    # Blaettern aus dem Fenster faellt, dass der Ort verschwindet, und dass ein
+    # ausgenommener Einzeltermin beim naechsten Laden wieder da ist.
+    serie = api.call("POST", "/api/kalender/entries", {
+        "date": tag.isoformat(), "title": f"{PRAEFIX} Serie", "location": "Raum 12",
+        "rrule": "FREQ=WEEKLY;BYSETPOS=2",   # BYSETPOS rechnet niemand — muss herausfallen
+    }, erwartet=(201,))
+    spuren.append(("Serien-Eintrag", lambda: api.call(
+        "DELETE", f"/api/kalender/entries/{serie['id']}", erwartet=(204, 404))))
+    if serie.get("rrule") != "FREQ=WEEKLY" or serie.get("location") != "Raum 12":
+        raise AssertionError(f"Serie nicht gespeichert wie erwartet: {serie}")
+    spanne = (f"?frm={(tag + timedelta(days=6)).isoformat()}"
+              f"&to={(tag + timedelta(days=27)).isoformat()}")
+    vork = [e for e in api.call("GET", f"/api/kalender/entries{spanne}", erwartet=(200,))
+            if e["id"] == serie["id"]]
+    if len(vork) != 3:
+        raise AssertionError(f"Serie im Fenster: {len(vork)} Vorkommen statt 3 — "
+                             "faellt der Serienkopf aus dem Zeitraum?")
+    api.call("POST", f"/api/kalender/entries/{serie['id']}/ausnahme",
+             {"date": vork[0]["date"], "loesen": False}, erwartet=(200,))
+    danach = [e for e in api.call("GET", f"/api/kalender/entries{spanne}", erwartet=(200,))
+              if e["id"] == serie["id"]]
+    if len(danach) != 2:
+        raise AssertionError(f"ausgenommener Termin ist wieder da: {len(danach)} Vorkommen")
+
     slot = api.call("PUT", "/api/kalender/timetable/slot", {
         "weekday": 0, "period": 1, "class_id": u.class_id, "title": f"{PRAEFIX} Slot",
     }, erwartet=(200,))

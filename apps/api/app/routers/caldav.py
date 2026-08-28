@@ -34,7 +34,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import PlainTextResponse as _Text
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import caldav as X
@@ -145,14 +145,34 @@ def _dateiname(e: CalendarEntry) -> str:
     return f"{sicher}-{e.id}.ics"
 
 
-async def _texte(db: AsyncSession, user: User, eintraege) -> dict:
-    """Je Eintrag das fertige .ics — mit derselben Beschriftung wie ueberall
-    („Fach · Kursname"), damit der Termin im Handy nicht anders heisst als im
-    Browser."""
+async def _beschriftung(db: AsyncSession, user: User):
+    """Eine Funktion, die einem Eintrag seinen Titel im fremden Kalender gibt.
+
+    Der ist IMMER „Fach · Kursname", wenn ein Kurs am Eintrag haengt — im Handy
+    steht der Termin zwischen Arztterminen, und „Station 3" beantwortet dort
+    nicht die Frage, die man an einen Kalender stellt. Was die Lehrkraft
+    geschrieben hat, geht nicht verloren: es wandert in die Beschreibung.
+    Dieselbe Regel wie im ICS-Feed (`_kurs_label`) — zwei Fassungen hiessen,
+    dass derselbe Termin im abonnierten Kalender anders heisst als im
+    geschriebenen.
+    """
     kurse = {k.id: k for k in (await db.execute(select(Kurs).where(
         Kurs.owner_id == user.id, Kurs.deleted_at.is_(None)))).scalars().all()}
     klassen = {c.id: c for c in (await db.execute(select(SchoolClass).where(
         SchoolClass.owner_id == user.id))).scalars().all()}
+
+    def label(e: CalendarEntry) -> str:
+        k = kurse.get(e.kurs_id) or kurse.get(getattr(klassen.get(e.class_id), "kurs_id", None))
+        return (_kurs_label(k) or e.title
+                or getattr(klassen.get(e.class_id), "name", "") or "Termin")
+    return label
+
+
+async def _texte(db: AsyncSession, user: User, eintraege) -> dict:
+    """Je Eintrag das fertige .ics — mit derselben Beschriftung wie ueberall
+    („Fach · Kursname"), damit der Termin im Handy nicht anders heisst als im
+    Browser."""
+    label = await _beschriftung(db, user)
 
     # Uhrzeiten des Stundenrasters: ein Eintrag ohne eigene Uhrzeit gehoert zu
     # einer STUNDE, und die hat eine. Ohne diesen Rueckgriff wurde aus jedem
@@ -172,11 +192,15 @@ async def _texte(db: AsyncSession, user: User, eintraege) -> dict:
 
     out = {}
     for e in eintraege:
-        k = kurse.get(e.kurs_id) or kurse.get(getattr(klassen.get(e.class_id), "kurs_id", None))
-        titel = e.title or _kurs_label(k) or getattr(klassen.get(e.class_id), "name", "") or "Termin"
+        titel = label(e)
+        # Der eigene Titel geht nicht verloren, weil der Kurs die Ueberschrift
+        # stellt — er steht ueber den Notizen in der Beschreibung.
+        notiz = "\n".join(x for x in ((e.title if e.title != titel else ""), e.notes or "") if x)
         tag = e.date.date() if hasattr(e.date, "date") else e.date
         von, bis = _stundenzeit(e)
-        out[e.id] = X.baue_vevent(uid=_uid(e), tag=tag, titel=titel, notiz=e.notes or "",
+        out[e.id] = X.baue_vevent(uid=_uid(e), tag=tag, titel=titel, notiz=notiz,
+                                  ort=e.location or "", rrule=e.rrule or "",
+                                  exdate=list(e.exdate or []),
                                   start_time=von, end_time=bis, stand=e.created_at)
     return out
 
@@ -236,7 +260,11 @@ async def _ressourcen(db: AsyncSession, u: User, fenster=None) -> list:
 async def _alle(db: AsyncSession, u: User, fenster=None):
     q = select(CalendarEntry).where(CalendarEntry.owner_id == u.id)
     if fenster and fenster[0]:
-        q = q.where(CalendarEntry.date >= tagesbeginn(fenster[0]))
+        # Serien bleiben immer dabei: ihr Kopf liegt am ERSTEN Termin und damit
+        # fast immer vor dem Fenster. Filterte man ihn weg, waere eine seit
+        # September laufende AG im Maerz aus dem Handykalender verschwunden —
+        # und beim naechsten Abgleich als geloescht gemeldet.
+        q = q.where(or_(CalendarEntry.date >= tagesbeginn(fenster[0]), CalendarEntry.rrule != ""))
     if fenster and fenster[1]:
         q = q.where(CalendarEntry.date < tagesbeginn(fenster[1]))
     return (await db.execute(q.order_by(CalendarEntry.date))).scalars().all()
@@ -601,6 +629,7 @@ async def ressource(request: Request, user_id: int, name: str,
         e = CalendarEntry(owner_id=u.id, date=tagesbeginn(daten["datum"] or tag),
                           period=s_obj.period, class_id=s_obj.class_id, kurs_id=s_obj.kurs_id,
                           topic_id=s_obj.topic_id, title=daten["title"], notes=daten["notes"],
+                          location=daten["location"], rrule=daten["rrule"], exdate=daten["exdate"],
                           start_time=daten["start_time"], end_time=daten["end_time"],
                           caldav_uid=daten["uid"] or None)
         db.add(e)
@@ -611,9 +640,30 @@ async def ressource(request: Request, user_id: int, name: str,
             **_DAV_KOPF, "ETag": X.etag(text), "Content-Location": _pfad(u.id, _dateiname(e))})
 
     if treffer:
+        # Der Titel, den das Geraet zurueckschickt, ist der, den wir ihm gegeben
+        # haben — bei einem Termin mit Kurs also „Fach · Kursname". Den in
+        # `title` zu schreiben hiesse, den eigenen Titel der Lehrkraft bei jedem
+        # Abgleich durch das Kurs-Etikett zu ersetzen. Also: nur uebernehmen,
+        # was WIRKLICH jemand geaendert hat.
+        label = await _beschriftung(db, u)
+        titel = daten["title"]
+        if titel == label(treffer):
+            titel = treffer.title
+        # Dasselbe fuer die Beschreibung: wir schicken „eigener Titel + Notiz"
+        # hinaus, und ohne diesen Abzug staende der Titel nach zwei Abgleichen
+        # zweimal in den Notizen.
+        notiz = daten["notes"]
+        kopf = treffer.title if treffer.title and treffer.title != label(treffer) else ""
+        if kopf and notiz == kopf:
+            notiz = ""
+        elif kopf and notiz.startswith(kopf + "\n"):
+            notiz = notiz[len(kopf) + 1:]
         treffer.date = tagesbeginn(daten["datum"])
-        treffer.title = daten["title"]
-        treffer.notes = daten["notes"]
+        treffer.title = titel
+        treffer.notes = notiz
+        treffer.location = daten["location"]
+        treffer.rrule = daten["rrule"]
+        treffer.exdate = daten["exdate"]
         treffer.start_time = daten["start_time"]
         treffer.end_time = daten["end_time"]
         if daten["uid"]:
@@ -624,6 +674,7 @@ async def ressource(request: Request, user_id: int, name: str,
         rate_limit("caldav_neu", f"u{u.id}", 200, 3600, "Zu viele neue Termine.")
         e = CalendarEntry(owner_id=u.id, date=tagesbeginn(daten["datum"]),
                           title=daten["title"], notes=daten["notes"],
+                          location=daten["location"], rrule=daten["rrule"], exdate=daten["exdate"],
                           start_time=daten["start_time"], end_time=daten["end_time"],
                           caldav_uid=daten["uid"] or None)
         db.add(e)
