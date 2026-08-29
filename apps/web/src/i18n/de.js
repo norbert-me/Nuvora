@@ -1788,7 +1788,7 @@ export default {
   "melder.danke": "Danke!",
   "melder.dankeText": "Die Meldung ist unterwegs. Wenn eine Rückfrage nötig ist, kommt sie an deine Konto-Adresse.",
   "melder.protokoll": "Protokoll dieses Browsers",
-  "melder.protokollHinweis": "Was Nuvora zuletzt getan hat — Seitenwechsel, fehlgeschlagene Aufrufe, Fehler. Es liegt nur in diesem Browser und geht nirgendwohin, solange du keine Fehlermeldung abschickst. Ein Server-Protokoll ist das nicht: fremde Sitzungen sind hier nicht einsehbar.",
+  "melder.protokollHinweis": "Liegt nur in diesem Browser und geht nirgendwohin, solange du keine Fehlermeldung abschickst.",
   "melder.kopieren": "Kopieren",
   "melder.leeren": "Leeren",
   "widget.heute": "Heute",

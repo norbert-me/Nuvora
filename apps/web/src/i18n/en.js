@@ -1802,7 +1802,7 @@ export default {
   "melder.danke": "Thank you!",
   "melder.dankeText": "The report is on its way. If we need to ask something, it goes to your account address.",
   "melder.protokoll": "Log of this browser",
-  "melder.protokollHinweis": "What Nuvora did last — page changes, failed calls, errors. It lives in this browser only and goes nowhere unless you send a report. This is not a server log: other people's sessions are not visible here.",
+  "melder.protokollHinweis": "Stays in this browser and goes nowhere unless you send a bug report.",
   "melder.kopieren": "Copy",
   "melder.leeren": "Clear",
   "widget.heute": "Today",

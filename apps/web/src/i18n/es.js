@@ -1803,7 +1803,7 @@ export default {
   "melder.danke": "¡Gracias!",
   "melder.dankeText": "El informe va en camino. Si hace falta preguntar algo, será a la dirección de tu cuenta.",
   "melder.protokoll": "Registro de este navegador",
-  "melder.protokollHinweis": "Lo último que hizo Nuvora — cambios de página, llamadas fallidas, errores. Está solo en este navegador y no va a ninguna parte mientras no envíes un informe. No es un registro del servidor: aquí no se ven sesiones ajenas.",
+  "melder.protokollHinweis": "Se queda en este navegador y no va a ninguna parte mientras no envíes un informe de error.",
   "melder.kopieren": "Copiar",
   "melder.leeren": "Vaciar",
   "widget.heute": "Hoy",
