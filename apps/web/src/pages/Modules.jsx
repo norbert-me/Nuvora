@@ -32,6 +32,10 @@ export default function Modules() {
 
   const dispName = (m) => (t(`mod.${m.key}.name`) !== `mod.${m.key}.name` ? t(`mod.${m.key}.name`) : m.name);
   const descOf = (m) => (t(`mod.${m.key}.desc`) !== `mod.${m.key}.desc` ? t(`mod.${m.key}.desc`) : m.description) || "";
+  // Der eine Satz fuer die Liste. Fehlt er, steht dort die lange Beschreibung
+  // (auf zwei Zeilen geklemmt) — ein Modul ohne kurzen Satz ist damit
+  // unschoen, aber nicht kaputt.
+  const kurzOf = (m) => (t(`mod.${m.key}.kurz`) !== `mod.${m.key}.kurz` ? t(`mod.${m.key}.kurz`) : descOf(m));
   const helpOf = (m) => {
     const hk = `mod.${m.key}.help`;
     if (t(hk) !== hk) return t(hk);
@@ -136,17 +140,16 @@ export default function Modules() {
                   </span>
                 )}
               </div>
-              {/* Zwei Zeilen, dann ist Schluss. Die Beschreibungen sind
-                  vollstaendig — beim Modul Auswertung waren das acht Zeilen in
-                  einer Liste, durch die man scrollt, um ein Modul
-                  einzuschalten. Der ganze Text steht hinter „Mehr". Geklemmt
-                  wird per CSS, nicht durch Abschneiden am Satzende: „z. B."
-                  und „u. a." kommen darin vor, und jede Regel, die daran
-                  scheitert, schneidet mitten im Wort. */}
+              {/* In der Liste steht EIN Satz: was das Modul tut. Die
+                  vollstaendige Beschreibung ist die Antwort auf „was steckt
+                  alles drin?" und gehoert hinter „Mehr" — in der Liste waren
+                  es beim Modul Auswertung acht Zeilen, durch die man scrollt,
+                  um ein Modul einzuschalten. Die Klemme auf zwei Zeilen bleibt
+                  als Netz fuer Module, die noch keinen kurzen Satz haben. */}
               <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.6,
                 display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
                 overflow: "hidden" }}>
-                {descOf(m)}
+                {kurzOf(m)}
               </div>
               <button onClick={() => setHelpMod(m)} style={{ border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--accent)", fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" }}>
                 {t("modules.more")} ›
