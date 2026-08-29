@@ -136,13 +136,21 @@ export default function Modules() {
                   </span>
                 )}
               </div>
-              <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.6 }}>
+              {/* Zwei Zeilen, dann ist Schluss. Die Beschreibungen sind
+                  vollstaendig — beim Modul Auswertung waren das acht Zeilen in
+                  einer Liste, durch die man scrollt, um ein Modul
+                  einzuschalten. Der ganze Text steht hinter „Mehr". Geklemmt
+                  wird per CSS, nicht durch Abschneiden am Satzende: „z. B."
+                  und „u. a." kommen darin vor, und jede Regel, die daran
+                  scheitert, schneidet mitten im Wort. */}
+              <div style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.6,
+                display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+                overflow: "hidden" }}>
                 {descOf(m)}
-                {" "}
-                <button onClick={() => setHelpMod(m)} style={{ border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--accent)", fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" }}>
-                  {t("modules.more")} ›
-                </button>
               </div>
+              <button onClick={() => setHelpMod(m)} style={{ border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--accent)", fontSize: 14, fontWeight: 600, whiteSpace: "nowrap" }}>
+                {t("modules.more")} ›
+              </button>
               {/* Abschaltbare Teile — nur bei aktivem Modul. An einem
                   abgeschalteten waeren es Einstellungen an etwas, das es fuer
                   diese Lehrkraft gerade nicht gibt. */}

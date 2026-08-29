@@ -62,6 +62,37 @@ const Zeile = ({ label, hint, block = false, erste = false, children }) => (
   </div>
 );
 
+// Ein Abschnitt der Profilseite: Überschrift zum Aufklappen, Inhalt darunter.
+// Aufklappbar sind die ABSCHNITTE, nicht die einzelnen Felder — vorher war
+// jede Einstellung ein eigener Aufklapper, vier Überschriften mit Pfeil und
+// Info-Punkt untereinander, hinter jeder ein kleines Feld. Der Zustand liegt im
+// localStorage: wer sein Schuljahr jede Woche anfasst, findet es offen vor.
+const Abschnitt = ({ id, titel, zu = true, kopf = null, children }) => {
+  const [offen, setOffen] = useState(() => {
+    try {
+      const v = localStorage.getItem(`nuvora_profil_${id}`);
+      return v === null ? !zu : v === "1";
+    } catch { return !zu; }
+  });
+  const um = () => setOffen((v) => {
+    try { localStorage.setItem(`nuvora_profil_${id}`, v ? "0" : "1"); } catch { /* egal */ }
+    return !v;
+  });
+  return (
+    <div style={abschnitt}>
+      <button type="button" onClick={um}
+        style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none",
+          border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
+        <Icon d={offen ? ICONS.chevronUp : ICONS.chevronDown} size={15} />
+        <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", flex: 1 }}>{titel}</span>
+        {/* Was auch zugeklappt sichtbar bleiben muss (die eigene Adresse). */}
+        {!offen && kopf}
+      </button>
+      {offen && <div style={{ marginTop: 16 }}>{children}</div>}
+    </div>
+  );
+};
+
 // Papierkorb aus der einen Icon-Quelle statt als eigenes SVG.
 const TrashIcon = ({ size = 16 }) => <Icon d={ICONS.trash} size={size} color={C.danger} />;
 
@@ -221,8 +252,8 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
           Umschalter, die sofort wirken. Vorher lagen Sofort-Umschalter und
           Entwurfsfelder in derselben Karte — man sah einer Zeile nicht an, ob
           sie schon gespeichert war. */}
-      <div style={abschnitt}>
-        <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("profile.account")}</div>
+      <Abschnitt id="konto" titel={t("profile.account")} zu={false}
+        kopf={<span style={{ fontSize: 13, color: "var(--text3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</span>}>
         <div style={{ fontSize: 13, color: "var(--text3)" }}>{t("profile.email")}</div>
         <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>{user.email}</div>
         {pendingEmail && (
@@ -264,12 +295,11 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             </div>
           </form>
         )}
-      </div>
+      </Abschnitt>
 
       {/* Bewusst kein <form>: die Knöpfe der Speicherleiste wären darin
           Submit-Knöpfe, und „Abbrechen" schickte das Formular ab. */}
-      <div style={abschnitt}>
-        <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("profile.settings")}</div>
+      <Abschnitt id="unterricht" titel={t("profile.settings")}>
 
         {/* Schuljahr zuerst: die Achse, auf der jede Planung liegt. */}
         <Zeile label={t("profile.schuljahr")} hint={t("profile.schuljahrHint")} block erste>
@@ -319,14 +349,14 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             ist. Dauerhaft sichtbar stand dort ein Speichern-Knopf, der nichts
             zu speichern hatte. */}
         <Speicherleiste entwurf={profil} style={{ marginTop: 16 }} />
-      </div>
+      </Abschnitt>
 
       {/* Was sofort wirkt, steht zusammen und ohne Speicherleiste: die Sprache
           wechselt die Oberflaeche im selben Augenblick, das Tutorial startet.
           Beides sind die begruendeten Ausnahmen von „ohne Speichern-Knopf geht
           nichts" (siehe CLAUDE.md) — in einer eigenen Karte sieht man, dass
           hier eine andere Regel gilt als eine Karte weiter oben. */}
-      <div style={abschnitt}>
+      <Abschnitt id="sofort" titel={t("profile.sofort")}>
         <Zeile label={t("nav.language")} erste>
           <select value={lang} onChange={(e) => setLang(e.target.value)} style={{ ...selectStyle, minWidth: 160 }}>
             {Object.entries(LANGUAGES).map(([code, label]) => (
@@ -340,7 +370,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             window.location.href = "/";
           }} style={btnSecondary}>{t("profile.tutorialRestart")}</button>
         </Zeile>
-      </div>
+      </Abschnitt>
 
       {/* Protokoll dieses Browsers.
           Es steht hier und nicht nur im Melde-Dialog, weil genau hier danach
@@ -349,17 +379,21 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
           geht nirgendwohin, solange niemand eine Meldung abschickt. Deshalb
           auch fuer alle sichtbar und nicht nur fuer die Administration: fremde
           Protokolle kann hier ohnehin niemand sehen. */}
-      <div style={{ ...abschnitt, marginTop: 24 }}>
-        <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>{t("melder.protokoll")}</div>
+      <Abschnitt id="protokoll" titel={t("melder.protokoll")}>
         <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 12px" }}>{t("melder.protokollHinweis")}</p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <button onClick={() => setLogOffen((v) => !v)} style={btnSecondary}>
             {logOffen ? t("melder.logZu") : t("melder.logZeigen")} ({logAnzahl})
           </button>
-          <button onClick={() => { navigator.clipboard?.writeText(alsText()); }} disabled={!logAnzahl}
-            style={{ ...btnSecondary, opacity: logAnzahl ? 1 : 0.5 }}>{t("melder.kopieren")}</button>
+          {/* Kopieren ist weggefallen: gebraucht wird das Protokoll im
+              Melde-Dialog, und der legt es selbst bei. Leeren als Papierkorb —
+              ein ganzes Wort fuer einen Handgriff, den man selten braucht. */}
           <button onClick={() => { leeren(); setLogAnzahl(0); }} disabled={!logAnzahl}
-            style={{ ...btnSecondary, opacity: logAnzahl ? 1 : 0.5 }}>{t("melder.leeren")}</button>
+            className="icon-btn" title={t("melder.leeren")} aria-label={t("melder.leeren")}
+            style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: CONTROL_R,
+              opacity: logAnzahl ? 1 : 0.5 }}>
+            <TrashIcon size={16} />
+          </button>
         </div>
         {logOffen && (
           <pre style={{ marginTop: 12, padding: 10, borderRadius: CONTROL_R, background: "var(--bg2)",
@@ -368,7 +402,7 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             {alsText() || t("melder.logLeer")}
           </pre>
         )}
-      </div>
+      </Abschnitt>
 
       {isAdmin && (
         <div style={{ marginTop: 24, marginBottom: 24 }}>
