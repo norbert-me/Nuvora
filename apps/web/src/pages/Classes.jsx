@@ -320,9 +320,6 @@ export default function Classes() {
           <input placeholder={t("classes.namePlaceholder")} value={name} onChange={(e) => setName(e.target.value)}
             autoComplete="off" style={{ ...inputStyle, fontSize: 16, width: 300 }} autoFocus />
         </div>
-        {!editing.id && (
-          <p style={{ color: "var(--text3)", fontSize: 13, marginBottom: 16, maxWidth: 460 }}>{t("classes.subjectHint")}</p>
-        )}
         <p style={{ color: "var(--text3)", marginBottom: 8, fontSize: 14 }}>
           {t("classes.fillHint", { filled, total: students.length })}
         </p>

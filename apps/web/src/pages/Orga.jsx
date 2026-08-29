@@ -121,7 +121,6 @@ export default function Orga() {
           Reiter „Optionen" blendet Reiter ein/aus (Modul-Zahnrad als Seite). */}
       {tab === "optionen" ? (
         <div style={{ maxWidth: 560 }}>
-          <p style={{ color: "var(--text2)", fontSize: 14, marginBottom: 16 }}>{t("orga.optionsIntro")}</p>
           <div style={{ ...cardStyle, display: "flex", flexDirection: "column", gap: 4 }}>
             {ORGA_TABS.map((k) => (
               <div key={k} style={{ display: "flex", alignItems: "center", padding: "12px 4px", borderBottom: "1px solid var(--border)" }}>

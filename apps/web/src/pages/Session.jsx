@@ -524,7 +524,6 @@ export default function Session() {
           <img src={`${API}/sessions/${sessionId}/qr`} alt="QR Code"
             style={{ width: 160, height: 160, borderRadius: CONTROL_R, border: "1px solid var(--border3)" }}
             onError={(e) => { e.target.style.display = "none"; e.target.nextSibling.style.display = "none"; }} />
-          <p style={{ color: "var(--text3)", fontSize: 12, marginTop: 4 }}>{t("session.qrHint")}</p>
         </div>
         <p style={{ color: "var(--text2)", marginBottom: 24, fontSize: 16 }}>
           {t("session.countsLine", { q: questions.length, s: studentList.length })}

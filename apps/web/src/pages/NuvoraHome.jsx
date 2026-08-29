@@ -353,9 +353,6 @@ export default function NuvoraHome({ user }) {
           </button>
         )}
       </div>
-      <p style={{ color: "var(--text2)", marginBottom: 16, marginTop: 8 }}>
-        {edit ? t("home.arrangeHint") : t("home.intro")}
-      </p>
 
       {/* Sucheinstieg: nicht jeder weiss, dass die Ausleihe unter Orga sitzt.
           Klick oder ⌘K oeffnet dieselbe Suche wie die Lupe in der Navigation
@@ -408,7 +405,6 @@ export default function NuvoraHome({ user }) {
           {edit && (
             <div style={{ ...card, padding: 16, marginBottom: 16 }}>
               <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{t("home.widgets")}</div>
-              <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 12px" }}>{t("home.widgetsHint")}</p>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {WIDGETS.filter((w) => isOn(w.modul)).map((w) => {
                   const an = kacheln.wert.widgets.includes(w.key);
