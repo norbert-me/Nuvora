@@ -40,6 +40,28 @@ const InfoDot = ({ text }) => {
   );
 };
 
+// Eine Einstellungszeile: links, wofuer sie steht, rechts der Wert. Vorher war
+// jede Zeile ein Aufklapper mit Pfeil und Info-Punkt — vier Ueberschriften
+// untereinander, hinter denen jeweils EIN kleines Feld lag. Wer sein Schuljahr
+// nachsehen wollte, musste es erst aufklappen. `block` stellt den Wert unter
+// die Beschriftung; das brauchen die beiden breiten Zeilen (Notenschluessel,
+// Schuljahr), die sonst die Karte sprengen.
+const Zeile = ({ label, hint, block = false, erste = false, children }) => (
+  <div style={{
+    display: "flex", gap: 12, flexWrap: "wrap",
+    flexDirection: block ? "column" : "row",
+    alignItems: block ? "stretch" : "center",
+    padding: erste ? "0 0 12px" : "12px 0",
+    borderTop: erste ? "none" : "1px solid var(--border)",
+  }}>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14,
+      fontWeight: 600, color: "var(--text)", flex: block ? "none" : 1, minWidth: 120 }}>
+      {label}{hint && <InfoDot text={hint} />}
+    </span>
+    {children}
+  </div>
+);
+
 // Papierkorb aus der einen Icon-Quelle statt als eigenes SVG.
 const TrashIcon = ({ size = 16 }) => <Icon d={ICONS.trash} size={size} color={C.danger} />;
 
@@ -66,13 +88,9 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   });
   const profil = useEntwurf(profilBasis, (w) => saveProfile(w));
   const { marketplaceName, gradeScale, gradeTendency } = profil.wert;
-  const [showUsername, setShowUsername] = useState(false);
-  const [showScale, setShowScale] = useState(false);
-  const [showJahr, setShowJahr] = useState(false);
   const [logOffen, setLogOffen] = useState(false);
   const [logAnzahl, setLogAnzahl] = useState(0);
   useEffect(() => beobachte(setLogAnzahl), []);
-  const [showTendency, setShowTendency] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminMsg, setAdminMsg] = useState("");
@@ -197,21 +215,15 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
     <div style={{ ...pageForm }}>
       <h1 style={pageTitle}>{t("nav.profile")}</h1>
 
-      {/* Sprache steht im Profil, nicht mehr in der Navbar — sie wird einmal
-          gesetzt, nicht im Betrieb gewechselt. */}
-      <div style={{ ...abschnitt, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ flex: 1, minWidth: 160 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("nav.language")}</div>
-        </div>
-        <select value={lang} onChange={(e) => setLang(e.target.value)} style={{ ...selectStyle, minWidth: 160 }}>
-          {Object.entries(LANGUAGES).map(([code, label]) => (
-            <option key={code} value={code}>{label}</option>
-          ))}
-        </select>
-      </div>
-
+      {/* Drei Karten, und jede hat GENAU EINE Art zu speichern: das Konto
+          (jede Aenderung ihr eigenes Formular mit eigenem Knopf), der
+          Unterricht (ein Entwurf, eine Speicherleiste) und ganz unten die
+          Umschalter, die sofort wirken. Vorher lagen Sofort-Umschalter und
+          Entwurfsfelder in derselben Karte — man sah einer Zeile nicht an, ob
+          sie schon gespeichert war. */}
       <div style={abschnitt}>
-        <div style={{ fontSize: 14, color: "var(--text3)", marginBottom: 4 }}>{t("profile.email")}</div>
+        <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("profile.account")}</div>
+        <div style={{ fontSize: 13, color: "var(--text3)" }}>{t("profile.email")}</div>
         <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>{user.email}</div>
         {pendingEmail && (
           <div style={{ fontSize: 12, color: C.warning, marginBottom: 8 }}>
@@ -219,9 +231,12 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
           </div>
         )}
         {!showEmailForm ? (
-          <button type="button" onClick={() => { setShowEmailForm(true); setEmailMsg(""); }} style={{ ...linkBtn, marginBottom: 16 }}>{t("profile.changeEmail")}</button>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            <button type="button" onClick={() => { setShowEmailForm(true); setEmailMsg(""); }} style={linkBtn}>{t("profile.changeEmail")}</button>
+            <button type="button" onClick={() => setShowPw((o) => !o)} style={linkBtn}>{t("profile.changePw")}</button>
+          </div>
         ) : (
-          <form onSubmit={changeEmail} style={{ marginBottom: 16 }}>
+          <form onSubmit={changeEmail}>
             <input type="email" name="new-email" autoComplete="email" aria-label={t("profile.newEmail")} placeholder={t("profile.newEmail")} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} style={feldStyle} required />
             <input type="password" name="current-password" autoComplete="current-password" aria-label={t("profile.currentPw")} placeholder={t("profile.currentPw")} value={emailPw} onChange={(e) => setEmailPw(e.target.value)} style={feldStyle} required />
             <p style={{ fontSize: 12, color: "var(--text3)", margin: "0 0 10px" }}>
@@ -233,50 +248,45 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             </div>
           </form>
         )}
-        {emailMsg && <div style={{ fontSize: 13, color: emailMsg === t("profile.linkSent") ? C.success : C.danger, marginBottom: 16 }}>{emailMsg}</div>}
+        {emailMsg && <div style={{ fontSize: 13, color: emailMsg === t("profile.linkSent") ? C.success : C.danger, marginTop: 8 }}>{emailMsg}</div>}
 
-        {/* Bewusst kein <form>: die Knöpfe der Speicherleiste wären darin
-            Submit-Knöpfe, und „Abbrechen" schickte das Formular ab. */}
-        <div>
-          <button type="button" onClick={() => setShowUsername((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: showUsername ? 8 : 0 }}>
-            <Icon d={showUsername ? ICONS.chevronUp : ICONS.chevronDown} size={15} />
-            <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("profile.username")}</span>
-            <InfoDot text={t("profile.usernameHint")} />
-          </button>
-          {showUsername && (
-            <input placeholder={t("profile.usernamePlaceholder")} value={marketplaceName} onChange={(e) => profil.setz({ marketplaceName: e.target.value })}
-              onKeyDown={(e) => { if (e.key === "Enter") profil.speichern(); }}
-              style={{ ...feldStyle, marginBottom: 10 }} />
-          )}
-
-          {/* Schuljahr: die Achse, auf der die Planung liegt. Der Kalender
-              kennt Ferien als freie ZEITRAEUME — ein Halbjahr ist aber keine
-              Unterbrechung, sondern der Rahmen. */}
-          <button type="button" onClick={() => setShowJahr((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: 24, marginBottom: showJahr ? 8 : 0 }}>
-            <Icon d={showJahr ? ICONS.chevronUp : ICONS.chevronDown} size={15} />
-            <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("profile.schuljahr")}</span>
-            <InfoDot text={t("profile.schuljahrHint")} />
-          </button>
-          {showJahr && (
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12, marginTop: 4 }}>
-              {[["hj1", t("profile.hj1")], ["hj2", t("profile.hj2")], ["ende", t("profile.jahrEnde")]].map(([feld, label]) => (
-                <label key={feld} style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 12, color: "var(--text2)" }}>
-                  <span>{label}</span>
-                  <input type="date" value={profil.wert[feld] || ""} onChange={(e) => profil.setz({ [feld]: e.target.value })}
-                    style={{ ...feldStyle, width: 170, marginBottom: 0 }} />
-                </label>
-              ))}
+        {showPw && (
+          <form onSubmit={changePw} autoComplete="on" style={{ marginTop: 16, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+            <input type="hidden" name="username" autoComplete="username" value={user?.email || ""} />
+            <input type="password" name="current-password" autoComplete="current-password" placeholder={t("profile.oldPw")} value={oldPw} onChange={(e) => setOldPw(e.target.value)}
+              style={feldStyle} required />
+            <input type="password" name="new-password" autoComplete="new-password" placeholder={t("profile.newPw")} value={newPw} onChange={(e) => setNewPw(e.target.value)}
+              style={feldStyle} required />
+            {msg && <div style={{ fontSize: 13, color: msg === t("profile.pwChanged") ? C.success : C.danger, marginBottom: 8 }}>{msg}</div>}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="submit" style={btnPrimary}>{t("profile.change")}</button>
+              <button type="button" onClick={() => setShowPw(false)} style={btnSecondary}>{t("common.cancel")}</button>
             </div>
-          )}
+          </form>
+        )}
+      </div>
 
-          <button type="button" onClick={() => setShowScale((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: 24, marginBottom: showScale ? 8 : 0 }}>
-            <Icon d={showScale ? ICONS.chevronUp : ICONS.chevronDown} size={15} />
-            <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("profile.gradeScale")}</span>
-            <InfoDot text={t("profile.gradeScaleHint")} />
-          </button>
-          <style>{".nice-num::-webkit-inner-spin-button,.nice-num::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.nice-num{-moz-appearance:textfield;appearance:textfield}"}</style>
-          {showScale && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12, marginTop: 4 }}>
+      {/* Bewusst kein <form>: die Knöpfe der Speicherleiste wären darin
+          Submit-Knöpfe, und „Abbrechen" schickte das Formular ab. */}
+      <div style={abschnitt}>
+        <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", marginBottom: 12 }}>{t("profile.settings")}</div>
+
+        {/* Schuljahr zuerst: die Achse, auf der jede Planung liegt. */}
+        <Zeile label={t("profile.schuljahr")} hint={t("profile.schuljahrHint")} block erste>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {[["hj1", t("profile.hj1")], ["hj2", t("profile.hj2")], ["ende", t("profile.jahrEnde")]].map(([feld, label]) => (
+              <label key={feld} style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 12, color: "var(--text2)" }}>
+                <span>{label}</span>
+                <input type="date" value={profil.wert[feld] || ""} onChange={(e) => profil.setz({ [feld]: e.target.value })}
+                  style={{ ...feldStyle, width: 170, marginBottom: 0 }} />
+              </label>
+            ))}
+          </div>
+        </Zeile>
+
+        <style>{".nice-num::-webkit-inner-spin-button,.nice-num::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.nice-num{-moz-appearance:textfield;appearance:textfield}"}</style>
+        <Zeile label={t("profile.gradeScale")} hint={t("profile.gradeScaleHint")} block>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {[1, 2, 3, 4, 5].map((g) => (
               <div key={g} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 8px", background: "var(--card)", borderRadius: CONTROL_R }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{g}</span>
@@ -291,55 +301,45 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
               </div>
             ))}
           </div>
-          )}
+        </Zeile>
 
-          {/* Noten-Anzeige: mit Tendenz (2+/2-) oder ganze Noten — einklappbar wie
-              die Abschnitte darüber. */}
-          <button type="button" onClick={() => setShowTendency((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: 24, marginBottom: showTendency ? 8 : 0 }}>
-            <Icon d={showTendency ? ICONS.chevronUp : ICONS.chevronDown} size={15} />
-            <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("profile.gradeTendency")}</span>
-            <InfoDot text={t("profile.gradeTendencyHint")} />
-          </button>
-          {showTendency && (
-            // `Tabs` statt eines zweiten Umschalters von Hand: dieselbe
-            // Entscheidung soll ueberall gleich aussehen.
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
-              <Tabs value={gradeTendency ? "an" : "aus"} onChange={(v) => profil.setz({ gradeTendency: v === "an" })}
-                options={[["an", t("profile.gradeTendencyOn")], ["aus", t("profile.gradeTendencyOff")]]} />
-            </div>
-          )}
+        <Zeile label={t("profile.gradeTendency")} hint={t("profile.gradeTendencyHint")}>
+          <Tabs value={gradeTendency ? "an" : "aus"} onChange={(v) => profil.setz({ gradeTendency: v === "an" })}
+            options={[["an", t("profile.gradeTendencyOn")], ["aus", t("profile.gradeTendencyOff")]]} />
+        </Zeile>
 
-          {profileMsg && <div style={{ fontSize: 13, color: profileMsg === t("profile.saved") ? C.success : C.danger, marginTop: 12, marginBottom: 8 }}>{profileMsg}</div>}
-          <Speicherleiste entwurf={profil} immer style={{ marginTop: 16 }} />
-        </div>
+        <Zeile label={t("profile.username")} hint={t("profile.usernameHint")}>
+          <input placeholder={t("profile.usernamePlaceholder")} value={marketplaceName} onChange={(e) => profil.setz({ marketplaceName: e.target.value })}
+            onKeyDown={(e) => { if (e.key === "Enter") profil.speichern(); }}
+            style={{ ...feldStyle, marginBottom: 0, width: 220 }} />
+        </Zeile>
+
+        {profileMsg && <div style={{ fontSize: 13, color: profileMsg === t("profile.saved") ? C.success : C.danger, marginTop: 12 }}>{profileMsg}</div>}
+        {/* Ohne `immer`: die Leiste erscheint erst, wenn wirklich etwas offen
+            ist. Dauerhaft sichtbar stand dort ein Speichern-Knopf, der nichts
+            zu speichern hatte. */}
+        <Speicherleiste entwurf={profil} style={{ marginTop: 16 }} />
       </div>
 
+      {/* Was sofort wirkt, steht zusammen und ohne Speicherleiste: die Sprache
+          wechselt die Oberflaeche im selben Augenblick, das Tutorial startet.
+          Beides sind die begruendeten Ausnahmen von „ohne Speichern-Knopf geht
+          nichts" (siehe CLAUDE.md) — in einer eigenen Karte sieht man, dass
+          hier eine andere Regel gilt als eine Karte weiter oben. */}
       <div style={abschnitt}>
-        <button type="button" onClick={() => setShowPw((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: showPw ? 12 : 0 }}>
-          <Icon d={showPw ? ICONS.chevronUp : ICONS.chevronDown} size={15} />
-          <span style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("profile.changePw")}</span>
-        </button>
-        {showPw && (
-        <form onSubmit={changePw} autoComplete="on">
-          <input type="hidden" name="username" autoComplete="username" value={user?.email || ""} />
-          <input type="password" name="current-password" autoComplete="current-password" placeholder={t("profile.oldPw")} value={oldPw} onChange={(e) => setOldPw(e.target.value)}
-            style={feldStyle} required />
-          <input type="password" name="new-password" autoComplete="new-password" placeholder={t("profile.newPw")} value={newPw} onChange={(e) => setNewPw(e.target.value)}
-            style={feldStyle} required />
-          {msg && <div style={{ fontSize: 13, color: msg === t("profile.pwChanged") ? C.success : C.danger, marginBottom: 8 }}>{msg}</div>}
-          <button type="submit" style={btnPrimary}>{t("profile.change")}</button>
-        </form>
-        )}
-      </div>
-
-      <div style={{ ...abschnitt, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ flex: 1, minWidth: 180 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("profile.tutorialTitle")}</div>
-        </div>
-        <button type="button" onClick={() => {
-          try { localStorage.removeItem(`nuvora_onboarded_${user?.id ?? "x"}`); } catch { /* egal */ }
-          window.location.href = "/";
-        }} style={btnSecondary}>{t("profile.tutorialRestart")}</button>
+        <Zeile label={t("nav.language")} erste>
+          <select value={lang} onChange={(e) => setLang(e.target.value)} style={{ ...selectStyle, minWidth: 160 }}>
+            {Object.entries(LANGUAGES).map(([code, label]) => (
+              <option key={code} value={code}>{label}</option>
+            ))}
+          </select>
+        </Zeile>
+        <Zeile label={t("profile.tutorialTitle")}>
+          <button type="button" onClick={() => {
+            try { localStorage.removeItem(`nuvora_onboarded_${user?.id ?? "x"}`); } catch { /* egal */ }
+            window.location.href = "/";
+          }} style={btnSecondary}>{t("profile.tutorialRestart")}</button>
+        </Zeile>
       </div>
 
       {/* Protokoll dieses Browsers.
