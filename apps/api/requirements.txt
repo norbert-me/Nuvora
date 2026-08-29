@@ -27,6 +27,11 @@ qrcode>=8.2,<9.0
 # kommt ueber qrcode und reportlab herein.
 Pillow>=12.3,<13.0
 argon2-cffi>=23.1,<26.0
+# XML von fremden Programmen (CalDAV-Anfragen). Weist Dokumenttyp- und
+# Entitaetsdeklarationen im Parser ab — die "Billion Laughs" ist damit nicht
+# erreichbar. Von Hand ging das ueber das expat-Objekt hinter xml.etree; das
+# gibt es seit Python 3.14 nicht mehr.
+defusedxml>=0.7.1,<1.0
 # Nicht fuer den Betrieb der Datenbank (das ist asyncpg), sondern fuer den
 # **Probelauf** beim Zurueckspielen: `backup.py` spielt eine Sicherung zuerst in
 # eine Wegwerf-SQLite im temporaeren Verzeichnis und zeigt die Zeilenzahlen an.

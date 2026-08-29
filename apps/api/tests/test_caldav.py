@@ -12,10 +12,9 @@ Zwei Teile, mit Absicht getrennt:
 """
 import asyncio
 import base64
-import json
 import os
 import tempfile
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 
 import pytest
 import pytest_asyncio

@@ -55,22 +55,35 @@ def parse_xml(rumpf: bytes):
 
     * **Groessengrenze.** Der Koerper kommt von einem fremden Programm; ein
       PROPFIND mit 50 MB waere sonst ein Weg, den Server zu fuellen.
-    * **Kein DOCTYPE.** `xml.etree` loest zwar keine EXTERNEN Entitaeten auf,
-      expandiert aber interne — die „Billion Laughs" ist damit erreichbar. Eine
-      Dokumenttypdeklaration braucht in CalDAV niemand, also fliegt sie raus,
-      statt sie zu entschaerfen.
+    * **Keine Entitaeten.** `xml.etree` loest zwar keine EXTERNEN Entitaeten
+      auf, expandiert aber interne — die „Billion Laughs" ist damit erreichbar.
+      Eine Dokumenttypdeklaration braucht in CalDAV niemand, also wird sie
+      abgewiesen, statt sie zu entschaerfen. Abgewiesen wird sie im **Parser**
+      (expat meldet jede Entitaets- und Dokumenttypdeklaration), nicht durch
+      einen Blick auf den Anfang des Koerpers: dort stand die Pruefung frueher,
+      sie sah nur die ersten 200 Byte, und 200 Byte Leerraum davor haetten
+      gereicht, um an ihr vorbeizukommen.
     """
     if not rumpf or not rumpf.strip():
         return None
     if len(rumpf) > 512_000:
         raise CaldavFehler(413, "Anfrage zu gross")
-    kopf = rumpf.lstrip()[:200].lower()
-    if b"<!doctype" in kopf or b"<!entity" in kopf:
-        raise CaldavFehler(400, "DOCTYPE nicht erlaubt")
-    import xml.etree.ElementTree as ET
+    # defusedxml statt xml.etree: es weist Dokumenttyp- und
+    # Entitaetsdeklarationen im Parser ab. Selbst gebaut ging das frueher
+    # ueber `XMLParser().parser` (expat) — in Python 3.14 gibt es das Attribut
+    # nicht mehr, und eine Pruefung, die mit der naechsten Python-Fassung still
+    # aufhoert zu greifen, ist keine.
+    from defusedxml.ElementTree import ParseError, fromstring
+    from defusedxml.common import DefusedXmlException
     try:
-        return ET.fromstring(rumpf)
-    except ET.ParseError:
+        # forbid_dtd: in CalDAV braucht niemand eine Dokumenttypdeklaration,
+        # und ohne sie gibt es auch keine Entitaeten, die sich entfalten
+        # koennten. defusedxml laesst sie voreingestellt durch (harmlos ohne
+        # Entitaeten) — hier ist strenger richtig.
+        return fromstring(rumpf, forbid_dtd=True)
+    except DefusedXmlException:
+        raise CaldavFehler(400, "DOCTYPE nicht erlaubt")
+    except ParseError:
         raise CaldavFehler(400, "XML unlesbar")
 
 

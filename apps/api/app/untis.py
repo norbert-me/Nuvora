@@ -30,10 +30,13 @@ und die Oberflaeche muss es sagen koennen (siehe `GRUENDE`):
 In allen diesen Faellen bleibt der ICS-Weg.
 """
 import json
+import logging
 import re
 from datetime import date
 
 from .netz import NetzFehler, hole
+
+_log = logging.getLogger("nuvora.untis")
 
 
 class UntisFehler(Exception):
@@ -160,8 +163,12 @@ class UntisSitzung:
     def __exit__(self, *a):
         try:
             self._ruf("logout")
-        except Exception:
-            pass
+        except Exception as e:
+            # Das Abmelden darf den Abruf nicht kippen: die Daten sind zu
+            # diesem Zeitpunkt geholt, und die Sitzung laeuft bei Untis ohnehin
+            # von selbst ab. Vermerkt wird es trotzdem — ein Fehler, den
+            # niemand je sieht, ist ein Fehler, den niemand behebt.
+            _log.info("WebUntis-Abmeldung fehlgeschlagen: %s", e)
         return False
 
     # ─── Abfragen ───
