@@ -249,7 +249,7 @@ export default function Anwesenheit() {
       ) : (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 8px", flexWrap: "wrap" }}>
-            <p style={{ fontSize: 13, color: "var(--text3)", margin: 0, flex: 1 }}>{t("anwesenheit.overviewHint")}</p>
+            <span style={{ flex: 1 }} />
             <button onClick={() => ladePdf(`${API}/${classId}/report.pdf`, `Fehlzeiten_${cls?.name || ""}.pdf`)} style={toolbarBtn}>{t("anwesenheit.classPdf")}</button>
           </div>
           {legende}

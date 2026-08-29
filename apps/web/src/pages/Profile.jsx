@@ -335,7 +335,6 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
       <div style={{ ...abschnitt, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 180 }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text)" }}>{t("profile.tutorialTitle")}</div>
-          <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 2 }}>{t("profile.tutorialHint")}</div>
         </div>
         <button type="button" onClick={() => {
           try { localStorage.removeItem(`nuvora_onboarded_${user?.id ?? "x"}`); } catch { /* egal */ }

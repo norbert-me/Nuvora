@@ -557,7 +557,6 @@ export default function Sitzplan() {
               {x.label}
             </span>
           ))}
-          <span style={{ color: "var(--text3)" }}>· {t("sitzplan.segelCycleHint")}</span>
         </div>
       )}
       {hervor && (
@@ -571,7 +570,6 @@ export default function Sitzplan() {
               {l.text}
             </span>
           ))}
-          {hervor === "mark" && <span>· {t("sitzplan.markHint")}</span>}
         </div>
       )}
       {msg && <p style={{ fontSize: 13, color: C.success, marginBottom: 12 }}>{msg}</p>}

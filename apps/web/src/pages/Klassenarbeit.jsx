@@ -1268,7 +1268,6 @@ export function KlassenarbeitVergleich() {
 
   return (
     <div style={{ ...pageApp, padding: "0 16px 40px" }}>
-      <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 16 }}>{t("klassenarbeit.compareHint")}</p>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <KursKlasseSelect value={classId} onChange={(id, kid) => { setClassId(id); setKursId(kid); }} onKurs={setKursId} />
         {works.length > 0 && (

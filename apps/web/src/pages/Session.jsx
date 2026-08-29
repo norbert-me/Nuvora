@@ -458,12 +458,6 @@ export default function Session() {
               style={{ marginBottom: 16 }}
               options={[["test", t("session.test")], ["game", t("session.game")]]} />
 
-            {gameMode && (
-              <p style={{ fontSize: 13, color: "var(--text3)", marginBottom: 12, lineHeight: 1.5 }}>
-                {t("session.gameHint")}
-              </p>
-            )}
-
             <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer", marginBottom: 16 }}>
               <input type="checkbox" checked={showAnswers} onChange={(e) => setShowAnswers(e.target.checked)}
                 style={{ width: 18, height: 18, accentColor: "var(--accent)" }} />

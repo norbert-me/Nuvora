@@ -79,12 +79,6 @@ export default function Modules() {
         <p style={{ color: C.danger, fontSize: 13, marginBottom: 12 }}>{error}</p>
       )}
 
-      {noneActive && beliebt.size > 0 && (
-        <p style={{ ...panelStyle, fontSize: 13, color: "var(--text2)", marginBottom: 16 }}>
-          {t("modules.startHint")}
-        </p>
-      )}
-
       {/* Eine Leiste: Suchfeld, Reiter und Richtungsknopf auf CONTROL_H. Der
           Richtungsknopf gehoert zur Sortierung — deshalb als Segment AN den
           Reitern statt lose daneben. */}
