@@ -106,7 +106,7 @@ export default function CaldavZugaenge() {
         <div style={{ ...panelStyle, padding: 10, marginBottom: 12, borderLeft: `3px solid ${C.success}` }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{t("caldav.neuTitel", { name: frisch.name })}</div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <code style={{ ...inputStyle, flex: 1, fontFamily: "monospace", fontSize: 14, letterSpacing: 0.5 }}>{frisch.passwort}</code>
+            <code style={{ ...inputStyle, flex: 1, minWidth: 0, overflowX: "auto", fontFamily: "monospace", fontSize: 14, letterSpacing: 0.5 }}>{frisch.passwort}</code>
             <button onClick={() => navigator.clipboard?.writeText(frisch.passwort)} style={{ ...btnSecondary, ...btnSmall, borderRadius: CONTROL_R }}>
               {t("common.copy")}
             </button>
@@ -123,10 +123,10 @@ export default function CaldavZugaenge() {
           {daten.zugaenge.map((z) => (
             <div key={z.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
               <Icon d={ICONS.link} size={14} color="var(--text3)" />
-              <span style={{ flex: 1, minWidth: 80 }}>{z.name}</span>
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{z.name}</span>
               {/* Erst hieran sieht man, welcher Eintrag das alte iPad war,
                   bevor man es löscht. */}
-              <span style={{ fontSize: 11, color: "var(--text3)" }}>
+              <span style={{ fontSize: 11, color: "var(--text3)", flexShrink: 0 }}>
                 {z.zuletzt ? t("caldav.zuletzt", { wann: new Date(z.zuletzt).toLocaleDateString() })
                   : t("caldav.nieBenutzt")}
               </span>
@@ -140,10 +140,10 @@ export default function CaldavZugaenge() {
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 8 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80}
-          placeholder={t("caldav.namePlatzhalter")} name="caldav-name" autoComplete="off"
-          style={{ ...inputStyle, flex: 1 }} />
+          placeholder={t("caldav.namePlatzhalter")} name="caldav-name" autoComplete="off" size={1}
+          style={{ ...inputStyle, flex: "1 1 160px", minWidth: 0 }} />
         <button onClick={anlegen} disabled={laeuft} style={{ ...btnPrimary, borderRadius: CONTROL_R, opacity: laeuft ? 0.6 : 1 }}>
           {t("caldav.anlegen")}
         </button>
@@ -189,8 +189,11 @@ function Zeile({ label, wert, t }) {
   return (
     <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4 }}>
       <span style={{ width: 74, flexShrink: 0, fontSize: 12, color: "var(--text3)" }}>{label}</span>
-      <input readOnly value={wert || ""} onFocus={(e) => e.target.select()}
-        style={{ ...inputStyle, flex: 1, fontSize: 12 }} />
+      {/* minWidth: 0 ist Pflicht: ein Flex-Kind ist sonst mindestens so breit
+          wie sein Inhalt, und ein Eingabefeld rechnet das aus seiner size —
+          auf dem Handy schob das die ganze Zeile aus dem Dialog. */}
+      <input readOnly value={wert || ""} onFocus={(e) => e.target.select()} size={1}
+        style={{ ...inputStyle, flex: 1, minWidth: 0, fontSize: 12 }} />
       <button onClick={() => navigator.clipboard?.writeText(wert || "")} className="icon-btn"
         style={toolbarIconBtn} title={t("common.copy")} aria-label={t("common.copy")}>
         <Icon d={ICONS.duplicate} size={15} />
