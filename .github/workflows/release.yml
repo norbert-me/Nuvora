@@ -110,6 +110,38 @@ jobs:
           name: mac-dmg
           path: mac
 
+      # Die Release-Notiz ist der Changelog-Abschnitt dieser Fassung — nicht
+      # die automatische PR-Liste. Die zeigte zuletzt zwei Dependabot-Bumps und
+      # keinen einzigen der Punkte, um die es in der Fassung ging.
+      - name: Release-Notiz aus dem Changelog bauen
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            $0 ~ "^## " v "( |$)" {drin=1; next}
+            drin && /^## / {exit}
+            drin {print}
+          ' CHANGELOG.md > notes.md
+          # Kein Abschnitt gefunden: lieber ein ehrlicher Verweis als eine
+          # leere Notiz, die aussieht, als habe sich nichts geaendert.
+          if [ ! -s notes.md ]; then
+            echo "Siehe [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md)." > notes.md
+          fi
+          cat >> notes.md <<'ENDE'
+
+          ---
+
+          **Mac-App:** `Nuvora-<Fassung>-arm64.dmg` für Apple Silicon,
+          `Nuvora-<Fassung>.dmg` für Intel. Sie ist **nicht signiert** — beim
+          ersten Start meldet macOS „kann nicht geöffnet werden". Rechtsklick
+          auf die App → *Öffnen* → *Öffnen*; danach startet sie normal. Wer
+          das nicht möchte, benutzt Nuvora im Browser: die App ist nur ein
+          Fenster auf denselben Server.
+
+          **iOS/iPadOS:** es gibt keine App. Auf dem iPad in Safari öffnen,
+          *Teilen* → *Zum Home-Bildschirm* — dann liegt Nuvora als Symbol
+          dort und startet ohne Browserleiste.
+          ENDE
+
       - name: Release anlegen
         uses: softprops/action-gh-release@v3
         with:
@@ -120,15 +152,4 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           prerelease: ${{ steps.channel.outputs.prerelease }}
-          generate_release_notes: true
-          body: |
-            **Mac-App:** `Nuvora-<Fassung>-arm64.dmg` für Apple Silicon,
-            `Nuvora-<Fassung>.dmg` für Intel. Sie ist **nicht signiert** — beim
-            ersten Start meldet macOS „kann nicht geöffnet werden". Rechtsklick
-            auf die App → *Öffnen* → *Öffnen*; danach startet sie normal. Wer
-            das nicht möchte, benutzt Nuvora im Browser: die App ist nur ein
-            Fenster auf denselben Server.
-
-            **iOS/iPadOS:** es gibt keine App. Auf dem iPad in Safari öffnen,
-            *Teilen* → *Zum Home-Bildschirm* — dann liegt Nuvora als Symbol
-            dort und startet ohne Browserleiste.
+          body_path: notes.md
