@@ -342,7 +342,7 @@ export default {
   "profile.linkSent": "Confirmation link sent to the new address.",
   "profile.username": "Marketplace name",
   "profile.settings": "Teaching",
-  "profile.sofort": "Takes effect at once",
+  "profile.sofort": "Nuvora",
   "profile.account": "Account",
   "profile.usernameHint": "Shown in the marketplace on your published question sets.",
   "profile.usernamePlaceholder": "e.g. Ms. Miller or a pseudonym",

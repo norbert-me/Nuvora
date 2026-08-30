@@ -343,7 +343,7 @@ export default {
   "profile.linkSent": "Enlace de confirmación enviado a la nueva dirección.",
   "profile.username": "Nombre en el mercado",
   "profile.settings": "Docencia",
-  "profile.sofort": "Efecto inmediato",
+  "profile.sofort": "Nuvora",
   "profile.account": "Cuenta",
   "profile.usernameHint": "Se muestra en el mercado junto a tus bancos de preguntas publicados.",
   "profile.usernamePlaceholder": "p. ej. Sra. García o un seudónimo",

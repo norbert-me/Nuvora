@@ -344,7 +344,7 @@ export default {
   "profile.linkSent": "Bestätigungslink an die neue Adresse gesendet.",
   "profile.username": "Name im Marktplatz",
   "profile.settings": "Unterricht",
-  "profile.sofort": "Wirkt sofort",
+  "profile.sofort": "Nuvora",
   "profile.account": "Konto",
   "profile.usernameHint": "Wird im Marktplatz bei veröffentlichten Fragesets angezeigt.",
   "profile.usernamePlaceholder": "z.B. Frau Müller oder ein Pseudonym",
