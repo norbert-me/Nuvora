@@ -16,10 +16,14 @@ Entwicklungsgeschichte in `git log`.
 - Einen fremden Termin im Handy zu löschen blendet ihn in Nuvora aus — im
   fremden Kalender bleibt er unangetastet. Ändern geht nicht: das gehört dorthin,
   wo der Termin herkommt.
-- Neuer Reiter **Ausgeblendet**: entfallene Stunden und weggeblendete fremde
-  Termine stehen an einer Stelle und lassen sich dort zurückholen. Vorher lagen
-  sie verstreut — als durchgestrichene Chips über jedem Tag und als Sammelknopf
-  im Auge-Menü.
+- Über dem Kalender erscheint eine Zeile, wenn im gezeigten Zeitraum etwas
+  ausgeblendet ist — entfallene Stunden und weggeblendete fremde Termine. Ein
+  Klick zeigt sie im Popup, dort lassen sie sich zurückholen. Vorher lagen sie
+  verstreut: als durchgestrichene Chips über jedem Tag und als Sammelknopf im
+  Auge-Menü.
+- Freie Tage lassen sich auf **Kommende / Vergangene / Alle** umschalten und
+  zeigen voreingestellt nur das Kommende. Die Liste wächst mit jedem Schuljahr;
+  Vergangenes ist nicht weg, es steht nur nicht mehr im Weg.
 
 **CalDAV**
 

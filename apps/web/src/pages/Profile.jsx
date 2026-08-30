@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { askConfirm, askPrompt, showAlert } from "../core/dialog.jsx";
 import { istAdmin } from "../core/admin.js";
-import { alsText, beobachte, leeren } from "../core/protokoll.js";
 import { useLanguage, LANGUAGES } from "../i18n/index.jsx";
 import { btnPrimary, btnSecondary, selectStyle, COLORS as C, pageForm, pageTitle, panelStyle, popoverPanel,
   sectionLabel, Tabs, th as thBasis, td as tdBasis, iconBtn, inputStyle as inputBasis, Icon, ICONS, CONTROL_R } from "../components/Icons.jsx";
@@ -119,9 +118,6 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
   });
   const profil = useEntwurf(profilBasis, (w) => saveProfile(w));
   const { marketplaceName, gradeScale, gradeTendency } = profil.wert;
-  const [logOffen, setLogOffen] = useState(false);
-  const [logAnzahl, setLogAnzahl] = useState(0);
-  useEffect(() => beobachte(setLogAnzahl), []);
   const [showPw, setShowPw] = useState(false);
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminMsg, setAdminMsg] = useState("");
@@ -370,38 +366,6 @@ export default function Profile({ user, onLogout, onUserUpdate }) {
             window.location.href = "/";
           }} style={btnSecondary}>{t("profile.tutorialRestart")}</button>
         </Zeile>
-      </Abschnitt>
-
-      {/* Protokoll dieses Browsers.
-          Es steht hier und nicht nur im Melde-Dialog, weil genau hier danach
-          gesucht wird — und weil es KEIN Server-Protokoll ist: es liegt im
-          Arbeitsspeicher dieses einen Browsers, gehoert dieser einen Person und
-          geht nirgendwohin, solange niemand eine Meldung abschickt. Deshalb
-          auch fuer alle sichtbar und nicht nur fuer die Administration: fremde
-          Protokolle kann hier ohnehin niemand sehen. */}
-      <Abschnitt id="protokoll" titel={t("melder.protokoll")}>
-        <p style={{ fontSize: 13, color: "var(--text3)", margin: "0 0 12px" }}>{t("melder.protokollHinweis")}</p>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <button onClick={() => setLogOffen((v) => !v)} style={btnSecondary}>
-            {logOffen ? t("melder.logZu") : t("melder.logZeigen")} ({logAnzahl})
-          </button>
-          {/* Kopieren ist weggefallen: gebraucht wird das Protokoll im
-              Melde-Dialog, und der legt es selbst bei. Leeren als Papierkorb —
-              ein ganzes Wort fuer einen Handgriff, den man selten braucht. */}
-          <button onClick={() => { leeren(); setLogAnzahl(0); }} disabled={!logAnzahl}
-            className="icon-btn" title={t("melder.leeren")} aria-label={t("melder.leeren")}
-            style={{ ...iconBtn, border: "1px solid var(--border2)", borderRadius: CONTROL_R,
-              opacity: logAnzahl ? 1 : 0.5 }}>
-            <TrashIcon size={16} />
-          </button>
-        </div>
-        {logOffen && (
-          <pre style={{ marginTop: 12, padding: 10, borderRadius: CONTROL_R, background: "var(--bg2)",
-            maxHeight: 260, overflow: "auto", fontSize: 11, lineHeight: 1.5, color: "var(--text2)",
-            whiteSpace: "pre-wrap" }}>
-            {alsText() || t("melder.logLeer")}
-          </pre>
-        )}
       </Abschnitt>
 
       {isAdmin && (

@@ -193,7 +193,7 @@ export default function Kalender() {
   const updExam = async (id, body) => { await sende(`${API}/klassenarbeiten/${id}`, alsJson("PUT", body), t("common.save")); loadExams(); load(); };
   const delExam = async (id) => { await sende(`${API}/klassenarbeiten/${id}`, { method: "DELETE" }, t("common.delete")); loadExams(); load(); };
   useEffect(() => { if (view === "klassenarbeit") loadExams(); /* eslint-disable-next-line */ }, [view]);
-  useEffect(() => { if (view === "ausgeblendet") loadHidden(); }, [view, loadHidden]);
+  useEffect(() => { loadHidden(); }, [loadHidden]);
   const [wdhVorschlag, setWdhVorschlag] = useState([]); // schwache Themen der Vorwoche
   const [slotEdit, setSlotEdit] = useState(null); // { weekday, period, ...slot } oder null
   const [extInfo, setExtInfo] = useState(null); // angeklickter externer (abonnierter) Termin
@@ -415,6 +415,23 @@ export default function Kalender() {
   // per className raten. Eine Klasse kann in mehreren Kursen liegen — nur kurs_id
   // weiß, welcher gemeint war.
   const slotName = (s) => (s && s.kurs_id && kursName(s.kurs_id)) || className(s && s.class_id);
+
+  // Ausgeblendetes im SICHTBAREN Zeitraum. Der Zeitraum ist der Punkt: im
+  // Tagesblick interessiert nicht, was im November weggeblendet wurde.
+  const [hiddenOffen, setHiddenOffen] = useState(false);
+  const ausgeblendet = (() => {
+    const [a, b] = range;
+    const von = ymd(a), bis = ymd(b);
+    const ext = (extHiddenList || []).filter((e) => e.date >= von && e.date <= bis);
+    const stunden = (slotCancels || []).map((c) => {
+      const d = new Date(c.date);
+      const s = tt.slots.find((x) => x.weekday === wochentagMo0(d) && x.period === c.period && slotActiveOn(x, d));
+      return { ...c, d, name: (s && (slotName(s) || s.title)) || "" };
+    }).filter((c) => ymd(c.d) >= von && ymd(c.d) <= bis)
+      .sort((x, y) => (x.d - y.d) || (x.period - y.period));
+    return { ext, stunden, anzahl: ext.length + stunden.length };
+  })();
+
   // Farbe gehört dem KURS (das, was im Slot gewählt wurde) — nicht der dahinter
   // liegenden Fach-Klasse. Sonst teilen sich mehrere Kurse mit derselben Klasse
   // (geteilte SuS) DIESELBE Farbe. Am slot.kurs_id (eindeutig), nicht per class_id.
@@ -633,12 +650,28 @@ export default function Kalender() {
       )}
       {view === "breaks" && <BreaksPanel breaks={breaks} onAdd={addBreak} onDel={delBreak} t={t} standalone />}
       {view === "stoffplan" && <Stoffplan />}
-      {view === "ausgeblendet" && (
-        <AusgeblendetPanel ext={extHiddenList} onExtBack={unhideExtEvent}
-          cancels={slotCancels} slots={tt.slots} slotName={slotName} slotActiveOn={slotActiveOn}
-          onSlotBack={restoreSlot} t={t} />
-      )}
       {view === "klassenarbeit" && <ExamPanel overview={examOverview} periods={tt.periods} aktiv={aktiv} topics={topics} onAdd={addExam} onUpd={updExam} onDel={delExam} t={t} />}
+
+      {/* Was im ANGEZEIGTEN Zeitraum ausgeblendet ist — eine Fläche über dem
+          Kalender, kein eigener Reiter: die Frage „was sehe ich hier gerade
+          nicht?" stellt sich am Kalender, nicht daneben. Sie erscheint nur,
+          wenn wirklich etwas fehlt; eine dauerhafte leere Zeile über dem Monat
+          wäre Rauschen. */}
+      {["month", "week", "day"].includes(view) && ausgeblendet.anzahl > 0 && (
+        <button onClick={() => setHiddenOffen(true)}
+          style={{ ...panelStyle, width: "100%", textAlign: "left", marginBottom: 12,
+            padding: "8px 12px", display: "flex", alignItems: "center", gap: 8,
+            fontSize: 13, color: "var(--text2)", cursor: "pointer" }}>
+          <Icon d={ICONS.eye} size={15} color="var(--text3)" />
+          <span style={{ flex: 1 }}>{t("kalender.hiddenBar", { n: ausgeblendet.anzahl })}</span>
+          <span style={{ color: "var(--accent)", fontWeight: 600 }}>{t("kalender.hiddenOpen")}</span>
+        </button>
+      )}
+      {hiddenOffen && (
+        <AusgeblendetModal ext={ausgeblendet.ext} cancels={ausgeblendet.stunden}
+          onExtBack={unhideExtEvent} onSlotBack={restoreSlot}
+          onClose={() => setHiddenOffen(false)} t={t} />
+      )}
 
       {view === "month" && <MonthGrid extColor={extColor} range={range} cursor={cursor} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/notizbrett")} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} kursName={kursName} slotName={slotName} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
       {view === "week" && wdhVorschlag.length > 0 && (
@@ -705,69 +738,50 @@ export default function Kalender() {
   );
 }
 
-// ─── Reiter „Ausgeblendet" ───
+// ─── Was hier gerade nicht zu sehen ist ───
 //
-// Was weggeblendet ist, stand vorher an drei Stellen verstreut: die entfallenen
-// Stunden als durchgestrichene Chips ueber jedem Tag, die ausgeblendeten
-// fremden Termine nur als „12 wieder zeigen" im Auge-Menue. Beides beantwortet
-// dieselbe Frage — „was sehe ich gerade nicht, und wie hole ich es zurueck?" —
-// und beides gehoert deshalb an EINE Stelle, nicht ueber die Tage verteilt.
-function AusgeblendetPanel({ ext, onExtBack, cancels, slots, slotName, slotActiveOn, onSlotBack, t }) {
+// Ein Popup ueber dem Kalender, kein eigener Reiter und keine Chips ueber jedem
+// Tag: die Frage „was fehlt hier?" stellt sich AM Kalender, und sie stellt sich
+// fuer den Zeitraum, den man gerade ansieht — im Tagesblick interessiert nicht,
+// was im November weggeblendet wurde. Zwei Sorten, eine Liste: entfallene
+// Stunden und ausgeblendete fremde Termine.
+function AusgeblendetModal({ ext, cancels, onExtBack, onSlotBack, onClose, t }) {
   const fmt = (iso) => { try { return new Date(iso + "T00:00:00").toLocaleDateString(); } catch { return iso; } };
-  // Zu einer entfallenen Stunde die Vorlage suchen — nur so steht dort der
-  // Kurs statt „3. Stunde".
-  const zeilen = [...(cancels || [])].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.period - b.period))
-    .map((c) => {
-      const d = new Date(c.date);
-      const s = (slots || []).find((x) => x.weekday === wochentagMo0(d) && x.period === c.period && slotActiveOn(x, d));
-      return { ...c, d, name: (s && (slotName(s) || s.title)) || "" };
-    });
-
-  const Abschnitt = ({ titel, leer, children }) => (
-    <div style={{ ...cardStyle, marginBottom: 16 }}>
-      <div style={{ ...sectionLabel, marginBottom: 8 }}>{titel}</div>
-      {leer ? <div style={{ fontSize: 13, color: "var(--text3)" }}>{leer}</div> : children}
+  const zeile = (links, mitte, kursiv, zurueck, key) => (
+    <div key={key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, padding: "6px 0",
+      borderBottom: "1px solid var(--border)" }}>
+      <span style={{ color: "var(--text3)", flexShrink: 0, fontSize: 12 }}>{links}</span>
+      <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        color: kursiv ? "var(--text3)" : "var(--text)", fontStyle: kursiv ? "italic" : "normal" }}>{mitte}</span>
+      <button onClick={zurueck} style={{ ...btnSecondary, ...btnSmall, borderRadius: CONTROL_R, flexShrink: 0 }}>
+        {t("kalender.hiddenBack")}
+      </button>
     </div>
   );
-
   return (
-    <div>
-      <Abschnitt titel={t("kalender.hiddenExt")} leer={ext.length ? null : t("kalender.hiddenNone")}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {ext.map((e) => (
-            <div key={e.key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-              <span style={{ color: "var(--text3)", flexShrink: 0, fontSize: 12 }}>{fmt(e.date)}</span>
-              {/* Ein Schlüssel ohne Ereignis: der Termin ist im fremden
-                  Kalender geloescht oder der Feed abgemeldet. Er steht trotzdem
-                  hier, sonst liesse er sich nie wieder loswerden. */}
-              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                color: e.verwaist ? "var(--text3)" : "var(--text)", fontStyle: e.verwaist ? "italic" : "normal" }}>
-                {e.title || t("kalender.hiddenGone")}
-              </span>
-              <button onClick={() => onExtBack(e.key)} style={{ ...btnSecondary, ...btnSmall, borderRadius: CONTROL_R, flexShrink: 0 }}>
-                {t("kalender.hiddenBack")}
-              </button>
-            </div>
-          ))}
+    <Modal onClose={onClose} width={480} title={t("kalender.hiddenTitle")}>
+      {cancels.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ ...sectionLabel, marginBottom: 4 }}>{t("kalender.hiddenSlots")}</div>
+          {cancels.map((c) => zeile(c.d.toLocaleDateString(),
+            `${c.period}. ${t("kalender.period")}${c.name ? ` · ${c.name}` : ""}`,
+            false, () => onSlotBack(c.d, c.period), `${c.date}|${c.period}`))}
         </div>
-      </Abschnitt>
-
-      <Abschnitt titel={t("kalender.hiddenSlots")} leer={zeilen.length ? null : t("kalender.hiddenNone")}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {zeilen.map((c) => (
-            <div key={`${c.date}|${c.period}`} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-              <span style={{ color: "var(--text3)", flexShrink: 0, fontSize: 12 }}>{c.d.toLocaleDateString()}</span>
-              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {c.period}. {t("kalender.period")}{c.name ? ` · ${c.name}` : ""}
-              </span>
-              <button onClick={() => onSlotBack(c.d, c.period)} style={{ ...btnSecondary, ...btnSmall, borderRadius: CONTROL_R, flexShrink: 0 }}>
-                {t("kalender.hiddenBack")}
-              </button>
-            </div>
-          ))}
+      )}
+      {ext.length > 0 && (
+        <div>
+          <div style={{ ...sectionLabel, marginBottom: 4 }}>{t("kalender.hiddenExt")}</div>
+          {/* Ein Schluessel ohne Ereignis: der Termin ist im fremden Kalender
+              geloescht oder der Feed abgemeldet. Er steht trotzdem hier, sonst
+              liesse er sich nie wieder loswerden. */}
+          {ext.map((e) => zeile(fmt(e.date), e.title || t("kalender.hiddenGone"),
+            !!e.verwaist, () => onExtBack(e.key), e.key))}
         </div>
-      </Abschnitt>
-    </div>
+      )}
+      <div style={{ marginTop: 16, textAlign: "right" }}>
+        <button onClick={onClose} style={btnSecondary}>{t("common.close")}</button>
+      </div>
+    </Modal>
   );
 }
 
@@ -1524,6 +1538,16 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
     setVon(""); setBis(""); setLabel("");
   };
   const fmt = (s) => new Date(s).toLocaleDateString();
+  // Die Liste waechst mit jedem Schuljahr und besteht nach zwei Jahren zur
+  // Haelfte aus Ferien, die vorbei sind. Vorgabe ist deshalb „Kommende";
+  // Vergangenes ist nicht weg, es steht nur nicht mehr im Weg.
+  const [zeitraum, setZeitraum] = useState("kommend");
+  const heuteIso = ymd(new Date());
+  const sichtbar = (breaks || []).filter((b) => {
+    if (zeitraum === "alle") return true;
+    const vorbei = ymd(new Date(b.end_date)) < heuteIso;
+    return zeitraum === "vergangen" ? vorbei : !vorbei;
+  });
   // Ferien-Import: statischer Datensatz (openHolidays), zwei Schuljahre. Fuegt
   // nur fehlende Zeitraeume hinzu (gleiches Startdatum + Label = schon da).
   const [land, setLand] = useState(() => localStorage.getItem("nuvora_bundesland") || "NW");
@@ -1575,6 +1599,16 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
           WAS importiert wird; man setzt es einmal und nie wieder. */}
       <Werkzeugleiste
         style={{ marginBottom: 16 }}
+        links={(
+          <Segment>
+            {[["kommend", t("kalender.breaksUpcoming")], ["vergangen", t("kalender.breaksPast")],
+              ["alle", t("kalender.breaksAll")]].map(([k, label]) => (
+                <button key={k} onClick={() => setZeitraum(k)}
+                  style={{ ...segmentBtn, fontWeight: zeitraum === k ? 700 : 500,
+                    color: zeitraum === k ? "var(--accent)" : "var(--text2)" }}>{label}</button>
+              ))}
+          </Segment>
+        )}
         mehr={[
           { key: "land", label: `${t("kalender.bundesland")}: ${(BUNDESLAENDER.find(([k]) => k === land) || [])[1] || land}`, icon: ICONS.settings, onClick: () => setLandOffen(true) },
           { key: "ferien", label: importing ? t("kalender.ferienImporting") : t("kalender.ferienImport"), icon: ICONS.import, disabled: importing, onClick: ferienImport },
@@ -1613,11 +1647,13 @@ function BreaksPanel({ breaks, onAdd, onDel, t, standalone }) {
           </div>
         </Modal>
       )}
-      {breaks.length === 0 ? (
-        <p style={{ fontSize: 13, color: "var(--text3)" }}>{t("kalender.noBreaks")}</p>
+      {sichtbar.length === 0 ? (
+        <p style={{ fontSize: 13, color: "var(--text3)" }}>
+          {breaks.length === 0 ? t("kalender.noBreaks") : t("kalender.breaksNoneHere")}
+        </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {breaks.map((b) => (
+          {sichtbar.map((b) => (
             <div key={b.id} style={{ ...cardStyle, display: "flex", alignItems: "center", gap: 8, padding: "8px 12px" }}>
               <span style={{ fontSize: 14, fontWeight: 600 }}>{b.label || t("kalender.free")}</span>
               <span style={{ fontSize: 12, color: "var(--text3)" }}>{fmt(b.start_date)}{fmt(b.start_date) !== fmt(b.end_date) ? ` – ${fmt(b.end_date)}` : ""}</span>

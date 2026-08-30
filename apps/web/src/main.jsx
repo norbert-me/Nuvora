@@ -142,7 +142,7 @@ window.addEventListener("online", _flush);
 window.addEventListener("cardvote:offline", () => { _wasOffline = true; });
 window.addEventListener("cardvote:online", () => { if (_wasOffline) { _wasOffline = false; _flush(); } });
 setTimeout(_flush, 2000);
-import { createBrowserRouter, RouterProvider, Routes, Route, NavLink, Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Routes, Route, NavLink, Link, Navigate, useLocation, useNavigate, useNavigationType } from "react-router-dom";
 // Statisch bleibt nur, was fuer das erste Bild gebraucht wird: Rahmen, Landing,
 // Login und die Startseite. Alles andere wuerde beim Start einen Ladezustand
 // aufblitzen lassen, ohne dass jemand die Seite ueberhaupt sehen will.
@@ -333,12 +333,11 @@ const getModuleNavItems = (t, location, user) => {
   if (area === "kalender") {
     const cur = params.get("view");
     return [
-      { to: KAL, label: t("kalender.title"), active: !["timetable", "breaks", "klassenarbeit", "stoffplan", "ausgeblendet"].includes(cur) },
+      { to: KAL, label: t("kalender.title"), active: !["timetable", "breaks", "klassenarbeit", "stoffplan"].includes(cur) },
       { to: `${KAL}?view=timetable`, label: t("kalender.timetable"), active: cur === "timetable" },
       { to: `${KAL}?view=stoffplan`, label: t("stoffplan.tab"), active: cur === "stoffplan" },
       { to: `${KAL}?view=breaks`, label: t("kalender.breaksTab"), active: cur === "breaks" },
       { to: `${KAL}?view=klassenarbeit`, label: t("kalender.examsTab"), active: cur === "klassenarbeit" },
-      { to: `${KAL}?view=ausgeblendet`, label: t("kalender.hiddenTab"), active: cur === "ausgeblendet" },
     ];
   }
   if (area === "unterrichtsplanung") {
@@ -984,8 +983,6 @@ function AppRoutes({ user, setUser, logout }) {
         <span style={{ display: "inline-flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: "0 8px", padding: "0 16px" }}>
           <Link to={`/help?area=${helpArea(location.pathname)}`} style={footerLink}>{t("footer.help")}</Link>
           <span style={footerSep}>·</span>
-          <Link to="/tutorial" style={footerLink}>Tutorial</Link>
-          <span style={footerSep}>·</span>
           <Link to="/contact" style={footerLink}>{t("footer.contact")}</Link>
           <span style={footerSep}>·</span>
           <Link to="/legal" style={footerLink}>{t("footer.legal")}</Link>
@@ -1166,6 +1163,17 @@ function Wurzel() {
   // Meldung „ich war irgendwo und dann ging es nicht".
   const ort = useLocation();
   useEffect(() => { notiereSeite(ort.pathname + ort.search); }, [ort.pathname, ort.search]);
+  // Eine neue Seite faengt oben an. Ohne das behaelt der Browser die
+  // Scrollposition der vorigen: wer unten im Impressum-Link klickt, landet in
+  // der Mitte des Impressums und haelt es fuer halb geladen.
+  //
+  // Nur beim VORWAERTS-Gehen. „Zurueck" (POP) soll dort landen, wo man war —
+  // sonst verliert eine lange Liste bei jedem Zurueck ihre Stelle.
+  const richtung = useNavigationType();
+  useEffect(() => {
+    if (richtung === "POP") return;
+    window.scrollTo(0, 0);
+  }, [ort.pathname, richtung]);
   return (
     <>
         <ConnectionMonitor />
