@@ -126,6 +126,30 @@ jobs:
           if [ ! -s notes.md ]; then
             echo "Siehe [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md)." > notes.md
           fi
+          # Eine neue Zwischenfassung (x.y.0) sammelt ein: wer von 4.1.0 auf
+          # 4.2.0 geht, ueberspringt 4.1.1 bis 4.1.9 und hat sie nie gesehen.
+          # Deshalb stehen deren Abschnitte hier mit drin — sonst ist die Notiz
+          # zur groessten Fassung die duennste.
+          major="${version%%.*}"
+          rest="${version#*.}"
+          minor="${rest%%.*}"
+          patch="${version##*.}"
+          if [ "$patch" = "0" ] && [ "$minor" != "0" ]; then
+            vorher="${major}.$((minor - 1))"
+            awk -v p="^## ${vorher}\\." '
+              $0 ~ p {drin=1; print "### " substr($0, 4); next}
+              drin && /^## / {drin=0}
+              drin {print}
+            ' CHANGELOG.md > zwischen.md
+            if [ -s zwischen.md ]; then
+              {
+                echo
+                echo "## Seit ${vorher}.0"
+                echo
+                cat zwischen.md
+              } >> notes.md
+            fi
+          fi
           cat >> notes.md <<'ENDE'
 
           ---
