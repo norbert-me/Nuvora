@@ -333,11 +333,12 @@ const getModuleNavItems = (t, location, user) => {
   if (area === "kalender") {
     const cur = params.get("view");
     return [
-      { to: KAL, label: t("kalender.title"), active: !["timetable", "breaks", "klassenarbeit", "stoffplan"].includes(cur) },
+      { to: KAL, label: t("kalender.title"), active: !["timetable", "breaks", "klassenarbeit", "stoffplan", "ausgeblendet"].includes(cur) },
       { to: `${KAL}?view=timetable`, label: t("kalender.timetable"), active: cur === "timetable" },
       { to: `${KAL}?view=stoffplan`, label: t("stoffplan.tab"), active: cur === "stoffplan" },
       { to: `${KAL}?view=breaks`, label: t("kalender.breaksTab"), active: cur === "breaks" },
       { to: `${KAL}?view=klassenarbeit`, label: t("kalender.examsTab"), active: cur === "klassenarbeit" },
+      { to: `${KAL}?view=ausgeblendet`, label: t("kalender.hiddenTab"), active: cur === "ausgeblendet" },
     ];
   }
   if (area === "unterrichtsplanung") {

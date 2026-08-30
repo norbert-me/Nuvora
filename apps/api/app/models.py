@@ -113,6 +113,12 @@ class User(Base):
     caldav_props: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     # Ausgeblendete externe Einzel-Ereignisse: Liste von Schlüsseln "uid|YYYY-MM-DD".
     external_hidden: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # Gehen die Termine der abonnierten fremden Kalender im eigenen Export (ICS
+    # und CalDAV) MIT hinaus? Aus, und das ist die richtige Vorgabe: wer seinen
+    # iCloud-Kalender in Nuvora einblendet und Nuvora zurueck aufs selbe Handy
+    # spiegelt, sieht jeden Termin doppelt. An ist es fuer den anderen Fall —
+    # ein Geraet oder ein Kalender, der die fremden Feeds nicht selbst hat.
+    feed_external: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Einstiege-Startsammlung einmalig angelegt? Danach nicht erneut seeden,
     # auch wenn die Lehrkraft alle Einstiege loescht (sonst tauchen sie wieder auf).
     methoden_seeded: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")

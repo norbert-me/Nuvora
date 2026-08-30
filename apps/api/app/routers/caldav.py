@@ -47,7 +47,8 @@ from ..models import (CaldavToken, CalendarEntry, Kurs, SchoolClass,
                       SlotCancellation, TimetableSlot, User)
 from ..zeit import tagesbeginn
 from .auth import _hash_pw, _verify_pw, rate_limit
-from .kalender import _kurs_label, stundenplan_vorkommen
+from .kalender import (_d_iso, _kurs_label, ext_dateiname, ext_uid,
+                       externe_ereignisse, stundenplan_vorkommen)
 from .modules import is_active, modul_pflicht
 
 router = APIRouter(prefix="/api/caldav", tags=["caldav"])
@@ -369,7 +370,48 @@ async def _ressourcen(db: AsyncSession, u: User, fenster=None) -> list:
             # anders ausfallen. Der Client hielte dann jede Stunde fuer
             # geaendert und liefe in einen Dauerabgleich.
             stand=datetime(tag.year, tag.month, tag.day))})
+
+    # DRITTE Sorte, nur auf Wunsch (users.feed_external): die Termine der
+    # abonnierten fremden Kalender. Aus, weil sie sonst auf einem Handy, das
+    # dieselben Kalender selbst abonniert hat, doppelt stehen.
+    #
+    # Sie sind hier READ-ONLY, und zwar mit Absicht: geaendert wird ein fremder
+    # Termin dort, wo er herkommt (PUT gibt 403). Was das Handy hier loeschen
+    # kann, ist keine Loeschung, sondern ein AUSBLENDEN in Nuvora — dieselbe
+    # Bedeutung wie beim Wegwischen einer Stundenplan-Stunde, die als Datensatz
+    # ebenfalls nicht existiert.
+    for ev in await _externe(u):
+        tag = _d_iso(ev["date"])
+        if not tag or (von and tag < von) or (bis and tag > bis):
+            continue
+        out.append({"name": ext_dateiname(ev["key"]), "text": X.baue_vevent(
+            uid=ext_uid(ev["key"]), tag=tag, titel=ev.get("title") or "Termin",
+            ort=ev.get("location") or "",
+            start_time=ev.get("time") or "", end_time=ev.get("endtime") or "",
+            # Wie bei den Stunden ein fester Zeitstempel: ein wanderndes
+            # DTSTAMP aenderte das ETag bei jedem Abruf und triebe den Client
+            # in einen Dauerabgleich.
+            stand=datetime(tag.year, tag.month, tag.day))})
     return out
+
+
+async def _externe(u: User) -> list:
+    """Die SICHTBAREN fremden Termine — leer, solange der Schalter aus ist."""
+    if not u.feed_external:
+        return []
+    return [e for e in await externe_ereignisse(u) if not e["hidden"]]
+
+
+def _externer_schluessel(name: str, rows) -> str:
+    """Zu einem Dateinamen den Ereignis-Schluessel — oder "".
+
+    Rueckwaerts gerechnet statt gespeichert: der Name ist der Hash des
+    Schluessels, und die Liste der Ereignisse liegt ohnehin vor.
+    """
+    for ev in rows:
+        if ext_dateiname(ev["key"]) == name:
+            return ev["key"]
+    return ""
 
 
 async def _alle(db: AsyncSession, u: User, fenster=None):
@@ -652,9 +694,12 @@ async def ressource(request: Request, user_id: int, name: str,
     # der Datenbank — sie entsteht aus Vorlage + Tag. Lesen geht wie bei allem
     # anderen; Schreiben und Loeschen bedeuten hier etwas Eigenes (siehe unten).
     stunde = _slot_lesen(name)
+    # Ein fremder (abonnierter) Termin? Auch den gibt es nicht als Zeile: er
+    # kommt aus einem anderen Kalender und wird nur mit ausgeliefert.
+    fremd = name.startswith("ext-")
     eintraege = await _alle(db, u)
     treffer = next((e for e in eintraege if _dateiname(e) == name), None)
-    if stunde is not None:
+    if stunde is not None or fremd:
         alles = await _ressourcen(db, u)
         vorhanden = next((r for r in alles if r["name"] == name), None)
     else:
@@ -683,6 +728,23 @@ async def ressource(request: Request, user_id: int, name: str,
                         headers={**_DAV_KOPF, "ETag": X.etag(text)})
 
     if request.method == "DELETE":
+        if fremd:
+            # Ein fremder Termin laesst sich von hier aus nicht loeschen — er
+            # gehoert dem anderen Kalender. Was der Nutzer meint, wenn er ihn
+            # in Nuvoras Kalender wegwischt, kennt Nuvora aber seit jeher:
+            # ausblenden (external_hidden). Er steht danach im Reiter
+            # „Ausgeblendet" und laesst sich dort zurueckholen; im fremden
+            # Kalender bleibt er unangetastet.
+            schluessel = _externer_schluessel(name, await _externe(u))
+            if not schluessel:
+                return Response(status_code=404, headers=_DAV_KOPF)
+            hid = list(u.external_hidden or [])
+            if schluessel not in hid:
+                hid.append(schluessel)
+                u.external_hidden = hid[:2000]
+                await db.commit()
+            notiere(u.email, request, 204, "fremder Termin ausgeblendet")
+            return Response(status_code=204, headers=_DAV_KOPF)
         if stunde is not None:
             # Eine Stundenplan-Stunde laesst sich nicht loeschen — es gibt sie
             # als Datensatz gar nicht. Was der Nutzer meint, wenn er sie im
@@ -707,6 +769,14 @@ async def ressource(request: Request, user_id: int, name: str,
         return Response(status_code=204, headers=_DAV_KOPF)
 
     # PUT: anlegen oder aendern.
+    if fremd:
+        # Aendern geht dort, wo der Termin herkommt. Ihn hier zu uebernehmen
+        # hiesse, eine Kopie anzulegen, die beim naechsten Abgleich neben dem
+        # Original steht — und die Aenderung waere im fremden Kalender trotzdem
+        # nicht angekommen.
+        notiere(u.email, request, 403, "fremder Termin ist nicht aenderbar")
+        return Response(content=X.fehler_xml("valid-calendar-object-resource"), status_code=403,
+                        media_type="application/xml; charset=utf-8", headers=_DAV_KOPF)
     try:
         daten = X.parse_vevent((await request.body()).decode("utf-8", "replace"))
     except X.CaldavFehler as e:

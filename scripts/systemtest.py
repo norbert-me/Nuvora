@@ -176,6 +176,7 @@ def endpunkte(u):
             ("GET", "/api/kalender/export"),
             ("GET", "/api/kalender/subscribe"),
             ("GET", "/api/kalender/external"),
+            ("GET", "/api/kalender/external-hidden"),
             ("GET", f"/api/kalender/quiz-session?set_id=0&class_id={c}"),
         ],
         "orga": [
@@ -891,8 +892,37 @@ def inhalt_kalender(api, u, spuren):
               "schule": "zz-selbsttest", "benutzer": f"{PRAEFIX}-untis", "ics_url": ""},
              erwartet=(200,))
 
+    # Fremde Kalender im eigenen Export: der Schalter muss wirklich am Konto
+    # haengen (und nicht nur im Browser), sonst ist er nach dem naechsten
+    # Neuladen aus — und ausgeblendete Termine muessen auffindbar bleiben,
+    # sonst ist der Reiter „Ausgeblendet" leer, obwohl etwas fehlt.
+    vorher_ext = api.call("GET", "/api/kalender/external", erwartet=(200,))
+    spuren.append(("Externe Kalender", lambda: api.call(
+        "PUT", "/api/kalender/external",
+        {"calendars": vorher_ext.get("calendars") or [],
+         "mitschicken": bool(vorher_ext.get("mitschicken"))}, erwartet=(200, 404))))
+    an = api.call("PUT", "/api/kalender/external",
+                  {"calendars": vorher_ext.get("calendars") or [], "mitschicken": True},
+                  erwartet=(200,))
+    if an.get("mitschicken") is not True:
+        raise AssertionError(f"Schalter nicht gespeichert: {an}")
+    if api.call("GET", "/api/kalender/external", erwartet=(200,)).get("mitschicken") is not True:
+        raise AssertionError("Schalter kommt beim Lesen nicht zurueck")
+    # Ein alter Client schickt das Feld gar nicht mit — dann darf der Schalter
+    # nicht stillschweigend ausgehen.
+    ohne = api.call("PUT", "/api/kalender/external",
+                    {"calendars": vorher_ext.get("calendars") or []}, erwartet=(200,))
+    if ohne.get("mitschicken") is not True:
+        raise AssertionError(f"Schalter faellt ohne Feld um: {ohne}")
+    if not isinstance(api.call("GET", "/api/kalender/external-hidden", erwartet=(200,)), list):
+        raise AssertionError("Ausgeblendet-Liste antwortet nicht als Liste")
+    api.call("PUT", "/api/kalender/external",
+             {"calendars": vorher_ext.get("calendars") or [],
+              "mitschicken": bool(vorher_ext.get("mitschicken"))}, erwartet=(200,))
+
     return ("Eintrag (6 Felder + Verlaufsplan), Slot, freier Zeitraum, "
-            "Klassenarbeit mit Themen, Stoffplan wiedergefunden, Untis-Angaben")
+            "Klassenarbeit mit Themen, Stoffplan wiedergefunden, Untis-Angaben, "
+            "Export-Schalter fremde Kalender")
 
 
 def inhalt_orga(api, u, spuren):

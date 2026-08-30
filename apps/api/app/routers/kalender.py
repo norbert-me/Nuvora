@@ -1566,6 +1566,36 @@ def _kurs_label(kurs) -> str:
     return f"{fach} · {name}"
 
 
+# ─── Fremde Termine im eigenen Export ───
+#
+# Der Schluessel eines externen Ereignisses ist "uid|YYYY-MM-DD" und enthaelt
+# alles, was ein fremder Kalender in eine UID schreibt — Leerzeichen, Doppel-
+# punkte, Umlaute. Als Dateiname (CalDAV) und als UID (ICS) taugt er deshalb
+# nicht: gehasht ist er kurz, stabil und harmlos. Stabil ist wichtig — eine
+# wandernde UID legt im Handy bei jedem Abgleich eine Kopie an.
+def ext_kurz(key: str) -> str:
+    import hashlib
+    return hashlib.md5((key or "").encode("utf-8")).hexdigest()[:20]
+
+
+def ext_uid(key: str) -> str:
+    return f"nuvora-ext-{ext_kurz(key)}@nuvora"
+
+
+def ext_dateiname(key: str) -> str:
+    return f"ext-{ext_kurz(key)}.ics"
+
+
+def _d_iso(s: str):
+    """'YYYY-MM-DD' -> date, sonst None."""
+    from datetime import date as _date
+    try:
+        j, m, t = (s or "").split("-")
+        return _date(int(j), int(m), int(t))
+    except Exception:
+        return None
+
+
 @router.get("/feed/{token}.ics")
 async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depends(get_db)):
     """ICS-Feed eines Kontos (Token statt Login). Kalender-Eintraege als
@@ -1744,6 +1774,31 @@ async def ics_feed(token: str, request: _Request = None, db: AsyncSession = Depe
                       f"DTEND;VALUE=DATE:{d8(day + timedelta(days=1))}",
                       f"SUMMARY:{_ics_escape(v['titel'])}", "END:VEVENT"]
 
+    # Die Termine der abonnierten fremden Kalender — nur wenn ausdruecklich
+    # eingeschaltet (users.feed_external). Sie sind hier Beifang und bleiben
+    # read-only: aendern laesst sich ein fremder Termin ueber Nuvora nicht,
+    # loeschen heisst „in Nuvora ausblenden" (das kann nur CalDAV).
+    if u.feed_external:
+        for ev in await externe_ereignisse(u):
+            if ev["hidden"]:
+                continue
+            tag = _d_iso(ev["date"])
+            if not tag:
+                continue
+            a, b2 = _hm(ev.get("time")), _hm(ev.get("endtime"))
+            zeilen = ["BEGIN:VEVENT", f"UID:{ext_uid(ev['key'])}", f"DTSTAMP:{now}",
+                      f"SEQUENCE:{seq}"]
+            if a and b2:
+                zeilen += [f"DTSTART:{d8(tag)}T{a}", f"DTEND:{d8(tag)}T{b2}"]
+            else:
+                zeilen += [f"DTSTART;VALUE=DATE:{d8(tag)}",
+                           f"DTEND;VALUE=DATE:{d8(tag + timedelta(days=1))}"]
+            zeilen.append(f"SUMMARY:{_ics_escape(ev.get('title') or 'Termin')}")
+            if ev.get("location"):
+                zeilen.append(f"LOCATION:{_ics_escape(ev['location'])}")
+            zeilen.append("END:VEVENT")
+            lines += zeilen
+
     lines.append("END:VCALENDAR")
 
     # Hat sich inhaltlich etwas geaendert? Gemessen am Inhalt selbst, nicht an
@@ -1790,6 +1845,9 @@ class ExtCalIn(BaseModel):
 
 class ExtCalsIn(BaseModel):
     calendars: List[ExtCalIn] = []
+    # Nicht Optional aus Bequemlichkeit: ein aelterer Client schickt das Feld
+    # gar nicht mit, und dann darf der Schalter nicht stillschweigend ausgehen.
+    mitschicken: Optional[bool] = None
 
 
 class ExtHideIn(BaseModel):
@@ -1810,7 +1868,8 @@ def _ext_calendars(user: User) -> list:
 
 @router.get("/external")
 async def get_external(user: User = Depends(require_module)):
-    return {"calendars": _ext_calendars(user), "hidden": user.external_hidden or []}
+    return {"calendars": _ext_calendars(user), "hidden": user.external_hidden or [],
+            "mitschicken": bool(user.feed_external)}
 
 
 @router.put("/external")
@@ -1830,8 +1889,11 @@ async def set_external(body: ExtCalsIn, user: User = Depends(require_module), db
     # Altfelder mitziehen (erster Kalender), damit nichts Altes wiederauflebt.
     user.external_ics_url = out[0]["url"] if out else None
     user.external_ics_color = out[0]["color"] if out else ""
+    if body.mitschicken is not None:
+        user.feed_external = bool(body.mitschicken)
     await db.commit()
-    return {"calendars": out, "hidden": user.external_hidden or []}
+    return {"calendars": out, "hidden": user.external_hidden or [],
+            "mitschicken": bool(user.feed_external)}
 
 
 @router.post("/external/hide", status_code=204)
@@ -1994,22 +2056,35 @@ def _fetch_ics(url: str) -> str:
     return hole(url, timeout=6, max_bytes=2_000_000)
 
 
-@router.get("/external-events")
-async def external_events(refresh: bool = False, user: User = Depends(require_module)):
-    """Holt ALLE externen ICS-Feeds und liefert Events als {date, title, color,
-    key, …}. Read-only. 10-Min-Cache; refresh=1 umgeht ihn. Ausgeblendete
-    Ereignisse (external_hidden, Schlüssel uid|Datum) werden weggelassen."""
+async def externe_ereignisse(user: User, refresh: bool = False) -> list:
+    """ALLE Ereignisse aus den externen ICS-Feeds — auch die ausgeblendeten.
+
+    Eine Quelle fuer drei Leser: die Kalenderansicht (`/external-events`), der
+    ICS-Feed und der CalDAV-Kalender. Als Kopie waeren die Regeln (Fenster,
+    Serien, mehrtaegige Termine, Schluessel) nach der ersten Aenderung
+    auseinandergelaufen, und im Handy staende etwas anderes als im Browser.
+
+    Ausgeblendetes faellt hier NICHT heraus, sondern traegt `hidden: True` —
+    den Reiter „Ausgeblendet" gibt es nur, weil sich das Weggeblendete wieder
+    finden lassen muss. Wer nur das Sichtbare will, filtert selbst.
+    """
     import time
     cals = _ext_calendars(user)
-    hidden = set(user.external_hidden or [])
-    # Cache-Signatur: URLs + Farben + ausgeblendete Schlüssel.
-    sig = "|".join(f"{c['url']}~{c.get('color','')}" for c in cals) + "##" + ",".join(sorted(hidden))
     if not cals:
         _EXT_CACHE.pop(user.id, None)
         return []
+    # Cache-Signatur: URLs + Farben. Die ausgeblendeten Schluessel stehen
+    # bewusst NICHT drin — sie werden erst beim Lesen angeheftet, sonst wuerde
+    # jedes Ausblenden alle Feeds neu holen.
+    sig = "|".join(f"{c['url']}~{c.get('color','')}" for c in cals)
+    hidden = set(user.external_hidden or [])
+
+    def _mit_stand(rows):
+        return [{**r, "hidden": r["key"] in hidden} for r in rows]
+
     hit = _EXT_CACHE.get(user.id)
     if not refresh and hit and hit[0] == sig and hit[1] > time.time():
-        return hit[2]
+        return _mit_stand(hit[2])
     import asyncio, hashlib
     from datetime import date, timedelta
     def _d(v):
@@ -2048,10 +2123,7 @@ async def external_events(refresh: bool = False, user: User = Depends(require_mo
                     "description": e.get("description", ""), "start": d0.isoformat(), "end": last.isoformat()}
 
             def _emit(iso_date, ov=None):
-                key = f"{uid}|{iso_date}"
-                if key in hidden:
-                    return
-                row = {**info, "date": iso_date, "key": key}
+                row = {**info, "date": iso_date, "key": f"{uid}|{iso_date}"}
                 if ov:
                     row.update(ov)
                 out.append(row)
@@ -2071,7 +2143,36 @@ async def external_events(refresh: bool = False, user: User = Depends(require_mo
     out.sort(key=lambda x: (x["date"], x.get("time") or ""))
     result = out[:20000]
     _EXT_CACHE[user.id] = (sig, time.time() + _EXT_TTL, result)
-    return result
+    return _mit_stand(result)
+
+
+@router.get("/external-events")
+async def external_events(refresh: bool = False, user: User = Depends(require_module)):
+    """Die SICHTBAREN Ereignisse der externen Kalender. Read-only, 10-Min-Cache;
+    refresh=1 umgeht ihn. Ausgeblendetes (external_hidden, Schluessel
+    uid|Datum) faellt hier heraus und steht im Reiter „Ausgeblendet"."""
+    rows = await externe_ereignisse(user, refresh)
+    return [{k: v for k, v in r.items() if k != "hidden"} for r in rows if not r["hidden"]]
+
+
+@router.get("/external-hidden")
+async def external_hidden(user: User = Depends(require_module)):
+    """Was ausgeblendet ist — mit Titel und Datum, nicht nur als Schluessel.
+
+    Der Reiter „Ausgeblendet" muss zeigen, WAS da weggeblendet wurde; eine
+    Liste aus „a1b2c3|2026-09-14" beantwortet das nicht. Schluessel, zu denen
+    es kein Ereignis mehr gibt (Termin im fremden Kalender geloescht, Feed
+    abgemeldet), stehen als `verwaist` dabei — sonst blieben sie fuer immer
+    unsichtbar in der Liste stehen und liessen sich nie zurueckholen.
+    """
+    rows = await externe_ereignisse(user)
+    bekannt = {r["key"]: r for r in rows if r["hidden"]}
+    out = [{k: v for k, v in r.items() if k != "hidden"} for r in bekannt.values()]
+    for key in (user.external_hidden or []):
+        if key not in bekannt:
+            out.append({"key": key, "title": "", "date": key.split("|")[-1], "verwaist": True})
+    out.sort(key=lambda x: (x.get("date") or "", x.get("time") or ""))
+    return out
 
 
 # ─── WebUntis: den Stundenplan der Schule uebernehmen ───

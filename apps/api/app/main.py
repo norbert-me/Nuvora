@@ -232,6 +232,7 @@ def _ensure_columns(sync_conn):
         ("cards", "niveau", "VARCHAR(1) DEFAULT '' NOT NULL"),
         ("users", "external_calendars", "JSON"),
         ("users", "external_hidden", "JSON"),
+        ("users", "feed_external", "BOOLEAN DEFAULT false NOT NULL"),
         ("users", "marketplace_name", "VARCHAR(100) DEFAULT '' NOT NULL"),
         ("users", "grade_tendency", "BOOLEAN DEFAULT true NOT NULL"),
         ("users", "email_verified", "BOOLEAN DEFAULT false NOT NULL"),

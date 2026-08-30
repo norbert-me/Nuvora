@@ -108,14 +108,13 @@ export default function Kalender() {
   // Mehrere externe Kalender (read-only): je Kalender URL + Farbe. Einzelne
   // Ereignisse lassen sich ausblenden (external_hidden, Schlüssel uid|Datum).
   const [extCals, setExtCals] = useState([]); // [{url,color,name}]
-  const [extHidden, setExtHidden] = useState([]);
   const [extEvents, setExtEvents] = useState([]); // [{date,title,color,key,…}]
   const [todoEvents, setTodoEvents] = useState([]); // datierte To-dos [{id,date,time,text,done}]
   // Fallback-Farbe (Kalender ohne eigene Farbe): erste gesetzte Kalenderfarbe.
   const extColor = extCals.find((c) => c.color)?.color || "";
   const openAbo = async () => {
     const r = await fetch(`${API}/subscribe`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
-    if (r) { const ex = await fetch(`${API}/external`).then((x) => (x.ok ? x.json() : {})).catch(() => ({})); setAbo({ ...r, cals: (ex.calendars || []) }); }
+    if (r) { const ex = await fetch(`${API}/external`).then((x) => (x.ok ? x.json() : {})).catch(() => ({})); setAbo({ ...r, cals: (ex.calendars || []), mit: !!ex.mitschicken }); }
   };
   // Force-Resync: neues Abo-Token holen. Die alte URL wird sofort ungueltig —
   // damit behandelt Apple/Google das Abo als neu und laedt alles einmal frisch.
@@ -131,24 +130,30 @@ export default function Kalender() {
   const [extBusy, setExtBusy] = useState(false);
   const loadExt = (force = false) => { if (force) setExtBusy(true); return hol(`${API}/external-events${force ? "?refresh=1" : ""}`).then((d) => setExtEvents(Array.isArray(d) ? d : [])).finally(() => force && setExtBusy(false)); };
   // Kalenderliste speichern (URL/Farbe je Kalender) und Events neu ziehen.
-  const saveCals = async (cals) => {
+  const saveCals = async (cals, mitschicken) => {
     const clean = cals.filter((c) => (c.url || "").trim());
-    await fetch(`${API}/external`, alsJson("PUT", { calendars: clean })).catch(() => {});
+    await fetch(`${API}/external`, alsJson("PUT", { calendars: clean, mitschicken })).catch(() => {});
     setExtCals(clean); loadExt(true);
   };
   // Ein externes Ereignis aus-/wieder einblenden (Schlüssel uid|Datum).
   const hideExtEvent = async (key) => {
     if (!key) return;
-    setExtHidden((h) => [...h, key]);
     setExtEvents((evs) => evs.filter((e) => e.key !== key));  // sofort raus
     await fetch(`${API}/external/hide`, alsJson("POST", { key })).catch(() => {});
+    loadHidden();
   };
+  // Ausgeblendete fremde Termine MIT Titel und Datum — der Reiter zeigt sie,
+  // und eine Liste aus Schlüsseln beantwortet nicht, was da weg ist.
+  const [extHiddenList, setExtHiddenList] = useState([]);
+  const loadHidden = useCallback(() => {
+    hol(`${API}/external-hidden`).then((d) => setExtHiddenList(Array.isArray(d) ? d : []));
+  }, []);
   const unhideExtEvent = async (key) => {
-    setExtHidden((h) => h.filter((k) => k !== key));
     await fetch(`${API}/external/unhide`, alsJson("POST", { key })).catch(() => {});
+    loadHidden();
     loadExt(true);
   };
-  useEffect(() => { hol(`${API}/external`, {}).then((d) => { setExtCals(d.calendars || []); setExtHidden(d.hidden || []); if ((d.calendars || []).length) loadExt(); }); }, []);
+  useEffect(() => { hol(`${API}/external`, {}).then((d) => { setExtCals(d.calendars || []); if ((d.calendars || []).length) loadExt(); }); }, []);
   const extByDay = (d) => extEvents.filter((e) => e.date === ymd(d));
   const [entries, setEntries] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -188,6 +193,7 @@ export default function Kalender() {
   const updExam = async (id, body) => { await sende(`${API}/klassenarbeiten/${id}`, alsJson("PUT", body), t("common.save")); loadExams(); load(); };
   const delExam = async (id) => { await sende(`${API}/klassenarbeiten/${id}`, { method: "DELETE" }, t("common.delete")); loadExams(); load(); };
   useEffect(() => { if (view === "klassenarbeit") loadExams(); /* eslint-disable-next-line */ }, [view]);
+  useEffect(() => { if (view === "ausgeblendet") loadHidden(); }, [view, loadHidden]);
   const [wdhVorschlag, setWdhVorschlag] = useState([]); // schwache Themen der Vorwoche
   const [slotEdit, setSlotEdit] = useState(null); // { weekday, period, ...slot } oder null
   const [extInfo, setExtInfo] = useState(null); // angeklickter externer (abonnierter) Termin
@@ -252,8 +258,6 @@ export default function Kalender() {
     await fetch(`${API}/slot-cancellations`, alsJson("DELETE", { date: isoDay(d), period })).catch(() => {});
     loadCancels();
   };
-  // Ausgefallene Stunden eines Tages (für die „entfällt"-Chips mit Wiederherstellen).
-  const cancelledFor = (d) => tt.slots.filter((s) => s.weekday === wochentagMo0(d) && slotActiveOn(s, d) && isCancelled(d, s.period)).sort((a, b) => a.period - b.period);
 
   // Wochenansicht: schwache Themen der Vorwoche als Wiederholungs-Vorschlag.
   useEffect(() => {
@@ -545,14 +549,6 @@ export default function Kalender() {
                     {extBusy ? t("kalender.extRefreshing") : t("kalender.extRefresh")}
                   </button>
                 )}
-                {extHidden.length > 0 && (
-                  <button onClick={() => { extHidden.forEach((k) => unhideExtEvent(k)); setViewMenuOpen(false); }}
-                    style={{ ...menuRow, boxSizing: "border-box", fontWeight: 500 }}
-                    title={t("kalender.extUnhideAllHint")}>
-                    <Icon d={ICONS.eye} size={15} color="var(--text2)" />
-                    {t("kalender.extUnhideAll", { n: extHidden.length })}
-                  </button>
-                )}
               </Popover>
             </>)}
             </div>
@@ -637,6 +633,11 @@ export default function Kalender() {
       )}
       {view === "breaks" && <BreaksPanel breaks={breaks} onAdd={addBreak} onDel={delBreak} t={t} standalone />}
       {view === "stoffplan" && <Stoffplan />}
+      {view === "ausgeblendet" && (
+        <AusgeblendetPanel ext={extHiddenList} onExtBack={unhideExtEvent}
+          cancels={slotCancels} slots={tt.slots} slotName={slotName} slotActiveOn={slotActiveOn}
+          onSlotBack={restoreSlot} t={t} />
+      )}
       {view === "klassenarbeit" && <ExamPanel overview={examOverview} periods={tt.periods} aktiv={aktiv} topics={topics} onAdd={addExam} onUpd={updExam} onDel={delExam} t={t} />}
 
       {view === "month" && <MonthGrid extColor={extColor} range={range} cursor={cursor} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/notizbrett")} slotsFor={slotsFor} onSlot={fromSlot} frei={frei} className={className} kursName={kursName} slotName={slotName} topicName={topicName} classColor={classColor} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} onWeekView={(d) => { setCursor(startOfDay(d)); setView("week"); }} t={t} />}
@@ -656,7 +657,7 @@ export default function Kalender() {
         </div>
       )}
       {view === "week" && <WeekView extColor={extColor} range={range} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/notizbrett")} slotsFor={slotsFor} frei={frei} className={className} kursName={kursName} slotName={slotName} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} onDayView={(d) => { setCursor(startOfDay(d)); setView("day"); }} t={t} />}
-      {view === "day" && <DayView extColor={extColor} day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/notizbrett")} slotsFor={slotsFor} cancelledFor={cancelledFor} onCancelSlot={cancelSlot} onRestoreSlot={restoreSlot} frei={frei} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
+      {view === "day" && <DayView extColor={extColor} day={cursor} tt={tt} byDay={byDayV} extByDay={extByDayV} todoByDay={todoByDay} onTodo={() => nav("/notizbrett")} slotsFor={slotsFor} onCancelSlot={cancelSlot} frei={frei} className={className} slotName={slotName} slotColor={slotColor} classColor={classColor} topicName={topicName} onAdd={(d) => setEditing({ date: startOfDay(d) })} onOpen={setEditing} onExt={setExtInfo} onSlot={fromSlot} t={t} />}
       {untisOffen && (
         <UntisImport onClose={() => setUntisOffen(false)} kurse={kurse} klassen={classes} periods={tt.periods}
           onFertig={() => { loadTt(); loadBreaks(); loadCancels(); }} />
@@ -687,7 +688,10 @@ export default function Kalender() {
             <div style={{ borderTop: "1px solid var(--border)", marginTop: 24, paddingTop: 16 }}>
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{t("kalender.extTitle")}</div>
               <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8 }}>{t("kalender.extText")}</div>
-              <ExtCalEditor cals={abo.cals || []} onChange={(cals) => setAbo((a) => ({ ...a, cals }))} onSave={(cals) => { saveCals(cals); setAbo((a) => ({ ...a, cals })); }} t={t} />
+              <ExtCalEditor cals={abo.cals || []} mit={!!abo.mit}
+                onChange={(cals) => setAbo((a) => ({ ...a, cals }))}
+                onMit={(v) => setAbo((a) => ({ ...a, mit: v }))}
+                onSave={(cals, mit) => { saveCals(cals, mit); setAbo((a) => ({ ...a, cals, mit })); }} t={t} />
             </div>
 
             <div style={{ marginTop: 16, textAlign: "right" }}>
@@ -697,6 +701,72 @@ export default function Kalender() {
       )}
       {slotEdit && <SlotModal slot={slotEdit} classes={classes} kurse={kurse} topics={topics} onSave={saveSlot} onDelete={removeSlot} onColor={setSlotColor} onClose={() => setSlotEdit(null)} t={t} />}
       {extInfo && <ExtInfoModal ev={extInfo} onClose={() => setExtInfo(null)} onHide={(k) => { hideExtEvent(k); setExtInfo(null); }} t={t} />}
+    </div>
+  );
+}
+
+// ─── Reiter „Ausgeblendet" ───
+//
+// Was weggeblendet ist, stand vorher an drei Stellen verstreut: die entfallenen
+// Stunden als durchgestrichene Chips ueber jedem Tag, die ausgeblendeten
+// fremden Termine nur als „12 wieder zeigen" im Auge-Menue. Beides beantwortet
+// dieselbe Frage — „was sehe ich gerade nicht, und wie hole ich es zurueck?" —
+// und beides gehoert deshalb an EINE Stelle, nicht ueber die Tage verteilt.
+function AusgeblendetPanel({ ext, onExtBack, cancels, slots, slotName, slotActiveOn, onSlotBack, t }) {
+  const fmt = (iso) => { try { return new Date(iso + "T00:00:00").toLocaleDateString(); } catch { return iso; } };
+  // Zu einer entfallenen Stunde die Vorlage suchen — nur so steht dort der
+  // Kurs statt „3. Stunde".
+  const zeilen = [...(cancels || [])].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.period - b.period))
+    .map((c) => {
+      const d = new Date(c.date);
+      const s = (slots || []).find((x) => x.weekday === wochentagMo0(d) && x.period === c.period && slotActiveOn(x, d));
+      return { ...c, d, name: (s && (slotName(s) || s.title)) || "" };
+    });
+
+  const Abschnitt = ({ titel, leer, children }) => (
+    <div style={{ ...cardStyle, marginBottom: 16 }}>
+      <div style={{ ...sectionLabel, marginBottom: 8 }}>{titel}</div>
+      {leer ? <div style={{ fontSize: 13, color: "var(--text3)" }}>{leer}</div> : children}
+    </div>
+  );
+
+  return (
+    <div>
+      <Abschnitt titel={t("kalender.hiddenExt")} leer={ext.length ? null : t("kalender.hiddenNone")}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {ext.map((e) => (
+            <div key={e.key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+              <span style={{ color: "var(--text3)", flexShrink: 0, fontSize: 12 }}>{fmt(e.date)}</span>
+              {/* Ein Schlüssel ohne Ereignis: der Termin ist im fremden
+                  Kalender geloescht oder der Feed abgemeldet. Er steht trotzdem
+                  hier, sonst liesse er sich nie wieder loswerden. */}
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                color: e.verwaist ? "var(--text3)" : "var(--text)", fontStyle: e.verwaist ? "italic" : "normal" }}>
+                {e.title || t("kalender.hiddenGone")}
+              </span>
+              <button onClick={() => onExtBack(e.key)} style={{ ...btnSecondary, ...btnSmall, borderRadius: CONTROL_R, flexShrink: 0 }}>
+                {t("kalender.hiddenBack")}
+              </button>
+            </div>
+          ))}
+        </div>
+      </Abschnitt>
+
+      <Abschnitt titel={t("kalender.hiddenSlots")} leer={zeilen.length ? null : t("kalender.hiddenNone")}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {zeilen.map((c) => (
+            <div key={`${c.date}|${c.period}`} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+              <span style={{ color: "var(--text3)", flexShrink: 0, fontSize: 12 }}>{c.d.toLocaleDateString()}</span>
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {c.period}. {t("kalender.period")}{c.name ? ` · ${c.name}` : ""}
+              </span>
+              <button onClick={() => onSlotBack(c.d, c.period)} style={{ ...btnSecondary, ...btnSmall, borderRadius: CONTROL_R, flexShrink: 0 }}>
+                {t("kalender.hiddenBack")}
+              </button>
+            </div>
+          ))}
+        </div>
+      </Abschnitt>
     </div>
   );
 }
@@ -738,7 +808,7 @@ function ExtInfoModal({ ev, onClose, onHide, t }) {
 
 // Editor für mehrere externe Kalender: je Zeile URL + Farbe + Löschen. „Speichern"
 // schreibt die ganze Liste (leere URLs fallen weg).
-function ExtCalEditor({ cals, onChange, onSave, t }) {
+function ExtCalEditor({ cals, mit, onChange, onMit, onSave, t }) {
   const rows = cals.length ? cals : [{ url: "", color: "", name: "" }];
   const setRow = (i, patch) => { const next = rows.map((r, j) => (j === i ? { ...r, ...patch } : r)); onChange(next); };
   const addRow = () => onChange([...rows, { url: "", color: "", name: "" }]);
@@ -758,12 +828,22 @@ function ExtCalEditor({ cals, onChange, onSave, t }) {
           </div>
         ))}
       </div>
+      {/* Die fremden Termine im eigenen Export mitschicken. Aus als Vorgabe,
+          und der Hinweis bleibt trotz der Regel gegen Erklärtexte stehen: dass
+          derselbe Termin dann auf einem Gerät doppelt steht, das die Kalender
+          selbst abonniert hat, sieht man dem Schalter nicht an — man sieht es
+          erst im Handy. */}
+      <label style={{ ...menuRow, boxSizing: "border-box", fontWeight: 500, marginTop: 12, paddingLeft: 0 }}>
+        <input type="checkbox" checked={!!mit} onChange={(e) => onMit(e.target.checked)} />
+        {t("kalender.extShare")}
+      </label>
+      <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2, marginBottom: 4, lineHeight: 1.4 }}>{t("kalender.extShareHint")}</div>
       <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
         <button onClick={addRow} style={{ ...btnSecondary, display: "inline-flex", alignItems: "center", gap: 6 }}>
           <Icon d={ICONS.plus} size={14} /> {t("kalender.extAdd")}
         </button>
         <span style={{ flex: 1 }} />
-        <button onClick={() => onSave(rows)} style={btnPrimary}>{t("common.save")}</button>
+        <button onClick={() => onSave(rows, !!mit)} style={btnPrimary}>{t("common.save")}</button>
       </div>
     </div>
   );
@@ -953,7 +1033,7 @@ function FreiMarker({ label, t }) {
   );
 }
 
-function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDay, todoByDay, onTodo, slotsFor, cancelledFor, onCancelSlot, onRestoreSlot, frei, className, slotName, slotColor, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
+function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDay, todoByDay, onTodo, slotsFor, onCancelSlot, frei, className, slotName, slotColor, classColor, topicName, onAdd, onOpen, onExt, onSlot, t }) {
   const list = byDay(day);
   const f = frei && frei(day);
   // An freien Tagen faellt der Stundenplan weg — die Termine des Tages nicht.
@@ -1068,19 +1148,6 @@ function DayView({ extColor, day, tt = { times: [], periods: 0 }, byDay, extByDa
             {ganztags.map((e) => bannerBtn("g" + e.id, `${e.title || topicName(e.topic_id) || "—"}${linked(e) ? " ↗" : ""}`, e.notes || "", () => onOpen({ ...e, date: new Date(e.date) }), false))}
             {extAllDay.map((ev, i) => bannerBtn("xa" + i, ev.title || "—", ev.location || "", () => onExt(ev), true, ev.color))}
           </div>
-        </div>
-      )}
-
-      {/* Ausgefallene Stunden an diesem Tag: Chip mit Wiederherstellen. */}
-      {cancelledFor && cancelledFor(day).length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-          <span style={{ fontSize: 12, color: "var(--text3)" }}>{t("kalender.cancelledLessons")}:</span>
-          {cancelledFor(day).map((s) => (
-            <button key={s.id} onClick={() => onRestoreSlot(day, s.period)} title={t("kalender.slotRestore")}
-              style={{ ...chipStyle, display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 12px", border: "1px dashed var(--border2)", background: "var(--bg2)", color: "var(--text3)", cursor: "pointer", textDecoration: "line-through" }}>
-              {s.period}. {t("kalender.period")} {slotName(s) || s.title || ""} <Icon d={ICONS.undo} size={13} color="var(--accent)" />
-            </button>
-          ))}
         </div>
       )}
 

@@ -834,3 +834,79 @@ async def test_profil_stirbt_mit_dem_modul(welt):
         await s.commit()
     r = await _ruf(welt["app"], "GET", f"/api/caldav-zugaenge/profil/{token}", auth=False)
     assert r.status == 404
+
+
+# ─── Fremde (abonnierte) Termine im CalDAV-Kalender ───
+#
+# Sie liegen nur auf Wunsch dort (users.feed_external). Was das Handy an ihnen
+# tun darf, ist die eigentliche Entscheidung: LOESCHEN heisst „in Nuvora
+# ausblenden" (der fremde Kalender bleibt unangetastet), AENDERN geht gar nicht
+# — eine hier uebernommene Aenderung stuende beim naechsten Abgleich als Kopie
+# neben dem Original und waere drueben trotzdem nicht angekommen.
+
+def _fremd_ics(tag_iso, uid="fremd-1", titel="Zahnarzt"):
+    return ("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\n"
+            f"UID:{uid}\r\nDTSTART;VALUE=DATE:{tag_iso.replace('-', '')}\r\n"
+            f"SUMMARY:{titel}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n")
+
+
+@pytest_asyncio.fixture
+async def fremd(welt, monkeypatch):
+    """Ein abonnierter Kalender mit einem Termin in drei Tagen, Export AN."""
+    from datetime import date, timedelta
+    from sqlalchemy import select
+    import app.routers.kalender as K
+    from app.models import User
+
+    tag = (date.today() + timedelta(days=3)).isoformat()
+    K._EXT_CACHE.clear()
+    monkeypatch.setattr(K, "_fetch_ics", lambda url, **kw: _fremd_ics(tag))
+    async with welt["sitzung"]() as s:
+        u = (await s.execute(select(User).where(User.id == welt["user_id"]))).scalar_one()
+        u.external_calendars = [{"url": "https://example.org/x.ics", "color": "", "name": ""}]
+        u.feed_external = True
+        await s.commit()
+        rows = await K.externe_ereignisse(u)
+    return {"tag": tag, "key": rows[0]["key"], "name": K.ext_dateiname(rows[0]["key"])}
+
+
+@pytest.mark.asyncio
+async def test_fremder_termin_liegt_im_kalender(welt, fremd):
+    r = await _ruf(welt["app"], "GET", _kal(welt, fremd["name"]))
+    assert r.status == 200
+    assert "Zahnarzt" in r.body.decode()
+
+
+@pytest.mark.asyncio
+async def test_ohne_schalter_liegt_er_nicht_da(welt, fremd):
+    from sqlalchemy import select
+    from app.models import User
+    async with welt["sitzung"]() as s:
+        u = (await s.execute(select(User).where(User.id == welt["user_id"]))).scalar_one()
+        u.feed_external = False
+        await s.commit()
+    r = await _ruf(welt["app"], "GET", _kal(welt, fremd["name"]))
+    assert r.status == 404
+
+
+@pytest.mark.asyncio
+async def test_loeschen_heisst_ausblenden(welt, fremd):
+    """Der Termin gehoert einem fremden Kalender — geloescht wird er nicht,
+    ausgeblendet schon. Danach ist er auch aus dem Kalender des Handys weg."""
+    from sqlalchemy import select
+    from app.models import User
+    r = await _ruf(welt["app"], "DELETE", _kal(welt, fremd["name"]))
+    assert r.status == 204
+    async with welt["sitzung"]() as s:
+        u = (await s.execute(select(User).where(User.id == welt["user_id"]))).scalar_one()
+        assert fremd["key"] in (u.external_hidden or [])
+    assert (await _ruf(welt["app"], "GET", _kal(welt, fremd["name"]))).status == 404
+
+
+@pytest.mark.asyncio
+async def test_aendern_wird_mit_grund_abgelehnt(welt, fremd):
+    koerper = _fremd_ics(fremd["tag"], titel="Anders").encode()
+    r = await _ruf(welt["app"], "PUT", _kal(welt, fremd["name"]), body=koerper)
+    assert r.status == 403
+    # Mit Vorbedingung, damit die Kalender-App sagen kann, WAS nicht ging.
+    assert "valid-calendar-object-resource" in r.body.decode()

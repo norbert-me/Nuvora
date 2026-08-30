@@ -60,6 +60,7 @@ export const ZIELE = [
   { pfad: "/kalender", key: "kalender.title", modul: "kalender", worte: ["termin", "woche", "monat", "tag"] },
   { pfad: "/kalender?view=timetable", key: "kalender.timetable", modul: "kalender", worte: ["stundenplan", "stunden", "slots"] },
   { pfad: "/kalender?view=breaks", key: "kalender.breaksTab", modul: "kalender", worte: ["ferien", "feiertag", "frei"] },
+  { pfad: "/kalender?view=ausgeblendet", key: "kalender.hiddenTab", modul: "kalender", worte: ["ausgeblendet", "entfallen", "ausfall", "versteckt", "wieder einblenden"] },
   { pfad: "/kalender?view=klassenarbeit", key: "kalender.examsTab", modul: "kalender", worte: ["klassenarbeit termin", "arbeit planen"] },
   { pfad: "/kalender?view=stoffplan", key: "stoffplan.tab", modul: "kalender", worte: ["stoffverteilung", "stoffverteilungsplan", "jahresplanung", "themen planen", "wann kommt was"] },
 
