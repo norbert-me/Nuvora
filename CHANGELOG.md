@@ -32,3 +32,17 @@ Entwicklungsgeschichte in `git log`.
   Knopf erscheint direkt nach dem Anlegen eines Gerätepassworts; der Link gilt
   einmal und zehn Minuten. iOS meldet dabei „Nicht signiert“ — das ist erwartet.
 - Der Teilen-Dialog läuft auf schmalen Bildschirmen nicht mehr aus dem Rand.
+
+**Oberfläche**
+
+- Kontakt, Anmelden und Passwort zurücksetzen erzeugen auf dem Handy keine
+  waagerechte Bildlaufleiste mehr, und die Formularseiten sind etwas breiter.
+- Eine neue Seite fängt oben an. Wer unten auf „Impressum“ klickte, landete
+  bisher in der Mitte des Impressums. Bei „Zurück“ bleibt die alte Stelle.
+- Das Tutorial steht im Profil neben „Tutorial neu starten“ statt in der
+  Fußzeile.
+- „Name im Marktplatz“ heißt „Name zu Nuvora“ und steht bei den Einstellungen,
+  die sofort wirken.
+- Weniger Erklärtext: der Protokoll-Abschnitt im Profil und die beiden
+  Hinweisabsätze im Melde-Dialog sind weg. Was mitgeschickt wird, zeigt dort
+  weiterhin der Knopf im Klartext, und beide Häkchen lassen sich abwählen.
