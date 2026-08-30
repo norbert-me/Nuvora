@@ -112,6 +112,22 @@ export default function CaldavZugaenge() {
             </button>
           </div>
           <div style={{ fontSize: 12, color: C.warning, marginTop: 6 }}>{t("caldav.nurEinmal")}</div>
+          {/* Ein Klick statt Abtippen: iOS richtet das Konto aus einem
+              Konfigurationsprofil ein. Bewusst ein echtes <a> mit Navigation —
+              iOS startet den Installationsdialog nur, wenn Safari die Adresse
+              ANSTEUERT und die Antwort application/x-apple-aspen-config ist;
+              eine per JavaScript gebaute Datei landet stattdessen in „Dateien".
+              Der Hinweis darunter bleibt stehen, obwohl er ein Erklärtext ist:
+              „Nicht signiert" in Rot sieht nach Fehler aus, und ohne den Satz
+              bricht an der Stelle jeder ab. */}
+          {frisch.profil && (
+            <div style={{ marginTop: 8 }}>
+              <a href={frisch.profil} style={{ ...btnSecondary, ...btnSmall, borderRadius: CONTROL_R, display: "inline-block", textDecoration: "none" }}>
+                {t("caldav.profil")}
+              </a>
+              <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 6, lineHeight: 1.4 }}>{t("caldav.profilHinweis")}</div>
+            </div>
+          )}
           <button onClick={() => setFrisch(null)} style={{ ...btnSecondary, ...btnSmall, borderRadius: CONTROL_R, marginTop: 8 }}>
             {t("caldav.notiert")}
           </button>

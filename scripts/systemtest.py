@@ -1383,12 +1383,39 @@ def teste_caldav(api, b, u, sch, spuren):
             raise AssertionError(f"Termindaten im Protokollpfad: {eintraege[:2]}")
         return f"{len(eintraege)} Zugriffe mit Grund, Pfade ohne Termindaten"
 
+    def profil():
+        """Der Ein-Klick-Weg aufs iPhone.
+
+        Geprueft wird, was die Einrichtung im Geraet scheitern liesse und was
+        pytest nicht sehen kann: dass die Adresse OHNE Anmeldung durch den
+        Proxy kommt (Safari schickt beim Ansteuern keinen Token mit), dass der
+        Content-Type stimmt (sonst bietet iOS die Installation gar nicht an) —
+        und dass sie nur EINMAL traegt: im Profil steht das Geraete-Passwort
+        im Klartext.
+        """
+        weg = zugang.get("profil")
+        if not weg:
+            raise AssertionError("Anlegen liefert keine Profil-Adresse")
+        st, text, kopf = dav("GET", weg, mit_anmeldung=False)
+        if st != 200:
+            raise AssertionError(f"Profil nicht erreichbar (HTTP {st})")
+        if not kopf.get("content-type", "").startswith("application/x-apple-aspen-config"):
+            raise AssertionError(f"falscher Content-Type: {kopf.get('content-type')!r}")
+        for teil in ("com.apple.caldav.account", stand["benutzer"], zugang["passwort"], stand["pfad"]):
+            if teil not in text:
+                raise AssertionError(f"Profil ohne {teil!r}")
+        st2, _, _ = dav("GET", weg, mit_anmeldung=False)
+        if st2 != 404:
+            raise AssertionError(f"Profil-Adresse traegt ein zweites Mal (HTTP {st2})")
+        return "Profil einmal gueltig, danach 404"
+
     b.pruefe("CalDAV", "Erkennung (OPTIONS)", erkennung)
     b.pruefe("CalDAV", "Anmeldung verlangt", anmeldung)
     b.pruefe("CalDAV", "PROPFIND durch den Proxy", propfind)
     b.pruefe("CalDAV", "Anlegen, lesen, loeschen", schreiben)
     b.pruefe("CalDAV", "Ohne Modul dicht", ohne_modul)
     b.pruefe("CalDAV", "Protokoll zeigt die Zugriffe", protokoll)
+    b.pruefe("CalDAV", "Konfigurationsprofil (iPhone)", profil)
     api.call("DELETE", f"/api/caldav-zugaenge/{zugang['id']}", erwartet=(204, 404))
 
 

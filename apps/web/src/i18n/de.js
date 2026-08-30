@@ -2543,6 +2543,8 @@ export default {
   "caldav.neuTitel": "Neues Passwort für „{{name}}“",
   "caldav.nurEinmal": "Jetzt notieren — es wird nur einmal angezeigt.",
   "caldav.notiert": "Notiert",
+  "caldav.profil": "Auf iPhone/iPad einrichten",
+  "caldav.profilHinweis": "Öffnet ein Konfigurationsprofil: iOS meldet „Nicht signiert“ — das ist erwartet. Der Link gilt einmal und zehn Minuten.",
   "caldav.zuruecknehmen": "Zurücknehmen",
   "caldav.zuletzt": "zuletzt {{wann}}",
   "caldav.nieBenutzt": "noch nie benutzt",

@@ -29,6 +29,8 @@ alles andere an die Weboberflaeche. Apple sucht zuerst unter
 import base64
 import logging
 import secrets
+import time as _time
+import uuid as _uuid
 from collections import deque
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
@@ -886,7 +888,10 @@ async def anlegen(body: ZugangIn, db: AsyncSession = Depends(get_db),
     db.add(z)
     await db.commit()
     await db.refresh(z)
-    return {"id": z.id, "name": z.name, "passwort": klartext}
+    # Die Einmal-Adresse fuers Konfigurationsprofil entsteht GENAU HIER — im
+    # einzigen Augenblick, in dem der Klartext vorliegt. Siehe unten.
+    return {"id": z.id, "name": z.name, "passwort": klartext,
+            "profil": f"/api/caldav-zugaenge/profil/{_profil_merken(user.id, z.name, klartext)}"}
 
 
 @verwaltung.delete("/{zugang_id}", status_code=204)
@@ -900,3 +905,119 @@ async def zuruecknehmen(zugang_id: int, db: AsyncSession = Depends(get_db),
         raise HTTPException(404, "Zugang nicht gefunden")
     await db.delete(z)
     await db.commit()
+
+
+# ─── Konfigurationsprofil (.mobileconfig) ───
+#
+# Auf dem iPhone ist die Einrichtung von Hand die eigentliche Huerde: Serveradresse,
+# Port, Pfad, Benutzername und ein zwanzigstelliges Passwort abtippen, und das im
+# Dialog „Erweitert", den man erst finden muss. Ein Konfigurationsprofil erledigt
+# das in zwei Tipps.
+#
+# Drei Entscheidungen:
+#
+# (a) **Der Weg ist eine GET-Navigation, kein Download.** iOS startet den
+#     Installationsdialog nur, wenn Safari eine Adresse ANSTEUERT, die mit
+#     `application/x-apple-aspen-config` antwortet. Eine per JavaScript gebaute
+#     Blob-Datei landet stattdessen in „Dateien" und muss von dort geoeffnet
+#     werden. Eine Navigation traegt aber keinen Bearer-Token — deshalb eine
+#     eigene, unerratbare Einmal-Adresse statt der normalen Anmeldung.
+#
+# (b) **Nur beim Anlegen, nur einmal, nur kurz.** Das Profil enthaelt das
+#     Geraete-Passwort im Klartext; anders koennte es nichts einrichten. Es
+#     entsteht deshalb genau in dem Augenblick, in dem der Klartext ohnehin
+#     einmal ueber die Leitung geht, liegt zehn Minuten im Arbeitsspeicher und
+#     ist nach dem ersten Abruf weg. Kein zweiter Weg, an ein bestehendes
+#     Passwort zu kommen — sonst waere „genau einmal sichtbar" eine Behauptung.
+#
+# (c) **Unsigniert.** Signieren ginge mit dem TLS-Zertifikat des Servers, dafuer
+#     braeuchte die API dessen privaten Schluessel — fuer einen gruenen Haken
+#     statt eines roten Hinweises ein schlechter Tausch (und bei jeder
+#     Erneuerung eine Stelle, an der das Profil ploetzlich ABGELEHNT statt nur
+#     bemaengelt wird). iOS meldet „Nicht signiert" und installiert es trotzdem.
+_PROFIL_TTL = 600           # Sekunden
+_PROFIL_MAX = 200           # Obergrenze, damit der Speicher nicht waechst
+# token -> (ablauf, owner_id, name, klartext)
+_PROFILE: dict[str, tuple[float, int, str, str]] = {}
+
+
+def _profil_merken(owner_id: int, name: str, klartext: str) -> str:
+    """Einmal-Adresse fuer ein frisch angelegtes Geraete-Passwort."""
+    jetzt = _time.time()
+    for k in [k for k, v in _PROFILE.items() if v[0] <= jetzt]:
+        _PROFILE.pop(k, None)
+    while len(_PROFILE) >= _PROFIL_MAX:
+        _PROFILE.pop(next(iter(_PROFILE)), None)
+    token = secrets.token_urlsafe(32)
+    _PROFILE[token] = (jetzt + _PROFIL_TTL, owner_id, name, klartext)
+    return token
+
+
+def _plist_text(s: str) -> str:
+    """XML-Escape. Ein Kursname mit & zerlegt sonst die ganze Datei."""
+    return (s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+
+
+def _mobileconfig(*, host: str, port: int, ssl: bool, pfad: str, benutzer: str,
+                  passwort: str, name: str, uuid_profil: str, uuid_payload: str) -> str:
+    """Ein CalDAV-Konto als Apple-Konfigurationsprofil."""
+    e = _plist_text
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>PayloadContent</key>
+  <array>
+    <dict>
+      <key>PayloadType</key><string>com.apple.caldav.account</string>
+      <key>PayloadVersion</key><integer>1</integer>
+      <key>PayloadIdentifier</key><string>de.nuvora.caldav.{e(uuid_payload)}</string>
+      <key>PayloadUUID</key><string>{e(uuid_payload)}</string>
+      <key>PayloadDisplayName</key><string>{e(KALENDER_NAME)}</string>
+      <key>CalDAVAccountDescription</key><string>{e(KALENDER_NAME)}</string>
+      <key>CalDAVHostName</key><string>{e(host)}</string>
+      <key>CalDAVPort</key><integer>{int(port)}</integer>
+      <key>CalDAVUseSSL</key><{'true' if ssl else 'false'}/>
+      <key>CalDAVPrincipalURL</key><string>{e(pfad)}</string>
+      <key>CalDAVUsername</key><string>{e(benutzer)}</string>
+      <key>CalDAVPassword</key><string>{e(passwort)}</string>
+    </dict>
+  </array>
+  <key>PayloadDisplayName</key><string>{e(KALENDER_NAME)} ({e(name)})</string>
+  <key>PayloadDescription</key><string>Richtet den Nuvora-Kalender auf diesem Geraet ein.</string>
+  <key>PayloadIdentifier</key><string>de.nuvora.profil.{e(uuid_profil)}</string>
+  <key>PayloadUUID</key><string>{e(uuid_profil)}</string>
+  <key>PayloadType</key><string>Configuration</string>
+  <key>PayloadVersion</key><integer>1</integer>
+  <key>PayloadRemovalDisallowed</key><false/>
+</dict>
+</plist>
+"""
+
+
+@verwaltung.get("/profil/{token}")
+async def profil(token: str, request: Request, db: AsyncSession = Depends(get_db)):
+    """Das Konfigurationsprofil zu einem frisch angelegten Geraete-Passwort.
+
+    Ohne die normale Anmeldung, weil Safari beim Ansteuern der Adresse keinen
+    Bearer-Token mitschickt — dafuer einmalig, zehn Minuten gueltig und mit
+    32 Byte Zufall als Adresse. Der zweite Abruf findet nichts mehr.
+    """
+    eintrag = _PROFILE.pop(token, None)
+    if not eintrag or eintrag[0] <= _time.time():
+        raise HTTPException(404, "Dieser Link ist abgelaufen. Bitte ein neues Geraete-Passwort anlegen.")
+    _, owner_id, name, klartext = eintrag
+    u = (await db.execute(select(User).where(User.id == owner_id))).scalar_one_or_none()
+    # Auch hier stirbt der Zugang mit dem Modul — ein Profil einzurichten, das
+    # sofort 403 bekaeme, waere eine Einladung in eine Sackgasse.
+    if not u or not await is_active(db, u.id, MODULE_KEY):
+        raise HTTPException(404, "Dieser Link ist abgelaufen.")
+    ssl = request.url.scheme == "https"
+    text = _mobileconfig(
+        host=request.url.hostname or "", port=request.url.port or (443 if ssl else 80),
+        ssl=ssl, pfad=f"/api/caldav/p/{u.id}/", benutzer=u.email or "", passwort=klartext,
+        name=name, uuid_profil=str(_uuid.uuid4()), uuid_payload=str(_uuid.uuid4()))
+    return Response(text, media_type="application/x-apple-aspen-config", headers={
+        "Content-Disposition": 'attachment; filename="nuvora-kalender.mobileconfig"',
+        "Cache-Control": "no-store",
+    })

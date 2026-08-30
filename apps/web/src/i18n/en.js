@@ -2550,6 +2550,8 @@ export default {
   "caldav.neuTitel": "New password for “{{name}}”",
   "caldav.nurEinmal": "Write it down now — shown only once.",
   "caldav.notiert": "Noted",
+  "caldav.profil": "Set up on iPhone/iPad",
+  "caldav.profilHinweis": "Opens a configuration profile: iOS reports \u201eNot signed\u201c \u2014 that is expected. The link works once and for ten minutes.",
   "caldav.zuruecknehmen": "Revoke",
   "caldav.zuletzt": "last used {{wann}}",
   "caldav.nieBenutzt": "never used",

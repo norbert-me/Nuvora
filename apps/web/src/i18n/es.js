@@ -2551,6 +2551,8 @@ export default {
   "caldav.neuTitel": "Nueva contraseña para «{{name}}»",
   "caldav.nurEinmal": "Anótela ahora — solo se muestra una vez.",
   "caldav.notiert": "Anotada",
+  "caldav.profil": "Configurar en iPhone/iPad",
+  "caldav.profilHinweis": "Abre un perfil de configuraci\u00f3n: iOS indica \u00abNo firmado\u00bb, es lo esperado. El enlace sirve una vez y durante diez minutos.",
   "caldav.zuruecknehmen": "Retirar",
   "caldav.zuletzt": "última vez {{wann}}",
   "caldav.nieBenutzt": "nunca usada",

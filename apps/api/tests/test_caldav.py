@@ -769,3 +769,68 @@ async def test_ctag_aendert_sich_nach_einer_aenderung(welt):
                body=X.baue_vevent(uid="a@x", tag=TAG, titel="Neu").encode())
     nachher = (await _ruf(welt["app"], "PROPFIND", _kal(welt), kopf={"depth": 0}, body=frage)).text
     assert vorher != nachher
+
+
+# ─── Konfigurationsprofil (.mobileconfig) ───
+#
+# Der Ein-Klick-Weg auf iPhone und iPad. Geprueft wird das, was die Einrichtung
+# scheitern liesse: der falsche Content-Type (dann bietet iOS die Installation
+# gar nicht an), fehlende Angaben im Profil (dann steht ein halb eingerichtetes
+# Konto im Geraet) — und dass die Adresse wirklich nur EINMAL traegt: sie
+# enthaelt das Geraete-Passwort im Klartext.
+
+@pytest.mark.asyncio
+async def test_profil_liefert_ein_apple_profil_mit_allen_angaben(welt):
+    from app.routers.caldav import _profil_merken
+    token = _profil_merken(welt["user_id"], "iPhone", "geheim-1234")
+    r = await _ruf(welt["app"], "GET", f"/api/caldav-zugaenge/profil/{token}", auth=False)
+    assert r.status == 200
+    # Ohne diesen Content-Type behandelt iOS die Datei als Download und der
+    # Installationsdialog kommt nie.
+    assert r.headers.get("content-type", "").startswith("application/x-apple-aspen-config")
+    text = r.body.decode()
+    assert "com.apple.caldav.account" in text
+    assert "<string>caldav@test.de</string>" in text          # Benutzername
+    assert "<string>geheim-1234</string>" in text             # Passwort
+    assert f"/api/caldav/p/{welt['user_id']}/" in text        # Serverpfad
+    assert "<key>CalDAVPort</key>" in text
+
+
+@pytest.mark.asyncio
+async def test_profil_traegt_nur_einmal(welt):
+    """Die Adresse enthaelt das Passwort im Klartext — der zweite Abruf muss
+    ins Leere laufen, sonst waere ein weitergegebener Link ein Dauerzugang."""
+    from app.routers.caldav import _profil_merken
+    token = _profil_merken(welt["user_id"], "iPhone", "geheim-1234")
+    assert (await _ruf(welt["app"], "GET", f"/api/caldav-zugaenge/profil/{token}", auth=False)).status == 200
+    assert (await _ruf(welt["app"], "GET", f"/api/caldav-zugaenge/profil/{token}", auth=False)).status == 404
+
+
+@pytest.mark.asyncio
+async def test_profil_laeuft_ab(welt):
+    import app.routers.caldav as X
+    token = X._profil_merken(welt["user_id"], "iPhone", "geheim-1234")
+    ablauf, *rest = X._PROFILE[token]
+    X._PROFILE[token] = (0.0, *rest)
+    assert (await _ruf(welt["app"], "GET", f"/api/caldav-zugaenge/profil/{token}", auth=False)).status == 404
+
+
+@pytest.mark.asyncio
+async def test_profil_unbekannter_token_404(welt):
+    r = await _ruf(welt["app"], "GET", "/api/caldav-zugaenge/profil/gibtesnicht", auth=False)
+    assert r.status == 404
+
+
+@pytest.mark.asyncio
+async def test_profil_stirbt_mit_dem_modul(welt):
+    """Wie jeder ausgeteilte Zugang: ohne das Modul Kalender richtet das Profil
+    ein Konto ein, das sofort 403 bekaeme."""
+    from sqlalchemy import delete
+    from app.models import UserModule
+    from app.routers.caldav import _profil_merken
+    token = _profil_merken(welt["user_id"], "iPhone", "geheim-1234")
+    async with welt["sitzung"]() as s:
+        await s.execute(delete(UserModule).where(UserModule.user_id == welt["user_id"]))
+        await s.commit()
+    r = await _ruf(welt["app"], "GET", f"/api/caldav-zugaenge/profil/{token}", auth=False)
+    assert r.status == 404
